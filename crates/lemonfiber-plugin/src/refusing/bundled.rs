@@ -96,7 +96,7 @@ pub(super) fn answering(label: &str) -> bool {
 /// still a name the file has spoken for. Anything else in the file says nothing
 /// about a name, including the prose that mentions the placeholder without putting a
 /// label in front of it.
-fn proxied(text: &str) -> Vec<String> {
+pub(super) fn proxied(text: &str) -> Vec<String> {
     let mut found: Vec<String> = Vec::new();
     for line in text.lines() {
         let said = line.trim_start().trim_start_matches('#').trim_start();

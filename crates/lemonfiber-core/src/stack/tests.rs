@@ -501,3 +501,37 @@ fn a_directory_that_cannot_be_read_contributes_nothing_rather_than_stopping() {
     // to walk simply has no compose files in it.
     assert!(super::on_disk(Path::new("/lemonfiber-no-such-directory")).is_empty());
 }
+
+/// What an operator's stack is run from is its own files and the overlay over it, and
+/// never the documents lemonfiber writes for its plugins.
+#[test]
+fn a_stack_is_run_from_its_own_files_and_the_overlay_and_not_the_plugins() {
+    let dir = written("run-from", "");
+    for (path, text) in [
+        ("compose.yml", "services:\n  theirs: {}\n"),
+        ("compose/plugins/komga.yml", "services:\n  komga: {}\n"),
+    ] {
+        let at = dir.join(path);
+        assert!(at
+            .parent()
+            .is_some_and(|up| std::fs::create_dir_all(up).is_ok()));
+        assert!(std::fs::write(&at, text).is_ok());
+    }
+    let overlay = dir.with_extension("override.yml");
+    assert!(std::fs::write(&overlay, "services:\n  watchtower: {}\n").is_ok());
+
+    let read: Vec<String> = Source::External(dir)
+        .run_from(&[overlay.clone(), dir.join("no-such-overlay.yml")])
+        .into_iter()
+        .map(|(_, text)| text)
+        .collect();
+
+    assert_eq!(
+        read,
+        [
+            "services:\n  theirs: {}\n".to_owned(),
+            "services:\n  watchtower: {}\n".to_owned()
+        ]
+    );
+    assert!(!Source::Embedded(&EMBEDDED).run_from(&[]).is_empty());
+}

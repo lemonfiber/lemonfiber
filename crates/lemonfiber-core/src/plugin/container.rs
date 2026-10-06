@@ -38,6 +38,15 @@
 //! like a security control. A plugin has no field by which to say which shape its
 //! image is, so writing `rootless` for it would be this build asserting something
 //! about a stranger's image that nobody checked.
+//!
+//! **What the container may do is fixed here too, and the same for every plugin.** No
+//! privilege gained after it starts; every kernel capability dropped but the six an
+//! image needs to start as root, give its files to the operator's uid and drop to it;
+//! and a ceiling on how many processes it may hold. A manifest has no field to widen
+//! any of it. What is not set is set nowhere for a reason: a memory ceiling that fits a
+//! media server transcoding is no ceiling for a sidecar, a read-only root breaks every
+//! image that writes outside its configuration directory, and a user would break every
+//! image that drops to one itself.
 
 use serde::Serialize;
 
@@ -87,6 +96,33 @@ const HOUSEHOLD: &str = "${LAN_BIND:-0.0.0.0}";
 
 /// The interface an operator surface is published on.
 const OPERATOR: &str = "127.0.0.1";
+
+/// What the container may not do once it has started: gain a privilege, through a
+/// setuid program or a file capability.
+const SECURITY: [&str; 1] = ["no-new-privileges:true"];
+
+/// Every kernel capability, all of which are dropped before the few below are given
+/// back.
+const DROPPED: [&str; 1] = ["ALL"];
+
+/// The capabilities given back: what an image that starts as root needs to give its
+/// files to the operator's uid, become that uid, and signal the processes it then runs.
+///
+/// Raw sockets, device nodes, chroot and the rest of the engine's defaults are not
+/// among them, so a plugin cannot forge traffic on the stack's network or make a device
+/// it was not given.
+const KEPT: [&str; 6] = [
+    "CHOWN",
+    "DAC_OVERRIDE",
+    "FOWNER",
+    "SETGID",
+    "SETUID",
+    "KILL",
+];
+
+/// How many processes the container may hold at once, which is far past what a service
+/// runs and well short of what exhausts the machine.
+const PROCESSES: u32 = 1024;
 
 /// The container entries lemonfiber writes for an installed plugin.
 ///
@@ -140,7 +176,8 @@ impl Serialize for Services<'_> {
 ///
 /// A key is a field here, so a key a plugin may not have — a mount of its own, a
 /// device, a kernel grant, a network mode, a user, an entrypoint, a command, an
-/// environment — is one there is no field for.
+/// environment — is one there is no field for. The four that bound what it may do are
+/// fields, and every value in them is this build's.
 #[derive(Serialize)]
 struct Entry {
     /// The template it extends.
@@ -159,6 +196,14 @@ struct Entry {
     /// because naming any network takes a service off the default unless it is named.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     networks: Vec<String>,
+    /// What it may not gain once started.
+    security_opt: [&'static str; 1],
+    /// The capabilities it starts without.
+    cap_drop: [&'static str; 1],
+    /// The capabilities it is given back.
+    cap_add: [&'static str; 6],
+    /// How many processes it may hold.
+    pids_limit: u32,
 }
 
 /// The template reference an entry extends.
@@ -209,6 +254,10 @@ fn entry(plugin: &str, placed: &Placed) -> Entry {
         ports,
         volumes,
         networks: placed.networks.iter().map(|name| literal(name)).collect(),
+        security_opt: SECURITY,
+        cap_drop: DROPPED,
+        cap_add: KEPT,
+        pids_limit: PROCESSES,
     }
 }
 

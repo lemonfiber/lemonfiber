@@ -5,9 +5,14 @@ use crate::origin::{Origin, Replaced};
 /// The document an install of `plugin` records making, which is what marks the
 /// operation as a plugin's.
 fn installed(plugin: &str) -> Change {
+    made_under(&crate::plugin::owner(plugin), plugin)
+}
+
+/// The document of `plugin`'s, recorded as made under `operation`.
+fn made_under(operation: &str, plugin: &str) -> Change {
     Change {
         at: "1".to_owned(),
-        operation: plugin.to_owned(),
+        operation: operation.to_owned(),
         target: "document".to_owned(),
         kind: Kind::Made {
             path: format!("/stack/compose/plugins/{plugin}.yml"),
@@ -54,7 +59,7 @@ fn a_value_set_over_the_operators_answer_carries_both_and_says_whose_the_first_w
     let journal = [
         set("setup", "TZ", None, "Europe/Amsterdam"),
         installed("komga"),
-        set("komga", "TZ", Some("Europe/Amsterdam"), "UTC"),
+        set("plugin komga", "TZ", Some("Europe/Amsterdam"), "UTC"),
     ];
 
     assert_eq!(
@@ -70,7 +75,7 @@ fn a_value_set_over_the_operators_answer_carries_both_and_says_whose_the_first_w
 /// Over nothing at all, which is this build's default having been in force.
 #[test]
 fn a_value_set_where_nothing_was_replaced_the_default() {
-    let journal = [installed("komga"), set("komga", "TZ", None, "UTC")];
+    let journal = [installed("komga"), set("plugin komga", "TZ", None, "UTC")];
 
     assert_eq!(
         of_journalled("TZ", "UTC", &journal, Some(&komga())),
@@ -83,9 +88,9 @@ fn a_value_set_where_nothing_was_replaced_the_default() {
 fn a_value_set_over_another_plugins_names_that_plugin() {
     let journal = [
         installed("plex"),
-        set("plex", "TZ", None, "Asia/Tokyo"),
+        set("plugin plex", "TZ", None, "Asia/Tokyo"),
         installed("komga"),
-        set("komga", "TZ", Some("Asia/Tokyo"), "UTC"),
+        set("plugin komga", "TZ", Some("Asia/Tokyo"), "UTC"),
     ];
 
     assert_eq!(
@@ -106,8 +111,8 @@ fn a_plugin_that_wrote_it_twice_replaced_what_was_there_before_the_first() {
     let journal = [
         set("setup", "TZ", None, "Europe/Amsterdam"),
         installed("komga"),
-        set("komga", "TZ", Some("Europe/Amsterdam"), "UTC"),
-        set("komga", "TZ", Some("UTC"), "Etc/GMT"),
+        set("plugin komga", "TZ", Some("Europe/Amsterdam"), "UTC"),
+        set("plugin komga", "TZ", Some("UTC"), "Etc/GMT"),
     ];
 
     assert_eq!(
@@ -125,7 +130,7 @@ fn a_plugin_that_wrote_it_twice_replaced_what_was_there_before_the_first() {
 fn a_replaced_value_nothing_recorded_is_unknown_and_never_bundled() {
     let journal = [
         installed("komga"),
-        set("komga", "TZ", Some("Asia/Tokyo"), "UTC"),
+        set("plugin komga", "TZ", Some("Asia/Tokyo"), "UTC"),
     ];
 
     let read = of_journalled("TZ", "UTC", &journal, Some(&komga()));
@@ -143,7 +148,7 @@ fn a_replaced_value_edited_after_its_last_recorded_write_is_unknown() {
     let journal = [
         set("setup", "TZ", None, "Europe/Amsterdam"),
         installed("komga"),
-        set("komga", "TZ", Some("Europe/Paris"), "UTC"),
+        set("plugin komga", "TZ", Some("Europe/Paris"), "UTC"),
     ];
 
     let read = of_journalled("TZ", "UTC", &journal, Some(&komga()));
@@ -161,7 +166,7 @@ fn a_replaced_value_an_undo_put_back_is_unknown() {
     let journal = [
         set(super::UNDO, "TZ", None, "Europe/Amsterdam"),
         installed("komga"),
-        set("komga", "TZ", Some("Europe/Amsterdam"), "UTC"),
+        set("plugin komga", "TZ", Some("Europe/Amsterdam"), "UTC"),
     ];
 
     let read = of_journalled("TZ", "UTC", &journal, Some(&komga()));
@@ -179,7 +184,7 @@ fn a_replaced_credential_is_withheld_and_never_shown() {
         set("setup", "INDEXER_APIKEY", None, "the-old-one"),
         installed("komga"),
         set(
-            "komga",
+            "plugin komga",
             "INDEXER_APIKEY",
             Some("the-old-one"),
             "the-new-one",
@@ -198,7 +203,7 @@ fn a_replaced_credential_is_withheld_and_never_shown() {
 fn a_replaced_value_still_sealed_is_withheld_and_unknown() {
     let journal = [
         installed("komga"),
-        set("komga", "TZ", Some("sealed:1:00"), "UTC"),
+        set("plugin komga", "TZ", Some("sealed:1:00"), "UTC"),
     ];
 
     let read = of_journalled("TZ", "UTC", &journal, Some(&komga()));
@@ -214,7 +219,10 @@ fn a_replaced_value_still_sealed_is_withheld_and_unknown() {
 /// about whether it is still in force, and that is said.
 #[test]
 fn a_write_whose_record_will_not_open_is_unknown_and_names_the_plugin() {
-    let journal = [installed("komga"), set("komga", "TZ", None, "sealed:1:00")];
+    let journal = [
+        installed("komga"),
+        set("plugin komga", "TZ", None, "sealed:1:00"),
+    ];
 
     let read = of_journalled("TZ", "UTC", &journal, Some(&komga()));
 
@@ -230,7 +238,7 @@ fn a_write_whose_record_will_not_open_is_unknown_and_names_the_plugin() {
 /// named.
 #[test]
 fn a_value_a_removed_plugin_left_in_force_is_orphaned_and_named() {
-    let journal = [installed("komga"), set("komga", "TZ", None, "UTC")];
+    let journal = [installed("komga"), set("plugin komga", "TZ", None, "UTC")];
 
     assert_eq!(
         of_journalled("TZ", "UTC", &journal, Some(&[])),
@@ -243,7 +251,7 @@ fn a_value_a_removed_plugin_left_in_force_is_orphaned_and_named() {
 /// A record that would not read cannot say the plugin is gone.
 #[test]
 fn a_plugin_missing_from_a_record_that_would_not_read_is_not_called_orphaned() {
-    let journal = [installed("komga"), set("komga", "TZ", None, "UTC")];
+    let journal = [installed("komga"), set("plugin komga", "TZ", None, "UTC")];
 
     let read = of_journalled("TZ", "UTC", &journal, None);
 
@@ -261,7 +269,7 @@ fn a_plugin_missing_from_a_record_that_would_not_read_is_not_called_orphaned() {
 fn nothing_is_said_where_a_plugin_is_not_what_put_the_value_in_force() {
     let journal = [
         installed("komga"),
-        set("komga", "TZ", None, "UTC"),
+        set("plugin komga", "TZ", None, "UTC"),
         set("setup", "PUID", None, "1000"),
     ];
 
@@ -296,4 +304,31 @@ fn only_an_operation_that_made_its_own_document_is_a_plugin() {
     ];
 
     assert_eq!(of_journalled("TZ", "UTC", &journal, Some(&komga())), None);
+}
+
+/// A plugin's document made under its bare id marks that id as the plugin, so a value
+/// it set under the same name is still said to be its own.
+#[test]
+fn a_plugin_recorded_under_its_bare_id_is_still_named() {
+    let journal = [
+        made_under("komga", "komga"),
+        set("komga", "TZ", None, "UTC"),
+    ];
+
+    assert_eq!(
+        of_journalled("TZ", "UTC", &journal, Some(&komga())),
+        Some(overridden(replaced(None, false, Origin::Bundled)))
+    );
+}
+
+/// A plugin called after one of lemonfiber's operations claims none of what that
+/// operation set, however its document was recorded.
+#[test]
+fn a_plugin_named_after_an_operation_claims_none_of_its_settings() {
+    let apply = vec![crate::wizard::APPLY.to_owned()];
+    for document in [installed("apply"), made_under("apply", "apply")] {
+        let journal = [document, set("apply", "TZ", None, "UTC")];
+
+        assert_eq!(of_journalled("TZ", "UTC", &journal, Some(&apply)), None);
+    }
 }

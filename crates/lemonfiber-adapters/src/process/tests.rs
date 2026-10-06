@@ -159,3 +159,32 @@ async fn a_stream_whose_reader_goes_away_takes_the_program_with_it() {
     }
     assert!(gone, "the program was stopped once nobody was reading it");
 }
+
+/// A variable handed to the run is one the program reads.
+#[tokio::test]
+async fn a_run_with_variables_sets_each_of_them() {
+    let ran = Local
+        .run_with(
+            &argv(&["sh", "-c", "printf '%s' \"$LEMONFIBER_PROBE\""]),
+            &[("LEMONFIBER_PROBE".to_owned(), "set".to_owned())],
+        )
+        .await
+        .map(|output| output.stdout);
+    assert_eq!(ran.ok().as_deref(), Some("set"));
+}
+
+/// A run given up on takes its child with it, rather than leaving it running.
+#[tokio::test]
+async fn a_run_given_up_on_ends_its_child() {
+    let marker = std::env::temp_dir().join(format!("lemonfiber-kill-{}", std::process::id()));
+    let _ = std::fs::remove_file(&marker);
+    let script = format!("sleep 1; touch {}", marker.display());
+    let given_up = tokio::time::timeout(
+        std::time::Duration::from_millis(100),
+        Local.run(&argv(&["sh", "-c", &script])),
+    )
+    .await;
+    assert!(given_up.is_err());
+    tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+    assert!(!marker.exists());
+}

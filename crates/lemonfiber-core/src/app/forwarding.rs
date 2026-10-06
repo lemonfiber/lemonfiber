@@ -24,6 +24,9 @@ use crate::journal::{Change, Kind};
 use super::targets::{download_targets, forwarded_client, host_fillers};
 use super::Ctx;
 
+/// The operation a moved forwarded port is journalled under.
+pub const OPERATION: &str = "vpn port forwarding";
+
 /// The setting a re-pushed port is journalled under, so a change to it reads like
 /// any other change lemonfiber made.
 pub const SETTING: &str = "qbittorrent.listen_port";
@@ -54,7 +57,7 @@ impl Pushed {
         match self {
             Self::Moved { from, to } => Some(Change {
                 at: stamp.to_owned(),
-                operation: "vpn port forwarding".to_owned(),
+                operation: OPERATION.to_owned(),
                 target: "qbittorrent".to_owned(),
                 kind: Kind::Set {
                     key: SETTING.to_owned(),

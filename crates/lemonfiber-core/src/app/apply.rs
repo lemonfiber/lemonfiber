@@ -323,7 +323,7 @@ fn made(path: &Path, stamp: &str) -> Change {
     let path = path.display().to_string();
     Change {
         at: stamp.to_owned(),
-        operation: "apply".to_owned(),
+        operation: crate::wizard::APPLY.to_owned(),
         target: path.clone(),
         kind: Kind::Made { path },
     }

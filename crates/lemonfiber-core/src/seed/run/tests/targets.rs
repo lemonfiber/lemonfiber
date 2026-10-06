@@ -239,7 +239,7 @@ async fn a_plugin_named_after_a_setting_lemonfiber_keeps_is_never_handed_it() {
             .service("jellyfin-admin")
             .and_then(|client| fillers.setting(client, crate::config::PASSWORD_SUFFIX))
             .as_deref(),
-        Some("PLUGIN_JELLYFIN__ADMIN_PASSWORD")
+        Some("PLUGIN_NAMESAKE_JELLYFIN__ADMIN_PASSWORD")
     );
 }
 
@@ -249,7 +249,7 @@ async fn a_plugin_named_after_a_setting_lemonfiber_keeps_is_never_handed_it() {
 #[tokio::test]
 async fn a_plugin_setting_that_lands_on_one_the_stack_holds_is_refused() {
     let path = config_scratch("held-landed");
-    let _ = store::set(&path, "PLUGIN_NZBGET_PASSWORD", "the-stacks-own");
+    let _ = store::set(&path, "PLUGIN_NZBGET_NZBGET_PASSWORD", "the-stacks-own");
     let ctx = seed_ctx(None, true, Vec::new(), None, Some(path.to_path_buf()));
     let fillers = crate::test_support::stack()
         .manifest()
@@ -258,7 +258,7 @@ async fn a_plugin_setting_that_lands_on_one_the_stack_holds_is_refused() {
             // plugin's namespace would spell.
             manifest
                 .services
-                .push(manifest_service("plugin-nzbget", None, None));
+                .push(manifest_service("plugin-nzbget-nzbget", None, None));
             crate::wiring::Fillers::of(
                 &manifest,
                 &[crate::test_support::an_installed(

@@ -1,4 +1,4 @@
-use super::{listed, owner, proxied, taken, HOUSEHOLD_GROUP, OPERATOR_GROUP};
+use super::{listed, proxied, taken, HOUSEHOLD_GROUP, OPERATOR_GROUP};
 use crate::plugin::installed::{Installed, Placed, Reached};
 
 fn placed(service: &str, reached: Option<Reached>) -> Placed {
@@ -174,9 +174,4 @@ fn a_label_another_plugin_answers_on_is_taken_and_one_nobody_does_is_not() {
         None,
         "the version being replaced is not another plugin"
     );
-}
-
-#[test]
-fn a_plugins_region_is_named_as_the_plugins() {
-    assert_eq!(owner("comics"), "plugin comics");
 }

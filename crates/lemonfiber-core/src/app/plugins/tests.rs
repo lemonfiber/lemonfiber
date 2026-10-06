@@ -334,16 +334,38 @@ async fn installing(ctx: &Ctx, at: &Path) -> Result<Installs, Box<crate::error::
 /// under test is the rollback layer's judgement of such a change and no verb makes
 /// one yet. The entry is the same shape an apply writes.
 fn journal_a_set(ctx: &Ctx, operation: &str, key: &str, wrote: &str) {
-    let change = Change {
-        at: ctx.stamp(),
-        operation: operation.to_owned(),
-        target: ".env".to_owned(),
-        kind: crate::journal::Kind::Set {
-            key: key.to_owned(),
-            previous: None,
-            current: wrote.to_owned(),
+    journal(
+        ctx,
+        Change {
+            at: ctx.stamp(),
+            operation: operation.to_owned(),
+            target: ".env".to_owned(),
+            kind: crate::journal::Kind::Set {
+                key: key.to_owned(),
+                previous: None,
+                current: wrote.to_owned(),
+            },
         },
-    };
+    );
+}
+
+/// Put a directory on the record as made under one operation's name, making it.
+fn journal_a_made(ctx: &Ctx, operation: &str, path: &Path) {
+    assert!(std::fs::create_dir_all(path).is_ok());
+    let path = path.display().to_string();
+    journal(
+        ctx,
+        Change {
+            at: ctx.stamp(),
+            operation: operation.to_owned(),
+            target: path.clone(),
+            kind: crate::journal::Kind::Made { path },
+        },
+    );
+}
+
+/// Put one change on the record.
+fn journal(ctx: &Ctx, change: Change) {
     let recorded = crate::app::targets::layout(ctx).map(|paths| {
         crate::app::recover::journalled(&paths.journal(), &[change], ctx.seams.random.as_ref())
     });

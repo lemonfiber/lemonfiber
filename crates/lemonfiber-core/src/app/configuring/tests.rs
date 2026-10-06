@@ -541,10 +541,11 @@ async fn a_change_to_a_credential_is_withheld_on_both_sides_of_the_difference() 
 /// machine's journal, by hand — nothing in this build writes a setting under a
 /// plugin's name until recipes apply, so this is the shape they will write.
 fn a_plugin_set(ctx: &Ctx, plugin: &str, key: &str, previous: Option<&str>, current: &str) {
+    let operation = crate::plugin::owner(plugin);
     let changes = [
         crate::journal::Change {
             at: "1".to_owned(),
-            operation: plugin.to_owned(),
+            operation: operation.clone(),
             target: "document".to_owned(),
             kind: crate::journal::Kind::Made {
                 path: format!("/stack/compose/plugins/{plugin}.yml"),
@@ -552,7 +553,7 @@ fn a_plugin_set(ctx: &Ctx, plugin: &str, key: &str, previous: Option<&str>, curr
         },
         crate::journal::Change {
             at: "1".to_owned(),
-            operation: plugin.to_owned(),
+            operation,
             target: ".env".to_owned(),
             kind: crate::journal::Kind::Set {
                 key: key.to_owned(),

@@ -256,6 +256,10 @@ codes! {
         /// Raised when the source an update names holds a different plugin from the one
         /// it was asked to update.
         ANOTHER_PLUGIN = "PLUGIN-27",
+        /// Raised when a plugin's service would take a name, a port or a label something
+        /// already on this machine holds: a service of the stack or of the operator's
+        /// overlay, another plugin's port, or a site in the proxy's live configuration.
+        OCCUPIED = "PLUGIN-28",
         /// Raised when the catalogue's index verifies and is older than the newest one
         /// this machine has verified.
         CATALOGUE_REPLACED = "PLUGIN-29",

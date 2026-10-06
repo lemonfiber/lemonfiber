@@ -76,25 +76,48 @@ pub(super) fn with_the_stack(manifest: &Manifest, found: &mut Vec<Violation>) {
 /// costs is that the thing behind `watch` is no longer the thing that was behind
 /// `watch` — with both services running, both healthy, and nothing failing.
 fn addressed(manifest: &Manifest, found: &mut Vec<Violation>) {
-    // Every declared wiring, not only the first. A plugin with two services has a
-    // stanza each, and checking the first
-    // would leave the second free to take a name the stack already answers on —
-    // which is the collision this exists to refuse, arrived at by the back door.
-    let taken = manifest
-        .wirings
-        .iter()
-        .filter_map(|wiring| wiring.hostname.as_deref())
-        .filter(|label| bundled::answering(label));
-    for hostname in taken {
+    // The label each household service is proxied at once the default is applied,
+    // which is its id where the manifest names none. An undeclared label is still a
+    // stanza lemonfiber writes, so it is held to the same names a declared one is.
+    for service in proxied(manifest) {
+        let hostname = manifest.entry(service).hostname;
+        if !bundled::answering(hostname) {
+            continue;
+        }
+        let declared = manifest.wirings.iter().any(|wiring| {
+            wiring.hostname.as_deref() == Some(hostname)
+                && wiring
+                    .service
+                    .as_deref()
+                    .is_none_or(|named| named == service.id)
+        });
+        let (location, said) = if declared {
+            ("wiring.hostname".to_owned(), hostname.to_owned())
+        } else {
+            (
+                format!("service {}.id", service.id),
+                format!(
+                    "{hostname}, the label this service is proxied at since no wiring names one,"
+                ),
+            )
+        };
         found.push(Violation {
-            location: "wiring.hostname".to_owned(),
+            location,
             message: format!(
-                "{hostname} is a name the stack's own proxy is already written to answer on, and \
-                 a second stanza for it puts this plugin in front of the bundled service rather \
-                 than beside it; the label is the plugin's to choose, and this one is taken"
+                "{said} is a name the stack's own proxy is already written to answer on, and a \
+                 second stanza for it puts this plugin in front of the bundled service rather than \
+                 beside it; the label is the plugin's to choose, and this one is taken"
             ),
         });
     }
+}
+
+/// Every service lemonfiber writes a proxy stanza for: a port, on the household tier.
+fn proxied(manifest: &Manifest) -> impl Iterator<Item = &crate::schema::Service> {
+    manifest
+        .services
+        .iter()
+        .filter(|service| service.port.is_some() && service.bind == Some(crate::schema::Bind::Lan))
 }
 
 #[cfg(test)]

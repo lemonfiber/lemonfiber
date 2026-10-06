@@ -31,6 +31,10 @@ mod declared;
 mod fronting;
 mod installed;
 mod joining;
+// Whose a journalled change is. Apart from the fronting whose region markers carry the
+// same name: those say where a plugin's wiring sits, and this says what leaves the
+// machine with the plugin.
+mod owning;
 mod register;
 // What a plugin's recipes would do, as an operator agrees to it.
 mod recipes;
@@ -76,6 +80,7 @@ pub use declared::{Declaration, Secret};
 pub use fronting::{proxied as fronting_proxied, taken as label_taken, DASHBOARD, PROXY};
 pub use installed::{answering, spelled_alike, Installed, Placed, Reached};
 pub use joining::Joins;
+pub use owning::{owner, owns};
 pub(crate) use placing::OVERLAYS;
 pub use placing::{documents, overlay, writes, Lands, Write};
 pub use provenance::{held, vouched, Key, Provenance, Unusable, Vouch, Vouched};

@@ -55,6 +55,8 @@ mod removing;
 mod standing;
 // Installing from a git source: the revision resolved, the commit fetched as data.
 mod fetching;
+// Git as it is run against a stranger's repository: one configuration, one deadline.
+pub(crate) mod git;
 // Installing by name: the catalogue's index verified, and the name resolved through it.
 mod cataloguing;
 // What is installed, read off the record alone or with each source asked.
@@ -67,6 +69,8 @@ mod installing;
 mod offering;
 // Where the fault lies in each refusal, as the published list gives it.
 mod refusals;
+// What a plugin's services would take that this machine already holds.
+mod occupied;
 // Installing what the record already holds: an update, or a second source for one name.
 mod twice;
 mod updating;

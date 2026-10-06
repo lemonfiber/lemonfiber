@@ -167,11 +167,11 @@ fn overlays_are_layered_after_the_stack_s_own_file() {
     );
 }
 
-/// An installed plugin's document is layered, and after the operator's own
+/// An installed plugin's document is layered, and before the operator's own
 /// overlay: Compose takes the later file as the one that wins, and a stranger's
 /// plugin is not entitled to override a choice the operator made.
 #[test]
-fn an_installed_plugin_s_document_is_layered_after_the_operator_s_own() {
+fn an_installed_plugin_s_document_is_layered_before_the_operator_s_own() {
     let settings = Settings {
         overlays: vec![PathBuf::from(
             "/opt/lemonfiber/stack/stacks/compose.storage.nas.yml",
@@ -183,8 +183,8 @@ fn an_installed_plugin_s_document_is_layered_after_the_operator_s_own() {
         line(&["library"], &Action::Up, &settings)
             .as_deref()
             .map(|command| command.contains(concat!(
-                "--file /opt/lemonfiber/stack/stacks/compose.storage.nas.yml ",
-                "--file /opt/lemonfiber/stack/compose/plugins/komga.yml"
+                "--file /opt/lemonfiber/stack/compose/plugins/komga.yml ",
+                "--file /opt/lemonfiber/stack/stacks/compose.storage.nas.yml"
             ))),
         Some(true)
     );

@@ -88,6 +88,7 @@ pub(super) async fn install(
         .stack_dir
         .as_deref()
         .ok_or_else(|| Box::new(nowhere_to_write(&would.plugin)))?;
+    super::occupied::unoccupied(ctx, &would, held.installed(), stack)?;
     let planned = writing::landing(ctx, crate::plugin::writes(&would, stack));
     let contests = standing::contested(ctx, &stack_manifest, &held, &would);
     let changes = crate::plugin::changes(&planned);

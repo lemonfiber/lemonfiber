@@ -145,18 +145,60 @@ fn what_a_parser_reads_back_is_the_name_it_was_sent() {
     }
 }
 
+/// Everything that draws nothing goes too: the soft hyphen, the grapheme joiner, the
+/// Hangul fillers, the Mongolian vowel separator, the word joiner and invisible
+/// operators, the interlinear annotation marks and the tag characters, which spell
+/// text nobody sees.
+#[test]
+fn every_character_that_draws_nothing_goes() {
+    for hidden in [
+        '\u{ad}',
+        '\u{34f}',
+        '\u{115f}',
+        '\u{1160}',
+        '\u{3164}',
+        '\u{ffa0}',
+        '\u{180e}',
+        '\u{2060}',
+        '\u{2064}',
+        '\u{206a}',
+        '\u{fff9}',
+        '\u{fffb}',
+        '\u{1bca0}',
+        '\u{1d173}',
+        '\u{e0001}',
+        '\u{e0041}',
+        '\u{e007f}',
+    ] {
+        let name = format!("Some{hidden}Release");
+        assert_eq!(plain(&name), "SomeRelease", "U+{:04X}", u32::from(hidden));
+    }
+    assert_eq!(plain("❤\u{fe0f} premiere"), "❤\u{fe0f} premiere");
+}
+
+/// A character past the first plane goes through the parser's door as the pair JSON
+/// spells it with, and reads back as itself rather than as a nearer character.
+#[test]
+fn a_character_past_the_first_plane_is_written_as_its_pair() {
+    assert_eq!(escaped("a\u{e0041}b"), "a\\udb40\\udc41b");
+    let name = "Some\u{e0041}Release";
+    let written = serde_json::to_string(name).unwrap_or_default();
+    let read: String = serde_json::from_str(&escaped(&written)).unwrap_or_default();
+    assert_eq!(read, name);
+}
+
 /// The two doors answer about the same set.
 ///
 /// The drift this is bought against: a character recognised as an instruction on
 /// one door and not on the other leaves the quieter door open, and nothing about
-/// either function would look wrong. Every code point below the astral planes is
-/// asked of both, so a range added to one and not the other fails here.
+/// either function would look wrong. Every code point is asked of both, so a range
+/// added to one and not the other fails here.
 #[test]
 fn a_character_one_door_answers_for_is_answered_by_the_other() {
     // Filtered rather than pushed into from a branch. A branch that only runs
     // where the doors disagree is a line nothing executes while they agree, and
     // the coverage gate reads test code too.
-    let disagreeing: Vec<u32> = (0..=0xffff_u32)
+    let disagreeing: Vec<u32> = (0..=0x10_ffff_u32)
         .filter_map(char::from_u32)
         .filter(|character| {
             let name = format!("a{character}b");

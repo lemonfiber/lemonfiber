@@ -330,25 +330,22 @@ pub fn together<'a>(changes: &'a [Change], operation: &str, at: &str) -> Vec<&'a
         .collect()
 }
 
-/// Every change an operation ever made, across every run of it.
+/// Every change `whose` claims, across every run.
 ///
 /// [`together`] is one run, and the doc above says why: an operation's name is reused by
 /// every run of that kind, so matching on the name alone would gather every apply this
 /// machine has ever made into one unit. That is exactly the wrong answer for an undo of
-/// a stamp — and exactly the right one where the operation names a thing rather than a
+/// a stamp — and exactly the right one where what is asked for is a thing rather than a
 /// kind of run.
 ///
-/// A plugin's id is such a name. It is one plugin, installed once, and every change
-/// journalled under it is that plugin's doing — so taking the plugin off the machine
-/// means taking all of them back, whether they were written by the install or by
-/// something that wrote to it since. A removal that put back only the run that installed
-/// it would leave whatever came after standing with nothing to explain it.
+/// A plugin is such a thing. It is one plugin, installed once, and every change that is
+/// its own is that plugin's doing — so taking the plugin off the machine means taking
+/// all of them back, whether they were written by the install or by something that
+/// wrote to it since. A removal that put back only the run that installed it would
+/// leave whatever came after standing with nothing to explain it.
 #[must_use]
-pub fn everything<'a>(changes: &'a [Change], operation: &str) -> Vec<&'a Change> {
-    changes
-        .iter()
-        .filter(|change| change.operation == operation)
-        .collect()
+pub fn everything<'a>(changes: &'a [Change], whose: &dyn Fn(&Change) -> bool) -> Vec<&'a Change> {
+    changes.iter().filter(|change| whose(change)).collect()
 }
 
 #[cfg(test)]

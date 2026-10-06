@@ -151,7 +151,9 @@ async fn removing_one_of_two_leaves_the_record_holding_the_other() {
         counted(installing(&ctx, &source("two-of-them", PROVING)).await),
         Some(1)
     );
-    let second = PROVING.replace("\"komga\"", "\"kavita\"");
+    let second = PROVING
+        .replace("\"komga\"", "\"kavita\"")
+        .replace("25600", "25601");
     assert_eq!(
         counted(installing(&ctx, &source("two-of-them-again", &second)).await),
         Some(2)
@@ -356,7 +358,7 @@ async fn a_setting_edited_since_the_install_refuses_the_removal() {
     // A setting the plugin is on the record as having written, and an operator's
     // own value in the file where that change would be put back.
     let key = "LEMONFIBER_PLUGIN_TEST_KEY";
-    journal_a_set(&ctx, "komga", key, "what the plugin wrote");
+    journal_a_set(&ctx, "plugin komga", key, "what the plugin wrote");
     let _ = ctx
         .settings
         .env_file
@@ -384,6 +386,94 @@ async fn a_setting_edited_since_the_install_refuses_the_removal() {
     );
 }
 
+/// A plugin whose id is one of lemonfiber's own operations takes none of that
+/// operation's changes with it when it is removed: neither a setting it wrote nor a
+/// directory it made.
+#[tokio::test]
+async fn a_plugin_named_after_an_operation_takes_none_of_its_changes() {
+    let ctx = proving(
+        "named-apply",
+        Arc::new(Recording::answering(Ok(spoke("")))),
+        answering(200),
+    );
+    let apply = PROVING.replacen("id          = \"komga\"", "id          = \"apply\"", 1);
+    assert_eq!(
+        counted(installing(&ctx, &source("named-apply", &apply)).await),
+        Some(1)
+    );
+    let key = "LEMONFIBER_PLUGIN_TEST_KEY";
+    journal_a_set(&ctx, crate::wizard::APPLY, key, "what setup wrote");
+    let _ = ctx
+        .settings
+        .env_file
+        .as_deref()
+        .map(|file| crate::config::store::set(file, key, "what setup wrote"));
+    let made = stack_of(&ctx).with_file_name("media");
+    journal_a_made(&ctx, crate::wizard::APPLY, &made);
+
+    let gone = removal(removing(&ctx, "apply").await);
+
+    assert!(gone.is_some_and(|one| one.removed), "it is removed");
+    assert_eq!(setting(&ctx, key).as_deref(), Some("what setup wrote"));
+    assert!(made.is_dir(), "the directory setup made is still there");
+}
+
+/// A path made under a plugin's bare id is that plugin's, and goes back with it, where
+/// the id names no operation of lemonfiber's.
+#[tokio::test]
+async fn a_path_made_under_the_bare_id_goes_back_with_the_plugin() {
+    let ctx = proving(
+        "bare-id",
+        Arc::new(Recording::answering(Ok(spoke("")))),
+        answering(200),
+    );
+    assert_eq!(
+        counted(installing(&ctx, &source("bare-id", PROVING)).await),
+        Some(1)
+    );
+    let made = stack_of(&ctx).join("config/komga-cache");
+    journal_a_made(&ctx, "komga", &made);
+
+    let gone = removal(removing(&ctx, "komga").await);
+
+    assert!(gone.is_some_and(|one| one.removed), "it is removed");
+    assert!(!made.exists(), "what it made under its bare id is gone");
+}
+
+/// What the environment file holds for `key`.
+fn setting(ctx: &Ctx, key: &str) -> Option<String> {
+    ctx.settings
+        .env_file
+        .as_deref()
+        .and_then(|file| crate::config::store::read(file).ok())
+        .and_then(|file| file.get(key).map(str::to_owned))
+}
+
+/// A credential kept for the plugin's service goes with the plugin, and one kept under
+/// a name that is not the plugin's stays.
+#[tokio::test]
+async fn a_credential_kept_for_the_plugin_goes_with_it() {
+    let ctx = proving(
+        "credential-kept",
+        Arc::new(Recording::answering(Ok(spoke("")))),
+        answering(200),
+    );
+    assert_eq!(
+        counted(installing(&ctx, &source("credential-kept", PROVING)).await),
+        Some(1)
+    );
+    let file = ctx.settings.env_file.clone().unwrap_or_default();
+    let _ = crate::config::store::set(&file, "PLUGIN_KOMGA_KOMGA_PASSWORD", "minted");
+    let _ = crate::config::store::set(&file, "KOMGA_PASSWORD", "somebody else's");
+
+    let gone = removal(removing(&ctx, "komga").await);
+
+    assert!(gone.is_some_and(|one| one.removed), "it is removed");
+    let read = crate::config::store::read(&file).unwrap_or_default();
+    assert_eq!(read.get("PLUGIN_KOMGA_KOMGA_PASSWORD"), None);
+    assert_eq!(read.get("KOMGA_PASSWORD"), Some("somebody else's"));
+}
+
 /// And the one refusal that is not a refusal: a change that re-points where data
 /// lives goes back and says plainly that the data does not move with it.
 #[tokio::test]
@@ -399,7 +489,7 @@ async fn re_pointing_where_data_lives_says_the_data_does_not_move_back() {
     );
     journal_a_set(
         &ctx,
-        "komga",
+        "plugin komga",
         crate::config::DATA_ROOT_KEY,
         "/srv/elsewhere",
     );
@@ -488,12 +578,13 @@ async fn a_journal_that_cannot_be_read_refuses_a_removal() {
         .unwrap_or_default();
     assert!(std::fs::create_dir_all(journal.join("held")).is_ok());
 
-    let admitted = crate::app::putting_back::admitted(&ctx, "komga");
+    let whose = |change: &crate::journal::Change| crate::plugin::owns("komga", change);
+    let admitted = crate::app::putting_back::admitted(&ctx, "plugin komga", &whose);
     assert!(
         admitted.is_err_and(|problem| problem.summary.contains("could not be read")),
         "a removal was admitted over a journal nothing could read"
     );
-    let everything = crate::app::putting_back::everything(&ctx, "komga").await;
+    let everything = crate::app::putting_back::everything(&ctx, "plugin komga", &whose).await;
     assert!(
         everything.is_err_and(|problem| problem.summary.contains("could not be read")),
         "a removal went ahead over a journal nothing could read"
@@ -530,7 +621,9 @@ async fn a_removal_answering_a_reading_that_moved_takes_nothing_away() {
 fn a_removal_with_nowhere_to_look_is_not_admitted() {
     let mut nowhere = ctx("not-admitted");
     nowhere.settings.stack_dir = None;
-    let admitted = crate::app::putting_back::admitted(&nowhere, "komga");
+    let whose = |change: &crate::journal::Change| crate::plugin::owns("komga", change);
+    let admitted =
+        crate::app::putting_back::admitted(&nowhere, &crate::plugin::owner("komga"), &whose);
     assert_eq!(
         admitted.err().map(|problem| problem.code.to_string()),
         Some("UNDO-4".to_owned())

@@ -1,7 +1,7 @@
 //! Taking a plugin off the machine.
 //!
 //! **A removal is a rollback with a name on it, and nothing here undoes anything.**
-//! Every change an install made is in the journal under the plugin's own id, so what
+//! Every change an install made is in the journal under the plugin's own name, so what
 //! takes them back is the machinery that takes back any other run — the same
 //! judgement, the same order, the same record of having done it, the same account
 //! given. What is here is the three things that are not a journal entry: the
@@ -66,6 +66,18 @@ pub(crate) async fn remove(
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
     let leaves = unfilled(&going, held.installed(), &stack.services);
+    let kept = crate::wiring::Fillers::of(
+        &stack,
+        held.installed(),
+        &super::super::targets::chosen_fillers(ctx),
+        None,
+    )
+    .kept_for(&going.plugin);
+
+    // What leaves with the plugin, asked for by the same two answers on every call
+    // below: the name the reversal goes by, and which journalled changes are its own.
+    let at = crate::plugin::owner(&going.plugin);
+    let whose = |change: &crate::journal::Change| crate::plugin::owns(&going.plugin, change);
 
     // What stops, named before anything does. A reading carries it in its report,
     // which is read before the real run is asked for; a real run says it aloud as well,
@@ -87,8 +99,7 @@ pub(crate) async fn remove(
     // container here would have changed the machine it only said it would.
     if !acting {
         let went_back =
-            super::super::putting_back::everything(&ctx.clone().rehearsing(), &going.plugin)
-                .await?;
+            super::super::putting_back::everything(&ctx.clone().rehearsing(), &at, &whose).await?;
         return Ok(answering(
             held.installed().to_vec(),
             Removal {
@@ -106,7 +117,7 @@ pub(crate) async fn remove(
     // change a later one depends on, and a removal that had already stopped the
     // container when it heard that would leave a plugin the register still calls
     // installed with nothing of it running — the one state this verb must not leave.
-    super::super::putting_back::admitted(ctx, &going.plugin)?;
+    super::super::putting_back::admitted(ctx, &at, &whose)?;
     ctx.narrator
         .say(&interrupting(&going.plugin, &interrupts))
         .await;
@@ -116,7 +127,7 @@ pub(crate) async fn remove(
 
     // Carried out through the one call the rehearsal asked, so what goes back is the
     // same machinery reporting rather than a second description of it.
-    let mut went_back = super::super::putting_back::everything(ctx, &going.plugin).await?;
+    let mut went_back = super::super::putting_back::everything(ctx, &at, &whose).await?;
     if stayed {
         went_back.left.push(super::super::putting_back::Left {
             target: going.plugin.clone(),
@@ -150,6 +161,14 @@ pub(crate) async fn remove(
         let _ = at.map(std::fs::remove_file);
     }
 
+    // The credentials lemonfiber minted for its services and kept beside the settings,
+    // which no journal entry covers because seeding keeps them rather than an install.
+    // They go with the plugin: a later plugin is somebody else, and the next service to
+    // take one of these ids would otherwise be handed this one's password.
+    if let Some(file) = ctx.settings.env_file.as_deref() {
+        forget_credentials(ctx, file, &kept);
+    }
+
     // Its route came out of the proxy's file with everything else it wrote, and the
     // proxy only reads that file when it starts. The stack is the one the judgement
     // above already needed the layout of, so it is there.
@@ -168,6 +187,19 @@ pub(crate) async fn remove(
         },
         offer,
     ))
+}
+
+/// Take each of these settings out of the environment file.
+///
+/// Best effort, as keeping them is: the plugin is already off the record by here, and a
+/// setting that would not go is one nothing reads until a plugin of the same id arrives.
+fn forget_credentials(ctx: &Ctx, file: &std::path::Path, kept: &[String]) {
+    let held = kept
+        .iter()
+        .filter(|setting| super::super::targets::recorded_secret(ctx, setting).is_some());
+    for setting in held {
+        let _ = crate::config::store::unset(file, setting);
+    }
 }
 
 /// The report, which is the listing as it stands plus what this run came to.

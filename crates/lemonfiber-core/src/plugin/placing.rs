@@ -187,7 +187,7 @@ pub fn writes(installed: &Installed, stack: &Path) -> Vec<Write> {
         overlay(stack, &installed.plugin),
         super::container::written(installed),
     ));
-    let owner = super::fronting::owner(&installed.plugin);
+    let owner = super::owning::owner(&installed.plugin);
     for (key, body) in [
         (super::fronting::PROXY, super::fronting::proxied(installed)),
         (

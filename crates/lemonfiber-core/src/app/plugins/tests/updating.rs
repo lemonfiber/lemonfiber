@@ -228,7 +228,7 @@ async fn a_drifted_setting_refuses_the_update_before_anything_is_taken() {
         Some(1)
     );
     let key = "LEMONFIBER_PLUGIN_TEST_KEY";
-    journal_a_set(&ctx, "komga", key, "what the plugin wrote");
+    journal_a_set(&ctx, "plugin komga", key, "what the plugin wrote");
     let _ = ctx
         .settings
         .env_file
@@ -442,7 +442,7 @@ async fn a_rehearsed_update_is_refused_for_drift_as_the_real_one_is() {
         Some(1)
     );
     let key = "LEMONFIBER_PLUGIN_TEST_KEY";
-    journal_a_set(&ctx, "komga", key, "what the plugin wrote");
+    journal_a_set(&ctx, "plugin komga", key, "what the plugin wrote");
     let _ = ctx
         .settings
         .env_file
@@ -499,4 +499,39 @@ async fn an_update_whose_source_holds_another_plugin_is_refused_naming_both() {
         "it names both"
     );
     assert!(!record_of(&ctx).exists());
+}
+
+/// An update whose new version would publish on a port another plugin holds is refused
+/// before anything moves.
+#[tokio::test]
+async fn an_update_onto_a_port_another_plugin_holds_is_refused() {
+    let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+    let ctx = proving("update-occupied", runner, answering(200));
+    assert_eq!(
+        counted(installing(&ctx, &source("update-occupied", PROVING)).await),
+        Some(1)
+    );
+    let other = PROVING
+        .replace("\"komga\"", "\"kavita\"")
+        .replace("25600", "25601");
+    assert_eq!(
+        counted(installing(&ctx, &source("update-occupied-other", &other)).await),
+        Some(2)
+    );
+    let next = PROVING
+        .replace("version     = \"1.2.0\"", "version     = \"1.3.0\"")
+        .replace("25600", "25601");
+
+    let refused = updating(&ctx, &source("update-occupied-next", &next))
+        .await
+        .err();
+
+    assert_eq!(
+        refused.as_ref().map(|one| one.code.to_string()).as_deref(),
+        Some("PLUGIN-28")
+    );
+    assert!(refused
+        .as_ref()
+        .and_then(|one| one.detail.as_deref())
+        .is_some_and(|detail| detail.contains("kavita")));
 }

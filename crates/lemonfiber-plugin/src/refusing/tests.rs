@@ -374,6 +374,41 @@ fn a_value_a_diff_cannot_show_is_refused() {
     );
 }
 
+/// A character that draws nothing is refused as surely as a control character: one
+/// from each family a diff hides, named by its code point.
+#[test]
+fn a_value_carrying_something_that_draws_nothing_is_refused() {
+    for (hidden, named) in [
+        ("\\u202E", "U+202E"),
+        ("\\u2060", "U+2060"),
+        ("\\u00AD", "U+00AD"),
+        ("\\u034F", "U+034F"),
+        ("\\u180E", "U+180E"),
+        ("\\u3164", "U+3164"),
+        ("\\U000E0041", "U+E0041"),
+    ] {
+        let said = without(
+            r#"name        = "Komga"
+version"#,
+            &format!("name        = \"Kom{hidden}ga\"\nversion"),
+        );
+        assert!(
+            names(&said, &["plugin.name", named]),
+            "{named} got: {said:?}"
+        );
+    }
+}
+
+/// And what a name in somebody's language is written with is not refused.
+#[test]
+fn a_value_in_another_script_is_refused_nothing() {
+    let said = without(
+        r#"description = "Reads your comics on any browser""#,
+        "description = \"Lit vos bandes dessinées — 漫画を読む\"",
+    );
+    assert!(!names(&said, &["plugin.description"]), "got: {said:?}");
+}
+
 /// Every string the manifest declares is one this sweep looks at.
 ///
 /// The sweep is a list, and a list is a thing that goes stale: a field added to the

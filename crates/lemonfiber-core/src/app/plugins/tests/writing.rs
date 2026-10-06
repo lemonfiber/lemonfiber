@@ -49,7 +49,9 @@ async fn every_write_is_journalled_under_the_plugin_s_own_name_as_one_run() {
 
     let changes = journalled(&ctx);
     assert!(!changes.is_empty(), "the install journalled what it wrote");
-    assert!(changes.iter().all(|change| change.operation == "komga"));
+    assert!(changes
+        .iter()
+        .all(|change| change.operation == "plugin komga"));
 
     let stamps: BTreeSet<&str> = changes.iter().map(|change| change.at.as_str()).collect();
     assert_eq!(stamps.len(), 1, "one install is one run");
@@ -92,7 +94,10 @@ async fn a_plugin_s_changes_are_in_the_history_named_as_the_plugin() {
 
     let shown = crate::app::history::history(&ctx).unwrap_or_default();
     assert!(!shown.changes.is_empty());
-    assert!(shown.changes.iter().all(|one| one.operation == "komga"));
+    assert!(shown
+        .changes
+        .iter()
+        .all(|one| one.operation == "plugin komga"));
     assert!(shown
         .changes
         .iter()

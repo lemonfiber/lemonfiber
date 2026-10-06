@@ -16,6 +16,8 @@
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use futures_util::StreamExt as _;
+
 use crate::app::Ctx;
 use crate::config::REACH_PLUGIN_SOURCE_KEY;
 use crate::error::codes::plugin::{NO_REVISION, SOURCE_OFF, UNFETCHED};
@@ -102,7 +104,7 @@ async fn resolved(ctx: &Ctx, url: &str, revision: Option<&str>) -> Result<String
         return Ok(commit.to_ascii_lowercase());
     }
     let asked = revision.unwrap_or("HEAD");
-    let listed = git(ctx, &["ls-remote", "--", url, asked])
+    let listed = super::git::run(ctx, &["ls-remote", "--", url, asked], super::git::ASKING)
         .await
         .map_err(|why| Box::new(unfetched(url, &why)))?;
     listed_commit(&listed, asked).ok_or_else(|| Box::new(no_revision(url, asked)))
@@ -150,36 +152,11 @@ async fn fetched_into(ctx: &Ctx, url: &str, commit: &str, into: &Path) -> Result
         &["-C", &at, "checkout", "--quiet", "FETCH_HEAD"],
     ];
     for step in steps {
-        git(ctx, step)
+        super::git::run(ctx, step, super::git::FETCHING)
             .await
             .map_err(|why| Box::new(unfetched(url, &why)))?;
     }
     Ok(())
-}
-
-/// Run git with the hooks of whatever it is working on switched off, and hand back
-/// what it wrote, or why it did not finish.
-async fn git(ctx: &Ctx, args: &[&str]) -> Result<String, String> {
-    let command: Vec<String> = ["git", "-c", "core.hooksPath=/dev/null"]
-        .iter()
-        .chain(args)
-        .map(|arg| (*arg).to_owned())
-        .collect();
-    let output = ctx
-        .seams
-        .runner
-        .run(&command)
-        .await
-        .map_err(|failure| failure.to_string())?;
-    if output.succeeded() {
-        return Ok(output.stdout);
-    }
-    let said = output.stderr.trim();
-    Err(said
-        .lines()
-        .last()
-        .unwrap_or("git gave no reason")
-        .to_owned())
 }
 
 /// Said where fetching from a git source is switched off.
@@ -235,15 +212,22 @@ fn no_revision(url: &str, asked: &str) -> Problem {
 /// there cannot be fetched from, which is the same answer a repository that stopped
 /// answering gets.
 pub(super) async fn standings(ctx: &Ctx, installed: &[Installed]) -> Vec<Sourced> {
-    let mut standings = Vec::new();
-    for one in installed {
-        standings.push(Sourced {
-            plugin: one.plugin.clone(),
-            from: one.from.clone(),
-            standing: standing(ctx, &one.from).await,
-        });
+    // Asked a few at a time and answered in the record's order, so one host that is
+    // slow to answer costs the listing its own deadline rather than everyone's in turn.
+    let asking: Vec<_> = installed.iter().map(|one| sourced(ctx, one)).collect();
+    futures_util::stream::iter(asking)
+        .buffered(super::git::AT_ONCE)
+        .collect()
+        .await
+}
+
+/// One installed plugin's source, and what asking it came to.
+async fn sourced(ctx: &Ctx, one: &Installed) -> Sourced {
+    Sourced {
+        plugin: one.plugin.clone(),
+        from: one.from.clone(),
+        standing: standing(ctx, &one.from).await,
     }
-    standings
 }
 
 /// What asking one source comes to.
@@ -273,10 +257,13 @@ async fn standing(ctx: &Ctx, from: &str) -> Fetchable {
                 ),
             }
         }
-        Source::Git { url, .. } => match git(ctx, &["ls-remote", "--", &url, "HEAD"]).await {
-            Ok(_) => Fetchable::Reachable,
-            Err(why) => Fetchable::Unreachable { why },
-        },
+        Source::Git { url, .. } => {
+            match super::git::run(ctx, &["ls-remote", "--", &url, "HEAD"], super::git::ASKING).await
+            {
+                Ok(_) => Fetchable::Reachable,
+                Err(why) => Fetchable::Unreachable { why },
+            }
+        }
     }
 }
 

@@ -18,6 +18,7 @@
 //! capture with the archive. Nothing here is a second implementation of any of them.
 
 mod staging;
+pub(crate) use staging::OPERATION;
 
 use lemonfiber_manifest::Manifest;
 use serde::Serialize;

@@ -38,7 +38,7 @@ use crate::error::codes::plugin::{ANSWERED, SPELLED_ALIKE};
 /// install never put there. It follows that installing over the wreckage of a
 /// half-removed plugin records only what it actually had to make.
 ///
-/// The operation every entry is written under is the plugin's own id, so its changes
+/// The operation every entry is written under is the plugin's own, so its changes
 /// read in the history as that plugin's rather than as lemonfiber's, and so a
 /// reversal can ask for exactly them. The stamp is handed in rather than read here:
 /// it is what names the run, and an install that proves before it records spans more
@@ -141,7 +141,7 @@ fn bounded(plugin: &str, path: &Path, key: &str, owner: &str, body: &str, stamp:
     let path = path.display().to_string();
     Change {
         at: stamp.to_owned(),
-        operation: plugin.to_owned(),
+        operation: crate::plugin::owner(plugin),
         target: path.clone(),
         kind: Kind::Region {
             path,
@@ -232,13 +232,13 @@ fn missing_from(path: &Path, directory: bool) -> Vec<PathBuf> {
 
 /// The journal entry for a path an install created, so it can be removed again.
 ///
-/// The plugin's id is the operation, so a plugin's changes sit in the same record as
-/// every other change and read there as that plugin's own.
+/// The plugin's own operation, so a plugin's changes sit in the same record as every
+/// other change and read there as that plugin's own.
 fn made(plugin: &str, path: &Path, stamp: &str) -> Change {
     let path = path.display().to_string();
     Change {
         at: stamp.to_owned(),
-        operation: plugin.to_owned(),
+        operation: crate::plugin::owner(plugin),
         target: path.clone(),
         kind: Kind::Made { path },
     }

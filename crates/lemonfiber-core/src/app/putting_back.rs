@@ -17,13 +17,16 @@
 //! nobody has been told about, and the judgement is already available without touching
 //! anything.
 
-use crate::error::{Diagnose as _, Problem, Remedy, Severity, State};
+use crate::error::{Diagnose as _, Problem};
 use crate::journal::{Change, Undo};
 use crate::rollback::{standing, together, Reversal as Judgement};
 
 use super::repair::told;
 use super::Ctx;
-use crate::error::codes::undo::{CANNOT_SUCCEED, MORE_THAN_ONE_RUN, NOWHERE_TO_LOOK, NO_SUCH_RUN};
+
+// What a reversal that cannot go ahead says, and why.
+mod refused;
+use refused::{cannot_succeed, more_than_one, no_such_run, nowhere_to_look};
 
 /// What putting a run back came to.
 ///
@@ -120,7 +123,7 @@ async fn named(ctx: &Ctx, at: &str) -> Result<Reversal, Box<Problem>> {
     carried_out(ctx, &paths, changes, &run, at).await
 }
 
-/// Put back every change one operation ever made.
+/// Put back every change `whose` claims, called `at` in what is said about it.
 ///
 /// The same machinery as an undo of a stamp and deliberately not a second one: what
 /// differs between taking a plugin off a machine and putting back a run somebody named
@@ -134,14 +137,18 @@ async fn named(ctx: &Ctx, at: &str) -> Result<Reversal, Box<Problem>> {
 /// Where there is nowhere to look for the record, where the judgement says a change
 /// cannot be put back — drift, or a later change that depends on it — or for any reason
 /// the executor underneath gives.
-pub(crate) async fn everything(ctx: &Ctx, operation: &str) -> Result<Reversal, Box<Problem>> {
+pub(crate) async fn everything(
+    ctx: &Ctx,
+    at: &str,
+    whose: &(dyn Fn(&Change) -> bool + Sync),
+) -> Result<Reversal, Box<Problem>> {
     let paths = super::targets::layout(ctx).ok_or_else(|| Box::new(nowhere_to_look()))?;
     let journal = super::recover::journal_at(&paths.journal())
         .map_err(|failure| Box::new(failure.problem()))?;
     let changes = journal.changes();
 
-    let run = crate::rollback::everything(changes, operation);
-    carried_out(ctx, &paths, changes, &run, operation).await
+    let run = crate::rollback::everything(changes, whose);
+    carried_out(ctx, &paths, changes, &run, at).await
 }
 
 /// Whether [`everything`] would go ahead, asked without touching anything.
@@ -155,7 +162,11 @@ pub(crate) async fn everything(ctx: &Ctx, operation: &str) -> Result<Reversal, B
 ///
 /// The ones [`everything`] would give before touching anything: nowhere to look for
 /// the record, or a change the judgement will not put back.
-pub(crate) fn admitted(ctx: &Ctx, operation: &str) -> Result<(), Box<Problem>> {
+pub(crate) fn admitted(
+    ctx: &Ctx,
+    at: &str,
+    whose: &dyn Fn(&Change) -> bool,
+) -> Result<(), Box<Problem>> {
     let paths = super::targets::layout(ctx).ok_or_else(|| Box::new(nowhere_to_look()))?;
     let journal = super::recover::journal_at(&paths.journal())
         .map_err(|failure| Box::new(failure.problem()))?;
@@ -163,8 +174,8 @@ pub(crate) fn admitted(ctx: &Ctx, operation: &str) -> Result<(), Box<Problem>> {
     judged(
         ctx,
         changes,
-        &crate::rollback::everything(changes, operation),
-        operation,
+        &crate::rollback::everything(changes, whose),
+        at,
     )
     .map(drop)
 }
@@ -491,59 +502,4 @@ fn inverted(kind: &crate::journal::Kind) -> Option<crate::journal::Kind> {
         | Kind::Pinned { .. }
         | Kind::KeyRevoked { .. } => None,
     }
-}
-
-fn nowhere_to_look() -> Problem {
-    Problem::new(
-        NOWHERE_TO_LOOK,
-        Severity::Error,
-        "This run has nowhere it knows to look for what was changed",
-        "What lemonfiber changed is recorded in its own directory, and this machine \
-         would not say where that is. Nothing was put back.",
-        Remedy::new("Set a home directory for this user and run it again"),
-    )
-    .in_state(State::Guided)
-}
-
-fn no_such_run(at: &str) -> Problem {
-    Problem::new(
-        NO_SUCH_RUN,
-        Severity::Error,
-        format!("Nothing was changed at {at}"),
-        format!(
-            "No run in the record carries the stamp {at}. It may have fallen outside the \
-             horizon the record keeps, or the stamp may be mistyped. Nothing was put back."
-        ),
-        Remedy::new("Run `lemonfiber history` and take the stamp from the entry you want"),
-    )
-    .in_state(State::Actionable)
-}
-
-fn more_than_one(at: &str, operations: &[&str]) -> Problem {
-    Problem::new(
-        MORE_THAN_ONE_RUN,
-        Severity::Error,
-        format!("More than one run is stamped {at}"),
-        format!(
-            "{at} names {}, and putting back the wrong one is not something to guess at. \
-             Nothing was put back.",
-            operations.join(" and ")
-        ),
-        Remedy::new("Ask for one of them by name once the surfaces carry it"),
-    )
-    .in_state(State::Actionable)
-}
-
-fn cannot_succeed(at: &str, target: &str, why: &str) -> Problem {
-    Problem::new(
-        CANNOT_SUCCEED,
-        Severity::Error,
-        format!("The run stamped {at} cannot be put back"),
-        format!(
-            "One of its changes, against {target}, cannot be reversed: {why}. A run goes \
-             back whole or not at all, so nothing was put back."
-        ),
-        Remedy::new("Deal with that change first, or restore from a backup"),
-    )
-    .in_state(State::Actionable)
 }

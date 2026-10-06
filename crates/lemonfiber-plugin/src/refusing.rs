@@ -74,6 +74,17 @@ pub fn refusals(manifest: &Manifest, occupied: &[&str]) -> Vec<Violation> {
     found
 }
 
+/// Every label a proxy configuration puts in front of the operator's domain, read the
+/// way the shipped one is read.
+///
+/// For the configuration on a machine rather than the one this build ships: an
+/// operator adds sites to the live file by hand, and a plugin's stanza for one of
+/// those names would stop the proxy as surely as one for a shipped name.
+#[must_use]
+pub fn answered_in(proxy: &str) -> Vec<String> {
+    bundled::proxied(proxy)
+}
+
 /// Who the plugin says it is, and whether an operator could go and check.
 ///
 /// The licence is recorded rather than constrained: every bundled service is
@@ -292,10 +303,7 @@ fn requiring(manifest: &Manifest, found: &mut Vec<Violation>) {
 /// reviewable at all.
 fn readable(manifest: &Manifest, found: &mut Vec<Violation>) {
     for (at, text) in declared(manifest) {
-        if let Some(hidden) = text
-            .chars()
-            .find(|letter| letter.is_control() && *letter != '\n' && *letter != '\t')
-        {
+        if let Some(hidden) = text.chars().find(|letter| unshown(*letter)) {
             found.push(Violation {
                 location: at,
                 message: format!(
@@ -306,6 +314,54 @@ fn readable(manifest: &Manifest, found: &mut Vec<Violation>) {
             });
         }
     }
+}
+
+/// Whether a diff shows nothing where this character is.
+///
+/// The control characters other than a line break and a tab, and then everything that
+/// draws nothing: Unicode's format characters (`Cf`) and its default-ignorable code
+/// points. Those are the bidirectional overrides that draw a word backwards, the
+/// zero-widths and joiners, the soft hyphen, the invisible operators, the fillers and
+/// the tag characters — each of them lets one name read as another, or carries text
+/// nobody reviewing the diff can see. A manifest is read rather than typeset, so none
+/// of them is needed to write one.
+fn unshown(letter: char) -> bool {
+    (letter.is_control() && letter != '\n' && letter != '\t') || draws_nothing(letter)
+}
+
+/// Whether a character is a format character or a default-ignorable one.
+///
+/// The union of `Cf` and `Default_Ignorable_Code_Point` as Unicode 16 assigns them,
+/// written out because the standard library answers neither.
+const fn draws_nothing(letter: char) -> bool {
+    matches!(
+        letter,
+        '\u{ad}'
+            | '\u{34f}'
+            | '\u{600}'..='\u{605}'
+            | '\u{61c}'
+            | '\u{6dd}'
+            | '\u{70f}'
+            | '\u{890}'..='\u{891}'
+            | '\u{8e2}'
+            | '\u{115f}'..='\u{1160}'
+            | '\u{17b4}'..='\u{17b5}'
+            | '\u{180b}'..='\u{180f}'
+            | '\u{200b}'..='\u{200f}'
+            | '\u{202a}'..='\u{202e}'
+            | '\u{2060}'..='\u{206f}'
+            | '\u{3164}'
+            | '\u{fe00}'..='\u{fe0f}'
+            | '\u{feff}'
+            | '\u{ffa0}'
+            | '\u{fff0}'..='\u{fffb}'
+            | '\u{110bd}'
+            | '\u{110cd}'
+            | '\u{13430}'..='\u{1343f}'
+            | '\u{1bca0}'..='\u{1bca3}'
+            | '\u{1d173}'..='\u{1d17a}'
+            | '\u{e0000}'..='\u{e0fff}'
+    )
 }
 
 /// Every string a manifest declares, with where it was declared.

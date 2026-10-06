@@ -13,20 +13,18 @@
 //! appear with no change here.
 //!
 //! **Which operations are plugins is read from the journal too.** An install records
-//! the Compose document it writes for the plugin, under the plugin's name, at a path
-//! named after it — so an operation that made its own document is a plugin. A name
-//! list kept here would drift from the operations lemonfiber actually runs.
+//! the Compose document it writes for the plugin at a path named after it, under an
+//! operation that is the plugin's own — so an operation that made its plugin's document
+//! is that plugin's. A name list kept here would drift from the operations lemonfiber
+//! actually runs.
 
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use crate::error::withheld::is_secret;
 
 use super::{Origin, Replaced};
 use crate::journal::{is_sealed, Change, Kind};
-
-/// Where the directory holding a plugin's Compose document sits beneath the stack.
-const DOCUMENTS: &str = "compose/plugins";
 
 /// The operation a reversal records its own changes under.
 const UNDO: &str = crate::app::putting_back::OPERATION;
@@ -62,10 +60,8 @@ pub fn of_journalled(
         })
         .collect();
     let (last, _) = sets.split_last()?;
-    let &(named, _, current) = last;
-    if !plugins.contains(named) {
-        return None;
-    }
+    let &(operation, _, current) = last;
+    let named = plugins.get(operation)?.as_str();
     if is_sealed(current) {
         return Some(Origin::Unknown {
             why: format!(
@@ -106,9 +102,12 @@ fn replaced(
     named: &str,
     last: &(&str, Option<&str>, &str),
     sets: &[(&str, Option<&str>, &str)],
-    plugins: &BTreeSet<String>,
+    plugins: &BTreeMap<String, String>,
 ) -> Replaced {
-    let run = sets.iter().rev().take_while(|one| one.0 == named);
+    let run = sets
+        .iter()
+        .rev()
+        .take_while(|one| plugins.get(one.0).is_some_and(|plugin| plugin == named));
     let chain = run.clone().count();
     let &(_, previous, _) = run.fold(last, |_, one| one);
     let before = sets
@@ -136,7 +135,7 @@ fn replaced(
 fn wrote(
     previous: &str,
     before: &[(&str, Option<&str>, &str)],
-    plugins: &BTreeSet<String>,
+    plugins: &BTreeMap<String, String>,
 ) -> Origin {
     if is_sealed(previous) {
         return Origin::Unknown {
@@ -155,9 +154,9 @@ fn wrote(
                 .to_owned(),
         };
     }
-    if plugins.contains(operation) {
+    if let Some(named) = plugins.get(operation) {
         return Origin::Plugin {
-            named: operation.to_owned(),
+            named: named.clone(),
         };
     }
     if operation == UNDO {
@@ -173,17 +172,21 @@ fn wrote(
     Origin::Operator
 }
 
-/// Every operation in the journal that is a plugin: one that recorded making its own
-/// Compose document.
-fn plugins(changes: &[Change]) -> BTreeSet<String> {
+/// Every operation in the journal that is a plugin's, with the plugin it is: one that
+/// recorded making that plugin's own Compose document.
+fn plugins(changes: &[Change]) -> BTreeMap<String, String> {
     changes
         .iter()
-        .filter(|change| match &change.kind {
-            Kind::Made { path } => Path::new(path)
-                .ends_with(Path::new(DOCUMENTS).join(format!("{}.yml", change.operation))),
-            _ => false,
+        .filter_map(|change| {
+            let Kind::Made { path } = &change.kind else {
+                return None;
+            };
+            let path = Path::new(path);
+            let plugin = path.file_stem()?.to_str()?;
+            let document = Path::new(crate::plugin::OVERLAYS).join(format!("{plugin}.yml"));
+            (path.ends_with(document) && crate::plugin::owns(plugin, change))
+                .then(|| (change.operation.clone(), plugin.to_owned()))
         })
-        .map(|change| change.operation.clone())
         .collect()
 }
 

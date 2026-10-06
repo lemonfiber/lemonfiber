@@ -101,6 +101,23 @@ pub trait Runner: Send + Sync {
     /// those are different events and the caller decides what each means.
     async fn run(&self, argv: &[String]) -> Result<Output, Failure>;
 
+    /// Run `argv` with these variables set in the environment it inherits, and wait
+    /// for it to finish.
+    ///
+    /// For a program whose behaviour this machine's own configuration would otherwise
+    /// decide, where the caller has to settle it instead. The default runs `argv` as
+    /// [`Self::run`] does and sets nothing, which is the whole of what a stand-in that
+    /// starts no process can do; the implementation that starts a real one overrides
+    /// it to set every variable.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::run`].
+    async fn run_with(&self, argv: &[String], env: &[(String, String)]) -> Result<Output, Failure> {
+        let _ = env;
+        self.run(argv).await
+    }
+
     /// Spawn `argv` and stream what it emits as it emits it — each line, then the
     /// exit — for a long command whose progress should be seen rather than waited
     /// on in silence. The stream ends after the [`Progress::Ended`] event.
