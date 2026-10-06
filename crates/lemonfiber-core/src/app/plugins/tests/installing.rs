@@ -95,6 +95,39 @@ async fn a_manifest_this_build_refuses_is_not_installed() {
     assert!(!record_of(&ctx).exists(), "the record was written");
 }
 
+/// A header's name is written out, so a recipe substituting into one is refused with a
+/// code of its own — and every other fault is still listed beside it.
+#[tokio::test]
+async fn a_recipe_substituting_into_a_header_s_name_is_refused_with_its_own_code() {
+    let ctx = ctx("header-named");
+    let recipe = "\n[[recipe]]\nid    = \"in\"\ntitle = \"In\"\nwhy   = \"To sign in\"\n\n\
+                  [[recipe.step]]\nid   = \"in\"\ncall = { method = \"GET\", to = \"komga\", \
+                  path = \"/x\", headers = { \"X-{{key}}\" = \"1\" } }\n";
+    let at = source("header-named", &format!("{MANIFEST}{recipe}"));
+
+    let refused = installing(&ctx, &at)
+        .await
+        .err()
+        .map(|problem| (problem.code.to_string(), problem.detail.unwrap_or_default()))
+        .unwrap_or_default();
+
+    assert_eq!(refused.0, "PLUGIN-33");
+    assert!(refused.1.contains("fixed identifier"), "{}", refused.1);
+    assert!(
+        refused.1.contains("recipe.run"),
+        "the fault beside it is listed too: {}",
+        refused.1
+    );
+    assert!(!record_of(&ctx).exists(), "the record was written");
+
+    // A recipe refused for anything else is the manifest's refusal as any other.
+    let elsewhere = source(
+        "header-valued",
+        &format!("{MANIFEST}{recipe}").replace("\"X-{{key}}\" = \"1\"", "X-Key = \"{{key}}\""),
+    );
+    assert_eq!(refusal(installing(&ctx, &elsewhere).await), "PLUGIN-3");
+}
+
 /// A plugin needing something of lemonfiber that this build does not offer is
 /// refused by naming the thing, never a version. *Too old* is the wrong sentence for
 /// a mechanism that went, and an operator cannot upgrade their way to one that was

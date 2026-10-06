@@ -311,7 +311,6 @@ fn substituting(
         carried.extend(substitutions(body).map(|name| ("body".to_owned(), name)));
     }
     for (header, value) in step.call.headers.iter().flatten() {
-        carried.extend(substitutions(header).map(|name| ("headers".to_owned(), name)));
         carried.extend(substitutions(value).map(|name| (format!("headers.{header}"), name)));
     }
 
@@ -347,7 +346,7 @@ fn substituting(
 }
 
 /// Refuse a substitution where a call is written out: its destination, its path's
-/// segments and its query's names.
+/// segments, its query's names and its headers' names.
 ///
 /// What a call reaches is fixed by reading it. A destination worked out while running,
 /// or a resource chosen by something that came back, would make the set of things a
@@ -378,6 +377,37 @@ fn written_out(step: &Step, at: &str, found: &mut Vec<Violation>) {
                 .to_owned(),
         });
     }
+    for header in named_headers(step) {
+        found.push(Violation {
+            location: format!("{at}.call.headers"),
+            message: format!(
+                "substitutes a value into the name of the header {header:?}; a header's name is a \
+                 fixed identifier of the protocol, so it is written out and only its value may \
+                 carry one"
+            ),
+        });
+    }
+}
+
+/// Whether any recipe of this manifest substitutes a value into a header's name, which
+/// is refused with a code of its own.
+#[must_use]
+pub fn names_a_header_by_substitution(manifest: &Manifest) -> bool {
+    manifest
+        .recipes
+        .iter()
+        .flat_map(|recipe| &recipe.steps)
+        .any(|step| named_headers(step).next().is_some())
+}
+
+/// Every header of one call whose name carries a substitution.
+fn named_headers(step: &Step) -> impl Iterator<Item = &str> {
+    step.call
+        .headers
+        .iter()
+        .flatten()
+        .map(|(header, _)| header.as_str())
+        .filter(|header| substitutions(header).next().is_some())
 }
 
 /// Every name substituted into the values of a path's query.

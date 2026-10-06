@@ -142,26 +142,41 @@ fn a_value_substituted_into_a_body_is_read_as_a_flow_too() {
     assert!(names(&said, &["call.body", "nothing"]), "got: {said:?}");
 }
 
-/// A header's name is part of the call too, so a value substituted there is a flow
-/// like any other and needs what any other needs.
+/// A header's name is a fixed identifier of the protocol, written out like the path, so
+/// a substitution there is refused for where it stands and is not also read as a flow.
 #[test]
-fn a_value_substituted_into_a_header_s_name_is_read_as_a_flow_too() {
-    let unheld = without(
+fn a_value_substituted_into_a_header_s_name_is_refused_where_it_stands() {
+    for header in ["X-{{nothing}}", "X-{{token}}", "{{token}}"] {
+        let said = without(
+            r#"headers = { Authorization = "Bearer {{token}}" }"#,
+            &format!(r#"headers = {{ "{header}" = "1" }}"#),
+        );
+        assert!(
+            names(&said, &["call.headers", header, "fixed identifier"]),
+            "{header}: {said:?}"
+        );
+        assert!(
+            !names(&said, &["call.headers", "no earlier step"]),
+            "{header}: {said:?}"
+        );
+        let manifest = Manifest::from_toml(&WHOLE.replace(
+            r#"headers = { Authorization = "Bearer {{token}}" }"#,
+            &format!(r#"headers = {{ "{header}" = "1" }}"#),
+        ));
+        assert!(manifest.is_ok_and(|one| crate::names_a_header_by_substitution(&one)));
+    }
+}
+
+/// A substitution in a header's value is what headers are for, and is not a name.
+#[test]
+fn a_value_substituted_into_a_header_s_value_names_no_header() {
+    let manifest = Manifest::from_toml(WHOLE);
+    assert!(manifest.is_ok_and(|one| !crate::names_a_header_by_substitution(&one)));
+    let said = without(
         r#"headers = { Authorization = "Bearer {{token}}" }"#,
-        r#"headers = { "X-{{nothing}}" = "1" }"#,
+        r#"headers = { Authorization = "Bearer {{token}}", X-Plain = "{{token}}" }"#,
     );
-    assert!(
-        names(&unheld, &["call.headers", "nothing", "no earlier step"]),
-        "got: {unheld:?}"
-    );
-    let undeclared = without(
-        r#"headers = { Authorization = "Bearer {{token}}" }"#,
-        r#"headers = { "X-{{token}}" = "1" }"#,
-    );
-    assert!(
-        !names(&undeclared, &["call.headers"]),
-        "the fixture declares token to komga: {undeclared:?}"
-    );
+    assert!(!names(&said, &["fixed identifier"]), "{said:?}");
 }
 
 /// A file the schema refuses never reaches these rules.

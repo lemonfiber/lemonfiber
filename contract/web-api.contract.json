@@ -21476,6 +21476,11 @@
       "status": 400,
       "description": "Raised when a git source's host is, or stands for, an address on this machine or on a network of its own: loopback, private, link-local or unspecified."
     },
+    "PLUGIN-33": {
+      "name": "HEADER_NAMED",
+      "status": 400,
+      "description": "Raised when a recipe substitutes a value into a header's name, which is a fixed identifier of the protocol and written out; the manifest's every other fault is listed beside it."
+    },
     "PLUGIN-4": {
       "name": "UNRECORDED",
       "status": 500,

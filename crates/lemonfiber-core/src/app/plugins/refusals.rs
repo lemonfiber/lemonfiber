@@ -24,7 +24,7 @@
 
 use crate::error::codes::plugin::{
     ADDRESS_REFUSED, ALREADY, ANOTHER_PLUGIN, ANSWERED, CATALOGUE_OFF, CATALOGUE_REPLACED,
-    CATALOGUE_UNREACHABLE, CATALOGUE_UNREADABLE, NEWEST_UNKEPT, NOTHING_TO_REMOVE,
+    CATALOGUE_UNREACHABLE, CATALOGUE_UNREADABLE, HEADER_NAMED, NEWEST_UNKEPT, NOTHING_TO_REMOVE,
     NOTHING_TO_UPDATE, NOT_AS_REVIEWED, NOT_CATALOGUED, NOWHERE, NO_REVISION, OCCUPIED, REFUSED,
     SCHEME_REFUSED, SIGNATURE_UNVERIFIED, SOURCE_OFF, SPELLED_ALIKE, STUCK, TWO_SOURCES,
     UNAPPROVED, UNFETCHED, UNPROVED, UNREADABLE, UNRECORDABLE, UNWRITABLE,
@@ -34,7 +34,7 @@ use crate::error::{Amiss, Code, Problem};
 /// Every plugin code an install, an update or a removal is refused with, apart from the
 /// record that cannot be read and the offer that moved, and where the fault lies in
 /// each.
-pub const REFUSALS: [(Code, Amiss); 29] = [
+pub const REFUSALS: [(Code, Amiss); 30] = [
     (UNREADABLE, Amiss::Naming),
     (REFUSED, Amiss::Asking),
     (ALREADY, Amiss::Asking),
@@ -62,6 +62,7 @@ pub const REFUSALS: [(Code, Amiss); 29] = [
     (OCCUPIED, Amiss::Asking),
     (SCHEME_REFUSED, Amiss::Asking),
     (ADDRESS_REFUSED, Amiss::Asking),
+    (HEADER_NAMED, Amiss::Asking),
     (CATALOGUE_REPLACED, Amiss::Answering),
     (NEWEST_UNKEPT, Amiss::Answering),
 ];
