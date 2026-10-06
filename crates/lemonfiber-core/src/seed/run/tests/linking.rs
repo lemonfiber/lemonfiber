@@ -153,10 +153,7 @@ async fn seeded_with(
     project: &std::path::Path,
 ) -> Vec<Wiring> {
     let server = served(services);
-    let admin = match &server {
-        Some(server) => super::super::identity::seed_jellyfin_admin(ctx, server).await,
-        None => None,
-    };
+    let admin = super::super::identity::seed_jellyfin_admin(ctx, server.as_ref()).await;
     super::super::seed_jellyfin_identity(
         ctx,
         services,

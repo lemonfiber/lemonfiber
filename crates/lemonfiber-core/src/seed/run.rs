@@ -487,10 +487,7 @@ async fn seed_media_server(
     // the first: the server has no key to read, so its administrator's password is
     // minted and recorded here, and the request gate's key below is minted with it.
     let mut wirings = Vec::new();
-    let admin = match server {
-        Some(server) => identity::seed_jellyfin_admin(ctx, server).await,
-        None => None,
-    };
+    let admin = identity::seed_jellyfin_admin(ctx, server).await;
 
     // Which origins a browser may read the media server from: the front door's alone.
     // After the identity's first half, because that is what records the administrator

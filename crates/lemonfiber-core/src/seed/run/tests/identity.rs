@@ -20,10 +20,7 @@ async fn identity_beside(
 ) -> (Vec<Wiring>, crate::baseline::Baseline) {
     let fillers = fillers_beside(services.to_vec(), installed, stack_root());
     let server = crate::app::targets::MediaServer::of(&fillers);
-    let admin = match &server {
-        Some(server) => super::super::identity::seed_jellyfin_admin(ctx, server).await,
-        None => None,
-    };
+    let admin = super::super::identity::seed_jellyfin_admin(ctx, server.as_ref()).await;
     super::super::seed_jellyfin_identity(ctx, services, expected, server.as_ref(), admin, None)
         .await
 }
@@ -256,6 +253,58 @@ async fn a_password_change_refused_after_setup_is_said(tag: &str, admitted: u16,
         "{changed:?}"
     );
     assert!(written.contains("JELLYFIN_ADMIN_PASSWORD="), "{written}");
+}
+
+/// A plugin's media server that will not take its changed password is said the same way,
+/// and what closes it is the server itself: lemonfiber does not rotate a plugin's
+/// credentials, so the operator is pointed at the server and at the setting its own
+/// administrator's password is kept under.
+#[tokio::test]
+async fn a_plugins_server_refusing_its_changed_password_points_at_the_server() {
+    let env = config_scratch("jellyfin-plugin-unchanged");
+    if let Some(parent) = env.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
+    let ctx = seed_ctx(
+        None,
+        true,
+        Vec::new(),
+        Some(vec![0x11; 24]),
+        Some(env.to_path_buf()),
+    )
+    .with_http(super::household_changing(false, false, 200, 500));
+    let mut placed = crate::test_support::a_placed(
+        "emby",
+        &["identity.source"],
+        Some(jellyfin_api()),
+        Some(8920),
+    );
+    placed.tag = "10.10.7".to_owned();
+    let server = crate::test_support::an_installed("emby-server", vec![placed]);
+
+    let (wirings, _) = identity_beside(
+        &ctx,
+        &[seerr_svc()],
+        &[server],
+        &crate::baseline::Baseline::new(),
+    )
+    .await;
+    let changed = wirings.get(1).map(|one| format!("{one:?}"));
+    let written = std::fs::read_to_string(&env).unwrap_or_default();
+    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+
+    assert!(
+        changed.as_deref().is_some_and(|said| said.contains(
+            "`lemonfiber config set PLUGIN_EMBY__SERVER_EMBY_ADMIN_PASSWORD <password>`"
+        )),
+        "{changed:?}"
+    );
+    assert!(
+        written.contains("PLUGIN_EMBY__SERVER_EMBY_ADMIN_PASSWORD="),
+        "{written}"
+    );
+    assert!(!written.contains("JELLYFIN_ADMIN_PASSWORD="), "{written}");
 }
 
 /// A telling the operator set before lemonfiber ever ran is taken on, not flagged.

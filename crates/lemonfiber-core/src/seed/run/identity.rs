@@ -13,20 +13,27 @@ use crate::app::credentials::Replacing;
 use crate::app::targets::MediaServer;
 
 /// The media server's administrator, as the first half of the identity left it: the
-/// password to go on with, or the state the identity rests in without one.
-pub(super) struct Admin(Result<String, crate::seed::State>);
+/// password to go on with, or the state the identity rests in without one, and where the
+/// host reaches the request service that asked for it.
+pub(super) struct Admin {
+    /// The password, or the state the identity rests in without one.
+    administered: Result<String, crate::seed::State>,
+    /// Where the host reaches the request service that asks for the server.
+    requests: String,
+}
 
 /// The first half of making whatever fills the identity source the one the request
 /// service signs in against: the media server's administrator, minted where its first-run
 /// setup has not run.
 ///
-/// Nothing where the service asking is not a request service this build speaks to:
-/// without it there is nothing to wire. The admin password is the one credential minted
+/// Nothing where nothing fills the identity source, or where the service asking is not a
+/// request service this build speaks to: without both there is nothing to wire. The admin password is the one credential minted
 /// rather than read — recorded under the server's own setting on the run that mints it,
 /// before the setup is given it, and read back on a later run. Recorded here, before the
 /// second half, so the steps between the two can sign in with it.
-pub(super) async fn seed_jellyfin_admin(ctx: &Ctx, server: &MediaServer) -> Option<Admin> {
-    server.requests()?;
+pub(super) async fn seed_jellyfin_admin(ctx: &Ctx, server: Option<&MediaServer>) -> Option<Admin> {
+    let server = server?;
+    let requests = server.requests()?;
     let client = server.client(ctx);
     let recorded = server.recorded_password(ctx);
     let keep = |password: &str| server.record_password(ctx, password);
@@ -38,7 +45,10 @@ pub(super) async fn seed_jellyfin_admin(ctx: &Ctx, server: &MediaServer) -> Opti
         &keep,
     )
     .await;
-    Some(Admin(administered))
+    Some(Admin {
+        administered,
+        requests,
+    })
 }
 
 /// The second half: the request service signed in through the media server — at the
@@ -54,10 +64,14 @@ pub(super) async fn seed_jellyfin_identity(
     project: Option<&std::path::Path>,
 ) -> (Vec<crate::seed::Wiring>, crate::baseline::Baseline) {
     let mut records = crate::baseline::Baseline::new();
-    let (Some(server), Some(Admin(administered))) = (server, admin) else {
-        return (Vec::new(), records);
-    };
-    let Some(seerr_base) = server.requests() else {
+    let (
+        Some(server),
+        Some(Admin {
+            administered,
+            requests: seerr_base,
+        }),
+    ) = (server, admin)
+    else {
         return (Vec::new(), records);
     };
     let gate = project.filter(|_| crate::app::gating::service(services).is_some());
