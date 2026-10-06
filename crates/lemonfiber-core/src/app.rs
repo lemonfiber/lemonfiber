@@ -83,6 +83,7 @@ pub mod restore;
 pub(crate) mod screen;
 pub mod setup;
 pub mod support;
+pub mod switched;
 pub(crate) mod targets;
 pub(crate) mod trace;
 pub mod unforwarded;

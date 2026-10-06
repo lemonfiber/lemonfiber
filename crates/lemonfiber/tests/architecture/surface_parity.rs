@@ -123,11 +123,14 @@ const DASHBOARD: &str = "dashboard";
 /// end of the name a long-running action is answered with, and being answered with
 /// a name is itself the web's own arrangement. The door a password is exchanged at
 /// is the same kind of thing: a command line is already sitting at the machine that
-/// printed this run's token, so there is nothing for it to log in to.
+/// printed this run's token, so there is nothing for it to log in to. What the
+/// stack can do is read by a client that may be older or newer than the stack, and a
+/// command line is always the stack's own build, so it has nothing to ask.
 ///
 /// Anything else this surface routes belongs in a row.
-const UNREQUESTED: [&str; 4] = [
+const UNREQUESTED: [&str; 5] = [
     "/api/events",
+    "/api/capabilities",
     "/api/actions/{action}",
     "/api/jobs/{job}",
     "/api/session",

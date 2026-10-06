@@ -156,6 +156,61 @@ pub struct Arguments {
     pub dry_run: Running,
 }
 
+impl Arguments {
+    /// Something for every argument any action reads, so every action reaches the
+    /// command it names.
+    ///
+    /// For asking which command a request reaches without a request: what this carries
+    /// is never carried out, and nothing about a stack is in it. Held to every action in
+    /// a test, so an action that gains a required argument is given one here too.
+    #[must_use]
+    pub fn naming_everything() -> Self {
+        Self {
+            forms: vec!["library".to_owned()],
+            services: vec!["jellyfin".to_owned()],
+            service: Some("jellyfin".to_owned()),
+            name: Some("someone".to_owned()),
+            libraries: vec!["Films".to_owned()],
+            age_limit: Some(12),
+            unrated: Some("allow".to_owned()),
+            key: Some("DATA_ROOT".to_owned()),
+            value: Some("/srv".to_owned()),
+            preset: Some("balanced".to_owned()),
+            media_type: Some("tv".to_owned()),
+            archive: Some("lemonfiber-full-1700000000.tar.gz".to_owned()),
+            at: Some("1700000000".to_owned()),
+            logs: Some(1),
+            reveal: Vec::new(),
+            only: Some("vpn".to_owned()),
+            check: Some("vpn.unprotected".to_owned()),
+            disruptive: Disturbing::Included,
+            offer: Some("00000000".to_owned()),
+            confirm: true,
+            agreed: vec!["vpn.unprotected".to_owned()],
+            item: Some("Sintel".to_owned()),
+            term: Some("Sintel".to_owned()),
+            season: Some(1),
+            download: Some("Sintel".to_owned()),
+            policy: Some("within-a-limit".to_owned()),
+            requests: Some(1),
+            days: Some(1),
+            request: Some(1),
+            reason: Some("asked".to_owned()),
+            capability: Some("indexer.search".to_owned()),
+            tier: Some("stop".to_owned()),
+            kept: Some("watch".to_owned()),
+            down: Some("50%".to_owned()),
+            up: Some("50%".to_owned()),
+            active: Some("07:00-23:00".to_owned()),
+            line: Some("100MiB/10MiB".to_owned()),
+            cap: Some("1TiB".to_owned()),
+            exceeded: Some("pause".to_owned()),
+            unrestricted_for: Some(1),
+            ..Self::default()
+        }
+    }
+}
+
 /// Whether an action is carried out, or rehearsed.
 ///
 /// A reading of the bare word a request carries, for the reason [`Disturbing`] is

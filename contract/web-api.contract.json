@@ -1654,6 +1654,78 @@
         }
       }
     },
+    "capabilities": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/Capabilities"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Capabilities": {
+          "description": "Every capability this stack has, by the path its request is served at.",
+          "type": "object",
+          "properties": {
+            "capabilities": {
+              "description": "What each comes to for the credential that asked. A request this stack does\nnot have is absent rather than listed as anything.",
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/CapabilityState"
+              }
+            }
+          },
+          "required": [
+            "capabilities"
+          ]
+        },
+        "CapabilityState": {
+          "description": "What one capability comes to for the credential that asked.",
+          "oneOf": [
+            {
+              "description": "This stack can do it, and this credential may.",
+              "type": "string",
+              "const": "available"
+            },
+            {
+              "description": "The stack has it, and a setting this machine has switched off has to be turned\nback on first.",
+              "type": "string",
+              "const": "unconfigured"
+            },
+            {
+              "description": "The stack has it, and this credential may not ask for it.",
+              "type": "string",
+              "const": "unpermitted"
+            }
+          ]
+        }
+      }
+    },
     "catalogue": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",
