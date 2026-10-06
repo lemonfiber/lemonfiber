@@ -272,6 +272,10 @@ codes! {
         /// Raised when a git source's host is, or stands for, an address on this machine
         /// or on a network of its own: loopback, private, link-local or unspecified.
         ADDRESS_REFUSED = "PLUGIN-32",
+        /// Raised when a recipe substitutes a value into a header's name, which is a fixed
+        /// identifier of the protocol and written out; the manifest's every other fault is
+        /// listed beside it.
+        HEADER_NAMED = "PLUGIN-33",
     }
     /// The `PROVIDER` codes.
     provider {

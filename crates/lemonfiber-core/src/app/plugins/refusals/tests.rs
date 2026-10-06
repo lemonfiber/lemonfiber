@@ -1,5 +1,5 @@
 use super::{place, REFUSALS};
-use crate::error::codes::plugin::{CONTRIBUTED_FAILED, NOTHING_TO_REMOVE};
+use crate::error::codes::plugin::{CONTRIBUTED_FAILED, HEADER_NAMED, NOTHING_TO_REMOVE, REFUSED};
 use crate::error::{Amiss, Problem, Remedy, Severity};
 
 /// A problem carrying this code, raised where nothing has placed it.
@@ -46,4 +46,16 @@ fn each_code_is_listed_once_and_nowhere_else() {
     codes.sort_unstable();
     codes.dedup();
     assert_eq!(codes.len(), REFUSALS.len());
+}
+
+/// A manifest refused with a code of its own for one of its faults is still a manifest
+/// refused, and lies where the manifest's refusal does.
+#[test]
+fn a_header_named_by_substitution_lies_where_a_refused_manifest_does() {
+    let mut named = raised(HEADER_NAMED);
+    let mut refused = raised(REFUSED);
+    place(&mut named);
+    place(&mut refused);
+    assert_eq!(named.amiss, refused.amiss);
+    assert_eq!(named.amiss, Amiss::Asking);
 }

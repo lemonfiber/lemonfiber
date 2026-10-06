@@ -270,6 +270,6 @@ pub(super) fn accepted(
     if refusals.is_empty() {
         Ok((manifest, digest))
     } else {
-        Err(Box::new(refused(&manifest.plugin.id, &refusals)))
+        Err(Box::new(refused(&manifest, &refusals)))
     }
 }
