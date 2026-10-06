@@ -92,6 +92,7 @@ impl Qbittorrent {
             url: self.endpoint.url(&format!("/api/v2{path}")),
             headers: vec![form_content_type()],
             body: Some(form_encoded(fields)),
+            pinned: None,
         }
     }
 
@@ -217,6 +218,7 @@ impl Qbittorrent {
             url: self.endpoint.url(&format!("/api/v2{path}")),
             headers: Vec::new(),
             body: None,
+            pinned: None,
         };
         self.endpoint.send(&request).await
     }

@@ -155,6 +155,7 @@ fn asking(base: &str, key: &str) -> Request {
         url: format!("{base}/api/v3/system/status?apikey={key}"),
         headers: vec![(API_KEY_HEADER.to_owned(), key.to_owned())],
         body: None,
+        pinned: None,
     }
 }
 

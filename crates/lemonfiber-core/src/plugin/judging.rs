@@ -27,7 +27,7 @@ const READABLE: usize = 120;
 
 /// The method a declaration names, as the transport carries it.
 ///
-/// Four, because four is what the port has. A declaration naming anything else cannot
+/// Five, because five is what the port has. A declaration naming anything else cannot
 /// be sent, and saying so is a better answer than sending a different method than the
 /// one that was written down — a proof asked with the wrong verb is a proof about a
 /// question nobody declared.
@@ -42,6 +42,7 @@ pub(crate) fn method(declared: &str) -> Option<crate::ports::http::Method> {
         "GET" => Some(Method::Get),
         "POST" => Some(Method::Post),
         "PUT" => Some(Method::Put),
+        "PATCH" => Some(Method::Patch),
         "DELETE" => Some(Method::Delete),
         _ => None,
     }

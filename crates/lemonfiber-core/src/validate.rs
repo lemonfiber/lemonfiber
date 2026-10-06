@@ -269,6 +269,7 @@ impl Live {
             url: format!("{url}{separator}t=search&apikey={key}"),
             headers: Vec::new(),
             body: None,
+            pinned: None,
         };
 
         let started = Instant::now();
@@ -305,6 +306,7 @@ impl Live {
             url: url.to_owned(),
             headers: vec![(API_KEY_HEADER.to_owned(), key.to_owned())],
             body: None,
+            pinned: None,
         };
 
         let started = Instant::now();

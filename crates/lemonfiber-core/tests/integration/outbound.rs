@@ -380,6 +380,7 @@ async fn a_request_that_went_is_written_down_where_the_operator_can_read_it() {
         url: "https://indexer.example/api?apikey=the-indexer-key".to_owned(),
         headers: vec![("X-Api-Key".to_owned(), "the-indexer-key".to_owned())],
         body: None,
+        pinned: None,
     };
     let answered = transport.send(&asked).await;
 

@@ -74,6 +74,7 @@ impl Bindery {
             url: self.endpoint.url(INSTANCES),
             headers,
             body,
+            pinned: None,
         }
     }
 }

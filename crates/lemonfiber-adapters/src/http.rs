@@ -6,6 +6,7 @@
 //! stands in for this. `reqwest` is confined here and nowhere else.
 
 use std::collections::BTreeMap;
+use std::net::{IpAddr, SocketAddr};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -59,6 +60,10 @@ const BODY_LIMIT: usize = 128 * 1024 * 1024;
 #[derive(Debug, Clone)]
 pub struct Web {
     client: reqwest::Client,
+    /// The cookies every client this builds keeps, so a request held to checked
+    /// addresses carries the session one sent the ordinary way set, and the other way
+    /// round.
+    cookies: Arc<PerOrigin>,
     /// The most of an answer's body read before it is refused.
     limit: usize,
 }
@@ -88,14 +93,10 @@ impl Web {
         // forbid); were it ever to fire, the default client would drop the cookie
         // store and timeouts these lines set, so the fallback is a degraded client,
         // not an equivalent one — acceptable only because it is unreachable.
+        let cookies = Arc::new(PerOrigin::default());
         Self {
-            client: reqwest::Client::builder()
-                .cookie_provider(Arc::new(PerOrigin::default()))
-                .redirect(no_redirect())
-                .connect_timeout(CONNECT_TIMEOUT)
-                .timeout(REQUEST_TIMEOUT)
-                .build()
-                .unwrap_or_default(),
+            client: builder(&cookies).build().unwrap_or_default(),
+            cookies,
             limit: BODY_LIMIT,
         }
     }
@@ -117,8 +118,62 @@ impl Default for Web {
 #[async_trait]
 impl Http for Web {
     async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-        sent(&self.client, request, self.limit).await
+        let client = self.client_for(request)?;
+        sent(&client, request, self.limit).await
     }
+}
+
+impl Web {
+    /// The client a request is sent with: the shared one, or one held to the addresses
+    /// the request was checked against. A clone of the shared one is a handle to it.
+    fn client_for(&self, request: &Request) -> Result<reqwest::Client, Unreachable> {
+        request.pinned.as_deref().map_or_else(
+            || Ok(self.client.clone()),
+            |addresses| pinned(&self.cookies, &request.url, addresses),
+        )
+    }
+}
+
+/// Every client this adapter sends with, before anything one request asks of it.
+fn builder(cookies: &Arc<PerOrigin>) -> reqwest::ClientBuilder {
+    reqwest::Client::builder()
+        .cookie_provider(Arc::clone(cookies))
+        .redirect(no_redirect())
+        .connect_timeout(CONNECT_TIMEOUT)
+        .timeout(REQUEST_TIMEOUT)
+}
+
+/// A client that connects to these addresses for the host `url` names, and asks the
+/// resolver nothing about it.
+///
+/// A client of its own, because what a name resolves to is a setting of the client
+/// rather than of a request. A pin to no address is refused rather than read as no pin,
+/// which would hand the name back to the resolver it was checked against.
+fn pinned(
+    cookies: &Arc<PerOrigin>,
+    url: &str,
+    addresses: &[IpAddr],
+) -> Result<reqwest::Client, Unreachable> {
+    let refused = || {
+        Unreachable::once(
+            &without_credentials(url),
+            "it could not be held to the addresses it was checked against, so nothing was asked",
+        )
+    };
+    let host = Url::parse(url)
+        .ok()
+        .and_then(|parsed| parsed.host_str().map(str::to_owned))
+        .filter(|_| !addresses.is_empty())
+        .ok_or_else(refused)?;
+    let held: Vec<SocketAddr> = addresses
+        .iter()
+        .map(|address| SocketAddr::new(*address, 0))
+        .collect();
+    builder(cookies)
+        .resolve_to_addrs(&host, &held)
+        .build()
+        .ok()
+        .ok_or_else(refused)
 }
 
 /// The request built, sent, and read back — or the one failure that says why not.
@@ -131,6 +186,7 @@ async fn sent(
         Method::Get => client.get(&request.url),
         Method::Post => client.post(&request.url),
         Method::Put => client.put(&request.url),
+        Method::Patch => client.patch(&request.url),
         Method::Delete => client.delete(&request.url),
     };
     for (name, value) in &request.headers {
