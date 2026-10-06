@@ -91,6 +91,7 @@
             "const:\"repin\"",
             "const:\"restore\"",
             "const:\"revoke\"",
+            "const:\"rewind\"",
             "const:\"withdraw\""
           ],
           "required": true
@@ -170,6 +171,7 @@
         "\"repin\"",
         "\"restore\"",
         "\"revoke\"",
+        "\"rewind\"",
         "\"withdraw\""
       ]
     },

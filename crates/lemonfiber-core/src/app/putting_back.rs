@@ -499,6 +499,7 @@ fn inverted(kind: &crate::journal::Kind) -> Option<crate::journal::Kind> {
         Kind::Created { .. }
         | Kind::Made { .. }
         | Kind::Region { .. }
+        | Kind::Rewritten { .. }
         | Kind::Pinned { .. }
         | Kind::KeyRevoked { .. } => None,
     }

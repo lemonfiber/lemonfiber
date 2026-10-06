@@ -24,7 +24,7 @@ use super::Ctx;
 mod journal;
 
 use crate::error::codes::setup::{
-    NEEDS_SERVICE, NOT_OPENED, NOT_PUT_BACK, NOT_REMOVED, NOT_WITHDRAWN, STILL_HOLDING,
+    NEEDS_SERVICE, NOT_OPENED, NOT_PUT_BACK, NOT_REMOVED, NOT_REWOUND, NOT_WITHDRAWN, STILL_HOLDING,
 };
 pub use journal::{journal_at, journalled, unrecorded};
 
@@ -269,6 +269,11 @@ fn carry_out(confined: &dyn Confined, action: &Action, env_file: &Path) -> Resul
                 }),
             }
         }
+        Action::Rewind {
+            path,
+            previous,
+            written,
+        } => rewind(Path::new(path), previous, *written),
         // Both need the service that made the change: one to delete what it created, the
         // other to put a field of it back. Neither is something the host can do, and a
         // reversal that took the second for an ordinary setting would write the field's
@@ -287,6 +292,37 @@ fn carry_out(confined: &dyn Confined, action: &Action, env_file: &Path) -> Resul
             Ok(Step::BeyondReach(format!("the key {name}")))
         }
     }
+}
+
+/// Write a file back to what it held, where what lemonfiber wrote over it is still there.
+///
+/// A file already holding what putting it back would write is done, which is what makes
+/// asking twice harmless; one that is gone is done too, since writing it back would bring
+/// back a file something has since removed. Anything else was written by another hand
+/// after this change, and is left exactly as it is.
+fn rewind(path: &Path, previous: &str, written: u32) -> Result<Step, Fault> {
+    let holds = match std::fs::read_to_string(path) {
+        Ok(holds) => holds,
+        Err(why) if why.kind() == std::io::ErrorKind::NotFound => return Ok(Step::Done),
+        Err(why) => {
+            return Err(Fault::NotRewound {
+                path: path.to_path_buf(),
+                reason: why.to_string(),
+            })
+        }
+    };
+    if holds == previous {
+        return Ok(Step::Done);
+    }
+    if super::bounded::written(&holds) != written {
+        return Ok(Step::TheirsNow(path.display().to_string()));
+    }
+    store::write(path, previous)
+        .map(|()| Step::Done)
+        .map_err(|failure| Fault::NotRewound {
+            path: path.to_path_buf(),
+            reason: failure.to_string(),
+        })
 }
 
 /// Put one setting back to `value`, where the change being reversed is still the
@@ -375,6 +411,13 @@ enum Fault {
         /// The operating system's own words.
         reason: String,
     },
+    /// A file lemonfiber wrote over could not be written back to what it held.
+    NotRewound {
+        /// The file left as lemonfiber wrote it.
+        path: PathBuf,
+        /// The operating system's own words.
+        reason: String,
+    },
     /// A directory could not be removed.
     NotRemoved {
         /// The directory left in place.
@@ -395,6 +438,14 @@ impl Fault {
                 "A directory from the interrupted setup could not be removed",
                 "The rest of the setup was reversed; this one directory is still there. It holds nothing.",
                 Remedy::new("Remove it by hand, or leave it where it is"),
+            )
+            .with_detail(format!("{}: {reason}", path.display())),
+            Self::NotRewound { path, reason } => Problem::new(
+                NOT_REWOUND,
+                Severity::Error,
+                "A file lemonfiber wrote over could not be written back to what it held",
+                "Everything before it was put back; this file still holds what lemonfiber wrote.",
+                Remedy::new("Run it again once the file can be written"),
             )
             .with_detail(format!("{}: {reason}", path.display())),
             Self::NotWithdrawn { path, reason } => Problem::new(

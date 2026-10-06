@@ -71,7 +71,15 @@ pub(super) async fn install(
     // was fetched, rather than from the checkout it was read out of.
     let stamp = ctx.stamp();
     let stack_manifest = writing::stack_manifest(ctx)?;
-    let (would, named) = settled(ctx, &stack_manifest, &manifest, path, from, &stamp);
+    let (would, named) = settled(
+        ctx,
+        &stack_manifest,
+        held.installed(),
+        &manifest,
+        path,
+        from,
+        &stamp,
+    );
     let mut after = held.clone();
     after
         .record(would.clone())
@@ -199,21 +207,26 @@ pub(super) async fn install(
 ///
 /// A plugin fetched from a git source is recorded as coming from that source, at the
 /// one commit that was fetched, rather than from the checkout it was read out of. Each
-/// of its services joins the networks of what it stands in for, and every recipe call
+/// of its services joins the networks of what it is settled in for beside `held`, the
+/// plugins already installed, and every recipe call
 /// to one of the stack's services is given the adapter it reaches through, which only
 /// the stack can say.
 pub(super) fn settled(
     ctx: &Ctx,
     stack: &lemonfiber_manifest::Manifest,
+    held: &[Installed],
     manifest: &lemonfiber_plugin::Manifest,
     path: &Path,
     from: Option<&Fetched<'_>>,
     stamp: &str,
 ) -> (Installed, PathBuf) {
-    let settled = Installed::of(manifest)
-        .installed(path, stamp)
-        .joining(&writing::joins(ctx, stack))
-        .reaching(stack);
+    let settled = writing::joined(
+        ctx,
+        stack,
+        held,
+        Installed::of(manifest).installed(path, stamp),
+    )
+    .reaching(stack);
     match from {
         Some(fetched) => {
             let fetched_at = settled.fetched(fetched.url, fetched.commit);

@@ -142,6 +142,7 @@ pub fn described(change: &Change) -> String {
         // Written by a plugin's install rather than a first run, and named for the same
         // reason the service's own field below is.
         Kind::Region { owner, path, .. } => format!("{owner}'s region in {path}"),
+        Kind::Rewritten { path, .. } => format!("the file {path}"),
         Kind::Pinned { current, .. } => format!("the move to {current}"),
         Kind::Created { resource, .. } => format!("a {resource}"),
         // Not something a first run writes — a repair does — but the journal is

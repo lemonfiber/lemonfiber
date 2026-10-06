@@ -387,6 +387,24 @@ pub fn recorded(
     }
 }
 
+/// The journal entry for a file a substitution wrote over.
+pub(crate) fn overwritten(
+    overwrite: &crate::app::plugins::writing::Overwrite,
+    at: &str,
+) -> crate::journal::Change {
+    let path = overwrite.path.display().to_string();
+    crate::journal::Change {
+        at: at.to_owned(),
+        operation: OPERATION.to_owned(),
+        target: path.clone(),
+        kind: crate::journal::Kind::Rewritten {
+            path,
+            previous: overwrite.previous.clone(),
+            written: crate::materialised::checksum(overwrite.text.as_bytes()),
+        },
+    }
+}
+
 /// What the history calls a substitution.
 pub const OPERATION: &str = "substitute";
 

@@ -20,11 +20,12 @@
 //! that one service and never about whatever stands in for it, so a stand-in is never
 //! reached over it and is given no route to what is on it.
 //!
-//! **Declared rather than settled.** What a plugin's service joins follows from what it
-//! provides, not from whether the operator has chosen it to fill an ask, because the
-//! choice is a setting that changes without the container being written again, and a
-//! container whose networks lagged its choice would be the one the request service
-//! could not reach.
+//! **Settled rather than declared.** A plugin's service stands in for a stack service
+//! only through an ask it is settled to fill: the one the operator chose it for, or one
+//! every claimant answers. A plugin claiming what the stack's own service still answers
+//! replaces nothing, and joining that service's networks would give it reach the stack
+//! never granted it. Choosing a filler is what changes this, so a choice rewrites the
+//! documents of the plugins whose networks it moves.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -39,6 +40,9 @@ use crate::stack::attached::DEFAULT;
 pub struct Joins {
     /// Every stack service that speaks an adapter, in the manifest's order.
     standing: Vec<Standing>,
+    /// Each plugin's service the stack's asks are settled to reach, by the plugin and the
+    /// service, with what they ask it for.
+    fills: BTreeMap<(String, String), BTreeSet<String>>,
 }
 
 /// One stack service, as what a plugin's service could stand in for.
@@ -55,9 +59,41 @@ struct Standing {
 }
 
 impl Joins {
-    /// The stack's services and the networks its compose files put each on.
+    /// The stack's services and the networks its compose files put each on, beside what
+    /// each of the stack's asks is settled to reach.
     #[must_use]
-    pub fn of(manifest: &Manifest, attached: &BTreeMap<String, BTreeSet<String>>) -> Self {
+    pub fn of(
+        manifest: &Manifest,
+        attached: &BTreeMap<String, BTreeSet<String>>,
+        settled: &[crate::wiring::Wired],
+    ) -> Self {
+        // A settled answer names a service by its id alone, so one a stack service also
+        // carries cannot be told apart from the stack's own: it is taken as the stack's,
+        // and no plugin's service is settled by a name it shares.
+        let mut fills: BTreeMap<(String, String), BTreeSet<String>> = BTreeMap::new();
+        for wired in settled {
+            let crate::wiring::Reaches::Asked {
+                capability,
+                services,
+                origins,
+                ..
+            } = &wired.reaches
+            else {
+                continue;
+            };
+            for service in services {
+                let Some(crate::origin::Origin::Plugin { named }) = origins.get(service) else {
+                    continue;
+                };
+                if manifest.services.iter().any(|one| one.id == *service) {
+                    continue;
+                }
+                fills
+                    .entry((named.clone(), service.clone()))
+                    .or_default()
+                    .insert(capability.clone());
+            }
+        }
         let standing = manifest
             .services
             .iter()
@@ -75,21 +111,29 @@ impl Joins {
                 })
             })
             .collect();
-        Self { standing }
+        Self { standing, fills }
     }
 
-    /// The networks `placed` joins: every network a stack service it stands in for is
-    /// on, or nothing where that is the default network alone, which it is on already.
+    /// The networks `placed`, one of `plugin`'s services, joins: every network a stack
+    /// service it stands in for is on, through a capability it declares and is settled to
+    /// fill, or nothing where that is the default network alone, which it is on already.
     #[must_use]
-    pub fn of_service(&self, placed: &Placed) -> Vec<String> {
+    pub fn of_service(&self, plugin: &str, placed: &Placed) -> Vec<String> {
         let Some(speaks) = placed.api.as_ref().map(|api| api.kind) else {
             return Vec::new();
         };
+        let Some(settled) = self.fills.get(&(plugin.to_owned(), placed.service.clone())) else {
+            return Vec::new();
+        };
+        let fills: BTreeSet<&String> = settled
+            .iter()
+            .filter(|it| placed.provides.contains(it))
+            .collect();
         let joined: BTreeSet<&String> = self
             .standing
             .iter()
             .filter(|one| one.speaks == speaks)
-            .filter(|one| one.provides.iter().any(|it| placed.provides.contains(it)))
+            .filter(|one| one.provides.iter().any(|it| fills.contains(&it)))
             .filter(|one| {
                 one.files.is_empty() || one.files.iter().any(|it| placed.media_types.contains(it))
             })
