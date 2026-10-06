@@ -275,3 +275,62 @@ async fn a_stack_with_no_door_or_a_door_with_no_port_names_no_origin() {
         assert!(http.requests().is_empty(), "{name}: {:?}", http.requests());
     }
 }
+
+/// **A plugin's origin is never allowed to read the media server.** A plugin's request
+/// service installed beside a stack holding only its library, published through the
+/// proxy at a configured domain and named as the front door, does not put its origin
+/// on the media server's allow-list: the list stays on the stack's own front door.
+#[tokio::test]
+async fn a_plugins_door_never_puts_its_origin_on_the_allow_list() {
+    let http = serving(OPEN, OPEN);
+    let base = cors_ctx("cors-plugin-door", true, http.clone());
+    let ctx = Ctx {
+        settings: Settings {
+            household_domain: Some("home.lan".to_owned()),
+            front_door: Some("requests".to_owned()),
+            ..base.settings.clone()
+        },
+        ..base
+    };
+    let mut register = crate::plugin::Register::empty();
+    assert!(register
+        .record(crate::door::fixtures::installed(vec![
+            crate::door::fixtures::brought(
+                "requests",
+                Some(lemonfiber_manifest::ApiKind::Seerr),
+                Some("ask"),
+            )
+        ]))
+        .is_ok());
+    assert!(crate::app::record::keep(
+        crate::app::targets::beside_env(&ctx, crate::config::paths::PLUGINS).as_deref(),
+        &register
+    )
+    .is_ok());
+
+    let wiring = super::super::cors::seed_cors(&ctx, &[published(jellyfin_svc())]).await;
+    let written: Vec<String> = http
+        .requests()
+        .into_iter()
+        .filter(|asked| {
+            asked.method == Method::Post && asked.url.ends_with("/System/Configuration")
+        })
+        .filter_map(|asked| asked.body)
+        .collect();
+
+    assert!(
+        written.iter().all(|body| !body.contains("home.lan")),
+        "{written:?}"
+    );
+    assert!(
+        wiring.is_some_and(|wiring| !matches!(&wiring.state,
+            State::WouldWire { ours: Some(origin), .. } if origin.contains("home.lan"))),
+        "a plugin's origin was offered for the allow-list"
+    );
+    assert!(
+        written
+            .iter()
+            .any(|body| body.contains("http://192.168.1.20:8096")),
+        "the list did not stay on the stack's own front door: {written:?}"
+    );
+}
