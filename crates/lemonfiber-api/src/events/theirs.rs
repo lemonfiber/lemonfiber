@@ -97,19 +97,15 @@ impl Theirs {
         let mut asking = Vec::new();
         if joined || due(heard.rows, ROWS_EVERY, now) {
             heard.rows = Some(now);
-            asking.push(Command::Household { member: None });
-            asking.push(Command::Held {
-                member: Whom::Defaults,
-                most: A_SHELF,
-            });
+            asking.extend([Reading::Household, Reading::Held]);
         }
         if joined || due(heard.playing, PLAYING_EVERY, now) {
             heard.playing = Some(now);
-            asking.push(Command::Playing { member: None });
+            asking.push(Reading::Playing);
         }
         let mut said = Vec::new();
-        for command in asking {
-            let Some(rendered) = self.answered(command).await else {
+        for reading in asking {
+            let Some(rendered) = self.answered(reading).await else {
                 continue;
             };
             let previous = heard
@@ -124,45 +120,71 @@ impl Theirs {
 
     /// One reading, narrowed to the member by the decision every read takes, as the
     /// event it is said as. Nothing where the decision gives the member nothing.
-    async fn answered(&self, command: Command) -> Option<Rendered> {
-        // A stream of this kind is a member's, and the commands above are only theirs
-        // once the decision has narrowed them to a member. A caller who is not one would
-        // be handed them as asked, which is the household's whole view, so nothing is.
-        self.caller.member()?;
-        let Permitted::This(narrowed) = may(&self.caller, Door::Reading, command) else {
+    async fn answered(&self, reading: Reading) -> Option<Rendered> {
+        // A stream of this kind is a member's, and the commands are only theirs once the
+        // decision has narrowed them to a member. A caller who is not one would be handed
+        // them as asked, which is the household's whole view, so nothing is.
+        let (Some(_), Permitted::This(narrowed)) = (
+            self.caller.member(),
+            may(&self.caller, Door::Reading, reading.command()),
+        ) else {
             return None;
         };
-        let outcome = match dispatch(narrowed.clone(), &self.ctx).await {
+        let outcome = match dispatch(narrowed, &self.ctx).await {
             Ok(outcome) => outcome,
-            Err(_) => unread(&narrowed)?,
+            Err(_) => reading.unread(),
         };
         Rendered::of(Nature::State, &outcome.envelope())
+    }
+}
+
+/// The three things a member's stream reads, and nothing else it could be asked to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Reading {
+    /// Their household row.
+    Household,
+    /// Their shelf.
+    Held,
+    /// What they are playing.
+    Playing,
+}
+
+impl Reading {
+    /// The command as an operator would ask it, before the decision narrows it.
+    const fn command(self) -> Command {
+        match self {
+            Self::Household => Command::Household { member: None },
+            Self::Held => Command::Held {
+                member: Whom::Defaults,
+                most: A_SHELF,
+            },
+            Self::Playing => Command::Playing { member: None },
+        }
+    }
+
+    /// The reading where the stack could not be read, said as unread rather than empty.
+    fn unread(self) -> Outcome {
+        let findings = vec![UNREAD.to_owned()];
+        match self {
+            Self::Household => Outcome::Household(HouseholdReport {
+                findings,
+                ..HouseholdReport::default()
+            }),
+            Self::Held => Outcome::Held(HeldReport {
+                findings,
+                ..HeldReport::default()
+            }),
+            Self::Playing => Outcome::Playing(PlayingReport {
+                findings,
+                ..PlayingReport::default()
+            }),
+        }
     }
 }
 
 /// Whether a pace that last came round at `last` has come round again.
 fn due(last: Option<Instant>, every: Duration, now: Instant) -> bool {
     last.is_none_or(|last| now.duration_since(last) >= every)
-}
-
-/// A reading that could not be made, said as unread rather than as empty.
-fn unread(command: &Command) -> Option<Outcome> {
-    let findings = vec![UNREAD.to_owned()];
-    match command {
-        Command::Household { .. } => Some(Outcome::Household(HouseholdReport {
-            findings,
-            ..HouseholdReport::default()
-        })),
-        Command::Held { .. } => Some(Outcome::Held(HeldReport {
-            findings,
-            ..HeldReport::default()
-        })),
-        Command::Playing { .. } => Some(Outcome::Playing(PlayingReport {
-            findings,
-            ..PlayingReport::default()
-        })),
-        _ => None,
-    }
 }
 
 #[cfg(test)]

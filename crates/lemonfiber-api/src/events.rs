@@ -114,11 +114,11 @@ pub async fn stream(
     if let Some(refused) = crate::router::refused(&knocking) {
         return refused;
     }
-    if let Err(refusal) = admitted(
-        matches!(knocking, Knocking::Known(_)),
-        &headers,
-        &streaming.bound,
-    ) {
+    let caller = match knocking {
+        Knocking::Known(caller) => Some(caller),
+        Knocking::Nobody | Knocking::Unconfirmed | Knocking::Held(_) | Knocking::Exposed => None,
+    };
+    if let Err(refusal) = admitted(caller.is_some(), &headers, &streaming.bound) {
         return refusal.answered();
     }
     let seen = headers
@@ -138,11 +138,12 @@ pub async fn stream(
     // The operator's stream carries their whole view — the dashboard, every log line
     // they follow, what setup is doing — and nothing on it is narrowed to a member. A
     // member is handed a stream of their own instead, read for them alone.
-    if let Knocking::Known(caller) = &knocking {
-        if let Some(member) = caller.member() {
-            staying.member = Some(member.to_owned());
-            return theirs(&streaming, caller.clone(), seen.as_deref(), staying).await;
-        }
+    if let Some((caller, member)) = caller.and_then(|caller| {
+        let member = caller.member()?.to_owned();
+        Some((caller, member))
+    }) {
+        staying.member = Some(member);
+        return theirs(&streaming, caller, seen.as_deref(), staying).await;
     }
     let listening = streaming.live.listening(seen.as_deref()).await;
     // Asked for after the client is listening, so the gather it prompts is one

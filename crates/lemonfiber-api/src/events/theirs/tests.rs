@@ -1,12 +1,12 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use lemonfiber_core::app::{Command, Ctx};
+use lemonfiber_core::app::Ctx;
 use lemonfiber_core::keys::Scope;
 use lemonfiber_core::model::kind;
 use tokio::time::Instant;
 
-use super::{due, unread, Theirs, PLAYING_EVERY, ROWS_EVERY, UNREAD};
+use super::{due, Reading, Theirs, PLAYING_EVERY, ROWS_EVERY, UNREAD};
 use crate::admission::{Caller, Keyed};
 use crate::events::live::Gathers;
 
@@ -128,18 +128,14 @@ fn a_pace_comes_round_once_its_interval_has_passed() {
 /// operator's problem, which names what only the operator is shown.
 #[test]
 fn an_unmade_reading_is_unread_in_a_sentence_of_its_own() {
-    use lemonfiber_core::app::{Outcome, Whom};
-    let household = unread(&Command::Household { member: None });
-    assert!(matches!(&household, Some(Outcome::Household(report))
-        if !report.available && report.findings == vec![UNREAD.to_owned()]));
-    let held = unread(&Command::Held {
-        member: Whom::Defaults,
-        most: 1,
-    });
-    assert!(matches!(&held, Some(Outcome::Held(report))
-        if !report.available && report.findings == vec![UNREAD.to_owned()]));
-    let playing = unread(&Command::Playing { member: None });
-    assert!(matches!(&playing, Some(Outcome::Playing(report))
-        if !report.available && report.findings == vec![UNREAD.to_owned()]));
-    assert!(unread(&Command::Version).is_none());
+    use lemonfiber_core::app::Outcome;
+    let unread = vec![UNREAD.to_owned()];
+    assert!(
+        matches!(Reading::Household.unread(), Outcome::Household(report)
+        if !report.available && report.findings == unread)
+    );
+    assert!(matches!(Reading::Held.unread(), Outcome::Held(report)
+        if !report.available && report.findings == unread));
+    assert!(matches!(Reading::Playing.unread(), Outcome::Playing(report)
+        if !report.available && report.findings == unread));
 }
