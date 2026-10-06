@@ -218,7 +218,7 @@ async fn a_manifest_other_than_the_reviewed_one_is_refused() {
     assert!(signing.is_some(), "no key pair could be made");
     if let Some(signing) = signing {
         let listed = index(REVIEWED, PROVING);
-        let (ctx, _) = cataloguing(
+        let (ctx, serving) = cataloguing(
             "catalogue-moved",
             release(&listed, Some(signing.signed(&listed))),
             signing.key(),
@@ -226,7 +226,7 @@ async fn a_manifest_other_than_the_reviewed_one_is_refused() {
 
         assert_eq!(refusal(by_name(&ctx, "komga").await), "PLUGIN-23");
         assert_eq!(counted(reading(&ctx).await), Some(0));
-        assert!(super::super::fetching::checkout(&ctx, REVIEWED).is_some_and(|at| !at.exists()));
+        assert!(serving.left_nothing());
     }
 }
 

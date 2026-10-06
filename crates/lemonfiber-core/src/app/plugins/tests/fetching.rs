@@ -41,6 +41,23 @@ impl Serving {
             .map(|asked| asked.clone())
             .unwrap_or_default()
     }
+    /// Every directory a commit was checked out into, in the order they were made.
+    pub(super) fn checkouts(&self) -> Vec<std::path::PathBuf> {
+        self.asked()
+            .iter()
+            .filter_map(|one| match one.as_slice() {
+                [init, quiet, at] if init == "init" && quiet == "--quiet" => Some(at.into()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Whether a commit was checked out, and every directory it was checked out into is
+    /// gone.
+    pub(super) fn left_nothing(&self) -> bool {
+        let made = self.checkouts();
+        !made.is_empty() && made.iter().all(|at| !at.exists())
+    }
 }
 
 #[async_trait]
@@ -126,10 +143,7 @@ async fn a_git_source_is_installed_at_the_commit_it_serves_and_recorded() {
             && one.last().map(String::as_str) == Some(HEAD)),
         "the one commit was not what was fetched: {asked:?}"
     );
-    assert!(
-        super::super::fetching::checkout(&ctx, HEAD).is_some_and(|at| !at.exists()),
-        "the checkout was left behind"
-    );
+    assert!(serving.left_nothing(), "the checkout was left behind");
 }
 
 /// A tag is installed at the commit it points at, not at the tag's own object.
@@ -220,7 +234,7 @@ async fn a_commit_that_will_not_be_fetched_is_refused_and_leaves_nothing() {
         refusal(from_git(&ctx, "https://example.org/plugin-komga").await),
         "PLUGIN-16"
     );
-    assert!(super::super::fetching::checkout(&ctx, HEAD).is_some_and(|at| !at.exists()));
+    assert!(serving.left_nothing());
 }
 
 /// A git that cannot be run at all is a source that could not be fetched.
@@ -271,7 +285,7 @@ async fn a_rehearsed_git_install_records_nothing_and_leaves_nothing() {
         Some((false, HEAD.to_owned()))
     );
     assert!(!record_of(&ctx).exists());
-    assert!(super::super::fetching::checkout(&ctx, HEAD).is_some_and(|at| !at.exists()));
+    assert!(serving.left_nothing());
 }
 
 /// A listing with lines that are not a commit and a name is read past them.
@@ -392,6 +406,35 @@ async fn a_record_naming_no_source_is_not_asked() {
         said.first().map(|one| &one.standing),
         Some(crate::plugin::Fetchable::Unasked { .. })
     ));
+}
+
+/// Two rehearsals of one commit at once, in one run and over one machine, each check it
+/// out into a directory of its own and each removes only its own.
+#[tokio::test]
+async fn two_installs_of_one_commit_at_once_never_share_a_checkout() {
+    let serving = Arc::new(Serving::listing(&format!("{HEAD}\tHEAD\n")));
+    let mut ctx = served("git-together", &serving);
+    ctx.dry_run = true;
+
+    let (one, other) = tokio::join!(
+        from_git(&ctx, "https://example.org/plugin-komga"),
+        from_git(&ctx, "https://example.org/plugin-komga"),
+    );
+
+    assert!(report(one).and_then(|one| one.install).is_some());
+    assert!(report(other).and_then(|one| one.install).is_some());
+    // Each install reads its offer and then answers it, so each checks out twice.
+    let made = serving.checkouts();
+    let mut apart = made.clone();
+    apart.sort();
+    apart.dedup();
+    assert_eq!(made.len(), 4, "{made:?}");
+    assert_eq!(
+        apart.len(),
+        made.len(),
+        "two installs shared a checkout: {made:?}"
+    );
+    assert!(serving.left_nothing());
 }
 
 /// A checkout is made under lemonfiber's own data directory rather than the temporary
