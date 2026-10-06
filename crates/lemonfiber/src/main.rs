@@ -234,11 +234,14 @@ async fn main() -> ExitCode {
         Request::Setup { flags } if flags.status => Command::Setup(SetupAction::Where),
         // Setup itself is a conversation and then a stack coming up, not a value
         // that arrives once, so like streaming and watching it runs its own way.
-        // It takes the context by value because it rewrites the settings mid-run.
+        // It takes the context by value because it rewrites the settings mid-run,
+        // and is boxed because that context is held across every wait.
         //
         // Narrated because setup ends by offering the walk: the offer is put at a
         // terminal, so what the walk says has a terminal to say it to.
-        Request::Setup { flags } => return setup_from(narrating(ctx, cli.json), flags).await,
+        Request::Setup { flags } => {
+            return Box::pin(setup_from(narrating(ctx, cli.json), flags)).await;
+        }
         Request::Version => Command::Version,
         // Naming nothing asks what forms there are; naming one asks what it would
         // come to. Two questions about the same subject, so one word answers both.
