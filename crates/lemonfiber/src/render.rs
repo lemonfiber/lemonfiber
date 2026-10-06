@@ -1,14 +1,12 @@
 //! The surface's rendering, kept apart from the CLI wiring and orchestration.
 //!
-//! `main` decides what to run and hands the outcome here; this module decides only how it
-//! reads. One renderer per answer, for a person or for a script, with nothing about
-//! parsing input or dispatching commands mixed in — so the shape of an operator's report
-//! and the shape of the command line stay two separate things to change.
+//! `main` decides what to run and hands the outcome here; this module decides only how
+//! it reads. One renderer per answer, for a person or for a script, with no parsing or
+//! dispatching mixed in, so a report's shape and the command line's change apart.
 //!
-//! Every renderer *builds* its lines and hands them back; one printer at the edge puts
-//! them on the terminal. Rendering is then a value a test can assert on rather than a
-//! side effect it can only watch happen, which is what lets the words an operator
-//! actually reads be held to the same standard as the rest.
+//! Every renderer *builds* its lines and one printer at the edge puts them on the
+//! terminal, so rendering is a value a test asserts on rather than a side effect it can
+//! only watch, and the words an operator reads are held to the same standard as the rest.
 
 #[cfg(test)]
 pub(crate) mod fixtures;
@@ -33,6 +31,7 @@ mod keys;
 mod migration;
 mod news;
 mod outbound;
+mod playing;
 pub(crate) mod plugin;
 mod provenance;
 mod qr;
@@ -240,6 +239,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Trace(report) => trace::trace(report),
         Outcome::Household(report) => trace::household(report),
         Outcome::Held(report) => held::held(report),
+        Outcome::Playing(report) => playing::playing(report),
         Outcome::Hosting(report) => hosting::hosting(report),
         Outcome::FrontDoor(report) => door::front_door(report),
         Outcome::News(report) => news::news(report),

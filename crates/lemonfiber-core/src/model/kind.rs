@@ -93,6 +93,8 @@ kinds! {
     HOUSEHOLD = "household",
     /// What one member can watch, as the media server answers it for them.
     HELD = "held",
+    /// What the media server is playing now, for everybody or for one member.
+    PLAYING = "playing",
     /// Where handing somebody's device the way onto the stack stands.
     HANDOFF = "handoff",
     /// What copying an operator's own records across came to.

@@ -68,6 +68,7 @@ pub(crate) mod materialise;
 pub mod members;
 pub(crate) mod music;
 pub(crate) mod outbox;
+pub(crate) mod playing;
 pub mod plugins;
 pub(crate) mod preflight;
 pub mod putting_back;
@@ -270,12 +271,12 @@ async fn walked(ctx: &Ctx, item: Option<String>) -> Result<Outcome, Box<Problem>
 }
 
 /// What a trace follows, and whether it reaches past this machine to find it.
-async fn traced(
-    ctx: &Ctx,
-    term: String,
-    season: Option<u32>,
-    searching: bool,
-) -> Result<Outcome, Box<Problem>> {
+async fn traced(ctx: &Ctx, tracing: Tracing) -> Result<Outcome, Box<Problem>> {
+    let Tracing {
+        term,
+        season,
+        searching,
+    } = tracing;
     trace::trace(ctx, &term, season, searching)
         .await
         .map(Outcome::Trace)
@@ -438,12 +439,9 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::History => history::history(ctx).map(Outcome::History),
         Command::Migrate(action) => migration::migrate(ctx, action).await,
         Command::QualityMusic { format } => music::music(ctx, format).await.map(Outcome::Music),
-        Command::Trace(Tracing {
-            term,
-            season,
-            searching,
-        }) => traced(ctx, term, season, searching).await,
+        Command::Trace(tracing) => traced(ctx, tracing).await,
         Command::Held { member, most } => held::held(ctx, &member, most).await.map(Outcome::Held),
+        Command::Playing { member } => playing::asked(ctx, member.as_deref()).await,
         Command::Household { member } => household::household(ctx, member.as_ref())
             .await
             .map(Outcome::Household),

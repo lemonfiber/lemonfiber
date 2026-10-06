@@ -40,6 +40,7 @@
     "outbound": "ref:Leaving",
     "pairing": "ref:Pairing",
     "pausing": "ref:PausingReport",
+    "playing": "ref:PlayingReport",
     "plugins": "ref:PluginInstalls",
     "preview": "ref:Plan",
     "provenance": "ref:ProvenanceReport",
@@ -5114,6 +5115,94 @@
         "services": {
           "type": [
             "array[string]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "Playback": {
+      "fields": {
+        "device": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "episode": {
+          "type": [
+            "integer|null/uint32"
+          ],
+          "required": false
+        },
+        "medium": {
+          "type": [
+            "ref:Medium"
+          ],
+          "required": true
+        },
+        "member": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "member_id": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "paused": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "season": {
+          "type": [
+            "integer|null/uint32"
+          ],
+          "required": false
+        },
+        "series": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "title": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "PlayingReport": {
+      "fields": {
+        "available": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "findings": {
+          "type": [
+            "array[string]"
+          ],
+          "required": true
+        },
+        "member": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "sessions": {
+          "type": [
+            "array[ref:Playback]"
           ],
           "required": true
         }

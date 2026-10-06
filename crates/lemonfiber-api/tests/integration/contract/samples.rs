@@ -207,6 +207,7 @@ fn serving() -> Vec<Outcome> {
         Outcome::Hosting(HostingReport::default()),
         Outcome::Household(HouseholdReport::default()),
         Outcome::Held(lemonfiber_core::model::HeldReport::default()),
+        Outcome::Playing(lemonfiber_core::model::PlayingReport::default()),
         Outcome::Stuck(StuckReport::default()),
         Outcome::Invitation(lemonfiber_core::model::Invitation {
             name: "ana".to_owned(),

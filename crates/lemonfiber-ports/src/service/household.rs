@@ -238,6 +238,18 @@ pub trait Household: Send + Sync {
     /// Returns [`Failure`] when the server is unreachable or refuses.
     async fn sessions(&self, member: &str) -> Result<Vec<Session>, Failure>;
 
+    /// What the media server is playing now: one entry a session playing something,
+    /// for one account where `member` names its identifier, or for every account.
+    ///
+    /// Asked of the server each time rather than kept, because what is playing is the
+    /// fact most likely to have changed since anybody last asked. A session signed in
+    /// and playing nothing is not listed: it is a device, not somebody watching.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the server is unreachable or refuses.
+    async fn playing(&self, member: Option<&str>) -> Result<Vec<Playback>, Failure>;
+
     /// Whether the server offers the sign-in by short code, in which a device already
     /// signed in approves a new one.
     ///
@@ -260,6 +272,37 @@ pub struct Session {
     /// When the server last heard from it, as the server writes an instant, where it
     /// says.
     pub last_seen: Option<String>,
+}
+
+/// Somebody watching something now, as the media server lists the session.
+///
+/// Who and what, and where: what a household recognises about somebody watching. No
+/// stream, no bitrate and no transcode reason, because a member is not choosing one and
+/// a surface handed those would have to decide not to draw them.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+pub struct Playback {
+    /// The identifier the server files the account under.
+    pub member_id: String,
+    /// The name the account is known by.
+    pub member: String,
+    /// What is playing, in the words the server holds it under: an episode's own name
+    /// where it is an episode.
+    pub title: String,
+    /// The series an episode belongs to, where it is one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub series: Option<String>,
+    /// The season an episode is in, where the server numbers one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub season: Option<u32>,
+    /// The episode's number within its season, where the server numbers one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub episode: Option<u32>,
+    /// Which of the kinds this product deals in it is. An episode is of a series.
+    pub medium: Medium,
+    /// Whether it is paused rather than playing.
+    pub paused: bool,
+    /// What the device it plays on calls itself.
+    pub device: String,
 }
 
 /// One library the media server holds, with the name it was given.

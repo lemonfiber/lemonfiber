@@ -311,6 +311,7 @@ async fn main() -> ExitCode {
         Request::Explain { word } => return explaining(&ctx, &word, cli.json, cli.dry_run).await,
         Request::Household { whom, action } => taken!(household(whom, action)),
         Request::Held { whom, most } => taken!(translate::held(whom, most)),
+        Request::Playing { member } => Command::Playing { member },
         Request::History => Command::History,
         Request::Undo { at } => Command::Undo { run: Some(at) },
         Request::Stuck => Command::Stuck,

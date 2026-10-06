@@ -11,6 +11,7 @@
 //! configuration, because the server's record is bounded and can be pushed along by
 //! anybody able to make it record something.
 
+mod playing;
 mod policy;
 mod shelf;
 
@@ -20,9 +21,12 @@ use super::{item_type, Jellyfin};
 use crate::ports::http::Method;
 use crate::ports::media::Kind;
 use crate::ports::service::{
-    Access, Allowed, Certificate, Failure, Held, Invited, Medium, Member, NamedLibrary, Session,
-    Signed, Unrated,
+    Access, Allowed, Certificate, Failure, Held, Invited, Medium, Member, NamedLibrary, Playback,
+    Session, Signed, Unrated,
 };
+
+/// Where the media server lists every session signed in, and what each is playing.
+const SESSIONS: &str = "/Sessions";
 
 /// The account list, as the media server names its fields.
 #[derive(serde::Deserialize)]
@@ -315,7 +319,7 @@ impl crate::ports::service::Household for Jellyfin {
     }
 
     async fn sessions(&self, member: &str) -> Result<Vec<Session>, Failure> {
-        let response = self.as_admin(Method::Get, "/Sessions", None).await?;
+        let response = self.as_admin(Method::Get, SESSIONS, None).await?;
         let listed: Vec<SessionResource> = self
             .endpoint
             .decode(&response, "the media server's sessions could not be read")?;
@@ -343,6 +347,10 @@ impl crate::ports::service::Household for Jellyfin {
 
     async fn holdings(&self, member: Option<&str>, most: u32) -> Result<Vec<Held>, Failure> {
         shelf::holdings(self, member, most).await
+    }
+
+    async fn playing(&self, member: Option<&str>) -> Result<Vec<Playback>, Failure> {
+        playing::playing(self, member).await
     }
 
     async fn libraries(&self) -> Result<Vec<NamedLibrary>, Failure> {

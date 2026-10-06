@@ -31,7 +31,9 @@
 mod asked;
 mod naming;
 
-use naming::{diagnosing, following, household, moving, narrowed, removing, setting, shelf};
+use naming::{
+    diagnosing, following, household, moving, narrowed, removing, setting, shelf, watching,
+};
 pub(crate) use naming::{THE_STACK, THIS_BINARY};
 
 /// How much of a shelf a read answers with, and the most it ever will.
@@ -87,6 +89,10 @@ pub const REQUESTS: &str = "/api/requests";
 /// age limit, blocked kinds and library access before it answers, so a single shelf for
 /// everybody would be wrong for whoever it was not read as.
 pub const HELD: &str = "/api/held";
+
+/// What the media server is playing now: every session for the operator, and a
+/// member's own for a member.
+pub const PLAYING: &str = "/api/playing";
 
 /// What this machine keeps running when no terminal is open.
 pub const HOSTING: &str = "/api/hosting";
@@ -257,6 +263,7 @@ pub const OFFERED: &[&str] = &[
     STORAGE,
     REQUESTS,
     HELD,
+    PLAYING,
     HOSTING,
     FRONT_DOOR,
     NEWS,
@@ -383,6 +390,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, Refusal> {
         STORAGE => Ok(diagnosing(Narrowing::Category(Category::Storage))),
         REQUESTS => household(member, defaults.as_deref()),
         HELD => shelf(member, defaults.as_deref(), most),
+        PLAYING => watching(member),
         // Nothing asked of it, because what is hosted is a property of the machine
         // rather than of the caller: the two words that change it are actions, at the
         // other door, and a parameter here would let one surface be told a different

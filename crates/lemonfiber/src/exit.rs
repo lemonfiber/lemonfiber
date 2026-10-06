@@ -211,6 +211,8 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // The shelf arrived. That the media server would not say what is on it is
         // reported in the answer, for the same reason it is on the household read.
         | Outcome::Held(_)
+        // Who is watching arrived, or that the media server would not say did.
+        | Outcome::Playing(_)
         // What is hosted is a reading, and an install or a removal that could not be
         // carried out already comes back as a problem — so a report here is one that
         // arrived, whatever it says stands.

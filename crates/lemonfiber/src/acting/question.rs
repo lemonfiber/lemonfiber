@@ -49,8 +49,8 @@ pub(crate) use shape::{Narrows, Needed, Question, Wants};
 
 use lemonfiber_api::read::table::{
     named, ALERTS, BANDWIDTH, CATALOGUE, CHECKS, CLIENTS, CONFIG, CREDENTIALS, FORMS, FRONT_DOOR,
-    HELD, HISTORY, HOSTING, MIGRATION, NEWS, OUTBOUND, PROVENANCE, QUALITY, REQUESTS, STORED,
-    STUCK, TRACE, UNINSTALL, UPDATE, VERSION,
+    HELD, HISTORY, HOSTING, MIGRATION, NEWS, OUTBOUND, PLAYING, PROVENANCE, QUALITY, REQUESTS,
+    STORED, STUCK, TRACE, UNINSTALL, UPDATE, VERSION,
 };
 use lemonfiber_api::refusal::Refusal;
 use lemonfiber_core::app::Command;
@@ -165,6 +165,21 @@ static AFTER: &[Question] = &[
         read: HELD,
         needs: Needed::Typed(&[Wants {
             asks: "Whose shelf, as you would say their name",
+            narrows: Narrows::Member,
+        }]),
+    },
+    Question {
+        name: "what is playing",
+        about: "who is watching what right now, and on which device",
+        read: PLAYING,
+        needs: Needed::Nothing,
+    },
+    Question {
+        name: "what one person is playing",
+        about: "narrow that to one member of the household",
+        read: PLAYING,
+        needs: Needed::Typed(&[Wants {
+            asks: "Which member, as you would say their name",
             narrows: Narrows::Member,
         }]),
     },

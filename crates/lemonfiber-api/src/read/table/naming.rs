@@ -148,6 +148,17 @@ pub(super) fn household(
     }
 }
 
+/// What is playing, for one member where one is named, or for the whole house.
+///
+/// An empty name is refused rather than read as having named nobody, which would
+/// answer with every session where one person's was asked for.
+pub(super) fn watching(member: Option<String>) -> Result<Command, Refusal> {
+    match member {
+        Some(member) if member.is_empty() => Err(Refusal::NoMember),
+        member => Ok(Command::Playing { member }),
+    }
+}
+
 /// How many holdings a shelf answers with where the caller named no number.
 ///
 /// Enough to fill a screen and scroll through it, and small enough that a phone on a

@@ -293,3 +293,54 @@ fn nothing_that_cannot_be_undone_or_widens_trust_is_callable_by_a_key() {
         assert!(!callable_by_a_key(&command), "{command:?}");
     }
 }
+
+/// **What is playing is narrowed as the shelf is.** A member naming somebody else, or
+/// nobody, is answered with their own sessions — never with another member's and never
+/// with the whole house, which is the operator's reading.
+#[test]
+fn a_member_asking_what_is_playing_is_given_their_own_whatever_they_named() {
+    for named in [
+        None,
+        Some(SOMEBODY_ELSE.to_owned()),
+        Some(ASKING.to_owned()),
+    ] {
+        assert_eq!(
+            may(&member(), Door::Reading, Command::Playing { member: named }),
+            Permitted::This(Command::Playing {
+                member: Some(ASKING.to_owned())
+            })
+        );
+    }
+}
+
+/// A key scoped to a member reads what is playing as that member does.
+#[test]
+fn a_member_key_reads_what_is_playing_as_that_member() {
+    use lemonfiber_core::keys::Scope;
+    let theirs = key(Scope::Member {
+        id: ASKING.to_owned(),
+        name: "ana".to_owned(),
+    });
+    assert_eq!(
+        may(&theirs, Door::Reading, Command::Playing { member: None }),
+        Permitted::This(Command::Playing {
+            member: Some(ASKING.to_owned())
+        })
+    );
+}
+
+/// The operator, and a key that is not a member's, read the whole house or whoever
+/// they named, as asked.
+#[test]
+fn the_operator_and_a_read_key_read_what_is_playing_as_asked() {
+    use lemonfiber_core::keys::Scope;
+    for caller in [Caller::Operator, key(Scope::Read), key(Scope::Act)] {
+        for named in [None, Some(SOMEBODY_ELSE.to_owned())] {
+            let asked = Command::Playing { member: named };
+            assert_eq!(
+                may(&caller, Door::Reading, asked.clone()),
+                Permitted::This(asked)
+            );
+        }
+    }
+}

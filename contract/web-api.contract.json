@@ -10880,6 +10880,159 @@
         }
       }
     },
+    "playing": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/PlayingReport"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Medium": {
+          "description": "The kinds of thing a household holds.\n\nNamed rather than passed through as the server's own word, because a surface\ndrawing \"Series\" against one server and \"tvshow\" against another would be\nrendering a detail of which server this household runs.\n\n`Medium` rather than `Kind`, `Holding` or `Sort`: this product already calls the two\nrequest services a [`crate::media::Kind`], a request's suspension a\n[`crate::service::asking::Holding`], and what one line of a manifest is a\n`uninstall::Sort` — and one word meaning two things in one vocabulary is how a\nreader comes to trust the wrong one. The contract flattens every type name into one\nnamespace, so a clash there is a clash for anything reading it by name.",
+          "oneOf": [
+            {
+              "description": "One film.",
+              "type": "string",
+              "const": "film"
+            },
+            {
+              "description": "A television series, rather than one episode of one.",
+              "type": "string",
+              "const": "series"
+            },
+            {
+              "description": "Something the server holds that is neither, and is not hidden for that.",
+              "type": "string",
+              "const": "other"
+            }
+          ]
+        },
+        "Playback": {
+          "description": "Somebody watching something now, as the media server lists the session.\n\nWho and what, and where: what a household recognises about somebody watching. No\nstream, no bitrate and no transcode reason, because a member is not choosing one and\na surface handed those would have to decide not to draw them.",
+          "type": "object",
+          "properties": {
+            "device": {
+              "description": "What the device it plays on calls itself.",
+              "type": "string"
+            },
+            "episode": {
+              "description": "The episode's number within its season, where the server numbers one.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0
+            },
+            "medium": {
+              "description": "Which of the kinds this product deals in it is. An episode is of a series.",
+              "$ref": "#/$defs/Medium"
+            },
+            "member": {
+              "description": "The name the account is known by.",
+              "type": "string"
+            },
+            "member_id": {
+              "description": "The identifier the server files the account under.",
+              "type": "string"
+            },
+            "paused": {
+              "description": "Whether it is paused rather than playing.",
+              "type": "boolean"
+            },
+            "season": {
+              "description": "The season an episode is in, where the server numbers one.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0
+            },
+            "series": {
+              "description": "The series an episode belongs to, where it is one.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "title": {
+              "description": "What is playing, in the words the server holds it under: an episode's own name\nwhere it is an episode.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "member_id",
+            "member",
+            "title",
+            "medium",
+            "paused",
+            "device"
+          ]
+        },
+        "PlayingReport": {
+          "description": "What is playing now, and whose sessions were asked about.",
+          "type": "object",
+          "properties": {
+            "available": {
+              "description": "Whether the media server could be asked at all.\n\nNobody watching and a server that would not say are different answers, and\ncollapsing them would report a quiet house on the day the media server was down.\nAnything that could not be read is said in `findings` and this goes false.",
+              "type": "boolean"
+            },
+            "findings": {
+              "description": "What is worth saying about this reading, in the words its reader would use.\n\nAlways written, empty or not, so a reader never has to guess what an absent\nfield means.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "member": {
+              "description": "The member this was narrowed to, by the name they are known by, or empty where\nit is every session in the house.",
+              "type": "string"
+            },
+            "sessions": {
+              "description": "Every session playing something, in the order the media server lists them. How\nmany are playing is how many these are, rather than a count kept beside them.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Playback"
+              }
+            }
+          },
+          "required": [
+            "member",
+            "sessions",
+            "available",
+            "findings"
+          ]
+        }
+      }
+    },
     "plugins": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",
