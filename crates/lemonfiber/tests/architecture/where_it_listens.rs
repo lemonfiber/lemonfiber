@@ -33,7 +33,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::net::{IpAddr, SocketAddr};
 
-use crate::source_tree::shipped;
+use crate::source_tree::{crates_that_ship, in_a_crate_that_ships, shipped};
 
 /// The calls that take an address from the operating system, and the call that
 /// serves on what one of them gave.
@@ -244,9 +244,16 @@ fn addresses_on(line: &str) -> Vec<(String, bool)> {
 }
 
 /// Every address the shipped half of this workspace names.
+///
+/// Only in the crates a release is built from: a fixture names whatever address a test
+/// needs a name to stand for, and nothing it names is anything a release could bind.
 fn named() -> Vec<Named> {
+    let crates = crates_that_ship();
     let mut found = Vec::new();
-    for (file, ships) in shipped() {
+    for (file, ships) in shipped()
+        .into_iter()
+        .filter(|(file, _)| in_a_crate_that_ships(file, &crates))
+    {
         for (number, line) in ships.lines().enumerate() {
             found.extend(
                 addresses_on(line)

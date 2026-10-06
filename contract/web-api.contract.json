@@ -21467,6 +21467,16 @@
       "status": 500,
       "description": "Raised when the record of the newest catalogue index this machine verified cannot be read or written."
     },
+    "PLUGIN-31": {
+      "name": "SCHEME_REFUSED",
+      "status": 400,
+      "description": "Raised when a git source is named over a transport other than https, before anything is asked of it."
+    },
+    "PLUGIN-32": {
+      "name": "ADDRESS_REFUSED",
+      "status": 400,
+      "description": "Raised when a git source's host is, or stands for, an address on this machine or on a network of its own: loopback, private, link-local or unspecified."
+    },
     "PLUGIN-4": {
       "name": "UNRECORDED",
       "status": 500,

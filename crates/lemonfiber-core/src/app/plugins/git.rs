@@ -16,10 +16,11 @@
 //! once. Every command has a deadline, and a command past it is ended rather than left
 //! running.
 //!
-//! **Only https is spoken, and a link is checked out as a file.** Every other transport
-//! is refused by git itself, whatever the address says, and a link in the repository
-//! becomes a small file holding its target, so nothing read out of a checkout can
-//! reach a file outside it.
+//! **Only https is spoken, no redirect is followed, and a link is checked out as a
+//! file.** Every other transport is refused by git itself, whatever the address says; a
+//! source that answers with somewhere else is not followed there; and a link in the
+//! repository becomes a small file holding its target, so nothing read out of a
+//! checkout can reach a file outside it.
 
 use std::time::Duration;
 
@@ -47,15 +48,17 @@ pub(crate) const AT_ONCE: usize = 4;
 /// The configuration every command is run under, as `-c` pairs.
 ///
 /// Hooks off, so nothing in the repository runs; links checked out as files; no
-/// filesystem monitor, which is a program git would start; and https as the one
+/// filesystem monitor, which is a program git would start; https as the one
 /// transport, which also refuses `file`, `ext` and every other git would otherwise
-/// follow an address to.
-const SETTINGS: [&str; 5] = [
+/// follow an address to; and no redirect followed, so the host a source was checked
+/// for is the host it is fetched from.
+const SETTINGS: [&str; 6] = [
     "core.hooksPath=/dev/null",
     "core.symlinks=false",
     "core.fsmonitor=false",
     "protocol.allow=never",
     "protocol.https.allow=always",
+    "http.followRedirects=false",
 ];
 
 /// The environment every command is run with.
@@ -117,6 +120,27 @@ pub(crate) async fn run(ctx: &Ctx, args: &[&str], within: Duration) -> Result<St
         .last()
         .unwrap_or("git gave no reason")
         .to_owned())
+}
+
+/// Run git as [`run`] does, held to the addresses a source was checked for where
+/// `pin` names them.
+///
+/// # Errors
+///
+/// As [`run`].
+pub(crate) async fn run_pinned(
+    ctx: &Ctx,
+    pin: Option<&str>,
+    args: &[&str],
+    within: Duration,
+) -> Result<String, String> {
+    let pinned: Vec<&str> = pin
+        .map(|pin| ["-c", pin])
+        .into_iter()
+        .flatten()
+        .chain(args.iter().copied())
+        .collect();
+    run(ctx, &pinned, within).await
 }
 
 /// Said where git ran past its deadline.

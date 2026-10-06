@@ -23,6 +23,7 @@ use crate::nntp::Nntp;
 use crate::occupancy::Occupancy;
 use crate::process::Runner;
 use crate::random::Random;
+use crate::resolve::Resolver;
 use crate::time::Clock;
 use crate::FileSystem;
 
@@ -61,4 +62,6 @@ pub struct Seams {
     pub random: Arc<dyn Random>,
     /// How a Usenet provider is reached, which is a connection rather than a request.
     pub nntp: Arc<dyn Nntp>,
+    /// How a name is asked which addresses it stands for.
+    pub resolver: Arc<dyn Resolver>,
 }

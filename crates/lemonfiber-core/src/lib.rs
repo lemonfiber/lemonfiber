@@ -115,6 +115,7 @@ pub mod repair;
 pub use crate::error::retry;
 pub mod rollback;
 pub mod sabnzbd;
+pub(crate) mod schemes;
 pub mod secret;
 pub mod seed;
 pub mod seerr;

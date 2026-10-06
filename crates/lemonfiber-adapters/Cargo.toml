@@ -35,7 +35,7 @@ rustls-pki-types = { workspace = true }
 tokio-rustls = { workspace = true }
 webpki-roots = { workspace = true }
 sysinfo = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["net"] }
 tokio-stream = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]

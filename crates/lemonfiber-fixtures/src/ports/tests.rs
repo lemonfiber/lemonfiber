@@ -53,3 +53,22 @@ fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
     let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
     era * 146_097 + day_of_era - 719_468
 }
+
+/// A resolver stand-in answers every name alike and remembers each one it was asked.
+#[tokio::test]
+async fn a_resolver_stand_in_answers_alike_and_remembers_what_it_was_asked() {
+    use lemonfiber_ports::resolve::Resolver as _;
+
+    let anywhere = super::Resolving::anywhere();
+    assert_eq!(
+        anywhere.addresses("example.org", 443).await,
+        Ok(vec![super::ANYWHERE])
+    );
+    assert_eq!(anywhere.asked(), [("example.org".to_owned(), 443)]);
+
+    let failing = super::Resolving::failing("no such host");
+    assert_eq!(
+        failing.addresses("example.org", 443).await,
+        Err("no such host".to_owned())
+    );
+}
