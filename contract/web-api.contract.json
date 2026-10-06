@@ -12370,11 +12370,11 @@
           "type": "object",
           "properties": {
             "approval": {
-              "description": "What approving this pair is written as, on the command line and over the web.",
+              "description": "What approving this pair is written as, on the command line and over the web,\nwhere it carries the value to a host outside the stack. Absent where it reaches\na service in this stack, which takes nothing off the machine and asks for no\napproval.",
               "type": "string"
             },
             "origin": {
-              "description": "Whose value it is, as the step that captures it says; empty where no step does.",
+              "description": "Whose value it is, as its input or the step that captures it says; empty where\nneither does.",
               "type": "string"
             },
             "to": {
@@ -12390,8 +12390,7 @@
           "required": [
             "value",
             "origin",
-            "to",
-            "approval"
+            "to"
           ]
         },
         "PluginPlaced": {

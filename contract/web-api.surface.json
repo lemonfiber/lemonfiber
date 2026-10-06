@@ -5526,7 +5526,7 @@
           "type": [
             "string"
           ],
-          "required": true
+          "required": false
         },
         "origin": {
           "type": [

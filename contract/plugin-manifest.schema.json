@@ -181,7 +181,7 @@
       "type": "object",
       "properties": {
         "from": {
-          "description": "Where in the answer it is read from.",
+          "description": "Where in the answer it is read from: an expectation key, or `header.<name>`.",
           "type": "string"
         },
         "name": {
@@ -189,8 +189,8 @@
           "type": "string"
         },
         "origin": {
-          "description": "Whose value it is.",
-          "type": "string"
+          "description": "Whose value it is: the service in this stack or the host outside it that\nanswered.",
+          "$ref": "#/$defs/PluginValueOrigin"
         }
       },
       "additionalProperties": false,
@@ -519,6 +519,41 @@
         }
       ]
     },
+    "Input": {
+      "description": "A value a recipe brings in from outside an answer.",
+      "type": "object",
+      "properties": {
+        "ask": {
+          "description": "What the operator is asked, in one line, where the operator supplies it.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "name": {
+          "description": "What the value is called, for a call to name.",
+          "type": "string"
+        },
+        "of": {
+          "description": "The service whose credential it is, where the credential store holds it.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "origin": {
+          "description": "Whose value it is: the credential store, or the operator.",
+          "$ref": "#/$defs/PluginValueOrigin"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "origin"
+      ]
+    },
     "KeySource": {
       "description": "Where a service's credential comes from.",
       "oneOf": [
@@ -587,7 +622,7 @@
           "type": "string"
         },
         "value": {
-          "description": "The captured value, by the name the capture gave it.",
+          "description": "The value, by the name its capture or its input gives it.",
           "type": "string"
         }
       },
@@ -837,6 +872,89 @@
         }
       ]
     },
+    "PluginRecipeCondition": {
+      "description": "What an earlier step or value must have come to.\n\nOne of two shapes, and a condition carrying neither or both is refused when the\nmanifest is read: an earlier step answered a status, or an earlier value holds a\ntext exactly.",
+      "type": "object",
+      "properties": {
+        "equals": {
+          "description": "The text it must hold, exactly.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "status": {
+          "description": "The status that step must have answered.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint16",
+          "default": null,
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "step": {
+          "description": "The earlier step whose answer is asked about.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "value": {
+          "description": "The earlier capture or input asked about.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "additionalProperties": false
+    },
+    "PluginRecipeOn": {
+      "description": "When a recipe runs.",
+      "oneOf": [
+        {
+          "description": "During an install and an update, after the plugin's proofs and the stack's checks\nhold and before the install is recorded. What a recipe that says nothing does,\nbecause a first-run flow is what a recipe is for.",
+          "type": "string",
+          "const": "install"
+        },
+        {
+          "description": "Only when the operator asks for it by name, with approvals of its own.",
+          "type": "string",
+          "const": "demand"
+        }
+      ]
+    },
+    "PluginRecipeRetry": {
+      "description": "Making a step again until its answer is the one wanted.",
+      "type": "object",
+      "properties": {
+        "every": {
+          "description": "How long it waits between two, written as whole seconds, `6s`, and no longer\nthan [`LONGEST_WAIT`].",
+          "type": "string"
+        },
+        "times": {
+          "description": "How many times it is made again, at most: no more than [`MOST_RETRIES`].",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "until": {
+          "description": "What the answer must come to for it to stop: a status, or a value it captured.",
+          "$ref": "#/$defs/PluginRecipeCondition"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "times",
+        "every",
+        "until"
+      ]
+    },
     "PluginRequest": {
       "description": "What is asked, and where.\n\nThree fields and no more, and the third is the one worth explaining. A service that\nanswers XML unless a caller asks for JSON cannot satisfy a capability whose probe\nrequires a JSON assertion, and until this field there was nowhere to ask: Plex\nanswers `text/xml` at every path, including the one its health probe uses, unless\nthe request carries `Accept: application/json`.\n\n**It is one media type and not a header map, and the difference is the point.** A\nprobe declares who it is asked as, and `none` on every `guarded` probe has meant what\nit says partly because nothing could be presented. A map of headers would make that a\nconvention a reviewer has to hold — any service may name its credential header\nwhatever it likes, so no list of refused names could ever be closed — where one named\nfield keeps it a property of the format. A probe still cannot present anything,\nbecause there is nowhere to write it.",
       "type": "object",
@@ -988,6 +1106,31 @@
         "criticality"
       ]
     },
+    "PluginValueOrigin": {
+      "description": "Where a value a recipe carries comes from.\n\nFour, and no fifth: a service in this stack and a host outside it each answer a\ncall, and lemonfiber's credential store and the operator each supply a value no call\nanswered. Written by the manifest, and held to where the value really comes from.",
+      "oneOf": [
+        {
+          "description": "The answer of a call to a service in this stack.",
+          "type": "string",
+          "const": "stack-service"
+        },
+        {
+          "description": "The answer of a call to a host outside it.",
+          "type": "string",
+          "const": "external-response"
+        },
+        {
+          "description": "A credential lemonfiber already holds for a service.",
+          "type": "string",
+          "const": "credential-store"
+        },
+        {
+          "description": "A value the operator supplies when the recipe runs.",
+          "type": "string",
+          "const": "operator"
+        }
+      ]
+    },
     "Proof": {
       "description": "What must hold before a plugin is installed.",
       "type": "object",
@@ -1053,6 +1196,17 @@
         "id": {
           "description": "Unique within the plugin.",
           "type": "string"
+        },
+        "input": {
+          "description": "The values it brings in from outside an answer: a credential lemonfiber holds,\nor one the operator supplies when it runs.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Input"
+          }
+        },
+        "on": {
+          "description": "When it runs: as part of installing the plugin, or when it is asked for.",
+          "$ref": "#/$defs/PluginRecipeOn"
         },
         "pair": {
           "description": "Every value this flow could carry to every destination it could reach.\n\nA flow with no pair behind it fails validation before a call is made, which is\nwhat makes \"what does this plugin tell whom\" answerable from the manifest.",
@@ -1153,6 +1307,28 @@
         "id": {
           "description": "Unique within the recipe.",
           "type": "string"
+        },
+        "retry": {
+          "description": "How often the step is made again before its answer is taken as final.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PluginRecipeRetry"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "when": {
+          "description": "What must hold for the step to be made; where it does not, the step is skipped.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PluginRecipeCondition"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "additionalProperties": false,
@@ -1189,11 +1365,11 @@
           "type": "string"
         },
         "path": {
-          "description": "The path on it.",
+          "description": "The path on it, written out. Never a substitution.",
           "type": "string"
         },
         "to": {
-          "description": "A service id in this stack, or a DNS name outside it. Never an address.",
+          "description": "A service id in this stack, or a DNS name outside it. Never an address, and\nnever a substitution.",
           "type": "string"
         }
       },

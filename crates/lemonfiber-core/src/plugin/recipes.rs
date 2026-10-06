@@ -68,12 +68,20 @@ pub struct Step {
 pub struct Pair {
     /// What the value is called within the recipe.
     pub value: String,
-    /// Whose value it is, as the step that captures it says; empty where no step does.
+    /// Whose value it is, as its input or the step that captures it says; empty where
+    /// neither does.
     pub origin: String,
     /// Where it may be carried, by the name the manifest gives it.
     pub to: String,
-    /// What approving this pair is written as, on the command line and over the web.
-    pub approval: String,
+    /// What approving this pair is written as, on the command line and over the web,
+    /// where it carries the value to a host outside the stack. Absent where it reaches
+    /// a service in this stack, which takes nothing off the machine and asks for no
+    /// approval.
+    // Described as a string that may be absent rather than as a nullable one: it is
+    // left out, never sent as null. Not a doc comment, which schemars would publish.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "String")]
+    pub approval: Option<String>,
 }
 
 /// One recipe, as an operator agrees to what it does.
@@ -172,19 +180,34 @@ pub fn declared(manifest: &Manifest) -> Vec<Recipe> {
                 .iter()
                 .map(|pair| Pair {
                     value: pair.value.clone(),
-                    origin: recipe
-                        .steps
-                        .iter()
-                        .flat_map(|step| step.capture.iter())
-                        .find(|capture| capture.name == pair.value)
-                        .map(|capture| capture.origin.clone())
+                    origin: origin_of(recipe, &pair.value)
+                        .map(|origin| origin.written().to_owned())
                         .unwrap_or_default(),
                     to: pair.to.clone(),
-                    approval: approval(&pair.value, &pair.to),
+                    approval: lemonfiber_plugin::outside(manifest, &pair.to)
+                        .then(|| approval(&pair.value, &pair.to)),
                 })
                 .collect(),
         })
         .collect()
+}
+
+/// Where a value one recipe has comes from: the input that brings it in, or the step
+/// that captures it.
+fn origin_of(recipe: &lemonfiber_plugin::Recipe, value: &str) -> Option<lemonfiber_plugin::Origin> {
+    recipe
+        .inputs
+        .iter()
+        .find(|input| input.name == value)
+        .map(|input| input.origin)
+        .or_else(|| {
+            recipe
+                .steps
+                .iter()
+                .flat_map(|step| step.capture.iter())
+                .find(|capture| capture.name == value)
+                .map(|capture| capture.origin)
+        })
 }
 
 /// The same recipes, with the adapter of every call to one of the stack's services.
@@ -210,9 +233,13 @@ pub fn reaching(mut recipes: Vec<Recipe>, stack: &lemonfiber_manifest::Manifest)
 #[must_use]
 pub fn approvals(recipes: &[Recipe]) -> Vec<&str> {
     let mut asked: Vec<&str> = Vec::new();
-    for pair in recipes.iter().flat_map(|recipe| recipe.pairs.iter()) {
-        if !asked.contains(&pair.approval.as_str()) {
-            asked.push(&pair.approval);
+    for approval in recipes
+        .iter()
+        .flat_map(|recipe| recipe.pairs.iter())
+        .filter_map(|pair| pair.approval.as_deref())
+    {
+        if !asked.contains(&approval) {
+            asked.push(approval);
         }
     }
     asked

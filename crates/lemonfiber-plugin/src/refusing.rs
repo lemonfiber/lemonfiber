@@ -36,6 +36,8 @@ mod naming;
 mod reaching;
 mod recipes;
 
+pub use recipes::outside;
+
 use std::collections::BTreeSet;
 
 use crate::offering;
@@ -440,6 +442,7 @@ fn declared(manifest: &Manifest) -> Vec<(String, &str)> {
         let at = format!("recipe {}", recipe.id);
         every.push((format!("{at}.title"), recipe.title.as_str()));
         every.push((format!("{at}.why"), recipe.why.as_str()));
+        inputs(&at, &recipe.inputs, &mut every);
         steps(&at, &recipe.steps, &mut every);
     }
     for secret in &manifest.secrets {
@@ -466,7 +469,37 @@ fn steps<'a>(at: &str, steps: &'a [crate::schema::Step], every: &mut Vec<(String
         }
         for capture in &step.capture {
             every.push((format!("{here}.capture.from"), capture.from.as_str()));
-            every.push((format!("{here}.capture.origin"), capture.origin.as_str()));
+        }
+        let conditions = [("when", step.when.as_ref())]
+            .into_iter()
+            .chain(std::iter::once((
+                "retry.until",
+                step.retry.as_ref().map(|retry| &retry.until),
+            )));
+        for (field, condition) in conditions {
+            for text in condition
+                .into_iter()
+                .flat_map(|one| [&one.value, &one.equals])
+                .flatten()
+            {
+                every.push((format!("{here}.{field}"), text.as_str()));
+            }
+        }
+        if let Some(retry) = &step.retry {
+            every.push((format!("{here}.retry.every"), retry.every.as_str()));
+        }
+    }
+}
+
+/// What each input of a recipe is called, whose it is, and what the operator is asked.
+fn inputs<'a>(at: &str, inputs: &'a [crate::schema::Input], every: &mut Vec<(String, &'a str)>) {
+    for input in inputs {
+        let here = format!("{at}.input {}", input.name);
+        every.push((format!("{here}.name"), input.name.as_str()));
+        for (field, text) in [("of", &input.of), ("ask", &input.ask)] {
+            if let Some(text) = text {
+                every.push((format!("{here}.{field}"), text.as_str()));
+            }
         }
     }
 }

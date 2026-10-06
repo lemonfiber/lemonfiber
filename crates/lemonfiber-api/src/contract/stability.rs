@@ -28,8 +28,9 @@
 //! Were the surface simply regenerated from the types, whoever removed a field
 //! would regenerate it along with the artefact and the guard would compare a shape
 //! with itself. [`Surface::broken`] is therefore asked by the generator as well as
-//! by the test, so the only way to land a removal is to move the wire version —
-//! which is the decision the rule was always about.
+//! by the test, so a removal lands only by moving the wire version or by declaring
+//! that one break in [`DECLARED`] — a decision either way, which is what the rule
+//! was always about.
 //!
 //! # What counts as breaking, and what does not
 //!
@@ -58,6 +59,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::Contract;
+
+mod declared;
+
+pub use declared::{Declared, DECLARED};
 
 /// Where the committed surface is kept, relative to the workspace root.
 pub const SURFACE_PATH: &str = "contract/web-api.surface.json";
@@ -146,15 +151,30 @@ pub struct Surface {
 pub struct Break {
     /// What moved, named the way a consumer would address it.
     pub what: String,
+    /// How it moved.
+    pub moved: Moved,
     /// Why that is a change a consumer cannot absorb.
     pub because: String,
 }
 
+/// How a promise stopped being kept, so a declaration accepting one change on a name
+/// accepts no other change on it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Moved {
+    /// It is no longer there: a kind, a refusal, a type, a value or a field.
+    Gone,
+    /// It is there and holds something else: another payload, status or type.
+    Retyped,
+    /// A field that was always present may now be absent.
+    MayBeAbsent,
+}
+
 impl Break {
     /// One break, named and explained.
-    fn new(what: String, because: &str) -> Self {
+    fn new(what: String, moved: Moved, because: &str) -> Self {
         Self {
             what,
+            moved,
             because: because.to_owned(),
         }
     }
@@ -207,6 +227,13 @@ impl Surface {
         refusals_kept(before, after, &mut found);
         found
     }
+
+    /// Every break [`Surface::broken`] finds that no entry of [`DECLARED`] accepts —
+    /// what the generator and the suite refuse.
+    #[must_use]
+    pub fn refused(before: &Self, after: &Self) -> Vec<Break> {
+        declared::undeclared(Self::broken(before, after), before.api_version, DECLARED)
+    }
 }
 
 /// Every kind `before` emitted, still emitted and still carrying the same payload.
@@ -215,11 +242,13 @@ fn kinds_kept(before: &Surface, after: &Surface, found: &mut Vec<Break>) {
         match after.kinds.get(kind) {
             None => found.push(Break::new(
                 kind.clone(),
+                Moved::Gone,
                 "this kind is no longer emitted, so a consumer branching on it has nothing left \
                  to parse",
             )),
             Some(now) if now != was => found.push(Break::new(
                 kind.clone(),
+                Moved::Retyped,
                 &format!("the payload this kind carries was {was} and is now {now}"),
             )),
             Some(_) => {}
@@ -237,11 +266,13 @@ fn refusals_kept(before: &Surface, after: &Surface, found: &mut Vec<Break>) {
         match after.refusals.get(code) {
             None => found.push(Break::new(
                 code.clone(),
+                Moved::Gone,
                 "this refusal is no longer listed, so a client generating its codes loses \
                  one it may still be answered with",
             )),
             Some(now) if now != was => found.push(Break::new(
                 code.clone(),
+                Moved::Retyped,
                 &format!("this refusal was answered with {was} and is now answered with {now}"),
             )),
             Some(_) => {}
@@ -255,6 +286,7 @@ fn types_kept(before: &Surface, after: &Surface, found: &mut Vec<Break>) {
         let Some(now) = after.types.get(name) else {
             found.push(Break::new(
                 name.clone(),
+                Moved::Gone,
                 "this type is no longer described, so anything generated from it has no \
                  definition to key by",
             ));
@@ -263,6 +295,7 @@ fn types_kept(before: &Surface, after: &Surface, found: &mut Vec<Break>) {
         for gone in was.variants.difference(&now.variants) {
             found.push(Break::new(
                 format!("{name} = {gone}"),
+                Moved::Gone,
                 "this value is no longer on the wire, and a consumer matching on it has a case \
                  that can never be taken",
             ));
@@ -283,6 +316,7 @@ fn fields_kept(
         let Some(after) = now.fields.get(field) else {
             found.push(Break::new(
                 format!("{name}.{field}"),
+                Moved::Gone,
                 "this field is gone, and a consumer reading it finds nothing there",
             ));
             continue;
@@ -293,6 +327,7 @@ fn fields_kept(
             }
             found.push(Break::new(
                 format!("{name}.{field}"),
+                Moved::Retyped,
                 &format!(
                     "this field was described as {lost} and no longer is, so a consumer parsing \
                      it that way fails on the value it receives"
@@ -302,6 +337,7 @@ fn fields_kept(
         if before.required && !after.required {
             found.push(Break::new(
                 format!("{name}.{field}"),
+                Moved::MayBeAbsent,
                 "this field was always present and may now be absent, which a consumer that \
                  never had to check for it will read as missing data",
             ));

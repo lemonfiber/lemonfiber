@@ -1,4 +1,4 @@
-use super::{gather, read, rendered, token, Break, Field, Shape, Surface, SURFACE_PATH};
+use super::{gather, read, rendered, token, Break, Field, Moved, Shape, Surface, SURFACE_PATH};
 use crate::contract::Contract;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
@@ -537,7 +537,11 @@ fn moving_the_wire_version_is_what_makes_a_removal_allowed() {
 
 #[test]
 fn every_break_is_rendered_with_what_moved_and_why_it_matters() {
-    let rendering = rendered(&[Break::new("Report.binary".to_owned(), "it is gone")]);
+    let rendering = rendered(&[Break::new(
+        "Report.binary".to_owned(),
+        Moved::Gone,
+        "it is gone",
+    )]);
     assert_eq!(rendering, "  Report.binary — it is gone\n");
     assert_eq!(rendered(&[]), String::new());
 }
@@ -556,7 +560,7 @@ fn nothing_the_released_surface_describes_is_removed_or_retyped_under_one_versio
          `just surface`, which refuses to write a surface that drops anything"
     );
 
-    let broken = Surface::broken(
+    let broken = Surface::refused(
         &before.unwrap_or_default(),
         &Surface::of(&Contract::describe()),
     );
@@ -565,8 +569,9 @@ fn nothing_the_released_surface_describes_is_removed_or_retyped_under_one_versio
     assert!(
         broken.is_empty(),
         "these are promises the machine-readable output has made and this build no longer \
-         keeps, under an unchanged api_version:\n{named}\nEither put them back, or \
-         increment `API_VERSION` and rewrite the surface with `just surface`."
+         keeps, under an unchanged api_version:\n{named}\nEither put them back, declare \
+         each in `stability::DECLARED`, or increment `API_VERSION` and rewrite the surface \
+         with `just surface`."
     );
 }
 

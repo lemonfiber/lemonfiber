@@ -419,7 +419,7 @@ fn a_value_in_another_script_is_refused_nothing() {
 fn every_string_the_whole_manifest_declares_is_swept() {
     let read = Manifest::from_toml(crate::schema::tests::WHOLE).ok();
     let swept = read.as_ref().map(|manifest| declared(manifest).len());
-    assert_eq!(swept, Some(38));
+    assert_eq!(swept, Some(41));
 }
 
 /// A recipe that takes a value out of an answer and says nothing about holding

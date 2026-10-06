@@ -40,15 +40,17 @@ fn committed() -> Surface {
 ///
 /// The whole promise the version number carries, checked the way the generator
 /// checks it. Failing here is not a file to regenerate: either the field goes back,
-/// or `API_VERSION` moves and consumers are told the shapes changed under them.
+/// the one break is declared with its reason, or `API_VERSION` moves and consumers
+/// are told the shapes changed under them.
 #[test]
 fn this_build_still_describes_everything_the_committed_surface_does() {
-    let breaks = Surface::broken(&committed(), &Surface::of(&Contract::describe()));
+    let breaks = Surface::refused(&committed(), &Surface::of(&Contract::describe()));
 
     assert!(
         breaks.is_empty(),
         "this build drops what the committed surface describes, under an unchanged \
-         api_version:\n{}\nEither put them back, or increment API_VERSION first.",
+         api_version:\n{}\nEither put them back, declare each in stability::DECLARED, or \
+         increment API_VERSION first.",
         rendered(&breaks)
     );
 }

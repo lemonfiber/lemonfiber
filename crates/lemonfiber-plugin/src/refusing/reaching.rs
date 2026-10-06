@@ -92,7 +92,8 @@ fn captured(manifest: &Manifest, step: &Step, at: &str, found: &mut Vec<Violatio
                  hold is named in the manifest before anything can hold one, so what installing \
                  it commits the operator to is something they read rather than something they \
                  find out",
-                capture.name, capture.origin
+                capture.name,
+                capture.origin.written()
             ),
         });
     }
