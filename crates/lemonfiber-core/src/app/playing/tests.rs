@@ -52,8 +52,8 @@ impl Server {
     }
 }
 
-/// A context whose media server can be reached, or not where `password` is false.
-fn ctx_over(transport: Arc<Transport>, tag: &str, password: bool) -> Ctx {
+/// A context whose media server can be signed in to, or not where `signs_in` is false.
+fn ctx_over(transport: Arc<Transport>, tag: &str, signs_in: bool) -> Ctx {
     let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("playing-{tag}")).kept();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
@@ -62,7 +62,7 @@ fn ctx_over(transport: Arc<Transport>, tag: &str, password: bool) -> Ctx {
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
         .with_http(transport);
     context.settings.env_file = Some(dir.join(".env"));
-    if password {
+    if signs_in {
         let _ = crate::app::targets::record_secret(
             &context,
             crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,

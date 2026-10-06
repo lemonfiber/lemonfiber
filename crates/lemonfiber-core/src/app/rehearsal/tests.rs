@@ -238,6 +238,7 @@ fn reads() -> Vec<Command> {
         Command::Stuck,
         Command::FrontDoor,
         Command::News,
+        Command::Playing { member: None },
         Command::Explain {
             word: "seeding".to_owned(),
         },
