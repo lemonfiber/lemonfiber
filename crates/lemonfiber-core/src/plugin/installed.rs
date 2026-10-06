@@ -285,6 +285,15 @@ pub struct Installed {
     pub plugin: String,
     /// The plugin's own content version, as it stood when it was installed.
     pub version: String,
+    /// What the plugin calls itself, for a person to read.
+    ///
+    /// Absent on a record written before it was kept, and never filled in from the id:
+    /// a name is the author's, and one made up here would be lemonfiber's.
+    #[serde(default)]
+    pub name: Option<String>,
+    /// What it does for the operator, in its author's words. Absent alike.
+    #[serde(default)]
+    pub description: Option<String>,
     /// What was placed, one entry per service the plugin declares.
     pub services: Vec<Placed>,
     /// Every core capability its services fill, as the install settled them.
@@ -323,6 +332,16 @@ pub struct Installed {
     /// will hold.
     #[serde(default)]
     pub declared: super::declared::Declaration,
+    /// Every recipe it declares: each call in order with the adapter it reaches through,
+    /// and every value that could leave for somewhere else.
+    ///
+    /// Empty for a plugin that declares none and for a record written before these were
+    /// kept, so a list is always there to read.
+    #[serde(default)]
+    pub recipes: Vec<super::recipes::Recipe>,
+    /// Every adapter of lemonfiber's its own services name, each said to be lemonfiber's.
+    #[serde(default)]
+    pub adapters: Vec<super::recipes::Named>,
     /// The source it was installed from, as the operator named it.
     ///
     /// Empty for a record written before this was kept. A rehearsal's account carries
@@ -372,6 +391,8 @@ impl Installed {
         Self {
             plugin: manifest.plugin.id.clone(),
             version: manifest.plugin.version.clone(),
+            name: Some(manifest.plugin.name.clone()),
+            description: Some(manifest.plugin.description.clone()),
             services: manifest
                 .services
                 .iter()
@@ -389,6 +410,8 @@ impl Installed {
                 })
                 .collect(),
             declared: super::declared::Declaration::of(manifest),
+            recipes: super::recipes::declared(manifest),
+            adapters: super::recipes::named(manifest),
             from: String::new(),
             revision: String::new(),
             signed: String::new(),
@@ -426,6 +449,16 @@ impl Installed {
                     ..placed
                 })
                 .collect(),
+            ..self
+        }
+    }
+
+    /// The same record, with the adapter of every recipe call to one of the stack's own
+    /// services.
+    #[must_use]
+    pub fn reaching(self, stack: &lemonfiber_manifest::Manifest) -> Self {
+        Self {
+            recipes: super::recipes::reaching(self.recipes, stack),
             ..self
         }
     }

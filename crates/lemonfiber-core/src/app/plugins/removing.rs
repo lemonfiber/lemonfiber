@@ -42,6 +42,7 @@ pub(crate) async fn remove(
     ctx: &Ctx,
     held: Register,
     plugin: &str,
+    consent: &super::Consent,
 ) -> Result<crate::plugin::Installs, Box<Problem>> {
     let Some(going) = held
         .installed()
@@ -66,51 +67,28 @@ pub(crate) async fn remove(
         .map_err(|err| Box::new(err.problem()))?;
     let leaves = unfilled(&going, held.installed(), &stack.services);
 
-    // Judged before anything is taken, on a run that takes anything. The rollback layer
-    // refuses a drifted setting or a change a later one depends on, and a removal that
-    // had already stopped the container when it heard that would leave a plugin the
-    // register still calls installed with nothing of it running — the one state this
-    // verb must not leave. A rehearsal needs no separate question: it touches nothing,
-    // and the reversal below makes the same judgement before answering it.
-    if !ctx.dry_run {
-        super::super::putting_back::admitted(ctx, &going.plugin)?;
-    }
-
-    // What stops, named before anything does. A rehearsal carries it in its report,
+    // What stops, named before anything does. A reading carries it in its report,
     // which is read before the real run is asked for; a real run says it aloud as well,
     // because its report arrives after the containers are already gone, and a sentence
     // about what is about to stop is no use once it has.
-    let interrupts: Vec<String> = going
-        .services
-        .iter()
-        .map(|placed| placed.service.clone())
-        .collect();
-    if !ctx.dry_run {
-        ctx.narrator
-            .say(&interrupting(&going.plugin, &interrupts))
-            .await;
-    }
+    let interrupts = super::offering::stopping(&going);
+    let offer = super::offering::removing(&going, &leaves);
+    let acting = super::offering::acting(
+        ctx,
+        consent,
+        &going.plugin,
+        &offer,
+        &super::offering::REMOVING,
+        &[],
+    )?;
 
-    // Off the machine before the files that describe it go back, and only on a run
-    // that acts: a rehearsal that stopped a container would be a rehearsal that changed
-    // the machine, which is the one thing it promises not to do.
-    let stayed = !ctx.dry_run && !taken_off(ctx, &going.plugin, &interrupts).await;
-
-    // Rehearsed or carried out through the one call. The rollback layer answers a run
-    // that is only asking with what it would put back and touches nothing, so a
-    // rehearsal here is the same machinery reporting rather than a second description
-    // of it.
-    let mut went_back = super::super::putting_back::everything(ctx, &going.plugin).await?;
-    if stayed {
-        went_back.left.push(super::super::putting_back::Left {
-            target: going.plugin.clone(),
-            because: "its container could not be taken off the machine, so it may still be \
-                      running with nothing in the stack describing it"
-                .to_owned(),
-        });
-    }
-
-    if ctx.dry_run {
+    // A reading and a rehearsal ask the rollback layer what it would put back, which
+    // judges it whole and touches nothing, and stop there: a run that stopped a
+    // container here would have changed the machine it only said it would.
+    if !acting {
+        let went_back =
+            super::super::putting_back::everything(&ctx.clone().rehearsing(), &going.plugin)
+                .await?;
         return Ok(answering(
             held.installed().to_vec(),
             Removal {
@@ -120,7 +98,32 @@ pub(crate) async fn remove(
                 removed: false,
                 went_back,
             },
+            offer,
         ));
+    }
+
+    // Judged before anything is taken. The rollback layer refuses a drifted setting or a
+    // change a later one depends on, and a removal that had already stopped the
+    // container when it heard that would leave a plugin the register still calls
+    // installed with nothing of it running — the one state this verb must not leave.
+    super::super::putting_back::admitted(ctx, &going.plugin)?;
+    ctx.narrator
+        .say(&interrupting(&going.plugin, &interrupts))
+        .await;
+
+    // Off the machine before the files that describe it go back.
+    let stayed = !taken_off(ctx, &going.plugin, &interrupts).await;
+
+    // Carried out through the one call the rehearsal asked, so what goes back is the
+    // same machinery reporting rather than a second description of it.
+    let mut went_back = super::super::putting_back::everything(ctx, &going.plugin).await?;
+    if stayed {
+        went_back.left.push(super::super::putting_back::Left {
+            target: going.plugin.clone(),
+            because: "its container could not be taken off the machine, so it may still be \
+                      running with nothing in the stack describing it"
+                .to_owned(),
+        });
     }
 
     // Written last, the way an install writes it last. Until this lands the plugin is
@@ -163,12 +166,18 @@ pub(crate) async fn remove(
             removed: true,
             went_back,
         },
+        offer,
     ))
 }
 
 /// The report, which is the listing as it stands plus what this run came to.
-fn answering(installed: Vec<Installed>, removal: Removal) -> crate::plugin::Installs {
+fn answering(
+    installed: Vec<Installed>,
+    removal: Removal,
+    offer: String,
+) -> crate::plugin::Installs {
     crate::plugin::Installs {
+        agreement: Some(offer),
         rehearsed: false,
         installed,
         install: None,

@@ -7,6 +7,9 @@
 //! key are refused alike, before the name is looked up, and nothing is fetched from any
 //! origin it names.
 //!
+//! **Nothing is resolved through a release the catalogue replaced.** An index older
+//! than the newest one this machine has verified is refused, though it verifies.
+//!
 //! **What is installed is what was reviewed.** The index names one commit and the
 //! digest of the manifest there; the commit is fetched and its manifest held to that
 //! digest before the install reads a line of it. What the origin serves by default
@@ -36,19 +39,23 @@ use super::fetching::{self, Vouched};
 /// a bound is what keeps an address that hands on to itself from being asked for ever.
 const HOPS: usize = 3;
 
-/// Install the plugin the catalogue registers under `name`, at the commit it reviewed.
+/// Carry an errand out over the plugin the catalogue registers under `name`, at the
+/// commit it reviewed.
 ///
 /// # Errors
 ///
 /// Where asking the catalogue is switched off, where its index or signature cannot be
 /// fetched, where the signature does not verify or there is no key to verify it
-/// against, where the index cannot be read, where it holds no plugin by that name,
+/// against, where the index cannot be read, where it is older than the newest one this
+/// machine verified or that cannot be known, where it holds no plugin by that name,
 /// where the commit it names holds a manifest other than the one it reviewed, and every
-/// refusal an install from a git source makes.
-pub(super) async fn installed(
+/// refusal the errand makes over a git source.
+pub(super) async fn resolved(
     ctx: &Ctx,
     held: Register,
     name: &str,
+    errand: super::Errand<'_>,
+    consent: &super::Consent,
 ) -> Result<Installs, Box<Problem>> {
     if !ctx.settings.reaching.allows(REACH_CATALOGUE_KEY) {
         return Err(Box::new(switched_off(name)));
@@ -73,6 +80,14 @@ pub(super) async fn installed(
             })
         },
     )?;
+    // Before the name is looked up: a release the catalogue replaced still verifies, and
+    // what it reviewed may have been withdrawn since. Remembered only by a run that acts,
+    // because a reading and a rehearsal write nothing.
+    super::newest::held(
+        ctx,
+        read.serial(),
+        !ctx.dry_run && consent.agreement.is_some(),
+    )?;
     let entry = read
         .entry(name)
         .ok_or_else(|| Box::new(not_catalogued(name)))?;
@@ -90,14 +105,12 @@ pub(super) async fn installed(
         entry,
         signed: &signed,
     };
-    fetching::installed(
-        ctx,
-        held,
-        &entry.origin,
-        Some(&entry.revision),
-        Some(&vouched),
-    )
-    .await
+    let source = fetching::Fetching {
+        url: &entry.origin,
+        revision: Some(&entry.revision),
+        vouched: Some(&vouched),
+    };
+    fetching::fetched(ctx, held, &source, errand, consent).await
 }
 
 /// What one of the release's files holds, nothing where the release has no such file,

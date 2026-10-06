@@ -28,7 +28,10 @@ fn an_update_says_first_which_version_the_machine_is_on() {
         rehearsed.contains("The version it puts on, 1.3.0:"),
         "{rehearsed}"
     );
-    assert!(rehearsed.contains("Nothing was changed."), "{rehearsed}");
+    assert!(
+        rehearsed.contains("Nothing has been changed."),
+        "{rehearsed}"
+    );
 
     let back = Restored {
         version: "1.2.0".to_owned(),
@@ -104,6 +107,7 @@ fn taking(
 ) -> Installs {
     Installs {
         rehearsed: false,
+        agreement: None,
         installed: Vec::new(),
         install: None,
         removal: Some(Removal {
@@ -269,6 +273,7 @@ fn an_install_that_went_back_names_what_went_and_what_stayed() {
     let one = recorded("komga", Some(household()));
     let said = installs(&Installs {
         rehearsed: false,
+        agreement: None,
         removal: None,
         installed: Vec::new(),
         install: Some(Box::new(Install {
@@ -309,8 +314,8 @@ fn an_install_that_went_back_names_what_went_and_what_stayed() {
         "{said}"
     );
     assert!(
-        !said.contains("Run it again without --dry-run"),
-        "a reversal is not a rehearsal, and must not be read as one: {said}"
+        !said.contains("answering this offer by name"),
+        "a reversal is not a reading, and must not be answered as one: {said}"
     );
 }
 
@@ -321,6 +326,7 @@ fn a_reversal_that_could_not_finish_names_what_is_still_standing() {
     let one = recorded("komga", Some(household()));
     let said = installs(&Installs {
         rehearsed: false,
+        agreement: None,
         removal: None,
         installed: Vec::new(),
         install: Some(Box::new(Install {

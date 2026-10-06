@@ -227,6 +227,29 @@ pub fn read(path: &Path) -> Result<Manifest, Unreadable> {
     sourced(path).map(|(_, manifest)| manifest)
 }
 
+/// The manifest at this path and the SHA-256 of the bytes it was read from, in
+/// lower-case hexadecimal.
+///
+/// One read for both, so the digest is of exactly what was parsed: a file replaced
+/// between a read that digested it and one that parsed it would be a plugin nobody
+/// digested.
+///
+/// # Errors
+///
+/// [`Unreadable`] where there is no manifest at the path, or where this build cannot
+/// read the one that is there.
+pub fn read_digested(path: &Path) -> Result<(Manifest, String), Unreadable> {
+    let (root, at) = source(path);
+    if !at.is_file() {
+        return Err(Unreadable::NoManifest(root));
+    }
+    let text = std::fs::read_to_string(&at)?;
+    let digest = crate::secret::render(
+        ring::digest::digest(&ring::digest::SHA256, text.as_bytes()).as_ref(),
+    );
+    Ok((Manifest::from_toml(&text)?, digest))
+}
+
 /// The plugin's root and the manifest inside it, or why neither could be had.
 ///
 /// The one answer to *where a plugin's manifest is*, because the two reads above

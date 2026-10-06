@@ -324,10 +324,14 @@ fn komga() -> lemonfiber_core::plugin::Installed {
     lemonfiber_core::plugin::Installed {
         plugin: "komga".to_owned(),
         version: "1.2.0".to_owned(),
+        name: None,
+        description: None,
         services: Vec::new(),
         provides: Vec::new(),
         contributions: Vec::new(),
         declared: lemonfiber_core::plugin::Declaration::default(),
+        recipes: Vec::new(),
+        adapters: Vec::new(),
         from: String::new(),
         revision: String::new(),
         signed: String::new(),
@@ -342,6 +346,7 @@ fn installed(
 ) -> Outcome {
     Outcome::Plugins(lemonfiber_core::plugin::Installs {
         rehearsed: false,
+        agreement: None,
         removal: None,
         installed: Vec::new(),
         install: Some(Box::new(lemonfiber_core::plugin::Install {
@@ -394,6 +399,7 @@ fn a_removal_that_left_something_standing_exits_as_a_refusal() {
     let taking = |removed: bool, left: Vec<lemonfiber_core::app::putting_back::Left>| {
         Outcome::Plugins(lemonfiber_core::plugin::Installs {
             rehearsed: false,
+            agreement: None,
             installed: Vec::new(),
             install: None,
             removal: Some(lemonfiber_core::plugin::Removal {
@@ -449,6 +455,7 @@ fn an_update_that_did_not_hold_exits_as_a_refusal() {
     let moving = |recorded: bool, restored: bool| {
         Outcome::Plugins(lemonfiber_core::plugin::Installs {
             rehearsed: false,
+            agreement: None,
             installed: Vec::new(),
             install: None,
             removal: None,
@@ -504,6 +511,7 @@ fn reading_what_is_installed_always_succeeds() {
         shown(settled(&Outcome::Plugins(
             lemonfiber_core::plugin::Installs {
                 rehearsed: false,
+                agreement: None,
                 removal: None,
                 installed: vec![komga()],
                 install: None,

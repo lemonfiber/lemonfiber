@@ -12,7 +12,8 @@ const INDEX: &str = r#"{
       "revision": "8fa05ba718f70624f2c122f8c0371d47e6c90d0e"
     }
   ],
-  "schema": 1
+  "schema": 1,
+  "serial": 7
 }
 "#;
 
@@ -159,4 +160,21 @@ fn a_signer_is_named_with_its_fingerprint() {
             && named.len() == "the catalogue's test key (sha256:".len() + 64 + 1),
         "{named:?}"
     );
+}
+
+/// An index names the release it is, and one that does not is not an index this build
+/// reads: a replaced release could not be told from the one that replaced it.
+#[test]
+fn an_index_is_numbered_and_one_that_is_not_is_unreadable() {
+    let signing = Signing::new();
+    assert!(signing.is_some(), "no key pair could be made");
+    if let Some(signing) = signing {
+        let read = verified(INDEX, &signing.signed(INDEX), signing.key().as_ref());
+        assert_eq!(read.map(|index| index.serial()).ok(), Some(7));
+        let unnumbered = INDEX.replace(",\n  \"serial\": 7", "");
+        assert_eq!(
+            came_to(&unnumbered, &signing.signed(&unnumbered), &signing).0,
+            "unreadable"
+        );
+    }
 }

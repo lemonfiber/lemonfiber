@@ -32,6 +32,8 @@ mod fronting;
 mod installed;
 mod joining;
 mod register;
+// What a plugin's recipes would do, as an operator agrees to it.
+mod recipes;
 // Where the plugin to install is, told apart by how the operator wrote it.
 mod source;
 // Where an install puts what it writes. Beside the record and the container rather
@@ -66,7 +68,7 @@ use thiserror::Error;
 use crate::doctor::BUNDLED_CHECKS;
 
 pub use claimed::{
-    claimed, read, Asserted, Assertion, Claimed, Claiming, Contributed, Evidence,
+    claimed, read, read_digested, Asserted, Assertion, Claimed, Claiming, Contributed, Evidence,
     FailingAsDeclared, Ran, Unreadable, Verdict,
 };
 pub use container::{profile, written};
@@ -77,6 +79,7 @@ pub use joining::Joins;
 pub(crate) use placing::OVERLAYS;
 pub use placing::{documents, overlay, writes, Lands, Write};
 pub use provenance::{held, vouched, Key, Provenance, Unusable, Vouch, Vouched};
+pub use recipes::{approval, approvals, Adapter, Named, Owner, Pair, Recipe, Step};
 pub use recorded::{Answer, Asked, Recording};
 pub use register::{Already, Register, Unreadable as Unrecorded};
 pub use reports::{

@@ -31,6 +31,7 @@ pub(super) fn updated(one: &Update) -> Lines {
         one.install.recorded,
     ));
     lines.extend(super::changes(&one.install.changes, acted));
+    lines.extend(super::answering::recipes(&one.install.would.recipes));
     lines.extend(super::proving(
         &one.install.proofs,
         one.install.against,
@@ -51,9 +52,6 @@ pub(super) fn updated(one: &Update) -> Lines {
     }
     if let Some(back) = &one.restored {
         lines.spaced(restoring(&one.plugin, back));
-    }
-    if !acted {
-        lines.spaced("Nothing was changed. Run it again without --dry-run to update it.");
     }
     lines
 }

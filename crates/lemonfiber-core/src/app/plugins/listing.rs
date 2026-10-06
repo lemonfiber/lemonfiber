@@ -33,6 +33,7 @@ pub fn recorded(ctx: &Ctx) -> Result<Installs, Box<Problem>> {
         install: None,
         removal: None,
         update: None,
+        agreement: None,
     })
 }
 

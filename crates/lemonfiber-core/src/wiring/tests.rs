@@ -539,6 +539,8 @@ fn plugin_filling(plugin: &str, service: &str, capability: &str) -> crate::plugi
     crate::plugin::Installed {
         plugin: plugin.to_owned(),
         version: "1.0.0".to_owned(),
+        name: None,
+        description: None,
         services: vec![crate::plugin::Placed {
             service: service.to_owned(),
             image: format!("example.invalid/{service}"),
@@ -559,6 +561,8 @@ fn plugin_filling(plugin: &str, service: &str, capability: &str) -> crate::plugi
         provides: vec![capability.to_owned()],
         contributions: Vec::new(),
         declared: crate::plugin::Declaration::default(),
+        recipes: Vec::new(),
+        adapters: Vec::new(),
         from: String::new(),
         revision: String::new(),
         signed: String::new(),

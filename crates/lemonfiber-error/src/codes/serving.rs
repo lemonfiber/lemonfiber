@@ -247,6 +247,21 @@ codes! {
         /// Raised when a plugin's service would be named, where lemonfiber keeps what a
         /// service holds, as another installed plugin's service already is.
         SPELLED_ALIKE = "PLUGIN-24",
+        /// Raised when an install, an update or a removal answers an offer that was read
+        /// against a plugin, a stack or a record that has since moved.
+        PLUGIN_OFFER_MOVED = "PLUGIN-25",
+        /// Raised when a value a recipe would carry to a destination was not approved as
+        /// itself, or an approval names a pair the recipe does not carry.
+        UNAPPROVED = "PLUGIN-26",
+        /// Raised when the source an update names holds a different plugin from the one
+        /// it was asked to update.
+        ANOTHER_PLUGIN = "PLUGIN-27",
+        /// Raised when the catalogue's index verifies and is older than the newest one
+        /// this machine has verified.
+        CATALOGUE_REPLACED = "PLUGIN-29",
+        /// Raised when the record of the newest catalogue index this machine verified
+        /// cannot be read or written.
+        NEWEST_UNKEPT = "PLUGIN-30",
     }
     /// The `PROVIDER` codes.
     provider {

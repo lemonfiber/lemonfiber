@@ -345,16 +345,23 @@ fn door(read: lemonfiber::cli::PluginCommand) -> Option<Command> {
     }
 }
 
-/// The two words about this machine become commands, and the path the operator
-/// typed is carried through untouched.
+/// The words about this machine become commands: the source the operator typed, the
+/// offer they answer and every pair they approve are carried through untouched.
 #[test]
 fn the_words_about_this_machine_become_commands() {
+    let consent = |agreement: Option<&str>, approved: &[&str]| plugins::Consent {
+        agreement: agreement.map(str::to_owned),
+        approved: approved.iter().map(|pair| (*pair).to_owned()).collect(),
+    };
     assert_eq!(
         door(lemonfiber::cli::PluginCommand::Install {
-            source: "/srv/komga".to_owned()
+            source: "/srv/komga".to_owned(),
+            offer: Some("1a2b3c4d".to_owned()),
+            approved: vec!["token@metadata.example.org".to_owned()],
         }),
         Some(Command::Plugins(plugins::Asked::Install {
-            source: lemonfiber_core::plugin::Source::Path(std::path::PathBuf::from("/srv/komga"))
+            source: lemonfiber_core::plugin::Source::Path(std::path::PathBuf::from("/srv/komga")),
+            consent: consent(Some("1a2b3c4d"), &["token@metadata.example.org"]),
         }))
     );
     assert_eq!(
@@ -363,21 +370,28 @@ fn the_words_about_this_machine_become_commands() {
     );
     assert_eq!(
         door(lemonfiber::cli::PluginCommand::Remove {
-            plugin: "komga".to_owned()
+            plugin: "komga".to_owned(),
+            offer: None,
         }),
         Some(Command::Plugins(plugins::Asked::Remove {
-            plugin: "komga".to_owned()
+            plugin: "komga".to_owned(),
+            consent: consent(None, &[]),
         })),
         "a removal names the plugin rather than a path, because the source may be gone"
     );
     assert_eq!(
         door(lemonfiber::cli::PluginCommand::Update {
-            path: std::path::PathBuf::from("/srv/komga")
+            plugin: "komga".to_owned(),
+            source: "https://example.org/komga@v2".to_owned(),
+            offer: Some("1a2b3c4d".to_owned()),
+            approved: Vec::new(),
         }),
         Some(Command::Plugins(plugins::Asked::Update {
-            path: std::path::PathBuf::from("/srv/komga")
+            plugin: "komga".to_owned(),
+            source: lemonfiber_core::plugin::Source::named("https://example.org/komga@v2"),
+            consent: consent(Some("1a2b3c4d"), &[]),
         })),
-        "an update names the new version's source, because that is what is coming on"
+        "an update names the plugin and any source the install takes"
     );
 }
 

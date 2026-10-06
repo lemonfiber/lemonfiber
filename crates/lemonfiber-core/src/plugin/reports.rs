@@ -246,6 +246,12 @@ pub struct Installs {
     /// run that installs, updates or removes one leaves it empty.
     #[serde(default)]
     pub sources: Vec<Sourced>,
+    /// What this run's reading names itself, so an answer to it can say which reading
+    /// it answered; nothing on the reading of what is installed, which offers nothing.
+    ///
+    /// Named part by part, so an answer refused because something moved is told which
+    /// part did.
+    pub agreement: Option<String>,
     /// Whether this was a rehearsal: what would have happened, with none of it done.
     ///
     /// Said in a field of its own so that a rehearsal is never told from the real run by

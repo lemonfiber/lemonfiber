@@ -257,12 +257,71 @@ fn source(named: &str, manifest: &str) -> PathBuf {
     at
 }
 
+/// What asking this came to once its reading is answered with the offer it named and
+/// every pair it lists approved: the reading first, then the same request carrying the
+/// yes, which is how an operator gets from one to the other.
+pub(super) async fn answered(
+    ctx: &Ctx,
+    asked: Asked,
+) -> Result<Installs, Box<crate::error::Problem>> {
+    let reading = plugins(ctx, &asked).await?;
+    let approved: Vec<String> = reading
+        .install
+        .as_ref()
+        .map(|install| install.would.recipes.as_slice())
+        .or_else(|| {
+            reading
+                .update
+                .as_ref()
+                .map(|update| update.install.would.recipes.as_slice())
+        })
+        .map(|recipes| {
+            crate::plugin::approvals(recipes)
+                .into_iter()
+                .map(str::to_owned)
+                .collect()
+        })
+        .unwrap_or_default();
+    let consent = super::Consent {
+        agreement: reading.agreement,
+        approved,
+    };
+    let yes = match asked {
+        Asked::Install { source, .. } => Asked::Install { source, consent },
+        Asked::Remove { plugin, .. } => Asked::Remove { plugin, consent },
+        Asked::Update { plugin, source, .. } => Asked::Update {
+            plugin,
+            source,
+            consent,
+        },
+        Asked::Installed => Asked::Installed,
+    };
+    plugins(ctx, &yes).await
+}
+
+/// A yes given for a reading that is not the one standing now: an offer of six parts,
+/// none of which any reading names.
+fn stale() -> super::Consent {
+    super::Consent {
+        agreement: Some(crate::agreement::parted(&[
+            &[""],
+            &[""],
+            &[""],
+            &[""],
+            &[""],
+            &[""],
+        ])),
+        approved: Vec::new(),
+    }
+}
+
 /// What installing that source came to.
 async fn installing(ctx: &Ctx, at: &Path) -> Result<Installs, Box<crate::error::Problem>> {
-    plugins(
+    answered(
         ctx,
-        &Asked::Install {
+        Asked::Install {
             source: crate::plugin::Source::Path(at.to_path_buf()),
+            consent: super::Consent::default(),
         },
     )
     .await
@@ -296,10 +355,11 @@ fn journal_a_set(ctx: &Ctx, operation: &str, key: &str, wrote: &str) {
 
 /// What removing that plugin came to.
 async fn removing(ctx: &Ctx, plugin: &str) -> Result<Installs, Box<crate::error::Problem>> {
-    plugins(
+    answered(
         ctx,
-        &Asked::Remove {
+        Asked::Remove {
             plugin: plugin.to_owned(),
+            consent: super::Consent::default(),
         },
     )
     .await
@@ -407,10 +467,17 @@ fn next() -> String {
 
 /// What updating to that source came to.
 async fn updating(ctx: &Ctx, at: &Path) -> Result<Installs, Box<crate::error::Problem>> {
-    plugins(
+    let plugin = std::fs::read_to_string(at.join("plugin.toml"))
+        .ok()
+        .and_then(|text| lemonfiber_plugin::Manifest::from_toml(&text).ok())
+        .map(|manifest| manifest.plugin.id)
+        .unwrap_or_default();
+    answered(
         ctx,
-        &Asked::Update {
-            path: at.to_path_buf(),
+        Asked::Update {
+            plugin,
+            source: crate::plugin::Source::Path(at.to_path_buf()),
+            consent: super::Consent::default(),
         },
     )
     .await
