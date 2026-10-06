@@ -108,11 +108,14 @@ pub struct ByAKey {
     /// is taken away to prove it comes back.
     pub disturbs: bool,
     /// Whether calling it again with the same arguments leaves the stack as calling it
-    /// once did, so a second call does nothing the first did not.
+    /// once did.
     ///
-    /// False for an action that does its work again however often it is asked — takes
-    /// the services down, takes the tunnel away, moves to whatever is newest by then —
-    /// even where the stack ends up running either way.
+    /// Read by where the stack ends up, not by whether the work is done again: a second
+    /// restart takes the services down a second time and leaves them running, as the
+    /// first did. False where a second call can leave the stack somewhere the first did
+    /// not: an update moves to whatever is newest by then, and a disturbing diagnosis
+    /// takes the tunnel away each time to prove it comes back, so whether it does is the
+    /// outcome of every call rather than of the first.
     pub idempotent: bool,
 }
 
@@ -126,7 +129,7 @@ pub const KEY_CALLABLE: &[ByAKey] = &[
     ByAKey {
         action: "restart",
         disturbs: true,
-        idempotent: false,
+        idempotent: true,
     },
     ByAKey {
         action: "diagnose",
