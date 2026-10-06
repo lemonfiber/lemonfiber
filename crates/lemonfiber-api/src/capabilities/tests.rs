@@ -84,3 +84,49 @@ fn a_member_is_offered_what_the_core_gives_a_member() {
     );
     assert_eq!(declared.capabilities.len(), every_path().len());
 }
+
+/// A key is told what its scope admits at each door: a read-only key every read and no
+/// action, and a key that may act the actions a key may call as well.
+#[test]
+fn a_key_is_offered_what_its_scope_admits_at_each_door() {
+    use lemonfiber_core::keys::Scope;
+
+    let key = |scope| {
+        Caller::Key(crate::admission::Keyed {
+            name: "home-assistant".to_owned(),
+            scope,
+        })
+    };
+    let available = |declared: &super::Capabilities| -> Vec<String> {
+        declared
+            .capabilities
+            .iter()
+            .filter(|(_, standing)| **standing == Standing::Available)
+            .map(|(path, _)| path.clone())
+            .collect()
+    };
+    let reads: Vec<String> = crate::read::table::OFFERED
+        .iter()
+        .map(|read| (*read).to_owned())
+        .collect();
+
+    let reading = declared(&reaching(None), &key(Scope::Read));
+    let mut sorted = reads.clone();
+    sorted.sort();
+    assert_eq!(available(&reading), sorted);
+
+    let acting = declared(&reaching(None), &key(Scope::Act));
+    let callable = available(&acting);
+    assert!(
+        callable.contains(&"/api/actions/restart".to_owned()),
+        "{callable:?}"
+    );
+    assert!(
+        !callable.contains(&"/api/actions/uninstall".to_owned()),
+        "{callable:?}"
+    );
+    assert_eq!(
+        acting.capabilities.get("/api/actions/uninstall"),
+        Some(&Standing::Unpermitted)
+    );
+}

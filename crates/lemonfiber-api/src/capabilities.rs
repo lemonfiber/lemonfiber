@@ -29,7 +29,7 @@ use serde::Serialize;
 
 use crate::actions::{reached, Arguments, ACTION};
 use crate::admission::Caller;
-use crate::entitled::{may, Permitted};
+use crate::entitled::{may, Door, Permitted};
 use crate::read::enveloped;
 use crate::read::table::{self, Wanted};
 use crate::router::Serving;
@@ -84,19 +84,21 @@ pub fn declared(ctx: &Ctx, caller: &Caller) -> Capabilities {
     let actions = crate::actions::OFFERED.iter().map(|action| {
         (
             served_at(action),
+            Door::Acting,
             reached(action, Arguments::naming_everything()).ok(),
         )
     });
     let reads = table::OFFERED.iter().map(|read| {
         (
             (*read).to_owned(),
+            Door::Reading,
             table::named(read, Wanted::naming_everything()).ok(),
         )
     });
     Capabilities {
         capabilities: actions
             .chain(reads)
-            .filter_map(|(path, command)| Some((path, standing(ctx, caller, command?))))
+            .filter_map(|(path, door, command)| Some((path, standing(ctx, caller, door, command?))))
             .collect(),
     }
 }
@@ -106,11 +108,11 @@ fn served_at(action: &str) -> String {
     ACTION.replace("{action}", action)
 }
 
-/// What one request comes to for `caller`: what [`may`] answers for its command, and
-/// whether a setting it needs is off.
-fn standing(ctx: &Ctx, caller: &Caller, command: Command) -> Standing {
-    match may(caller, command) {
-        Permitted::Nothing => Standing::Unpermitted,
+/// What one request comes to for `caller`: what [`may`] answers for its command at the
+/// door it arrives at, and whether a setting it needs is off.
+fn standing(ctx: &Ctx, caller: &Caller, door: Door, command: Command) -> Standing {
+    match may(caller, door, command) {
+        Permitted::Nothing | Permitted::NotForAKey(_) => Standing::Unpermitted,
         Permitted::This(command) => match switched::off(ctx, &command) {
             Some(_) => Standing::Unconfigured,
             None => Standing::Available,
