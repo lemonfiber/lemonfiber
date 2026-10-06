@@ -51,6 +51,7 @@ use lemonfiber_core::error::Problem;
 use crate::refusal::Refusal;
 
 pub(crate) use asked::{Asked, FOLLOW, FORM, SERVICE, TAIL};
+pub(crate) use naming::told;
 
 /// The versions in play: this binary, the stack it operates, and the engine's.
 pub const VERSION: &str = "/api/version";
@@ -293,6 +294,9 @@ pub struct Wanted {
     pub forms: Vec<String>,
     /// The household member to narrow to.
     pub member: Option<String>,
+    /// Whether a household read is answered as the household's defaults, as it was
+    /// written.
+    pub defaults: Option<String>,
     /// What to follow, named as a person would say it.
     pub term: Option<String>,
     /// The season to narrow a trace to, as it was written.
@@ -354,6 +358,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, Refusal> {
     let Wanted {
         forms,
         member,
+        defaults,
         term,
         season,
         key,
@@ -375,8 +380,8 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, Refusal> {
         SERVICES => Ok(Command::Status { forms }),
         CHECKS => narrowed(only.as_deref()).ok_or(Refusal::NoSuchGroup),
         STORAGE => Ok(diagnosing(Narrowing::Category(Category::Storage))),
-        REQUESTS => household(member),
-        HELD => shelf(member, most),
+        REQUESTS => household(member, defaults.as_deref()),
+        HELD => shelf(member, defaults.as_deref(), most),
         // Nothing asked of it, because what is hosted is a property of the machine
         // rather than of the caller: the two words that change it are actions, at the
         // other door, and a parameter here would let one surface be told a different

@@ -1,13 +1,13 @@
 //! The words about the people in the household: who is offered an account, whose shelf
 //! is read, and what they may ask for.
 
-use lemonfiber_core::app::{Allowance, Answer, Arranged, Chosen, Command, Decision};
+use lemonfiber_core::app::{Allowance, Answer, Arranged, Chosen, Command, Decision, Whom};
 use lemonfiber_core::asking::Policy;
 use lemonfiber_core::ports::service::{Quota, Unrated};
 
 use crate::exit::USAGE;
 use crate::say::complain;
-use lemonfiber::cli::{HouseholdCommand, RawAllowance, RawUnrated};
+use lemonfiber::cli::{HouseholdCommand, RawAllowance, RawUnrated, RawWhom};
 
 /// The command line spells what somebody may watch as three flags and the core carries
 /// them as one choice, because they are one decision taken at one moment. Only the
@@ -34,13 +34,32 @@ pub(crate) fn invitation(name: String, allowance: RawAllowance) -> Command {
     }
 }
 
+/// Whom a household reading is narrowed to, from the two flags that can narrow it.
+///
+/// The command line refuses the two together, so a member never arrives beside the
+/// defaults; the defaults are read first only because there is nothing to choose.
+fn narrowed(whom: RawWhom) -> Option<Whom> {
+    if whom.defaults {
+        return Some(Whom::Defaults);
+    }
+    whom.member.map(Whom::Named)
+}
+
 /// Whose shelf, and how much of it.
 ///
-/// Naming nobody cannot happen — the word requires it, because there is no
-/// whole-household form of this to fall back to. Naming a number of nought or more than
-/// one read answers with is refused rather than rounded: somebody who asked for a
-/// thousand and was shown five hundred has been told that is the shelf.
-pub(crate) fn held(member: String, most: Option<u32>) -> Result<Command, u8> {
+/// Naming nobody is refused, because there is no whole-household form of this to fall
+/// back to: a member is named, or the household's defaults are asked for. Naming a
+/// number of nought or more than one read answers with is refused rather than rounded:
+/// somebody who asked for a thousand and was shown five hundred has been told that is
+/// the shelf.
+pub(crate) fn held(whom: RawWhom, most: Option<u32>) -> Result<Command, u8> {
+    let Some(member) = narrowed(whom) else {
+        complain!(
+            "error: name whose shelf with `--member`, or ask for the household's defaults \
+             with `--defaults`"
+        );
+        return Err(USAGE);
+    };
     // Taken from the served read rather than restated, so a terminal and a browser
     // looking at one household cannot come to see two different shelves. A number
     // written down twice is a number that drifts the first time one of them moves.
@@ -64,17 +83,15 @@ pub(crate) fn held(member: String, most: Option<u32>) -> Result<Command, u8> {
 /// the *reading* to one person, and a decision about one person carries its own — so the
 /// two together are two requests in one line, and the pair is refused rather than one
 /// half being dropped.
-pub(crate) fn household(
-    member: Option<String>,
-    action: Option<HouseholdCommand>,
-) -> Result<Command, u8> {
+pub(crate) fn household(whom: RawWhom, action: Option<HouseholdCommand>) -> Result<Command, u8> {
+    let member = narrowed(whom);
     let Some(action) = action else {
         return Ok(Command::Household { member });
     };
     if member.is_some() {
         complain!(
-            "error: `--member` narrows who is listed and cannot be given to a decision \
-             (name the person on the decision instead)"
+            "error: `--member` and `--defaults` narrow who is listed and cannot be given \
+             to a decision (name the person on the decision instead)"
         );
         return Err(USAGE);
     }

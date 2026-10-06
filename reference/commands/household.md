@@ -29,7 +29,10 @@ Options:
           Print machine-readable output
 
       --member <MEMBER>
-          Narrow to one member, named the way you would say it
+          One member, named the way you would say it
+
+      --defaults
+          Somebody invited with the household's defaults, read without asking about anybody's account
 
       --dry-run
           Say what would happen, and change nothing

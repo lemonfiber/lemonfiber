@@ -15,7 +15,7 @@ async fn a_shelf_is_asked_for_against_the_members_own_account() {
         Answer::reply(200, SIGNED_IN),
         Answer::reply(200, A_SHELF),
     ]);
-    let held = reader(&fake).holdings("a7f3", 25).await;
+    let held = reader(&fake).holdings(Some("a7f3"), 25).await;
     assert!(
         held.is_ok(),
         "a shelf the server answered was not read: {held:?}"
@@ -47,6 +47,37 @@ async fn a_shelf_is_asked_for_against_the_members_own_account() {
     );
 }
 
+/// Naming nobody asks about no account: the shelf is the one the administrator's own
+/// sign-in is answered with, which holds every library and no age limit. No member's
+/// id is in the path, because the defaults are nobody's.
+#[tokio::test]
+async fn the_defaults_shelf_is_asked_for_against_no_account() {
+    let fake = Fake::in_turn(vec![
+        Answer::reply(200, SIGNED_IN),
+        Answer::reply(200, A_SHELF),
+    ]);
+    let held = reader(&fake).holdings(None, 25).await;
+    assert_eq!(held.map(|held| held.len()).ok(), Some(3));
+
+    let url = fake
+        .requests()
+        .last()
+        .map(|request| request.url.clone())
+        .unwrap_or_default();
+    assert!(
+        url.contains("/Items?Recursive=true"),
+        "the defaults shelf was not asked for: {url}"
+    );
+    assert!(
+        !url.contains("/Users/"),
+        "the defaults shelf was asked for as an account: {url}"
+    );
+    assert!(
+        url.contains("Limit=25"),
+        "the count did not reach the server: {url}"
+    );
+}
+
 /// The two kinds arrive as this product's own words, and a third arrives rather than
 /// vanishing: the query named two, so a third is the server describing something in a
 /// way this build has not been taught — and leaving it out would be this deciding what
@@ -57,7 +88,10 @@ async fn what_the_server_calls_things_arrives_in_this_products_words() {
         Answer::reply(200, SIGNED_IN),
         Answer::reply(200, A_SHELF),
     ]);
-    let held = reader(&fake).holdings("a7f3", 25).await.unwrap_or_default();
+    let held = reader(&fake)
+        .holdings(Some("a7f3"), 25)
+        .await
+        .unwrap_or_default();
 
     assert_eq!(
         held.iter().map(|one| one.medium).collect::<Vec<_>>(),
@@ -84,7 +118,7 @@ async fn a_shelf_the_server_would_not_describe_is_refused_rather_than_read_as_em
         Answer::reply(200, "not json"),
     ]);
     assert!(matches!(
-        reader(&fake).holdings("a7f3", 25).await,
+        reader(&fake).holdings(Some("a7f3"), 25).await,
         Err(Failure::Refused { .. })
     ));
 }
@@ -99,7 +133,7 @@ async fn a_shelf_with_nothing_on_it_is_an_answer() {
         Answer::reply(200, "{}"),
     ]);
     assert_eq!(
-        reader(&fake).holdings("a7f3", 25).await.ok(),
+        reader(&fake).holdings(Some("a7f3"), 25).await.ok(),
         Some(Vec::new())
     );
 }

@@ -425,7 +425,7 @@ impl Household for AHousehold {
     async fn libraries(&self) -> Result<Vec<NamedLibrary>, Failure> {
         unreachable!("the door asks this household who somebody is and nothing else")
     }
-    async fn holdings(&self, _: &str, _: u32) -> Result<Vec<Held>, Failure> {
+    async fn holdings(&self, _: Option<&str>, _: u32) -> Result<Vec<Held>, Failure> {
         unreachable!("the door asks this household who somebody is and nothing else")
     }
     async fn ratings(&self) -> Result<Vec<Certificate>, Failure> {

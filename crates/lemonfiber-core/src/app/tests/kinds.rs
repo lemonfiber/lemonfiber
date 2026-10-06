@@ -353,7 +353,7 @@ async fn a_dispatched_household_serialises_under_its_own_kind() {
 async fn a_shelf_with_no_media_server_behind_it_is_unread_not_empty() {
     let json = dispatch(
         Command::Held {
-            member: "ada".to_owned(),
+            member: crate::app::Whom::Named("ada".to_owned()),
             most: 25,
         },
         &ctx(Ok(spoke(""))),

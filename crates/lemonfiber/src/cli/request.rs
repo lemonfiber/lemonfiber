@@ -16,7 +16,8 @@ use clap::Subcommand;
 use super::{
     AlertCommand, Asked, ConfigAction, HostingCommand, HouseholdCommand, MigrateCommand,
     PluginCommand, QualityCommand, RawAllowance, RawBandwidth, RawCompanion, RawCredentials,
-    RawDoctor, RawDownloads, RawKey, RawRemoving, RawSetup, RawTrace, RawUi, UpdateCommand,
+    RawDoctor, RawDownloads, RawKey, RawRemoving, RawSetup, RawTrace, RawUi, RawWhom,
+    UpdateCommand,
 };
 
 /// What the operator asked for.
@@ -225,9 +226,9 @@ pub enum Request {
     /// Name one of the four things underneath to change any of that, to answer one
     /// request that is waiting, or to arrange what becomes of the ones nobody answers.
     Household {
-        /// Narrow to one member, named the way you would say it.
-        #[arg(long)]
-        member: Option<String>,
+        /// Narrow to one member, or to the household's defaults.
+        #[command(flatten)]
+        whom: RawWhom,
         /// Decide what the household may ask for, or answer one waiting request.
         #[command(subcommand)]
         action: Option<HouseholdCommand>,
@@ -243,9 +244,9 @@ pub enum Request {
     ///
     /// One person at a time, because no two accounts need have the same shelf.
     Held {
-        /// Whose shelf, named the way you would say it.
-        #[arg(long)]
-        member: String,
+        /// Whose shelf.
+        #[command(flatten)]
+        whom: RawWhom,
         /// How many to show, newest first.
         #[arg(long)]
         most: Option<u32>,

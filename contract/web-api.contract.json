@@ -21540,7 +21540,12 @@
     "READ-15": {
       "name": "NOT_A_CHOICE",
       "status": 400,
-      "description": "Raised where whether to keep reading is neither true nor false."
+      "description": "Raised where a parameter that takes a yes or a no is neither true nor false."
+    },
+    "READ-16": {
+      "name": "MEMBER_AND_DEFAULTS",
+      "status": 400,
+      "description": "Raised where a household read named a member and asked for the household's defaults as well."
     },
     "READ-2": {
       "name": "REPEATED",

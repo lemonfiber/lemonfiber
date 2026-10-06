@@ -78,8 +78,10 @@ pub enum Refusal {
     NoUpdateObject,
     /// How many log lines to begin with is not a number within the ceiling.
     NotALineCount,
-    /// Whether to keep reading is neither true nor false.
+    /// A parameter that takes a yes or a no is neither true nor false.
     NotAChoice,
+    /// A household read named a member and asked for the household's defaults as well.
+    MemberAndDefaults,
     /// No action goes by the name that was asked for.
     NoSuchAction,
     /// An action was not given an argument it needs.
@@ -121,7 +123,7 @@ impl Refusal {
     ///
     /// What the contract lists, so a variant added above and not here is a code no
     /// client can name. A test holds the two together.
-    pub const EVERY: [Self; 37] = [
+    pub const EVERY: [Self; 38] = [
         Self::NotAdmitted,
         Self::Elsewhere,
         Self::NotYours,
@@ -146,6 +148,7 @@ impl Refusal {
         Self::NoUpdateObject,
         Self::NotALineCount,
         Self::NotAChoice,
+        Self::MemberAndDefaults,
         Self::NoSuchAction,
         Self::MissingArgument,
         Self::UnrecognisedArgument,
@@ -189,6 +192,7 @@ impl Refusal {
             Self::NoUpdateObject => read::NO_UPDATE_OBJECT,
             Self::NotALineCount => read::NOT_A_LINE_COUNT,
             Self::NotAChoice => read::NOT_A_CHOICE,
+            Self::MemberAndDefaults => read::MEMBER_AND_DEFAULTS,
             Self::NoSuchAction => ask::NO_SUCH_ACTION,
             Self::MissingArgument => ask::MISSING_ARGUMENT,
             Self::UnrecognisedArgument => ask::UNRECOGNISED_ARGUMENT,
@@ -242,6 +246,7 @@ impl Refusal {
             | Self::NoUpdateObject
             | Self::NotALineCount
             | Self::NotAChoice
+            | Self::MemberAndDefaults
             | Self::MissingArgument
             | Self::UnrecognisedArgument
             | Self::UnwantedArgument
@@ -312,7 +317,10 @@ impl Refusal {
             // so a page asking about one and handed the other was answered wrongly.
             Self::NoUpdateObject => "Which of stack or self to move forward must be named.",
             Self::NotALineCount => "How many lines to begin with must be a number.",
-            Self::NotAChoice => "Whether to keep reading must be true or false.",
+            Self::NotAChoice => "A parameter that takes a yes or a no must be true or false.",
+            Self::MemberAndDefaults => {
+                "Name a member or ask for the household's defaults, not both."
+            }
             Self::NoSuchAction => {
                 "There is no action by that name. \
                  This surface offers what the command line offers, and nothing else."
@@ -385,7 +393,8 @@ impl Refusal {
             | Self::NoSuchRemoval
             | Self::NoUpdateObject
             | Self::NotALineCount
-            | Self::NotAChoice => Remedy::new("Ask again as the sentence says"),
+            | Self::NotAChoice
+            | Self::MemberAndDefaults => Remedy::new("Ask again as the sentence says"),
             Self::NoSuchAction => Remedy::new("Ask for one of the actions the contract names"),
             Self::MissingArgument
             | Self::UnrecognisedArgument

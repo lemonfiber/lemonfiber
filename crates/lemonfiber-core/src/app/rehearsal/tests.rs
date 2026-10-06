@@ -337,7 +337,7 @@ fn always_reported() -> Vec<Command> {
         },
         Command::Household { member: None },
         Command::Held {
-            member: "ana".to_owned(),
+            member: crate::app::Whom::Named("ana".to_owned()),
             most: 25,
         },
         Command::Allowing(Chosen::default()),

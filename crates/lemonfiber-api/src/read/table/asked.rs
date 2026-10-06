@@ -44,6 +44,9 @@ pub(crate) const FOLLOW: &str = "follow";
 /// The parameter naming the household member to narrow to.
 const MEMBER: &str = "member";
 
+/// The parameter asking for a household read answered as the household's defaults.
+const DEFAULTS: &str = "defaults";
+
 /// The parameter saying how many holdings to answer with.
 const MOST: &str = "most";
 
@@ -93,8 +96,8 @@ const TAKEN: &[(&str, &[&str])] = &[
     (LOGS, &[FORM, SERVICE, TAIL, FOLLOW]),
     (CHECKS, &[ONLY]),
     (STORAGE, &[]),
-    (REQUESTS, &[MEMBER]),
-    (HELD, &[MEMBER, MOST]),
+    (REQUESTS, &[MEMBER, DEFAULTS]),
+    (HELD, &[MEMBER, DEFAULTS, MOST]),
     (HOSTING, &[]),
     (FRONT_DOOR, &[]),
     (NEWS, &[]),
@@ -192,6 +195,7 @@ impl Asked {
         Wanted {
             forms: self.every(FORM),
             member: self.one(MEMBER).map(str::to_owned),
+            defaults: self.one(DEFAULTS).map(str::to_owned),
             term: self.one(TERM).map(str::to_owned),
             season: self.one(SEASON).map(str::to_owned),
             key: self.one(KEY).map(str::to_owned),

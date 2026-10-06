@@ -28,7 +28,7 @@ pub use bandwidth::BandwidthAsked;
 pub use credentials::Asking;
 pub use filling::{Filling, Linking};
 pub use hosting::{Hostable, Keeping, HOSTABLE};
-pub use household::{Answer, Arranged, Chosen, Decision};
+pub use household::{Answer, Arranged, Chosen, Decision, Whom};
 pub use migrate::MigrateAction;
 pub use quality::QualityAction;
 pub use setting::Setting;
@@ -223,16 +223,16 @@ pub enum Command {
     /// member rather than all of them, because the shelf is different for every account
     /// and a single answer would be wrong for whoever it was not read as.
     Held {
-        /// Whose shelf — an id the media server files somebody under, or their name.
-        member: String,
+        /// Whose shelf — a member, or somebody invited with the household's defaults.
+        member: Whom,
         /// How many to answer with, newest first.
         most: u32,
     },
     /// Report what the household has asked for and where each request stands, in the
     /// words the member who asked would use rather than the services' own.
     Household {
-        /// The member to narrow to, or every member where absent.
-        member: Option<String>,
+        /// The member or the household's defaults to narrow to, or every member where absent.
+        member: Option<Whom>,
     },
     /// Choose what the household may ask for — the policy, the limit, or both, for
     /// everybody or for one person.

@@ -11,7 +11,7 @@ one version: M4 spans `0.3.0` and `0.4.0`, M5 spans three, M6 spans `0.8.0` and
 `1.0.0` with fifteen versions in between, and M10 is scoped by no version manifest at
 all. Nor do the numbers run in ship order — M14 ships at `0.16.0`–`0.18.0` and M16 at
 `0.19.0`, ahead of M11's `0.20.0`–`0.21.0`. M0–M1 live in the `spec` and `lemonfiber-media-stack` repos and are
-recorded here for context. Milestones M11, M12, M13, M15 and M16 are not started — their
+recorded here for context. Milestones M11, M12, M13 and M15 are not started — their
 sections point at the
 [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md).
 Every other milestone has a table, and several hold rows that landed ahead of the
@@ -848,10 +848,15 @@ to lift, not a first step into it.
 
 ---
 
-## M16 — The household's library · ☐
+## M16 — The household's library · ◐
 
 `0.19.0`. A member finds a title, sees its artwork and what it is, asks for it, and
 plays it on their own media-server account under their own limits: the grant and the
 guarded front door, the reads behind each title, and a member's own search and ask.
-Not started.
+One row has landed ahead of the rest: the household's defaults, which the operator
+reads to see the member's side.
 See the [spec roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md#m16--the-households-library).
+
+| Deliverable | Reqs | Status | Landed |
+|-------------|------|--------|--------|
+| The member's side, read for nobody | `D6-R20` | ✅ | **The household's defaults are a member who is nobody in particular.** `lemonfiber held --defaults` and `lemonfiber household --defaults`, and `?defaults=true` on `/api/held` and `/api/requests`, answer with the envelopes a member's own session is answered with, read for somebody invited without a choice of their own: every library, no age limit, and what the household may ask for where nobody chose otherwise. [`command/household.rs`](crates/lemonfiber-core/src/app/command/household.rs) carries the choice as one value beside a named member. **Nothing of anybody's is read to answer it.** The shelf is asked at `/Items` under the administrator's own sign-in, which holds every library and no limit, rather than at any member's `/Users/{id}/Items` ([`shelf.rs`](crates/lemonfiber-core/src/jellyfin/household/shelf.rs)); the household is one row under no name, built from the request service's own setting and nothing else — no account list, no requests and nobody's count ([`defaults.rs`](crates/lemonfiber-core/src/household/run/defaults.rs)). Both are held to what was asked of the services, not only to what came back. A member's session asking for the defaults is answered with their own row and shelf, as a name they did not hold is ([`entitled.rs`](crates/lemonfiber-api/src/entitled.rs)), and naming a member beside the defaults is refused as `READ-16` rather than either half dropped. Landed in #892. |

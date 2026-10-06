@@ -1,4 +1,4 @@
-use lemonfiber_core::app::Command;
+use lemonfiber_core::app::{Command, Whom};
 
 use super::{callable_by_a_key, may, Door, Permitted};
 use crate::admission::Caller;
@@ -13,6 +13,56 @@ fn member() -> Caller {
     Caller::Member(ASKING.to_owned())
 }
 
+fn named(id: &str) -> Whom {
+    Whom::Named(id.to_owned())
+}
+
+/// Asking for the household's defaults is discarded like a name is: a member is
+/// somebody, and is answered with their own row and their own shelf.
+#[test]
+fn a_member_asking_for_the_defaults_is_given_their_own() {
+    assert_eq!(
+        may(
+            &member(),
+            Door::Reading,
+            Command::Household {
+                member: Some(Whom::Defaults)
+            }
+        ),
+        Permitted::This(Command::Household {
+            member: Some(named(ASKING))
+        })
+    );
+    assert_eq!(
+        may(
+            &member(),
+            Door::Reading,
+            Command::Held {
+                member: Whom::Defaults,
+                most: 25,
+            }
+        ),
+        Permitted::This(Command::Held {
+            member: named(ASKING),
+            most: 25,
+        })
+    );
+}
+
+/// The operator is answered as the household's defaults where they asked to be,
+/// which is how the member's side is seen without reading any member's.
+#[test]
+fn the_operator_is_answered_as_the_defaults() {
+    let defaults = Command::Held {
+        member: Whom::Defaults,
+        most: 25,
+    };
+    assert_eq!(
+        may(&Caller::Operator, Door::Reading, defaults.clone()),
+        Permitted::This(defaults)
+    );
+}
+
 #[test]
 fn a_members_household_read_is_narrowed_to_them() {
     assert_eq!(
@@ -22,7 +72,7 @@ fn a_members_household_read_is_narrowed_to_them() {
             Command::Household { member: None }
         ),
         Permitted::This(Command::Household {
-            member: Some(ASKING.to_owned())
+            member: Some(named(ASKING))
         })
     );
 }
@@ -38,11 +88,11 @@ fn a_member_naming_somebody_else_is_still_narrowed_to_themselves() {
             &member(),
             Door::Reading,
             Command::Household {
-                member: Some(SOMEBODY_ELSE.to_owned())
+                member: Some(named(SOMEBODY_ELSE))
             }
         ),
         Permitted::This(Command::Household {
-            member: Some(ASKING.to_owned())
+            member: Some(named(ASKING))
         })
     );
 }
@@ -57,12 +107,12 @@ fn a_member_naming_somebody_elses_shelf_is_given_their_own() {
             &member(),
             Door::Reading,
             Command::Held {
-                member: SOMEBODY_ELSE.to_owned(),
+                member: named(SOMEBODY_ELSE),
                 most: 25,
             }
         ),
         Permitted::This(Command::Held {
-            member: ASKING.to_owned(),
+            member: named(ASKING),
             most: 25,
         })
     );
@@ -77,12 +127,12 @@ fn how_much_of_the_shelf_a_member_asked_for_is_carried_through() {
             &member(),
             Door::Reading,
             Command::Held {
-                member: ASKING.to_owned(),
+                member: named(ASKING),
                 most: 7,
             }
         ),
         Permitted::This(Command::Held {
-            member: ASKING.to_owned(),
+            member: named(ASKING),
             most: 7,
         }),
         "the count a member asked for was not carried through"
@@ -121,11 +171,11 @@ fn the_machine_and_the_operator_are_asked_nothing_new() {
                 &caller,
                 Door::Reading,
                 Command::Household {
-                    member: Some(SOMEBODY_ELSE.to_owned())
+                    member: Some(named(SOMEBODY_ELSE))
                 }
             ),
             Permitted::This(Command::Household {
-                member: Some(SOMEBODY_ELSE.to_owned())
+                member: Some(named(SOMEBODY_ELSE))
             })
         );
     }
@@ -214,14 +264,14 @@ fn a_member_key_is_exactly_that_members_session_at_either_door() {
                 &theirs,
                 door,
                 Command::Household {
-                    member: Some(SOMEBODY_ELSE.to_owned())
+                    member: Some(named(SOMEBODY_ELSE))
                 }
             ),
             may(
                 &member(),
                 door,
                 Command::Household {
-                    member: Some(SOMEBODY_ELSE.to_owned())
+                    member: Some(named(SOMEBODY_ELSE))
                 }
             )
         );

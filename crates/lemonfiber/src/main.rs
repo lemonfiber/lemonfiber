@@ -306,8 +306,8 @@ async fn main() -> ExitCode {
         // Naming a word says what it means and naming none lists them, and both are
         // answered from a table compiled into the binary rather than from a stack.
         Request::Explain { word } => return explaining(&ctx, &word, cli.json, cli.dry_run).await,
-        Request::Household { member, action } => taken!(household(member, action)),
-        Request::Held { member, most } => taken!(translate::held(member, most)),
+        Request::Household { whom, action } => taken!(household(whom, action)),
+        Request::Held { whom, most } => taken!(translate::held(whom, most)),
         Request::History => Command::History,
         Request::Undo { at } => Command::Undo { run: Some(at) },
         Request::Stuck => Command::Stuck,

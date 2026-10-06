@@ -12,7 +12,7 @@ use lemonfiber_core::model::{kind, Envelope};
 use lemonfiber_core::ports::docker::LogQuery;
 
 use crate::admission::Caller;
-use crate::read::table::{Asked, FOLLOW, FORM, LOGS, SERVICE, TAIL};
+use crate::read::table::{told, Asked, FOLLOW, FORM, LOGS, SERVICE, TAIL};
 use crate::refusal::Refusal;
 use crate::router::Serving;
 use crate::serve::operator_only;
@@ -72,22 +72,6 @@ async fn log_lines(
         return crate::following::followed(&serving, forms, services, tail).await;
     }
     read_logs(&serving.ctx, &forms, &services, tail).await
-}
-
-/// Whether a request asked to keep reading, or nothing where it said something
-/// that is neither.
-///
-/// Not given is not asked for. A word that is neither is a mistake to correct
-/// rather than a request to answer with the scrollback, because the two answers
-/// are different shapes — lines, or a name — and a caller that meant to follow
-/// would otherwise parse an answer it never asked for.
-fn told(said: Option<&str>) -> Option<bool> {
-    match said {
-        // Not given is not asked for, which is the same answer as having said so.
-        None | Some("false") => Some(false),
-        Some("true") => Some(true),
-        Some(_) => None,
-    }
 }
 
 /// The scrollback, one envelope per line.
