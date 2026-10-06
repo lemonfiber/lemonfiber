@@ -423,9 +423,17 @@ async fn two_installs_of_one_commit_at_once_never_share_a_checkout() {
 
     assert!(report(one).and_then(|one| one.install).is_some());
     assert!(report(other).and_then(|one| one.install).is_some());
+    // Each install reads its offer and then answers it, so each checks out twice.
     let made = serving.checkouts();
-    assert_eq!(made.len(), 2, "{made:?}");
-    assert_ne!(made.first(), made.get(1), "two installs shared a checkout");
+    let mut apart = made.clone();
+    apart.sort();
+    apart.dedup();
+    assert_eq!(made.len(), 4, "{made:?}");
+    assert_eq!(
+        apart.len(),
+        made.len(),
+        "two installs shared a checkout: {made:?}"
+    );
     assert!(serving.left_nothing());
 }
 
