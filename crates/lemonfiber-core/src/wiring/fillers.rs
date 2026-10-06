@@ -235,6 +235,24 @@ impl Fillers {
     }
 }
 
+/// Whether a credential a service of `owner`'s origin holds may be handed to a service
+/// of `recipient`'s: the one gate every credential crosses between two services here.
+///
+/// **Only to the stack's own, or to the owner's own plugin.** A plugin's service is a
+/// stranger's code: what it is handed it can keep, and nothing could take it back. So
+/// no credential of the stack's reaches a plugin's service, and no plugin's credential
+/// reaches another plugin's. A plugin's credential reaching the stack's own service is
+/// a plugin standing in for a bundled one being wired, which is what it was installed
+/// for.
+#[must_use]
+pub fn crosses(owner: &Origin, recipient: &Origin) -> bool {
+    match recipient {
+        Origin::Bundled => true,
+        Origin::Plugin { .. } => owner == recipient,
+        _ => false,
+    }
+}
+
 /// The name a credential `filler` holds would be kept under, ending in `holds`, before
 /// anything is refused.
 fn spelled(filler: &Filler, holds: &str) -> String {

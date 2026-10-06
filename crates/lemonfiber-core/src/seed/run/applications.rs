@@ -3,7 +3,7 @@
 //! The indexer needs to know what to search on behalf of, which is the one connection
 //! that runs from the indexer outward rather than into it.
 
-use super::connecting::{pairings, Connection, Own, FILM, MUSIC, TELEVISION};
+use super::connecting::{pairings, Cleared, Connection, FILM, MUSIC, TELEVISION};
 use super::Ctx;
 use crate::ports::filesystem::Beneath;
 use crate::ports::service::Application;
@@ -13,7 +13,7 @@ use crate::wiring::{Filler, Fillers};
 /// wiring that says why it is not told yet.
 struct Syncing<'a> {
     /// The indexer that asks.
-    asker: Own<'a>,
+    asker: Cleared<'a>,
     /// Each curator, with the application it comes to.
     curators: Vec<(&'a Filler, crate::ports::service::ApplicationKind, String)>,
 }
@@ -72,8 +72,8 @@ async fn sync(ctx: &Ctx, syncing: &Syncing<'_>, only: Option<&str>) -> Vec<crate
     if curators.is_empty() {
         return Vec::new();
     }
-    // An indexer is one of the stack's own services, whose credential file is never
-    // confined, so its key is read or not written yet and nothing here is refused.
+    // The indexer's own key, which every curator it registers is handed: one not written
+    // yet, or in a file it may not be read from, registers nothing this run.
     let Beneath::Read(asker_key) = super::arrs::servarr_key(ctx, asker).await else {
         return curators
             .iter()
@@ -83,9 +83,8 @@ async fn sync(ctx: &Ctx, syncing: &Syncing<'_>, only: Option<&str>) -> Vec<crate
     let mut wanted = Vec::new();
     let mut passed = Vec::new();
     for (curator, kind, reached) in curators {
-        // A curator registered here is one of the stack's own — a plugin's is never handed
-        // the indexer's key — and its credential file is never confined, so its key is
-        // read or not written yet and nothing here is refused.
+        // A curator the gate let the indexer's key reach, read from its own file: one not
+        // written yet, or in a file it may not be read from, is passed over this run.
         let Beneath::Read(key) = super::arrs::servarr_key(ctx, curator).await else {
             passed.push(skipped(synced(&curator.name, &asker.name), &curator.name));
             continue;

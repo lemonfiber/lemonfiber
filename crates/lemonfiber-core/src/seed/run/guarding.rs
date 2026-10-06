@@ -52,11 +52,12 @@ struct Aggregator {
 /// The aggregator this stack ships, where it runs one this machine can reach.
 ///
 /// The stack's own and never a plugin's: the password this pass mints, keeps and sends
-/// is the stack's, and a plugin's service naming the same adapter is not handed it.
+/// is the stack's, and the gate lets no plugin's service naming the same adapter be
+/// handed it.
 fn aggregator(ctx: &Ctx, fillers: &Fillers) -> Option<Aggregator> {
     let own = fillers
         .speaking(ApiKind::Nzbhydra2)
-        .find(|filler| filler.origin == Origin::Bundled)?;
+        .find(|filler| crate::wiring::crosses(&Origin::Bundled, &filler.origin))?;
     Some(Aggregator {
         client: Nzbhydra2::new(
             ctx.seams.http.clone(),

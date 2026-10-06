@@ -196,9 +196,7 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
 
     // The book *arr, which the aggregator cannot register itself into: it keeps its own
     // list of aggregators and pulls from them, so it is told where one is instead.
-    wirings.extend(
-        aggregators::seed_aggregators(ctx, &manifest.services, project.as_deref(), &filled).await,
-    );
+    wirings.extend(aggregators::seed_aggregators(ctx, &fillers).await);
 
     // The media server and everything that signs in to it as its administrator.
     wirings.extend(
