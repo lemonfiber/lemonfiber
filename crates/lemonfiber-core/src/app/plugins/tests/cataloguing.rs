@@ -509,6 +509,12 @@ async fn a_newest_index_that_cannot_be_kept_resolves_nothing() {
             release(&listed, Some(signing.signed(&listed))),
             signing.key(),
         );
+        // Where checkouts are made is under the data directory, which here sits inside the
+        // configuration one, so it is made before that is locked: only the record is
+        // left with nowhere to be written.
+        let checkouts =
+            crate::app::targets::layout(&ctx).map(|paths| paths.data_dir().to_path_buf());
+        assert!(checkouts.is_some_and(|dir| std::fs::create_dir_all(dir.join("checkouts")).is_ok()));
         let config = newest(&ctx).parent().map(std::path::Path::to_path_buf);
         let locked = |mode: u32| {
             config.as_ref().is_some_and(|dir| {
