@@ -1,7 +1,7 @@
+use super::refusing::refused;
 use super::{
-    asked, carried, not_taught_yet, refused, repair, restore, update, verdict, Asked, Rehearsal,
-    A_SEARCH_IS_THE_ANSWER, MATERIAL_IS_MATERIAL, THE_CHECK_IS_THE_DISRUPTION,
-    THE_WALK_IS_THE_OBSERVATION,
+    asked, carried, not_taught_yet, verdict, Asked, Rehearsal, A_SEARCH_IS_THE_ANSWER,
+    MATERIAL_IS_MATERIAL, THE_CHECK_IS_THE_DISRUPTION, THE_WALK_IS_THE_OBSERVATION,
 };
 use crate::app::command::{
     AlertAction, Arranged, Asking, BandwidthAsked, Chosen, Decision, Filling, Keeping, Linking,
@@ -10,6 +10,7 @@ use crate::app::command::{
 use crate::app::engine::Waiting;
 use crate::app::plugins;
 use crate::app::setup::SetupAction;
+use crate::app::{repair, restore, update};
 use crate::app::{
     Command, Diagnosing, Gathering, Inviting, LettingGo, Restoring, Teardown, Tracing,
 };

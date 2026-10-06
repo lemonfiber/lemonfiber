@@ -30,19 +30,17 @@
 //! reports the report it would have filled in and stops short of the one irreversible
 //! step. See `.docs/architecture/rehearsal.md`.
 
-use crate::error::{Amiss, Problem, Remedy, Severity, State};
+use crate::error::Problem;
 use crate::model::kind::{self, Kind};
 
 use super::command::{
-    Asking, Diagnosing, Gathering, Keeping, Linking, MigrateAction, Restoring, Teardown, Tracing,
+    Asking, Diagnosing, Gathering, Keeping, Linking, MigrateAction, Teardown, Tracing,
 };
 use super::disturbance::Situation;
 use super::engine::Waiting;
 use super::plugins;
 use super::setup::SetupAction;
-use super::{repair, restore, update, Command, Ctx};
-
-use crate::error::codes::rehearse::CANNOT;
+use super::{Command, Ctx};
 
 /// Why a search cannot be rehearsed.
 ///
@@ -68,8 +66,6 @@ const MATERIAL_IS_MATERIAL: &str = "pairing material is the answer itself — a 
 const THE_WALK_IS_THE_OBSERVATION: &str = "a walkthrough is an end-to-end observation — \
      what it reports is what this stack actually did with a real item, which cannot be \
      known without asking it to";
-
-use crate::error::codes::rehearse::NOT_YET;
 
 /// What a rehearsal means for one command.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -373,76 +369,6 @@ pub const fn asked(command: &Command) -> Asked {
     }
 }
 
-/// The command as this run should carry it out.
-///
-/// A real run carries what was asked. A rehearsal carries the same thing with the
-/// operator's go-ahead taken back — see [`unconfirmed`] for why that is the whole of
-/// what a rehearsal of those commands needs to be.
-#[must_use]
-pub fn carried(command: Command, ctx: &Ctx) -> Command {
-    if ctx.dry_run {
-        unconfirmed(command)
-    } else {
-        command
-    }
-}
-
-/// The same command with the operator's go-ahead withheld.
-///
-/// Eight commands here already answer twice: unconfirmed they say what they would do,
-/// confirmed they do it. The unconfirmed answer *is* the rehearsal — the same report,
-/// in the same words, filled in by the same code path — so a rehearsal takes the yes
-/// back rather than eight handlers each learning a second way to say what they already
-/// say. A second way is a second thing to keep true, and the one nobody exercises is
-/// the one that stops being true.
-///
-/// Not exhaustive, and that is deliberate: this is the mechanism, not the decision.
-/// What a rehearsal of a command *means* is decided in [`asked`], which the compiler
-/// checks, and a command that claims to report while its go-ahead is not taken back
-/// here fails `a_rehearsal_changes_nothing` against a real disk.
-#[must_use]
-fn unconfirmed(command: Command) -> Command {
-    match command {
-        Command::Reset { .. } => Command::Reset { confirm: false },
-        Command::Remove { name, .. } => Command::Remove {
-            name,
-            confirm: false,
-        },
-        Command::QualityUpgrade { .. } => Command::QualityUpgrade { confirm: false },
-        Command::Migrate(MigrateAction::Act { mode, .. }) => Command::Migrate(MigrateAction::Act {
-            mode,
-            confirmed: false,
-        }),
-        Command::Migrate(MigrateAction::Replace { .. }) => {
-            Command::Migrate(MigrateAction::Replace { offer: None })
-        }
-        Command::Update(asked) => Command::Update(update::Asked {
-            confirm: false,
-            ..asked
-        }),
-        Command::Restore(asked) => Command::Restore(Restoring {
-            consent: restore::Consent::List,
-            ..asked
-        }),
-        Command::Repair { disruptive, .. } => Command::Repair {
-            consent: repair::Consent::Offer,
-            disruptive,
-        },
-        // A support bundle is asked for twice by the same word: without `--write` it
-        // says what one would hold and where it would land, with it there is a file.
-        // The description is the rehearsal, and it is the better command to be asked
-        // for it — an operator deciding whether to produce the archive wants the size
-        // and the path at the one moment the answer can still change what they do.
-        Command::Support(asked) => Command::Support(Gathering {
-            write: false,
-            ..asked
-        }),
-        // Everything else either changes nothing, reports for itself, or refuses the
-        // flag outright — none of which a withheld confirmation would change.
-        other => other,
-    }
-}
-
 /// Whether this run may go ahead, or the refusal to give instead of running it.
 ///
 /// Consulted by [`super::dispatch`] before the handler is reached, which is the whole
@@ -461,88 +387,11 @@ pub fn permitted(command: &Command, ctx: &Ctx) -> Result<(), Box<Problem>> {
     verdict(&asked(command))
 }
 
-/// What one of the four answers comes to, given what was asked.
-///
-/// Apart from the run that reaches it, because one of the four is an answer no
-/// command carries today. `Untaught` is the escape hatch a command added tomorrow
-/// gets: the match over every command is exhaustive, so whoever adds one has to
-/// choose a verdict, and this is the one that says "not yet" out loud rather than
-/// quietly rehearsing something that would act. Every command has since been taught,
-/// which leaves the arm shipped and unreachable through `permitted` — and a rule
-/// nothing can enter is a rule nobody has checked. Taking the answer rather than the
-/// command is what lets it be handed one.
-///
-/// Public for that reason and only that reason. The arm is reachable nowhere
-/// inside this crate, and a test in a `#[cfg(test)]` module would enter the copy
-/// built for tests while the copy that ships stayed unentered — which is a rule
-/// checked in a build nobody runs.
-///
-/// # Errors
-///
-/// Returns the [`Problem`] that refuses `--dry-run` where what was asked cannot be
-/// rehearsed, or has not been taught to report what it would do.
-pub fn verdict(asked: &Asked) -> Result<(), Box<Problem>> {
-    match asked.rehearsal {
-        Rehearsal::Reads | Rehearsal::Reports => Ok(()),
-        Rehearsal::Cannot(why) => Err(Box::new(refused(asked, why))),
-        Rehearsal::Untaught => Err(Box::new(not_taught_yet(asked.named))),
-    }
-}
-
-/// The refusal a command gives when it cannot rehearse what was asked of it.
-///
-/// Said here rather than at each handler for the reason the verdict is decided here:
-/// a sentence written once is a sentence that stays the same across fifty commands,
-/// and an operator who has met it on one recognises it on the next.
-#[must_use]
-fn refused(asked: &Asked, why: &'static str) -> Problem {
-    Problem::new(
-        CANNOT,
-        Severity::Error,
-        format!("`{}` cannot be rehearsed", asked.named),
-        format!(
-            "Nothing was done. {why}, so a rehearsal of this would be a report with \
-             nothing in it that a rehearsal could have found out."
-        ),
-        Remedy::new(format!(
-            "Run `lemonfiber {}` without `--dry-run` when you mean it",
-            asked.named
-        )),
-    )
-    .lies_in(Amiss::Asking)
-    .in_state(State::Guided)
-}
-
-/// The refusal a command gives when it changes things and has not been taught to
-/// report what it would change.
-///
-/// Separate from [`refused`] because the two are separate facts about the world, and
-/// an operator can act on the difference: this one is a gap somebody is closing, and
-/// the message says so rather than implying a limitation that is not there.
-///
-/// Takes the name rather than the whole of what was asked, which is what lets a test
-/// in `tests/` reach it. It is unreachable through [`permitted`] — every command has
-/// been taught — so the copy in the shipped build is a function no run enters, and a
-/// function no run enters is counted against every covered line beside it. Reaching
-/// it from outside the crate is what exercises the copy that ships.
-#[must_use]
-pub fn not_taught_yet(named: &str) -> Problem {
-    Problem::new(
-        NOT_YET,
-        Severity::Error,
-        format!("`{named}` does not rehearse yet"),
-        "Nothing was done. This command changes things and has not yet been taught to \
-         say what it would change, so it refuses the flag rather than accepting it and \
-         going ahead — which is what it used to do."
-            .to_owned(),
-        Remedy::new(format!(
-            "Run `lemonfiber {named}` without `--dry-run` when you mean it"
-        )),
-    )
-    .lies_in(Amiss::Asking)
-    .in_state(State::Guided)
-}
-
 mod keyed;
+mod refusing;
+mod withheld;
+
+pub use refusing::{not_taught_yet, verdict};
+pub use withheld::carried;
 #[cfg(test)]
 mod tests;
