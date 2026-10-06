@@ -16,6 +16,20 @@ pub struct MemberRequest {
     /// library could be read. Absent for a request no service holds yet — one still
     /// awaiting approval has been handed to nobody, so there is no title to find.
     pub title: Option<String>,
+    /// The year that title came out, where the service filing it knows one. Absent, not
+    /// null, until the request has been handed to that service, for the reason the title
+    /// is.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub year: Option<u16>,
+    /// When the title arrived on the media server, as the request service timestamps it.
+    /// Absent, not null, until it is there.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub arrived: Option<String>,
+    /// The identifier the media server holds the title under, which is the one the held
+    /// read names it by, so a request that has arrived can be found on the shelf. Absent,
+    /// not null, until it is there.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shelf_id: Option<String>,
     /// What kind of thing it is — a series, a film — in the household's own words.
     /// Absent where the request service names a kind this build does not know.
     pub media: Option<String>,

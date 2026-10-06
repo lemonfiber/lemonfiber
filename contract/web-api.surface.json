@@ -3934,6 +3934,12 @@
     },
     "MemberRequest": {
       "fields": {
+        "arrived": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
         "estimate": {
           "type": [
             "anyOf(null,ref:Estimate)"
@@ -3958,6 +3964,12 @@
           ],
           "required": false
         },
+        "shelf_id": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
         "state": {
           "type": [
             "anyOf(null,ref:RequestState)"
@@ -3973,6 +3985,12 @@
         "waiting_days": {
           "type": [
             "integer|null/uint64"
+          ],
+          "required": false
+        },
+        "year": {
+          "type": [
+            "integer|null/uint16"
           ],
           "required": false
         }

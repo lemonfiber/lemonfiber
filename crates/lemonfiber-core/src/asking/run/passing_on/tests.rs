@@ -10,6 +10,8 @@ const AT: &str = "2026-08-17T21:04:09";
 /// One request as the service records it, at the two statuses that decide its state.
 fn asked(id: i64) -> HouseholdRequest {
     HouseholdRequest {
+        arrived: None,
+        shelf_id: None,
         id,
         made: Some(AT.to_owned()),
         member: "Ana".to_owned(),

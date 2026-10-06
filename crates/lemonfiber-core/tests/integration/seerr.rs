@@ -641,3 +641,30 @@ async fn a_new_media_server_link_sends_where_and_with_what() {
             .is_err());
     }
 }
+
+#[tokio::test]
+async fn a_request_whose_title_is_on_the_media_server_says_when_it_arrived_and_where() {
+    let page = r#"{
+        "pageInfo":{"pages":1,"page":1,"results":2,"pageSize":100},
+        "results":[
+            {"status":2,"type":"movie","media":{"status":5,"externalServiceId":7,
+              "mediaAddedAt":"2026-10-01T20:00:00.000Z","jellyfinMediaId":"f00d"},
+             "requestedBy":{"displayName":"Alex"}},
+            {"status":2,"type":"tv","media":{"status":3,"externalServiceId":11},
+             "requestedBy":{"displayName":"Alex"}}
+        ]
+    }"#;
+    let fake = Fake::in_turn(vec![Answer::reply(200, page)]);
+    let requests = seerr(&fake).requests().await.unwrap_or_default();
+    let read: Vec<(Option<&str>, Option<&str>)> = requests
+        .iter()
+        .map(|request| (request.arrived.as_deref(), request.shelf_id.as_deref()))
+        .collect();
+    assert_eq!(
+        read,
+        vec![
+            (Some("2026-10-01T20:00:00.000Z"), Some("f00d")),
+            (None, None)
+        ]
+    );
+}

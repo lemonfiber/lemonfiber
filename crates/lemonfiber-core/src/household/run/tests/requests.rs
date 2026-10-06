@@ -12,7 +12,7 @@ fn assembled(
     accounts: Vec<Member>,
     requests: Vec<HouseholdRequest>,
     libraries: &BTreeMap<String, String>,
-    titles: &BTreeMap<(&'static str, i64), String>,
+    titles: &BTreeMap<(&'static str, i64), Titled>,
     member: Option<&str>,
 ) -> HouseholdReport {
     assemble(
@@ -293,7 +293,7 @@ fn an_item_the_library_does_not_hold_is_left_unnamed() {
     // Handed over, but the library has no such id — the join simply does not land,
     // and nothing is guessed from it.
     assert_eq!(
-        title_of(
+        titled(
             &request("Alex", Some(Kind::Sonarr), Some(999), (2, 5)),
             &titles()
         ),
@@ -301,7 +301,7 @@ fn an_item_the_library_does_not_hold_is_left_unnamed() {
     );
     // Nor is a film's id looked up against the television library.
     assert_eq!(
-        title_of(
+        titled(
             &request("Alex", Some(Kind::Sonarr), Some(7), (2, 5)),
             &titles()
         ),
@@ -309,7 +309,7 @@ fn an_item_the_library_does_not_hold_is_left_unnamed() {
     );
     // A request whose kind this build does not know is never joined at all.
     assert_eq!(
-        title_of(&request("Alex", None, Some(11), (2, 5)), &titles()),
+        titled(&request("Alex", None, Some(11), (2, 5)), &titles()),
         None
     );
 }
@@ -446,4 +446,66 @@ fn a_narrowed_read_names_nobody_else() {
             .all(|finding| !finding.contains("gone")),
         "a member was told who else asked for something: {report:?}"
     );
+}
+
+/// A request carries the year its library gives, and, once the title is on the media
+/// server, when it arrived and the identifier the shelf names it by.
+///
+/// Each is left out of the document rather than written as null where it is not known:
+/// a client reading `null` as a value would draw a year of nothing beside a film.
+#[test]
+fn a_request_carries_its_year_its_arrival_and_its_shelf_id_where_each_is_known() {
+    let arrived = HouseholdRequest {
+        arrived: Some("2026-10-01T20:00:00.000Z".to_owned()),
+        shelf_id: Some("f00d".to_owned()),
+        ..request("Alex", Some(Kind::Sonarr), Some(11), (2, 5))
+    };
+    let waiting = request("Alex", Some(Kind::Radarr), Some(7), (2, 3));
+    let unhanded = request("Alex", Some(Kind::Radarr), None, (1, 1));
+    let report = assembled(
+        vec![account("Alex", true)],
+        vec![arrived, waiting, unhanded],
+        &unnamed(),
+        &titles(),
+        None,
+    );
+    let said: Vec<_> = report
+        .members
+        .iter()
+        .flat_map(|member| member.requests.iter())
+        .map(|request| {
+            (
+                request.year,
+                request.arrived.as_deref(),
+                request.shelf_id.as_deref(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        said,
+        vec![
+            (Some(2015), Some("2026-10-01T20:00:00.000Z"), Some("f00d")),
+            (None, None, None),
+            (None, None, None),
+        ]
+    );
+
+    let written: Vec<serde_json::Value> = report
+        .members
+        .iter()
+        .flat_map(|member| member.requests.iter())
+        .filter_map(|request| serde_json::to_value(request).ok())
+        .collect();
+    assert_eq!(
+        written.first().and_then(|first| first.get("shelf_id")),
+        Some(&serde_json::json!("f00d"))
+    );
+    for absent in ["year", "arrived", "shelf_id"] {
+        assert!(
+            written
+                .get(1)
+                .is_some_and(|waiting| waiting.get(absent).is_none()),
+            "`{absent}` was written for a request that has not arrived: {written:?}"
+        );
+    }
 }

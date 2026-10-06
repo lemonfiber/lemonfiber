@@ -25,6 +25,8 @@ fn ctx(name: &str) -> crate::app::Ctx {
 /// One request as the service records it, at the status that decides its state.
 fn asked(id: i64, made: Option<&str>, request_status: u8) -> HouseholdRequest {
     HouseholdRequest {
+        arrived: None,
+        shelf_id: None,
         id,
         made: made.map(str::to_owned),
         member: "Ana".to_owned(),

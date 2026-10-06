@@ -39,6 +39,12 @@ pub struct HouseholdRequest {
     /// \*arr has been told about — so the item cannot be named from the library, and
     /// is not claimed to be.
     pub item: Option<i64>,
+    /// When the media it asked for arrived on the media server, as the request service
+    /// timestamps it, or nothing until it is there.
+    pub arrived: Option<String>,
+    /// The identifier the media server holds that media under, as the request service
+    /// records it, or nothing until it is there.
+    pub shelf_id: Option<String>,
     /// What became of the request, as the service numbers them.
     pub request_status: u8,
     /// What became of the media it asked for, as the service numbers them.

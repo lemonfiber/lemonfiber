@@ -580,3 +580,27 @@ async fn a_history_the_service_refuses_still_answers_with_the_queue() {
     assert_eq!(read.items.first().map(|item| item.grabs), Some(1));
     assert_eq!(read.total, 1, "the queue itself still came back");
 }
+
+#[tokio::test]
+async fn the_library_says_the_year_each_item_came_out_and_no_year_where_it_knows_none() {
+    let router = Fake::by_route(vec![(
+        Method::Get,
+        "/series",
+        Answer::reply(
+            200,
+            r#"[{"id":1,"title":"The Expanse","year":2015,"monitored":true},
+            {"id":2,"title":"Foundation","year":0,"monitored":true},
+            {"id":3,"title":"Severance","monitored":true}]"#
+                .to_owned(),
+        ),
+    )]);
+    let years: Vec<Option<u16>> = sonarr_routed(&router)
+        .library(Kind::Sonarr)
+        .await
+        .unwrap_or_default()
+        .iter()
+        .map(|item| item.year)
+        .collect();
+    // The service writes nought for a year it does not know, and that is no year.
+    assert_eq!(years, vec![Some(2015), None, None]);
+}

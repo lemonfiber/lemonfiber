@@ -4421,6 +4421,13 @@
           "description": "One thing a household member asked for, and where it stands in their words.",
           "type": "object",
           "properties": {
+            "arrived": {
+              "description": "When the title arrived on the media server, as the request service timestamps it.\nAbsent, not null, until it is there.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "estimate": {
               "description": "About how much room it will want, at the quality in force.\n\nA guess and labelled as one — see [`crate::asking::Estimate`]. Absent where the\nrequest service names a kind this build does not know, since there is nothing to\nguess the length of.",
               "anyOf": [
@@ -4455,6 +4462,13 @@
                 }
               ]
             },
+            "shelf_id": {
+              "description": "The identifier the media server holds the title under, which is the one the held\nread names it by, so a request that has arrived can be found on the shelf. Absent,\nnot null, until it is there.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "state": {
               "description": "Where the request stands, or absent where the request service reports a status\nthis build does not know rather than guessing it into the nearest word.",
               "anyOf": [
@@ -4480,6 +4494,16 @@
                 "null"
               ],
               "format": "uint64",
+              "minimum": 0
+            },
+            "year": {
+              "description": "The year that title came out, where the service filing it knows one. Absent, not\nnull, until the request has been handed to that service, for the reason the title\nis.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint16",
+              "maximum": 65535,
               "minimum": 0
             }
           },
@@ -7994,6 +8018,13 @@
           "description": "One thing a household member asked for, and where it stands in their words.",
           "type": "object",
           "properties": {
+            "arrived": {
+              "description": "When the title arrived on the media server, as the request service timestamps it.\nAbsent, not null, until it is there.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "estimate": {
               "description": "About how much room it will want, at the quality in force.\n\nA guess and labelled as one — see [`crate::asking::Estimate`]. Absent where the\nrequest service names a kind this build does not know, since there is nothing to\nguess the length of.",
               "anyOf": [
@@ -8028,6 +8059,13 @@
                 }
               ]
             },
+            "shelf_id": {
+              "description": "The identifier the media server holds the title under, which is the one the held\nread names it by, so a request that has arrived can be found on the shelf. Absent,\nnot null, until it is there.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "state": {
               "description": "Where the request stands, or absent where the request service reports a status\nthis build does not know rather than guessing it into the nearest word.",
               "anyOf": [
@@ -8053,6 +8091,16 @@
                 "null"
               ],
               "format": "uint64",
+              "minimum": 0
+            },
+            "year": {
+              "description": "The year that title came out, where the service filing it knows one. Absent, not\nnull, until the request has been handed to that service, for the reason the title\nis.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint16",
+              "maximum": 65535,
               "minimum": 0
             }
           },

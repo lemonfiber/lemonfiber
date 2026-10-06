@@ -11,6 +11,9 @@ fn the_household_view_names_each_member_and_links_what_it_can_trace() {
             to_hand_over: Vec::new(),
             requests: vec![
                 MemberRequest {
+                    year: None,
+                    arrived: None,
+                    shelf_id: None,
                     title: Some("The Expanse".to_owned()),
                     media: Some("series".to_owned()),
                     state: Some(lemonfiber_core::household::State::Here),
@@ -21,6 +24,9 @@ fn the_household_view_names_each_member_and_links_what_it_can_trace() {
                 },
                 // No service holds it yet, so it is named by what it is.
                 MemberRequest {
+                    year: None,
+                    arrived: None,
+                    shelf_id: None,
                     title: None,
                     media: Some("film".to_owned()),
                     state: Some(lemonfiber_core::household::State::WaitingForApproval),
@@ -31,6 +37,9 @@ fn the_household_view_names_each_member_and_links_what_it_can_trace() {
                 },
                 // Neither a title nor a kind this build knows.
                 MemberRequest {
+                    year: None,
+                    arrived: None,
+                    shelf_id: None,
                     title: None,
                     media: None,
                     state: None,
@@ -129,6 +138,9 @@ fn a_household(
             to_hand_over: Vec::new(),
             requests: vec![
                 MemberRequest {
+                    year: None,
+                    arrived: None,
+                    shelf_id: None,
                     id: 7,
                     title: Some("Dune".to_owned()),
                     media: Some("film".to_owned()),
@@ -140,6 +152,9 @@ fn a_household(
                     refused: None,
                 },
                 MemberRequest {
+                    year: None,
+                    arrived: None,
+                    shelf_id: None,
                     id: 8,
                     title: Some("The Expanse".to_owned()),
                     media: Some("series".to_owned()),
