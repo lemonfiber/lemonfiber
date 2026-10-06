@@ -41,8 +41,24 @@ impl Stepping {
     /// narrating into a channel nobody reads.
     #[must_use]
     pub fn onto(live: Arc<Live>) -> (Self, Carrying) {
+        Self::carried(live, None)
+    }
+
+    /// A narrator for the walk this job names, and the run that carries it.
+    ///
+    /// Every step it says carries the name, so a client that asked for the walk
+    /// ties each step to the request it made (`D3-R14`). Its own channel rather
+    /// than the surface's, so the carrying ends with the job: the walk's context is
+    /// the last holder of the narrator, and it goes when the walk does.
+    #[must_use]
+    pub fn for_job(live: Arc<Live>, job: &str) -> (Self, Carrying) {
+        Self::carried(live, Some(job.to_owned()))
+    }
+
+    /// The two halves, saying under `job` where there is one.
+    fn carried(live: Arc<Live>, job: Option<String>) -> (Self, Carrying) {
         let (said, heard) = unbounded_channel();
-        (Self(said), Carrying { live, heard })
+        (Self(said), Carrying { live, heard, job })
     }
 }
 
@@ -64,21 +80,27 @@ pub struct Carrying {
     live: Arc<Live>,
     /// The steps still to be said, oldest first.
     heard: UnboundedReceiver<Line>,
+    /// The work these steps belong to, by the name its accepting reply gave it.
+    job: Option<String>,
 }
 
 impl Carrying {
     /// Say each step on the stream, in the order the walk said it.
     ///
-    /// Ends when the last narrator is dropped, which is when the run ends: a walk
-    /// that finished leaves the channel open for the next one, so this is started
-    /// once with the surface rather than once per walk.
+    /// Ends when the last narrator is dropped. The surface's own is held for the
+    /// whole run, and a walk that finished leaves its channel open for the next one,
+    /// so that one is started once with the surface; a job's is held by the job's
+    /// context, so it ends when the job's work does.
     pub async fn carrying(mut self) {
         while let Some(line) = self.heard.recv().await {
             // A record rather than state: a step is something that happened, and a
             // client that missed one has a hole in the walk rather than an
             // out-of-date figure. The newest step does not describe the ones before
             // it, which is exactly what a wait's own narration does describe.
-            let said = Rendered::of(Nature::Record, &Envelope::new(kind::STEP, &line));
+            let said = Rendered::of(
+                Nature::Record,
+                &Envelope::new(kind::STEP, &line).said_by(self.job.as_deref()),
+            );
             self.live.say_if_rendered(said).await;
         }
     }

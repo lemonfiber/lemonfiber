@@ -23,13 +23,27 @@ use super::wire::{Nature, Rendered};
 pub struct Saying {
     /// What is said, and everyone hearing it.
     live: Arc<Live>,
+    /// The work this wait belongs to, by the name its accepting reply gave it.
+    job: Option<String>,
 }
 
 impl Saying {
-    /// Say onto this stream.
+    /// Say onto this stream, for work no job names.
     #[must_use]
     pub const fn onto(live: Arc<Live>) -> Self {
-        Self { live }
+        Self { live, job: None }
+    }
+
+    /// Say onto this stream, for the work this job names.
+    ///
+    /// Every line it says carries the name, so a client that asked for the work
+    /// ties what the wait says to the request it made (`B2-R19`).
+    #[must_use]
+    pub fn for_job(live: Arc<Live>, job: &str) -> Self {
+        Self {
+            live,
+            job: Some(job.to_owned()),
+        }
     }
 }
 
@@ -41,7 +55,7 @@ impl Narrator for Saying {
     /// what the wait is waiting for now, so a client that was away is caught up
     /// with where the wait got to instead of being replayed every second of it.
     async fn say(&self, said: &str) {
-        said_to(&self.live, said).await;
+        said_to(&self.live, self.job.as_deref(), said).await;
     }
 }
 
@@ -50,10 +64,10 @@ impl Narrator for Saying {
 /// The dropping is [`Live::say_if_rendered`]'s rather than a branch here, because a
 /// payload that will not render is a case this cannot stage and that one is already
 /// driven where it lives.
-async fn said_to(live: &Live, said: &str) {
+async fn said_to(live: &Live, job: Option<&str>, said: &str) {
     live.say_if_rendered(Rendered::of(
         Nature::State,
-        &Envelope::new(kind::START, said),
+        &Envelope::new(kind::START, said).said_by(job),
     ))
     .await;
 }
