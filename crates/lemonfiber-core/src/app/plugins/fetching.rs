@@ -7,12 +7,14 @@
 //! whether the name has moved, not an assumption that it has not.
 //!
 //! **Fetched as data.** One commit, shallow, no tags, no submodules and no hooks, into a
-//! directory of its own that is removed when the install is done — a rehearsal
-//! included, so asking what an install would do leaves nothing behind. Nothing from
+//! directory made for that one install and removed when it is done — a rehearsal
+//! included, so asking what an install would do leaves nothing behind, and two installs
+//! of one commit at once never share a directory. Nothing from
 //! the repository is run: the install reads its manifest and recordings and holds them
 //! to everything a directory's are held to.
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::app::Ctx;
 use crate::config::REACH_PLUGIN_SOURCE_KEY;
@@ -281,19 +283,26 @@ async fn standing(ctx: &Ctx, from: &str) -> Fetchable {
 /// The directory under lemonfiber's own data directory checkouts are made in.
 const CHECKOUTS: &str = "checkouts";
 
-/// Where one commit is checked out while it is installed, and removed from after:
-/// nothing where this machine has not been set up and so has no data directory.
+/// How many checkouts this process has named, so each is named apart from every other.
+static NAMED: AtomicU64 = AtomicU64::new(0);
+
+/// Where one install checks a commit out, and removes it from after: nothing where this
+/// machine has not been set up and so has no data directory.
 ///
 /// Under lemonfiber's own data directory rather than the shared temporary one, where any
 /// other user of the machine could make the directory first and hold what is fetched
-/// into it. Named for the commit and this process, so two runs never share one.
+/// into it. Named for the commit, this process and the checkouts it has named before,
+/// so no two installs share one: not two runs, and not two installs of one commit that
+/// one run is serving at once, where the first to finish would remove what the other is
+/// still reading.
 pub(super) fn checkout(ctx: &Ctx, commit: &str) -> Option<PathBuf> {
     let paths = crate::app::targets::layout(ctx)?;
+    let named = NAMED.fetch_add(1, Ordering::Relaxed);
     Some(
         paths
             .data_dir()
             .join(CHECKOUTS)
-            .join(format!("{commit}-{}", std::process::id())),
+            .join(format!("{commit}-{}-{named}", std::process::id())),
     )
 }
 
