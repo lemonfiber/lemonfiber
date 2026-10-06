@@ -21562,6 +21562,19 @@
       "file": false
     },
     {
+      "path": "/api/playing",
+      "parameters": [
+        {
+          "name": "member",
+          "repeatable": false
+        }
+      ],
+      "kinds": [
+        "playing"
+      ],
+      "file": false
+    },
+    {
       "path": "/api/hosting",
       "parameters": [],
       "kinds": [
