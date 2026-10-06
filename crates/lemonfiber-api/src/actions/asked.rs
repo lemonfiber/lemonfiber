@@ -217,6 +217,9 @@ impl Arguments {
             cap: Some("1TiB".to_owned()),
             exceeded: Some("pause".to_owned()),
             unrestricted_for: Some(1),
+            plugin: Some("komga".to_owned()),
+            source: Some("komga".to_owned()),
+            approved: vec!["api_key@komga".to_owned()],
             ..Self::default()
         }
     }
