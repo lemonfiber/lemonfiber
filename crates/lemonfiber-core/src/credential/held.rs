@@ -286,6 +286,18 @@ const AUDIOBOOKSHELF: Entry = Entry {
     proven_by: None,
 };
 
+/// The Usenet indexer aggregator's administrator password.
+const NZBHYDRA2: Entry = Entry {
+    name: "NZBHydra2 administrator password",
+    setting: config::NZBHYDRA2_ADMIN_PASSWORD_KEY,
+    consumers: &[Consumer::at_the_service(
+        "NZBHydra2's own administrator account",
+    )],
+    origin: Origin::Lemonfiber,
+    needed: Needed::OverUsenet,
+    proven_by: None,
+};
+
 /// The book service's API key — minted here and adopted by the service.
 const BINDERY: Entry = Entry {
     name: "Book library API key",
@@ -310,6 +322,7 @@ pub const CATALOGUE: &[Entry] = &[
     QBITTORRENT,
     JELLYFIN,
     AUDIOBOOKSHELF,
+    NZBHYDRA2,
     BINDERY,
 ];
 

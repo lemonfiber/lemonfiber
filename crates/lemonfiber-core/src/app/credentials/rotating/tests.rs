@@ -69,7 +69,7 @@ fn every_credential_this_cannot_replace_says_where_a_replacement_would_come_from
         })
         .collect();
 
-    assert_eq!(asked.len(), 5, "{asked:?}");
+    assert_eq!(asked.len(), 6, "{asked:?}");
     for setting in asked {
         let said = elsewhere(setting);
         assert!(said.contains("still in force"), "{setting}: {said}");

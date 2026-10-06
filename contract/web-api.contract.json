@@ -11193,6 +11193,11 @@
               "description": "Audiobookshelf — a listening server whose first account lemonfiber creates,\nlike Jellyfin's, so its `key_source` is `generated` too. The token it hands\nback on sign-in is stable, so it is read again rather than recorded twice.",
               "type": "string",
               "const": "audiobookshelf"
+            },
+            {
+              "description": "`NZBHydra2` — the Usenet indexer aggregator, which starts with no authentication,\nso lemonfiber turns it on with an administrator it names and a password it mints.",
+              "type": "string",
+              "const": "nzbhydra2"
             }
           ]
         },

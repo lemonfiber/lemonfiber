@@ -240,6 +240,16 @@ pub const JELLYFIN_ADMIN_PASSWORD_KEY: &str = "JELLYFIN_ADMIN_PASSWORD";
 /// server first; no token of it is recorded.
 pub(crate) const AUDIOBOOKSHELF_PASSWORD_KEY: &str = "AUDIOBOOKSHELF_PASSWORD";
 
+/// The environment key holding the Usenet indexer aggregator's administrator password.
+///
+/// The aggregator starts with no authentication, so there is nothing to read: lemonfiber
+/// mints this, turns authentication on with it, and keeps it, so that the indexer
+/// accounts the aggregator holds are not read by anything that can reach it.
+pub(crate) const NZBHYDRA2_ADMIN_PASSWORD_KEY: &str = "NZBHYDRA2_ADMIN_PASSWORD";
+
+/// The name of the administrator lemonfiber gives the Usenet indexer aggregator.
+pub(crate) const NZBHYDRA2_ADMIN_USER: &str = "admin";
+
 /// The environment key holding the book \*arr's API key.
 ///
 /// The one credential in the stack that lemonfiber mints and the *service* adopts,
@@ -379,6 +389,7 @@ pub const SETTINGS: &[&str] = &[
     QBITTORRENT_PASSWORD_KEY,
     JELLYFIN_ADMIN_PASSWORD_KEY,
     AUDIOBOOKSHELF_PASSWORD_KEY,
+    NZBHYDRA2_ADMIN_PASSWORD_KEY,
     BINDERY_API_KEY,
     FRONT_DOOR_KEY,
     FILLS_KEY,

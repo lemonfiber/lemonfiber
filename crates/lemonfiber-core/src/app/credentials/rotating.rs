@@ -152,6 +152,10 @@ fn elsewhere(setting: &str) -> String {
             "Audiobookshelf's own account settings",
             "lemonfiber config set AUDIOBOOKSHELF_PASSWORD",
         ),
+        config::NZBHYDRA2_ADMIN_PASSWORD_KEY => (
+            "NZBHydra2's own authentication settings",
+            "lemonfiber config set NZBHYDRA2_ADMIN_PASSWORD",
+        ),
         config::BINDERY_API_KEY => (
             "this setting itself — the book service adopts whatever it is given",
             "lemonfiber config set BINDERY_API_KEY",

@@ -92,6 +92,7 @@ pub mod materialised;
 pub mod migration;
 pub mod model;
 pub mod notify;
+pub mod nzbhydra2;
 pub mod origin;
 pub mod outbound;
 pub mod platform;

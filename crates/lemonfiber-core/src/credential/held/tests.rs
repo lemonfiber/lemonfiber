@@ -4,7 +4,7 @@ use crate::credential::Reach;
 
 #[test]
 fn every_entry_names_what_it_is_where_it_lives_and_who_uses_it() {
-    assert_eq!(CATALOGUE.len(), 7);
+    assert_eq!(CATALOGUE.len(), 8);
     for entry in CATALOGUE {
         assert!(!entry.name.is_empty(), "{}", entry.setting);
         assert!(!entry.setting.is_empty(), "{}", entry.name);
@@ -101,7 +101,7 @@ fn what_records_a_proof_is_recorded_only_where_proceeding_unproven_was_a_choice(
         .filter(|entry| entry.origin.mints_its_own())
         .map(|entry| entry.setting)
         .collect();
-    assert_eq!(minted.len(), 4, "{minted:?}");
+    assert_eq!(minted.len(), 5, "{minted:?}");
     assert!(CATALOGUE
         .iter()
         .filter(|entry| entry.origin.mints_its_own())

@@ -184,7 +184,7 @@ pub fn schema() -> Option<String> {
 #[derive(Debug, Serialize)]
 pub struct Adapters {
     /// Every adapter kind lemonfiber implements.
-    pub kinds: [lemonfiber_manifest::ApiKind; 8],
+    pub kinds: [lemonfiber_manifest::ApiKind; 9],
     /// Every place an adapter may read a service's credential from.
     pub key_sources: [lemonfiber_manifest::KeySource; 7],
 }

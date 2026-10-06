@@ -55,6 +55,9 @@ pub enum ApiKind {
     /// like Jellyfin's, so its `key_source` is `generated` too. The token it hands
     /// back on sign-in is stable, so it is read again rather than recorded twice.
     Audiobookshelf,
+    /// `NZBHydra2` — the Usenet indexer aggregator, which starts with no authentication,
+    /// so lemonfiber turns it on with an administrator it names and a password it mints.
+    Nzbhydra2,
 }
 
 /// Where a service's credential comes from.
@@ -80,7 +83,7 @@ pub enum KeySource {
 impl ApiKind {
     /// Every adapter lemonfiber implements, which is the whole of what a plugin's
     /// service may name.
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; 9] = [
         Self::Servarr,
         Self::Sabnzbd,
         Self::Qbittorrent,
@@ -89,6 +92,7 @@ impl ApiKind {
         Self::Jellyfin,
         Self::Bazarr,
         Self::Audiobookshelf,
+        Self::Nzbhydra2,
     ];
 }
 
