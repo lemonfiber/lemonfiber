@@ -17,7 +17,7 @@
 use crate::acting;
 use carriers::{command, naming, refusal, swept, SWEEPS};
 use lemonfiber_api::actions::{Arguments, Refused};
-use lemonfiber_core::app::{Command, Waiting};
+use lemonfiber_core::app::{Command, Teardown, Waiting};
 
 #[test]
 fn an_argument_is_taken_exactly_where_the_command_it_reaches_carries_it() {
@@ -100,10 +100,10 @@ fn stopping_a_whole_stack_is_not_gated_the_way_a_reset_is() {
     // it. The command it reaches carries no agreement at all.
     assert_eq!(
         command("down", naming("tv")),
-        Some(Command::Down {
+        Some(Command::Down(Teardown {
             forms: vec!["tv".to_owned()],
             wait: Waiting::Never
-        })
+        }))
     );
     let agreed = Arguments {
         forms: vec!["tv".to_owned()],

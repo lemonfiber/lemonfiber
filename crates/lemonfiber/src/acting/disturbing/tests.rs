@@ -2,7 +2,7 @@ use super::{answered, disturbing, under, Widening, DIAGNOSIS, OFFERED_UNDER};
 use crate::acting::question::tests::called;
 use crate::acting::{Press, Stage, Wanted};
 use lemonfiber_api::actions::OFFERED as WEB;
-use lemonfiber_core::app::Command;
+use lemonfiber_core::app::{Command, Diagnosing, Tracing};
 use lemonfiber_core::doctor::{Category, Narrowing};
 
 /// The widened run one answer offers, or nothing where it offers none.
@@ -41,11 +41,11 @@ fn every_widened_run_is_an_action_the_other_surfaces_offer() {
 fn a_diagnosis_asked_whole_is_widened_over_the_whole_suite() {
     assert_eq!(
         sends("how this stack is doing", &[""]),
-        Some(Command::Doctor {
+        Some(Command::Doctor(Diagnosing {
             narrowing: Narrowing::Suite,
             disruptive: true,
             accept: None,
-        })
+        }))
     );
 }
 
@@ -56,19 +56,19 @@ fn a_diagnosis_asked_whole_is_widened_over_the_whole_suite() {
 fn a_diagnosis_asked_about_one_family_is_widened_over_that_family_alone() {
     assert_eq!(
         sends("one family of checks", &["vpn"]),
-        Some(Command::Doctor {
+        Some(Command::Doctor(Diagnosing {
             narrowing: Narrowing::Category(Category::Vpn),
             disruptive: true,
             accept: None,
-        })
+        }))
     );
     assert_eq!(
         sends("one family of checks", &["services.releases"]),
-        Some(Command::Doctor {
+        Some(Command::Doctor(Diagnosing {
             narrowing: Narrowing::Check("services.releases".to_owned()),
             disruptive: true,
             accept: None,
-        })
+        }))
     );
 }
 
@@ -89,11 +89,11 @@ fn a_narrowing_that_reaches_no_command_is_not_offered_at_all() {
 fn a_trace_is_widened_into_the_search_that_asks_the_indexers() {
     assert_eq!(
         sends("where one thing is", &["The Expanse"]),
-        Some(Command::Trace {
+        Some(Command::Trace(Tracing {
             term: "The Expanse".to_owned(),
             season: None,
             searching: true,
-        })
+        }))
     );
 }
 
@@ -104,11 +104,11 @@ fn a_trace_is_widened_into_the_search_that_asks_the_indexers() {
 fn a_trace_narrowed_to_one_season_searches_for_that_season() {
     assert_eq!(
         sends("where one season of it is", &["The Expanse", "2"]),
-        Some(Command::Trace {
+        Some(Command::Trace(Tracing {
             term: "The Expanse".to_owned(),
             season: Some(2),
             searching: true,
-        })
+        }))
     );
 }
 
@@ -154,7 +154,7 @@ fn only_an_explicit_yes_runs_the_widened_diagnosis() {
         &Press::Typed('Y'),
     );
 
-    assert!(matches!(wanted, Wanted::Carry(Command::Doctor { .. })));
+    assert!(matches!(wanted, Wanted::Carry(Command::Doctor(_))));
     assert_eq!(running(&stage), Some("diagnose"));
 }
 
@@ -175,7 +175,7 @@ fn a_yes_over_a_trace_sends_the_search_and_says_which_run_it_is() {
         &Press::Typed('y'),
     );
 
-    assert!(matches!(wanted, Wanted::Carry(Command::Trace { .. })));
+    assert!(matches!(wanted, Wanted::Carry(Command::Trace(_))));
     assert_eq!(running(&stage), Some("search"));
 }
 

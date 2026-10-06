@@ -23,7 +23,7 @@
 use std::sync::Arc;
 
 use crate::common::household::recorded_admin;
-use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Outcome};
+use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Inviting, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::model::{Invitation, InvitationStanding, Linked};
 use lemonfiber_core::ports::http::{Method, Request};
@@ -322,11 +322,11 @@ async fn a_reset_stands_for_its_own_window_and_not_the_account_s_age() {
     let env = recorded_admin("swept");
     let ctx = context(&env, http.clone(), false);
     let offered = dispatch(
-        Command::Invite {
+        Command::Invite(Inviting {
             name: "cy".to_owned(),
             allowance: Allowance::default(),
             confirm: true,
-        },
+        }),
         &ctx,
     )
     .await;
@@ -394,11 +394,11 @@ async fn offering_an_account_to_somebody_reset_says_their_password_went() {
     let env = recorded_admin("offer-after-reset");
     let ctx = context(&env, http.clone(), false);
     let offered = dispatch(
-        Command::Invite {
+        Command::Invite(Inviting {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
             confirm: true,
-        },
+        }),
         &ctx,
     )
     .await;

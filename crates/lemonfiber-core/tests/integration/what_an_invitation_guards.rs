@@ -14,7 +14,7 @@
 use std::sync::Arc;
 
 use crate::common::household::recorded_admin;
-use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Outcome};
+use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Inviting, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::{InvitationStanding, MemberStanding};
@@ -203,11 +203,11 @@ async fn running(
 
 /// Offer `name` an account, choosing `allowance`.
 fn inviting(name: &str, allowance: Allowance) -> Command {
-    Command::Invite {
+    Command::Invite(Inviting {
         name: name.to_owned(),
         allowance,
         confirm: true,
-    }
+    })
 }
 
 /// Nothing to leave beside the configuration.

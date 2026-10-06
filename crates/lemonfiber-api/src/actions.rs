@@ -34,7 +34,7 @@ use axum::response::Response;
 use axum::routing::post;
 use axum::{Json, Router};
 use lemonfiber_core::app::restore::Consent as RestoreConsent;
-use lemonfiber_core::app::{Command, Ctx, Setting, Waiting};
+use lemonfiber_core::app::{Command, Ctx, Restoring, Setting, Waiting};
 
 use crate::admission::Caller;
 use crate::entitled::{may, Door};
@@ -99,10 +99,10 @@ pub const fn answering(command: &Command) -> Answering {
         // Choosing what fills a capability writes one setting and its journal entry,
         // both lemonfiber's own files, and asks nothing of a service.
         | Command::Wiring(_)
-        | Command::Restore {
+        | Command::Restore(Restoring {
             consent: RestoreConsent::List,
             ..
-        } => Answering::Now,
+        }) => Answering::Now,
         _ => Answering::Later,
     }
 }

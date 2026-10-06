@@ -19,7 +19,7 @@
 use std::sync::Arc;
 
 use crate::common::household::recorded_admin;
-use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Outcome};
+use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Inviting, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::model::{Invitation, InvitationStanding};
 use lemonfiber_core::ports::http::{Method, Request};
@@ -159,11 +159,11 @@ async fn offering_beside(
     let ctx = context(&env, http.clone(), rehearsing);
 
     let said = dispatch(
-        Command::Invite {
+        Command::Invite(Inviting {
             name: name.to_owned(),
             allowance: Allowance::default(),
             confirm: true,
-        },
+        }),
         &ctx,
     )
     .await;

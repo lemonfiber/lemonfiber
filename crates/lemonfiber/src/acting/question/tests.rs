@@ -1,7 +1,7 @@
 use super::{all, asked_at, every, Narrows, Needed, Question, CONFIG, FORMS, OPENS_ON, TRACE};
 use lemonfiber_api::read::table::OFFERED as SERVED;
 use lemonfiber_api::refusal::Refusal;
-use lemonfiber_core::app::Command;
+use lemonfiber_core::app::{Command, Tracing};
 use lemonfiber_core::uninstall::Tier;
 use std::collections::BTreeSet;
 
@@ -116,11 +116,11 @@ fn each_question_that_names_its_own_object_reaches_the_command_for_that_object()
 fn each_typed_question_fills_the_argument_its_read_names() {
     assert_eq!(
         asking(called("where one thing is"), &["The Expanse"]),
-        Ok(Command::Trace {
+        Ok(Command::Trace(Tracing {
             term: "The Expanse".to_owned(),
             season: None,
             searching: false,
-        })
+        }))
     );
     assert_eq!(
         asking(called("one setting"), &["The Expanse"]),
@@ -226,11 +226,11 @@ fn taking_a_listed_entry_asks_the_read_it_names() {
     assert_eq!(at, TRACE, "a stuck item is followed at the trace");
     assert_eq!(
         asked_at(at, narrows, "The Expanse"),
-        Ok(Command::Trace {
+        Ok(Command::Trace(Tracing {
             term: "The Expanse".to_owned(),
             season: None,
             searching: false,
-        })
+        }))
     );
 
     let (at, narrows) = called("what starting one would come to")

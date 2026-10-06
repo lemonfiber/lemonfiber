@@ -1,7 +1,7 @@
+use super::refusing::refused;
 use super::{
-    asked, carried, not_taught_yet, refused, repair, restore, update, verdict, Asked, Rehearsal,
-    A_SEARCH_IS_THE_ANSWER, MATERIAL_IS_MATERIAL, THE_CHECK_IS_THE_DISRUPTION,
-    THE_WALK_IS_THE_OBSERVATION,
+    asked, carried, not_taught_yet, verdict, Asked, Rehearsal, A_SEARCH_IS_THE_ANSWER,
+    MATERIAL_IS_MATERIAL, THE_CHECK_IS_THE_DISRUPTION, THE_WALK_IS_THE_OBSERVATION,
 };
 use crate::app::command::{
     AlertAction, Arranged, Asking, BandwidthAsked, Chosen, Decision, Filling, Keeping, Linking,
@@ -10,7 +10,10 @@ use crate::app::command::{
 use crate::app::engine::Waiting;
 use crate::app::plugins;
 use crate::app::setup::SetupAction;
-use crate::app::Command;
+use crate::app::{repair, restore, update};
+use crate::app::{
+    Command, Diagnosing, Gathering, Inviting, LettingGo, Restoring, Teardown, Tracing,
+};
 
 /// A command that has not been taught to rehearse is refused rather than run.
 ///
@@ -119,29 +122,29 @@ fn reasoning(rehearsal: Rehearsal) -> Option<&'static str> {
 
 /// A trace, asked with and without a live search.
 fn tracing(searching: bool) -> Command {
-    Command::Trace {
+    Command::Trace(Tracing {
         term: "anything".to_owned(),
         season: None,
         searching,
-    }
+    })
 }
 
 /// A doctor run, disruptive or not, acknowledging nothing.
 fn examining(disruptive: bool) -> Command {
-    Command::Doctor {
+    Command::Doctor(Diagnosing {
         narrowing: crate::doctor::Narrowing::Suite,
         disruptive,
         accept: None,
-    }
+    })
 }
 
 /// A support bundle, written out or only described.
 fn bundling(write: bool) -> Command {
-    Command::Support {
+    Command::Support(Gathering {
         write,
         wanted: crate::bundle::run::Wanted::default(),
         dest: crate::app::support::Destination::Kept,
-    }
+    })
 }
 
 /// The four that refuse the flag for good say so, the read half of each command
@@ -309,10 +312,10 @@ fn always_reported() -> Vec<Command> {
             forms: Vec::new(),
             services: Vec::new(),
         },
-        Command::Down {
+        Command::Down(Teardown {
             forms: Vec::new(),
             wait: Waiting::Never,
-        },
+        }),
         Command::Halt {
             forms: Vec::new(),
             services: Vec::new(),
@@ -350,11 +353,11 @@ fn always_reported() -> Vec<Command> {
             what: crate::app::Hostable::Watch,
             forms: Vec::new(),
         }),
-        Command::Invite {
+        Command::Invite(Inviting {
             name: "ana".to_owned(),
             allowance: crate::app::Allowance::default(),
             confirm: true,
-        },
+        }),
         Command::Reissue {
             name: "ana".to_owned(),
         },
@@ -365,10 +368,10 @@ fn always_reported() -> Vec<Command> {
         Command::Space {
             agreement: Some("anything".to_owned()),
         },
-        Command::StopSeeding {
+        Command::StopSeeding(LettingGo {
             download: "anything".to_owned(),
             agreement: None,
-        },
+        }),
         Command::Bandwidth(BandwidthAsked {
             down: Some("20".to_owned()),
             ..BandwidthAsked::default()
@@ -441,11 +444,11 @@ fn answering_twice() -> Vec<Command> {
             confirm: true,
             wait: Waiting::Never,
         }),
-        Command::Restore {
+        Command::Restore(Restoring {
             archive: crate::app::restore::Kept::Named("anything".to_owned()),
             repoint: false,
             consent: crate::app::restore::Consent::Standing,
-        },
+        }),
         bundling(true),
         Command::Seed,
         Command::Adopt,
@@ -465,11 +468,11 @@ fn untaught() -> Vec<Command> {
 
 /// A doctor run acknowledging a finding, which is the third of its three arms.
 fn examining_accepting() -> Command {
-    Command::Doctor {
+    Command::Doctor(Diagnosing {
         narrowing: crate::doctor::Narrowing::Suite,
         disruptive: false,
         accept: Some("storage.one-filesystem".to_owned()),
-    }
+    })
 }
 
 /// Every command gives the verdict this module says it gives.
@@ -516,11 +519,11 @@ fn a_rehearsal_carries_the_confirmable_commands_without_their_yes() {
             confirm: true,
             wait: Waiting::Never,
         }),
-        Command::Restore {
+        Command::Restore(Restoring {
             archive: restore::Kept::Named("anything".to_owned()),
             repoint: false,
             consent: restore::Consent::Standing,
-        },
+        }),
         Command::Repair {
             consent: repair::Consent::Standing,
             disruptive: false,

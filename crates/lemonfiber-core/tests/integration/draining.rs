@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, Waiting};
+use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, Teardown, Waiting};
 use lemonfiber_core::config::{store, Protocols, Settings, QBITTORRENT_PASSWORD_KEY};
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
 use lemonfiber_core::ports::http::Http;
@@ -97,10 +97,10 @@ async fn a_teardown_asked_to_wait_holds_on_until_nothing_is_coming_down() {
 
     let envelope = rendered(
         dispatch(
-            Command::Down {
+            Command::Down(Teardown {
                 forms: named(&["dl"]),
                 wait: Waiting::ForTheDownloads,
-            },
+            }),
             &context,
         )
         .await,
@@ -138,10 +138,10 @@ async fn a_teardown_that_was_not_asked_to_wait_asks_the_clients_nothing() {
 
     let envelope = rendered(
         dispatch(
-            Command::Down {
+            Command::Down(Teardown {
                 forms: named(&["dl"]),
                 wait: Waiting::Never,
-            },
+            }),
             &context,
         )
         .await,

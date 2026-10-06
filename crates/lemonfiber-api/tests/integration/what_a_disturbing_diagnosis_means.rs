@@ -40,7 +40,7 @@ use lemonfiber_api::events::live::Live;
 use lemonfiber_api::guard::Token;
 use lemonfiber_api::jobs::Jobs;
 use lemonfiber_api::router::Serving;
-use lemonfiber_core::app::Command;
+use lemonfiber_core::app::{Command, Diagnosing};
 use lemonfiber_core::doctor::{Category, Narrowing};
 use lemonfiber_fixtures::ports::{Chance, Stopped};
 
@@ -77,11 +77,11 @@ fn a_disturbing_diagnosis_reaches_the_command_the_command_line_reaches() {
     // answered: the widening is the whole of what this asks for.
     assert_eq!(
         command(DIAGNOSE, disturbing(None)),
-        Some(Command::Doctor {
+        Some(Command::Doctor(Diagnosing {
             narrowing: Narrowing::Suite,
             disruptive: true,
             accept: None,
-        })
+        }))
     );
 }
 
@@ -92,11 +92,11 @@ fn one_group_of_checks_is_disturbed_rather_than_all_of_them() {
     // releases finding's own instruction keeps their tunnel.
     assert_eq!(
         command(DIAGNOSE, disturbing(Some("services"))),
-        Some(Command::Doctor {
+        Some(Command::Doctor(Diagnosing {
             narrowing: Narrowing::Category(Category::Services),
             disruptive: true,
             accept: None,
-        })
+        }))
     );
 }
 
@@ -104,11 +104,11 @@ fn one_group_of_checks_is_disturbed_rather_than_all_of_them() {
 fn one_check_is_asked_for_by_the_name_its_finding_carries() {
     assert_eq!(
         command(DIAGNOSE, disturbing(Some(KILLSWITCH))),
-        Some(Command::Doctor {
+        Some(Command::Doctor(Diagnosing {
             narrowing: Narrowing::Check(KILLSWITCH.to_owned()),
             disruptive: true,
             accept: None,
-        })
+        }))
     );
 }
 

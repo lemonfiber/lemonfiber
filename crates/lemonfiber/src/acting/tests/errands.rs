@@ -1,6 +1,7 @@
 //! Errands: a reset, a capture and a restore, asked and carried out.
 
 use super::*;
+use lemonfiber_core::app::Restoring;
 
 /// What a reset would revert, or did.
 fn a_reset(confirmed: bool) -> ResetReport {
@@ -82,11 +83,11 @@ fn a_restore_is_named_read_and_only_then_agreed_to() {
 
     assert_eq!(
         listing,
-        Wanted::Carry(Command::Restore {
+        Wanted::Carry(Command::Restore(Restoring {
             archive: Kept::Named("lemonfiber-full-1.tar.gz".to_owned()),
             repoint: false,
             consent: restore::Consent::List,
-        })
+        }))
     );
 }
 
@@ -284,11 +285,11 @@ fn a_restore_onto_a_different_data_root_is_accepted_under_the_listing() {
     );
     assert_eq!(
         acting.pressed(&Press::Typed('y')),
-        Wanted::Carry(Command::Restore {
+        Wanted::Carry(Command::Restore(Restoring {
             archive: Kept::Named("kept.tar.gz".to_owned()),
             repoint: true,
             consent: restore::Consent::Standing,
-        })
+        }))
     );
 }
 
@@ -303,11 +304,11 @@ fn a_restore_that_moves_nothing_asks_for_no_re_point() {
     assert!(!asked.contains("re-pointing"), "{asked}");
     assert_eq!(
         acting.pressed(&Press::Typed('y')),
-        Wanted::Carry(Command::Restore {
+        Wanted::Carry(Command::Restore(Restoring {
             archive: Kept::Named("kept.tar.gz".to_owned()),
             repoint: false,
             consent: restore::Consent::Standing,
-        })
+        }))
     );
 }
 

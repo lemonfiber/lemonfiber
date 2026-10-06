@@ -1,6 +1,7 @@
 //! Offering a repair, agreeing to it, and putting it back.
 
 use super::*;
+use lemonfiber_core::app::Diagnosing;
 
 /// The claim this slice makes, end to end. Asking what is wrong was reachable and
 /// putting it right was not: the offer is asked for, every word of it is read,
@@ -124,11 +125,11 @@ fn a_warning_is_answered_off_the_run_that_raised_it() {
     let (mut acting, wanted) = putting("accept");
     assert_eq!(
         wanted,
-        Wanted::Carry(Command::Doctor {
+        Wanted::Carry(Command::Doctor(Diagnosing {
             narrowing: Narrowing::Suite,
             disruptive: false,
             accept: None,
-        })
+        }))
     );
 
     acting.came_to(Ok(Outcome::Doctor(a_warning())));
@@ -144,11 +145,11 @@ fn a_warning_is_answered_off_the_run_that_raised_it() {
 
     assert_eq!(
         acting.pressed(&Press::Typed('y')),
-        Wanted::Carry(Command::Doctor {
+        Wanted::Carry(Command::Doctor(Diagnosing {
             narrowing: Narrowing::Suite,
             disruptive: false,
             accept: Some("vpn.unprotected".to_owned()),
-        })
+        }))
     );
 }
 

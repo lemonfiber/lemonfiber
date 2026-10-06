@@ -1,6 +1,7 @@
 //! Offering somebody an account, taking one back, and what either leaves behind.
 
 use super::*;
+use crate::app::Inviting;
 
 /// Removing somebody dispatches, and unconfirmed it removes nobody.
 ///
@@ -173,11 +174,11 @@ async fn offering_an_account_hands_back_one_address_and_a_name() {
         .with_http(http);
 
     let made = dispatch(
-        Command::Invite {
+        Command::Invite(Inviting {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
             confirm: true,
-        },
+        }),
         &ctx,
     )
     .await;
@@ -222,11 +223,11 @@ async fn a_machine_with_no_address_makes_no_account_and_says_so() {
         .with_http(http);
 
     let made = dispatch(
-        Command::Invite {
+        Command::Invite(Inviting {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
             confirm: true,
-        },
+        }),
         &ctx,
     )
     .await;
@@ -260,11 +261,11 @@ async fn offering(
         .build()
         .with_http(http);
     dispatch(
-        Command::Invite {
+        Command::Invite(Inviting {
             name: name.to_owned(),
             allowance: Allowance::default(),
             confirm: true,
-        },
+        }),
         &ctx,
     )
     .await
@@ -472,11 +473,11 @@ async fn an_invitation_nobody_claimed_is_taken_back_and_named() {
         .with_http(http);
 
     let made = dispatch(
-        Command::Invite {
+        Command::Invite(Inviting {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
             confirm: true,
-        },
+        }),
         &ctx,
     )
     .await;
@@ -557,11 +558,11 @@ async fn offered_without_writing(named: &str, dry_run: bool, confirm: bool) {
     let ctx = context.with_http(http);
 
     let made = dispatch(
-        Command::Invite {
+        Command::Invite(Inviting {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
             confirm,
-        },
+        }),
         &ctx,
     )
     .await;
@@ -632,11 +633,11 @@ async fn an_offer_on_a_stack_running_the_decline_service_carries_its_decline_add
         .with_http(http);
 
     let made = dispatch(
-        Command::Invite {
+        Command::Invite(Inviting {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
             confirm: true,
-        },
+        }),
         &ctx,
     )
     .await;

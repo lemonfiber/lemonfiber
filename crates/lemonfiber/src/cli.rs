@@ -10,11 +10,13 @@ mod companion;
 mod credentials;
 mod downloads;
 mod keys;
+mod logs;
 mod plugin;
 mod removing;
 mod repair;
 mod serving;
 mod setup;
+mod starting;
 mod trace;
 
 use std::path::PathBuf;
@@ -40,11 +42,13 @@ pub use companion::{CompanionCommand, RawCompanion};
 pub use credentials::RawCredentials;
 pub use downloads::{DownloadsCommand, RawDownloads};
 pub use keys::{KeyCommand, RawKey};
+pub use logs::RawLogs;
 pub use plugin::{Authoring, PluginCommand};
 pub use removing::{RawRemoval, RawRemoving};
 pub use repair::{Fixing, Mending, RawDoctor};
 pub use serving::{Asked, RawUi};
 pub use setup::RawSetup;
+pub use starting::{RawDown, RawUp};
 pub use trace::RawTrace;
 pub use whom::RawWhom;
 

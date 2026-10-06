@@ -1,6 +1,7 @@
 //! Starting, stopping and pulling, as the engine is asked to.
 
 use super::*;
+use crate::app::Teardown;
 
 #[tokio::test]
 async fn starting_a_form_reports_what_it_would_run_and_runs_nothing() {
@@ -65,10 +66,10 @@ async fn a_real_run_reports_how_the_command_exited() {
         )))
         .settings(settings)
         .build();
-    let command = Command::Down {
+    let command = Command::Down(Teardown {
         forms: vec!["library".to_owned()],
         wait: Waiting::Never,
-    };
+    });
     let produced = report(dispatch(command, &ctx).await);
 
     assert_eq!(
@@ -128,10 +129,10 @@ async fn a_teardown_asked_to_wait_where_nothing_is_downloading_stops_at_once() {
         )))
         .settings(settings)
         .build();
-    let command = Command::Down {
+    let command = Command::Down(Teardown {
         forms: vec!["search".to_owned()],
         wait: Waiting::ForTheDownloads,
-    };
+    });
     let produced = report(dispatch(command, &ctx).await);
 
     assert_eq!(

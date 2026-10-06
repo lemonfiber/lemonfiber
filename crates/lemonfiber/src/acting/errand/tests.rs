@@ -3,7 +3,7 @@ use crate::acting::offer::OFFERED as KEYED;
 use lemonfiber::reaching::{ACTS, ALSO};
 use lemonfiber_api::actions::{OFFERED as WEB, TAKES_AGREEMENT, TAKES_CONSENT};
 use lemonfiber_core::app::restore::{Consent, Kept};
-use lemonfiber_core::app::{Command, Waiting};
+use lemonfiber_core::app::{Command, Gathering, LettingGo, Restoring, Waiting};
 use lemonfiber_core::bundle::Filenames;
 
 /// One errand naming an action no surface offers, for the paths that report a
@@ -217,7 +217,7 @@ fn no_bundle_this_screen_can_send_names_a_setting_to_reveal() {
     for (given, lines, filenames) in &bundling {
         assert_eq!(
             sending("support").map(|errand| errand.sent(given)),
-            Some(Ok(Command::Support {
+            Some(Ok(Command::Support(Gathering {
                 write: true,
                 wanted: lemonfiber_core::bundle::run::Wanted {
                     lines: *lines,
@@ -226,7 +226,7 @@ fn no_bundle_this_screen_can_send_names_a_setting_to_reveal() {
                     confirmed: true,
                 },
                 dest: lemonfiber_core::app::support::Destination::Kept,
-            }))
+            })))
         );
     }
 }
@@ -380,10 +380,10 @@ fn the_yes_to_letting_a_download_go_is_the_name_the_offer_gave_itself() {
 
     assert_eq!(
         answered,
-        Some(Ok(Command::StopSeeding {
+        Some(Ok(Command::StopSeeding(LettingGo {
             download: "A.Show.S01E01".to_owned(),
             agreement: Some(offer.agreement),
-        })),
+        }))),
         "the offer that was read is what the yes names"
     );
 }
@@ -460,14 +460,14 @@ fn the_bundle_this_screen_asks_for_replaces_filenames_and_carries_the_agreement(
 
     assert_eq!(
         bundle,
-        Some(Ok(Command::Support {
+        Some(Ok(Command::Support(Gathering {
             write: true,
             wanted: lemonfiber_core::bundle::run::Wanted {
                 confirmed: true,
                 ..lemonfiber_core::bundle::run::Wanted::default()
             },
             dest: lemonfiber_core::app::support::Destination::Kept,
-        }))
+        })))
     );
 }
 
@@ -482,7 +482,7 @@ fn a_bundle_is_asked_for_with_the_window_and_the_filenames_that_were_chosen() {
 
     assert_eq!(
         bundle,
-        Some(Ok(Command::Support {
+        Some(Ok(Command::Support(Gathering {
             write: true,
             wanted: lemonfiber_core::bundle::run::Wanted {
                 lines: 20,
@@ -491,7 +491,7 @@ fn a_bundle_is_asked_for_with_the_window_and_the_filenames_that_were_chosen() {
                 confirmed: true,
             },
             dest: lemonfiber_core::app::support::Destination::Kept,
-        }))
+        })))
     );
 }
 
@@ -503,7 +503,7 @@ fn what_a_bundle_would_hold_is_asked_for_before_one_is_written() {
 
     assert!(matches!(
         would,
-        Some(Ok(Command::Support { write: false, .. }))
+        Some(Ok(Command::Support(Gathering { write: false, .. })))
     ));
 }
 
@@ -517,19 +517,19 @@ fn a_restore_carries_the_name_it_was_given_and_never_a_path() {
     let climbing = restoring.map(|errand| errand.sent(&typed("../../etc/shadow")));
     assert_eq!(
         climbing,
-        Some(Ok(Command::Restore {
+        Some(Ok(Command::Restore(Restoring {
             archive: Kept::Named("../../etc/shadow".to_owned()),
             repoint: false,
             consent: Consent::Standing,
-        }))
+        })))
     );
     let listing = restoring.and_then(|errand| errand.would(&typed("lemonfiber-full-1.tar.gz")));
     assert!(matches!(
         listing,
-        Some(Ok(Command::Restore {
+        Some(Ok(Command::Restore(Restoring {
             consent: Consent::List,
             ..
-        }))
+        })))
     ));
 }
 

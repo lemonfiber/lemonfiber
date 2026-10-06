@@ -19,6 +19,7 @@ use crate::common;
 use async_trait::async_trait;
 use lemonfiber_core::app::support::{run, Destination};
 use lemonfiber_core::app::Ctx;
+use lemonfiber_core::app::Gathering;
 use lemonfiber_core::archive::{Archive, Archiving, Fault as ArchiveFault, Reader, Space, Vault};
 use lemonfiber_core::backup::{Existing, Item, Manifest as BackupManifest};
 use lemonfiber_core::bundle::run::{collect, write, Wanted};
@@ -553,11 +554,11 @@ async fn a_machine_that_will_not_supply_randomness_gets_no_bundle_at_all() {
 async fn a_dispatched_support_request_serialises_under_its_own_kind() {
     let vault = Arc::new(Recorder::new(1 << 30, false));
     let json = lemonfiber_core::app::dispatch(
-        lemonfiber_core::app::Command::Support {
+        lemonfiber_core::app::Command::Support(Gathering {
             write: false,
             wanted: plainly(),
             dest: Destination::Kept,
-        },
+        }),
         &asking(&vault),
     )
     .await

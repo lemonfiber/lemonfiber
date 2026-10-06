@@ -14,7 +14,7 @@
 //! request name a number instead, because a household asks for the same film twice
 //! under two spellings and a decision matched on words could rule on the wrong one.
 
-use lemonfiber_core::app::{Allowance, Answer, Chosen, Command, Decision};
+use lemonfiber_core::app::{Allowance, Answer, Chosen, Command, Decision, Inviting};
 use lemonfiber_core::asking::Policy;
 use lemonfiber_core::ports::service::{Quota, Unrated};
 
@@ -108,11 +108,11 @@ fn about_a_person(
         unrated: unrated(allowance.unrated.as_deref())?,
     };
     match action {
-        "invite" => Ok(Command::Invite {
+        "invite" => Ok(Command::Invite(Inviting {
             name,
             allowance,
             confirm,
-        }),
+        })),
         "reissue" => Ok(Command::Reissue { name }),
         "household-handoff" => Ok(Command::Handoff { name }),
         _ => Ok(Command::Remove { name, confirm }),

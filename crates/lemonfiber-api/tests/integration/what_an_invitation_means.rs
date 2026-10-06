@@ -11,7 +11,7 @@
 //! rather than at the top of the page.
 
 use lemonfiber_api::actions::{named, Arguments, Refused};
-use lemonfiber_core::app::{Command, Outcome};
+use lemonfiber_core::app::{Command, Inviting, Outcome};
 use lemonfiber_core::model::{Invitation, InvitationStanding, Linked};
 
 /// What an action came to, or nothing where it was refused.
@@ -33,7 +33,7 @@ fn an_invitation_carries_the_name_it_is_for() {
 
     assert!(matches!(
         command("invite", with_name),
-        Some(Command::Invite { name, allowance, confirm })
+        Some(Command::Invite(Inviting { name, allowance, confirm }))
             if name == "ana" && allowance == lemonfiber_core::app::Allowance::default() && !confirm
     ));
 }
@@ -50,7 +50,7 @@ fn an_invitation_is_made_only_once_it_is_confirmed() {
 
     assert!(matches!(
         command("invite", confirmed),
-        Some(Command::Invite { confirm: true, .. })
+        Some(Command::Invite(Inviting { confirm: true, .. }))
     ));
 }
 
@@ -72,7 +72,7 @@ fn an_invitation_carries_what_they_may_watch() {
     assert!(
         matches!(
             command("invite", narrowed),
-            Some(Command::Invite { allowance, .. })
+            Some(Command::Invite(Inviting { allowance, .. }))
                 if allowance.libraries == ["Films", "Shows"] && allowance.age_limit == Some(12)
         ),
         "an invitation reached the core without what it was told they may watch"

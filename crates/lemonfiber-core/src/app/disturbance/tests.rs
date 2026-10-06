@@ -1,6 +1,7 @@
 use super::*;
 use crate::app::engine::Waiting;
 use crate::app::plugins::Asked;
+use crate::app::Teardown;
 
 /// A patience unlike any default, so a length read from it cannot be a
 /// constant that happens to match.
@@ -45,10 +46,10 @@ fn every_verb_that_starts_something_is_bounded_the_same_way() {
 
 #[test]
 fn a_teardown_that_waits_for_downloads_has_nothing_bounding_it() {
-    let command = Command::Down {
+    let command = Command::Down(Teardown {
         forms: Vec::new(),
         wait: Waiting::ForTheDownloads,
-    };
+    });
 
     assert_eq!(
         of(&command, WAITED),
@@ -59,10 +60,10 @@ fn a_teardown_that_waits_for_downloads_has_nothing_bounding_it() {
 
 #[test]
 fn a_teardown_that_does_not_wait_is_bounded_by_the_engines_grace() {
-    let command = Command::Down {
+    let command = Command::Down(Teardown {
         forms: Vec::new(),
         wait: Waiting::Never,
-    };
+    });
 
     assert_eq!(
         of(&command, WAITED),
@@ -225,10 +226,10 @@ fn the_payload_and_the_command_agree_on_every_length() {
             payload.starting,
         ),
         (
-            Command::Down {
+            Command::Down(Teardown {
                 forms: forms(),
                 wait: Waiting::Never,
-            },
+            }),
             payload.stopping,
         ),
         (
@@ -239,10 +240,10 @@ fn the_payload_and_the_command_agree_on_every_length() {
             payload.stopping,
         ),
         (
-            Command::Down {
+            Command::Down(Teardown {
                 forms: forms(),
                 wait: Waiting::ForTheDownloads,
-            },
+            }),
             payload.stopping_after_downloads,
         ),
         (
@@ -292,10 +293,10 @@ fn a_form_and_the_services_inside_it_are_held_to_the_same_clock() {
             },
         ),
         (
-            Command::Down {
+            Command::Down(Teardown {
                 forms: forms.clone(),
                 wait: Waiting::Never,
-            },
+            }),
             Command::Halt {
                 forms: forms.clone(),
                 services,

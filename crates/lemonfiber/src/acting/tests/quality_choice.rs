@@ -1,6 +1,7 @@
 //! Changing the quality choice, and what it costs first.
 
 use super::*;
+use lemonfiber_core::app::Tracing;
 
 /// The screen, having taken the change that records a choice and then the media
 /// that choice is about.
@@ -427,10 +428,10 @@ fn a_trace_is_narrowed_to_one_season_on_a_second_line() {
     acting.pressed(&Press::Typed('2'));
     assert_eq!(
         acting.pressed(&Press::Accept),
-        Wanted::Carry(Command::Trace {
+        Wanted::Carry(Command::Trace(Tracing {
             term: "The Expanse".to_owned(),
             season: Some(2),
             searching: false,
-        })
+        }))
     );
 }

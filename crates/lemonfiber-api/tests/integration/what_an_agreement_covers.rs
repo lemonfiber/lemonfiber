@@ -16,7 +16,7 @@
 use lemonfiber_api::actions::{named, Arguments, Refused, TAKES_AGREEMENT};
 use lemonfiber_core::app::restore::{self, Kept};
 use lemonfiber_core::app::support::Destination;
-use lemonfiber_core::app::{Command, QualityAction};
+use lemonfiber_core::app::{Command, Gathering, LettingGo, QualityAction, Restoring};
 use lemonfiber_core::bundle::run::{Wanted, LINES};
 use lemonfiber_core::bundle::Filenames;
 use lemonfiber_core::quality::Preset;
@@ -102,13 +102,13 @@ fn a_reset_an_upgrade_and_a_restore_carry_the_agreement_into_the_command() {
                 ..Arguments::default()
             }
         ),
-        Some(Command::Restore {
+        Some(Command::Restore(Restoring {
             archive: Kept::Named("a-backup.tar.gz".to_owned()),
             repoint: false,
             // A yes carrying no listing is the standing consent, which is what
             // `confirm` alone has always meant here.
             consent: restore::Consent::Standing,
-        })
+        }))
     );
 }
 
@@ -296,10 +296,10 @@ fn the_offer_read_is_the_whole_of_how_this_one_is_agreed_to() {
                 ..Arguments::default()
             }
         ),
-        Some(Command::StopSeeding {
+        Some(Command::StopSeeding(LettingGo {
             download: HELD.to_owned(),
             agreement: None
-        })
+        }))
     );
     assert_eq!(
         command(
@@ -310,10 +310,10 @@ fn the_offer_read_is_the_whole_of_how_this_one_is_agreed_to() {
                 ..Arguments::default()
             }
         ),
-        Some(Command::StopSeeding {
+        Some(Command::StopSeeding(LettingGo {
             download: HELD.to_owned(),
             agreement: Some(READ.to_owned())
-        })
+        }))
     );
 }
 
@@ -345,21 +345,21 @@ fn a_bundles_agreement_lands_on_the_revealing_and_never_on_the_file() {
     // A yes with nothing named to reveal writes nothing at all.
     assert_eq!(
         command("support", bundling(false, &[], true)),
-        Some(Command::Support {
+        Some(Command::Support(Gathering {
             write: false,
             wanted: Wanted::asked(LINES, Filenames::Replaced, Vec::new(), true),
             dest: Destination::Kept,
-        })
+        }))
     );
     // And a file asked for with no yes is written, revealing nothing — which is
     // what makes the agreement an agreement to the revealing.
     assert_eq!(
         command("support", bundling(true, &[], false)),
-        Some(Command::Support {
+        Some(Command::Support(Gathering {
             write: true,
             wanted: Wanted::asked(LINES, Filenames::Replaced, Vec::new(), false),
             dest: Destination::Kept,
-        })
+        }))
     );
 }
 
@@ -369,7 +369,7 @@ fn a_setting_named_to_be_shown_travels_beside_the_yes_that_answers_it() {
     // publishes a credential and the yes to publishing it cannot arrive apart.
     let asked = command("support", bundling(true, &["QBITTORRENT_PASSWORD"], true));
     let wanted = asked.and_then(|command| match command {
-        Command::Support { wanted, .. } => Some(wanted),
+        Command::Support(Gathering { wanted, .. }) => Some(wanted),
         _ => None,
     });
 

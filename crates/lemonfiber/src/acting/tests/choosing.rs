@@ -1,6 +1,7 @@
 //! Choosing an action: the key, the forms marked, and the question asked.
 
 use super::*;
+use lemonfiber_core::app::Teardown;
 
 /// The whole flow, which is the claim this screen exists to make: a key, a
 /// choice, a question, an explicit yes, and only then a command — and the
@@ -220,10 +221,10 @@ fn the_whole_stack_is_a_choice_where_the_command_can_mean_it() {
 
     assert_eq!(
         carried,
-        Wanted::Carry(Command::Down {
+        Wanted::Carry(Command::Down(Teardown {
             forms: Vec::new(),
             wait: Waiting::Never
-        })
+        }))
     );
 }
 

@@ -2,8 +2,9 @@
 
 use super::a_plugin_source;
 use lemonfiber_core::app::{
-    plugins, AlertAction, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision, Filling,
-    Keeping, Linking, MigrateAction, QualityAction, Removing, Setting, SetupAction, Waiting,
+    plugins, AlertAction, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision, Diagnosing,
+    Filling, Gathering, Inviting, Keeping, LettingGo, Linking, MigrateAction, QualityAction,
+    Removing, Restoring, Setting, SetupAction, Teardown, Tracing, Waiting,
 };
 use lemonfiber_core::config::Protocols;
 use lemonfiber_core::doctor::Narrowing;
@@ -51,10 +52,10 @@ fn over_the_stack() -> Vec<(&'static str, Command)> {
         ("up", Command::Up { forms: Vec::new() }),
         (
             "down",
-            Command::Down {
+            Command::Down(Teardown {
                 forms: Vec::new(),
                 wait: Waiting::ForTheDownloads,
-            },
+            }),
         ),
         (
             "switch",
@@ -91,11 +92,11 @@ fn over_the_stack() -> Vec<(&'static str, Command)> {
         ),
         (
             "doctor",
-            Command::Doctor {
+            Command::Doctor(Diagnosing {
                 narrowing: Narrowing::Suite,
                 disruptive: false,
                 accept: Some("storage.one-filesystem".to_owned()),
-            },
+            }),
         ),
         ("watch", Command::Watch { forms: Vec::new() }),
         (
@@ -113,11 +114,11 @@ fn over_the_household() -> Vec<(&'static str, Command)> {
     vec![
         (
             "trace",
-            Command::Trace {
+            Command::Trace(Tracing {
                 term: "anything".to_owned(),
                 season: None,
                 searching: true,
-            },
+            }),
         ),
         ("household", Command::Household { member: None }),
         (
@@ -179,11 +180,11 @@ fn over_the_household() -> Vec<(&'static str, Command)> {
         ("clients", Command::Clients),
         (
             "invite",
-            Command::Invite {
+            Command::Invite(Inviting {
                 name: "ana".to_owned(),
                 allowance: lemonfiber_core::app::Allowance::default(),
                 confirm: true,
-            },
+            }),
         ),
         (
             "reissue",
@@ -222,10 +223,10 @@ fn over_what_this_machine_keeps() -> Vec<(&'static str, Command)> {
         ),
         (
             "stop-seeding",
-            Command::StopSeeding {
+            Command::StopSeeding(LettingGo {
                 download: "anything".to_owned(),
                 agreement: None,
-            },
+            }),
         ),
         (
             "bandwidth",
@@ -266,19 +267,19 @@ fn over_what_this_machine_keeps() -> Vec<(&'static str, Command)> {
         ),
         (
             "support",
-            Command::Support {
+            Command::Support(Gathering {
                 write: true,
                 wanted: lemonfiber_core::bundle::run::Wanted::default(),
                 dest: lemonfiber_core::app::support::Destination::Kept,
-            },
+            }),
         ),
         (
             "restore",
-            Command::Restore {
+            Command::Restore(Restoring {
                 archive: lemonfiber_core::app::restore::Kept::Named("anything".to_owned()),
                 repoint: false,
                 consent: lemonfiber_core::app::restore::Consent::Standing,
-            },
+            }),
         ),
         ("setup", Command::Setup(SetupAction::Apply)),
     ]
@@ -368,11 +369,11 @@ pub(super) fn beyond_the_command_line() -> Vec<(&'static str, Command)> {
         // wrote something.
         (
             "support-described",
-            Command::Support {
+            Command::Support(Gathering {
                 write: false,
                 wanted: lemonfiber_core::bundle::run::Wanted::default(),
                 dest: lemonfiber_core::app::support::Destination::Kept,
-            },
+            }),
         ),
         // Answering a setup question, which writes the resumable progress file — the
         // one write in the configuration home that no other sample here reaches.

@@ -6,7 +6,7 @@ use crate::acting::chooser::Chooser;
 use crate::acting::reading::Reading;
 use crate::acting::{Press, Stage, Wanted};
 use lemonfiber_api::actions::{OFFERED as WEB, TAKES_CONSENT, TAKES_DISRUPTION};
-use lemonfiber_core::app::{Command, Outcome};
+use lemonfiber_core::app::{Command, Diagnosing, Outcome};
 use lemonfiber_core::doctor::{Category, Finding, Narrowing, Overall, Verdict};
 use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
 use lemonfiber_core::model::DoctorReport;
@@ -241,11 +241,11 @@ fn no_half_of_a_repair_asked_for_here_disturbs_the_stack() {
 fn the_warnings_are_asked_for_as_the_diagnosis_every_surface_reads() {
     assert_eq!(
         doing("accept").asking(),
-        Ok(Command::Doctor {
+        Ok(Command::Doctor(Diagnosing {
             narrowing: Narrowing::Suite,
             disruptive: false,
             accept: None,
-        })
+        }))
     );
 }
 

@@ -1,7 +1,9 @@
 //! The words about the people in the household: who is offered an account, whose shelf
 //! is read, and what they may ask for.
 
-use lemonfiber_core::app::{Allowance, Answer, Arranged, Chosen, Command, Decision, Whom};
+use lemonfiber_core::app::{
+    Allowance, Answer, Arranged, Chosen, Command, Decision, Inviting, Whom,
+};
 use lemonfiber_core::asking::Policy;
 use lemonfiber_core::ports::service::{Quota, Unrated};
 
@@ -20,7 +22,7 @@ use lemonfiber::cli::{HouseholdCommand, RawAllowance, RawUnrated, RawWhom};
 /// whatever a restriction carries by default. A `false` written for a word nobody typed
 /// would be this surface deciding on the household's behalf.
 pub(crate) fn invitation(name: String, allowance: RawAllowance) -> Command {
-    Command::Invite {
+    Command::Invite(Inviting {
         name,
         confirm: true,
         allowance: Allowance {
@@ -31,7 +33,7 @@ pub(crate) fn invitation(name: String, allowance: RawAllowance) -> Command {
                 RawUnrated::Allow => Unrated::LetThrough,
             }),
         },
-    }
+    })
 }
 
 /// Whom a household reading is narrowed to, from the two flags that can narrow it.

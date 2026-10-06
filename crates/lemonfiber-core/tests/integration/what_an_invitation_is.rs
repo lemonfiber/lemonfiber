@@ -12,7 +12,7 @@
 use std::sync::Arc;
 
 use crate::common::household::recorded_admin;
-use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Outcome};
+use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Inviting, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::model::Linked;
 use lemonfiber_core::stack::Source;
@@ -104,11 +104,11 @@ async fn an_invitation_carries_one_address_and_the_name_to_sign_in_as() {
     let ctx = context(&env);
 
     let made = dispatch(
-        Command::Invite {
+        Command::Invite(Inviting {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
             confirm: true,
-        },
+        }),
         &ctx,
     )
     .await;
@@ -138,11 +138,11 @@ async fn the_request_service_is_told_about_everybody_and_not_only_the_new_accoun
     let ctx = context_over(&env, http.clone());
 
     let made = dispatch(
-        Command::Invite {
+        Command::Invite(Inviting {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
             confirm: true,
-        },
+        }),
         &ctx,
     )
     .await;
@@ -179,11 +179,11 @@ async fn an_invitation_stands_when_the_request_service_will_not_answer() {
     let ctx = context_over(&env, http.clone());
 
     let made = dispatch(
-        Command::Invite {
+        Command::Invite(Inviting {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
             confirm: true,
-        },
+        }),
         &ctx,
     )
     .await;
@@ -217,11 +217,11 @@ async fn somebody_already_here_is_named_once() {
     let ctx = context_over(&env, http.clone());
 
     let made = dispatch(
-        Command::Invite {
+        Command::Invite(Inviting {
             name: "owner".to_owned(),
             allowance: Allowance::default(),
             confirm: true,
-        },
+        }),
         &ctx,
     )
     .await;
@@ -286,11 +286,11 @@ async fn a_stack_with_no_request_service_calls_it_nothing_tried() {
     );
 
     let made = dispatch(
-        Command::Invite {
+        Command::Invite(Inviting {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
             confirm: true,
-        },
+        }),
         &ctx,
     )
     .await;
@@ -326,11 +326,11 @@ async fn a_refused_session_leaves_the_invitation_standing_too() {
     let ctx = context_over(&env, http.clone());
 
     let made = dispatch(
-        Command::Invite {
+        Command::Invite(Inviting {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
             confirm: true,
-        },
+        }),
         &ctx,
     )
     .await;
@@ -358,11 +358,11 @@ async fn a_rehearsal_tells_the_request_service_nothing() {
     let ctx = context_over(&env, http.clone()).rehearsing();
 
     let made = dispatch(
-        Command::Invite {
+        Command::Invite(Inviting {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
             confirm: true,
-        },
+        }),
         &ctx,
     )
     .await;
@@ -388,11 +388,11 @@ async fn an_invitation_serialises_under_its_own_name() {
     let ctx = context(&env);
 
     let json = dispatch(
-        Command::Invite {
+        Command::Invite(Inviting {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
             confirm: true,
-        },
+        }),
         &ctx,
     )
     .await

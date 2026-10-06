@@ -1,6 +1,8 @@
 //! Each outcome dispatching produces, written under its own kind.
 
 use super::*;
+use crate::app::LettingGo;
+use crate::app::{Gathering, Restoring, Tracing};
 
 /// A run that keeps archives, whose engine answers and reports nothing running.
 fn keeping_archives(vault: &Arc<crate::app::fixtures::FakeArchive>) -> Ctx {
@@ -150,11 +152,11 @@ async fn a_dispatched_restore_serialises_under_its_own_kind() {
         crate::backup::SCHEMA,
     ));
     let json = dispatch(
-        Command::Restore {
+        Command::Restore(Restoring {
             archive: crate::app::restore::Kept::Named("lemonfiber-full-1.tar.gz".to_owned()),
             repoint: false,
             consent: crate::app::restore::Consent::List,
-        },
+        }),
         &keeping_archives(&vault),
     )
     .await
@@ -199,11 +201,11 @@ async fn a_dispatched_support_request_serialises_under_its_own_kind() {
     let vault = Arc::new(crate::app::fixtures::FakeArchive::roomy());
     let ctx = keeping_archives(&vault).with_http(Fake::silent());
     let json = dispatch(
-        Command::Support {
+        Command::Support(Gathering {
             write: false,
             wanted: super::super::bundle::Wanted::default(),
             dest: super::super::support::Destination::Kept,
-        },
+        }),
         &ctx,
     )
     .await
@@ -313,11 +315,11 @@ async fn a_dispatched_trace_serialises_under_its_own_kind() {
     // No key opens a target, so no item matches and the trace stays offline while
     // exercising the dispatch, envelope and serialise arms for its outcome.
     let json = dispatch(
-        Command::Trace {
+        Command::Trace(Tracing {
             term: "the expanse".to_owned(),
             season: None,
             searching: false,
-        },
+        }),
         &ctx(Ok(spoke(""))),
     )
     .await
@@ -752,10 +754,10 @@ async fn a_dispatched_request_to_stop_seeding_reaches_its_own_arm() {
     // refused before it looks at what a client is holding. Which is also what
     // exercises the arm, and it is a different arm from the account beside it.
     let refused = dispatch(
-        Command::StopSeeding {
+        Command::StopSeeding(LettingGo {
             download: "A.Show.S01E01".to_owned(),
             agreement: None,
-        },
+        }),
         &ctx(Ok(spoke(""))),
     )
     .await
