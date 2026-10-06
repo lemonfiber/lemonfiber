@@ -22,6 +22,7 @@
 mod bundle;
 pub mod kept;
 mod logs;
+pub mod published;
 pub mod table;
 
 use axum::body::Body;

@@ -4,27 +4,32 @@
     {
       "action": "restart",
       "disturbs": true,
-      "rehearsal": true
+      "rehearsal": true,
+      "idempotent": false
     },
     {
       "action": "diagnose",
       "disturbs": true,
-      "rehearsal": false
+      "rehearsal": false,
+      "idempotent": false
     },
     {
       "action": "update",
       "disturbs": true,
-      "rehearsal": true
+      "rehearsal": true,
+      "idempotent": false
     },
     {
       "action": "downloads-pause",
       "disturbs": false,
-      "rehearsal": true
+      "rehearsal": true,
+      "idempotent": true
     },
     {
       "action": "downloads-resume",
       "disturbs": false,
-      "rehearsal": true
+      "rehearsal": true,
+      "idempotent": true
     }
   ],
   "kinds": {
@@ -21300,6 +21305,369 @@
       }
     }
   },
+  "reads": [
+    {
+      "path": "/api/version",
+      "parameters": [],
+      "kinds": [
+        "version"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/forms",
+      "parameters": [
+        {
+          "name": "form",
+          "repeatable": true
+        }
+      ],
+      "kinds": [
+        "forms",
+        "preview"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/status",
+      "parameters": [],
+      "kinds": [
+        "status"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/services",
+      "parameters": [
+        {
+          "name": "form",
+          "repeatable": true
+        }
+      ],
+      "kinds": [
+        "status"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/checks",
+      "parameters": [
+        {
+          "name": "only",
+          "repeatable": false
+        }
+      ],
+      "kinds": [
+        "doctor"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/storage",
+      "parameters": [],
+      "kinds": [
+        "doctor"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/requests",
+      "parameters": [
+        {
+          "name": "member",
+          "repeatable": false
+        },
+        {
+          "name": "defaults",
+          "repeatable": false
+        }
+      ],
+      "kinds": [
+        "household"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/held",
+      "parameters": [
+        {
+          "name": "member",
+          "repeatable": false
+        },
+        {
+          "name": "defaults",
+          "repeatable": false
+        },
+        {
+          "name": "most",
+          "repeatable": false
+        }
+      ],
+      "kinds": [
+        "held"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/hosting",
+      "parameters": [],
+      "kinds": [
+        "hosting"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/front-door",
+      "parameters": [],
+      "kinds": [
+        "front-door"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/news",
+      "parameters": [],
+      "kinds": [
+        "news-items"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/trace",
+      "parameters": [
+        {
+          "name": "term",
+          "repeatable": false
+        },
+        {
+          "name": "season",
+          "repeatable": false
+        }
+      ],
+      "kinds": [
+        "trace"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/stuck",
+      "parameters": [],
+      "kinds": [
+        "stuck"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/config",
+      "parameters": [
+        {
+          "name": "key",
+          "repeatable": false
+        }
+      ],
+      "kinds": [
+        "config"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/quality",
+      "parameters": [],
+      "kinds": [
+        "quality"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/explain",
+      "parameters": [
+        {
+          "name": "word",
+          "repeatable": false
+        }
+      ],
+      "kinds": [
+        "glossary",
+        "word"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/backups",
+      "parameters": [],
+      "kinds": [
+        "archives"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/outbound",
+      "parameters": [],
+      "kinds": [
+        "outbound"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/provenance",
+      "parameters": [],
+      "kinds": [
+        "provenance"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/catalogue",
+      "parameters": [],
+      "kinds": [
+        "catalogue"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/stored",
+      "parameters": [],
+      "kinds": [
+        "stored"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/uninstall",
+      "parameters": [
+        {
+          "name": "tier",
+          "repeatable": false
+        }
+      ],
+      "kinds": [
+        "uninstall"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/space",
+      "parameters": [],
+      "kinds": [
+        "space"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/bandwidth",
+      "parameters": [],
+      "kinds": [
+        "bandwidth"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/clients",
+      "parameters": [],
+      "kinds": [
+        "clients"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/alerts",
+      "parameters": [],
+      "kinds": [
+        "alerts"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/credentials",
+      "parameters": [],
+      "kinds": [
+        "credentials"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/migration",
+      "parameters": [],
+      "kinds": [
+        "migration"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/history",
+      "parameters": [],
+      "kinds": [
+        "history"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/update",
+      "parameters": [
+        {
+          "name": "what",
+          "repeatable": false
+        },
+        {
+          "name": "to",
+          "repeatable": false
+        }
+      ],
+      "kinds": [
+        "self-update",
+        "update"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/plugins",
+      "parameters": [],
+      "kinds": [
+        "plugins"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/wiring",
+      "parameters": [],
+      "kinds": [
+        "wiring"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/logs",
+      "parameters": [
+        {
+          "name": "form",
+          "repeatable": true
+        },
+        {
+          "name": "service",
+          "repeatable": true
+        },
+        {
+          "name": "tail",
+          "repeatable": false
+        },
+        {
+          "name": "follow",
+          "repeatable": false
+        }
+      ],
+      "kinds": [
+        "job",
+        "log"
+      ],
+      "file": false
+    },
+    {
+      "path": "/api/bundle/{name}",
+      "parameters": [],
+      "kinds": [],
+      "file": true
+    }
+  ],
   "refusals": {
     "ADMIT-10": {
       "name": "NOT_A_PASSWORD",
