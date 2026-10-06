@@ -25,6 +25,7 @@ mod one_gate_for_every_credential;
 mod one_number_one_place;
 mod one_spelling_on_the_wire;
 mod plain_language;
+mod seeding_names_nothing_that_fills_an_ask;
 mod surface_parity;
 mod the_one_way_out;
 mod what_a_check_can_see;
