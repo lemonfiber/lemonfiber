@@ -22,13 +22,12 @@
 
 use serde::Serialize;
 
-use lemonfiber_manifest::Service;
+use super::{begins_at, Candidate, Facing};
 
-use super::{begins_at, facing, Facing};
-
-/// What is said where nothing this stack declares goes by the name that was given.
-const UNDECLARED: &str = "this stack declares no service by that name, so there is nothing \
-                          behind it to send anybody to";
+/// What is said where nothing this stack declares or a plugin brings goes by the name
+/// that was given.
+const UNDECLARED: &str = "neither this stack nor an installed plugin runs a service by that \
+                          name, so there is nothing behind it to send anybody to";
 
 /// What is said where the name reaches a service the household tier does not publish.
 const WITHHELD: &str = "it answers this machine and nowhere else, which is where the services \
@@ -102,16 +101,19 @@ impl Chosen {
 /// [`begins_at`], which is the whole of what decided this before there was a
 /// setting to consult.
 #[must_use]
-pub fn chosen<'a>(
-    services: &'a [Service],
+pub fn chosen<'a, 'b>(
+    candidates: &'b [Candidate<'a>],
     named: Option<&str>,
-) -> (Chosen, Option<(Facing, &'a Service)>) {
-    let derived = begins_at(services);
+) -> (Chosen, Option<(Facing, &'b Candidate<'a>)>) {
+    let derived = begins_at(candidates);
     let Some(named) = named.map(str::trim).filter(|named| !named.is_empty()) else {
         return (Chosen::Derived, derived);
     };
-    match offered(services, named) {
-        Ok((facing, service)) => (Chosen::Named(service.id.clone()), Some((facing, service))),
+    match offered(candidates, named) {
+        Ok((facing, candidate)) => (
+            Chosen::Named(candidate.id.to_owned()),
+            Some((facing, candidate)),
+        ),
         Err(because) => (
             Chosen::Refused(Refusal {
                 named: named.to_owned(),
@@ -131,18 +133,21 @@ pub fn chosen<'a>(
 /// The last refusal borrows the register's own words rather than writing a second
 /// set. Why the index over every service is not a way in has an answer already, and
 /// two answers to one question is one of them going stale.
-fn offered<'a>(services: &'a [Service], named: &str) -> Result<(Facing, &'a Service), String> {
-    let Some(service) = services
+fn offered<'a, 'b>(
+    candidates: &'b [Candidate<'a>],
+    named: &str,
+) -> Result<(Facing, &'b Candidate<'a>), String> {
+    let Some(candidate) = candidates
         .iter()
-        .find(|service| service.id.eq_ignore_ascii_case(named))
+        .find(|candidate| candidate.id.eq_ignore_ascii_case(named))
     else {
         return Err(UNDECLARED.to_owned());
     };
-    let Some(facing) = facing(service) else {
+    let Some(facing) = candidate.facing else {
         return Err(WITHHELD.to_owned());
     };
     if facing.begins() {
-        return Ok((facing, service));
+        return Ok((facing, candidate));
     }
     Err(facing.because().to_owned())
 }

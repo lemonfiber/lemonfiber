@@ -1,6 +1,6 @@
 use super::{answering, assembled, front_door, meaning, NOWHERE, UNADDRESSED};
 use crate::door::fixtures::{asking, service, watching};
-use crate::door::{Chosen, Facing, Refusal, KEPT};
+use crate::door::{Chosen, Facing, Place, Refusal, KEPT};
 use crate::model::Standing;
 use crate::platform::Environment;
 use crate::ports::docker::{Health, Lifecycle};
@@ -215,10 +215,19 @@ async fn the_address_the_operator_recorded_is_the_one_that_is_given() {
 fn a_door_with_no_address_says_so_and_a_stack_with_no_door_does_not() {
     // The two absences are different: one has somewhere to send people and no
     // way to say where, and the other has nowhere to send them at all.
-    assert!(meaning(Standing::Stranded, "Seerr", &Chosen::Derived).contains(UNADDRESSED.trim()));
-    assert!(!meaning(Standing::Established, "Seerr", &Chosen::Derived).contains(UNADDRESSED.trim()));
+    assert!(
+        meaning(Standing::Stranded, "Seerr", UNADDRESSED, &Chosen::Derived)
+            .contains(UNADDRESSED.trim())
+    );
+    assert!(!meaning(
+        Standing::Established,
+        "Seerr",
+        UNADDRESSED,
+        &Chosen::Derived
+    )
+    .contains(UNADDRESSED.trim()));
     assert_eq!(
-        meaning(Standing::Absent, "Seerr", &Chosen::Derived),
+        meaning(Standing::Absent, "Seerr", UNADDRESSED, &Chosen::Derived),
         NOWHERE
     );
 }
@@ -262,12 +271,18 @@ fn a_stack_that_publishes_nothing_to_the_household_is_told_there_is_no_door() {
         Some(lemonfiber_manifest::ApiKind::Servarr),
     )];
     let report = assembled(
-        &declared,
-        &[up("sonarr", crate::docker::State::Healthy)],
-        Some("kitchen-nas"),
+        &crate::door::candidates(&declared, &[]),
+        super::Running {
+            surveyed: &[up("sonarr", crate::docker::State::Healthy)],
+            undeclared: &[],
+        },
+        &Place {
+            named: Some("kitchen-nas"),
+            recorded: None,
+            domain: None,
+            environment: Environment::MacOs,
+        },
         None,
-        None,
-        Environment::MacOs,
     );
     assert_eq!(report.standing, Standing::Absent);
     assert_eq!(report.service, None);
@@ -280,12 +295,18 @@ fn a_stack_that_publishes_nothing_to_the_household_is_told_there_is_no_door() {
 fn a_stack_with_only_a_library_makes_the_library_the_door() {
     let declared = [watching()];
     let report = assembled(
-        &declared,
-        &[up("jellyfin", crate::docker::State::Healthy)],
-        Some("kitchen-nas"),
+        &crate::door::candidates(&declared, &[]),
+        super::Running {
+            surveyed: &[up("jellyfin", crate::docker::State::Healthy)],
+            undeclared: &[],
+        },
+        &Place {
+            named: Some("kitchen-nas"),
+            recorded: None,
+            domain: None,
+            environment: Environment::MacOs,
+        },
         None,
-        None,
-        Environment::MacOs,
     );
     assert_eq!(report.standing, Standing::LibraryOnly);
     assert_eq!(report.service, Some("jellyfin".to_owned()));
@@ -298,12 +319,18 @@ fn a_door_the_operating_system_runs_is_answering_like_any_other() {
     // so a stack running one is not reported as having a door that is down.
     let declared = [watching()];
     let report = assembled(
-        &declared,
-        &[up("jellyfin", crate::docker::State::HostManaged)],
-        Some("kitchen-nas"),
+        &crate::door::candidates(&declared, &[]),
+        super::Running {
+            surveyed: &[up("jellyfin", crate::docker::State::HostManaged)],
+            undeclared: &[],
+        },
+        &Place {
+            named: Some("kitchen-nas"),
+            recorded: None,
+            domain: None,
+            environment: Environment::MacOs,
+        },
         None,
-        None,
-        Environment::MacOs,
     );
     assert_eq!(report.standing, Standing::LibraryOnly);
 }
@@ -315,12 +342,18 @@ fn a_door_still_starting_has_not_begun_answering() {
     assert!(answering(crate::docker::State::Running));
     let declared = [asking()];
     let report = assembled(
-        &declared,
-        &[up("seerr", crate::docker::State::Starting)],
-        Some("kitchen-nas"),
+        &crate::door::candidates(&declared, &[]),
+        super::Running {
+            surveyed: &[up("seerr", crate::docker::State::Starting)],
+            undeclared: &[],
+        },
+        &Place {
+            named: Some("kitchen-nas"),
+            recorded: None,
+            domain: None,
+            environment: Environment::MacOs,
+        },
         None,
-        None,
-        Environment::MacOs,
     );
     assert_eq!(report.standing, Standing::Unreachable);
 }
@@ -400,14 +433,24 @@ async fn a_door_with_no_address_is_not_reported_as_established() {
 
 #[test]
 fn nothing_stands_in_for_a_door_that_is_not_answering() {
-    let said = meaning(Standing::Unreachable, "Seerr", &Chosen::Derived);
+    let said = meaning(
+        Standing::Unreachable,
+        "Seerr",
+        UNADDRESSED,
+        &Chosen::Derived,
+    );
     assert!(said.contains("Seerr"));
     assert!(said.contains("stand-in"));
 }
 
 #[test]
 fn a_library_only_stack_is_told_there_is_nowhere_to_ask() {
-    let said = meaning(Standing::LibraryOnly, "Jellyfin", &Chosen::Derived);
+    let said = meaning(
+        Standing::LibraryOnly,
+        "Jellyfin",
+        UNADDRESSED,
+        &Chosen::Derived,
+    );
     assert!(said.contains("nowhere to ask"));
 }
 
@@ -485,7 +528,12 @@ async fn a_named_door_the_household_tier_does_not_publish_is_refused_and_said() 
 fn a_door_nobody_named_says_nothing_about_having_been_named() {
     // The sentence is the cost of a decision, and a stack whose operator made no
     // decision has not paid it.
-    let derived = meaning(Standing::Established, "Seerr", &Chosen::Derived);
+    let derived = meaning(
+        Standing::Established,
+        "Seerr",
+        UNADDRESSED,
+        &Chosen::Derived,
+    );
     assert!(!derived.contains(KEPT));
     assert!(!derived.contains("cannot be one"));
 }
@@ -500,12 +548,18 @@ fn a_refusal_is_said_even_where_there_was_no_door_to_fall_back_to() {
         Some(lemonfiber_manifest::ApiKind::Servarr),
     )];
     let report = assembled(
-        &declared,
-        &[up("sonarr", crate::docker::State::Healthy)],
-        Some("kitchen-nas"),
-        None,
+        &crate::door::candidates(&declared, &[]),
+        super::Running {
+            surveyed: &[up("sonarr", crate::docker::State::Healthy)],
+            undeclared: &[],
+        },
+        &Place {
+            named: Some("kitchen-nas"),
+            recorded: None,
+            domain: None,
+            environment: Environment::MacOs,
+        },
         Some("sonarr"),
-        Environment::MacOs,
     );
     assert_eq!(report.standing, Standing::Absent);
     assert!(report.meaning.starts_with(NOWHERE));
@@ -515,8 +569,122 @@ fn a_refusal_is_said_even_where_there_was_no_door_to_fall_back_to() {
 #[test]
 fn no_door_at_all_says_so_rather_than_naming_the_nearest_thing() {
     assert_eq!(
-        meaning(Standing::Absent, "Homepage", &Chosen::Derived),
+        meaning(Standing::Absent, "Homepage", UNADDRESSED, &Chosen::Derived),
         NOWHERE
     );
     assert!(!NOWHERE.contains("Homepage"));
+}
+
+/// A plugin's container, as the engine reports one the stack does not declare.
+fn stranger(id: &str, state: crate::docker::State) -> crate::docker::Undeclared {
+    crate::docker::Undeclared {
+        id: id.to_owned(),
+        state,
+        describes: crate::docker::UNDESCRIBED.to_owned(),
+    }
+}
+
+/// The door over a stack holding a library and its proxy, and a plugin's request
+/// service published through that proxy, with the plugin's container `state` where it
+/// runs, the proxy `proxying` where it is up, and the proxy's domain `domain`.
+fn over_a_plugin_door(
+    state: Option<crate::docker::State>,
+    proxying: bool,
+    domain: Option<&str>,
+) -> crate::model::FrontDoorReport {
+    use crate::door::fixtures::{brought, installed};
+    let declared = [
+        watching(),
+        service("caddy", Some(lemonfiber_manifest::Bind::Lan), None),
+    ];
+    let mut surveyed = vec![up("jellyfin", crate::docker::State::Healthy)];
+    if proxying {
+        surveyed.push(up("caddy", crate::docker::State::Running));
+    }
+    let plugin = installed(vec![brought(
+        "requests",
+        Some(lemonfiber_manifest::ApiKind::Seerr),
+        Some("ask"),
+    )]);
+    let undeclared: Vec<crate::docker::Undeclared> = state
+        .map(|state| stranger("requests", state))
+        .into_iter()
+        .collect();
+    assembled(
+        &crate::door::candidates(&declared, std::slice::from_ref(&plugin)),
+        super::Running {
+            surveyed: &surveyed,
+            undeclared: &undeclared,
+        },
+        &Place {
+            named: Some("kitchen-nas"),
+            recorded: None,
+            domain,
+            environment: Environment::MacOs,
+        },
+        None,
+    )
+}
+
+/// A plugin's request service is the front door, handed over at the address the proxy
+/// publishes it at, and the stack's library stands beside it at this machine's.
+#[test]
+fn a_plugins_request_service_is_the_door_at_the_address_the_proxy_publishes() {
+    let report = over_a_plugin_door(Some(crate::docker::State::Running), true, Some("home.lan"));
+
+    assert_eq!(report.standing, Standing::Established);
+    assert_eq!(report.service.as_deref(), Some("requests the plugin's"));
+    assert_eq!(
+        report.address.map(|address| address.url),
+        Some("https://ask.home.lan".to_owned())
+    );
+    assert!(report
+        .beside
+        .iter()
+        .any(|beside| beside.service == "jellyfin"
+            && beside
+                .address
+                .as_ref()
+                .is_some_and(|address| address.url.contains("kitchen-nas"))));
+}
+
+/// With no domain configured for the proxy, a plugin's door is answering and has no
+/// address to hand anybody, and what is said names the setting that gives it one rather
+/// than the household address a stack's door would need.
+#[test]
+fn a_plugins_door_with_no_domain_has_no_address_and_says_which_setting_gives_one() {
+    for domain in [None, Some("home.example")] {
+        let report = over_a_plugin_door(Some(crate::docker::State::Healthy), true, domain);
+
+        assert_eq!(report.standing, Standing::Stranded, "{domain:?}");
+        assert_eq!(report.address, None, "{domain:?}");
+        assert!(
+            report.meaning.contains(super::UNPROXIED.trim()),
+            "{}",
+            report.meaning
+        );
+        assert!(
+            !report.meaning.contains("HOMEPAGE_VAR_LAN_HOST"),
+            "{}",
+            report.meaning
+        );
+    }
+}
+
+/// A plugin's door whose container is not running is a door that is down, and so is
+/// one whose container runs behind a proxy that does not: the household reaches it
+/// through nothing else.
+#[test]
+fn a_plugins_door_that_is_not_running_or_not_proxied_is_unreachable() {
+    for (state, proxying) in [
+        (None, true),
+        (Some(crate::docker::State::Starting), true),
+        (Some(crate::docker::State::Running), false),
+    ] {
+        assert_eq!(
+            over_a_plugin_door(state, proxying, Some("home.lan")).standing,
+            Standing::Unreachable,
+            "{state:?}, proxying: {proxying}"
+        );
+    }
 }

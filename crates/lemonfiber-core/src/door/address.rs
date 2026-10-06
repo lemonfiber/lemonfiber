@@ -108,6 +108,49 @@ pub fn address(
     })
 }
 
+/// The names a domain is never a real one under: kept for documentation and testing,
+/// or meaning this machine alone, so none of them is somewhere another device arrives.
+const RESERVED: [&str; 4] = ["example", "test", "invalid", "localhost"];
+
+/// Where this machine is, as everything handing the household an address reads it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Place<'a> {
+    /// What the machine calls itself, where it says.
+    pub named: Option<&'a str>,
+    /// The address the operator recorded for the household's links, where they did.
+    pub recorded: Option<&'a str>,
+    /// The domain the stack's proxy publishes the household's services under, where
+    /// one is configured.
+    pub domain: Option<&'a str>,
+    /// The platform, which decides whether the machine's own name can be offered.
+    pub environment: Environment,
+}
+
+/// The address the household is handed for a service the stack's proxy publishes at
+/// `label` — `https://<label>.<domain>`, the way the proxy's own route names it.
+///
+/// Nothing where no domain is configured, or where the one configured is a name kept
+/// for examples and tests rather than one a network resolves: the proxy then serves on
+/// a name nothing outside this machine is promised to answer, and an address built on
+/// it is one somebody sends on and nobody arrives at.
+#[must_use]
+pub fn proxied(label: &str, domain: Option<&str>) -> Option<Address> {
+    let domain = domain
+        .map(|domain| domain.trim().trim_end_matches('.'))
+        .filter(|domain| published(domain))?;
+    Some(Address {
+        url: format!("https://{label}.{domain}"),
+        caution: None,
+    })
+}
+
+/// Whether `domain` is one a network could resolve: not empty, and not under a name
+/// kept for examples, tests or this machine alone.
+fn published(domain: &str) -> bool {
+    let last = domain.rsplit('.').next().unwrap_or_default();
+    !domain.is_empty() && !RESERVED.iter().any(|kept| last.eq_ignore_ascii_case(kept))
+}
+
 /// A machine's name as another device on the network asks for it.
 ///
 /// Always the `.local` form, because this is only reached where a responder answers

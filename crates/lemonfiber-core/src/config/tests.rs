@@ -1,7 +1,7 @@
 use super::{
-    env, front_door_from_env, household_host_from_env, indexer_from_env, ip_echo_from_env,
-    provider_host_from_env, Indexer, Protocol, Protocols, Settings, DEFAULT_IP_ECHO, OFFLINE_KEY,
-    SECOND_IP_ECHO,
+    env, front_door_from_env, household_domain_from_env, household_host_from_env, indexer_from_env,
+    ip_echo_from_env, provider_host_from_env, Indexer, Protocol, Protocols, Settings,
+    DEFAULT_IP_ECHO, OFFLINE_KEY, SECOND_IP_ECHO,
 };
 
 #[test]
@@ -311,4 +311,18 @@ fn port_forwarding_is_off_by_default_and_a_blank_provider_is_absent() {
     let recorded = super::port_forward_from_env(&blank);
     assert!(!recorded.enabled);
     assert_eq!(recorded.provider, None);
+}
+
+/// The proxy's domain is read trimmed, and a blank one as none.
+#[test]
+fn the_domain_the_proxy_serves_is_read_trimmed_and_a_blank_one_as_none() {
+    assert_eq!(
+        household_domain_from_env(&env::EnvFile::parse("DOMAIN= home.lan \n")).as_deref(),
+        Some("home.lan")
+    );
+    assert_eq!(
+        household_domain_from_env(&env::EnvFile::parse("DOMAIN=\n")),
+        None
+    );
+    assert_eq!(household_domain_from_env(&env::EnvFile::parse("")), None);
 }

@@ -129,3 +129,26 @@ fn a_machine_that_says_nothing_and_a_file_that_says_nothing_give_no_address() {
         None
     );
 }
+
+/// A service the proxy publishes is handed over at its label in front of the configured
+/// domain, over the certificates the proxy obtains for it; with no domain, a blank one,
+/// or one kept for examples and tests, there is no address rather than a guess.
+#[test]
+fn a_proxied_service_is_reached_at_its_label_in_front_of_a_real_domain() {
+    use super::proxied;
+
+    assert_eq!(
+        proxied("ask", Some(" home.lan. ")).map(|address| address.url),
+        Some("https://ask.home.lan".to_owned())
+    );
+    assert!(proxied("ask", Some("home.lan")).is_some_and(|address| address.caution.is_none()));
+    for unresolved in [
+        None,
+        Some(""),
+        Some("home.example"),
+        Some("box.TEST"),
+        Some("localhost"),
+    ] {
+        assert_eq!(proxied("ask", unresolved), None, "{unresolved:?}");
+    }
+}

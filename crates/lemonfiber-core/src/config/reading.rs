@@ -14,7 +14,7 @@ use super::env;
 use super::reaching::offline;
 use super::Indexer;
 use super::{
-    DATA_ROOT_KEY, DEFAULT_IP_ECHO, EXPOSED_KEY, FRONT_DOOR_KEY, HOUSEHOLD_HOST_KEY,
+    DATA_ROOT_KEY, DEFAULT_IP_ECHO, DOMAIN_KEY, EXPOSED_KEY, FRONT_DOOR_KEY, HOUSEHOLD_HOST_KEY,
     INDEXER_APIKEY_KEY, INDEXER_URL_KEY, IP_ECHO_KEY, PGID_KEY, PROVIDER_HOST_KEY, PUID_KEY,
     SECOND_IP_ECHO, UNMANAGED_KEY, VPN_PORT_FORWARDING_KEY, VPN_PROVIDER_KEY,
 };
@@ -164,6 +164,19 @@ pub fn data_root_from_env(file: &env::EnvFile) -> Option<PathBuf> {
 #[must_use]
 pub fn household_host_from_env(file: &env::EnvFile) -> Option<String> {
     file.get(HOUSEHOLD_HOST_KEY)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned)
+}
+
+/// The domain the stack's proxy publishes the household's services under, where one
+/// is written.
+///
+/// An empty value is read as absent, as the household address is. Whether it is one a
+/// network resolves is the door's to decide, where an address is built on it.
+#[must_use]
+pub fn household_domain_from_env(file: &env::EnvFile) -> Option<String> {
+    file.get(DOMAIN_KEY)
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(str::to_owned)

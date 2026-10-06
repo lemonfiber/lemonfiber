@@ -175,6 +175,13 @@ pub(crate) const JELLYFIN_MODE_KEY: &str = "JELLYFIN_MODE";
 /// the wrong address to hand anybody.
 pub(crate) const HOUSEHOLD_HOST_KEY: &str = "HOMEPAGE_VAR_LAN_HOST";
 
+/// The domain the stack's proxy publishes the household's services under.
+///
+/// The stack's, and what its proxy writes every route a plugin's household service is
+/// reached at in front of — so what the household is handed for one is that route, at
+/// that domain.
+pub(crate) const DOMAIN_KEY: &str = "DOMAIN";
+
 /// The service the operator chose to send the household to, by the id the stack
 /// declares it under.
 ///

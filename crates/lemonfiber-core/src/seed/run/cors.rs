@@ -86,10 +86,13 @@ pub(super) async fn seed_cors(
 /// household is handed for it — the same derivation every surface that shows the door
 /// uses, so the list names what the household was told.
 async fn front_door_origin(ctx: &Ctx, services: &[lemonfiber_manifest::Service]) -> Option<String> {
-    let (_, door) = crate::door::chosen(services, ctx.settings.front_door.as_deref());
-    let (_, service) = door?;
-    crate::app::invite::household_address(ctx, service.port?)
-        .await
+    let register =
+        crate::app::plugins::read(ctx).unwrap_or_else(|_| crate::plugin::Register::empty());
+    let candidates = crate::door::candidates(services, register.installed());
+    let (_, door) = crate::door::chosen(&candidates, ctx.settings.front_door.as_deref());
+    let (_, door) = door?;
+    let named = ctx.site.name().await;
+    crate::door::run::reached(door, &crate::door::run::place(ctx, named.as_deref()))
         .map(|address| address.url)
 }
 
