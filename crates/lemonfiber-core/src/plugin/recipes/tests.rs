@@ -39,7 +39,7 @@ why   = "So the comics are read where the household already looks"
 [[recipe.step]]
 id      = "in"
 call    = { method = "POST", to = "komga", path = "/api/v1/login" }
-capture = [{ name = "token", from = "$.token", origin = "komga" }]
+capture = [{ name = "token", from = "token", origin = "stack-service" }]
 
 [[recipe.step]]
 id   = "ask"
@@ -60,6 +60,10 @@ to    = "mirror.example.org"
 [[recipe.pair]]
 value = "token"
 to    = "metadata.example.org"
+
+[[recipe.pair]]
+value = "token"
+to    = "komga"
 "#;
 
 /// The manifest above, read the way an install reads one.
@@ -146,9 +150,9 @@ fn every_pair_carries_its_origin_and_what_approving_it_is_written_as() {
         pairs.as_ref().and_then(|pairs| pairs.first()).cloned(),
         Some(Pair {
             value: "token".to_owned(),
-            origin: "komga".to_owned(),
+            origin: "stack-service".to_owned(),
             to: "metadata.example.org".to_owned(),
-            approval: "token@metadata.example.org".to_owned(),
+            approval: Some("token@metadata.example.org".to_owned()),
         })
     );
 }
@@ -167,7 +171,7 @@ fn each_approval_is_asked_for_once_in_the_order_declared() {
 #[test]
 fn a_value_no_step_captures_has_no_origin_rather_than_an_invented_one() {
     let text = RECIPED.replace(
-        "capture = [{ name = \"token\", from = \"$.token\", origin = \"komga\" }]",
+        "capture = [{ name = \"token\", from = \"token\", origin = \"stack-service\" }]",
         "",
     );
     let pairs = Manifest::from_toml(&text)
@@ -178,6 +182,37 @@ fn a_value_no_step_captures_has_no_origin_rather_than_an_invented_one() {
         pairs.and_then(|pairs| pairs.first().map(|pair| pair.origin.clone())),
         Some(String::new())
     );
+}
+
+/// A value an input brings in carries the origin the input writes, whichever it is.
+#[test]
+fn a_value_an_input_brings_in_carries_the_inputs_origin() {
+    for (origin, extra) in [
+        ("operator", "ask    = \"The code\""),
+        ("credential-store", "of     = \"sonarr\""),
+    ] {
+        let text = RECIPED
+            .replace(
+                "capture = [{ name = \"token\", from = \"token\", origin = \"stack-service\" }]",
+                "",
+            )
+            .replace(
+                "[[recipe.step]]\nid      = \"in\"",
+                &format!(
+                    "[[recipe.input]]\nname   = \"token\"\norigin = \"{origin}\"\n{extra}\n\n\
+                     [[recipe.step]]\nid      = \"in\""
+                ),
+            );
+        let pairs = Manifest::from_toml(&text)
+            .ok()
+            .map(|manifest| declared(&manifest))
+            .and_then(|recipes| recipes.first().map(|recipe| recipe.pairs.clone()));
+        assert_eq!(
+            pairs.and_then(|pairs| pairs.first().map(|pair| pair.origin.clone())),
+            Some(origin.to_owned()),
+            "{text}"
+        );
+    }
 }
 
 #[test]
@@ -200,4 +235,20 @@ fn an_adapter_says_whose_it_is_on_the_wire() {
     })
     .unwrap_or_default();
     assert_eq!(said, r#"{"kind":"servarr","owner":"lemonfiber"}"#);
+}
+
+/// A pair to a service in this stack takes nothing off the machine and asks for no
+/// approval; one to a host outside asks for its own.
+#[test]
+fn only_a_pair_to_a_host_outside_asks_for_approval() {
+    let pairs: Vec<Pair> = manifest()
+        .map(|manifest| declared(&manifest))
+        .and_then(|recipes| recipes.first().map(|recipe| recipe.pairs.clone()))
+        .unwrap_or_default();
+    let inside = pairs.iter().find(|pair| pair.to == "komga");
+    assert_eq!(inside.map(|pair| pair.approval.clone()), Some(None));
+    assert!(pairs
+        .iter()
+        .filter(|pair| pair.to != "komga")
+        .all(|pair| pair.approval.is_some()));
 }

@@ -105,7 +105,7 @@ fn a_recipe_a_step_or_a_capture_declared_twice_is_refused() {
         "[[recipe.pair]]\nvalue = \"token\"\nto    = \"komga\"",
         "[[recipe.step]]\nid      = \"sign-in\"\n\
          call    = { method = \"GET\", to = \"komga\", path = \"/again\" }\n\
-         capture = [{ name = \"token\", from = \"json.token\", origin = \"stack-service\" }]\n\n\
+         capture = [{ name = \"token\", from = \"token\", origin = \"stack-service\" }]\n\n\
          [[recipe.pair]]\nvalue = \"token\"\nto    = \"komga\"",
     );
     let twice_said = said(&twice);
@@ -114,7 +114,7 @@ fn a_recipe_a_step_or_a_capture_declared_twice_is_refused() {
         "got: {twice_said:?}"
     );
     assert!(
-        names(&twice_said, &["capture", "captured twice"]),
+        names(&twice_said, &["capture", "token", "twice"]),
         "got: {twice_said:?}"
     );
 
@@ -140,6 +140,28 @@ fn a_value_substituted_into_a_body_is_read_as_a_flow_too() {
         r#"body = "{\"name\": \"{{nothing}}\"}" }"#,
     );
     assert!(names(&said, &["call.body", "nothing"]), "got: {said:?}");
+}
+
+/// A header's name is part of the call too, so a value substituted there is a flow
+/// like any other and needs what any other needs.
+#[test]
+fn a_value_substituted_into_a_header_s_name_is_read_as_a_flow_too() {
+    let unheld = without(
+        r#"headers = { Authorization = "Bearer {{token}}" }"#,
+        r#"headers = { "X-{{nothing}}" = "1" }"#,
+    );
+    assert!(
+        names(&unheld, &["call.headers", "nothing", "no earlier step"]),
+        "got: {unheld:?}"
+    );
+    let undeclared = without(
+        r#"headers = { Authorization = "Bearer {{token}}" }"#,
+        r#"headers = { "X-{{token}}" = "1" }"#,
+    );
+    assert!(
+        !names(&undeclared, &["call.headers"]),
+        "the fixture declares token to komga: {undeclared:?}"
+    );
 }
 
 /// A file the schema refuses never reaches these rules.
@@ -253,13 +275,115 @@ fn every_field_a_call_and_a_capture_declare_is_held_to_being_readable() {
             "Authorization = \"Bearer {{token}}\"",
             "Authorization = \"Bearer\\r{{token}}\"",
         ),
-        ("from = \"json.token\"", "from = \"json.\\u0007token\""),
-        (
-            "origin = \"stack-service\" }]\n\n[[recipe.step]]",
-            "origin = \"stack\\u001bservice\" }]\n\n[[recipe.step]]",
-        ),
+        ("from = \"token\"", "from = \"to\\u0007ken\""),
+        ("ask    = \"What", "ask    = \"\\u001b[2KWhat"),
+        ("every = \"5s\"", "every = \"5\\u0007s\""),
+        ("equals = \"Comics\"", "equals = \"Com\\u202eics\""),
     ] {
         let said = without(before, after);
         assert!(names(&said, &["diff cannot show"]), "{after}: {said:?}");
     }
+}
+
+/// A query value may carry a value a pair permits, and nothing else in a path may.
+#[test]
+fn only_a_query_value_in_a_path_carries_a_value() {
+    let carried = without(
+        "path = \"/api/v1/libraries\"",
+        "path = \"/api/v1/libraries?token={{token}}&kind=comics\"",
+    );
+    assert!(!names(&carried, &["call.path"]), "got: {carried:?}");
+
+    let unpaired = without(
+        "path = \"/api/v1/libraries\"",
+        "path = \"/api/v1/libraries?name={{library-name}}\"",
+    );
+    assert!(
+        names(
+            &unpaired,
+            &["call.path", "library-name", "no [[recipe.pair]]"]
+        ),
+        "got: {unpaired:?}"
+    );
+
+    for path in [
+        "/api/{{nothing}}/libraries",
+        "/api/v1/libraries?{{nothing}}=x",
+        "/api/v1/libraries?{{nothing}}",
+    ] {
+        let said = without(
+            "path = \"/api/v1/libraries\"",
+            &format!("path = \"{path}\""),
+        );
+        assert!(
+            names(&said, &["call.path", "only a query value"]),
+            "{path}: {said:?}"
+        );
+        assert!(
+            !names(&said, &["call.path", "no earlier step"]),
+            "{path}: a refused place is not also read as a flow: {said:?}"
+        );
+    }
+}
+
+/// Where a call goes is written out, and never substituted.
+#[test]
+fn a_destination_carrying_a_substitution_is_refused() {
+    let said = without(
+        r#"to = "komga", path = "/api/v1/libraries""#,
+        r#"to = "{{token}}", path = "/api/v1/libraries""#,
+    );
+    assert!(names(&said, &["call.to", "written out"]), "got: {said:?}");
+}
+
+/// A pair is a value the recipe has, to somewhere that is a destination.
+#[test]
+fn a_pair_naming_no_value_or_no_destination_is_refused() {
+    let valueless = without(
+        "value = \"token\"\nto    = \"komga\"",
+        "value = \"nothing\"\nto    = \"komga\"",
+    );
+    assert!(
+        names(&valueless, &["pair #1.value", "nothing", "permits nothing"]),
+        "got: {valueless:?}"
+    );
+    let nowhere = without(
+        "value = \"token\"\nto    = \"komga\"",
+        "value = \"token\"\nto    = \"elsewhere\"",
+    );
+    assert!(
+        names(&nowhere, &["pair #1.to", "elsewhere", "neither a service"]),
+        "got: {nowhere:?}"
+    );
+}
+
+/// An input and a capture of one name are two values one name means.
+#[test]
+fn an_input_and_a_capture_of_one_name_are_refused() {
+    let said = without("name   = \"library-name\"", "name   = \"token\"");
+    assert!(
+        names(&said, &["capture", "token", "twice"]),
+        "got: {said:?}"
+    );
+    let twice = without(
+        "[[recipe.step]]\nid      = \"sign-in\"",
+        "[[recipe.input]]\nname   = \"library-name\"\norigin = \"operator\"\nask    = \"Again\"\n\n\
+         [[recipe.step]]\nid      = \"sign-in\"",
+    );
+    assert!(
+        names(&twice, &["input library-name", "twice"]),
+        "got: {twice:?}"
+    );
+}
+
+/// Whether a destination is outside the stack is answered as validation classifies it.
+#[test]
+fn a_destination_is_outside_where_it_is_a_host_and_inside_where_it_is_a_service() {
+    let Some(manifest) = Manifest::from_toml(WHOLE).ok() else {
+        unreachable!("the whole fixture parses");
+    };
+    assert!(super::outside(&manifest, "metadata.example.org"));
+    assert!(!super::outside(&manifest, "komga"));
+    assert!(!super::outside(&manifest, "sonarr"));
+    assert!(!super::outside(&manifest, "elsewhere"));
 }

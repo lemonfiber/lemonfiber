@@ -44,11 +44,14 @@ pub(super) fn recipes(declared: &[Recipe]) -> Lines {
             } else {
                 format!(" ({})", plain(&pair.origin))
             };
+            let asked = pair.approval.as_deref().map_or_else(
+                || " — inside the stack, nothing to approve".to_owned(),
+                |approval| format!(" — approve with --approve {}", plain(approval)),
+            );
             lines.put(format!(
-                "      sends {}{whose} to {} — approve with --approve {}",
+                "      sends {}{whose} to {}{asked}",
                 plain(&pair.value),
                 plain(&pair.to),
-                plain(&pair.approval)
             ));
         }
     }

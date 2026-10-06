@@ -128,7 +128,8 @@ contract:
 # is what a removed or retyped field is caught against.
 #
 # It exits non-zero, leaving the committed surface alone, where the new one drops
-# anything the old one describes under an unchanged `API_VERSION`.
+# anything the old one describes under an unchanged `API_VERSION` that no entry of
+# `stability::DECLARED` accepts.
 surface:
     cargo run --quiet --example surface -p lemonfiber-api
 

@@ -24,11 +24,13 @@ pub mod vocabulary;
 
 pub use conforming::Violation;
 pub use error::Failure;
-pub use refusing::refusals;
+pub use refusing::{outside, refusals};
 pub use schema::{
-    Bind, Capture, Claim, ClaimProbe, Contribution, Criticality, Declaration, Declared, Entry,
-    Expect, Expected, ExpectedKind, Health, HealthKind, Manifest, Override, Pair, Plugin, Proof,
-    Recipe, Request, Requires, Secret, Service, Step, StepCall, Wiring, CONFIGURATION, RUN,
+    Bind, Capture, Claim, ClaimProbe, Condition, Contribution, Criticality, Declaration, Declared,
+    Entry, Expect, Expected, ExpectedKind, Health, HealthKind, Input, Manifest, On, Origin,
+    Override, Pair, Plugin, Proof, Recipe, Request, Requires, Retry, Secret, Service, Step,
+    StepCall, Wiring, ALL_WAITING, CALL_DEADLINE, CONFIGURATION, HEADER, LARGEST_ANSWER,
+    LONGEST_WAIT, MOST_RETRIES, RUN,
 };
 
 /// The manifest schema version this crate prefers.

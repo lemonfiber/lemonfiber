@@ -87,18 +87,26 @@ why    = "Until somebody does, the first caller on the household network becomes
 id    = "adopt-existing-library"
 title = "Point it at the comics the stack already files"
 why   = "The stack already files comics, and a fresh Komga knows nothing about them."
+on    = "install"
+
+[[recipe.input]]
+name   = "library-name"
+origin = "operator"
+ask    = "What the comics library is called"
 
 [[recipe.step]]
 id      = "sign-in"
 call    = { method = "POST", to = "komga", path = "/api/v1/login", body = "{\"password\": \"read from the operator's store\"}" }
 expect  = { status = 200 }
-capture = [{ name = "token", from = "json.token", origin = "stack-service" }]
+capture = [{ name = "token", from = "token", origin = "stack-service" }]
+retry   = { times = 3, every = "5s", until = { status = 200 } }
 
 [[recipe.step]]
 id      = "create"
+when    = { value = "library-name", equals = "Comics" }
 call    = { method = "POST", to = "komga", path = "/api/v1/libraries", headers = { Authorization = "Bearer {{token}}" }, body = "{\"name\": \"Comics\"}" }
 expect  = { status = 200 }
-capture = [{ name = "library", from = "json.id", origin = "stack-service" }]
+capture = [{ name = "library", from = "id", origin = "stack-service" }]
 
 [[recipe.pair]]
 value = "token"
@@ -474,8 +482,8 @@ fn a_recipe_declares_its_calls_its_captures_and_where_each_value_may_go() {
                 Some(200),
                 Some((
                     "library".to_owned(),
-                    "json.id".to_owned(),
-                    "stack-service".to_owned()
+                    "id".to_owned(),
+                    crate::schema::Origin::StackService
                 )),
             )),
             Some(("token".to_owned(), "komga".to_owned())),

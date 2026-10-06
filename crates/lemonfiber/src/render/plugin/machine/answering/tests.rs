@@ -33,7 +33,7 @@ fn recipe() -> Recipe {
             value: "token".to_owned(),
             origin: "komga".to_owned(),
             to: "metadata.example.org".to_owned(),
-            approval: "token@metadata.example.org".to_owned(),
+            approval: Some("token@metadata.example.org".to_owned()),
         }],
     }
 }
@@ -76,6 +76,21 @@ fn a_value_no_step_captures_is_said_with_no_origin() {
 }
 
 #[test]
+fn a_pair_inside_the_stack_says_there_is_nothing_to_approve() {
+    let mut inside = recipe();
+    if let Some(pair) = inside.pairs.first_mut() {
+        pair.to = "sonarr".to_owned();
+        pair.approval = None;
+    }
+    let said = recipes(&[inside]).text();
+    assert!(
+        said.contains("sends token (komga) to sonarr — inside the stack, nothing to approve"),
+        "{said}"
+    );
+    assert!(!said.contains("--approve"), "{said}");
+}
+
+#[test]
 fn a_plugin_that_declares_no_recipe_draws_nothing() {
     assert!(recipes(&[]).text().is_empty());
 }
@@ -89,7 +104,7 @@ fn nothing_a_plugin_wrote_can_redraw_the_line_an_operator_approves_on() {
     hostile.why = "So it\rApproved".to_owned();
     if let Some(pair) = hostile.pairs.first_mut() {
         pair.value = "tok\u{202e}en".to_owned();
-        pair.approval = "tok\u{202e}en@metadata.example.org".to_owned();
+        pair.approval = Some("tok\u{202e}en@metadata.example.org".to_owned());
     }
     let said = recipes(&[hostile]).text();
     for obeyed in ['\u{1b}', '\r', '\u{202e}'] {

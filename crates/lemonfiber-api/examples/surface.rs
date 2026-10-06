@@ -3,9 +3,10 @@
 //! `just surface` runs it, and it writes beside the artefact and renames over it, so
 //! a run that fails leaves the committed file as it was. It refuses rather than
 //! writing where the new surface drops something the committed one describes under
-//! an unchanged wire version — which is the whole reason this is a program of its
-//! own instead of a redirect: a surface regenerated from the types alone would let
-//! whoever removed a field rewrite the record of the field having been there.
+//! an unchanged wire version and no declaration accepts it — which is the whole
+//! reason this is a program of its own instead of a redirect: a surface regenerated
+//! from the types alone would let whoever removed a field rewrite the record of the
+//! field having been there.
 
 use std::path::Path;
 
@@ -23,11 +24,12 @@ fn main() {
         .and_then(Surface::parse)
         .unwrap_or_default();
 
-    let broken = Surface::broken(&before, &fresh);
+    let broken = Surface::refused(&before, &fresh);
     if !broken.is_empty() {
         eprintln!(
             "this surface drops what the committed one describes, under an unchanged \
-             api_version:\n{}\nEither put them back, or increment API_VERSION first.",
+             api_version:\n{}\nEither put them back, declare each in \
+             stability::DECLARED, or increment API_VERSION first.",
             rendered(&broken)
         );
         std::process::exit(1);

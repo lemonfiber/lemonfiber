@@ -98,6 +98,41 @@ fn an_approval_of_a_pair_nothing_carries_is_refused() {
         .is_some_and(|problem| problem.summary.contains("token@elsewhere.example")));
 }
 
+/// A pair to a service in the stack carries nothing off the machine and asks for no
+/// approval, so an approval written for one names a pair nothing asks about.
+#[test]
+fn an_approval_of_a_pair_inside_the_stack_is_refused_as_one_nothing_asks_for() {
+    let pair = |to: &str, outside: bool| crate::plugin::Pair {
+        value: "token".to_owned(),
+        origin: "stack-service".to_owned(),
+        to: to.to_owned(),
+        approval: outside.then(|| crate::plugin::approval("token", to)),
+    };
+    let recipes = [crate::plugin::Recipe {
+        id: "adopt".to_owned(),
+        title: "Adopt".to_owned(),
+        why: "Held".to_owned(),
+        steps: Vec::new(),
+        pairs: vec![pair("komga", false), pair("meta.example.org", true)],
+    }];
+    let asked = crate::plugin::approvals(&recipes);
+    assert_eq!(asked, ["token@meta.example.org"]);
+
+    let ctx = crate::test_support::a_context().build();
+    let consent = Consent {
+        agreement: Some(standing()),
+        approved: vec![
+            "token@meta.example.org".to_owned(),
+            "token@komga".to_owned(),
+        ],
+    };
+    let result = acting(&ctx, &consent, "komga", &standing(), &INSTALLING, &asked);
+    assert_eq!(refused(&result), Some("PLUGIN-26"));
+    assert!(result
+        .err()
+        .is_some_and(|problem| problem.summary.contains("token@komga")));
+}
+
 /// An approval is the asker's own words, so the refusal that repeats one repeats it
 /// with nothing in it a terminal would obey.
 #[test]

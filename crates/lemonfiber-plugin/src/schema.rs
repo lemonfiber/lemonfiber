@@ -22,7 +22,10 @@ pub use evidence::{
     Claim, ClaimProbe, Contribution, Declaration, Declared, Expect, Expected, ExpectedKind, Proof,
     Request,
 };
-pub use recipe::{Capture, Pair, Recipe, Step, StepCall, RUN};
+pub use recipe::{
+    Capture, Condition, Input, On, Origin, Pair, Recipe, Retry, Step, StepCall, ALL_WAITING,
+    CALL_DEADLINE, HEADER, LARGEST_ANSWER, LONGEST_WAIT, MOST_RETRIES, RUN,
+};
 
 /// A whole plugin manifest.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
