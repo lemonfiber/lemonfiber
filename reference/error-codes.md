@@ -114,6 +114,7 @@ what to do about it, is written for operators at
 - `KEY-8`
 - `KEY-9`
 - `KEY-10`
+- `KEY-11`
 - `LIFE-1`
 - `LIFE-2`
 - `LIFE-3`

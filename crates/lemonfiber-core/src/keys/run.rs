@@ -23,8 +23,8 @@ use super::{
     Used, Wanted, FILE, USED_FILE,
 };
 use refused::{
-    bad_name, name_taken, no_secret, no_such_key, no_such_member, not_a_purpose, not_a_scope,
-    not_for_yourself, nowhere, unasked, unkept,
+    bad_name, members_may_not_mint, name_held, name_taken, no_secret, no_such_key, no_such_member,
+    not_a_purpose, not_a_scope, not_for_yourself, nowhere, unasked, unkept,
 };
 
 /// What was asked of the keys.
@@ -41,8 +41,12 @@ pub enum Asked {
         /// Who is minting it.
         by: Minter,
     },
-    /// List every key, without its secret.
-    List,
+    /// List the keys, without their secrets: every one to the operator, and to a
+    /// member only those scoped to them.
+    List {
+        /// Who is asking.
+        by: Minter,
+    },
     /// Revoke the key holding a name.
     Revoke {
         /// The key's name.
@@ -88,7 +92,7 @@ pub async fn asked(ctx: &Ctx, asked: Asked) -> Result<Outcome, Box<Problem>> {
         } => mint(ctx, &name, &scope, &purpose, &by)
             .await
             .map(Outcome::Minted),
-        Asked::List => list(ctx).await.map(Outcome::Keys),
+        Asked::List { by } => list(ctx, &by).await.map(Outcome::Keys),
         Asked::Revoke { name, by } => revoke(ctx, &name, &by).await.map(Outcome::Keys),
     }
 }
@@ -108,6 +112,9 @@ pub async fn mint(
     purpose: &str,
     by: &Minter,
 ) -> Result<Minted, Box<Problem>> {
+    if matches!(by, Minter::Member { .. }) && !members_may_mint(ctx) {
+        return Err(Box::new(members_may_not_mint()));
+    }
     if !names_a_key(name) {
         return Err(Box::new(bad_name(name)));
     }
@@ -116,7 +123,10 @@ pub async fn mint(
     let path = at(ctx).ok_or_else(|| Box::new(nowhere()))?;
     let mut kept = read(&path)?;
     if let Some(held) = kept.named(name) {
-        return Err(Box::new(name_taken(held)));
+        return Err(Box::new(match by {
+            Minter::Member { id } if held.scope.member() != Some(id.as_str()) => name_held(name),
+            _ => name_taken(held),
+        }));
     }
     let scope = resolved(ctx, wanted).await?;
     if let Minter::Member { id } = by {
@@ -150,16 +160,49 @@ pub async fn mint(
     })
 }
 
-/// Every key, without its secret.
+/// The keys `by` may see, without their secrets: every one to the operator, and to a
+/// member only those scoped to them.
 ///
 /// # Errors
 ///
 /// A [`Problem`] where there is nowhere keys are kept, or the record of them is there and
 /// cannot be read.
-pub async fn list(ctx: &Ctx) -> Result<Listing, Box<Problem>> {
+pub async fn list(ctx: &Ctx, by: &Minter) -> Result<Listing, Box<Problem>> {
     let path = at(ctx).ok_or_else(|| Box::new(nowhere()))?;
     let kept = read(&path)?;
-    Ok(listed(ctx, &kept, None).await)
+    Ok(listed(ctx, &seen_by(kept, by), None).await)
+}
+
+/// What of `kept` is `by`'s to see.
+///
+/// A member is shown only keys scoped to them, so another member's keys, their names
+/// included, are nothing a member's listing, mint or revoke can tell apart from keys
+/// that do not exist.
+fn seen_by(kept: Kept, by: &Minter) -> Kept {
+    match by {
+        Minter::Operator => kept,
+        Minter::Member { id } => Kept {
+            keys: kept
+                .keys
+                .into_iter()
+                .filter(|record| record.scope.member() == Some(id.as_str()))
+                .collect(),
+        },
+    }
+}
+
+/// Whether the operator has allowed household members to mint keys for themselves.
+///
+/// Off unless the setting reads as on, and off where there is no configuration to read
+/// it from.
+#[must_use]
+pub fn members_may_mint(ctx: &Ctx) -> bool {
+    ctx.settings
+        .env_file
+        .as_deref()
+        .and_then(|path| crate::config::store::read(path).ok())
+        .and_then(|file| file.get(crate::config::MEMBER_KEYS_KEY).map(str::to_owned))
+        .is_some_and(|value| crate::config::reads_as_on(&value))
 }
 
 /// Revoke the key holding `name`, or say what revoking it would come to.
@@ -171,16 +214,12 @@ pub async fn list(ctx: &Ctx) -> Result<Listing, Box<Problem>> {
 pub async fn revoke(ctx: &Ctx, name: &str, by: &Minter) -> Result<Listing, Box<Problem>> {
     let path = at(ctx).ok_or_else(|| Box::new(nowhere()))?;
     let mut kept = read(&path)?;
-    let Some(found) = active(&kept, name) else {
-        return Err(Box::new(no_such_key(name, kept.named(name))));
+    let seen = seen_by(kept.clone(), by);
+    let Some(found) = active(&seen, name) else {
+        return Err(Box::new(no_such_key(name, seen.named(name))));
     };
-    if let Minter::Member { id } = by {
-        if found.scope.member() != Some(id.as_str()) {
-            return Err(Box::new(not_for_yourself()));
-        }
-    }
     if ctx.dry_run {
-        return Ok(listed(ctx, &kept, Some(name.to_owned())).await);
+        return Ok(listed(ctx, &seen, Some(name.to_owned())).await);
     }
     journalled(
         ctx,
@@ -192,7 +231,7 @@ pub async fn revoke(ctx: &Ctx, name: &str, by: &Minter) -> Result<Listing, Box<P
     )?;
     revoked(ctx, &path, &mut kept, &found.name)?;
     heard(ctx, &found, Heard::Revoked).await;
-    Ok(listed(ctx, &kept, Some(found.name)).await)
+    Ok(listed(ctx, &seen_by(kept, by), Some(found.name)).await)
 }
 
 /// Revoke a key as the reversal of the run that minted it.

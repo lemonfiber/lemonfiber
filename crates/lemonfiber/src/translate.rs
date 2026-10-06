@@ -420,7 +420,9 @@ pub(crate) fn keyed(asked: RawKey) -> Command {
             purpose,
             by: Minter::Operator,
         },
-        KeyCommand::List => Keyed::List,
+        KeyCommand::List => Keyed::List {
+            by: Minter::Operator,
+        },
         KeyCommand::Revoke { name } => Keyed::Revoke {
             name,
             by: Minter::Operator,

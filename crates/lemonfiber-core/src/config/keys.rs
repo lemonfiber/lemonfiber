@@ -66,6 +66,13 @@ pub const EXPLANATIONS_KEY: &str = "LEMONFIBER_EXPLANATIONS";
 /// that could not say where its power comes from.
 pub const AUTOSTART_ON_BATTERY_KEY: &str = "LEMONFIBER_AUTOSTART_ON_BATTERY";
 
+/// The setting that lets a household member mint a key scoped to themselves.
+///
+/// Off unless the operator turns it on: a member's key carries that member's requests
+/// and viewing to whatever program holds it, and that is the operator's to allow. Turning
+/// it off stops new mints; keys members already minted stay until somebody revokes them.
+pub const MEMBER_KEYS_KEY: &str = "LEMONFIBER_MEMBER_KEYS";
+
 /// The hours the operator does not want waking for, as `HH:MM-HH:MM`.
 ///
 /// Read in the zone `TZ` names, which is the same zone the stack hands every container,
@@ -345,6 +352,7 @@ pub const SETTINGS: &[&str] = &[
     REACH_CATALOGUE_KEY,
     EXPLANATIONS_KEY,
     AUTOSTART_ON_BATTERY_KEY,
+    MEMBER_KEYS_KEY,
     PROJECT_KEY,
     OVERLAY_KEY,
     QUIET_HOURS_KEY,

@@ -15,13 +15,13 @@ use crate::door::*;
 use tower::ServiceExt as _;
 
 /// This machine, as a connection names it.
-const HERE: IpAddr = IpAddr::V4(std::net::Ipv4Addr::LOCALHOST);
+pub(crate) const HERE: IpAddr = IpAddr::V4(std::net::Ipv4Addr::LOCALHOST);
 
 /// Another machine on the household network.
-const NEXT_DOOR: IpAddr = IpAddr::V4(std::net::Ipv4Addr::new(192, 168, 1, 23));
+pub(crate) const NEXT_DOOR: IpAddr = IpAddr::V4(std::net::Ipv4Addr::new(192, 168, 1, 23));
 
 /// A secret minted from a source answering with `byte`.
-fn a_secret(byte: u8) -> Secret {
+pub(crate) fn a_secret(byte: u8) -> Secret {
     let Some(secret) = Secret::mint(&Chance::exactly(Some(vec![byte; 32]))) else {
         unreachable!("thirty-two bytes mint a secret")
     };
@@ -100,7 +100,7 @@ fn surface_with(keys: &Keys, household: Arc<AHousehold>) -> (axum::Router, Arc<A
 
 /// One request carrying `secret`, from `from` over a connection encrypted or not, or
 /// over one nothing vouched for where `from` is nothing.
-async fn presented(
+pub(crate) async fn presented(
     router: axum::Router,
     method: &str,
     path: &str,
@@ -111,7 +111,7 @@ async fn presented(
 }
 
 /// One request carrying `secret` and `body`, and the answer with its headers.
-async fn sent(
+pub(crate) async fn sent(
     router: axum::Router,
     method: &str,
     path: &str,
@@ -152,7 +152,7 @@ async fn sent(
 }
 
 /// The refusal code an answer carries.
-fn code(answer: &Answer) -> String {
+pub(crate) fn code(answer: &Answer) -> String {
     serde_json::from_str::<serde_json::Value>(&answer.body)
         .ok()
         .and_then(|body| {
@@ -561,216 +561,4 @@ async fn a_use_is_written_down_and_the_secret_is_not() {
     assert!(!used.contains(keys.read.as_str()));
     let kept = fs::read_to_string(&keys.kept).unwrap_or_default();
     assert!(!kept.contains(keys.read.as_str()));
-}
-
-/// A machine with a password kept and nothing minted, served by its own token.
-fn minting_machine(named: &str) -> (axum::Router, String, PathBuf) {
-    let admission = keeping(&format!("mint-{named}"));
-    let mut ctx = world(Some(admission.clone()), not_the_token());
-    let env = a_directory(&format!("mint-env-{named}")).join(".env");
-    if let Some(dir) = env.parent() {
-        let _ = fs::create_dir_all(dir);
-    }
-    ctx.settings.env_file = Some(env.clone());
-    ctx.settings.stack_dir = env.parent().map(|dir| dir.join("stack"));
-    let admitting = Arc::new(Admitting {
-        kept: Some(admission),
-        keys: Keyring::at(
-            lemonfiber_core::keys::run::at(&ctx),
-            lemonfiber_core::keys::run::used_at(&ctx),
-        ),
-        ..Admitting::default()
-    });
-    let (router, token) = surface(ctx, &admitting);
-    (router, token.as_str().to_owned(), env)
-}
-
-/// What a mint is asked with, under `password`.
-fn mint_body(name: &str, password: &str) -> String {
-    serde_json::json!({
-        "name": name,
-        "scope": "act",
-        "purpose": "home-assistant",
-        "password": password,
-    })
-    .to_string()
-}
-
-/// The secret a mint reply hands back.
-fn handed(body: &str) -> String {
-    serde_json::from_str::<serde_json::Value>(body)
-        .ok()
-        .and_then(|reply| {
-            reply
-                .pointer("/data/secret")
-                .and_then(serde_json::Value::as_str)
-                .map(str::to_owned)
-        })
-        .unwrap_or_default()
-}
-
-#[tokio::test]
-async fn the_operator_mints_with_the_password_and_sees_the_secret_once() {
-    let (router, token, env) = minting_machine("minted");
-    let (minted, headers) = sent(
-        router.clone(),
-        "POST",
-        "/api/keys",
-        &token,
-        Some((HERE, false)),
-        &mint_body("ha", &chosen()),
-    )
-    .await;
-    assert_eq!(minted.status, StatusCode::OK, "{}", minted.body);
-    assert_eq!(
-        headers
-            .get(header::CACHE_CONTROL)
-            .and_then(|value| value.to_str().ok()),
-        Some("no-store")
-    );
-    let secret = handed(&minted.body);
-    assert!(lemonfiber_core::keys::shaped(&secret), "{}", minted.body);
-    let listed = presented(
-        router.clone(),
-        "GET",
-        "/api/keys",
-        &token,
-        Some((HERE, false)),
-    )
-    .await;
-    assert!(listed.body.contains("\"ha\""), "{}", listed.body);
-    assert!(!listed.body.contains(&secret));
-    let kept = fs::read_to_string(env.with_file_name("keys.json")).unwrap_or_default();
-    assert!(kept.contains("\"ha\"") && !kept.contains(&secret));
-    let used = presented(
-        router.clone(),
-        "GET",
-        "/api/explain?word=indexer",
-        &secret,
-        Some((HERE, false)),
-    )
-    .await;
-    assert_eq!(used.status, StatusCode::OK, "{}", used.body);
-    let revoked = presented(
-        router.clone(),
-        "DELETE",
-        "/api/keys/ha",
-        &token,
-        Some((HERE, false)),
-    )
-    .await;
-    assert_eq!(revoked.status, StatusCode::OK, "{}", revoked.body);
-    let after = presented(
-        router,
-        "GET",
-        "/api/explain?word=indexer",
-        &secret,
-        Some((HERE, false)),
-    )
-    .await;
-    assert_eq!(code(&after), "ADMIT-4");
-}
-
-#[tokio::test]
-async fn a_mint_without_the_right_password_mints_nothing() {
-    let (router, token, env) = minting_machine("unproven");
-    let (refused, _) = sent(
-        router,
-        "POST",
-        "/api/keys",
-        &token,
-        Some((HERE, false)),
-        &mint_body("ha", &nobodys()),
-    )
-    .await;
-    assert_eq!(refused.status, StatusCode::UNAUTHORIZED, "{}", refused.body);
-    assert!(!env.with_file_name("keys.json").exists());
-}
-
-#[tokio::test]
-async fn a_mint_asked_in_anything_but_its_own_shape_is_refused() {
-    let (router, token, env) = minting_machine("misshapen");
-    let (refused, _) = sent(
-        router,
-        "POST",
-        "/api/keys",
-        &token,
-        Some((HERE, false)),
-        "name=ha&scope=act",
-    )
-    .await;
-    assert_eq!(refused.status, StatusCode::BAD_REQUEST, "{}", refused.body);
-    assert_eq!(code(&refused), "ASK-11");
-    assert!(!env.with_file_name("keys.json").exists());
-}
-
-#[tokio::test]
-async fn a_mint_from_another_machine_in_the_clear_is_refused_before_the_password_is_tried() {
-    let (router, token, env) = minting_machine("in-the-clear");
-    for from in [Some((NEXT_DOOR, false)), None] {
-        let (refused, _) = sent(
-            router.clone(),
-            "POST",
-            "/api/keys",
-            &token,
-            from,
-            &mint_body("ha", &chosen()),
-        )
-        .await;
-        assert_eq!(code(&refused), "ADMIT-11", "{}", refused.body);
-    }
-    assert!(!env.with_file_name("keys.json").exists());
-}
-
-#[tokio::test]
-async fn a_machine_keeping_no_password_mints_nothing_over_the_web() {
-    let mut ctx = world(None, not_the_token());
-    let env = a_directory("mint-env-no-password").join(".env");
-    if let Some(dir) = env.parent() {
-        let _ = fs::create_dir_all(dir);
-    }
-    ctx.settings.env_file = Some(env.clone());
-    ctx.settings.stack_dir = env.parent().map(|dir| dir.join("stack"));
-    let admitting = Arc::new(Admitting {
-        keys: Keyring::at(
-            lemonfiber_core::keys::run::at(&ctx),
-            lemonfiber_core::keys::run::used_at(&ctx),
-        ),
-        ..Admitting::default()
-    });
-    let (router, token) = surface(ctx, &admitting);
-    let (refused, _) = sent(
-        router,
-        "POST",
-        "/api/keys",
-        token.as_str(),
-        Some((HERE, false)),
-        &mint_body("ha", &chosen()),
-    )
-    .await;
-    assert_eq!(refused.status, StatusCode::UNAUTHORIZED, "{}", refused.body);
-    assert!(!env.with_file_name("keys.json").exists());
-}
-
-#[tokio::test]
-async fn wrong_passwords_at_a_mint_earn_the_wait_a_sign_in_does() {
-    let (router, token, env) = minting_machine("guessed");
-    let mut held = None;
-    for _ in 0..8 {
-        let (answer, _) = sent(
-            router.clone(),
-            "POST",
-            "/api/keys",
-            &token,
-            Some((NEXT_DOOR, true)),
-            &mint_body("ha", &nobodys()),
-        )
-        .await;
-        if answer.status == StatusCode::TOO_MANY_REQUESTS {
-            held = Some(answer);
-            break;
-        }
-    }
-    assert!(held.is_some_and(|held| held.left.is_some()));
-    assert!(!env.with_file_name("keys.json").exists());
 }

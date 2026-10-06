@@ -183,6 +183,9 @@ codes! {
         NO_SECRET = "KEY-9",
         /// Raised when no active key holds the name a revoke gave.
         NO_SUCH_KEY = "KEY-10",
+        /// Raised when a household member asks to mint a key and the operator has not
+        /// allowed members to.
+        MEMBERS_MAY_NOT_MINT = "KEY-11",
     }
     /// The `PLUGIN` codes.
     plugin {

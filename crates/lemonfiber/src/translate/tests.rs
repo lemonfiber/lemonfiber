@@ -51,7 +51,9 @@ fn the_key_commands_reach_the_core_as_the_operator_asks_them() {
         super::keyed(RawKey {
             action: KeyCommand::List,
         }),
-        Command::Keys(Keyed::List)
+        Command::Keys(Keyed::List {
+            by: Minter::Operator
+        })
     );
     assert_eq!(
         super::keyed(RawKey {

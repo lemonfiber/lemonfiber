@@ -1,7 +1,9 @@
 use axum::http::StatusCode;
 use lemonfiber_core::keys::Scope;
 
-use super::{operator, Minting};
+use lemonfiber_core::keys::Minter;
+
+use super::{keeper, Minting};
 use crate::admission::{Caller, Keyed};
 
 /// A key of `scope`, as the door hands it over.
@@ -14,8 +16,8 @@ fn a_key(scope: Scope) -> Caller {
 
 #[test]
 fn the_operator_keeps_keys_by_a_session_or_by_this_runs_token() {
-    assert!(operator(&Caller::Operator).is_ok());
-    assert!(operator(&Caller::Machine).is_ok());
+    assert_eq!(keeper(&Caller::Operator).ok(), Some(Minter::Operator));
+    assert_eq!(keeper(&Caller::Machine).ok(), Some(Minter::Operator));
 }
 
 #[test]
@@ -25,17 +27,20 @@ fn no_key_keeps_keys_whatever_its_scope() {
         name: "ana".to_owned(),
     };
     for scope in [Scope::Read, Scope::Act, member] {
-        let refused = operator(&a_key(scope)).err().map(|answer| answer.status());
+        let refused = keeper(&a_key(scope)).err().map(|answer| answer.status());
         assert_eq!(refused, Some(StatusCode::FORBIDDEN));
     }
 }
 
 #[test]
-fn a_member_is_told_keys_are_not_theirs() {
-    let refused = operator(&Caller::Member("a7f3".to_owned()))
-        .err()
-        .map(|answer| answer.status());
-    assert_eq!(refused, Some(StatusCode::FORBIDDEN));
+fn a_member_keeps_keys_as_themselves() {
+    let kept = keeper(&Caller::Member("a7f3".to_owned())).ok();
+    assert_eq!(
+        kept,
+        Some(Minter::Member {
+            id: "a7f3".to_owned()
+        })
+    );
 }
 
 #[test]

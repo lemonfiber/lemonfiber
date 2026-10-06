@@ -1,11 +1,16 @@
 //! Minting, listing and revoking keys from a browser or the companion.
 //!
 //! The one credential write this surface takes, and it is answered the way the
-//! decision record that allows it says: only the operator may make it, minting asks for
+//! decision record that allows it says: the operator keeps every key, minting asks for
 //! the password again in the same request, and the secret appears once, in the reply
 //! that minted it, sent with `no-store` as every reply here is. A session left open on a
 //! shared screen mints nothing without the password, and a request forged from another
 //! page cannot know it.
+//!
+//! **A household member keeps keys of their own once the operator allows it**, through
+//! the same three routes and the same guard: their own password again in the same
+//! request, and a key scoped to them alone. What a member may see, mint and revoke is
+//! decided by the core, beside the operator's.
 //!
 //! **No key may mint, list or revoke keys, whatever its scope.** A key is the credential
 //! most likely to be held somewhere the operator is not, and one that could mint another
@@ -21,6 +26,7 @@ use axum::response::Response;
 use axum::routing::{delete, get};
 use axum::{Extension, Json, Router};
 use lemonfiber_core::app::Command;
+use lemonfiber_core::keys::run::members_may_mint;
 use lemonfiber_core::keys::run::Asked;
 use lemonfiber_core::keys::Minter;
 use serde::Deserialize;
@@ -72,10 +78,10 @@ pub fn routes() -> Router<Serving> {
 
 /// Every key, without its secret.
 async fn listed(State(serving): State<Serving>, caller: Caller) -> Response {
-    if let Err(refused) = operator(&caller) {
-        return *refused;
+    match keeper(&caller) {
+        Ok(by) => carried_out(&serving.ctx, Command::Keys(Asked::List { by })).await,
+        Err(refused) => *refused,
     }
-    carried_out(&serving.ctx, Command::Keys(Asked::List)).await
 }
 
 /// A key minted, its secret shown this once.
@@ -85,9 +91,10 @@ async fn minted(
     arrived: Option<Extension<Arrived>>,
     given: Result<Json<Minting>, JsonRejection>,
 ) -> Response {
-    if let Err(refused) = operator(&caller) {
-        return *refused;
-    }
+    let by = match keeper(&caller) {
+        Ok(by) => by,
+        Err(refused) => return *refused,
+    };
     let Some(Extension(arrived)) = arrived.filter(|Extension(arrived)| arrived.may_carry_a_key())
     else {
         return Refusal::KeyInTheClear.answered();
@@ -95,23 +102,44 @@ async fn minted(
     let Ok(Json(given)) = given else {
         return Refusal::NotAKeyRequest.answered();
     };
-    let now = serving.ctx.seams.clock.now();
-    match serving
-        .admitting
-        .proves_the_operator(&given.password, Some(arrived.from), now)
-        .await
-    {
-        Ok(true) => {}
-        Ok(false) => return Refusal::NotThePassword.answered(),
-        Err(left) => return crate::admission::waiting(left.as_secs().max(1)),
-    }
     let asked = Asked::Mint {
         name: given.name,
         scope: given.scope,
         purpose: given.purpose,
-        by: Minter::Operator,
+        by: by.clone(),
     };
-    carried_out(&serving.ctx, Command::Keys(asked)).await
+    // A member the operator has not allowed is told so before their password is put to
+    // the media server: the answer does not turn on it, and asking would open a sign-in
+    // there for nothing.
+    if matches!(by, Minter::Member { .. }) && !members_may_mint(&serving.ctx) {
+        return carried_out(&serving.ctx, Command::Keys(asked)).await;
+    }
+    let now = serving.ctx.seams.clock.now();
+    let proved = match &by {
+        Minter::Operator => {
+            serving
+                .admitting
+                .proves_the_operator(&given.password, Some(arrived.from), now)
+                .await
+        }
+        Minter::Member { id } => {
+            serving
+                .admitting
+                .proves_the_member(
+                    id,
+                    &given.password,
+                    Some(arrived.from),
+                    now,
+                    serving.ctx.seams.random.as_ref(),
+                )
+                .await
+        }
+    };
+    match proved {
+        Ok(true) => carried_out(&serving.ctx, Command::Keys(asked)).await,
+        Ok(false) => Refusal::NotThePassword.answered(),
+        Err(left) => crate::admission::waiting(left.as_secs().max(1)),
+    }
 }
 
 /// A key revoked, by its name.
@@ -120,29 +148,25 @@ async fn revoked(
     caller: Caller,
     Path(name): Path<String>,
 ) -> Response {
-    if let Err(refused) = operator(&caller) {
-        return *refused;
+    match keeper(&caller) {
+        Ok(by) => carried_out(&serving.ctx, Command::Keys(Asked::Revoke { name, by })).await,
+        Err(refused) => *refused,
     }
-    let asked = Asked::Revoke {
-        name,
-        by: Minter::Operator,
-    };
-    carried_out(&serving.ctx, Command::Keys(asked)).await
 }
 
-/// Whether this caller may keep keys, or the refusal they are answered with.
+/// Who this caller keeps keys as, or the refusal they are answered with.
 ///
-/// The operator, by a session or by this run's own token, and nobody else. A key is
-/// refused naming what it is, so a program told no knows that no key of any scope will
-/// do; anybody else is told it is not theirs.
-fn operator(caller: &Caller) -> Result<(), Box<Response>> {
+/// The operator, by a session or by this run's own token, keeps every key; a member keeps
+/// their own, as far as the core allows. A key is refused naming what it is, so a program
+/// told no knows that no key of any scope will do.
+fn keeper(caller: &Caller) -> Result<Minter, Box<Response>> {
     match caller {
-        Caller::Operator | Caller::Machine => Ok(()),
+        Caller::Operator | Caller::Machine => Ok(Minter::Operator),
+        Caller::Member(id) => Ok(Minter::Member { id: id.clone() }),
         Caller::Key(_) => Err(Box::new(
             Refusal::NotForAKey
                 .saying("A key may not mint, list or revoke keys, whatever its scope."),
         )),
-        Caller::Member(_) => Err(Box::new(Refusal::NotYours.answered())),
     }
 }
 
