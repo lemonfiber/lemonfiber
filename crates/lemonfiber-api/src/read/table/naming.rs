@@ -10,7 +10,7 @@
 //! The reads that take nothing have no function here, which is the shape of the file
 //! rather than an omission: there is nothing for them to mean.
 
-use lemonfiber_core::app::{Command, Removing, Waiting};
+use lemonfiber_core::app::{Command, Removing, Waiting, Whom};
 use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::uninstall::Tier;
 use lemonfiber_core::update::run as update;
@@ -88,19 +88,56 @@ pub(super) fn setting(key: Option<String>) -> Result<Command, Refusal> {
     }
 }
 
-/// What the household asked for, narrowed to one member or taken whole.
+/// Whether a parameter that takes a yes or a no said one, or nothing where it said
+/// something that is neither.
+///
+/// Not given is not asked for. A word that is neither is a mistake to correct rather
+/// than a request to answer as though it had said no, because the two answers are
+/// different and a caller that meant yes would read one it never asked for.
+pub(crate) fn told(said: Option<&str>) -> Option<bool> {
+    match said {
+        // Not given is not asked for, which is the same answer as having said so.
+        None | Some("false") => Some(false),
+        Some("true") => Some(true),
+        Some(_) => None,
+    }
+}
+
+/// Whom a household read is answered as, where it asked for the household's defaults.
+///
+/// Nothing where it did not, so the member it named, or nobody, decides. Naming a
+/// member as well is refused rather than either half dropped: the defaults are nobody,
+/// and a read asking about somebody and nobody at once has two answers.
+fn as_the_defaults(member: Option<&String>, defaults: Option<&str>) -> Result<bool, Refusal> {
+    match told(defaults) {
+        None => Err(Refusal::NotAChoice),
+        Some(true) if member.is_some() => Err(Refusal::MemberAndDefaults),
+        Some(defaults) => Ok(defaults),
+    }
+}
+
+/// What the household asked for, narrowed to one member or taken whole — or what
+/// somebody invited with the household's defaults would be told.
 ///
 /// Empty is refused for the reason it is refused of a setting: a member nobody named
 /// would match nobody, and a report of no requests reads as "nobody has asked for
 /// anything" — which is exactly the reading
 /// [`lemonfiber_core::app`]'s own household reader refuses to produce when it cannot
 /// reach the request service.
-pub(super) fn household(member: Option<String>) -> Result<Command, Refusal> {
+pub(super) fn household(
+    member: Option<String>,
+    defaults: Option<&str>,
+) -> Result<Command, Refusal> {
+    if as_the_defaults(member.as_ref(), defaults)? {
+        return Ok(Command::Household {
+            member: Some(Whom::Defaults),
+        });
+    }
     match member {
         None => Ok(Command::Household { member: None }),
         Some(member) if member.is_empty() => Err(Refusal::NoMember),
         Some(member) => Ok(Command::Household {
-            member: Some(member),
+            member: Some(Whom::Named(member)),
         }),
     }
 }
@@ -122,10 +159,19 @@ pub const MOST_AT_ONCE: u32 = 500;
 ///
 /// Naming nobody is refused rather than read as everybody, because there is no
 /// everybody: the shelf is what one account may watch and no two accounts need have
-/// the same one.
-pub(super) fn shelf(member: Option<String>, most: Option<String>) -> Result<Command, Refusal> {
-    let Some(member) = member.filter(|member| !member.is_empty()) else {
-        return Err(Refusal::NoShelfWithoutAMember);
+/// the same one. The household's defaults are the one shelf that is nobody's.
+pub(super) fn shelf(
+    member: Option<String>,
+    defaults: Option<&str>,
+    most: Option<String>,
+) -> Result<Command, Refusal> {
+    let member = if as_the_defaults(member.as_ref(), defaults)? {
+        Whom::Defaults
+    } else {
+        match member.filter(|member| !member.is_empty()) {
+            Some(member) => Whom::Named(member),
+            None => return Err(Refusal::NoShelfWithoutAMember),
+        }
     };
     let most = match most.map(|most| most.parse::<u32>()) {
         None => A_SHELF,

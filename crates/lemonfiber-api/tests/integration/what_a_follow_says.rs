@@ -195,7 +195,7 @@ async fn a_follow_that_is_neither_yes_nor_no_is_refused_rather_than_read_as_eith
         run.asked("/api/logs?follow=maybe").await,
         refused(
             Refusal::NotAChoice,
-            "Whether to keep reading must be true or false."
+            "A parameter that takes a yes or a no must be true or false."
         )
     );
 }

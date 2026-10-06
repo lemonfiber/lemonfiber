@@ -165,10 +165,14 @@ pub trait Household: Send + Sync {
     /// larger than a screen, and deciding which part of it to ask for is the caller's
     /// errand rather than this one's.
     ///
+    /// `None` names no member and reads what an account with every library and no age
+    /// limit holds, which is what an invitation that chose nothing grants. It is asked
+    /// about no account, so it carries nothing of anybody's.
+    ///
     /// # Errors
     ///
     /// Returns [`Failure`] when the server is unreachable or refuses.
-    async fn holdings(&self, member: &str, most: u32) -> Result<Vec<Held>, Failure>;
+    async fn holdings(&self, member: Option<&str>, most: u32) -> Result<Vec<Held>, Failure>;
 
     /// The certificates this server's own rating table names, and the ages it holds
     /// them against.

@@ -35,7 +35,7 @@ async fn read(kept: &Kept, ctx: &Ctx, member: &str) -> String {
             ctx,
             member,
             Command::Household {
-                member: Some(member.to_owned()),
+                member: Some(lemonfiber_core::app::Whom::Named(member.to_owned())),
             },
         )
         .await;

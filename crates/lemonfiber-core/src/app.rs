@@ -92,7 +92,8 @@ pub mod watch;
 
 pub use command::{
     AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
-    Filling, Hostable, Keeping, Linking, MigrateAction, QualityAction, Removing, Setting, HOSTABLE,
+    Filling, Hostable, Keeping, Linking, MigrateAction, QualityAction, Removing, Setting, Whom,
+    HOSTABLE,
 };
 pub(crate) mod outcome;
 pub use ctx::{Ctx, PATIENCE};
@@ -441,7 +442,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
             searching,
         } => traced(ctx, term, season, searching).await,
         Command::Held { member, most } => held::held(ctx, &member, most).await.map(Outcome::Held),
-        Command::Household { member } => household::household(ctx, member.as_deref())
+        Command::Household { member } => household::household(ctx, member.as_ref())
             .await
             .map(Outcome::Household),
         // Both answer with the household as it now stands rather than with a report of

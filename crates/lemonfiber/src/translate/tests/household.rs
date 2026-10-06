@@ -1,6 +1,13 @@
 //! Requests the household makes and the allowances it is given, as commands.
 
 use super::*;
+use lemonfiber::cli::RawWhom;
+use lemonfiber_core::app::Whom;
+
+/// The two flags that narrow a household word, as the command line took them.
+fn whom(member: Option<String>, defaults: bool) -> RawWhom {
+    RawWhom { member, defaults }
+}
 
 /// What a walk was asked for is words joined back into a title, and asking for
 /// nothing in particular is a request rather than an omission.
@@ -39,9 +46,9 @@ fn the_two_things_an_update_can_mean_go_to_two_commands() {
 #[test]
 fn a_shelf_with_no_count_takes_the_one_both_surfaces_share() {
     assert_eq!(
-        super::super::held("Ada".to_owned(), None),
+        super::super::held(whom(Some("Ada".to_owned()), false), None),
         Ok(Command::Held {
-            member: "Ada".to_owned(),
+            member: Whom::Named("Ada".to_owned()),
             most: lemonfiber_api::read::table::A_SHELF,
         })
     );
@@ -52,9 +59,9 @@ fn a_shelf_with_no_count_takes_the_one_both_surfaces_share() {
 #[test]
 fn a_count_outside_what_one_shelf_shows_is_refused_at_either_end() {
     let ceiling = lemonfiber_api::read::table::MOST_AT_ONCE;
-    assert!(super::super::held("Ada".to_owned(), Some(0)).is_err());
-    assert!(super::super::held("Ada".to_owned(), Some(ceiling + 1)).is_err());
-    assert!(super::super::held("Ada".to_owned(), Some(ceiling)).is_ok());
+    assert!(super::super::held(whom(Some("Ada".to_owned()), false), Some(0)).is_err());
+    assert!(super::super::held(whom(Some("Ada".to_owned()), false), Some(ceiling + 1)).is_err());
+    assert!(super::super::held(whom(Some("Ada".to_owned()), false), Some(ceiling)).is_ok());
 }
 
 /// One choice about what the household may ask for, as the command line took it.
@@ -65,7 +72,7 @@ fn allowing(
     days: Option<u32>,
 ) -> Result<Command, u8> {
     household(
-        None,
+        whom(None, false),
         Some(HouseholdCommand::Allow {
             member: member.map(str::to_owned),
             policy: policy.map(str::to_owned),
@@ -79,13 +86,13 @@ fn allowing(
 #[test]
 fn naming_nothing_under_the_word_is_the_reading() {
     assert_eq!(
-        household(None, None),
+        household(whom(None, false), None),
         Ok(Command::Household { member: None })
     );
     assert_eq!(
-        household(Some("ana".to_owned()), None),
+        household(whom(Some("ana".to_owned()), false), None),
         Ok(Command::Household {
-            member: Some("ana".to_owned())
+            member: Some(Whom::Named("ana".to_owned()))
         })
     );
 }
@@ -96,7 +103,7 @@ fn naming_nothing_under_the_word_is_the_reading() {
 fn the_narrowing_and_a_decision_are_refused_together() {
     assert_eq!(
         household(
-            Some("ana".to_owned()),
+            whom(Some("ana".to_owned()), false),
             Some(HouseholdCommand::Approve { request: 7 })
         ),
         Err(USAGE)
@@ -158,7 +165,10 @@ fn a_policy_this_build_does_not_know_is_a_usage_error() {
 #[test]
 fn approving_and_declining_are_one_command_with_two_answers() {
     assert_eq!(
-        household(None, Some(HouseholdCommand::Approve { request: 7 })),
+        household(
+            whom(None, false),
+            Some(HouseholdCommand::Approve { request: 7 })
+        ),
         Ok(Command::Deciding(Decision {
             request: 7,
             answer: Answer::LetThrough,
@@ -166,7 +176,7 @@ fn approving_and_declining_are_one_command_with_two_answers() {
     );
     assert_eq!(
         household(
-            None,
+            whom(None, false),
             Some(HouseholdCommand::Decline {
                 request: 8,
                 reason: "no room".to_owned(),
@@ -191,7 +201,7 @@ fn approving_and_declining_are_one_command_with_two_answers() {
 fn arranging_an_expiry_and_running_on_it_are_different_requests() {
     assert_eq!(
         household(
-            None,
+            whom(None, false),
             Some(HouseholdCommand::Expiring {
                 after: Some(30),
                 never: false,
@@ -201,7 +211,7 @@ fn arranging_an_expiry_and_running_on_it_are_different_requests() {
     );
     assert_eq!(
         household(
-            None,
+            whom(None, false),
             Some(HouseholdCommand::Expiring {
                 after: None,
                 never: true,
@@ -211,7 +221,7 @@ fn arranging_an_expiry_and_running_on_it_are_different_requests() {
     );
     assert_eq!(
         household(
-            None,
+            whom(None, false),
             Some(HouseholdCommand::Expiring {
                 after: None,
                 never: false,
@@ -297,7 +307,7 @@ fn a_line_asked_about_and_not_changed_carries_no_answers() {
 fn a_hand_off_names_whose_device_it_is() {
     assert_eq!(
         household(
-            None,
+            whom(None, false),
             Some(HouseholdCommand::Handoff {
                 name: "ana".to_owned(),
             })
@@ -305,5 +315,38 @@ fn a_hand_off_names_whose_device_it_is() {
         Ok(Command::Handoff {
             name: "ana".to_owned(),
         })
+    );
+}
+
+/// The household's defaults are a shelf of their own, and naming neither them nor a
+/// member is refused: there is no whole-household shelf to fall back to.
+#[test]
+fn a_shelf_is_a_members_or_the_defaults() {
+    assert_eq!(
+        super::super::held(whom(None, true), None),
+        Ok(Command::Held {
+            member: Whom::Defaults,
+            most: lemonfiber_api::read::table::A_SHELF,
+        })
+    );
+    assert_eq!(super::super::held(whom(None, false), None), Err(USAGE));
+}
+
+/// The reading narrowed to the household's defaults is what somebody invited with
+/// them would be told, and like a member's narrowing it is no part of a decision.
+#[test]
+fn the_reading_narrowed_to_the_defaults_is_no_part_of_a_decision() {
+    assert_eq!(
+        household(whom(None, true), None),
+        Ok(Command::Household {
+            member: Some(Whom::Defaults)
+        })
+    );
+    assert_eq!(
+        household(
+            whom(None, true),
+            Some(HouseholdCommand::Approve { request: 7 })
+        ),
+        Err(USAGE)
     );
 }

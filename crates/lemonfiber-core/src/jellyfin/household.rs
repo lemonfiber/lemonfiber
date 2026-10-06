@@ -341,7 +341,7 @@ impl crate::ports::service::Household for Jellyfin {
         )
     }
 
-    async fn holdings(&self, member: &str, most: u32) -> Result<Vec<Held>, Failure> {
+    async fn holdings(&self, member: Option<&str>, most: u32) -> Result<Vec<Held>, Failure> {
         shelf::holdings(self, member, most).await
     }
 

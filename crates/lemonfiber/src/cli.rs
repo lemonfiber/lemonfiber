@@ -23,6 +23,7 @@ use clap::{CommandFactory, Parser};
 
 mod request;
 mod under;
+mod whom;
 mod wiring;
 
 pub use under::{
@@ -45,6 +46,7 @@ pub use repair::{Fixing, Mending, RawDoctor};
 pub use serving::{Asked, RawUi};
 pub use setup::RawSetup;
 pub use trace::RawTrace;
+pub use whom::RawWhom;
 
 // Re-exported so that `cli::Request` still names it: where the subcommands are
 // written down is this file's business, and moving them would otherwise be a change

@@ -57,7 +57,8 @@ impl Refusal {
             | Self::NotACount
             | Self::NoUpdateObject
             | Self::NotALineCount
-            | Self::NotAChoice => {
+            | Self::NotAChoice
+            | Self::MemberAndDefaults => {
                 "The read cannot be answered as it was asked, and answering a different \
                  question in its place would read like the answer to this one."
             }

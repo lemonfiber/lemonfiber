@@ -40,22 +40,34 @@ struct ItemsResource {
 /// The administrator's key authenticates the call, but the id in the path is what the
 /// limits are read from — so nothing here re-applies them, and there is no second copy
 /// of three rules to disagree with the server on the day any of them moves.
+///
+/// **Naming nobody asks `/Items` instead**, which the server answers for whoever
+/// signed in: the administrator, who holds every library and no age limit. That is the
+/// access an invitation that chose nothing grants, and asking it this way reads no
+/// member's account at all.
 pub(super) async fn holdings(
     jellyfin: &Jellyfin,
-    member: &str,
+    member: Option<&str>,
     most: u32,
 ) -> Result<Vec<Held>, Failure> {
-    let kinds = Kind::ALL.map(item_type).join(",");
-    let asked = format!(
-        "/Users/{member}/Items?Recursive=true&IncludeItemTypes={kinds}\
-         &SortBy=DateCreated&SortOrder=Descending&Limit={most}"
-    );
-    let response = jellyfin.as_admin(Method::Get, &asked, None).await?;
+    let response = jellyfin
+        .as_admin(Method::Get, &asked(member, most), None)
+        .await?;
     let held: ItemsResource = jellyfin
         .endpoint
         .decode(&response, "what the household holds could not be read")?;
 
     Ok(held.items.into_iter().map(ItemResource::held).collect())
+}
+
+/// The path a shelf is asked at, for one member or for nobody in particular.
+fn asked(member: Option<&str>, most: u32) -> String {
+    let kinds = Kind::ALL.map(item_type).join(",");
+    let whose = member.map_or_else(String::new, |member| format!("/Users/{member}"));
+    format!(
+        "{whose}/Items?Recursive=true&IncludeItemTypes={kinds}\
+         &SortBy=DateCreated&SortOrder=Descending&Limit={most}"
+    )
 }
 
 /// Which of the two a held item is, from the word the server uses for it.

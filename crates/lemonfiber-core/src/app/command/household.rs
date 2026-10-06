@@ -1,5 +1,5 @@
 //! What one surface is asking about a household: who may ask, what becomes of one
-//! request, and what becomes of the ones nobody rules on.
+//! request, what becomes of the ones nobody rules on, and whom a reading is answered as.
 //!
 //! Apart from the enumeration beside them because they are one feature's vocabulary
 //! rather than the list of what may be asked at all. A reader checking that a command
@@ -84,3 +84,18 @@ pub enum Arranged {
 
 #[cfg(test)]
 mod tests;
+
+/// Whom a household read is answered as.
+///
+/// **The defaults are not a member.** They are what an invitation that chose nothing
+/// would grant: every library, no age limit, and what the household may ask for where
+/// nobody chose otherwise for one person. Answering as them reads no account, so it can
+/// show the operator the member's side without reading anybody's requests, allowance or
+/// watch history — which naming a member, any member, would.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Whom {
+    /// One member, by the id the media server files them under or by their name.
+    Named(String),
+    /// A member invited with the household's defaults, who is nobody in particular.
+    Defaults,
+}

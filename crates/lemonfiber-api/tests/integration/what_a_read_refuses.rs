@@ -504,7 +504,7 @@ fn a_shelf_asked_for_with_no_count_is_read_to_what_one_screen_holds() {
     assert_eq!(
         named,
         Some(Command::Held {
-            member: "ada".to_owned(),
+            member: lemonfiber_core::app::Whom::Named("ada".to_owned()),
             most: table::A_SHELF,
         })
     );
@@ -517,6 +517,76 @@ async fn a_shelf_at_the_ceiling_is_still_asked_for() {
         seen.as_ref()
             .is_some_and(|(status, _)| *status != StatusCode::BAD_REQUEST),
         "the ceiling is the last count this answers, not the first it refuses: {seen:?}"
+    );
+}
+
+/// What a read names, from a query string, or nothing where it is refused.
+fn reached(read: &str, query: &str) -> Option<Command> {
+    table::wanted(read, Some(query))
+        .ok()
+        .and_then(|given| table::named(read, given).ok())
+}
+
+/// Both household reads answer as the household's defaults where asked to, and as
+/// the member named, or everybody, where asked not to.
+#[test]
+fn both_household_reads_answer_as_the_defaults_where_asked() {
+    use lemonfiber_core::app::Whom;
+    assert_eq!(
+        reached(table::HELD, "defaults=true"),
+        Some(Command::Held {
+            member: Whom::Defaults,
+            most: table::A_SHELF,
+        })
+    );
+    assert_eq!(
+        reached(table::REQUESTS, "defaults=true"),
+        Some(Command::Household {
+            member: Some(Whom::Defaults)
+        })
+    );
+    assert_eq!(
+        reached(table::HELD, "member=ada&defaults=false"),
+        Some(Command::Held {
+            member: Whom::Named("ada".to_owned()),
+            most: table::A_SHELF,
+        })
+    );
+    assert_eq!(
+        reached(table::REQUESTS, "defaults=false"),
+        Some(Command::Household { member: None })
+    );
+}
+
+/// A member and the defaults together are two answers asked for at once, refused
+/// rather than either dropped — and on the shelf as on the household.
+#[tokio::test]
+async fn a_member_and_the_defaults_together_are_refused() {
+    for path in [
+        "/api/held?member=ada&defaults=true",
+        "/api/requests?member=ada&defaults=true",
+    ] {
+        assert_eq!(
+            asked(world(running(), stack()), path).await,
+            refused(
+                Refusal::MemberAndDefaults,
+                "Name a member or ask for the household's defaults, not both."
+            ),
+            "{path}"
+        );
+    }
+}
+
+/// Whether to answer as the defaults is a yes or a no, and a word that is neither is
+/// corrected rather than read as one of them.
+#[tokio::test]
+async fn the_defaults_asked_for_with_neither_yes_nor_no_are_refused() {
+    assert_eq!(
+        asked(world(running(), stack()), "/api/requests?defaults=yes").await,
+        refused(
+            Refusal::NotAChoice,
+            "A parameter that takes a yes or a no must be true or false."
+        )
     );
 }
 

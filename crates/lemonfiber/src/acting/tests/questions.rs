@@ -327,7 +327,7 @@ fn a_setting_and_a_member_are_named_on_the_line_a_trace_is_named_on() {
     assert_eq!(
         acting.pressed(&Press::Accept),
         Wanted::Carry(Command::Household {
-            member: Some("ada".to_owned()),
+            member: Some(lemonfiber_core::app::Whom::Named("ada".to_owned())),
         })
     );
 }

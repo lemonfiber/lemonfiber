@@ -19,7 +19,7 @@
 //! fact about the wire, and it is what the requirement about one member seeing
 //! another's requests asks for.
 
-use lemonfiber_core::app::Command;
+use lemonfiber_core::app::{Command, Whom};
 use lemonfiber_core::keys::Scope;
 
 use crate::admission::Caller;
@@ -130,14 +130,16 @@ fn members(id: &str, command: &Command) -> Permitted {
         // rather than compared, so there is no arm on which a mismatch could be
         // let through — and a page left open reloading with a stale name is
         // answered with their own row rather than signed out for holding it.
+        // Asking for the household's defaults is discarded the same way: a member
+        // is somebody, and what they are told is what they are told.
         Command::Household { .. } => Permitted::This(Command::Household {
-            member: Some(id.to_owned()),
+            member: Some(Whom::Named(id.to_owned())),
         }),
         // Theirs, and narrowed the same way. How much of the shelf to answer with
         // is the caller's to choose and is carried through; whose shelf it is
         // never was, so what the request named is discarded rather than checked.
         Command::Held { most, .. } => Permitted::This(Command::Held {
-            member: id.to_owned(),
+            member: Whom::Named(id.to_owned()),
             most: *most,
         }),
         // **Everything not named above is refused**, and the catch-all is the

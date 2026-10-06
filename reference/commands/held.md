@@ -12,23 +12,26 @@ The household word says what has been *asked for*. This says what is already her
 
 One person at a time, because no two accounts need have the same shelf.
 
-Usage: lemonfiber held [OPTIONS] --member <MEMBER>
+Usage: lemonfiber held [OPTIONS]
 
 Options:
       --json
           Print machine-readable output
 
       --member <MEMBER>
-          Whose shelf, named the way you would say it
+          One member, named the way you would say it
+
+      --defaults
+          Somebody invited with the household's defaults, read without asking about anybody's account
 
       --dry-run
           Say what would happen, and change nothing
 
-      --most <MOST>
-          How many to show, newest first
-
       --force
           Take the stack from a run that claimed it and did not give it back
+
+      --most <MOST>
+          How many to show, newest first
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one

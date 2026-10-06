@@ -123,7 +123,7 @@ fn over_the_household() -> Vec<(&'static str, Command)> {
         (
             "held",
             Command::Held {
-                member: "anybody".to_owned(),
+                member: lemonfiber_core::app::Whom::Named("anybody".to_owned()),
                 most: 25,
             },
         ),

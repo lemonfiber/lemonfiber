@@ -210,8 +210,11 @@ codes! {
         NO_UPDATE_OBJECT = "READ-13",
         /// Raised where how many log lines to begin with is not a number within the ceiling.
         NOT_A_LINE_COUNT = "READ-14",
-        /// Raised where whether to keep reading is neither true nor false.
+        /// Raised where a parameter that takes a yes or a no is neither true nor false.
         NOT_A_CHOICE = "READ-15",
+        /// Raised where a household read named a member and asked for the household's
+        /// defaults as well.
+        MEMBER_AND_DEFAULTS = "READ-16",
     }
     /// The `REHEARSE` codes.
     rehearse {

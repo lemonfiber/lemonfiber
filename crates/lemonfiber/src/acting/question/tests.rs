@@ -131,7 +131,7 @@ fn each_typed_question_fills_the_argument_its_read_names() {
     assert_eq!(
         asking(called("what one person asked for"), &["The Expanse"]),
         Ok(Command::Household {
-            member: Some("The Expanse".to_owned()),
+            member: Some(lemonfiber_core::app::Whom::Named("The Expanse".to_owned())),
         })
     );
     // The one word this question takes names one of four rather than anything

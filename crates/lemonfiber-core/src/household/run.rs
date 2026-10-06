@@ -11,6 +11,7 @@
 //! password seeding already minted and recorded.
 
 mod allowance;
+mod defaults;
 mod handing_over;
 mod holding;
 mod naming;
@@ -20,7 +21,7 @@ mod standing;
 use std::collections::BTreeMap;
 
 use crate::app::targets::{jellyfin_reader, seerr_reader};
-use crate::app::{Ctx, Hostable};
+use crate::app::{Ctx, Hostable, Whom};
 use naming::{library_titles, named_access, named_by_the_server, title_of, Naming};
 
 use crate::asking::Policy;
@@ -44,10 +45,22 @@ use crate::recyclarr::Kind;
 /// the whole of why it is worth saying here: a member filtered out of their own
 /// household comes back as a house holding nobody, which is not an error anywhere, and
 /// the app above draws it as *there is nothing to tell you*.
+///
+/// Narrowed to the household's defaults, it reads no account at all.
 pub(crate) async fn household(
     ctx: &Ctx,
-    member: Option<&str>,
+    member: Option<&Whom>,
 ) -> Result<HouseholdReport, Box<Problem>> {
+    match member {
+        None => everybody(ctx, None).await,
+        Some(Whom::Named(member)) => everybody(ctx, Some(member)).await,
+        Some(Whom::Defaults) => defaults::as_the_defaults(ctx).await,
+    }
+}
+
+/// The household as the media server holds it, narrowed to one member where one is
+/// named.
+async fn everybody(ctx: &Ctx, member: Option<&str>) -> Result<HouseholdReport, Box<Problem>> {
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())
