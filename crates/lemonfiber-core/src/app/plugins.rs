@@ -150,7 +150,7 @@ pub(super) enum Errand<'a> {
 
 use crate::error::codes::plugin::UNREADABLE;
 
-use crate::error::codes::plugin::REFUSED;
+use crate::error::codes::plugin::{HEADER_NAMED, REFUSED};
 
 use crate::error::codes::plugin::UNRECORDED;
 
@@ -371,15 +371,25 @@ fn unreadable_source(why: &crate::plugin::Unreadable) -> Problem {
 ///
 /// Every reason at once, each placed where the author wrote it. An operator handed
 /// one fault per attempt at somebody else's manifest is guessing at how many are
-/// left.
-fn refused(plugin: &str, found: &[lemonfiber_plugin::Violation]) -> Problem {
+/// left. A recipe substituting into a header's name answers with a code of its own,
+/// whatever else is wrong beside it.
+fn refused(
+    manifest: &lemonfiber_plugin::Manifest,
+    found: &[lemonfiber_plugin::Violation],
+) -> Problem {
+    let plugin = &manifest.plugin.id;
+    let code = if lemonfiber_plugin::names_a_header_by_substitution(manifest) {
+        HEADER_NAMED
+    } else {
+        REFUSED
+    };
     let listed = found
         .iter()
         .map(std::string::ToString::to_string)
         .collect::<Vec<String>>()
         .join("; ");
     Problem::new(
-        REFUSED,
+        code,
         Severity::Error,
         format!("{plugin} declares things lemonfiber will not install"),
         "Nothing was installed and nothing was written. A manifest is refused whole, so none \
