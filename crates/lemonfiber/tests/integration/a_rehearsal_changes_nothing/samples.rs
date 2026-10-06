@@ -146,6 +146,15 @@ fn over_the_household() -> Vec<(&'static str, Command)> {
             "companion",
             Command::Companion(lemonfiber_core::companion::Asked::Certificate { confirm: true }),
         ),
+        // The revoke rather than the mint, which is refused under the flag: a rehearsed
+        // revoke that leaked through would cut a program off its stack.
+        (
+            "key",
+            Command::Keys(lemonfiber_core::keys::run::Asked::Revoke {
+                name: "home-assistant".to_owned(),
+                by: lemonfiber_core::keys::Minter::Operator,
+            }),
+        ),
         ("outbound", Command::Outbound),
         ("provenance", Command::Provenance),
         ("catalogue", Command::Catalogue),

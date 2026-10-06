@@ -84,6 +84,7 @@ pub mod instant;
 pub mod invitation;
 pub mod jellyfin;
 pub mod journal;
+pub mod keys;
 pub mod lidarr;
 pub mod logs;
 pub mod machine;

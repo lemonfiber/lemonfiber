@@ -280,6 +280,12 @@ fn carry_out(confined: &dyn Confined, action: &Action, env_file: &Path) -> Resul
         // and what Compose was told to start, so a reversal reaching only the
         // environment file and the filesystem leaves this standing and says so.
         Action::Repin { previous, .. } => Ok(Step::BeyondReach(format!("version {previous}"))),
+        // A key is revoked by the reversal that puts back a named run, which holds the
+        // clock and the narrator a revoke is heard through. A reversal of an interrupted
+        // setup never meets one, and leaves it standing and says so if it ever did.
+        Action::Revoke { name } | Action::Reinstate { name } => {
+            Ok(Step::BeyondReach(format!("the key {name}")))
+        }
     }
 }
 

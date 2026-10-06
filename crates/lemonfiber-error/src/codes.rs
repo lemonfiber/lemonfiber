@@ -69,8 +69,8 @@ pub use operating::{
     proc, read, rehearse, serve, setup, stack, telling, tui, update, watch, word,
 };
 pub use serving::{
-    admit, backup, bundle, cred, gone, handoff, invite, kept, plugin, provider, qual, quota, rate,
-    reissue, remove, repair, restore, seed, space, storage, undo, vpn, wire, wiring,
+    admit, backup, bundle, cred, gone, handoff, invite, kept, key, plugin, provider, qual, quota,
+    rate, reissue, remove, repair, restore, seed, space, storage, undo, vpn, wire, wiring,
 };
 
 /// One code as this file declares it: the code, the name it is declared under and

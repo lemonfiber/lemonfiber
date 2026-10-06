@@ -350,7 +350,51 @@ fn keeping() -> Vec<Outcome> {
         Outcome::Bandwidth(a_shared_line()),
         Outcome::Pausing(every_client_paused()),
         Outcome::Outbound(what_leaves()),
+        Outcome::Minted(a_minted_key()),
+        Outcome::Keys(every_key()),
     ]
+}
+
+/// A key just minted, with every optional half present: the address, the pin and a
+/// caution beside them.
+fn a_minted_key() -> lemonfiber_core::keys::Minted {
+    use lemonfiber_core::keys::{Minted, Purpose, Secret};
+    let source = lemonfiber_fixtures::ports::Chance::exactly(Some(vec![7; 32]));
+    let Some(secret) = Secret::mint(&source) else {
+        unreachable!("thirty-two bytes mint a key")
+    };
+    Minted {
+        name: "ha".to_owned(),
+        scope: "act".to_owned(),
+        purpose: Purpose::HomeAssistant,
+        secret,
+        address: Some("https://lemonfiber.local:8443".to_owned()),
+        pin: Some("ab".repeat(32)),
+        caution: Some("Serve it encrypted on your network first.".to_owned()),
+    }
+}
+
+/// A listing holding a key in use and one revoked, after a revoke.
+fn every_key() -> lemonfiber_core::keys::Listing {
+    use lemonfiber_core::keys::{Listed, Listing, Purpose, State};
+    let listed = |name: &str, state: State| Listed {
+        name: name.to_owned(),
+        scope: "read".to_owned(),
+        purpose: Purpose::Mcp,
+        state,
+        minted: "2026-10-05T06:00:00".to_owned(),
+        used: Some("2026-10-05T07:00:00".to_owned()),
+        revoked: None,
+        member_minted: false,
+    };
+    let mut gone = listed("gone", State::Revoked);
+    gone.revoked = Some("2026-10-05T08:00:00".to_owned());
+    Listing {
+        keys: vec![listed("assistant", State::Active), gone],
+        revoked: Some("gone".to_owned()),
+        purposes: "What a purpose is worth.".to_owned(),
+        rehearsed: false,
+    }
 }
 
 /// A pause one client took and one nothing reached, with the caution a spent cap

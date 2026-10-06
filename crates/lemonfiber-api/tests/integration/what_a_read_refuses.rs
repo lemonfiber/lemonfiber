@@ -74,7 +74,7 @@ async fn a_request_carrying_no_token_never_reaches_a_read() {
         .await,
         refused(
             Refusal::NotAdmitted,
-            "This request carried no token or session this run admits."
+            "This request carried no token, session or key this run admits."
         )
     );
 }

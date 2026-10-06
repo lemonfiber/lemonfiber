@@ -62,10 +62,12 @@ use lemonfiber_core::model::{
 };
 use lemonfiber_core::wiring;
 
+use crate::actions::{named, Arguments, KEY_CALLABLE};
 use crate::admission::admitted::Admitted;
 use crate::jobs::started::Started;
 use crate::read::answering;
 use crate::refusal::Refusal;
+use lemonfiber_core::app::rehearsal::Rehearsal;
 use lemonfiber_core::logs::Line as LogLine;
 use lemonfiber_core::news::Newest;
 use lemonfiber_core::walkthrough::Line;
@@ -81,6 +83,13 @@ pub use stability::{Surface, SURFACE_PATH};
 pub struct Contract {
     /// The wire version these shapes belong to.
     pub api_version: u32,
+    /// Every action a key may call, with whether it disturbs the running system and
+    /// whether it takes a rehearsal.
+    ///
+    /// Beside the kinds rather than inside one, for the reason the refusals are: it is
+    /// not a document any request answers with, and a client deciding which controls to
+    /// offer a key reads it before it asks anything.
+    pub key_callable: Vec<Callable>,
     /// `kind` to the schema of the envelope carrying it.
     pub kinds: BTreeMap<String, Schema>,
     /// Every code a refusal may carry, to what the registry says of it.
@@ -90,6 +99,18 @@ pub struct Contract {
     /// branches on is which of these a refusal is, so they are listed where a
     /// generator can give each one a name rather than copy it.
     pub refusals: BTreeMap<String, Listed>,
+}
+
+/// One action a key may call, as the contract lists it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Callable {
+    /// The action, as `POST /api/actions/<action>` names it.
+    pub action: &'static str,
+    /// Whether calling it disturbs the running system.
+    pub disturbs: bool,
+    /// Whether it takes `dry_run`, read off the core's own account of the command it
+    /// reaches, so a client can rehearse it and offer the real call after.
+    pub rehearsal: bool,
 }
 
 /// One refusal as the contract lists it.
@@ -113,6 +134,7 @@ impl Contract {
 
         Self {
             api_version: API_VERSION,
+            key_callable: key_callable(),
             kinds,
             refusals: refusals(),
         }
@@ -199,6 +221,45 @@ fn refusals() -> BTreeMap<String, Listed> {
             ))
         })
         .collect()
+}
+
+/// Every action a key may call, each with what calling it is like.
+fn key_callable() -> Vec<Callable> {
+    KEY_CALLABLE
+        .iter()
+        .map(|by| Callable {
+            action: by.action,
+            disturbs: by.disturbs,
+            rehearsal: rehearsable(by.action),
+        })
+        .collect()
+}
+
+/// Whether an action takes `dry_run`, as the core decides for the command it reaches.
+///
+/// The command is named from the plainest arguments that name one — nothing, a form,
+/// or the checks that disturb the system — because what an action reaches is decided by
+/// its name and those, never by which form or which service it was given.
+#[must_use]
+pub fn rehearsable(action: &str) -> bool {
+    let given = |forms: bool, disruptive: bool| Arguments {
+        forms: if forms {
+            vec!["any".to_owned()]
+        } else {
+            Vec::new()
+        },
+        disruptive: disruptive.into(),
+        ..Arguments::default()
+    };
+    [given(false, false), given(true, false), given(false, true)]
+        .into_iter()
+        .find_map(|arguments| named(action, arguments).ok())
+        .is_some_and(|command| {
+            matches!(
+                lemonfiber_core::app::rehearsal::asked(&command).rehearsal,
+                Rehearsal::Reads | Rehearsal::Reports
+            )
+        })
 }
 
 /// One kind, and the shape of the envelope carrying it.

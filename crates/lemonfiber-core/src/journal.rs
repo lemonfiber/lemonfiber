@@ -136,6 +136,25 @@ pub enum Kind {
         /// What it was changed to.
         current: String,
     },
+    /// A key was minted for a program to reach the web surface with. Undoing revokes
+    /// it.
+    ///
+    /// The secret is not here and could not be: it is never kept anywhere, and what
+    /// putting a mint back needs is only which key to revoke.
+    KeyMinted {
+        /// The key's name, which identifies it for good.
+        name: String,
+        /// What it admits, as every surface writes a scope.
+        scope: String,
+    },
+    /// A key was revoked. Nothing undoes it: a revoked key is never made good again,
+    /// and whatever still needs one is minted a new one.
+    KeyRevoked {
+        /// The key's name.
+        name: String,
+        /// What it admitted.
+        scope: String,
+    },
 }
 
 impl Change {
@@ -186,6 +205,8 @@ impl Change {
                 field: field.clone(),
                 value: previous.clone(),
             },
+            Kind::KeyMinted { name, .. } => Action::Revoke { name: name.clone() },
+            Kind::KeyRevoked { name, .. } => Action::Reinstate { name: name.clone() },
         };
         Undo {
             target: self.target.clone(),
@@ -280,6 +301,21 @@ pub enum Action {
         field: String,
         /// What to put back, or `None` where it held nothing.
         value: Option<String>,
+    },
+    /// Revoke the key a mint made.
+    Revoke {
+        /// The key's name.
+        name: String,
+    },
+    /// Make a revoked key good again.
+    ///
+    /// Worked out so the record of a revoke has a reversal to name, and never carried
+    /// out: a key is revoked because something should stop holding it, and reinstating
+    /// it would hand back what the revoke took away. Whatever still needs a key is
+    /// minted a new one.
+    Reinstate {
+        /// The key's name.
+        name: String,
     },
 }
 

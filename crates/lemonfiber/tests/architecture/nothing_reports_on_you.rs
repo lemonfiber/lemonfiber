@@ -136,6 +136,13 @@ const MINTING: &[(&str, &str)] = &[
          another",
     ),
     (
+        "crates/lemonfiber-core/src/keys.rs",
+        "the secret of one integration key the operator minted for a program they chose. Shown \
+         once, in the reply that minted it, and kept only as a digest; it identifies the key it \
+         was minted for, which the operator can revoke, and nothing about the installation — a \
+         second key carries another",
+    ),
+    (
         "crates/lemonfiber-core/src/secret.rs",
         "the two passwords lemonfiber has to mint rather than read: qBittorrent's web UI and \
          Jellyfin's administrator. Recorded in the settings file because the services \

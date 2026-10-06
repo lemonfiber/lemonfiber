@@ -385,3 +385,35 @@ fn every_reversal_writes_itself_as_what_it_does() {
         r#"{"target":"qbittorrent","action":{"does":"repin","previous":"4.0.15","current":"4.1.0"}}"#
     );
 }
+
+/// A mint is put back by revoking the key it made, and a revoke names the reversal it
+/// would have, which nothing carries out.
+#[test]
+fn a_key_change_is_reversed_by_name() {
+    let change = |kind: Kind| Change {
+        at: "1".to_owned(),
+        operation: "key".to_owned(),
+        target: "ha".to_owned(),
+        kind,
+    };
+    let minted = change(Kind::KeyMinted {
+        name: "ha".to_owned(),
+        scope: "read".to_owned(),
+    });
+    let revoked = change(Kind::KeyRevoked {
+        name: "ha".to_owned(),
+        scope: "read".to_owned(),
+    });
+    assert_eq!(
+        minted.undo().action,
+        Action::Revoke {
+            name: "ha".to_owned()
+        }
+    );
+    assert_eq!(
+        revoked.undo().action,
+        Action::Reinstate {
+            name: "ha".to_owned()
+        }
+    );
+}

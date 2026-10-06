@@ -70,7 +70,48 @@ fn every_outcome() -> Vec<Outcome> {
     let mut every = the_first_of_them();
     every.extend(the_migrations());
     every.extend(the_rest_of_them());
+    every.extend(the_keys());
     every
+}
+
+/// The two a key answers with: one just minted, with everything a client elsewhere
+/// needs, and a listing holding a key in use and one revoked.
+fn the_keys() -> Vec<Outcome> {
+    use lemonfiber_core::keys::{Listed, Listing, Minted, Purpose, Secret, State};
+    let source = lemonfiber_fixtures::ports::Chance::exactly(Some(vec![7; 32]));
+    let Some(secret) = Secret::mint(&source) else {
+        unreachable!("thirty-two bytes mint a key")
+    };
+    let listed = |name: &str, state: State| Listed {
+        name: name.to_owned(),
+        scope: "read".to_owned(),
+        purpose: Purpose::Mcp,
+        state,
+        minted: "2026-10-05T06:00:00".to_owned(),
+        used: Some("2026-10-05T07:00:00".to_owned()),
+        revoked: None,
+        member_minted: false,
+    };
+    vec![
+        Outcome::Minted(Minted {
+            name: "ha".to_owned(),
+            scope: "act".to_owned(),
+            purpose: Purpose::HomeAssistant,
+            secret,
+            address: Some("https://den.local:8443".to_owned()),
+            pin: Some("ab".repeat(32)),
+            caution: None,
+        }),
+        Outcome::Keys(Listing {
+            keys: vec![
+                listed("assistant", State::Active),
+                listed("gone", State::Revoked),
+            ],
+            revoked: Some("gone".to_owned()),
+            purposes: "A purpose is what the minter said.".to_owned(),
+            rehearsed: false,
+        }),
+    ]
 }
 
 /// The two a migration answers with, which are their own family and grew the list

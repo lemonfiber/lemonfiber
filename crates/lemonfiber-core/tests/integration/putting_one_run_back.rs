@@ -677,3 +677,54 @@ async fn a_reversal_that_cannot_be_recorded_says_it_stands_unrecorded() {
         "the reversal itself stands"
     );
 }
+
+/// A run that minted a key goes back by revoking the key, and the revoke is what the
+/// record says was done.
+#[tokio::test]
+async fn a_run_that_minted_a_key_goes_back_by_revoking_it() {
+    let root = scratch("key");
+    let ctx = ctx(&root);
+    let minted = dispatch(
+        Command::Keys(lemonfiber_core::keys::run::Asked::Mint {
+            name: "ha".to_owned(),
+            scope: "read".to_owned(),
+            purpose: "other".to_owned(),
+            by: lemonfiber_core::keys::Minter::Operator,
+        }),
+        &ctx,
+    )
+    .await;
+    assert!(
+        minted.is_ok(),
+        "{:?}",
+        minted.err().map(|problem| problem.summary)
+    );
+    let journal = lemonfiber_core::app::recover::journal_at(&paths(&root).journal()).ok();
+    let Some(at) = journal
+        .as_ref()
+        .and_then(|journal| journal.changes().last())
+        .map(|change| change.at.clone())
+    else {
+        unreachable!("a mint is journaled")
+    };
+
+    let reversed = dispatch(Command::Undo { run: Some(at) }, &ctx).await;
+
+    let Ok(Outcome::Undo(reversal)) = reversed else {
+        unreachable!("a run that minted a key can be put back")
+    };
+    assert!(reversal.reversed.iter().any(|undo| undo.target == "ha"));
+    let kept = lemonfiber_core::keys::run::at(&ctx)
+        .and_then(|path| lemonfiber_core::keys::Kept::at(&path).ok())
+        .unwrap_or_default();
+    assert!(kept
+        .named("ha")
+        .is_some_and(lemonfiber_core::keys::Record::is_revoked));
+    let recorded = lemonfiber_core::app::recover::journal_at(&paths(&root).journal()).ok();
+    assert!(
+        recorded.is_some_and(|journal| journal.changes().iter().any(|change| matches!(
+            &change.kind,
+            Kind::KeyRevoked { name, .. } if name == "ha"
+        )))
+    );
+}

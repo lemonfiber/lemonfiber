@@ -29,6 +29,7 @@ mod history;
 pub(crate) mod host;
 mod hosting;
 mod invitation;
+mod keys;
 mod migration;
 mod news;
 mod outbound;
@@ -186,8 +187,7 @@ impl Lines {
 }
 
 /// Render an outcome, for a person or for a script, one renderer per answer: what a
-/// version report owes an operator and what a lifecycle report owes them are different
-/// questions.
+/// version report owes an operator and what a lifecycle report owes them are different questions.
 pub(crate) fn render(outcome: &Outcome, json: bool) {
     answer(outcome, json).print();
 }
@@ -209,8 +209,7 @@ fn answer(outcome: &Outcome, json: bool) -> Lines {
     // report explains is a property of what it ended up saying — a renderer that
     // had to remember to do this would be a renderer that could forget. After the
     // `json` return, never before it: a footnote is prose for a person, and appending
-    // it to a machine-readable answer would corrupt the one thing that answer exists
-    // to be.
+    // it to a machine-readable answer would corrupt the one thing that answer exists to be.
     let notes = glossary::footnotes(&lines.text(), glossary::wanted(), glossary::known());
     lines.extend(notes);
     lines
@@ -252,6 +251,8 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Handoff(report) => invitation::handoff(report),
         Outcome::Pairing(report) => companion::pairing(report),
         Outcome::Certificate(report) => companion::certificate(report),
+        Outcome::Minted(report) => keys::minted(report),
+        Outcome::Keys(report) => keys::listing(report),
         Outcome::Removal(report) => removal::removal(report),
         Outcome::Outbound(report) => outbound::leaving(report),
         Outcome::Plugins(report) => plugin::installs(report),
@@ -439,8 +440,7 @@ fn settings(report: &ConfigReport) -> Lines {
     }
     // Last, so the values and any change to one read as one block. These are the
     // footnotes to the listing above rather than part of it, and a sentence sitting
-    // between a setting and the change being made to it would read as being about
-    // the change.
+    // between a setting and the change being made to it would read as being about the change.
     lines.extend(unsettled(&report.settings));
     lines
 }

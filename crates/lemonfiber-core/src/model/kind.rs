@@ -101,12 +101,16 @@ kinds! {
     REMOVAL = "removal",
     /// The name given to work that outlives the request that started it.
     JOB = "job",
+    /// Every key this machine has minted, and what became of a revoke.
+    KEYS = "keys",
     /// What a lifecycle command did, or would have done.
     LIFECYCLE = "lifecycle",
     /// One line of a service's log.
     LOG = "log",
     /// What is already on this machine, before anything is proposed.
     MIGRATION = "migration",
+    /// A key minted, with its secret, shown this once.
+    MINTED_KEY = "minted-key",
     /// The music format chosen, and what became of applying it.
     MUSIC = "music",
     /// The newest few of each kind a surface can mark as new, by what names them.

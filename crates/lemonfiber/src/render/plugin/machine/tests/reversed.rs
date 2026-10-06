@@ -431,4 +431,16 @@ fn every_shape_a_reversal_puts_back_says_what_it_did() {
         }),
         "put category back on komga"
     );
+    assert_eq!(
+        undone(Action::Revoke {
+            name: "ha".to_owned()
+        }),
+        "revoked the key ha"
+    );
+    assert_eq!(
+        undone(Action::Reinstate {
+            name: "ha".to_owned()
+        }),
+        "made the key ha good again"
+    );
 }

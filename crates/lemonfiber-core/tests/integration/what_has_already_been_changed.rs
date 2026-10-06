@@ -230,6 +230,16 @@ fn created(resource: &str, id: &str) -> Change {
     }
 }
 
+/// A change to a key, minted or revoked.
+fn key(kind: Kind) -> Change {
+    Change {
+        at: "2000".to_owned(),
+        operation: "key".to_owned(),
+        target: "ha".to_owned(),
+        kind,
+    }
+}
+
 /// A path lemonfiber itself made on this machine.
 fn made(path: &str) -> Change {
     Change {
@@ -288,6 +298,14 @@ async fn every_kind_of_change_reads_as_the_sentence_it_was() {
             set("reconfigure", "PUID", Some("1000"), "1001"),
             set("apply", "TZ", None, "Europe/Amsterdam"),
             pinned("sonarr", "4.0.14", "4.0.15"),
+            key(Kind::KeyMinted {
+                name: "ha".to_owned(),
+                scope: "read".to_owned(),
+            }),
+            key(Kind::KeyRevoked {
+                name: "ha".to_owned(),
+                scope: "read".to_owned(),
+            }),
         ],
     );
 
@@ -298,6 +316,8 @@ async fn every_kind_of_change_reads_as_the_sentence_it_was() {
     assert_eq!(
         said,
         [
+            "revoked the key ha, with the scope read",
+            "minted the key ha, with the scope read",
             "moved from 4.0.14 to 4.0.15",
             "set TZ to Europe/Amsterdam",
             "changed PUID from 1000 to 1001",

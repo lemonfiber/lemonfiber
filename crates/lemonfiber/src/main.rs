@@ -8,10 +8,9 @@
 use std::process::ExitCode;
 
 use clap::Parser;
-use lemonfiber::cli::{Cli, CompanionCommand, Mending, RawDoctor, RawSetup, RawUi, Request};
+use lemonfiber::cli::{Cli, Mending, RawDoctor, RawSetup, RawUi, Request};
 use lemonfiber_core::app::restore::{Consent, Kept};
 use lemonfiber_core::app::{dispatch, Command, Ctx, SetupAction};
-use lemonfiber_core::companion::Asked as Paired;
 
 mod acting;
 mod authoring;
@@ -314,10 +313,7 @@ async fn main() -> ExitCode {
         Request::Stuck => Command::Stuck,
         Request::FrontDoor => Command::FrontDoor,
         Request::News => Command::News,
-        Request::Companion(asked) => Command::Companion(match asked.action {
-            CompanionCommand::Pair => Paired::Pair,
-            CompanionCommand::Certificate { confirm } => Paired::Certificate { confirm },
-        }),
+        Request::Companion(asked) => translate::paired(&asked),
         Request::Catalogue => Command::Catalogue,
         Request::Wiring { fill } => wiring(fill),
         Request::Outbound => Command::Outbound,
@@ -334,6 +330,7 @@ async fn main() -> ExitCode {
         Request::StopSeeding { download, offer } => letting(download, offer),
         Request::Bandwidth(asked) => translate::sharing(asked),
         Request::Downloads(asked) => translate::pausing(&asked),
+        Request::Key(asked) => translate::keyed(asked),
         Request::Seed => Command::Seed,
         Request::Adopt => Command::Adopt,
         Request::Reset { confirm } => Command::Reset { confirm },

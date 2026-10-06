@@ -69,7 +69,12 @@ async fn a_member_the_media_server_recognises_is_admitted_as_that_member() {
     };
     assert_eq!(
         admitting
-            .carried(&carrying(Some(&session(&answer.body))), &token, moment())
+            .carried(
+                &carrying(Some(&session(&answer.body))),
+                &token,
+                None,
+                moment()
+            )
             .await,
         Knocking::Known(Caller::Member("a7f3".to_owned()))
     );

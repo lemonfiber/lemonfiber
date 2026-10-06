@@ -248,9 +248,17 @@ pub fn standing(
             written,
             ..
         } => bounded(path, owner, *written, reads),
-        // A setting, a path, or one field of a service's record — each reversed by
-        // something this product actually does.
-        Kind::Set { .. } | Kind::Made { .. } | Kind::Configured { .. } => Standing::whole(),
+        // A key is revoked because something should stop holding it, and making it good
+        // again would hand back exactly what the revoke took away.
+        Kind::KeyRevoked { name, .. } => Standing::refused(
+            &format!("the key {name} was revoked, and a revoked key is never made good again"),
+            Some("mint a new key for whatever still needs one"),
+        ),
+        // A setting, a path, one field of a service's record, or a key to revoke — each
+        // reversed by something this product actually does.
+        Kind::Set { .. } | Kind::Made { .. } | Kind::Configured { .. } | Kind::KeyMinted { .. } => {
+            Standing::whole()
+        }
     }
 }
 

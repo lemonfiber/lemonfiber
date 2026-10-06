@@ -385,6 +385,8 @@ fn undone(undo: &Undo) -> String {
         Action::Restore { key, .. } => format!("put {key} back"),
         Action::Repin { previous, .. } => format!("{} back to {previous}", undo.target),
         Action::Reconfigure { field, .. } => format!("put {field} back on {}", undo.target),
+        Action::Revoke { name } => format!("revoked the key {name}"),
+        Action::Reinstate { name } => format!("made the key {name} good again"),
     }
 }
 

@@ -234,6 +234,10 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // was said; anything that stopped either comes back as a problem.
         | Outcome::Pairing(_)
         | Outcome::Certificate(_)
+        // A key was minted, listed or revoked; anything that refused comes back as a
+        // problem.
+        | Outcome::Minted(_)
+        | Outcome::Keys(_)
         | Outcome::Outbound(_)
         | Outcome::Provenance(_)
         | Outcome::Catalogue(_)

@@ -39,7 +39,7 @@ use lemonfiber_core::wizard::{Answer, Choice};
 use serde::Deserialize;
 
 use crate::admission::Caller;
-use crate::entitled::{may, Permitted};
+use crate::entitled::{may, Door};
 use crate::read::{enveloped, refusing};
 use crate::refusal::Refusal;
 use crate::router::Serving;
@@ -125,8 +125,9 @@ struct Chosen {
 
 /// One step of the walk, carried out and answered with where it left setup.
 async fn walked(serving: &Serving, caller: &Caller, action: SetupAction) -> Response {
-    let Permitted::This(command) = may(caller, Command::Setup(action)) else {
-        return Refusal::NotYours.answered();
+    let command = match may(caller, Door::Acting, Command::Setup(action)).granted() {
+        Ok(command) => command,
+        Err(refused) => return *refused,
     };
     match dispatch(command, &serving.ctx).await {
         Ok(outcome) => enveloped(StatusCode::OK, outcome.envelope().to_json()),

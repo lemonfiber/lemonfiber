@@ -405,3 +405,27 @@ fn a_refusal_of_pairing_names_no_command() {
         assert!(marked.is_none(), "the {which} refusal names a command");
     }
 }
+
+/// A key handed out from a machine served encrypted on the network carries the address
+/// a client elsewhere reaches it at, beside the pin, and no caution.
+#[tokio::test]
+async fn reaching_a_served_machine_names_its_address_and_pin() {
+    let at = served_from("companion-reaching", 8443);
+    let reaching = super::reaching(&machine(Some(at.clone()), Some("den"), None)).await;
+    let pin = certificate::kept(&at)
+        .ok()
+        .flatten()
+        .map(|held| held.fingerprint);
+    assert_eq!(reaching.address.as_deref(), Some("https://den.local:8443"));
+    assert_eq!(reaching.pin, pin);
+    assert!(reaching.caution.is_none());
+}
+
+/// A machine keeping nowhere for the companion's certificate hands a key out with no
+/// address and no pin, and says how to serve the stack.
+#[tokio::test]
+async fn reaching_a_machine_keeping_nowhere_says_how_to_serve_it() {
+    let reaching = super::reaching(&machine(None, Some("den"), None)).await;
+    assert!(reaching.address.is_none() && reaching.pin.is_none());
+    assert!(reaching.caution.is_some());
+}

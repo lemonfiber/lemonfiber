@@ -445,3 +445,37 @@ fn a_region_whose_markers_were_edited_is_refused_rather_than_guessed_at() {
     let said = read.refusal.map(|why| why.because).unwrap_or_default();
     assert!(said.contains("no longer marked out"), "{said}");
 }
+
+/// A mint is put back whole, by revoking the key; a revoke is never put back, because
+/// making a revoked key good again would hand back what the revoke took away.
+#[test]
+fn a_mint_goes_back_and_a_revoke_does_not() {
+    let key = |kind: Kind| Change {
+        at: "1".to_owned(),
+        operation: "key".to_owned(),
+        target: "ha".to_owned(),
+        kind,
+    };
+    let minted = standing(
+        &key(Kind::KeyMinted {
+            name: "ha".to_owned(),
+            scope: "read".to_owned(),
+        }),
+        &[],
+        &holding(&[]),
+        &unread,
+    );
+    assert_eq!(minted.reversal, Reversal::Whole);
+    let revoked = standing(
+        &key(Kind::KeyRevoked {
+            name: "ha".to_owned(),
+            scope: "read".to_owned(),
+        }),
+        &[],
+        &holding(&[]),
+        &unread,
+    );
+    assert!(revoked
+        .refusal
+        .is_some_and(|refusal| refusal.because.contains("never made good again")));
+}

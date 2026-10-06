@@ -29,6 +29,9 @@ codes! {
         NO_ENDPOINT = "ASK-9",
         /// Raised where an endpoint was asked with a method it does not answer.
         WRONG_METHOD = "ASK-10",
+        /// Raised where the body of a mint is not a key's name, scope, purpose and the
+        /// password.
+        NOT_A_KEY_REQUEST = "ASK-11",
     }
     /// The `BIND` codes.
     bind {

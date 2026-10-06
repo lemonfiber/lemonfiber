@@ -62,6 +62,7 @@ Commands:
   support       Gather everything a person helping you would ask for, with every value not named safe replaced by a stand-in
   ui            Serve the web interface, for as long as you leave it running
   companion     Pair a phone with this stack, or replace the certificate a paired phone pins
+  key           Mint, list or revoke the keys another program reaches the web interface with
   restore       Restore your configuration from a backup archive
   help          Print this message or the help of the given subcommand(s)
 
@@ -145,4 +146,5 @@ Options:
 - [`lemonfiber support`](commands/support.md)
 - [`lemonfiber ui`](commands/ui.md)
 - [`lemonfiber companion`](commands/companion.md)
+- [`lemonfiber key`](commands/key.md)
 - [`lemonfiber restore`](commands/restore.md)

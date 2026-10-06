@@ -123,6 +123,8 @@ fn restoring(action: &Action) -> String {
         Action::Delete { path } => format!("{path} removed"),
         Action::Withdraw { owner, path, .. } => format!("{owner}'s region taken out of {path}"),
         Action::Repin { previous, .. } => format!("the version pinned back to {previous}"),
+        Action::Revoke { name } => format!("the key {name} revoked"),
+        Action::Reinstate { name } => format!("the key {name} good again"),
     }
 }
 

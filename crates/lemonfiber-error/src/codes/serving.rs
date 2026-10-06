@@ -10,7 +10,7 @@ codes! {
         NO_SALT = "ADMIT-2",
         /// Raised when the two answers were not the same word.
         MISTYPED = "ADMIT-3",
-        /// Raised when a request carried no token or session this run admits.
+        /// Raised when a request carried no token, session or key this run admits.
         NOT_ADMITTED = "ADMIT-4",
         /// Raised when a request said it came from somewhere this server is not.
         ELSEWHERE = "ADMIT-5",
@@ -24,6 +24,11 @@ codes! {
         TOO_MANY_ATTEMPTS = "ADMIT-9",
         /// Raised when what was offered at the door is not a password.
         NOT_A_PASSWORD = "ADMIT-10",
+        /// Raised when a key arrived from another machine over a connection its pin does
+        /// not verify.
+        KEY_IN_THE_CLEAR = "ADMIT-11",
+        /// Raised when a key asked for something its scope does not reach.
+        NOT_FOR_A_KEY = "ADMIT-12",
     }
     /// The `BACKUP` codes.
     backup {
@@ -154,6 +159,30 @@ codes! {
     kept {
         /// Raised when this run does not know where lemonfiber's own files go.
         NOWHERE_KNOWN = "KEPT-1",
+    }
+    /// The `KEY` codes.
+    key {
+        /// Raised when a key is asked for under a word that cannot name one.
+        BAD_NAME = "KEY-1",
+        /// Raised when a key is asked for with a scope that is none of the three.
+        NOT_A_SCOPE = "KEY-2",
+        /// Raised when a key is asked for with a purpose that is none of the three.
+        NOT_A_PURPOSE = "KEY-3",
+        /// Raised when the record of keys is there and does not read as keys.
+        UNREADABLE = "KEY-4",
+        /// Raised when a key is asked for under a name another key holds.
+        NAME_TAKEN = "KEY-5",
+        /// Raised when a member's key names an account the household does not hold.
+        NO_SUCH_MEMBER = "KEY-6",
+        /// Raised when the household could not be asked about a member's account.
+        UNASKED = "KEY-7",
+        /// Raised when a household member asks for a key, or a revoke, that is not theirs
+        /// alone.
+        NOT_FOR_YOURSELF = "KEY-8",
+        /// Raised when this machine would not supply the bytes a secret is made of.
+        NO_SECRET = "KEY-9",
+        /// Raised when no active key holds the name a revoke gave.
+        NO_SUCH_KEY = "KEY-10",
     }
     /// The `PLUGIN` codes.
     plugin {

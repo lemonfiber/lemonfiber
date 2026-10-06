@@ -72,10 +72,15 @@ pub fn answered(rendered: String) -> Response<Body> {
 /// a bundle, the logs, the work begun under a job's name and the event stream. Each
 /// carries what the operator is shown — a whole support bundle, every container's
 /// log lines, another caller's results — and none of it is narrowed to a member, so
-/// a member is refused outright rather than handed the operator's copy.
+/// a member is refused outright rather than handed the operator's copy. A key scoped to
+/// a member is that member here as everywhere, and is refused the same way; a `read` or
+/// `act` key is admitted, since every served read and the stream are what it is for.
 #[must_use]
 pub fn operator_only(caller: &crate::admission::Caller) -> Option<Response<Body>> {
-    matches!(caller, crate::admission::Caller::Member(_)).then(|| Refusal::NotYours.answered())
+    caller
+        .member()
+        .is_some()
+        .then(|| Refusal::NotYours.answered())
 }
 
 /// Every response this surface produces, wearing the headers all of them carry.

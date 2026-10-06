@@ -274,8 +274,7 @@ pub enum Command {
     Companion(crate::companion::Asked),
     /// Say what one of this product's words means, at length.
     ///
-    /// Answered from a table compiled into the binary, so it needs neither a stack
-    /// nor a daemon.
+    /// Answered from a table compiled into the binary, so it needs neither a stack nor a daemon.
     Explain {
         /// The word, as it would be said.
         word: String,
@@ -286,8 +285,7 @@ pub enum Command {
     /// resolving them: a surface that has to name a word cannot know the names in
     /// advance, and asking is what keeps it from carrying its own copy of the table.
     Glossary,
-    /// Say which app to use on which device, and where the honest answer is to use
-    /// something else.
+    /// Say which app to use on which device, and where the honest answer is to use something else.
     ///
     /// A read with no arguments. The table it answers with is the same for every
     /// machine — the client landscape belongs to the platforms rather than to this
@@ -454,6 +452,8 @@ pub enum Command {
     Bandwidth(BandwidthAsked),
     /// Pause every download client the stack runs, or let them all fetch again.
     Downloads(crate::bandwidth::Pausing),
+    /// Mint, list or revoke the keys another program reaches the web surface with.
+    Keys(crate::keys::run::Asked),
     /// Guard the data location while the given forms run, stopping them the moment
     /// it disappears.
     ///
