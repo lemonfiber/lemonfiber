@@ -65,14 +65,7 @@ pub(crate) async fn update(
         from,
         &stamp,
     );
-    let Some(was) = held
-        .installed()
-        .iter()
-        .find(|one| one.plugin == would.plugin)
-        .cloned()
-    else {
-        return Err(Box::new(not_installed(&would.plugin)));
-    };
+    let was = installed_as(&held, &would.plugin)?;
     let stack = ctx
         .settings
         .stack_dir
@@ -336,6 +329,19 @@ fn answering(installed: Vec<Installed>, update: Update, offer: String) -> Instal
         substituted: Vec::new(),
         sources: Vec::new(),
     }
+}
+
+/// The version of `plugin` the record holds now, which an update replaces.
+///
+/// # Errors
+///
+/// Where the record holds no plugin by that name, so there is nothing to update.
+fn installed_as(held: &Register, plugin: &str) -> Result<Installed, Box<Problem>> {
+    held.installed()
+        .iter()
+        .find(|one| one.plugin == plugin)
+        .cloned()
+        .ok_or_else(|| Box::new(not_installed(plugin)))
 }
 
 /// No version of this plugin is installed, so there is nothing to replace.
