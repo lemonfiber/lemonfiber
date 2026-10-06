@@ -38,7 +38,7 @@ fn a_code_is_published_by_the_name_and_line_it_is_declared_with() {
     assert_eq!(found.map(super::Declared::name), Some("NOT_ADMITTED"));
     assert_eq!(
         found.map(super::Declared::description),
-        Some("Raised when a request carried no token or session this run admits.")
+        Some("Raised when a request carried no token, session or key this run admits.")
     );
 }
 

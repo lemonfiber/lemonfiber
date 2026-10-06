@@ -70,11 +70,13 @@ const POOL: u32 = 30;
 /// together is a guess a minute, at most, at any door.
 const REFILLED_EVERY: Duration = Duration::from_secs(60);
 
-/// A door a password opens.
+/// A door a password or a key opens.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Door {
     /// The machine's own password.
     Operator,
+    /// A key the operator minted for a program.
+    Key,
     /// A household member's, by the name they sign in with, lower-cased the way the
     /// media server compares names.
     Member(String),
@@ -199,6 +201,16 @@ impl Counted {
     fn proved(&self, peer: Peer, door: &Door) -> bool {
         self.proved.contains_key(&(peer, door.clone()))
     }
+
+    /// Give back the one attempt `ticket` counted, and whatever it drew on the pool.
+    fn given_back(&mut self, ticket: &Ticket) {
+        if let Some(wrong) = self.wrong.get_mut(&ticket.peer) {
+            wrong.count = wrong.count.saturating_sub(1);
+        }
+        if ticket.drew {
+            self.pool.returned();
+        }
+    }
 }
 
 /// The wrong answers this run has been given.
@@ -281,21 +293,70 @@ impl Attempts {
         Ok(ticket)
     }
 
+    /// Take an attempt at a key, or say how long is left before one is taken.
+    ///
+    /// The same two limits a password meets, and counted the same way: before the key is
+    /// looked at, so every key arriving at once meets them together. An address that has
+    /// presented a right key this run is let past the shared pool, as one back at a door
+    /// it already opened is.
+    ///
+    /// # Errors
+    ///
+    /// How long is left, where the address has earned a wait or the shared pool is spent.
+    pub async fn taken_at_a_key(
+        &self,
+        peer: impl Into<Option<IpAddr>>,
+        now: SystemTime,
+    ) -> Result<Ticket, Duration> {
+        let peer = canonical(peer.into());
+        let mut counted = self.counted.lock().await;
+        counted.tidied(now);
+        if let Some(left) = counted.wrong.get(&peer).and_then(|wrong| wrong.left(now)) {
+            return Err(left);
+        }
+        let proved = counted.proved(peer, &Door::Key);
+        let drew = !proved && counted.pool.drawn(now);
+        if !proved && !drew {
+            return Err(counted.pool.next(now).max(Duration::from_secs(1)));
+        }
+        let count = counted
+            .wrong
+            .get(&peer)
+            .map_or(0, |wrong| wrong.remembered(now));
+        counted.wrong.insert(
+            peer,
+            Wrong {
+                count: count.saturating_add(1),
+                last: now,
+            },
+        );
+        Ok(Ticket {
+            peer,
+            operator: false,
+            member: None,
+            drew,
+        })
+    }
+
     /// Take back an attempt that proved `door`, and remember the address proved it.
     ///
     /// Only that attempt is taken back: a right answer at one door is no evidence about
     /// wrong ones anywhere else.
     pub async fn right(&self, ticket: &Ticket, door: Door, now: SystemTime) {
         let mut counted = self.counted.lock().await;
-        if let Some(wrong) = counted.wrong.get_mut(&ticket.peer) {
-            wrong.count = wrong.count.saturating_sub(1);
-        }
-        if ticket.drew {
-            counted.pool.returned();
-        }
+        counted.given_back(ticket);
         if let Some(until) = now.checked_add(LASTS) {
             counted.proved.insert((ticket.peer, door), until);
         }
+    }
+
+    /// Take back an attempt that turned out not to be a guess, proving nothing.
+    ///
+    /// For a key this machine minted and refuses — revoked, or a member's whose account
+    /// has gone. It was never a guess, so it is not counted as one; and it opened
+    /// nothing, so the address is no nearer the door than it was.
+    pub async fn forgiven(&self, ticket: &Ticket) {
+        self.counted.lock().await.given_back(ticket);
     }
 }
 

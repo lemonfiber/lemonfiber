@@ -20,8 +20,23 @@
 //! another's requests asks for.
 
 use lemonfiber_core::app::Command;
+use lemonfiber_core::keys::Scope;
 
 use crate::admission::Caller;
+
+/// Which door a command was asked for at.
+///
+/// Asked because a key's scope draws its line between the two: a `read` key reaches
+/// every read and no action, so the same caller is answered differently at each.
+/// Nobody else's answer turns on it — the operator has both doors, and a member has
+/// what is theirs at either.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Door {
+    /// A read, asked for at the path it is served under.
+    Reading,
+    /// An action, or a step of setup.
+    Acting,
+}
 
 /// What is left of a command once who is asking has been taken into account.
 ///
@@ -36,9 +51,33 @@ pub enum Permitted {
     This(Command),
     /// Nothing, and say so. The caller proved who they are and this is not theirs.
     Nothing,
+    /// Nothing, because a key with this scope may not call it.
+    NotForAKey(String),
 }
 
-/// The command this caller actually gets, or nothing.
+impl Permitted {
+    /// The command to carry out, or the refusal the caller is answered with.
+    ///
+    /// # Errors
+    ///
+    /// The refusal, where this is not a command to carry out: what is not theirs, or
+    /// what a key with this scope may not call, named by that scope.
+    pub fn granted(self) -> Result<Command, Box<axum::response::Response>> {
+        match self {
+            Self::This(command) => Ok(command),
+            Self::Nothing => Err(Box::new(crate::refusal::Refusal::NotYours.answered())),
+            Self::NotForAKey(scope) => Err(Box::new(crate::refusal::Refusal::NotForAKey.saying(
+                format!(
+                    "A key with the scope {scope} may not call this. A key calls only the \
+                     actions the contract publishes as callable by a key, and a read key \
+                     calls none."
+                ),
+            ))),
+        }
+    }
+}
+
+/// The command this caller actually gets at `door`, or nothing.
 ///
 /// Every command reaches this, whether it was asked for as a read, at the actions
 /// door or as a step of setup, and whether it is answered now or handed to a job —
@@ -47,34 +86,66 @@ pub enum Permitted {
 /// member is not entitled to asks for. A hand-written
 /// request gets no further here than a tapped button does.
 #[must_use]
-pub fn may(caller: &Caller, command: Command) -> Permitted {
+pub fn may(caller: &Caller, door: Door, command: Command) -> Permitted {
     match caller {
         // The whole surface, unchanged. Somebody at this machine's terminal and
         // somebody holding this machine's password are the two people this product
         // already answered everything for, and nothing here narrows that.
         Caller::Machine | Caller::Operator => Permitted::This(command),
-        // **Everything not named below is refused**, and the catch-all is the
+        Caller::Member(id) => members(id, &command),
+        Caller::Key(keyed) => match (&keyed.scope, door) {
+            // Exactly what that member's own session admits, at either door.
+            (Scope::Member { id, .. }, _) => members(id, &command),
+            (Scope::Read | Scope::Act, Door::Reading) => Permitted::This(command),
+            (Scope::Act, Door::Acting) if callable_by_a_key(&command) => Permitted::This(command),
+            (scope @ (Scope::Read | Scope::Act), Door::Acting) => {
+                Permitted::NotForAKey(scope.written())
+            }
+        },
+    }
+}
+
+/// Whether a key may call this command, as the contract publishes.
+///
+/// **Everything not named here is refused to a key**, for the reason everything not
+/// named is refused to a member: a command added later is not a key's until somebody
+/// decides it is. The list is short on purpose — a key is the credential most likely
+/// to be held somewhere the operator is not, so nothing here cannot be undone or widens
+/// what the stack trusts.
+#[must_use]
+pub const fn callable_by_a_key(command: &Command) -> bool {
+    matches!(
+        command,
+        Command::Restart { .. }
+            | Command::Doctor { accept: None, .. }
+            | Command::Update(_)
+            | Command::Downloads(_)
+    )
+}
+
+/// What a household member may have of a command.
+fn members(id: &str, command: &Command) -> Permitted {
+    match command {
+        // Theirs, narrowed to them. Whatever the request named is discarded
+        // rather than compared, so there is no arm on which a mismatch could be
+        // let through — and a page left open reloading with a stale name is
+        // answered with their own row rather than signed out for holding it.
+        Command::Household { .. } => Permitted::This(Command::Household {
+            member: Some(id.to_owned()),
+        }),
+        // Theirs, and narrowed the same way. How much of the shelf to answer with
+        // is the caller's to choose and is carried through; whose shelf it is
+        // never was, so what the request named is discarded rather than checked.
+        Command::Held { most, .. } => Permitted::This(Command::Held {
+            member: id.to_owned(),
+            most: *most,
+        }),
+        // **Everything not named above is refused**, and the catch-all is the
         // statement rather than an omission: a command added later is not a
         // member's until somebody decides it is and writes it down. Listing what
         // members may *not* do would make every new command theirs by default, and
         // the day that is wrong is the day nobody notices.
-        Caller::Member(id) => match command {
-            // Theirs, narrowed to them. Whatever the request named is discarded
-            // rather than compared, so there is no arm on which a mismatch could be
-            // let through — and a page left open reloading with a stale name is
-            // answered with their own row rather than signed out for holding it.
-            Command::Household { .. } => Permitted::This(Command::Household {
-                member: Some(id.clone()),
-            }),
-            // Theirs, and narrowed the same way. How much of the shelf to answer with
-            // is the caller's to choose and is carried through; whose shelf it is
-            // never was, so what the request named is discarded rather than checked.
-            Command::Held { most, .. } => Permitted::This(Command::Held {
-                member: id.clone(),
-                most,
-            }),
-            _ => Permitted::Nothing,
-        },
+        _ => Permitted::Nothing,
     }
 }
 

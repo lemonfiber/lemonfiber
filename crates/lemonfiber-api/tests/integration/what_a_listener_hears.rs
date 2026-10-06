@@ -99,7 +99,7 @@ impl Serving {
     /// What a request saying these headers is answered with.
     async fn answering(&self, said: &[(&str, &str)]) -> Option<Response<Body>> {
         let streaming = self.streaming.clone()?;
-        Some(stream(State(streaming), saying(said)).await)
+        Some(stream(State(streaming), None, saying(said)).await)
     }
 }
 
@@ -662,7 +662,7 @@ async fn a_stream_whose_session_is_voided_ends_once_its_last_yes_runs_out() {
         live: Arc::clone(&live),
         clock,
     });
-    let answer = stream(State(streaming), saying(&welcome(&admitted.token))).await;
+    let answer = stream(State(streaming), None, saying(&welcome(&admitted.token))).await;
     assert_eq!(answer.status(), StatusCode::OK);
     let mut body = answer.into_body().into_data_stream();
 

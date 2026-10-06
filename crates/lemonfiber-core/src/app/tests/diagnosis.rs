@@ -51,6 +51,8 @@ fn diagnosis(
             | Outcome::StopSeeding(_)
             | Outcome::Bandwidth(_)
             | Outcome::Pausing(_)
+            | Outcome::Minted(_)
+            | Outcome::Keys(_)
             | Outcome::Status(_)
             | Outcome::Repair(_)
             | Outcome::Undo(_)

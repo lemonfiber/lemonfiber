@@ -1,6 +1,6 @@
 use lemonfiber_core::app::Command;
 
-use super::{may, Permitted};
+use super::{callable_by_a_key, may, Door, Permitted};
 use crate::admission::Caller;
 
 /// The member asking, by the id the media server files them under.
@@ -16,7 +16,11 @@ fn member() -> Caller {
 #[test]
 fn a_members_household_read_is_narrowed_to_them() {
     assert_eq!(
-        may(&member(), Command::Household { member: None }),
+        may(
+            &member(),
+            Door::Reading,
+            Command::Household { member: None }
+        ),
         Permitted::This(Command::Household {
             member: Some(ASKING.to_owned())
         })
@@ -32,6 +36,7 @@ fn a_member_naming_somebody_else_is_still_narrowed_to_themselves() {
     assert_eq!(
         may(
             &member(),
+            Door::Reading,
             Command::Household {
                 member: Some(SOMEBODY_ELSE.to_owned())
             }
@@ -50,6 +55,7 @@ fn a_member_naming_somebody_elses_shelf_is_given_their_own() {
     assert_eq!(
         may(
             &member(),
+            Door::Reading,
             Command::Held {
                 member: SOMEBODY_ELSE.to_owned(),
                 most: 25,
@@ -69,6 +75,7 @@ fn how_much_of_the_shelf_a_member_asked_for_is_carried_through() {
     assert_eq!(
         may(
             &member(),
+            Door::Reading,
             Command::Held {
                 member: ASKING.to_owned(),
                 most: 7,
@@ -84,12 +91,18 @@ fn how_much_of_the_shelf_a_member_asked_for_is_carried_through() {
 
 #[test]
 fn a_member_is_refused_a_read_that_is_not_theirs() {
-    assert_eq!(may(&member(), Command::Version), Permitted::Nothing);
+    assert_eq!(
+        may(&member(), Door::Reading, Command::Version),
+        Permitted::Nothing
+    );
 }
 
 #[test]
 fn a_member_is_refused_something_that_changes_the_machine() {
-    assert_eq!(may(&member(), Command::AtBoot), Permitted::Nothing);
+    assert_eq!(
+        may(&member(), Door::Reading, Command::AtBoot),
+        Permitted::Nothing
+    );
 }
 
 /// Both of the people this product already answered everything for keep the
@@ -100,12 +113,13 @@ fn a_member_is_refused_something_that_changes_the_machine() {
 fn the_machine_and_the_operator_are_asked_nothing_new() {
     for caller in [Caller::Machine, Caller::Operator] {
         assert_eq!(
-            may(&caller, Command::Version),
+            may(&caller, Door::Reading, Command::Version),
             Permitted::This(Command::Version)
         );
         assert_eq!(
             may(
                 &caller,
+                Door::Reading,
                 Command::Household {
                     member: Some(SOMEBODY_ELSE.to_owned())
                 }
@@ -114,5 +128,118 @@ fn the_machine_and_the_operator_are_asked_nothing_new() {
                 member: Some(SOMEBODY_ELSE.to_owned())
             })
         );
+    }
+}
+
+/// A key with this scope.
+fn key(scope: lemonfiber_core::keys::Scope) -> Caller {
+    Caller::Key(crate::admission::Keyed {
+        name: "home-assistant".to_owned(),
+        scope,
+    })
+}
+
+/// A restart, which a key may call.
+fn a_restart() -> Command {
+    Command::Restart {
+        forms: vec!["tv".to_owned()],
+        services: Vec::new(),
+    }
+}
+
+/// An uninstall, which no key may ever call.
+fn an_uninstall() -> Command {
+    Command::Uninstall(lemonfiber_core::app::Removing::surveying(
+        lemonfiber_core::uninstall::Tier::Media,
+    ))
+}
+
+#[test]
+fn a_read_key_reaches_every_read_and_no_action() {
+    use lemonfiber_core::keys::Scope;
+    let reading = key(Scope::Read);
+    assert_eq!(
+        may(&reading, Door::Reading, Command::Version),
+        Permitted::This(Command::Version)
+    );
+    for command in [a_restart(), an_uninstall(), Command::Seed] {
+        assert_eq!(
+            may(&reading, Door::Acting, command),
+            Permitted::NotForAKey("read".to_owned())
+        );
+    }
+}
+
+#[test]
+fn an_act_key_calls_exactly_what_a_key_may_call() {
+    use lemonfiber_core::keys::Scope;
+    let acting = key(Scope::Act);
+    assert_eq!(
+        may(&acting, Door::Acting, a_restart()),
+        Permitted::This(a_restart())
+    );
+    let downloads = Command::Downloads(lemonfiber_core::bandwidth::Pausing::Pause);
+    assert_eq!(
+        may(&acting, Door::Acting, downloads.clone()),
+        Permitted::This(downloads)
+    );
+    for refused in [
+        an_uninstall(),
+        Command::Seed,
+        Command::Reset { confirm: true },
+        Command::Forget { confirm: true },
+        Command::Doctor {
+            narrowing: lemonfiber_core::doctor::Narrowing::Suite,
+            disruptive: true,
+            accept: Some("vpn.leak".to_owned()),
+        },
+    ] {
+        assert_eq!(
+            may(&acting, Door::Acting, refused),
+            Permitted::NotForAKey("act".to_owned())
+        );
+    }
+}
+
+#[test]
+fn a_member_key_is_exactly_that_members_session_at_either_door() {
+    use lemonfiber_core::keys::Scope;
+    let theirs = key(Scope::Member {
+        id: ASKING.to_owned(),
+        name: "ana".to_owned(),
+    });
+    for door in [Door::Reading, Door::Acting] {
+        assert_eq!(
+            may(
+                &theirs,
+                door,
+                Command::Household {
+                    member: Some(SOMEBODY_ELSE.to_owned())
+                }
+            ),
+            may(
+                &member(),
+                door,
+                Command::Household {
+                    member: Some(SOMEBODY_ELSE.to_owned())
+                }
+            )
+        );
+        assert_eq!(may(&theirs, door, Command::Version), Permitted::Nothing);
+        assert_eq!(may(&theirs, door, a_restart()), Permitted::Nothing);
+    }
+}
+
+#[test]
+fn nothing_that_cannot_be_undone_or_widens_trust_is_callable_by_a_key() {
+    let never = [
+        an_uninstall(),
+        Command::Reset { confirm: true },
+        Command::Seed,
+        Command::Credentials(lemonfiber_core::app::Asking::Read),
+        Command::Plugins(lemonfiber_core::app::plugins::Asked::Installed),
+    ];
+    for command in never {
+        assert!(!callable_by_a_key(&command), "{command:?}");
     }
 }

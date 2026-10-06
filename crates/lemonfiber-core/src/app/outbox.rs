@@ -33,10 +33,13 @@ pub(crate) fn save(ctx: &Ctx, outbox: &Outbox) {
     let _ = super::record::keep(path(ctx).as_deref(), outbox);
 }
 
+/// The file it is kept in, beside the environment file.
+pub(crate) const FILE: &str = "outbox.json";
+
 /// Where it is kept: beside the environment file, or nowhere on a machine with
 /// nothing configured — which has nobody to owe anything to either.
 fn path(ctx: &Ctx) -> Option<std::path::PathBuf> {
-    super::targets::beside_env(ctx, "outbox.json")
+    super::targets::beside_env(ctx, FILE)
 }
 
 #[cfg(test)]

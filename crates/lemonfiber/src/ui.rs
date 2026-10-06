@@ -33,7 +33,7 @@ use std::time::Duration;
 use axum::Router;
 use lemonfiber::cli::RawUi;
 use lemonfiber_api::admission::remembered::Remembered;
-use lemonfiber_api::admission::{Admitting, HouseholdAtHand};
+use lemonfiber_api::admission::{Admitting, HouseholdAtHand, Keyring};
 use lemonfiber_api::events::live::Live;
 use lemonfiber_api::events::saying::Saying;
 use lemonfiber_api::events::stepping::Stepping;
@@ -45,6 +45,7 @@ use lemonfiber_api::router::{self, Serving};
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::error::{Problem, Remedy, Severity, State as Standing};
 use lemonfiber_core::frontend::Source;
+use lemonfiber_core::keys::run as keys;
 use lemonfiber_core::platform::HOST_OS;
 use lemonfiber_core::PRODUCT;
 use tokio::net::TcpListener;
@@ -289,6 +290,21 @@ enum Ending {
     Revoked,
 }
 
+/// The one register, shared by the door, the guard over everything else and the
+/// stream: two would be a run somebody could be admitted to half of. It reads the
+/// password and the keys afresh at every asking, so the serving loop asks again without
+/// anything having to tell it, and opens the household again once it is a few seconds old.
+fn register(ctx: &Arc<Ctx>) -> Arc<Admitting> {
+    Arc::new(Admitting {
+        kept: ctx.settings.admission.clone(),
+        household: Some(Arc::new(Remembered::over(
+            Arc::clone(ctx) as Arc<dyn HouseholdAtHand>
+        ))),
+        keys: Keyring::at(keys::at(ctx), keys::used_at(ctx)),
+        ..Admitting::default()
+    })
+}
+
 /// Serve, and go on serving until the operator stops it or the policy turns.
 ///
 /// The policy is read once before a socket exists and again while one is held, and it
@@ -330,18 +346,7 @@ async fn serving(
     // about it, so a guard whose browser went away is let go rather than left
     // polling a drive until this process stops.
     tokio::spawn(jobs.clone().sweeping(LEASE));
-    // One register, shared by the door, the guard over everything else and the
-    // stream: two would be a run somebody could be admitted to half of. It reads the
-    // password afresh every time it is asked, which is what lets the loop below ask
-    // again without anything having to tell it. The household is opened from the
-    // stack again whenever the one it opened last is a few seconds old.
-    let admitting = Arc::new(Admitting {
-        kept: ctx.settings.admission.clone(),
-        household: Some(Arc::new(Remembered::over(
-            Arc::clone(&ctx) as Arc<dyn HouseholdAtHand>
-        ))),
-        ..Admitting::default()
-    });
+    let admitting = register(&ctx);
     let app = app(embedded, asked.assets.clone());
     let encrypting = match encrypted::encrypting(&ctx, asked.tls, asked.port) {
         Ok(encrypting) => encrypting,

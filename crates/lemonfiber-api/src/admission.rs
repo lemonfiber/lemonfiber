@@ -31,6 +31,8 @@
 
 pub mod admitted;
 pub mod attempts;
+pub mod keyed;
+pub mod keyring;
 pub mod remembered;
 pub mod sessions;
 
@@ -39,7 +41,7 @@ use sessions::Opened;
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{ConnectInfo, FromRequestParts, State};
@@ -55,7 +57,7 @@ use lemonfiber_core::ports::random::Random;
 use lemonfiber_core::ports::service::{Household, Signed};
 use serde::Deserialize;
 
-use crate::guard::{host_is_here, origin_is_here, Binding, Token, TOKEN_HEADER};
+use crate::guard::{host_is_here, origin_is_here, Arrived, Binding, Token, TOKEN_HEADER};
 use crate::read::enveloped;
 use crate::refusal::Refusal;
 use crate::router::Serving;
@@ -64,6 +66,8 @@ use crate::router::Serving;
 const DEVICE_BYTES: usize = 16;
 
 pub use attempts::{Attempts, Door, Ticket};
+pub use keyed::Keyed;
+pub use keyring::{Holding, Keyring};
 pub use sessions::Sessions;
 
 /// Where a password is exchanged for a session.
@@ -94,6 +98,8 @@ pub struct Admitting {
     /// Where the household this machine keeps is found. Asked who somebody is when
     /// the machine's own password does not know them.
     pub household: Option<Arc<dyn HouseholdAtHand>>,
+    /// The keys other programs hold, read afresh whenever one is presented.
+    pub keys: Keyring,
 }
 
 /// Where the household is found, at the moment somebody is checked against it.
@@ -174,6 +180,36 @@ impl Admitting {
         opened(Arc::clone(self.household.as_ref()?)).await
     }
 
+    /// Whether `password` is this machine's own, counted as every password offered is.
+    ///
+    /// For a write that asks for the password again in the same request, which a
+    /// session alone does not stand in for: the same two limits a sign-in meets, the
+    /// same slow check on a thread made for blocking, and a right answer forgiving
+    /// nothing but itself.
+    ///
+    /// # Errors
+    ///
+    /// How long is left, where the wrong answers so far have earned a wait.
+    pub async fn proves_the_operator(
+        &self,
+        password: &str,
+        peer: Option<IpAddr>,
+        now: SystemTime,
+    ) -> Result<bool, Duration> {
+        let ticket = self.attempts.taken(peer, None, now).await?;
+        let Some(held) = self.credential_now().await.filter(|_| ticket.operator) else {
+            return Ok(false);
+        };
+        let offered = password.to_owned();
+        let proved = tokio::task::spawn_blocking(move || held.verifies(&offered))
+            .await
+            .unwrap_or(false);
+        if proved {
+            self.attempts.right(&ticket, Door::Operator, now).await;
+        }
+        Ok(proved)
+    }
+
     /// Who a name and a password prove somebody to be, or nothing.
     ///
     /// **Two doors, tried in order, and nothing chooses between them.** The machine's
@@ -246,21 +282,33 @@ impl Admitting {
 
     /// Who the secret a request carried proves it to be, or nothing.
     ///
-    /// Two secrets answer to the one header and they are not the same claim. The
-    /// per-run token is what somebody at this machine's terminal was given; a
-    /// session is what somebody who proved the password was given. Both are
-    /// compared over every byte, so how long either takes says nothing about how
-    /// much of a guess was right.
+    /// Three secrets answer to the one header and they are not the same claim. The
+    /// per-run token is what somebody at this machine's terminal was given; a session
+    /// is what somebody who proved the password was given; a key is what the operator
+    /// minted for a program. The token and a session are compared over every byte, and
+    /// a key is found by its digest over every key kept, so how long any of them takes
+    /// says nothing about how much of a guess was right.
     ///
-    /// `None` is every refusal. There is one of those rather than several because
-    /// a caller learning *which* secret was wrong learns which one to keep
-    /// guessing at.
-    pub async fn carried(&self, headers: &HeaderMap, token: &Token, now: SystemTime) -> Knocking {
+    /// `Nobody` is every refusal of who is asking. There is one of those rather than
+    /// several because a caller learning *which* secret was wrong learns which one to
+    /// keep guessing at. The two other refusals a key can meet are said apart because
+    /// neither is about whether it was right: one is the wait guessing has earned, the
+    /// other is a key that crossed a network in the clear.
+    pub async fn carried(
+        &self,
+        headers: &HeaderMap,
+        token: &Token,
+        arrived: Option<Arrived>,
+        now: SystemTime,
+    ) -> Knocking {
         let offered = headers
             .get(TOKEN_HEADER)
             .and_then(|value| value.to_str().ok());
         if token.carried_by(offered) {
             return Knocking::Known(Caller::Machine);
+        }
+        if let Some(key) = offered.filter(|offered| lemonfiber_core::keys::shaped(offered)) {
+            return self.keyed(key, arrived, now).await;
         }
         // The credential is read only for a session that was opened against one, so a
         // request carrying nothing, or a secret this run never handed out, costs no
@@ -342,6 +390,12 @@ pub enum Knocking {
     Nobody,
     /// Could not be established, which is not the same as nobody.
     Unconfirmed,
+    /// A key arrived while the wrong answers so far have earned a wait, and was not
+    /// looked at. How long is left.
+    Held(Duration),
+    /// A key arrived from another machine over a connection its pin does not verify,
+    /// and was not looked at.
+    Exposed,
 }
 
 /// Who a request proved itself to be.
@@ -364,6 +418,21 @@ pub enum Caller {
     /// under. What they may then do is the core's answer and is decided where it is
     /// known — never from this, and never by a client reading it.
     Member(String),
+    /// A program holding a key the operator minted for it.
+    Key(Keyed),
+}
+
+impl Caller {
+    /// The household member this caller acts as, where it acts as one: a member's own
+    /// session, or a key scoped to them.
+    #[must_use]
+    pub fn member(&self) -> Option<&str> {
+        match self {
+            Self::Member(id) => Some(id),
+            Self::Key(keyed) => keyed.scope.member(),
+            Self::Machine | Self::Operator => None,
+        }
+    }
 }
 
 /// Who is asking, taken from what the guard admitted.
@@ -463,9 +532,9 @@ fn peer(connected: Option<Extension<ConnectInfo<SocketAddr>>>) -> Option<IpAddr>
 /// The wait is said in the header a client already knows to read and in the sentence
 /// a person reads, because both of them are here: the page shows one and the client
 /// behind it waits on the other.
-fn waiting(seconds: u64) -> Response {
+pub(crate) fn waiting(seconds: u64) -> Response {
     let mut response = Refusal::TooManyAttempts.saying(format!(
-        "Too many wrong passwords. Try again in {seconds} seconds."
+        "Too many wrong passwords and keys. Try again in {seconds} seconds."
     ));
     response
         .headers_mut()

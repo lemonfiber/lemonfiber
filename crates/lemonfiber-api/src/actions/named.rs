@@ -94,6 +94,45 @@ pub const OFFERED: &[&str] = &[
     "wiring-fill",
 ];
 
+/// One action a key may call, as the contract publishes it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ByAKey {
+    /// The action, by the name every surface calls it.
+    pub action: &'static str,
+    /// Whether calling it disturbs the running system: services restart, or the tunnel
+    /// is taken away to prove it comes back.
+    pub disturbs: bool,
+}
+
+/// Every action a key may call, in the order they are worth reading.
+///
+/// Short on purpose, and every entry is something that can be undone or that widens
+/// nothing the stack trusts. Held to [`crate::entitled::callable_by_a_key`], which is
+/// what actually decides, by a test in both directions: a name here a key could not
+/// call, or a command a key can call that no name here reaches, is red.
+pub const KEY_CALLABLE: &[ByAKey] = &[
+    ByAKey {
+        action: "restart",
+        disturbs: true,
+    },
+    ByAKey {
+        action: "diagnose",
+        disturbs: true,
+    },
+    ByAKey {
+        action: "update",
+        disturbs: true,
+    },
+    ByAKey {
+        action: "downloads-pause",
+        disturbs: false,
+    },
+    ByAKey {
+        action: "downloads-resume",
+        disturbs: false,
+    },
+];
+
 /// The actions that must be told what to act on.
 ///
 /// A guard is one of them for a reason the other three do not share: it is not

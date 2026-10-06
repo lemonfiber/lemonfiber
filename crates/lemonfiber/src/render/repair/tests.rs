@@ -189,6 +189,18 @@ fn what_was_put_back_is_said_in_the_terms_of_what_it_changed() {
                 value: None,
             },
         },
+        Undo {
+            target: "ha".to_owned(),
+            action: Action::Revoke {
+                name: "ha".to_owned(),
+            },
+        },
+        Undo {
+            target: "ha".to_owned(),
+            action: Action::Reinstate {
+                name: "ha".to_owned(),
+            },
+        },
     ];
 
     let said = reversed(&putting_back(undos, Vec::new())).text();
@@ -210,6 +222,8 @@ fn what_was_put_back_is_said_in_the_terms_of_what_it_changed() {
         said.contains("downloadclient's movieCategory cleared, as it was"),
         "{said}"
     );
+    assert!(said.contains("the key ha revoked"), "{said}");
+    assert!(said.contains("the key ha good again"), "{said}");
 }
 
 /// A reversal that was carried out, over these two lists.

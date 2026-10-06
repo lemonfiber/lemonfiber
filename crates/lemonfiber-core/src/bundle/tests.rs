@@ -537,3 +537,20 @@ fn a_key_only_the_encoding_reveals_is_found_by_the_scan() {
         "{line}"
     );
 }
+
+/// A key an integration holds, in whatever line it turns up in, never leaves in a
+/// bundle: the key file itself is no part of one, and a key quoted in a log is a dense
+/// run like any other secret.
+#[test]
+fn an_integration_key_quoted_in_a_log_line_is_replaced() {
+    let Some(secret) = crate::keys::Secret::mint(&Fixed(vec![0xa7; 32])) else {
+        unreachable!("thirty-two bytes mint a key")
+    };
+    let line = format!(
+        "homeassistant | sent X-Lemonfiber-Token: {}",
+        secret.as_str()
+    );
+    let said = prose(&line, &marks(salt()), &Terms::default());
+    assert!(!said.contains(secret.as_str()), "{said}");
+    assert!(!said.contains(&"a7".repeat(32)), "{said}");
+}

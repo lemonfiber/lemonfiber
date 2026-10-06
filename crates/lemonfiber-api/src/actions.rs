@@ -37,7 +37,7 @@ use lemonfiber_core::app::restore::Consent as RestoreConsent;
 use lemonfiber_core::app::{Command, Ctx, Setting, Waiting};
 
 use crate::admission::Caller;
-use crate::entitled::{may, Permitted};
+use crate::entitled::{may, Door};
 use crate::jobs::{accepted, Job};
 use crate::read::carried_out;
 use crate::refusal::Refusal;
@@ -50,7 +50,7 @@ pub use asked::{
     TAKES_REASON, TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING,
     TAKES_SHARING, TAKES_TERM, TAKES_TIER, TAKES_WAITING,
 };
-pub use named::{named, OFFERED};
+pub use named::{named, ByAKey, KEY_CALLABLE, OFFERED};
 pub use refused::Refused;
 
 /// When an action's answer arrives.
@@ -146,8 +146,9 @@ async fn taken(
     // ruled on by the same sentence as one answered on the spot. A check that lived
     // in the immediate arm would leave the slow half of this door as the way round
     // the fast half.
-    let Permitted::This(command) = may(&caller, command) else {
-        return Refusal::NotYours.answered();
+    let command = match may(&caller, Door::Acting, command).granted() {
+        Ok(command) => command,
+        Err(refused) => return *refused,
     };
     match answering(&command) {
         Answering::Now => carried_out(&ctx, command).await,

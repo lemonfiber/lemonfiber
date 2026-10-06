@@ -18,6 +18,7 @@ mod following;
 pub mod frontend;
 pub mod guard;
 pub mod jobs;
+pub mod keys;
 pub mod read;
 pub mod refusal;
 pub mod router;

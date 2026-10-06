@@ -59,6 +59,32 @@ impl Binding {
     }
 }
 
+/// Where a request arrived from, as the connection it came over says.
+///
+/// Put on every request by whatever accepted the connection, because only that knows
+/// it: a header naming an address is something a client wrote, and the question this
+/// answers is one no client may answer for itself.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Arrived {
+    /// The address the connection came from.
+    pub from: std::net::IpAddr,
+    /// Whether it came over the TLS the certificate pin verifies.
+    pub encrypted: bool,
+}
+
+impl Arrived {
+    /// Whether a key may be presented over this connection.
+    ///
+    /// From this machine, always: nothing crossed a network. From anywhere else, only
+    /// encrypted, because a key sent in the clear has been handed to everything between
+    /// the client and here. An address written the way IPv6 carries an IPv4 one is read
+    /// as the address it carries, so loopback reached that way is loopback.
+    #[must_use]
+    pub fn may_carry_a_key(&self) -> bool {
+        self.encrypted || self.from.to_canonical().is_loopback()
+    }
+}
+
 /// A secret minted once per run, held in memory, never written down.
 ///
 /// It is printed when the server starts and given to a client by whoever read

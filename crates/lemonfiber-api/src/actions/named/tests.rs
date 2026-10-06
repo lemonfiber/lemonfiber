@@ -1,5 +1,6 @@
-use super::{carried, OFFERED};
+use super::{carried, KEY_CALLABLE, OFFERED};
 use crate::actions::{Arguments, TAKES_AGREEMENT};
+use crate::entitled::callable_by_a_key;
 
 /// A carrier holding something for every argument any action reads, agreed to or not.
 ///
@@ -93,4 +94,44 @@ fn every_action_that_reads_the_agreement_is_listed_as_taking_it() {
         reading.contains(&"migrate-adopt") && reading.contains(&"reset"),
         "and the sweep sees the reads it exists to find: {reading:?}"
     );
+}
+
+/// The published list and the rule that decides are the same list.
+///
+/// Every action is reached from nothing, from a full carrier and from a full carrier
+/// agreed to, and is callable by a key if any of those reaches a command the rule lets
+/// a key call. A name published that no key could call would send a program to a
+/// refusal; an action a key can call that is not published is one an operator was
+/// never told about.
+#[test]
+fn what_a_key_may_call_is_exactly_what_is_published() {
+    let callable: Vec<&str> = OFFERED
+        .iter()
+        .copied()
+        .filter(|action| {
+            [Arguments::default(), everything(false), everything(true)]
+                .into_iter()
+                .filter_map(|given| carried(action, given).ok())
+                .any(|command| callable_by_a_key(&command))
+        })
+        .collect();
+    let mut published: Vec<&str> = KEY_CALLABLE.iter().map(|by| by.action).collect();
+    let mut reached = callable.clone();
+    published.sort_unstable();
+    reached.sort_unstable();
+    assert_eq!(reached, published);
+}
+
+/// A key may not accept a disturbing check's offer: only the operator says yes to
+/// taking the system down, even where diagnosing it is a key's to ask.
+#[test]
+fn a_key_may_diagnose_but_not_accept_what_a_diagnosis_offers() {
+    let accepting = carried("accept", everything(true));
+    assert!(accepting.is_ok_and(|command| !callable_by_a_key(&command)));
+    let widened = Arguments {
+        disruptive: true.into(),
+        ..Arguments::default()
+    };
+    let diagnosing = carried("diagnose", widened);
+    assert!(diagnosing.is_ok_and(|command| callable_by_a_key(&command)));
 }

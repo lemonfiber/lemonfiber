@@ -31,3 +31,22 @@ fn a_stamp_that_is_not_seconds_is_read_as_the_epoch() {
         assert_eq!(stamped(unreadable), "0", "{unreadable:?}");
     }
 }
+
+/// A key is named with its scope, minted or revoked.
+#[test]
+fn a_key_reads_as_its_name_and_scope() {
+    assert_eq!(
+        did(&crate::journal::Kind::KeyMinted {
+            name: "ha".to_owned(),
+            scope: "act".to_owned(),
+        }),
+        "minted the key ha, with the scope act"
+    );
+    assert_eq!(
+        did(&crate::journal::Kind::KeyRevoked {
+            name: "ha".to_owned(),
+            scope: "act".to_owned(),
+        }),
+        "revoked the key ha, with the scope act"
+    );
+}

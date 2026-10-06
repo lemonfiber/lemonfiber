@@ -673,3 +673,25 @@ fn an_outcome_is_said_as_a_rehearsal_only_where_one_can_be() {
     let read = crate::app::Outcome::Glossary(crate::glossary::vocabulary());
     assert_eq!(read.clone().said_as_a_rehearsal(), read);
 }
+
+/// Asking the keys rehearses as each request is: a listing reads, a revoke says which
+/// key it would refuse, and a mint cannot, because a key is its secret.
+#[test]
+fn asking_the_keys_rehearses_as_each_request_is() {
+    use crate::keys::run::Asked as Keyed;
+    use crate::keys::Minter;
+    let list = asked(&Command::Keys(Keyed::List));
+    assert!(matches!(list.rehearsal, Rehearsal::Reads));
+    let revoke = asked(&Command::Keys(Keyed::Revoke {
+        name: "ha".to_owned(),
+        by: Minter::Operator,
+    }));
+    assert!(matches!(revoke.rehearsal, Rehearsal::Reports));
+    let mint = asked(&Command::Keys(Keyed::Mint {
+        name: "ha".to_owned(),
+        scope: "read".to_owned(),
+        purpose: "other".to_owned(),
+        by: Minter::Operator,
+    }));
+    assert!(matches!(mint.rehearsal, Rehearsal::Cannot(_)));
+}

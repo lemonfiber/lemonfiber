@@ -219,6 +219,55 @@ pub async fn answers_to(ctx: &Ctx, port: u16) -> Option<String> {
         .map(str::to_owned)
 }
 
+/// What a client on another machine needs to reach this stack and know it.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Reaching {
+    /// The `https` address the surface was last served at on the network, where it has
+    /// been.
+    pub address: Option<String>,
+    /// The certificate that address presents, where one is kept or could be made.
+    pub pin: Option<String>,
+    /// How to serve the stack so another machine can reach it, where nothing yet does.
+    pub caution: Option<String>,
+}
+
+/// Where a client on another machine reaches this stack, and the certificate it pins.
+///
+/// The certificate is made where none is kept yet, as serving encrypted would make it,
+/// so a client is handed the one this machine will go on presenting. The address is the
+/// one pairing names, and only where the surface has been served encrypted on the
+/// network: an address nothing has served is one no client could reach.
+pub async fn reaching(ctx: &Ctx) -> Reaching {
+    let Some(directory) = ctx.settings.companion.as_deref() else {
+        return Reaching {
+            caution: Some(UNSERVED.to_owned()),
+            ..Reaching::default()
+        };
+    };
+    let pin = certificate::kept_or_made(directory)
+        .ok()
+        .map(|kept| kept.fingerprint);
+    let address = match served::last(directory).filter(|served| served.encrypted && served.network)
+    {
+        Some(served) => reached(ctx, served.port)
+            .await
+            .map(|reached| encrypted(&reached.url)),
+        None => None,
+    };
+    Reaching {
+        caution: address.is_none().then(|| UNSERVED.to_owned()),
+        address,
+        pin,
+    }
+}
+
+/// What a key is handed with where nothing has served the stack to another machine.
+const UNSERVED: &str =
+    "Nothing has served this stack encrypted on your network yet, so a client on \
+    another machine has no address to reach. Serve the web interface on your \
+    network, encrypted and on a port that stays the same, and use this key from this \
+    machine until then.";
+
 /// The household's address for this machine on `port`, which is where a phone is sent.
 async fn reached(ctx: &Ctx, port: u16) -> Option<crate::door::Address> {
     let named = ctx.site.name().await;

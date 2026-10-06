@@ -20,7 +20,7 @@ use crate::admission::Admitting;
 use crate::admission::Knocking;
 use crate::events::live::Live;
 use crate::events::Streaming;
-use crate::guard::{Binding, Token};
+use crate::guard::{Arrived, Binding, Token};
 use crate::jobs::Jobs;
 use crate::read::kept::Kept;
 use crate::refusal::Refusal;
@@ -96,6 +96,7 @@ pub fn routes(serving: Serving, streaming: Arc<Streaming>) -> Router {
         .merge(crate::jobs::routes())
         .merge(crate::setup::routes())
         .merge(crate::admission::routes())
+        .merge(crate::keys::routes())
         .with_state(serving.clone())
         .merge(crate::events::routes(streaming))
         // Set after every route is merged, because it reaches only the routes already
@@ -112,22 +113,23 @@ async fn guarded(State(serving): State<Serving>, request: Request, next: Next) -
     // and nothing else carries none by definition. The other half of the guard still
     // applies to it below, which is what stops a page the operator happens to be
     // visiting from posting guesses at it.
+    let arrived = request.extensions().get::<Arrived>().copied();
     let knocking = serving
         .admitting
-        .carried(request.headers(), &serving.token, now)
+        .carried(request.headers(), &serving.token, arrived, now)
         .await;
-    // Said as what it is, rather than folded into the silence below. Somebody whose
-    // household could not be asked has not been turned away — they have not been
-    // asked about — and the sign-in door stays open to them so a media server
-    // coming back is all it takes, rather than a sentence telling them their
-    // account is gone.
+    // Said as what it is, rather than folded into the silence below. The sign-in door
+    // stays open to all of them, since none is about the password offered there: a
+    // media server coming back is all it takes for somebody it could not vouch for.
     let at_the_door = request.uri().path() == crate::admission::SESSION;
-    if matches!(knocking, Knocking::Unconfirmed) && !at_the_door {
-        return Refusal::Unconfirmed.answered();
+    if !at_the_door {
+        if let Some(refused) = refused(&knocking) {
+            return refused;
+        }
     }
     let caller = match knocking {
         Knocking::Known(caller) => Some(caller),
-        Knocking::Nobody | Knocking::Unconfirmed => None,
+        Knocking::Nobody | Knocking::Unconfirmed | Knocking::Held(_) | Knocking::Exposed => None,
     };
     let known = at_the_door || caller.is_some();
     match admitted(known, request.headers(), &serving.bound) {
@@ -142,5 +144,22 @@ async fn guarded(State(serving): State<Serving>, request: Request, next: Next) -
             next.run(request).await
         }
         Err(refusal) => refusal.answered(),
+    }
+}
+
+/// The refusal a knock is answered with before anything else is asked, where it is one
+/// that is not simply nobody.
+///
+/// Each is said as what it is. Somebody whose household could not be asked has not been
+/// turned away. A key held back by the wait guessing has earned is told how long is
+/// left, in the header a client already reads. A key sent in the clear from another
+/// machine is told to come back over the connection its pin verifies, which no other
+/// key would help with.
+pub(crate) fn refused(knocking: &Knocking) -> Option<Response> {
+    match knocking {
+        Knocking::Unconfirmed => Some(Refusal::Unconfirmed.answered()),
+        Knocking::Held(left) => Some(crate::admission::waiting(left.as_secs().max(1))),
+        Knocking::Exposed => Some(Refusal::KeyInTheClear.answered()),
+        Knocking::Known(_) | Knocking::Nobody => None,
     }
 }

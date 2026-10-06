@@ -16,7 +16,7 @@ use clap::Subcommand;
 use super::{
     AlertCommand, Asked, ConfigAction, HostingCommand, HouseholdCommand, MigrateCommand,
     PluginCommand, QualityCommand, RawAllowance, RawBandwidth, RawCompanion, RawCredentials,
-    RawDoctor, RawDownloads, RawRemoving, RawSetup, RawTrace, RawUi, UpdateCommand,
+    RawDoctor, RawDownloads, RawKey, RawRemoving, RawSetup, RawTrace, RawUi, UpdateCommand,
 };
 
 /// What the operator asked for.
@@ -529,6 +529,8 @@ pub enum Request {
     Ui(RawUi),
     /// Pair a phone with this stack, or replace the certificate a paired phone pins.
     Companion(RawCompanion),
+    /// Mint, list or revoke the keys another program reaches the web interface with.
+    Key(RawKey),
     /// Restore your configuration from a backup archive.
     ///
     /// Verifies the archive and lists what it holds before anything is

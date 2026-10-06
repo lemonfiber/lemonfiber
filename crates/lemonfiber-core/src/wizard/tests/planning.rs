@@ -422,6 +422,20 @@ fn a_written_change_is_said_plainly_enough_to_recognise() {
         "a root folder"
     );
     assert_eq!(
+        described(&change(Kind::KeyMinted {
+            name: "ha".to_owned(),
+            scope: "read".to_owned(),
+        })),
+        "the key ha"
+    );
+    assert_eq!(
+        described(&change(Kind::KeyRevoked {
+            name: "ha".to_owned(),
+            scope: "read".to_owned(),
+        })),
+        "the revoke of the key ha"
+    );
+    assert_eq!(
         described(&change(Kind::Region {
             path: "/srv/stack/config/caddy/Caddyfile".to_owned(),
             key: "config/caddy/Caddyfile".to_owned(),

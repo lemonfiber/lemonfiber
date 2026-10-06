@@ -209,7 +209,7 @@ async fn a_member_whose_household_went_quiet_is_told_what_could_not_be_checked()
         refused.body
     );
     assert!(
-        !refused.body.contains("no token or session"),
+        !refused.body.contains("no token, session or key"),
         "a member whose household went quiet was answered as somebody carrying \
          nothing: {}",
         refused.body

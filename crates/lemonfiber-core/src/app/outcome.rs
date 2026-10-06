@@ -148,6 +148,10 @@ outcomes! {
     Pairing(crate::companion::Pairing) => PAIRING,
     /// What replacing the certificate a paired phone pins came to, or would cost.
     Certificate(crate::companion::Replacement) => CERTIFICATE [rehearsed],
+    /// A key minted, with its secret, shown this once.
+    Minted(crate::keys::Minted) => MINTED_KEY,
+    /// Every key this machine has minted, and what became of a revoke.
+    Keys(crate::keys::Listing) => KEYS [rehearsed],
     /// Somebody taken out of the household, or what taking them would cost.
     Removal(crate::model::HouseholdRemoval) => REMOVAL [rehearsed],
     /// What each service in this stack is for, and what became of the ones that went.

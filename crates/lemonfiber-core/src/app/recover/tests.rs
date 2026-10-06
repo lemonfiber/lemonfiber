@@ -707,3 +707,33 @@ fn a_change_made_and_not_recorded_says_it_stands() {
     assert!(problem.meaning.contains("The change stands"), "{problem:?}");
     assert!(problem.cause.is_some_and(|cause| cause.detail.is_some()));
 }
+
+/// A key is revoked by the reversal of a named run, never by this one, so one met here
+/// is left standing and named rather than reported as put back.
+#[test]
+fn a_key_is_left_standing_and_named() {
+    let env = scratch("key").join(".env");
+    for action in [
+        Action::Revoke {
+            name: "ha".to_owned(),
+        },
+        Action::Reinstate {
+            name: "ha".to_owned(),
+        },
+    ] {
+        let carried = super::carrying_out(
+            &lemonfiber_adapters::Disk,
+            &[Undo {
+                target: "ha".to_owned(),
+                action,
+            }],
+            &env,
+            Vec::new(),
+        )
+        .ok();
+        assert_eq!(
+            carried.map(|carried| (carried.done.len(), carried.beyond_reach)),
+            Some((0, vec!["the key ha".to_owned()]))
+        );
+    }
+}

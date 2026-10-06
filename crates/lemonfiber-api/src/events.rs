@@ -31,8 +31,7 @@ use axum::Router;
 use lemonfiber_core::ports::time::Clock;
 
 use crate::admission::Knocking;
-use crate::guard::{Binding, Token};
-use crate::refusal::Refusal;
+use crate::guard::{Arrived, Binding, Token};
 use crate::serve::{admitted, carrying, STREAM};
 
 use self::live::{Listening, Live};
@@ -93,14 +92,19 @@ pub fn routes(streaming: Arc<Streaming>) -> Router {
 /// here rather than left to whoever assembles the tree: this route brings its own
 /// state and can therefore be merged outside the layer that guards the rest,
 /// which is an assembly mistake that would otherwise leave it open.
-pub async fn stream(State(streaming): State<Arc<Streaming>>, headers: HeaderMap) -> Response<Body> {
+pub async fn stream(
+    State(streaming): State<Arc<Streaming>>,
+    arrived: Option<axum::Extension<Arrived>>,
+    headers: HeaderMap,
+) -> Response<Body> {
     let now = streaming.clock.now();
+    let arrived = arrived.map(|axum::Extension(arrived)| arrived);
     let knocking = streaming
         .admitting
-        .carried(&headers, &streaming.token, now)
+        .carried(&headers, &streaming.token, arrived, now)
         .await;
-    if matches!(knocking, Knocking::Unconfirmed) {
-        return Refusal::Unconfirmed.answered();
+    if let Some(refused) = crate::router::refused(&knocking) {
+        return refused;
     }
     // The stream carries the operator's whole view — the dashboard, every log line
     // the operator follows, what setup is doing — and nothing on it is narrowed to a
@@ -132,6 +136,7 @@ pub async fn stream(State(streaming): State<Arc<Streaming>>, headers: HeaderMap)
             clock: Arc::clone(&streaming.clock),
             headers,
             vouched: None,
+            arrived,
         },
     )
 }
@@ -162,6 +167,8 @@ pub struct Staying {
     headers: HeaderMap,
     /// Until when the last yes stands, where there has been one.
     vouched: Option<tokio::time::Instant>,
+    /// The connection it opened the stream over.
+    arrived: Option<Arrived>,
 }
 
 impl Staying {
@@ -174,11 +181,13 @@ impl Staying {
         let now = self.clock.now();
         let still = match self
             .admitting
-            .carried(&self.headers, &self.token, now)
+            .carried(&self.headers, &self.token, self.arrived, now)
             .await
         {
             Knocking::Known(caller) => crate::serve::operator_only(&caller).is_none(),
-            Knocking::Nobody | Knocking::Unconfirmed => false,
+            Knocking::Nobody | Knocking::Unconfirmed | Knocking::Held(_) | Knocking::Exposed => {
+                false
+            }
         };
         self.vouched = still.then(|| asked + RECHECKED_EVERY);
         still

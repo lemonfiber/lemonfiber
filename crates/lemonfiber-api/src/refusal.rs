@@ -1,10 +1,11 @@
 //! Every refusal this surface answers with, and the code that says which it is.
 //!
-//! A status groups refusals and cannot tell them apart. Four of them answer `403` —
-//! a secret this run does not admit, a request from somewhere else, an account asking
-//! for what is not its own, and an account the media server could not vouch for — and
-//! each has a different remedy: sign in again, reach the right address, leave it be,
-//! try later. A client left with the status and a sentence would have to parse English
+//! A status groups refusals and cannot tell them apart. Six of them answer `403` — a
+//! secret this run does not admit, a request from somewhere else, an account asking for
+//! what is not its own, an account the media server could not vouch for, a key sent in
+//! the clear and a key asking past its scope — and each has a different remedy: sign in
+//! again, reach the right address, leave it be, try later, connect encrypted, ask
+//! somebody. A client left with the status and a sentence would have to parse English
 //! to choose between them, so every refusal is a problem document, and its code is the
 //! answer.
 //!
@@ -45,6 +46,10 @@ pub enum Refusal {
     TooManyAttempts,
     /// What was offered at the door is not a password.
     NotAPassword,
+    /// A key arrived from another machine over a connection its pin does not verify.
+    KeyInTheClear,
+    /// A key asked for something its scope does not reach.
+    NotForAKey,
     /// A read was given a parameter its answer has nowhere to put.
     Unwanted,
     /// A parameter carrying one value was given more than once.
@@ -91,6 +96,8 @@ pub enum Refusal {
     NoSuchJob,
     /// The body of a setup step is not an answer it can read.
     NotAnAnswer,
+    /// The body of a mint is not what a key is minted with.
+    NotAKeyRequest,
     /// A path under the endpoints that no endpoint answers.
     NoEndpoint,
     /// An endpoint asked with a method it does not answer.
@@ -114,7 +121,7 @@ impl Refusal {
     ///
     /// What the contract lists, so a variant added above and not here is a code no
     /// client can name. A test holds the two together.
-    pub const EVERY: [Self; 34] = [
+    pub const EVERY: [Self; 37] = [
         Self::NotAdmitted,
         Self::Elsewhere,
         Self::NotYours,
@@ -122,6 +129,8 @@ impl Refusal {
         Self::NotThePassword,
         Self::TooManyAttempts,
         Self::NotAPassword,
+        Self::KeyInTheClear,
+        Self::NotForAKey,
         Self::Unwanted,
         Self::Repeated,
         Self::NoSuchRead,
@@ -145,6 +154,7 @@ impl Refusal {
         Self::NotArguments,
         Self::NoSuchJob,
         Self::NotAnAnswer,
+        Self::NotAKeyRequest,
         Self::NoEndpoint,
         Self::WrongMethod,
         Self::Unrenderable,
@@ -162,6 +172,8 @@ impl Refusal {
             Self::NotThePassword => admit::NOT_THE_PASSWORD,
             Self::TooManyAttempts => admit::TOO_MANY_ATTEMPTS,
             Self::NotAPassword => admit::NOT_A_PASSWORD,
+            Self::KeyInTheClear => admit::KEY_IN_THE_CLEAR,
+            Self::NotForAKey => admit::NOT_FOR_A_KEY,
             Self::Unwanted => read::UNWANTED,
             Self::Repeated => read::REPEATED,
             Self::NoSuchRead => read::NO_SUCH_READ,
@@ -185,6 +197,7 @@ impl Refusal {
             Self::NotArguments => ask::NOT_ARGUMENTS,
             Self::NoSuchJob => ask::NO_SUCH_JOB,
             Self::NotAnAnswer => ask::NOT_AN_ANSWER,
+            Self::NotAKeyRequest => ask::NOT_A_KEY_REQUEST,
             Self::NoEndpoint => ask::NO_ENDPOINT,
             Self::WrongMethod => ask::WRONG_METHOD,
             Self::Unrenderable => serve::UNRENDERABLE,
@@ -201,9 +214,12 @@ impl Refusal {
     #[must_use]
     pub const fn status(self) -> StatusCode {
         match self {
-            Self::NotAdmitted | Self::Elsewhere | Self::NotYours | Self::Unconfirmed => {
-                StatusCode::FORBIDDEN
-            }
+            Self::NotAdmitted
+            | Self::Elsewhere
+            | Self::NotYours
+            | Self::Unconfirmed
+            | Self::KeyInTheClear
+            | Self::NotForAKey => StatusCode::FORBIDDEN,
             Self::NotThePassword => StatusCode::UNAUTHORIZED,
             Self::TooManyAttempts => StatusCode::TOO_MANY_REQUESTS,
             Self::NoSuchRead | Self::NoSuchAction | Self::NoSuchJob | Self::NoEndpoint => {
@@ -231,7 +247,8 @@ impl Refusal {
             | Self::UnwantedArgument
             | Self::ArgumentsTogether
             | Self::NotArguments
-            | Self::NotAnAnswer => StatusCode::BAD_REQUEST,
+            | Self::NotAnAnswer
+            | Self::NotAKeyRequest => StatusCode::BAD_REQUEST,
         }
     }
 
@@ -245,7 +262,7 @@ impl Refusal {
             // Deliberately vague, as is the one below it. Both answer somebody who has
             // proved nothing, and naming what was wrong — which secret, which header —
             // would tell them what to keep guessing at.
-            Self::NotAdmitted => "This request carried no token or session this run admits.",
+            Self::NotAdmitted => "This request carried no token, session or key this run admits.",
             Self::Elsewhere => "This request said it came from somewhere this server is not.",
             // Said plainly: this answers somebody who proved who they are, so there is
             // nothing left to guess, and a household member reading it is owed the
@@ -262,8 +279,15 @@ impl Refusal {
             // set: to whoever is knocking they are the same fact, and saying which
             // would tell somebody guessing whether there is anything here to guess at.
             Self::NotThePassword => "That is not the password for this machine.",
-            Self::TooManyAttempts => "Too many wrong passwords. Try again later.",
+            Self::TooManyAttempts => "Too many wrong passwords and keys. Try again later.",
             Self::NotAPassword => "The body of this request is not a password.",
+            // Said before the key was looked at, so it says nothing about whether the key
+            // was right: only that it came the wrong way.
+            Self::KeyInTheClear => {
+                "A key is accepted from another machine only over the encrypted connection \
+                 its pin verifies."
+            }
+            Self::NotForAKey => "A key with this scope may not call this.",
             Self::Unwanted => "This read takes no such parameter.",
             Self::Repeated => {
                 "This read takes that parameter once, and it was given more than once."
@@ -309,111 +333,16 @@ impl Refusal {
                 "The body of this request is not one of setup's answers, nor a way out of \
                  an interrupted apply."
             }
+            // What arrived is not quoted back, because it carries the password.
+            Self::NotAKeyRequest => {
+                "The body of this request is not a key's name, scope and purpose with the \
+                 password."
+            }
             Self::NoEndpoint => "No endpoint answers this path.",
             Self::WrongMethod => "This endpoint does not answer that method.",
             Self::Unrenderable => "This answer could not be rendered.",
             Self::NoJobName => {
                 "This machine would not supply the randomness a job needs to be named."
-            }
-        }
-    }
-
-    /// What the refusal means for whoever asked.
-    const fn meaning(self) -> &'static str {
-        match self {
-            Self::NotAdmitted => {
-                "This run of lemonfiber does not let in what this request carried, and \
-                 nothing was answered."
-            }
-            Self::Elsewhere => {
-                "The address this request named, or the page it came from, is not the one \
-                 this server is listening on, and nothing was answered."
-            }
-            Self::NotYours => {
-                "Nothing is wrong with the account. What was asked for belongs to somebody \
-                 else, or to whoever looks after this machine."
-            }
-            Self::Unconfirmed => {
-                "Nobody was identified, so nothing was answered. The account has not been \
-                 removed and the session has not ended."
-            }
-            Self::NotThePassword => "Nothing was opened, and no session was begun.",
-            Self::TooManyAttempts => {
-                "The door has stopped looking at passwords for a while. Another attempt \
-                 now makes the wait longer."
-            }
-            Self::NotAPassword => {
-                "The door reads a password, and a household member's name beside it, and \
-                 this body carried neither in a form it can read."
-            }
-            Self::Unwanted => {
-                "It is refused rather than dropped, because dropping it would answer a \
-                 wider question than the one that was asked — and a wider answer reads \
-                 like the answer."
-            }
-            Self::Repeated => {
-                "Which of them was meant is not something this can work out, and answering \
-                 for one of them would drop the others without saying so."
-            }
-            Self::NoSuchRead => {
-                "Every read this surface answers is named in the contract, and this name \
-                 is not one of them."
-            }
-            Self::NoTerm
-            | Self::NotASeason
-            | Self::NoSetting
-            | Self::NoMember
-            | Self::NoShelfWithoutAMember
-            | Self::NotACount
-            | Self::NoUpdateObject
-            | Self::NotALineCount
-            | Self::NotAChoice => {
-                "The read cannot be answered as it was asked, and answering a different \
-                 question in its place would read like the answer to this one."
-            }
-            // Refused rather than quietly cut down to the ceiling: a caller that asked for
-            // five thousand and was handed five hundred has been told it has the whole
-            // shelf, which is the same failure as a wider answer than was asked for.
-            Self::TooManyAtOnce => {
-                "It is refused rather than cut down, because a shorter answer wearing the \
-                 shape of the whole one reads as the whole shelf."
-            }
-            Self::NoSuchGroup | Self::NoSuchRemoval => {
-                "The word names none of the things there are, and reading it as the \
-                 nearest one would answer something that was not asked."
-            }
-            Self::NoSuchAction => {
-                "An action here is a command the command line offers, and nothing by this \
-                 name is one."
-            }
-            Self::MissingArgument
-            | Self::UnrecognisedArgument
-            | Self::UnwantedArgument
-            | Self::ArgumentsTogether
-            | Self::NotArguments => {
-                "The action was not carried out, and nothing was changed. Carrying out \
-                 a different request from the one asked for would be worse than none."
-            }
-            Self::NoSuchJob => {
-                "Jobs are named by the run that starts them, and nothing this run started \
-                 goes by this name. Work from an earlier run is not tracked here."
-            }
-            Self::NotAnAnswer => "Setup did not move, and nothing was changed.",
-            Self::NoEndpoint => {
-                "Every endpoint this surface answers is named in the contract, and this \
-                 path is not one of them."
-            }
-            Self::WrongMethod => {
-                "The path is one this surface answers, asked in a way it does not answer \
-                 it, and nothing was done."
-            }
-            Self::Unrenderable => {
-                "The request was understood and carried out, and what it came to could not \
-                 be written down as an answer. Nothing about the request was wrong."
-            }
-            Self::NoJobName => {
-                "A job with no name is work nothing could ever be told about, so it was \
-                 not begun, and nothing was changed."
             }
         }
     }
@@ -428,6 +357,14 @@ impl Refusal {
             Self::NotYours => Remedy::new("Ask whoever looks after this machine if you need it"),
             Self::Unconfirmed => Remedy::new("Try again once the media server is running"),
             Self::NotThePassword => Remedy::new("Check the password and try again"),
+            Self::KeyInTheClear => Remedy::new(
+                "Connect over https, pinning the certificate the key was minted with, and \
+                 revoke the key if it may have been read",
+            ),
+            Self::NotForAKey => Remedy::new(
+                "Ask whoever looks after this machine, or call only what the contract lists \
+                 as callable by a key",
+            ),
             Self::TooManyAttempts => {
                 Remedy::new("Wait as long as the refusal says, then try once more")
                     .with_detail("Retry-After")
@@ -457,6 +394,9 @@ impl Refusal {
             | Self::NotArguments => Remedy::new("Ask again with the arguments the action takes"),
             Self::NoSuchJob => Remedy::new("Ask about a job this run started"),
             Self::NotAnAnswer => Remedy::new("Answer the question setup is asking"),
+            Self::NotAKeyRequest => {
+                Remedy::new("Send the name, scope, purpose and password as the body's four fields")
+            }
             Self::WrongMethod => Remedy::new("Ask again with the method the contract names"),
             Self::Unrenderable | Self::NoJobName => {
                 Remedy::new("Ask again, and send a diagnostic bundle if it keeps happening")
@@ -473,7 +413,9 @@ impl Refusal {
     /// somebody looking for a fault that is not there.
     const fn severity(self) -> Severity {
         match self {
-            Self::NotYours | Self::Unconfirmed | Self::TooManyAttempts => Severity::Warning,
+            Self::NotYours | Self::Unconfirmed | Self::TooManyAttempts | Self::NotForAKey => {
+                Severity::Warning
+            }
             _ => Severity::Error,
         }
     }
@@ -525,6 +467,8 @@ impl Refusal {
         enveloped(self.status(), Envelope::new(kind::ERROR, problem).to_json())
     }
 }
+
+mod meaning;
 
 #[cfg(test)]
 mod tests;

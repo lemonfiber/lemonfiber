@@ -35,7 +35,7 @@ use lemonfiber_core::error::{Amiss, Problem};
 use lemonfiber_core::model::{kind, Envelope};
 
 use crate::admission::Caller;
-use crate::entitled::{may, Permitted};
+use crate::entitled::{may, Door};
 use crate::read::table::{named, wanted, OFFERED};
 use crate::refusal::{Refusal, UNRENDERED};
 use crate::router::Serving;
@@ -89,14 +89,16 @@ pub(crate) async fn reading(
         // Ruled on between naming the command and carrying it out, so what is
         // carried out is what this caller may have — narrowed where they may have
         // part of it, and nothing where it is not theirs at all.
-        Ok(command) => match (may(caller, command), caller) {
+        Ok(command) => match may(caller, Door::Reading, command).granted() {
             // A member's household is the operator's whole reading narrowed to them,
-            // so it is kept a few seconds rather than read again at every asking.
-            (Permitted::This(command @ Command::Household { .. }), Caller::Member(id)) => {
-                serving.kept.read(&serving.ctx, id, command).await
-            }
-            (Permitted::This(command), _) => carried_out(&serving.ctx, command).await,
-            (Permitted::Nothing, _) => Refusal::NotYours.answered(),
+            // so it is kept a few seconds rather than read again at every asking —
+            // whether the member asked with their session or with a key of theirs.
+            Ok(command @ Command::Household { .. }) => match caller.member() {
+                Some(id) => serving.kept.read(&serving.ctx, id, command).await,
+                None => carried_out(&serving.ctx, command).await,
+            },
+            Ok(command) => carried_out(&serving.ctx, command).await,
+            Err(refused) => *refused,
         },
         Err(why) => why.answered(),
     }

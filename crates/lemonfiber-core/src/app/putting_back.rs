@@ -209,9 +209,19 @@ async fn carried_out(
     let project = super::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     let reached =
         super::recover::reconfigured(ctx, &undos, &manifest.services, project.as_deref()).await;
+    // A key goes back through the keys themselves, where the clock and the narrator a
+    // revoke is heard through are; everything else on this machine goes back on disk.
+    let (revoking, left): (Vec<Undo>, Vec<Undo>) = reached
+        .left
+        .iter()
+        .cloned()
+        .partition(|undo| crate::keys::run::revoked_by(undo).is_some());
+    for name in revoking.iter().filter_map(crate::keys::run::revoked_by) {
+        crate::keys::run::undone(ctx, name).await?;
+    }
     let carried = super::recover::carrying_out(
         ctx.seams.confined.as_ref(),
-        &reached.left,
+        &left,
         &paths.env_file(),
         Vec::new(),
     )?;
@@ -225,6 +235,7 @@ async fn carried_out(
     let reversed: Vec<Undo> = reached
         .put_back
         .iter()
+        .chain(revoking.iter())
         .chain(carried.done.iter())
         .cloned()
         .map(told)
@@ -357,17 +368,19 @@ fn judged(
         // It goes back, and going back is not the whole of what happens. A judgement
         // that says so on a change it can still carry out is saying the one thing an
         // operator would otherwise find out by going to look.
+        // Read off the refusal rather than branched on: a partial judgement always says
+        // what it leaves, and a branch for one that did not would be a line no test reaches.
         if verdict.reversal == Judgement::Partial {
-            if let Some(refusal) = verdict.refusal {
-                noted.push(Noted {
+            noted.extend(verdict.refusal.map(|refusal| {
+                Noted {
                     target: change.target.clone(),
                     because: [Some(refusal.because), refusal.instead]
                         .into_iter()
                         .flatten()
                         .collect::<Vec<String>>()
                         .join(" — "),
-                });
-            }
+                }
+            }));
         }
     }
     Ok(noted)
@@ -468,9 +481,15 @@ fn inverted(kind: &crate::journal::Kind) -> Option<crate::journal::Kind> {
             previous: Some(current.clone()),
             current: previous.clone().unwrap_or_default(),
         }),
-        Kind::Created { .. } | Kind::Made { .. } | Kind::Region { .. } | Kind::Pinned { .. } => {
-            None
-        }
+        Kind::KeyMinted { name, scope } => Some(Kind::KeyRevoked {
+            name: name.clone(),
+            scope: scope.clone(),
+        }),
+        Kind::Created { .. }
+        | Kind::Made { .. }
+        | Kind::Region { .. }
+        | Kind::Pinned { .. }
+        | Kind::KeyRevoked { .. } => None,
     }
 }
 

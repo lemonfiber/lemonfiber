@@ -1,5 +1,32 @@
 {
   "api_version": 1,
+  "key_callable": [
+    {
+      "action": "restart",
+      "disturbs": true,
+      "rehearsal": true
+    },
+    {
+      "action": "diagnose",
+      "disturbs": true,
+      "rehearsal": false
+    },
+    {
+      "action": "update",
+      "disturbs": true,
+      "rehearsal": true
+    },
+    {
+      "action": "downloads-pause",
+      "disturbs": false,
+      "rehearsal": true
+    },
+    {
+      "action": "downloads-resume",
+      "disturbs": false,
+      "rehearsal": true
+    }
+  ],
   "kinds": {
     "admission": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -8433,6 +8460,172 @@
         }
       }
     },
+    "keys": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/KeyListing"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "KeyListing": {
+          "description": "Every key this machine has minted, and what became of a revoke.",
+          "type": "object",
+          "properties": {
+            "keys": {
+              "description": "In the order they were minted.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ListedKey"
+              }
+            },
+            "purposes": {
+              "description": "What a purpose in the listing is worth, said with it.",
+              "type": "string"
+            },
+            "rehearsed": {
+              "description": "Whether this was a rehearsal: what revoking would come to, with nothing revoked.",
+              "type": "boolean"
+            },
+            "revoked": {
+              "description": "The key this run revoked, where it revoked one.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "keys",
+            "purposes",
+            "rehearsed"
+          ]
+        },
+        "KeyPurpose": {
+          "description": "What the minter said a key is for.\n\nA label and nothing more. The core cannot tell what a program does with a key, so the\nlisting shows this as the minter's own declaration rather than as anything verified.",
+          "oneOf": [
+            {
+              "description": "Home Assistant.",
+              "type": "string",
+              "const": "home-assistant"
+            },
+            {
+              "description": "An assistant reaching the stack through the Model Context Protocol.",
+              "type": "string",
+              "const": "mcp"
+            },
+            {
+              "description": "Anything else.",
+              "type": "string",
+              "const": "other"
+            }
+          ]
+        },
+        "KeyState": {
+          "description": "Where a key stands.",
+          "oneOf": [
+            {
+              "description": "Admitted within its scope.",
+              "type": "string",
+              "const": "active"
+            },
+            {
+              "description": "Refused as a wrong token is, and kept in the listing with when it was revoked.",
+              "type": "string",
+              "const": "revoked"
+            },
+            {
+              "description": "A member's key whose account has left the household: refused, and listed so it\ncan be revoked.",
+              "type": "string",
+              "const": "orphaned"
+            },
+            {
+              "description": "A member's key whose account the media server could not be asked about just now.",
+              "type": "string",
+              "const": "unconfirmed"
+            }
+          ]
+        },
+        "ListedKey": {
+          "description": "One key as the listing shows it, without its secret.",
+          "type": "object",
+          "properties": {
+            "member_minted": {
+              "description": "Whether a household member minted it for themselves.",
+              "type": "boolean"
+            },
+            "minted": {
+              "description": "When it was minted.",
+              "type": "string"
+            },
+            "name": {
+              "description": "The name it was minted under.",
+              "type": "string"
+            },
+            "purpose": {
+              "description": "What the minter said it is for. A declaration, not something the core verified.",
+              "$ref": "#/$defs/KeyPurpose"
+            },
+            "revoked": {
+              "description": "When it was revoked, where it has been.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "scope": {
+              "description": "What it admits: `read`, `act` or `member:<name>`.",
+              "type": "string"
+            },
+            "state": {
+              "description": "Where it stands.",
+              "$ref": "#/$defs/KeyState"
+            },
+            "used": {
+              "description": "When it was last admitted, where it has been.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "name",
+            "scope",
+            "purpose",
+            "state",
+            "minted",
+            "member_minted"
+          ]
+        }
+      }
+    },
     "lifecycle": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",
@@ -9457,6 +9650,115 @@
             "what",
             "because"
           ]
+        }
+      }
+    },
+    "minted-key": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/MintedKey"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "KeyPurpose": {
+          "description": "What the minter said a key is for.\n\nA label and nothing more. The core cannot tell what a program does with a key, so the\nlisting shows this as the minter's own declaration rather than as anything verified.",
+          "oneOf": [
+            {
+              "description": "Home Assistant.",
+              "type": "string",
+              "const": "home-assistant"
+            },
+            {
+              "description": "An assistant reaching the stack through the Model Context Protocol.",
+              "type": "string",
+              "const": "mcp"
+            },
+            {
+              "description": "Anything else.",
+              "type": "string",
+              "const": "other"
+            }
+          ]
+        },
+        "MintedKey": {
+          "description": "A key minted, with everything a client on another machine needs to use it.\n\nThe only document that ever carries the secret. Every surface that renders it does so\nonce, and nothing here writes it down.",
+          "type": "object",
+          "properties": {
+            "address": {
+              "description": "Where a client on another machine reaches the stack: the `https` address it was\nlast served at on the network. Absent where it has never been served that way.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "caution": {
+              "description": "What is worth knowing before handing the key over, where anything is: how to\nserve the stack so another machine can reach it.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "name": {
+              "description": "The name it was minted under.",
+              "type": "string"
+            },
+            "pin": {
+              "description": "The certificate that address presents: SHA-256 over its DER encoding, in\nlower-case hex. A client off this machine pins it.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "purpose": {
+              "description": "What the minter said it is for.",
+              "$ref": "#/$defs/KeyPurpose"
+            },
+            "scope": {
+              "description": "What it admits: `read`, `act` or `member:<name>`.",
+              "type": "string"
+            },
+            "secret": {
+              "description": "The secret, sent in `X-Lemonfiber-Token`. It is not shown again.",
+              "$ref": "#/$defs/Secret"
+            }
+          },
+          "required": [
+            "name",
+            "scope",
+            "purpose",
+            "secret"
+          ]
+        },
+        "Secret": {
+          "description": "A key's secret, as it is handed over once.\n\nIt has no `Debug` that prints it and no way back from its digest, and nothing here\nwrites it anywhere: the one reply that carries it is the only place it appears.",
+          "type": "string"
         }
       }
     },
@@ -10700,6 +11002,42 @@
                 "resource",
                 "id",
                 "field"
+              ]
+            },
+            {
+              "description": "Revoke the key a mint made.",
+              "type": "object",
+              "properties": {
+                "does": {
+                  "type": "string",
+                  "const": "revoke"
+                },
+                "name": {
+                  "description": "The key's name.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "does",
+                "name"
+              ]
+            },
+            {
+              "description": "Make a revoked key good again.\n\nWorked out so the record of a revoke has a reversal to name, and never carried\nout: a key is revoked because something should stop holding it, and reinstating\nit would hand back what the revoke took away. Whatever still needs a key is\nminted a new one.",
+              "type": "object",
+              "properties": {
+                "does": {
+                  "type": "string",
+                  "const": "reinstate"
+                },
+                "name": {
+                  "description": "The key's name.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "does",
+                "name"
               ]
             }
           ]
@@ -17558,6 +17896,42 @@
                 "id",
                 "field"
               ]
+            },
+            {
+              "description": "Revoke the key a mint made.",
+              "type": "object",
+              "properties": {
+                "does": {
+                  "type": "string",
+                  "const": "revoke"
+                },
+                "name": {
+                  "description": "The key's name.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "does",
+                "name"
+              ]
+            },
+            {
+              "description": "Make a revoked key good again.\n\nWorked out so the record of a revoke has a reversal to name, and never carried\nout: a key is revoked because something should stop holding it, and reinstating\nit would hand back what the revoke took away. Whatever still needs a key is\nminted a new one.",
+              "type": "object",
+              "properties": {
+                "does": {
+                  "type": "string",
+                  "const": "reinstate"
+                },
+                "name": {
+                  "description": "The key's name.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "does",
+                "name"
+              ]
             }
           ]
         },
@@ -20595,10 +20969,20 @@
       "status": 400,
       "description": "Raised when what was offered at the door is not a password."
     },
+    "ADMIT-11": {
+      "name": "KEY_IN_THE_CLEAR",
+      "status": 403,
+      "description": "Raised when a key arrived from another machine over a connection its pin does not verify."
+    },
+    "ADMIT-12": {
+      "name": "NOT_FOR_A_KEY",
+      "status": 403,
+      "description": "Raised when a key asked for something its scope does not reach."
+    },
     "ADMIT-4": {
       "name": "NOT_ADMITTED",
       "status": 403,
-      "description": "Raised when a request carried no token or session this run admits."
+      "description": "Raised when a request carried no token, session or key this run admits."
     },
     "ADMIT-5": {
       "name": "ELSEWHERE",
@@ -20634,6 +21018,11 @@
       "name": "WRONG_METHOD",
       "status": 405,
       "description": "Raised where an endpoint was asked with a method it does not answer."
+    },
+    "ASK-11": {
+      "name": "NOT_A_KEY_REQUEST",
+      "status": 400,
+      "description": "Raised where the body of a mint is not a key's name, scope, purpose and the password."
     },
     "ASK-2": {
       "name": "MISSING_ARGUMENT",

@@ -287,10 +287,11 @@ pub(crate) fn carrying(secret: Option<&str>) -> HeaderMap {
     headers
 }
 
-/// A household that answers one question and refuses the rest.
+/// A household that answers the questions a door asks and refuses the rest.
 ///
-/// Only `whoever` is reached from the door, and a stand-in answering more than the
-/// thing under test is one that can pass a test the surface would fail.
+/// Who somebody is, whether a sign-in still stands, and whether an account a member's
+/// key names is still here: a stand-in answering more than the thing under test is one
+/// that can pass a test the surface would fail.
 pub(crate) struct AHousehold {
     /// Who a name and password prove somebody to be, where it recognises them.
     known: Option<String>,
@@ -386,8 +387,28 @@ impl Household for AHousehold {
         Ok(self.known.as_deref() == Some(signed.id.as_str()))
     }
 
+    /// Asked by a member's key, which was never a sign-in and so has no access to ask
+    /// about: whether the account is still here is the whole question.
     async fn household(&self) -> Result<Vec<Member>, Failure> {
-        unreachable!("the door asks this household about one account and nothing else")
+        if self.unreachable.load(Ordering::SeqCst) {
+            return Err(Failure::Unavailable {
+                service: "jellyfin".to_owned(),
+            });
+        }
+        if self.withdrawn.load(Ordering::SeqCst) {
+            return Ok(Vec::new());
+        }
+        Ok(self
+            .known
+            .iter()
+            .map(|id| Member {
+                id: id.clone(),
+                name: "ana".to_owned(),
+                claimed: true,
+                access: lemonfiber_core::ports::service::Access::default(),
+                last_seen: None,
+            })
+            .collect())
     }
     async fn invite(&self, _: &str) -> Result<Member, Failure> {
         unreachable!("the door asks this household who somebody is and nothing else")

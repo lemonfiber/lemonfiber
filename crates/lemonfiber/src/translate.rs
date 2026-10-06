@@ -15,7 +15,10 @@ use lemonfiber_core::app::{
 use lemonfiber_core::audio::Format;
 use lemonfiber_core::bandwidth::Pausing;
 use lemonfiber_core::bundle::run::Wanted;
+use lemonfiber_core::companion::Asked as Paired;
 use lemonfiber_core::doctor::Narrowing;
+use lemonfiber_core::keys::run::Asked as Keyed;
+use lemonfiber_core::keys::Minter;
 use lemonfiber_core::migration::mode::Mode;
 use lemonfiber_core::quality::Preset;
 use lemonfiber_core::recyclarr::Kind;
@@ -25,9 +28,10 @@ use lemonfiber_core::update::run as update;
 use crate::exit::USAGE;
 use crate::say::complain;
 use lemonfiber::cli::{
-    AlertCommand, Asked, Authoring, ConfigAction, DownloadsCommand, HostingCommand, Kept,
-    MigrateCommand, PluginCommand, QualityCommand, RawBandwidth, RawCredentials, RawDownloads,
-    RawRemoval, RawRemoving, UpdateCommand, WiringCommand,
+    AlertCommand, Asked, Authoring, CompanionCommand, ConfigAction, DownloadsCommand,
+    HostingCommand, Kept, KeyCommand, MigrateCommand, PluginCommand, QualityCommand, RawBandwidth,
+    RawCompanion, RawCredentials, RawDownloads, RawKey, RawRemoval, RawRemoving, UpdateCommand,
+    WiringCommand,
 };
 
 mod people;
@@ -392,6 +396,35 @@ pub(crate) const fn pausing(asked: &RawDownloads) -> Command {
     Command::Downloads(match asked.action {
         DownloadsCommand::Pause => Pausing::Pause,
         DownloadsCommand::Resume => Pausing::Resume,
+    })
+}
+
+/// Which of the two is asked of pairing.
+pub(crate) const fn paired(asked: &RawCompanion) -> Command {
+    Command::Companion(match asked.action {
+        CompanionCommand::Pair => Paired::Pair,
+        CompanionCommand::Certificate { confirm } => Paired::Certificate { confirm },
+    })
+}
+
+/// What was asked of the keys, as the operator at this machine's terminal asks it.
+pub(crate) fn keyed(asked: RawKey) -> Command {
+    Command::Keys(match asked.action {
+        KeyCommand::Mint {
+            name,
+            scope,
+            purpose,
+        } => Keyed::Mint {
+            name,
+            scope,
+            purpose,
+            by: Minter::Operator,
+        },
+        KeyCommand::List => Keyed::List,
+        KeyCommand::Revoke { name } => Keyed::Revoke {
+            name,
+            by: Minter::Operator,
+        },
     })
 }
 

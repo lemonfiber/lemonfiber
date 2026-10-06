@@ -18,6 +18,7 @@ use axum::Router;
 use hyper::body::Incoming;
 use hyper_util::rt::{TokioIo, TokioTimer};
 use hyper_util::service::TowerToHyperService;
+use lemonfiber_api::guard::Arrived;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::watch;
@@ -164,6 +165,13 @@ async fn connection(
         peer,
         slot: _held,
     } = accepted;
+    // Taken from the socket rather than from anything the request says, because only
+    // the socket can say it: where the connection came from, and whether it is about to
+    // be encrypted.
+    let arrived = Arrived {
+        from: peer.ip(),
+        encrypted: tls.is_some(),
+    };
     let io: Box<dyn Io> = match tls {
         None => Box::new(socket),
         Some(acceptor) => {
@@ -177,6 +185,7 @@ async fn connection(
     let surface = surface.map_request(move |request: Request<Incoming>| {
         let mut request = request.map(|body| Deadlined::within(body, body_within));
         request.extensions_mut().insert(ConnectInfo(peer));
+        request.extensions_mut().insert(arrived);
         request
     });
     let answered = hyper::server::conn::http1::Builder::new()

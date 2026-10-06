@@ -28,9 +28,11 @@
     "import": "ref:ImportReport",
     "invitation": "ref:Invitation",
     "job": "ref:Started",
+    "keys": "ref:KeyListing",
     "lifecycle": "ref:LifecycleReport",
     "log": "ref:LogLine",
     "migration": "ref:MigrationReport",
+    "minted-key": "ref:MintedKey",
     "music": "ref:MusicReport",
     "news": "ref:Newest",
     "news-items": "ref:News",
@@ -83,9 +85,11 @@
           "type": [
             "const:\"delete\"",
             "const:\"reconfigure\"",
+            "const:\"reinstate\"",
             "const:\"remove\"",
             "const:\"repin\"",
             "const:\"restore\"",
+            "const:\"revoke\"",
             "const:\"withdraw\""
           ],
           "required": true
@@ -103,6 +107,12 @@
           "required": true
         },
         "key": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "name": {
           "type": [
             "string"
           ],
@@ -154,9 +164,11 @@
       "variants": [
         "\"delete\"",
         "\"reconfigure\"",
+        "\"reinstate\"",
         "\"remove\"",
         "\"repin\"",
         "\"restore\"",
+        "\"revoke\"",
         "\"withdraw\""
       ]
     },
@@ -3329,6 +3341,43 @@
       },
       "variants": []
     },
+    "KeyListing": {
+      "fields": {
+        "keys": {
+          "type": [
+            "array[ref:ListedKey]"
+          ],
+          "required": true
+        },
+        "purposes": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "rehearsed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "revoked": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "KeyPurpose": {
+      "fields": {},
+      "variants": [
+        "\"home-assistant\"",
+        "\"mcp\"",
+        "\"other\""
+      ]
+    },
     "KeySource": {
       "fields": {},
       "variants": [
@@ -3339,6 +3388,15 @@
         "\"config-yaml\"",
         "\"generated\"",
         "\"none\""
+      ]
+    },
+    "KeyState": {
+      "fields": {},
+      "variants": [
+        "\"active\"",
+        "\"orphaned\"",
+        "\"revoked\"",
+        "\"unconfirmed\""
       ]
     },
     "Leaving": {
@@ -3615,6 +3673,59 @@
             "string"
           ],
           "required": true
+        }
+      },
+      "variants": []
+    },
+    "ListedKey": {
+      "fields": {
+        "member_minted": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "minted": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "name": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "purpose": {
+          "type": [
+            "ref:KeyPurpose"
+          ],
+          "required": true
+        },
+        "revoked": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "scope": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "state": {
+          "type": [
+            "ref:KeyState"
+          ],
+          "required": true
+        },
+        "used": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
         }
       },
       "variants": []
@@ -3959,6 +4070,53 @@
         "unsupported": {
           "type": [
             "array[ref:UnsupportedReport]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "MintedKey": {
+      "fields": {
+        "address": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "caution": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "name": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "pin": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "purpose": {
+          "type": [
+            "ref:KeyPurpose"
+          ],
+          "required": true
+        },
+        "scope": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "secret": {
+          "type": [
+            "ref:Secret"
           ],
           "required": true
         }
@@ -7049,6 +7207,10 @@
       },
       "variants": []
     },
+    "Secret": {
+      "fields": {},
+      "variants": []
+    },
     "SeedReport": {
       "fields": {
         "assessment": {
@@ -9837,6 +9999,8 @@
   },
   "refusals": {
     "ADMIT-10": 400,
+    "ADMIT-11": 403,
+    "ADMIT-12": 403,
     "ADMIT-4": 403,
     "ADMIT-5": 403,
     "ADMIT-6": 403,
@@ -9845,6 +10009,7 @@
     "ADMIT-9": 429,
     "ASK-1": 404,
     "ASK-10": 405,
+    "ASK-11": 400,
     "ASK-2": 400,
     "ASK-3": 400,
     "ASK-4": 400,

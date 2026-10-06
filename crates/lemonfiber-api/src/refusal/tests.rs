@@ -76,7 +76,7 @@ fn only_the_password_door_answers_unauthorized() {
 }
 
 #[test]
-fn the_four_refusals_of_who_is_asking_share_a_status_and_not_a_code() {
+fn the_refusals_of_who_is_asking_share_a_status_and_not_a_code() {
     let forbidden: Vec<Refusal> = Refusal::EVERY
         .into_iter()
         .filter(|refusal| refusal.status() == StatusCode::FORBIDDEN)
@@ -88,6 +88,8 @@ fn the_four_refusals_of_who_is_asking_share_a_status_and_not_a_code() {
             Refusal::Elsewhere,
             Refusal::NotYours,
             Refusal::Unconfirmed,
+            Refusal::KeyInTheClear,
+            Refusal::NotForAKey,
         ]
     );
 }
@@ -97,7 +99,10 @@ fn only_the_refusals_that_are_not_faults_are_warnings() {
     for refusal in Refusal::EVERY {
         let warns = matches!(
             refusal,
-            Refusal::NotYours | Refusal::Unconfirmed | Refusal::TooManyAttempts
+            Refusal::NotYours
+                | Refusal::Unconfirmed
+                | Refusal::TooManyAttempts
+                | Refusal::NotForAKey
         );
         let severity = refusal.problem("").severity;
         assert_eq!(

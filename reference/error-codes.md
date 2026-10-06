@@ -18,6 +18,8 @@ what to do about it, is written for operators at
 - `ADMIT-8`
 - `ADMIT-9`
 - `ADMIT-10`
+- `ADMIT-11`
+- `ADMIT-12`
 - `ASK-1`
 - `ASK-2`
 - `ASK-3`
@@ -28,6 +30,7 @@ what to do about it, is written for operators at
 - `ASK-8`
 - `ASK-9`
 - `ASK-10`
+- `ASK-11`
 - `BACKUP-1`
 - `BACKUP-2`
 - `BACKUP-3`
@@ -101,6 +104,16 @@ what to do about it, is written for operators at
 - `INVITE-10`
 - `INVITE-11`
 - `KEPT-1`
+- `KEY-1`
+- `KEY-2`
+- `KEY-3`
+- `KEY-4`
+- `KEY-5`
+- `KEY-6`
+- `KEY-7`
+- `KEY-8`
+- `KEY-9`
+- `KEY-10`
 - `LIFE-1`
 - `LIFE-2`
 - `LIFE-3`

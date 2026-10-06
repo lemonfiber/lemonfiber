@@ -69,6 +69,8 @@ fn settings_of(
             | Outcome::StopSeeding(_)
             | Outcome::Bandwidth(_)
             | Outcome::Pausing(_)
+            | Outcome::Minted(_)
+            | Outcome::Keys(_)
             | Outcome::Status(_)
             | Outcome::Doctor(_)
             | Outcome::Repair(_)
