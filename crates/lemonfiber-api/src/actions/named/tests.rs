@@ -138,3 +138,16 @@ fn a_key_may_diagnose_but_not_accept_what_a_diagnosis_offers() {
     let diagnosing = carried("diagnose", widened);
     assert!(diagnosing.is_ok_and(|command| callable_by_a_key(&command)));
 }
+
+/// Pausing and resuming downloads leave nothing more done by a second call, while a
+/// restart, a diagnosis and an update do their work again however often they are
+/// asked — so only the first two are published as safe to repeat.
+#[test]
+fn only_what_a_second_call_leaves_alone_is_published_as_idempotent() {
+    let repeatable: Vec<&str> = KEY_CALLABLE
+        .iter()
+        .filter(|by| by.idempotent)
+        .map(|by| by.action)
+        .collect();
+    assert_eq!(repeatable, ["downloads-pause", "downloads-resume"]);
+}

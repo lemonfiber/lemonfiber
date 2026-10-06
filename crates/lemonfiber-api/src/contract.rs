@@ -68,6 +68,7 @@ use crate::admission::admitted::Admitted;
 use crate::capabilities::Capabilities;
 use crate::jobs::started::Started;
 use crate::read::answering;
+use crate::read::published::{self, Read};
 use crate::refusal::Refusal;
 use lemonfiber_core::app::rehearsal::Rehearsal;
 use lemonfiber_core::logs::Line as LogLine;
@@ -85,8 +86,8 @@ pub use stability::{Surface, SURFACE_PATH};
 pub struct Contract {
     /// The wire version these shapes belong to.
     pub api_version: u32,
-    /// Every action a key may call, with whether it disturbs the running system and
-    /// whether it takes a rehearsal.
+    /// Every action a key may call, with whether it disturbs the running system,
+    /// whether it takes a rehearsal and whether calling it twice is calling it once.
     ///
     /// Beside the kinds rather than inside one, for the reason the refusals are: it is
     /// not a document any request answers with, and a client deciding which controls to
@@ -94,6 +95,13 @@ pub struct Contract {
     pub key_callable: Vec<Callable>,
     /// `kind` to the schema of the envelope carrying it.
     pub kinds: BTreeMap<String, Schema>,
+    /// Every read the surface serves: where it is asked, what it may be given, and
+    /// what it answers with.
+    ///
+    /// Beside the kinds for the reason the actions a key may call are: a read is where
+    /// a document is asked for rather than a document, and a client generating a
+    /// method per read reads this before it asks anything.
+    pub reads: Vec<Read>,
     /// Every code a refusal may carry, to what the registry says of it.
     ///
     /// Beside the kinds rather than inside one, because a refusal is the `error` kind
@@ -113,6 +121,9 @@ pub struct Callable {
     /// Whether it takes `dry_run`, read off the core's own account of the command it
     /// reaches, so a client can rehearse it and offer the real call after.
     pub rehearsal: bool,
+    /// Whether calling it again with the same arguments leaves the stack as calling it
+    /// once did, so a client can tell a person whether repeating it is safe.
+    pub idempotent: bool,
 }
 
 /// One refusal as the contract lists it.
@@ -138,6 +149,7 @@ impl Contract {
             api_version: API_VERSION,
             key_callable: key_callable(),
             kinds,
+            reads: published::every(),
             refusals: refusals(),
         }
     }
@@ -243,6 +255,7 @@ fn key_callable() -> Vec<Callable> {
             action: by.action,
             disturbs: by.disturbs,
             rehearsal: rehearsable(by.action),
+            idempotent: by.idempotent,
         })
         .collect()
 }

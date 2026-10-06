@@ -30,6 +30,10 @@ it is whatever spec clone is at hand:
 
   python3 scripts/reads_match_the_contract.py --spec ../spec
 
+The committed artefact lists the reads too, generated from the same table, and it
+is held to the same routes here: a route a read module adds beside the table is one
+the generator cannot see, so it is reported rather than left out of every client.
+
 Reading nothing is a failure, not a pass. A block that stopped matching the
 shape this parses would otherwise agree with a surface serving anything at all.
 """
@@ -37,6 +41,7 @@ shape this parses would otherwise agree with a surface serving anything at all.
 from __future__ import annotations
 
 import argparse
+import json
 import pathlib
 import re
 import sys
@@ -50,6 +55,9 @@ OFFERED = re.compile(r"pub const OFFERED: &\[&str\] = &\[(.*?)\];", re.DOTALL)
 
 # Where a path held in a constant is declared, relative to the same root.
 DECLARING = pathlib.Path("crates/lemonfiber-api/src")
+
+# The committed artefact, relative to the repository root, and the list in it.
+ARTEFACT = pathlib.Path("contract/web-api.contract.json")
 
 # The page, relative to a spec checkout, and the heading the block sits under.
 PAGE = pathlib.Path("20-architecture/contracts/web-api.md")
@@ -169,6 +177,17 @@ def named(spec: pathlib.Path) -> tuple[set[str], list[str]]:
     return set(ENTRY.findall("\n".join(blocks))), []
 
 
+def listed(root: pathlib.Path) -> tuple[set[str], list[str]]:
+    """Every read the committed artefact lists, and anything unreadable about it."""
+    artefact = root / ARTEFACT
+    if not artefact.is_file():
+        return set(), [f"no artefact at {artefact}"]
+    reads = json.loads(artefact.read_text(encoding="utf-8")).get("reads")
+    if not isinstance(reads, list):
+        return set(), [f"{artefact} lists no `reads`"]
+    return {read["path"] for read in reads if isinstance(read, dict) and "path" in read}, []
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -180,6 +199,8 @@ def main() -> int:
     routes, problems = served(args.repo)
     entries, unreadable = named(args.spec)
     problems.extend(unreadable)
+    generated, unlisted = listed(args.repo)
+    problems.extend(unlisted)
 
     for count, what, where in (
         (len(routes), "routes", str(args.repo / READS)),
@@ -203,6 +224,14 @@ def main() -> int:
         problems.append(
             f"`{HEADING}` in {PAGE} names these and nothing serves them: "
             + ", ".join(unserved)
+        )
+
+    if generated and generated != routes:
+        problems.append(
+            f"{ARTEFACT} lists the reads {sorted(generated - routes)} that nothing "
+            f"serves and leaves out {sorted(routes - generated)} that are served — "
+            "a route outside the table the generator reads, or an artefact not "
+            "regenerated"
         )
 
     if problems:
