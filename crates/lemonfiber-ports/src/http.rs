@@ -10,6 +10,8 @@
 //! answered, and the caller decides what a refusal means. The failure this port
 //! reports is the other kind — nothing answered at all.
 
+use std::net::IpAddr;
+
 use async_trait::async_trait;
 use thiserror::Error;
 
@@ -22,6 +24,8 @@ pub enum Method {
     Post,
     /// Replace an existing resource.
     Put,
+    /// Change part of an existing resource.
+    Patch,
     /// Take a resource away.
     Delete,
 }
@@ -37,6 +41,15 @@ pub struct Request {
     pub headers: Vec<(String, String)>,
     /// The body, where the request carries one.
     pub body: Option<String>,
+    /// The only addresses the request may connect to for the host its URL names, where
+    /// they were checked before it was sent; nothing where the transport asks the
+    /// resolver itself.
+    ///
+    /// On the request rather than beside it, so a transport that wraps another — one
+    /// that retries, one that records — carries it as it carries the rest. Held to, a
+    /// name that stands for somewhere else by the time the call is made is not asked
+    /// again. The port is the URL's: only the address is pinned.
+    pub pinned: Option<Vec<IpAddr>>,
 }
 
 /// What a service answered.

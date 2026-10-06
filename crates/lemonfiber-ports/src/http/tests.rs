@@ -71,6 +71,7 @@ fn a_request_is_plain_data() {
         url: "http://sonarr:8989/api/v3/rootfolder".to_owned(),
         headers: vec![("X-Api-Key".to_owned(), "secret".to_owned())],
         body: Some("{}".to_owned()),
+        pinned: None,
     };
     assert_eq!(request.clone(), request);
     assert_eq!(request.method, Method::Post);

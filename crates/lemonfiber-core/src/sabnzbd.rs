@@ -85,6 +85,7 @@ impl Sabnzbd {
                 .url(&format!("/api?mode={mode}&output=json&apikey={}", self.key)),
             headers: Vec::new(),
             body: None,
+            pinned: None,
         };
         let response = self.endpoint.send(&request).await?;
         self.endpoint.decode(&response, whenever)
@@ -112,6 +113,7 @@ impl Sabnzbd {
             )),
             headers: Vec::new(),
             body: None,
+            pinned: None,
         };
         let response = self.endpoint.send(&request).await?;
         self.endpoint.expect_success(&response)

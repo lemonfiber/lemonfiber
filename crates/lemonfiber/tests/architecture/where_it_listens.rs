@@ -117,6 +117,26 @@ const LISTENS: &[(&str, &str)] = &[
 /// argue for.
 const DECIDES: &str = "crates/lemonfiber/src/ui/reach.rs";
 
+/// The files that name addresses to refuse them, and why none of those is one this
+/// product listens on or connects to.
+///
+/// The opposite of the policy below rather than an exception to it: every address and
+/// range written here is one a call or a fetch is turned away from. A file arriving on
+/// this list is somebody writing down that it only ever refuses, which is the claim a
+/// reviewer checks.
+const REFUSES: &[(&str, &str)] = &[
+    (
+        "crates/lemonfiber-core/src/outward.rs",
+        "reading an address a name or a source was written as, in every spelling, so it can \
+         be classed before anything is asked",
+    ),
+    (
+        "crates/lemonfiber-core/src/outward/classes.rs",
+        "the ranges no call or fetch goes to — this machine, a network of its own, and the \
+         ranges nothing out on the internet answers on",
+    ),
+];
+
 /// The addresses beyond this machine that the policy names, and what each is for.
 ///
 /// Two, and they are one decision written on both families. An entry arriving here
@@ -337,6 +357,7 @@ fn every_address_beyond_this_machine_is_one_the_policy_names() {
     let unnamed: Vec<String> = found
         .iter()
         .filter(|address| !address.loopback)
+        .filter(|address| !REFUSES.iter().any(|(file, _)| *file == address.file))
         .filter(|address| !declared.contains(address.written.as_str()) || address.file != DECIDES)
         .map(|address| format!("{}:{}: `{}`", address.file, address.line, address.written))
         .collect();

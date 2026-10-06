@@ -280,6 +280,7 @@ pub(super) async fn answering(
         url: format!("{address}{}", proof.request.path),
         headers: Vec::new(),
         body: None,
+        pinned: None,
     };
     loop {
         match ctx.seams.http.send(&request).await {

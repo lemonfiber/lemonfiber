@@ -124,7 +124,7 @@ async fn a_git_past_its_deadline_is_stopped_and_says_so() {
 async fn a_pin_is_one_more_setting_before_what_was_asked() {
     let answering = Arc::new(Answering::default());
     let ctx = a_context().runner(answering.clone()).build();
-    let pin = "http.curloptResolve=example.org:443:203.0.113.10";
+    let pin = "http.curloptResolve=example.org:443:192.88.99.10";
 
     let pinned = run_pinned(
         &ctx,

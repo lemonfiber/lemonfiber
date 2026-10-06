@@ -102,6 +102,7 @@ async fn asking(reaching: &dyn Http, image: &Image) -> Result<Vec<Offered>, Unan
             url: manifest.clone(),
             headers: vec![("Accept".to_owned(), MANIFESTS.to_owned())],
             body: None,
+            pinned: None,
         })
         .await
         .map_err(|why| Unanswerable::about(image, &why.reason))?;
@@ -149,6 +150,7 @@ async fn asking(reaching: &dyn Http, image: &Image) -> Result<Vec<Offered>, Unan
                 url: blob.clone(),
                 headers: Vec::new(),
                 body: None,
+                pinned: None,
             })
             .await
             .map_err(|why| Unanswerable::about(image, &why.reason))?;

@@ -50,6 +50,7 @@ impl Audiobookshelf {
                 .into_iter()
                 .collect(),
             body,
+            pinned: None,
         }
     }
 

@@ -78,6 +78,7 @@ async fn ran(check: &GuidesCheck) -> Vec<Finding> {
         url: GUIDE_SOURCE.to_owned(),
         headers: Vec::new(),
         body: None,
+        pinned: None,
     };
     let verdict = match check.http.send(&request).await {
         Ok(response) if response.is_success() => Verdict::Pass {

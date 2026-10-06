@@ -259,9 +259,10 @@ impl Site for Bound {
     }
 }
 
-/// Where every name stands when a test has not said: one address set aside for
-/// documentation, which no rule refuses and nothing answers on.
-pub const ANYWHERE: IpAddr = IpAddr::V4(Ipv4Addr::new(203, 0, 113, 10));
+/// Where every name stands when a test has not said: an address out on the internet that
+/// nothing answers on — in `192.88.99.0/24`, the 6to4 relay range RFC 7526 retired,
+/// which no rule here refuses and nobody routes any more.
+pub const ANYWHERE: IpAddr = IpAddr::V4(Ipv4Addr::new(192, 88, 99, 10));
 
 /// A resolver that answers every name alike, and remembers each name it was asked.
 ///
@@ -271,6 +272,9 @@ pub const ANYWHERE: IpAddr = IpAddr::V4(Ipv4Addr::new(203, 0, 113, 10));
 pub struct Resolving {
     /// What every name stands for, or why none could be told.
     answer: Result<Vec<IpAddr>, String>,
+    /// What every name stands for from the second time it is asked, where that differs:
+    /// a name rebound between a check and a connection.
+    then: Option<Vec<IpAddr>>,
     /// Every name asked, with its port, in order.
     asked: Mutex<Vec<(String, u16)>>,
 }
@@ -281,6 +285,18 @@ impl Resolving {
     pub fn standing_for(addresses: &[IpAddr]) -> Arc<Self> {
         Arc::new(Self {
             answer: Ok(addresses.to_vec()),
+            then: None,
+            asked: Mutex::new(Vec::new()),
+        })
+    }
+
+    /// Every name standing for `first` the first time it is asked and for `then` every
+    /// time after.
+    #[must_use]
+    pub fn rebinding(first: &[IpAddr], then: &[IpAddr]) -> Arc<Self> {
+        Arc::new(Self {
+            answer: Ok(first.to_vec()),
+            then: Some(then.to_vec()),
             asked: Mutex::new(Vec::new()),
         })
     }
@@ -296,6 +312,7 @@ impl Resolving {
     pub fn failing(why: &str) -> Arc<Self> {
         Arc::new(Self {
             answer: Err(why.to_owned()),
+            then: None,
             asked: Mutex::new(Vec::new()),
         })
     }
@@ -311,10 +328,14 @@ impl Resolving {
 
     /// Remember `host` was asked, and answer it as every name is answered.
     fn answering(&self, host: &str, port: u16) -> Result<Vec<IpAddr>, String> {
-        if let Ok(mut asked) = self.asked.lock() {
+        let before = self.asked.lock().map_or(0, |mut asked| {
             asked.push((host.to_owned(), port));
+            asked.len() - 1
+        });
+        match &self.then {
+            Some(then) if before > 0 => Ok(then.clone()),
+            _ => self.answer.clone(),
         }
-        self.answer.clone()
     }
 }
 

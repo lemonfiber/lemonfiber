@@ -26,6 +26,7 @@ jiff = { workspace = true }
 crc32fast = { workspace = true }
 include_dir = { workspace = true }
 form_urlencoded = { workspace = true }
+url = { workspace = true }
 futures-util = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true }

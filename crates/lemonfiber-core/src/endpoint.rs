@@ -95,6 +95,7 @@ impl Endpoint {
             url: self.url(path),
             headers: json_content_type(body.as_ref()).into_iter().collect(),
             body,
+            pinned: None,
         }
     }
 
@@ -115,6 +116,7 @@ impl Endpoint {
             url: self.url(path),
             headers,
             body,
+            pinned: None,
         }
     }
 

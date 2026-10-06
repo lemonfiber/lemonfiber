@@ -114,6 +114,7 @@ fn carrying(address: &Address, reason: &str) -> Request {
         url: url.to_owned(),
         headers,
         body: Some(body),
+        pinned: None,
     }
 }
 

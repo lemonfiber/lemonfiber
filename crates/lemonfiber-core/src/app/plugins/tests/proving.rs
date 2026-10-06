@@ -495,16 +495,16 @@ async fn an_engine_that_cannot_be_run_at_all_stops_the_install() {
 /// nobody declared.
 #[tokio::test]
 async fn a_proof_naming_a_method_lemonfiber_cannot_send_is_never_put() {
-    let patched = PROVING.replace("method = \"GET\"", "method = \"PATCH\"");
+    let traced = PROVING.replace("method = \"GET\"", "method = \"TRACE\"");
     let ctx = proving(
-        "patched",
+        "traced",
         Arc::new(Recording::answering(Ok(spoke("")))),
         answering(200),
     );
 
-    let stated = verdicts(installing(&ctx, &source("patched", &patched)).await);
+    let stated = verdicts(installing(&ctx, &source("traced", &traced)).await);
     assert_eq!(came_to(stated.first().and_then(Option::as_ref)), "unproven");
-    assert!(why(stated.first().and_then(Option::as_ref)).contains("PATCH"));
+    assert!(why(stated.first().and_then(Option::as_ref)).contains("TRACE"));
 }
 
 /// A container the engine would not take off the machine is named as still
