@@ -86,3 +86,19 @@ fn a_trailing_at_names_no_revision() {
         git("https://github.com/ana/plugin-komga@", None)
     );
 }
+
+/// Every scheme git reads but https is named, and https and a path are not.
+#[test]
+fn every_scheme_but_https_is_named_as_written() {
+    for (written, scheme) in [
+        ("http://example.org/x", Some("http://")),
+        ("ssh://git@example.org/x", Some("ssh://")),
+        ("git://example.org/x", Some("git://")),
+        ("git@example.org:x", Some("git@")),
+        ("https://example.org/x", None),
+        ("./komga", None),
+    ] {
+        assert_eq!(super::unspoken(written), scheme, "{written}");
+    }
+    assert!(Source::named("http://example.org/x").is_git());
+}

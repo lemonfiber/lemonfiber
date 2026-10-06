@@ -57,6 +57,8 @@ mod standing;
 mod fetching;
 // Git as it is run against a stranger's repository: one configuration, one deadline.
 pub(crate) mod git;
+// Where a git source may be fetched from: over https, from a host out on the internet.
+mod reach;
 // Installing by name: the catalogue's index verified, and the name resolved through it.
 mod cataloguing;
 // What is installed, read off the record alone or with each source asked.

@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 
-use super::{command, environment, run, ASKING};
+use super::{command, environment, run, run_pinned, ASKING};
 use crate::ports::process::{Failure, Output, Runner};
 use crate::test_support::a_context;
 
@@ -54,6 +54,7 @@ fn every_command_is_git_with_every_setting_before_what_was_asked() {
         "core.fsmonitor=false",
         "protocol.allow=never",
         "protocol.https.allow=always",
+        "http.followRedirects=false",
     ] {
         let at = built.iter().position(|arg| arg == setting);
         assert!(
@@ -114,5 +115,50 @@ async fn a_git_past_its_deadline_is_stopped_and_says_so() {
     assert_eq!(
         said,
         Err("git did not finish within 30 seconds, so it was stopped".to_owned())
+    );
+}
+
+/// A pinned command carries the pin among its settings, before what was asked; an
+/// unpinned one carries nothing more.
+#[tokio::test]
+async fn a_pin_is_one_more_setting_before_what_was_asked() {
+    let answering = Arc::new(Answering::default());
+    let ctx = a_context().runner(answering.clone()).build();
+    let pin = "http.curloptResolve=example.org:443:203.0.113.10";
+
+    let pinned = run_pinned(
+        &ctx,
+        Some(pin),
+        &["ls-remote", "--", "https://example.org/x"],
+        ASKING,
+    )
+    .await;
+    let unpinned = run_pinned(
+        &ctx,
+        None,
+        &["ls-remote", "--", "https://example.org/x"],
+        ASKING,
+    )
+    .await;
+
+    assert_eq!(pinned.as_deref(), Ok("listed"));
+    assert_eq!(unpinned.as_deref(), Ok("listed"));
+    let ran: Vec<Vec<String>> = answering
+        .ran
+        .lock()
+        .map(|ran| ran.iter().map(|(argv, _)| argv.clone()).collect())
+        .unwrap_or_default();
+    let first = ran.first().cloned().unwrap_or_default();
+    let at = first.iter().position(|arg| arg == pin);
+    let asked = first.iter().position(|arg| arg == "ls-remote");
+    assert!(
+        at.zip(asked).is_some_and(
+            |(at, asked)| at < asked && first.get(at - 1).map(String::as_str) == Some("-c")
+        ),
+        "{first:?}"
+    );
+    assert_eq!(
+        ran.get(1),
+        Some(&command(&["ls-remote", "--", "https://example.org/x"]))
     );
 }

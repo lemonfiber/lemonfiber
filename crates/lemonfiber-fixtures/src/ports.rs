@@ -9,14 +9,16 @@
 //! twice is two places for the semantics to drift, and the drift is invisible until a test
 //! passes against one copy and would have failed against the other.
 
+use std::net::{IpAddr, Ipv4Addr};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
 use lemonfiber_ports::network::Site;
 use lemonfiber_ports::process::{Failure as RunFailure, Output, Runner};
 use lemonfiber_ports::random::Random;
+use lemonfiber_ports::resolve::Resolver;
 use lemonfiber_ports::time::Clock;
 
 /// A runner that spawns nothing.
@@ -254,6 +256,72 @@ impl Site for Bound {
         found.sort_unstable();
         found.dedup();
         found
+    }
+}
+
+/// Where every name stands when a test has not said: one address set aside for
+/// documentation, which no rule refuses and nothing answers on.
+pub const ANYWHERE: IpAddr = IpAddr::V4(Ipv4Addr::new(203, 0, 113, 10));
+
+/// A resolver that answers every name alike, and remembers each name it was asked.
+///
+/// A test chooses what a name stands for, because the real answer differs by machine and
+/// by hour, and a decision taken over an address can only be tested against the address
+/// that decides it.
+pub struct Resolving {
+    /// What every name stands for, or why none could be told.
+    answer: Result<Vec<IpAddr>, String>,
+    /// Every name asked, with its port, in order.
+    asked: Mutex<Vec<(String, u16)>>,
+}
+
+impl Resolving {
+    /// Every name standing for these addresses.
+    #[must_use]
+    pub fn standing_for(addresses: &[IpAddr]) -> Arc<Self> {
+        Arc::new(Self {
+            answer: Ok(addresses.to_vec()),
+            asked: Mutex::new(Vec::new()),
+        })
+    }
+
+    /// Every name standing for [`ANYWHERE`].
+    #[must_use]
+    pub fn anywhere() -> Arc<Self> {
+        Self::standing_for(&[ANYWHERE])
+    }
+
+    /// No name standing for anything, for the reason given.
+    #[must_use]
+    pub fn failing(why: &str) -> Arc<Self> {
+        Arc::new(Self {
+            answer: Err(why.to_owned()),
+            asked: Mutex::new(Vec::new()),
+        })
+    }
+
+    /// Every name asked so far, with its port.
+    #[must_use]
+    pub fn asked(&self) -> Vec<(String, u16)> {
+        self.asked
+            .lock()
+            .map(|asked| asked.clone())
+            .unwrap_or_default()
+    }
+
+    /// Remember `host` was asked, and answer it as every name is answered.
+    fn answering(&self, host: &str, port: u16) -> Result<Vec<IpAddr>, String> {
+        if let Ok(mut asked) = self.asked.lock() {
+            asked.push((host.to_owned(), port));
+        }
+        self.answer.clone()
+    }
+}
+
+#[async_trait]
+impl Resolver for Resolving {
+    async fn addresses(&self, host: &str, port: u16) -> Result<Vec<IpAddr>, String> {
+        self.answering(host, port)
     }
 }
 

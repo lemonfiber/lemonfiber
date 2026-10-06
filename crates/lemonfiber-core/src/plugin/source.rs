@@ -8,6 +8,10 @@
 //! `./` in front of it. A path that happens to look like none of these is still a path,
 //! and is refused as one if nothing is there.
 //!
+//! A repository is fetched over https and nothing else: an address beginning with any
+//! other scheme git reads is still a repository, and [`unspoken`] names that scheme so
+//! the install is refused for it rather than for a path that is not there.
+//!
 //! A repository may name a revision after its last `@` — a branch, a tag or a whole
 //! commit — and names none otherwise, which means whatever it serves as its default.
 //! Either way what is installed is the one commit that resolves to, and that commit is
@@ -16,7 +20,12 @@
 use std::path::PathBuf;
 
 /// The beginnings of an address git fetches from.
-const GIT: &[&str] = &["https://", "http://", "ssh://", "git://", "git@"];
+const GIT: &[&str] = &[SPOKEN, "http://", "ssh://", "git://", "git@"];
+
+/// The one transport a repository is fetched over. Every other beginning git reads as
+/// a repository is still read as one, so it is refused by name rather than looked for
+/// as a path.
+pub const SPOKEN: &str = "https://";
 
 /// Where the plugin to install is.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -70,6 +79,16 @@ impl Source {
     pub const fn is_git(&self) -> bool {
         matches!(self, Self::Git { .. })
     }
+}
+
+/// The beginning a repository's address is written with, where it is one git reads and
+/// not [`SPOKEN`].
+#[must_use]
+pub fn unspoken(url: &str) -> Option<&'static str> {
+    GIT.iter()
+        .copied()
+        .filter(|scheme| *scheme != SPOKEN)
+        .find(|scheme| url.starts_with(scheme))
 }
 
 /// Whether a word is shaped as a plugin's id: lowercase letters and digits in words

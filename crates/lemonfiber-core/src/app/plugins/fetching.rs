@@ -73,17 +73,21 @@ pub(super) async fn fetched(
     consent: &super::Consent,
 ) -> Result<Installs, Box<Problem>> {
     let url = source.url;
+    if let Some(scheme) = crate::plugin::unspoken(url) {
+        return Err(Box::new(super::reach::scheme_refused(url, scheme)));
+    }
     if !ctx.settings.reaching.allows(REACH_PLUGIN_SOURCE_KEY) {
         return Err(Box::new(switched_off(url)));
     }
-    let commit = resolved(ctx, url, source.revision).await?;
+    let reached = super::reach::reached(ctx, url).await?;
+    let commit = resolved(ctx, url, source.revision, &reached).await?;
     let Some(into) = checkout(ctx, &commit) else {
         return Err(Box::new(crate::config::store::Failure::Nowhere.problem()));
     };
     if let Err(why) = made_fresh(&into) {
         return Err(Box::new(unfetched(url, &why.to_string())));
     }
-    let result = match fetched_into(ctx, url, &commit, &into).await {
+    let result = match fetched_into(ctx, url, &commit, &into, &reached).await {
         Ok(()) => {
             let from = Fetched {
                 url,
@@ -99,12 +103,18 @@ pub(super) async fn fetched(
 }
 
 /// The one commit a revision names on a source, or the one it serves by default.
-async fn resolved(ctx: &Ctx, url: &str, revision: Option<&str>) -> Result<String, Box<Problem>> {
+async fn resolved(
+    ctx: &Ctx,
+    url: &str,
+    revision: Option<&str>,
+    reached: &super::reach::Reached,
+) -> Result<String, Box<Problem>> {
     if let Some(commit) = revision.filter(|named| is_commit(named)) {
         return Ok(commit.to_ascii_lowercase());
     }
     let asked = revision.unwrap_or("HEAD");
-    let listed = super::git::run(ctx, &["ls-remote", "--", url, asked], super::git::ASKING)
+    let listing = ["ls-remote", "--", url, asked];
+    let listed = super::git::run_pinned(ctx, reached.pin(), &listing, super::git::ASKING)
         .await
         .map_err(|why| Box::new(unfetched(url, &why)))?;
     listed_commit(&listed, asked).ok_or_else(|| Box::new(no_revision(url, asked)))
@@ -132,7 +142,13 @@ fn is_commit(named: &str) -> bool {
 }
 
 /// Fetch one commit into `into`, as data.
-async fn fetched_into(ctx: &Ctx, url: &str, commit: &str, into: &Path) -> Result<(), Box<Problem>> {
+async fn fetched_into(
+    ctx: &Ctx,
+    url: &str,
+    commit: &str,
+    into: &Path,
+    reached: &super::reach::Reached,
+) -> Result<(), Box<Problem>> {
     let at = into.display().to_string();
     let steps: [&[&str]; 4] = [
         &["init", "--quiet", &at],
@@ -152,7 +168,7 @@ async fn fetched_into(ctx: &Ctx, url: &str, commit: &str, into: &Path) -> Result
         &["-C", &at, "checkout", "--quiet", "FETCH_HEAD"],
     ];
     for step in steps {
-        super::git::run(ctx, step, super::git::FETCHING)
+        super::git::run_pinned(ctx, reached.pin(), step, super::git::FETCHING)
             .await
             .map_err(|why| Box::new(unfetched(url, &why)))?;
     }
@@ -176,7 +192,7 @@ fn switched_off(url: &str) -> Problem {
 }
 
 /// Said where a git source could not be reached or would not hand a revision over.
-fn unfetched(url: &str, why: &str) -> Problem {
+pub(super) fn unfetched(url: &str, why: &str) -> Problem {
     Problem::new(
         UNFETCHED,
         Severity::Error,

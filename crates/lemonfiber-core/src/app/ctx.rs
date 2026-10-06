@@ -322,6 +322,13 @@ impl Ctx {
         self
     }
 
+    /// The same context, asking the given seam which addresses a name stands for.
+    #[must_use]
+    pub fn with_resolver(mut self, resolver: Arc<dyn crate::ports::Resolver>) -> Self {
+        self.seams.resolver = resolver;
+        self
+    }
+
     /// The same context, asking the given seam where this machine is.
     ///
     /// Lets the address a household is handed be asserted, which the real one

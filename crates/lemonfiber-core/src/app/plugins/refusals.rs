@@ -9,9 +9,10 @@
 //! repository does not have and a name the catalogue does not hold are each something
 //! named that is not one of the things there are. A manifest this build refuses, a
 //! plugin that would collide with what is installed or take what this machine already
-//! holds, a source this machine is set not to ask, an update whose source holds another
-//! plugin and a yes that leaves a value unapproved are each asked in a way that cannot
-//! be answered as it stands. A machine that could not write, start, fetch or verify, a
+//! holds, a source this machine is set not to ask, a source not fetched over https or
+//! standing for an address on this machine or a network of its own, an update whose
+//! source holds another plugin and a yes that leaves a value unapproved are each asked
+//! in a way that cannot be answered as it stands. A machine that could not write, start, fetch or verify, a
 //! catalogue entry whose source no longer holds what was reviewed, a catalogue serving
 //! a release older than one this machine verified, and a record of the newest one that
 //! cannot be kept, are the answering.
@@ -22,18 +23,18 @@
 //! and is not a plugin's to list.
 
 use crate::error::codes::plugin::{
-    ALREADY, ANOTHER_PLUGIN, ANSWERED, CATALOGUE_OFF, CATALOGUE_REPLACED, CATALOGUE_UNREACHABLE,
-    CATALOGUE_UNREADABLE, NEWEST_UNKEPT, NOTHING_TO_REMOVE, NOTHING_TO_UPDATE, NOT_AS_REVIEWED,
-    NOT_CATALOGUED, NOWHERE, NO_REVISION, OCCUPIED, REFUSED, SIGNATURE_UNVERIFIED, SOURCE_OFF,
-    SPELLED_ALIKE, STUCK, TWO_SOURCES, UNAPPROVED, UNFETCHED, UNPROVED, UNREADABLE, UNRECORDABLE,
-    UNWRITABLE,
+    ADDRESS_REFUSED, ALREADY, ANOTHER_PLUGIN, ANSWERED, CATALOGUE_OFF, CATALOGUE_REPLACED,
+    CATALOGUE_UNREACHABLE, CATALOGUE_UNREADABLE, NEWEST_UNKEPT, NOTHING_TO_REMOVE,
+    NOTHING_TO_UPDATE, NOT_AS_REVIEWED, NOT_CATALOGUED, NOWHERE, NO_REVISION, OCCUPIED, REFUSED,
+    SCHEME_REFUSED, SIGNATURE_UNVERIFIED, SOURCE_OFF, SPELLED_ALIKE, STUCK, TWO_SOURCES,
+    UNAPPROVED, UNFETCHED, UNPROVED, UNREADABLE, UNRECORDABLE, UNWRITABLE,
 };
 use crate::error::{Amiss, Code, Problem};
 
 /// Every plugin code an install, an update or a removal is refused with, apart from the
 /// record that cannot be read and the offer that moved, and where the fault lies in
 /// each.
-pub const REFUSALS: [(Code, Amiss); 27] = [
+pub const REFUSALS: [(Code, Amiss); 29] = [
     (UNREADABLE, Amiss::Naming),
     (REFUSED, Amiss::Asking),
     (ALREADY, Amiss::Asking),
@@ -59,6 +60,8 @@ pub const REFUSALS: [(Code, Amiss); 27] = [
     (UNAPPROVED, Amiss::Asking),
     (ANOTHER_PLUGIN, Amiss::Asking),
     (OCCUPIED, Amiss::Asking),
+    (SCHEME_REFUSED, Amiss::Asking),
+    (ADDRESS_REFUSED, Amiss::Asking),
     (CATALOGUE_REPLACED, Amiss::Answering),
     (NEWEST_UNKEPT, Amiss::Answering),
 ];

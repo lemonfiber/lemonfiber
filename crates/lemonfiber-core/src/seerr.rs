@@ -34,6 +34,7 @@ use crate::ports::service::{
     Failure, FulfilmentTarget, HouseholdRequest, MediaServerLink, RegisteredTarget, Requesting,
     Requests, Telling,
 };
+use crate::schemes::{PLAIN, SECURE};
 
 /// Seerr's own API key, read from the settings file it writes.
 ///
@@ -81,11 +82,6 @@ struct Reached<'a> {
     /// A path the service is served under, empty where it is served at the root.
     base: String,
 }
-
-/// The port assumed where an address carries none, by its scheme.
-const PLAIN: u16 = 80;
-/// The same, for TLS.
-const SECURE: u16 = 443;
 
 /// Take an address apart into the pieces Seerr asks for.
 ///

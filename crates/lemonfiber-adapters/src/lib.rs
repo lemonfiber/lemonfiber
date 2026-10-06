@@ -27,6 +27,7 @@ pub mod occupancy;
 pub mod process;
 pub mod random;
 pub mod registry;
+pub mod resolve;
 pub mod retrying;
 pub mod time;
 
@@ -40,6 +41,7 @@ pub use http::Web;
 pub use nntp::Dialer;
 pub use process::Local;
 pub use random::Os;
+pub use resolve::Lookup;
 pub use retrying::Retrying;
 pub use time::System;
 
@@ -96,5 +98,6 @@ pub fn live_reaching(target: &lemonfiber_ports::docker::Target) -> Seams {
         hosting: Arc::new(Unhosted),
         random: Arc::new(Os),
         nntp: Arc::new(Dialer::new()),
+        resolver: Arc::new(Lookup),
     }
 }

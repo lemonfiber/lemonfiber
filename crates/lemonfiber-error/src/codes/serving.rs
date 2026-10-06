@@ -266,6 +266,12 @@ codes! {
         /// Raised when the record of the newest catalogue index this machine verified
         /// cannot be read or written.
         NEWEST_UNKEPT = "PLUGIN-30",
+        /// Raised when a git source is named over a transport other than https, before
+        /// anything is asked of it.
+        SCHEME_REFUSED = "PLUGIN-31",
+        /// Raised when a git source's host is, or stands for, an address on this machine
+        /// or on a network of its own: loopback, private, link-local or unspecified.
+        ADDRESS_REFUSED = "PLUGIN-32",
     }
     /// The `PROVIDER` codes.
     provider {

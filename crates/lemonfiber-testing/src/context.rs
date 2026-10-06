@@ -146,6 +146,9 @@ impl Context {
             clock: self.clock,
             filesystem: self.filesystem,
             images: self.images.unwrap_or(live.images),
+            // Never the machine's own: a name a test writes is asked of nothing real, and
+            // stands where the test says it does.
+            resolver: lemonfiber_fixtures::ports::Resolving::anywhere(),
             ..live
         };
         Ctx::new(seams, self.stack, self.settings, self.environment)
