@@ -8,10 +8,12 @@
 //!
 //! The two that can be a door are told apart by the shape of their API rather than
 //! by their name, the way every other service resolution here is, so a stack that
-//! ships a different request service under the same shape resolves the same way. The
-//! rest speak no API lemonfiber knows, so each is written down below with what it is
-//! to the household — and one nobody has written down is not offered, for the reason
-//! [`crate::config::display`] withholds a setting nobody vouched for.
+//! ships a different request service under the same shape resolves the same way —
+//! and so does a plugin's service published to the household, judged by the adapter
+//! it names. The rest speak no API lemonfiber knows, so each of the stack's is written
+//! down below with what it is to the household — and one nobody has written down, a
+//! plugin's among them, is not offered, for the reason [`crate::config::display`]
+//! withholds a setting nobody vouched for.
 //!
 //! All of which is a default rather than a decree. An operator who disagrees about
 //! their own stack names the service they want, and [`chosen`] is where that name
@@ -26,7 +28,9 @@ use serde::Serialize;
 
 use lemonfiber_manifest::{ApiKind, Bind, Service};
 
-pub use address::{address, publishes_a_name, Address};
+use crate::plugin::{Installed, Placed};
+
+pub use address::{address, proxied, publishes_a_name, Address, Place};
 pub use chosen::{chosen, Chosen, Refusal, KEPT};
 
 /// What a service published to the local network is to the people in the house.
@@ -132,11 +136,78 @@ pub fn facing(service: &Service) -> Option<Facing> {
     if service.bind != Some(Bind::Lan) {
         return None;
     }
-    match service.api.as_ref().map(|api| api.kind) {
+    Some(by_adapter(service.api.as_ref().map(|api| api.kind)).unwrap_or_else(|| named(&service.id)))
+}
+
+/// What a plugin's service is to the household, or nothing where it is not published
+/// to them at all.
+///
+/// Published is the household tier its record names, which puts it behind the stack's
+/// proxy and nowhere else: the one way the household reaches it. Judged by the adapter
+/// it names and by nothing else — the register is the stack's account of its own
+/// services, and a plugin's service choosing an id the register names is not thereby
+/// what the register says.
+#[must_use]
+pub fn brought(placed: &Placed) -> Option<Facing> {
+    placed.reached.as_ref()?.hostname()?;
+    Some(by_adapter(placed.api.as_ref().map(|api| api.kind)).unwrap_or(Facing::Unstated))
+}
+
+/// What the shape of an API makes a service to the household, where it settles it.
+const fn by_adapter(kind: Option<ApiKind>) -> Option<Facing> {
+    match kind {
         Some(ApiKind::Seerr) => Some(Facing::Asking),
         Some(ApiKind::Jellyfin) => Some(Facing::Watching),
-        _ => Some(named(&service.id)),
+        _ => None,
     }
+}
+
+/// How the household reaches one service published to them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Reached<'a> {
+    /// At this machine, on the port the stack publishes it on, where it publishes one.
+    Port(Option<u16>),
+    /// Through the stack's proxy, at this one label in front of the operator's domain.
+    Proxied(&'a str),
+}
+
+/// One service the household might be sent to, the stack's or an installed plugin's.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Candidate<'a> {
+    /// The id it runs under, which a front door is named by.
+    pub id: &'a str,
+    /// What it is called in front of a person.
+    pub name: &'a str,
+    /// What it is to the household, or nothing where it is not published to them.
+    pub facing: Option<Facing>,
+    /// How the household reaches it.
+    pub reached: Reached<'a>,
+}
+
+/// Every service the household might be sent to: the stack's, in the order it declares
+/// them, then each installed plugin's.
+#[must_use]
+pub fn candidates<'a>(services: &'a [Service], installed: &'a [Installed]) -> Vec<Candidate<'a>> {
+    let bundled = services.iter().map(|service| Candidate {
+        id: &service.id,
+        name: &service.name,
+        facing: facing(service),
+        reached: Reached::Port(service.port),
+    });
+    let plugins = installed
+        .iter()
+        .flat_map(|one| one.services.iter())
+        .map(|placed| Candidate {
+            id: &placed.service,
+            name: placed.called(),
+            facing: brought(placed),
+            reached: placed
+                .reached
+                .as_ref()
+                .and_then(crate::plugin::Reached::hostname)
+                .map_or(Reached::Port(None), Reached::Proxied),
+        });
+    bundled.chain(plugins).collect()
 }
 
 /// What the register says this service is, or that nobody has said.
@@ -147,10 +218,12 @@ fn named(id: &str) -> Facing {
         .map_or(Facing::Unstated, |(_, facing)| *facing)
 }
 
-/// The one service the household begins at, from everything the stack declares.
+/// The one service the household begins at, from everything the stack declares and
+/// every installed plugin brings.
 ///
-/// Whichever request surface the stack has, and the library where it has none. Read
-/// from what the stack *declares* rather than from what is up at this moment,
+/// Whichever request surface there is, and the library where there is none; the
+/// stack's own first where both it and a plugin offer one. Read from what is
+/// *declared* rather than from what is up at this moment,
 /// deliberately: a request service that is not running is a front door that is down,
 /// and answering "the library, then" would hand the household somewhere they cannot
 /// ask for anything without ever saying that is what happened.
@@ -159,20 +232,19 @@ fn named(id: &str) -> Facing {
 /// configuration has no household front door — and it is said as one rather than
 /// filled in with the nearest thing that would open.
 #[must_use]
-pub(crate) fn begins_at(services: &[Service]) -> Option<(Facing, &Service)> {
-    let mut best: Option<(Facing, &Service)> = None;
-    for service in services {
-        let Some(facing) = facing(service) else {
+pub(crate) fn begins_at<'a, 'b>(
+    candidates: &'b [Candidate<'a>],
+) -> Option<(Facing, &'b Candidate<'a>)> {
+    let mut best: Option<(Facing, &Candidate<'a>)> = None;
+    for candidate in candidates {
+        let Some(facing) = candidate.facing.filter(|facing| facing.begins()) else {
             continue;
         };
-        if !facing.begins() {
-            continue;
-        }
         if facing == Facing::Asking {
-            return Some((facing, service));
+            return Some((facing, candidate));
         }
         if best.is_none() {
-            best = Some((facing, service));
+            best = Some((facing, candidate));
         }
     }
     best

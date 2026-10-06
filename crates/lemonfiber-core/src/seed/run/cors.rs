@@ -80,16 +80,24 @@ pub(super) async fn seed_cors(
     Some(Wiring::settled(CONNECTION.to_owned(), state))
 }
 
-/// The origin the household front door is reached at, where there is one.
+/// The origin the household front door is reached at, where the door is the stack's
+/// own.
 ///
 /// The door the operator chose, or the one the stack begins at, at the address the
 /// household is handed for it — the same derivation every surface that shows the door
 /// uses, so the list names what the household was told.
+///
+/// **Over the stack's own services alone.** An origin on this list may read the media
+/// server from a browser, and a plugin's page is a stranger's code: a plugin's service
+/// standing as the door, or named as it, is never given that, and the list stays on the
+/// door the stack's own services make. Nothing a plugin's service does as a door needs
+/// to read the media server from a browser, so nothing is lost by it.
 async fn front_door_origin(ctx: &Ctx, services: &[lemonfiber_manifest::Service]) -> Option<String> {
-    let (_, door) = crate::door::chosen(services, ctx.settings.front_door.as_deref());
-    let (_, service) = door?;
-    crate::app::invite::household_address(ctx, service.port?)
-        .await
+    let candidates = crate::door::candidates(services, &[]);
+    let (_, door) = crate::door::chosen(&candidates, ctx.settings.front_door.as_deref());
+    let (_, door) = door?;
+    let named = ctx.site.name().await;
+    crate::door::run::reached(door, &crate::door::run::place(ctx, named.as_deref()))
         .map(|address| address.url)
 }
 

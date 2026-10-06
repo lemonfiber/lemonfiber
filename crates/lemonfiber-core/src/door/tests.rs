@@ -1,4 +1,4 @@
-use super::fixtures::{asking, service, watching};
+use super::fixtures::{asking, brought, installed, service, watching};
 use super::{begins_at, facing, Facing, NAMED};
 use lemonfiber_manifest::{ApiKind, Bind};
 
@@ -6,7 +6,8 @@ use lemonfiber_manifest::{ApiKind, Bind};
 fn the_request_surface_is_the_door_wherever_there_is_one() {
     let services = [watching(), asking()];
     assert_eq!(
-        begins_at(&services).map(|(facing, service)| (facing, service.id.clone())),
+        begins_at(&super::candidates(&services, &[]))
+            .map(|(facing, candidate)| (facing, candidate.id.to_owned())),
         Some((Facing::Asking, "seerr".to_owned()))
     );
 }
@@ -15,7 +16,8 @@ fn the_request_surface_is_the_door_wherever_there_is_one() {
 fn the_library_is_the_door_only_where_nothing_can_be_asked_for() {
     let services = [watching()];
     assert_eq!(
-        begins_at(&services).map(|(facing, service)| (facing, service.id.clone())),
+        begins_at(&super::candidates(&services, &[]))
+            .map(|(facing, candidate)| (facing, candidate.id.to_owned())),
         Some((Facing::Watching, "jellyfin".to_owned()))
     );
 }
@@ -28,7 +30,7 @@ fn a_stack_publishing_nothing_to_the_household_has_no_door_at_all() {
         service("sonarr", Some(Bind::Loopback), Some(ApiKind::Servarr)),
         service("homepage", Some(Bind::Lan), None),
     ];
-    assert!(begins_at(&services).is_none());
+    assert!(begins_at(&super::candidates(&services, &[])).is_none());
 }
 
 #[test]
@@ -111,4 +113,81 @@ fn the_register_names_nothing_the_shape_of_an_api_already_answers() {
     assert!(!NAMED
         .iter()
         .any(|(id, _)| *id == "seerr" || *id == "jellyfin"));
+}
+
+/// A plugin's service published to the household is judged by the adapter it names:
+/// a request service asks, a media server watches, anything else is unstated — and the
+/// register, the stack's account of its own services, does not reach it by its id. One
+/// reachable from this machine alone is no part of this.
+#[test]
+fn a_plugins_service_is_judged_by_its_adapter_alone() {
+    use super::brought as facing_of;
+
+    assert_eq!(
+        facing_of(&brought("requests", Some(ApiKind::Seerr), Some("ask"))),
+        Some(Facing::Asking)
+    );
+    assert_eq!(
+        facing_of(&brought("server", Some(ApiKind::Jellyfin), Some("watch"))),
+        Some(Facing::Watching)
+    );
+    assert_eq!(
+        facing_of(&brought("homepage", None, Some("home"))),
+        Some(Facing::Unstated)
+    );
+    assert_eq!(
+        facing_of(&brought("requests", Some(ApiKind::Seerr), None)),
+        None
+    );
+}
+
+/// The stack's own request surface is the door before a plugin's, a plugin's request
+/// surface is the door before the stack's library, and a plugin's library is the door
+/// where nothing anywhere can be asked for.
+#[test]
+fn a_plugins_service_can_be_the_door_by_the_same_rule() {
+    let requests = installed(vec![brought("requests", Some(ApiKind::Seerr), Some("ask"))]);
+    let server = installed(vec![brought(
+        "server",
+        Some(ApiKind::Jellyfin),
+        Some("watch"),
+    )]);
+    let door = |services: &[lemonfiber_manifest::Service], plugin: &crate::plugin::Installed| {
+        let candidates = super::candidates(services, std::slice::from_ref(plugin));
+        begins_at(&candidates).map(|(facing, candidate)| (facing, candidate.id.to_owned()))
+    };
+
+    assert_eq!(
+        door(&[watching(), asking()], &requests),
+        Some((Facing::Asking, "seerr".to_owned()))
+    );
+    assert_eq!(
+        door(&[watching()], &requests),
+        Some((Facing::Asking, "requests".to_owned()))
+    );
+    assert_eq!(
+        door(&[], &server),
+        Some((Facing::Watching, "server".to_owned()))
+    );
+}
+
+/// A plugin's service is reached through the proxy at its label, and one reachable from
+/// this machine alone is reached at no port the household could use.
+#[test]
+fn a_plugins_service_is_reached_through_the_proxy() {
+    let plugin = installed(vec![
+        brought("requests", Some(ApiKind::Seerr), Some("ask")),
+        brought("hidden", Some(ApiKind::Seerr), None),
+    ]);
+    let candidates = super::candidates(&[], std::slice::from_ref(&plugin));
+    let reached: Vec<super::Reached<'_>> = candidates.iter().map(|one| one.reached).collect();
+
+    assert_eq!(
+        reached,
+        vec![super::Reached::Proxied("ask"), super::Reached::Port(None)]
+    );
+    assert_eq!(
+        candidates.first().map(|one| one.name),
+        Some("requests the plugin's")
+    );
 }

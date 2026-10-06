@@ -205,10 +205,13 @@ fn no_other_services_word_is_written_as_if_it_were_ours() {
 /// are typed by whoever set `DOCKER_HOST`, so they are met as spelling before they are
 /// met as prose — and the sentences they stand in say what each costs: one is not
 /// encrypted, and the other is refused by keys and accounts rather than by Docker.
+///
+/// `DOMAIN` is the stack's own name for the setting, the kind `TZ` is: shown where it
+/// is typed, in the sentence saying what setting it gives the front door an address.
 const ORDINARY: &[&str] = &[
     "API", "URL", "TLS", "JSON", "DNS", "IP", "UI", "HTTP", "OSI", "FAT", "SMB", "CIFS", "NFS",
     "WSL2", "UID", "GID", "NAT", "PMP", "P2P", "GB", "MB", "CD", "TV", "MP3", "AAC", "FLAC",
-    "ALAC", "YYYY", "MM", "DD", "NOT", "CPU", "UTC", "TZ", "HH", "TCP", "SSH",
+    "ALAC", "YYYY", "MM", "DD", "NOT", "CPU", "UTC", "TZ", "HH", "TCP", "SSH", "DOMAIN",
 ];
 
 /// Every acronym an operator is shown is explained, or declared ordinary.

@@ -141,7 +141,10 @@ pub async fn paced(ctx: &Ctx, previous: Option<&Gathered>) -> Gathered {
         volume(ctx, root, &due),
     );
 
-    let seen = seen.unwrap_or_else(|| Err(late(ENGINE)));
+    let (seen, undeclared) = match seen.unwrap_or_else(|| Err(late(ENGINE))) {
+        Ok((surveyed, undeclared)) => (Ok(surveyed), undeclared),
+        Err(reason) => (Err(reason), Vec::new()),
+    };
     let reach = Reach::of(configured, seen.as_deref().ok());
     let vpn = tunnel.settled(
         last.map(|was| was.vpn.clone()),
@@ -176,7 +179,7 @@ pub async fn paced(ctx: &Ctx, previous: Option<&Gathered>) -> Gathered {
         Ok(services) => Panel::Ready(services),
         Err(reason) => Panel::unavailable(reason),
     };
-    let door = front_door(ctx, manifest, &services, named.as_deref());
+    let door = front_door(ctx, manifest, &services, &undeclared, named.as_deref());
 
     let storage = stored(
         root,

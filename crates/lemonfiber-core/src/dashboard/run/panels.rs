@@ -52,6 +52,7 @@ pub(super) fn front_door(
     ctx: &Ctx,
     manifest: Result<&Manifest, &String>,
     services: &Panel<Vec<Service>>,
+    undeclared: &[crate::docker::Undeclared],
     named: Option<&str>,
 ) -> Panel<FrontDoorReport> {
     let manifest = match manifest {
@@ -62,13 +63,18 @@ pub(super) fn front_door(
         Panel::Ready(running) => running,
         Panel::Unavailable { reason } => return Panel::unavailable(reason.clone()),
     };
+    // A record of what is installed that will not read leaves the stack's own services
+    // to answer for the door, as the command that shows it does.
+    let register =
+        crate::app::plugins::read(ctx).unwrap_or_else(|_| crate::plugin::Register::empty());
     Panel::Ready(crate::door::run::assembled(
-        &manifest.services,
-        running,
-        named,
-        ctx.settings.household_host.as_deref(),
+        &crate::door::candidates(&manifest.services, register.installed()),
+        crate::door::run::Running {
+            surveyed: running,
+            undeclared,
+        },
+        &crate::door::run::place(ctx, named),
         ctx.settings.front_door.as_deref(),
-        ctx.environment,
     ))
 }
 
@@ -370,7 +376,9 @@ pub(super) fn hardlink_of(linked: &Linked) -> Hardlink {
     }
 }
 
-/// Observe every service the stack declares, or the reason it could not be read.
+/// Observe every service the stack declares, and every container running under the
+/// project that it does not — a plugin's among them — or the reason neither could be
+/// read.
 ///
 /// The reason is the operator-facing summary of whatever went wrong — an
 /// unreadable stack, an engine that would not answer — so the panel that carries
@@ -378,7 +386,7 @@ pub(super) fn hardlink_of(linked: &Linked) -> Hardlink {
 pub(super) async fn observe(
     ctx: &Ctx,
     manifest: Result<&Manifest, &String>,
-) -> Result<Vec<Service>, String> {
+) -> Result<(Vec<Service>, Vec<crate::docker::Undeclared>), String> {
     let manifest = manifest.map_err(Clone::clone)?;
     let profiles: Vec<String> = manifest
         .profiles
@@ -391,11 +399,15 @@ pub(super) async fn observe(
         .list(&ctx.settings.project)
         .await
         .map_err(|err| err.problem().summary)?;
-    Ok(survey(
-        manifest,
-        &profiles,
-        &containers,
-        &crate::app::engine::halted::load(ctx),
-        ctx.settings.protocols,
+    let halted = crate::app::engine::halted::load(ctx);
+    Ok((
+        survey(
+            manifest,
+            &profiles,
+            &containers,
+            &halted,
+            ctx.settings.protocols,
+        ),
+        crate::docker::undeclared(manifest, &containers, &halted),
     ))
 }

@@ -47,3 +47,42 @@ pub(crate) fn asking() -> Service {
 pub(crate) fn watching() -> Service {
     service("jellyfin", Some(Bind::Lan), Some(ApiKind::Jellyfin))
 }
+
+/// A plugin's service speaking `api`, published to the household through the stack's
+/// proxy at `label` where there is one, and reachable from this machine alone where
+/// there is not.
+pub(crate) fn brought(
+    id: &str,
+    api: Option<ApiKind>,
+    label: Option<&str>,
+) -> crate::plugin::Placed {
+    let mut placed = crate::test_support::a_placed(
+        id,
+        &[],
+        api.map(|kind| Api {
+            kind,
+            key_source: KeySource::Generated,
+            path: None,
+            version: None,
+        }),
+        Some(8000),
+    );
+    placed.name = format!("{id} the plugin's");
+    placed.reached = Some(match label {
+        Some(label) => crate::plugin::Reached::Household {
+            port: 8000,
+            hostname: label.to_owned(),
+            group: None,
+        },
+        None => crate::plugin::Reached::Loopback {
+            port: 8000,
+            group: None,
+        },
+    });
+    placed
+}
+
+/// An installed plugin holding `services`.
+pub(crate) fn installed(services: Vec<crate::plugin::Placed>) -> crate::plugin::Installed {
+    crate::test_support::an_installed("brought", services)
+}

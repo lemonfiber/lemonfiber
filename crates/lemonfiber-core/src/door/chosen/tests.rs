@@ -8,8 +8,9 @@ fn door(
     services: &[lemonfiber_manifest::Service],
     named: Option<&str>,
 ) -> (Chosen, Option<String>) {
-    let (chosen, door) = chosen(services, named);
-    (chosen, door.map(|(_, service)| service.id.clone()))
+    let candidates = crate::door::candidates(services, &[]);
+    let (chosen, door) = chosen(&candidates, named);
+    (chosen, door.map(|(_, candidate)| candidate.id.to_owned()))
 }
 
 /// The refusal a name comes back with, as the two things it carries.
@@ -179,5 +180,34 @@ fn how_a_door_was_chosen_reads_the_same_way_to_a_browser_as_to_a_person() {
             "door": { "named": "sonarr", "because": WITHHELD },
         })),
         "{refused:?}"
+    );
+}
+
+/// A plugin's service published to the household can be named as the door, and one
+/// reachable from this machine alone is refused for the reason the stack's would be.
+#[test]
+fn a_plugins_service_can_be_named_and_one_it_keeps_to_this_machine_cannot() {
+    use crate::door::fixtures::{brought, installed};
+    let plugin = installed(vec![
+        brought("requests", Some(ApiKind::Seerr), Some("ask")),
+        brought("hidden", Some(ApiKind::Seerr), None),
+    ]);
+    let services = [watching()];
+    let candidates = crate::door::candidates(&services, std::slice::from_ref(&plugin));
+    let named = |name: &str| {
+        let (chosen, door) = chosen(&candidates, Some(name));
+        (chosen, door.map(|(_, candidate)| candidate.id.to_owned()))
+    };
+
+    assert_eq!(
+        named("requests"),
+        (
+            Chosen::Named("requests".to_owned()),
+            Some("requests".to_owned())
+        )
+    );
+    assert_eq!(
+        named("hidden"),
+        (refused("hidden", WITHHELD), Some("requests".to_owned()))
     );
 }

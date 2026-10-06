@@ -176,6 +176,7 @@ pub(crate) fn read_settings() -> Settings {
         admission: here().map(|paths| paths.admission()),
         companion: here().map(|paths| paths.companion()),
         household_host: household_host_from_env(&recorded),
+        household_domain: lemonfiber_core::config::household_domain_from_env(&recorded),
         exposed: exposed_from_env(&recorded),
         unmanaged: lemonfiber_core::config::unmanaged_from_env(&recorded),
         front_door: front_door_from_env(&recorded),
