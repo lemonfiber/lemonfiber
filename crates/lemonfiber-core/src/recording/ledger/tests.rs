@@ -11,10 +11,6 @@ fn record(name: &str) -> std::path::PathBuf {
 }
 
 /// Lines noted together all arrive, each whole and in the order noted.
-///
-/// The second and third are noted while the first is being written, so whoever
-/// writes next takes both — and the one left with nothing to write leaves the file
-/// alone rather than writing an empty line.
 #[tokio::test]
 async fn lines_noted_together_all_arrive_whole() {
     let at = record("together");
@@ -28,6 +24,42 @@ async fn lines_noted_together_all_arrive_whole() {
 
     let written = std::fs::read_to_string(&at).unwrap_or_default();
     assert_eq!(written, "1 first\n2 second\n3 third\n");
+    let _ = at.parent().map(std::fs::remove_dir_all);
+}
+
+/// A line already written by whoever wrote before is not written again, and the one
+/// left with nothing to write leaves the file alone.
+///
+/// Both lines are queued while a write is held in progress, so whoever is let in first
+/// takes both and the other finds nothing waiting. Held here rather than left to how
+/// quickly a write finishes, which decides on its own whether anybody is left waiting.
+#[tokio::test]
+async fn whoever_writes_next_takes_every_line_queued_and_the_other_writes_nothing() {
+    let at = record("taken");
+    let ledger = std::sync::Arc::new(Ledger::at(at.clone()));
+    let held = ledger.writing.lock().await;
+
+    let first = tokio::spawn({
+        let ledger = ledger.clone();
+        async move { ledger.note("1 first".to_owned()).await }
+    });
+    let second = tokio::spawn({
+        let ledger = ledger.clone();
+        async move { ledger.note("2 second".to_owned()).await }
+    });
+    while ledger.waiting.lock().map_or(0, |waiting| waiting.len()) < 2 {
+        tokio::task::yield_now().await;
+    }
+    drop(held);
+    let (first, second) = tokio::join!(first, second);
+
+    assert!(first.is_ok() && second.is_ok());
+    let written = std::fs::read_to_string(&at).unwrap_or_default();
+    assert_eq!(written, "1 first\n2 second\n");
+    assert!(ledger
+        .waiting
+        .lock()
+        .is_ok_and(|waiting| waiting.is_empty()));
     let _ = at.parent().map(std::fs::remove_dir_all);
 }
 
