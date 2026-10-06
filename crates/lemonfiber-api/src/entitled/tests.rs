@@ -1,4 +1,4 @@
-use lemonfiber_core::app::{Command, Whom};
+use lemonfiber_core::app::{Command, Diagnosing, Whom};
 
 use super::{callable_by_a_key, may, Door, Permitted};
 use crate::admission::Caller;
@@ -238,11 +238,11 @@ fn an_act_key_calls_exactly_what_a_key_may_call() {
         Command::Seed,
         Command::Reset { confirm: true },
         Command::Forget { confirm: true },
-        Command::Doctor {
+        Command::Doctor(Diagnosing {
             narrowing: lemonfiber_core::doctor::Narrowing::Suite,
             disruptive: true,
             accept: Some("vpn.leak".to_owned()),
-        },
+        }),
     ] {
         assert_eq!(
             may(&acting, Door::Acting, refused),

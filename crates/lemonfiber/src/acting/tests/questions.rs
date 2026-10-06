@@ -1,6 +1,7 @@
 //! Questions: asked, typed at, picked from, and answered.
 
 use super::*;
+use lemonfiber_core::app::Tracing;
 
 /// Two stuck items, the second of them the one a test takes.
 fn two_stuck() -> StuckReport {
@@ -73,11 +74,11 @@ fn a_question_that_takes_a_word_is_typed_before_it_is_asked() {
 
     assert_eq!(
         acting.pressed(&Press::Accept),
-        Wanted::Carry(Command::Trace {
+        Wanted::Carry(Command::Trace(Tracing {
             term: "Expanse".to_owned(),
             season: None,
             searching: false,
-        })
+        }))
     );
 }
 
@@ -144,11 +145,11 @@ fn taking_one_of_the_stuck_items_follows_that_one() {
     acting.pressed(&Press::Forward);
     assert_eq!(
         acting.pressed(&Press::Accept),
-        Wanted::Carry(Command::Trace {
+        Wanted::Carry(Command::Trace(Tracing {
             term: "Dune".to_owned(),
             season: None,
             searching: false,
-        })
+        }))
     );
 
     // And what *that* comes to is read as an answer, under the question that led
@@ -206,11 +207,11 @@ fn a_stuck_entry_with_nothing_to_follow_by_is_not_offered() {
     assert!(showing(&acting).contains("> Dune"));
     assert_eq!(
         acting.pressed(&Press::Accept),
-        Wanted::Carry(Command::Trace {
+        Wanted::Carry(Command::Trace(Tracing {
             term: "Dune".to_owned(),
             season: None,
             searching: false,
-        })
+        }))
     );
 
     let mut acting = asking("what is stuck");

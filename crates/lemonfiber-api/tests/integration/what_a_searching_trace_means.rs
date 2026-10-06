@@ -47,7 +47,7 @@ use lemonfiber_api::events::live::Live;
 use lemonfiber_api::guard::Token;
 use lemonfiber_api::jobs::Jobs;
 use lemonfiber_api::router::Serving;
-use lemonfiber_core::app::Command;
+use lemonfiber_core::app::{Command, Tracing};
 use lemonfiber_fixtures::ports::{Chance, Stopped};
 
 /// The name the action is asked for under.
@@ -87,11 +87,11 @@ fn a_searching_trace_reaches_the_command_the_command_line_reaches() {
     // the whole of what this asks for beyond what the read already takes.
     assert_eq!(
         command(SEARCH, searching(None)),
-        Some(Command::Trace {
+        Some(Command::Trace(Tracing {
             term: FOLLOWED.to_owned(),
             season: None,
             searching: true,
-        })
+        }))
     );
 }
 
@@ -101,11 +101,11 @@ fn the_season_the_reading_was_narrowed_to_narrows_the_search_too() {
     // be spent on a report about every season of a show somebody asked about one of.
     assert_eq!(
         command(SEARCH, searching(Some(2))),
-        Some(Command::Trace {
+        Some(Command::Trace(Tracing {
             term: FOLLOWED.to_owned(),
             season: Some(2),
             searching: true,
-        })
+        }))
     );
 }
 

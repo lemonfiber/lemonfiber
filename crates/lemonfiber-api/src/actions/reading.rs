@@ -13,7 +13,7 @@
 //! place and the mapping beside them stays a mapping.
 
 use lemonfiber_core::app::restore;
-use lemonfiber_core::app::{Command, QualityAction};
+use lemonfiber_core::app::{Command, Diagnosing, QualityAction, Tracing};
 use lemonfiber_core::audio::Format;
 use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::quality::Preset;
@@ -126,10 +126,12 @@ pub(super) fn widening(action: &str, disruptive: Disturbing) -> Result<(), Refus
 
 /// The diagnosis a widened run asks for, narrowed as the reading it follows was.
 pub(super) fn diagnosing(only: Option<String>) -> Result<Command, Refused> {
-    narrowed(only).map(|narrowing| Command::Doctor {
-        narrowing,
-        disruptive: true,
-        accept: None,
+    narrowed(only).map(|narrowing| {
+        Command::Doctor(Diagnosing {
+            narrowing,
+            disruptive: true,
+            accept: None,
+        })
     })
 }
 
@@ -147,11 +149,11 @@ pub(super) fn following(term: Option<String>, season: Option<u32>) -> Result<Com
             action: "search".to_owned(),
             argument: "term".to_owned(),
         })?;
-    Ok(Command::Trace {
+    Ok(Command::Trace(Tracing {
         term,
         season,
         searching: true,
-    })
+    }))
 }
 
 /// A quality choice, which is two commands depending on what it is about.

@@ -92,8 +92,8 @@ pub mod watch;
 
 pub use command::{
     AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
-    Filling, Hostable, Keeping, Linking, MigrateAction, QualityAction, Removing, Setting, Whom,
-    HOSTABLE,
+    Diagnosing, Filling, Gathering, Hostable, Inviting, Keeping, LettingGo, Linking, MigrateAction,
+    QualityAction, Removing, Restoring, Setting, Teardown, Tracing, Whom, HOSTABLE,
 };
 pub(crate) mod outcome;
 pub use ctx::{Ctx, PATIENCE};
@@ -423,7 +423,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Up { forms } => lifecycle(ctx, &forms, Action::Up).await,
         Command::AtBoot => boot::at_boot(ctx).await.map(Outcome::Lifecycle),
         Command::Start { forms, services } => lifecycle(ctx, &forms, Action::Start(services)).await,
-        Command::Down { forms, wait } => down(ctx, &forms, wait).await,
+        Command::Down(Teardown { forms, wait }) => down(ctx, &forms, wait).await,
         Command::Halt { forms, services } => lifecycle(ctx, &forms, Action::Stop(services)).await,
         Command::Switch { forms } => engine::switch(ctx, &forms).await.map(Outcome::Lifecycle),
         Command::Restart { forms, services } => restarted(ctx, &forms, services).await,
@@ -436,11 +436,11 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::History => history::history(ctx).map(Outcome::History),
         Command::Migrate(action) => migration::migrate(ctx, action).await,
         Command::QualityMusic { format } => music::music(ctx, format).await.map(Outcome::Music),
-        Command::Trace {
+        Command::Trace(Tracing {
             term,
             season,
             searching,
-        } => traced(ctx, term, season, searching).await,
+        }) => traced(ctx, term, season, searching).await,
         Command::Held { member, most } => held::held(ctx, &member, most).await.map(Outcome::Held),
         Command::Household { member } => household::household(ctx, member.as_ref())
             .await
@@ -464,11 +464,11 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Explain { word } => worded(Some(&word)),
         Command::Glossary => worded(None),
         Command::Clients => Ok(guided(ctx)),
-        Command::Invite {
+        Command::Invite(Inviting {
             name,
             allowance: to,
             confirm,
-        } => invited(ctx, name, to, confirm).await,
+        }) => invited(ctx, name, to, confirm).await,
         Command::Reissue { name } => invite::reissue(ctx, name).await.map(Outcome::Invitation),
         Command::Handoff { name } => handoff::handoff(ctx, name).await.map(Outcome::Handoff),
         Command::Remove { name, confirm } => removed(ctx, name, confirm).await,
@@ -478,11 +478,11 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Provenance => engine::provenance(ctx).map(Outcome::Provenance),
         Command::QualityUpgrade { confirm } => upgraded(ctx, confirm).await,
         Command::Status { forms } => engine::status(ctx, &forms).await.map(Outcome::Status),
-        Command::Doctor {
+        Command::Doctor(Diagnosing {
             narrowing,
             disruptive,
             accept,
-        } => diagnosed(ctx, narrowing, disruptive, accept).await,
+        }) => diagnosed(ctx, narrowing, disruptive, accept).await,
         Command::Repair {
             consent,
             disruptive,
@@ -506,10 +506,10 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         // answered by the offer's own name. Apart from the account rather than an
         // argument to it, because a yes to reclaiming what costs nothing is not a yes
         // to losing a ratio a tracker keeps somebody's account on.
-        Command::StopSeeding {
+        Command::StopSeeding(LettingGo {
             download,
             agreement,
-        } => letting(ctx, download, agreement).await,
+        }) => letting(ctx, download, agreement).await,
         // And the same shape over the line rather than the disk: asked nothing it
         // reads, asked for a limit it declares one and tells every client.
         Command::Bandwidth(asked) => bandwidth::shared(ctx, &asked).await,
@@ -528,17 +528,17 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         // touches nothing; confirmed it takes those steps behind a backup.
         Command::Update(asked) => update::update(ctx, asked).await.map(Outcome::Update),
         Command::Backup { service } => backup::backup(ctx, service).await.map(Outcome::Backup),
-        Command::Support {
+        Command::Support(Gathering {
             write,
             wanted,
             dest,
-        } => bundled(ctx, wanted, write, dest).await,
+        }) => bundled(ctx, wanted, write, dest).await,
         Command::Archives => archives::archives(ctx).await.map(Outcome::Archives),
-        Command::Restore {
+        Command::Restore(Restoring {
             archive,
             repoint,
             consent,
-        } => restored(ctx, archive, repoint, consent).await,
+        }) => restored(ctx, archive, repoint, consent).await,
     }
 }
 

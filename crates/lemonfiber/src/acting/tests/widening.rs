@@ -1,6 +1,7 @@
 //! A diagnosis read and widened, and a trace followed further.
 
 use super::*;
+use lemonfiber_core::app::{Diagnosing, Tracing};
 
 /// The screen, having read a diagnosis and agreed to the checks that disturb.
 fn widened() -> Acting {
@@ -109,11 +110,11 @@ fn the_diagnosis_is_read_and_then_widened_under_its_own_report() {
 
     assert_eq!(
         acting.pressed(&Press::Accept),
-        Wanted::Carry(Command::Doctor {
+        Wanted::Carry(Command::Doctor(Diagnosing {
             narrowing: Narrowing::Suite,
             disruptive: false,
             accept: None,
-        })
+        }))
     );
 
     acting.came_to(Ok(Outcome::Doctor(report)));
@@ -133,11 +134,11 @@ fn the_diagnosis_is_read_and_then_widened_under_its_own_report() {
 
     assert_eq!(
         acting.pressed(&Press::Typed('y')),
-        Wanted::Carry(Command::Doctor {
+        Wanted::Carry(Command::Doctor(Diagnosing {
             narrowing: Narrowing::Suite,
             disruptive: true,
             accept: None,
-        })
+        }))
     );
 }
 
@@ -154,22 +155,22 @@ fn a_narrowed_diagnosis_is_widened_over_the_narrowing_it_was_asked_with() {
 
     assert_eq!(
         acting.pressed(&Press::Accept),
-        Wanted::Carry(Command::Doctor {
+        Wanted::Carry(Command::Doctor(Diagnosing {
             narrowing: Narrowing::Category(Category::Vpn),
             disruptive: false,
             accept: None,
-        })
+        }))
     );
 
     acting.came_to(Ok(Outcome::Doctor(a_diagnosis())));
 
     assert_eq!(
         acting.pressed(&Press::Typed('y')),
-        Wanted::Carry(Command::Doctor {
+        Wanted::Carry(Command::Doctor(Diagnosing {
             narrowing: Narrowing::Category(Category::Vpn),
             disruptive: true,
             accept: None,
-        })
+        }))
     );
 }
 
@@ -209,11 +210,11 @@ fn a_yes_over_a_trace_asks_the_indexers_about_the_show_it_followed() {
 
     assert_eq!(
         acting.pressed(&Press::Typed('y')),
-        Wanted::Carry(Command::Trace {
+        Wanted::Carry(Command::Trace(Tracing {
             term: "The Expanse".to_owned(),
             season: None,
             searching: true,
-        })
+        }))
     );
     // And the foot of the screen names the search rather than the checks, which
     // are not what is running.

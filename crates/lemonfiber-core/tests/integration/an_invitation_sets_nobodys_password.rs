@@ -31,7 +31,7 @@
 use std::sync::Arc;
 
 use crate::common::household::recorded_admin;
-use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Outcome};
+use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Inviting, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::ports::http::Request;
 use lemonfiber_fixtures::http::{Answer, Fake};
@@ -158,11 +158,11 @@ fn context(env: &std::path::Path, http: Arc<Fake>) -> Ctx {
 fn both_ways_an_account_becomes_claimable() -> Vec<(Command, Arc<Fake>)> {
     vec![
         (
-            Command::Invite {
+            Command::Invite(Inviting {
                 name: "ana".to_owned(),
                 allowance: Allowance::default(),
                 confirm: true,
-            },
+            }),
             a_server_holding_nobody(),
         ),
         (
@@ -200,11 +200,11 @@ async fn driving(
 async fn offering(scratch: &str) -> (Vec<Request>, Option<Outcome>) {
     driving(
         scratch,
-        Command::Invite {
+        Command::Invite(Inviting {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
             confirm: true,
-        },
+        }),
         a_server_holding_nobody(),
     )
     .await
@@ -218,7 +218,7 @@ async fn offering(scratch: &str) -> (Vec<Request>, Option<Outcome>) {
 async fn allowing(scratch: &str) -> (Vec<Request>, Option<Outcome>) {
     driving(
         scratch,
-        Command::Invite {
+        Command::Invite(Inviting {
             name: "ana".to_owned(),
             allowance: Allowance {
                 libraries: Vec::new(),
@@ -226,7 +226,7 @@ async fn allowing(scratch: &str) -> (Vec<Request>, Option<Outcome>) {
                 unrated: None,
             },
             confirm: true,
-        },
+        }),
         a_server_holding_nobody(),
     )
     .await

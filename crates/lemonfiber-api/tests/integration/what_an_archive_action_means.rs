@@ -32,7 +32,7 @@ use lemonfiber_api::jobs::Jobs;
 use lemonfiber_api::router::Serving;
 use lemonfiber_core::app::restore::{Consent, Kept};
 use lemonfiber_core::app::support::Destination;
-use lemonfiber_core::app::Command;
+use lemonfiber_core::app::{Command, Gathering, Restoring};
 use lemonfiber_core::bundle::run as bundle;
 use lemonfiber_core::bundle::Filenames;
 use lemonfiber_fixtures::ports::{Chance, Stopped};
@@ -100,7 +100,7 @@ fn a_bundle_goes_where_lemonfiber_keeps_its_own_files() {
     };
     assert_eq!(
         command("support", asked),
-        Some(Command::Support {
+        Some(Command::Support(Gathering {
             write: true,
             wanted: bundle::Wanted::asked(
                 50,
@@ -109,7 +109,7 @@ fn a_bundle_goes_where_lemonfiber_keeps_its_own_files() {
                 true
             ),
             dest: Destination::Kept,
-        })
+        }))
     );
     let named_a_path = serde_json::from_str::<Arguments>(r#"{"out":"/etc/lemonfiber.tar.gz"}"#);
     assert!(named_a_path.is_err(), "there is no such argument");
@@ -123,11 +123,11 @@ fn a_bundle_asked_for_without_a_window_takes_the_one_the_command_line_takes() {
     };
     assert_eq!(
         command("support", bare),
-        Some(Command::Support {
+        Some(Command::Support(Gathering {
             write: true,
             wanted: bundle::Wanted::default(),
             dest: Destination::Kept,
-        })
+        }))
     );
 }
 
@@ -137,11 +137,11 @@ fn a_restore_names_one_of_this_machines_backups_rather_than_a_path() {
     // the core, so nothing this surface hands over is a path the server can read.
     assert_eq!(
         command("restore", restoring(true, true)),
-        Some(Command::Restore {
+        Some(Command::Restore(Restoring {
             archive: Kept::Named(KEPT.to_owned()),
             repoint: true,
             consent: Consent::Standing,
-        })
+        }))
     );
 }
 
@@ -160,13 +160,13 @@ fn a_restore_carries_the_listing_its_yes_was_read_in() {
     };
     assert_eq!(
         command("restore", answered),
-        Some(Command::Restore {
+        Some(Command::Restore(Restoring {
             archive: Kept::Named(KEPT.to_owned()),
             repoint: true,
             consent: Consent::Given {
                 listing: LISTING.to_owned()
             },
-        })
+        }))
     );
 
     // A listing named without the yes is an answer to a question nobody was asked:

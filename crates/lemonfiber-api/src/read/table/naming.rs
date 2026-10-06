@@ -10,7 +10,7 @@
 //! The reads that take nothing have no function here, which is the shape of the file
 //! rather than an omission: there is nothing for them to mean.
 
-use lemonfiber_core::app::{Command, Removing, Waiting, Whom};
+use lemonfiber_core::app::{Command, Diagnosing, Removing, Tracing, Waiting, Whom};
 use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::uninstall::Tier;
 use lemonfiber_core::update::run as update;
@@ -52,11 +52,11 @@ pub(super) fn moving(what: Option<&str>, to: Option<String>) -> Result<Command, 
 /// A read looks and does not touch, so it neither accepts a warning nor opts into
 /// the checks that disturb a running system; both of those change something.
 pub(super) const fn diagnosing(narrowing: Narrowing) -> Command {
-    Command::Doctor {
+    Command::Doctor(Diagnosing {
         narrowing,
         disruptive: false,
         accept: None,
-    }
+    })
 }
 
 /// The diagnosis a request asked for, or nothing where it named a group of checks
@@ -201,9 +201,9 @@ pub(super) fn following(term: Option<String>, season: Option<&str>) -> Result<Co
     let Ok(season) = season.map(str::parse::<u32>).transpose() else {
         return Err(Refusal::NotASeason);
     };
-    Ok(Command::Trace {
+    Ok(Command::Trace(Tracing {
         term,
         season,
         searching: false,
-    })
+    }))
 }

@@ -1,6 +1,7 @@
 //! What an invitation is refused over, and what it says when it is.
 
 use super::*;
+use crate::app::Inviting;
 
 /// The record is read from further back than the window it is judged against.
 ///
@@ -51,11 +52,11 @@ async fn the_record_is_read_from_further_back_than_the_window_it_judges() {
         .with_http(http);
 
     let _ = dispatch(
-        Command::Invite {
+        Command::Invite(Inviting {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
             confirm: true,
-        },
+        }),
         &ctx,
     )
     .await;
@@ -116,11 +117,11 @@ async fn an_invitation_serialises_under_its_own_kind() {
         .with_http(http);
 
     let json = dispatch(
-        Command::Invite {
+        Command::Invite(Inviting {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
             confirm: true,
-        },
+        }),
         &ctx,
     )
     .await
@@ -145,11 +146,11 @@ async fn offering_an_account_over_an_unreadable_stack_says_so() {
 
     assert!(
         dispatch(
-            Command::Invite {
+            Command::Invite(Inviting {
                 name: "ana".to_owned(),
                 allowance: Allowance::default(),
                 confirm: true,
-            },
+            }),
             &ctx,
         )
         .await
@@ -209,11 +210,11 @@ async fn an_invitation_the_server_will_not_withdraw_is_not_reported_as_withdrawn
         .with_http(http);
 
     let made = dispatch(
-        Command::Invite {
+        Command::Invite(Inviting {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
             confirm: true,
-        },
+        }),
         &ctx,
     )
     .await;
@@ -255,11 +256,11 @@ async fn a_media_server_that_refuses_the_account_is_reported() {
         .with_http(http);
 
     let refused = dispatch(
-        Command::Invite {
+        Command::Invite(Inviting {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
             confirm: true,
-        },
+        }),
         &ctx,
     )
     .await;
@@ -309,11 +310,11 @@ async fn a_sweep_that_cannot_run_still_makes_the_invitation() {
         .with_http(http);
 
     let made = dispatch(
-        Command::Invite {
+        Command::Invite(Inviting {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
             confirm: true,
-        },
+        }),
         &ctx,
     )
     .await;
@@ -363,11 +364,11 @@ async fn offering_an_account_without_a_media_server_says_there_is_nowhere_to_mak
         .with_http(Fake::silent());
 
     let refused = dispatch(
-        Command::Invite {
+        Command::Invite(Inviting {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
             confirm: true,
-        },
+        }),
         &ctx,
     )
     .await;
@@ -387,11 +388,11 @@ async fn offering_an_account_before_setup_is_refused_rather_than_attempted() {
     let ctx = a_context().build().with_http(Fake::silent());
 
     let refused = dispatch(
-        Command::Invite {
+        Command::Invite(Inviting {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
             confirm: true,
-        },
+        }),
         &ctx,
     )
     .await;

@@ -1,6 +1,7 @@
 //! Diagnoses, removals, credentials and what is already here, as commands.
 
 use super::*;
+use lemonfiber_core::app::Diagnosing;
 
 /// The start a login makes is asked for by the same word as the other two, and
 /// takes no forms.
@@ -88,11 +89,11 @@ fn a_notification_preset_is_taken_by_name_and_refused_by_name() {
 fn a_diagnosis_carries_what_it_was_narrowed_to() {
     assert_eq!(
         diagnosing(Some("storage.space"), true, Some("STORAGE-1".to_owned())),
-        Ok(Command::Doctor {
+        Ok(Command::Doctor(Diagnosing {
             narrowing: Narrowing::Check("storage.space".to_owned()),
             disruptive: true,
             accept: Some("STORAGE-1".to_owned()),
-        })
+        }))
     );
 }
 

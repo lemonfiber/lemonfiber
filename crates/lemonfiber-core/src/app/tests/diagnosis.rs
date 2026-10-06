@@ -1,6 +1,7 @@
 //! A diagnosis: which checks run, and what their findings carry.
 
 use super::*;
+use crate::app::{Diagnosing, Teardown};
 
 fn diagnosis(
     outcome: Result<Outcome, Box<super::super::Problem>>,
@@ -96,10 +97,10 @@ async fn asking_twice_is_not_an_error_the_second_time() {
         Command::Up {
             forms: vec!["library".to_owned()],
         },
-        Command::Down {
+        Command::Down(Teardown {
             forms: vec!["library".to_owned()],
             wait: Waiting::Never,
-        },
+        }),
         Command::Switch {
             forms: vec!["library".to_owned()],
         },
@@ -128,11 +129,11 @@ async fn asking_twice_is_not_an_error_the_second_time() {
 async fn a_run_with_no_service_in_trouble_quotes_nothing() {
     let report = diagnosis(
         dispatch(
-            Command::Doctor {
+            Command::Doctor(Diagnosing {
                 narrowing: Narrowing::Category(Category::Environment),
                 disruptive: false,
                 accept: None,
-            },
+            }),
             &watching(Reporting::holding(
                 &LIBRARY,
                 Lifecycle::Running,
@@ -352,11 +353,11 @@ async fn doctor_runs_the_checks_and_reports_them_in_the_envelope() {
         Lifecycle::Running,
         Health::Healthy,
     ));
-    let command = Command::Doctor {
+    let command = Command::Doctor(Diagnosing {
         narrowing: Narrowing::Category(Category::Vpn),
         disruptive: false,
         accept: None,
-    };
+    });
     let outcome = dispatch(command, &ctx).await;
 
     let json = outcome
@@ -389,11 +390,11 @@ async fn a_full_doctor_run_includes_the_quality_guide_check() {
         Health::Healthy,
     ));
     let outcome = dispatch(
-        Command::Doctor {
+        Command::Doctor(Diagnosing {
             narrowing: Narrowing::Suite,
             disruptive: false,
             accept: None,
-        },
+        }),
         &ctx,
     )
     .await;
@@ -425,11 +426,11 @@ async fn naming_one_check_runs_that_check_alone() {
         Health::Healthy,
     ));
     let outcome = dispatch(
-        Command::Doctor {
+        Command::Doctor(Diagnosing {
             narrowing: Narrowing::Check("services.quality-guides".to_owned()),
             disruptive: false,
             accept: None,
-        },
+        }),
         &ctx,
     )
     .await;
@@ -460,11 +461,11 @@ async fn a_check_this_stack_does_not_report_is_refused() {
         Health::Healthy,
     ));
     let outcome = dispatch(
-        Command::Doctor {
+        Command::Doctor(Diagnosing {
             narrowing: Narrowing::Check("services.nothing-of-the-kind".to_owned()),
             disruptive: false,
             accept: None,
-        },
+        }),
         &ctx,
     )
     .await;
@@ -513,11 +514,11 @@ async fn doctor_reports_an_unreadable_stack_rather_than_guessing() {
         .over(nowhere)
         .build();
     let outcome = dispatch(
-        Command::Doctor {
+        Command::Doctor(Diagnosing {
             narrowing: Narrowing::Suite,
             disruptive: false,
             accept: None,
-        },
+        }),
         &ctx,
     )
     .await;

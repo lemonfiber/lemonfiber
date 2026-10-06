@@ -31,7 +31,7 @@ use lemonfiber_api::events::live::Live;
 use lemonfiber_api::guard::Token;
 use lemonfiber_api::jobs::Jobs;
 use lemonfiber_api::router::Serving;
-use lemonfiber_core::app::Command;
+use lemonfiber_core::app::{Command, Diagnosing};
 use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::repair::run::Consent;
 use lemonfiber_fixtures::ports::{Chance, Stopped};
@@ -243,11 +243,11 @@ fn accepting_a_warning_names_the_check_it_is_answering() {
     };
     assert_eq!(
         command("accept", asked),
-        Some(Command::Doctor {
+        Some(Command::Doctor(Diagnosing {
             narrowing: Narrowing::Suite,
             disruptive: false,
             accept: Some("vpn.unprotected".to_owned()),
-        })
+        }))
     );
 }
 
@@ -263,11 +263,11 @@ fn accepting_a_warning_a_disturbing_check_raised_says_to_run_those_too() {
     };
     assert_eq!(
         command("accept", asked),
-        Some(Command::Doctor {
+        Some(Command::Doctor(Diagnosing {
             narrowing: Narrowing::Suite,
             disruptive: true,
             accept: Some("vpn.killswitch".to_owned()),
-        })
+        }))
     );
 }
 

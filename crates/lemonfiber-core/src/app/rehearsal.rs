@@ -33,7 +33,9 @@
 use crate::error::{Amiss, Problem, Remedy, Severity, State};
 use crate::model::kind::{self, Kind};
 
-use super::command::{Asking, Keeping, Linking, MigrateAction};
+use super::command::{
+    Asking, Diagnosing, Gathering, Keeping, Linking, MigrateAction, Restoring, Teardown, Tracing,
+};
 use super::disturbance::Situation;
 use super::engine::Waiting;
 use super::plugins;
@@ -217,7 +219,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Credentials(Asking::Read | Asking::Reveal { .. }) => reads("credentials"),
         Command::Hosting(Keeping::Read) => reads("hosting"),
         Command::Setup(SetupAction::Where) => reads("setup --status"),
-        Command::Support { write: false, .. } => reads("support"),
+        Command::Support(Gathering { write: false, .. }) => reads("support"),
         // Its own doc comment is the verdict: it replaces nothing, and what it answers
         // with is the command for whichever tool owns the copy that is running. It was
         // refusing the flag it did not need to refuse, which costs an operator a run
@@ -230,21 +232,21 @@ pub const fn asked(command: &Command) -> Asked {
         // asked. Refused rather than reported because the asking is the part with a
         // cost: an indexer allows a fixed number of queries a day, and one spent on
         // a rehearsal is one the operator no longer has.
-        Command::Trace {
+        Command::Trace(Tracing {
             searching: true, ..
-        } => cannot("trace --search", A_SEARCH_IS_THE_ANSWER),
-        Command::Trace { .. } => reads("trace"),
+        }) => cannot("trace --search", A_SEARCH_IS_THE_ANSWER),
+        Command::Trace(_) => reads("trace"),
 
         // The killswitch check *is* the disruption. It takes the tunnel's own route
         // down inside the container and watches what the rest of the stack does,
         // which is the only way to find out whether anything leaks. A rehearsal of it
         // could report the intent and nothing about the outcome, and the outcome is
         // the whole of what was asked for.
-        Command::Doctor {
+        Command::Doctor(Diagnosing {
             disruptive: true, ..
-        } => cannot("doctor --disruptive", THE_CHECK_IS_THE_DISRUPTION),
-        Command::Doctor { accept: None, .. } => reads("doctor"),
-        Command::Doctor { .. } => reports("doctor --accept", &[kind::DOCTOR]),
+        }) => cannot("doctor --disruptive", THE_CHECK_IS_THE_DISRUPTION),
+        Command::Doctor(Diagnosing { accept: None, .. }) => reads("doctor"),
+        Command::Doctor(_) => reports("doctor --accept", &[kind::DOCTOR]),
 
         // Same shape, for the same reason: a walk adds an item, waits for the stack to
         // do something with it, and reports what actually happened at each stage. What
@@ -260,11 +262,11 @@ pub const fn asked(command: &Command) -> Asked {
         // understand why a four-in-the-morning start gave up when it did.
         Command::AtBoot => reports("up --at-boot", LIFECYCLE).disturbing(Situation::Starting),
         Command::Start { .. } => reports("start", LIFECYCLE).disturbing(Situation::Starting),
-        Command::Down {
+        Command::Down(Teardown {
             wait: Waiting::ForTheDownloads,
             ..
-        } => reports("down", LIFECYCLE).disturbing(Situation::StoppingAfterDownloads),
-        Command::Down { .. } => reports("down", LIFECYCLE).disturbing(Situation::Stopping),
+        }) => reports("down", LIFECYCLE).disturbing(Situation::StoppingAfterDownloads),
+        Command::Down(_) => reports("down", LIFECYCLE).disturbing(Situation::Stopping),
         Command::Halt { .. } => reports("stop", LIFECYCLE).disturbing(Situation::Stopping),
         Command::Switch { .. } => reports("switch", LIFECYCLE).disturbing(Situation::Switching),
         Command::Restart { .. } => reports("restart", LIFECYCLE).disturbing(Situation::Restarting),
@@ -303,12 +305,12 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Deciding(_) => reports("decide", HOUSEHOLD),
         Command::Expiring(_) => reports("expiring", HOUSEHOLD),
         Command::Hosting(_) => reports("hosting", &[kind::HOSTING]),
-        Command::Invite { .. } => reports("invite", &[kind::INVITATION]),
+        Command::Invite(_) => reports("invite", &[kind::INVITATION]),
         Command::Reissue { .. } => reports("reissue", &[kind::INVITATION]),
         Command::Handoff { .. } => reports("household handoff", &[kind::HANDOFF]),
         Command::Forget { .. } => reports("forget", &[kind::STORED]),
         Command::Space { .. } => reports("space", &[kind::SPACE]),
-        Command::StopSeeding { .. } => reports("stop-seeding", &[kind::STOP_SEEDING]),
+        Command::StopSeeding(_) => reports("stop-seeding", &[kind::STOP_SEEDING]),
         Command::Bandwidth(_) => reports("bandwidth", &[kind::BANDWIDTH]),
         Command::Downloads(_) => reports("downloads", &[kind::PAUSING]),
         Command::Keys(asked) => keyed::keyed(asked),
@@ -345,8 +347,8 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Repair { .. } => reports("doctor --fix", &[kind::REPAIR]),
         Command::Reset { .. } => reports("reset", &[kind::RESET]),
         Command::Update(_) => reports("update", &[kind::UPDATE]),
-        Command::Restore { .. } => reports("restore", &[kind::RESTORE]),
-        Command::Support { .. } => reports("support --write", &[kind::BUNDLE]),
+        Command::Restore(_) => reports("restore", &[kind::RESTORE]),
+        Command::Support(_) => reports("support --write", &[kind::BUNDLE]),
 
         // Setup is split where the split is real, the way `credentials` and `doctor`
         // are. Reading where the walk stands changes nothing; every other step records
@@ -418,13 +420,10 @@ fn unconfirmed(command: Command) -> Command {
             confirm: false,
             ..asked
         }),
-        Command::Restore {
-            archive, repoint, ..
-        } => Command::Restore {
-            archive,
-            repoint,
+        Command::Restore(asked) => Command::Restore(Restoring {
             consent: restore::Consent::List,
-        },
+            ..asked
+        }),
         Command::Repair { disruptive, .. } => Command::Repair {
             consent: repair::Consent::Offer,
             disruptive,
@@ -434,11 +433,10 @@ fn unconfirmed(command: Command) -> Command {
         // The description is the rehearsal, and it is the better command to be asked
         // for it — an operator deciding whether to produce the archive wants the size
         // and the path at the one moment the answer can still change what they do.
-        Command::Support { wanted, dest, .. } => Command::Support {
+        Command::Support(asked) => Command::Support(Gathering {
             write: false,
-            wanted,
-            dest,
-        },
+            ..asked
+        }),
         // Everything else either changes nothing, reports for itself, or refuses the
         // flag outright — none of which a withheld confirmation would change.
         other => other,

@@ -30,7 +30,7 @@
 use std::sync::Arc;
 
 use crate::common::household::recorded_admin;
-use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Outcome};
+use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Inviting, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::ports::http::Request;
 use lemonfiber_fixtures::http::{Answer, Fake};
@@ -182,11 +182,11 @@ async fn driving(
     let ctx = context(&env, http.clone());
 
     let made = dispatch(
-        Command::Invite {
+        Command::Invite(Inviting {
             name: "ana".to_owned(),
             allowance,
             confirm: true,
-        },
+        }),
         &ctx,
     )
     .await;

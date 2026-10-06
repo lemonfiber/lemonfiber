@@ -1,6 +1,8 @@
 //! What an invitation, a bundle and a trace ask for beyond a key.
 
 use super::*;
+use lemonfiber_core::app::Gathering;
+use lemonfiber_core::app::Inviting;
 
 /// Taking back at an empty second line takes back the first word, which is the
 /// only way a question asked two of them has of correcting the first.
@@ -76,14 +78,16 @@ fn an_invitation_is_asked_which_libraries_and_how_far_up_the_ratings() {
 
     // What it would grant is asked of the core before anything is made: the
     // offer goes out unconfirmed, and what came back is what the yes is under.
-    let offered = |confirm| Command::Invite {
-        name: "ana".to_owned(),
-        allowance: Allowance {
-            libraries: vec!["Films".to_owned()],
-            age_limit: Some(12),
-            unrated: Some(lemonfiber_core::ports::service::Unrated::HeldBack),
-        },
-        confirm,
+    let offered = |confirm| {
+        Command::Invite(Inviting {
+            name: "ana".to_owned(),
+            allowance: Allowance {
+                libraries: vec!["Films".to_owned()],
+                age_limit: Some(12),
+                unrated: Some(lemonfiber_core::ports::service::Unrated::HeldBack),
+            },
+            confirm,
+        })
     };
     assert_eq!(
         acting.pressed(&Press::Accept),
@@ -144,11 +148,11 @@ fn a_bundle_is_asked_how_much_log_and_what_becomes_of_filenames() {
 
     assert_eq!(
         describing,
-        Wanted::Carry(Command::Support {
+        Wanted::Carry(Command::Support(Gathering {
             write: false,
             wanted: Bundled::asked(50, Filenames::Shown, Vec::new(), false),
             dest: Destination::Kept,
-        })
+        }))
     );
 
     acting.came_to(Ok(Outcome::Bundle(a_bundle())));
@@ -158,11 +162,11 @@ fn a_bundle_is_asked_how_much_log_and_what_becomes_of_filenames() {
     assert!(asked.contains("media filenames shown"), "{asked}");
     assert_eq!(
         acting.pressed(&Press::Typed('y')),
-        Wanted::Carry(Command::Support {
+        Wanted::Carry(Command::Support(Gathering {
             write: true,
             wanted: Bundled::asked(50, Filenames::Shown, Vec::new(), true),
             dest: Destination::Kept,
-        })
+        }))
     );
 }
 
@@ -196,11 +200,11 @@ fn the_window_a_bundle_is_given_takes_digits_and_nothing_else() {
 
     assert_eq!(
         describing,
-        Wanted::Carry(Command::Support {
+        Wanted::Carry(Command::Support(Gathering {
             write: false,
             wanted: Bundled::default(),
             dest: Destination::Kept,
-        })
+        }))
     );
 }
 

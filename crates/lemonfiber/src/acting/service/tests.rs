@@ -5,7 +5,7 @@ use crate::acting::offer::tests::{a_form_taken, offering};
 use crate::acting::offer::Choice;
 use crate::acting::{Press, Stage};
 use lemonfiber_api::actions::{named, Arguments, TAKES_SERVICE, TAKES_SERVICES};
-use lemonfiber_core::app::{Command, Waiting};
+use lemonfiber_core::app::{Command, Teardown, Waiting};
 use lemonfiber_core::dashboard::Panel;
 use lemonfiber_core::docker::{Criticality, Service, State};
 
@@ -270,10 +270,10 @@ fn naming_no_service_goes_on_with_what_was_already_named() {
     assert_eq!(about(&stage).as_deref(), Some("Full stack"));
     assert_eq!(
         carried(&stage),
-        Some(Command::Down {
+        Some(Command::Down(Teardown {
             forms: vec!["full".to_owned()],
             wait: Waiting::Never,
-        })
+        }))
     );
 }
 

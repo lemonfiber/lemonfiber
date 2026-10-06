@@ -19,7 +19,7 @@
 //! fact about the wire, and it is what the requirement about one member seeing
 //! another's requests asks for.
 
-use lemonfiber_core::app::{Command, Whom};
+use lemonfiber_core::app::{Command, Diagnosing, Whom};
 use lemonfiber_core::keys::Scope;
 
 use crate::admission::Caller;
@@ -117,7 +117,7 @@ pub const fn callable_by_a_key(command: &Command) -> bool {
     matches!(
         command,
         Command::Restart { .. }
-            | Command::Doctor { accept: None, .. }
+            | Command::Doctor(Diagnosing { accept: None, .. })
             | Command::Update(_)
             | Command::Downloads(_)
     )

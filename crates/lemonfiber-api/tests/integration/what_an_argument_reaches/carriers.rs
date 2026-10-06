@@ -10,6 +10,8 @@ use lemonfiber_core::app::plugins::Asked as Installing;
 use lemonfiber_core::app::restore::{Consent as RestoreConsent, Kept};
 use lemonfiber_core::app::{Answer, Chosen, Decision, Filling, Keeping, Linking};
 use lemonfiber_core::app::{Command, MigrateAction, QualityAction, Setting, Waiting};
+use lemonfiber_core::app::{Diagnosing, Gathering, Restoring, Teardown, Tracing};
+use lemonfiber_core::app::{Inviting, LettingGo};
 use lemonfiber_core::bundle::run::Wanted;
 use lemonfiber_core::bundle::Filenames;
 use lemonfiber_core::doctor::Narrowing;
@@ -39,7 +41,7 @@ pub(super) fn refusal(action: &str, given: Arguments) -> Option<Refused> {
 fn carries_forms(command: &Command) -> bool {
     match command {
         Command::Up { forms }
-        | Command::Down { forms, .. }
+        | Command::Down(Teardown { forms, .. })
         | Command::Switch { forms }
         | Command::Pull { forms }
         | Command::Watch { forms }
@@ -55,10 +57,10 @@ fn carries_forms(command: &Command) -> bool {
 fn carries_wait(command: &Command) -> bool {
     matches!(
         command,
-        Command::Down {
+        Command::Down(Teardown {
             wait: Waiting::ForTheDownloads,
             ..
-        } | Command::ConfigSet(Setting {
+        }) | Command::ConfigSet(Setting {
             waiting: Waiting::ForTheDownloads,
             ..
         })
@@ -114,22 +116,22 @@ fn carries_agreement(command: &Command) -> bool {
             | Command::Reset { confirm: true }
             | Command::Forget { confirm: true }
             | Command::Remove { confirm: true, .. }
-            | Command::Invite { confirm: true, .. }
+            | Command::Invite(Inviting { confirm: true, .. })
             | Command::Migrate(MigrateAction::Act {
                 confirmed: true,
                 ..
             })
-            | Command::Restore {
+            | Command::Restore(Restoring {
                 consent: RestoreConsent::Given { .. } | RestoreConsent::Standing,
                 ..
-            }
-            | Command::Support {
+            })
+            | Command::Support(Gathering {
                 wanted: Wanted {
                     confirmed: true,
                     ..
                 },
                 ..
-            }
+            })
     ) || carries_a_yes(command)
         || matches!(command, Command::Uninstall(asked) if asked.confirm)
         || matches!(command, Command::Update(asked) if asked.confirm)
@@ -149,7 +151,7 @@ fn carries_a_yes(command: &Command) -> bool {
 
 /// Whether the command has the check whose warning is being answered in it.
 fn carries_check(command: &Command) -> bool {
-    matches!(command, Command::Doctor { accept: Some(check), .. } if check == WARNED)
+    matches!(command, Command::Doctor(Diagnosing { accept: Some(check), .. }) if check == WARNED)
 }
 
 /// Whether the command was told to do the widened thing rather than the plain one.
@@ -163,13 +165,13 @@ fn carries_disruption(command: &Command) -> bool {
         Command::Repair {
             disruptive: true,
             ..
-        } | Command::Doctor {
+        } | Command::Doctor(Diagnosing {
             disruptive: true,
             ..
-        } | Command::Trace {
+        }) | Command::Trace(Tracing {
             searching: true,
             ..
-        }
+        })
     )
 }
 
@@ -183,18 +185,18 @@ fn carries_offer(command: &Command) -> bool {
             consent: Consent::Given { offer, .. },
             ..
         } => offer == OFFER,
-        Command::Restore {
+        Command::Restore(Restoring {
             consent: RestoreConsent::Given { listing },
             ..
-        } => listing == OFFER,
+        }) => listing == OFFER,
         // Letting a download go and reclaiming room have no other way of saying yes at
         // all: the offer's own name is the agreement, so an offer dropped here is a
         // removal nobody could ask for — and one silently kept would be a removal
         // nobody read the cost or the list of.
-        Command::StopSeeding {
+        Command::StopSeeding(LettingGo {
             agreement: Some(named),
             ..
-        }
+        })
         | Command::Space {
             agreement: Some(named),
         } => named == OFFER,
@@ -231,7 +233,7 @@ fn carries_tier(command: &Command) -> bool {
 
 /// Whether the command has the completed download it was told to stop seeding in it.
 fn carries_download(command: &Command) -> bool {
-    matches!(command, Command::StopSeeding { download, .. } if download == DOWNLOAD)
+    matches!(command, Command::StopSeeding(LettingGo { download, .. }) if download == DOWNLOAD)
 }
 
 fn give_download(given: &mut Arguments) {
@@ -259,7 +261,7 @@ fn carries_service(command: &Command) -> bool {
 /// Whether the command has the archive it was named in it, as a name rather than a
 /// path — which is the whole of what a browser may ask to be read.
 fn carries_archive(command: &Command) -> bool {
-    matches!(command, Command::Restore { archive: Kept::Named(name), .. } if name == ARCHIVE)
+    matches!(command, Command::Restore(Restoring { archive: Kept::Named(name), .. }) if name == ARCHIVE)
 }
 
 /// Whether the command names the run it was given.
@@ -269,36 +271,36 @@ fn carries_at(command: &Command) -> bool {
 
 /// Whether the command has the accepted re-point in it.
 fn carries_repoint(command: &Command) -> bool {
-    matches!(command, Command::Restore { repoint: true, .. })
+    matches!(command, Command::Restore(Restoring { repoint: true, .. }))
 }
 
 /// Whether the command was told to produce the file rather than describe one.
 fn carries_write(command: &Command) -> bool {
-    matches!(command, Command::Support { write: true, .. })
+    matches!(command, Command::Support(Gathering { write: true, .. }))
 }
 
 /// Whether the command has the log window it was given in it.
 fn carries_logs(command: &Command) -> bool {
-    matches!(command, Command::Support { wanted, .. } if wanted.lines == LOGS)
+    matches!(command, Command::Support(Gathering { wanted, .. }) if wanted.lines == LOGS)
 }
 
 /// Whether the command was told to leave media filenames as they are.
 fn carries_filenames(command: &Command) -> bool {
     matches!(
         command,
-        Command::Support {
+        Command::Support(Gathering {
             wanted: Wanted {
                 filenames: Filenames::Shown,
                 ..
             },
             ..
-        }
+        })
     )
 }
 
 /// Whether the command has the settings it was told to show as they are.
 fn carries_reveal(command: &Command) -> bool {
-    matches!(command, Command::Support { wanted, .. } if !wanted.reveal.is_empty())
+    matches!(command, Command::Support(Gathering { wanted, .. }) if !wanted.reveal.is_empty())
 }
 
 fn give_forms(given: &mut Arguments) {
@@ -376,7 +378,7 @@ fn give_item(given: &mut Arguments) {
 
 /// Whether the command has the title it was told to follow in it.
 fn carries_term(command: &Command) -> bool {
-    matches!(command, Command::Trace { term, .. } if term == FOLLOWED)
+    matches!(command, Command::Trace(Tracing { term, .. }) if term == FOLLOWED)
 }
 
 fn give_term(given: &mut Arguments) {
@@ -387,10 +389,10 @@ fn give_term(given: &mut Arguments) {
 fn carries_season(command: &Command) -> bool {
     matches!(
         command,
-        Command::Trace {
+        Command::Trace(Tracing {
             season: Some(SEASON),
             ..
-        }
+        })
     )
 }
 
@@ -471,7 +473,7 @@ fn give_unrestricted_for(given: &mut Arguments) {
 
 /// Whether the command has the libraries it was told they may open in it.
 fn carries_libraries(command: &Command) -> bool {
-    matches!(command, Command::Invite { allowance, .. }
+    matches!(command, Command::Invite(Inviting { allowance, .. })
         if allowance.libraries.iter().any(|named| named == LIBRARY))
 }
 
@@ -482,7 +484,7 @@ fn give_libraries(given: &mut Arguments) {
 /// Whether the command has the age limit it was given in it, as the age it was given
 /// as — the media server keeps an age, so there is nothing here to translate.
 fn carries_age_limit(command: &Command) -> bool {
-    matches!(command, Command::Invite { allowance, .. } if allowance.age_limit == Some(AGE))
+    matches!(command, Command::Invite(Inviting { allowance, .. }) if allowance.age_limit == Some(AGE))
 }
 
 fn give_age_limit(given: &mut Arguments) {
@@ -494,7 +496,7 @@ fn give_age_limit(given: &mut Arguments) {
 /// The word given is the one a restriction does *not* default to, so a command that
 /// dropped it and fell to the default cannot pass for one that carried it.
 fn carries_unrated(command: &Command) -> bool {
-    matches!(command, Command::Invite { allowance, .. }
+    matches!(command, Command::Invite(Inviting { allowance, .. })
         if allowance.unrated == Some(Unrated::LetThrough))
 }
 
@@ -510,10 +512,10 @@ fn give_check(given: &mut Arguments) {
 fn carries_narrowing(command: &Command) -> bool {
     matches!(
         command,
-        Command::Doctor {
+        Command::Doctor(Diagnosing {
             narrowing: Narrowing::Check(id),
             ..
-        } if id == NARROWED
+        }) if id == NARROWED
     )
 }
 

@@ -1,6 +1,7 @@
 //! Versions, traces and what has stopped, read.
 
 use super::reading::*;
+use lemonfiber_core::app::Tracing;
 
 #[tokio::test]
 async fn the_versions_in_play_are_the_envelope_the_command_renders() {
@@ -31,11 +32,11 @@ async fn the_versions_in_play_are_carried_in_their_own_envelope() {
 async fn following_one_item_is_the_envelope_the_command_renders() {
     let expected = as_the_command_renders_it(
         &world(running(), stack()),
-        Command::Trace {
+        Command::Trace(Tracing {
             term: "the expanse".to_owned(),
             season: None,
             searching: false,
-        },
+        }),
     )
     .await;
 
@@ -63,11 +64,11 @@ async fn the_term_a_trace_followed_is_the_term_that_was_asked_for() {
 async fn a_season_narrows_a_trace_the_way_it_narrows_the_command() {
     let expected = as_the_command_renders_it(
         &world(running(), stack()),
-        Command::Trace {
+        Command::Trace(Tracing {
             term: "the expanse".to_owned(),
             season: Some(2),
             searching: false,
-        },
+        }),
     )
     .await;
 

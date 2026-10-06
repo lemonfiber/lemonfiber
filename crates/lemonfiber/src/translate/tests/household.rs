@@ -2,6 +2,7 @@
 
 use super::*;
 use lemonfiber::cli::RawWhom;
+use lemonfiber_core::app::Inviting;
 use lemonfiber_core::app::Whom;
 
 /// The two flags that narrow a household word, as the command line took them.
@@ -243,7 +244,7 @@ fn an_invitation_carries_what_was_chosen_as_one_allowance() {
                 unrated: Some(RawUnrated::Block),
             }
         ),
-        Command::Invite {
+        Command::Invite(Inviting {
             name: "ada".to_owned(),
             allowance: Allowance {
                 libraries: vec!["Films".to_owned()],
@@ -251,7 +252,7 @@ fn an_invitation_carries_what_was_chosen_as_one_allowance() {
                 unrated: Some(Unrated::HeldBack),
             },
             confirm: true,
-        }
+        })
     );
 }
 

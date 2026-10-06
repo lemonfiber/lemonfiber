@@ -9,8 +9,8 @@ use lemonfiber_core::alert::Appetite;
 use lemonfiber_core::app::plugins;
 use lemonfiber_core::app::support::Destination;
 use lemonfiber_core::app::{
-    AlertAction, Asking, BandwidthAsked, Command, Filling, Hostable, Keeping, Linking,
-    MigrateAction, QualityAction, Removing, Setting,
+    AlertAction, Asking, BandwidthAsked, Command, Diagnosing, Filling, Gathering, Hostable,
+    Keeping, LettingGo, Linking, MigrateAction, QualityAction, Removing, Setting, Tracing,
 };
 use lemonfiber_core::audio::Format;
 use lemonfiber_core::bandwidth::Pausing;
@@ -45,7 +45,7 @@ pub(crate) use people::{held, household, invitation};
 /// told about — which is the one thing this decides that a browser's request
 /// cannot, and the reason the translation is not the same on both surfaces.
 pub(crate) fn bundling(asked: Asked) -> Command {
-    Command::Support {
+    Command::Support(Gathering {
         write: asked.write,
         wanted: Wanted::asked(
             asked.logs,
@@ -54,7 +54,7 @@ pub(crate) fn bundling(asked: Asked) -> Command {
             asked.confirm,
         ),
         dest: asked.out.map_or(Destination::Beside, Destination::At),
-    }
+    })
 }
 
 /// Who an invitation is for, and what the account is to let them watch.
@@ -224,11 +224,11 @@ pub(crate) fn quality(action: QualityCommand) -> Result<Command, u8> {
 /// real search against the indexers' daily allowance, so it happens only where the
 /// flag asked for it.
 pub(crate) fn traced(term: &[String], season: Option<u32>, search: bool) -> Command {
-    Command::Trace {
+    Command::Trace(Tracing {
         term: term.join(" "),
         season,
         searching: search,
-    }
+    })
 }
 
 /// What was asked about the line, carried as it was written.
@@ -269,10 +269,10 @@ pub(crate) fn restarting(form: String, services: Vec<String>) -> Command {
 /// and carrying it would be a name the core goes and fails to match, so it is dropped
 /// here, where the emptiness is visible, rather than travelling as one.
 pub(crate) fn letting(download: String, offer: Option<String>) -> Command {
-    Command::StopSeeding {
+    Command::StopSeeding(LettingGo {
         download,
         agreement: offer.filter(|named| !named.trim().is_empty()),
-    }
+    })
 }
 
 /// Which removal was asked for, and what was answered about it.
@@ -310,10 +310,12 @@ pub(crate) fn diagnosing(
     disruptive: bool,
     accept: Option<String>,
 ) -> Result<Command, u8> {
-    narrowed(only).map(|narrowing| Command::Doctor {
-        narrowing,
-        disruptive,
-        accept,
+    narrowed(only).map(|narrowing| {
+        Command::Doctor(Diagnosing {
+            narrowing,
+            disruptive,
+            accept,
+        })
     })
 }
 

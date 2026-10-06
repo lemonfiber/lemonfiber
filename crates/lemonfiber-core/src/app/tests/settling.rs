@@ -1,6 +1,7 @@
 //! Waiting for services to become usable, and stopping them.
 
 use super::*;
+use crate::app::Teardown;
 
 #[tokio::test]
 async fn starting_waits_until_the_services_are_usable() {
@@ -211,10 +212,10 @@ async fn stopping_a_form_another_running_one_needs_is_refused_by_name() {
         Health::Healthy,
     );
     let refused = dispatch(
-        Command::Down {
+        Command::Down(Teardown {
             forms: vec!["tv".to_owned()],
             wait: Waiting::Never,
-        },
+        }),
         &watching(running),
     )
     .await
@@ -239,10 +240,10 @@ async fn stopping_a_form_another_running_one_needs_is_refused_by_name() {
 #[tokio::test]
 async fn stopping_reports_an_engine_it_cannot_see() {
     let refusal = dispatch(
-        Command::Down {
+        Command::Down(Teardown {
             forms: vec!["library".to_owned()],
             wait: Waiting::Never,
-        },
+        }),
         &rehearsing(crate::config::Protocols::both()),
     )
     .await
@@ -271,10 +272,10 @@ async fn stopping_the_only_form_that_is_up_is_not_refused() {
     );
     let produced = report(
         dispatch(
-            Command::Down {
+            Command::Down(Teardown {
                 forms: vec!["library".to_owned()],
                 wait: Waiting::Never,
-            },
+            }),
             &watching(running),
         )
         .await,
@@ -291,10 +292,10 @@ async fn stopping_the_only_form_that_is_up_is_not_refused() {
 async fn stopping_does_not_wait_for_anything() {
     let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Starting);
     let ctx = watching(engine).with_patience(Duration::ZERO);
-    let command = Command::Down {
+    let command = Command::Down(Teardown {
         forms: vec!["library".to_owned()],
         wait: Waiting::Never,
-    };
+    });
 
     let produced = report(dispatch(command, &ctx).await);
     assert_eq!(

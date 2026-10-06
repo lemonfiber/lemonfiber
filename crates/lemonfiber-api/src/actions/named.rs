@@ -21,7 +21,10 @@
 
 use lemonfiber_core::app::restore::Kept;
 use lemonfiber_core::app::support::Destination;
-use lemonfiber_core::app::{Command, Hostable, Keeping, Removing, Setting, Waiting, HOSTABLE};
+use lemonfiber_core::app::{
+    Command, Diagnosing, Gathering, Hostable, Keeping, LettingGo, Removing, Restoring, Setting,
+    Teardown, Waiting, HOSTABLE,
+};
 use lemonfiber_core::bundle::run::{Wanted, LINES};
 use lemonfiber_core::companion::Asked as Paired;
 use lemonfiber_core::doctor::Narrowing;
@@ -183,10 +186,10 @@ fn stopping(download: Option<String>, offer: Option<String>) -> Result<Command, 
         action: "stop-seeding".to_owned(),
         argument: "download".to_owned(),
     })?;
-    Ok(Command::StopSeeding {
+    Ok(Command::StopSeeding(LettingGo {
         download,
         agreement: offer,
-    })
+    }))
 }
 
 /// The command a warning being answered names, or why it names none.
@@ -205,10 +208,24 @@ fn accepting(check: Option<String>, disruptive: Disturbing) -> Result<Command, R
             argument: "check".to_owned(),
         });
     };
-    Ok(Command::Doctor {
+    Ok(Command::Doctor(Diagnosing {
         narrowing: Narrowing::Suite,
         disruptive: disruptive.included(),
         accept: Some(check),
+    }))
+}
+
+/// Restoring one archive, named the way the server can name one, under the consent
+/// this run was given.
+fn restoring(
+    name: String,
+    repoint: bool,
+    consent: lemonfiber_core::app::restore::Consent,
+) -> Command {
+    Command::Restore(Restoring {
+        archive: Kept::Named(name),
+        repoint,
+        consent,
     })
 }
 
@@ -293,7 +310,7 @@ pub(crate) fn carried(action: &str, given: Arguments) -> Result<Command, Refused
         // tearing a form down are, and Compose spells both pairs differently.
         "up" if services.is_empty() => Ok(Command::Up { forms }),
         "up" => Ok(Command::Start { forms, services }),
-        "down" if services.is_empty() => Ok(Command::Down { forms, wait }),
+        "down" if services.is_empty() => Ok(Command::Down(Teardown { forms, wait })),
         "down" => Ok(Command::Halt { forms, services }),
         "switch" => Ok(Command::Switch { forms }),
         "restart" => Ok(Command::Restart { forms, services }),
@@ -342,20 +359,16 @@ pub(crate) fn carried(action: &str, given: Arguments) -> Result<Command, Refused
         // filesystem in front of it and no path it could name that would mean
         // anything here, so the destination is settled rather than asked for —
         // which answers *which path*, the only web-specific question a bundle has.
-        "support" => Ok(Command::Support {
+        "support" => Ok(Command::Support(Gathering {
             write,
             wanted: Wanted::asked(logs.unwrap_or(LINES), filenames, reveal, confirm),
             dest: Destination::Kept,
-        }),
+        })),
         // By the name it was written under, never by a path. The server runs as the
         // operator, so a path it accepted would be a path it could read; a name is
         // resolved beneath the backups directory by the core and nowhere else.
         "restore" => match archive {
-            Some(name) => listing(confirm, offer).map(|consent| Command::Restore {
-                archive: Kept::Named(name),
-                repoint,
-                consent,
-            }),
+            Some(name) => listing(confirm, offer).map(|consent| restoring(name, repoint, consent)),
             None => Err(needs("archive")),
         },
         "watch" => Ok(Command::Watch { forms }),

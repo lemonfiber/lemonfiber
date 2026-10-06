@@ -1,6 +1,8 @@
 //! Quality, configuration, bundles and downloads, as commands.
 
 use super::*;
+use lemonfiber_core::app::{Gathering, Tracing};
+use lemonfiber_core::app::{Inviting, LettingGo};
 
 /// Naming no service restarts whatever the form holds, which is the form alone.
 #[test]
@@ -29,19 +31,19 @@ fn a_restart_carries_the_one_form_and_only_the_services_named() {
 fn a_trace_joins_its_words_and_searches_only_when_asked() {
     assert_eq!(
         traced(&["the".to_owned(), "wire".to_owned()], Some(2), true),
-        Command::Trace {
+        Command::Trace(Tracing {
             term: "the wire".to_owned(),
             season: Some(2),
             searching: true,
-        }
+        })
     );
     assert_eq!(
         traced(&["dune".to_owned()], None, false),
-        Command::Trace {
+        Command::Trace(Tracing {
             term: "dune".to_owned(),
             season: None,
             searching: false,
-        }
+        })
     );
 }
 
@@ -194,11 +196,11 @@ fn a_bundle_asked_for_at_a_shell_goes_where_the_shell_is() {
     };
     assert_eq!(
         bundling(asked),
-        Command::Support {
+        Command::Support(Gathering {
             write: true,
             wanted: Wanted::asked(12, Filenames::Shown, vec!["INDEXER_KEY".to_owned()], true),
             dest: Destination::Beside,
-        }
+        })
     );
 }
 
@@ -214,10 +216,10 @@ fn a_bundle_told_where_to_go_goes_there() {
     };
     assert!(matches!(
         bundling(asked),
-        Command::Support {
+        Command::Support(Gathering {
             dest: Destination::At(path),
             ..
-        } if path == std::path::Path::new("/tmp/bundle.tar.gz")
+        }) if path == std::path::Path::new("/tmp/bundle.tar.gz")
     ));
 }
 
@@ -235,7 +237,7 @@ fn offering(unrated: Option<RawUnrated>) -> Command {
 
 /// The same invitation as it reaches the core, told what to do or told nothing.
 fn reaching(unrated: Option<Unrated>) -> Command {
-    Command::Invite {
+    Command::Invite(Inviting {
         name: "ana".to_owned(),
         allowance: Allowance {
             libraries: vec!["Films".to_owned()],
@@ -243,7 +245,7 @@ fn reaching(unrated: Option<Unrated>) -> Command {
             unrated,
         },
         confirm: true,
-    }
+    })
 }
 
 /// The other word reaches the other answer, so the two cannot be one flag read
@@ -275,10 +277,10 @@ const HELD: &str = "A.Show.S01E01";
 fn a_download_named_alone_asks_what_stopping_it_would_cost() {
     assert_eq!(
         letting(HELD.to_owned(), None),
-        Command::StopSeeding {
+        Command::StopSeeding(LettingGo {
             download: HELD.to_owned(),
             agreement: None
-        }
+        })
     );
 }
 
@@ -287,10 +289,10 @@ fn a_download_named_alone_asks_what_stopping_it_would_cost() {
 fn the_offer_typed_back_is_the_agreement_the_core_compares() {
     assert_eq!(
         letting(HELD.to_owned(), Some("3f2a1b9c".to_owned())),
-        Command::StopSeeding {
+        Command::StopSeeding(LettingGo {
             download: HELD.to_owned(),
             agreement: Some("3f2a1b9c".to_owned())
-        }
+        })
     );
 }
 
@@ -299,10 +301,10 @@ fn the_offer_typed_back_is_the_agreement_the_core_compares() {
 fn an_empty_answer_is_no_answer_at_all() {
     assert_eq!(
         letting(HELD.to_owned(), Some("   ".to_owned())),
-        Command::StopSeeding {
+        Command::StopSeeding(LettingGo {
             download: HELD.to_owned(),
             agreement: None
-        }
+        })
     );
 }
 

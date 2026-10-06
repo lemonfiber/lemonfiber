@@ -6,32 +6,46 @@
 //! without the routing in the way. The dispatcher lives beside it and matches on
 //! every variant here, so nothing can be added without somewhere to send it.
 
-use crate::{audio::Format, doctor::Narrowing};
+use crate::audio::Format;
 
-use super::{bundle, plugins, repair, restore, setup::SetupAction, support, update, Waiting};
+use super::{plugins, repair, setup::SetupAction, update, Waiting};
 
 mod alerts;
 mod allowance;
 mod bandwidth;
 mod credentials;
+mod diagnosing;
 mod filling;
+mod gathering;
 mod hosting;
 mod household;
+mod inviting;
+mod letting_go;
 mod migrate;
 mod quality;
+mod restoring;
 mod setting;
+mod teardown;
+mod tracing;
 mod uninstall;
 
 pub use alerts::AlertAction;
 pub use allowance::Allowance;
 pub use bandwidth::BandwidthAsked;
 pub use credentials::Asking;
+pub use diagnosing::Diagnosing;
 pub use filling::{Filling, Linking};
+pub use gathering::Gathering;
 pub use hosting::{Hostable, Keeping, HOSTABLE};
 pub use household::{Answer, Arranged, Chosen, Decision, Whom};
+pub use inviting::Inviting;
+pub use letting_go::LettingGo;
 pub use migrate::MigrateAction;
 pub use quality::QualityAction;
+pub use restoring::Restoring;
 pub use setting::Setting;
+pub use teardown::Teardown;
+pub use tracing::Tracing;
 pub use uninstall::Removing;
 
 /// What a surface is asking for.
@@ -75,17 +89,7 @@ pub enum Command {
         services: Vec<String>,
     },
     /// Stop and remove what a form started.
-    Down {
-        /// The forms to stop.
-        forms: Vec<String>,
-        /// Whether anything still downloading is let finish before the stop.
-        ///
-        /// The wait is inside the command rather than in front of it, so a surface
-        /// that cannot sit in a loop asks for it by saying so. Whether to offer the
-        /// choice at all is the surface's — a terminal asks, a machine-readable run
-        /// is not asked — but the waiting itself is one implementation.
-        wait: Waiting,
-    },
+    Down(Teardown),
     /// Stop named services, leaving the rest of what is running alone.
     ///
     /// Apart from [`Command::Down`] because they are different requests, not one
@@ -133,16 +137,7 @@ pub enum Command {
         forms: Vec<String>,
     },
     /// Run the diagnostic checks: the whole suite, one category, or one check.
-    Doctor {
-        /// What the run is narrowed to. A single check is named by the identifier
-        /// its finding carries, so a report can be read and asked for again.
-        narrowing: Narrowing,
-        /// Whether the operator opted into the checks that disturb the system.
-        disruptive: bool,
-        /// A check whose warning the operator is answering: they have weighed the
-        /// cost and chosen it, so it stops leading from now on.
-        accept: Option<String>,
-    },
+    Doctor(Diagnosing),
     /// Offer what the diagnosis found that lemonfiber can put right, and carry out
     /// whatever this run was given consent for.
     ///
@@ -200,22 +195,7 @@ pub enum Command {
     },
     /// Follow one item across the services and report where it is — "where is my
     /// show?" — searched for by a human term rather than an internal id.
-    Trace {
-        /// The show, film, or request to follow.
-        term: String,
-        /// The season to narrow the per-part coverage to, or every season where absent.
-        season: Option<u32>,
-        /// Whether the indexers may be asked what they carry for it.
-        ///
-        /// The one read in a trace that costs something outside this machine: it
-        /// spends a live search against the daily allowance the indexers hold the
-        /// operator to. Without it a trace that finds an item wanted and never
-        /// grabbed cannot say whether the indexers carry nothing or the quality in
-        /// force wants none of what they carry, and it says so rather than picking
-        /// one. Carried like [`Command::Doctor`]'s widening, and asked for at the
-        /// door changes are asked for.
-        searching: bool,
-    },
+    Trace(Tracing),
     /// Report what one member can watch, as the media server answers it for them.
     ///
     /// Apart from [`Command::Household`] because they are different questions: that one
@@ -231,7 +211,8 @@ pub enum Command {
     /// Report what the household has asked for and where each request stands, in the
     /// words the member who asked would use rather than the services' own.
     Household {
-        /// The member or the household's defaults to narrow to, or every member where absent.
+        /// The member to narrow to, or every member where absent. Narrowed to the
+        /// household's defaults, it is what somebody invited with them would be told.
         member: Option<Whom>,
     },
     /// Choose what the household may ask for — the policy, the limit, or both, for
@@ -294,14 +275,7 @@ pub enum Command {
     /// Offer somebody in the house an account they can claim: one on the media server
     /// with no password, which whoever sets the first password claims. Takes back any
     /// nobody claimed in time on the way past, since nothing runs between commands to.
-    Invite {
-        /// What they will sign in as.
-        name: String,
-        /// What the account is to let them watch.
-        allowance: Allowance,
-        /// Make the account; unconfirmed, what it would grant is said and none is made.
-        confirm: bool,
-    },
+    Invite(Inviting),
     /// Put somebody's account back to having no password, so they can claim it again.
     ///
     /// The operator never chooses or reads a password: the account returns to the
@@ -435,13 +409,7 @@ pub enum Command {
     ///
     /// The agreement is the offer's own name and there is no blanket form of it, so
     /// the only path to the removal runs through a run that stated the consequence.
-    StopSeeding {
-        /// Which completed download, by the name the client and the account both use.
-        download: String,
-        /// The offer being answered, as the run that made it named itself; without
-        /// one, the cost is stated and nothing is removed.
-        agreement: Option<String>,
-    },
+    StopSeeding(LettingGo),
     /// Account for the line: what it carries, what the stack may take of it, and
     /// whether the clients are keeping to that.
     ///
@@ -513,14 +481,7 @@ pub enum Command {
     },
     /// Gather everything somebody helping would ask for, with every value not named
     /// safe replaced by a stand-in.
-    Support {
-        /// Whether to produce the file, rather than say what one would hold.
-        write: bool,
-        /// What goes in it, and what was agreed to going in it.
-        wanted: bundle::Wanted,
-        /// Where it is written, for a run that produces one.
-        dest: support::Destination,
-    },
+    Support(Gathering),
     /// List the backup archives this machine has kept, by the names they were
     /// written under.
     ///
@@ -530,16 +491,7 @@ pub enum Command {
     /// front of it cannot look.
     Archives,
     /// Put a configuration back from a backup archive.
-    Restore {
-        /// The archive to restore from, named the way the surface can name one.
-        archive: restore::Kept,
-        /// Whether re-pointing to this machine's data root was accepted.
-        repoint: bool,
-        /// How much of the restore this run was given consent for, and for which
-        /// listing. Without a yes the archive is verified and its contents listed,
-        /// and nothing is touched.
-        consent: restore::Consent,
-    },
+    Restore(Restoring),
     /// Walk first-run setup: read where it stands, answer one question, move
     /// between them, or apply what has been answered.
     ///

@@ -15,7 +15,7 @@ use std::process::ExitCode;
 
 use lemonfiber_core::app::{
     claimed, dispatch, in_flight, logs, pull_progress, released, start_progress, started, Command,
-    Ctx, Outcome, Waiting,
+    Ctx, Outcome, Teardown, Waiting,
 };
 use lemonfiber_core::logs::Line;
 use lemonfiber_core::model::kind::{self, Kind};
@@ -355,10 +355,10 @@ pub(crate) async fn halting(
     } else {
         settle(ctx, &forms, wait, yes).await == Choice::Wait
     };
-    Command::Down {
+    Command::Down(Teardown {
         forms,
         wait: Waiting::from(waiting),
-    }
+    })
 }
 
 async fn announce(ctx: &Ctx, forms: &[String], json: bool, doing: Doing) {

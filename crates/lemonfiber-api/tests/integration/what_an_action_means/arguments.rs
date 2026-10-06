@@ -2,7 +2,7 @@
 
 use super::{command, naming, nothing, refusal};
 use lemonfiber_api::actions::{named, Arguments, Refused};
-use lemonfiber_core::app::{Command, QualityAction, Waiting};
+use lemonfiber_core::app::{Command, Inviting, QualityAction, Teardown, Waiting};
 use lemonfiber_core::quality::Preset;
 
 #[test]
@@ -19,10 +19,10 @@ fn starting_and_stopping_take_the_forms_they_are_given() {
     );
     assert_eq!(
         command("down", naming("tv")),
-        Some(Command::Down {
+        Some(Command::Down(Teardown {
             forms: vec!["tv".to_owned()],
             wait: Waiting::Never
-        })
+        }))
     );
 }
 
@@ -61,10 +61,10 @@ fn a_teardown_can_be_asked_to_let_the_downloads_finish_first() {
     };
     assert_eq!(
         command("down", waiting),
-        Some(Command::Down {
+        Some(Command::Down(Teardown {
             forms: vec!["tv".to_owned()],
             wait: Waiting::ForTheDownloads
-        })
+        }))
     );
 }
 
@@ -265,7 +265,7 @@ fn each_word_about_unrated_content_reaches_the_choice_it_names() {
         let reached = named("invite", given);
 
         assert!(
-            matches!(&reached, Ok(Command::Invite { allowance, .. })
+            matches!(&reached, Ok(Command::Invite(Inviting { allowance, .. }))
                 if allowance.unrated == Some(chosen)),
             "{written}: {reached:?}"
         );

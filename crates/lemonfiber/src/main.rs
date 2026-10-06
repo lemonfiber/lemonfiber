@@ -8,9 +8,9 @@
 use std::process::ExitCode;
 
 use clap::Parser;
-use lemonfiber::cli::{Cli, Mending, RawDoctor, RawSetup, RawUi, Request};
+use lemonfiber::cli::{Cli, Mending, RawDoctor, RawDown, RawLogs, RawSetup, RawUi, RawUp, Request};
 use lemonfiber_core::app::restore::{Consent, Kept};
-use lemonfiber_core::app::{dispatch, Command, Ctx, SetupAction};
+use lemonfiber_core::app::{dispatch, Command, Ctx, Restoring, SetupAction};
 
 mod acting;
 mod authoring;
@@ -90,11 +90,11 @@ fn walking(json: bool) -> std::sync::Arc<dyn lemonfiber_core::walkthrough::Narra
 /// asking again would only produce the same refusal after the operator had been
 /// told once.
 async fn restoring(ctx: &Ctx, archive: Kept, repoint: bool, json: bool) -> ExitCode {
-    let looking = Command::Restore {
+    let looking = Command::Restore(Restoring {
         archive: archive.clone(),
         repoint,
         consent: Consent::List,
-    };
+    });
     match dispatch(looking, ctx).await {
         Ok(outcome) => render(&outcome, json),
         Err(problem) => return complain(&problem),
@@ -103,11 +103,11 @@ async fn restoring(ctx: &Ctx, archive: Kept, repoint: bool, json: bool) -> ExitC
     // commands are one run over one look, so there is no gap for the archive to
     // move in — which is exactly what the operator who typed the agreement in
     // advance was agreeing to.
-    let doing = Command::Restore {
+    let doing = Command::Restore(Restoring {
         archive,
         repoint,
         consent: Consent::Standing,
-    };
+    });
     match dispatch(doing, ctx).await {
         Ok(outcome) => {
             render(&outcome, json);
@@ -217,13 +217,13 @@ async fn main() -> ExitCode {
         // Streaming is not a value that arrives once, so it does not become a
         // command and does not go through dispatch. It still goes through the
         // core, which is the part that matters.
-        Request::Logs {
+        Request::Logs(RawLogs {
             services,
             form,
             follow,
             watch,
             tail,
-        } => return read_logs(&ctx, &form, &services, follow, watch, tail, cli.json).await,
+        }) => return read_logs(&ctx, &form, &services, follow, watch, tail, cli.json).await,
         // Long-running, and still a value that arrives once: what a guard produces
         // is one report, at the end. So it goes through dispatch like everything
         // that answers, and the waiting is the command's rather than this file's.
@@ -255,16 +255,16 @@ async fn main() -> ExitCode {
         // nothing to stream to and nothing to announce — and what it starts is not in
         // the request at all. It goes through dispatch like every other value that
         // arrives once.
-        Request::Up { at_boot: true, .. } => Command::AtBoot,
-        Request::Up {
+        Request::Up(RawUp { at_boot: true, .. }) => Command::AtBoot,
+        Request::Up(RawUp {
             forms, services, ..
-        } => return starting(&ctx, &forms, &services, cli.json).await,
-        Request::Down {
+        }) => return starting(&ctx, &forms, &services, cli.json).await,
+        Request::Down(RawDown {
             forms,
             services,
             wait,
             yes,
-        } => halting(&ctx, forms, services, wait, yes, cli.json).await,
+        }) => halting(&ctx, forms, services, wait, yes, cli.json).await,
         // Not announced beforehand the way starting is. A switch's own report is the
         // announcement — what stopped, what started, and what was left alone — and
         // saying "starts eight services" first would name the wrong set twice over.

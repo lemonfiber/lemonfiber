@@ -16,8 +16,8 @@ use clap::Subcommand;
 use super::{
     AlertCommand, Asked, ConfigAction, HostingCommand, HouseholdCommand, MigrateCommand,
     PluginCommand, QualityCommand, RawAllowance, RawBandwidth, RawCompanion, RawCredentials,
-    RawDoctor, RawDownloads, RawKey, RawRemoving, RawSetup, RawTrace, RawUi, RawWhom,
-    UpdateCommand,
+    RawDoctor, RawDown, RawDownloads, RawKey, RawLogs, RawRemoving, RawSetup, RawTrace, RawUi,
+    RawUp, RawWhom, UpdateCommand,
 };
 
 /// What the operator asked for.
@@ -58,44 +58,9 @@ pub enum Request {
         action: Option<MigrateCommand>,
     },
     /// Start a form, or the union of several.
-    Up {
-        /// The forms to start; none starts everything the stack declares.
-        forms: Vec<String>,
-        /// Start only these services, leaving the rest of the form alone.
-        #[arg(long = "service", value_name = "NAME")]
-        services: Vec<String>,
-        /// Start what a restart of this machine should start, and nothing otherwise.
-        ///
-        /// What a login runs. It brings back whichever form was last running unless
-        /// you pinned one, and it declines — saying why — where you stopped the stack
-        /// on purpose, where you never asked for it to start on its own, or where this
-        /// machine is on its battery and you have not said to start anyway. It waits
-        /// for the container engine to finish starting and tries again while the
-        /// network is still arriving, and if the stack still does not come back it
-        /// records that, so the next thing you type tells you once rather than not at
-        /// all. Naming a form or a service alongside it is refused: which forms come
-        /// back is the record's answer, not this command line's.
-        #[arg(long, conflicts_with_all = ["forms", "services"])]
-        at_boot: bool,
-    },
+    Up(RawUp),
     /// Stop and remove what a form started.
-    Down {
-        /// The forms to stop; none stops everything the stack declares.
-        forms: Vec<String>,
-        /// Stop only these services, leaving the rest of the form running.
-        #[arg(long = "service", value_name = "NAME")]
-        services: Vec<String>,
-        /// Let anything still downloading finish before stopping.
-        ///
-        /// Not for a stop of named services: what is in flight is a question about
-        /// the download clients a form holds, so naming two services that are not
-        /// download clients would wait on downloads stopping them cannot interrupt.
-        #[arg(long, conflicts_with = "services")]
-        wait: bool,
-        /// Stop without asking about anything still downloading.
-        #[arg(long, conflicts_with = "wait")]
-        yes: bool,
-    },
+    Down(RawDown),
     /// Make these forms the active set, leaving shared services running.
     ///
     /// Only what falls outside the new shape is stopped. A service the old shape
@@ -125,22 +90,7 @@ pub enum Request {
         forms: Vec<String>,
     },
     /// Show what services are saying.
-    Logs {
-        /// The services to read; none reads them all.
-        services: Vec<String>,
-        /// Read only the services a form declares.
-        #[arg(long, value_name = "FORM")]
-        form: Vec<String>,
-        /// Keep reading as new lines arrive.
-        #[arg(long, short)]
-        follow: bool,
-        /// Read them on a screen that can be scrolled back and filtered.
-        #[arg(long, conflicts_with = "follow")]
-        watch: bool,
-        /// How many existing lines to begin with.
-        #[arg(long, default_value_t = 50)]
-        tail: u32,
-    },
+    Logs(RawLogs),
     /// Read or change one setting.
     Config {
         /// Which of the three things to do with a setting.
@@ -226,7 +176,8 @@ pub enum Request {
     /// Name one of the four things underneath to change any of that, to answer one
     /// request that is waiting, or to arrange what becomes of the ones nobody answers.
     Household {
-        /// Narrow to one member, or to the household's defaults.
+        /// Narrow to one member, or to what somebody invited with the household's
+        /// defaults would be told.
         #[command(flatten)]
         whom: RawWhom,
         /// Decide what the household may ask for, or answer one waiting request.
@@ -242,7 +193,9 @@ pub enum Request {
     /// the only place a restriction can be seen as the list it comes to rather than
     /// as the setting it was typed in as.
     ///
-    /// One person at a time, because no two accounts need have the same shelf.
+    /// One person at a time, because no two accounts need have the same shelf — or
+    /// nobody in particular: the household's defaults, which are every library and no
+    /// age limit, read without asking about any account.
     Held {
         /// Whose shelf.
         #[command(flatten)]

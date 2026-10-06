@@ -2,7 +2,7 @@ use super::{answering, Warning};
 use crate::acting::mending::looked;
 use crate::acting::mending::tests::{a_diagnosis, doing, pressed, warned_about};
 use crate::acting::{Press, Stage, Wanted};
-use lemonfiber_core::app::{Command, Outcome};
+use lemonfiber_core::app::{Command, Diagnosing, Outcome};
 use lemonfiber_core::doctor::{Narrowing, Overall};
 use lemonfiber_core::model::DoctorReport;
 
@@ -59,11 +59,11 @@ fn answering_a_warning_names_the_check_the_finding_named() {
 
     assert_eq!(
         wanted,
-        Wanted::Carry(Command::Doctor {
+        Wanted::Carry(Command::Doctor(Diagnosing {
             narrowing: Narrowing::Suite,
             disruptive: false,
             accept: Some("vpn.unprotected".to_owned()),
-        })
+        }))
     );
     assert!(matches!(running, Stage::Putting(_)));
 }

@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::common::household::recorded_admin;
-use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Outcome};
+use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Inviting, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::model::MemberStanding;
 use lemonfiber_core::ports::http::Method;
@@ -97,11 +97,11 @@ fn context(env: &Path, stack: &'static Path) -> Ctx {
 
 async fn invited(ctx: &Ctx, confirm: bool) -> Option<lemonfiber_core::model::Invitation> {
     match dispatch(
-        Command::Invite {
+        Command::Invite(Inviting {
             name: "ana".to_owned(),
             allowance: Allowance::default(),
             confirm,
-        },
+        }),
         ctx,
     )
     .await
