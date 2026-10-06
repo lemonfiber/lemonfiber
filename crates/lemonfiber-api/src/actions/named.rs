@@ -107,6 +107,13 @@ pub struct ByAKey {
     /// Whether calling it disturbs the running system: services restart, or the tunnel
     /// is taken away to prove it comes back.
     pub disturbs: bool,
+    /// Whether calling it again with the same arguments leaves the stack as calling it
+    /// once did, so a second call does nothing the first did not.
+    ///
+    /// False for an action that does its work again however often it is asked — takes
+    /// the services down, takes the tunnel away, moves to whatever is newest by then —
+    /// even where the stack ends up running either way.
+    pub idempotent: bool,
 }
 
 /// Every action a key may call, in the order they are worth reading.
@@ -119,22 +126,27 @@ pub const KEY_CALLABLE: &[ByAKey] = &[
     ByAKey {
         action: "restart",
         disturbs: true,
+        idempotent: false,
     },
     ByAKey {
         action: "diagnose",
         disturbs: true,
+        idempotent: false,
     },
     ByAKey {
         action: "update",
         disturbs: true,
+        idempotent: false,
     },
     ByAKey {
         action: "downloads-pause",
         disturbs: false,
+        idempotent: true,
     },
     ByAKey {
         action: "downloads-resume",
         disturbs: false,
+        idempotent: true,
     },
 ];
 

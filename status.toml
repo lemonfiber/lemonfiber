@@ -1630,6 +1630,11 @@ rows = [
     "`C10-R15`, `C10-R16`",
     "**Off until the operator turns `LEMONFIBER_MEMBER_KEYS` on**, a setting in the register `config set` writes and members cannot reach. While it is on, a member session mints through the same `POST /api/keys`, giving their own password again: [`proves_the_member`](crates/lemonfiber-api/src/admission/proving.rs) reads their name from the household and puts the pair to the media server through the sign-in their door uses, under the same per-address and shared limits. [`mint`](crates/lemonfiber-core/src/keys/run.rs) takes only `member:` and themselves from a member, and while the setting is off refuses a member's mint with its own code (`KEY-11`) before their password is put to the media server. A member's listing holds only their own keys and they revoke only those, the setting off or not; a key that is not theirs is answered as no key at all, and a name another member's key holds is refused without saying whose. Every member mint and revoke is journaled and alerts the operator like any other, and the operator's listing marks the key member-minted.",
   ] },
+  { state = "done", cells = [
+    "The reads, and whether an action is safe to repeat, in the artefact",
+    "`ARCH-R159`, `ARCH-R160`",
+    "The contract artefact lists every read the web API serves under `reads` ([`published.rs`](crates/lemonfiber-api/src/read/published.rs)): its path, each query parameter it takes and whether that may be given more than once, and every kind it answers under, or that it answers with a file. The paths and parameters are read off the table every request is held to, and the kinds off the core's account of the command each read reaches ([`answering.rs`](crates/lemonfiber-core/src/app/answering.rs)), which takes a reporting command's kinds from the rehearsal table and names the rest; a read that forks on a parameter is asked each way and lists both kinds. A test asks every read and holds what it answers to the kinds it is listed under, and [`reads_match_the_contract.py`](scripts/reads_match_the_contract.py) holds the listed paths to the routes served. Each `key_callable` entry also says whether it is `idempotent`: pausing and resuming downloads are, while a restart, a diagnosis and an update do their work again however often they are asked.",
+  ] },
 ]
 
 [[milestone.part]]

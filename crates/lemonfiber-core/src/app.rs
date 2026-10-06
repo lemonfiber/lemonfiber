@@ -37,6 +37,7 @@ use crate::wiring::run as wiring;
 
 pub mod accepted;
 pub(crate) mod adopt;
+pub mod answering;
 pub mod appetite;
 pub mod apply;
 pub mod archives;
@@ -96,6 +97,7 @@ pub use command::{
     QualityAction, Removing, Restoring, Setting, Teardown, Tracing, Whom, HOSTABLE,
 };
 pub(crate) mod outcome;
+pub use answering::answered_under;
 pub use ctx::{Ctx, PATIENCE};
 pub use outcome::Outcome;
 pub use rehearsal::{asked, carried, permitted, Asked, Rehearsal};

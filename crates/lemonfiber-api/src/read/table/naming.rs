@@ -17,6 +17,12 @@ use lemonfiber_core::update::run as update;
 
 use crate::refusal::Refusal;
 
+/// The object of an update read that is this binary.
+pub(crate) const THIS_BINARY: &str = "self";
+
+/// The object of an update read that is the stack it operates.
+pub(crate) const THE_STACK: &str = "stack";
+
 /// The removal a name asks for, read and nothing more.
 ///
 /// Naming none reads the one that removes nothing, which is the safe reading and the
@@ -37,8 +43,8 @@ pub(super) fn removing(tier: Option<String>) -> Result<Command, Refusal> {
 /// replaces anything, so both are reads.
 pub(super) fn moving(what: Option<&str>, to: Option<String>) -> Result<Command, Refusal> {
     match what {
-        Some("self") => Ok(Command::SelfUpdate { to }),
-        Some("stack") => Ok(Command::Update(update::Asked {
+        Some(THIS_BINARY) => Ok(Command::SelfUpdate { to }),
+        Some(THE_STACK) => Ok(Command::Update(update::Asked {
             service: None,
             confirm: false,
             wait: Waiting::Never,

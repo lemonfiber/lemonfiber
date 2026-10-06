@@ -32,6 +32,7 @@ mod asked;
 mod naming;
 
 use naming::{diagnosing, following, household, moving, narrowed, removing, setting, shelf};
+pub(crate) use naming::{THE_STACK, THIS_BINARY};
 
 /// How much of a shelf a read answers with, and the most it ever will.
 ///
@@ -50,7 +51,7 @@ use lemonfiber_core::error::Problem;
 
 use crate::refusal::Refusal;
 
-pub(crate) use asked::{Asked, FOLLOW, FORM, SERVICE, TAIL};
+pub(crate) use asked::{taken, Asked, FOLLOW, FORM, REPEATABLE, SERVICE, TAIL};
 pub(crate) use naming::told;
 
 /// The versions in play: this binary, the stack it operates, and the engine's.
@@ -329,7 +330,7 @@ impl Wanted {
         Self {
             member: Some("someone".to_owned()),
             term: Some("Sintel".to_owned()),
-            what: Some("stack".to_owned()),
+            what: Some(THE_STACK.to_owned()),
             ..Self::default()
         }
     }

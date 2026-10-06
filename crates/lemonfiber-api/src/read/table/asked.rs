@@ -127,7 +127,7 @@ const TAKEN: &[(&str, &[&str])] = &[
 /// Two, and they are the two the commands behind them take as lists: a log read is
 /// narrowed to as many forms and as many services as were named. Every other
 /// parameter names one thing, and naming a second is a request with two answers.
-const REPEATABLE: &[&str] = &[FORM, SERVICE];
+pub(crate) const REPEATABLE: &[&str] = &[FORM, SERVICE];
 
 /// What a read with no row takes.
 const NOTHING: &[&str] = &[];
@@ -210,7 +210,7 @@ impl Asked {
 }
 
 /// What a read takes, or nothing where no row names it.
-fn taken(read: &str) -> &'static [&'static str] {
+pub(crate) fn taken(read: &str) -> &'static [&'static str] {
     TAKEN
         .iter()
         .find(|(named, _)| *named == read)
