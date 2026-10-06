@@ -16,6 +16,7 @@ pub mod extending;
 pub mod live;
 pub mod saying;
 pub mod stepping;
+pub mod theirs;
 pub mod wire;
 
 use std::convert::Infallible;
@@ -28,13 +29,15 @@ use axum::http::{HeaderMap, Response, StatusCode};
 use axum::routing::get;
 use axum::Router;
 
+use lemonfiber_core::app::Ctx;
 use lemonfiber_core::ports::time::Clock;
 
-use crate::admission::Knocking;
+use crate::admission::{Caller, Knocking};
 use crate::guard::{Arrived, Binding, Token};
 use crate::serve::{admitted, carrying, STREAM};
 
 use self::live::{Listening, Live};
+use self::theirs::Theirs;
 
 /// Where the stream is served.
 pub const PATH: &str = "/api/events";
@@ -74,6 +77,11 @@ pub struct Streaming {
     /// disagree at the moment a session expires, and the route that disagreed would
     /// be the one nobody tested. Held rather than asked of the platform here.
     pub clock: Arc<dyn Clock>,
+    /// The world a household member's own stream reads in.
+    ///
+    /// The operator's stream says what the one gather says; a member's is read for them
+    /// alone, so it needs the context a read runs against.
+    pub reading: Arc<Ctx>,
 }
 
 /// The event stream's route, for the surface to merge with the rest.
@@ -106,14 +114,6 @@ pub async fn stream(
     if let Some(refused) = crate::router::refused(&knocking) {
         return refused;
     }
-    // The stream carries the operator's whole view — the dashboard, every log line
-    // the operator follows, what setup is doing — and nothing on it is narrowed to a
-    // member, so a member is refused it rather than handed the operator's copy.
-    if let Knocking::Known(caller) = &knocking {
-        if let Some(refusal) = crate::serve::operator_only(caller) {
-            return refusal;
-        }
-    }
     if let Err(refusal) = admitted(
         matches!(knocking, Knocking::Known(_)),
         &headers,
@@ -123,22 +123,60 @@ pub async fn stream(
     }
     let seen = headers
         .get(LAST_EVENT_ID)
-        .and_then(|seen| seen.to_str().ok());
-    let listening = streaming.live.listening(seen).await;
+        .and_then(|seen| seen.to_str().ok())
+        .map(str::to_owned);
+    let mut staying = Staying {
+        admitting: Arc::clone(&streaming.admitting),
+        token: Arc::clone(&streaming.token),
+        clock: Arc::clone(&streaming.clock),
+        headers,
+        vouched: None,
+        arrived,
+        member: None,
+        gathering: None,
+    };
+    // The operator's stream carries their whole view — the dashboard, every log line
+    // they follow, what setup is doing — and nothing on it is narrowed to a member. A
+    // member is handed a stream of their own instead, read for them alone.
+    if let Knocking::Known(caller) = &knocking {
+        if let Some(member) = caller.member() {
+            staying.member = Some(member.to_owned());
+            return theirs(&streaming, caller.clone(), seen.as_deref(), staying).await;
+        }
+    }
+    let listening = streaming.live.listening(seen.as_deref()).await;
     // Asked for after the client is listening, so the gather it prompts is one
     // this client hears — which is what replaces whatever it still holds.
     streaming.live.nudge();
-    held(
-        listening,
-        Staying {
-            admitting: Arc::clone(&streaming.admitting),
-            token: Arc::clone(&streaming.token),
-            clock: Arc::clone(&streaming.clock),
-            headers,
-            vouched: None,
-            arrived,
-        },
-    )
+    held(listening, staying)
+}
+
+/// A household member's own stream: a run of its own beside this one, gathering their
+/// household row, their shelf and what they are playing, and ending when they stop
+/// listening or this run's streams are told to end.
+async fn theirs(
+    streaming: &Streaming,
+    caller: Caller,
+    seen: Option<&str>,
+    mut staying: Staying,
+) -> Response<Body> {
+    let live = Arc::new(streaming.live.beside(streaming.clock.as_ref()));
+    let listening = live.listening(seen).await;
+    let source = Arc::new(Theirs::for_member(Arc::clone(&streaming.reading), caller));
+    staying.gathering = Some(Gathering(tokio::spawn(live.gathering(source))));
+    held(listening, staying)
+}
+
+/// The gather behind one member's stream, stopped when the stream it feeds is dropped.
+///
+/// Owned by the stream rather than left running: a gather nobody listens to would go
+/// on asking the media server on that member's behalf after they had gone.
+struct Gathering(tokio::task::JoinHandle<()>);
+
+impl Drop for Gathering {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
 }
 
 /// What a stream is asked, before each thing it says, to go on being said to.
@@ -169,6 +207,10 @@ pub struct Staying {
     vouched: Option<tokio::time::Instant>,
     /// The connection it opened the stream over.
     arrived: Option<Arrived>,
+    /// The household member the stream was opened for, where it is a member's own.
+    member: Option<String>,
+    /// The gather feeding a member's own stream, stopped with it.
+    gathering: Option<Gathering>,
 }
 
 impl Staying {
@@ -184,7 +226,13 @@ impl Staying {
             .carried(&self.headers, &self.token, self.arrived, now)
             .await
         {
-            Knocking::Known(caller) => crate::serve::operator_only(&caller).is_none(),
+            // Still the person it was opened for: an operator's stream is never carried
+            // on for somebody it would refuse, and a member's ends if whoever carries
+            // its credential is no longer that member.
+            Knocking::Known(caller) => match &self.member {
+                None => crate::serve::operator_only(&caller).is_none(),
+                Some(member) => caller.member() == Some(member.as_str()),
+            },
             Knocking::Nobody | Knocking::Unconfirmed | Knocking::Held(_) | Knocking::Exposed => {
                 false
             }
@@ -209,3 +257,6 @@ pub fn held(listening: Listening, staying: Staying) -> Response<Body> {
     );
     carrying(StatusCode::OK, STREAM, Body::from_stream(talking))
 }
+
+#[cfg(test)]
+mod tests;

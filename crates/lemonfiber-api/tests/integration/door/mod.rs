@@ -120,6 +120,7 @@ pub(crate) fn surface(ctx: Ctx, admitting: &Arc<Admitting>) -> (axum::Router, Ar
         admitting: Arc::clone(admitting),
         live,
         clock: Stopped::at(NOW),
+        reading: Arc::clone(&serving.ctx),
     });
     (routes(serving, streaming), token)
 }
@@ -141,6 +142,7 @@ pub(crate) fn stream_alone(admitting: &Arc<Admitting>) -> axum::Router {
         admitting: Arc::clone(admitting),
         live,
         clock: Stopped::at(NOW),
+        reading: Arc::new(crate::idle::ctx()),
     }))
 }
 
@@ -200,6 +202,61 @@ pub(crate) async fn asked(
         body: String::from_utf8_lossy(&read).into_owned(),
         left,
     }
+}
+
+/// How long a stream is given to say its next thing before a test stops listening.
+pub(crate) const HEARD_WITHIN: Duration = Duration::from_secs(5);
+
+/// What a member's stream says when they join, in the order it says it.
+pub(crate) fn a_members_kinds() -> Vec<String> {
+    use lemonfiber_core::model::kind;
+    [kind::HOUSEHOLD, kind::HELD, kind::PLAYING]
+        .iter()
+        .map(|kind| kind.as_str().to_owned())
+        .collect()
+}
+
+/// A stream opened carrying `pairs` from `arrived`: the status it was answered under,
+/// and the kind of each of the first `most` events it said.
+///
+/// Listened to rather than read to its end, because a stream that is let on does not
+/// end; whatever is not said within [`HEARD_WITHIN`] is taken as not said.
+pub(crate) async fn listened(
+    router: axum::Router,
+    pairs: &[(&str, String)],
+    arrived: Option<lemonfiber_api::guard::Arrived>,
+    most: usize,
+) -> (StatusCode, Vec<String>) {
+    use futures_util::StreamExt as _;
+
+    let mut building = Request::builder()
+        .method("GET")
+        .uri(lemonfiber_api::events::PATH);
+    for (name, value) in pairs {
+        building = building.header(*name, value);
+    }
+    let Ok(mut request) = building.body(Body::empty()) else {
+        unreachable!("the request a test writes is one that can be built")
+    };
+    if let Some(arrived) = arrived {
+        request.extensions_mut().insert(arrived);
+    }
+    let Ok(response) = router.oneshot(request).await;
+    let status = response.status();
+    let mut body = response.into_body().into_data_stream();
+    let mut kinds = Vec::new();
+    while kinds.len() < most {
+        let Ok(Some(Ok(said))) = tokio::time::timeout(HEARD_WITHIN, body.next()).await else {
+            break;
+        };
+        kinds.extend(
+            String::from_utf8_lossy(&said)
+                .lines()
+                .filter_map(|line| line.strip_prefix("event: "))
+                .map(str::to_owned),
+        );
+    }
+    (status, kinds)
 }
 
 /// Where a request comes from when the surface is driven without a socket.

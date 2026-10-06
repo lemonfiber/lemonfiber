@@ -174,6 +174,7 @@ pub(crate) async fn sent(
             bound: bound(),
             live,
             clock: Stopped::at(0),
+            reading: Arc::new(crate::idle::ctx()),
         }),
     );
 

@@ -59,6 +59,18 @@ impl Rendered {
             nature,
         })
     }
+
+    /// What the envelope calls itself.
+    #[must_use]
+    pub const fn kind(&self) -> Kind {
+        self.kind
+    }
+
+    /// The envelope, as the command line renders it.
+    #[must_use]
+    pub fn said(&self) -> &str {
+        &self.said
+    }
 }
 
 /// One thing the stream said, and where in the run it said it.

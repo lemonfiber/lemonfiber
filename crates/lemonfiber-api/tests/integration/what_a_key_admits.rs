@@ -353,15 +353,122 @@ async fn a_member_key_is_that_member_and_nothing_more() {
     )
     .await;
     assert_eq!(code(&theirs), "ADMIT-6", "{}", theirs.body);
-    let stream = presented(
-        router,
-        "GET",
-        "/api/events",
-        keys.member.as_str(),
-        Some((HERE, false)),
-    )
+    let mut carried = from_here();
+    carried.push((TOKEN_HEADER, keys.member.as_str().to_owned()));
+    let arrived = Arrived {
+        from: HERE,
+        encrypted: false,
+    };
+    let (status, kinds) = listened(router, &carried, Some(arrived), 3).await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "a member key was not let on to its stream"
+    );
+    assert_eq!(
+        kinds,
+        a_members_kinds(),
+        "a member key heard more than its member's own: {kinds:?}"
+    );
+}
+
+/// The frames a member key's stream says, opened and then listened to until it ends
+/// or `most` have been said, with `meanwhile` done once the first is heard.
+async fn heard_until_it_ends(
+    router: axum::Router,
+    secret: &str,
+    most: usize,
+    meanwhile: impl FnOnce(),
+) -> usize {
+    use futures_util::StreamExt as _;
+
+    let mut building = Request::builder()
+        .method("GET")
+        .uri(lemonfiber_api::events::PATH)
+        .header(TOKEN_HEADER, secret);
+    for (name, value) in from_here() {
+        building = building.header(name, value);
+    }
+    let Ok(mut request) = building.body(Body::empty()) else {
+        unreachable!("the request a test writes is one that can be built")
+    };
+    request.extensions_mut().insert(Arrived {
+        from: HERE,
+        encrypted: false,
+    });
+    let Ok(response) = router.oneshot(request).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let mut body = response.into_body().into_data_stream();
+    let _first = body.next().await;
+    meanwhile();
+    let mut said = 0;
+    while said < most && body.next().await.is_some() {
+        said += 1;
+    }
+    said
+}
+
+/// How many more things a stream that should have ended is let say before it is
+/// taken as one that never will: a beat and a reading either side of the next asking.
+const BEFORE_IT_ENDS: usize = 8;
+
+#[tokio::test(start_paused = true)]
+async fn a_member_keys_stream_ends_once_the_key_is_revoked() {
+    let keys = keeping_keys("member-stream-revoked");
+    let (router, _) = surface_with(&keys, AHousehold::knowing("a7f3"));
+    let said = heard_until_it_ends(router, keys.member.as_str(), BEFORE_IT_ENDS, || {
+        let Ok(mut kept) = Kept::at(&keys.kept) else {
+            unreachable!("the keys this test kept can be read back")
+        };
+        for record in &mut kept.keys {
+            if matches!(record.scope, Scope::Member { .. }) {
+                record.revoked = Some("2026-10-05T08:00:00".to_owned());
+            }
+        }
+        assert!(kept.keep(&keys.kept).is_ok());
+    })
     .await;
-    assert_eq!(code(&stream), "ADMIT-6", "{}", stream.body);
+    assert!(
+        said < BEFORE_IT_ENDS,
+        "a revoked key went on hearing its member's stream"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_member_keys_stream_ends_once_the_key_no_longer_names_the_member() {
+    let keys = keeping_keys("member-stream-rescoped");
+    let (router, _) = surface_with(&keys, AHousehold::knowing("a7f3"));
+    let said = heard_until_it_ends(router, keys.member.as_str(), BEFORE_IT_ENDS, || {
+        let Ok(mut kept) = Kept::at(&keys.kept) else {
+            unreachable!("the keys this test kept can be read back")
+        };
+        for record in &mut kept.keys {
+            if matches!(record.scope, Scope::Member { .. }) {
+                record.scope = Scope::Read;
+            }
+        }
+        assert!(kept.keep(&keys.kept).is_ok());
+    })
+    .await;
+    assert!(
+        said < BEFORE_IT_ENDS,
+        "a key that no longer names the member went on hearing their stream"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_member_keys_stream_ends_once_the_member_has_left() {
+    let keys = keeping_keys("member-stream-left");
+    let household = AHousehold::knowing("a7f3");
+    let (router, _) = surface_with(&keys, Arc::clone(&household));
+    let said = heard_until_it_ends(router, keys.member.as_str(), BEFORE_IT_ENDS, || {
+        household.withdraw();
+    })
+    .await;
+    assert!(
+        said < BEFORE_IT_ENDS,
+        "a member who left went on hearing their stream"
+    );
 }
 
 #[tokio::test]
