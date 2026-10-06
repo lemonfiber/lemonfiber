@@ -4,11 +4,12 @@
 //! given and what each argument looks like, and two copies of that would answer the
 //! same question differently the first time one of them was updated.
 pub(crate) use lemonfiber_api::actions::{
-    named, Arguments, Refused, TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_ARCHIVE,
-    TAKES_BUNDLING, TAKES_CAPABILITY, TAKES_CHECK, TAKES_CONSENT, TAKES_DISRUPTION, TAKES_DOWNLOAD,
-    TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_NAME, TAKES_NARROWING, TAKES_POLICY, TAKES_PRESET,
-    TAKES_REASON, TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING,
-    TAKES_SHARING, TAKES_TERM, TAKES_TIER, TAKES_WAITING,
+    named, Arguments, Refused, TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_APPROVED,
+    TAKES_ARCHIVE, TAKES_BUNDLING, TAKES_CAPABILITY, TAKES_CHECK, TAKES_CONSENT, TAKES_DISRUPTION,
+    TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_NAME, TAKES_NARROWING, TAKES_PLUGIN,
+    TAKES_POLICY, TAKES_PRESET, TAKES_REASON, TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE,
+    TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING, TAKES_SOURCE, TAKES_TERM, TAKES_TIER,
+    TAKES_WAITING,
 };
 pub(crate) use lemonfiber_core::app::Command;
 pub(crate) use std::collections::BTreeSet;
@@ -112,6 +113,13 @@ pub(crate) fn exactly_what(action: &str) -> Arguments {
         request: takes(TAKES_REQUEST).then_some(WAITING),
         reason: takes(TAKES_REASON).then(|| REASON.to_owned()),
         capability: takes(TAKES_CAPABILITY).then(|| CAPABILITY.to_owned()),
+        plugin: takes(TAKES_PLUGIN).then(|| PLUGIN.to_owned()),
+        source: takes(TAKES_SOURCE).then(|| SOURCE.to_owned()),
+        approved: if takes(TAKES_APPROVED) {
+            vec![APPROVAL.to_owned()]
+        } else {
+            Vec::new()
+        },
         kept: takes(TAKES_KEPT).then(|| KEPT.to_owned()),
         tier: takes(TAKES_TIER).then(|| REMOVAL.to_owned()),
         down: takes(TAKES_SHARING).then(|| SHARE.to_owned()),
@@ -129,6 +137,15 @@ pub(crate) fn exactly_what(action: &str) -> Arguments {
 
 /// A capability a choice of filler is about.
 pub(crate) const CAPABILITY: &str = "indexer.search";
+
+/// A plugin an update or a removal acts on.
+pub(crate) const PLUGIN: &str = "komga";
+
+/// Where a plugin comes from: a directory on the machine.
+pub(crate) const SOURCE: &str = "./plugins/komga";
+
+/// A value a recipe would carry elsewhere, approved as the reading lists it.
+pub(crate) const APPROVAL: &str = "token@metadata.example.org";
 
 /// A backup name, as one is written under.
 pub(crate) const ARCHIVE: &str = "lemonfiber-full-1700000000.tar.gz";

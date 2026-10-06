@@ -12,15 +12,16 @@
 //! says what a caller may write; that one says who may write it.
 
 mod takers;
+mod unwanted;
 
-pub(crate) use takers::unwanted;
 pub use takers::{
-    TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_ARCHIVE, TAKES_BUNDLING,
+    TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_APPROVED, TAKES_ARCHIVE, TAKES_BUNDLING,
     TAKES_CAPABILITY, TAKES_CHECK, TAKES_CONSENT, TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS,
-    TAKES_ITEM, TAKES_KEPT, TAKES_NAME, TAKES_NARROWING, TAKES_POLICY, TAKES_PRESET, TAKES_REASON,
-    TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING,
-    TAKES_TERM, TAKES_TIER, TAKES_WAITING,
+    TAKES_ITEM, TAKES_KEPT, TAKES_NAME, TAKES_NARROWING, TAKES_PLUGIN, TAKES_POLICY, TAKES_PRESET,
+    TAKES_REASON, TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING,
+    TAKES_SHARING, TAKES_SOURCE, TAKES_TERM, TAKES_TIER, TAKES_WAITING,
 };
+pub(crate) use unwanted::unwanted;
 
 use lemonfiber_core::app::Waiting;
 use lemonfiber_core::bundle::Filenames;
@@ -114,6 +115,16 @@ pub struct Arguments {
     pub reason: Option<String>,
     /// The capability whose filler is being chosen.
     pub capability: Option<String>,
+    /// The plugin an update or a removal acts on, by the id the record of what is
+    /// installed lists it under.
+    pub plugin: Option<String>,
+    /// Where a plugin comes from: its name in the catalogue, its directory on this
+    /// machine or the `plugin.toml` inside it, or a git repository, at a branch, tag or
+    /// commit named after its last `@`.
+    pub source: Option<String>,
+    /// Every value a recipe would carry elsewhere that is approved, as `value@destination`
+    /// exactly as the reading lists it.
+    pub approved: Vec<String>,
     /// Which of the four removals an uninstall was asked for.
     ///
     /// A word rather than a level, for the reason `policy` is a word: they are four
@@ -206,6 +217,9 @@ impl Arguments {
             cap: Some("1TiB".to_owned()),
             exceeded: Some("pause".to_owned()),
             unrestricted_for: Some(1),
+            plugin: Some("komga".to_owned()),
+            source: Some("komga".to_owned()),
+            approved: vec!["api_key@komga".to_owned()],
             ..Self::default()
         }
     }
