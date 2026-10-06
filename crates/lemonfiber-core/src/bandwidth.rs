@@ -42,6 +42,7 @@ pub mod cap;
 pub mod capacity;
 pub mod holding;
 pub mod limit;
+pub mod pausing;
 pub mod respite;
 pub mod rhythm;
 pub(crate) mod run;
@@ -50,6 +51,7 @@ pub use cap::{Cap, Metered, Reached, WhenExceeded, CRAWL};
 pub use capacity::Capacity;
 pub use holding::{Answer, Held, Holding, Pulling, Verdict};
 pub use limit::{Limit, Resolved};
+pub use pausing::{Paused, Pauses, Pausing};
 pub use respite::Respite;
 pub use rhythm::{Period, Rhythm, Wall};
 

@@ -198,6 +198,18 @@ pub(super) fn sharing(report: &lemonfiber_core::bandwidth::Sharing) -> ExitCode 
     ExitCode::SUCCESS
 }
 
+/// The exit code pausing or resuming every download client earns.
+///
+/// A failure wherever one client did not end up where it was asked to be, whether it
+/// could not be reached or read back the opposite. A rehearsal asked nothing.
+pub(super) fn pausing(report: &lemonfiber_core::bandwidth::Pauses) -> ExitCode {
+    if report.whole() {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::from(FAILURE)
+    }
+}
+
 /// The exit code a question about the credentials earns.
 ///
 /// Only a rotation that was asked for and did not land is a failure. A reading is a

@@ -400,3 +400,21 @@ fn the_documents_an_author_reads_are_not_dispatched() {
         assert_eq!(door(lemonfiber::cli::PluginCommand::Authoring(read)), None);
     }
 }
+
+#[test]
+fn a_pause_and_a_resume_each_reach_every_download_client() {
+    use lemonfiber::cli::{DownloadsCommand, RawDownloads};
+    use lemonfiber_core::bandwidth::Pausing;
+    assert_eq!(
+        super::super::pausing(&RawDownloads {
+            action: DownloadsCommand::Pause
+        }),
+        Command::Downloads(Pausing::Pause)
+    );
+    assert_eq!(
+        super::super::pausing(&RawDownloads {
+            action: DownloadsCommand::Resume
+        }),
+        Command::Downloads(Pausing::Resume)
+    );
+}

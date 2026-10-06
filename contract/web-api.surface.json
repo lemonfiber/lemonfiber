@@ -36,6 +36,7 @@
     "news-items": "ref:News",
     "outbound": "ref:Leaving",
     "pairing": "ref:Pairing",
+    "pausing": "ref:PausingReport",
     "plugins": "ref:PluginInstalls",
     "preview": "ref:Plan",
     "provenance": "ref:ProvenanceReport",
@@ -4787,6 +4788,71 @@
         "to": {
           "type": [
             "array[string]"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
+    },
+    "PausedClient": {
+      "fields": {
+        "client": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "now": {
+          "type": [
+            "anyOf(null,ref:Pulling)"
+          ],
+          "required": false
+        },
+        "unreached": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "was": {
+          "type": [
+            "anyOf(null,ref:Pulling)"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
+    "Pausing": {
+      "fields": {},
+      "variants": [
+        "\"pause\"",
+        "\"resume\""
+      ]
+    },
+    "PausingReport": {
+      "fields": {
+        "asked": {
+          "type": [
+            "ref:Pausing"
+          ],
+          "required": true
+        },
+        "caution": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        },
+        "clients": {
+          "type": [
+            "array[ref:PausedClient]"
+          ],
+          "required": true
+        },
+        "rehearsed": {
+          "type": [
+            "boolean"
           ],
           "required": true
         }

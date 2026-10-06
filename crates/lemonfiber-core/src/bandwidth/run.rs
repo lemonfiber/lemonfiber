@@ -36,9 +36,10 @@ use crate::ports::service::{Rates, Wanted, Window};
 
 use crate::app::command::BandwidthAsked as Asked;
 use crate::app::targets::{download_targets, host_fillers, project_directory};
-use crate::app::Ctx;
+use crate::app::{Ctx, Outcome};
 use reaching::Fetch;
 
+pub(crate) mod pausing;
 mod reaching;
 mod revising;
 
@@ -128,6 +129,15 @@ pub(crate) async fn bandwidth(ctx: &Ctx, asked: &Asked) -> Result<Sharing, Box<P
         metered,
         applied: writing,
     }))
+}
+
+/// The same, as the answer a command comes back with.
+///
+/// # Errors
+///
+/// As [`bandwidth`].
+pub(crate) async fn shared(ctx: &Ctx, asked: &Asked) -> Result<Outcome, Box<Problem>> {
+    bandwidth(ctx, asked).await.map(Outcome::Bandwidth)
 }
 
 /// Whether what was asked for can be carried out at all, checked before anything

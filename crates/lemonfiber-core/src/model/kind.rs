@@ -117,6 +117,8 @@ kinds! {
     OUTBOUND = "outbound",
     /// What a phone is handed to pair with this stack.
     PAIRING = "pairing",
+    /// What pausing or resuming every download client came to, client by client.
+    PAUSING = "pausing",
     /// Every plugin installed on this machine, and what installing one came to.
     PLUGINS = "plugins",
     /// What starting or stopping would do, before it is done.

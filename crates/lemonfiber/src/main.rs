@@ -333,6 +333,7 @@ async fn main() -> ExitCode {
         Request::Space { offer } => Command::Space { agreement: offer },
         Request::StopSeeding { download, offer } => letting(download, offer),
         Request::Bandwidth(asked) => translate::sharing(asked),
+        Request::Downloads(asked) => translate::pausing(&asked),
         Request::Seed => Command::Seed,
         Request::Adopt => Command::Adopt,
         Request::Reset { confirm } => Command::Reset { confirm },

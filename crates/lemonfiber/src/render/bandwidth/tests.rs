@@ -1,7 +1,7 @@
-use super::sharing;
+use super::{pausing, sharing};
 use lemonfiber_core::bandwidth::{
-    weigh, Answer, Cap, Capacity, Declared, Held, Holding, Limit, Measured, Metered, Period,
-    Pulling, Respite, Rhythm, WhenExceeded,
+    weigh, Answer, Cap, Capacity, Declared, Held, Holding, Limit, Measured, Metered, Paused,
+    Pauses, Pausing, Period, Pulling, Respite, Rhythm, WhenExceeded,
 };
 
 /// A moment every case here reads against.
@@ -220,4 +220,81 @@ fn a_month_that_is_not_over_says_nothing_about_stopping_anything() {
     assert!(!said.contains("The cap is spent"), "{said}");
     assert!(!said.contains("nothing new is fetched"), "{said}");
     assert!(!said.contains("stopped, and taking nothing new"), "{said}");
+}
+
+/// A report on two clients: one that read back `torrent`, and one nothing reached.
+fn paused(asked: Pausing, torrent: Option<Pulling>, rehearsed: bool) -> Pauses {
+    Pauses {
+        asked,
+        clients: vec![
+            Paused {
+                client: "qbittorrent".to_owned(),
+                was: Some(Pulling::Fetching),
+                now: torrent,
+                unreached: None,
+            },
+            Paused {
+                client: "sabnzbd".to_owned(),
+                was: None,
+                now: None,
+                unreached: Some("it would not answer".to_owned()),
+            },
+        ],
+        caution: None,
+        rehearsed,
+    }
+}
+
+#[test]
+fn a_pause_names_each_client_with_what_it_read_back() {
+    let said = pausing(&paused(Pausing::Pause, Some(Pulling::Stopped), false)).text();
+    assert!(said.contains("asked to pause"), "{said}");
+    assert!(
+        said.contains("qbittorrent  stopped, and taking nothing new"),
+        "{said}"
+    );
+    assert!(
+        said.contains("sabnzbd      not reached — it would not answer"),
+        "{said}"
+    );
+    assert!(
+        said.contains("Not every client ended up where it was asked to be."),
+        "{said}"
+    );
+}
+
+#[test]
+fn a_rehearsal_says_what_each_client_is_doing_now_and_claims_nothing_asked() {
+    let said = pausing(&paused(Pausing::Resume, None, true)).text();
+    assert!(
+        said.contains("Resuming every download client would ask:"),
+        "{said}"
+    );
+    assert!(said.contains("qbittorrent  fetching now"), "{said}");
+    assert!(!said.contains("Not every client"), "{said}");
+}
+
+#[test]
+fn a_resume_at_a_spent_cap_says_the_cap_will_stop_them_again() {
+    let mut report = paused(Pausing::Resume, Some(Pulling::Fetching), false);
+    report.caution = Some("This month's cap is spent.".to_owned());
+    report.clients.truncate(1);
+    let said = pausing(&report).text();
+    assert!(said.contains("asked to resume"), "{said}");
+    assert!(said.contains("This month's cap is spent."), "{said}");
+    assert!(!said.contains("Not every client"), "{said}");
+}
+
+#[test]
+fn a_client_that_said_nothing_is_not_described_as_doing_anything() {
+    let mut report = paused(Pausing::Pause, None, true);
+    report.clients.truncate(1);
+    if let Some(client) = report.clients.first_mut() {
+        client.was = None;
+    }
+    let said = pausing(&report).text();
+    assert!(
+        said.contains("said nothing about what it is doing"),
+        "{said}"
+    );
 }

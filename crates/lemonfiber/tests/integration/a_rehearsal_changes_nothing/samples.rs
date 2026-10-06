@@ -225,6 +225,13 @@ fn over_what_this_machine_keeps() -> Vec<(&'static str, Command)> {
                 ..BandwidthAsked::default()
             }),
         ),
+        // The pause rather than the resume: a rehearsal of either asks each client what
+        // it is doing, and the pause is the one whose rehearsal would cost a household
+        // its evening if it leaked through.
+        (
+            "downloads",
+            Command::Downloads(lemonfiber_core::bandwidth::Pausing::Pause),
+        ),
         ("seed", Command::Seed),
         ("adopt", Command::Adopt),
         ("reset", Command::Reset { confirm: true }),

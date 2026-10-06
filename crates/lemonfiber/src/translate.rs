@@ -13,6 +13,7 @@ use lemonfiber_core::app::{
     MigrateAction, QualityAction, Removing, Setting,
 };
 use lemonfiber_core::audio::Format;
+use lemonfiber_core::bandwidth::Pausing;
 use lemonfiber_core::bundle::run::Wanted;
 use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::migration::mode::Mode;
@@ -24,9 +25,9 @@ use lemonfiber_core::update::run as update;
 use crate::exit::USAGE;
 use crate::say::complain;
 use lemonfiber::cli::{
-    AlertCommand, Asked, Authoring, ConfigAction, HostingCommand, Kept, MigrateCommand,
-    PluginCommand, QualityCommand, RawBandwidth, RawCredentials, RawRemoval, RawRemoving,
-    UpdateCommand, WiringCommand,
+    AlertCommand, Asked, Authoring, ConfigAction, DownloadsCommand, HostingCommand, Kept,
+    MigrateCommand, PluginCommand, QualityCommand, RawBandwidth, RawCredentials, RawDownloads,
+    RawRemoval, RawRemoving, UpdateCommand, WiringCommand,
 };
 
 mod people;
@@ -384,6 +385,14 @@ pub(crate) fn moving(object: UpdateCommand) -> Command {
         }),
         UpdateCommand::Itself { to } => Command::SelfUpdate { to },
     }
+}
+
+/// Which of the two is asked of every download client.
+pub(crate) const fn pausing(asked: &RawDownloads) -> Command {
+    Command::Downloads(match asked.action {
+        DownloadsCommand::Pause => Pausing::Pause,
+        DownloadsCommand::Resume => Pausing::Resume,
+    })
 }
 
 /// Which of the two doors a word under `plugin` goes through.

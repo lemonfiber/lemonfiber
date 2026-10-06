@@ -51,8 +51,8 @@ impl Client {
     /// The name the stack knows it under, which is what the report names it by.
     pub(super) fn name(&self) -> &'static str {
         match self {
-            Self::Torrent(_) => "qbittorrent",
-            Self::Usenet(_) => "sabnzbd",
+            Self::Torrent(_) => crate::qbittorrent::SERVICE,
+            Self::Usenet(_) => crate::sabnzbd::SERVICE,
         }
     }
 
@@ -73,7 +73,7 @@ impl Client {
     }
 
     /// Whether it is fetching at all.
-    fn fetching(&self) -> &dyn Fetching {
+    pub(super) fn fetching(&self) -> &dyn Fetching {
         match self {
             Self::Torrent(client) => client.as_ref(),
             Self::Usenet(client) => client.as_ref(),
@@ -93,20 +93,21 @@ impl Client {
 /// than reported as unlimited: it is not a client with no limits, it is a client
 /// nothing here can see, and the two must not render alike.
 pub(super) fn opened(ctx: &Ctx, targets: &[DownloadTarget]) -> Vec<Client> {
-    let mut clients = Vec::new();
-    for target in targets {
-        clients.push(match &target.kind {
-            DownloadKind::Qbittorrent { password } => Client::Torrent(Box::new(
-                Qbittorrent::authenticated(ctx.seams.http.clone(), &target.base, password.clone()),
-            )),
-            DownloadKind::Sabnzbd { key } => Client::Usenet(Box::new(Sabnzbd::new(
-                ctx.seams.http.clone(),
-                &target.base,
-                key.clone(),
-            ))),
-        });
+    targets.iter().map(|target| open(ctx, target)).collect()
+}
+
+/// One download client, opened with the credential it answers to.
+pub(super) fn open(ctx: &Ctx, target: &DownloadTarget) -> Client {
+    match &target.kind {
+        DownloadKind::Qbittorrent { password } => Client::Torrent(Box::new(
+            Qbittorrent::authenticated(ctx.seams.http.clone(), &target.base, password.clone()),
+        )),
+        DownloadKind::Sabnzbd { key } => Client::Usenet(Box::new(Sabnzbd::new(
+            ctx.seams.http.clone(),
+            &target.base,
+            key.clone(),
+        ))),
     }
-    clients
 }
 
 /// Put the limits to one client where `writing`, and read back what it says.
@@ -187,7 +188,7 @@ fn answer(wanted: &Wanted, held: &Throttled, moving: &Rates) -> Answer {
 ///
 /// The service's own detail where it gave one, so the operator reads what refused
 /// rather than an interpretation of it; the failure's own sentence otherwise.
-fn said(failure: &Failure) -> String {
+pub(super) fn said(failure: &Failure) -> String {
     match failure {
         Failure::Refused { detail, .. } | Failure::Unsupported { detail, .. } => detail.clone(),
         Failure::Unavailable { .. } | Failure::Unauthorised { .. } => failure.to_string(),

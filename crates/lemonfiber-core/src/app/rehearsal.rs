@@ -310,6 +310,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Space { .. } => reports("space", &[kind::SPACE]),
         Command::StopSeeding { .. } => reports("stop-seeding", &[kind::STOP_SEEDING]),
         Command::Bandwidth(_) => reports("bandwidth", &[kind::BANDWIDTH]),
+        Command::Downloads(_) => reports("downloads", &[kind::PAUSING]),
         Command::Uninstall(_) => reports("uninstall", &[kind::UNINSTALL]),
         // A guard is the one command with no ending of its own, so a rehearsal of it
         // cannot be the command run with the last step left out — it would hold the

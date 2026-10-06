@@ -27,8 +27,8 @@ use crate::endpoint::Endpoint;
 use crate::ports::http::{Http, Method, Request};
 use crate::ports::service::Failure;
 
-/// The service name a failure is reported against.
-const SERVICE: &str = "sabnzbd";
+/// The name the stack knows this client under, which a failure is reported against.
+pub(crate) const SERVICE: &str = "sabnzbd";
 
 /// The `status` a slot carries while it is the one being downloaded — the active
 /// slot, to which the queue's single speed belongs.

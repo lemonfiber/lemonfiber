@@ -66,6 +66,8 @@ pub const OFFERED: &[&str] = &[
     "space",
     "stop-seeding",
     "bandwidth",
+    "downloads-pause",
+    "downloads-resume",
     "update",
     "backup",
     "invite",
@@ -198,7 +200,7 @@ fn carried(action: &str, given: Arguments) -> Result<Command, Refused> {
     // Apart for the same reason: seven fields no other row reads, and nothing here to
     // refuse — what a share or a window means is the core's answer for every surface.
     if sharing::about_the_line(action) {
-        return Ok(sharing::asked_for(given));
+        return Ok(sharing::asked_for(action, given));
     }
     // And again, twice: one field and nothing to refuse for the first, two fields and
     // one refusal for the second.

@@ -348,8 +348,34 @@ fn keeping() -> Vec<Outcome> {
             },
         )),
         Outcome::Bandwidth(a_shared_line()),
+        Outcome::Pausing(every_client_paused()),
         Outcome::Outbound(what_leaves()),
     ]
+}
+
+/// A pause one client took and one nothing reached, with the caution a spent cap
+/// carries, so every optional half of the shape is compared.
+fn every_client_paused() -> lemonfiber_core::bandwidth::Pauses {
+    use lemonfiber_core::bandwidth::{Paused, Pauses, Pausing, Pulling};
+    Pauses {
+        asked: Pausing::Resume,
+        clients: vec![
+            Paused {
+                client: "qbittorrent".to_owned(),
+                was: Some(Pulling::Stopped),
+                now: Some(Pulling::Fetching),
+                unreached: None,
+            },
+            Paused {
+                client: "sabnzbd".to_owned(),
+                was: None,
+                now: None,
+                unreached: Some("it would not answer".to_owned()),
+            },
+        ],
+        caution: Some("This month's cap is spent.".to_owned()),
+        rehearsed: false,
+    }
 }
 
 /// Pairing material, with the caution an address that is a number carries, so the

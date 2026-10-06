@@ -452,6 +452,8 @@ pub enum Command {
     /// client, then reads back what each says — because a client that accepts a
     /// setting and does not apply it looks exactly like one that did.
     Bandwidth(BandwidthAsked),
+    /// Pause every download client the stack runs, or let them all fetch again.
+    Downloads(crate::bandwidth::Pausing),
     /// Guard the data location while the given forms run, stopping them the moment
     /// it disappears.
     ///
