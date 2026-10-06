@@ -3,7 +3,7 @@ use lemonfiber_plugin::Expect;
 use super::super::recorded::{Answer, Recording};
 use lemonfiber_plugin::vocabulary::Constraint;
 
-use super::{faults, judge};
+use super::{faults, judge, method};
 
 /// An answer built out of a recording, which is the only way one is ever built.
 ///
@@ -629,4 +629,21 @@ fn every_fault_is_placed_by_its_constraint_with_what_the_answer_held() {
         placed(r#"{"json_array_min": 1}"#, r#"{"status": 200, "json": {}}"#),
         vec![whole(Constraint::JsonArrayMin, "an object")]
     );
+}
+
+/// Every verb the port carries is read from a declaration in any case, and nothing else.
+#[test]
+fn a_declared_method_is_the_verb_the_port_carries_or_none() {
+    use crate::ports::http::Method;
+    for (declared, carried) in [
+        ("GET", Method::Get),
+        ("post", Method::Post),
+        ("Put", Method::Put),
+        ("PATCH", Method::Patch),
+        ("delete", Method::Delete),
+    ] {
+        assert_eq!(method(declared), Some(carried), "{declared}");
+    }
+    assert_eq!(method("HEAD"), None);
+    assert_eq!(method("OPTIONS"), None);
 }

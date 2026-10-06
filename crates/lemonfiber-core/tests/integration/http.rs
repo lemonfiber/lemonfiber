@@ -15,7 +15,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
 /// What the fake server sends back.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 enum Reply {
     /// A complete response with this status and body.
     Whole(u16, &'static str),
@@ -32,6 +32,8 @@ enum Reply {
     Announcing(u64),
     /// A response announcing no length at all, sending this body and closing.
     Unannounced(&'static str),
+    /// A redirect to this address.
+    Redirecting(String),
 }
 
 /// A running fake server on localhost, and the request it captured.
@@ -86,7 +88,7 @@ async fn answer(listener: TcpListener, reply: Reply, captured: Arc<Mutex<String>
     // origin that set it takes two requests to one server. A test that asks once is
     // unaffected: it reads what it captured and then stops the server.
     loop {
-        served(&listener, reply, &captured).await;
+        served(&listener, reply.clone(), &captured).await;
     }
 }
 
@@ -138,6 +140,10 @@ async fn served(listener: &TcpListener, reply: Reply, captured: &Arc<Mutex<Strin
         Reply::Unannounced(body) => {
             format!("HTTP/1.1 200 X\r\nConnection: close\r\n\r\n{body}").into_bytes()
         }
+        Reply::Redirecting(location) => {
+            format!("HTTP/1.1 302 X\r\nLocation: {location}\r\nContent-Length: 0\r\n\r\n")
+                .into_bytes()
+        }
     };
     let _ = socket.write_all(&bytes).await;
     let _ = socket.flush().await;
@@ -162,6 +168,7 @@ fn asking(base: &str) -> Request {
         url: format!("{base}/api/v3/system/status"),
         headers: Vec::new(),
         body: None,
+        pinned: None,
     }
 }
 
@@ -173,6 +180,7 @@ async fn a_get_returns_the_status_and_the_body() {
         url: format!("{}/api/v3/system/status", server.base),
         headers: Vec::new(),
         body: None,
+        pinned: None,
     };
     let response = Web::default().send(&request).await;
     let sent = server.request();
@@ -233,6 +241,7 @@ async fn a_post_carries_its_headers_and_body() {
         url: format!("{}/api/v3/rootfolder", server.base),
         headers: vec![("X-Api-Key".to_owned(), "the-secret".to_owned())],
         body: Some(r#"{"path":"/data/media/tv"}"#.to_owned()),
+        pinned: None,
     };
     let response = Web::new().send(&request).await;
     let sent = server.request();
@@ -255,6 +264,7 @@ async fn a_put_carries_its_body_to_replace_a_resource() {
         url: format!("{}/api/v1/qualityprofile/1", server.base),
         headers: vec![("X-Api-Key".to_owned(), "the-secret".to_owned())],
         body: Some(r#"{"id":1,"upgradeAllowed":true}"#.to_owned()),
+        pinned: None,
     };
     let response = Web::new().send(&request).await;
     let sent = server.request();
@@ -278,6 +288,7 @@ async fn a_refusal_is_a_response_rather_than_a_failure() {
         url: format!("{}/api/v3/system/status", server.base),
         headers: Vec::new(),
         body: None,
+        pinned: None,
     };
     let response = Web::new().send(&request).await;
     server.stop().await;
@@ -294,6 +305,7 @@ async fn a_service_that_is_not_listening_is_unreachable() {
         url: format!("{}/api/v3/system/status", dead_url().await),
         headers: Vec::new(),
         body: None,
+        pinned: None,
     };
     let outcome = Web::new().send(&request).await;
     assert_eq!(
@@ -312,6 +324,7 @@ async fn shown_for(query: &str) -> String {
         url: format!("{}/api?{query}", dead_url().await),
         headers: Vec::new(),
         body: None,
+        pinned: None,
     };
     let unreachable = Web::new().send(&request).await.err();
     assert!(
@@ -380,6 +393,7 @@ async fn a_body_that_does_not_arrive_is_unreachable() {
         url: format!("{}/api/v3/system/status", server.base),
         headers: Vec::new(),
         body: None,
+        pinned: None,
     };
     let outcome = Web::new().send(&request).await;
     server.stop().await;
@@ -454,6 +468,7 @@ async fn a_removal_is_sent_as_a_removal() {
         url: format!("{}/Users/ec5f5785a6f4416a9c993800ef463226", server.base),
         headers: vec![("X-Api-Key".to_owned(), "the-secret".to_owned())],
         body: None,
+        pinned: None,
     };
     let response = Web::new().send(&request).await;
     let sent = server.request();
@@ -499,4 +514,104 @@ async fn an_answer_past_the_limit_is_refused_rather_than_held() {
             .is_err_and(|failure| failure.reason.contains("larger than 16 bytes")),
         "{refused:?}"
     );
+}
+
+/// A change to part of a resource is sent as one, with its body.
+#[tokio::test]
+async fn a_change_to_part_of_a_resource_is_sent_as_a_patch() {
+    let server = serve(Reply::Whole(200, "")).await;
+    let request = Request {
+        method: Method::Patch,
+        body: Some("{\"name\":\"Comics\"}".to_owned()),
+        ..asking(&server.base)
+    };
+    let response = Web::new().send(&request).await;
+    let sent = server.request();
+    server.stop().await;
+
+    assert_eq!(response.ok().map(|answer| answer.status), Some(200));
+    assert!(sent.starts_with("PATCH "), "a PATCH was sent: {sent:?}");
+    assert!(
+        sent.contains("{\"name\":\"Comics\"}"),
+        "with its body: {sent:?}"
+    );
+}
+
+/// A request held to checked addresses connects to them for the name it carries, and
+/// asks no resolver: the name here stands for nothing anywhere.
+#[tokio::test]
+async fn a_request_held_to_checked_addresses_connects_to_them_alone() {
+    let server = serve(Reply::Whole(200, "held")).await;
+    let port = server
+        .base
+        .rsplit(':')
+        .next()
+        .unwrap_or_default()
+        .to_owned();
+    let named = format!("http://pinned.invalid:{port}");
+    let held = Request {
+        pinned: Some(vec![std::net::IpAddr::from([127, 0, 0, 1])]),
+        ..asking(&named)
+    };
+    let response = Web::new().send(&held).await;
+    let sent = server.request();
+    server.stop().await;
+
+    assert_eq!(
+        response.ok().map(|answer| answer.body),
+        Some("held".to_owned())
+    );
+    assert!(
+        sent.to_ascii_lowercase()
+            .contains(&format!("host: pinned.invalid:{port}")),
+        "the name is the one asked for: {sent:?}"
+    );
+
+    // Unheld, the same name is the resolver's to answer, and it answers nothing.
+    let unheld = Web::new().send(&asking(&named)).await;
+    assert!(unheld.is_err());
+}
+
+/// A request held to no address is not sent: handing the name back to a resolver would
+/// undo the check the addresses came from.
+#[tokio::test]
+async fn a_request_held_to_no_address_is_not_sent() {
+    let server = serve(Reply::Whole(200, "")).await;
+    let held = Request {
+        pinned: Some(Vec::new()),
+        ..asking(&server.base)
+    };
+    let response = Web::new().send(&held).await;
+    let sent = server.request();
+    server.stop().await;
+
+    assert!(response
+        .err()
+        .is_some_and(|refused| refused.reason.contains("nothing was asked")),);
+    assert!(sent.is_empty(), "nothing reached the server: {sent:?}");
+}
+
+/// A call held to checked addresses follows no redirect: the hop is an answer, and the
+/// address it names is never asked.
+#[tokio::test]
+async fn a_request_held_to_checked_addresses_follows_no_redirect() {
+    let elsewhere = serve(Reply::Whole(200, "elsewhere")).await;
+    let server = serve(Reply::Redirecting(format!("{}/taken", elsewhere.base))).await;
+    let port = server
+        .base
+        .rsplit(':')
+        .next()
+        .unwrap_or_default()
+        .to_owned();
+    let held = Request {
+        pinned: Some(vec![std::net::IpAddr::from([127, 0, 0, 1])]),
+        ..asking(&format!("http://pinned.invalid:{port}"))
+    };
+    let response = Web::new().send(&held).await;
+    let reached = elsewhere.request();
+    server.stop().await;
+    elsewhere.stop().await;
+
+    assert_eq!(response.ok().map(|answer| answer.status), Some(302));
+    assert!(reached.is_empty(), "the hop was followed: {reached:?}");
 }

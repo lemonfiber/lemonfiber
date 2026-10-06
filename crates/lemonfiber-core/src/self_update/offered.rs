@@ -126,6 +126,7 @@ pub fn asking(at: &str) -> Request {
             ("User-Agent".to_owned(), CALLED.to_owned()),
         ],
         body: None,
+        pinned: None,
     }
 }
 

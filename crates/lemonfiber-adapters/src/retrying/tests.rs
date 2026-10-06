@@ -45,6 +45,7 @@ fn request(method: Method) -> Request {
         url: "http://sonarr:8989/api/v3/system/status".to_owned(),
         headers: Vec::new(),
         body: None,
+        pinned: None,
     }
 }
 

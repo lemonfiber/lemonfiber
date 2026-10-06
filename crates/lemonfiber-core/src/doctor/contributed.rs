@@ -303,6 +303,7 @@ impl Contributed {
                 url: format!("{}{path}", address.trim_end_matches('/')),
                 headers: Vec::new(),
                 body: None,
+                pinned: None,
             })
             .await;
         match answered {

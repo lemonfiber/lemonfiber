@@ -148,6 +148,7 @@ impl Bazarr {
             url: self.endpoint.url(SETTINGS),
             headers,
             body,
+            pinned: None,
         }
     }
 }
