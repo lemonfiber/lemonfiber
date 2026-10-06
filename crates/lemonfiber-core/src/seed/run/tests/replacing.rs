@@ -189,12 +189,20 @@ fn replacing_the_media_server_changes_nothing_that_signs_in_to_it() {
         .as_ref()
         .and_then(|(_, before)| MediaServer::of(before));
     let after = shipped_stack.as_ref().and_then(|(manifest, before)| {
+        let identity = crate::app::targets::IDENTITY;
+        let asking = before
+            .asks()
+            .iter()
+            .find(|ask| ask.capability == identity)?;
         let replaced = before.service(was.as_ref()?.id())?;
-        swapped(manifest, "seerr", crate::app::targets::IDENTITY, replaced)
+        swapped(manifest, &asking.by, identity, replaced)
     });
     let now = after.as_ref().and_then(MediaServer::of);
 
-    assert!(was.is_some(), "the shipped stack has a media server");
+    assert!(
+        was.as_ref().and_then(MediaServer::requests).is_some(),
+        "the shipped stack's request service asks its media server"
+    );
     assert_eq!(now.as_ref().map(MediaServer::id), Some(STAND_IN));
     assert_eq!(
         now.as_ref().map(|one| one.network.url()),
