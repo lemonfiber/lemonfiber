@@ -113,6 +113,35 @@ async fn the_record_reads_newest_first() {
     assert_eq!(first, Some("set PUID to 1000".to_owned()));
 }
 
+/// A file a choice of filler wrote over reads as which file it was, through the same
+/// dispatch every surface reaches the record by.
+#[tokio::test]
+async fn a_file_written_over_reads_as_which_file_it_was() {
+    let root = scratch("rewritten");
+    let path = root.join("komga.yml").display().to_string();
+    journalled(
+        &root,
+        &[Change {
+            at: "2000".to_owned(),
+            operation: "wiring".to_owned(),
+            target: path.clone(),
+            kind: Kind::Rewritten {
+                path: path.clone(),
+                previous: "services: {}\n".to_owned(),
+                written: 0,
+            },
+        }],
+    );
+
+    let report = recorded(&ctx(&root)).await;
+    let changes = report.map(|report| report.changes).unwrap_or_default();
+
+    assert_eq!(
+        changes.first().map(|change| change.did.clone()),
+        Some(format!("wrote over {path}"))
+    );
+}
+
 /// A setting somebody has edited since is refused rather than quietly overwritten, and
 /// the refusal names what it holds now — which is only knowable by reading the file.
 #[tokio::test]
