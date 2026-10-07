@@ -1,4 +1,5 @@
-use super::{looks_like_an_address, substitutions};
+use super::looks_like_an_address;
+use crate::addressing::named as substitutions;
 use crate::refusing::refusals;
 use crate::schema::tests::WHOLE;
 use crate::schema::Manifest;

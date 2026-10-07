@@ -63,6 +63,7 @@ fn install(would: Installed, recorded: bool) -> Install {
         overrides: Vec::new(),
         reversed: None,
         contests: Vec::new(),
+        recipes_ran: Vec::new(),
     }
 }
 

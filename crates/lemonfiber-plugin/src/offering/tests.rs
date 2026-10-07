@@ -22,7 +22,12 @@ fn every_published_point_is_an_offer() {
 #[test]
 fn a_capability_no_mechanism_here_provides_is_not_offered() {
     assert!(!offers("service.add"));
-    assert!(!offers("recipe.run"));
+}
+
+/// Running a recipe is offered, by the name a manifest declaring one asks for.
+#[test]
+fn running_a_recipe_is_offered() {
+    assert!(offers("recipe.run"));
 }
 
 /// The set is derived, so removing what it is derived from empties it.

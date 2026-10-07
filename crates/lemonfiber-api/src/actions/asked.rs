@@ -125,6 +125,9 @@ pub struct Arguments {
     /// Every value a recipe would carry elsewhere that is approved, as `value@destination`
     /// exactly as the reading lists it.
     pub approved: Vec<String>,
+    /// Every value the operator supplies for an input a recipe asks for, as `name=value`.
+    /// What follows the `=` may be a secret, and is never repeated back.
+    pub inputs: Vec<String>,
     /// Which of the four removals an uninstall was asked for.
     ///
     /// A word rather than a level, for the reason `policy` is a word: they are four
@@ -220,6 +223,7 @@ impl Arguments {
             plugin: Some("komga".to_owned()),
             source: Some("komga".to_owned()),
             approved: vec!["api_key@komga".to_owned()],
+            inputs: vec!["claim=1234".to_owned()],
             ..Self::default()
         }
     }

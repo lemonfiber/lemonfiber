@@ -5919,6 +5919,13 @@
                   "description": "Where it stands with respect to being fixed.",
                   "$ref": "#/$defs/ProblemState"
                 },
+                "steps": {
+                  "description": "Every step a run declares, with what each came to, where the problem ended a run\nof steps part-way; absent from every other problem.\n\nData beside the detail rather than in it, so a client reads what changed\nsomewhere going back cannot reach without parsing a sentence written for a person.",
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/ProblemStep"
+                  }
+                },
                 "summary": {
                   "description": "What happened, in one plain sentence.",
                   "type": "string"
@@ -5982,6 +5989,13 @@
                 "state": {
                   "description": "Where it stands with respect to being fixed.",
                   "$ref": "#/$defs/ProblemState"
+                },
+                "steps": {
+                  "description": "Every step a run declares, with what each came to, where the problem ended a run\nof steps part-way; absent from every other problem.\n\nData beside the detail rather than in it, so a client reads what changed\nsomewhere going back cannot reach without parsing a sentence written for a person.",
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/ProblemStep"
+                  }
                 },
                 "summary": {
                   "description": "What happened, in one plain sentence.",
@@ -6179,6 +6193,13 @@
               "description": "Where it stands with respect to being fixed.",
               "$ref": "#/$defs/ProblemState"
             },
+            "steps": {
+              "description": "Every step a run declares, with what each came to, where the problem ended a run\nof steps part-way; absent from every other problem.\n\nData beside the detail rather than in it, so a client reads what changed\nsomewhere going back cannot reach without parsing a sentence written for a person.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ProblemStep"
+              }
+            },
             "summary": {
               "description": "What happened, in one plain sentence.",
               "type": "string"
@@ -6248,6 +6269,35 @@
             }
           ]
         },
+        "ProblemStep": {
+          "description": "What one step of a run that stopped part-way came to.",
+          "type": "object",
+          "properties": {
+            "came": {
+              "description": "What it came to.",
+              "$ref": "#/$defs/StepCame"
+            },
+            "landed": {
+              "description": "Whether it reached somewhere other than the plugin's own services, which going\nback cannot undo.",
+              "type": "boolean"
+            },
+            "recipe": {
+              "description": "The recipe the step belongs to.",
+              "type": "string"
+            },
+            "step": {
+              "description": "The step's id within it.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "recipe",
+            "step",
+            "came",
+            "landed"
+          ]
+        },
         "Remedy": {
           "description": "One thing the operator can do about a problem.",
           "type": "object",
@@ -6266,6 +6316,56 @@
           },
           "required": [
             "action"
+          ]
+        },
+        "StepCame": {
+          "description": "What one step of a recipe came to.",
+          "oneOf": [
+            {
+              "description": "It was answered with what it should be, and took what it captures.",
+              "type": "string",
+              "const": "answered"
+            },
+            {
+              "description": "Its guard did not hold, so it was not made.",
+              "type": "string",
+              "const": "skipped"
+            },
+            {
+              "description": "An earlier step did not come to what it should, so this one was not made.",
+              "type": "string",
+              "const": "not-reached"
+            },
+            {
+              "description": "Nothing answered it.",
+              "type": "string",
+              "const": "unreachable"
+            },
+            {
+              "description": "It was not sent: its host stands for an address not out on the internet, or\ncould not be resolved.",
+              "type": "string",
+              "const": "refused"
+            },
+            {
+              "description": "It was not sent: a value it carries may not go where it was going.",
+              "type": "string",
+              "const": "withheld"
+            },
+            {
+              "description": "It was answered with something other than what it expects.",
+              "type": "string",
+              "const": "unexpected"
+            },
+            {
+              "description": "Its answer held nothing where a capture reads.",
+              "type": "string",
+              "const": "uncaptured"
+            },
+            {
+              "description": "Its answer was larger than any answer a recipe reads.",
+              "type": "string",
+              "const": "oversized"
+            }
           ]
         },
         "ValueOrigin": {
@@ -6493,6 +6593,13 @@
               "description": "Where it stands with respect to being fixed.",
               "$ref": "#/$defs/ProblemState"
             },
+            "steps": {
+              "description": "Every step a run declares, with what each came to, where the problem ended a run\nof steps part-way; absent from every other problem.\n\nData beside the detail rather than in it, so a client reads what changed\nsomewhere going back cannot reach without parsing a sentence written for a person.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ProblemStep"
+              }
+            },
             "summary": {
               "description": "What happened, in one plain sentence.",
               "type": "string"
@@ -6562,6 +6669,35 @@
             }
           ]
         },
+        "ProblemStep": {
+          "description": "What one step of a run that stopped part-way came to.",
+          "type": "object",
+          "properties": {
+            "came": {
+              "description": "What it came to.",
+              "$ref": "#/$defs/StepCame"
+            },
+            "landed": {
+              "description": "Whether it reached somewhere other than the plugin's own services, which going\nback cannot undo.",
+              "type": "boolean"
+            },
+            "recipe": {
+              "description": "The recipe the step belongs to.",
+              "type": "string"
+            },
+            "step": {
+              "description": "The step's id within it.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "recipe",
+            "step",
+            "came",
+            "landed"
+          ]
+        },
         "Remedy": {
           "description": "One thing the operator can do about a problem.",
           "type": "object",
@@ -6580,6 +6716,56 @@
           },
           "required": [
             "action"
+          ]
+        },
+        "StepCame": {
+          "description": "What one step of a recipe came to.",
+          "oneOf": [
+            {
+              "description": "It was answered with what it should be, and took what it captures.",
+              "type": "string",
+              "const": "answered"
+            },
+            {
+              "description": "Its guard did not hold, so it was not made.",
+              "type": "string",
+              "const": "skipped"
+            },
+            {
+              "description": "An earlier step did not come to what it should, so this one was not made.",
+              "type": "string",
+              "const": "not-reached"
+            },
+            {
+              "description": "Nothing answered it.",
+              "type": "string",
+              "const": "unreachable"
+            },
+            {
+              "description": "It was not sent: its host stands for an address not out on the internet, or\ncould not be resolved.",
+              "type": "string",
+              "const": "refused"
+            },
+            {
+              "description": "It was not sent: a value it carries may not go where it was going.",
+              "type": "string",
+              "const": "withheld"
+            },
+            {
+              "description": "It was answered with something other than what it expects.",
+              "type": "string",
+              "const": "unexpected"
+            },
+            {
+              "description": "Its answer held nothing where a capture reads.",
+              "type": "string",
+              "const": "uncaptured"
+            },
+            {
+              "description": "Its answer was larger than any answer a recipe reads.",
+              "type": "string",
+              "const": "oversized"
+            }
           ]
         }
       }
@@ -12133,6 +12319,13 @@
                   "description": "Where it stands with respect to being fixed.",
                   "$ref": "#/$defs/ProblemState"
                 },
+                "steps": {
+                  "description": "Every step a run declares, with what each came to, where the problem ended a run\nof steps part-way; absent from every other problem.\n\nData beside the detail rather than in it, so a client reads what changed\nsomewhere going back cannot reach without parsing a sentence written for a person.",
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/ProblemStep"
+                  }
+                },
                 "summary": {
                   "description": "What happened, in one plain sentence.",
                   "type": "string"
@@ -12196,6 +12389,13 @@
                 "state": {
                   "description": "Where it stands with respect to being fixed.",
                   "$ref": "#/$defs/ProblemState"
+                },
+                "steps": {
+                  "description": "Every step a run declares, with what each came to, where the problem ended a run\nof steps part-way; absent from every other problem.\n\nData beside the detail rather than in it, so a client reads what changed\nsomewhere going back cannot reach without parsing a sentence written for a person.",
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/ProblemStep"
+                  }
                 },
                 "summary": {
                   "description": "What happened, in one plain sentence.",
@@ -12803,6 +13003,13 @@
                 "$ref": "#/$defs/PluginProving"
               }
             },
+            "recipes_ran": {
+              "description": "Every install recipe the act ran, in order, with what each step came to; an\nempty list where none ran, which is every rehearsal and every plugin declaring no\ninstall recipe.\n\nA recipe that did not hold ends the act with a problem carrying the same account,\nso this is the account of recipes that held.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/PluginRecipeRan"
+              }
+            },
             "recorded": {
               "description": "Whether it was written down. A rehearsal leaves this false.",
               "type": "boolean"
@@ -12840,7 +13047,8 @@
             "changes",
             "proofs",
             "contests",
-            "overrides"
+            "overrides",
+            "recipes_ran"
           ]
         },
         "PluginInstalled": {
@@ -13358,6 +13566,40 @@
             "pairs"
           ]
         },
+        "PluginRecipeRan": {
+          "description": "What one recipe came to.",
+          "type": "object",
+          "properties": {
+            "held": {
+              "description": "Whether every step it made came to what it should.",
+              "type": "boolean"
+            },
+            "recipe": {
+              "description": "The recipe's id.",
+              "type": "string"
+            },
+            "steps": {
+              "description": "Every step it declares, in order, with what each came to.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/PluginStepRan"
+              }
+            },
+            "why": {
+              "description": "Why it did not, where it did not.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "recipe",
+            "held",
+            "steps"
+          ]
+        },
         "PluginRemoval": {
           "description": "What taking a plugin off the machine came to, or would come to.",
           "type": "object",
@@ -13631,6 +13873,59 @@
             "owner"
           ]
         },
+        "PluginStepRan": {
+          "description": "What one step came to.",
+          "type": "object",
+          "properties": {
+            "came": {
+              "description": "What it came to.",
+              "$ref": "#/$defs/StepCame"
+            },
+            "landed": {
+              "description": "Whether it reached somewhere other than this plugin's own services, which an\ninstall going back cannot undo.",
+              "type": "boolean"
+            },
+            "status": {
+              "description": "The status its last answer carried, where anything answered.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0
+            },
+            "step": {
+              "description": "The step's id.",
+              "type": "string"
+            },
+            "to": {
+              "description": "Where it calls, by the name the manifest gives it.",
+              "type": "string"
+            },
+            "tries": {
+              "description": "How many times it was made.",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "why": {
+              "description": "Why it came to what it did, where that wants saying.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "step",
+            "to",
+            "came",
+            "tries",
+            "landed"
+          ]
+        },
         "PluginSubstituted": {
           "description": "A capability the operator chose one of a plugin's services to fill.\n\nThe only way anything a plugin brought comes to fill what the stack asks for in\nplace of the stack's own: a plugin cannot choose, and wiring by name is not\nsomething a plugin can introduce. So what a plugin substituted is what the operator\nsubstituted with it, and it is read off the recorded choices rather than off the\nplugin.",
           "type": "object",
@@ -13878,6 +14173,13 @@
               "description": "Where it stands with respect to being fixed.",
               "$ref": "#/$defs/ProblemState"
             },
+            "steps": {
+              "description": "Every step a run declares, with what each came to, where the problem ended a run\nof steps part-way; absent from every other problem.\n\nData beside the detail rather than in it, so a client reads what changed\nsomewhere going back cannot reach without parsing a sentence written for a person.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ProblemStep"
+              }
+            },
             "summary": {
               "description": "What happened, in one plain sentence.",
               "type": "string"
@@ -13947,6 +14249,35 @@
             }
           ]
         },
+        "ProblemStep": {
+          "description": "What one step of a run that stopped part-way came to.",
+          "type": "object",
+          "properties": {
+            "came": {
+              "description": "What it came to.",
+              "$ref": "#/$defs/StepCame"
+            },
+            "landed": {
+              "description": "Whether it reached somewhere other than the plugin's own services, which going\nback cannot undo.",
+              "type": "boolean"
+            },
+            "recipe": {
+              "description": "The recipe the step belongs to.",
+              "type": "string"
+            },
+            "step": {
+              "description": "The step's id within it.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "recipe",
+            "step",
+            "came",
+            "landed"
+          ]
+        },
         "Remedy": {
           "description": "One thing the operator can do about a problem.",
           "type": "object",
@@ -13965,6 +14296,56 @@
           },
           "required": [
             "action"
+          ]
+        },
+        "StepCame": {
+          "description": "What one step of a recipe came to.",
+          "oneOf": [
+            {
+              "description": "It was answered with what it should be, and took what it captures.",
+              "type": "string",
+              "const": "answered"
+            },
+            {
+              "description": "Its guard did not hold, so it was not made.",
+              "type": "string",
+              "const": "skipped"
+            },
+            {
+              "description": "An earlier step did not come to what it should, so this one was not made.",
+              "type": "string",
+              "const": "not-reached"
+            },
+            {
+              "description": "Nothing answered it.",
+              "type": "string",
+              "const": "unreachable"
+            },
+            {
+              "description": "It was not sent: its host stands for an address not out on the internet, or\ncould not be resolved.",
+              "type": "string",
+              "const": "refused"
+            },
+            {
+              "description": "It was not sent: a value it carries may not go where it was going.",
+              "type": "string",
+              "const": "withheld"
+            },
+            {
+              "description": "It was answered with something other than what it expects.",
+              "type": "string",
+              "const": "unexpected"
+            },
+            {
+              "description": "Its answer held nothing where a capture reads.",
+              "type": "string",
+              "const": "uncaptured"
+            },
+            {
+              "description": "Its answer was larger than any answer a recipe reads.",
+              "type": "string",
+              "const": "oversized"
+            }
           ]
         },
         "Undo": {
@@ -22785,6 +23166,31 @@
       "name": "HEADER_NAMED",
       "status": 400,
       "description": "Raised when a recipe substitutes a value into a header's name, which is a fixed identifier of the protocol and written out; the manifest's every other fault is listed beside it."
+    },
+    "PLUGIN-34": {
+      "name": "INPUT_UNMATCHED",
+      "status": 400,
+      "description": "Raised when a recipe of the act asks the operator for a value that was not given, or a value was given that no recipe of the act asks for."
+    },
+    "PLUGIN-35": {
+      "name": "CALL_REFUSED",
+      "status": 500,
+      "description": "Raised when a recipe's call was not sent because its host stands for an address not out on the internet; the install or update was put back."
+    },
+    "PLUGIN-36": {
+      "name": "STEP_FAILED",
+      "status": 500,
+      "description": "Raised when a recipe's step failed any other way — nothing answered, the answer was not the one it expects, a capture found nothing, or the answer was larger than a recipe reads; the install or update was put back."
+    },
+    "PLUGIN-37": {
+      "name": "PATH_NOT_PLAIN",
+      "status": 400,
+      "description": "Raised when a recipe's call path is not a plain absolute path; the manifest's every other fault is listed beside it."
+    },
+    "PLUGIN-38": {
+      "name": "VALUE_WITHHELD",
+      "status": 400,
+      "description": "Raised when a recipe's call was not sent because a value it carries may not go where it was going: not where its pairs say, not back to the service a credential belongs to, or outside without its approval; the install or update was put back."
     },
     "PLUGIN-4": {
       "name": "UNRECORDED",

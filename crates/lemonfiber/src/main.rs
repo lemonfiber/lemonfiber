@@ -287,8 +287,8 @@ async fn main() -> ExitCode {
         // build generated at compile time, so they are answered here and never
         // dispatched: there is no stack to ask, nothing to decide, and a context to
         // build would be a context nothing reached through.
-        Request::Plugin { read } => match translate::plugin(read) {
-            translate::Under::Dispatched(command) => command,
+        Request::Plugin { read } => match taken!(translate::plugin(read)) {
+            translate::Under::Dispatched(command) => keyed(&mut ctx, command, cli.json),
             translate::Under::Published(read) => return for_an_author(&read, cli.json).await,
         },
         Request::Trace(asked) => traced(&asked.term, asked.season, asked.search),
@@ -394,6 +394,20 @@ async fn for_an_author(read: &lemonfiber::cli::Authoring, json: bool) -> ExitCod
 pub(crate) const EMBEDDED_APP: Option<lemonfiber_core::frontend::Source> = Some(
     lemonfiber_core::frontend::Source::Embedded(&lemonfiber::carried::APP),
 );
+
+/// A plugin verb's command, its run able to ask the operator at this keyboard for a
+/// value only they have.
+///
+/// A recipe's input missing from the command line is asked for at a terminal, and a run
+/// whose answer is a JSON document is a script's, with nobody to ask. Set for the plugin
+/// verbs alone: the web interface is served from a context too, and a request it
+/// carries is never answered from the keyboard of whoever started it.
+fn keyed(ctx: &mut Ctx, command: Command, json: bool) -> Command {
+    if !json {
+        ctx.asking = std::sync::Arc::new(Keyboard);
+    }
+    command
+}
 
 /// Serve the web interface until the operator stops the process.
 ///

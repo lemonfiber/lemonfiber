@@ -12,7 +12,7 @@
 //! what it would do. Each value a recipe would carry elsewhere is approved in a list of
 //! its own beside the offer.
 
-use lemonfiber_core::app::plugins::{Asked, Consent};
+use lemonfiber_core::app::plugins::{Asked, Consent, Inputs};
 use lemonfiber_core::app::{Command, Filling, Linking};
 use lemonfiber_core::plugin::Source;
 
@@ -46,6 +46,7 @@ pub(super) fn asked_for(action: &str, given: Arguments) -> Result<Command, Refus
         reason,
         offer,
         approved,
+        inputs,
         ..
     } = given;
     let needs = |argument: &str| Refused::Missing {
@@ -66,6 +67,7 @@ pub(super) fn asked_for(action: &str, given: Arguments) -> Result<Command, Refus
     let consent = Consent {
         agreement,
         approved,
+        inputs: supplied(&inputs)?,
     };
     let source = named(source).map(|written| Source::named(&written));
     let plugin = named(plugin);
@@ -85,6 +87,21 @@ pub(super) fn asked_for(action: &str, given: Arguments) -> Result<Command, Refus
         },
     };
     Ok(Command::Plugins(asked))
+}
+
+/// The values supplied for recipes' inputs, each written `name=value`.
+///
+/// # Errors
+///
+/// Where one is written without its `=`, said without repeating what was written,
+/// since what follows a name may be a secret.
+fn supplied(written: &[String]) -> Result<Inputs, Refused> {
+    Inputs::written(written).ok_or_else(|| Refused::Unrecognised {
+        argument: "inputs".to_owned(),
+        offered: "an input is written as its name, `=`, and its value, and one was written \
+                  without the `=`"
+            .to_owned(),
+    })
 }
 
 /// What was written, where anything was: a field sent and left blank names nothing,

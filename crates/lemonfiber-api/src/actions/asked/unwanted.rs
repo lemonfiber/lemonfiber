@@ -22,7 +22,7 @@ use lemonfiber_core::bundle::Filenames;
 /// it is anything else, and saying what its arguments should have been would be
 /// answering about an action that does not exist.
 pub(crate) fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Option<Refused> {
-    let carried: [(&str, bool, &[&str]); 47] = [
+    let carried: [(&str, bool, &[&str]); 48] = [
         ("forms", !given.forms.is_empty(), TAKES_FORMS),
         ("services", !given.services.is_empty(), TAKES_SERVICES),
         (
@@ -69,6 +69,7 @@ pub(crate) fn unwanted(action: &str, given: &Arguments, offered: &[&str]) -> Opt
         ("plugin", given.plugin.is_some(), TAKES_PLUGIN),
         ("source", given.source.is_some(), TAKES_SOURCE),
         ("approved", !given.approved.is_empty(), TAKES_APPROVED),
+        ("inputs", !given.inputs.is_empty(), TAKES_APPROVED),
         ("tier", given.tier.is_some(), TAKES_TIER),
         ("kept", given.kept.is_some(), TAKES_KEPT),
         ("down", given.down.is_some(), TAKES_SHARING),

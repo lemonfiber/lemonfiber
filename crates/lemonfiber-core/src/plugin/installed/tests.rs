@@ -448,6 +448,7 @@ fn the_report_says_what_is_installed_and_what_this_run_did() {
                 overrides: Vec::new(),
                 reversed: None,
                 contests: Vec::new(),
+                recipes_ran: Vec::new(),
             })
         }),
         update: None,

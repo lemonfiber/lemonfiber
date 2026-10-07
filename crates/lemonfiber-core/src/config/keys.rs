@@ -310,6 +310,13 @@ pub(crate) const API_KEY_SUFFIX: &str = "_API_KEY";
 /// administrator password is never read for, or sent to, a plugin's server.
 pub(crate) const ADMIN_PASSWORD_SUFFIX: &str = "_ADMIN_PASSWORD";
 
+/// What a setting holding a value a plugin's recipe captured ends with, after the
+/// plugin's id and the declared `[[secret]]`'s, spelled by [`for_plugin`].
+///
+/// Apart from [`CREDENTIAL_SUFFIXES`], which are what a service is reached with: a
+/// captured value is the plugin's to hold, and no adapter of lemonfiber's reads one.
+pub(crate) const CAPTURED_SUFFIX: &str = "_SECRET";
+
 /// Every ending a setting holding one service's credential is given, so a name computed
 /// for one service can be checked against every name another's would take.
 pub(crate) const CREDENTIAL_SUFFIXES: [&str; 4] = [

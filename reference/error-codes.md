@@ -164,6 +164,11 @@ what to do about it, is written for operators at
 - `PLUGIN-31`
 - `PLUGIN-32`
 - `PLUGIN-33`
+- `PLUGIN-34`
+- `PLUGIN-35`
+- `PLUGIN-36`
+- `PLUGIN-37`
+- `PLUGIN-38`
 - `PROC-1`
 - `PROC-2`
 - `PROVIDER-1`

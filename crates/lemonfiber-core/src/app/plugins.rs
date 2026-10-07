@@ -65,6 +65,8 @@ mod cataloguing;
 mod listing;
 // The newest catalogue index this machine verified, and the refusal of any older.
 mod newest;
+// The install recipes an install or an update runs, and the values they are given.
+mod following;
 // Installing from a directory: what it settles, its offer, and its writes and proofs.
 mod installing;
 // The yes to an install, an update or a removal, and the approval of what a recipe sends.
@@ -79,7 +81,7 @@ mod updating;
 pub(crate) mod writing;
 
 pub use listing::{installed, recorded};
-pub use offering::Consent;
+pub use offering::{Consent, Inputs};
 pub use refusals::REFUSALS;
 
 /// What is asked about the plugins on this machine.
@@ -150,7 +152,23 @@ pub(super) enum Errand<'a> {
 
 use crate::error::codes::plugin::UNREADABLE;
 
-use crate::error::codes::plugin::{HEADER_NAMED, REFUSED};
+use crate::error::codes::plugin::{HEADER_NAMED, PATH_NOT_PLAIN, REFUSED};
+
+/// Whether a manifest has a fault refused with a code of its own.
+type Singling = fn(&lemonfiber_plugin::Manifest) -> bool;
+
+/// The faults of a manifest that are refused with a code of their own, the first that
+/// holds deciding the code, and every other manifest refused with [`REFUSED`].
+///
+/// A path that could be read as another host comes first: of the two it is the one
+/// that would send a call somewhere its destination does not name.
+const SINGLED_OUT: [(Singling, crate::error::Code); 2] = [
+    (lemonfiber_plugin::names_a_path_not_plain, PATH_NOT_PLAIN),
+    (
+        lemonfiber_plugin::names_a_header_by_substitution,
+        HEADER_NAMED,
+    ),
+];
 
 use crate::error::codes::plugin::UNRECORDED;
 
@@ -371,18 +389,17 @@ fn unreadable_source(why: &crate::plugin::Unreadable) -> Problem {
 ///
 /// Every reason at once, each placed where the author wrote it. An operator handed
 /// one fault per attempt at somebody else's manifest is guessing at how many are
-/// left. A recipe substituting into a header's name answers with a code of its own,
-/// whatever else is wrong beside it.
+/// left. A fault that has a code of its own answers with that code whatever else is
+/// wrong beside it ([`SINGLED_OUT`]).
 fn refused(
     manifest: &lemonfiber_plugin::Manifest,
     found: &[lemonfiber_plugin::Violation],
 ) -> Problem {
     let plugin = &manifest.plugin.id;
-    let code = if lemonfiber_plugin::names_a_header_by_substitution(manifest) {
-        HEADER_NAMED
-    } else {
-        REFUSED
-    };
+    let code = SINGLED_OUT
+        .iter()
+        .find(|(has, _)| has(manifest))
+        .map_or(REFUSED, |(_, code)| *code);
     let listed = found
         .iter()
         .map(std::string::ToString::to_string)

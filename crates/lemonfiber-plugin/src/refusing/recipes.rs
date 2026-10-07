@@ -18,23 +18,18 @@
 
 use std::collections::BTreeSet;
 
+use crate::addressing::{named, placed, PARAMETERS, QUERY, VALUED};
 use crate::schema::{Manifest, Recipe, Step, RUN};
 use crate::Violation;
 
 // Guards that look back, retries within the published bounds, and captures that read
 // a place.
 mod bounds;
+mod pathing;
+
+pub use pathing::names_a_path_not_plain;
 // Where a call goes, and where a value comes from.
 mod whither;
-
-/// What begins a path's query, after which a value may be substituted.
-const QUERY: char = '?';
-
-/// What a substitution is written between.
-const OPENS: &str = "{{";
-
-/// And what closes it.
-const CLOSES: &str = "}}";
 
 /// The methods a call may use.
 ///
@@ -85,6 +80,7 @@ pub fn outside(manifest: &Manifest, to: &str) -> bool {
 /// happen, which is a sentence they would weigh for nothing.
 fn paired(manifest: &Manifest, recipe: &Recipe, at: &str, found: &mut Vec<Violation>) {
     let had: BTreeSet<&str> = values(recipe).collect();
+    let holders = whither::holders(recipe);
     for (number, pair) in recipe.pairs.iter().enumerate() {
         let here = format!("{at}.pair #{}", number + 1);
         worded(&pair.value, &format!("{here}.value"), found);
@@ -100,7 +96,13 @@ fn paired(manifest: &Manifest, recipe: &Recipe, at: &str, found: &mut Vec<Violat
         }
         destination(&pair.to, &format!("{here}.to"), found);
         whither::reachable(manifest, &pair.to, &format!("{here}.to"), found);
-        whither::returned(recipe, &pair.value, &pair.to, &format!("{here}.to"), found);
+        whither::returned(
+            &holders,
+            &pair.value,
+            &pair.to,
+            &format!("{here}.to"),
+            found,
+        );
     }
 }
 
@@ -161,6 +163,7 @@ fn flows(manifest: &Manifest, recipe: &Recipe, at: &str, found: &mut Vec<Violati
         let here = format!("{at}.step {}", step.id);
         worded(&step.id, &format!("{here}.id"), found);
         calling(step, &here, found);
+        pathing::plain(manifest, step, &here, found);
         whither::reachable(manifest, &step.call.to, &format!("{here}.call.to"), found);
         whither::captured(manifest, step, &here, found);
         bounds::guarded(step, &before, &here, found);
@@ -304,19 +307,10 @@ fn substituting(
     found: &mut Vec<Violation>,
 ) {
     written_out(step, at, found);
-    let mut carried: Vec<(String, &str)> = queried(&step.call.path)
-        .map(|name| ("path".to_owned(), name))
-        .collect();
-    if let Some(body) = &step.call.body {
-        carried.extend(substitutions(body).map(|name| ("body".to_owned(), name)));
-    }
-    for (header, value) in step.call.headers.iter().flatten() {
-        carried.extend(substitutions(value).map(|name| (format!("headers.{header}"), name)));
-    }
-
-    for (where_it_is, name) in carried {
+    let holders = whither::holders(recipe);
+    for (where_it_is, name) in placed(&step.call) {
         let here = format!("{at}.call.{where_it_is}");
-        whither::returned(recipe, name, &step.call.to, &here, found);
+        whither::returned(&holders, name, &step.call.to, &here, found);
         if !captured.contains(name) {
             found.push(Violation {
                 location: format!("{at}.call.{where_it_is}"),
@@ -345,6 +339,11 @@ fn substituting(
     }
 }
 
+/// Every value one call carries.
+fn carried(step: &Step) -> impl Iterator<Item = &str> {
+    placed(&step.call).into_iter().map(|(_, name)| name)
+}
+
 /// Refuse a substitution where a call is written out: its destination, its path's
 /// segments, its query's names and its headers' names.
 ///
@@ -352,7 +351,7 @@ fn substituting(
 /// or a resource chosen by something that came back, would make the set of things a
 /// recipe could do one that only running it reveals.
 fn written_out(step: &Step, at: &str, found: &mut Vec<Violation>) {
-    if substitutions(&step.call.to).next().is_some() {
+    if named(&step.call.to).next().is_some() {
         found.push(Violation {
             location: format!("{at}.call.to"),
             message: "substitutes a value into where the call goes, which is written out so that \
@@ -365,11 +364,12 @@ fn written_out(step: &Step, at: &str, found: &mut Vec<Violation>) {
         .path
         .split_once(QUERY)
         .unwrap_or((step.call.path.as_str(), ""));
-    let named = query.split('&').filter_map(|pair| {
-        pair.split_once('=')
-            .map_or(Some(pair), |(name, _)| Some(name))
+    let names = query.split(PARAMETERS).map(|parameter| {
+        parameter
+            .split_once(VALUED)
+            .map_or(parameter, |(name, _)| name)
     });
-    if substitutions(segments).next().is_some() || named.flat_map(substitutions).next().is_some() {
+    if named(segments).next().is_some() || names.flat_map(named).next().is_some() {
         found.push(Violation {
             location: format!("{at}.call.path"),
             message: "substitutes a value into the path itself; only a query value may carry one, \
@@ -407,25 +407,7 @@ fn named_headers(step: &Step) -> impl Iterator<Item = &str> {
         .iter()
         .flatten()
         .map(|(header, _)| header.as_str())
-        .filter(|header| substitutions(header).next().is_some())
-}
-
-/// Every name substituted into the values of a path's query.
-fn queried(path: &str) -> impl Iterator<Item = &str> {
-    path.split_once(QUERY)
-        .map(|(_, query)| query)
-        .into_iter()
-        .flat_map(|query| query.split('&'))
-        .filter_map(|pair| pair.split_once('=').map(|(_, value)| value))
-        .flat_map(substitutions)
-}
-
-/// Every name substituted into one piece of text.
-fn substitutions(text: &str) -> impl Iterator<Item = &str> {
-    text.split(OPENS)
-        .skip(1)
-        .filter_map(|after| after.split_once(CLOSES))
-        .map(|(name, _)| name.trim())
+        .filter(|header| named(header).next().is_some())
 }
 
 #[cfg(test)]

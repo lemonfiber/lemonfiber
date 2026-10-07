@@ -278,7 +278,7 @@ async fn a_configured_machine_nobody_is_watching_is_pointed_at_its_settings() {
     let (_scratch, paths) = scratch("configured");
     let _ = paths.env_file().parent().map(std::fs::create_dir_all);
     let _ = std::fs::write(paths.env_file(), "DATA_ROOT=/srv\n");
-    let code = greeting(ctx(), &paths, &Scripted::saying(false, &[])).await;
+    let code = Box::pin(greeting(ctx(), &paths, &Scripted::saying(false, &[]))).await;
     assert_eq!(shown(code), success());
 }
 
@@ -293,7 +293,7 @@ async fn a_bare_run_asks_the_screen_rather_than_the_keyboard() {
     let _ = paths.env_file().parent().map(std::fs::create_dir_all);
     let _ = std::fs::write(paths.env_file(), "DATA_ROOT=/srv\n");
 
-    let code = greeting(ctx(), &paths, &piped).await;
+    let code = Box::pin(greeting(ctx(), &paths, &piped)).await;
 
     assert_eq!(shown(code), success());
     assert!(
@@ -345,14 +345,14 @@ fn a_bare_run_in_front_of_a_person_opens_the_dashboard() {
 async fn an_unconfigured_machine_with_nobody_there_is_told_what_to_run() {
     // Stated rather than asked: never left waiting on input that will not come.
     let (_scratch, paths) = scratch("piped");
-    let code = greeting(ctx(), &paths, &Scripted::saying(false, &[])).await;
+    let code = Box::pin(greeting(ctx(), &paths, &Scripted::saying(false, &[]))).await;
     assert_eq!(shown(code), success());
 }
 
 #[tokio::test(start_paused = true)]
 async fn a_declined_offer_writes_nothing() {
     let (_scratch, paths) = scratch("declined");
-    let code = greeting(ctx(), &paths, &Scripted::saying(true, &["n"])).await;
+    let code = Box::pin(greeting(ctx(), &paths, &Scripted::saying(true, &["n"]))).await;
     assert_eq!(shown(code), success());
     assert!(!paths.env_file().exists());
 }
@@ -362,7 +362,7 @@ async fn a_rehearsed_greeting_says_there_is_nothing_to_rehearse() {
     let (_scratch, paths) = scratch("rehearsed");
     let mut rehearsing = ctx();
     rehearsing.dry_run = true;
-    let code = greeting(rehearsing, &paths, &Scripted::saying(true, &[])).await;
+    let code = Box::pin(greeting(rehearsing, &paths, &Scripted::saying(true, &[]))).await;
     assert_ne!(shown(code), success());
 }
 
@@ -397,7 +397,7 @@ async fn an_accepted_offer_is_stopped_by_an_environment_that_cannot_work() {
     // Nothing setup does works without a container engine, so it is checked
     // before the first question rather than after eleven answers.
     let (_scratch, paths) = scratch("preflight");
-    let code = greeting(ctx(), &paths, &Scripted::saying(true, &["y"])).await;
+    let code = Box::pin(greeting(ctx(), &paths, &Scripted::saying(true, &["y"]))).await;
     assert_ne!(shown(code), success());
     // Nothing was asked and nothing was written.
     assert!(!paths.env_file().exists());
@@ -550,7 +550,12 @@ async fn a_bare_run_on_a_machine_mid_setup_picks_it_up_rather_than_greeting() {
         paths.setup_progress(),
         r#"{"at":"protocols","answers":{},"phase":"in-progress"}"#,
     );
-    let code = greeting(working_ctx(), &paths, &Scripted::saying(true, &[])).await;
+    let code = Box::pin(greeting(
+        working_ctx(),
+        &paths,
+        &Scripted::saying(true, &[]),
+    ))
+    .await;
     // Picked up rather than greeted: greeting a machine leaves the saved run
     // untouched, and resuming one consumes it.
     assert!(

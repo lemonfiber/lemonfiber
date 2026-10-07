@@ -37,6 +37,9 @@ pub const CALL_DEADLINE: u64 = 30;
 /// The most one answer's body may hold, in bytes.
 pub const LARGEST_ANSWER: usize = 1024 * 1024;
 
+/// What a wait between two tries is written as, after its number.
+const SECONDS: char = 's';
+
 /// What a capture reading a header of the answer begins with, before the header's name.
 pub const HEADER: &str = "header.";
 
@@ -128,6 +131,10 @@ pub struct Input {
     /// What the operator is asked, in one line, where the operator supplies it.
     #[serde(default)]
     pub ask: Option<String>,
+    /// Whether what the operator supplies may be a secret, so a terminal takes it without
+    /// showing it.
+    #[serde(default)]
+    pub secret: bool,
 }
 
 /// One call in a flow.
@@ -187,6 +194,19 @@ pub struct Retry {
     pub every: String,
     /// What the answer must come to for it to stop: a status, or a value it captured.
     pub until: Condition,
+}
+
+impl Retry {
+    /// How long it waits between two tries, in seconds, where `every` is written as the
+    /// format allows: a whole number of seconds from 1 to [`LONGEST_WAIT`], then `s`.
+    #[must_use]
+    pub fn seconds(&self) -> Option<u64> {
+        self.every
+            .strip_suffix(SECONDS)
+            .filter(|digits| !digits.is_empty() && digits.bytes().all(|byte| byte.is_ascii_digit()))
+            .and_then(|digits| digits.parse().ok())
+            .filter(|seconds| (1..=LONGEST_WAIT).contains(seconds))
+    }
 }
 
 /// What one step calls.

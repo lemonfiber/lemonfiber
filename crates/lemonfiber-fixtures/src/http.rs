@@ -38,6 +38,16 @@ pub enum Answer {
         /// The body.
         body: String,
     },
+    /// A response carrying these headers, for the code that reads a header out of what
+    /// came back.
+    Headed {
+        /// The status.
+        status: u16,
+        /// Every header, in the order it is sent.
+        headers: Vec<(String, String)>,
+        /// The body.
+        body: String,
+    },
     /// Nothing at all — the service is not there.
     Silent,
 }
@@ -290,6 +300,15 @@ fn answered(answer: Answer, request: &Request) -> Result<Response, Unreachable> 
         } => Ok(Response {
             status,
             headers: vec![("content-type".to_owned(), content_type)],
+            body,
+        }),
+        Answer::Headed {
+            status,
+            headers,
+            body,
+        } => Ok(Response {
+            status,
+            headers,
             body,
         }),
         Answer::Silent => Err(Unreachable {

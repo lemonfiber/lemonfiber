@@ -46,6 +46,22 @@ impl Answers for Keyboard {
     }
 }
 
+/// An act asks the operator through the same keyboard, and only where a terminal is
+/// there to answer.
+impl lemonfiber_core::ports::asking::Asking for Keyboard {
+    fn present(&self) -> bool {
+        Answers::present(self)
+    }
+
+    fn ask(&self, question: &str) -> String {
+        Answers::ask(self, question)
+    }
+
+    fn secret(&self, question: &str) -> String {
+        Answers::secret(self, question)
+    }
+}
+
 /// The terminal setup holds its conversation across.
 ///
 /// Here for the same reason [`Keyboard`] is: whether someone is present, what they

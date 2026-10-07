@@ -142,6 +142,7 @@ fn consent(offer: &str, approved: &[&str]) -> Consent {
     Consent {
         agreement: Some(offer.to_owned()),
         approved: approved.iter().map(|pair| (*pair).to_owned()).collect(),
+        inputs: lemonfiber_core::app::plugins::Inputs::default(),
     }
 }
 
@@ -337,4 +338,29 @@ async fn removing_what_is_not_installed_is_refused_as_something_named_that_is_no
     assert_eq!(accepted, 202);
     assert_eq!(status, 404, "{refused}");
     assert_eq!(field(&refused, "/data/code"), "PLUGIN-10");
+}
+
+/// A value for a recipe's input is carried by its name, and one written without its `=`
+/// is refused without what was written being repeated, since it may be a secret.
+#[test]
+fn a_value_for_a_recipe_is_carried_by_name_and_a_malformed_one_refused_unrepeated() {
+    let install = |inputs: &[&str]| Arguments {
+        source: Some("./plugins/kavita".to_owned()),
+        inputs: inputs.iter().map(|one| (*one).to_owned()).collect(),
+        ..Arguments::default()
+    };
+    let carried = match named("plugin-install", install(&["claim=a=b"])) {
+        Ok(Command::Plugins(Asked::Install { consent, .. })) => consent.inputs.values().clone(),
+        _ => std::collections::BTreeMap::new(),
+    };
+    assert_eq!(
+        carried,
+        std::collections::BTreeMap::from([("claim".to_owned(), "a=b".to_owned())])
+    );
+    let refused = named("plugin-install", install(&["claim=1", "s3cret"])).err();
+    assert!(
+        matches!(&refused, Some(Refused::Unrecognised { argument, offered })
+            if argument == "inputs" && !offered.contains("s3cret")),
+        "{refused:?}"
+    );
 }

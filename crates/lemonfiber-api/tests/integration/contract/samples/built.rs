@@ -264,6 +264,7 @@ pub(super) fn what_is_installed() -> lemonfiber_core::plugin::Installs {
             recorded: true,
             reversed: None,
             contests: Vec::new(),
+            recipes_ran: Vec::new(),
         })),
         update: None,
         substituted: Vec::new(),

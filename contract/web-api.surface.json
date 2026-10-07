@@ -1818,6 +1818,12 @@
           ],
           "required": true
         },
+        "steps": {
+          "type": [
+            "array[ref:ProblemStep]"
+          ],
+          "required": false
+        },
         "summary": {
           "type": [
             "string"
@@ -5450,6 +5456,12 @@
           ],
           "required": true
         },
+        "recipes_ran": {
+          "type": [
+            "array[ref:PluginRecipeRan]"
+          ],
+          "required": true
+        },
         "recorded": {
           "type": [
             "boolean"
@@ -5871,6 +5883,35 @@
       },
       "variants": []
     },
+    "PluginRecipeRan": {
+      "fields": {
+        "held": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "recipe": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "steps": {
+          "type": [
+            "array[ref:PluginStepRan]"
+          ],
+          "required": true
+        },
+        "why": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
+        }
+      },
+      "variants": []
+    },
     "PluginRemoval": {
       "fields": {
         "interrupts": {
@@ -6092,6 +6133,53 @@
             "ref:PluginAdapterOwner"
           ],
           "required": true
+        }
+      },
+      "variants": []
+    },
+    "PluginStepRan": {
+      "fields": {
+        "came": {
+          "type": [
+            "ref:StepCame"
+          ],
+          "required": true
+        },
+        "landed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "status": {
+          "type": [
+            "integer|null/uint16"
+          ],
+          "required": false
+        },
+        "step": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "to": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "tries": {
+          "type": [
+            "integer/uint32"
+          ],
+          "required": true
+        },
+        "why": {
+          "type": [
+            "null|string"
+          ],
+          "required": false
         }
       },
       "variants": []
@@ -6371,6 +6459,12 @@
           ],
           "required": true
         },
+        "steps": {
+          "type": [
+            "array[ref:ProblemStep]"
+          ],
+          "required": false
+        },
         "summary": {
           "type": [
             "string"
@@ -6398,6 +6492,35 @@
         "\"suppressed\"",
         "\"unknown\""
       ]
+    },
+    "ProblemStep": {
+      "fields": {
+        "came": {
+          "type": [
+            "ref:StepCame"
+          ],
+          "required": true
+        },
+        "landed": {
+          "type": [
+            "boolean"
+          ],
+          "required": true
+        },
+        "recipe": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        },
+        "step": {
+          "type": [
+            "string"
+          ],
+          "required": true
+        }
+      },
+      "variants": []
     },
     "Propagation": {
       "fields": {
@@ -8389,6 +8512,20 @@
       },
       "variants": []
     },
+    "StepCame": {
+      "fields": {},
+      "variants": [
+        "\"answered\"",
+        "\"not-reached\"",
+        "\"oversized\"",
+        "\"refused\"",
+        "\"skipped\"",
+        "\"uncaptured\"",
+        "\"unexpected\"",
+        "\"unreachable\"",
+        "\"withheld\""
+      ]
+    },
     "Stopped": {
       "fields": {
         "logs": {
@@ -10358,6 +10495,11 @@
     "PLUGIN-31": 400,
     "PLUGIN-32": 400,
     "PLUGIN-33": 400,
+    "PLUGIN-34": 400,
+    "PLUGIN-35": 500,
+    "PLUGIN-36": 500,
+    "PLUGIN-37": 400,
+    "PLUGIN-38": 400,
     "PLUGIN-4": 500,
     "PLUGIN-5": 400,
     "PLUGIN-6": 500,

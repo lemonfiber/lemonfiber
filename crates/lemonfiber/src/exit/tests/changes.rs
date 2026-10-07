@@ -359,6 +359,7 @@ fn installed(
             overrides: Vec::new(),
             reversed,
             contests: Vec::new(),
+            recipes_ran: Vec::new(),
         })),
         update: None,
         substituted: Vec::new(),
@@ -475,6 +476,7 @@ fn an_update_that_did_not_hold_exits_as_a_refusal() {
                     overrides: Vec::new(),
                     reversed: None,
                     contests: Vec::new(),
+                    recipes_ran: Vec::new(),
                 },
                 stopped: None,
                 restored: restored.then(|| lemonfiber_core::plugin::Restored {

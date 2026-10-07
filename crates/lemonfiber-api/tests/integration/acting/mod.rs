@@ -120,6 +120,11 @@ pub(crate) fn exactly_what(action: &str) -> Arguments {
         } else {
             Vec::new()
         },
+        inputs: if takes(TAKES_APPROVED) {
+            vec![INPUT.to_owned()]
+        } else {
+            Vec::new()
+        },
         kept: takes(TAKES_KEPT).then(|| KEPT.to_owned()),
         tier: takes(TAKES_TIER).then(|| REMOVAL.to_owned()),
         down: takes(TAKES_SHARING).then(|| SHARE.to_owned()),
@@ -146,6 +151,9 @@ pub(crate) const SOURCE: &str = "./plugins/komga";
 
 /// A value a recipe would carry elsewhere, approved as the reading lists it.
 pub(crate) const APPROVAL: &str = "token@metadata.example.org";
+
+/// A value given for a recipe's input, written as its name and its value.
+pub(crate) const INPUT: &str = "claim=1234";
 
 /// A backup name, as one is written under.
 pub(crate) const ARCHIVE: &str = "lemonfiber-full-1700000000.tar.gz";
