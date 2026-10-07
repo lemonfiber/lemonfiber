@@ -5,7 +5,7 @@
       "action": "restart",
       "disturbs": true,
       "rehearsal": true,
-      "idempotent": false
+      "idempotent": true
     },
     {
       "action": "diagnose",
@@ -11171,6 +11171,13 @@
         },
         "host": {
           "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "job": {
+          "description": "The work that said this, by the name its accepting reply gave it.",
           "type": [
             "string",
             "null"
