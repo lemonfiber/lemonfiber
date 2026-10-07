@@ -1,0 +1,333 @@
+{
+  "version": "0.11.0",
+  "tag": "v0.11.0",
+  "released_on": "2026-09-04",
+  "delivers": "The household asks — requests, identity, client apps",
+  "patches": null,
+  "carried": null,
+  "withdrawn": null,
+  "user_facing": true,
+  "groups": [
+    {
+      "title": "New",
+      "entries": [
+        {
+          "summary": "Serve the app this binary carries",
+          "requirements": ["ARCH-R54"],
+          "reference": "#468"
+        },
+        {
+          "summary": "Which app to watch on, and where to use something else",
+          "requirements": ["G6-R1", "G6-R2", "G6-R3", "G6-R5", "G6-R7", "G6-R8"],
+          "reference": "#470"
+        },
+        {
+          "summary": "What the household is waiting on, without being asked",
+          "requirements": ["D4-R8"],
+          "reference": "#471"
+        },
+        {
+          "summary": "What to do when it does not work",
+          "requirements": ["G6-R9", "G6-R10", "G6-R11", "G6-R12"],
+          "reference": "#472"
+        },
+        {
+          "summary": "The address as something to point a camera at",
+          "requirements": ["G6-R4"],
+          "reference": "#475"
+        },
+        {
+          "summary": "Tell the person who asked",
+          "requirements": ["D4-R2", "D4-R3"],
+          "reference": "#476"
+        },
+        {
+          "summary": "Say when the household stopped being told",
+          "requirements": ["D4-R2", "D4-R3"],
+          "reference": "#477"
+        },
+        {
+          "summary": "Hand the request service the arrs that fulfil requests",
+          "requirements": ["D1-R17", "D4-R4"],
+          "reference": "#478"
+        },
+        {
+          "summary": "An invitation is an account waiting to be claimed",
+          "requirements": ["G5-R6", "G5-R7", "G8-R13", "D6-R11", "D6-R3", "GOV-R12"],
+          "reference": "#482"
+        },
+        {
+          "summary": "An account already here is not made twice",
+          "requirements": ["D6-R6"],
+          "reference": "#484"
+        },
+        {
+          "summary": "Publish each service's key where the stack reads it",
+          "requirements": ["D1-R18"],
+          "reference": "#489"
+        },
+        {
+          "summary": "Tell the subtitle finder which *arrs to watch",
+          "requirements": ["D1-R18"],
+          "reference": "#491"
+        },
+        {
+          "summary": "Hold what an invitation never hands over, and claim the code",
+          "requirements": ["D6-R2", "D6-R4", "D6-R14"],
+          "reference": "#501"
+        },
+        {
+          "summary": "Make the household list a list of members",
+          "requirements": ["D6-R7"],
+          "reference": "#502"
+        },
+        {
+          "summary": "Tell the request service about the household, and say when it could not",
+          "requirements": ["D6-R12"],
+          "reference": "#504"
+        },
+        {
+          "summary": "Take somebody out of both services, and say what it costs first",
+          "requirements": ["D6-R8", "D6-R9", "G1-R1"],
+          "reference": "#505"
+        },
+        {
+          "summary": "Tell the book *arr where the indexers are",
+          "requirements": ["D1-R15", "Q-R61"],
+          "reference": "#500"
+        },
+        {
+          "summary": "A reset is an invitation again",
+          "requirements": ["D6-R10", "D6-R2"],
+          "reference": "#506"
+        },
+        {
+          "summary": "An expired invitation keeps its account",
+          "requirements": ["D6-R13"],
+          "reference": "#507"
+        },
+        {
+          "summary": "Choose what somebody may watch while inviting them",
+          "requirements": ["D6-R5", "ARCH-R5", "G1-R1"],
+          "reference": "#512"
+        },
+        {
+          "summary": "Say what playback here will struggle with",
+          "requirements": ["G6-R6"],
+          "reference": "#514"
+        },
+        {
+          "summary": "Tell nothing found apart from nothing good enough",
+          "requirements": ["D4-R7", "GOV-R12"],
+          "reference": "#513"
+        }
+      ]
+    },
+    {
+      "title": "Fixed",
+      "entries": [
+        {
+          "summary": "The tag recipe says what it did",
+          "requirements": ["GOV-R12"],
+          "reference": "#467"
+        },
+        {
+          "summary": "Read the account into being before writing it",
+          "requirements": ["D1-R4"],
+          "reference": "#481"
+        },
+        {
+          "summary": "Publish the name the responder answers to",
+          "requirements": ["G5-R8"],
+          "reference": "#483"
+        },
+        {
+          "summary": "Sign in to the request service the way it accepts",
+          "requirements": ["D4-R1", "D6-R1"],
+          "reference": "#485"
+        },
+        {
+          "summary": "Register the arrs as a signed-in caller, with the field each list wants",
+          "requirements": ["D1-R17"],
+          "reference": "#486"
+        },
+        {
+          "summary": "Carry what a preset asks for, rather than fetching it",
+          "requirements": ["D1-R18"],
+          "reference": "#490"
+        },
+        {
+          "summary": "Report the password already in force rather than setting it again",
+          "requirements": ["D1-R18", "GOV-R12"],
+          "reference": "#494"
+        },
+        {
+          "summary": "Give every service the dashboard reads a key, and Lidarr what it asks for",
+          "requirements": ["D1-R18", "GOV-R12"],
+          "reference": "#495"
+        },
+        {
+          "summary": "Keep the tests beside the file rather than inside it",
+          "requirements": ["Q-R64"],
+          "reference": "#503"
+        },
+        {
+          "summary": "Say the version this actually builds on, and check it",
+          "requirements": ["GOV-R12"],
+          "reference": "#508"
+        }
+      ]
+    },
+    {
+      "title": "Maintenance",
+      "entries": [
+        {
+          "summary": "The gate and its copy measure the same tree",
+          "requirements": ["Q-R61"],
+          "reference": "#469"
+        },
+        {
+          "summary": "Nobody in the house needs an account here",
+          "requirements": ["D4-R9"],
+          "reference": "#473"
+        },
+        {
+          "summary": "One way in, and it is the account somebody already has",
+          "requirements": ["D4-R1"],
+          "reference": "#474"
+        },
+        {
+          "summary": "What the request service already does",
+          "requirements": ["D4-R11", "D4-R13"],
+          "reference": "#479"
+        },
+        {
+          "summary": "Five the request flow already satisfies",
+          "requirements": ["D4-R5", "D4-R6", "D4-R12", "D4-R14", "D4-R10"],
+          "reference": "#480"
+        },
+        {
+          "summary": "Carry the pin that lets the arrs reach the download client",
+          "requirements": ["GOV-R12"],
+          "reference": "#487"
+        },
+        {
+          "summary": "What the wiring graph still owes",
+          "requirements": ["D1-R18"],
+          "reference": "#488"
+        },
+        {
+          "summary": "Let the line cap read the file it claims to",
+          "requirements": ["GOV-R12"],
+          "reference": "#492"
+        },
+        {
+          "summary": "Pin what these checks assert over, so empty cannot pass",
+          "requirements": ["GOV-R12"],
+          "reference": "#493"
+        },
+        {
+          "summary": "Ship the category the book *arr files under",
+          "requirements": ["D1-R18"],
+          "reference": "#496"
+        },
+        {
+          "summary": "Pin two rules today's defects proved and nothing enforced",
+          "requirements": ["GOV-R12"],
+          "reference": "#497"
+        },
+        {
+          "summary": "Bump argon2 from 0.5.3 to 0.6.0",
+          "requirements": ["C6-R8"],
+          "reference": "#498"
+        },
+        {
+          "summary": "Bump the codeql group across 1 directory with 4 updates",
+          "requirements": [],
+          "reference": "#499"
+        },
+        {
+          "summary": "Count what is judged, because all over nothing is true",
+          "requirements": ["Q-R12"],
+          "reference": "#509"
+        },
+        {
+          "summary": "Sample every outcome, not two thirds of them",
+          "requirements": ["ARCH-R5"],
+          "reference": "#510"
+        },
+        {
+          "summary": "Claim the members who have never arrived",
+          "requirements": ["G6-R13"],
+          "reference": "#511"
+        },
+        {
+          "summary": "Bump the workspace to 0.11.0",
+          "requirements": ["GOV-R12"],
+          "reference": "#516"
+        }
+      ]
+    }
+  ],
+  "requirements": {
+    "ARCH-R54": {"feature": "Contract: the web API", "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/web-api/#requirements"},
+    "G6-R1": {"feature": "Client app guidance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g6-client-apps/#acceptance-criteria"},
+    "G6-R2": {"feature": "Client app guidance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g6-client-apps/#acceptance-criteria"},
+    "G6-R3": {"feature": "Client app guidance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g6-client-apps/#acceptance-criteria"},
+    "G6-R5": {"feature": "Client app guidance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g6-client-apps/#acceptance-criteria"},
+    "G6-R7": {"feature": "Client app guidance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g6-client-apps/#acceptance-criteria"},
+    "G6-R8": {"feature": "Client app guidance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g6-client-apps/#acceptance-criteria"},
+    "D4-R8": {"feature": "Household request flow", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d4-request-flow/#acceptance-criteria"},
+    "G6-R9": {"feature": "Client app guidance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g6-client-apps/#acceptance-criteria"},
+    "G6-R10": {"feature": "Client app guidance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g6-client-apps/#acceptance-criteria"},
+    "G6-R11": {"feature": "Client app guidance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g6-client-apps/#acceptance-criteria"},
+    "G6-R12": {"feature": "Client app guidance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g6-client-apps/#acceptance-criteria"},
+    "G6-R4": {"feature": "Client app guidance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g6-client-apps/#acceptance-criteria"},
+    "D4-R2": {"feature": "Household request flow", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d4-request-flow/#acceptance-criteria"},
+    "D4-R3": {"feature": "Household request flow", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d4-request-flow/#acceptance-criteria"},
+    "D1-R17": {"feature": "Service auto-wiring", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d1-seed/#acceptance-criteria"},
+    "D4-R4": {"feature": "Household request flow", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d4-request-flow/#acceptance-criteria"},
+    "G5-R6": {"feature": "The front door", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g5-front-door/#acceptance-criteria"},
+    "G5-R7": {"feature": "The front door", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g5-front-door/#acceptance-criteria"},
+    "G8-R13": {"feature": "Privacy stance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g8-privacy/#acceptance-criteria"},
+    "D6-R11": {"feature": "Household identity & invitations", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d6-household-identity/#acceptance-criteria"},
+    "D6-R3": {"feature": "Household identity & invitations", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d6-household-identity/#acceptance-criteria"},
+    "GOV-R12": {"feature": "Canonical spec", "url": "https://docs.lemonfiber.app/spec/50-governance/canonical-spec/"},
+    "D6-R6": {"feature": "Household identity & invitations", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d6-household-identity/#acceptance-criteria"},
+    "D1-R18": {"feature": "Service auto-wiring", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d1-seed/#acceptance-criteria"},
+    "D6-R2": {"feature": "Household identity & invitations", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d6-household-identity/#acceptance-criteria"},
+    "D6-R4": {"feature": "Household identity & invitations", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d6-household-identity/#acceptance-criteria"},
+    "D6-R14": {"feature": "Household identity & invitations", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d6-household-identity/#acceptance-criteria"},
+    "D6-R7": {"feature": "Household identity & invitations", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d6-household-identity/#acceptance-criteria"},
+    "D6-R12": {"feature": "Household identity & invitations", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d6-household-identity/#acceptance-criteria"},
+    "D6-R8": {"feature": "Household identity & invitations", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d6-household-identity/#acceptance-criteria"},
+    "D6-R9": {"feature": "Household identity & invitations", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d6-household-identity/#acceptance-criteria"},
+    "G1-R1": {"feature": "Interface tiers", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g1-interface-tiers/#acceptance-criteria"},
+    "D1-R15": {"feature": "Service auto-wiring", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d1-seed/#acceptance-criteria"},
+    "Q-R61": {"feature": "Testing strategy", "url": "https://docs.lemonfiber.app/spec/40-quality/testing-strategy/#requirements"},
+    "D6-R10": {"feature": "Household identity & invitations", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d6-household-identity/#acceptance-criteria"},
+    "D6-R13": {"feature": "Household identity & invitations", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d6-household-identity/#acceptance-criteria"},
+    "D6-R5": {"feature": "Household identity & invitations", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d6-household-identity/#acceptance-criteria"},
+    "ARCH-R5": {"feature": "Contract: versioning & compatibility", "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/versioning/#requirements"},
+    "G6-R6": {"feature": "Client app guidance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g6-client-apps/#acceptance-criteria"},
+    "D4-R7": {"feature": "Household request flow", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d4-request-flow/#acceptance-criteria"},
+    "D1-R4": {"feature": "Service auto-wiring", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d1-seed/#acceptance-criteria"},
+    "G5-R8": {"feature": "The front door", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g5-front-door/#acceptance-criteria"},
+    "D4-R1": {"feature": "Household request flow", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d4-request-flow/#acceptance-criteria"},
+    "D6-R1": {"feature": "Household identity & invitations", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d6-household-identity/#acceptance-criteria"},
+    "Q-R64": {"feature": "CI/CD", "url": "https://docs.lemonfiber.app/spec/40-quality/ci-cd/#requirements"},
+    "D4-R9": {"feature": "Household request flow", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d4-request-flow/#acceptance-criteria"},
+    "D4-R11": {"feature": "Household request flow", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d4-request-flow/#acceptance-criteria"},
+    "D4-R13": {"feature": "Household request flow", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d4-request-flow/#acceptance-criteria"},
+    "D4-R5": {"feature": "Household request flow", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d4-request-flow/#acceptance-criteria"},
+    "D4-R6": {"feature": "Household request flow", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d4-request-flow/#acceptance-criteria"},
+    "D4-R12": {"feature": "Household request flow", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d4-request-flow/#acceptance-criteria"},
+    "D4-R14": {"feature": "Household request flow", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d4-request-flow/#acceptance-criteria"},
+    "D4-R10": {"feature": "Household request flow", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d4-request-flow/#acceptance-criteria"},
+    "C6-R8": {"feature": "Web UI security & binding policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c6-web-security/#acceptance-criteria"},
+    "Q-R12": {"feature": "Code standards", "url": "https://docs.lemonfiber.app/spec/40-quality/code-standards/#requirements"},
+    "G6-R13": {"feature": "Client app guidance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g6-client-apps/#acceptance-criteria"}
+  },
+  "withdraws": {},
+  "withdrawn_requirements": []
+}

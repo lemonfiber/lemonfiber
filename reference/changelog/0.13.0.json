@@ -1,0 +1,198 @@
+{
+  "version": "0.13.0",
+  "tag": "v0.13.0",
+  "released_on": "2026-09-09",
+  "delivers": "Changing your mind — reconfigure, migrate, uninstall, credentials",
+  "patches": null,
+  "carried": null,
+  "withdrawn": null,
+  "user_facing": true,
+  "groups": [
+    {
+      "title": "New",
+      "entries": [
+        {
+          "summary": "What a credential test is allowed to leave unsaid",
+          "requirements": ["A3-R5", "A3-R12", "A3-R7", "A3-R11", "A3-R6", "A3-R9", "A3-R13"],
+          "reference": "#543"
+        },
+        {
+          "summary": "Four removals, and every secret named",
+          "requirements": ["A6-R1", "A6-R2", "A6-R6", "A6-R9", "A6-R10", "A6-R3", "A6-R4", "A6-R5", "A6-R7", "A6-R8", "A6-R11", "A6-R12", "A6-R13", "A7-R1", "A7-R2", "A7-R3", "A7-R4", "A7-R5", "A7-R6", "A7-R7", "A7-R8", "A7-R9", "A7-R10", "A7-R11", "A7-R12", "A7-R13", "A7-R14", "C1-R13", "D10-R1"],
+          "reference": "#548"
+        },
+        {
+          "summary": "Say what changing a setup answer affects",
+          "requirements": ["A4-R1", "A4-R2", "A4-R12"],
+          "reference": "#544"
+        },
+        {
+          "summary": "Survey what is already on this machine, and change none of it",
+          "requirements": ["A5-R1", "A5-R2", "A5-R11"],
+          "reference": "#550"
+        },
+        {
+          "summary": "Say what taking an existing stack over would cost, and what may be done about it",
+          "requirements": ["A5-R6", "A5-R3", "A5-R2"],
+          "reference": "#551"
+        },
+        {
+          "summary": "What a migration must never touch, and what an unlinkable layout costs",
+          "requirements": ["A5-R4", "A5-R10"],
+          "reference": "#552"
+        },
+        {
+          "summary": "Take over the setup already here, refusing what would damage it",
+          "requirements": ["A5-R6"],
+          "reference": "#553"
+        },
+        {
+          "summary": "Weigh a change against what is in force before it reaches the file",
+          "requirements": ["A4-R3", "A4-R4", "A4-R8", "A4-R11"],
+          "reference": "#555"
+        },
+        {
+          "summary": "Stand lemonfiber beside a setup already here",
+          "requirements": ["A5-R5"],
+          "reference": "#556"
+        },
+        {
+          "summary": "Stand in place of a setup already here, deleting none of it",
+          "requirements": ["A5-R3"],
+          "reference": "#557"
+        },
+        {
+          "summary": "Carry the records an operator built into lemonfiber's own services",
+          "requirements": ["A5-R8"],
+          "reference": "#559"
+        },
+        {
+          "summary": "What a change comes to on the machine it is made on",
+          "requirements": ["A4-R5", "A4-R6", "A4-R7", "A4-R9", "A4-R10", "A4-R8"],
+          "reference": "#558"
+        },
+        {
+          "summary": "Hold the hours nobody wants waking for, and never the emergency",
+          "requirements": ["B5-R11"],
+          "reference": "#562"
+        }
+      ]
+    },
+    {
+      "title": "Fixed",
+      "entries": [
+        {
+          "summary": "Three findings from reviewing what landed",
+          "requirements": ["A3-R11", "A3-R12", "A3-R5"],
+          "reference": "#545"
+        },
+        {
+          "summary": "Name the code that runs, and say what is usually the matter",
+          "requirements": ["C2-R9", "B5-R11", "C7-R9"],
+          "reference": "#546"
+        }
+      ]
+    },
+    {
+      "title": "Maintenance",
+      "entries": [
+        {
+          "summary": "Make room for the commands still to come",
+          "requirements": ["GOV-R12"],
+          "reference": "#542"
+        },
+        {
+          "summary": "Make room for the two families still to come",
+          "requirements": ["GOV-R12"],
+          "reference": "#549"
+        },
+        {
+          "summary": "Ask what a filesystem is without holding one that can change it",
+          "requirements": ["A5-R4"],
+          "reference": "#554"
+        },
+        {
+          "summary": "Read the four modes from one list rather than four",
+          "requirements": ["A5-R3"],
+          "reference": "#560"
+        },
+        {
+          "summary": "Say where an act stands the one way the rest of the product does",
+          "requirements": ["A5-R3"],
+          "reference": "#561"
+        },
+        {
+          "summary": "Carry thirteen, and say what it brought",
+          "requirements": ["OPS-R30"],
+          "reference": "#563"
+        }
+      ]
+    }
+  ],
+  "requirements": {
+    "A3-R5": {"feature": "Credential validation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a3-credential-validation/#acceptance-criteria"},
+    "A3-R12": {"feature": "Credential validation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a3-credential-validation/#acceptance-criteria"},
+    "A3-R7": {"feature": "Credential validation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a3-credential-validation/#acceptance-criteria"},
+    "A3-R11": {"feature": "Credential validation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a3-credential-validation/#acceptance-criteria"},
+    "A3-R6": {"feature": "Credential validation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a3-credential-validation/#acceptance-criteria"},
+    "A3-R9": {"feature": "Credential validation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a3-credential-validation/#acceptance-criteria"},
+    "A3-R13": {"feature": "Credential validation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a3-credential-validation/#acceptance-criteria"},
+    "A6-R1": {"feature": "Clean uninstall", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a6-uninstall/#acceptance-criteria"},
+    "A6-R2": {"feature": "Clean uninstall", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a6-uninstall/#acceptance-criteria"},
+    "A6-R6": {"feature": "Clean uninstall", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a6-uninstall/#acceptance-criteria"},
+    "A6-R9": {"feature": "Clean uninstall", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a6-uninstall/#acceptance-criteria"},
+    "A6-R10": {"feature": "Clean uninstall", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a6-uninstall/#acceptance-criteria"},
+    "A6-R3": {"feature": "Clean uninstall", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a6-uninstall/#acceptance-criteria"},
+    "A6-R4": {"feature": "Clean uninstall", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a6-uninstall/#acceptance-criteria"},
+    "A6-R5": {"feature": "Clean uninstall", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a6-uninstall/#acceptance-criteria"},
+    "A6-R7": {"feature": "Clean uninstall", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a6-uninstall/#acceptance-criteria"},
+    "A6-R8": {"feature": "Clean uninstall", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a6-uninstall/#acceptance-criteria"},
+    "A6-R11": {"feature": "Clean uninstall", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a6-uninstall/#acceptance-criteria"},
+    "A6-R12": {"feature": "Clean uninstall", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a6-uninstall/#acceptance-criteria"},
+    "A6-R13": {"feature": "Clean uninstall", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a6-uninstall/#acceptance-criteria"},
+    "A7-R1": {"feature": "Credential management & rotation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a7-credential-management/#acceptance-criteria"},
+    "A7-R2": {"feature": "Credential management & rotation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a7-credential-management/#acceptance-criteria"},
+    "A7-R3": {"feature": "Credential management & rotation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a7-credential-management/#acceptance-criteria"},
+    "A7-R4": {"feature": "Credential management & rotation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a7-credential-management/#acceptance-criteria"},
+    "A7-R5": {"feature": "Credential management & rotation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a7-credential-management/#acceptance-criteria"},
+    "A7-R6": {"feature": "Credential management & rotation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a7-credential-management/#acceptance-criteria"},
+    "A7-R7": {"feature": "Credential management & rotation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a7-credential-management/#acceptance-criteria"},
+    "A7-R8": {"feature": "Credential management & rotation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a7-credential-management/#acceptance-criteria"},
+    "A7-R9": {"feature": "Credential management & rotation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a7-credential-management/#acceptance-criteria"},
+    "A7-R10": {"feature": "Credential management & rotation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a7-credential-management/#acceptance-criteria"},
+    "A7-R11": {"feature": "Credential management & rotation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a7-credential-management/#acceptance-criteria"},
+    "A7-R12": {"feature": "Credential management & rotation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a7-credential-management/#acceptance-criteria"},
+    "A7-R13": {"feature": "Credential management & rotation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a7-credential-management/#acceptance-criteria"},
+    "A7-R14": {"feature": "Credential management & rotation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a7-credential-management/#acceptance-criteria"},
+    "C1-R13": {"feature": "Diagnostics", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c1-diagnostics/#acceptance-criteria"},
+    "D10-R1": {"feature": "Bandwidth & scheduling", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d10-bandwidth/#acceptance-criteria"},
+    "A4-R1": {"feature": "Reconfiguration", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a4-reconfiguration/#acceptance-criteria"},
+    "A4-R2": {"feature": "Reconfiguration", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a4-reconfiguration/#acceptance-criteria"},
+    "A4-R12": {"feature": "Reconfiguration", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a4-reconfiguration/#acceptance-criteria"},
+    "A5-R1": {"feature": "Migration from an existing stack", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a5-migration/#acceptance-criteria"},
+    "A5-R2": {"feature": "Migration from an existing stack", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a5-migration/#acceptance-criteria"},
+    "A5-R11": {"feature": "Migration from an existing stack", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a5-migration/#acceptance-criteria"},
+    "A5-R6": {"feature": "Migration from an existing stack", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a5-migration/#acceptance-criteria"},
+    "A5-R3": {"feature": "Migration from an existing stack", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a5-migration/#acceptance-criteria"},
+    "A5-R4": {"feature": "Migration from an existing stack", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a5-migration/#acceptance-criteria"},
+    "A5-R10": {"feature": "Migration from an existing stack", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a5-migration/#acceptance-criteria"},
+    "A4-R3": {"feature": "Reconfiguration", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a4-reconfiguration/#acceptance-criteria"},
+    "A4-R4": {"feature": "Reconfiguration", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a4-reconfiguration/#acceptance-criteria"},
+    "A4-R8": {"feature": "Reconfiguration", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a4-reconfiguration/#acceptance-criteria"},
+    "A4-R11": {"feature": "Reconfiguration", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a4-reconfiguration/#acceptance-criteria"},
+    "A5-R5": {"feature": "Migration from an existing stack", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a5-migration/#acceptance-criteria"},
+    "A5-R8": {"feature": "Migration from an existing stack", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a5-migration/#acceptance-criteria"},
+    "A4-R5": {"feature": "Reconfiguration", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a4-reconfiguration/#acceptance-criteria"},
+    "A4-R6": {"feature": "Reconfiguration", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a4-reconfiguration/#acceptance-criteria"},
+    "A4-R7": {"feature": "Reconfiguration", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a4-reconfiguration/#acceptance-criteria"},
+    "A4-R9": {"feature": "Reconfiguration", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a4-reconfiguration/#acceptance-criteria"},
+    "A4-R10": {"feature": "Reconfiguration", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a4-reconfiguration/#acceptance-criteria"},
+    "B5-R11": {"feature": "Notifications & alerting", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b5-notifications/#acceptance-criteria"},
+    "C2-R9": {"feature": "VPN verification", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c2-vpn-verification/#acceptance-criteria"},
+    "C7-R9": {"feature": "Queue health & stuck items", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c7-queue-health/#acceptance-criteria"},
+    "GOV-R12": {"feature": "Canonical spec", "url": "https://docs.lemonfiber.app/spec/50-governance/canonical-spec/"},
+    "OPS-R30": {"feature": "Release staging — the version train", "url": "https://docs.lemonfiber.app/spec/70-operations/staging/#requirements"}
+  },
+  "withdraws": {},
+  "withdrawn_requirements": []
+}

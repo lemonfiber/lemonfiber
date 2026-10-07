@@ -1,0 +1,289 @@
+{
+  "version": "0.1.0",
+  "tag": "v0.1.0",
+  "released_on": "2026-07-26",
+  "delivers": "Core: manifest, compose driver, CLI",
+  "patches": null,
+  "carried": null,
+  "withdrawn": null,
+  "user_facing": true,
+  "groups": [
+    {
+      "title": "New",
+      "entries": [
+        {
+          "summary": "Discord notifications + maintainer triage & labels",
+          "requirements": ["OPS-R23", "OPS-R24", "OPS-R25", "OPS-R26", "OPS-R27", "OPS-R28"]
+        },
+        {
+          "summary": "Schema-compat gate, 100% coverage gate, CI hardening",
+          "requirements": ["F1-R9", "Q-R61", "Q-R62"]
+        },
+        {
+          "summary": "Lay out the modules, the seam, and the way in",
+          "requirements": ["ARCH-R42", "ARCH-R11", "ARCH-R14", "ARCH-R35", "ARCH-R7", "F2-R14", "GOV-R6", "GOV-R12"]
+        },
+        {
+          "summary": "Embed the stack, and refuse to build against one this cannot read",
+          "requirements": ["ARCH-R6", "ARCH-R5", "ARCH-R3", "F1-R3", "G4-R14"],
+          "reference": "#13"
+        },
+        {
+          "summary": "Resolve forms to profiles, and build the compose command",
+          "requirements": ["ARCH-R12", "ARCH-R13", "ARCH-R23", "B1-R4", "B1-R5", "Q-R23"],
+          "reference": "#14"
+        },
+        {
+          "summary": "Read and write the environment file without disturbing it",
+          "requirements": ["A4-R9", "F1-R3", "ARCH-R35"],
+          "reference": "#16"
+        },
+        {
+          "summary": "Start and stop a form, and say what would happen first",
+          "requirements": ["B1-R4", "B1-R7", "B2-R3", "ARCH-R13", "ARCH-R14", "ARCH-R42", "F1-R2"],
+          "reference": "#17"
+        },
+        {
+          "summary": "Check a manifest against the contract, all faults at once",
+          "requirements": ["F1-R9", "F2-R5", "F2-R14", "B1-R12", "B1-R14", "E1-R1"],
+          "reference": "#18"
+        },
+        {
+          "summary": "Read and change settings, and let providers be configured",
+          "requirements": ["A4-R1", "A4-R9", "B1-R4", "C4-R2", "F1-R6", "GOV-R12"],
+          "reference": "#19"
+        },
+        {
+          "summary": "Reach the container engine, health-gate starting, and answer what is running",
+          "requirements": ["ARCH-R14", "B2-R10", "B3-R6", "B3-R7", "B4-R1", "C2-R1", "B2-R1", "B2-R8", "B2-R9", "B2-R15", "B4-R12", "REPO-R11", "REPO-R14", "Q-R61", "GOV-R12", "Q-R5", "G1-R8", "Q-R11", "G4-R3"],
+          "reference": "#21"
+        },
+        {
+          "summary": "Prove the VPN isn't leaking (doctor + C2 egress check)",
+          "requirements": ["C1-R3", "C1-R4", "C1-R6", "C1-R7", "C1-R8", "C1-R9", "G7-R3", "G7-R5", "C2-R3", "C2-R14", "G8-R5", "C2-R1", "C2-R2", "C2-R7", "C2-R11", "C2-R12", "C2-R15", "C1-R5", "REPO-R11"],
+          "reference": "#22"
+        },
+        {
+          "summary": "Prove the machine can run the stack, and cost what it needs",
+          "requirements": ["A2-R9", "C1-R2", "C1-R11", "C1-R13", "A1-R2", "A1-R3", "A1-R4", "A1-R5", "A1-R6", "A1-R11", "A1-R12", "A1-R13"],
+          "reference": "#26"
+        }
+      ]
+    },
+    {
+      "title": "Fixed",
+      "entries": [
+        {
+          "summary": "Narrow by the protocol a profile declares, not by its name",
+          "requirements": ["B1-R15", "B1-R4", "B1-R3"],
+          "reference": "#15"
+        }
+      ]
+    },
+    {
+      "title": "Maintenance",
+      "entries": [
+        {
+          "summary": "Cargo workspace, three crates, strict lints, tooling",
+          "requirements": ["REPO-R10", "ARCH-R11", "Q-R11", "Q-R12", "Q-R15"]
+        },
+        {
+          "summary": "Embed media-stack as a submodule",
+          "requirements": []
+        },
+        {
+          "summary": "NightWorks logo footer",
+          "requirements": ["GOV-R12"]
+        },
+        {
+          "summary": "Capitalise Lemonfiber in public prose",
+          "requirements": ["DES-R21"]
+        },
+        {
+          "summary": "Repo rename to lemonfiber, Discord logo in footer",
+          "requirements": ["DES-R21", "GOV-R12"]
+        },
+        {
+          "summary": "DCO check, stale automation, CODEOWNERS, release scaffold",
+          "requirements": ["GOV-R30", "OPS-R15", "OPS-R17", "OPS-R1"]
+        },
+        {
+          "summary": "Standardise markdownlint config",
+          "requirements": ["Q-R54"]
+        },
+        {
+          "summary": "Pin actions to latest SHAs, add commit-lint + labeler",
+          "requirements": ["OPS-R21", "OPS-R22"]
+        },
+        {
+          "summary": "Add CI status badges, fix sonar project key",
+          "requirements": ["OPS-R7"]
+        },
+        {
+          "summary": "Typos allowlist for ratatui and hotkey notation",
+          "requirements": ["Q-R54"]
+        },
+        {
+          "summary": "OpenSSF hardening — token permissions, CodeQL, cargo-deny",
+          "requirements": ["Q-R53", "Q-R56"]
+        },
+        {
+          "summary": "SHA-pin reusables + SonarCloud security hardening",
+          "requirements": ["Q-R53"]
+        },
+        {
+          "summary": "Add the spec-references PR comment bot",
+          "requirements": ["GOV-R32"]
+        },
+        {
+          "summary": "Give Scorecard an admin-read token for Branch-Protection",
+          "requirements": ["Q-R63"]
+        },
+        {
+          "summary": "Call the shared awaiting-maintainer workflow",
+          "requirements": ["OPS-R26", "GOV-R12"]
+        },
+        {
+          "summary": "Drop the handover note from the repository",
+          "requirements": ["GOV-R12"],
+          "reference": "#20"
+        },
+        {
+          "summary": "Fail the merge on any new SonarCloud issue",
+          "requirements": ["Q-R63", "Q-R64"],
+          "reference": "#23"
+        },
+        {
+          "summary": "Label PRs by the area of the codebase they touch",
+          "requirements": ["OPS-R12"],
+          "reference": "#24"
+        },
+        {
+          "summary": "Track built-vs-roadmap so state isn't reconstructed from source",
+          "requirements": ["GOV-R12"],
+          "reference": "#25"
+        },
+        {
+          "summary": "Reuse the shared issue gate from spec",
+          "requirements": ["Q-R64"],
+          "reference": "#27"
+        },
+        {
+          "summary": "Prepare 0.1.0",
+          "requirements": ["OPS-R1", "OPS-R3", "OPS-R23", "GOV-R12", "OPS-R53"],
+          "reference": "#28"
+        }
+      ]
+    }
+  ],
+  "requirements": {
+    "OPS-R23": {"feature": "Notifications & maintainer automation", "url": "https://docs.lemonfiber.app/spec/70-operations/notifications/#requirements"},
+    "OPS-R24": {"feature": "Notifications & maintainer automation", "url": "https://docs.lemonfiber.app/spec/70-operations/notifications/#requirements"},
+    "OPS-R25": {"feature": "Notifications & maintainer automation", "url": "https://docs.lemonfiber.app/spec/70-operations/notifications/#requirements"},
+    "OPS-R26": {"feature": "Notifications & maintainer automation", "url": "https://docs.lemonfiber.app/spec/70-operations/notifications/#requirements"},
+    "OPS-R27": {"feature": "Notifications & maintainer automation", "url": "https://docs.lemonfiber.app/spec/70-operations/notifications/#requirements"},
+    "OPS-R28": {"feature": "Notifications & maintainer automation", "url": "https://docs.lemonfiber.app/spec/70-operations/notifications/#requirements"},
+    "F1-R9": {"feature": "Customisation & escape hatches", "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f1-customisation/#acceptance-criteria"},
+    "Q-R61": {"feature": "Testing strategy", "url": "https://docs.lemonfiber.app/spec/40-quality/testing-strategy/#requirements"},
+    "Q-R62": {"feature": "Testing strategy", "url": "https://docs.lemonfiber.app/spec/40-quality/testing-strategy/#requirements"},
+    "ARCH-R42": {"feature": "Component model", "url": "https://docs.lemonfiber.app/spec/20-architecture/component-model/#requirements"},
+    "ARCH-R11": {"feature": "Component model", "url": "https://docs.lemonfiber.app/spec/20-architecture/component-model/#requirements"},
+    "ARCH-R14": {"feature": "Component model", "url": "https://docs.lemonfiber.app/spec/20-architecture/component-model/#requirements"},
+    "ARCH-R35": {"feature": "Platform matrix", "url": "https://docs.lemonfiber.app/spec/20-architecture/platform-matrix/#requirements"},
+    "ARCH-R7": {"feature": "Contract: versioning & compatibility", "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/versioning/#requirements"},
+    "F2-R14": {"feature": "Service catalogue", "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f2-service-catalogue/#acceptance-criteria"},
+    "GOV-R6": {"feature": "Canonical spec", "url": "https://docs.lemonfiber.app/spec/50-governance/canonical-spec/"},
+    "GOV-R12": {"feature": "Canonical spec", "url": "https://docs.lemonfiber.app/spec/50-governance/canonical-spec/"},
+    "ARCH-R6": {"feature": "Contract: versioning & compatibility", "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/versioning/#requirements"},
+    "ARCH-R5": {"feature": "Contract: versioning & compatibility", "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/versioning/#requirements"},
+    "ARCH-R3": {"feature": "Contract: versioning & compatibility", "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/versioning/#requirements"},
+    "F1-R3": {"feature": "Customisation & escape hatches", "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f1-customisation/#acceptance-criteria"},
+    "G4-R14": {"feature": "Error & remedy model", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g4-error-model/#acceptance-criteria"},
+    "ARCH-R12": {"feature": "Component model", "url": "https://docs.lemonfiber.app/spec/20-architecture/component-model/#requirements"},
+    "ARCH-R13": {"feature": "Component model", "url": "https://docs.lemonfiber.app/spec/20-architecture/component-model/#requirements"},
+    "ARCH-R23": {"feature": "Data flow", "url": "https://docs.lemonfiber.app/spec/20-architecture/data-flow/#requirements"},
+    "B1-R4": {"feature": "Forms & partial stacks", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b1-forms/#acceptance-criteria"},
+    "B1-R5": {"feature": "Forms & partial stacks", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b1-forms/#acceptance-criteria"},
+    "Q-R23": {"feature": "Testing strategy", "url": "https://docs.lemonfiber.app/spec/40-quality/testing-strategy/#requirements"},
+    "A4-R9": {"feature": "Reconfiguration", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a4-reconfiguration/#acceptance-criteria"},
+    "B1-R7": {"feature": "Forms & partial stacks", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b1-forms/#acceptance-criteria"},
+    "B2-R3": {"feature": "Lifecycle control", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b2-lifecycle/#acceptance-criteria"},
+    "F1-R2": {"feature": "Customisation & escape hatches", "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f1-customisation/#acceptance-criteria"},
+    "F2-R5": {"feature": "Service catalogue", "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f2-service-catalogue/#acceptance-criteria"},
+    "B1-R12": {"feature": "Forms & partial stacks", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b1-forms/#acceptance-criteria"},
+    "B1-R14": {"feature": "Forms & partial stacks", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b1-forms/#acceptance-criteria"},
+    "E1-R1": {"feature": "Stack updates", "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e1-stack-updates/#acceptance-criteria"},
+    "A4-R1": {"feature": "Reconfiguration", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a4-reconfiguration/#acceptance-criteria"},
+    "C4-R2": {"feature": "Support bundle", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c4-support-bundle/#acceptance-criteria"},
+    "F1-R6": {"feature": "Customisation & escape hatches", "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f1-customisation/#acceptance-criteria"},
+    "B2-R10": {"feature": "Lifecycle control", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b2-lifecycle/#acceptance-criteria"},
+    "B3-R6": {"feature": "Live dashboard", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b3-dashboard/#acceptance-criteria"},
+    "B3-R7": {"feature": "Live dashboard", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b3-dashboard/#acceptance-criteria"},
+    "B4-R1": {"feature": "Log viewing", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b4-logs/#acceptance-criteria"},
+    "C2-R1": {"feature": "VPN verification", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c2-vpn-verification/#acceptance-criteria"},
+    "B2-R1": {"feature": "Lifecycle control", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b2-lifecycle/#acceptance-criteria"},
+    "B2-R8": {"feature": "Lifecycle control", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b2-lifecycle/#acceptance-criteria"},
+    "B2-R9": {"feature": "Lifecycle control", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b2-lifecycle/#acceptance-criteria"},
+    "B2-R15": {"feature": "Lifecycle control", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b2-lifecycle/#acceptance-criteria"},
+    "B4-R12": {"feature": "Log viewing", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b4-logs/#acceptance-criteria"},
+    "REPO-R11": {"feature": "`lemonfiber` — command reference", "url": "https://docs.lemonfiber.app/spec/30-repos/lemonfiber-reference/#requirements"},
+    "REPO-R14": {"feature": "`lemonfiber` — command reference", "url": "https://docs.lemonfiber.app/spec/30-repos/lemonfiber-reference/#requirements"},
+    "Q-R5": {"feature": "Code comments", "url": "https://docs.lemonfiber.app/spec/40-quality/code-comments/#requirements"},
+    "G1-R8": {"feature": "Interface tiers", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g1-interface-tiers/#acceptance-criteria"},
+    "Q-R11": {"feature": "Code standards", "url": "https://docs.lemonfiber.app/spec/40-quality/code-standards/#requirements"},
+    "G4-R3": {"feature": "Error & remedy model", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g4-error-model/#acceptance-criteria"},
+    "C1-R3": {"feature": "Diagnostics", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c1-diagnostics/#acceptance-criteria"},
+    "C1-R4": {"feature": "Diagnostics", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c1-diagnostics/#acceptance-criteria"},
+    "C1-R6": {"feature": "Diagnostics", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c1-diagnostics/#acceptance-criteria"},
+    "C1-R7": {"feature": "Diagnostics", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c1-diagnostics/#acceptance-criteria"},
+    "C1-R8": {"feature": "Diagnostics", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c1-diagnostics/#acceptance-criteria"},
+    "C1-R9": {"feature": "Diagnostics", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c1-diagnostics/#acceptance-criteria"},
+    "G7-R3": {"feature": "Overall health summary", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g7-health-summary/#acceptance-criteria"},
+    "G7-R5": {"feature": "Overall health summary", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g7-health-summary/#acceptance-criteria"},
+    "C2-R3": {"feature": "VPN verification", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c2-vpn-verification/#acceptance-criteria"},
+    "C2-R14": {"feature": "VPN verification", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c2-vpn-verification/#acceptance-criteria"},
+    "G8-R5": {"feature": "Privacy stance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g8-privacy/#acceptance-criteria"},
+    "C2-R2": {"feature": "VPN verification", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c2-vpn-verification/#acceptance-criteria"},
+    "C2-R7": {"feature": "VPN verification", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c2-vpn-verification/#acceptance-criteria"},
+    "C2-R11": {"feature": "VPN verification", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c2-vpn-verification/#acceptance-criteria"},
+    "C2-R12": {"feature": "VPN verification", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c2-vpn-verification/#acceptance-criteria"},
+    "C2-R15": {"feature": "VPN verification", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c2-vpn-verification/#acceptance-criteria"},
+    "C1-R5": {"feature": "Diagnostics", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c1-diagnostics/#acceptance-criteria"},
+    "A2-R9": {"feature": "Setup wizard", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a2-setup-wizard/#acceptance-criteria"},
+    "C1-R2": {"feature": "Diagnostics", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c1-diagnostics/#acceptance-criteria"},
+    "C1-R11": {"feature": "Diagnostics", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c1-diagnostics/#acceptance-criteria"},
+    "C1-R13": {"feature": "Diagnostics", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c1-diagnostics/#acceptance-criteria"},
+    "A1-R2": {"feature": "Prerequisites & account guidance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a1-prerequisites/#acceptance-criteria"},
+    "A1-R3": {"feature": "Prerequisites & account guidance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a1-prerequisites/#acceptance-criteria"},
+    "A1-R4": {"feature": "Prerequisites & account guidance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a1-prerequisites/#acceptance-criteria"},
+    "A1-R5": {"feature": "Prerequisites & account guidance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a1-prerequisites/#acceptance-criteria"},
+    "A1-R6": {"feature": "Prerequisites & account guidance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a1-prerequisites/#acceptance-criteria"},
+    "A1-R11": {"feature": "Prerequisites & account guidance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a1-prerequisites/#acceptance-criteria"},
+    "A1-R12": {"feature": "Prerequisites & account guidance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a1-prerequisites/#acceptance-criteria"},
+    "A1-R13": {"feature": "Prerequisites & account guidance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a1-prerequisites/#acceptance-criteria"},
+    "B1-R15": {"feature": "Forms & partial stacks", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b1-forms/#acceptance-criteria"},
+    "B1-R3": {"feature": "Forms & partial stacks", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b1-forms/#acceptance-criteria"},
+    "REPO-R10": {"feature": "`lemonfiber` — command reference", "url": "https://docs.lemonfiber.app/spec/30-repos/lemonfiber-reference/#requirements"},
+    "Q-R12": {"feature": "Code standards", "url": "https://docs.lemonfiber.app/spec/40-quality/code-standards/#requirements"},
+    "Q-R15": {"feature": "Code standards", "url": "https://docs.lemonfiber.app/spec/40-quality/code-standards/#requirements"},
+    "DES-R21": {"feature": "Brand rules", "url": "https://docs.lemonfiber.app/spec/60-brand/brand-rules/#requirements"},
+    "GOV-R30": {"feature": "Sign-off & inbound licensing", "url": "https://docs.lemonfiber.app/spec/50-governance/dco/#requirements"},
+    "OPS-R15": {"feature": "Project workflow", "url": "https://docs.lemonfiber.app/spec/70-operations/project-workflow/#requirements"},
+    "OPS-R17": {"feature": "Maintainers", "url": "https://docs.lemonfiber.app/spec/70-operations/maintainers/#requirements"},
+    "OPS-R1": {"feature": "Releasing", "url": "https://docs.lemonfiber.app/spec/70-operations/releasing/#requirements"},
+    "Q-R54": {"feature": "Tooling", "url": "https://docs.lemonfiber.app/spec/40-quality/tooling/#requirements"},
+    "OPS-R21": {"feature": "Project workflow", "url": "https://docs.lemonfiber.app/spec/70-operations/project-workflow/#requirements"},
+    "OPS-R22": {"feature": "Project workflow", "url": "https://docs.lemonfiber.app/spec/70-operations/project-workflow/#requirements"},
+    "OPS-R7": {"feature": "Setup registry", "url": "https://docs.lemonfiber.app/spec/70-operations/setup-registry/#requirements"},
+    "Q-R53": {"feature": "Tooling", "url": "https://docs.lemonfiber.app/spec/40-quality/tooling/#requirements"},
+    "Q-R56": {"feature": "Tooling", "url": "https://docs.lemonfiber.app/spec/40-quality/tooling/#requirements"},
+    "GOV-R32": {"feature": "Cross-repo CI", "url": "https://docs.lemonfiber.app/spec/50-governance/cross-repo-ci/"},
+    "Q-R63": {"feature": "Security", "url": "https://docs.lemonfiber.app/spec/40-quality/security/#requirements"},
+    "Q-R64": {"feature": "CI/CD", "url": "https://docs.lemonfiber.app/spec/40-quality/ci-cd/#requirements"},
+    "OPS-R12": {"feature": "Project workflow", "url": "https://docs.lemonfiber.app/spec/70-operations/project-workflow/#requirements"},
+    "OPS-R3": {"feature": "Releasing", "url": "https://docs.lemonfiber.app/spec/70-operations/releasing/#requirements"},
+    "OPS-R53": {"feature": "Notifications & maintainer automation", "url": "https://docs.lemonfiber.app/spec/70-operations/notifications/#requirements"}
+  },
+  "withdraws": {},
+  "withdrawn_requirements": []
+}

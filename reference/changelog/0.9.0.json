@@ -1,0 +1,815 @@
+{
+  "version": "0.9.0",
+  "tag": "v0.9.0",
+  "released_on": "2026-08-26",
+  "delivers": "Speaking plainly — interface tiers and the plain-language layer",
+  "patches": null,
+  "carried": null,
+  "withdrawn": null,
+  "user_facing": true,
+  "groups": [
+    {
+      "title": "New",
+      "entries": [
+        {
+          "summary": "Honour NO_COLOR",
+          "requirements": ["G1-R10", "G3-R2"],
+          "reference": "#285"
+        },
+        {
+          "summary": "Give output one way out",
+          "requirements": ["G3-R9"],
+          "reference": "#287"
+        },
+        {
+          "summary": "Say what the words mean, where the words are used",
+          "requirements": ["G2-R2", "G2-R5", "G2-R6", "G2-R9", "G2-R12", "G2-R8", "G2-R3"],
+          "reference": "#288"
+        },
+        {
+          "summary": "Explain the words this product had not explained",
+          "requirements": ["G2-R13"],
+          "reference": "#292"
+        },
+        {
+          "summary": "Let setup use the glossary's words rather than its own",
+          "requirements": ["G2-R1", "G2-R5", "G2-R12"],
+          "reference": "#294"
+        },
+        {
+          "summary": "Give a script a failure it can parse",
+          "requirements": ["G1-R7"],
+          "reference": "#297"
+        },
+        {
+          "summary": "Let the last two commands answer a script too",
+          "requirements": ["G1-R7"],
+          "reference": "#298"
+        },
+        {
+          "summary": "Let a full screen say what its words mean",
+          "requirements": ["G2-R1"],
+          "reference": "#299"
+        },
+        {
+          "summary": "Let an operator turn the explanations off",
+          "requirements": ["G2-R7"],
+          "reference": "#302"
+        },
+        {
+          "summary": "Stop explaining a word you went and found out about",
+          "requirements": ["G2-R7"],
+          "reference": "#303"
+        },
+        {
+          "summary": "Opening the words is asking what they mean",
+          "requirements": ["G2-R7"],
+          "reference": "#305"
+        },
+        {
+          "summary": "Describe the wire once, so every SDK generates from it",
+          "requirements": ["ARCH-R56"],
+          "reference": "#309"
+        },
+        {
+          "summary": "Emit the command reference from what the binary parses",
+          "requirements": ["ARCH-R68"],
+          "reference": "#312"
+        },
+        {
+          "summary": "Emit the error-code reference from what the crates declare",
+          "requirements": ["ARCH-R69"],
+          "reference": "#315"
+        },
+        {
+          "summary": "A crate for the endpoints, and what they refuse",
+          "requirements": ["C6-R10", "C6-R12"],
+          "reference": "#317"
+        },
+        {
+          "summary": "Answer the reads with the envelope the command already renders",
+          "requirements": ["ARCH-R46"],
+          "reference": "#318"
+        },
+        {
+          "summary": "The stream a browser leaves open, and what it hears on it",
+          "requirements": ["ARCH-R56", "ARCH-R63", "ARCH-R49", "ARCH-R50", "ARCH-R51", "ARCH-R61", "ARCH-R62"],
+          "reference": "#319"
+        },
+        {
+          "summary": "Describe every kind the server can emit",
+          "requirements": ["ARCH-R56"],
+          "reference": "#321"
+        },
+        {
+          "summary": "The actions endpoint, the embedded frontend, and the command that starts them",
+          "requirements": ["G1-R2", "ARCH-R48", "G1-R5"],
+          "reference": "#323"
+        },
+        {
+          "summary": "Run one check by the name its finding carries",
+          "requirements": ["C1-R5", "C1-R6"],
+          "reference": "#344"
+        },
+        {
+          "summary": "Let a browser answer the questions a terminal asks",
+          "requirements": ["G1-R14"],
+          "reference": "#347"
+        },
+        {
+          "summary": "Say what a start is still waiting for",
+          "requirements": ["G3-R11"],
+          "reference": "#354"
+        },
+        {
+          "summary": "List the forms, redeem the name, refuse the argument nothing carries",
+          "requirements": ["G1-R1", "ARCH-R47", "ARCH-R48", "Q-R66"],
+          "reference": "#365"
+        },
+        {
+          "summary": "Serve the five reads a browser could not make",
+          "requirements": ["G1-R1"],
+          "reference": "#370"
+        },
+        {
+          "summary": "Let the dashboard act on what it shows",
+          "requirements": ["G1-R1"],
+          "reference": "#373"
+        },
+        {
+          "summary": "Answer what a word means in a browser",
+          "requirements": ["G1-R1", "G1-R2"],
+          "reference": "#374"
+        },
+        {
+          "summary": "Reach the archives from a browser",
+          "requirements": ["G1-R1"],
+          "reference": "#377"
+        },
+        {
+          "summary": "Let the dashboard answer what it does not show",
+          "requirements": ["G1-R1"],
+          "reference": "#381"
+        },
+        {
+          "summary": "Serve what runs for minutes",
+          "requirements": ["G1-R1"],
+          "reference": "#398"
+        },
+        {
+          "summary": "Offer a repair from a browser",
+          "requirements": ["G1-R1"],
+          "reference": "#399"
+        },
+        {
+          "summary": "Carry the arguments the web could not reach",
+          "requirements": ["G1-R1"],
+          "reference": "#407"
+        },
+        {
+          "summary": "Let the terminal do the rest",
+          "requirements": ["G1-R1"],
+          "reference": "#401"
+        },
+        {
+          "summary": "Hand over the bundle, and list what is kept",
+          "requirements": ["G1-R1", "ARCH-R46"],
+          "reference": "#409"
+        },
+        {
+          "summary": "Reach the three the terminal could not",
+          "requirements": ["G1-R1"],
+          "reference": "#408"
+        },
+        {
+          "summary": "Offer the three the quality read was being made without",
+          "requirements": ["G1-R1", "G1-R2", "D2-R4", "D2-R7", "D2-R8"],
+          "reference": "#412"
+        },
+        {
+          "summary": "Ask for the checks that disturb, on their own",
+          "requirements": ["G1-R1", "G1-R2"],
+          "reference": "#411"
+        },
+        {
+          "summary": "Let the list name several forms at once",
+          "requirements": ["G1-R1"],
+          "reference": "#414"
+        },
+        {
+          "summary": "Let the screen name one of the things it lists",
+          "requirements": ["G1-R1", "Q-R66"],
+          "reference": "#413"
+        },
+        {
+          "summary": "Ask the screen for the diagnosis, and for the checks that disturb",
+          "requirements": ["G1-R1", "G1-R2", "Q-R66"],
+          "reference": "#415"
+        },
+        {
+          "summary": "Offer the repair, and the consent that answers it",
+          "requirements": ["G1-R1", "G1-R2"],
+          "reference": "#422"
+        },
+        {
+          "summary": "Let the screen name a service inside what it named",
+          "requirements": ["G1-R1", "G1-R2", "B2-R4"],
+          "reference": "#418"
+        },
+        {
+          "summary": "Choose how the surface is served before handing it over",
+          "requirements": ["G1-R1", "Q-R66"],
+          "reference": "#428"
+        },
+        {
+          "summary": "Narrow what the screen asks, and say what it holds",
+          "requirements": ["G1-R1", "Q-R66", "Q-R64"],
+          "reference": "#429"
+        }
+      ]
+    },
+    {
+      "title": "Fixed",
+      "entries": [
+        {
+          "summary": "Let a shortened value still say which one it is",
+          "requirements": ["G3-R10"],
+          "reference": "#286"
+        },
+        {
+          "summary": "A word in the plural is still the word",
+          "requirements": ["G2-R1"],
+          "reference": "#291"
+        },
+        {
+          "summary": "Stop a failure being able to drive the terminal",
+          "requirements": ["G2-R10"],
+          "reference": "#293"
+        },
+        {
+          "summary": "Stop folding what a parser reads",
+          "requirements": ["G3-R9"],
+          "reference": "#295"
+        },
+        {
+          "summary": "Keep the changelog the release generates",
+          "requirements": ["OPS-R3"],
+          "reference": "#316"
+        },
+        {
+          "summary": "One way to answer, and a token as wide as it claims",
+          "requirements": ["ARCH-R52"],
+          "reference": "#322"
+        },
+        {
+          "summary": "Keep in the backlog only what the backlog can hand back",
+          "requirements": ["ARCH-R51"],
+          "reference": "#325"
+        },
+        {
+          "summary": "Take the pre-push guard that still refuses the trunk",
+          "requirements": ["GOV-R12"],
+          "reference": "#336"
+        },
+        {
+          "summary": "Answer what the scanner had been saying here",
+          "requirements": ["Q-R64"],
+          "reference": "#338"
+        },
+        {
+          "summary": "Claim the stack for the two lifecycle paths that did not",
+          "requirements": ["G1-R12"],
+          "reference": "#345"
+        },
+        {
+          "summary": "Tell a script which flags, rather than asking it a question",
+          "requirements": ["G1-R4"],
+          "reference": "#348"
+        },
+        {
+          "summary": "Put back what a check disturbs, and say what a check spends",
+          "requirements": ["C1-R5", "C1-R3", "C1-R11"],
+          "reference": "#349"
+        },
+        {
+          "summary": "Ask the screen whether to draw, and print the help itself",
+          "requirements": ["G1-R3"],
+          "reference": "#352"
+        },
+        {
+          "summary": "Lay every row of the viewer out for the width it has",
+          "requirements": ["G3-R8"],
+          "reference": "#357"
+        },
+        {
+          "summary": "Keep both ends of a value and every word of an explanation",
+          "requirements": ["G3-R10"],
+          "reference": "#361"
+        },
+        {
+          "summary": "Keep both ends of a service's error body",
+          "requirements": ["G3-R10"],
+          "reference": "#363"
+        },
+        {
+          "summary": "Say the reach the rows carry, and read the summary back",
+          "requirements": ["G1-R1"],
+          "reference": "#364"
+        },
+        {
+          "summary": "Refuse every argument the command an action reaches cannot carry",
+          "requirements": ["G1-R1", "ARCH-R48"],
+          "reference": "#366"
+        },
+        {
+          "summary": "Say the tunnel sentence in the room the panel has",
+          "requirements": ["G3-R8"],
+          "reference": "#367"
+        },
+        {
+          "summary": "Describe the diagnosis a warn or fail carries",
+          "requirements": ["ARCH-R56"],
+          "reference": "#368"
+        },
+        {
+          "summary": "One answer to whether a name is a secret",
+          "requirements": ["A7-R3"],
+          "reference": "#375"
+        },
+        {
+          "summary": "Read a key, not a sentence",
+          "requirements": ["A7-R3", "Q-R26"],
+          "reference": "#393"
+        },
+        {
+          "summary": "Answer a refused read as the refusal it is",
+          "requirements": ["ARCH-R74"],
+          "reference": "#394"
+        },
+        {
+          "summary": "Take the query, not the parameter that looks like a key",
+          "requirements": ["A7-R3"],
+          "reference": "#395"
+        },
+        {
+          "summary": "Say what leaving the dashboard really does",
+          "requirements": ["G1-R12", "B3-R5", "A2-R3"],
+          "reference": "#396"
+        },
+        {
+          "summary": "A read refuses the parameter it does not take",
+          "requirements": ["ARCH-R74", "ARCH-R46", "ARCH-R47"],
+          "reference": "#404"
+        },
+        {
+          "summary": "One refusal, one status, whichever door it came through",
+          "requirements": ["ARCH-R74"],
+          "reference": "#419"
+        },
+        {
+          "summary": "Withhold the credential, not the first word",
+          "requirements": ["A7-R3", "G4-R4"],
+          "reference": "#421"
+        },
+        {
+          "summary": "A name is a capability, and is minted like one",
+          "requirements": ["ARCH-R47"],
+          "reference": "#425"
+        },
+        {
+          "summary": "An archive is as private as what it holds",
+          "requirements": ["ARCH-R47"],
+          "reference": "#416"
+        },
+        {
+          "summary": "An agreement is bound to what was read",
+          "requirements": ["C3-R7", "C3-R15", "E3-R7", "E3-R10", "Q-R66"],
+          "reference": "#423"
+        },
+        {
+          "summary": "Withhold and make plain what the screens quote",
+          "requirements": ["A7-R3", "G3-R15", "B4-R7", "D9-R11"],
+          "reference": "#427"
+        },
+        {
+          "summary": "An offer is what somebody reads before deciding",
+          "requirements": ["C3-R1", "C3-R11", "C2-R7", "C4-R8", "D2-R4"],
+          "reference": "#420"
+        }
+      ]
+    },
+    {
+      "title": "Maintenance",
+      "entries": [
+        {
+          "summary": "Cut a tag the same way twice",
+          "requirements": ["GOV-R12"],
+          "reference": "#283"
+        },
+        {
+          "summary": "Pin the actions the release build reaches for",
+          "requirements": ["GOV-R12"],
+          "reference": "#284"
+        },
+        {
+          "summary": "Keep output to one way out, and close the two leaks it found",
+          "requirements": ["G3-R9"],
+          "reference": "#289"
+        },
+        {
+          "summary": "Make the last two plain-language rules hold by test",
+          "requirements": ["G2-R3", "G2-R11"],
+          "reference": "#290"
+        },
+        {
+          "summary": "Tidy what a sweep of today's code turned up",
+          "requirements": ["G3-R9"],
+          "reference": "#296"
+        },
+        {
+          "summary": "Keep what a keypress does apart from what the view is",
+          "requirements": ["GOV-R12"],
+          "reference": "#300"
+        },
+        {
+          "summary": "Record that numbers already carry their consequence",
+          "requirements": ["G2-R4"],
+          "reference": "#301"
+        },
+        {
+          "summary": "Refuse the two shapes a false picture usually takes",
+          "requirements": ["G2-R8", "G2-R13"],
+          "reference": "#304"
+        },
+        {
+          "summary": "Run the shared gates as they stand today",
+          "requirements": ["GOV-R12"],
+          "reference": "#306"
+        },
+        {
+          "summary": "Say what this repo is at 0.8.0, and where the web surface went",
+          "requirements": ["GOV-R12"],
+          "reference": "#307"
+        },
+        {
+          "summary": "Link Discord by a name we control, not an invite code",
+          "requirements": ["GOV-R12"],
+          "reference": "#308"
+        },
+        {
+          "summary": "One pin for the shared gates",
+          "requirements": ["GOV-R12"],
+          "reference": "#310"
+        },
+        {
+          "summary": "Point the submodule at the name the stack now carries",
+          "requirements": ["GOV-R12"],
+          "reference": "#311"
+        },
+        {
+          "summary": "Take the markdownlint config from its one home",
+          "requirements": ["Q-R56"],
+          "reference": "#313"
+        },
+        {
+          "summary": "Follow the embedded stack to its new name",
+          "requirements": ["GOV-R12"],
+          "reference": "#314"
+        },
+        {
+          "summary": "Make a kind something only this module can name",
+          "requirements": ["ARCH-R56"],
+          "reference": "#324"
+        },
+        {
+          "summary": "Three promises the command kept with nothing watching",
+          "requirements": ["G3-R7", "G3-R12", "G3-R14"],
+          "reference": "#320"
+        },
+        {
+          "summary": "Cite the requirement each workflow rests on",
+          "requirements": ["GOV-R12"],
+          "reference": "#326"
+        },
+        {
+          "summary": "Record the web API the tracker had not heard of",
+          "requirements": ["ARCH-R46"],
+          "reference": "#327"
+        },
+        {
+          "summary": "Refuse a push that would empty the branch it lands on",
+          "requirements": ["GOV-R12"],
+          "reference": "#328"
+        },
+        {
+          "summary": "Stop promising an interface the binary does not carry",
+          "requirements": ["G1-R7"],
+          "reference": "#329"
+        },
+        {
+          "summary": "Check the installer's digest before running it",
+          "requirements": ["GOV-R12"],
+          "reference": "#330"
+        },
+        {
+          "summary": "Let only the job that writes hold a token that can",
+          "requirements": ["Q-R53"],
+          "reference": "#331"
+        },
+        {
+          "summary": "Read this repository's own workflows",
+          "requirements": ["Q-R53"],
+          "reference": "#333"
+        },
+        {
+          "summary": "Say what the surface already does, not what it waited for",
+          "requirements": ["GOV-R12"],
+          "reference": "#332"
+        },
+        {
+          "summary": "Give the release token to the job that writes a release",
+          "requirements": ["Q-R53"],
+          "reference": "#334"
+        },
+        {
+          "summary": "Turn the pre-push guard on from the command already run",
+          "requirements": ["GOV-R12"],
+          "reference": "#335"
+        },
+        {
+          "summary": "Install the hooks the config only described",
+          "requirements": ["OPS-R51"],
+          "reference": "#339"
+        },
+        {
+          "summary": "Say what is built, and un-tick what is not",
+          "requirements": ["OPS-R34"],
+          "reference": "#337"
+        },
+        {
+          "summary": "Take the shared definitions as they are now",
+          "requirements": ["GOV-R12"],
+          "reference": "#340"
+        },
+        {
+          "summary": "Verify every installer, and that the patches are still there",
+          "requirements": ["OPS-R1", "Q-R30"],
+          "reference": "#341"
+        },
+        {
+          "summary": "Take the shared definitions as they are now",
+          "requirements": ["GOV-R12"],
+          "reference": "#342"
+        },
+        {
+          "summary": "Refuse a fault named beside the person reading it",
+          "requirements": ["G4-R5"],
+          "reference": "#343"
+        },
+        {
+          "summary": "Record what 0.9.0 had already proved",
+          "requirements": ["G1-R12"],
+          "reference": "#346"
+        },
+        {
+          "summary": "Refuse a port on the network and a screen a terminal cannot draw",
+          "requirements": ["C6-R1", "C6-R3", "G1-R9"],
+          "reference": "#350"
+        },
+        {
+          "summary": "Say what the checks now hold, and what setup reaches",
+          "requirements": ["G1-R14"],
+          "reference": "#351"
+        },
+        {
+          "summary": "Hold the surface to loopback, and its words to the connection",
+          "requirements": ["C6-R6", "G1-R6", "G1-R11"],
+          "reference": "#355"
+        },
+        {
+          "summary": "Record what the web surface now holds",
+          "requirements": ["G1-R2"],
+          "reference": "#353"
+        },
+        {
+          "summary": "Four rows for work that has landed",
+          "requirements": ["G3-R11"],
+          "reference": "#356"
+        },
+        {
+          "summary": "A narrow terminal is a terminal, not a smaller one",
+          "requirements": ["G3-R8"],
+          "reference": "#359"
+        },
+        {
+          "summary": "Say what each surface reaches, and make a claim checkable",
+          "requirements": ["G1-R1"],
+          "reference": "#358"
+        },
+        {
+          "summary": "Assert a refusal names the flags, not merely that it refused",
+          "requirements": ["G1-R13"],
+          "reference": "#360"
+        },
+        {
+          "summary": "Four places shortened a value, not two",
+          "requirements": ["G3-R10"],
+          "reference": "#362"
+        },
+        {
+          "summary": "Tell the SDKs when the artefact they vendor has moved",
+          "requirements": ["ARCH-R64"],
+          "reference": "#369"
+        },
+        {
+          "summary": "Name the reading the artefact is held to",
+          "requirements": ["ARCH-R73"],
+          "reference": "#371"
+        },
+        {
+          "summary": "Refuse a setting whose value nothing decided to show",
+          "requirements": ["A7-R3", "Q-R26", "Q-R66"],
+          "reference": "#372"
+        },
+        {
+          "summary": "Hold the contract page to the reads this surface serves",
+          "requirements": ["Q-R66", "GOV-R12"],
+          "reference": "#376"
+        },
+        {
+          "summary": "A module counts the reads it declares",
+          "requirements": ["ARCH-R46"],
+          "reference": "#378"
+        },
+        {
+          "summary": "Nothing is reachable by mouse alone",
+          "requirements": ["G3-R4"],
+          "reference": "#379"
+        },
+        {
+          "summary": "Take the updates GitHub can open",
+          "requirements": ["GOV-R12", "Q-R55"],
+          "reference": "#380"
+        },
+        {
+          "summary": "Every read module counts itself",
+          "requirements": ["ARCH-R46"],
+          "reference": "#392"
+        },
+        {
+          "summary": "Read the summary sentence, not the page",
+          "requirements": ["G1-R1"],
+          "reference": "#382"
+        },
+        {
+          "summary": "Say where a problem lies",
+          "requirements": ["ARCH-R74"],
+          "reference": "#397"
+        },
+        {
+          "summary": "Move the codeql family as one",
+          "requirements": ["GOV-R12", "Q-R55"],
+          "reference": "#400"
+        },
+        {
+          "summary": "Give every stack its own credential file",
+          "requirements": ["Q-R28"],
+          "reference": "#406"
+        },
+        {
+          "summary": "Skip a scan a bot cannot authenticate",
+          "requirements": ["Q-R55", "Q-R61", "Q-R64", "Q-R66", "GOV-R12"],
+          "reference": "#410"
+        },
+        {
+          "summary": "Bump the codeql group across 1 directory with 4 updates",
+          "requirements": [],
+          "reference": "#403"
+        },
+        {
+          "summary": "Take getrandom 0.4",
+          "requirements": ["GOV-R12", "Q-R55"],
+          "reference": "#405"
+        },
+        {
+          "summary": "Say what the guard actually wraps",
+          "requirements": ["ARCH-R47"],
+          "reference": "#417"
+        },
+        {
+          "summary": "A guard watches for something that exists",
+          "requirements": ["Q-R66"],
+          "reference": "#426"
+        },
+        {
+          "summary": "A route this cannot read is not a route it may skip",
+          "requirements": ["Q-R66"],
+          "reference": "#424"
+        },
+        {
+          "summary": "Bump the workspace to 0.9.0",
+          "requirements": ["GOV-R12"],
+          "reference": "#430"
+        }
+      ]
+    }
+  ],
+  "requirements": {
+    "G1-R10": {"feature": "Interface tiers", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g1-interface-tiers/#acceptance-criteria"},
+    "G3-R2": {"feature": "Accessibility", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g3-accessibility/#acceptance-criteria"},
+    "G3-R9": {"feature": "Accessibility", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g3-accessibility/#acceptance-criteria"},
+    "G2-R2": {"feature": "Plain-language layer & in-product help", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g2-plain-language/#acceptance-criteria"},
+    "G2-R5": {"feature": "Plain-language layer & in-product help", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g2-plain-language/#acceptance-criteria"},
+    "G2-R6": {"feature": "Plain-language layer & in-product help", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g2-plain-language/#acceptance-criteria"},
+    "G2-R9": {"feature": "Plain-language layer & in-product help", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g2-plain-language/#acceptance-criteria"},
+    "G2-R12": {"feature": "Plain-language layer & in-product help", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g2-plain-language/#acceptance-criteria"},
+    "G2-R8": {"feature": "Plain-language layer & in-product help", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g2-plain-language/#acceptance-criteria"},
+    "G2-R3": {"feature": "Plain-language layer & in-product help", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g2-plain-language/#acceptance-criteria"},
+    "G2-R13": {"feature": "Plain-language layer & in-product help", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g2-plain-language/#acceptance-criteria"},
+    "G2-R1": {"feature": "Plain-language layer & in-product help", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g2-plain-language/#acceptance-criteria"},
+    "G1-R7": {"feature": "Interface tiers", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g1-interface-tiers/#acceptance-criteria"},
+    "G2-R7": {"feature": "Plain-language layer & in-product help", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g2-plain-language/#acceptance-criteria"},
+    "ARCH-R56": {"feature": "Contract: the web API", "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/web-api/#requirements"},
+    "ARCH-R68": {"feature": "Component model", "url": "https://docs.lemonfiber.app/spec/20-architecture/component-model/#requirements"},
+    "ARCH-R69": {"feature": "Component model", "url": "https://docs.lemonfiber.app/spec/20-architecture/component-model/#requirements"},
+    "C6-R10": {"feature": "Web UI security & binding policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c6-web-security/#acceptance-criteria"},
+    "C6-R12": {"feature": "Web UI security & binding policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c6-web-security/#acceptance-criteria"},
+    "ARCH-R46": {"feature": "Contract: the web API", "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/web-api/#requirements"},
+    "ARCH-R63": {"feature": "Contract: the web API", "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/web-api/#requirements"},
+    "ARCH-R49": {"feature": "Contract: the web API", "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/web-api/#requirements"},
+    "ARCH-R50": {"feature": "Contract: the web API", "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/web-api/#requirements"},
+    "ARCH-R51": {"feature": "Contract: the web API", "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/web-api/#requirements"},
+    "ARCH-R61": {"feature": "Contract: the web API", "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/web-api/#requirements"},
+    "ARCH-R62": {"feature": "Contract: the web API", "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/web-api/#requirements"},
+    "G1-R2": {"feature": "Interface tiers", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g1-interface-tiers/#acceptance-criteria"},
+    "ARCH-R48": {"feature": "Contract: the web API", "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/web-api/#requirements"},
+    "G1-R5": {"feature": "Interface tiers", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g1-interface-tiers/#acceptance-criteria"},
+    "C1-R5": {"feature": "Diagnostics", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c1-diagnostics/#acceptance-criteria"},
+    "C1-R6": {"feature": "Diagnostics", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c1-diagnostics/#acceptance-criteria"},
+    "G1-R14": {"feature": "Interface tiers", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g1-interface-tiers/#acceptance-criteria"},
+    "G3-R11": {"feature": "Accessibility", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g3-accessibility/#acceptance-criteria"},
+    "G1-R1": {"feature": "Interface tiers", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g1-interface-tiers/#acceptance-criteria"},
+    "ARCH-R47": {"feature": "Contract: the web API", "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/web-api/#requirements"},
+    "Q-R66": {"feature": "Testing strategy", "url": "https://docs.lemonfiber.app/spec/40-quality/testing-strategy/#requirements"},
+    "D2-R4": {"feature": "Quality presets in plain language", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d2-quality-presets/#acceptance-criteria"},
+    "D2-R7": {"feature": "Quality presets in plain language", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d2-quality-presets/#acceptance-criteria"},
+    "D2-R8": {"feature": "Quality presets in plain language", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d2-quality-presets/#acceptance-criteria"},
+    "B2-R4": {"feature": "Lifecycle control", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b2-lifecycle/#acceptance-criteria"},
+    "Q-R64": {"feature": "CI/CD", "url": "https://docs.lemonfiber.app/spec/40-quality/ci-cd/#requirements"},
+    "G3-R10": {"feature": "Accessibility", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g3-accessibility/#acceptance-criteria"},
+    "G2-R10": {"feature": "Plain-language layer & in-product help", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g2-plain-language/#acceptance-criteria"},
+    "OPS-R3": {"feature": "Releasing", "url": "https://docs.lemonfiber.app/spec/70-operations/releasing/#requirements"},
+    "ARCH-R52": {"feature": "Contract: the web API", "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/web-api/#requirements"},
+    "GOV-R12": {"feature": "Canonical spec", "url": "https://docs.lemonfiber.app/spec/50-governance/canonical-spec/"},
+    "G1-R12": {"feature": "Interface tiers", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g1-interface-tiers/#acceptance-criteria"},
+    "G1-R4": {"feature": "Interface tiers", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g1-interface-tiers/#acceptance-criteria"},
+    "C1-R3": {"feature": "Diagnostics", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c1-diagnostics/#acceptance-criteria"},
+    "C1-R11": {"feature": "Diagnostics", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c1-diagnostics/#acceptance-criteria"},
+    "G1-R3": {"feature": "Interface tiers", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g1-interface-tiers/#acceptance-criteria"},
+    "G3-R8": {"feature": "Accessibility", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g3-accessibility/#acceptance-criteria"},
+    "A7-R3": {"feature": "Credential management & rotation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a7-credential-management/#acceptance-criteria"},
+    "Q-R26": {"feature": "Testing strategy", "url": "https://docs.lemonfiber.app/spec/40-quality/testing-strategy/#requirements"},
+    "ARCH-R74": {"feature": "Contract: the web API", "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/web-api/#requirements"},
+    "B3-R5": {"feature": "Live dashboard", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b3-dashboard/#acceptance-criteria"},
+    "A2-R3": {"feature": "Setup wizard", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a2-setup-wizard/#acceptance-criteria"},
+    "G4-R4": {"feature": "Error & remedy model", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g4-error-model/#acceptance-criteria"},
+    "C3-R7": {"feature": "Auto-remediation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c3-auto-remediation/#acceptance-criteria"},
+    "C3-R15": {"feature": "Auto-remediation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c3-auto-remediation/#acceptance-criteria"},
+    "E3-R7": {"feature": "Backup & restore", "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e3-backup-restore/#acceptance-criteria"},
+    "E3-R10": {"feature": "Backup & restore", "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e3-backup-restore/#acceptance-criteria"},
+    "G3-R15": {"feature": "Accessibility", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g3-accessibility/#acceptance-criteria"},
+    "B4-R7": {"feature": "Log viewing", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b4-logs/#acceptance-criteria"},
+    "D9-R11": {"feature": "'\"Where is my show?\" pipeline trace'", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d9-pipeline-trace/#acceptance-criteria"},
+    "C3-R1": {"feature": "Auto-remediation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c3-auto-remediation/#acceptance-criteria"},
+    "C3-R11": {"feature": "Auto-remediation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c3-auto-remediation/#acceptance-criteria"},
+    "C2-R7": {"feature": "VPN verification", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c2-vpn-verification/#acceptance-criteria"},
+    "C4-R8": {"feature": "Support bundle", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c4-support-bundle/#acceptance-criteria"},
+    "G2-R11": {"feature": "Plain-language layer & in-product help", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g2-plain-language/#acceptance-criteria"},
+    "G2-R4": {"feature": "Plain-language layer & in-product help", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g2-plain-language/#acceptance-criteria"},
+    "Q-R56": {"feature": "Tooling", "url": "https://docs.lemonfiber.app/spec/40-quality/tooling/#requirements"},
+    "G3-R7": {"feature": "Accessibility", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g3-accessibility/#acceptance-criteria"},
+    "G3-R12": {"feature": "Accessibility", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g3-accessibility/#acceptance-criteria"},
+    "G3-R14": {"feature": "Accessibility", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g3-accessibility/#acceptance-criteria"},
+    "Q-R53": {"feature": "Tooling", "url": "https://docs.lemonfiber.app/spec/40-quality/tooling/#requirements"},
+    "OPS-R51": {"feature": "Project workflow", "url": "https://docs.lemonfiber.app/spec/70-operations/project-workflow/#requirements"},
+    "OPS-R34": {"feature": "Release staging — the version train", "url": "https://docs.lemonfiber.app/spec/70-operations/staging/#requirements"},
+    "OPS-R1": {"feature": "Releasing", "url": "https://docs.lemonfiber.app/spec/70-operations/releasing/#requirements"},
+    "Q-R30": {"feature": "CI/CD", "url": "https://docs.lemonfiber.app/spec/40-quality/ci-cd/#requirements"},
+    "G4-R5": {"feature": "Error & remedy model", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g4-error-model/#acceptance-criteria"},
+    "C6-R1": {"feature": "Web UI security & binding policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c6-web-security/#acceptance-criteria"},
+    "C6-R3": {"feature": "Web UI security & binding policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c6-web-security/#acceptance-criteria"},
+    "G1-R9": {"feature": "Interface tiers", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g1-interface-tiers/#acceptance-criteria"},
+    "C6-R6": {"feature": "Web UI security & binding policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c6-web-security/#acceptance-criteria"},
+    "G1-R6": {"feature": "Interface tiers", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g1-interface-tiers/#acceptance-criteria"},
+    "G1-R11": {"feature": "Interface tiers", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g1-interface-tiers/#acceptance-criteria"},
+    "G1-R13": {"feature": "Interface tiers", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g1-interface-tiers/#acceptance-criteria"},
+    "ARCH-R64": {"feature": "Contract: the web API", "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/web-api/#requirements"},
+    "ARCH-R73": {"feature": "Contract: the web API", "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/web-api/#requirements"},
+    "G3-R4": {"feature": "Accessibility", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g3-accessibility/#acceptance-criteria"},
+    "Q-R55": {"feature": "Tooling", "url": "https://docs.lemonfiber.app/spec/40-quality/tooling/#requirements"},
+    "Q-R28": {"feature": "Testing strategy", "url": "https://docs.lemonfiber.app/spec/40-quality/testing-strategy/#requirements"},
+    "Q-R61": {"feature": "Testing strategy", "url": "https://docs.lemonfiber.app/spec/40-quality/testing-strategy/#requirements"}
+  },
+  "withdraws": {},
+  "withdrawn_requirements": []
+}

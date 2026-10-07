@@ -1,0 +1,154 @@
+{
+  "version": "0.5.0",
+  "tag": "v0.5.0",
+  "released_on": "2026-08-09",
+  "delivers": "How the product speaks — errors, notifications, health, dashboard data",
+  "patches": null,
+  "carried": null,
+  "withdrawn": null,
+  "user_facing": true,
+  "groups": [
+    {
+      "title": "New",
+      "entries": [
+        {
+          "summary": "Remember what is wrong between runs",
+          "requirements": ["C3-R9", "C7-R14", "C8-R14"],
+          "reference": "#194"
+        },
+        {
+          "summary": "An error that cannot carry a secret, and does not repeat itself",
+          "requirements": ["G4-R8", "G4-R9"],
+          "reference": "#196"
+        },
+        {
+          "summary": "Decide when the operator is worth interrupting",
+          "requirements": ["B5-R5", "B5-R6", "B5-R7", "B5-R11"],
+          "reference": "#197"
+        },
+        {
+          "summary": "Never lose an alert because a channel was down",
+          "requirements": ["B5-R4", "B5-R10", "B5-R13"],
+          "reference": "#198"
+        },
+        {
+          "summary": "Send what is owed, and notice a channel that will not take it",
+          "requirements": ["B5-R4", "B5-R10"],
+          "reference": "#199"
+        },
+        {
+          "summary": "Tell the website when this repository changes",
+          "requirements": ["GOV-R12"],
+          "reference": "#200"
+        },
+        {
+          "summary": "Summarise the stack from what is wrong, not what is running",
+          "requirements": ["G7-R1", "G7-R2", "G7-R3", "G7-R4", "G7-R5", "G7-R8", "G7-R9", "G7-R10", "G7-R12", "G7-R13"],
+          "reference": "#201"
+        },
+        {
+          "summary": "Count problems rather than symptoms, and say what to do",
+          "requirements": ["G7-R6", "G7-R7", "G7-R11", "B5-R8"],
+          "reference": "#202"
+        },
+        {
+          "summary": "One event about four services, and none for a stack turned off",
+          "requirements": ["B5-R1", "B5-R8", "B5-R12", "B5-R14"],
+          "reference": "#203"
+        },
+        {
+          "summary": "Ask once how much to hear, and let every event be changed after",
+          "requirements": ["B5-R2", "B5-R3", "GOV-R12"],
+          "reference": "#204"
+        },
+        {
+          "summary": "Try again before saying anything, and say how hard it was tried",
+          "requirements": ["G4-R15"],
+          "reference": "#205"
+        },
+        {
+          "summary": "Keep the last figure a quiet source gave, marked stale",
+          "requirements": ["B3-R5", "B3-R11"],
+          "reference": "#206"
+        },
+        {
+          "summary": "Keep credentials out of alerts, and guard what only held by construction",
+          "requirements": ["G4-R1", "G4-R2", "G4-R4", "G4-R5", "G4-R6", "G4-R7", "G4-R8", "G4-R10", "G4-R11", "G4-R12", "G4-R13", "B5-R9", "B3-R15"],
+          "reference": "#207"
+        }
+      ]
+    },
+    {
+      "title": "Fixed",
+      "entries": [
+        {
+          "summary": "Take the gate that waits for a summary of this commit",
+          "requirements": ["Q-R64"],
+          "reference": "#195"
+        }
+      ]
+    },
+    {
+      "title": "Maintenance",
+      "entries": [
+        {
+          "summary": "Bump the workspace to 0.5.0",
+          "requirements": ["GOV-R12"],
+          "reference": "#208"
+        }
+      ]
+    }
+  ],
+  "requirements": {
+    "C3-R9": {"feature": "Auto-remediation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c3-auto-remediation/#acceptance-criteria"},
+    "C7-R14": {"feature": "Queue health & stuck items", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c7-queue-health/#acceptance-criteria"},
+    "C8-R14": {"feature": "Provider health & quota tracking", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c8-provider-health/#acceptance-criteria"},
+    "G4-R8": {"feature": "Error & remedy model", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g4-error-model/#acceptance-criteria"},
+    "G4-R9": {"feature": "Error & remedy model", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g4-error-model/#acceptance-criteria"},
+    "B5-R5": {"feature": "Notifications & alerting", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b5-notifications/#acceptance-criteria"},
+    "B5-R6": {"feature": "Notifications & alerting", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b5-notifications/#acceptance-criteria"},
+    "B5-R7": {"feature": "Notifications & alerting", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b5-notifications/#acceptance-criteria"},
+    "B5-R11": {"feature": "Notifications & alerting", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b5-notifications/#acceptance-criteria"},
+    "B5-R4": {"feature": "Notifications & alerting", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b5-notifications/#acceptance-criteria"},
+    "B5-R10": {"feature": "Notifications & alerting", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b5-notifications/#acceptance-criteria"},
+    "B5-R13": {"feature": "Notifications & alerting", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b5-notifications/#acceptance-criteria"},
+    "GOV-R12": {"feature": "Canonical spec", "url": "https://docs.lemonfiber.app/spec/50-governance/canonical-spec/"},
+    "G7-R1": {"feature": "Overall health summary", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g7-health-summary/#acceptance-criteria"},
+    "G7-R2": {"feature": "Overall health summary", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g7-health-summary/#acceptance-criteria"},
+    "G7-R3": {"feature": "Overall health summary", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g7-health-summary/#acceptance-criteria"},
+    "G7-R4": {"feature": "Overall health summary", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g7-health-summary/#acceptance-criteria"},
+    "G7-R5": {"feature": "Overall health summary", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g7-health-summary/#acceptance-criteria"},
+    "G7-R8": {"feature": "Overall health summary", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g7-health-summary/#acceptance-criteria"},
+    "G7-R9": {"feature": "Overall health summary", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g7-health-summary/#acceptance-criteria"},
+    "G7-R10": {"feature": "Overall health summary", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g7-health-summary/#acceptance-criteria"},
+    "G7-R12": {"feature": "Overall health summary", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g7-health-summary/#acceptance-criteria"},
+    "G7-R13": {"feature": "Overall health summary", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g7-health-summary/#acceptance-criteria"},
+    "G7-R6": {"feature": "Overall health summary", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g7-health-summary/#acceptance-criteria"},
+    "G7-R7": {"feature": "Overall health summary", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g7-health-summary/#acceptance-criteria"},
+    "G7-R11": {"feature": "Overall health summary", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g7-health-summary/#acceptance-criteria"},
+    "B5-R8": {"feature": "Notifications & alerting", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b5-notifications/#acceptance-criteria"},
+    "B5-R1": {"feature": "Notifications & alerting", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b5-notifications/#acceptance-criteria"},
+    "B5-R12": {"feature": "Notifications & alerting", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b5-notifications/#acceptance-criteria"},
+    "B5-R14": {"feature": "Notifications & alerting", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b5-notifications/#acceptance-criteria"},
+    "B5-R2": {"feature": "Notifications & alerting", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b5-notifications/#acceptance-criteria"},
+    "B5-R3": {"feature": "Notifications & alerting", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b5-notifications/#acceptance-criteria"},
+    "G4-R15": {"feature": "Error & remedy model", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g4-error-model/#acceptance-criteria"},
+    "B3-R5": {"feature": "Live dashboard", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b3-dashboard/#acceptance-criteria"},
+    "B3-R11": {"feature": "Live dashboard", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b3-dashboard/#acceptance-criteria"},
+    "G4-R1": {"feature": "Error & remedy model", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g4-error-model/#acceptance-criteria"},
+    "G4-R2": {"feature": "Error & remedy model", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g4-error-model/#acceptance-criteria"},
+    "G4-R4": {"feature": "Error & remedy model", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g4-error-model/#acceptance-criteria"},
+    "G4-R5": {"feature": "Error & remedy model", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g4-error-model/#acceptance-criteria"},
+    "G4-R6": {"feature": "Error & remedy model", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g4-error-model/#acceptance-criteria"},
+    "G4-R7": {"feature": "Error & remedy model", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g4-error-model/#acceptance-criteria"},
+    "G4-R10": {"feature": "Error & remedy model", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g4-error-model/#acceptance-criteria"},
+    "G4-R11": {"feature": "Error & remedy model", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g4-error-model/#acceptance-criteria"},
+    "G4-R12": {"feature": "Error & remedy model", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g4-error-model/#acceptance-criteria"},
+    "G4-R13": {"feature": "Error & remedy model", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g4-error-model/#acceptance-criteria"},
+    "B5-R9": {"feature": "Notifications & alerting", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b5-notifications/#acceptance-criteria"},
+    "B3-R15": {"feature": "Live dashboard", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b3-dashboard/#acceptance-criteria"},
+    "Q-R64": {"feature": "CI/CD", "url": "https://docs.lemonfiber.app/spec/40-quality/ci-cd/#requirements"}
+  },
+  "withdraws": {},
+  "withdrawn_requirements": []
+}

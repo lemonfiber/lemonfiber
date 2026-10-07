@@ -206,6 +206,8 @@ jobs:
           persist-credentials: false
       - name: The record holds its own claims
         run: python3 scripts/the_record_a_release_leaves.py --self-test
+      - name: A release is written once, and what arose since rides the next
+        run: python3 scripts/a_release_written_once.py --self-test
       # Fetched and checked against a digest rather than taken on trust, the same
       # way `release-changelog` takes it and for the same reason.
       - name: Take git-cliff, and check it is the one asked for
@@ -225,4 +227,4 @@ jobs:
           set -euo pipefail
           git-cliff --config cliff.toml --context > context.json
           python3 scripts/the_record_a_release_leaves.py \
-            --spec .spec-canonical --check reference/changelog.json < context.json
+            --spec .spec-canonical --check reference/changelog < context.json

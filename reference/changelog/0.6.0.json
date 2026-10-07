@@ -1,0 +1,182 @@
+{
+  "version": "0.6.0",
+  "tag": "v0.6.0",
+  "released_on": "2026-08-16",
+  "delivers": "Trust checks: VPN, storage, queue health",
+  "patches": null,
+  "carried": null,
+  "withdrawn": null,
+  "user_facing": true,
+  "groups": [
+    {
+      "title": "New",
+      "entries": [
+        {
+          "summary": "Tell the spec when a release is published",
+          "requirements": ["GOV-R12"],
+          "reference": "#209"
+        },
+        {
+          "summary": "Notice the stall nobody owns, and say which kind it is",
+          "requirements": ["C7-R1", "C7-R2", "C7-R3", "C7-R5", "C7-R6", "C7-R7", "C7-R12"],
+          "reference": "#210"
+        },
+        {
+          "summary": "Ask more than one address service, and report when they disagree",
+          "requirements": ["C7-R1", "C7-R2", "C7-R3", "C7-R5", "C7-R6", "C7-R7", "C7-R12", "C2-R14"],
+          "reference": "#211"
+        },
+        {
+          "summary": "Read the items, not just how many there are",
+          "requirements": ["C7-R9", "C7-R15"],
+          "reference": "#213"
+        },
+        {
+          "summary": "Watch the pipeline across the services that each see half of it",
+          "requirements": ["C7-R8", "C7-R11", "C7-R13", "C7-R14"],
+          "reference": "#214"
+        },
+        {
+          "summary": "Move the download client onto the port the provider granted",
+          "requirements": ["C2-R4", "C2-R5", "C2-R19"],
+          "reference": "#216"
+        },
+        {
+          "summary": "Tell the arrs to copy where the volume cannot link",
+          "requirements": ["C5-R3", "C5-R4", "C5-R12"],
+          "reference": "#217"
+        },
+        {
+          "summary": "Re-check the tunnel while traffic is moving",
+          "requirements": ["C2-R9", "C2-R10"],
+          "reference": "#218"
+        },
+        {
+          "summary": "Warn about torrents nothing contains, and let it be answered",
+          "requirements": ["C2-R13", "C2-R17", "C2-R20"],
+          "reference": "#219"
+        },
+        {
+          "summary": "Refuse a stack that splits the data root across mounts",
+          "requirements": ["C5-R5"],
+          "reference": "#220"
+        },
+        {
+          "summary": "Read the history behind the queue, and attribute one cause once",
+          "requirements": ["C7-R4", "C7-R9", "C7-R10"],
+          "reference": "#221"
+        },
+        {
+          "summary": "The screen the model has been waiting for",
+          "requirements": ["B3-R1", "B3-R4"],
+          "reference": "#224"
+        },
+        {
+          "summary": "Make the refresh the thing that drives the checks",
+          "requirements": ["B5-R4", "B5-R13", "C7-R8"],
+          "reference": "#229"
+        }
+      ]
+    },
+    {
+      "title": "Fixed",
+      "entries": [
+        {
+          "summary": "Stop the compose walk following a link back to an ancestor",
+          "requirements": ["C5-R5"],
+          "reference": "#223"
+        },
+        {
+          "summary": "Stop text from elsewhere instructing the terminal, and keep one record reader",
+          "requirements": ["GOV-R12"],
+          "reference": "#225"
+        }
+      ]
+    },
+    {
+      "title": "Maintenance",
+      "entries": [
+        {
+          "summary": "Record what landed, and stop crediting what did not",
+          "requirements": ["C2-R6", "C2-R16", "C2-R18"],
+          "reference": "#212"
+        },
+        {
+          "summary": "Record the queue wiring",
+          "requirements": ["GOV-R12"],
+          "reference": "#215"
+        },
+        {
+          "summary": "Drop the row superseded by the port-forward slice",
+          "requirements": ["GOV-R12"],
+          "reference": "#222"
+        },
+        {
+          "summary": "Split the answers that are proven from the walk that asks",
+          "requirements": ["GOV-R12"],
+          "reference": "#226"
+        },
+        {
+          "summary": "One transport for every integration test, and one seam per file",
+          "requirements": ["GOV-R12"],
+          "reference": "#227"
+        },
+        {
+          "summary": "Split two files at the seams they already had",
+          "requirements": ["GOV-R12"],
+          "reference": "#228"
+        },
+        {
+          "summary": "One row per requirement, so the gate cannot read it both ways",
+          "requirements": ["GOV-R12"],
+          "reference": "#230"
+        },
+        {
+          "summary": "Bump the workspace to 0.6.0",
+          "requirements": ["GOV-R12"],
+          "reference": "#231"
+        }
+      ]
+    }
+  ],
+  "requirements": {
+    "GOV-R12": {"feature": "Canonical spec", "url": "https://docs.lemonfiber.app/spec/50-governance/canonical-spec/"},
+    "C7-R1": {"feature": "Queue health & stuck items", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c7-queue-health/#acceptance-criteria"},
+    "C7-R2": {"feature": "Queue health & stuck items", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c7-queue-health/#acceptance-criteria"},
+    "C7-R3": {"feature": "Queue health & stuck items", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c7-queue-health/#acceptance-criteria"},
+    "C7-R5": {"feature": "Queue health & stuck items", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c7-queue-health/#acceptance-criteria"},
+    "C7-R6": {"feature": "Queue health & stuck items", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c7-queue-health/#acceptance-criteria"},
+    "C7-R7": {"feature": "Queue health & stuck items", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c7-queue-health/#acceptance-criteria"},
+    "C7-R12": {"feature": "Queue health & stuck items", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c7-queue-health/#acceptance-criteria"},
+    "C2-R14": {"feature": "VPN verification", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c2-vpn-verification/#acceptance-criteria"},
+    "C7-R9": {"feature": "Queue health & stuck items", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c7-queue-health/#acceptance-criteria"},
+    "C7-R15": {"feature": "Queue health & stuck items", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c7-queue-health/#acceptance-criteria"},
+    "C7-R8": {"feature": "Queue health & stuck items", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c7-queue-health/#acceptance-criteria"},
+    "C7-R11": {"feature": "Queue health & stuck items", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c7-queue-health/#acceptance-criteria"},
+    "C7-R13": {"feature": "Queue health & stuck items", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c7-queue-health/#acceptance-criteria"},
+    "C7-R14": {"feature": "Queue health & stuck items", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c7-queue-health/#acceptance-criteria"},
+    "C2-R4": {"feature": "VPN verification", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c2-vpn-verification/#acceptance-criteria"},
+    "C2-R5": {"feature": "VPN verification", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c2-vpn-verification/#acceptance-criteria"},
+    "C2-R19": {"feature": "VPN verification", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c2-vpn-verification/#acceptance-criteria"},
+    "C5-R3": {"feature": "Storage & hardlink management", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c5-storage/#acceptance-criteria"},
+    "C5-R4": {"feature": "Storage & hardlink management", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c5-storage/#acceptance-criteria"},
+    "C5-R12": {"feature": "Storage & hardlink management", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c5-storage/#acceptance-criteria"},
+    "C2-R9": {"feature": "VPN verification", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c2-vpn-verification/#acceptance-criteria"},
+    "C2-R10": {"feature": "VPN verification", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c2-vpn-verification/#acceptance-criteria"},
+    "C2-R13": {"feature": "VPN verification", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c2-vpn-verification/#acceptance-criteria"},
+    "C2-R17": {"feature": "VPN verification", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c2-vpn-verification/#acceptance-criteria"},
+    "C2-R20": {"feature": "VPN verification", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c2-vpn-verification/#acceptance-criteria"},
+    "C5-R5": {"feature": "Storage & hardlink management", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c5-storage/#acceptance-criteria"},
+    "C7-R4": {"feature": "Queue health & stuck items", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c7-queue-health/#acceptance-criteria"},
+    "C7-R10": {"feature": "Queue health & stuck items", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c7-queue-health/#acceptance-criteria"},
+    "B3-R1": {"feature": "Live dashboard", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b3-dashboard/#acceptance-criteria"},
+    "B3-R4": {"feature": "Live dashboard", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b3-dashboard/#acceptance-criteria"},
+    "B5-R4": {"feature": "Notifications & alerting", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b5-notifications/#acceptance-criteria"},
+    "B5-R13": {"feature": "Notifications & alerting", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b5-notifications/#acceptance-criteria"},
+    "C2-R6": {"feature": "VPN verification", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c2-vpn-verification/#acceptance-criteria"},
+    "C2-R16": {"feature": "VPN verification", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c2-vpn-verification/#acceptance-criteria"},
+    "C2-R18": {"feature": "VPN verification", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c2-vpn-verification/#acceptance-criteria"}
+  },
+  "withdraws": {},
+  "withdrawn_requirements": []
+}

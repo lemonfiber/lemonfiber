@@ -1,0 +1,209 @@
+{
+  "version": "0.10.0",
+  "tag": "v0.10.0",
+  "released_on": "2026-08-27",
+  "delivers": "The front door, its security, and the privacy stance",
+  "patches": null,
+  "carried": null,
+  "withdrawn": null,
+  "user_facing": true,
+  "groups": [
+    {
+      "title": "New",
+      "entries": [
+        {
+          "summary": "Ask what is listening, not what was meant to be",
+          "requirements": ["C6-R8", "C6-R9", "C6-R4", "C6-R13"],
+          "reference": "#444"
+        },
+        {
+          "summary": "The address is read now, and its worth is said with it",
+          "requirements": ["G5-R1", "G5-R2", "G5-R3", "G5-R4", "G5-R5", "G5-R8", "G5-R9", "G5-R11"],
+          "reference": "#440"
+        },
+        {
+          "summary": "Tell a door that is down from one there is no way to",
+          "requirements": ["G5-R13", "G5-R5", "G5-R7", "G5-R10", "G5-R12"],
+          "reference": "#452"
+        },
+        {
+          "summary": "Say where a rule you added does not decide",
+          "requirements": ["C6-R16", "Q-R66"],
+          "reference": "#455"
+        },
+        {
+          "summary": "Say what stays on this machine, and take it off on request",
+          "requirements": ["G8-R3", "G8-R5", "G8-R9", "G8-R12", "G8-R7", "G8-R8"],
+          "reference": "#445"
+        },
+        {
+          "summary": "Say so once, and it is recorded",
+          "requirements": ["C6-R15", "Q-R66"],
+          "reference": "#456"
+        },
+        {
+          "summary": "Write down what actually left this machine",
+          "requirements": ["G8-R14", "Q-R66"],
+          "reference": "#461"
+        },
+        {
+          "summary": "Refuse an app that speaks a wire version this binary does not",
+          "requirements": ["ARCH-R54"],
+          "reference": "#462"
+        },
+        {
+          "summary": "Carry the app the browser is served",
+          "requirements": ["ARCH-R54"],
+          "reference": "#464"
+        }
+      ]
+    },
+    {
+      "title": "Fixed",
+      "entries": [
+        {
+          "summary": "The recipe applies the token, and the verifier claims it",
+          "requirements": ["OPS-R34"],
+          "reference": "#433"
+        },
+        {
+          "summary": "The parser's door disarms what it hands a terminal",
+          "requirements": ["G3-R15"],
+          "reference": "#437"
+        }
+      ]
+    },
+    {
+      "title": "Maintenance",
+      "entries": [
+        {
+          "summary": "Hold the absences this product is chosen for",
+          "requirements": ["G8-R1", "G8-R2", "G8-R6", "G8-R11"],
+          "reference": "#435"
+        },
+        {
+          "summary": "Record the two references the tracker had not heard of",
+          "requirements": ["ARCH-R68", "ARCH-R69"],
+          "reference": "#436"
+        },
+        {
+          "summary": "Bump actions/cache/save from 4.3.0 to 6.1.0",
+          "requirements": [],
+          "reference": "#446"
+        },
+        {
+          "summary": "Bump actions/upload-artifact from 4.6.2 to 7.0.1",
+          "requirements": [],
+          "reference": "#447"
+        },
+        {
+          "summary": "Bump actions/checkout from 5.0.0 to 7.0.1",
+          "requirements": [],
+          "reference": "#448"
+        },
+        {
+          "summary": "The wait is earned at the door, not set beside it",
+          "requirements": ["C6-R11", "Q-R66"],
+          "reference": "#450"
+        },
+        {
+          "summary": "Read what the household knob comes to, not only that it is used",
+          "requirements": ["C6-R2", "Q-R66"],
+          "reference": "#451"
+        },
+        {
+          "summary": "Record the knob the operator is given, and where they read it",
+          "requirements": ["C6-R17"],
+          "reference": "#449"
+        },
+        {
+          "summary": "The command line in parts, so the next command fits",
+          "requirements": ["Q-R18", "Q-R66"],
+          "reference": "#453"
+        },
+        {
+          "summary": "What a read refuses is its own seam",
+          "requirements": ["Q-R18"],
+          "reference": "#454"
+        },
+        {
+          "summary": "What serves is more than one crate, and a revert has two halves",
+          "requirements": ["C6-R5", "C6-R7", "Q-R66"],
+          "reference": "#457"
+        },
+        {
+          "summary": "Name the commits that finished what nothing cites",
+          "requirements": ["OPS-R34"],
+          "reference": "#459"
+        },
+        {
+          "summary": "Record the warning and the two kinds of unreachable",
+          "requirements": ["C6-R16", "G5-R13"],
+          "reference": "#460"
+        },
+        {
+          "summary": "Record the exposure agreed to, and what actually left",
+          "requirements": ["C6-R15", "G8-R14"],
+          "reference": "#463"
+        },
+        {
+          "summary": "Take the stack as it stands",
+          "requirements": ["Q-R68"],
+          "reference": "#465"
+        },
+        {
+          "summary": "Bump the workspace to 0.10.0",
+          "requirements": ["GOV-R12"],
+          "reference": "#466"
+        }
+      ]
+    }
+  ],
+  "requirements": {
+    "C6-R8": {"feature": "Web UI security & binding policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c6-web-security/#acceptance-criteria"},
+    "C6-R9": {"feature": "Web UI security & binding policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c6-web-security/#acceptance-criteria"},
+    "C6-R4": {"feature": "Web UI security & binding policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c6-web-security/#acceptance-criteria"},
+    "C6-R13": {"feature": "Web UI security & binding policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c6-web-security/#acceptance-criteria"},
+    "G5-R1": {"feature": "The front door", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g5-front-door/#acceptance-criteria"},
+    "G5-R2": {"feature": "The front door", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g5-front-door/#acceptance-criteria"},
+    "G5-R3": {"feature": "The front door", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g5-front-door/#acceptance-criteria"},
+    "G5-R4": {"feature": "The front door", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g5-front-door/#acceptance-criteria"},
+    "G5-R5": {"feature": "The front door", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g5-front-door/#acceptance-criteria"},
+    "G5-R8": {"feature": "The front door", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g5-front-door/#acceptance-criteria"},
+    "G5-R9": {"feature": "The front door", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g5-front-door/#acceptance-criteria"},
+    "G5-R11": {"feature": "The front door", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g5-front-door/#acceptance-criteria"},
+    "G5-R13": {"feature": "The front door", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g5-front-door/#acceptance-criteria"},
+    "G5-R7": {"feature": "The front door", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g5-front-door/#acceptance-criteria"},
+    "G5-R10": {"feature": "The front door", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g5-front-door/#acceptance-criteria"},
+    "G5-R12": {"feature": "The front door", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g5-front-door/#acceptance-criteria"},
+    "C6-R16": {"feature": "Web UI security & binding policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c6-web-security/#acceptance-criteria"},
+    "Q-R66": {"feature": "Testing strategy", "url": "https://docs.lemonfiber.app/spec/40-quality/testing-strategy/#requirements"},
+    "G8-R3": {"feature": "Privacy stance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g8-privacy/#acceptance-criteria"},
+    "G8-R5": {"feature": "Privacy stance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g8-privacy/#acceptance-criteria"},
+    "G8-R9": {"feature": "Privacy stance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g8-privacy/#acceptance-criteria"},
+    "G8-R12": {"feature": "Privacy stance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g8-privacy/#acceptance-criteria"},
+    "G8-R7": {"feature": "Privacy stance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g8-privacy/#acceptance-criteria"},
+    "G8-R8": {"feature": "Privacy stance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g8-privacy/#acceptance-criteria"},
+    "C6-R15": {"feature": "Web UI security & binding policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c6-web-security/#acceptance-criteria"},
+    "G8-R14": {"feature": "Privacy stance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g8-privacy/#acceptance-criteria"},
+    "ARCH-R54": {"feature": "Contract: the web API", "url": "https://docs.lemonfiber.app/spec/20-architecture/contracts/web-api/#requirements"},
+    "OPS-R34": {"feature": "Release staging — the version train", "url": "https://docs.lemonfiber.app/spec/70-operations/staging/#requirements"},
+    "G3-R15": {"feature": "Accessibility", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g3-accessibility/#acceptance-criteria"},
+    "G8-R1": {"feature": "Privacy stance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g8-privacy/#acceptance-criteria"},
+    "G8-R2": {"feature": "Privacy stance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g8-privacy/#acceptance-criteria"},
+    "G8-R6": {"feature": "Privacy stance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g8-privacy/#acceptance-criteria"},
+    "G8-R11": {"feature": "Privacy stance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g8-privacy/#acceptance-criteria"},
+    "ARCH-R68": {"feature": "Component model", "url": "https://docs.lemonfiber.app/spec/20-architecture/component-model/#requirements"},
+    "ARCH-R69": {"feature": "Component model", "url": "https://docs.lemonfiber.app/spec/20-architecture/component-model/#requirements"},
+    "C6-R11": {"feature": "Web UI security & binding policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c6-web-security/#acceptance-criteria"},
+    "C6-R2": {"feature": "Web UI security & binding policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c6-web-security/#acceptance-criteria"},
+    "C6-R17": {"feature": "Web UI security & binding policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c6-web-security/#acceptance-criteria"},
+    "Q-R18": {"feature": "Code standards", "url": "https://docs.lemonfiber.app/spec/40-quality/code-standards/#requirements"},
+    "C6-R5": {"feature": "Web UI security & binding policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c6-web-security/#acceptance-criteria"},
+    "C6-R7": {"feature": "Web UI security & binding policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c6-web-security/#acceptance-criteria"},
+    "Q-R68": {"feature": "Tooling", "url": "https://docs.lemonfiber.app/spec/40-quality/tooling/#requirements"},
+    "GOV-R12": {"feature": "Canonical spec", "url": "https://docs.lemonfiber.app/spec/50-governance/canonical-spec/"}
+  },
+  "withdraws": {},
+  "withdrawn_requirements": []
+}

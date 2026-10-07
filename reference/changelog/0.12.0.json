@@ -1,0 +1,230 @@
+{
+  "version": "0.12.0",
+  "tag": "v0.12.0",
+  "released_on": "2026-09-07",
+  "delivers": "Living within limits — disk, retention, bandwidth",
+  "patches": null,
+  "carried": null,
+  "withdrawn": null,
+  "user_facing": true,
+  "groups": [
+    {
+      "title": "New",
+      "entries": [
+        {
+          "summary": "See the disk fill before it does, and say where it went",
+          "requirements": ["D5-R1", "D5-R2", "D5-R3", "D5-R4", "D5-R5", "D5-R7", "D5-R8", "D5-R9", "D5-R10", "D5-R11", "D5-R12", "D5-R13", "D5-R14"],
+          "reference": "#517"
+        },
+        {
+          "summary": "Let an open alert stop the merge",
+          "requirements": ["GOV-R12"],
+          "reference": "#522"
+        },
+        {
+          "summary": "Say a limit in the household's own certificates, and set both halves of it",
+          "requirements": ["D8-R1", "D8-R2", "D8-R3", "D8-R4", "D8-R5", "D8-R6", "D8-R7", "D8-R10", "D8-R12", "D8-R13"],
+          "reference": "#519"
+        },
+        {
+          "summary": "Say what stopping a torrent's seeding costs, and take its own yes",
+          "requirements": ["D5-R6"],
+          "reference": "#524"
+        },
+        {
+          "summary": "Say what a household may ask for, and answer one thing it asked",
+          "requirements": ["D7-R1", "D7-R2", "D7-R4", "D7-R6", "D7-R9", "D7-R10", "D7-R11", "D7-R12", "D7-R14", "D7-R5", "D7-R7", "D7-R3"],
+          "reference": "#526"
+        },
+        {
+          "summary": "Hold the stack to a share of the line, and read back whether it took",
+          "requirements": ["D10-R1", "D10-R2", "D10-R3", "D10-R4", "D10-R5", "D10-R6", "D10-R7", "D10-R8", "D10-R9", "D10-R10", "D10-R11", "D10-R12", "D10-R13", "D10-R14"],
+          "reference": "#525"
+        },
+        {
+          "summary": "Answer the person who asked, and keep why a request was refused",
+          "requirements": ["D7-R3", "D7-R5", "D7-R7", "D7-R8", "D7-R13"],
+          "reference": "#530"
+        },
+        {
+          "summary": "Give the Usenet client the household's hours, and a spent cap its teeth",
+          "requirements": ["D10-R3", "D10-R6", "D10-R9"],
+          "reference": "#531"
+        },
+        {
+          "summary": "Say what a thing costs where the household is deciding",
+          "requirements": ["D7-R3", "D7-R5", "D7-R7", "D7-R8", "D7-R13"],
+          "reference": "#532"
+        },
+        {
+          "summary": "Stop the asking while the disk has no room",
+          "requirements": ["D7-R13"],
+          "reference": "#533"
+        },
+        {
+          "summary": "Say how a limit frees up where the household is deciding",
+          "requirements": ["D7-R5"],
+          "reference": "#534"
+        },
+        {
+          "summary": "Carry a refusal's reason to the person who asked",
+          "requirements": ["D7-R7", "B5-R1", "B5-R5", "G8-R3", "G8-R5"],
+          "reference": "#535"
+        },
+        {
+          "summary": "A clock the household agrees to before it closes anything",
+          "requirements": ["D7-R8"],
+          "reference": "#536"
+        },
+        {
+          "summary": "Hand the two long commands to the machine that runs them",
+          "requirements": ["B10-R1", "B10-R2", "B10-R3", "B10-R4", "B10-R5", "B10-R6", "B10-R7", "B10-R8", "B10-R9", "B10-R10", "B10-R11", "B10-R12", "B10-R13", "B10-R14", "B10-R15", "B10-R16", "G8-R1"],
+          "reference": "#537"
+        }
+      ]
+    },
+    {
+      "title": "Fixed",
+      "entries": [
+        {
+          "summary": "Let each language name its own analysis, and refuse a drive",
+          "requirements": ["GOV-R12"],
+          "reference": "#520"
+        },
+        {
+          "summary": "Trigger the maintainer flag on every workflow that supplies a required check",
+          "requirements": ["OPS-R26", "OPS-R27"],
+          "reference": "#527"
+        }
+      ]
+    },
+    {
+      "title": "Maintenance",
+      "entries": [
+        {
+          "summary": "Put the mapping where the mapping lives, and name two arms apart",
+          "requirements": ["GOV-R12"],
+          "reference": "#518"
+        },
+        {
+          "summary": "Pin the one installed package by what it is, not only by its name",
+          "requirements": ["GOV-R12"],
+          "reference": "#521"
+        },
+        {
+          "summary": "Bump orhun/git-cliff-action",
+          "requirements": [],
+          "reference": "#515"
+        },
+        {
+          "summary": "Drive what the media server shows a restricted member",
+          "requirements": ["D8-R8", "D8-R9", "D8-R11"],
+          "reference": "#523"
+        },
+        {
+          "summary": "Take every shared gate to the revision that is maintained",
+          "requirements": ["GOV-R12"],
+          "reference": "#528"
+        },
+        {
+          "summary": "Name three more rows apart before the last two slices land",
+          "requirements": ["GOV-R12"],
+          "reference": "#529"
+        },
+        {
+          "summary": "Prove installing twice leaves one agent, not two",
+          "requirements": ["B10-R12"],
+          "reference": "#539"
+        },
+        {
+          "summary": "Bump the workspace to 0.12.0",
+          "requirements": ["GOV-R12"],
+          "reference": "#540"
+        }
+      ]
+    }
+  ],
+  "requirements": {
+    "D5-R1": {"feature": "Disk space management", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d5-disk-space/#acceptance-criteria"},
+    "D5-R2": {"feature": "Disk space management", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d5-disk-space/#acceptance-criteria"},
+    "D5-R3": {"feature": "Disk space management", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d5-disk-space/#acceptance-criteria"},
+    "D5-R4": {"feature": "Disk space management", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d5-disk-space/#acceptance-criteria"},
+    "D5-R5": {"feature": "Disk space management", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d5-disk-space/#acceptance-criteria"},
+    "D5-R7": {"feature": "Disk space management", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d5-disk-space/#acceptance-criteria"},
+    "D5-R8": {"feature": "Disk space management", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d5-disk-space/#acceptance-criteria"},
+    "D5-R9": {"feature": "Disk space management", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d5-disk-space/#acceptance-criteria"},
+    "D5-R10": {"feature": "Disk space management", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d5-disk-space/#acceptance-criteria"},
+    "D5-R11": {"feature": "Disk space management", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d5-disk-space/#acceptance-criteria"},
+    "D5-R12": {"feature": "Disk space management", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d5-disk-space/#acceptance-criteria"},
+    "D5-R13": {"feature": "Disk space management", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d5-disk-space/#acceptance-criteria"},
+    "D5-R14": {"feature": "Disk space management", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d5-disk-space/#acceptance-criteria"},
+    "GOV-R12": {"feature": "Canonical spec", "url": "https://docs.lemonfiber.app/spec/50-governance/canonical-spec/"},
+    "D8-R1": {"feature": "Parental controls", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d8-parental-controls/#acceptance-criteria"},
+    "D8-R2": {"feature": "Parental controls", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d8-parental-controls/#acceptance-criteria"},
+    "D8-R3": {"feature": "Parental controls", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d8-parental-controls/#acceptance-criteria"},
+    "D8-R4": {"feature": "Parental controls", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d8-parental-controls/#acceptance-criteria"},
+    "D8-R5": {"feature": "Parental controls", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d8-parental-controls/#acceptance-criteria"},
+    "D8-R6": {"feature": "Parental controls", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d8-parental-controls/#acceptance-criteria"},
+    "D8-R7": {"feature": "Parental controls", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d8-parental-controls/#acceptance-criteria"},
+    "D8-R10": {"feature": "Parental controls", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d8-parental-controls/#acceptance-criteria"},
+    "D8-R12": {"feature": "Parental controls", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d8-parental-controls/#acceptance-criteria"},
+    "D8-R13": {"feature": "Parental controls", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d8-parental-controls/#acceptance-criteria"},
+    "D5-R6": {"feature": "Disk space management", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d5-disk-space/#acceptance-criteria"},
+    "D7-R1": {"feature": "Request approval & quotas", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d7-approval-quotas/#acceptance-criteria"},
+    "D7-R2": {"feature": "Request approval & quotas", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d7-approval-quotas/#acceptance-criteria"},
+    "D7-R4": {"feature": "Request approval & quotas", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d7-approval-quotas/#acceptance-criteria"},
+    "D7-R6": {"feature": "Request approval & quotas", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d7-approval-quotas/#acceptance-criteria"},
+    "D7-R9": {"feature": "Request approval & quotas", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d7-approval-quotas/#acceptance-criteria"},
+    "D7-R10": {"feature": "Request approval & quotas", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d7-approval-quotas/#acceptance-criteria"},
+    "D7-R11": {"feature": "Request approval & quotas", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d7-approval-quotas/#acceptance-criteria"},
+    "D7-R12": {"feature": "Request approval & quotas", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d7-approval-quotas/#acceptance-criteria"},
+    "D7-R14": {"feature": "Request approval & quotas", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d7-approval-quotas/#acceptance-criteria"},
+    "D7-R5": {"feature": "Request approval & quotas", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d7-approval-quotas/#acceptance-criteria"},
+    "D7-R7": {"feature": "Request approval & quotas", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d7-approval-quotas/#acceptance-criteria"},
+    "D7-R3": {"feature": "Request approval & quotas", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d7-approval-quotas/#acceptance-criteria"},
+    "D10-R1": {"feature": "Bandwidth & scheduling", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d10-bandwidth/#acceptance-criteria"},
+    "D10-R2": {"feature": "Bandwidth & scheduling", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d10-bandwidth/#acceptance-criteria"},
+    "D10-R3": {"feature": "Bandwidth & scheduling", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d10-bandwidth/#acceptance-criteria"},
+    "D10-R4": {"feature": "Bandwidth & scheduling", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d10-bandwidth/#acceptance-criteria"},
+    "D10-R5": {"feature": "Bandwidth & scheduling", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d10-bandwidth/#acceptance-criteria"},
+    "D10-R6": {"feature": "Bandwidth & scheduling", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d10-bandwidth/#acceptance-criteria"},
+    "D10-R7": {"feature": "Bandwidth & scheduling", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d10-bandwidth/#acceptance-criteria"},
+    "D10-R8": {"feature": "Bandwidth & scheduling", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d10-bandwidth/#acceptance-criteria"},
+    "D10-R9": {"feature": "Bandwidth & scheduling", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d10-bandwidth/#acceptance-criteria"},
+    "D10-R10": {"feature": "Bandwidth & scheduling", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d10-bandwidth/#acceptance-criteria"},
+    "D10-R11": {"feature": "Bandwidth & scheduling", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d10-bandwidth/#acceptance-criteria"},
+    "D10-R12": {"feature": "Bandwidth & scheduling", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d10-bandwidth/#acceptance-criteria"},
+    "D10-R13": {"feature": "Bandwidth & scheduling", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d10-bandwidth/#acceptance-criteria"},
+    "D10-R14": {"feature": "Bandwidth & scheduling", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d10-bandwidth/#acceptance-criteria"},
+    "D7-R8": {"feature": "Request approval & quotas", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d7-approval-quotas/#acceptance-criteria"},
+    "D7-R13": {"feature": "Request approval & quotas", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d7-approval-quotas/#acceptance-criteria"},
+    "B5-R1": {"feature": "Notifications & alerting", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b5-notifications/#acceptance-criteria"},
+    "B5-R5": {"feature": "Notifications & alerting", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b5-notifications/#acceptance-criteria"},
+    "G8-R3": {"feature": "Privacy stance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g8-privacy/#acceptance-criteria"},
+    "G8-R5": {"feature": "Privacy stance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g8-privacy/#acceptance-criteria"},
+    "B10-R1": {"feature": "Hosting long-running commands", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b10-hosting/#acceptance-criteria"},
+    "B10-R2": {"feature": "Hosting long-running commands", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b10-hosting/#acceptance-criteria"},
+    "B10-R3": {"feature": "Hosting long-running commands", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b10-hosting/#acceptance-criteria"},
+    "B10-R4": {"feature": "Hosting long-running commands", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b10-hosting/#acceptance-criteria"},
+    "B10-R5": {"feature": "Hosting long-running commands", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b10-hosting/#acceptance-criteria"},
+    "B10-R6": {"feature": "Hosting long-running commands", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b10-hosting/#acceptance-criteria"},
+    "B10-R7": {"feature": "Hosting long-running commands", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b10-hosting/#acceptance-criteria"},
+    "B10-R8": {"feature": "Hosting long-running commands", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b10-hosting/#acceptance-criteria"},
+    "B10-R9": {"feature": "Hosting long-running commands", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b10-hosting/#acceptance-criteria"},
+    "B10-R10": {"feature": "Hosting long-running commands", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b10-hosting/#acceptance-criteria"},
+    "B10-R11": {"feature": "Hosting long-running commands", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b10-hosting/#acceptance-criteria"},
+    "B10-R12": {"feature": "Hosting long-running commands", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b10-hosting/#acceptance-criteria"},
+    "B10-R13": {"feature": "Hosting long-running commands", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b10-hosting/#acceptance-criteria"},
+    "B10-R14": {"feature": "Hosting long-running commands", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b10-hosting/#acceptance-criteria"},
+    "B10-R15": {"feature": "Hosting long-running commands", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b10-hosting/#acceptance-criteria"},
+    "B10-R16": {"feature": "Hosting long-running commands", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b10-hosting/#acceptance-criteria"},
+    "G8-R1": {"feature": "Privacy stance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/g-ux/g8-privacy/#acceptance-criteria"},
+    "OPS-R26": {"feature": "Notifications & maintainer automation", "url": "https://docs.lemonfiber.app/spec/70-operations/notifications/#requirements"},
+    "OPS-R27": {"feature": "Notifications & maintainer automation", "url": "https://docs.lemonfiber.app/spec/70-operations/notifications/#requirements"},
+    "D8-R8": {"feature": "Parental controls", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d8-parental-controls/#acceptance-criteria"},
+    "D8-R9": {"feature": "Parental controls", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d8-parental-controls/#acceptance-criteria"},
+    "D8-R11": {"feature": "Parental controls", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d8-parental-controls/#acceptance-criteria"}
+  },
+  "withdraws": {},
+  "withdrawn_requirements": []
+}

@@ -1,41 +1,139 @@
-use super::{notes, told, Record, State, Summary, CARRIED, RECORD_PATH};
+use super::{notes, told, Record, Requirement, State, Summary, CARRIED, RECORD_DIR};
 
-/// A record of two releases, one of them taken back.
-const TWO: &str = r##"{
-  "releases": [
-    {
-      "version": "0.2.0", "tag": "v0.2.0", "released_on": "2026-02-01",
-      "delivers": "The setup wizard", "patches": null, "carried": null,
-      "withdrawn": "the installer shipped a broken pin", "user_facing": true,
-      "groups": [{"title": "New", "entries": [
-        {"summary": "Four removals", "requirements": ["A6-R1"], "reference": "#5"}
-      ]}]
-    },
-    {
-      "version": "0.1.0", "tag": "v0.1.0", "released_on": "2026-01-01",
-      "delivers": null, "patches": null, "carried": null, "withdrawn": null,
-      "user_facing": false,
-      "groups": [{"title": "Maintenance", "entries": [
-        {"summary": "Bump a dependency", "requirements": []}
-      ]}]
-    }
-  ],
-  "requirements": {
-    "A6-R1": {"feature": "Clean uninstall", "url": "https://example.test/a6",
-              "shipped_in": ["0.2.0"]},
-    "A6-R9": {"feature": "Clean uninstall", "withdrawn": true,
-              "shipped_in": ["0.1.0"]}
-  }
+/// The newer of two releases, taken back.
+const NEWER: &str = r##"{
+  "version": "0.2.0", "tag": "v0.2.0", "released_on": "2026-02-01",
+  "delivers": "The setup wizard", "patches": null, "carried": null,
+  "withdrawn": "the installer shipped a broken pin", "user_facing": true,
+  "groups": [{"title": "New", "entries": [
+    {"summary": "Four removals", "requirements": ["A6-R1"], "reference": "#5"}
+  ]}],
+  "requirements": {"A6-R1": {"feature": "Clean uninstall", "url": "https://example.test/a6"}},
+  "withdraws": {}, "withdrawn_requirements": []
 }"##;
 
+/// The older of the two, whose entries cite nothing.
+const OLDER: &str = r#"{
+  "version": "0.1.0", "tag": "v0.1.0", "released_on": "2026-01-01",
+  "delivers": null, "patches": null, "carried": null, "withdrawn": null,
+  "user_facing": false,
+  "groups": [{"title": "Maintenance", "entries": [
+    {"summary": "Bump a dependency", "requirements": []}
+  ]}],
+  "requirements": {},
+  "withdraws": {}, "withdrawn_requirements": []
+}"#;
+
 fn two() -> Option<Record> {
-    Record::read(TWO)
+    Record::read(&[("0.1.0.json", OLDER), ("0.2.0.json", NEWER)])
 }
 
 #[test]
-fn a_document_that_is_not_a_record_is_read_as_none() {
-    assert_eq!(Record::read("not json at all"), None);
-    assert_eq!(Record::read(r#"{"releases": []}"#), None);
+fn files_that_are_not_a_record_are_read_as_none() {
+    assert_eq!(Record::read(&[("0.1.0.json", "not json at all")]), None);
+    assert_eq!(
+        Record::read(&[("0.1.0.json", r#"{"version": "0.1.0"}"#)]),
+        None
+    );
+    assert_eq!(Record::read(&[]), None);
+}
+
+#[test]
+fn a_file_named_for_another_release_is_read_as_none() {
+    assert_eq!(Record::read(&[("0.3.0.json", NEWER)]), None);
+    assert_eq!(Record::read(&[("0.2.0", NEWER)]), None);
+}
+
+#[test]
+fn a_release_whose_version_is_not_numbers_is_read_as_none() {
+    let odd = NEWER.replace("\"0.2.0\"", "\"next\"");
+    assert_eq!(Record::read(&[("next.json", odd.as_str())]), None);
+}
+
+#[test]
+fn the_releases_are_read_newest_first_whatever_order_the_files_come_in() {
+    let tenth = OLDER
+        .replace("\"0.1.0\"", "\"0.10.0\"")
+        .replace("v0.1.0", "v0.10.0");
+    let read = Record::read(&[("0.10.0.json", tenth.as_str()), ("0.2.0.json", NEWER)]);
+    assert_eq!(
+        read.map(|record| record
+            .releases
+            .into_iter()
+            .map(|one| one.version)
+            .collect::<Vec<_>>()),
+        Some(vec!["0.10.0".to_owned(), "0.2.0".to_owned()])
+    );
+}
+
+#[test]
+fn which_releases_shipped_a_requirement_is_read_off_their_entries() {
+    let again = NEWER
+        .replace("\"0.2.0\"", "\"0.3.0\"")
+        .replace("v0.2.0", "v0.3.0");
+    let read = Record::read(&[("0.2.0.json", NEWER), ("0.3.0.json", again.as_str())]);
+    assert_eq!(
+        read.and_then(|record| record.requirements.get("A6-R1").cloned()),
+        Some(Requirement {
+            feature: "Clean uninstall".to_owned(),
+            url: Some("https://example.test/a6".to_owned()),
+            withdrawn: false,
+            shipped_in: vec!["0.3.0".to_owned(), "0.2.0".to_owned()],
+        })
+    );
+}
+
+#[test]
+fn a_release_citing_a_requirement_twice_shipped_it_once() {
+    let twice = NEWER.replace(
+        r##"{"summary": "Four removals", "requirements": ["A6-R1"], "reference": "#5"}"##,
+        r##"{"summary": "Four removals", "requirements": ["A6-R1"], "reference": "#5"},
+    {"summary": "A fifth", "requirements": ["A6-R1"]}"##,
+    );
+    assert_ne!(twice, NEWER);
+    let read = Record::read(&[("0.2.0.json", twice.as_str())]);
+
+    assert_eq!(
+        read.and_then(|record| record.requirements.get("A6-R1").cloned())
+            .map(|one| one.shipped_in),
+        Some(vec!["0.2.0".to_owned()])
+    );
+}
+
+/// A third release, saying the first release was taken back and a requirement the
+/// second cites was withdrawn, both after their own files were written.
+const LATER: &str = r#"{
+  "version": "0.3.0", "tag": "v0.3.0", "released_on": null, "delivers": null,
+  "patches": null, "carried": null, "withdrawn": null, "user_facing": false,
+  "groups": [], "requirements": {},
+  "withdraws": {"0.1.0": "it deleted the library"},
+  "withdrawn_requirements": ["A6-R1"]
+}"#;
+
+#[test]
+fn a_withdrawal_a_later_file_carries_is_folded_back_over_what_it_names() {
+    let read = Record::read(&[
+        ("0.1.0.json", OLDER),
+        ("0.2.0.json", NEWER),
+        ("0.3.0.json", LATER),
+    ]);
+
+    assert_eq!(
+        read.as_ref()
+            .and_then(|record| record.release("0.1.0"))
+            .and_then(|one| one.withdrawn.clone()),
+        Some("it deleted the library".to_owned())
+    );
+    // A release that was already withdrawn in its own file keeps its own reason.
+    assert_eq!(
+        read.as_ref()
+            .and_then(|record| record.release("0.2.0"))
+            .and_then(|one| one.withdrawn.clone()),
+        Some("the installer shipped a broken pin".to_owned())
+    );
+    let gone = read.and_then(|record| record.requirements.get("A6-R1").cloned());
+    assert_eq!(gone.as_ref().map(|one| one.withdrawn), Some(true));
+    assert_eq!(gone.and_then(|one| one.url), None);
 }
 
 #[test]
@@ -44,8 +142,14 @@ fn the_record_this_build_carries_is_one_this_code_can_read() {
     // report a shape this cannot parse — this is what would.
     let carried = Record::carried();
     assert!(carried.is_some(), "the carried record did not parse");
-    assert!(Record::read(CARRIED).is_some());
-    assert_eq!(RECORD_PATH, "reference/changelog.json");
+    assert_eq!(RECORD_DIR, "reference/changelog");
+    assert_eq!(
+        CARRIED
+            .iter()
+            .map(|(name, _)| *name)
+            .find(|name| *name == "0.1.0.json"),
+        Some("0.1.0.json")
+    );
     // Destructured with a combinator rather than a `let ... else`: the arm for
     // a record that is certainly there is a line no test can ever run.
     assert_eq!(

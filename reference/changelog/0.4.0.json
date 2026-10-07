@@ -1,0 +1,370 @@
+{
+  "version": "0.4.0",
+  "tag": "v0.4.0",
+  "released_on": "2026-08-08",
+  "delivers": "Auto-wiring, seed, quality, trace and the first-content walk",
+  "patches": null,
+  "carried": null,
+  "withdrawn": null,
+  "user_facing": true,
+  "groups": [
+    {
+      "title": "New",
+      "entries": [
+        {
+          "summary": "Refuse a root folder two *arrs share",
+          "requirements": ["D1-R10"],
+          "reference": "#140"
+        },
+        {
+          "summary": "Report an unsupported API version instead of writing to it",
+          "requirements": ["D1-R12"],
+          "reference": "#141"
+        },
+        {
+          "summary": "Refuse a root folder outside the data root",
+          "requirements": ["D1-R9"],
+          "reference": "#142"
+        },
+        {
+          "summary": "Record an expected-state baseline of what it writes",
+          "requirements": ["C9-R1"],
+          "reference": "#144"
+        },
+        {
+          "summary": "Compare drift three ways — expected, actual, desired",
+          "requirements": ["C9-R2", "C9-R3", "C9-R4"],
+          "reference": "#145"
+        },
+        {
+          "summary": "Present both sides of a config conflict",
+          "requirements": ["C9-R5"],
+          "reference": "#147"
+        },
+        {
+          "summary": "Adopt operator edits & take on an existing setup (C9-R6/R9)",
+          "requirements": ["C9-R6", "C9-R9", "C9-R8"],
+          "reference": "#148"
+        },
+        {
+          "summary": "Tell a lost expected-state record from a first seed",
+          "requirements": ["C9-R14"],
+          "reference": "#150"
+        },
+        {
+          "summary": "Keep an operator's edits to the materialised stack files",
+          "requirements": ["C9-R13"],
+          "reference": "#151"
+        },
+        {
+          "summary": "Model quality presets in the operator's own terms",
+          "requirements": ["D2-R1", "D2-R2", "D2-R5"],
+          "reference": "#153"
+        },
+        {
+          "summary": "Map presets to Recyclarr's community profiles",
+          "requirements": ["D2-R3"],
+          "reference": "#154"
+        },
+        {
+          "summary": "Warn before a preset a household cannot smoothly play",
+          "requirements": ["D2-R4"],
+          "reference": "#155"
+        },
+        {
+          "summary": "Choose a quality preset in plain language",
+          "requirements": ["D2-R1", "D2-R2", "D2-R4", "D2-R5", "D2-R6"],
+          "reference": "#156"
+        },
+        {
+          "summary": "Apply the chosen preset to the Recyclarr config",
+          "requirements": ["D2-R3"],
+          "reference": "#157"
+        },
+        {
+          "summary": "Detect a hand-edited config and consent to overwrite it",
+          "requirements": ["D2-R8"],
+          "reference": "#158"
+        },
+        {
+          "summary": "Report when the quality guide source can't be reached",
+          "requirements": ["D2-R9"],
+          "reference": "#159"
+        },
+        {
+          "summary": "Warn when the disk is small for the chosen quality",
+          "requirements": ["D2-R10"],
+          "reference": "#160"
+        },
+        {
+          "summary": "Upgrade existing content to the chosen quality (D2-R7)",
+          "requirements": ["D2-R7"],
+          "reference": "#161"
+        },
+        {
+          "summary": "Audio format model for media without a resolution (D2-R11)",
+          "requirements": ["D2-R11"],
+          "reference": "#162"
+        },
+        {
+          "summary": "Map an audio format onto Lidarr's quality profile (D2-R11)",
+          "requirements": ["D2-R11"],
+          "reference": "#163"
+        },
+        {
+          "summary": "Apply an audio format to Lidarr through its API (D2-R11)",
+          "requirements": ["D2-R11"],
+          "reference": "#164"
+        },
+        {
+          "summary": "Choose and apply the music format from the surface (D2-R11)",
+          "requirements": ["D2-R11"],
+          "reference": "#165"
+        },
+        {
+          "summary": "Tell no matching releases from an indexer failure (D2-R12)",
+          "requirements": ["D2-R12"],
+          "reference": "#166"
+        },
+        {
+          "summary": "The pipeline stages an item passes through (D9-R5)",
+          "requirements": ["D9-R5"],
+          "reference": "#167"
+        },
+        {
+          "summary": "Read one *arr's fragment of an item's journey (D9-R4)",
+          "requirements": ["D9-R4"],
+          "reference": "#168"
+        },
+        {
+          "summary": "The \"where is my show?\" command over the *arr spine (D9-R1/R2)",
+          "requirements": ["D9-R1"],
+          "reference": "#169"
+        },
+        {
+          "summary": "Enrich the trace with the download queue (D9-R3/R5)",
+          "requirements": ["D9-R5"],
+          "reference": "#170"
+        },
+        {
+          "summary": "The last stage — is my show finally in the library? (D9-R6/R7)",
+          "requirements": ["D9-R2", "D9-R3", "D9-R6", "D9-R7", "D9-R8"],
+          "reference": "#171"
+        },
+        {
+          "summary": "Complete the C9 drift epic — full reset, drift severity, schema re-baseline",
+          "requirements": ["C9-R12", "C9-R7", "C9-R10"],
+          "reference": "#176"
+        },
+        {
+          "summary": "Repeated-attempt history and the stuck-item landing point (D9-R9/R11)",
+          "requirements": ["D9-R9", "D9-R11"],
+          "reference": "#177"
+        },
+        {
+          "summary": "Withhold a drifted secret's value from both sides of the diff",
+          "requirements": ["C9-R11"],
+          "reference": "#190"
+        },
+        {
+          "summary": "Prove the killswitch by breaking the tunnel",
+          "requirements": ["C2-R7", "C2-R8"],
+          "reference": "#193"
+        }
+      ]
+    },
+    {
+      "title": "Fixed",
+      "entries": [
+        {
+          "summary": "Let the issue gate count to one, and stop the fake it flagged",
+          "requirements": ["GOV-R12"],
+          "reference": "#188"
+        }
+      ]
+    },
+    {
+      "title": "Maintenance",
+      "entries": [
+        {
+          "summary": "Enumerate the E3 requirements 0.3.0 covers",
+          "requirements": ["E3-R1", "E3-R2", "E3-R3", "E3-R4", "E3-R6", "E3-R7", "E3-R8", "E3-R9", "E3-R10", "E3-R11", "E3-R12", "E3-R13", "E3-R14"],
+          "reference": "#139"
+        },
+        {
+          "summary": "Prove interruption-integrity and record the seed budget",
+          "requirements": ["D1-R13", "D1-R14"],
+          "reference": "#143"
+        },
+        {
+          "summary": "Security hardening, concurrency, and cleanup from a codebase review",
+          "requirements": ["GOV-R12"],
+          "reference": "#146"
+        },
+        {
+          "summary": "Credit the built D1 and C9 work per the release gate",
+          "requirements": ["GOV-R12"],
+          "reference": "#152"
+        },
+        {
+          "summary": "Credit the completed D2 quality-presets epic in the tracker",
+          "requirements": ["GOV-R12"],
+          "reference": "#172"
+        },
+        {
+          "summary": "Give each recording test its own temp dir",
+          "requirements": ["GOV-R12"],
+          "reference": "#174"
+        },
+        {
+          "summary": "Pay down the D2/D9 accretion + close two trace honesty gaps",
+          "requirements": ["GOV-R12", "D9-R10", "D9-R14"],
+          "reference": "#175"
+        },
+        {
+          "summary": "Report a show season by season, not by one episode landing (D9-R13)",
+          "requirements": [],
+          "reference": "#178"
+        },
+        {
+          "summary": "Show what the household asked for, in their own words (D9-R12)",
+          "requirements": [],
+          "reference": "#179"
+        },
+        {
+          "summary": "Build the surface's lines so they can be read back (coverage)",
+          "requirements": ["GOV-R12"],
+          "reference": "#180"
+        },
+        {
+          "summary": "Cover the backup and restore surfaces",
+          "requirements": ["GOV-R12"],
+          "reference": "#181"
+        },
+        {
+          "summary": "Cover the provider dial, and give it one exit",
+          "requirements": ["GOV-R12"],
+          "reference": "#182"
+        },
+        {
+          "summary": "Move the provider dialer in beside the other adapters",
+          "requirements": ["GOV-R12"],
+          "reference": "#183"
+        },
+        {
+          "summary": "Answer setup's questions from a script",
+          "requirements": ["GOV-R12"],
+          "reference": "#184"
+        },
+        {
+          "summary": "Make one concern per file the standard, and enforce it",
+          "requirements": ["GOV-R12"],
+          "reference": "#185"
+        },
+        {
+          "summary": "Put the first-run walk under the 100% gate",
+          "requirements": ["GOV-R12"],
+          "reference": "#186"
+        },
+        {
+          "summary": "End setup with something working, not an empty dashboard",
+          "requirements": [],
+          "reference": "#187"
+        },
+        {
+          "summary": "Take the issue gate that blocks only on a real count",
+          "requirements": ["GOV-R12"],
+          "reference": "#189"
+        },
+        {
+          "summary": "Close the 0.4.0 gate's bookkeeping",
+          "requirements": ["D3-R2", "D3-R3", "D3-R4", "D3-R5", "D3-R6", "D3-R7", "D3-R8", "D3-R9", "D3-R10", "D3-R11", "D3-R12", "D3-R13", "D9-R12", "D9-R13", "GOV-R12"],
+          "reference": "#191"
+        },
+        {
+          "summary": "Bump the workspace to 0.4.0",
+          "requirements": ["OPS-R1"],
+          "reference": "#192"
+        }
+      ]
+    }
+  ],
+  "requirements": {
+    "D1-R10": {"feature": "Service auto-wiring", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d1-seed/#acceptance-criteria"},
+    "D1-R12": {"feature": "Service auto-wiring", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d1-seed/#acceptance-criteria"},
+    "D1-R9": {"feature": "Service auto-wiring", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d1-seed/#acceptance-criteria"},
+    "C9-R1": {"feature": "Config drift detection & seed policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c9-drift/#acceptance-criteria"},
+    "C9-R2": {"feature": "Config drift detection & seed policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c9-drift/#acceptance-criteria"},
+    "C9-R3": {"feature": "Config drift detection & seed policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c9-drift/#acceptance-criteria"},
+    "C9-R4": {"feature": "Config drift detection & seed policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c9-drift/#acceptance-criteria"},
+    "C9-R5": {"feature": "Config drift detection & seed policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c9-drift/#acceptance-criteria"},
+    "C9-R6": {"feature": "Config drift detection & seed policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c9-drift/#acceptance-criteria"},
+    "C9-R9": {"feature": "Config drift detection & seed policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c9-drift/#acceptance-criteria"},
+    "C9-R8": {"feature": "Config drift detection & seed policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c9-drift/#acceptance-criteria"},
+    "C9-R14": {"feature": "Config drift detection & seed policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c9-drift/#acceptance-criteria"},
+    "C9-R13": {"feature": "Config drift detection & seed policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c9-drift/#acceptance-criteria"},
+    "D2-R1": {"feature": "Quality presets in plain language", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d2-quality-presets/#acceptance-criteria"},
+    "D2-R2": {"feature": "Quality presets in plain language", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d2-quality-presets/#acceptance-criteria"},
+    "D2-R5": {"feature": "Quality presets in plain language", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d2-quality-presets/#acceptance-criteria"},
+    "D2-R3": {"feature": "Quality presets in plain language", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d2-quality-presets/#acceptance-criteria"},
+    "D2-R4": {"feature": "Quality presets in plain language", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d2-quality-presets/#acceptance-criteria"},
+    "D2-R6": {"feature": "Quality presets in plain language", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d2-quality-presets/#acceptance-criteria"},
+    "D2-R8": {"feature": "Quality presets in plain language", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d2-quality-presets/#acceptance-criteria"},
+    "D2-R9": {"feature": "Quality presets in plain language", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d2-quality-presets/#acceptance-criteria"},
+    "D2-R10": {"feature": "Quality presets in plain language", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d2-quality-presets/#acceptance-criteria"},
+    "D2-R7": {"feature": "Quality presets in plain language", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d2-quality-presets/#acceptance-criteria"},
+    "D2-R11": {"feature": "Quality presets in plain language", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d2-quality-presets/#acceptance-criteria"},
+    "D2-R12": {"feature": "Quality presets in plain language", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d2-quality-presets/#acceptance-criteria"},
+    "D9-R5": {"feature": "'\"Where is my show?\" pipeline trace'", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d9-pipeline-trace/#acceptance-criteria"},
+    "D9-R4": {"feature": "'\"Where is my show?\" pipeline trace'", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d9-pipeline-trace/#acceptance-criteria"},
+    "D9-R1": {"feature": "'\"Where is my show?\" pipeline trace'", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d9-pipeline-trace/#acceptance-criteria"},
+    "D9-R2": {"feature": "'\"Where is my show?\" pipeline trace'", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d9-pipeline-trace/#acceptance-criteria"},
+    "D9-R3": {"feature": "'\"Where is my show?\" pipeline trace'", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d9-pipeline-trace/#acceptance-criteria"},
+    "D9-R6": {"feature": "'\"Where is my show?\" pipeline trace'", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d9-pipeline-trace/#acceptance-criteria"},
+    "D9-R7": {"feature": "'\"Where is my show?\" pipeline trace'", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d9-pipeline-trace/#acceptance-criteria"},
+    "D9-R8": {"feature": "'\"Where is my show?\" pipeline trace'", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d9-pipeline-trace/#acceptance-criteria"},
+    "C9-R12": {"feature": "Config drift detection & seed policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c9-drift/#acceptance-criteria"},
+    "C9-R7": {"feature": "Config drift detection & seed policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c9-drift/#acceptance-criteria"},
+    "C9-R10": {"feature": "Config drift detection & seed policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c9-drift/#acceptance-criteria"},
+    "D9-R9": {"feature": "'\"Where is my show?\" pipeline trace'", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d9-pipeline-trace/#acceptance-criteria"},
+    "D9-R11": {"feature": "'\"Where is my show?\" pipeline trace'", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d9-pipeline-trace/#acceptance-criteria"},
+    "C9-R11": {"feature": "Config drift detection & seed policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c9-drift/#acceptance-criteria"},
+    "C2-R7": {"feature": "VPN verification", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c2-vpn-verification/#acceptance-criteria"},
+    "C2-R8": {"feature": "VPN verification", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c2-vpn-verification/#acceptance-criteria"},
+    "GOV-R12": {"feature": "Canonical spec", "url": "https://docs.lemonfiber.app/spec/50-governance/canonical-spec/"},
+    "E3-R1": {"feature": "Backup & restore", "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e3-backup-restore/#acceptance-criteria"},
+    "E3-R2": {"feature": "Backup & restore", "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e3-backup-restore/#acceptance-criteria"},
+    "E3-R3": {"feature": "Backup & restore", "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e3-backup-restore/#acceptance-criteria"},
+    "E3-R4": {"feature": "Backup & restore", "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e3-backup-restore/#acceptance-criteria"},
+    "E3-R6": {"feature": "Backup & restore", "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e3-backup-restore/#acceptance-criteria"},
+    "E3-R7": {"feature": "Backup & restore", "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e3-backup-restore/#acceptance-criteria"},
+    "E3-R8": {"feature": "Backup & restore", "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e3-backup-restore/#acceptance-criteria"},
+    "E3-R9": {"feature": "Backup & restore", "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e3-backup-restore/#acceptance-criteria"},
+    "E3-R10": {"feature": "Backup & restore", "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e3-backup-restore/#acceptance-criteria"},
+    "E3-R11": {"feature": "Backup & restore", "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e3-backup-restore/#acceptance-criteria"},
+    "E3-R12": {"feature": "Backup & restore", "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e3-backup-restore/#acceptance-criteria"},
+    "E3-R13": {"feature": "Backup & restore", "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e3-backup-restore/#acceptance-criteria"},
+    "E3-R14": {"feature": "Backup & restore", "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e3-backup-restore/#acceptance-criteria"},
+    "D1-R13": {"feature": "Service auto-wiring", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d1-seed/#acceptance-criteria"},
+    "D1-R14": {"feature": "Service auto-wiring", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d1-seed/#acceptance-criteria"},
+    "D9-R10": {"feature": "'\"Where is my show?\" pipeline trace'", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d9-pipeline-trace/#acceptance-criteria"},
+    "D9-R14": {"feature": "'\"Where is my show?\" pipeline trace'", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d9-pipeline-trace/#acceptance-criteria"},
+    "D3-R2": {"feature": "First-content walkthrough", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d3-first-content/#acceptance-criteria"},
+    "D3-R3": {"feature": "First-content walkthrough", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d3-first-content/#acceptance-criteria"},
+    "D3-R4": {"feature": "First-content walkthrough", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d3-first-content/#acceptance-criteria"},
+    "D3-R5": {"feature": "First-content walkthrough", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d3-first-content/#acceptance-criteria"},
+    "D3-R6": {"feature": "First-content walkthrough", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d3-first-content/#acceptance-criteria"},
+    "D3-R7": {"feature": "First-content walkthrough", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d3-first-content/#acceptance-criteria"},
+    "D3-R8": {"feature": "First-content walkthrough", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d3-first-content/#acceptance-criteria"},
+    "D3-R9": {"feature": "First-content walkthrough", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d3-first-content/#acceptance-criteria"},
+    "D3-R10": {"feature": "First-content walkthrough", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d3-first-content/#acceptance-criteria"},
+    "D3-R11": {"feature": "First-content walkthrough", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d3-first-content/#acceptance-criteria"},
+    "D3-R12": {"feature": "First-content walkthrough", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d3-first-content/#acceptance-criteria"},
+    "D3-R13": {"feature": "First-content walkthrough", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d3-first-content/#acceptance-criteria"},
+    "D9-R12": {"feature": "'\"Where is my show?\" pipeline trace'", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d9-pipeline-trace/#acceptance-criteria"},
+    "D9-R13": {"feature": "'\"Where is my show?\" pipeline trace'", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d9-pipeline-trace/#acceptance-criteria"},
+    "OPS-R1": {"feature": "Releasing", "url": "https://docs.lemonfiber.app/spec/70-operations/releasing/#requirements"}
+  },
+  "withdraws": {},
+  "withdrawn_requirements": []
+}

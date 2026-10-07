@@ -1,0 +1,499 @@
+{
+  "version": "0.2.0",
+  "tag": "v0.2.0",
+  "released_on": "2026-07-30",
+  "delivers": "Setup wizard + doctor",
+  "patches": null,
+  "carried": null,
+  "withdrawn": null,
+  "user_facing": true,
+  "groups": [
+    {
+      "title": "New",
+      "entries": [
+        {
+          "summary": "Prove the data root can hardlink, and derive its storage mode",
+          "requirements": ["C5-R1", "C5-R2", "C5-R13", "C5-R14", "A2-R8"],
+          "reference": "#31"
+        },
+        {
+          "summary": "Report free space on the data root",
+          "requirements": ["C5-R6"],
+          "reference": "#32"
+        },
+        {
+          "summary": "Detect a data root that used to hardlink and no longer does",
+          "requirements": ["C5-R11"],
+          "reference": "#33"
+        },
+        {
+          "summary": "Tell an operator permission problem from a service one",
+          "requirements": ["C5-R10"],
+          "reference": "#34"
+        },
+        {
+          "summary": "Stop the stack if the data location disappears under it",
+          "requirements": ["C5-R7", "C5-R8", "C5-R9"],
+          "reference": "#35"
+        },
+        {
+          "summary": "Fuzz the manifest parser, validator and date parser",
+          "requirements": ["Q-R53"],
+          "reference": "#38"
+        },
+        {
+          "summary": "Verify the VPN forwarded port and name the provider trap",
+          "requirements": ["A3-R8"],
+          "reference": "#40"
+        },
+        {
+          "summary": "Gate the native-Jellyfin and PUID/PGID setup offers",
+          "requirements": ["A2-R6", "A2-R7"],
+          "reference": "#42"
+        },
+        {
+          "summary": "The setup wizard's state-machine core",
+          "requirements": ["A2-R1", "A2-R2", "A2-R3", "A2-R4", "A2-R5", "A2-R13", "A2-R14"],
+          "reference": "#43"
+        },
+        {
+          "summary": "A service HTTP transport behind a port",
+          "requirements": ["A3-R4"],
+          "reference": "#44"
+        },
+        {
+          "summary": "Render reviewed answers into the configuration apply writes",
+          "requirements": ["A2-R3"],
+          "reference": "#45"
+        },
+        {
+          "summary": "A client for the Servarr API shape",
+          "requirements": ["A3-R4", "D1-R11"],
+          "reference": "#46"
+        },
+        {
+          "summary": "Read a service's generated API key from its config",
+          "requirements": ["D1-R1"],
+          "reference": "#47"
+        },
+        {
+          "summary": "Record each change so it can be reversed on its own",
+          "requirements": ["E4-R1", "E4-R2"],
+          "reference": "#48"
+        },
+        {
+          "summary": "The idempotent, drift-aware seeding policy",
+          "requirements": ["D1-R2", "D1-R3", "D1-R5", "D1-R6"],
+          "reference": "#49"
+        },
+        {
+          "summary": "Wire a service's root folders, verifying each write",
+          "requirements": ["D1-R2", "D1-R4", "D1-R5", "D1-R8"],
+          "reference": "#50"
+        },
+        {
+          "summary": "Prove each service's credential by reading back its identity",
+          "requirements": ["A3-R2", "A3-R3", "A3-R4", "A3-R10", "D1-R1"],
+          "reference": "#51"
+        },
+        {
+          "summary": "Wire a service's download clients, matched by endpoint",
+          "requirements": ["D1-R2", "D1-R4", "D1-R5", "D1-R8"],
+          "reference": "#52"
+        },
+        {
+          "summary": "Read the generated API key from its config",
+          "requirements": ["D1-R1"],
+          "reference": "#53"
+        },
+        {
+          "summary": "Generate the one credential lemonfiber must mint itself",
+          "requirements": ["D1-R16"],
+          "reference": "#55"
+        },
+        {
+          "summary": "Replace the temporary web UI password with a generated one",
+          "requirements": ["D1-R16"],
+          "reference": "#56"
+        },
+        {
+          "summary": "Build each download client's real registration document",
+          "requirements": ["D1-R4", "D1-R8", "D1-R11"],
+          "reference": "#57"
+        },
+        {
+          "summary": "Mint, set and hand back qBittorrent's web UI password",
+          "requirements": ["D1-R16"],
+          "reference": "#58"
+        },
+        {
+          "summary": "The lemonfiber seed command, wiring qBittorrent's password",
+          "requirements": ["D1-R16"],
+          "reference": "#59"
+        },
+        {
+          "summary": "Wire each media-filing arr's root folders",
+          "requirements": ["D1-R4", "D1-R9"],
+          "reference": "#60"
+        },
+        {
+          "summary": "Register each arr's download clients",
+          "requirements": ["D1-R1", "D1-R4", "D1-R8"],
+          "reference": "#62"
+        },
+        {
+          "summary": "Register each arr into Prowlarr's app sync",
+          "requirements": ["D1-R2", "D1-R4", "D1-R5", "D1-R8", "D1-R11"],
+          "reference": "#77"
+        },
+        {
+          "summary": "Make Jellyfin the identity source for Seerr",
+          "requirements": ["D1-R7", "D1-R16", "D1-R4"],
+          "reference": "#78"
+        },
+        {
+          "summary": "Make an interrupted apply recoverable, not wedged",
+          "requirements": ["A2-R10"],
+          "reference": "#80"
+        },
+        {
+          "summary": "Decide the apply lifecycle and the changes it records",
+          "requirements": ["A2-R2"],
+          "reference": "#81"
+        },
+        {
+          "summary": "Write a reviewed setup to disk, recoverably",
+          "requirements": ["A2-R10"],
+          "reference": "#82"
+        },
+        {
+          "summary": "Record a filesystem path as a reversible change",
+          "requirements": ["E4-R2"],
+          "reference": "#83"
+        },
+        {
+          "summary": "Create the data directory as part of applying",
+          "requirements": ["A2-R10"],
+          "reference": "#84"
+        },
+        {
+          "summary": "Materialise the stack as the last of applying's writes",
+          "requirements": ["A2-R10"],
+          "reference": "#85"
+        },
+        {
+          "summary": "Carry out a failed apply's reversal",
+          "requirements": ["E4-R2"],
+          "reference": "#86"
+        },
+        {
+          "summary": "Drive the wizard to an applied setup through a prompt",
+          "requirements": ["A2-R3"],
+          "reference": "#87"
+        },
+        {
+          "summary": "Run the setup wizard from the command line",
+          "requirements": ["A2-R1"],
+          "reference": "#88"
+        },
+        {
+          "summary": "Bring the stack up at the end of setup",
+          "requirements": ["A2-R15"],
+          "reference": "#89"
+        },
+        {
+          "summary": "Recover an interrupted setup instead of wedging on it",
+          "requirements": ["A2-R10"],
+          "reference": "#90"
+        },
+        {
+          "summary": "Save setup progress as it is gathered, and resume it",
+          "requirements": ["A2-R4"],
+          "reference": "#91"
+        },
+        {
+          "summary": "Show the accounts a protocol choice needs, when it is made",
+          "requirements": ["A1-R2"],
+          "reference": "#92"
+        },
+        {
+          "summary": "Check the environment before asking the first question",
+          "requirements": ["C1-R13"],
+          "reference": "#93"
+        },
+        {
+          "summary": "Make a bare `lemonfiber` the front door to setup",
+          "requirements": ["A2-R1", "A2-R14"],
+          "reference": "#94"
+        },
+        {
+          "summary": "Test the chosen data location for hardlinks, and act on it",
+          "requirements": ["A2-R8", "C5-R1", "C5-R2", "C5-R14"],
+          "reference": "#96"
+        },
+        {
+          "summary": "Prove a credential against its live service",
+          "requirements": ["A3-R2", "A3-R3", "A3-R4"],
+          "reference": "#97"
+        },
+        {
+          "summary": "A credentials step that proves the key before it is kept",
+          "requirements": ["A3-R1", "A3-R2", "A3-R3", "A3-R4"],
+          "reference": "#98"
+        },
+        {
+          "summary": "Prove an existing service by reading back its identity",
+          "requirements": ["A3-R2", "A3-R3", "A3-R4"],
+          "reference": "#99"
+        },
+        {
+          "summary": "Re-prove the indexer credential as an ongoing check",
+          "requirements": ["A3-R10"],
+          "reference": "#100"
+        },
+        {
+          "summary": "Drive setup from flags for an unattended run",
+          "requirements": ["A2-R13"],
+          "reference": "#101"
+        },
+        {
+          "summary": "Prove a Usenet provider over NNTP",
+          "requirements": ["A3-R2", "A3-R3", "A3-R4"],
+          "reference": "#102"
+        },
+        {
+          "summary": "Gather and prove a Usenet provider over real NNTP",
+          "requirements": ["A3-R2", "A3-R3", "A3-R4"],
+          "reference": "#103"
+        },
+        {
+          "summary": "Mask secret input, and take a Usenet provider from flags",
+          "requirements": ["A2-R13"],
+          "reference": "#104"
+        },
+        {
+          "summary": "Stream a pull's progress line by line, not in silence",
+          "requirements": ["A2-R11"],
+          "reference": "#105"
+        }
+      ]
+    },
+    {
+      "title": "Fixed",
+      "entries": [
+        {
+          "summary": "Keep the hardlink and degraded verdicts honest",
+          "requirements": ["C5-R1", "C5-R11"],
+          "reference": "#37"
+        },
+        {
+          "summary": "Address code-review findings across the codebase",
+          "requirements": ["GOV-R12"],
+          "reference": "#39"
+        },
+        {
+          "summary": "Stop a fake test fixture tripping the secret scan",
+          "requirements": ["GOV-R12"],
+          "reference": "#54"
+        },
+        {
+          "summary": "Speak each service's own API version, and declare JSON bodies",
+          "requirements": ["F2-R2", "D1-R4", "A3-R3"],
+          "reference": "#79"
+        },
+        {
+          "summary": "Keep the files that hold credentials private to their owner",
+          "requirements": ["GOV-R12"],
+          "reference": "#107"
+        },
+        {
+          "summary": "Remove the saved progress once setup has applied",
+          "requirements": ["GOV-R12"],
+          "reference": "#108"
+        },
+        {
+          "summary": "Bound requests in time and keep secrets out of failures",
+          "requirements": ["GOV-R12"],
+          "reference": "#109"
+        }
+      ]
+    },
+    {
+      "title": "Maintenance",
+      "entries": [
+        {
+          "summary": "Update the Discord invite to the permanent link",
+          "requirements": ["GOV-R12"],
+          "reference": "#30"
+        },
+        {
+          "summary": "Scope the release write grant to the job that needs it",
+          "requirements": ["Q-R53"],
+          "reference": "#36"
+        },
+        {
+          "summary": "Commit the fuzz workspace lockfile",
+          "requirements": ["GOV-R12"],
+          "reference": "#41"
+        },
+        {
+          "summary": "One Finding constructor instead of three",
+          "requirements": [],
+          "reference": "#63"
+        },
+        {
+          "summary": "Share one Endpoint between the service clients",
+          "requirements": [],
+          "reference": "#64"
+        },
+        {
+          "summary": "Move Date out of the validator",
+          "requirements": [],
+          "reference": "#65"
+        },
+        {
+          "summary": "Separate pure translation from the daemon I/O",
+          "requirements": [],
+          "reference": "#66"
+        },
+        {
+          "summary": "Split the VPN check into leak and port-forward modules",
+          "requirements": [],
+          "reference": "#67"
+        },
+        {
+          "summary": "Move rendering out of main into a render module",
+          "requirements": [],
+          "reference": "#68"
+        },
+        {
+          "summary": "Repoint the VPN link after the module split",
+          "requirements": [],
+          "reference": "#69"
+        },
+        {
+          "summary": "Extract the shared test harness into test_support",
+          "requirements": [],
+          "reference": "#70"
+        },
+        {
+          "summary": "Strip quotes from a hand-edited IP-echo endpoint",
+          "requirements": [],
+          "reference": "#71"
+        },
+        {
+          "summary": "Move seed orchestration into its own module",
+          "requirements": [],
+          "reference": "#73"
+        },
+        {
+          "summary": "Keep the parser's own words when a response won't decode",
+          "requirements": [],
+          "reference": "#72"
+        },
+        {
+          "summary": "Three small correctness and honesty fixes",
+          "requirements": [],
+          "reference": "#74"
+        },
+        {
+          "summary": "Detect and preserve a re-filed download client (D1-R3)",
+          "requirements": [],
+          "reference": "#75"
+        },
+        {
+          "summary": "A transient stat error holds the watch, it does not stop the stack",
+          "requirements": [],
+          "reference": "#76"
+        },
+        {
+          "summary": "Lift the hardlink probe into one shared place",
+          "requirements": ["GOV-R12"],
+          "reference": "#95"
+        },
+        {
+          "summary": "Collapse shared HTTP boilerplate onto Endpoint",
+          "requirements": ["GOV-R12"],
+          "reference": "#106"
+        },
+        {
+          "summary": "Split the setup surface out of main",
+          "requirements": ["GOV-R12"],
+          "reference": "#111"
+        },
+        {
+          "summary": "Move the data-location watch into its own module",
+          "requirements": ["GOV-R12"],
+          "reference": "#110"
+        },
+        {
+          "summary": "Share the register-and-read-back driver",
+          "requirements": ["GOV-R12"],
+          "reference": "#112"
+        },
+        {
+          "summary": "Stop claiming the recorded changes are undone",
+          "requirements": ["GOV-R12"],
+          "reference": "#113"
+        },
+        {
+          "summary": "Set the workspace version to 0.2.0",
+          "requirements": ["OPS-R1"],
+          "reference": "#114"
+        }
+      ]
+    }
+  ],
+  "requirements": {
+    "C5-R1": {"feature": "Storage & hardlink management", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c5-storage/#acceptance-criteria"},
+    "C5-R2": {"feature": "Storage & hardlink management", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c5-storage/#acceptance-criteria"},
+    "C5-R13": {"feature": "Storage & hardlink management", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c5-storage/#acceptance-criteria"},
+    "C5-R14": {"feature": "Storage & hardlink management", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c5-storage/#acceptance-criteria"},
+    "A2-R8": {"feature": "Setup wizard", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a2-setup-wizard/#acceptance-criteria"},
+    "C5-R6": {"feature": "Storage & hardlink management", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c5-storage/#acceptance-criteria"},
+    "C5-R11": {"feature": "Storage & hardlink management", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c5-storage/#acceptance-criteria"},
+    "C5-R10": {"feature": "Storage & hardlink management", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c5-storage/#acceptance-criteria"},
+    "C5-R7": {"feature": "Storage & hardlink management", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c5-storage/#acceptance-criteria"},
+    "C5-R8": {"feature": "Storage & hardlink management", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c5-storage/#acceptance-criteria"},
+    "C5-R9": {"feature": "Storage & hardlink management", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c5-storage/#acceptance-criteria"},
+    "Q-R53": {"feature": "Tooling", "url": "https://docs.lemonfiber.app/spec/40-quality/tooling/#requirements"},
+    "A3-R8": {"feature": "Credential validation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a3-credential-validation/#acceptance-criteria"},
+    "A2-R6": {"feature": "Setup wizard", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a2-setup-wizard/#acceptance-criteria"},
+    "A2-R7": {"feature": "Setup wizard", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a2-setup-wizard/#acceptance-criteria"},
+    "A2-R1": {"feature": "Setup wizard", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a2-setup-wizard/#acceptance-criteria"},
+    "A2-R2": {"feature": "Setup wizard", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a2-setup-wizard/#acceptance-criteria"},
+    "A2-R3": {"feature": "Setup wizard", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a2-setup-wizard/#acceptance-criteria"},
+    "A2-R4": {"feature": "Setup wizard", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a2-setup-wizard/#acceptance-criteria"},
+    "A2-R5": {"feature": "Setup wizard", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a2-setup-wizard/#acceptance-criteria"},
+    "A2-R13": {"feature": "Setup wizard", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a2-setup-wizard/#acceptance-criteria"},
+    "A2-R14": {"feature": "Setup wizard", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a2-setup-wizard/#acceptance-criteria"},
+    "A3-R4": {"feature": "Credential validation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a3-credential-validation/#acceptance-criteria"},
+    "D1-R11": {"feature": "Service auto-wiring", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d1-seed/#acceptance-criteria"},
+    "D1-R1": {"feature": "Service auto-wiring", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d1-seed/#acceptance-criteria"},
+    "E4-R1": {"feature": "Rollback", "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e4-rollback/#acceptance-criteria"},
+    "E4-R2": {"feature": "Rollback", "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e4-rollback/#acceptance-criteria"},
+    "D1-R2": {"feature": "Service auto-wiring", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d1-seed/#acceptance-criteria"},
+    "D1-R3": {"feature": "Service auto-wiring", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d1-seed/#acceptance-criteria"},
+    "D1-R5": {"feature": "Service auto-wiring", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d1-seed/#acceptance-criteria"},
+    "D1-R6": {"feature": "Service auto-wiring", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d1-seed/#acceptance-criteria"},
+    "D1-R4": {"feature": "Service auto-wiring", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d1-seed/#acceptance-criteria"},
+    "D1-R8": {"feature": "Service auto-wiring", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d1-seed/#acceptance-criteria"},
+    "A3-R2": {"feature": "Credential validation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a3-credential-validation/#acceptance-criteria"},
+    "A3-R3": {"feature": "Credential validation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a3-credential-validation/#acceptance-criteria"},
+    "A3-R10": {"feature": "Credential validation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a3-credential-validation/#acceptance-criteria"},
+    "D1-R16": {"feature": "Service auto-wiring", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d1-seed/#acceptance-criteria"},
+    "D1-R9": {"feature": "Service auto-wiring", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d1-seed/#acceptance-criteria"},
+    "D1-R7": {"feature": "Service auto-wiring", "url": "https://docs.lemonfiber.app/spec/10-functional/features/d-content/d1-seed/#acceptance-criteria"},
+    "A2-R10": {"feature": "Setup wizard", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a2-setup-wizard/#acceptance-criteria"},
+    "A2-R15": {"feature": "Setup wizard", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a2-setup-wizard/#acceptance-criteria"},
+    "A1-R2": {"feature": "Prerequisites & account guidance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a1-prerequisites/#acceptance-criteria"},
+    "C1-R13": {"feature": "Diagnostics", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c1-diagnostics/#acceptance-criteria"},
+    "A3-R1": {"feature": "Credential validation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a3-credential-validation/#acceptance-criteria"},
+    "A2-R11": {"feature": "Setup wizard", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a2-setup-wizard/#acceptance-criteria"},
+    "GOV-R12": {"feature": "Canonical spec", "url": "https://docs.lemonfiber.app/spec/50-governance/canonical-spec/"},
+    "F2-R2": {"feature": "Service catalogue", "url": "https://docs.lemonfiber.app/spec/10-functional/features/f-extensibility/f2-service-catalogue/#acceptance-criteria"},
+    "OPS-R1": {"feature": "Releasing", "url": "https://docs.lemonfiber.app/spec/70-operations/releasing/#requirements"}
+  },
+  "withdraws": {},
+  "withdrawn_requirements": []
+}

@@ -1,0 +1,245 @@
+{
+  "version": "0.8.0",
+  "tag": "v0.8.0",
+  "released_on": "2026-08-22",
+  "delivers": "Live TUI: forms, lifecycle, logs and diagnostics as surfaces",
+  "patches": null,
+  "carried": null,
+  "withdrawn": null,
+  "user_facing": true,
+  "groups": [
+    {
+      "title": "New",
+      "entries": [
+        {
+          "summary": "Say what a form would start, before it starts it",
+          "requirements": ["B1-R3", "B1-R6", "B1-R7", "B1-R9", "B1-R13"],
+          "reference": "#249"
+        },
+        {
+          "summary": "Say where each form stands",
+          "requirements": ["B1-R10", "B2-R7"],
+          "reference": "#253"
+        },
+        {
+          "summary": "Say what a service that will not start costs",
+          "requirements": ["B1-R11"],
+          "reference": "#255"
+        },
+        {
+          "summary": "Switch to a form without stopping what it shares",
+          "requirements": ["B1-R10"],
+          "reference": "#254"
+        },
+        {
+          "summary": "Read the severity a line declares, and guess none",
+          "requirements": ["B4-R6"],
+          "reference": "#260"
+        },
+        {
+          "summary": "Refuse to take a service from a form still using it",
+          "requirements": ["B2-R7"],
+          "reference": "#257"
+        },
+        {
+          "summary": "Put the service's own words beside the finding",
+          "requirements": ["B4-R5"],
+          "reference": "#263"
+        },
+        {
+          "summary": "Read a scrollback as one account of what happened",
+          "requirements": ["B4-R1"],
+          "reference": "#264"
+        },
+        {
+          "summary": "Take the tunnel down after what is using its network",
+          "requirements": ["B2-R6"],
+          "reference": "#267"
+        },
+        {
+          "summary": "Let more findings say which service they are about",
+          "requirements": ["C1-R10"],
+          "reference": "#266"
+        },
+        {
+          "summary": "Say when a switch had nothing to move",
+          "requirements": ["B2-R5"],
+          "reference": "#268"
+        },
+        {
+          "summary": "Say what stopping will affect, before it does",
+          "requirements": ["B2-R3"],
+          "reference": "#269"
+        },
+        {
+          "summary": "Hold a scrollback that admits what it dropped",
+          "requirements": ["B4-R2", "B4-R3", "B4-R4", "B4-R8", "B4-R9", "B4-R12"],
+          "reference": "#271"
+        },
+        {
+          "summary": "Read a live tail on a screen of its own",
+          "requirements": ["B4-R2", "B4-R3", "B4-R4", "B4-R8", "B4-R9", "B4-R12"],
+          "reference": "#272"
+        },
+        {
+          "summary": "Note a service restarting without ending the view",
+          "requirements": ["B4-R11"],
+          "reference": "#274"
+        },
+        {
+          "summary": "Report what stopping would interrupt, and offer to wait",
+          "requirements": ["B2-R13"],
+          "reference": "#273"
+        },
+        {
+          "summary": "Export the view, redacted the way a support bundle is",
+          "requirements": ["B4-R10"],
+          "reference": "#275"
+        },
+        {
+          "summary": "Narrate a start while it happens",
+          "requirements": ["B2-R2", "B2-R12"],
+          "reference": "#276"
+        },
+        {
+          "summary": "Address an operation to a form, a service list, or everything",
+          "requirements": ["B2-R4"],
+          "reference": "#277"
+        },
+        {
+          "summary": "Let one operation at a time work on a stack",
+          "requirements": ["B2-R14"],
+          "reference": "#278"
+        }
+      ]
+    },
+    {
+      "title": "Fixed",
+      "entries": [
+        {
+          "summary": "Say which finding explains the others, and stop claiming two that do not hold",
+          "requirements": ["C1-R10"],
+          "reference": "#251"
+        },
+        {
+          "summary": "Let a filesystem check wait as long as a disk may take",
+          "requirements": ["C1-R14"],
+          "reference": "#252"
+        },
+        {
+          "summary": "Stop a container from rewriting the operator's terminal",
+          "requirements": ["B4-R7"],
+          "reference": "#256"
+        },
+        {
+          "summary": "Read the export back, and read only what the screen shows",
+          "requirements": ["B4-R8", "B4-R10", "B4-R12"],
+          "reference": "#279"
+        },
+        {
+          "summary": "Keep a cookie to the service that set it",
+          "requirements": ["GOV-R12"],
+          "reference": "#281"
+        }
+      ]
+    },
+    {
+      "title": "Faster",
+      "entries": [
+        {
+          "summary": "Read every service at once rather than one after another",
+          "requirements": ["GOV-R12"],
+          "reference": "#280"
+        }
+      ]
+    },
+    {
+      "title": "Maintenance",
+      "entries": [
+        {
+          "summary": "Prove the guarantees the manifest was already making",
+          "requirements": ["B1-R1", "B1-R2", "B1-R8", "B1-R15", "B2-R11"],
+          "reference": "#250"
+        },
+        {
+          "summary": "Claim the log-line sanitising that already shipped",
+          "requirements": ["B4-R7"],
+          "reference": "#258"
+        },
+        {
+          "summary": "Hold the whole suite to the run it has to fit in",
+          "requirements": ["C1-R12"],
+          "reference": "#259"
+        },
+        {
+          "summary": "Spell-check in `just ci`, where it costs a second",
+          "requirements": ["GOV-R12"],
+          "reference": "#261"
+        },
+        {
+          "summary": "Claim the log severity that already shipped",
+          "requirements": ["B4-R6"],
+          "reference": "#262"
+        },
+        {
+          "summary": "Claim the tail-first read that was already proven",
+          "requirements": ["B4-R13"],
+          "reference": "#265"
+        },
+        {
+          "summary": "Hold every check to having something to ask",
+          "requirements": ["C1-R1"],
+          "reference": "#270"
+        },
+        {
+          "summary": "Bump the workspace to 0.8.0",
+          "requirements": ["GOV-R12"],
+          "reference": "#282"
+        }
+      ]
+    }
+  ],
+  "requirements": {
+    "B1-R3": {"feature": "Forms & partial stacks", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b1-forms/#acceptance-criteria"},
+    "B1-R6": {"feature": "Forms & partial stacks", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b1-forms/#acceptance-criteria"},
+    "B1-R7": {"feature": "Forms & partial stacks", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b1-forms/#acceptance-criteria"},
+    "B1-R9": {"feature": "Forms & partial stacks", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b1-forms/#acceptance-criteria"},
+    "B1-R13": {"feature": "Forms & partial stacks", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b1-forms/#acceptance-criteria"},
+    "B1-R10": {"feature": "Forms & partial stacks", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b1-forms/#acceptance-criteria"},
+    "B2-R7": {"feature": "Lifecycle control", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b2-lifecycle/#acceptance-criteria"},
+    "B1-R11": {"feature": "Forms & partial stacks", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b1-forms/#acceptance-criteria"},
+    "B4-R6": {"feature": "Log viewing", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b4-logs/#acceptance-criteria"},
+    "B4-R5": {"feature": "Log viewing", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b4-logs/#acceptance-criteria"},
+    "B4-R1": {"feature": "Log viewing", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b4-logs/#acceptance-criteria"},
+    "B2-R6": {"feature": "Lifecycle control", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b2-lifecycle/#acceptance-criteria"},
+    "C1-R10": {"feature": "Diagnostics", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c1-diagnostics/#acceptance-criteria"},
+    "B2-R5": {"feature": "Lifecycle control", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b2-lifecycle/#acceptance-criteria"},
+    "B2-R3": {"feature": "Lifecycle control", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b2-lifecycle/#acceptance-criteria"},
+    "B4-R2": {"feature": "Log viewing", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b4-logs/#acceptance-criteria"},
+    "B4-R3": {"feature": "Log viewing", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b4-logs/#acceptance-criteria"},
+    "B4-R4": {"feature": "Log viewing", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b4-logs/#acceptance-criteria"},
+    "B4-R8": {"feature": "Log viewing", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b4-logs/#acceptance-criteria"},
+    "B4-R9": {"feature": "Log viewing", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b4-logs/#acceptance-criteria"},
+    "B4-R12": {"feature": "Log viewing", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b4-logs/#acceptance-criteria"},
+    "B4-R11": {"feature": "Log viewing", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b4-logs/#acceptance-criteria"},
+    "B2-R13": {"feature": "Lifecycle control", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b2-lifecycle/#acceptance-criteria"},
+    "B4-R10": {"feature": "Log viewing", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b4-logs/#acceptance-criteria"},
+    "B2-R2": {"feature": "Lifecycle control", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b2-lifecycle/#acceptance-criteria"},
+    "B2-R12": {"feature": "Lifecycle control", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b2-lifecycle/#acceptance-criteria"},
+    "B2-R4": {"feature": "Lifecycle control", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b2-lifecycle/#acceptance-criteria"},
+    "B2-R14": {"feature": "Lifecycle control", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b2-lifecycle/#acceptance-criteria"},
+    "C1-R14": {"feature": "Diagnostics", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c1-diagnostics/#acceptance-criteria"},
+    "B4-R7": {"feature": "Log viewing", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b4-logs/#acceptance-criteria"},
+    "GOV-R12": {"feature": "Canonical spec", "url": "https://docs.lemonfiber.app/spec/50-governance/canonical-spec/"},
+    "B1-R1": {"feature": "Forms & partial stacks", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b1-forms/#acceptance-criteria"},
+    "B1-R2": {"feature": "Forms & partial stacks", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b1-forms/#acceptance-criteria"},
+    "B1-R8": {"feature": "Forms & partial stacks", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b1-forms/#acceptance-criteria"},
+    "B1-R15": {"feature": "Forms & partial stacks", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b1-forms/#acceptance-criteria"},
+    "B2-R11": {"feature": "Lifecycle control", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b2-lifecycle/#acceptance-criteria"},
+    "C1-R12": {"feature": "Diagnostics", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c1-diagnostics/#acceptance-criteria"},
+    "B4-R13": {"feature": "Log viewing", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b4-logs/#acceptance-criteria"},
+    "C1-R1": {"feature": "Diagnostics", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c1-diagnostics/#acceptance-criteria"}
+  },
+  "withdraws": {},
+  "withdrawn_requirements": []
+}
