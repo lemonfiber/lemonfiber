@@ -36,3 +36,18 @@ pub fn with_the_gate(tag: &str) -> std::path::PathBuf {
     let _ = std::fs::write(to.join("stack.toml"), read);
     to
 }
+
+/// The day the fixture clock is stopped on, as the manifest's date rules read it.
+///
+/// Read from the same seconds `Stopped::today()` stops on, so a test validating this
+/// stack moves forward with the clock rather than going stale on a day of its own. A
+/// day that will not convert falls back to the epoch, which every recorded release is
+/// after, so a test using it fails rather than passes on a day nobody chose.
+pub fn frozen_day() -> lemonfiber_manifest::Date {
+    let seconds = i64::try_from(lemonfiber_fixtures::ports::TODAY).unwrap_or_default();
+    lemonfiber_manifest::Date::from_unix_seconds(seconds).unwrap_or(lemonfiber_manifest::Date {
+        year: 1970,
+        month: 1,
+        day: 1,
+    })
+}

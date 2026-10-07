@@ -15,6 +15,21 @@ pub mod context;
 
 pub(crate) use context::{a_context, nowhere, repository_stack as stack};
 
+/// The day the fixture clock is stopped on, as the manifest's date rules read it.
+///
+/// One day for every test that validates the real manifest, read from the same
+/// seconds `Stopped::today()` stops on, so it moves when that does. A day that will
+/// not convert falls back to the epoch, which every recorded release is after, so
+/// the tests that use it fail rather than pass on a day nobody chose.
+pub(crate) fn frozen_day() -> lemonfiber_manifest::Date {
+    let seconds = i64::try_from(lemonfiber_fixtures::ports::TODAY).unwrap_or_default();
+    lemonfiber_manifest::Date::from_unix_seconds(seconds).unwrap_or(lemonfiber_manifest::Date {
+        year: 1970,
+        month: 1,
+        day: 1,
+    })
+}
+
 /// A journal line for a setting written over nothing — a fresh file, so the prior value
 /// is absent.
 ///
