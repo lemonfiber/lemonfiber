@@ -80,7 +80,7 @@ pub fn outside(manifest: &Manifest, to: &str) -> bool {
 /// happen, which is a sentence they would weigh for nothing.
 fn paired(manifest: &Manifest, recipe: &Recipe, at: &str, found: &mut Vec<Violation>) {
     let had: BTreeSet<&str> = values(recipe).collect();
-    let holders = whither::holders(recipe);
+    let holders = whither::holders(manifest, recipe);
     for (number, pair) in recipe.pairs.iter().enumerate() {
         let here = format!("{at}.pair #{}", number + 1);
         worded(&pair.value, &format!("{here}.value"), found);
@@ -97,12 +97,14 @@ fn paired(manifest: &Manifest, recipe: &Recipe, at: &str, found: &mut Vec<Violat
         destination(&pair.to, &format!("{here}.to"), found);
         whither::reachable(manifest, &pair.to, &format!("{here}.to"), found);
         whither::returned(
+            recipe,
             &holders,
             &pair.value,
             &pair.to,
             &format!("{here}.to"),
             found,
         );
+        whither::freed(recipe, &holders, pair, &here, found);
     }
 }
 
@@ -169,8 +171,14 @@ fn flows(manifest: &Manifest, recipe: &Recipe, at: &str, found: &mut Vec<Violati
         bounds::guarded(step, &before, &here, found);
         bounds::retried(step, &before, &here, found);
         bounds::read(step, &here, found);
-        substituting(step, recipe, &before.values, &here, found);
-        whither::decided(&whither::holders(recipe), step, &here, found);
+        substituting(manifest, step, recipe, &before.values, &here, found);
+        whither::decided(
+            recipe,
+            &whither::holders(manifest, recipe),
+            step,
+            &here,
+            found,
+        );
 
         if !before.steps.insert(&step.id) {
             found.push(Violation {
@@ -299,8 +307,14 @@ fn looks_like_an_address(to: &str) -> bool {
                 .all(|part| !part.is_empty() && part.chars().all(|one| one.is_ascii_digit())))
 }
 
+/// Every value one call carries.
+fn carried(step: &Step) -> impl Iterator<Item = &str> {
+    placed(&step.call).into_iter().map(|(_, name)| name)
+}
+
 /// Every value this step carries, against what was captured and what was declared.
 fn substituting(
+    manifest: &Manifest,
     step: &Step,
     recipe: &Recipe,
     captured: &BTreeSet<&str>,
@@ -308,10 +322,10 @@ fn substituting(
     found: &mut Vec<Violation>,
 ) {
     written_out(step, at, found);
-    let holders = whither::holders(recipe);
+    let holders = whither::holders(manifest, recipe);
     for (where_it_is, name) in placed(&step.call) {
         let here = format!("{at}.call.{where_it_is}");
-        whither::returned(&holders, name, &step.call.to, &here, found);
+        whither::returned(recipe, &holders, name, &step.call.to, &here, found);
         if !captured.contains(name) {
             found.push(Violation {
                 location: format!("{at}.call.{where_it_is}"),
@@ -338,11 +352,6 @@ fn substituting(
             });
         }
     }
-}
-
-/// Every value one call carries.
-fn carried(step: &Step) -> impl Iterator<Item = &str> {
-    placed(&step.call).into_iter().map(|(_, name)| name)
 }
 
 /// Every value a step's guard or its retry's end decides on, with where it is read.

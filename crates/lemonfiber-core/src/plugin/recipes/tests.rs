@@ -153,6 +153,8 @@ fn every_pair_carries_its_origin_and_what_approving_it_is_written_as() {
             origin: "stack-service".to_owned(),
             to: "metadata.example.org".to_owned(),
             approval: Some("token@metadata.example.org".to_owned()),
+            release: None,
+            from: None,
         })
     );
 }

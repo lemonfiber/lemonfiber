@@ -512,10 +512,11 @@ to    = "komga"
 #[tokio::test]
 async fn a_value_traded_for_a_credential_is_withheld_from_anywhere_else() {
     let http = Fake::always(Answer::reply(200, r#"{"token":"t0k3n"}"#));
+    let token_only = TRADED.replace("X-Free = \"{{free}}\", ", "");
     let outcome = ran(
         &http,
         &Resolving::anywhere(),
-        TRADED,
+        &token_only,
         &[("key", "s3cret"), ("typed", "x")],
     )
     .await;
@@ -533,7 +534,7 @@ async fn a_value_traded_for_a_credential_is_withheld_from_anywhere_else() {
     assert!(
         why.contains("step carry was not sent")
             && why.contains("token to komga")
-            && why.contains("held to sonarr")
+            && why.contains("traded for the credential lemonfiber holds for sonarr")
             && !why.contains("t0k3n")
             && !why.contains("s3cret"),
         "{why}"
@@ -545,19 +546,32 @@ async fn a_value_traded_for_a_credential_is_withheld_from_anywhere_else() {
         .any(|step| step.step == "carry" && step.landed));
 }
 
-/// A capture from a call that carried nothing held goes wherever its pairs say.
+/// What a service answered a call carrying nothing held goes to another service only by
+/// a released pair this act approved, and the call carrying it is withheld until then.
 #[tokio::test]
-async fn a_value_traded_for_nothing_held_goes_where_its_pairs_say() {
+async fn an_answer_goes_elsewhere_only_by_an_approved_release() {
     let http = Fake::always(Answer::reply(200, r#"{"token":"t0k3n"}"#));
-    let free = TRADED.replace(", X-Token = \"{{token}}\"", "");
-    let outcome = ran(
+    let released = TRADED.replace(", X-Token = \"{{token}}\"", "").replace(
+        "value = \"free\"\nto    = \"komga\"\n",
+        "value = \"free\"\nto    = \"komga\"\nrelease = \"Komga shows what Sonarr files.\"\n",
+    );
+    let inputs = [("key", "s3cret"), ("typed", "x")];
+    let unapproved = ran(&http, &Resolving::anywhere(), &released, &inputs).await;
+    let why = unapproved.ran.why.unwrap_or_default();
+    assert!(
+        why.contains("step carry was not sent") && why.contains("free@komga was not approved"),
+        "{why}"
+    );
+    let http = Fake::always(Answer::reply(200, r#"{"token":"t0k3n"}"#));
+    let approved = ran_under(
         &http,
         &Resolving::anywhere(),
-        &free,
-        &[("key", "s3cret"), ("typed", "x")],
+        &released,
+        &inputs,
+        &["free@komga".to_owned()],
     )
     .await;
-    assert!(outcome.ran.held, "{:?}", outcome.ran);
+    assert!(approved.ran.held, "{:?}", approved.ran);
     assert_eq!(http.requests().len(), 4);
 }
 

@@ -45,8 +45,9 @@ call    = { method = "POST", to = "homepage", path = "/api/services", headers = 
 expect  = { status = 200 }
 
 [[recipe.pair]]
-value = "token"
-to    = "homepage"
+value   = "token"
+to      = "homepage"
+release = "The dashboard shows the library, so it signs in with Komga's session."
 "#;
 
 /// The installable manifest, with a recipe and its declarations on the end.

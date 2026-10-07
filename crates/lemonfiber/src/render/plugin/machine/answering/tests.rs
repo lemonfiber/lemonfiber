@@ -34,6 +34,8 @@ fn recipe() -> Recipe {
             origin: "komga".to_owned(),
             to: "metadata.example.org".to_owned(),
             approval: Some("token@metadata.example.org".to_owned()),
+            release: None,
+            from: None,
         }],
     }
 }

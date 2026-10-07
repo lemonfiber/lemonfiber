@@ -237,13 +237,13 @@ fn a_value_that_may_not_go_where_the_call_goes_withholds_the_call() {
             "radarr",
             Whither::Stack(7878),
             "/x?k={{key}}",
-            "key is held to sonarr",
+            "key is the credential lemonfiber holds for sonarr",
         ),
         (
             "plex.tv",
             Whither::Outside,
             "/x?k={{key}}",
-            "key is held to sonarr",
+            "key is the credential lemonfiber holds for sonarr",
         ),
         (
             "lidarr",
@@ -255,7 +255,7 @@ fn a_value_that_may_not_go_where_the_call_goes_withholds_the_call() {
             "radarr",
             Whither::Stack(7878),
             "/x?n={{code}}&k={{key}}",
-            "key is held to sonarr",
+            "key is the credential lemonfiber holds for sonarr",
         ),
     ] {
         let built = request(&call("GET", to, path), whither, &values, &bounds);

@@ -74,14 +74,26 @@ pub struct Pair {
     /// Where it may be carried, by the name the manifest gives it.
     pub to: String,
     /// What approving this pair is written as, on the command line and over the web,
-    /// where it carries the value to a host outside the stack. Absent where it reaches
-    /// a service in this stack, which takes nothing off the machine and asks for no
-    /// approval.
+    /// where it carries the value to a host outside the stack or carries a release.
+    /// Absent on any other pair to a service in this stack, which takes nothing off the
+    /// machine or away from the service it came from, and asks for no approval.
     // Described as a string that may be absent rather than as a nullable one: it is
     // left out, never sent as null. Not a doc comment, which schemars would publish.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(with = "String")]
     pub approval: Option<String>,
+    /// Why the value is carried away from the service it was read from, in the manifest's
+    /// own sentence, where the pair releases it. Absent on every other pair.
+    // Left out rather than sent as null, as `approval` is.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "String")]
+    pub release: Option<String>,
+    /// The service in this stack the released value was read from, where the pair
+    /// releases it. Absent on every other pair.
+    // Left out rather than sent as null, as `approval` is.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "String")]
+    pub from: Option<String>,
 }
 
 /// One recipe, as an operator agrees to what it does.
@@ -184,8 +196,15 @@ pub fn declared(manifest: &Manifest) -> Vec<Recipe> {
                         .map(|origin| origin.written().to_owned())
                         .unwrap_or_default(),
                     to: pair.to.clone(),
-                    approval: lemonfiber_plugin::outside(manifest, &pair.to)
-                        .then(|| approval(&pair.value, &pair.to)),
+                    approval: (pair.release.is_some()
+                        || lemonfiber_plugin::outside(manifest, &pair.to))
+                    .then(|| approval(&pair.value, &pair.to)),
+                    release: pair.release.clone(),
+                    from: pair
+                        .release
+                        .as_ref()
+                        .and_then(|_| read_from(recipe, &pair.value))
+                        .map(str::to_owned),
                 })
                 .collect(),
         })
@@ -208,6 +227,15 @@ fn origin_of(recipe: &lemonfiber_plugin::Recipe, value: &str) -> Option<lemonfib
                 .find(|capture| capture.name == value)
                 .map(|capture| capture.origin)
         })
+}
+
+/// The service whose answer a step of this recipe captures `value` from.
+fn read_from<'a>(recipe: &'a lemonfiber_plugin::Recipe, value: &str) -> Option<&'a str> {
+    recipe
+        .steps
+        .iter()
+        .find(|step| step.capture.iter().any(|capture| capture.name == value))
+        .map(|step| step.call.to.as_str())
 }
 
 /// The same recipes, with the adapter of every call to one of the stack's services.

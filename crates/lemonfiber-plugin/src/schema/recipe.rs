@@ -259,6 +259,13 @@ pub struct Pair {
     pub value: String,
     /// Where it may be carried.
     pub to: String,
+    /// Why a value captured from a service in this stack is carried to another
+    /// destination, in the one sentence the operator is shown when asked to approve it.
+    ///
+    /// A capture is held to the service that answered it, and this is the one thing that
+    /// lets it go elsewhere. Refused on a pair it frees nothing on.
+    #[serde(default)]
+    pub release: Option<String>,
 }
 
 #[cfg(test)]

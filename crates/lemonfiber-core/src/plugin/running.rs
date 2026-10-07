@@ -142,7 +142,12 @@ pub async fn run(
         };
         if made.ran.came == Came::Answered {
             answered.extend(made.ran.status.map(|status| (step.id.clone(), status)));
-            bounds.traded(&made.carried, made.captured.keys());
+            let by = running
+                .reaching
+                .ports
+                .contains_key(&step.call.to)
+                .then_some(step.call.to.as_str());
+            bounds.captured(&made.carried, by, made.captured.keys());
             values.extend(made.captured.clone());
             captured.extend(made.captured);
         } else {

@@ -2,16 +2,19 @@
 # status_check.py and the release gate.
 
 requirement = [
-  { id = "F8-R1", state = "partial", evidence = ["crates/lemonfiber-plugin/src/schema/recipe.rs"] },
+  { id = "F8-R1", state = "done", evidence = ["crates/lemonfiber-plugin/src/schema/recipe.rs", "crates/lemonfiber-core/src/plugin/running.rs", "crates/lemonfiber-core/src/plugin/running/tests.rs"] },
   { id = "F8-R2", state = "done", evidence = ["crates/lemonfiber-plugin/src/refusing/recipes.rs", "crates/lemonfiber-plugin/src/refusing/recipes/whither.rs", "crates/lemonfiber-plugin/src/refusing/recipes/bounds.rs", "crates/lemonfiber-api/src/contract/stability/declared.rs"] },
   { id = "F8-R3", state = "done", evidence = ["crates/lemonfiber-plugin/src/refusing/recipes.rs", "crates/lemonfiber-plugin/src/refusing/recipes/whither.rs", "crates/lemonfiber-plugin/src/refusing/recipes/bounds.rs", "crates/lemonfiber-api/src/contract/stability/declared.rs"] },
   { id = "F8-R4", state = "done", evidence = ["crates/lemonfiber-plugin/src/refusing/recipes.rs", "crates/lemonfiber-plugin/src/refusing/recipes/whither.rs", "crates/lemonfiber-plugin/src/refusing/recipes/bounds.rs", "crates/lemonfiber-api/src/contract/stability/declared.rs"] },
   { id = "F8-R5", state = "done", evidence = ["crates/lemonfiber-plugin/src/refusing/recipes.rs", "crates/lemonfiber-plugin/src/refusing/recipes/whither.rs", "crates/lemonfiber-plugin/src/refusing/recipes/bounds.rs", "crates/lemonfiber-api/src/contract/stability/declared.rs"] },
   { id = "F8-R6", state = "done", evidence = ["crates/lemonfiber-plugin/src/refusing/recipes.rs"] },
   { id = "F8-R8", state = "done", evidence = ["crates/lemonfiber-plugin/src/refusing/recipes.rs", "crates/lemonfiber-plugin/src/refusing/recipes/whither.rs", "crates/lemonfiber-plugin/src/refusing/recipes/bounds.rs", "crates/lemonfiber-api/src/contract/stability/declared.rs"] },
-  { id = "F8-R9", state = "partial", evidence = ["crates/lemonfiber-core/src/outward.rs", "crates/lemonfiber-core/src/outward/classes.rs", "crates/lemonfiber-core/src/app/plugins/reach.rs"] },
+  { id = "F8-R9", state = "done", evidence = ["crates/lemonfiber-core/src/outward.rs", "crates/lemonfiber-core/src/outward/classes.rs", "crates/lemonfiber-core/src/app/plugins/reach.rs", "crates/lemonfiber-core/src/plugin/running.rs"] },
   { id = "F8-R11", state = "done", evidence = ["crates/lemonfiber-plugin/src/schema.rs", "contract/adapters.json", "crates/lemonfiber-plugin/src/refusing/adapting.rs"] },
   { id = "F8-R12", state = "done", evidence = ["crates/lemonfiber-plugin/src/schema.rs", "contract/adapters.json", "crates/lemonfiber-plugin/src/refusing/adapting.rs"] },
   { id = "F8-R13", state = "done", evidence = ["crates/lemonfiber-plugin/src/schema.rs", "contract/adapters.json", "crates/lemonfiber-plugin/src/refusing/adapting.rs"] },
-  { id = "F8-R16", state = "done", evidence = ["crates/lemonfiber-plugin/src/refusing/recipes.rs", "crates/lemonfiber-plugin/src/refusing/recipes/whither.rs", "crates/lemonfiber-plugin/src/refusing/recipes/bounds.rs", "crates/lemonfiber-api/src/contract/stability/declared.rs"] },
+  { id = "F8-R14", state = "done", evidence = ["crates/lemonfiber-core/src/app/plugins/following.rs", "crates/lemonfiber-core/src/app/plugins/installing.rs", "crates/lemonfiber-core/src/app/plugins/updating.rs", "crates/lemonfiber-core/src/app/plugins/tests/following.rs"] },
+  { id = "F8-R16", state = "done", evidence = ["crates/lemonfiber-plugin/src/refusing/recipes/whither.rs", "crates/lemonfiber-plugin/src/refusing/recipes/whither/tests.rs::a_release_never_frees_what_a_credential_was_traded_for", "crates/lemonfiber-plugin/src/refusing/recipes/whither/tests.rs::what_a_credential_is_traded_for_goes_back_only_to_its_service"] },
+  { id = "F8-R17", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/running/bounding.rs", "crates/lemonfiber-core/src/plugin/running/bounding/tests.rs::an_answer_goes_elsewhere_only_by_an_approved_release", "crates/lemonfiber-core/src/plugin/running/bounding/tests.rs::no_approved_release_frees_what_a_credential_bought", "crates/lemonfiber-core/src/plugin/running/tests.rs::a_value_traded_for_a_credential_is_withheld_from_anywhere_else"] },
+  { id = "F8-R18", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/recipes.rs", "crates/lemonfiber/src/render/plugin/machine/answering.rs", "crates/lemonfiber-core/src/plugin/running/tests.rs::an_answer_goes_elsewhere_only_by_an_approved_release"] },
 ]

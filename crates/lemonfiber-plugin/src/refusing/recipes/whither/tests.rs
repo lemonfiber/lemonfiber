@@ -426,29 +426,113 @@ fn what_a_credential_is_traded_for_goes_back_only_to_its_service() {
     }
     assert!(
         !said.iter().any(|one| one.contains("carries free")),
-        "a capture from a call carrying nothing held is free to go where its pairs say: {said:?}"
+        "radarr's own answer goes back to radarr freely: {said:?}"
     );
 }
 
-/// Taken back to the service whose credential it is, what it was traded for is not
-/// refused, and a host outside is refused as another service is.
+/// A host outside is refused as another service is, and every capture is held: what a
+/// credential bought to the credential's service, and what a service answered to it.
 #[test]
-fn a_traded_value_may_go_back_to_its_service_and_nowhere_outside() {
+fn a_capture_goes_to_a_host_outside_no_more_than_to_another_service() {
+    let outside = refused(&trading("api.example.org"));
+    for (value, held) in [
+        ("token", "captured from a call that carried"),
+        ("session", "captured from a call that carried"),
+        ("free", "captured from the answer of radarr"),
+    ] {
+        assert!(
+            says(&outside, &["step carry", value, "api.example.org", held]),
+            "{value}: {outside:?}"
+        );
+    }
     assert!(!refused(&trading("sonarr"))
         .iter()
-        .any(|one| one.contains("traded for")),);
-    let outside = refused(&trading("api.example.org"));
+        .any(|one| one.contains("carries token") || one.contains("carries session")));
+}
+
+/// The trading recipe with each pair to `to` carrying a release.
+fn releasing(to: &str) -> String {
+    trading(to).replace(
+        &format!("to    = \"{to}\"\n"),
+        &format!("to    = \"{to}\"\nrelease = \"Komga files what Sonarr names.\"\n"),
+    )
+}
+
+/// A pair whose release says why carries a service's answer to another service, at the
+/// pair and at every call that substitutes it there.
+#[test]
+fn a_release_carries_an_answer_where_its_pair_says() {
+    let said = refused(&releasing("sonarr"));
+    assert!(
+        !said.iter().any(|one| one.contains("carries free")),
+        "{said:?}"
+    );
+}
+
+/// No release frees what a credential bought: it stays refused at every call and pair,
+/// and the release on it is refused as freeing nothing.
+#[test]
+fn a_release_never_frees_what_a_credential_was_traded_for() {
+    let said = refused(&releasing("radarr"));
     assert!(
         says(
-            &outside,
+            &said,
             &[
                 "step carry.call.path",
                 "token",
-                "api.example.org",
-                "traded for"
+                "captured from a call that carried"
             ]
-        ) && !outside.iter().any(|one| one.contains("carries free")),
-        "{outside:?}"
+        ),
+        "{said:?}"
+    );
+    assert!(
+        says(
+            &said,
+            &[
+                "pair #4.release",
+                "frees nothing",
+                "no release frees what a credential buys"
+            ]
+        ),
+        "{said:?}"
+    );
+}
+
+/// A release frees a service's answer carried away from it, and nothing else: never a
+/// credential, an operator's input, or an answer going home.
+#[test]
+fn a_release_that_frees_nothing_is_refused_naming_why() {
+    let home = refused(&releasing("sonarr"));
+    assert!(
+        says(
+            &home,
+            &[
+                "pair #1.release",
+                "frees nothing",
+                "credential lemonfiber holds for sonarr"
+            ]
+        ),
+        "{home:?}"
+    );
+    let away = refused(&releasing("radarr"));
+    for (place, frees) in [
+        ("pair #3.release", "operator's own"),
+        ("pair #6.release", "goes back to radarr"),
+    ] {
+        assert!(
+            says(&away, &[place, "frees nothing", frees]),
+            "{place}: {away:?}"
+        );
+    }
+}
+
+/// A release is a sentence, so one that says nothing is refused.
+#[test]
+fn a_release_that_says_nothing_is_refused() {
+    let said = refused(&releasing("radarr").replace("Komga files what Sonarr names.", " "));
+    assert!(
+        says(&said, &["pair #4.release", "says nothing"]),
+        "{said:?}"
     );
 }
 

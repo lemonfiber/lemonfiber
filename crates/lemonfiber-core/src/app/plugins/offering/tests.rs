@@ -111,6 +111,8 @@ fn an_approval_of_a_pair_inside_the_stack_is_refused_as_one_nothing_asks_for() {
         origin: "stack-service".to_owned(),
         to: to.to_owned(),
         approval: outside.then(|| crate::plugin::approval("token", to)),
+        release: None,
+        from: None,
     };
     let recipes = [crate::plugin::Recipe {
         id: "adopt".to_owned(),

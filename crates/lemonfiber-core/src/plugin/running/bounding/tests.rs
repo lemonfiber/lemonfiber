@@ -41,20 +41,21 @@ fn a_credential_is_held_to_its_service_over_its_pairs() {
     for (to, outside) in [("komga", false), ("metadata.example.org", true)] {
         assert!(bounds
             .withheld("key", "v", to, outside)
-            .is_some_and(|why| why.contains("key is held to sonarr")));
+            .is_some_and(|why| why.contains("key is the credential lemonfiber holds for sonarr")));
     }
 }
 
-/// Only a step whose call carried a value held to a service holds what it captured to
-/// that service; one carrying nothing held leaves its captures to their pairs.
+/// A step whose call carried a credential holds what it captured as the credential is;
+/// one to a host outside carrying nothing held leaves its captures to their pairs.
 #[test]
-fn a_capture_is_held_only_where_its_call_carried_something_held() {
+fn a_capture_is_traded_only_where_its_call_carried_a_credential() {
     let recipe = recipe();
     let approved = ["other@metadata.example.org".to_owned()];
     let mut bounds = Bounds::of(&recipe, &approved, &[]);
     let other = "other".to_owned();
-    bounds.traded(
+    bounds.captured(
         &BTreeMap::from([("nothing".to_owned(), "v".to_owned())]),
+        None,
         [&other].into_iter(),
     );
     assert_eq!(bounds.withheld("other", "v", "komga", false), None);
@@ -64,17 +65,74 @@ fn a_capture_is_held_only_where_its_call_carried_something_held() {
     );
 
     let token = "token".to_owned();
-    bounds.traded(
+    bounds.captured(
         &BTreeMap::from([
             ("other".to_owned(), "v".to_owned()),
             ("key".to_owned(), "v".to_owned()),
         ]),
+        Some("sonarr"),
         [&token].into_iter(),
     );
     assert_eq!(bounds.withheld("token", "v", "sonarr", false), None);
+    assert!(bounds.withheld("token", "v", "komga", false).is_some_and(
+        |why| why.contains("token was traded for the credential lemonfiber holds for sonarr")
+    ));
+}
+
+/// A recipe whose `lib` goes to sonarr by a released pair, and to radarr by a plain one.
+fn releasing() -> Recipe {
+    toml::from_str(
+        "id = \"r\"\ntitle = \"R\"\nwhy = \"Held\"\n[[input]]\nname = \"key\"\n\
+         origin = \"credential-store\"\nof = \"sonarr\"\n\
+         [[pair]]\nvalue = \"lib\"\nto = \"sonarr\"\nrelease = \"Sonarr files into it.\"\n\
+         [[pair]]\nvalue = \"lib\"\nto = \"radarr\"\n\
+         [[pair]]\nvalue = \"bought\"\nto = \"komga\"\nrelease = \"Why.\"\n",
+    )
+    .unwrap_or_else(|_| recipe())
+}
+
+/// What a service answered by a call carrying no credential goes back to it, and
+/// elsewhere only by a released pair this act approved.
+#[test]
+fn an_answer_goes_elsewhere_only_by_an_approved_release() {
+    let recipe = releasing();
+    let lib = "lib".to_owned();
+    let unapproved: [String; 0] = [];
+    let mut bounds = Bounds::of(&recipe, &unapproved, &[]);
+    bounds.captured(&BTreeMap::new(), Some("komga"), [&lib].into_iter());
     assert!(bounds
-        .withheld("token", "v", "komga", false)
-        .is_some_and(|why| why.contains("token is held to sonarr")));
+        .withheld("lib", "v", "radarr", false)
+        .is_some_and(|why| why
+            .contains("captured from the answer of komga, and no pair releases it to radarr")));
+    assert!(bounds
+        .withheld("lib", "v", "sonarr", false)
+        .is_some_and(|why| why.contains("releasing it as lib@sonarr was not approved")));
+    assert!(bounds
+        .decided("lib", "v", "sonarr")
+        .is_some_and(|why| why.starts_with("decides on lib for a call to sonarr")));
+
+    let approved = ["lib@sonarr".to_owned()];
+    let mut bounds = Bounds::of(&recipe, &approved, &[]);
+    bounds.captured(&BTreeMap::new(), Some("komga"), [&lib].into_iter());
+    assert_eq!(bounds.withheld("lib", "v", "sonarr", false), None);
+    assert_eq!(bounds.decided("lib", "v", "sonarr"), None);
+}
+
+/// No release and no approval frees what a credential bought.
+#[test]
+fn no_approved_release_frees_what_a_credential_bought() {
+    let recipe = releasing();
+    let approved = ["bought@komga".to_owned()];
+    let mut bounds = Bounds::of(&recipe, &approved, &[]);
+    let bought = "bought".to_owned();
+    bounds.captured(
+        &BTreeMap::from([("key".to_owned(), "v".to_owned())]),
+        Some("sonarr"),
+        [&bought].into_iter(),
+    );
+    assert!(bounds.withheld("bought", "v", "komga", false).is_some_and(
+        |why| why.contains("bought was traded for the credential lemonfiber holds for sonarr")
+    ));
 }
 
 /// A value outside the stack needs its pair and its approval both.
@@ -152,11 +210,12 @@ fn a_value_holding_a_credential_is_held_to_its_service_whatever_its_name() {
     assert_eq!(bounds.decided("other", "free", "komga"), None);
 
     let token = "token".to_owned();
-    bounds.traded(
+    bounds.captured(
         &BTreeMap::from([("other".to_owned(), "k3y-of-sonarr".to_owned())]),
+        None,
         [&token].into_iter(),
     );
-    assert!(bounds
-        .withheld("token", "v", "komga", false)
-        .is_some_and(|why| why.contains("token is held to sonarr")));
+    assert!(bounds.withheld("token", "v", "komga", false).is_some_and(
+        |why| why.contains("token was traded for the credential lemonfiber holds for sonarr")
+    ));
 }

@@ -13,6 +13,10 @@
 //! not a host outside. A plugin may present a credential lemonfiber holds; it may not
 //! take one somewhere.
 //!
+//! **What a service answers is held to that service.** A value captured from the answer
+//! of a service in this stack goes back to it freely, and anywhere else only by a pair
+//! whose `release` says why, which the operator approves as itself.
+//!
 //! **Four origins, written and held to.** A capture comes from whichever answered the
 //! call it reads, and an input from the credential store or the operator. The manifest
 //! writes which, so that what a rehearsal says about a value is what its author said,
@@ -150,22 +154,36 @@ pub(super) fn inputs(manifest: &Manifest, recipe: &Recipe, at: &str, found: &mut
     }
 }
 
-/// The service a value is held to, and whether it was traded for a credential rather
-/// than being one.
+/// How a value came to be held to one service, weakest first.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) enum Hold {
+    /// Captured from its answer by a call that carried no credential, which a pair
+    /// carrying a release may carry elsewhere.
+    Answered,
+    /// Captured from a call that carried a credential held to it: what a credential is
+    /// traded for is held as the credential is, and no release frees it.
+    Traded,
+    /// The credential lemonfiber holds for it, which goes back to it and nowhere else.
+    Credential,
+}
+
+/// The service a value is held to, and how it came to be.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct Held<'a> {
-    /// The service whose credential it is, or was traded for.
+    /// The service whose credential it is, or whose answer it was captured from.
     pub(super) owner: &'a str,
-    /// Whether a step captured it from a call that carried a credential.
-    pub(super) traded: bool,
+    /// How it came to be held there.
+    pub(super) hold: Hold,
 }
 
 /// Every value of this recipe held to one service: each input the credential store
-/// holds, and every value a step captures from a call carrying a value already held.
+/// holds, every value a step captures from a call carrying one, and every value a step
+/// captures from the answer of a service in this stack.
 ///
-/// Read through every step in order, guards or not: a step a guard usually skips still
-/// trades whatever it carries when it runs.
-pub(super) fn holders(recipe: &Recipe) -> BTreeMap<&str, Held<'_>> {
+/// A capture is held by its origin, whatever it holds, so a value is never laundered by
+/// trading it for another one. Read through every step in order, guards or not: a step a
+/// guard usually skips still trades whatever it carries when it runs.
+pub(super) fn holders<'a>(manifest: &Manifest, recipe: &'a Recipe) -> BTreeMap<&'a str, Held<'a>> {
     let mut held: BTreeMap<&str, Held<'_>> = recipe
         .inputs
         .iter()
@@ -176,72 +194,104 @@ pub(super) fn holders(recipe: &Recipe) -> BTreeMap<&str, Held<'_>> {
                     input.name.as_str(),
                     Held {
                         owner,
-                        traded: false,
+                        hold: Hold::Credential,
                     },
                 )
             })
         })
         .collect();
     for step in &recipe.steps {
-        let carried = super::carried(step)
+        let traded = super::carried(step)
             .chain(super::guarded(step).map(|(_, name)| name))
-            .find_map(|name| held.get(name).copied());
-        if let Some(Held { owner, .. }) = carried {
-            for capture in &step.capture {
-                held.insert(
-                    &capture.name,
-                    Held {
-                        owner,
-                        traded: true,
-                    },
-                );
+            .filter_map(|name| held.get(name).copied())
+            .find(|held| held.hold != Hold::Answered);
+        let holding = match traded {
+            Some(credential) => Held {
+                owner: credential.owner,
+                hold: Hold::Traded,
+            },
+            None if classified(manifest, &step.call.to) == Some(Whither::Stack) => Held {
+                owner: step.call.to.as_str(),
+                hold: Hold::Answered,
+            },
+            None => continue,
+        };
+        for capture in &step.capture {
+            // A value named twice is refused for it; a hold only grows stronger even then.
+            if held
+                .get(capture.name.as_str())
+                .is_none_or(|was| was.hold < holding.hold)
+            {
+                held.insert(&capture.name, holding);
             }
         }
     }
     held
 }
 
-/// Refuse carrying a value held to one service anywhere but back to it.
+/// Whether a pair of this recipe carrying `name` to `to` carries a release.
+fn released(recipe: &Recipe, name: &str, to: &str) -> bool {
+    recipe
+        .pairs
+        .iter()
+        .any(|pair| pair.value == name && pair.to == to && pair.release.is_some())
+}
+
+/// Why a value held to one service may not reach `to`, or nothing where it may: back to
+/// its own service, or a capture to where a pair releases it.
+fn kept(recipe: &Recipe, held: Held<'_>, name: &str, to: &str) -> Option<String> {
+    let owner = held.owner;
+    match held.hold {
+        _ if owner == to => None,
+        Hold::Answered if released(recipe, name, to) => None,
+        Hold::Credential => Some(format!(
+            "{name} is the credential lemonfiber holds for {owner}, and a credential goes back \
+             only to the service whose credential it is"
+        )),
+        Hold::Traded => Some(format!(
+            "{name} was captured from a call that carried the credential lemonfiber holds for \
+             {owner}, and what a credential is traded for goes back only to the service whose \
+             credential it is"
+        )),
+        Hold::Answered => Some(format!(
+            "{name} was captured from the answer of {owner}, and what a service answers goes \
+             back only to it, unless a pair carrying it to {to} says in `release` why"
+        )),
+    }
+}
+
+/// Refuse carrying a value held to one service anywhere it may not go.
 ///
 /// Asked wherever a value can leave: at every pair, and at every substitution into a
 /// call, so that neither a declaration nor a call can take one elsewhere.
 pub(super) fn returned(
+    recipe: &Recipe,
     holders: &BTreeMap<&str, Held<'_>>,
     name: &str,
     to: &str,
     at: &str,
     found: &mut Vec<Violation>,
 ) {
-    let Some(held) = holders.get(name).filter(|held| held.owner != to) else {
+    let Some(why) = holders
+        .get(name)
+        .and_then(|held| kept(recipe, *held, name, to))
+    else {
         return;
-    };
-    let owner = held.owner;
-    let message = if held.traded {
-        format!(
-            "carries {name} to {to}, and {name} was captured from a call that carried the \
-             credential lemonfiber holds for {owner}; what a credential is traded for goes \
-             back only to the service whose credential it is"
-        )
-    } else {
-        format!(
-            "carries {name}, the credential lemonfiber holds for {owner}, to {to}; a \
-             credential goes back only to the service whose credential it is"
-        )
     };
     found.push(Violation {
         location: at.to_owned(),
-        message,
+        message: format!("carries {name} to {to}; {why}"),
     });
 }
 
 /// Refuse a guard, or a retry's end, deciding on a value held to one service on a step
-/// that calls another.
+/// whose call that value may not reach.
 ///
 /// Deciding on a value is reading it, and what a step does after reading it tells the
 /// service it calls something about it, as carrying it would. So a guard is held where a
-/// call carrying the same value is: back to the service whose credential it is, and
-/// nowhere else.
+/// call carrying the same value is.
 pub(super) fn decided(
+    recipe: &Recipe,
     holders: &BTreeMap<&str, Held<'_>>,
     step: &Step,
     at: &str,
@@ -249,18 +299,69 @@ pub(super) fn decided(
 ) {
     let to = step.call.to.as_str();
     for (place, name) in super::guarded(step) {
-        let Some(held) = holders.get(name).filter(|held| held.owner != to) else {
+        let Some(why) = holders
+            .get(name)
+            .and_then(|held| kept(recipe, *held, name, to))
+        else {
             continue;
         };
         found.push(Violation {
             location: format!("{at}.{place}"),
-            message: format!(
-                "decides on {name}, held to {owner}, on a step that calls {to}; a value held \
-                 to a service is read only on a call back to {owner}",
-                owner = held.owner
-            ),
+            message: format!("decides on {name} on a step that calls {to}; {why}"),
         });
     }
+}
+
+/// Refuse a `release` that says nothing, or that frees nothing: on a credential, on an
+/// operator's input, on an outside host's answer, or on a capture going back to its own
+/// service.
+///
+/// A release the operator weighs for nothing teaches them to stop weighing releases.
+pub(super) fn freed(
+    recipe: &Recipe,
+    holders: &BTreeMap<&str, Held<'_>>,
+    pair: &crate::schema::Pair,
+    at: &str,
+    found: &mut Vec<Violation>,
+) {
+    let Some(release) = &pair.release else {
+        return;
+    };
+    let here = format!("{at}.release");
+    if release.trim().is_empty() {
+        found.push(Violation {
+            location: here.clone(),
+            message: "says nothing, and the operator approves a release by the sentence it gives"
+                .to_owned(),
+        });
+    }
+    let value = pair.value.as_str();
+    let frees = match holders.get(value) {
+        Some(held) if held.hold == Hold::Answered && held.owner != pair.to => return,
+        Some(held) if held.hold == Hold::Answered => {
+            format!(
+                "{value} goes back to {}, where it came from, freely",
+                held.owner
+            )
+        }
+        Some(held) if held.hold == Hold::Traded => format!(
+            "{value} was traded for the credential lemonfiber holds for {}, and no release frees \
+             what a credential buys",
+            held.owner
+        ),
+        Some(held) => format!(
+            "{value} is the credential lemonfiber holds for {}, which no release frees",
+            held.owner
+        ),
+        None if recipe.inputs.iter().any(|input| input.name == value) => {
+            format!("{value} is the operator's own, which no service holds")
+        }
+        None => format!("{value} is an outside host's answer, which no service holds"),
+    };
+    found.push(Violation {
+        location: here,
+        message: format!("frees nothing: {frees}"),
+    });
 }
 
 /// An input the credential store holds names a service of the stack's whose credential
