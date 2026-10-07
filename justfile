@@ -198,15 +198,17 @@ codes:
 #
 # `git-cliff` parses the history and the script turns that into releases, entries
 # and the requirements each served — the same two readings, in the same order, the
-# release pipeline makes, so the file this writes is the one a release page is
-# rendered from and the one the binary carries.
+# release pipeline makes, so what this writes is what a release page is rendered
+# from and what the binary carries.
 #
 # The spec has to be a checkout beside this one, because an identifier says nothing
 # about which page defines it and this repository does not vendor the spec — the
 # same `--spec` convention the contract check uses.
 #
-# It changes only when a release is tagged. A pull request that adds commits to the
-# trunk does not move it, which is why it can be a committed artefact at all.
+# It writes a file per release into `reference/changelog/`, only for releases that
+# have none, and never rewrites one. A pull request that adds commits to the trunk
+# adds nothing; the next tag adds a file, which is why it can be a committed
+# artefact at all.
 changelog SPEC='../spec':
     #!/usr/bin/env bash
     set -euo pipefail
@@ -215,8 +217,7 @@ changelog SPEC='../spec':
         exit 1
     fi
     git-cliff --config cliff.toml --context \
-        | python3 scripts/the_record_a_release_leaves.py --spec {{SPEC}} > reference/changelog.json.next
-    mv reference/changelog.json.next reference/changelog.json
+        | python3 scripts/the_record_a_release_leaves.py --spec {{SPEC}} --write reference/changelog
 
 # Read the committed record the way the release page and the binary read it.
 #
@@ -226,11 +227,11 @@ record VERSION='' REQUIREMENT='':
     #!/usr/bin/env bash
     set -euo pipefail
     if [ -n "{{VERSION}}" ]; then
-        python3 scripts/the_record_a_release_leaves.py --markdown {{VERSION}} < reference/changelog.json
+        python3 scripts/the_record_a_release_leaves.py --kept reference/changelog --markdown {{VERSION}}
     elif [ -n "{{REQUIREMENT}}" ]; then
-        python3 scripts/the_record_a_release_leaves.py --requirement {{REQUIREMENT}} < reference/changelog.json
+        python3 scripts/the_record_a_release_leaves.py --kept reference/changelog --requirement {{REQUIREMENT}}
     else
-        cat reference/changelog.json
+        ls reference/changelog
     fi
 
 fmt-check:

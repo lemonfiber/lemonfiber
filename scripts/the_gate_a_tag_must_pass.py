@@ -21,7 +21,7 @@ reimplementing them. Two scripts decide, both the spec's:
   * the no-stub gate — no requirement the version locks is unbuilt.
 
 Before either, the release record: the binary this tag builds carries
-`reference/changelog.json`, and a record without the release before this one
+`reference/changelog/`, and a record without the release before this one
 cannot name what is running. 0.15.0 and 0.16.0 both went out that way.
 
 **The spec is read at `main`, deliberately unpinned.** A pinned copy would be a
@@ -45,7 +45,6 @@ or the question could not be answered.
 from __future__ import annotations
 
 import argparse
-import json
 import re
 import shutil
 import subprocess
@@ -54,6 +53,8 @@ import tempfile
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
+
+from a_release_written_once import kept, releases_of
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
@@ -76,11 +77,11 @@ SELF = "lemonfiber"
 #: spec checkout, and it refuses a path outside it.
 TRACKER = "IMPLEMENTATION-STATUS.md"
 
-#: The release record the binary carries, which `just changelog` writes after a
-#: tag. It may lack the release being tagged, whose notes follow the tag, and no
-#: other: a binary built from a tree whose record stops short of the release before
-#: it cannot name the release it is.
-RECORD = "reference/changelog.json"
+#: The release record the binary carries, a file per release that `just changelog`
+#: writes after a tag. It may lack the release being tagged, whose notes follow the
+#: tag, and no other: a binary built from a tree whose record stops short of the
+#: release before it cannot name the release it is.
+RECORD = "reference/changelog"
 
 #: What judges every claim the embedded stack makes against the recordings it
 #: carries, from the tree being tagged.
@@ -272,8 +273,7 @@ def written(version: str) -> Step:
     if not ok:
         return Step(name, False, tags)
     try:
-        record = json.loads((ROOT / RECORD).read_text(encoding="utf-8"))
-        recorded = {release["version"] for release in record["releases"]}
+        recorded = {release["version"] for release in releases_of(kept(ROOT / RECORD))}
     except (OSError, ValueError, KeyError, TypeError) as unreadable:
         return Step(name, False, f"{RECORD} could not be read: {unreadable}")
     missing = unrecorded(version, tags.split(), recorded)

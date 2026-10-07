@@ -8,16 +8,21 @@ which release was taken back and why. Those are the questions an operator asks
 *before* deciding, and a reader who has to open twelve release pages to answer one
 of them has been handed a pile of pages rather than a record.
 
-So the whole history is read at once, and the answers are put in a file:
+So the whole history is read at once, and the answers are kept in
+`reference/changelog/`, a file per release written once at its tag
+(`a_release_written_once.py` says how):
 
-    git cliff --context | python3 scripts/the_record_a_release_leaves.py --spec ../spec
+    git cliff --context | python3 scripts/the_record_a_release_leaves.py --spec ../spec --write reference/changelog
+
+Without `--write` the whole record is printed instead.
 
 `git cliff` stays the thing that reads git — `--context` is its own parse of the
 history, tag by tag, with the conventional type and the trailers already taken
 apart — and this turns that into the record. One reader of git, one record, and
-the release page rendered from the same file rather than from a second opinion:
+the release page rendered from the same record rather than from a second opinion:
 
-    python3 scripts/the_record_a_release_leaves.py --markdown 0.13.0 < reference/changelog.json
+    git cliff --context | python3 scripts/the_record_a_release_leaves.py --spec ../spec > record.json
+    python3 scripts/the_record_a_release_leaves.py --markdown 0.13.0 < record.json
 
 **What decides where an entry goes is whether it cites anything.** A commit with
 a `Spec:` trailer changed something somebody asked for; one without is
@@ -58,6 +63,7 @@ import tomllib
 # this requirement defined" is how the release page and the record come to
 # disagree about the same tag. CPython puts a script's own directory on sys.path,
 # so this resolves under the invocation CI uses from any working directory.
+from a_release_written_once import assembled, kept, releases_of, write
 from the_requirements_an_entry_names import IDENTIFIER, Page, pages, runs
 
 # Where a release of this project is published, so an entry can link the version
@@ -715,7 +721,9 @@ def main() -> int:
     parser.add_argument("--spec", type=pathlib.Path, help="a checkout of the lemonfiber spec")
     parser.add_argument("--markdown", metavar="VERSION", help="render one release from a record")
     parser.add_argument("--requirement", metavar="ID", help="render one requirement's history")
-    parser.add_argument("--check", type=pathlib.Path, metavar="RECORD", help="a kept record, against the tags")
+    parser.add_argument("--check", type=pathlib.Path, metavar="DIRECTORY", help="the kept releases, against the tags")
+    parser.add_argument("--write", type=pathlib.Path, metavar="DIRECTORY", help="write each release the directory lacks")
+    parser.add_argument("--kept", type=pathlib.Path, metavar="DIRECTORY", help="render from the kept releases rather than stdin")
     parser.add_argument("--self-test", action="store_true")
     arguments = parser.parse_args()
     if arguments.self_test:
@@ -727,7 +735,8 @@ def main() -> int:
         if not asked:
             continue
         try:
-            sys.stdout.write(render(json.loads(sys.stdin.read()), asked))
+            given = assembled(kept(arguments.kept)) if arguments.kept else json.loads(sys.stdin.read())
+            sys.stdout.write(render(given, asked))
         except KeyError:
             print(f"::error::the record holds no {missing} {asked}", file=sys.stderr)
             return 1
@@ -746,10 +755,18 @@ def main() -> int:
     if not record["releases"]:
         print("::error::the history holds no release tag, so there is no record to write", file=sys.stderr)
         return 1
+    if arguments.write:
+        for version in write(record, arguments.write):
+            print(f"wrote {arguments.write / (version + '.json')}")
+        return 0
     if arguments.check:
-        kept = json.loads(arguments.check.read_text(encoding="utf-8"))
-        where, why = standing(kept, record)
-        late = overdue(kept, record)
+        try:
+            stored = {"releases": releases_of(kept(arguments.check))}
+        except ValueError as stray:
+            print(f"::error::{stray}", file=sys.stderr)
+            return 1
+        where, why = standing(stored, record)
+        late = overdue(stored, record)
         for line in why:
             print(f"::{'error' if where == 'stale' else 'notice'}::{line}")
         for line in late:

@@ -1,0 +1,158 @@
+{
+  "version": "0.3.0",
+  "tag": "v0.3.0",
+  "released_on": "2026-07-31",
+  "delivers": "Backup & restore",
+  "patches": null,
+  "carried": null,
+  "withdrawn": null,
+  "user_facing": true,
+  "groups": [
+    {
+      "title": "New",
+      "entries": [
+        {
+          "summary": "Decide what an archive holds and whether it restores",
+          "requirements": ["E3-R2"],
+          "reference": "#115"
+        },
+        {
+          "summary": "Capture a configuration to an archive, pruning older ones",
+          "requirements": ["E3-R2"],
+          "reference": "#116"
+        },
+        {
+          "summary": "Verify a backup and unpack it back over the layout",
+          "requirements": ["E3-R7"],
+          "reference": "#117"
+        },
+        {
+          "summary": "Run backup and restore over a real tar archive",
+          "requirements": ["E3-R7"],
+          "reference": "#118"
+        },
+        {
+          "summary": "Re-point the restored data root, and name the reconcile",
+          "requirements": ["E3-R10"],
+          "reference": "#119"
+        },
+        {
+          "summary": "The read-only screen's shape, kept honest by its types",
+          "requirements": ["B3-R5"],
+          "reference": "#120"
+        },
+        {
+          "summary": "Assemble a snapshot from the live stack, degrading not failing",
+          "requirements": ["B3-R7"],
+          "reference": "#121"
+        },
+        {
+          "summary": "Fill the storage panel with live free space",
+          "requirements": ["B3-R8"],
+          "reference": "#122"
+        },
+        {
+          "summary": "Read a service's queue depth and stuck count",
+          "requirements": ["B3-R2"],
+          "reference": "#123"
+        },
+        {
+          "summary": "Fill the queue panel from each arr",
+          "requirements": ["B3-R2"],
+          "reference": "#124"
+        },
+        {
+          "summary": "The transfers panel — port, adapters, gather driver + dedup sweep",
+          "requirements": ["B3-R2"],
+          "reference": "#126"
+        },
+        {
+          "summary": "Fill the VPN panel from the tunnel it shares with the leak check",
+          "requirements": ["B3-R3"],
+          "reference": "#127"
+        },
+        {
+          "summary": "Fill the storage panel's hardlink status and exhaustion",
+          "requirements": ["B3-R8"],
+          "reference": "#128"
+        },
+        {
+          "summary": "Project free-space exhaustion from the download queue",
+          "requirements": ["C5-R6"],
+          "reference": "#129"
+        }
+      ]
+    },
+    {
+      "title": "Fixed",
+      "entries": [
+        {
+          "summary": "Upgrade cargo-dist to 0.32 and lint the release pipeline",
+          "requirements": ["L1-R1"],
+          "reference": "#133"
+        },
+        {
+          "summary": "Resolve the LICENSE asset and defer the Windows target",
+          "requirements": ["L1-R1"],
+          "reference": "#136"
+        },
+        {
+          "summary": "Create the draft directly (create-release=true + --draft)",
+          "requirements": ["L1-R1"],
+          "reference": "#138"
+        }
+      ]
+    },
+    {
+      "title": "Maintenance",
+      "entries": [
+        {
+          "summary": "Give M5 and M6 their real deliverable rows",
+          "requirements": ["GOV-R12"],
+          "reference": "#125"
+        },
+        {
+          "summary": "Renumber the tracker to the new milestone scheme",
+          "requirements": ["GOV-R12"],
+          "reference": "#130"
+        },
+        {
+          "summary": "Set the workspace version to 0.3.0",
+          "requirements": ["OPS-R1"],
+          "reference": "#131"
+        },
+        {
+          "summary": "Generate the real cargo-dist release pipeline",
+          "requirements": ["L1-R1"],
+          "reference": "#132"
+        },
+        {
+          "summary": "Make the pipeline leave a draft, not auto-publish",
+          "requirements": ["L1-R1"],
+          "reference": "#134"
+        },
+        {
+          "summary": "Defer Homebrew + PowerShell to 1.0.0",
+          "requirements": ["L1-R1"],
+          "reference": "#137"
+        }
+      ]
+    }
+  ],
+  "requirements": {
+    "E3-R2": {"feature": "Backup & restore", "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e3-backup-restore/#acceptance-criteria"},
+    "E3-R7": {"feature": "Backup & restore", "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e3-backup-restore/#acceptance-criteria"},
+    "E3-R10": {"feature": "Backup & restore", "url": "https://docs.lemonfiber.app/spec/10-functional/features/e-maintenance/e3-backup-restore/#acceptance-criteria"},
+    "B3-R5": {"feature": "Live dashboard", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b3-dashboard/#acceptance-criteria"},
+    "B3-R7": {"feature": "Live dashboard", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b3-dashboard/#acceptance-criteria"},
+    "B3-R8": {"feature": "Live dashboard", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b3-dashboard/#acceptance-criteria"},
+    "B3-R2": {"feature": "Live dashboard", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b3-dashboard/#acceptance-criteria"},
+    "B3-R3": {"feature": "Live dashboard", "url": "https://docs.lemonfiber.app/spec/10-functional/features/b-running/b3-dashboard/#acceptance-criteria"},
+    "C5-R6": {"feature": "Storage & hardlink management", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c5-storage/#acceptance-criteria"},
+    "L1-R1": {"feature": "v1 release engineering", "url": "https://docs.lemonfiber.app/spec/10-functional/features/l-release/l1-release-engineering/#acceptance-criteria"},
+    "GOV-R12": {"feature": "Canonical spec", "url": "https://docs.lemonfiber.app/spec/50-governance/canonical-spec/"},
+    "OPS-R1": {"feature": "Releasing", "url": "https://docs.lemonfiber.app/spec/70-operations/releasing/#requirements"}
+  },
+  "withdraws": {},
+  "withdrawn_requirements": []
+}

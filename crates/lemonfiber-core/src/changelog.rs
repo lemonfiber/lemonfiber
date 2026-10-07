@@ -6,9 +6,11 @@
 //! the record travels with the binary: it is generated from the commits that made
 //! each release, committed as an artefact, and compiled in.
 //!
-//! **It changes only when a release is tagged**, which is what makes a generated
-//! file safe to commit. A pull request adds commits to the trunk and moves nothing
-//! here; the next tag does.
+//! **It is a file per release, written once at the release's tag**, which is what
+//! makes a generated artefact safe to commit. A pull request adds commits to the
+//! trunk and moves nothing here; the next tag adds a file. A release taken back or a
+//! requirement withdrawn after its file was written is said by the next release's
+//! file, and reading the directory folds it back over what it names.
 //!
 //! That also creates the one thing this has to be careful about. A kept file can
 //! stop describing what shipped, in two directions. Between a tag and the refresh
@@ -29,11 +31,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::migration::version::{among_versions, Standing};
 
-/// Where the generated record is kept, relative to the workspace root.
-pub const RECORD_PATH: &str = "reference/changelog.json";
+/// Where the generated record is kept, relative to the workspace root: a directory
+/// holding a file per release, named for its version.
+pub const RECORD_DIR: &str = "reference/changelog";
 
-/// The record this build carries.
-const CARRIED: &str = include_str!("../../../reference/changelog.json");
+/// The record this build carries: every file in that directory, by name, as the
+/// build script found them.
+const CARRIED: &[(&str, &str)] = include!(concat!(env!("OUT_DIR"), "/carried.rs"));
 
 /// Whether the record describes what this build could have shipped.
 ///
@@ -153,7 +157,7 @@ impl From<&Release> for Summary {
 }
 
 /// Every release, and every requirement any of them shipped something for.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Record {
     /// The releases, newest first.
     pub releases: Vec<Release>,
@@ -161,10 +165,40 @@ pub struct Record {
     pub requirements: BTreeMap<String, Requirement>,
 }
 
+/// One release's file, as it was written at the release's tag.
+#[derive(Debug, Deserialize)]
+struct Kept {
+    /// The release itself.
+    #[serde(flatten)]
+    release: Release,
+    /// What each requirement the release cites was when the file was written.
+    #[serde(default)]
+    requirements: BTreeMap<String, Cited>,
+    /// Earlier releases taken back since their own files were written, with why.
+    #[serde(default)]
+    withdraws: BTreeMap<String, String>,
+    /// Requirements withdrawn since the files citing them were written.
+    #[serde(default)]
+    withdrawn_requirements: Vec<String>,
+}
+
+/// A requirement as the release citing it recorded it.
+#[derive(Debug, Deserialize)]
+struct Cited {
+    /// The feature it belongs to, in words.
+    feature: String,
+    /// Where it is defined, unless it was withdrawn.
+    #[serde(default)]
+    url: Option<String>,
+    /// Whether it was withdrawn when the file was written.
+    #[serde(default)]
+    withdrawn: bool,
+}
+
 impl Record {
     /// The record this build carries, or nothing where it cannot be read.
     ///
-    /// Nothing rather than a typed failure, and deliberately: the file is generated
+    /// Nothing rather than a typed failure, and deliberately: the files are generated
     /// and compiled in, so an unreadable one is a defect in this build rather than
     /// something an operator did or can act on. What the surfaces do with it is say
     /// so — the state below becomes [`State::Stale`], which is the one answer that
@@ -174,16 +208,101 @@ impl Record {
         Self::read(CARRIED)
     }
 
-    /// The record a document describes, or nothing where it describes none.
+    /// The record a directory's files describe, given as each file's name and text,
+    /// or nothing where they describe none.
+    ///
+    /// Nothing where there is no file, where one is not a release, and where one is
+    /// named for a version other than the release it holds: each is a directory that
+    /// cannot say what shipped.
     #[must_use]
-    pub fn read(text: &str) -> Option<Self> {
-        serde_json::from_str(text).ok()
+    pub fn read(files: &[(&str, &str)]) -> Option<Self> {
+        let mut kept = Vec::with_capacity(files.len());
+        for (name, text) in files {
+            let one: Kept = serde_json::from_str(text).ok()?;
+            if name.strip_suffix(".json") != Some(one.release.version.as_str()) {
+                return None;
+            }
+            kept.push((numbered(&one.release.version)?, one));
+        }
+        if kept.is_empty() {
+            return None;
+        }
+        kept.sort_by(|(older, _), (newer, _)| newer.cmp(older));
+        Some(folded(kept.into_iter().map(|(_, one)| one).collect()))
     }
 
     /// The release of one version, where the record holds it.
     #[must_use]
     pub fn release(&self, version: &str) -> Option<&Release> {
         self.releases.iter().find(|one| one.version == version)
+    }
+}
+
+/// A release's version as the numbers it is, so 0.10.0 sorts after 0.2.0.
+fn numbered(version: &str) -> Option<Vec<u64>> {
+    version.split('.').map(|part| part.parse().ok()).collect()
+}
+
+/// The releases, newest first, with what later files said folded back over them,
+/// and every requirement they cite.
+///
+/// A requirement takes its feature and page from the newest release citing it, and
+/// its releases from the entries that cite it, so neither is stored to disagree.
+fn folded(kept: Vec<Kept>) -> Record {
+    let mut withdraws: BTreeMap<String, String> = BTreeMap::new();
+    let mut gone: Vec<String> = Vec::new();
+    let mut requirements: BTreeMap<String, Requirement> = BTreeMap::new();
+    for one in &kept {
+        for (version, why) in &one.withdraws {
+            withdraws
+                .entry(version.clone())
+                .or_insert_with(|| why.clone());
+        }
+        gone.extend(one.withdrawn_requirements.iter().cloned());
+        for (identifier, cited) in &one.requirements {
+            requirements
+                .entry(identifier.clone())
+                .or_insert_with(|| Requirement {
+                    feature: cited.feature.clone(),
+                    url: cited.url.clone(),
+                    withdrawn: cited.withdrawn,
+                    shipped_in: Vec::new(),
+                });
+        }
+    }
+    let releases: Vec<Release> = kept
+        .into_iter()
+        .map(|one| {
+            let mut release = one.release;
+            if release.withdrawn.is_none() {
+                release.withdrawn = withdraws.get(&release.version).cloned();
+            }
+            release
+        })
+        .collect();
+    for release in &releases {
+        for identifier in release
+            .groups
+            .iter()
+            .flat_map(|group| &group.entries)
+            .flat_map(|entry| &entry.requirements)
+        {
+            if let Some(requirement) = requirements.get_mut(identifier) {
+                if requirement.shipped_in.last() != Some(&release.version) {
+                    requirement.shipped_in.push(release.version.clone());
+                }
+            }
+        }
+    }
+    for identifier in &gone {
+        if let Some(requirement) = requirements.get_mut(identifier) {
+            requirement.withdrawn = true;
+            requirement.url = None;
+        }
+    }
+    Record {
+        releases,
+        requirements,
     }
 }
 

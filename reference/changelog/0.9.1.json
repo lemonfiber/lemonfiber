@@ -1,0 +1,69 @@
+{
+  "version": "0.9.1",
+  "tag": "v0.9.1",
+  "released_on": "2026-08-26",
+  "delivers": "Speaking plainly — interface tiers and the plain-language layer",
+  "patches": "0.9.0",
+  "carried": "0.9.0",
+  "withdrawn": null,
+  "user_facing": true,
+  "groups": [
+    {
+      "title": "Fixed",
+      "entries": [
+        {
+          "summary": "Mint a token that may create a release",
+          "requirements": ["OPS-R34"],
+          "reference": "#432"
+        },
+        {
+          "summary": "The guard is about branches, and lets a tag through",
+          "requirements": ["Q-R28"],
+          "reference": "#431"
+        }
+      ]
+    },
+    {
+      "title": "Maintenance",
+      "entries": [
+        {
+          "summary": "Bump etcetera from 0.10.0 to 0.11.0",
+          "requirements": [],
+          "reference": "#385"
+        },
+        {
+          "summary": "Bump toml from 0.9.12+spec-1.1.0 to 1.1.4+spec-1.1.0",
+          "requirements": [],
+          "reference": "#384"
+        },
+        {
+          "summary": "Bump the cargo group across 1 directory with 6 updates",
+          "requirements": [],
+          "reference": "#402"
+        },
+        {
+          "summary": "Bump actions/cache/restore from 4.3.0 to 6.1.0",
+          "requirements": [],
+          "reference": "#388"
+        },
+        {
+          "summary": "Bump Swatinem/rust-cache",
+          "requirements": [],
+          "reference": "#387"
+        },
+        {
+          "summary": "Bump the workspace to 0.9.1",
+          "requirements": ["GOV-R12"],
+          "reference": "#434"
+        }
+      ]
+    }
+  ],
+  "requirements": {
+    "OPS-R34": {"feature": "Release staging — the version train", "url": "https://docs.lemonfiber.app/spec/70-operations/staging/#requirements"},
+    "Q-R28": {"feature": "Testing strategy", "url": "https://docs.lemonfiber.app/spec/40-quality/testing-strategy/#requirements"},
+    "GOV-R12": {"feature": "Canonical spec", "url": "https://docs.lemonfiber.app/spec/50-governance/canonical-spec/"}
+  },
+  "withdraws": {},
+  "withdrawn_requirements": []
+}

@@ -1,0 +1,165 @@
+{
+  "version": "0.7.0",
+  "tag": "v0.7.0",
+  "released_on": "2026-08-21",
+  "delivers": "Trust checks: providers, support bundle, auto-remediation",
+  "patches": null,
+  "carried": null,
+  "withdrawn": null,
+  "user_facing": true,
+  "groups": [
+    {
+      "title": "New",
+      "entries": [
+        {
+          "summary": "Track what the accounts have left, not only that they work",
+          "requirements": ["C8-R1", "C8-R3", "C8-R4", "C8-R6", "C8-R7", "C8-R10", "C8-R11", "C8-R13", "C8-R14"],
+          "reference": "#232"
+        },
+        {
+          "summary": "Tell an account that refused from one that never answered",
+          "requirements": ["C8-R2", "C8-R9", "C8-R11", "C8-R12"],
+          "reference": "#233"
+        },
+        {
+          "summary": "Say when an indexer's allowance comes back",
+          "requirements": ["C8-R5"],
+          "reference": "#234"
+        },
+        {
+          "summary": "Let the accounts answer when nothing was found or taken",
+          "requirements": ["C8-R8"],
+          "reference": "#235"
+        },
+        {
+          "summary": "Let a few things through rather than take the secrets out",
+          "requirements": ["C4-R2", "C4-R3", "C4-R4", "C4-R5"],
+          "reference": "#236"
+        },
+        {
+          "summary": "Gather what can be read and name what cannot",
+          "requirements": ["C4-R11", "C4-R12"],
+          "reference": "#237"
+        },
+        {
+          "summary": "Read it back before writing it, and refuse rather than write",
+          "requirements": ["C4-R4", "C4-R5", "C4-R7", "C4-R10", "C4-R14", "C4-R1", "GOV-R12", "Q-R61"],
+          "reference": "#238"
+        },
+        {
+          "summary": "One command, and it describes before it writes",
+          "requirements": ["C4-R1", "C4-R6", "C4-R8", "C4-R9", "C4-R13", "GOV-R12", "C4-R2", "C4-R5", "C4-R11"],
+          "reference": "#239"
+        },
+        {
+          "summary": "What a repair is, and when one is worth offering",
+          "requirements": ["C3-R1", "C3-R4", "C3-R5", "C3-R9", "C3-R10", "C3-R11", "C3-R13", "C3-R14"],
+          "reference": "#240"
+        },
+        {
+          "summary": "Offer what can be put right, and prove it afterwards",
+          "requirements": ["C3-R1", "C3-R2", "C3-R3", "C3-R4", "C3-R5", "C3-R8", "C3-R9", "C3-R10", "C3-R11", "C3-R12", "C3-R13", "C3-R14", "GOV-R12", "Q-R61"],
+          "reference": "#242"
+        },
+        {
+          "summary": "Refuse to write over what the operator set",
+          "requirements": ["C3-R7"],
+          "reference": "#244"
+        },
+        {
+          "summary": "Put back the repair you just watched",
+          "requirements": ["C3-R15"],
+          "reference": "#245"
+        },
+        {
+          "summary": "Put right what the operator did not change",
+          "requirements": ["C3-R6", "C3-R7", "C9-R15"],
+          "reference": "#246"
+        }
+      ]
+    },
+    {
+      "title": "Fixed",
+      "entries": [
+        {
+          "summary": "Stop naming commands that do not exist, and add the one that should",
+          "requirements": ["GOV-R12"],
+          "reference": "#241"
+        }
+      ]
+    },
+    {
+      "title": "Maintenance",
+      "entries": [
+        {
+          "summary": "Say what auto-remediation does now, and what it does not",
+          "requirements": ["GOV-R12"],
+          "reference": "#243"
+        },
+        {
+          "summary": "The boundary becomes a crate",
+          "requirements": ["GOV-R12", "ARCH-R44", "ARCH-R45", "A1-R9"],
+          "reference": "#247"
+        },
+        {
+          "summary": "Bump the workspace to 0.7.0",
+          "requirements": ["GOV-R12"],
+          "reference": "#248"
+        }
+      ]
+    }
+  ],
+  "requirements": {
+    "C8-R1": {"feature": "Provider health & quota tracking", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c8-provider-health/#acceptance-criteria"},
+    "C8-R3": {"feature": "Provider health & quota tracking", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c8-provider-health/#acceptance-criteria"},
+    "C8-R4": {"feature": "Provider health & quota tracking", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c8-provider-health/#acceptance-criteria"},
+    "C8-R6": {"feature": "Provider health & quota tracking", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c8-provider-health/#acceptance-criteria"},
+    "C8-R7": {"feature": "Provider health & quota tracking", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c8-provider-health/#acceptance-criteria"},
+    "C8-R10": {"feature": "Provider health & quota tracking", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c8-provider-health/#acceptance-criteria"},
+    "C8-R11": {"feature": "Provider health & quota tracking", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c8-provider-health/#acceptance-criteria"},
+    "C8-R13": {"feature": "Provider health & quota tracking", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c8-provider-health/#acceptance-criteria"},
+    "C8-R14": {"feature": "Provider health & quota tracking", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c8-provider-health/#acceptance-criteria"},
+    "C8-R2": {"feature": "Provider health & quota tracking", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c8-provider-health/#acceptance-criteria"},
+    "C8-R9": {"feature": "Provider health & quota tracking", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c8-provider-health/#acceptance-criteria"},
+    "C8-R12": {"feature": "Provider health & quota tracking", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c8-provider-health/#acceptance-criteria"},
+    "C8-R5": {"feature": "Provider health & quota tracking", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c8-provider-health/#acceptance-criteria"},
+    "C8-R8": {"feature": "Provider health & quota tracking", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c8-provider-health/#acceptance-criteria"},
+    "C4-R2": {"feature": "Support bundle", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c4-support-bundle/#acceptance-criteria"},
+    "C4-R3": {"feature": "Support bundle", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c4-support-bundle/#acceptance-criteria"},
+    "C4-R4": {"feature": "Support bundle", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c4-support-bundle/#acceptance-criteria"},
+    "C4-R5": {"feature": "Support bundle", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c4-support-bundle/#acceptance-criteria"},
+    "C4-R11": {"feature": "Support bundle", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c4-support-bundle/#acceptance-criteria"},
+    "C4-R12": {"feature": "Support bundle", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c4-support-bundle/#acceptance-criteria"},
+    "C4-R7": {"feature": "Support bundle", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c4-support-bundle/#acceptance-criteria"},
+    "C4-R10": {"feature": "Support bundle", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c4-support-bundle/#acceptance-criteria"},
+    "C4-R14": {"feature": "Support bundle", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c4-support-bundle/#acceptance-criteria"},
+    "C4-R1": {"feature": "Support bundle", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c4-support-bundle/#acceptance-criteria"},
+    "GOV-R12": {"feature": "Canonical spec", "url": "https://docs.lemonfiber.app/spec/50-governance/canonical-spec/"},
+    "Q-R61": {"feature": "Testing strategy", "url": "https://docs.lemonfiber.app/spec/40-quality/testing-strategy/#requirements"},
+    "C4-R6": {"feature": "Support bundle", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c4-support-bundle/#acceptance-criteria"},
+    "C4-R8": {"feature": "Support bundle", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c4-support-bundle/#acceptance-criteria"},
+    "C4-R9": {"feature": "Support bundle", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c4-support-bundle/#acceptance-criteria"},
+    "C4-R13": {"feature": "Support bundle", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c4-support-bundle/#acceptance-criteria"},
+    "C3-R1": {"feature": "Auto-remediation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c3-auto-remediation/#acceptance-criteria"},
+    "C3-R4": {"feature": "Auto-remediation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c3-auto-remediation/#acceptance-criteria"},
+    "C3-R5": {"feature": "Auto-remediation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c3-auto-remediation/#acceptance-criteria"},
+    "C3-R9": {"feature": "Auto-remediation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c3-auto-remediation/#acceptance-criteria"},
+    "C3-R10": {"feature": "Auto-remediation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c3-auto-remediation/#acceptance-criteria"},
+    "C3-R11": {"feature": "Auto-remediation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c3-auto-remediation/#acceptance-criteria"},
+    "C3-R13": {"feature": "Auto-remediation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c3-auto-remediation/#acceptance-criteria"},
+    "C3-R14": {"feature": "Auto-remediation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c3-auto-remediation/#acceptance-criteria"},
+    "C3-R2": {"feature": "Auto-remediation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c3-auto-remediation/#acceptance-criteria"},
+    "C3-R3": {"feature": "Auto-remediation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c3-auto-remediation/#acceptance-criteria"},
+    "C3-R8": {"feature": "Auto-remediation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c3-auto-remediation/#acceptance-criteria"},
+    "C3-R12": {"feature": "Auto-remediation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c3-auto-remediation/#acceptance-criteria"},
+    "C3-R7": {"feature": "Auto-remediation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c3-auto-remediation/#acceptance-criteria"},
+    "C3-R15": {"feature": "Auto-remediation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c3-auto-remediation/#acceptance-criteria"},
+    "C3-R6": {"feature": "Auto-remediation", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c3-auto-remediation/#acceptance-criteria"},
+    "C9-R15": {"feature": "Config drift detection & seed policy", "url": "https://docs.lemonfiber.app/spec/10-functional/features/c-trust/c9-drift/#acceptance-criteria"},
+    "ARCH-R44": {"feature": "Component model", "url": "https://docs.lemonfiber.app/spec/20-architecture/component-model/#requirements"},
+    "ARCH-R45": {"feature": "Component model", "url": "https://docs.lemonfiber.app/spec/20-architecture/component-model/#requirements"},
+    "A1-R9": {"feature": "Prerequisites & account guidance", "url": "https://docs.lemonfiber.app/spec/10-functional/features/a-getting-started/a1-prerequisites/#acceptance-criteria"}
+  },
+  "withdraws": {},
+  "withdrawn_requirements": []
+}

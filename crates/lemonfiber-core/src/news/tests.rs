@@ -5,15 +5,22 @@ use crate::error::Severity;
 use crate::health::Affected;
 use crate::model::{HouseholdMember, HouseholdReport, MemberRequest};
 
-/// A record holding three releases, newest first, as the pipeline writes it.
+/// A record holding three releases, a file each, as the pipeline writes them.
 fn record() -> Option<Record> {
-    Record::read(
-        r#"{"releases":[
-            {"version":"0.17.1","tag":"v0.17.1","delivers":"Fixes","user_facing":true,"groups":[]},
-            {"version":"0.17.0","tag":"v0.17.0","delivers":"Plugins, part two","user_facing":true,"groups":[]},
-            {"version":"0.16.0","tag":"v0.16.0","user_facing":true,"groups":[]}
-        ],"requirements":{}}"#,
-    )
+    Record::read(&[
+        (
+            "0.17.1.json",
+            r#"{"version":"0.17.1","tag":"v0.17.1","delivers":"Fixes","user_facing":true,"groups":[]}"#,
+        ),
+        (
+            "0.17.0.json",
+            r#"{"version":"0.17.0","tag":"v0.17.0","delivers":"Plugins, part two","user_facing":true,"groups":[]}"#,
+        ),
+        (
+            "0.16.0.json",
+            r#"{"version":"0.16.0","tag":"v0.16.0","user_facing":true,"groups":[]}"#,
+        ),
+    ])
 }
 
 fn asked(id: i64, title: Option<&str>) -> MemberRequest {

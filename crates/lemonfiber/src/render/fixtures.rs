@@ -107,7 +107,8 @@ pub(super) fn a_version() -> VersionReport {
     }
 }
 
-/// A record of three releases, which is enough for every shape one can take.
+/// The newest of a record of three releases, a file each, which is enough for every
+/// shape one can take.
 ///
 /// `0.4.0` changed something somebody asked for; `0.3.1` is a patch, withdrawn,
 /// with the reason; `0.3.0` changed nothing an operator would notice. Written here
@@ -118,54 +119,61 @@ pub(super) fn a_version() -> VersionReport {
 /// One entry of `0.4.0` cites an identifier the index does not hold. A record
 /// written by an older generator can do that, and what a renderer does with it is
 /// worth pinning: the change still shipped, so the line stays and says what it said.
-const THREE: &str = r##"{
-  "releases": [
-    {
-      "version": "0.4.0", "tag": "v0.4.0", "released_on": "2026-04-01",
-      "delivers": "Seeing what is happening", "patches": null, "carried": null,
-      "withdrawn": null, "user_facing": true,
-      "groups": [
-        {"title": "New", "entries": [
-          {"summary": "The panel shows the forwarded port",
-           "requirements": ["C2-R4", "C2-R9"], "reference": "#42"},
-          {"summary": "One the record keeps no requirement for",
-           "requirements": ["Z9-R1"]}
-        ]},
-        {"title": "Maintenance", "entries": [
-          {"summary": "Bump a dependency", "requirements": []}
-        ]}
-      ]
-    },
-    {
-      "version": "0.3.1", "tag": "v0.3.1", "released_on": "2026-03-14",
-      "delivers": null, "patches": "0.3.0", "carried": null,
-      "withdrawn": "the installer shipped a broken pin", "user_facing": true,
-      "groups": [{"title": "Fixed", "entries": [
-        {"summary": "Put the broken pin back", "requirements": ["A1-R2"]}
-      ]}]
-    },
-    {
-      "version": "0.3.0", "tag": "v0.3.0", "released_on": "2026-03-01",
-      "delivers": null, "patches": null, "carried": null, "withdrawn": null,
-      "user_facing": false,
-      "groups": [{"title": "Maintenance", "entries": [
-        {"summary": "Move the modules about", "requirements": []}
-      ]}]
-    }
+const NEWEST: &str = r##"{
+  "version": "0.4.0", "tag": "v0.4.0", "released_on": "2026-04-01",
+  "delivers": "Seeing what is happening", "patches": null, "carried": null,
+  "withdrawn": null, "user_facing": true,
+  "groups": [
+    {"title": "New", "entries": [
+      {"summary": "The panel shows the forwarded port",
+       "requirements": ["C2-R4", "C2-R9"], "reference": "#42"},
+      {"summary": "One the record keeps no requirement for",
+       "requirements": ["Z9-R1"]}
+    ]},
+    {"title": "Maintenance", "entries": [
+      {"summary": "Bump a dependency", "requirements": []}
+    ]}
   ],
   "requirements": {
-    "A1-R2": {"feature": "Prerequisites", "url": "https://example.test/a1",
-              "shipped_in": ["0.3.1"]},
-    "C2-R4": {"feature": "VPN verification", "url": "https://example.test/c2",
-              "shipped_in": ["0.4.0"]},
-    "C2-R9": {"feature": "VPN verification", "withdrawn": true,
-              "shipped_in": ["0.4.0"]}
+    "C2-R4": {"feature": "VPN verification", "url": "https://example.test/c2"},
+    "C2-R9": {"feature": "VPN verification", "withdrawn": true}
   }
 }"##;
 
+/// The patch in [`NEWEST`]'s record.
+const PATCH: &str = r#"{
+  "version": "0.3.1", "tag": "v0.3.1", "released_on": "2026-03-14",
+  "delivers": null, "patches": "0.3.0", "carried": null,
+  "withdrawn": "the installer shipped a broken pin", "user_facing": true,
+  "groups": [{"title": "Fixed", "entries": [
+    {"summary": "Put the broken pin back", "requirements": ["A1-R2"]}
+  ]}],
+  "requirements": {
+    "A1-R2": {"feature": "Prerequisites", "url": "https://example.test/a1"}
+  }
+}"#;
+
+/// The release in [`NEWEST`]'s record that changed nothing an operator would notice.
+const QUIET: &str = r#"{
+  "version": "0.3.0", "tag": "v0.3.0", "released_on": "2026-03-01",
+  "delivers": null, "patches": null, "carried": null, "withdrawn": null,
+  "user_facing": false,
+  "groups": [{"title": "Maintenance", "entries": [
+    {"summary": "Move the modules about", "requirements": []}
+  ]}]
+}"#;
+
 /// What that record tells a build of the named version.
 pub(super) fn notes(running: &str) -> Notes {
-    told(Record::read(THREE).as_ref(), running)
+    told(
+        Record::read(&[
+            ("0.4.0.json", NEWEST),
+            ("0.3.1.json", PATCH),
+            ("0.3.0.json", QUIET),
+        ])
+        .as_ref(),
+        running,
+    )
 }
 
 /// One glossary entry, with every part of one filled.
