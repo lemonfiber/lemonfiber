@@ -1,0 +1,22 @@
+# One row per requirement this repository has worked on; read by spec's
+# status_check.py and the release gate.
+
+requirement = [
+  { id = "F6-R1", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/stating.rs", "crates/lemonfiber-plugin/src/refusing/reaching.rs"] },
+  { id = "F6-R2", state = "done", evidence = ["crates/lemonfiber-core/src/rollback.rs", "crates/lemonfiber-core/src/plugin/placing.rs", "crates/lemonfiber-core/src/app/plugins.rs"] },
+  { id = "F6-R3", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/judging.rs", "crates/lemonfiber-core/src/app/putting_back.rs"] },
+  { id = "F6-R4", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/verified.rs", "crates/lemonfiber-core/src/app/engine/diagnosis.rs"] },
+  { id = "F6-R5", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/verified.rs", "crates/lemonfiber-core/src/app/engine/diagnosis.rs"] },
+  { id = "F6-R6", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/verified.rs", "crates/lemonfiber-core/src/app/engine/diagnosis.rs"] },
+  { id = "F6-R7", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/owning.rs", "crates/lemonfiber-core/src/journal.rs", "crates/lemonfiber-core/src/rollback.rs"] },
+  { id = "F6-R8", state = "done", evidence = ["crates/lemonfiber-core/src/app/disturbance.rs", "crates/lemonfiber-core/src/plugin/reports.rs", "crates/lemonfiber-core/src/app/plugins/removing.rs"] },
+  { id = "F6-R9", state = "done", evidence = ["crates/lemonfiber-core/src/app/plugins/updating.rs", "crates/lemonfiber-core/src/plugin/reports.rs", "crates/lemonfiber-core/src/app/putting_back.rs"] },
+  { id = "F6-R10", state = "done", evidence = ["crates/lemonfiber-plugin/src/refusing.rs", "crates/lemonfiber-core/src/app/plugins.rs"] },
+  { id = "F6-R11", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/owning.rs", "crates/lemonfiber-core/src/journal.rs", "crates/lemonfiber-core/src/rollback.rs"] },
+  { id = "F6-R12", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/owning.rs", "crates/lemonfiber-core/src/journal.rs", "crates/lemonfiber-core/src/rollback.rs"] },
+  { id = "F6-R13", state = "done", evidence = ["crates/lemonfiber/src/exit/reports.rs", "crates/lemonfiber/tests/integration/every_plugin_step_runs_unattended.rs"] },
+  { id = "F6-R14", state = "done", evidence = ["crates/lemonfiber-api/src/read/table.rs", "crates/lemonfiber-core/src/wiring.rs", "crates/lemonfiber-core/src/stack.rs"] },
+  { id = "F6-R15", state = "done", evidence = ["crates/lemonfiber-api/src/actions/named/extending.rs", "crates/lemonfiber-core/src/app/plugins/refusals.rs"] },
+  { id = "F6-R16", state = "done", evidence = ["crates/lemonfiber-api/src/actions/named/extending.rs", "crates/lemonfiber-core/src/app/plugins/refusals.rs"] },
+  { id = "F6-R17", state = "done", evidence = ["crates/lemonfiber-core/src/app/plugins/offering.rs", "crates/lemonfiber-core/src/plugin/recipes.rs"] },
+]

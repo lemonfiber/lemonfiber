@@ -1,0 +1,19 @@
+# One row per requirement this repository has worked on; read by spec's
+# status_check.py and the release gate.
+
+requirement = [
+  { id = "F2-R1", state = "done", evidence = ["crates/lemonfiber-core/src/docker.rs", "crates/lemonfiber-core/src/model/catalogue.rs", "crates/lemonfiber/src/render/catalogue.rs", "crates/lemonfiber/src/render/stack.rs", ".docs/architecture/surface-parity.md"] },
+  { id = "F2-R2", state = "done", evidence = ["crates/lemonfiber-core/src/app/engine/settling.rs"] },
+  { id = "F2-R3", state = "done", evidence = ["crates/lemonfiber-manifest/src/schema.rs", "crates/lemonfiber-manifest/src/recognising.rs", "crates/lemonfiber-core/src/health/observed.rs", "crates/lemonfiber/src/render/catalogue.rs"] },
+  { id = "F2-R4", state = "done", evidence = ["crates/lemonfiber-core/src/model/provenance.rs", "crates/lemonfiber-core/src/app/engine.rs", "crates/lemonfiber-core/tests/integration/provenance.rs", ".docs/architecture/surface-parity.md"] },
+  { id = "F2-R5", state = "done", evidence = ["crates/lemonfiber-manifest/src/validate.rs"] },
+  { id = "F2-R7", state = "done", evidence = ["spec:10-functional/features/f-extensibility/f2-service-catalogue.md", "crates/lemonfiber-manifest/src/validate.rs"] },
+  { id = "F2-R8", state = "done", evidence = ["spec:10-functional/features/f-extensibility/f2-service-catalogue.md", "crates/lemonfiber-manifest/src/validate.rs"] },
+  { id = "F2-R9", state = "done", evidence = ["crates/lemonfiber-core/src/docker.rs", "crates/lemonfiber-core/src/model/catalogue.rs", "crates/lemonfiber/src/render/catalogue.rs", "crates/lemonfiber/src/render/stack.rs", ".docs/architecture/surface-parity.md", "spec:10-functional/features/f-extensibility/f2-service-catalogue.md"] },
+  { id = "F2-R10", state = "done", evidence = ["crates/lemonfiber-core/src/outbound/theirs.rs"] },
+  { id = "F2-R11", state = "done", evidence = ["crates/lemonfiber-core/src/docker.rs", "crates/lemonfiber-core/src/model/catalogue.rs", "crates/lemonfiber/src/render/catalogue.rs", "crates/lemonfiber/src/render/stack.rs", ".docs/architecture/surface-parity.md"] },
+  { id = "F2-R12", state = "done", evidence = ["contract/web-api.contract.json", "crates/lemonfiber-api/src/read.rs", "crates/lemonfiber-core/src/app.rs", "crates/lemonfiber-core/src/app/command.rs"] },
+  { id = "F2-R13", state = "done", evidence = ["crates/lemonfiber-manifest/src/schema.rs", "crates/lemonfiber-manifest/src/validate.rs", "crates/lemonfiber-manifest/src/lib.rs"] },
+  { id = "F2-R14", state = "done", evidence = ["contract/web-api.contract.json", "crates/lemonfiber-api/src/read.rs", "crates/lemonfiber-core/src/app.rs", "crates/lemonfiber-core/src/app/command.rs"] },
+  { id = "F2-R15", state = "done", evidence = ["contract/web-api.contract.json", "crates/lemonfiber-api/src/read.rs", "crates/lemonfiber-core/src/app.rs", "crates/lemonfiber-core/src/app/command.rs"] },
+]

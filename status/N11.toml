@@ -1,0 +1,6 @@
+# One row per requirement this repository has worked on; read by spec's
+# status_check.py and the release gate.
+
+requirement = [
+  { id = "N11-R4", state = "open", evidence = ["crates/lemonfiber-core/src/journal.rs"] },
+]

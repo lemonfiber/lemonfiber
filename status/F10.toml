@@ -1,0 +1,21 @@
+# One row per requirement this repository has worked on; read by spec's
+# status_check.py and the release gate.
+
+requirement = [
+  { id = "F10-R1", state = "done", evidence = ["crates/lemonfiber-core/examples/plugin_schema.rs", "crates/lemonfiber-core/src/plugin.rs", "crates/lemonfiber-plugin/src/conforming.rs", "contract/plugin-manifest.schema.json", ".github/workflows/release-contract.yml"] },
+  { id = "F10-R2", state = "done", evidence = ["contract/plugin-manifest.schema.json"] },
+  { id = "F10-R3", state = "done", evidence = ["crates/lemonfiber/tests/architecture/what_the_build_forbids.rs", "crates/lemonfiber/tests/integration/what_a_manifest_claims.rs", "crates/lemonfiber/tests/integration/a_rehearsal_changes_nothing.rs"] },
+  { id = "F10-R4", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/recorded.rs", "crates/lemonfiber-core/src/plugin/claimed.rs"] },
+  { id = "F10-R5", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/recorded.rs", "crates/lemonfiber-core/src/plugin/claimed.rs"] },
+  { id = "F10-R6", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/recorded.rs", "crates/lemonfiber-core/src/plugin/claimed.rs"] },
+  { id = "F10-R7", state = "done", evidence = ["crates/lemonfiber-core/src/app/plugins.rs"] },
+  { id = "F10-R8", state = "done", evidence = ["contract/extension-points.json", "contract/plugin-manifest.schema.json"] },
+  { id = "F10-R9", state = "done", evidence = ["lemonfiber-plugins:.github/workflows/registry.yml"] },
+  { id = "F10-R10", state = "done", evidence = ["crates/lemonfiber-plugin/src/conforming.rs"] },
+  { id = "F10-R12", state = "done", evidence = ["crates/lemonfiber-plugin/src/schema/evidence.rs", "crates/lemonfiber-plugin/src/extension.rs", "crates/lemonfiber-plugin/src/refusing/failing.rs", "crates/lemonfiber-core/src/plugin/claimed/asserting.rs", "crates/lemonfiber-core/src/plugin/judging.rs", "crates/lemonfiber-core/src/app/plugins/proving.rs"] },
+  { id = "F10-R13", state = "done", evidence = ["crates/lemonfiber-plugin/src/schema/evidence.rs", "crates/lemonfiber-plugin/src/extension.rs", "crates/lemonfiber-plugin/src/refusing/failing.rs", "crates/lemonfiber-core/src/plugin/claimed/asserting.rs", "crates/lemonfiber-core/src/plugin/judging.rs", "crates/lemonfiber-core/src/app/plugins/proving.rs"] },
+  { id = "F10-R14", state = "done", evidence = ["crates/lemonfiber-plugin/src/schema/evidence.rs", "crates/lemonfiber-plugin/src/extension.rs", "crates/lemonfiber-plugin/src/refusing/failing.rs", "crates/lemonfiber-core/src/plugin/claimed/asserting.rs", "crates/lemonfiber-core/src/plugin/judging.rs", "crates/lemonfiber-core/src/app/plugins/proving.rs"] },
+  { id = "F10-R15", state = "done", evidence = ["crates/lemonfiber-plugin/src/schema/evidence.rs", "crates/lemonfiber-plugin/src/extension.rs", "crates/lemonfiber-plugin/src/refusing/failing.rs", "crates/lemonfiber-core/src/plugin/claimed/asserting.rs", "crates/lemonfiber-core/src/plugin/judging.rs", "crates/lemonfiber-core/src/app/plugins/proving.rs"] },
+  { id = "F10-R16", state = "done", evidence = ["crates/lemonfiber-plugin/src/schema/evidence.rs", "crates/lemonfiber-plugin/src/extension.rs", "crates/lemonfiber-plugin/src/refusing/failing.rs", "crates/lemonfiber-core/src/plugin/claimed/asserting.rs", "crates/lemonfiber-core/src/plugin/judging.rs", "crates/lemonfiber-core/src/app/plugins/proving.rs"] },
+  { id = "F10-R17", state = "done", evidence = ["plugin-template:plugin.toml"] },
+]

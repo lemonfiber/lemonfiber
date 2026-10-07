@@ -1,0 +1,9 @@
+# One row per requirement this repository has worked on; read by spec's
+# status_check.py and the release gate.
+
+requirement = [
+  { id = "C3-R1", state = "done", evidence = ["crates/lemonfiber-core/src/repair.rs"] },
+  { id = "C3-R6", state = "done", evidence = ["crates/lemonfiber-core/src/repair.rs"] },
+  { id = "C3-R7", state = "done", evidence = ["crates/lemonfiber-core/src/repair.rs"] },
+  { id = "C3-R15", state = "done", evidence = ["crates/lemonfiber-core/src/repair.rs"] },
+]

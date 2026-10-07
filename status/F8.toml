@@ -1,0 +1,17 @@
+# One row per requirement this repository has worked on; read by spec's
+# status_check.py and the release gate.
+
+requirement = [
+  { id = "F8-R1", state = "partial", evidence = ["crates/lemonfiber-plugin/src/schema/recipe.rs"] },
+  { id = "F8-R2", state = "done", evidence = ["crates/lemonfiber-plugin/src/refusing/recipes.rs", "crates/lemonfiber-plugin/src/refusing/recipes/whither.rs", "crates/lemonfiber-plugin/src/refusing/recipes/bounds.rs", "crates/lemonfiber-api/src/contract/stability/declared.rs"] },
+  { id = "F8-R3", state = "done", evidence = ["crates/lemonfiber-plugin/src/refusing/recipes.rs", "crates/lemonfiber-plugin/src/refusing/recipes/whither.rs", "crates/lemonfiber-plugin/src/refusing/recipes/bounds.rs", "crates/lemonfiber-api/src/contract/stability/declared.rs"] },
+  { id = "F8-R4", state = "done", evidence = ["crates/lemonfiber-plugin/src/refusing/recipes.rs", "crates/lemonfiber-plugin/src/refusing/recipes/whither.rs", "crates/lemonfiber-plugin/src/refusing/recipes/bounds.rs", "crates/lemonfiber-api/src/contract/stability/declared.rs"] },
+  { id = "F8-R5", state = "done", evidence = ["crates/lemonfiber-plugin/src/refusing/recipes.rs", "crates/lemonfiber-plugin/src/refusing/recipes/whither.rs", "crates/lemonfiber-plugin/src/refusing/recipes/bounds.rs", "crates/lemonfiber-api/src/contract/stability/declared.rs"] },
+  { id = "F8-R6", state = "done", evidence = ["crates/lemonfiber-plugin/src/refusing/recipes.rs"] },
+  { id = "F8-R8", state = "done", evidence = ["crates/lemonfiber-plugin/src/refusing/recipes.rs", "crates/lemonfiber-plugin/src/refusing/recipes/whither.rs", "crates/lemonfiber-plugin/src/refusing/recipes/bounds.rs", "crates/lemonfiber-api/src/contract/stability/declared.rs"] },
+  { id = "F8-R9", state = "partial", evidence = ["crates/lemonfiber-core/src/outward.rs", "crates/lemonfiber-core/src/outward/classes.rs", "crates/lemonfiber-core/src/app/plugins/reach.rs"] },
+  { id = "F8-R11", state = "done", evidence = ["crates/lemonfiber-plugin/src/schema.rs", "contract/adapters.json", "crates/lemonfiber-plugin/src/refusing/adapting.rs"] },
+  { id = "F8-R12", state = "done", evidence = ["crates/lemonfiber-plugin/src/schema.rs", "contract/adapters.json", "crates/lemonfiber-plugin/src/refusing/adapting.rs"] },
+  { id = "F8-R13", state = "done", evidence = ["crates/lemonfiber-plugin/src/schema.rs", "contract/adapters.json", "crates/lemonfiber-plugin/src/refusing/adapting.rs"] },
+  { id = "F8-R16", state = "done", evidence = ["crates/lemonfiber-plugin/src/refusing/recipes.rs", "crates/lemonfiber-plugin/src/refusing/recipes/whither.rs", "crates/lemonfiber-plugin/src/refusing/recipes/bounds.rs", "crates/lemonfiber-api/src/contract/stability/declared.rs"] },
+]

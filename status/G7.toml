@@ -1,0 +1,16 @@
+# One row per requirement this repository has worked on; read by spec's
+# status_check.py and the release gate.
+
+requirement = [
+  { id = "G7-R1", state = "done", evidence = ["crates/lemonfiber-core/src/health.rs"] },
+  { id = "G7-R3", state = "done", evidence = ["crates/lemonfiber-core/src/health.rs"] },
+  { id = "G7-R4", state = "done", evidence = ["crates/lemonfiber-core/src/health.rs"] },
+  { id = "G7-R5", state = "done", evidence = ["crates/lemonfiber-core/src/health.rs"] },
+  { id = "G7-R6", state = "done", evidence = ["crates/lemonfiber-core/src/health.rs"] },
+  { id = "G7-R7", state = "done", evidence = ["crates/lemonfiber-core/src/health.rs"] },
+  { id = "G7-R8", state = "done", evidence = ["crates/lemonfiber-core/src/health.rs"] },
+  { id = "G7-R9", state = "done", evidence = ["crates/lemonfiber-core/src/health.rs"] },
+  { id = "G7-R10", state = "done", evidence = ["crates/lemonfiber-core/src/health.rs"] },
+  { id = "G7-R11", state = "done", evidence = ["crates/lemonfiber-core/src/health.rs"] },
+  { id = "G7-R12", state = "done", evidence = ["crates/lemonfiber-core/src/health.rs"] },
+]

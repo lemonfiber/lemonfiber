@@ -1,0 +1,17 @@
+# One row per requirement this repository has worked on; read by spec's
+# status_check.py and the release gate.
+
+requirement = [
+  { id = "G3-R1", state = "done", evidence = ["crates/lemonfiber/src/logs.rs"] },
+  { id = "G3-R2", state = "done", evidence = ["crates/lemonfiber/src/logs.rs"] },
+  { id = "G3-R6", state = "done", evidence = ["crates/lemonfiber/tests/architecture/modest_terminal.rs"] },
+  { id = "G3-R7", state = "done", evidence = ["crates/lemonfiber/tests/integration/piped.rs", "crates/lemonfiber-core/src/walkthrough/run/walk.rs"] },
+  { id = "G3-R8", state = "done", evidence = ["crates/lemonfiber-core/src/text.rs"] },
+  { id = "G3-R9", state = "done", evidence = ["crates/lemonfiber/src/say.rs", "crates/lemonfiber/src/main.rs", "crates/lemonfiber/src/keyboard.rs"] },
+  { id = "G3-R10", state = "done", evidence = ["crates/lemonfiber-core/src/text.rs", "crates/lemonfiber-core/src/endpoint.rs"] },
+  { id = "G3-R11", state = "done", evidence = ["crates/lemonfiber-core/src/app/engine.rs", "crates/lemonfiber-ports/src/narration.rs"] },
+  { id = "G3-R12", state = "done", evidence = ["crates/lemonfiber/tests/integration/prompting.rs"] },
+  { id = "G3-R13", state = "done", evidence = ["crates/lemonfiber-core/tests/fixtures/frontend/assets/app.css"] },
+  { id = "G3-R14", state = "done", evidence = ["crates/lemonfiber/src/logs/draw.rs"] },
+  { id = "G3-R15", state = "done", evidence = ["crates/lemonfiber/src/say.rs", "crates/lemonfiber/src/main.rs", "crates/lemonfiber/src/keyboard.rs", "crates/lemonfiber-core/src/text.rs"] },
+]

@@ -273,10 +273,6 @@ stack-moved:
 # workflow, which runs the self-test as its own first step — true, and invisible
 # to a checker that reads this tree. Proving it here is the better half anyway:
 # it fails on the machine that broke it rather than after a push.
-# IMPLEMENTATION-STATUS.md, written from status.toml — the file the release gates read.
-status:
-    python3 scripts/implementation_status.py --write
-
 scripts:
     uvx ruff@0.16.4 check scripts/
     python3 scripts/every_proof_runs.py
@@ -285,8 +281,6 @@ scripts:
     python3 scripts/the_requirements_an_entry_names.py --self-test
     python3 scripts/no_open_codeql_alert.py --self-test
     python3 scripts/the_gate_a_tag_must_pass.py --self-test
-    python3 scripts/implementation_status.py --self-test
-    python3 scripts/implementation_status.py --check
     python3 scripts/verify_dist_installer.py --self-test
     python3 scripts/the_installer_refuses_what_it_cannot_check.py --self-test
     python3 scripts/the_templates_name_the_image.py --self-test

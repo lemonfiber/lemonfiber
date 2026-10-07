@@ -1,0 +1,6 @@
+# One row per requirement this repository has worked on; read by spec's
+# status_check.py and the release gate.
+
+requirement = [
+  { id = "L3-R1", state = "done", evidence = ["packaging/image/Dockerfile", "scripts/the_templates_name_the_image.py", "packaging/README.md", "crates/lemonfiber/tests/architecture/what_a_nas_template_holds.rs", "crates/lemonfiber-core/src/contained.rs", "crates/lemonfiber-core/src/app/engine/underneath.rs"] },
+]

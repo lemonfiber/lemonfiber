@@ -1,0 +1,19 @@
+# One row per requirement this repository has worked on; read by spec's
+# status_check.py and the release gate.
+
+requirement = [
+  { id = "G1-R1", state = "done", evidence = ["crates/lemonfiber-api/src/actions.rs", "crates/lemonfiber-api/src/read/table.rs", "crates/lemonfiber/src/reaching.rs", "crates/lemonfiber/tests/architecture/surface_parity.rs", "crates/lemonfiber/src/acting.rs", "crates/lemonfiber-core/src/door.rs"] },
+  { id = "G1-R2", state = "done", evidence = ["crates/lemonfiber-api/src/jobs.rs"] },
+  { id = "G1-R3", state = "done", evidence = ["crates/lemonfiber/src/cli.rs"] },
+  { id = "G1-R4", state = "done", evidence = ["crates/lemonfiber/src/prompt.rs"] },
+  { id = "G1-R5", state = "done", evidence = ["crates/lemonfiber/src/ui.rs", "crates/lemonfiber-api/src/jobs.rs"] },
+  { id = "G1-R6", state = "done", evidence = ["crates/lemonfiber/src/ui.rs"] },
+  { id = "G1-R7", state = "done", evidence = ["crates/lemonfiber/src/cli.rs"] },
+  { id = "G1-R8", state = "done", evidence = ["crates/lemonfiber/src/exit.rs"] },
+  { id = "G1-R9", state = "done", evidence = ["crates/lemonfiber/tests/architecture/modest_terminal.rs"] },
+  { id = "G1-R10", state = "done", evidence = ["crates/lemonfiber/src/logs.rs"] },
+  { id = "G1-R11", state = "done", evidence = ["crates/lemonfiber/src/ui.rs"] },
+  { id = "G1-R12", state = "done", evidence = [".github/workflows/sonar.yml", "crates/lemonfiber/src/acting.rs", "crates/lemonfiber/src/acting/words.rs", "crates/lemonfiber/src/dashboard.rs"] },
+  { id = "G1-R13", state = "done", evidence = ["crates/lemonfiber/src/prompt.rs"] },
+  { id = "G1-R14", state = "done", evidence = ["crates/lemonfiber-api/src/setup.rs"] },
+]

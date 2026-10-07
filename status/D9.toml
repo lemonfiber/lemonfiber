@@ -1,0 +1,19 @@
+# One row per requirement this repository has worked on; read by spec's
+# status_check.py and the release gate.
+
+requirement = [
+  { id = "D9-R1", state = "done", evidence = ["crates/lemonfiber-ports/src/service/stage.rs", "crates/lemonfiber-core/src/app/trace.rs", "crates/lemonfiber-core/src/servarr.rs", "crates/lemonfiber-core/src/jellyfin.rs"] },
+  { id = "D9-R2", state = "done", evidence = ["crates/lemonfiber-ports/src/service/stage.rs", "crates/lemonfiber-core/src/app/trace.rs", "crates/lemonfiber-core/src/servarr.rs", "crates/lemonfiber-core/src/jellyfin.rs"] },
+  { id = "D9-R3", state = "done", evidence = ["crates/lemonfiber-ports/src/service/stage.rs", "crates/lemonfiber-core/src/app/trace.rs", "crates/lemonfiber-core/src/servarr.rs", "crates/lemonfiber-core/src/jellyfin.rs"] },
+  { id = "D9-R4", state = "done", evidence = ["crates/lemonfiber-ports/src/service/stage.rs", "crates/lemonfiber-core/src/app/trace.rs", "crates/lemonfiber-core/src/servarr.rs", "crates/lemonfiber-core/src/jellyfin.rs"] },
+  { id = "D9-R5", state = "done", evidence = ["crates/lemonfiber-ports/src/service/stage.rs", "crates/lemonfiber-core/src/app/trace.rs", "crates/lemonfiber-core/src/servarr.rs", "crates/lemonfiber-core/src/jellyfin.rs"] },
+  { id = "D9-R6", state = "done", evidence = ["crates/lemonfiber-ports/src/service/stage.rs", "crates/lemonfiber-core/src/app/trace.rs", "crates/lemonfiber-core/src/servarr.rs", "crates/lemonfiber-core/src/jellyfin.rs"] },
+  { id = "D9-R7", state = "done", evidence = ["crates/lemonfiber-ports/src/service/stage.rs", "crates/lemonfiber-core/src/app/trace.rs", "crates/lemonfiber-core/src/servarr.rs", "crates/lemonfiber-core/src/jellyfin.rs"] },
+  { id = "D9-R8", state = "done", evidence = ["crates/lemonfiber-ports/src/service/stage.rs", "crates/lemonfiber-core/src/app/trace.rs", "crates/lemonfiber-core/src/servarr.rs", "crates/lemonfiber-core/src/jellyfin.rs", "crates/lemonfiber-core/src/model.rs"] },
+  { id = "D9-R9", state = "done", evidence = ["crates/lemonfiber-ports/src/service/stage.rs", "crates/lemonfiber-core/src/app/trace.rs", "crates/lemonfiber-core/src/servarr/pipeline.rs"] },
+  { id = "D9-R10", state = "done", evidence = ["crates/lemonfiber-core/src/app/trace.rs", "crates/lemonfiber-ports/src/service/stage.rs"] },
+  { id = "D9-R11", state = "done", evidence = ["crates/lemonfiber-ports/src/service/stage.rs", "crates/lemonfiber-core/src/app/trace.rs", "crates/lemonfiber-core/src/servarr/pipeline.rs"] },
+  { id = "D9-R12", state = "done", evidence = ["crates/lemonfiber-core/src/household.rs", "crates/lemonfiber-core/src/seerr.rs", "crates/lemonfiber-core/src/servarr/pipeline.rs"] },
+  { id = "D9-R13", state = "done", evidence = ["crates/lemonfiber-ports/src/service/stage.rs", "crates/lemonfiber-core/src/servarr/pipeline.rs", "crates/lemonfiber-core/src/app/trace.rs"] },
+  { id = "D9-R14", state = "done", evidence = ["crates/lemonfiber-core/src/app/trace.rs", "crates/lemonfiber-ports/src/service/stage.rs"] },
+]

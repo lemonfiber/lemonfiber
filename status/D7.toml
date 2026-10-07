@@ -1,0 +1,19 @@
+# One row per requirement this repository has worked on; read by spec's
+# status_check.py and the release gate.
+
+requirement = [
+  { id = "D7-R1", state = "done", evidence = ["crates/lemonfiber-core/src/asking.rs", "crates/lemonfiber-core/src/seerr/asking.rs", "crates/lemonfiber-core/src/asking/run.rs", "crates/lemonfiber-core/src/household/run/allowance.rs"] },
+  { id = "D7-R2", state = "done", evidence = ["crates/lemonfiber-core/src/asking.rs", "crates/lemonfiber-core/src/seerr/asking.rs", "crates/lemonfiber-core/src/asking/run.rs", "crates/lemonfiber-core/src/household/run/allowance.rs"] },
+  { id = "D7-R3", state = "done", evidence = ["crates/lemonfiber-core/src/household/run/allowance.rs", "crates/lemonfiber-ports/src/service/notices.rs", "crates/lemonfiber-core/src/seerr/notices.rs", "crates/lemonfiber-core/src/household/run/notices.rs"] },
+  { id = "D7-R4", state = "done", evidence = ["crates/lemonfiber-core/src/asking.rs", "crates/lemonfiber-core/src/seerr/asking.rs", "crates/lemonfiber-core/src/asking/run.rs", "crates/lemonfiber-core/src/household/run/allowance.rs"] },
+  { id = "D7-R5", state = "done", evidence = ["crates/lemonfiber-core/src/household/run/handing_over.rs", "crates/lemonfiber-core/src/asking/window.rs", "crates/lemonfiber-core/src/household/run/notices.rs"] },
+  { id = "D7-R6", state = "done", evidence = ["crates/lemonfiber-core/src/asking.rs", "crates/lemonfiber-core/src/seerr/asking.rs", "crates/lemonfiber-core/src/asking/run.rs", "crates/lemonfiber-core/src/household/run/allowance.rs"] },
+  { id = "D7-R7", state = "done", evidence = ["crates/lemonfiber-core/src/asking/reasons.rs", "crates/lemonfiber-core/src/outbound.rs", "crates/lemonfiber-ports/src/service/addressing.rs", "crates/lemonfiber-core/src/seerr/addressing.rs", "crates/lemonfiber-core/src/telling.rs", "crates/lemonfiber-core/src/asking/run/passing_on.rs"] },
+  { id = "D7-R8", state = "done", evidence = ["crates/lemonfiber-core/src/asking/expiry.rs", "crates/lemonfiber-core/src/app/arrangement.rs", "crates/lemonfiber-core/src/app/expiring.rs"] },
+  { id = "D7-R9", state = "done", evidence = ["crates/lemonfiber-core/src/asking.rs", "crates/lemonfiber-core/src/seerr/asking.rs", "crates/lemonfiber-core/src/asking/run.rs", "crates/lemonfiber-core/src/household/run/allowance.rs"] },
+  { id = "D7-R10", state = "done", evidence = ["crates/lemonfiber-core/src/asking.rs", "crates/lemonfiber-core/src/seerr/asking.rs", "crates/lemonfiber-core/src/asking/run.rs", "crates/lemonfiber-core/src/household/run/allowance.rs"] },
+  { id = "D7-R11", state = "done", evidence = ["crates/lemonfiber-core/src/asking.rs", "crates/lemonfiber-core/src/seerr/asking.rs", "crates/lemonfiber-core/src/asking/run.rs", "crates/lemonfiber-core/src/household/run/allowance.rs"] },
+  { id = "D7-R12", state = "done", evidence = ["crates/lemonfiber-core/src/asking.rs", "crates/lemonfiber-core/src/seerr/asking.rs", "crates/lemonfiber-core/src/asking/run.rs", "crates/lemonfiber-core/src/household/run/allowance.rs"] },
+  { id = "D7-R13", state = "done", evidence = ["crates/lemonfiber-core/src/household/run/holding.rs"] },
+  { id = "D7-R14", state = "done", evidence = ["crates/lemonfiber-core/src/asking.rs", "crates/lemonfiber-core/src/seerr/asking.rs", "crates/lemonfiber-core/src/asking/run.rs", "crates/lemonfiber-core/src/household/run/allowance.rs"] },
+]
