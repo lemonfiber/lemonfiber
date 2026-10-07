@@ -32,7 +32,7 @@ use axum::Router;
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::ports::time::Clock;
 
-use crate::admission::{Caller, Knocking};
+use crate::admission::Knocking;
 use crate::guard::{Arrived, Binding, Token};
 use crate::serve::{admitted, carrying, STREAM};
 
@@ -138,12 +138,11 @@ pub async fn stream(
     // The operator's stream carries their whole view — the dashboard, every log line
     // they follow, what setup is doing — and nothing on it is narrowed to a member. A
     // member is handed a stream of their own instead, read for them alone.
-    if let Some((caller, member)) = caller.and_then(|caller| {
-        let member = caller.member()?.to_owned();
-        Some((caller, member))
-    }) {
-        staying.member = Some(member);
-        return theirs(&streaming, caller, seen.as_deref(), staying).await;
+    if let Some(source) =
+        caller.and_then(|caller| Theirs::for_member(Arc::clone(&streaming.reading), caller))
+    {
+        staying.member = Some(source.member().to_owned());
+        return theirs(&streaming, source, seen.as_deref(), staying).await;
     }
     let listening = streaming.live.listening(seen.as_deref()).await;
     // Asked for after the client is listening, so the gather it prompts is one
@@ -157,13 +156,13 @@ pub async fn stream(
 /// listening or this run's streams are told to end.
 async fn theirs(
     streaming: &Streaming,
-    caller: Caller,
+    source: Theirs,
     seen: Option<&str>,
     mut staying: Staying,
 ) -> Response<Body> {
     let live = Arc::new(streaming.live.beside(streaming.clock.as_ref()));
     let listening = live.listening(seen).await;
-    let source = Arc::new(Theirs::for_member(Arc::clone(&streaming.reading), caller));
+    let source = Arc::new(source);
     staying.gathering = Some(Gathering(tokio::spawn(live.gathering(source))));
     held(listening, staying)
 }

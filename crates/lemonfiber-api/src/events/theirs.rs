@@ -24,7 +24,7 @@ use tokio::time::Instant;
 use super::live::Gathers;
 use super::wire::{Nature, Rendered};
 use crate::admission::Caller;
-use crate::entitled::{may, Door, Permitted};
+use crate::entitled::{may, Door};
 use crate::read::table::A_SHELF;
 
 /// How often what a member is playing is read again while they listen.
@@ -53,6 +53,8 @@ pub struct Theirs {
     ctx: Arc<Ctx>,
     /// The member, as admission named them.
     caller: Caller,
+    /// The member's id, which is what makes this stream theirs.
+    member: String,
     /// When each pace last came round, and what was last said of each kind.
     heard: Mutex<Heard>,
 }
@@ -69,14 +71,26 @@ struct Heard {
 }
 
 impl Theirs {
-    /// A stream for the member a caller acts as.
+    /// A stream for the member a caller acts as, or none for a caller who is not one.
+    ///
+    /// The commands are only a member's once the decision has narrowed them to one, and
+    /// a caller who is not a member would be handed them as asked, which is the
+    /// household's whole view. So no such stream exists for anybody else.
     #[must_use]
-    pub fn for_member(ctx: Arc<Ctx>, caller: Caller) -> Self {
-        Self {
+    pub fn for_member(ctx: Arc<Ctx>, caller: Caller) -> Option<Self> {
+        let member = caller.member()?.to_owned();
+        Some(Self {
             ctx,
             caller,
+            member,
             heard: Mutex::new(Heard::default()),
-        }
+        })
+    }
+
+    /// The id of the member this stream is theirs.
+    #[must_use]
+    pub fn member(&self) -> &str {
+        &self.member
     }
 }
 
@@ -121,15 +135,9 @@ impl Theirs {
     /// One reading, narrowed to the member by the decision every read takes, as the
     /// event it is said as. Nothing where the decision gives the member nothing.
     async fn answered(&self, reading: Reading) -> Option<Rendered> {
-        // A stream of this kind is a member's, and the commands are only theirs once the
-        // decision has narrowed them to a member. A caller who is not one would be handed
-        // them as asked, which is the household's whole view, so nothing is.
-        let (Some(_), Permitted::This(narrowed)) = (
-            self.caller.member(),
-            may(&self.caller, Door::Reading, reading.command()),
-        ) else {
-            return None;
-        };
+        let narrowed = may(&self.caller, Door::Reading, reading.command())
+            .granted()
+            .ok()?;
         let outcome = match dispatch(narrowed, &self.ctx).await {
             Ok(outcome) => outcome,
             Err(_) => reading.unread(),
