@@ -1,0 +1,19 @@
+# What this repository has built of G2, one row per requirement (OPS-R74).
+# Change a row in the pull request that changes whether its requirement is met.
+# The format and the checks are in the specification's scripts/status_check.py.
+
+requirement = [
+  { id = "G2-R1", state = "done", evidence = ["crates/lemonfiber-core/src/glossary/tests.rs", "crates/lemonfiber/src/render/seed/tests.rs", "crates/lemonfiber-core/src/glossary.rs", "crates/lemonfiber/src/render/seed.rs"] },
+  { id = "G2-R2", state = "done", evidence = ["crates/lemonfiber-core/src/glossary.rs", "crates/lemonfiber/src/render/glossary.rs"] },
+  { id = "G2-R3", state = "done", evidence = ["crates/lemonfiber-core/src/glossary.rs", "crates/lemonfiber-core/src/lib.rs"] },
+  { id = "G2-R4", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/headroom.rs"] },
+  { id = "G2-R5", state = "done", evidence = ["crates/lemonfiber-core/src/glossary.rs", "crates/lemonfiber/src/render/glossary.rs"] },
+  { id = "G2-R6", state = "done", evidence = ["crates/lemonfiber-core/src/glossary.rs", "crates/lemonfiber/src/render/glossary.rs"] },
+  { id = "G2-R7", state = "done", evidence = ["crates/lemonfiber/src/context.rs", "crates/lemonfiber/src/dashboard.rs"] },
+  { id = "G2-R8", state = "done", evidence = ["crates/lemonfiber-core/src/glossary.rs", "crates/lemonfiber-core/src/lib.rs"] },
+  { id = "G2-R9", state = "done", evidence = ["crates/lemonfiber-core/src/glossary.rs", "crates/lemonfiber/src/render/glossary.rs"] },
+  { id = "G2-R10", state = "done", evidence = ["crates/lemonfiber/src/exit.rs", "crates/lemonfiber-core/src/endpoint.rs"] },
+  { id = "G2-R11", state = "done", evidence = ["crates/lemonfiber-core/src/glossary.rs"] },
+  { id = "G2-R12", state = "done", evidence = ["crates/lemonfiber-core/src/glossary.rs", "crates/lemonfiber/src/render/glossary.rs"] },
+  { id = "G2-R13", state = "done", evidence = ["crates/lemonfiber-core/src/glossary.rs"] },
+]

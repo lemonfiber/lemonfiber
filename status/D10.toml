@@ -1,0 +1,22 @@
+# What this repository has built of D10, one row per requirement (OPS-R74).
+# Change a row in the pull request that changes whether its requirement is met.
+# The format and the checks are in the specification's scripts/status_check.py.
+
+requirement = [
+  { id = "D10-R1", state = "done", evidence = ["crates/lemonfiber-core/src/bandwidth.rs", "crates/lemonfiber-ports/src/service/throttling.rs"] },
+  { id = "D10-R2", state = "done", evidence = ["crates/lemonfiber-core/src/bandwidth.rs", "crates/lemonfiber-ports/src/service/throttling.rs"] },
+  { id = "D10-R3", state = "done", evidence = ["crates/lemonfiber-core/src/sabnzbd/scheduling.rs", "crates/lemonfiber-ports/src/service/fetching.rs"] },
+  { id = "D10-R4", state = "done", evidence = ["crates/lemonfiber-core/src/bandwidth.rs", "crates/lemonfiber-ports/src/service/throttling.rs"] },
+  { id = "D10-R5", state = "done", evidence = ["crates/lemonfiber-core/src/bandwidth.rs", "crates/lemonfiber-ports/src/service/throttling.rs"] },
+  { id = "D10-R6", state = "done", evidence = ["crates/lemonfiber-core/src/sabnzbd/scheduling.rs", "crates/lemonfiber-ports/src/service/fetching.rs"] },
+  { id = "D10-R7", state = "done", evidence = ["crates/lemonfiber-core/src/bandwidth.rs", "crates/lemonfiber-ports/src/service/throttling.rs"] },
+  { id = "D10-R8", state = "done", evidence = ["crates/lemonfiber-core/src/bandwidth.rs", "crates/lemonfiber-ports/src/service/throttling.rs"] },
+  { id = "D10-R9", state = "done", evidence = ["crates/lemonfiber-core/src/sabnzbd/scheduling.rs", "crates/lemonfiber-ports/src/service/fetching.rs"] },
+  { id = "D10-R10", state = "done", evidence = ["crates/lemonfiber-core/src/bandwidth.rs", "crates/lemonfiber-ports/src/service/throttling.rs"] },
+  { id = "D10-R11", state = "done", evidence = ["crates/lemonfiber-core/src/bandwidth.rs", "crates/lemonfiber-ports/src/service/throttling.rs"] },
+  { id = "D10-R12", state = "done", evidence = ["crates/lemonfiber-core/src/bandwidth.rs", "crates/lemonfiber-ports/src/service/throttling.rs"] },
+  { id = "D10-R13", state = "done", evidence = ["crates/lemonfiber-core/src/bandwidth.rs", "crates/lemonfiber-ports/src/service/throttling.rs"] },
+  { id = "D10-R14", state = "done", evidence = ["crates/lemonfiber-core/src/bandwidth.rs", "crates/lemonfiber-ports/src/service/throttling.rs"] },
+  { id = "D10-R15", state = "done", evidence = ["crates/lemonfiber-core/src/bandwidth/run/pausing.rs", "crates/lemonfiber-ports/src/service/fetching.rs"] },
+  { id = "D10-R16", state = "done", evidence = ["crates/lemonfiber-core/src/bandwidth/run/pausing.rs", "crates/lemonfiber-ports/src/service/fetching.rs"] },
+]

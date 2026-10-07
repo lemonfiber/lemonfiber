@@ -1,0 +1,12 @@
+# What this repository has built of F9, one row per requirement (OPS-R74).
+# Change a row in the pull request that changes whether its requirement is met.
+# The format and the checks are in the specification's scripts/status_check.py.
+
+requirement = [
+  { id = "F9-R1", state = "done", evidence = ["crates/lemonfiber-plugin/src/vocabulary.rs", "crates/lemonfiber-core/src/plugin/tests.rs", "contract/capability-vocabulary.json"], landed = "553353f2" },
+  { id = "F9-R2", state = "done", evidence = ["crates/lemonfiber-core/tests/integration/what_the_bundled_stack_claims.rs", "scripts/the_gate_a_tag_must_pass.py", "crates/lemonfiber-core/src/plugin/bundled.rs"] },
+  { id = "F9-R3", state = "done", evidence = ["crates/lemonfiber-plugin/src/vocabulary.rs", "crates/lemonfiber-core/src/plugin/tests.rs", "contract/capability-vocabulary.json"], landed = "553353f2" },
+  { id = "F9-R4", state = "done", evidence = ["assets/media-stack", "crates/lemonfiber-core/src/app.rs"] },
+  { id = "F9-R5", state = "done", evidence = ["crates/lemonfiber-manifest/src/schema.rs", "crates/lemonfiber-plugin/src/claiming/bundled.rs", "crates/lemonfiber-core/src/plugin/claimed/asserting.rs", "crates/lemonfiber-core/src/plugin/bundled.rs"] },
+  { id = "F9-R6", state = "done", evidence = ["crates/lemonfiber-core/src/wiring/fillers.rs", "crates/lemonfiber-core/src/app/targets/media.rs", "crates/lemonfiber-core/src/seed/run/tests/replacing.rs", "crates/lemonfiber/tests/architecture/seeding_names_nothing_that_fills_an_ask.rs"] },
+]

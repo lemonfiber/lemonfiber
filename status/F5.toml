@@ -1,0 +1,18 @@
+# What this repository has built of F5, one row per requirement (OPS-R74).
+# Change a row in the pull request that changes whether its requirement is met.
+# The format and the checks are in the specification's scripts/status_check.py.
+
+requirement = [
+  { id = "F5-R3", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/source.rs", "crates/lemonfiber-core/src/plugin/catalogue.rs"] },
+  { id = "F5-R4", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/source.rs", "crates/lemonfiber-core/src/app/plugins/fetching.rs"] },
+  { id = "F5-R5", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/declared.rs", "crates/lemonfiber/src/render/plugin/machine/listed.rs", "crates/lemonfiber-core/src/app/plugins.rs"] },
+  { id = "F5-R6", state = "done", evidence = ["crates/lemonfiber-core/src/app/plugins/cataloguing.rs", "crates/lemonfiber-core/src/app/plugins/fetching.rs", "crates/lemonfiber-core/src/app/plugins.rs"] },
+  { id = "F5-R7", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/installed.rs"] },
+  { id = "F5-R8", state = "done", evidence = ["crates/lemonfiber-plugin/src/refusing/recipes.rs"] },
+  { id = "F5-R9", state = "done", evidence = ["crates/lemonfiber-core/src/outbound/theirs.rs"] },
+  { id = "F5-R10", state = "done", evidence = ["crates/lemonfiber-core/src/app/plugins/cataloguing.rs"] },
+  { id = "F5-R11", state = "done", evidence = ["crates/lemonfiber-core/src/app/plugins/fetching.rs"] },
+  { id = "F5-R12", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/declared.rs", "crates/lemonfiber/src/render/plugin/machine/listed.rs", "crates/lemonfiber-core/src/app/plugins.rs"] },
+  { id = "F5-R14", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/source.rs", "crates/lemonfiber-core/src/plugin/catalogue.rs"] },
+  { id = "F5-R15", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/catalogue.rs", "crates/lemonfiber-core/src/app/plugins/newest.rs"] },
+]

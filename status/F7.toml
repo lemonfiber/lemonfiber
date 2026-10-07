@@ -1,0 +1,18 @@
+# What this repository has built of F7, one row per requirement (OPS-R74).
+# Change a row in the pull request that changes whether its requirement is met.
+# The format and the checks are in the specification's scripts/status_check.py.
+
+requirement = [
+  { id = "F7-R1", state = "done", evidence = ["crates/lemonfiber-core/src/rollback.rs", "crates/lemonfiber-core/src/plugin/placing.rs", "crates/lemonfiber-core/src/app/plugins.rs"] },
+  { id = "F7-R2", state = "done", evidence = ["crates/lemonfiber-core/src/rollback.rs", "crates/lemonfiber-core/src/plugin/placing.rs", "crates/lemonfiber-core/src/app/plugins.rs"] },
+  { id = "F7-R3", state = "done", evidence = ["crates/lemonfiber-core/src/wiring.rs", "crates/lemonfiber-core/src/wiring/settling.rs", "crates/lemonfiber-core/src/doctor.rs"] },
+  { id = "F7-R4", state = "done", evidence = ["crates/lemonfiber-core/src/origin/journalled.rs", "crates/lemonfiber-core/src/app/configuring.rs", "crates/lemonfiber-core/src/origin.rs"] },
+  { id = "F7-R5", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/declared.rs", "crates/lemonfiber-core/src/plugin/register.rs"] },
+  { id = "F7-R6", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/stating.rs", "crates/lemonfiber-plugin/src/refusing/reaching.rs"], landed = "6a68df7" },
+  { id = "F7-R7", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/stating.rs", "crates/lemonfiber-plugin/src/refusing/reaching.rs"], landed = "6a68df7" },
+  { id = "F7-R8", state = "done", evidence = ["crates/lemonfiber-core/src/app/credentials/reading.rs", "crates/lemonfiber-core/src/credential.rs"] },
+  { id = "F7-R9", state = "done", evidence = ["crates/lemonfiber-core/src/outbound/theirs.rs"] },
+  { id = "F7-R10", state = "done", evidence = ["crates/lemonfiber-core/src/origin/journalled.rs", "crates/lemonfiber-core/src/app/configuring.rs", "crates/lemonfiber-core/src/origin.rs"] },
+  { id = "F7-R11", state = "done", evidence = ["crates/lemonfiber-core/src/origin.rs"] },
+  { id = "F7-R12", state = "done", evidence = ["crates/lemonfiber/tests/architecture/nothing_a_plugin_brings_gets_its_own_account.rs"] },
+]

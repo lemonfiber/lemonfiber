@@ -1,0 +1,18 @@
+# What this repository has built of D2, one row per requirement (OPS-R74).
+# Change a row in the pull request that changes whether its requirement is met.
+# The format and the checks are in the specification's scripts/status_check.py.
+
+requirement = [
+  { id = "D2-R1", state = "done", evidence = ["crates/lemonfiber-core/src/quality.rs", "crates/lemonfiber-core/src/recyclarr.rs"] },
+  { id = "D2-R2", state = "done", evidence = ["crates/lemonfiber-core/src/quality.rs", "crates/lemonfiber-core/src/recyclarr.rs"] },
+  { id = "D2-R3", state = "done", evidence = ["crates/lemonfiber-core/src/quality.rs", "crates/lemonfiber-core/src/recyclarr.rs"] },
+  { id = "D2-R4", state = "done", evidence = ["crates/lemonfiber-core/src/quality.rs", "crates/lemonfiber-core/src/recyclarr.rs"] },
+  { id = "D2-R5", state = "done", evidence = ["crates/lemonfiber-core/src/quality.rs", "crates/lemonfiber-core/src/recyclarr.rs"] },
+  { id = "D2-R6", state = "done", evidence = ["crates/lemonfiber-core/src/quality.rs", "crates/lemonfiber-core/src/recyclarr.rs"] },
+  { id = "D2-R7", state = "done", evidence = ["crates/lemonfiber-core/src/quality.rs", "crates/lemonfiber-core/src/recyclarr.rs"] },
+  { id = "D2-R8", state = "done", evidence = ["crates/lemonfiber-core/src/quality.rs", "crates/lemonfiber-core/src/recyclarr.rs"] },
+  { id = "D2-R9", state = "done", evidence = ["crates/lemonfiber-core/src/quality.rs", "crates/lemonfiber-core/src/recyclarr.rs"] },
+  { id = "D2-R10", state = "done", evidence = ["crates/lemonfiber-core/src/quality.rs", "crates/lemonfiber-core/src/recyclarr.rs"] },
+  { id = "D2-R11", state = "done", evidence = ["crates/lemonfiber-core/src/quality.rs", "crates/lemonfiber-core/src/recyclarr.rs"] },
+  { id = "D2-R12", state = "done", evidence = ["crates/lemonfiber-core/src/quality.rs", "crates/lemonfiber-core/src/recyclarr.rs"] },
+]

@@ -1,0 +1,21 @@
+# What this repository has built of C4, one row per requirement (OPS-R74).
+# Change a row in the pull request that changes whether its requirement is met.
+# The format and the checks are in the specification's scripts/status_check.py.
+
+requirement = [
+  { id = "C4-R1", state = "done", evidence = ["crates/lemonfiber-core/src/bundle.rs", "crates/lemonfiber-core/src/bytes.rs"] },
+  { id = "C4-R2", state = "done", evidence = ["crates/lemonfiber-core/src/bundle.rs", "crates/lemonfiber-core/src/bytes.rs"] },
+  { id = "C4-R3", state = "done", evidence = ["crates/lemonfiber-core/src/bundle.rs", "crates/lemonfiber-core/src/lib.rs"] },
+  { id = "C4-R4", state = "done", evidence = [".github/workflows/sonar.yml", "crates/lemonfiber-core/src/app.rs"] },
+  { id = "C4-R5", state = "done", evidence = ["crates/lemonfiber-core/src/bundle/tests.rs", "crates/lemonfiber-error/src/withheld/tests.rs", "crates/lemonfiber-adapters/src/filesystem.rs", "crates/lemonfiber-adapters/src/http.rs"] },
+  { id = "C4-R6", state = "done", evidence = ["crates/lemonfiber-core/src/bundle.rs", "crates/lemonfiber-core/src/bytes.rs"] },
+  { id = "C4-R7", state = "done", evidence = [".github/workflows/sonar.yml", "crates/lemonfiber-core/src/app.rs"] },
+  { id = "C4-R8", state = "done", evidence = ["crates/lemonfiber-api/src/actions/asked.rs", "crates/lemonfiber-core/src/bundle.rs"] },
+  { id = "C4-R9", state = "done", evidence = ["crates/lemonfiber-core/src/bundle.rs", "crates/lemonfiber-core/src/bytes.rs"] },
+  { id = "C4-R10", state = "done", evidence = [".github/workflows/sonar.yml", "crates/lemonfiber-core/src/app.rs"] },
+  { id = "C4-R11", state = "done", evidence = ["crates/lemonfiber-core/src/bundle.rs", "crates/lemonfiber-core/src/bytes.rs"] },
+  { id = "C4-R12", state = "done", evidence = ["crates/lemonfiber-core/src/app.rs", "crates/lemonfiber-core/src/bundle.rs"] },
+  { id = "C4-R13", state = "done", evidence = ["crates/lemonfiber-core/src/bundle.rs", "crates/lemonfiber-core/src/bytes.rs"] },
+  { id = "C4-R14", state = "done", evidence = [".github/workflows/sonar.yml", "crates/lemonfiber-core/src/app.rs"] },
+  { id = "C4-R16", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/examining.rs", "crates/lemonfiber-core/src/doctor/vpn/pair.rs", "crates/lemonfiber-core/src/bundle/run.rs"] },
+]

@@ -1,0 +1,7 @@
+# What this repository has built of N9, one row per requirement (OPS-R74).
+# Change a row in the pull request that changes whether its requirement is met.
+# The format and the checks are in the specification's scripts/status_check.py.
+
+requirement = [
+  { id = "N9-R5", state = "partial", evidence = ["crates/lemonfiber-core/src/app/invite.rs"] },
+]

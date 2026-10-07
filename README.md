@@ -29,8 +29,7 @@
 > acts rather than only watching, and a web API a browser is served from;
 > [the parity table](.docs/architecture/surface-parity.md) names each one that
 > reaches a surface in part or not at all.
-> See [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md) for
-> built-vs-roadmap and the
+> See [`status/`](status/) for what is built, one row per requirement, and the
 > [roadmap](https://github.com/lemonfiber/spec/blob/main/00-overview/roadmap.md)
 > (this repo is milestones **M2–M15**).
 

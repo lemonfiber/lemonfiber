@@ -24,9 +24,13 @@ the logic and the rendering must stay separate.
 
 ## Where to start
 
-0. [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md) — what is built vs. what
-   the roadmap still asks for, so you don't reconstruct it from source. Keep it
-   current in the same PR as your change.
+0. Where every goal of every unreleased version stands — met, built and not yet
+   recorded, claimed by an open pull request, or open — is the report the spec's
+   `state` workflow publishes on its `state` branch (`STATE.md`), and
+   `just goals <version>` in the spec writes the same from local checkouts.
+   What this repository has built is [`status/`](status/), one row per
+   requirement with the code and test that hold it; change a row in the same PR
+   as the change it records.
 1. The three `30-repos/lemonfiber*.md` specs above.
 2. [`20-architecture/component-model.md`](https://github.com/lemonfiber/spec/blob/main/20-architecture/component-model.md) — the crate boundaries and async model.
 3. The feature you're implementing under `10-functional/features/`.

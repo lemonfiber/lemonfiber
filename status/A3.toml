@@ -1,0 +1,21 @@
+# What this repository has built of A3, one row per requirement (OPS-R74).
+# Change a row in the pull request that changes whether its requirement is met.
+# The format and the checks are in the specification's scripts/status_check.py.
+
+requirement = [
+  { id = "A3-R1", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/credentials.rs", "crates/lemonfiber-core/src/servarr.rs"] },
+  { id = "A3-R2", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/credentials.rs", "crates/lemonfiber-core/src/servarr.rs"] },
+  { id = "A3-R3", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/credentials.rs", "crates/lemonfiber-core/src/servarr.rs"] },
+  { id = "A3-R4", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/credentials.rs", "crates/lemonfiber-core/src/servarr.rs"] },
+  { id = "A3-R5", state = "done", evidence = ["crates/lemonfiber-core/src/validate.rs", "crates/lemonfiber-core/src/app/setup/proving.rs"] },
+  { id = "A3-R6", state = "done", evidence = ["crates/lemonfiber-core/src/validate.rs"] },
+  { id = "A3-R7", state = "done", evidence = ["crates/lemonfiber-adapters/src/http.rs", "crates/lemonfiber-core/src/validate/reading.rs"] },
+  { id = "A3-R8", state = "done", evidence = ["crates/lemonfiber-core/src/app.rs", "crates/lemonfiber-core/src/config.rs"] },
+  { id = "A3-R9", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/vpn/probe.rs", "crates/lemonfiber-core/src/doctor/vpn/leak.rs"] },
+  { id = "A3-R10", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/credentials.rs", "crates/lemonfiber-core/src/servarr.rs"] },
+  { id = "A3-R11", state = "done", evidence = ["crates/lemonfiber-core/src/validate.rs"] },
+  { id = "A3-R12", state = "done", evidence = ["crates/lemonfiber-core/src/validate/reading.rs"] },
+  { id = "A3-R13", state = "done", evidence = ["crates/lemonfiber-core/src/app/setup/proving.rs"] },
+  { id = "A3-R14", state = "done", evidence = ["crates/lemonfiber-core/src/app.rs", "crates/lemonfiber-core/src/config.rs"] },
+  { id = "A3-R15", state = "done", evidence = ["crates/lemonfiber-core/src/app.rs", "crates/lemonfiber-core/src/config.rs"] },
+]

@@ -1,0 +1,20 @@
+# What this repository has built of E4, one row per requirement (OPS-R74).
+# Change a row in the pull request that changes whether its requirement is met.
+# The format and the checks are in the specification's scripts/status_check.py.
+
+requirement = [
+  { id = "E4-R1", state = "done", evidence = ["crates/lemonfiber-core/src/journal.rs", "crates/lemonfiber-core/src/app/recover.rs"] },
+  { id = "E4-R2", state = "done", evidence = ["crates/lemonfiber-core/src/app/putting_back.rs", "crates/lemonfiber-core/src/app/recover.rs"] },
+  { id = "E4-R3", state = "done", evidence = ["crates/lemonfiber-core/src/journal.rs", "crates/lemonfiber-core/src/rollback.rs", "crates/lemonfiber-core/src/app/history.rs"], landed = "01d7407" },
+  { id = "E4-R4", state = "done", evidence = ["crates/lemonfiber-core/src/app/putting_back.rs", "crates/lemonfiber-core/src/app/recover.rs"] },
+  { id = "E4-R5", state = "done", evidence = ["crates/lemonfiber-core/src/rollback.rs", "crates/lemonfiber-core/src/migration/version.rs", "crates/lemonfiber-core/src/app/history.rs"] },
+  { id = "E4-R6", state = "done", evidence = ["crates/lemonfiber-core/src/app/putting_back.rs", "crates/lemonfiber-core/src/app/recover.rs"] },
+  { id = "E4-R7", state = "done", evidence = ["crates/lemonfiber-core/src/journal.rs", "crates/lemonfiber-core/src/rollback.rs", "crates/lemonfiber-core/src/app/history.rs"], landed = "01d7407" },
+  { id = "E4-R8", state = "done", evidence = ["crates/lemonfiber-core/src/journal.rs", "crates/lemonfiber-core/src/rollback.rs", "crates/lemonfiber-core/src/app/history.rs"], landed = "01d7407" },
+  { id = "E4-R9", state = "done", evidence = ["crates/lemonfiber-core/src/journal.rs", "crates/lemonfiber-core/src/rollback.rs", "crates/lemonfiber-core/src/app/history.rs"], landed = "01d7407" },
+  { id = "E4-R10", state = "done", evidence = ["crates/lemonfiber-core/src/app/putting_back.rs", "crates/lemonfiber-core/src/app/recover.rs"] },
+  { id = "E4-R11", state = "done", evidence = ["crates/lemonfiber-core/src/journal.rs", "crates/lemonfiber-core/src/rollback.rs", "crates/lemonfiber-core/src/app/history.rs"], landed = "01d7407" },
+  { id = "E4-R12", state = "done", evidence = ["crates/lemonfiber-core/src/app/putting_back.rs", "crates/lemonfiber-core/src/app/recover.rs"] },
+  { id = "E4-R13", state = "done", evidence = ["crates/lemonfiber-core/src/journal/keeping.rs"] },
+  { id = "E4-R14", state = "done", evidence = ["crates/lemonfiber-api/src/actions.rs", "crates/lemonfiber-api/src/actions/asked.rs"] },
+]

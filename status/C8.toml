@@ -1,0 +1,20 @@
+# What this repository has built of C8, one row per requirement (OPS-R74).
+# Change a row in the pull request that changes whether its requirement is met.
+# The format and the checks are in the specification's scripts/status_check.py.
+
+requirement = [
+  { id = "C8-R1", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/providers.rs", "crates/lemonfiber-core/src/provider.rs"] },
+  { id = "C8-R2", state = "done", evidence = ["crates/lemonfiber-core/src/provider/trouble.rs"] },
+  { id = "C8-R3", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/providers.rs", "crates/lemonfiber-core/src/provider.rs"] },
+  { id = "C8-R4", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/providers.rs", "crates/lemonfiber-core/src/provider.rs"] },
+  { id = "C8-R5", state = "done", evidence = ["crates/lemonfiber-core/src/app/engine.rs", "crates/lemonfiber-core/src/doctor/providers.rs"] },
+  { id = "C8-R6", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/providers.rs", "crates/lemonfiber-core/src/provider.rs"] },
+  { id = "C8-R7", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/providers.rs", "crates/lemonfiber-core/src/provider.rs"] },
+  { id = "C8-R8", state = "done", evidence = ["crates/lemonfiber-core/src/app/trace.rs"] },
+  { id = "C8-R9", state = "done", evidence = ["crates/lemonfiber-core/src/provider/trouble.rs"] },
+  { id = "C8-R10", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/providers.rs", "crates/lemonfiber-core/src/provider.rs"] },
+  { id = "C8-R11", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/providers.rs", "crates/lemonfiber-core/src/provider.rs"] },
+  { id = "C8-R12", state = "done", evidence = ["crates/lemonfiber-core/src/provider/trouble.rs"] },
+  { id = "C8-R13", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/providers.rs", "crates/lemonfiber-core/src/provider.rs"] },
+  { id = "C8-R14", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/providers.rs", "crates/lemonfiber-core/src/provider.rs"] },
+]

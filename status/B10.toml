@@ -1,0 +1,22 @@
+# What this repository has built of B10, one row per requirement (OPS-R74).
+# Change a row in the pull request that changes whether its requirement is met.
+# The format and the checks are in the specification's scripts/status_check.py.
+
+requirement = [
+  { id = "B10-R1", state = "done", evidence = ["crates/lemonfiber-ports/src/hosting.rs", "crates/lemonfiber-adapters/src/hosting/launchd.rs", "crates/lemonfiber-adapters/src/hosting/systemd.rs", "crates/lemonfiber-core/src/app/hosting.rs"] },
+  { id = "B10-R2", state = "done", evidence = ["crates/lemonfiber-ports/src/hosting.rs", "crates/lemonfiber-adapters/src/hosting/launchd.rs", "crates/lemonfiber-adapters/src/hosting/systemd.rs", "crates/lemonfiber-core/src/app/hosting.rs"] },
+  { id = "B10-R3", state = "done", evidence = ["crates/lemonfiber-ports/src/hosting.rs", "crates/lemonfiber-adapters/src/hosting/launchd.rs", "crates/lemonfiber-adapters/src/hosting/systemd.rs", "crates/lemonfiber-core/src/app/hosting.rs"] },
+  { id = "B10-R4", state = "done", evidence = ["crates/lemonfiber-ports/src/hosting.rs", "crates/lemonfiber-adapters/src/hosting/launchd.rs", "crates/lemonfiber-adapters/src/hosting/systemd.rs", "crates/lemonfiber-core/src/app/hosting.rs"] },
+  { id = "B10-R5", state = "done", evidence = ["crates/lemonfiber-ports/src/hosting.rs", "crates/lemonfiber-adapters/src/hosting/launchd.rs", "crates/lemonfiber-adapters/src/hosting/systemd.rs", "crates/lemonfiber-core/src/app/hosting.rs"] },
+  { id = "B10-R6", state = "done", evidence = ["crates/lemonfiber-ports/src/hosting.rs", "crates/lemonfiber-adapters/src/hosting/launchd.rs", "crates/lemonfiber-adapters/src/hosting/systemd.rs", "crates/lemonfiber-core/src/app/hosting.rs"] },
+  { id = "B10-R7", state = "done", evidence = ["crates/lemonfiber-ports/src/hosting.rs", "crates/lemonfiber-adapters/src/hosting/launchd.rs", "crates/lemonfiber-adapters/src/hosting/systemd.rs", "crates/lemonfiber-core/src/app/hosting.rs"] },
+  { id = "B10-R8", state = "done", evidence = ["crates/lemonfiber-ports/src/hosting.rs", "crates/lemonfiber-adapters/src/hosting/launchd.rs", "crates/lemonfiber-adapters/src/hosting/systemd.rs", "crates/lemonfiber-core/src/app/hosting.rs"] },
+  { id = "B10-R9", state = "done", evidence = ["crates/lemonfiber-ports/src/hosting.rs", "crates/lemonfiber-adapters/src/hosting/launchd.rs", "crates/lemonfiber-adapters/src/hosting/systemd.rs", "crates/lemonfiber-core/src/app/hosting.rs"] },
+  { id = "B10-R10", state = "done", evidence = ["crates/lemonfiber-ports/src/hosting.rs", "crates/lemonfiber-adapters/src/hosting/launchd.rs", "crates/lemonfiber-adapters/src/hosting/systemd.rs", "crates/lemonfiber-core/src/app/hosting.rs"] },
+  { id = "B10-R11", state = "done", evidence = ["crates/lemonfiber-ports/src/hosting.rs", "crates/lemonfiber-adapters/src/hosting/launchd.rs", "crates/lemonfiber-adapters/src/hosting/systemd.rs", "crates/lemonfiber-core/src/app/hosting.rs"] },
+  { id = "B10-R12", state = "done", evidence = ["crates/lemonfiber-ports/src/hosting.rs", "crates/lemonfiber-adapters/src/hosting/launchd.rs", "crates/lemonfiber-adapters/src/hosting/systemd.rs", "crates/lemonfiber-core/src/app/hosting.rs"] },
+  { id = "B10-R13", state = "done", evidence = ["crates/lemonfiber-ports/src/hosting.rs", "crates/lemonfiber-adapters/src/hosting/launchd.rs", "crates/lemonfiber-adapters/src/hosting/systemd.rs", "crates/lemonfiber-core/src/app/hosting.rs"] },
+  { id = "B10-R14", state = "done", evidence = ["crates/lemonfiber-ports/src/hosting.rs", "crates/lemonfiber-adapters/src/hosting/launchd.rs", "crates/lemonfiber-adapters/src/hosting/systemd.rs", "crates/lemonfiber-core/src/app/hosting.rs"] },
+  { id = "B10-R15", state = "done", evidence = ["crates/lemonfiber-ports/src/hosting.rs", "crates/lemonfiber-adapters/src/hosting/launchd.rs", "crates/lemonfiber-adapters/src/hosting/systemd.rs", "crates/lemonfiber-core/src/app/hosting.rs"] },
+  { id = "B10-R16", state = "done", evidence = ["crates/lemonfiber-ports/src/hosting.rs", "crates/lemonfiber-adapters/src/hosting/launchd.rs", "crates/lemonfiber-adapters/src/hosting/systemd.rs", "crates/lemonfiber-core/src/app/hosting.rs"] },
+]

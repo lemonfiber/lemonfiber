@@ -1,0 +1,19 @@
+# What this repository has built of D8, one row per requirement (OPS-R74).
+# Change a row in the pull request that changes whether its requirement is met.
+# The format and the checks are in the specification's scripts/status_check.py.
+
+requirement = [
+  { id = "D8-R1", state = "done", evidence = ["crates/lemonfiber-core/src/rating.rs", ".docs/architecture/parental-controls.md", "crates/lemonfiber-core/src/age_limit.rs"] },
+  { id = "D8-R2", state = "done", evidence = ["crates/lemonfiber-core/tests/integration/what_an_invitation_lets_them_watch.rs", "crates/lemonfiber-core/src/rating.rs", "crates/lemonfiber-core/src/jellyfin/household.rs"] },
+  { id = "D8-R3", state = "done", evidence = ["crates/lemonfiber-core/tests/integration/what_an_invitation_lets_them_watch.rs", "crates/lemonfiber-core/src/rating.rs", "crates/lemonfiber-core/src/jellyfin/household.rs"] },
+  { id = "D8-R4", state = "done", evidence = ["crates/lemonfiber-core/tests/integration/what_an_invitation_lets_them_watch.rs", "crates/lemonfiber-core/src/rating.rs", "crates/lemonfiber-core/src/jellyfin/household.rs"] },
+  { id = "D8-R5", state = "done", evidence = ["crates/lemonfiber-core/tests/integration/what_an_invitation_lets_them_watch.rs", "crates/lemonfiber-core/src/rating.rs", "crates/lemonfiber-core/src/jellyfin/household.rs"] },
+  { id = "D8-R6", state = "done", evidence = ["crates/lemonfiber-core/tests/integration/what_an_invitation_lets_them_watch.rs", "crates/lemonfiber-core/src/rating.rs", "crates/lemonfiber-core/src/jellyfin/household.rs"] },
+  { id = "D8-R7", state = "done", evidence = ["crates/lemonfiber-core/tests/integration/what_an_invitation_lets_them_watch.rs", "crates/lemonfiber-core/src/rating.rs", "crates/lemonfiber-core/src/jellyfin/household.rs"] },
+  { id = "D8-R8", state = "done", evidence = ["scripts/a_library_with_certificates_on_it.py", "crates/lemonfiber-core/src/jellyfin/household.rs", "crates/lemonfiber-core/src/jellyfin/library.rs", ".docs/architecture/parental-controls.md"] },
+  { id = "D8-R9", state = "done", evidence = ["scripts/a_library_with_certificates_on_it.py", "crates/lemonfiber-core/src/jellyfin/household.rs", "crates/lemonfiber-core/src/jellyfin/library.rs", ".docs/architecture/parental-controls.md"] },
+  { id = "D8-R10", state = "done", evidence = ["crates/lemonfiber-core/tests/integration/what_an_invitation_lets_them_watch.rs", "crates/lemonfiber-core/src/rating.rs", "crates/lemonfiber-core/src/jellyfin/household.rs"] },
+  { id = "D8-R11", state = "done", evidence = ["scripts/a_library_with_certificates_on_it.py", "crates/lemonfiber-core/src/jellyfin/household.rs", "crates/lemonfiber-core/src/jellyfin/library.rs", ".docs/architecture/parental-controls.md"] },
+  { id = "D8-R12", state = "done", evidence = ["crates/lemonfiber-core/src/rating.rs", ".docs/architecture/parental-controls.md", "crates/lemonfiber-core/src/age_limit.rs"] },
+  { id = "D8-R13", state = "done", evidence = ["crates/lemonfiber-core/tests/integration/what_an_invitation_lets_them_watch.rs", "crates/lemonfiber-core/src/rating.rs", "crates/lemonfiber-core/src/jellyfin/household.rs"] },
+]

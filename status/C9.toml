@@ -1,0 +1,21 @@
+# What this repository has built of C9, one row per requirement (OPS-R74).
+# Change a row in the pull request that changes whether its requirement is met.
+# The format and the checks are in the specification's scripts/status_check.py.
+
+requirement = [
+  { id = "C9-R1", state = "done", evidence = ["crates/lemonfiber-core/src/baseline.rs", "crates/lemonfiber-core/src/seed.rs"] },
+  { id = "C9-R2", state = "done", evidence = ["crates/lemonfiber-core/src/baseline.rs", "crates/lemonfiber-core/src/seed.rs"] },
+  { id = "C9-R3", state = "done", evidence = ["crates/lemonfiber-core/src/baseline.rs", "crates/lemonfiber-core/src/seed.rs"] },
+  { id = "C9-R4", state = "done", evidence = ["crates/lemonfiber-core/src/baseline.rs", "crates/lemonfiber-core/src/seed.rs"] },
+  { id = "C9-R5", state = "done", evidence = ["crates/lemonfiber-core/src/baseline.rs", "crates/lemonfiber-core/src/seed.rs"] },
+  { id = "C9-R6", state = "done", evidence = ["crates/lemonfiber-core/src/baseline.rs", "crates/lemonfiber-core/src/seed.rs"] },
+  { id = "C9-R7", state = "done", evidence = ["crates/lemonfiber-core/src/test_support.rs", "crates/lemonfiber-core/src/app.rs", "crates/lemonfiber-core/src/app/materialise.rs"] },
+  { id = "C9-R8", state = "done", evidence = ["crates/lemonfiber-core/src/baseline.rs", "crates/lemonfiber-core/src/seed.rs"] },
+  { id = "C9-R9", state = "done", evidence = ["crates/lemonfiber-core/src/baseline.rs", "crates/lemonfiber-core/src/seed.rs"] },
+  { id = "C9-R10", state = "done", evidence = ["crates/lemonfiber-core/src/test_support.rs", "crates/lemonfiber-core/src/app.rs", "crates/lemonfiber-core/src/app/materialise.rs"] },
+  { id = "C9-R11", state = "done", evidence = ["crates/lemonfiber-core/src/materialised.rs", "crates/lemonfiber-core/src/config/store.rs"] },
+  { id = "C9-R12", state = "done", evidence = ["crates/lemonfiber-core/src/test_support.rs", "crates/lemonfiber-core/src/app.rs", "crates/lemonfiber-core/src/app/materialise.rs"] },
+  { id = "C9-R13", state = "done", evidence = ["crates/lemonfiber-core/src/baseline.rs", "crates/lemonfiber-core/src/seed.rs"] },
+  { id = "C9-R14", state = "done", evidence = ["crates/lemonfiber-core/src/baseline.rs", "crates/lemonfiber-core/src/seed.rs"] },
+  { id = "C9-R15", state = "done", evidence = ["crates/lemonfiber-core/src/test_support.rs", "crates/lemonfiber-core/src/app/engine/diagnosis.rs", "crates/lemonfiber-core/src/app/recover.rs"] },
+]

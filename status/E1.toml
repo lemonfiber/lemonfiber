@@ -1,0 +1,20 @@
+# What this repository has built of E1, one row per requirement (OPS-R74).
+# Change a row in the pull request that changes whether its requirement is met.
+# The format and the checks are in the specification's scripts/status_check.py.
+
+requirement = [
+  { id = "E1-R1", state = "done", evidence = ["crates/lemonfiber-manifest/src/validate.rs", "crates/lemonfiber-core/src/migration/image.rs"] },
+  { id = "E1-R2", state = "done", evidence = ["crates/lemonfiber-core/tests/integration/update.rs", "crates/lemonfiber-core/src/update.rs", "crates/lemonfiber-core/src/update/run.rs"], landed = "23e2c42" },
+  { id = "E1-R3", state = "done", evidence = ["crates/lemonfiber-core/tests/integration/update.rs", "crates/lemonfiber-core/src/update.rs", "crates/lemonfiber-core/src/update/run.rs"], landed = "23e2c42" },
+  { id = "E1-R4", state = "done", evidence = ["crates/lemonfiber-core/tests/integration/update.rs", "crates/lemonfiber-core/src/update.rs", "crates/lemonfiber-core/src/update/run.rs"], landed = "23e2c42" },
+  { id = "E1-R5", state = "done", evidence = ["crates/lemonfiber-core/tests/integration/update.rs", "crates/lemonfiber-core/src/update.rs", "crates/lemonfiber-core/src/update/run.rs"], landed = "23e2c42" },
+  { id = "E1-R6", state = "done", evidence = ["crates/lemonfiber-core/tests/integration/update.rs", "crates/lemonfiber-core/src/update.rs", "crates/lemonfiber-core/src/update/run.rs"], landed = "23e2c42" },
+  { id = "E1-R7", state = "done", evidence = ["crates/lemonfiber-core/tests/integration/update.rs", "crates/lemonfiber-core/src/update.rs", "crates/lemonfiber-core/src/update/run.rs"], landed = "23e2c42" },
+  { id = "E1-R8", state = "done", evidence = ["crates/lemonfiber-core/tests/integration/update.rs", "crates/lemonfiber-core/src/update.rs", "crates/lemonfiber-core/src/update/run.rs"], landed = "23e2c42" },
+  { id = "E1-R9", state = "done", evidence = ["crates/lemonfiber-core/tests/integration/update.rs", "crates/lemonfiber-core/src/update.rs", "crates/lemonfiber-core/src/update/run.rs"], landed = "23e2c42" },
+  { id = "E1-R10", state = "done", evidence = ["crates/lemonfiber-core/tests/integration/update.rs", "crates/lemonfiber-core/src/update.rs", "crates/lemonfiber-core/src/update/run.rs"], landed = "23e2c42" },
+  { id = "E1-R11", state = "done", evidence = ["crates/lemonfiber-core/tests/integration/update.rs", "crates/lemonfiber-core/src/update.rs", "crates/lemonfiber-core/src/update/run.rs"], landed = "23e2c42" },
+  { id = "E1-R12", state = "done", evidence = ["crates/lemonfiber-core/tests/integration/update.rs", "crates/lemonfiber-core/src/update.rs", "crates/lemonfiber-core/src/update/run.rs"], landed = "23e2c42" },
+  { id = "E1-R13", state = "done", evidence = ["crates/lemonfiber-core/tests/integration/update.rs", "crates/lemonfiber-core/src/update.rs", "crates/lemonfiber-core/src/update/run.rs"], landed = "23e2c42" },
+  { id = "E1-R14", state = "done", evidence = ["crates/lemonfiber-core/tests/integration/update.rs", "crates/lemonfiber-core/src/update.rs", "crates/lemonfiber-core/src/update/run.rs"], landed = "23e2c42" },
+]

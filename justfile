@@ -272,7 +272,7 @@ stack-moved:
 # workflow, which runs the self-test as its own first step — true, and invisible
 # to a checker that reads this tree. Proving it here is the better half anyway:
 # it fails on the machine that broke it rather than after a push.
-# IMPLEMENTATION-STATUS.md, written from status.toml — the file the release gates read.
+# IMPLEMENTATION-STATUS.md, written from status/ for the documentation site.
 status:
     python3 scripts/implementation_status.py --write
 

@@ -1,0 +1,21 @@
+# What this repository has built of F8, one row per requirement (OPS-R74).
+# Change a row in the pull request that changes whether its requirement is met.
+# The format and the checks are in the specification's scripts/status_check.py.
+
+requirement = [
+  { id = "F8-R1", state = "partial", evidence = ["crates/lemonfiber-plugin/src/schema/recipe.rs", "crates/lemonfiber-plugin/src/refusing/recipes.rs", "crates/lemonfiber-plugin/src/offering.rs", "crates/lemonfiber-plugin/src/refusing/recipes/bounds/tests.rs"] },
+  { id = "F8-R2", state = "done", evidence = ["crates/lemonfiber-plugin/src/refusing/recipes.rs", "crates/lemonfiber-plugin/src/refusing/recipes/whither.rs", "crates/lemonfiber-plugin/src/refusing/recipes/bounds.rs", "crates/lemonfiber-api/src/contract/stability/declared.rs"] },
+  { id = "F8-R3", state = "done", evidence = ["crates/lemonfiber-plugin/src/refusing/recipes.rs", "crates/lemonfiber-plugin/src/refusing/recipes/whither.rs", "crates/lemonfiber-plugin/src/refusing/recipes/bounds.rs", "crates/lemonfiber-api/src/contract/stability/declared.rs"] },
+  { id = "F8-R4", state = "done", evidence = ["crates/lemonfiber-plugin/src/refusing/recipes.rs", "crates/lemonfiber-plugin/src/refusing/recipes/whither.rs", "crates/lemonfiber-plugin/src/refusing/recipes/bounds.rs", "crates/lemonfiber-api/src/contract/stability/declared.rs"] },
+  { id = "F8-R5", state = "done", evidence = ["crates/lemonfiber-plugin/src/refusing/recipes.rs", "crates/lemonfiber-plugin/src/refusing/recipes/whither.rs", "crates/lemonfiber-plugin/src/refusing/recipes/bounds.rs", "crates/lemonfiber-api/src/contract/stability/declared.rs"] },
+  { id = "F8-R6", state = "done", evidence = ["crates/lemonfiber-plugin/src/refusing/recipes.rs", "crates/lemonfiber-plugin/src/refusing.rs", "crates/lemonfiber-plugin/src/refusing/recipes/tests.rs"], landed = "64097060028ada772e859b1139db31b9e41cb0da" },
+  { id = "F8-R7", state = "partial", evidence = ["crates/lemonfiber-core/src/plugin/recipes.rs", "crates/lemonfiber-core/src/app/plugins/offering.rs", "crates/lemonfiber-api/src/actions/named/extending.rs", "crates/lemonfiber-core/src/app/plugins/offering/tests.rs"], landed = "01e63d948c471e0a959ff04fdb3494af1fe9f9ab" },
+  { id = "F8-R8", state = "done", evidence = ["crates/lemonfiber-plugin/src/refusing/recipes.rs", "crates/lemonfiber-plugin/src/refusing/recipes/whither.rs", "crates/lemonfiber-plugin/src/refusing/recipes/bounds.rs", "crates/lemonfiber-api/src/contract/stability/declared.rs"] },
+  { id = "F8-R9", state = "partial", evidence = ["crates/lemonfiber-core/src/outward.rs", "crates/lemonfiber-core/src/outward/classes.rs", "crates/lemonfiber-core/src/app/plugins/reach.rs"] },
+  { id = "F8-R10", state = "partial", evidence = ["crates/lemonfiber-plugin/src/refusing/recipes.rs", "crates/lemonfiber-plugin/src/offering.rs", "crates/lemonfiber-plugin/src/refusing/recipes/tests.rs"] },
+  { id = "F8-R11", state = "done", evidence = ["crates/lemonfiber-plugin/src/schema.rs", "contract/adapters.json", "crates/lemonfiber-plugin/src/refusing/adapting.rs"] },
+  { id = "F8-R12", state = "done", evidence = ["crates/lemonfiber-plugin/src/schema.rs", "contract/adapters.json", "crates/lemonfiber-plugin/src/refusing/adapting.rs"] },
+  { id = "F8-R13", state = "done", evidence = ["crates/lemonfiber-plugin/src/schema.rs", "contract/adapters.json", "crates/lemonfiber-plugin/src/refusing/adapting.rs"] },
+  { id = "F8-R14", state = "partial", evidence = ["crates/lemonfiber-plugin/src/schema/recipe.rs"] },
+  { id = "F8-R16", state = "done", evidence = ["crates/lemonfiber-plugin/src/refusing/recipes.rs", "crates/lemonfiber-plugin/src/refusing/recipes/whither.rs", "crates/lemonfiber-plugin/src/refusing/recipes/bounds.rs", "crates/lemonfiber-api/src/contract/stability/declared.rs"] },
+]

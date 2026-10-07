@@ -1,0 +1,21 @@
+# What this repository has built of F10, one row per requirement (OPS-R74).
+# Change a row in the pull request that changes whether its requirement is met.
+# The format and the checks are in the specification's scripts/status_check.py.
+
+requirement = [
+  { id = "F10-R1", state = "done", evidence = ["crates/lemonfiber-core/examples/plugin_schema.rs", "crates/lemonfiber-core/src/plugin.rs"], landed = "553353f" },
+  { id = "F10-R2", state = "done", evidence = ["contract/plugin-manifest.schema.json"] },
+  { id = "F10-R3", state = "done", evidence = ["crates/lemonfiber/tests/architecture/what_the_build_forbids.rs", "crates/lemonfiber/tests/integration/what_a_manifest_claims.rs", "crates/lemonfiber/tests/integration/a_rehearsal_changes_nothing.rs"] },
+  { id = "F10-R4", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/recorded.rs", "crates/lemonfiber-core/src/plugin/claimed.rs"], landed = "86c7285" },
+  { id = "F10-R5", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/recorded.rs", "crates/lemonfiber-core/src/plugin/claimed.rs"], landed = "86c7285" },
+  { id = "F10-R6", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/recorded.rs", "crates/lemonfiber-core/src/plugin/claimed.rs"], landed = "86c7285" },
+  { id = "F10-R7", state = "done", evidence = ["crates/lemonfiber-core/src/app/plugins.rs"] },
+  { id = "F10-R8", state = "done", evidence = ["contract/extension-points.json", "contract/plugin-manifest.schema.json"] },
+  { id = "F10-R10", state = "done", evidence = ["crates/lemonfiber-plugin/src/conforming.rs"], landed = "172a24e" },
+  { id = "F10-R12", state = "done", evidence = ["crates/lemonfiber-plugin/src/schema/evidence.rs", "crates/lemonfiber-plugin/src/extension.rs"] },
+  { id = "F10-R13", state = "done", evidence = ["crates/lemonfiber-plugin/src/schema/evidence.rs", "crates/lemonfiber-plugin/src/extension.rs"] },
+  { id = "F10-R14", state = "done", evidence = ["crates/lemonfiber-plugin/src/schema/evidence.rs", "crates/lemonfiber-plugin/src/extension.rs"] },
+  { id = "F10-R15", state = "done", evidence = ["crates/lemonfiber-plugin/src/schema/evidence.rs", "crates/lemonfiber-plugin/src/extension.rs"] },
+  { id = "F10-R16", state = "done", evidence = ["crates/lemonfiber-plugin/src/schema/evidence.rs", "crates/lemonfiber-plugin/src/extension.rs"] },
+  { id = "F10-R17", state = "done", evidence = ["plugin-template:plugin.toml", "plugin-template:.github/reader/reader.py", "plugin-template:.github/reader/test_reader.py"] },
+]

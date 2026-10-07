@@ -71,10 +71,12 @@ WORK = ".release-gate"
 #: fetching it again would gate a different commit.
 SELF = "lemonfiber"
 
-#: The tracker, copied beside the spec so the no-stub gate can read it. That gate
-#: resolves the catalogue from its working directory, so it has to run inside the
-#: spec checkout, and it refuses a path outside it.
-TRACKER = "IMPLEMENTATION-STATUS.md"
+#: Where a repository keeps its tracker: one file, or one file per feature under a
+#: directory (the spec's OPS-R74). Each searched repository's is copied beside the
+#: spec so the no-stub gate can read it: that gate resolves the catalogue from its
+#: working directory, so it has to run inside the spec checkout, and it refuses a
+#: path outside it.
+TRACKERS = ("status.toml", "status")
 
 #: The release record the binary carries, which `just changelog` writes after a
 #: tag. It may lack the release being tagged, whose notes follow the tag, and no
@@ -265,6 +267,23 @@ def gather(spec: Path, version: str, work: Path) -> tuple[list[Step], list[str]]
     return steps, args
 
 
+def copied(repos: list[str], beside: Path, spec: Path) -> list[str]:
+    """Each `--repo=name=path` the goal gate read, as one naming a copy of its tracker
+    inside the spec checkout."""
+    args = []
+    for arg in repos:
+        name, _, raw = arg.removeprefix("--repo=").partition("=")
+        source, into = ROOT / raw, beside / name
+        into.mkdir(parents=True)
+        for kept in TRACKERS:
+            if (source / kept).is_dir():
+                shutil.copytree(source / kept, into / kept)
+            elif (source / kept).is_file():
+                shutil.copyfile(source / kept, into / kept)
+        args.append(f"--repo={name}={into.relative_to(spec).as_posix()}")
+    return args
+
+
 def written(version: str) -> Step:
     """Whether the record this tag's binary carries holds every release before it."""
     name = "the release record holds every earlier release"
@@ -340,10 +359,9 @@ def check(version: str, spec: Path, work: Path) -> list[Step]:
     if not at_main:
         return steps
 
-    tracker = ROOT / TRACKER
-    if not tracker.is_file():
+    if not any((ROOT / kept).exists() for kept in TRACKERS):
         steps.append(Step("the implementation status is readable", False,
-                          f"no {TRACKER} in the tree being tagged"))
+                          f"neither {' nor '.join(TRACKERS)} in the tree being tagged"))
         return steps
     steps.append(Step("the implementation status is readable", True))
 
@@ -370,30 +388,24 @@ def check(version: str, spec: Path, work: Path) -> list[Step]:
 
     ok, said = ran(
         sys.executable, str(spec / "scripts" / "gate.py"),
-        f"--manifest={manifest.as_posix()}", *repos, f"--status={TRACKER}",
+        f"--manifest={manifest.as_posix()}", *repos,
         cwd=ROOT,
     )
     steps.append(Step("every locked goal is satisfied", ok, said))
 
     # Inside the spec checkout: the no-stub gate resolves the feature catalogue
-    # and the version directory from its working directory, and refuses a status
-    # file outside it. A copy is what the tree being tagged holds, which is the
-    # commit this gate is about.
+    # and the version directory from its working directory, and refuses a path
+    # outside it. So each searched repository's tracker is copied in, the tree
+    # being tagged's included, which is the commit this gate is about.
     #
-    # Under a name nothing else uses, and removed whatever happens. The copy was
-    # `IMPLEMENTATION-STATUS.md` with no check that one was not already there, so
-    # running this by hand against a working spec clone that had one overwrote it
-    # and then deleted it.
-    beside = Path(tempfile.mkdtemp(prefix=".release-gate-", dir=spec)) / TRACKER
+    # Under a name nothing else uses, and removed whatever happens, so running
+    # this by hand against a working spec clone leaves nothing of it behind.
+    beside = Path(tempfile.mkdtemp(prefix=".release-gate-", dir=spec))
     try:
-        shutil.copyfile(tracker, beside)
-        ok, said = ran(
-            sys.executable, "scripts/check_no_stubs.py",
-            f"--version={version}", f"--status={beside.relative_to(spec).as_posix()}",
-            cwd=spec,
-        )
+        ok, said = ran(sys.executable, "scripts/check_no_stubs.py", f"--version={version}",
+                       *copied(repos, beside, spec), cwd=spec)
     finally:
-        shutil.rmtree(beside.parent, ignore_errors=True)
+        shutil.rmtree(beside, ignore_errors=True)
     steps.append(Step("no requirement it locks is unbuilt", ok, said))
     return steps
 

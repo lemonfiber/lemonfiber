@@ -1,0 +1,23 @@
+# What this repository has built of G8, one row per requirement (OPS-R74).
+# Change a row in the pull request that changes whether its requirement is met.
+# The format and the checks are in the specification's scripts/status_check.py.
+
+requirement = [
+  { id = "G8-R1", state = "done", evidence = ["crates/lemonfiber/tests/architecture/nothing_reports_on_you.rs", "deny.toml", "crates/lemonfiber/tests/integration/where_a_request_goes.rs"] },
+  { id = "G8-R2", state = "done", evidence = ["crates/lemonfiber/tests/architecture/nothing_reports_on_you.rs", "deny.toml", "crates/lemonfiber/tests/integration/where_a_request_goes.rs"] },
+  { id = "G8-R3", state = "done", evidence = ["crates/lemonfiber-core/src/outbound.rs", "crates/lemonfiber-core/src/config/reaching.rs"] },
+  { id = "G8-R4", state = "done", evidence = ["crates/lemonfiber-core/src/self_update/noticing.rs", "crates/lemonfiber-core/src/self_update/offered.rs"], landed = "a21dad1" },
+  { id = "G8-R5", state = "done", evidence = ["crates/lemonfiber-core/src/outbound.rs", "crates/lemonfiber-core/src/config/reaching.rs"] },
+  { id = "G8-R6", state = "done", evidence = ["crates/lemonfiber/tests/architecture/nothing_leaves_on_its_own.rs"] },
+  { id = "G8-R7", state = "done", evidence = ["crates/lemonfiber-core/src/stored.rs", "crates/lemonfiber-core/src/stored/run.rs", "crates/lemonfiber-core/src/config/paths.rs", "crates/lemonfiber-ports/src/filesystem.rs"] },
+  { id = "G8-R8", state = "done", evidence = ["crates/lemonfiber-core/src/stored.rs", "crates/lemonfiber-core/src/stored/run.rs", "crates/lemonfiber-core/src/config/paths.rs", "crates/lemonfiber-ports/src/filesystem.rs"] },
+  { id = "G8-R9", state = "done", evidence = ["crates/lemonfiber-core/src/outbound.rs", "crates/lemonfiber-core/src/config/reaching.rs"] },
+  { id = "G8-R10", state = "done", evidence = ["crates/lemonfiber-core/src/self_update/noticing.rs", "crates/lemonfiber-core/src/self_update/offered.rs"], landed = "a21dad1" },
+  { id = "G8-R11", state = "done", evidence = ["crates/lemonfiber/tests/architecture/nothing_reports_on_you.rs", "deny.toml", "crates/lemonfiber/tests/integration/where_a_request_goes.rs"] },
+  { id = "G8-R12", state = "done", evidence = ["crates/lemonfiber-core/src/outbound.rs", "crates/lemonfiber-core/src/config/reaching.rs"] },
+  { id = "G8-R13", state = "done", evidence = ["crates/lemonfiber/src/render/invitation.rs"] },
+  { id = "G8-R14", state = "done", evidence = ["crates/lemonfiber-core/src/recording.rs", "crates/lemonfiber-core/src/recording/inside.rs", "crates/lemonfiber-core/src/recording/ledger.rs"] },
+  { id = "G8-R15", state = "partial", evidence = ["crates/lemonfiber-core/src/outbound.rs", "crates/lemonfiber-core/src/outbound/theirs.rs"] },
+  { id = "G8-R17", state = "partial", evidence = ["crates/lemonfiber-core/tests/integration/outbound.rs"] },
+  { id = "G8-R18", state = "partial", evidence = ["crates/lemonfiber-plugin/src/offering.rs", "crates/lemonfiber-core/src/app/plugins/offering.rs", "crates/lemonfiber-core/src/plugin/recipes.rs", "crates/lemonfiber-core/src/app/plugins/offering/tests.rs"], landed = "01e63d948c471e0a959ff04fdb3494af1fe9f9ab" },
+]

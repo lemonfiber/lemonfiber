@@ -1,0 +1,20 @@
+# What this repository has built of F1, one row per requirement (OPS-R74).
+# Change a row in the pull request that changes whether its requirement is met.
+# The format and the checks are in the specification's scripts/status_check.py.
+
+requirement = [
+  { id = "F1-R1", state = "partial" },
+  { id = "F1-R2", state = "done", evidence = ["crates/lemonfiber/tests/integration/a_rehearsal_changes_nothing.rs", "crates/lemonfiber-core/src/app/rehearsal.rs", "crates/lemonfiber-core/src/app.rs"] },
+  { id = "F1-R3", state = "done", evidence = ["crates/lemonfiber-core/src/stack.rs"] },
+  { id = "F1-R4", state = "done", evidence = ["crates/lemonfiber-core/src/materialised.rs", "crates/lemonfiber-core/src/app/apply.rs", "crates/lemonfiber-core/src/config/store.rs", "crates/lemonfiber-core/src/reconfigure/review.rs"] },
+  { id = "F1-R5", state = "done", evidence = ["crates/lemonfiber-core/src/outbound/theirs.rs", "crates/lemonfiber-manifest/src/validate.rs"] },
+  { id = "F1-R6", state = "done", evidence = [".docs/architecture/surface-parity.md", "crates/lemonfiber/tests/architecture/surface_parity.rs", "crates/lemonfiber/src/exit.rs", "crates/lemonfiber-core/src/app/engine/streaming.rs"] },
+  { id = "F1-R7", state = "done", evidence = ["crates/lemonfiber-core/src/unmanaged.rs", "crates/lemonfiber-core/src/seed/report.rs", "crates/lemonfiber-core/src/doctor.rs", "crates/lemonfiber-core/src/repair/run.rs"] },
+  { id = "F1-R8", state = "done", evidence = ["crates/lemonfiber-core/src/unmanaged.rs", "crates/lemonfiber-core/src/seed/report.rs", "crates/lemonfiber-core/src/doctor.rs", "crates/lemonfiber-core/src/repair/run.rs"] },
+  { id = "F1-R9", state = "done", evidence = ["crates/lemonfiber-manifest/src/validate.rs", "crates/lemonfiber-core/src/stack.rs"] },
+  { id = "F1-R10", state = "done", evidence = ["crates/lemonfiber-core/src/docker.rs", "crates/lemonfiber-core/tests/integration/a_service_this_build_has_never_heard_of.rs"] },
+  { id = "F1-R11", state = "done", evidence = ["crates/lemonfiber-core/src/outbound/theirs.rs", "crates/lemonfiber-core/src/app/targets/servarr.rs", "crates/lemonfiber-core/src/unsupported.rs"] },
+  { id = "F1-R12", state = "partial", evidence = ["crates/lemonfiber/src/render/plugin.rs", "crates/lemonfiber-core/src/model.rs", "contract/web-api.surface.json", "crates/lemonfiber-api/src/contract/stability.rs"] },
+  { id = "F1-R13", state = "done", evidence = ["crates/lemonfiber-core/tests/fixtures/split-mounts", "crates/lemonfiber-core/src/doctor/storage/mounts.rs", "crates/lemonfiber-core/src/stack.rs"] },
+  { id = "F1-R14", state = "done", evidence = ["crates/lemonfiber-core/src/migration/standing.rs", "crates/lemonfiber-core/src/app/preflight.rs", "crates/lemonfiber-core/src/network.rs"] },
+]

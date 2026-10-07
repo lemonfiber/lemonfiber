@@ -1,0 +1,20 @@
+# What this repository has built of D5, one row per requirement (OPS-R74).
+# Change a row in the pull request that changes whether its requirement is met.
+# The format and the checks are in the specification's scripts/status_check.py.
+
+requirement = [
+  { id = "D5-R1", state = "done", evidence = ["crates/lemonfiber-core/src/space.rs", "crates/lemonfiber-core/src/space/tally.rs"] },
+  { id = "D5-R2", state = "done", evidence = ["crates/lemonfiber-core/src/space.rs", "crates/lemonfiber-core/src/space/tally.rs"] },
+  { id = "D5-R3", state = "done", evidence = ["crates/lemonfiber-core/src/space.rs", "crates/lemonfiber-core/src/space/tally.rs"] },
+  { id = "D5-R4", state = "done", evidence = ["crates/lemonfiber-core/src/space.rs", "crates/lemonfiber-core/src/space/tally.rs"] },
+  { id = "D5-R5", state = "done", evidence = ["crates/lemonfiber-core/src/space.rs", "crates/lemonfiber-core/src/space/tally.rs"] },
+  { id = "D5-R6", state = "done", evidence = ["crates/lemonfiber-core/src/space/letting.rs", "crates/lemonfiber-core/src/agreement.rs", "crates/lemonfiber-api/src/actions/asked.rs", "crates/lemonfiber-core/src/qbittorrent.rs"] },
+  { id = "D5-R7", state = "done", evidence = ["crates/lemonfiber-core/src/space.rs", "crates/lemonfiber-core/src/space/tally.rs"] },
+  { id = "D5-R8", state = "done", evidence = ["crates/lemonfiber-core/src/space.rs", "crates/lemonfiber-core/src/space/tally.rs"] },
+  { id = "D5-R9", state = "done", evidence = ["crates/lemonfiber-core/src/space.rs", "crates/lemonfiber-core/src/space/tally.rs"] },
+  { id = "D5-R10", state = "done", evidence = ["crates/lemonfiber-core/src/space.rs", "crates/lemonfiber-core/src/space/tally.rs"] },
+  { id = "D5-R11", state = "done", evidence = ["crates/lemonfiber-core/src/space.rs", "crates/lemonfiber-core/src/space/tally.rs"] },
+  { id = "D5-R12", state = "done", evidence = ["crates/lemonfiber-core/src/space.rs", "crates/lemonfiber-core/src/space/tally.rs"] },
+  { id = "D5-R13", state = "done", evidence = ["crates/lemonfiber-core/src/space.rs", "crates/lemonfiber-core/src/space/tally.rs"] },
+  { id = "D5-R14", state = "done", evidence = ["crates/lemonfiber-core/src/space.rs", "crates/lemonfiber-core/src/space/tally.rs"] },
+]

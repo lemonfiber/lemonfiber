@@ -1,0 +1,19 @@
+# What this repository has built of E5, one row per requirement (OPS-R74).
+# Change a row in the pull request that changes whether its requirement is met.
+# The format and the checks are in the specification's scripts/status_check.py.
+
+requirement = [
+  { id = "E5-R1", state = "done", evidence = [".github/workflows/release-changelog.yml", "cliff.toml"], landed = "433fdb8" },
+  { id = "E5-R2", state = "done", evidence = [".github/workflows/release-changelog.yml", "cliff.toml"], landed = "433fdb8" },
+  { id = "E5-R3", state = "done", evidence = ["scripts/the_requirements_an_entry_names.py"] },
+  { id = "E5-R4", state = "done", evidence = ["scripts/the_record_a_release_leaves.py", ".github/workflows/release-changelog.yml", "cliff.toml"] },
+  { id = "E5-R5", state = "done", evidence = ["cliff.toml", "scripts/the_record_a_release_leaves.py"] },
+  { id = "E5-R6", state = "done", evidence = ["crates/lemonfiber/src/render/self_update.rs", "crates/lemonfiber/src/render/update.rs", "crates/lemonfiber-core/src/self_update/offered.rs", "crates/lemonfiber-core/src/changelog.rs"] },
+  { id = "E5-R7", state = "done", evidence = ["scripts/the_record_a_release_leaves.py", ".github/workflows/release-changelog.yml", "cliff.toml"] },
+  { id = "E5-R8", state = "done", evidence = [".github/workflows/release-changelog.yml", "cliff.toml"] },
+  { id = "E5-R9", state = "done", evidence = ["scripts/the_record_a_release_leaves.py", ".github/workflows/release-changelog.yml", "cliff.toml"] },
+  { id = "E5-R10", state = "done", evidence = ["scripts/the_record_a_release_leaves.py", ".github/workflows/release-changelog.yml", "cliff.toml"] },
+  { id = "E5-R11", state = "done", evidence = ["crates/lemonfiber-core/src/changelog.rs", "reference/changelog.json", "scripts/the_record_a_release_leaves.py"] },
+  { id = "E5-R12", state = "done", evidence = [".github/workflows/release-changelog.yml", "cliff.toml"] },
+  { id = "E5-R13", state = "done", evidence = ["scripts/the_record_a_release_leaves.py"] },
+]

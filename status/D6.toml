@@ -1,0 +1,24 @@
+# What this repository has built of D6, one row per requirement (OPS-R74).
+# Change a row in the pull request that changes whether its requirement is met.
+# The format and the checks are in the specification's scripts/status_check.py.
+
+requirement = [
+  { id = "D6-R1", state = "done", evidence = ["crates/lemonfiber-core/src/seerr.rs", "crates/lemonfiber-core/tests/integration/one_way_in_and_it_is_the_media_server.rs"] },
+  { id = "D6-R2", state = "done", evidence = ["crates/lemonfiber-core/src/jellyfin/household.rs", "crates/lemonfiber-core/tests/integration/an_invitation_sets_nobodys_password.rs", "crates/lemonfiber-core/tests/integration/the_household_needs_no_account_here.rs", "crates/lemonfiber-api/src/admission.rs"] },
+  { id = "D6-R3", state = "done", evidence = ["crates/lemonfiber/src/render/invitation.rs", "crates/lemonfiber-core/src/invitation.rs"] },
+  { id = "D6-R4", state = "done", evidence = ["crates/lemonfiber/src/render/invitation.rs"] },
+  { id = "D6-R5", state = "done", evidence = ["crates/lemonfiber-core/src/jellyfin/household.rs", "crates/lemonfiber-core/src/age_limit.rs"] },
+  { id = "D6-R6", state = "done", evidence = ["crates/lemonfiber/src/render/invitation.rs", "crates/lemonfiber-core/src/invitation.rs"] },
+  { id = "D6-R7", state = "done", evidence = ["crates/lemonfiber-core/src/household/run.rs", "crates/lemonfiber/src/render/trace.rs"] },
+  { id = "D6-R8", state = "done", evidence = ["crates/lemonfiber-core/src/app/remove.rs", "crates/lemonfiber/src/render/removal.rs"] },
+  { id = "D6-R9", state = "done", evidence = ["crates/lemonfiber-core/src/app/remove.rs", "crates/lemonfiber/src/render/removal.rs"] },
+  { id = "D6-R10", state = "done", evidence = ["crates/lemonfiber-core/src/model/invitation.rs", "crates/lemonfiber-core/src/app/invite.rs", "crates/lemonfiber-core/src/invitation.rs"] },
+  { id = "D6-R11", state = "done", evidence = ["crates/lemonfiber/src/render/invitation.rs", "crates/lemonfiber-core/src/invitation.rs"] },
+  { id = "D6-R12", state = "done", evidence = ["crates/lemonfiber-core/src/app/invite.rs", "crates/lemonfiber-ports/src/service/household.rs"] },
+  { id = "D6-R13", state = "done", evidence = ["crates/lemonfiber-core/src/app/invite.rs"] },
+  { id = "D6-R14", state = "done", evidence = ["crates/lemonfiber-core/src/jellyfin/household.rs", "crates/lemonfiber-core/tests/integration/an_invitation_sets_nobodys_password.rs", "crates/lemonfiber-core/tests/integration/the_household_needs_no_account_here.rs", "crates/lemonfiber-api/src/admission.rs"] },
+  { id = "D6-R15", state = "done", evidence = ["crates/lemonfiber-core/src/app/invite/declining.rs", "crates/lemonfiber-sidecar", "crates/lemonfiber-core/src/seed/run/decline.rs", "crates/lemonfiber-core/src/app/credentials/declining.rs"] },
+  { id = "D6-R16", state = "done", evidence = ["crates/lemonfiber-core/src/app/invite/declining.rs", "crates/lemonfiber-sidecar", "crates/lemonfiber-core/src/seed/run/decline.rs", "crates/lemonfiber-core/src/app/credentials/declining.rs"] },
+  { id = "D6-R20", state = "done", evidence = ["crates/lemonfiber-core/src/app/command/household.rs", "crates/lemonfiber-core/src/jellyfin/household/shelf.rs", "crates/lemonfiber-core/src/household/run/defaults.rs", "crates/lemonfiber-api/src/entitled.rs"] },
+  { id = "D6-R21", state = "done", evidence = ["crates/lemonfiber-sidecar", "crates/lemonfiber-core/src/household/run/standing.rs", "crates/lemonfiber-core/src/doctor/declining.rs"] },
+]

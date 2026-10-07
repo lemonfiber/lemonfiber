@@ -1,0 +1,19 @@
+# What this repository has built of D3, one row per requirement (OPS-R74).
+# Change a row in the pull request that changes whether its requirement is met.
+# The format and the checks are in the specification's scripts/status_check.py.
+
+requirement = [
+  { id = "D3-R1", state = "done", evidence = ["crates/lemonfiber-core/src/walkthrough.rs", "crates/lemonfiber-ports/src/service/stage.rs"] },
+  { id = "D3-R2", state = "done", evidence = ["crates/lemonfiber-core/src/walkthrough.rs", "crates/lemonfiber-ports/src/service/stage.rs"] },
+  { id = "D3-R3", state = "done", evidence = ["crates/lemonfiber-core/src/walkthrough.rs", "crates/lemonfiber-ports/src/service/stage.rs"] },
+  { id = "D3-R4", state = "done", evidence = ["crates/lemonfiber-core/src/walkthrough.rs", "crates/lemonfiber-ports/src/service/stage.rs"] },
+  { id = "D3-R5", state = "done", evidence = ["crates/lemonfiber-core/src/walkthrough.rs", "crates/lemonfiber-ports/src/service/stage.rs"] },
+  { id = "D3-R6", state = "done", evidence = ["crates/lemonfiber-core/src/walkthrough.rs", "crates/lemonfiber-ports/src/service/stage.rs"] },
+  { id = "D3-R7", state = "done", evidence = ["crates/lemonfiber-core/src/walkthrough.rs", "crates/lemonfiber-ports/src/service/stage.rs"] },
+  { id = "D3-R8", state = "done", evidence = ["crates/lemonfiber-core/src/walkthrough.rs", "crates/lemonfiber-ports/src/service/stage.rs"] },
+  { id = "D3-R9", state = "done", evidence = ["crates/lemonfiber-core/src/walkthrough.rs", "crates/lemonfiber-ports/src/service/stage.rs"] },
+  { id = "D3-R10", state = "done", evidence = ["crates/lemonfiber-core/src/walkthrough.rs", "crates/lemonfiber-ports/src/service/stage.rs"] },
+  { id = "D3-R11", state = "done", evidence = ["crates/lemonfiber-core/src/walkthrough.rs", "crates/lemonfiber-ports/src/service/stage.rs"] },
+  { id = "D3-R12", state = "done", evidence = ["crates/lemonfiber-core/src/walkthrough.rs", "crates/lemonfiber-ports/src/service/stage.rs"] },
+  { id = "D3-R13", state = "done", evidence = ["crates/lemonfiber-core/src/walkthrough.rs", "crates/lemonfiber-ports/src/service/stage.rs"] },
+]

@@ -1,0 +1,17 @@
+# What this repository has built of G3, one row per requirement (OPS-R74).
+# Change a row in the pull request that changes whether its requirement is met.
+# The format and the checks are in the specification's scripts/status_check.py.
+
+requirement = [
+  { id = "G3-R1", state = "done", evidence = ["crates/lemonfiber/src/logs.rs"] },
+  { id = "G3-R2", state = "done", evidence = ["crates/lemonfiber/src/logs.rs"] },
+  { id = "G3-R6", state = "done", evidence = ["crates/lemonfiber/tests/architecture/modest_terminal.rs"] },
+  { id = "G3-R7", state = "done", evidence = ["crates/lemonfiber/tests/integration/piped.rs", "crates/lemonfiber-core/src/walkthrough/run/walk.rs"] },
+  { id = "G3-R8", state = "done", evidence = ["crates/lemonfiber-core/src/text.rs"] },
+  { id = "G3-R9", state = "done", evidence = ["crates/lemonfiber/src/say.rs", "crates/lemonfiber/src/main.rs"] },
+  { id = "G3-R10", state = "done", evidence = ["crates/lemonfiber-core/src/text.rs", "crates/lemonfiber-core/src/endpoint.rs"] },
+  { id = "G3-R11", state = "done", evidence = ["crates/lemonfiber-core/src/app/engine.rs", "crates/lemonfiber-ports/src/narration.rs"] },
+  { id = "G3-R12", state = "done", evidence = ["crates/lemonfiber/tests/integration/prompting.rs"] },
+  { id = "G3-R14", state = "done", evidence = ["crates/lemonfiber/src/logs/draw.rs"] },
+  { id = "G3-R15", state = "done", evidence = ["crates/lemonfiber-core/src/text.rs", "crates/lemonfiber/src/say.rs"] },
+]

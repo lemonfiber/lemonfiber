@@ -1,0 +1,18 @@
+# What this repository has built of A4, one row per requirement (OPS-R74).
+# Change a row in the pull request that changes whether its requirement is met.
+# The format and the checks are in the specification's scripts/status_check.py.
+
+requirement = [
+  { id = "A4-R1", state = "done", evidence = ["crates/lemonfiber-api/src/read.rs", "crates/lemonfiber-core/src/alert/appetite.rs"] },
+  { id = "A4-R2", state = "done", evidence = ["crates/lemonfiber-core/src/reconfigure.rs", "crates/lemonfiber-core/src/app/configuring.rs"] },
+  { id = "A4-R3", state = "done", evidence = ["crates/lemonfiber-core/src/reconfigure.rs", "crates/lemonfiber-core/src/app/configuring.rs"] },
+  { id = "A4-R4", state = "done", evidence = ["crates/lemonfiber-core/src/reconfigure/review.rs", "crates/lemonfiber/src/render.rs"] },
+  { id = "A4-R5", state = "done", evidence = ["crates/lemonfiber-core/src/app/reconfiguring/library.rs", "crates/lemonfiber-core/src/reconfigure/relocating.rs", "crates/lemonfiber-core/tests/integration/what_changing_one_answer_costs.rs"] },
+  { id = "A4-R6", state = "done", evidence = ["crates/lemonfiber-core/src/reconfigure/protocols.rs", "crates/lemonfiber-core/src/prerequisites.rs", "crates/lemonfiber-core/src/wizard/steps.rs"] },
+  { id = "A4-R7", state = "done", evidence = ["crates/lemonfiber-core/src/reconfigure/protocols.rs", "crates/lemonfiber-core/src/prerequisites.rs", "crates/lemonfiber-core/src/wizard/steps.rs"] },
+  { id = "A4-R8", state = "done", evidence = ["crates/lemonfiber-core/src/app/configuring/proving.rs", "crates/lemonfiber-core/src/validate.rs"] },
+  { id = "A4-R9", state = "done", evidence = ["crates/lemonfiber-core/src/reconfigure/edits.rs", "crates/lemonfiber-core/src/app/apply.rs"] },
+  { id = "A4-R10", state = "done", evidence = ["crates/lemonfiber-core/src/reconfigure/protocols.rs", "crates/lemonfiber-core/src/prerequisites.rs", "crates/lemonfiber-core/src/wizard/steps.rs"] },
+  { id = "A4-R11", state = "done", evidence = ["crates/lemonfiber-core/src/app/configuring.rs", "crates/lemonfiber-core/tests/integration/what_a_change_costs_before_it_is_made.rs"] },
+  { id = "A4-R12", state = "done", evidence = ["crates/lemonfiber/src/render/quality.rs"] },
+]

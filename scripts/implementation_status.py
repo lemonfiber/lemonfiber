@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
-"""IMPLEMENTATION-STATUS.md, written from `status.toml`.
+"""IMPLEMENTATION-STATUS.md, written from `status/`.
 
-The release gates read the Markdown file, and read a row's state from the glyph in
-its status column. That glyph is written here and nowhere else: `status.toml` holds
-each row's state as one of three words, and a row cannot carry a glyph anywhere a
-gate would misread it, because no cell a person writes is allowed to hold one.
+`status/` is this repository's tracker: one file per feature, one row per
+requirement, naming its state, the evidence that holds it and, where no commit
+cites it, the commit it landed in (the specification's OPS-R74, checked by its
+`scripts/status_check.py`). The release gate reads those files. This page is the
+same rows written out for the documentation site, which renders progress from
+it until it reads the trackers and the specification's report directly.
 
-Run:  python3 scripts/implementation_status.py --write   rewrite the Markdown
+A row's glyph is written here and nowhere else, from its state.
+
+Run:  python3 scripts/implementation_status.py --write   rewrite the page
       python3 scripts/implementation_status.py --check   fail where it is stale
       python3 scripts/implementation_status.py --self-test
 
-Exit 0 = the Markdown is what `status.toml` says; 1 = it is not, or the source is
-malformed.
+Exit 0 = the page is what `status/` says; 1 = it is not, or a row is malformed.
 """
 
 from __future__ import annotations
@@ -22,77 +25,75 @@ import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SOURCE = ROOT / "status.toml"
+SOURCE = ROOT / "status"
 TARGET = ROOT / "IMPLEMENTATION-STATUS.md"
 
-#: The three states a row or a milestone can be in, and the glyph each is shown as.
+#: The three states a row can be in, and the glyph each is shown as.
 GLYPHS = {"done": "✅", "partial": "◐", "open": "☐"}
 
 #: How the legend names each state, in the order `GLYPHS` lists them.
 LEGEND = ("done", "partial", "not started")
 
+PREAMBLE = """<!-- Written by `just status` from status/. Edit those files, not this one. -->
+
+# Implementation status
+
+What this repository has built against the
+[specification](https://github.com/lemonfiber/spec), one row per requirement,
+written from [`status/`](status/). Every repository a version is satisfied in keeps
+its own tracker in the same shape, and the release gate reads all of them."""
+
+COLUMNS = ("Requirement", "Status", "Evidence", "Landed")
+
 
 class Malformed(Exception):
-    """The source says something the Markdown cannot be written from."""
+    """The source says something the page cannot be written from."""
 
 
 def glyph(state: str, where: str) -> str:
-    """The glyph for a state, or a refusal naming where the state was written."""
     if state not in GLYPHS:
         raise Malformed(f"{where}: `{state}` is not one of {', '.join(GLYPHS)}")
     return GLYPHS[state]
 
 
-def refuse_glyphs(text: str, where: str) -> None:
-    """A glyph a person wrote is one a gate may read as a state."""
-    for mark in GLYPHS.values():
-        if mark in text:
-            raise Malformed(f"{where}: `{mark}` is written by the generator, not by hand")
+def evidence(entries: list[str], where: str) -> str:
+    """The evidence cell: a path here links to it; one elsewhere is named."""
+    shown = []
+    for entry in entries:
+        if any(mark in entry for mark in GLYPHS.values()):
+            raise Malformed(f"{where}: a status glyph is written by the generator, not by hand")
+        path = entry.split("::", 1)[0]
+        shown.append(f"`{entry}`" if ":" in path else f"[`{entry}`]({path})")
+    return "<br>".join(shown)
 
 
-def row_of(cells: list[str]) -> str:
-    """One table line, an empty cell kept to a single space."""
-    return "|" + "|".join(f" {cell} " if cell else " " for cell in cells) + "|"
+def ordered(ident: str) -> tuple[str, int]:
+    prefix, _, number = ident.partition("-R")
+    return prefix, int(number)
 
 
-def table(part: dict, where: str) -> list[str]:
-    """One table, its status column filled from each row's state."""
-    columns = part["columns"]
-    status_at = columns.index("Status")
-    lines = [
-        row_of(columns),
-        "|" + "|".join("-" * (len(column) + 2) for column in columns) + "|",
-    ]
-    for number, row in enumerate(part["rows"], start=1):
-        here = f"{where}, row {number}"
-        cells = list(row["cells"])
-        if len(cells) != len(columns) - 1:
-            raise Malformed(f"{here}: {len(cells)} cells for {len(columns) - 1} columns")
-        for cell in cells:
-            refuse_glyphs(cell, here)
-        cells.insert(status_at, glyph(row["state"], here))
-        lines.append(row_of(cells))
-    return lines
-
-
-def render(source: dict) -> str:
-    """The whole Markdown file."""
-    refuse_glyphs(source["preamble"], "preamble")
+def render(rows: list[dict]) -> str:
+    """The whole page, one table per feature."""
     legend = " · ".join(f"{mark} {word}" for word, mark in zip(LEGEND, GLYPHS.values(), strict=True))
-    out = [source["preamble"].strip("\n"), "", f"**Legend:** {legend}", "", "---", ""]
-    for milestone in source["milestone"]:
-        name = milestone["name"]
-        out.append(f"## {name} · {glyph(milestone['state'], name)}")
-        out.append("")
-        for index, part in enumerate(milestone.get("part", []), start=1):
-            where = f"{name}, part {index}"
-            if "prose" in part:
-                refuse_glyphs(part["prose"], where)
-                out.extend(part["prose"].rstrip("\n").split("\n"))
-            else:
-                out.extend(table(part, where))
-            out.append("")
-    return "\n".join(out).rstrip("\n") + "\n"
+    out = [PREAMBLE, "", f"**Legend:** {legend}"]
+    current = None
+    for row in sorted(rows, key=lambda r: ordered(r["id"])):
+        where = f"status/, {row['id']}"
+        family = row["id"].partition("-R")[0]
+        if family != current:
+            current = family
+            out += ["", f"## {family}", "", "| " + " | ".join(COLUMNS) + " |",
+                    "|" + "|".join("-" * (len(c) + 2) for c in COLUMNS) + "|"]
+        landed = f"landed in `{row['landed']}`" if row.get("landed") else ""
+        cells = [f"`{row['id']}`", glyph(row["state"], where),
+                 evidence(row.get("evidence", []), where), landed]
+        out.append("|" + "|".join(f" {cell} " if cell else " " for cell in cells) + "|")
+    return "\n".join(out) + "\n"
+
+
+def rows_in(source: Path) -> list[dict]:
+    return [row for path in sorted(source.glob("*.toml"))
+            for row in tomllib.loads(path.read_text(encoding="utf-8")).get("requirement", [])]
 
 
 def main(argv: list[str]) -> int:
@@ -105,59 +106,44 @@ def main(argv: list[str]) -> int:
     if args.self_test:
         return self_test()
     try:
-        rendered = render(tomllib.loads(SOURCE.read_text(encoding="utf-8")))
+        rendered = render(rows_in(SOURCE))
     except (Malformed, KeyError, ValueError, OSError) as refused:
-        print(f"status.toml cannot be written out: {refused}", file=sys.stderr)
+        print(f"status/ cannot be written out: {refused}", file=sys.stderr)
         return 1
     if args.write:
         TARGET.write_text(rendered, encoding="utf-8")
         return 0
     if TARGET.read_text(encoding="utf-8") != rendered:
-        print(
-            "IMPLEMENTATION-STATUS.md is not what status.toml says — edit status.toml "
-            "and run `just status`",
-            file=sys.stderr,
-        )
+        print("IMPLEMENTATION-STATUS.md is not what status/ says — edit status/ and run "
+              "`just status`", file=sys.stderr)
         return 1
     return 0
 
 
 def self_test() -> int:
-    good = {
-        "preamble": "# Status\n",
-        "milestone": [
-            {
-                "name": "M1 — One",
-                "state": "partial",
-                "part": [
-                    {"prose": "Words."},
-                    {
-                        "columns": ["Deliverable", "Status", "Landing"],
-                        "rows": [{"cells": ["A thing", "#1"], "state": "done"}],
-                    },
-                ],
-            }
-        ],
-    }
+    good = [
+        {"id": "B1-R10", "state": "partial"},
+        {"id": "B1-R2", "state": "done", "evidence": ["src/a.rs::held", "web:src/App.svelte"],
+         "landed": "abc1234"},
+        {"id": "A1-R1", "state": "open"},
+    ]
+    header = "| Requirement | Status | Evidence | Landed |\n|-------------|--------|----------|--------|\n"
     expected = (
-        "# Status\n\n**Legend:** ✅ done · ◐ partial · ☐ not started\n\n---\n\n## M1 — One · ◐\n\nWords.\n\n"
-        "| Deliverable | Status | Landing |\n|-------------|--------|---------|\n"
-        "| A thing | ✅ | #1 |\n"
+        PREAMBLE + "\n\n**Legend:** ✅ done · ◐ partial · ☐ not started\n\n"
+        "## A1\n\n" + header + "| `A1-R1` | ☐ | | |\n\n"
+        "## B1\n\n" + header
+        + "| `B1-R2` | ✅ | [`src/a.rs::held`](src/a.rs)<br>`web:src/App.svelte` | landed in `abc1234` |\n"
+        "| `B1-R10` | ◐ | | |\n"
     )
     failures = []
     if render(good) != expected:
         failures.append("a well-formed source did not render as expected")
     for broken, why in (
-        ({"cells": ["A ✅ thing", "#1"], "state": "done"}, "a glyph in a cell"),
-        ({"cells": ["A thing", "#1"], "state": "finished"}, "an unknown state"),
-        ({"cells": ["A thing"], "state": "done"}, "a missing cell"),
+        ({"id": "A1-R1", "state": "done", "evidence": ["a ✅ path"]}, "a glyph in a cell"),
+        ({"id": "A1-R1", "state": "finished"}, "an unknown state"),
     ):
-        bad = {**good, "milestone": [{**good["milestone"][0]}]}
-        bad["milestone"][0]["part"] = [
-            {"columns": ["Deliverable", "Status", "Landing"], "rows": [broken]}
-        ]
         try:
-            render(bad)
+            render([broken])
             failures.append(f"{why} was not refused")
         except Malformed:
             pass

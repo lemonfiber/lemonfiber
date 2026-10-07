@@ -1,0 +1,32 @@
+# What this repository has built of D1, one row per requirement (OPS-R74).
+# Change a row in the pull request that changes whether its requirement is met.
+# The format and the checks are in the specification's scripts/status_check.py.
+
+requirement = [
+  { id = "D1-R1", state = "done", evidence = ["crates/lemonfiber-core/src/sabnzbd.rs", "crates/lemonfiber-core/src/secret.rs"] },
+  { id = "D1-R2", state = "done", evidence = ["crates/lemonfiber-core/src/seed.rs", "crates/lemonfiber-core/src/servarr.rs"] },
+  { id = "D1-R3", state = "done", evidence = ["crates/lemonfiber-core/src/seed.rs", "crates/lemonfiber-core/src/servarr.rs"] },
+  { id = "D1-R4", state = "done", evidence = ["crates/lemonfiber-core/src/seed.rs", "crates/lemonfiber-core/src/servarr.rs"] },
+  { id = "D1-R5", state = "done", evidence = ["crates/lemonfiber-core/src/seed.rs", "crates/lemonfiber-core/src/servarr.rs"] },
+  { id = "D1-R6", state = "done", evidence = ["crates/lemonfiber-core/src/seed.rs", "crates/lemonfiber-core/src/servarr.rs"] },
+  { id = "D1-R7", state = "done", evidence = ["crates/lemonfiber-core/src/prowlarr.rs", "crates/lemonfiber-ports/src/service.rs", "crates/lemonfiber-core/src/jellyfin.rs", "crates/lemonfiber-core/src/seerr.rs"] },
+  { id = "D1-R8", state = "done", evidence = ["crates/lemonfiber-core/src/seed.rs", "crates/lemonfiber-core/src/servarr.rs"] },
+  { id = "D1-R9", state = "done", evidence = ["crates/lemonfiber-core/src/seed.rs", "crates/lemonfiber-core/src/servarr.rs"] },
+  { id = "D1-R10", state = "done", evidence = ["crates/lemonfiber-core/src/seed.rs", "crates/lemonfiber-core/src/servarr.rs"] },
+  { id = "D1-R11", state = "done", evidence = ["crates/lemonfiber-core/src/servarr.rs"] },
+  { id = "D1-R12", state = "done", evidence = ["crates/lemonfiber-core/src/seed.rs", "crates/lemonfiber-core/src/servarr.rs"] },
+  { id = "D1-R13", state = "done", evidence = ["crates/lemonfiber-core/src/seed.rs", "crates/lemonfiber-core/src/servarr.rs"] },
+  { id = "D1-R14", state = "done", evidence = ["crates/lemonfiber-core/src/seed.rs", "crates/lemonfiber-core/src/servarr.rs"] },
+  { id = "D1-R15", state = "done", evidence = ["assets/media-stack", "crates/lemonfiber-core/src/app/engine.rs"] },
+  { id = "D1-R16", state = "done", evidence = ["crates/lemonfiber-core/src/sabnzbd.rs", "crates/lemonfiber-core/src/secret.rs"] },
+  { id = "D1-R17", state = "done", evidence = ["crates/lemonfiber-core/src/seed/run/fulfilment.rs"] },
+  { id = "D1-R18", state = "done", evidence = ["crates/lemonfiber-core/tests/fixtures/stacklet/config/recyclarr/recyclarr.yml", "assets/media-stack", "crates/lemonfiber-core/src/app/targets/layout.rs"] },
+  { id = "D1-R19", state = "done", evidence = ["crates/lemonfiber-core/src/seed/run/fulfilment.rs", "crates/lemonfiber-core/src/seed/run/linking.rs"] },
+  { id = "D1-R20", state = "done", evidence = ["crates/lemonfiber-core/src/seed/run/identity.rs", "crates/lemonfiber-core/src/jellyfin/password.rs", "crates/lemonfiber-core/src/app/targets/opening.rs"] },
+  { id = "D1-R21", state = "done", evidence = ["crates/lemonfiber-core/src/seed/run/taken_back.rs", "crates/lemonfiber-core/src/app/credentials/resetting.rs"] },
+  { id = "D1-R22", state = "done", evidence = ["crates/lemonfiber-core/src/seed/run/guarding.rs", "crates/lemonfiber-core/src/nzbhydra2.rs"] },
+  { id = "D1-R23", state = "done", evidence = ["crates/lemonfiber-core/src/seed/run/guarding.rs", "crates/lemonfiber-core/src/nzbhydra2.rs"] },
+  { id = "D1-R24", state = "done", evidence = ["crates/lemonfiber-core/src/seed/run/guarding.rs", "crates/lemonfiber-core/src/nzbhydra2.rs"] },
+  { id = "D1-R25", state = "done", evidence = ["crates/lemonfiber-core/src/seed/run/guarding.rs", "crates/lemonfiber-core/src/nzbhydra2.rs"] },
+  { id = "D1-R26", state = "done", evidence = ["crates/lemonfiber-core/src/seed/run/guarding.rs", "crates/lemonfiber-core/src/nzbhydra2.rs"] },
+]
