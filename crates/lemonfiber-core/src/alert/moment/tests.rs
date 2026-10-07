@@ -155,3 +155,22 @@ fn an_alert_carries_the_exit_code_beside_its_summary() {
         Some(("sonarr stopped with an error".to_owned(), Some(137)))
     );
 }
+
+/// An onset and the resolution that ends it are named alike, and the next time the same
+/// thing goes wrong is named afresh, so a client closes what it opened by name alone.
+#[test]
+fn an_onset_and_its_resolution_share_a_name_and_a_recurrence_does_not() {
+    let mut condition = raised();
+    let onset = Alert::of(&condition, None).and_then(|alert| alert.id);
+    condition.clear("1100");
+    let resolved = Alert::of(&condition, Some(0)).and_then(|alert| alert.id);
+    condition.raise(
+        &wrong(Severity::Warning, "two downloads have not moved"),
+        "1200",
+    );
+    let again = Alert::of(&condition, Some(0)).and_then(|alert| alert.id);
+
+    assert_eq!(onset.as_deref(), Some("queue.stalled#0"));
+    assert_eq!(resolved, onset);
+    assert_eq!(again.as_deref(), Some("queue.stalled#1"));
+}

@@ -606,6 +606,7 @@ fn a_release_name_from_an_indexer_cannot_take_over_the_screen() {
 /// One alert about something that happened.
 fn an_alert(summary: &str, moment: lemonfiber_core::alert::Moment) -> Alert {
     Alert {
+        id: None,
         check: "service.sonarr".to_owned(),
         kind: "service.down".to_owned(),
         moment,

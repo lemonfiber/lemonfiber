@@ -11,15 +11,20 @@
 //! pace is carried forward until it is due — both done by handing the previous
 //! gather back in.
 //!
+//! An alert is said as it happens from the same gather too: what the dashboard's list
+//! carries that it did not a moment ago is what started or resolved since.
+//!
 //! What is newest is said from the same gather. The household's requests and what
 //! is wrong are already in the snapshot, so naming the newest of each kind costs no
 //! second reading, and it is said when a listener arrives and whenever it changes
 //! rather than on every tick: a phone marks a tab from it, and an unchanged mark is
 //! nothing to wake it for.
 
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use lemonfiber_core::alert::{Alert, Moment};
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::changelog::Record;
 use lemonfiber_core::dashboard::run::{paced, Gathered};
@@ -41,6 +46,9 @@ pub struct Dashboard {
     record: Option<Record>,
     /// What the stream last said was newest, so it says so again only on a change.
     told: Mutex<Option<Newest>>,
+    /// Every alert the dashboard carried at the last gather, by what names it and which
+    /// way it went, or nothing before the first gather of this run.
+    alerted: Mutex<Option<BTreeSet<(String, Moment)>>>,
 }
 
 impl Dashboard {
@@ -52,6 +60,7 @@ impl Dashboard {
             last: Mutex::new(None),
             record: Record::carried(),
             told: Mutex::new(None),
+            alerted: Mutex::new(None),
         }
     }
 }
@@ -74,7 +83,40 @@ async fn gathered(dashboard: &Dashboard, joined: bool) -> Vec<Rendered> {
             .into_iter()
             .collect();
     said.extend(newly(dashboard, snapshot, joined).await);
+    said.extend(alerted(dashboard, &snapshot.alerts).await);
     *last = Some(gathered);
+    said
+}
+
+/// Each alert the dashboard carries that it did not at the last gather, oldest first, as
+/// the thing that happened.
+///
+/// Read off the dashboard's own list rather than off the run that decided it, because
+/// an alert can be decided by a run other than this one — the watcher, a boot, a key
+/// minted at the terminal — and every one of them lands in that list. What it carried
+/// when this run began was said before anybody here was listening and is the list's to
+/// show, so the first gather says none of it. Said as a record, so a client that missed
+/// one while it was away is handed it when it comes back.
+async fn alerted(dashboard: &Dashboard, alerts: &[Alert]) -> Vec<Rendered> {
+    let carried: BTreeSet<(String, Moment)> = alerts
+        .iter()
+        .filter_map(|alert| Some((alert.id.clone()?, alert.moment)))
+        .collect();
+    let mut alerted = dashboard.alerted.lock().await;
+    let said = alerted.as_ref().map_or_else(Vec::new, |before| {
+        alerts
+            .iter()
+            .rev()
+            .filter(|alert| {
+                alert
+                    .id
+                    .as_ref()
+                    .is_some_and(|id| !before.contains(&(id.clone(), alert.moment)))
+            })
+            .filter_map(|alert| Rendered::of(Nature::Record, &Envelope::new(kind::ALERT, alert)))
+            .collect()
+    });
+    *alerted = Some(carried);
     said
 }
 
@@ -102,3 +144,6 @@ async fn newly(dashboard: &Dashboard, snapshot: &Snapshot, joined: bool) -> Opti
     *told = Some(newest);
     rendered
 }
+
+#[cfg(test)]
+mod tests;

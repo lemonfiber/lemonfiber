@@ -52,6 +52,7 @@ use schemars::{schema_for, Schema};
 use serde::Serialize;
 
 use lemonfiber_core::agreement;
+use lemonfiber_core::alert::Alert;
 use lemonfiber_core::app::plugins::REFUSALS;
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::dashboard::Snapshot;
@@ -182,6 +183,7 @@ fn answered(kinds: &mut BTreeMap<String, Schema>) {
 /// another, and the guard compared two integers that agreed.
 fn beside(kinds: &mut BTreeMap<String, Schema>) {
     describing(kinds, kind::ADMISSION, schema_for!(Envelope<Admitted>));
+    describing(kinds, kind::ALERT, schema_for!(Envelope<Alert>));
     describing(
         kinds,
         kind::CAPABILITIES,

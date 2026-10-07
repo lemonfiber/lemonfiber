@@ -301,6 +301,7 @@ fn a_wordy_snapshot() -> Snapshot {
         exit: None,
     }]);
     snapshot.alerts = vec![lemonfiber_core::alert::Alert {
+        id: None,
         check: "service.sonarr".to_owned(),
         kind: "service.down".to_owned(),
         moment: lemonfiber_core::alert::Moment::Onset,

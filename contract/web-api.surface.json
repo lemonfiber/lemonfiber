@@ -3,6 +3,7 @@
   "kinds": {
     "admission": "ref:Admitted",
     "adoption": "ref:AdoptReport",
+    "alert": "ref:Alert",
     "alerts": "ref:AlertReport",
     "archives": "ref:Listing",
     "backup": "ref:BackupReport",
@@ -356,6 +357,12 @@
         "exit": {
           "type": [
             "integer|null/int32"
+          ],
+          "required": false
+        },
+        "id": {
+          "type": [
+            "null|string"
           ],
           "required": false
         },

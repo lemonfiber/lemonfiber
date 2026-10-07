@@ -426,7 +426,14 @@ fn alert(record: &Record, heard: Heard) -> Alert {
         ),
     };
     let check = format!("{CHECK}{}", record.name);
+    // A key is minted once and revoked once, and a name is never minted again, so which
+    // of the two happened is all there is to tell one of its alerts from the other.
+    let happened = match heard {
+        Heard::Minted => "minted",
+        Heard::Revoked => "revoked",
+    };
     Alert {
+        id: Some(Alert::named(&check, happened)),
         check: check.clone(),
         kind: ALERT_KIND.to_owned(),
         moment: Moment::Onset,

@@ -434,6 +434,7 @@ pub(crate) async fn reported(ctx: &Ctx) {
 /// The alert a standing boot failure amounts to.
 fn owed(condition: &Condition) -> Alert {
     Alert {
+        id: Some(Alert::named(CHECK, condition.recurrences)),
         check: CHECK.to_owned(),
         kind: condition.kind.clone(),
         moment: Moment::Onset,

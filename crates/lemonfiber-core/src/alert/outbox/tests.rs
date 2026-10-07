@@ -5,6 +5,7 @@ use crate::error::Severity;
 /// An alert about one check.
 fn alert(check: &str, moment: Moment) -> Alert {
     Alert {
+        id: None,
         check: check.to_owned(),
         kind: "service.stopped".to_owned(),
         moment,

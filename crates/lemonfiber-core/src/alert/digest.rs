@@ -199,6 +199,7 @@ fn alert_for(condition: &Condition, told: Option<u32>) -> Option<Alert> {
     // hearing it again per flap is the thing being avoided.
     let unheard = told.is_none_or(|heard| heard < FLAPPING);
     unheard.then(|| Alert {
+        id: Some(Alert::named(&condition.check, condition.recurrences)),
         check: condition.check.clone(),
         kind: condition.kind.clone(),
         moment: Moment::Onset,
