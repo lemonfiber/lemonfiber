@@ -260,7 +260,8 @@ pub(super) struct Ticking {
 /// validation and takes every walkthrough test down with a fault about a service none
 /// of them is testing. `the_fixture_clock_is_not_older_than_the_stack_it_validates`
 /// is the guard; when it fails, move this forward rather than pinning an older image.
-const TODAY: std::time::Duration = std::time::Duration::from_secs(lemonfiber_fixtures::ports::TODAY);
+const TODAY: std::time::Duration =
+    std::time::Duration::from_secs(lemonfiber_fixtures::ports::TODAY);
 
 impl Ticking {
     /// A clock moving `step` further on each reading.
