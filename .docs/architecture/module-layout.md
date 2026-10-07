@@ -149,7 +149,6 @@ The file name is the question; the tests inside it are the ways of asking:
 | `what_a_source_file_may_not_say.rs` | No `#[allow(…)]` anywhere in `src/`, and no spec or area identifier in a comment |
 | `how_long_a_file_may_be.rs` | 550 lines a source file and 800 a test file, counted over the whole file, and a source file's tests kept beside it rather than inline |
 | `the_one_way_out.rs` | Output leaves through `say.rs`, treated on the way; a failure lands on stderr; what a parser reads is never folded for a person |
-| `each_requirement_is_claimed_once.rs` | Every requirement appears exactly once in the status table |
 | `what_a_check_can_see.rs` | Every diagnostic check is handed something to ask, and says how long it disturbs the stack for |
 | `a_latch_is_settled_once.rs` | Reading a value settled at startup never settles it |
 | `nothing_shapes_this_machines_traffic.rs` | Nothing shipped reaches for a traffic shaper |
