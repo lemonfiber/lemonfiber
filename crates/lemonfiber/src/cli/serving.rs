@@ -25,9 +25,8 @@ pub struct RawUi {
     pub no_browser: bool,
     /// Serve the interface from this directory rather than from the binary.
     ///
-    /// No build carries a web app of its own yet, so this is the only way to
-    /// serve one. A build asked without it says as much rather than answering
-    /// with an empty page.
+    /// Without it, the web app built into this binary is served. Use it to try
+    /// a build of the web app you made yourself.
     #[arg(long, value_name = "PATH")]
     pub assets: Option<PathBuf>,
     /// Offer this to your network, rather than to this machine only.
