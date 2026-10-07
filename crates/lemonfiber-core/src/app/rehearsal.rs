@@ -193,6 +193,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Stuck => reads("stuck"),
         Command::FrontDoor => reads("front-door"),
         Command::News => reads("news"),
+        Command::Playing { .. } => reads("playing"),
         Command::Companion(crate::companion::Asked::Pair) => {
             cannot("companion pair", MATERIAL_IS_MATERIAL)
         }

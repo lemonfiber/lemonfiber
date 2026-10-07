@@ -59,6 +59,7 @@ const fn read(command: &Command) -> &'static [Kind] {
         Command::SelfUpdate { .. } => &[kind::SELF_UPDATE],
         Command::Plugins(plugins::Asked::Installed) => &[kind::PLUGINS],
         Command::Wiring(Linking::Read) => &[kind::WIRING],
+        Command::Playing { .. } => &[kind::PLAYING],
         _ => &[],
     }
 }

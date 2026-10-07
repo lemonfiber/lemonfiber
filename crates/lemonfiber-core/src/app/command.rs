@@ -208,6 +208,15 @@ pub enum Command {
         /// How many to answer with, newest first.
         most: u32,
     },
+    /// Report what the media server is playing now: who is watching what, and where.
+    ///
+    /// Every session in the house, or one member's. A member asking is answered with
+    /// their own and nobody else's, because the command they reach names them.
+    Playing {
+        /// The member to narrow to, by name or by the id the server files them under,
+        /// or every session where absent.
+        member: Option<String>,
+    },
     /// Report what the household has asked for and where each request stands, in the
     /// words the member who asked would use rather than the services' own.
     Household {

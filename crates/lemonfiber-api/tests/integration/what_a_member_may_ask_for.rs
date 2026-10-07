@@ -122,6 +122,23 @@ async fn a_member_reaches_the_one_read_that_is_theirs() {
     let _ = fs::remove_dir_all(a_directory("member-own-read"));
 }
 
+/// What they are playing is theirs too, and naming somebody else does not turn it into
+/// a refusal: the command it reaches is narrowed to them, which `entitled` proves.
+#[tokio::test]
+async fn a_member_reaches_what_they_are_playing_whoever_they_named() {
+    let (router, carried) = as_a_member("member-playing").await;
+    for path in ["/api/playing", "/api/playing?member=bo"] {
+        let answer = asked(router.clone(), "GET", path, &carried, "").await;
+        assert_ne!(
+            answer.status,
+            StatusCode::FORBIDDEN,
+            "{path} was refused to the member it answers for: {}",
+            answer.body
+        );
+    }
+    let _ = fs::remove_dir_all(a_directory("member-playing"));
+}
+
 /// What the stack can do is told to a member as it is theirs, through every layer a
 /// run puts in front of it: the read that is theirs is available, and an action that
 /// is not is said to be unpermitted rather than left out.

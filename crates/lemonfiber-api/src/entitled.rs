@@ -142,6 +142,12 @@ fn members(id: &str, command: &Command) -> Permitted {
             member: Whom::Named(id.to_owned()),
             most: *most,
         }),
+        // Theirs, narrowed the same way: what they are playing, and nobody else's.
+        // Whatever the request named is discarded, so an operator's narrowing cannot
+        // be borrowed to read another member's sessions.
+        Command::Playing { .. } => Permitted::This(Command::Playing {
+            member: Some(id.to_owned()),
+        }),
         // **Everything not named above is refused**, and the catch-all is the
         // statement rather than an omission: a command added later is not a
         // member's until somebody decides it is and writes it down. Listing what

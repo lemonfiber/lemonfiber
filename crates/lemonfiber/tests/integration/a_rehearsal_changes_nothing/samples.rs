@@ -128,6 +128,7 @@ fn over_the_household() -> Vec<(&'static str, Command)> {
                 most: 25,
             },
         ),
+        ("playing", Command::Playing { member: None }),
         ("walkthrough", Command::Walkthrough { item: None }),
         (
             "explain",

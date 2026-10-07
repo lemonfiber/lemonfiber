@@ -45,6 +45,7 @@ fn settings_of(
             | Outcome::Hosting(_)
             | Outcome::Household(_)
             | Outcome::Held(_)
+            | Outcome::Playing(_)
             | Outcome::FrontDoor(_)
             | Outcome::News(_)
             | Outcome::Stuck(_)

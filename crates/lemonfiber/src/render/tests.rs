@@ -18,8 +18,8 @@ use lemonfiber_core::migration::mode::offered;
 use lemonfiber_core::model::{
     AdoptReport, AlertReport, BesideReport, CarryingReport, ConfigReport, ConflictReport,
     Disposition, DoctorReport, ExceptionReport, FormsReport, FrontDoorReport, HeldReport,
-    HouseholdReport, MigrationReport, MovedReport, MusicReport, OccupantReport, QualityReport,
-    ResetReport, SettingReport, Standing, StandingReport, StatusReport, StuckReport,
+    HouseholdReport, MigrationReport, MovedReport, MusicReport, OccupantReport, PlayingReport,
+    QualityReport, ResetReport, SettingReport, Standing, StandingReport, StatusReport, StuckReport,
     UnsupportedReport, UpgradeReport, VersionReport, WizardReport,
 };
 use lemonfiber_core::origin::Origin;
@@ -252,6 +252,7 @@ fn the_first_of_them() -> Vec<Outcome> {
             available: true,
             findings: Vec::new(),
         }),
+        Outcome::Playing(PlayingReport::default()),
         Outcome::Stuck(StuckReport {
             items: Vec::new(),
             incomplete: false,

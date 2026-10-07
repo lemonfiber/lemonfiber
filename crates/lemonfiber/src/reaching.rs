@@ -153,6 +153,10 @@ pub const ASKS: &[Reach] = &[
         through: "/api/held",
     },
     Reach {
+        request: "playing",
+        through: "/api/playing",
+    },
+    Reach {
         request: "history",
         through: "/api/history",
     },

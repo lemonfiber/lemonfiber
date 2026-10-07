@@ -449,6 +449,12 @@ impl Household for AHousehold {
     async fn quick_connect(&self) -> Result<bool, Failure> {
         unreachable!("the door asks this household who somebody is and nothing else")
     }
+    async fn playing(
+        &self,
+        _: Option<&str>,
+    ) -> Result<Vec<lemonfiber_core::ports::service::Playback>, Failure> {
+        unreachable!("the door asks this household who somebody is and nothing else")
+    }
 }
 
 /// A surface with a household behind it, minting its sessions from `random`.

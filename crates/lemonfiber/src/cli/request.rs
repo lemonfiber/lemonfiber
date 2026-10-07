@@ -204,6 +204,14 @@ pub enum Request {
         #[arg(long)]
         most: Option<u32>,
     },
+    /// Show what the media server is playing now: who is watching what, and where.
+    ///
+    /// Every session in the house, or one member's with `--member`.
+    Playing {
+        /// Whose sessions, by the name they are known by.
+        #[arg(long)]
+        member: Option<String>,
+    },
     /// Add one thing, end to end, and watch every step of it happen.
     ///
     /// The walk a first run is offered: search the indexers, grab a release, download

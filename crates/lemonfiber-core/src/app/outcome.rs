@@ -126,6 +126,8 @@ outcomes! {
     Household(HouseholdReport) => HOUSEHOLD [rehearsed],
     /// What one member can watch, as the media server answers it for them.
     Held(crate::model::HeldReport) => HELD [rehearsed],
+    /// What the media server is playing now, for everybody or for one member.
+    Playing(crate::model::PlayingReport) => PLAYING,
     /// What this machine keeps running for lemonfiber, and what a change to it did.
     Hosting(HostingReport) => HOSTING [rehearsed],
     /// The one address to hand somebody who lives here.

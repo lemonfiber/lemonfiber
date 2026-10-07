@@ -606,3 +606,22 @@ async fn a_read_asked_with_a_method_it_does_not_answer_is_refused_by_its_code() 
         refused(Refusal::WrongMethod, Refusal::WrongMethod.said())
     );
 }
+
+/// What is playing takes one member to narrow to, or none for the whole house, and
+/// refuses an empty name rather than reading it as having named nobody.
+#[test]
+fn what_is_playing_takes_a_member_or_nobody() {
+    assert_eq!(
+        reached(table::PLAYING, ""),
+        Some(Command::Playing { member: None })
+    );
+    assert_eq!(
+        reached(table::PLAYING, "member=ada"),
+        Some(Command::Playing {
+            member: Some("ada".to_owned())
+        })
+    );
+    assert_eq!(reached(table::PLAYING, "member="), None);
+    assert_eq!(reached(table::PLAYING, "member=ada&member=bo"), None);
+    assert_eq!(reached(table::PLAYING, "most=5"), None);
+}

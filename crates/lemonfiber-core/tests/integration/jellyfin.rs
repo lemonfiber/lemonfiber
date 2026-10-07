@@ -71,6 +71,7 @@ mod accounts;
 mod cors;
 mod keys;
 mod library;
+mod playing;
 /// **The design claim, asserted rather than described.** The account whose shelf this
 /// is appears in the path, not in a filter applied afterwards — which is what makes the
 /// media server the thing that applies the age limit, the blocked kinds and the library

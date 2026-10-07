@@ -61,6 +61,7 @@ fn reading() -> Vec<(Command, Kind)> {
         (Command::SelfUpdate { to: None }, kind::SELF_UPDATE),
         (Command::Plugins(plugins::Asked::Installed), kind::PLUGINS),
         (Command::Wiring(Linking::Read), kind::WIRING),
+        (Command::Playing { member: None }, kind::PLAYING),
     ]
 }
 
