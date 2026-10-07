@@ -72,7 +72,7 @@ pub struct Envelope<T> {
     pub host: Option<String>,
     /// The work that said this, by the name its accepting reply gave it.
     // Present exactly on a line said by work a job names, so a client ties each line
-    // to the start, fetch or walk it asked for (`B2-R19`, `D3-R14`); absent on
+    // to the start, fetch or walk it asked for; absent on
     // everything else, which is every reply and every line a terminal or the server
     // itself says. On the envelope rather than in `data`, so what a kind carries is
     // the same whoever said it. Skipped when absent for the reason `host` is.

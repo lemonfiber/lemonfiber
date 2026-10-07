@@ -518,7 +518,7 @@ async fn a_wait_says_what_it_is_waiting_for_to_whoever_is_listening() {
 /// A wait said by work a job names carries the name, and one no job said carries none.
 ///
 /// A client that asked for a start holds the name the accepting reply gave it, and
-/// ties each line to that start by it (`B2-R19`).
+/// ties each line to that start by it.
 #[tokio::test]
 async fn a_wait_names_the_job_it_belongs_to_and_an_untied_one_names_none() {
     let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
@@ -544,7 +544,7 @@ async fn a_wait_names_the_job_it_belongs_to_and_an_untied_one_names_none() {
 /// A walk's steps carry the name of the job that walks, and the carrying ends with it.
 ///
 /// Its own channel rather than the surface's, so a walk's steps are tied to the walk
-/// a client asked for (`D3-R14`) and nothing is left carrying once the walk is over.
+/// a client asked for and nothing is left carrying once the walk is over.
 #[tokio::test]
 async fn a_walks_steps_name_its_job_and_stop_being_carried_when_it_ends() {
     let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));

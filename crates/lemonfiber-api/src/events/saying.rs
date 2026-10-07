@@ -37,7 +37,7 @@ impl Saying {
     /// Say onto this stream, for the work this job names.
     ///
     /// Every line it says carries the name, so a client that asked for the work
-    /// ties what the wait says to the request it made (`B2-R19`).
+    /// ties what the wait says to the request it made.
     #[must_use]
     pub fn for_job(live: Arc<Live>, job: &str) -> Self {
         Self {

@@ -47,7 +47,7 @@ impl Stepping {
     /// A narrator for the walk this job names, and the run that carries it.
     ///
     /// Every step it says carries the name, so a client that asked for the walk
-    /// ties each step to the request it made (`D3-R14`). Its own channel rather
+    /// ties each step to the request it made. Its own channel rather
     /// than the surface's, so the carrying ends with the job: the walk's context is
     /// the last holder of the narrator, and it goes when the walk does.
     #[must_use]
