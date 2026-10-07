@@ -22,6 +22,7 @@ pub mod bundled;
 // The catalogue's signed index, and what a name resolves to through it.
 pub mod catalogue;
 mod claimed;
+mod compact;
 // The container written from a record, rather than anything read out of a manifest.
 // Beside the record because it is the derivation the record deliberately does not
 // hold: a copy of one is free to disagree with it, so there is one of each and this
@@ -158,13 +159,13 @@ fn each(found: &[Unpublishable]) -> String {
     })
 }
 
-/// As they are committed: two-space indent, one trailing newline.
+/// As they are committed: two-space indent, every innermost list or object of
+/// scalars on one line, and one trailing newline.
 ///
 /// `None` only where the value cannot serialise, which none of these can.
 fn rendered<T: Serialize>(artefact: &T) -> Option<String> {
-    serde_json::to_string_pretty(artefact)
-        .ok()
-        .map(|text| text + "\n")
+    let pretty = serde_json::to_string_pretty(artefact).ok()? + "\n";
+    compact::collapsed(&pretty)
 }
 
 /// The published schema for `plugin.toml`, from the types lemonfiber deserialises.

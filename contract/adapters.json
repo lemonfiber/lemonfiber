@@ -1,22 +1,4 @@
 {
-  "kinds": [
-    "servarr",
-    "sabnzbd",
-    "qbittorrent",
-    "seerr",
-    "bindery",
-    "jellyfin",
-    "bazarr",
-    "audiobookshelf",
-    "nzbhydra2"
-  ],
-  "key_sources": [
-    "config-xml",
-    "config-ini",
-    "config-json",
-    "config-yaml",
-    "api-settings",
-    "generated",
-    "none"
-  ]
+  "kinds": ["servarr", "sabnzbd", "qbittorrent", "seerr", "bindery", "jellyfin", "bazarr", "audiobookshelf", "nzbhydra2"],
+  "key_sources": ["config-xml", "config-ini", "config-json", "config-yaml", "api-settings", "generated", "none"]
 }
