@@ -70,6 +70,13 @@ pub struct Install {
     /// that had nothing to put back, which is both a rehearsal and an install that
     /// held.
     pub reversed: Option<crate::app::putting_back::Reversal>,
+    /// Every install recipe the act ran, in order, with what each step came to; an
+    /// empty list where none ran, which is every rehearsal and every plugin declaring no
+    /// install recipe.
+    ///
+    /// A recipe that did not hold ends the act with a problem carrying the same account,
+    /// so this is the account of recipes that held.
+    pub recipes_ran: Vec<super::running::Ran>,
 }
 
 /// A capability that would have nothing filling it.

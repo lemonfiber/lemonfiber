@@ -64,6 +64,8 @@ mod reports;
 pub(crate) mod judging;
 mod provenance;
 pub(crate) mod recorded;
+// Running a recipe: each step once, in order, held to where reading it allowed.
+pub mod running;
 
 use lemonfiber_manifest::Manifest;
 use schemars::schema_for;

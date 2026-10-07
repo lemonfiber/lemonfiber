@@ -23,6 +23,7 @@
 //! Module names avoid repeating their trait's name, so call sites read `ports::Engine`
 //! rather than `docker::DockerApi`. See `.docs/architecture/ports-and-adapters.md`.
 
+pub mod asking;
 pub mod docker;
 pub mod filesystem;
 pub mod hosting;
@@ -41,6 +42,7 @@ pub mod seams;
 pub mod service;
 pub mod time;
 
+pub use asking::Asking;
 pub use docker::{Engine, Images};
 pub use filesystem::{Confined, Eraser, FileSystem, Volume};
 pub use hosting::Host;

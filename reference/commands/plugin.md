@@ -269,6 +269,9 @@ Options:
       --force
           Take the stack from a run that claimed it and did not give it back
 
+      --input <NAME=VALUE>
+          A value a recipe asks for, written as its name, `=`, and the value. Once for each. At a terminal, a value a recipe asks for and was not given here is asked for, a secret without it showing as it is typed
+
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
@@ -398,6 +401,9 @@ Options:
 
       --force
           Take the stack from a run that claimed it and did not give it back
+
+      --input <NAME=VALUE>
+          A value a recipe asks for, written as its name, `=`, and the value. Once for each. At a terminal, a value a recipe asks for and was not given here is asked for, a secret without it showing as it is typed
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one

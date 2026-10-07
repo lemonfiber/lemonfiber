@@ -57,6 +57,7 @@ fn everything(confirm: bool) -> Arguments {
         exceeded: Some("pause".to_owned()),
         unrestricted_for: Some(37),
         dry_run: true.into(),
+        inputs: Vec::new(),
     }
 }
 

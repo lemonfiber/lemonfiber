@@ -26,6 +26,7 @@
 use std::collections::BTreeSet;
 
 use crate::extension;
+use crate::schema::RUN;
 
 /// The generation this set is at.
 ///
@@ -35,10 +36,10 @@ pub const OFFERED_VERSION: u32 = 1;
 
 /// An offer this build makes that no published extension point makes for it.
 ///
-/// Empty while every mechanism a plugin can ask for is either a point's or unbuilt.
 /// An entry here is a promise that something in this build does the thing, so one is
 /// added by the change that makes it true rather than by the change that wants it.
-const BESIDE_THE_POINTS: &[&str] = &[];
+/// [`RUN`] is here because this build runs a plugin's install recipes.
+const BESIDE_THE_POINTS: &[&str] = &[RUN];
 
 /// Every capability this build offers a plugin, in one stable order.
 #[must_use]

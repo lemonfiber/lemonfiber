@@ -341,8 +341,8 @@ fn adopting_carries_the_confirmation_through_as_it_was_given() {
 /// Which door a word under `plugin` goes through, and the command it becomes.
 fn door(read: lemonfiber::cli::PluginCommand) -> Option<Command> {
     match super::super::plugin(read) {
-        super::super::Under::Dispatched(command) => Some(command),
-        super::super::Under::Published(_) => None,
+        Ok(super::super::Under::Dispatched(command)) => Some(command),
+        Ok(super::super::Under::Published(_)) | Err(_) => None,
     }
 }
 
@@ -353,12 +353,14 @@ fn the_words_about_this_machine_become_commands() {
     let consent = |agreement: Option<&str>, approved: &[&str]| plugins::Consent {
         agreement: agreement.map(str::to_owned),
         approved: approved.iter().map(|pair| (*pair).to_owned()).collect(),
+        inputs: plugins::Inputs::default(),
     };
     assert_eq!(
         door(lemonfiber::cli::PluginCommand::Install {
             source: "/srv/komga".to_owned(),
             offer: Some("1a2b3c4d".to_owned()),
             approved: vec!["token@metadata.example.org".to_owned()],
+            inputs: Vec::new(),
         }),
         Some(Command::Plugins(plugins::Asked::Install {
             source: lemonfiber_core::plugin::Source::Path(std::path::PathBuf::from("/srv/komga")),
@@ -386,6 +388,7 @@ fn the_words_about_this_machine_become_commands() {
             source: "https://example.org/komga@v2".to_owned(),
             offer: Some("1a2b3c4d".to_owned()),
             approved: Vec::new(),
+            inputs: Vec::new(),
         }),
         Some(Command::Plugins(plugins::Asked::Update {
             plugin: "komga".to_owned(),
@@ -394,6 +397,46 @@ fn the_words_about_this_machine_become_commands() {
         })),
         "an update names the plugin and any source the install takes"
     );
+}
+
+/// A value for a recipe's input is carried by its name, and one written without its `=`
+/// is a usage error said without repeating it.
+#[test]
+fn a_value_for_a_recipe_is_carried_by_name_and_a_malformed_one_refused() {
+    let install = |inputs: &[&str]| lemonfiber::cli::PluginCommand::Install {
+        source: "/srv/komga".to_owned(),
+        offer: None,
+        approved: Vec::new(),
+        inputs: inputs.iter().map(|one| (*one).to_owned()).collect(),
+    };
+    let carried = match door(install(&["claim=a=b", " code =x"])) {
+        Some(Command::Plugins(plugins::Asked::Install { consent, .. })) => {
+            consent.inputs.values().clone()
+        }
+        _ => std::collections::BTreeMap::new(),
+    };
+    assert_eq!(
+        carried,
+        std::collections::BTreeMap::from([
+            ("claim".to_owned(), "a=b".to_owned()),
+            ("code".to_owned(), "x".to_owned()),
+        ])
+    );
+    assert!(matches!(
+        super::super::plugin(install(&["claim=1", "s3cret"])),
+        Err(crate::exit::USAGE)
+    ));
+    let update = lemonfiber::cli::PluginCommand::Update {
+        plugin: "komga".to_owned(),
+        source: "/srv/komga".to_owned(),
+        offer: None,
+        approved: Vec::new(),
+        inputs: vec!["s3cret".to_owned()],
+    };
+    assert!(matches!(
+        super::super::plugin(update),
+        Err(crate::exit::USAGE)
+    ));
 }
 
 /// And the five that are documents this build generated go the other way,

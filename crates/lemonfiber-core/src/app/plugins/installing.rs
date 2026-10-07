@@ -115,8 +115,13 @@ pub(super) async fn install(
     let mut checked = None;
     let mut put_back = None;
     let mut recorded = false;
+    let mut recipes_ran = Vec::new();
 
     if acting {
+        // Every value a recipe asks the operator for is given, and nothing else is,
+        // before anything is written.
+        let consent = &super::following::consented(ctx, &would.plugin, &manifest, consent)?;
+
         // An install starts containers, so it owes the pre-flight every start does,
         // and owes it before anything is written: a machine that would resolve the
         // plugin's mounts somewhere else is refused with nothing to put back.
@@ -154,6 +159,10 @@ pub(super) async fn install(
             .as_ref()
             .is_some_and(crate::plugin::Verification::held)
         {
+            // The recipes run once the install holds and before it is recorded, so a
+            // recipe that does not hold puts back an install nothing has recorded.
+            let coming = Following::of(&manifest, &would, &stack_manifest, stack, &stamp);
+            recipes_ran = followed(ctx, &coming, consent).await?;
             // Answered for here rather than passed on. The record writer is shared and
             // says *your settings could not be saved, your existing settings are
             // untouched* — which after the lines above is false twice over: the file
@@ -194,12 +203,77 @@ pub(super) async fn install(
             contests,
             overrides: crate::plugin::overrides(&manifest),
             reversed: put_back,
+            recipes_ran,
         })),
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
         agreement: Some(offer),
     })
+}
+
+/// Everything running an install's recipes reads, gathered once.
+struct Following<'a> {
+    /// The manifest the recipes are declared in.
+    manifest: &'a lemonfiber_plugin::Manifest,
+    /// What the install settles.
+    would: &'a Installed,
+    /// The stack's services, which a recipe may call.
+    services: &'a [lemonfiber_manifest::Service],
+    /// Where the stack is.
+    stack: &'a Path,
+    /// The stamp the install is journalled under.
+    stamp: &'a str,
+}
+
+impl<'a> Following<'a> {
+    /// What an install of this manifest into this stack reads to run its recipes.
+    const fn of(
+        manifest: &'a lemonfiber_plugin::Manifest,
+        would: &'a Installed,
+        stack_manifest: &'a lemonfiber_manifest::Manifest,
+        stack: &'a Path,
+        stamp: &'a str,
+    ) -> Self {
+        Self {
+            manifest,
+            would,
+            services: stack_manifest.services.as_slice(),
+            stack,
+            stamp,
+        }
+    }
+}
+
+/// Run the install's recipes, putting the install back where one does not hold.
+///
+/// # Errors
+///
+/// Where a recipe does not hold or what it captured could not be kept, saying what
+/// putting the install back left on the machine.
+async fn followed(
+    ctx: &Ctx,
+    coming: &Following<'_>,
+    consent: &Consent,
+) -> Result<Vec<crate::plugin::running::Ran>, Box<Problem>> {
+    let ran = super::following::followed(
+        ctx,
+        coming.manifest,
+        coming.would,
+        coming.services,
+        consent,
+        coming.stamp,
+    )
+    .await;
+    match ran {
+        Ok(ran) => Ok(ran),
+        Err(unfollowed) => {
+            let back = reversing(ctx, coming.would, coming.stack, coming.stamp).await;
+            Err(Box::new(
+                unfollowed.problem(&coming.would.plugin, super::left_behind(&back)),
+            ))
+        }
+    }
 }
 
 /// What installing this manifest from this source would record, and the source to

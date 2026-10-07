@@ -449,17 +449,24 @@ pub(crate) enum Under {
 /// The five documents answer the same on a machine with nothing installed as on one
 /// running everything, so there is no stack to ask and nothing to decide; the four
 /// verbs are about this machine and go where every other verb goes.
-pub(crate) fn plugin(read: PluginCommand) -> Under {
-    match read {
+///
+/// # Errors
+///
+/// Where a value for a recipe's input is written without its `=`, said without
+/// repeating what was written, since what follows a name may be a secret.
+pub(crate) fn plugin(read: PluginCommand) -> Result<Under, u8> {
+    Ok(match read {
         PluginCommand::Install {
             source,
             offer,
             approved,
+            inputs,
         } => Under::Dispatched(Command::Plugins(plugins::Asked::Install {
             source: lemonfiber_core::plugin::Source::named(&source),
             consent: plugins::Consent {
                 agreement: offer,
                 approved,
+                inputs: given(&inputs)?,
             },
         })),
         PluginCommand::Installed => Under::Dispatched(Command::Plugins(plugins::Asked::Installed)),
@@ -469,6 +476,7 @@ pub(crate) fn plugin(read: PluginCommand) -> Under {
                 consent: plugins::Consent {
                     agreement: offer,
                     approved: Vec::new(),
+                    inputs: plugins::Inputs::default(),
                 },
             }))
         }
@@ -477,16 +485,33 @@ pub(crate) fn plugin(read: PluginCommand) -> Under {
             source,
             offer,
             approved,
+            inputs,
         } => Under::Dispatched(Command::Plugins(plugins::Asked::Update {
             plugin,
             source: lemonfiber_core::plugin::Source::named(&source),
             consent: plugins::Consent {
                 agreement: offer,
                 approved,
+                inputs: given(&inputs)?,
             },
         })),
         PluginCommand::Authoring(read) => Under::Published(read),
-    }
+    })
+}
+
+/// The values given for recipes' inputs with `--input`.
+///
+/// # Errors
+///
+/// Where one is written without its `=`, said without repeating it.
+fn given(written: &[String]) -> Result<plugins::Inputs, u8> {
+    plugins::Inputs::written(written).ok_or_else(|| {
+        complain!(
+            "error: an --input is written as the input's name, `=`, and its value, and one \
+             was written without the `=`"
+        );
+        USAGE
+    })
 }
 
 #[cfg(test)]

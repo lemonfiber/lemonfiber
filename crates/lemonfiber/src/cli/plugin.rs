@@ -78,6 +78,11 @@ pub enum PluginCommand {
         /// lists it. Once for each.
         #[arg(long = "approve", value_name = "VALUE@DESTINATION")]
         approved: Vec<String>,
+        /// A value a recipe asks for, written as its name, `=`, and the value. Once for
+        /// each. At a terminal, a value a recipe asks for and was not given here is asked
+        /// for, a secret without it showing as it is typed.
+        #[arg(long = "input", value_name = "NAME=VALUE")]
+        inputs: Vec<String>,
     },
     /// Say what is installed, and what each plugin is doing.
     ///
@@ -154,6 +159,11 @@ pub enum PluginCommand {
         /// lists it. Once for each.
         #[arg(long = "approve", value_name = "VALUE@DESTINATION")]
         approved: Vec<String>,
+        /// A value a recipe asks for, written as its name, `=`, and the value. Once for
+        /// each. At a terminal, a value a recipe asks for and was not given here is asked
+        /// for, a secret without it showing as it is typed.
+        #[arg(long = "input", value_name = "NAME=VALUE")]
+        inputs: Vec<String>,
     },
 }
 

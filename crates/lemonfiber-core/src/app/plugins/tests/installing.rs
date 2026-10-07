@@ -423,6 +423,7 @@ async fn an_install_whose_source_was_rewritten_after_the_reading_is_refused() {
     let answered = crate::app::plugins::Consent {
         agreement: offer,
         approved: Vec::new(),
+        inputs: crate::app::plugins::Inputs::default(),
     };
     let (code, said) = refused(plugins(&ctx, &asked(answered)).await);
     assert_eq!(code, "PLUGIN-25");

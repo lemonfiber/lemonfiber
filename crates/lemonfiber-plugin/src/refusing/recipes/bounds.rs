@@ -13,13 +13,8 @@
 use std::collections::BTreeSet;
 
 use crate::pointing;
-use crate::schema::{
-    Condition, Recipe, Retry, Step, ALL_WAITING, HEADER, LONGEST_WAIT, MOST_RETRIES,
-};
+use crate::schema::{Condition, Recipe, Step, ALL_WAITING, HEADER, LONGEST_WAIT, MOST_RETRIES};
 use crate::Violation;
-
-/// What a wait between two tries is written as, after its number.
-const SECONDS: char = 's';
 
 /// What one recipe has seen by the time it reaches a step: the steps before it and the
 /// values brought in or captured before it.
@@ -79,7 +74,7 @@ pub(super) fn retried(step: &Step, before: &Before<'_>, at: &str, found: &mut Ve
             ),
         });
     }
-    if waited(retry).is_none() {
+    if retry.seconds().is_none() {
         found.push(Violation {
             location: format!("{here}.every"),
             message: format!(
@@ -117,7 +112,7 @@ pub(super) fn waiting(recipe: &Recipe, at: &str, found: &mut Vec<Violation>) {
         .steps
         .iter()
         .filter_map(|step| step.retry.as_ref())
-        .filter_map(|retry| waited(retry).map(|every| every * u64::from(retry.times)))
+        .filter_map(|retry| retry.seconds().map(|every| every * u64::from(retry.times)))
         .sum();
     if all > ALL_WAITING {
         found.push(Violation {
@@ -128,17 +123,6 @@ pub(super) fn waiting(recipe: &Recipe, at: &str, found: &mut Vec<Violation>) {
             ),
         });
     }
-}
-
-/// How long one retry waits between two tries, in seconds, where it is written as the
-/// format allows.
-pub(super) fn waited(retry: &Retry) -> Option<u64> {
-    retry
-        .every
-        .strip_suffix(SECONDS)
-        .filter(|digits| !digits.is_empty() && digits.bytes().all(|byte| byte.is_ascii_digit()))
-        .and_then(|digits| digits.parse().ok())
-        .filter(|seconds| (1..=LONGEST_WAIT).contains(seconds))
 }
 
 /// Refuse a capture that reads no place an answer could hold.

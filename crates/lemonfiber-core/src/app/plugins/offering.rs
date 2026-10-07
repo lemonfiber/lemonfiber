@@ -14,6 +14,8 @@
 
 use serde::Serialize;
 
+use std::collections::BTreeMap;
+
 use crate::error::codes::plugin::{PLUGIN_OFFER_MOVED, UNAPPROVED};
 use crate::error::{Problem, Remedy, Severity, State};
 use crate::plugin::{Changing, Installed};
@@ -53,6 +55,56 @@ pub struct Consent {
     pub agreement: Option<String>,
     /// Every value a recipe would carry elsewhere that was approved, as `value@to`.
     pub approved: Vec<String>,
+    /// Every value the operator supplied for a recipe to bring in, by the input's name.
+    pub inputs: Inputs,
+}
+
+/// The values an operator supplied for a recipe's inputs, by name.
+///
+/// A value may be a secret — a claim code, a password typed at a prompt — so it is held
+/// here and handed to the recipe that asks for it, and is never part of the offer, the
+/// journal or anything said back. Even a debug rendering names the inputs and not what
+/// they hold.
+#[derive(Clone, Default, PartialEq, Eq)]
+pub struct Inputs(BTreeMap<String, String>);
+
+impl Inputs {
+    /// These values, by the input each was given for.
+    #[must_use]
+    pub const fn of(values: BTreeMap<String, String>) -> Self {
+        Self(values)
+    }
+
+    /// Every value, by name.
+    #[must_use]
+    pub const fn values(&self) -> &BTreeMap<String, String> {
+        &self.0
+    }
+
+    /// The values written each as its input's name, `=`, and the value, as a command
+    /// line and a request carry them. Nothing where one is written without its `=`,
+    /// which a caller refuses without repeating what was written, since what follows a
+    /// name may be a secret.
+    #[must_use]
+    pub fn written(written: &[String]) -> Option<Self> {
+        written
+            .iter()
+            .map(|one| {
+                one.split_once(GIVEN_AS)
+                    .map(|(name, value)| (name.trim().to_owned(), value.to_owned()))
+            })
+            .collect::<Option<BTreeMap<_, _>>>()
+            .map(Self)
+    }
+}
+
+/// What divides an input's name from its value where one is written.
+const GIVEN_AS: char = '=';
+
+impl std::fmt::Debug for Inputs {
+    fn fmt(&self, into: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        into.debug_set().entries(self.0.keys()).finish()
+    }
 }
 
 /// What an install is offered as: the plugin, what it would write, what it would leave

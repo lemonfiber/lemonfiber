@@ -19,6 +19,9 @@
 //! and an origin that disagrees with where the value comes from is refused rather than
 //! corrected.
 
+use std::collections::BTreeMap;
+
+use crate::addressing::Toward;
 use crate::schema::{Input, Manifest, Origin, Recipe, Step};
 use crate::Violation;
 
@@ -57,6 +60,25 @@ fn own<'a>(manifest: &'a Manifest, id: &str) -> Option<&'a crate::schema::Servic
     manifest.services.iter().find(|service| service.id == id)
 }
 
+/// The port a service in this stack publishes, by its id: this plugin's own, or else
+/// the stack's.
+fn published(manifest: &Manifest, id: &str) -> Option<u16> {
+    own(manifest, id).map_or_else(
+        || bundled::named(id).and_then(|service| service.port),
+        |service| service.port,
+    )
+}
+
+/// Where a call to `to` is addressed, as reading the manifest classes it: a service in
+/// this stack at the port it publishes, or a host outside it by its name. Nothing where
+/// it is neither, or a service in this stack that publishes no port.
+pub(super) fn toward<'a>(manifest: &Manifest, to: &'a str) -> Option<Toward<'a>> {
+    match classified(manifest, to)? {
+        Whither::Stack => published(manifest, to).map(Toward::Stack),
+        Whither::Outside => Some(Toward::Outside(to)),
+    }
+}
+
 /// Refuse a destination that is neither a service in this stack reachable on a port
 /// nor a host outside it.
 ///
@@ -65,11 +87,7 @@ fn own<'a>(manifest: &'a Manifest, id: &str) -> Option<&'a crate::schema::Servic
 pub(super) fn reachable(manifest: &Manifest, to: &str, at: &str, found: &mut Vec<Violation>) {
     match classified(manifest, to) {
         Some(Whither::Stack) => {
-            let published = own(manifest, to).map_or_else(
-                || bundled::named(to).and_then(|service| service.port),
-                |service| service.port,
-            );
-            if published.is_none() {
+            if published(manifest, to).is_none() {
                 found.push(Violation {
                     location: at.to_owned(),
                     message: format!(
@@ -132,49 +150,108 @@ pub(super) fn inputs(manifest: &Manifest, recipe: &Recipe, at: &str, found: &mut
     }
 }
 
-/// Refuse carrying a credential the credential store holds anywhere but back to the
-/// service whose credential it is.
+/// The service a value is held to, and whether it was traded for a credential rather
+/// than being one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct Held<'a> {
+    /// The service whose credential it is, or was traded for.
+    pub(super) owner: &'a str,
+    /// Whether a step captured it from a call that carried a credential.
+    pub(super) traded: bool,
+}
+
+/// Every value of this recipe held to one service: each input the credential store
+/// holds, and every value a step captures from a call carrying a value already held.
+///
+/// Read through every step in order, guards or not: a step a guard usually skips still
+/// trades whatever it carries when it runs.
+pub(super) fn holders(recipe: &Recipe) -> BTreeMap<&str, Held<'_>> {
+    let mut held: BTreeMap<&str, Held<'_>> = recipe
+        .inputs
+        .iter()
+        .filter(|input| input.origin == Origin::CredentialStore)
+        .filter_map(|input| {
+            input.of.as_deref().map(|owner| {
+                (
+                    input.name.as_str(),
+                    Held {
+                        owner,
+                        traded: false,
+                    },
+                )
+            })
+        })
+        .collect();
+    for step in &recipe.steps {
+        let carried = super::carried(step).find_map(|name| held.get(name).copied());
+        if let Some(Held { owner, .. }) = carried {
+            for capture in &step.capture {
+                held.insert(
+                    &capture.name,
+                    Held {
+                        owner,
+                        traded: true,
+                    },
+                );
+            }
+        }
+    }
+    held
+}
+
+/// Refuse carrying a value held to one service anywhere but back to it.
 ///
 /// Asked wherever a value can leave: at every pair, and at every substitution into a
 /// call, so that neither a declaration nor a call can take one elsewhere.
 pub(super) fn returned(
-    recipe: &Recipe,
+    holders: &BTreeMap<&str, Held<'_>>,
     name: &str,
     to: &str,
     at: &str,
     found: &mut Vec<Violation>,
 ) {
-    let owner = recipe
-        .inputs
-        .iter()
-        .filter(|input| input.origin == Origin::CredentialStore && input.name == name)
-        .find_map(|input| input.of.as_deref());
-    if let Some(owner) = owner.filter(|owner| *owner != to) {
-        found.push(Violation {
-            location: at.to_owned(),
-            message: format!(
-                "carries {name}, the credential lemonfiber holds for {owner}, to {to}; a \
-                 credential goes back only to the service whose credential it is"
-            ),
-        });
-    }
-}
-
-/// An input the credential store holds names the service whose credential it is, and
-/// asks the operator nothing.
-fn held(manifest: &Manifest, input: &Input, at: &str, found: &mut Vec<Violation>) {
-    let credentialed = |id: &str| {
-        own(manifest, id).map_or_else(
-            || bundled::named(id).is_some_and(|service| service.api.is_some()),
-            |service| service.api.is_some(),
+    let Some(held) = holders.get(name).filter(|held| held.owner != to) else {
+        return;
+    };
+    let owner = held.owner;
+    let message = if held.traded {
+        format!(
+            "carries {name} to {to}, and {name} was captured from a call that carried the \
+             credential lemonfiber holds for {owner}; what a credential is traded for goes \
+             back only to the service whose credential it is"
+        )
+    } else {
+        format!(
+            "carries {name}, the credential lemonfiber holds for {owner}, to {to}; a \
+             credential goes back only to the service whose credential it is"
         )
     };
+    found.push(Violation {
+        location: at.to_owned(),
+        message,
+    });
+}
+
+/// An input the credential store holds names a service of the stack's whose credential
+/// it is, asks the operator nothing, and is no secret the operator types.
+///
+/// The stack's own, and never one of this plugin's: lemonfiber holds the key a bundled
+/// service is reached with, and holds none for a service a plugin brings, so a recipe
+/// naming one would be asking for a value nothing has.
+fn held(manifest: &Manifest, input: &Input, at: &str, found: &mut Vec<Violation>) {
     match &input.of {
-        Some(of) if credentialed(of) => {}
+        Some(of) if own(manifest, of).is_some() => found.push(Violation {
+            location: format!("{at}.of"),
+            message: format!(
+                "{of} is one of this plugin's own services, and lemonfiber holds no credential \
+                 for those; a credential comes from a service of the stack's"
+            ),
+        }),
+        Some(of) if bundled::named(of).is_some_and(|service| service.api.is_some()) => {}
         Some(of) => found.push(Violation {
             location: format!("{at}.of"),
             message: format!(
-                "{of} is no service in this stack whose credential lemonfiber holds; one that \
+                "{of} is no service of the stack's whose credential lemonfiber holds; one that \
                  does names the adapter it is reached through"
             ),
         }),
@@ -189,6 +266,14 @@ fn held(manifest: &Manifest, input: &Input, at: &str, found: &mut Vec<Violation>
         found.push(Violation {
             location: format!("{at}.ask"),
             message: "asks the operator for a value the credential store supplies".to_owned(),
+        });
+    }
+    if input.secret {
+        found.push(Violation {
+            location: format!("{at}.secret"),
+            message: "marks as typed in secret a value the credential store supplies, which \
+                      nobody types"
+                .to_owned(),
         });
     }
 }

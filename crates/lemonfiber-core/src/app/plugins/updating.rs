@@ -100,6 +100,10 @@ pub(crate) async fn update(
         return Ok(answering(held.installed().to_vec(), account, offer));
     }
 
+    // Every value a recipe asks the operator for is given, and nothing else is, before
+    // anything moves.
+    let consent = &super::following::consented(ctx, &would.plugin, &manifest, consent)?;
+
     // Judged before anything is taken, for the reason a removal judges first: a refusal
     // heard after the containers were already off would leave the version the record
     // names with nothing of it running.
@@ -154,6 +158,8 @@ pub(crate) async fn update(
         stamp: &stamp,
         standing: &standing,
         before: &before,
+        services: &stack_manifest.services,
+        consent,
     };
     let came = match on(ctx, &coming, &mut account.install).await {
         // Recorded last, and only here: until this lands every reader of the record
@@ -163,6 +169,9 @@ pub(crate) async fn update(
             Ok(after) => return Ok(answering(after.installed().to_vec(), account, offer)),
             Err(why) => Came::Stopped(why),
         },
+        // A recipe that did not hold ends the update with a problem, once the new
+        // version has gone back and the one it replaced is on again.
+        Came::Unfollowed(unfollowed) => return Err(unwound(ctx, unfollowed, &was, &coming).await),
         other => other,
     };
 
@@ -233,6 +242,7 @@ fn started(
             contests,
             overrides: crate::plugin::overrides(manifest),
             reversed: None,
+            recipes_ran: Vec::new(),
         },
         stopped: None,
         restored: None,
@@ -253,6 +263,10 @@ struct Coming<'a> {
     standing: &'a super::super::engine::Stack,
     /// What the stack's own checks said then.
     before: &'a [crate::doctor::Finding],
+    /// The stack's services, which the new version's recipes may call.
+    services: &'a [lemonfiber_manifest::Service],
+    /// What the operator agreed to and gave, which the recipes run under.
+    consent: &'a super::Consent,
 }
 
 /// How putting the new version on ended.
@@ -263,6 +277,8 @@ enum Came {
     NotHeld,
     /// Something stopped it before its proofs could be asked, and this is what.
     Stopped(String),
+    /// Its proofs and the stack's checks held, and its recipes did not.
+    Unfollowed(super::following::Unfollowed),
 }
 
 /// Put the new version on and ask it everything an install asks.
@@ -288,10 +304,80 @@ async fn on(ctx: &Ctx, coming: &Coming<'_>, install: &mut Install) -> Came {
         crate::plugin::against(coming.before, &verifying::again(ctx, coming.standing).await);
     let held = checked.held();
     install.verified = Some(checked);
-    if held {
-        Came::Held
-    } else {
-        Came::NotHeld
+    if !held {
+        return Came::NotHeld;
+    }
+    match super::following::followed(
+        ctx,
+        coming.manifest,
+        coming.would,
+        coming.services,
+        coming.consent,
+        coming.stamp,
+    )
+    .await
+    {
+        Ok(ran) => {
+            install.recipes_ran = ran;
+            Came::Held
+        }
+        Err(unfollowed) => Came::Unfollowed(unfollowed),
+    }
+}
+
+/// Take the new version off and put the one it replaced back on, after a recipe of the
+/// new version did not hold, and say so.
+async fn unwound(
+    ctx: &Ctx,
+    unfollowed: super::following::Unfollowed,
+    was: &Installed,
+    coming: &Coming<'_>,
+) -> Box<Problem> {
+    let back = super::reversing(ctx, coming.would, coming.stack, coming.stamp).await;
+    let restored = restored(ctx, was, coming.stack, coming.stamp).await;
+    Box::new(unfollowed.problem(
+        &coming.would.plugin,
+        brought_back(&was.plugin, &back, &restored),
+    ))
+}
+
+/// What the machine holds after an update whose recipe did not hold was put back, read
+/// off what taking the new version off and restoring the one it replaced did.
+pub(super) fn brought_back(
+    plugin: &str,
+    back: &crate::app::putting_back::Reversal,
+    restored: &Restored,
+) -> String {
+    let Restored {
+        version,
+        placed,
+        running,
+    } = restored;
+    let restoring = match (placed, running) {
+        (true, true) => format!(
+            "The update was put back, and {plugin} {version} is on again, as the record still \
+             says."
+        ),
+        (true, false) => format!(
+            "The update was put back, and {plugin} {version} is in place as the record still \
+             says, with its containers not running."
+        ),
+        (false, _) => format!(
+            "The update was put back as far as it could go: the record still names {plugin} \
+             {version}, and not everything it placed is on the machine again."
+        ),
+    };
+    let standing: Vec<String> = back
+        .left
+        .iter()
+        .map(|one| format!("{} — {}", one.target, one.because))
+        .collect();
+    match standing.as_slice() {
+        [] => restoring,
+        _ => format!(
+            "{restoring} Still standing from the new version: {}.",
+            standing.join("; ")
+        ),
     }
 }
 

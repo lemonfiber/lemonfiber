@@ -19,6 +19,9 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
+# A recipe's call address is built with it, when the manifest is read and when the call
+# is made, so the two are one reading.
+url = { workspace = true }
 
 [lints]
 workspace = true
