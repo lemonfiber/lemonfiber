@@ -25,7 +25,7 @@
 
 use std::sync::Arc;
 
-use crate::common::stack::stack;
+use crate::common::stack::{frozen_day, stack};
 use lemonfiber_core::app::{dispatch, Command, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::model::FrontDoorReport;
@@ -34,16 +34,9 @@ use lemonfiber_fixtures::support::Reporting;
 use lemonfiber_manifest::{Bind, Service};
 use lemonfiber_ports::docker::{Health, Lifecycle};
 
-/// A date the shipped stack is current at, for the freshness rule the reader applies.
-const TODAY: lemonfiber_manifest::Date = lemonfiber_manifest::Date {
-    year: 2026,
-    month: 10,
-    day: 4,
-};
-
 /// Every service that stack declares.
 fn declared() -> Vec<Service> {
-    let read = stack().checked_manifest(TODAY).ok();
+    let read = stack().checked_manifest(frozen_day()).ok();
     let Some(manifest) = read else {
         unreachable!("the stack this repository ships is one its own parser reads")
     };

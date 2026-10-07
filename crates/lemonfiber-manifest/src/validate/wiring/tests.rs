@@ -1,13 +1,7 @@
-use crate::{validate, Date, Manifest};
+use crate::validate::tests::TODAY;
+use crate::{validate, Manifest};
 
 const STACK: &str = include_str!("../../../../../assets/media-stack/stack.toml");
-
-/// After every date the stack records, so a pin bump does not fail these.
-const TODAY: Date = Date {
-    year: 2026,
-    month: 10,
-    day: 4,
-};
 
 /// Everything wrong with a manifest, as one line each.
 fn messages(text: &str) -> Vec<String> {

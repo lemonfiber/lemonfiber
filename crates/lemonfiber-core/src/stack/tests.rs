@@ -4,6 +4,7 @@ use include_dir::{include_dir, Dir};
 
 use super::{Diagnose, Failure, Source};
 use crate::error::{Severity, State};
+use crate::test_support::frozen_day as today;
 
 /// The same stack the binary embeds, so both variants are exercised against
 /// the real thing rather than against a fixture that could drift from it.
@@ -314,16 +315,6 @@ fn every_code_a_failure_raises_is_listed_and_every_listed_one_is_raised() {
             crate::wiring::UNREAD_AMISS,
             "{failure} is listed at the status a failure of the machine is answered with"
         );
-    }
-}
-
-/// Today, for the checks that take a date. Far enough forward that nothing in
-/// the shipped stack has aged out of its own freshness rule.
-const fn today() -> lemonfiber_manifest::Date {
-    lemonfiber_manifest::Date {
-        year: 2026,
-        month: 10,
-        day: 4,
     }
 }
 

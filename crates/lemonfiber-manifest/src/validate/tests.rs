@@ -36,10 +36,10 @@ const STACK: &str = include_str!("../../../../assets/media-stack/stack.toml");
 /// this and the fixture reports a fault that is nobody's mistake.
 /// `the_day_these_tests_use_is_after_everything_the_stack_records` is the guard;
 /// when it fails, move this forward rather than pinning an older image.
-const TODAY: Date = Date {
+pub(in crate::validate) const TODAY: Date = Date {
     year: 2026,
     month: 10,
-    day: 4,
+    day: 6,
 };
 
 fn check(text: &str) -> Vec<Violation> {

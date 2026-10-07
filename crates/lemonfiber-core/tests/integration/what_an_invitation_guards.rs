@@ -39,7 +39,7 @@ const HOUSEHOLD: &str = r#"[
     {"Id":"7","Name":"bo","HasPassword":false},
     {"Id":"5","Name":"cy","HasPassword":false,"LastActivityDate":"2025-12-01T10:00:00.0000000Z"},
     {"Id":"11","Name":"ed","HasPassword":false},
-    {"Id":"12","Name":"fay","HasPassword":true,"LastActivityDate":"2026-10-02T10:00:00.0000000Z"}
+    {"Id":"12","Name":"fay","HasPassword":true,"LastActivityDate":"2026-10-04T10:00:00.0000000Z"}
 ]"#;
 
 /// What the media server recorded: the old offers in January, and `ed`'s yesterday.
@@ -49,7 +49,7 @@ const HOUSEHOLD: &str = r#"[
 const RECORDED: &str = r#"{"Items":[
     {"Type":"UserCreated","Date":"2026-01-04T09:00:00.0000000Z","UserId":"7"},
     {"Type":"UserPasswordChanged","Date":"2026-01-04T09:00:00.0000000Z","UserId":"5"},
-    {"Type":"UserCreated","Date":"2026-10-03T10:00:00.0000000Z","UserId":"11"}
+    {"Type":"UserCreated","Date":"2026-10-05T10:00:00.0000000Z","UserId":"11"}
 ]}"#;
 
 /// An account as the media server answers a read of it, for a policy to be written over.
@@ -660,7 +660,7 @@ async fn an_invitation_that_could_not_be_taken_back_is_said() {
 fn offered_to_fay_and_owner(directory: &std::path::Path) {
     let _ = std::fs::write(
         directory.join("invitations.json"),
-        r#"{"12":{"offered":"2026-10-03T10:00:00Z","lapses":"2999-01-01T00:00:00Z"},
+        r#"{"12":{"offered":"2026-10-05T10:00:00Z","lapses":"2999-01-01T00:00:00Z"},
             "1":{"offered":"2026-01-01T10:00:00Z","lapses":"2026-01-03T10:00:00Z"}}"#,
     );
 }

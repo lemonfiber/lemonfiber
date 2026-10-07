@@ -4,14 +4,7 @@ use std::path::Path;
 use super::remembered;
 use crate::stack::{Failure, Source};
 
-/// The day the checks are made on, the one the stack's own tests use.
-const fn today() -> lemonfiber_manifest::Date {
-    lemonfiber_manifest::Date {
-        year: 2026,
-        month: 10,
-        day: 4,
-    }
-}
+use crate::test_support::frozen_day as today;
 
 /// A stack directory of its own, holding the manifest this repository carries.
 fn stack(name: &str) -> &'static Path {
