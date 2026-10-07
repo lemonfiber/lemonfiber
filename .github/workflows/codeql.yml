@@ -24,25 +24,66 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Whether this change reaches code, for the jobs below that judge nothing else.
+  # Each of them skips where it does not, and runs wherever this job did not
+  # succeed, so an answer that could not be reached runs everything.
+  scope:
+    name: what changed
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # Every commit, so the base is here to compare against, and no file
+          # contents but the checkout's: the comparison reads trees.
+          fetch-depth: 0
+          filter: blob:none
+      - id: diff
+        env:
+          # A pull request's base, a merge group's, or on a push the commit
+          # before it. Any other event has none, and the answer is then that
+          # everything runs.
+          BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+        run: python3 scripts/the_code_a_change_touches.py "${BASE}"
+
   analyze:
+    needs: scope
+    # Runs whatever `what changed` said, because a matrix job skipped whole
+    # reports with its matrix unexpanded and the required `analyze (rust)` would
+    # never appear. Where the change reaches no code its steps skip instead, and
+    # each language reports success having analysed nothing.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     permissions:
       security-events: write
+    env:
+      CODE: ${{ needs.scope.result != 'success' || needs.scope.outputs.code == 'true' }}
     strategy:
       fail-fast: false
       matrix:
         language: [rust, actions]
     steps:
+      - name: No code changed, so nothing is analysed
+        if: env.CODE != 'true'
+        env:
+          LANGUAGE: ${{ matrix.language }}
+        run: echo "::notice::Every path this change touches is one no code-judging job reads, so no ${LANGUAGE} analysis runs."
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: env.CODE == 'true'
         with:
           persist-credentials: false
           submodules: recursive
       - uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v3
+        if: env.CODE == 'true'
         with:
           languages: ${{ matrix.language }}
       - uses: github/codeql-action/autobuild@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v3
-        if: matrix.language == 'rust'
+        if: env.CODE == 'true' && matrix.language == 'rust'
       - uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v3
+        if: env.CODE == 'true'
         with:
           # One category per language, because two analyses of one commit that do not
           # name themselves apart land in the same place and the second replaces the
@@ -76,7 +117,7 @@ jobs:
   # says nothing. A cancelled run is somebody pressing stop, and finishing the
   # job they stopped serves nobody.
   alerts:
-    needs: analyze
+    needs: [scope, analyze]
     if: ${{ !cancelled() }}
     permissions:
       contents: read
@@ -89,3 +130,7 @@ jobs:
       # for an upload or asks once; which language is absent it works out itself,
       # off the matrix above.
       analysis: ${{ needs.analyze.result }}
+      # Whether the analysis above ran at all. Where the change reaches no code
+      # it did not, and the gate says so rather than refusing a commit with no
+      # analysis; a skipped call would report as `alerts`, not `alerts / alerts`.
+      code: ${{ needs.scope.result != 'success' || needs.scope.outputs.code == 'true' }}

@@ -16,7 +16,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Whether this change reaches code, for the jobs below that judge nothing else.
+  # Each of them skips where it does not, and runs wherever this job did not
+  # succeed, so an answer that could not be reached runs everything.
+  scope:
+    name: what changed
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # Every commit, so the base is here to compare against, and no file
+          # contents but the checkout's: the comparison reads trees.
+          fetch-depth: 0
+          filter: blob:none
+      - id: diff
+        env:
+          # A pull request's base, a merge group's, or on a push the commit
+          # before it. Any other event has none, and the answer is then that
+          # everything runs.
+          BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+        run: python3 scripts/the_code_a_change_touches.py "${BASE}"
+
   check:
+    needs: scope
+    if: ${{ !cancelled() && (needs.scope.result != 'success' || needs.scope.outputs.code == 'true') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -116,8 +143,13 @@ jobs:
       # status.toml, and a file that says something else is refused here.
       - name: The status file is what status.toml says
         run: python3 scripts/implementation_status.py --check
-      - name: And the writer refuses a glyph written by hand
+      - name: And the writer refuses a glyph written by hand, or a requirement claimed twice
         run: python3 scripts/implementation_status.py --self-test
+      # The answer `what changed` gives, which decides whether the code gates run.
+      # Proven here rather than there: that job is not required, and a red one
+      # runs everything, so a broken answer would be paid for and never seen.
+      - name: What reaches code is told from what does not
+        run: python3 scripts/the_code_a_change_touches.py --self-test
       # The release writes each NAS template's image in by digest, and a template
       # that has lost its place for it would be published naming none.
       - name: Every NAS template has a place for the image
@@ -126,6 +158,8 @@ jobs:
         run: python3 scripts/the_templates_name_the_image.py --self-test
 
   msrv:
+    needs: scope
+    if: ${{ !cancelled() && (needs.scope.result != 'success' || needs.scope.outputs.code == 'true') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -161,6 +195,8 @@ jobs:
           rustc --version
           cargo check --workspace --locked
   deny:
+    needs: scope
+    if: ${{ !cancelled() && (needs.scope.result != 'success' || needs.scope.outputs.code == 'true') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

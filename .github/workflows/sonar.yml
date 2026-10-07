@@ -31,7 +31,34 @@ concurrency:
 # refused unless it is the one regular file expected, and reaches the scanner as
 # an argument, so it can overwrite nothing the scanner reads and is never run.
 jobs:
+  # Whether this change reaches code, for the jobs below that judge nothing else.
+  # Each of them skips where it does not, and runs wherever this job did not
+  # succeed, so an answer that could not be reached runs everything.
+  scope:
+    name: what changed
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # Every commit, so the base is here to compare against, and no file
+          # contents but the checkout's: the comparison reads trees.
+          fetch-depth: 0
+          filter: blob:none
+      - id: diff
+        env:
+          # A pull request's base, a merge group's, or on a push the commit
+          # before it. Any other event has none, and the answer is then that
+          # everything runs.
+          BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+        run: python3 scripts/the_code_a_change_touches.py "${BASE}"
+
   coverage:
+    needs: scope
+    if: ${{ !cancelled() && (needs.scope.result != 'success' || needs.scope.outputs.code == 'true') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -104,12 +131,13 @@ jobs:
           if-no-files-found: error
 
   sonar:
-    needs: coverage
+    needs: [scope, coverage]
     # Runs whatever coverage did, and fails at once when it failed: a skipped job
     # reports as passing, so the required `sonar` would read green over a coverage
     # gate that was not met. `!cancelled()` rather than `always()`, because a
-    # cancelled run is somebody pressing stop.
-    if: ${{ !cancelled() }}
+    # cancelled run is somebody pressing stop. Skipped with coverage where the
+    # change reaches no code, since there is then no report and no code to scan.
+    if: ${{ !cancelled() && (needs.scope.result != 'success' || needs.scope.outputs.code == 'true') }}
     runs-on: ubuntu-latest
     steps:
       - name: The coverage gate held
@@ -210,7 +238,7 @@ jobs:
   # fails on any new issue, and posts a sticky verdict on the pull request. A summary
   # that never arrived, or one it cannot read, warns rather than blocks.
   gate:
-    needs: sonar
+    needs: [scope, sonar]
     # Runs whatever the scan did: `needs` alone would drop this job when the scan
     # fails, and a required check that never reports blocks a pull request with no
     # line saying why. A failed scan still leaves `sonar` red, which is required in
@@ -220,6 +248,10 @@ jobs:
     # On a merge group the shared gate re-reads the new-issue count of every pull
     # request in the batch and the open count against the project, and refuses what
     # it cannot read, since in a queue a pass is a merge.
+    #
+    # Never skipped where the change reaches no code: a skipped call reports as
+    # `gate`, not the required `gate / gate`. It is told so instead, and answers
+    # without waiting for a scan that did not run.
     if: ${{ !cancelled() }}
     permissions:
       contents: read
@@ -230,5 +262,6 @@ jobs:
       # SonarCloud login. A ceiling rather than an allowance: it may not rise past
       # what stands against `main`, and at zero the gate refuses the first issue.
       allowed-open: 0
+      code: ${{ needs.scope.result != 'success' || needs.scope.outputs.code == 'true' }}
     secrets:
       sonar-token: ${{ secrets.SONAR_TOKEN }}
