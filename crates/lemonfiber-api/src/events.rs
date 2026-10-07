@@ -139,7 +139,7 @@ pub async fn stream(
     // they follow, what setup is doing — and nothing on it is narrowed to a member. A
     // member is handed a stream of their own instead, read for them alone.
     if let Some(source) =
-        caller.and_then(|caller| Theirs::for_member(Arc::clone(&streaming.reading), caller))
+        caller.and_then(|caller| Theirs::for_member(Arc::clone(&streaming.reading), &caller))
     {
         staying.member = Some(source.member().to_owned());
         return theirs(&streaming, source, seen.as_deref(), staying).await;

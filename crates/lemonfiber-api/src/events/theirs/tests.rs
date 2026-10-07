@@ -23,7 +23,7 @@ fn a_member() -> Caller {
 }
 
 /// The stream a member's caller is handed.
-fn theirs(caller: Caller) -> Theirs {
+fn theirs(caller: &Caller) -> Theirs {
     let Some(theirs) = Theirs::for_member(a_world(), caller) else {
         unreachable!("a member's caller has a member's stream")
     };
@@ -39,7 +39,7 @@ fn kinds(said: &[crate::events::wire::Rendered]) -> Vec<&'static str> {
 /// dashboard, no news, nothing the operator's stream carries.
 #[tokio::test(start_paused = true)]
 async fn joining_says_the_members_row_their_shelf_and_what_they_are_playing() {
-    let theirs = theirs(a_member());
+    let theirs = theirs(&a_member());
     let said = theirs.gather(true).await;
     assert_eq!(
         kinds(&said),
@@ -55,7 +55,7 @@ async fn joining_says_the_members_row_their_shelf_and_what_they_are_playing() {
 /// commands were narrowed by the decision every read takes.
 #[tokio::test(start_paused = true)]
 async fn what_is_said_is_narrowed_to_the_member() {
-    let theirs = theirs(a_member());
+    let theirs = theirs(&a_member());
     for one in theirs.gather(true).await {
         let named = one.said().contains(ASKING);
         let whole_house = one.kind() == kind::PLAYING && one.said().contains(r#""member":"""#);
@@ -79,8 +79,8 @@ async fn a_member_key_hears_what_the_member_hears() {
             name: "ana".to_owned(),
         },
     });
-    let by_key = theirs(keyed).gather(true).await;
-    let by_session = theirs(a_member()).gather(true).await;
+    let by_key = theirs(&keyed).gather(true).await;
+    let by_session = theirs(&a_member()).gather(true).await;
     assert_eq!(kinds(&by_key), kinds(&by_session));
 }
 
@@ -89,10 +89,10 @@ async fn a_member_key_hears_what_the_member_hears() {
 #[test]
 fn a_caller_who_is_not_a_member_has_no_members_stream() {
     for caller in [Caller::Operator, Caller::Machine] {
-        assert!(Theirs::for_member(a_world(), caller).is_none());
+        assert!(Theirs::for_member(a_world(), &caller).is_none());
     }
     assert!(
-        Theirs::for_member(a_world(), a_member()).is_some_and(|theirs| theirs.member() == ASKING)
+        Theirs::for_member(a_world(), &a_member()).is_some_and(|theirs| theirs.member() == ASKING)
     );
 }
 
@@ -100,7 +100,7 @@ fn a_caller_who_is_not_a_member_has_no_members_stream() {
 /// again when its pace comes round.
 #[tokio::test(start_paused = true)]
 async fn nothing_is_said_again_until_it_is_due_and_changed() {
-    let theirs = theirs(a_member());
+    let theirs = theirs(&a_member());
     let _joined = theirs.gather(true).await;
     assert!(
         theirs.gather(false).await.is_empty(),

@@ -5,17 +5,17 @@
 //! stream carries three things and nothing else: their household row, their shelf and
 //! what they are playing, each the answer the read gives that member.
 //!
-//! **Asked through the same decision every read is.** The commands are built as an
-//! operator would ask them and handed to [`crate::entitled::may`] with the member as
-//! the caller, so what narrows them to the member is the one place that decides what a
-//! member may have — not a second copy of that answer written here.
+//! **Narrowed by the same functions every member's read is.** Each reading is the
+//! command [`crate::entitled`] gives a member who asks for it themselves, built by the
+//! one function that decides what that read narrows to, so the stream cannot say more
+//! than the member's own reads would — not a second copy of that answer written here.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, Whom};
+use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::model::kind::Kind;
 use lemonfiber_core::model::{HeldReport, HouseholdReport, PlayingReport};
 use tokio::sync::Mutex;
@@ -24,7 +24,7 @@ use tokio::time::Instant;
 use super::live::Gathers;
 use super::wire::{Nature, Rendered};
 use crate::admission::Caller;
-use crate::entitled::{may, Door};
+use crate::entitled::{their_household, their_playing, their_shelf};
 use crate::read::table::A_SHELF;
 
 /// How often what a member is playing is read again while they listen.
@@ -51,8 +51,6 @@ const UNREAD: &str = "the stack could not be read just now, so this could not be
 pub struct Theirs {
     /// The world a member's reads run against.
     ctx: Arc<Ctx>,
-    /// The member, as admission named them.
-    caller: Caller,
     /// The member's id, which is what makes this stream theirs.
     member: String,
     /// When each pace last came round, and what was last said of each kind.
@@ -77,11 +75,10 @@ impl Theirs {
     /// a caller who is not a member would be handed them as asked, which is the
     /// household's whole view. So no such stream exists for anybody else.
     #[must_use]
-    pub fn for_member(ctx: Arc<Ctx>, caller: Caller) -> Option<Self> {
+    pub fn for_member(ctx: Arc<Ctx>, caller: &Caller) -> Option<Self> {
         let member = caller.member()?.to_owned();
         Some(Self {
             ctx,
-            caller,
             member,
             heard: Mutex::new(Heard::default()),
         })
@@ -117,26 +114,26 @@ impl Theirs {
             heard.playing = Some(now);
             asking.push(Reading::Playing);
         }
-        let mut said = Vec::new();
+        let mut read = Vec::new();
         for reading in asking {
-            if let Some(rendered) = self.answered(reading).await {
-                let previous = heard
-                    .said
-                    .insert(rendered.kind(), rendered.said().to_owned());
-                if joined || previous.as_deref() != Some(rendered.said()) {
-                    said.push(rendered);
-                }
+            read.extend(self.answered(reading).await);
+        }
+        let mut said = Vec::new();
+        for rendered in read {
+            let previous = heard
+                .said
+                .insert(rendered.kind(), rendered.said().to_owned());
+            if joined || previous.as_deref() != Some(rendered.said()) {
+                said.push(rendered);
             }
         }
         said
     }
 
-    /// One reading, narrowed to the member by the decision every read takes, as the
-    /// event it is said as. Nothing where the decision gives the member nothing.
+    /// One reading, narrowed to the member, as the event it is said as. Nothing where
+    /// the answer will not render.
     async fn answered(&self, reading: Reading) -> Option<Rendered> {
-        let decided = may(&self.caller, Door::Reading, reading.command());
-        let narrowed = decided.granted().ok()?;
-        let outcome = match dispatch(narrowed, &self.ctx).await {
+        let outcome = match dispatch(reading.theirs(&self.member), &self.ctx).await {
             Ok(outcome) => outcome,
             Err(_) => reading.unread(),
         };
@@ -156,15 +153,13 @@ enum Reading {
 }
 
 impl Reading {
-    /// The command as an operator would ask it, before the decision narrows it.
-    const fn command(self) -> Command {
+    /// The command narrowed to `member`, by the same functions that narrow it when the
+    /// member asks for it themselves.
+    fn theirs(self, member: &str) -> Command {
         match self {
-            Self::Household => Command::Household { member: None },
-            Self::Held => Command::Held {
-                member: Whom::Defaults,
-                most: A_SHELF,
-            },
-            Self::Playing => Command::Playing { member: None },
+            Self::Household => their_household(member),
+            Self::Held => their_shelf(member, A_SHELF),
+            Self::Playing => their_playing(member),
         }
     }
 
