@@ -1,7 +1,7 @@
 # Ask the SDKs to take the contract that has moved.
 #
 # Each SDK keeps a copy of the `contract/web-api/` directory and generates its
-# types from that copy. A copy goes stale in silence, so both repos carry a
+# types from that copy. A copy goes stale in silence, so each of them carries a
 # `contract-drift` check that compares what they hold against what this repo
 # serves — and it now runs on their pull requests rather than weekly.
 #
@@ -50,6 +50,7 @@ jobs:
           repositories: |
             sdk-ts
             sdk-php
+            sdk-python
 
       - name: Ask each SDK to take what we serve
         env:
@@ -60,7 +61,7 @@ jobs:
 
           # Every repo that vendors the artefact. Adding an SDK is a deliberate
           # act, so this list is written out rather than discovered.
-          sdks=(sdk-ts sdk-php)
+          sdks=(sdk-ts sdk-php sdk-python)
 
           unreachable=""
           for sdk in "${sdks[@]}"; do
