@@ -63,8 +63,9 @@ pub struct Live {
     /// A listener opening, for a gather waiting on there being anybody to hear it.
     arrived: Notify,
     /// How many times every stream open has been told to end. A listener remembers
-    /// the count it opened at and ends when it moves.
-    ended: watch::Sender<u64>,
+    /// the count it opened at and ends when it moves. Shared with every stream opened
+    /// [`beside`](Self::beside) this one, so ending this run's streams ends those too.
+    ended: Arc<watch::Sender<u64>>,
 }
 
 impl Live {
@@ -78,7 +79,21 @@ impl Live {
             wanted: Notify::new(),
             joined: AtomicBool::new(false),
             arrived: Notify::new(),
-            ended: watch::channel(0).0,
+            ended: Arc::new(watch::channel(0).0),
+        }
+    }
+
+    /// A stream of its own, opening now beside this one: it says what it is given and
+    /// nothing this one says, and ends whenever this one's streams are told to end.
+    ///
+    /// What a household member listens to. Theirs is not this run's stream, because
+    /// nothing on that is narrowed to them, but it is bound to this run's binding as
+    /// that is: a member is not left listening after the surface stopped serving.
+    #[must_use]
+    pub fn beside(&self, clock: &dyn Clock) -> Self {
+        Self {
+            ended: Arc::clone(&self.ended),
+            ..Self::opening(clock)
         }
     }
 

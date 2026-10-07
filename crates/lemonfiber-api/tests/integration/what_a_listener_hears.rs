@@ -84,6 +84,7 @@ impl Serving {
                 bound: lemonfiber_api::guard::Binding::here(8471),
                 live: Arc::clone(&live),
                 clock: Stopped::at(0),
+                reading: Arc::new(crate::idle::ctx()),
             })
         });
         Self { streaming, live }
@@ -710,6 +711,7 @@ async fn a_stream_whose_session_is_voided_ends_once_its_last_yes_runs_out() {
         bound: lemonfiber_api::guard::Binding::here(8471),
         live: Arc::clone(&live),
         clock,
+        reading: Arc::new(crate::idle::ctx()),
     });
     let answer = stream(State(streaming), None, saying(&welcome(&admitted.token))).await;
     assert_eq!(answer.status(), StatusCode::OK);

@@ -1,0 +1,167 @@
+use std::sync::Arc;
+use std::time::Duration;
+
+use lemonfiber_core::app::Ctx;
+use lemonfiber_core::keys::Scope;
+use lemonfiber_core::model::kind;
+use tokio::time::Instant;
+
+use super::{due, Reading, Theirs, PLAYING_EVERY, ROWS_EVERY, UNREAD};
+use crate::admission::{Caller, Keyed};
+use crate::events::live::Gathers;
+
+/// The member asking, by the id the media server files them under.
+const ASKING: &str = "a7f3";
+
+/// A world whose media server nobody can sign in to, so every reading is unread.
+fn a_world() -> Arc<Ctx> {
+    Arc::new(lemonfiber_testing::a_context().build())
+}
+
+fn a_member() -> Caller {
+    Caller::Member(ASKING.to_owned())
+}
+
+/// The stream a member's caller is handed.
+fn theirs(caller: &Caller) -> Theirs {
+    let Some(theirs) = Theirs::for_member(a_world(), caller) else {
+        unreachable!("a member's caller has a member's stream")
+    };
+    theirs
+}
+
+/// The kinds a gather said, in the order it said them.
+fn kinds(said: &[crate::events::wire::Rendered]) -> Vec<&'static str> {
+    said.iter().map(|one| one.kind().as_str()).collect()
+}
+
+/// Joining says all three of the member's own, and nothing of anybody else's: no
+/// dashboard, no news, nothing the operator's stream carries.
+#[tokio::test(start_paused = true)]
+async fn joining_says_the_members_row_their_shelf_and_what_they_are_playing() {
+    let theirs = theirs(&a_member());
+    let said = theirs.gather(true).await;
+    assert_eq!(
+        kinds(&said),
+        vec![
+            kind::HOUSEHOLD.as_str(),
+            kind::HELD.as_str(),
+            kind::PLAYING.as_str()
+        ]
+    );
+}
+
+/// **Each is the member's own.** What is said names the member asking, because the
+/// commands were narrowed by the decision every read takes.
+#[tokio::test(start_paused = true)]
+async fn what_is_said_is_narrowed_to_the_member() {
+    let theirs = theirs(&a_member());
+    for one in theirs.gather(true).await {
+        let named = one.said().contains(ASKING);
+        let whole_house = one.kind() == kind::PLAYING && one.said().contains(r#""member":"""#);
+        assert!(
+            named || one.kind() == kind::HOUSEHOLD,
+            "{} was not narrowed to the member: {}",
+            one.kind(),
+            one.said()
+        );
+        assert!(!whole_house, "what is playing was read for the whole house");
+    }
+}
+
+/// A key scoped to a member hears what that member hears.
+#[tokio::test(start_paused = true)]
+async fn a_member_key_hears_what_the_member_hears() {
+    let keyed = Caller::Key(Keyed {
+        name: "home-assistant".to_owned(),
+        scope: Scope::Member {
+            id: ASKING.to_owned(),
+            name: "ana".to_owned(),
+        },
+    });
+    let by_key = theirs(&keyed).gather(true).await;
+    let by_session = theirs(&a_member()).gather(true).await;
+    assert_eq!(kinds(&by_key), kinds(&by_session));
+}
+
+/// A caller who is not a member has no member's stream, rather than one carrying the
+/// household's whole view the commands would answer as asked.
+#[test]
+fn a_caller_who_is_not_a_member_has_no_members_stream() {
+    for caller in [Caller::Operator, Caller::Machine] {
+        assert!(Theirs::for_member(a_world(), &caller).is_none());
+    }
+    assert!(
+        Theirs::for_member(a_world(), &a_member()).is_some_and(|theirs| theirs.member() == ASKING)
+    );
+}
+
+/// Between paces nothing is read again, and an answer that has not changed is not said
+/// again when its pace comes round.
+#[tokio::test(start_paused = true)]
+async fn nothing_is_said_again_until_it_is_due_and_changed() {
+    let theirs = theirs(&a_member());
+    let _joined = theirs.gather(true).await;
+    assert!(
+        theirs.gather(false).await.is_empty(),
+        "read again before it was due"
+    );
+
+    tokio::time::advance(PLAYING_EVERY).await;
+    assert!(
+        theirs.gather(false).await.is_empty(),
+        "an unchanged reading was said again"
+    );
+
+    tokio::time::advance(ROWS_EVERY).await;
+    assert!(theirs.gather(false).await.is_empty());
+}
+
+/// A pace comes round once its interval has passed, and at once when nothing was read.
+#[test]
+fn a_pace_comes_round_once_its_interval_has_passed() {
+    let now = Instant::now();
+    assert!(due(None, ROWS_EVERY, now));
+    assert!(!due(Some(now), ROWS_EVERY, now));
+    assert!(due(Some(now), ROWS_EVERY, now + ROWS_EVERY));
+    assert!(!due(
+        Some(now),
+        ROWS_EVERY,
+        now + ROWS_EVERY - Duration::from_millis(1)
+    ));
+}
+
+/// A reading the stack could not make is said as unread with a sentence of its own,
+/// never as an empty household, an empty shelf or a quiet house — and never with the
+/// operator's problem, which names what only the operator is shown.
+#[test]
+fn an_unmade_reading_is_unread_in_a_sentence_of_its_own() {
+    use lemonfiber_core::app::Outcome;
+    let unread = vec![UNREAD.to_owned()];
+    assert!(
+        matches!(Reading::Household.unread(), Outcome::Household(report)
+        if !report.available && report.findings == unread)
+    );
+    assert!(matches!(Reading::Held.unread(), Outcome::Held(report)
+        if !report.available && report.findings == unread));
+    assert!(matches!(Reading::Playing.unread(), Outcome::Playing(report)
+        if !report.available && report.findings == unread));
+}
+
+/// A stack that cannot be read is said as each of the three unread, rather than as an
+/// empty household, an empty shelf and a quiet house.
+#[tokio::test(start_paused = true)]
+async fn a_stack_that_cannot_be_read_is_said_as_each_reading_unread() {
+    let unreadable = lemonfiber_testing::a_context()
+        .over(lemonfiber_testing::nowhere())
+        .build();
+    let Some(theirs) = Theirs::for_member(Arc::new(unreadable), &a_member()) else {
+        unreachable!("a member's caller has a member's stream")
+    };
+    let said = theirs.gather(true).await;
+    assert_eq!(said.len(), 3);
+    assert!(
+        said.iter().all(|one| one.said().contains(UNREAD)),
+        "{said:?}"
+    );
+}

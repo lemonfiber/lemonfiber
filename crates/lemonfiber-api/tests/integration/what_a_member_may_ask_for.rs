@@ -446,13 +446,15 @@ async fn the_stream_refuses_a_session_it_could_not_check_even_unguarded() {
     let _ = fs::remove_dir_all(a_directory(named));
 }
 
-/// A member the household vouches for is refused the stream, and the machine is not,
-/// so the refusal is about who is asking rather than the route being shut.
+/// A member the household vouches for is let on to the stream and hears only what is
+/// theirs, and the machine is let on as before.
 ///
-/// The stream carries the operator's whole view — the dashboard, the log lines the
-/// operator follows, what setup is doing — and none of it is narrowed to a member.
+/// The operator's stream carries their whole view — the dashboard, the log lines they
+/// follow, what setup is doing — and none of it is narrowed to a member, so a member is
+/// handed a stream of their own: their household row, their shelf and what they are
+/// playing.
 #[tokio::test]
-async fn the_stream_refuses_a_member_and_answers_the_machine() {
+async fn the_stream_tells_a_member_only_what_is_theirs() {
     let named = "stream-alone-open";
     let (router, token, admitting) = door_with(
         Some(keeping(named)),
@@ -470,15 +472,23 @@ async fn the_stream_refuses_a_member_and_answers_the_machine() {
     let mut carried = from_here();
     carried.push((TOKEN_HEADER, session(&answer.body)));
 
-    let refused = asked(stream_alone(&admitting), "GET", "/api/events", &carried, "").await;
-    assert_eq!(refused.status, StatusCode::FORBIDDEN, "{}", refused.body);
-    assert!(refused.body.contains("may ask for"), "{}", refused.body);
+    let (status, kinds) = listened(stream_alone(&admitting), &carried, None, 3).await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "a member was not let on to the stream"
+    );
+    assert_eq!(kinds, a_members_kinds(), "{kinds:?}");
+    // A stack that answers is said the same three ways as one that cannot be read.
+    let answering = lemonfiber_testing::a_context().build();
+    let (_, kinds) = listened(stream_reading(&admitting, answering), &carried, None, 3).await;
+    assert_eq!(kinds, a_members_kinds(), "{kinds:?}");
 
     let mut machine = from_here();
     machine.push((TOKEN_HEADER, token.as_str().to_owned()));
-    let heard = asked(stream_alone(&admitting), "GET", "/api/events", &machine, "").await;
+    let (status, _) = listened(stream_alone(&admitting), &machine, None, 0).await;
     assert_eq!(
-        heard.status,
+        status,
         StatusCode::OK,
         "the machine was not let on to the stream"
     );

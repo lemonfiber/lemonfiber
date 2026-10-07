@@ -409,6 +409,7 @@ async fn serving(
             admitting: Arc::clone(&admitting),
             live: Arc::clone(&live),
             clock: Arc::clone(&ctx.seams.clock),
+            reading: Arc::clone(&ctx),
         });
         let surface = surface(serving, streaming, app);
         let held = Held {

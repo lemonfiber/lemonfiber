@@ -123,6 +123,34 @@ pub const fn callable_by_a_key(command: &Command) -> bool {
     )
 }
 
+/// The household read narrowed to one member: their own row and nobody else's.
+///
+/// What a member asking for the household is given, and what their own stream reads, so
+/// the two cannot come to narrow it differently.
+#[must_use]
+pub(crate) fn their_household(id: &str) -> Command {
+    Command::Household {
+        member: Some(Whom::Named(id.to_owned())),
+    }
+}
+
+/// One member's own shelf, `most` of it.
+#[must_use]
+pub(crate) fn their_shelf(id: &str, most: u32) -> Command {
+    Command::Held {
+        member: Whom::Named(id.to_owned()),
+        most,
+    }
+}
+
+/// What one member is playing, and nobody else.
+#[must_use]
+pub(crate) fn their_playing(id: &str) -> Command {
+    Command::Playing {
+        member: Some(id.to_owned()),
+    }
+}
+
 /// What a household member may have of a command.
 fn members(id: &str, command: &Command) -> Permitted {
     match command {
@@ -132,22 +160,15 @@ fn members(id: &str, command: &Command) -> Permitted {
         // answered with their own row rather than signed out for holding it.
         // Asking for the household's defaults is discarded the same way: a member
         // is somebody, and what they are told is what they are told.
-        Command::Household { .. } => Permitted::This(Command::Household {
-            member: Some(Whom::Named(id.to_owned())),
-        }),
+        Command::Household { .. } => Permitted::This(their_household(id)),
         // Theirs, and narrowed the same way. How much of the shelf to answer with
         // is the caller's to choose and is carried through; whose shelf it is
         // never was, so what the request named is discarded rather than checked.
-        Command::Held { most, .. } => Permitted::This(Command::Held {
-            member: Whom::Named(id.to_owned()),
-            most: *most,
-        }),
+        Command::Held { most, .. } => Permitted::This(their_shelf(id, *most)),
         // Theirs, narrowed the same way: what they are playing, and nobody else's.
         // Whatever the request named is discarded, so an operator's narrowing cannot
         // be borrowed to read another member's sessions.
-        Command::Playing { .. } => Permitted::This(Command::Playing {
-            member: Some(id.to_owned()),
-        }),
+        Command::Playing { .. } => Permitted::This(their_playing(id)),
         // **Everything not named above is refused**, and the catch-all is the
         // statement rather than an omission: a command added later is not a
         // member's until somebody decides it is and writes it down. Listing what

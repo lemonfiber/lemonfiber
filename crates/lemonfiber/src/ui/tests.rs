@@ -376,6 +376,7 @@ fn as_served(random: &Chance) -> Option<Router> {
         admitting,
         live,
         clock: Arc::clone(&serving.ctx.seams.clock),
+        reading: Arc::clone(&serving.ctx),
     });
     Some(surface(serving, streaming, None))
 }
