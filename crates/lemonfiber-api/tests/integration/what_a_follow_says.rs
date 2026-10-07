@@ -81,6 +81,7 @@ impl Run {
                 jobs: Jobs::default(),
                 live: Arc::clone(&live),
                 kept: Arc::default(),
+                answered: Arc::default(),
             },
             live,
         })

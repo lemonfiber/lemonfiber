@@ -31,6 +31,8 @@ what to do about it, is written for operators at
 - `ASK-9`
 - `ASK-10`
 - `ASK-11`
+- `ASK-12`
+- `ASK-13`
 - `BACKUP-1`
 - `BACKUP-2`
 - `BACKUP-3`
@@ -245,6 +247,7 @@ what to do about it, is written for operators at
 - `SERVE-5`
 - `SERVE-6`
 - `SERVE-7`
+- `SERVE-8`
 - `SETUP-1`
 - `SETUP-2`
 - `SETUP-3`

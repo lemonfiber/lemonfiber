@@ -66,6 +66,7 @@ fn serving(paths: &Paths) -> Option<Serving> {
         jobs: Jobs::default(),
         live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
         kept: Arc::default(),
+        answered: Arc::default(),
     })
 }
 
@@ -87,6 +88,7 @@ fn homeless() -> Option<axum::Router> {
         jobs: Jobs::default(),
         live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
         kept: Arc::default(),
+        answered: Arc::default(),
     };
     Some(
         lemonfiber_api::setup::routes()

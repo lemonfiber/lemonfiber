@@ -15,7 +15,8 @@ use std::path::{Path, PathBuf};
 
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, Setting};
 use lemonfiber_core::config::{
-    store, Settings, DATA_ROOT_KEY, INDEXER_APIKEY_KEY, PROVIDER_PORT_KEY,
+    store, Resending, Settings, DATA_ROOT_KEY, IDEMPOTENCY_KEYS_KEY, IDEMPOTENCY_MINUTES_KEY,
+    INDEXER_APIKEY_KEY, PROVIDER_PORT_KEY,
 };
 use lemonfiber_core::model::ConfigReport;
 use lemonfiber_core::reconfigure::{Cost, Stance};
@@ -197,4 +198,42 @@ async fn a_value_that_cannot_be_read_leaves_the_file_alone_and_says_why() {
         "the refusal names nothing a port could be corrected to"
     );
     assert_eq!(on_disk(&path, PROVIDER_PORT_KEY).as_deref(), Some("563"));
+}
+
+#[tokio::test]
+async fn how_long_and_how_many_resent_actions_are_remembered_is_refused_outside_its_range() {
+    let path = env_at("resending", "");
+    let machine = ctx(path.clone());
+    for (key, value) in [
+        (IDEMPOTENCY_MINUTES_KEY, "0"),
+        (IDEMPOTENCY_MINUTES_KEY, "an hour"),
+        (IDEMPOTENCY_KEYS_KEY, "4097"),
+    ] {
+        let review = changing(&machine, key, value, true)
+            .await
+            .and_then(|report| report.review);
+        let stance = review.as_ref().map(|review| review.stance);
+        assert_eq!(stance, Some(Stance::Blocked), "{key}={value}");
+        let refusal = review.and_then(|review| review.refusal).unwrap_or_default();
+        assert!(refusal.contains(key), "{refusal}");
+        assert_eq!(on_disk(&path, key), None, "{key}={value}");
+    }
+}
+
+#[tokio::test]
+async fn how_long_and_how_many_resent_actions_are_remembered_is_written_and_read_back() {
+    let path = env_at("resending-kept", "");
+    let machine = ctx(path.clone());
+    changing(&machine, IDEMPOTENCY_MINUTES_KEY, "45", true).await;
+    changing(&machine, IDEMPOTENCY_KEYS_KEY, "64", true).await;
+    let read = store::read(&path)
+        .map(|file| Resending::from_env(&file))
+        .ok();
+    assert_eq!(
+        read,
+        Some(Resending {
+            within: std::time::Duration::from_secs(45 * 60),
+            at_most: 64,
+        })
+    );
 }

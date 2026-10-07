@@ -16,6 +16,7 @@ use axum::response::Response;
 use axum::Router;
 use lemonfiber_core::app::Ctx;
 
+use crate::actions::again::Answered;
 use crate::admission::Admitting;
 use crate::admission::Knocking;
 use crate::events::live::Live;
@@ -56,6 +57,36 @@ pub struct Serving {
     pub live: Arc<Live>,
     /// The household each member read last, handed back to them for a few seconds.
     pub kept: Arc<Kept>,
+    /// What each attempt at an action sent under a key was answered with, so the same
+    /// attempt sent again is answered the same and not carried out twice.
+    pub answered: Arc<Answered>,
+}
+
+impl Serving {
+    /// What a run hands its handlers, with what it remembers between requests empty.
+    ///
+    /// The households kept for members and the answers kept for actions sent again
+    /// are this run's own, so a run begins with neither.
+    #[must_use]
+    pub fn for_run(
+        ctx: Arc<Ctx>,
+        token: Arc<Token>,
+        bound: Binding,
+        jobs: Jobs,
+        admitting: Arc<Admitting>,
+        live: Arc<Live>,
+    ) -> Self {
+        Self {
+            ctx,
+            token,
+            bound,
+            jobs,
+            admitting,
+            live,
+            kept: Arc::default(),
+            answered: Arc::default(),
+        }
+    }
 }
 
 /// Every endpoint this surface answers, behind the guard they share.

@@ -58,6 +58,7 @@ fn routed(jobs: Jobs) -> axum::Router {
             jobs,
             live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
             kept: Arc::default(),
+            answered: Arc::default(),
         })
         // The subject the guard puts on every request it admits, for the reason
         // `what_a_disturbing_diagnosis_means` gives.

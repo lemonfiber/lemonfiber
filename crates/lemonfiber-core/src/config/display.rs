@@ -67,6 +67,15 @@ pub const SHOWN: &[(&str, &str)] = &[
          turned it on",
     ),
     (
+        super::IDEMPOTENCY_MINUTES_KEY,
+        "how long an action sent under a key is remembered, so the same action sent again \
+         is answered rather than run twice",
+    ),
+    (
+        super::IDEMPOTENCY_KEYS_KEY,
+        "how many actions sent under a key are remembered for each caller at once",
+    ),
+    (
         super::QUIET_HOURS_KEY,
         "the hours you would rather not be woken for, which hold everything but the \
          alerts that cannot wait",

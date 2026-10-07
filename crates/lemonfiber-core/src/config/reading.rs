@@ -22,7 +22,7 @@ use super::{
 /// A recorded value with the whitespace and surrounding quotes a person might
 /// add stripped, its case left alone — so a hand-edited `"https://IP.example"`
 /// keeps its path but loses the quotes that would otherwise reach the reader.
-fn unquoted(value: &str) -> String {
+pub(super) fn unquoted(value: &str) -> String {
     value
         .trim()
         .trim_matches(|c| c == '"' || c == '\'')

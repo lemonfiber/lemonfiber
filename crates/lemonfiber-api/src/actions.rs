@@ -18,9 +18,14 @@
 //! action that only reads and writes lemonfiber's own files is answered with its
 //! outcome, because it has already finished by the time a reply could be.
 //!
+//! A request may carry a key naming the attempt it is, so that a client that heard
+//! nothing back can send it again without the action running twice. What a second
+//! send under the same key is answered with lives in [`again`].
+//!
 //! No payload is serialised here. An envelope renders itself, and the same
 //! rendering answers the command line.
 
+pub mod again;
 mod asked;
 mod named;
 mod reading;
@@ -30,6 +35,7 @@ use std::sync::Arc;
 
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
+use axum::http::HeaderMap;
 use axum::response::Response;
 use axum::routing::post;
 use axum::{Json, Router};
@@ -40,10 +46,11 @@ use crate::admission::Caller;
 use crate::entitled::{may, Door};
 use crate::events::saying::Saying;
 use crate::events::stepping::Stepping;
-use crate::jobs::{accepted, Job};
-use crate::read::carried_out;
+use crate::jobs::Job;
+use crate::read::rendered;
 use crate::refusal::Refusal;
 use crate::router::Serving;
+use again::{Answer, Asked, Claim, Key};
 
 pub use asked::{
     Arguments, Disturbing, Running, TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_APPROVED,
@@ -132,8 +139,13 @@ async fn taken(
     State(serving): State<Serving>,
     caller: Caller,
     Path(action): Path<String>,
+    headers: HeaderMap,
     given: Result<Json<Arguments>, JsonRejection>,
 ) -> Response {
+    let key = match Key::carried(&headers) {
+        Ok(key) => key,
+        Err(why) => return why.answered(),
+    };
     // What the reader could not take from the body is kept as the detail: which field
     // it did not know, or where the text stopped being JSON. The sentence stays this
     // surface's own, so a client reads one refusal whatever the parser tripped on.
@@ -144,6 +156,7 @@ async fn taken(
             return why.answer(why.problem(why.said()).with_detail(rejection.body_text()));
         }
     };
+    let asked = Asked::of(&action, &given);
     let ctx = asked_of(&serving.ctx, given.dry_run.rehearses());
     let command = match named(&action, given) {
         Ok(command) => command,
@@ -157,15 +170,68 @@ async fn taken(
         Ok(command) => command,
         Err(refused) => return *refused,
     };
-    match answering(&command) {
-        Answering::Now => carried_out(&ctx, command).await,
-        Answering::Later => {
-            let Some(job) = Job::mint(serving.ctx.seams.random.as_ref()) else {
-                return unnameable();
-            };
-            let ctx = said_by(&serving, &ctx, &job);
-            serving.jobs.start(&job, &action, command, ctx).await;
-            accepted(&job, &action)
+    let job = match answering(&command) {
+        Answering::Now => None,
+        Answering::Later => match Job::mint(serving.ctx.seams.random.as_ref()) {
+            Some(job) => Some(job),
+            None => return unnameable(),
+        },
+    };
+    let carrying = Carrying {
+        action,
+        command,
+        ctx,
+        job,
+    };
+    let Some(key) = key else {
+        return carrying.out(&serving).await.reply();
+    };
+    let at = (serving.ctx.seams.clock.now(), again::bounds(&serving.ctx));
+    let slot = match serving.answered.claim(&caller, key, asked, at).await {
+        // Handed to the runtime rather than awaited here, so the attempt is carried out
+        // and its answer kept even when the client that sent it has stopped listening —
+        // which is the moment it sends the same action again.
+        Claim::First(slot) => {
+            let answered = Arc::clone(&serving.answered);
+            let work = tokio::spawn(async move { carrying.out(&serving).await });
+            let filling = Arc::clone(&slot);
+            tokio::spawn(async move { answered.settle(&filling, work).await });
+            slot
+        }
+        Claim::Again(slot) => slot,
+        Claim::Otherwise => return Refusal::IdempotencyKeyReused.answered(),
+    };
+    slot.wait().await.reply()
+}
+
+/// An action ruled on and ready to be carried out.
+struct Carrying {
+    /// The action as it was named.
+    action: String,
+    /// The command it reached.
+    command: Command,
+    /// The run it is carried out in.
+    ctx: Arc<Ctx>,
+    /// The name the work runs under, where it is answered with one.
+    job: Option<Job>,
+}
+
+impl Carrying {
+    /// Carry it out, or hand it to the runtime under its name.
+    async fn out(self, serving: &Serving) -> Answer {
+        match self.job {
+            None => {
+                let (status, body) = rendered(&self.ctx, self.command).await;
+                Answer::Now(status, body)
+            }
+            Some(job) => {
+                let ctx = said_by(serving, &self.ctx, &job);
+                serving
+                    .jobs
+                    .start(&job, &self.action, self.command, ctx)
+                    .await;
+                Answer::Later(job, self.action)
+            }
         }
     }
 }

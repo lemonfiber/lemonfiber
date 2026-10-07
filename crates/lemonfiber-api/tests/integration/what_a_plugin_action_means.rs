@@ -84,6 +84,7 @@ async fn redeemed(ctx: Ctx, action: &str, body: &str) -> (u16, serde_json::Value
             jobs: jobs.clone(),
             live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
             kept: Arc::default(),
+            answered: Arc::default(),
         })
         .layer(Extension(Caller::Machine));
     let request = axum::http::Request::builder()
