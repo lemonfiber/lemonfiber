@@ -83,8 +83,8 @@ fn which_releases_shipped_a_requirement_is_read_off_their_entries() {
     );
 }
 
-/// A third release, saying the first was taken back and A6-R1 withdrawn after
-/// their own files were written.
+/// A third release, saying the first release was taken back and a requirement the
+/// second cites was withdrawn, both after their own files were written.
 const LATER: &str = r#"{
   "version": "0.3.0", "tag": "v0.3.0", "released_on": null, "delivers": null,
   "patches": null, "carried": null, "withdrawn": null, "user_facing": false,
