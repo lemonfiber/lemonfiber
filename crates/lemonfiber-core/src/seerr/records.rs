@@ -63,7 +63,8 @@ pub(super) struct RequestRecord {
 
 /// The media a request asked for. It carries no title — Seerr looks those up from a
 /// metadata service rather than storing them — but it does carry the id the \*arr
-/// filing it knows it by, which is the exact join a name is found through.
+/// filing it knows it by, which is the exact join a name is found through, and, once the
+/// media server holds it, when it arrived there and the identifier it is held under.
 #[derive(Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct MediaRecord {
@@ -71,6 +72,10 @@ pub(super) struct MediaRecord {
     pub(super) status: u8,
     #[serde(default)]
     pub(super) external_service_id: Option<i64>,
+    #[serde(default)]
+    pub(super) media_added_at: Option<String>,
+    #[serde(default)]
+    pub(super) jellyfin_media_id: Option<String>,
 }
 
 /// The member who asked: the name Seerr shows them by, and the media server's id for
@@ -102,6 +107,8 @@ impl RequestRecord {
                 _ => None,
             },
             item: self.media.external_service_id,
+            arrived: self.media.media_added_at,
+            shelf_id: self.media.jellyfin_media_id,
             request_status: self.status,
             media_status: self.media.status,
         }

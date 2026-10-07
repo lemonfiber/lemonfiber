@@ -28,6 +28,9 @@ impl Pipeline for Servarr {
             .map(|item| FoundItem {
                 id: item.id,
                 title: item.title,
+                // The service writes nought for a year it does not know, which no title came
+                // out in.
+                year: item.year.filter(|year| *year > 0),
                 monitored: item.monitored,
             })
             .collect())
@@ -157,6 +160,8 @@ struct LibraryItem {
     id: i64,
     #[serde(default)]
     title: String,
+    #[serde(default)]
+    year: Option<u16>,
     #[serde(default)]
     monitored: bool,
 }

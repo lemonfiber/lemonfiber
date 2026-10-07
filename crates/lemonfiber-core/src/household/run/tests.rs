@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
-use super::{allowance, assemble, household, reaching, title_of, Ctx, Naming, Selection};
+use super::naming::Titled;
+use super::{allowance, assemble, household, reaching, titled, Ctx, Naming, Selection};
 use crate::household::State;
 use crate::model::{HouseholdReport, Restriction};
 use crate::ports::service::Certificate;
@@ -54,6 +55,8 @@ fn request(
     statuses: (u8, u8),
 ) -> HouseholdRequest {
     HouseholdRequest {
+        arrived: None,
+        shelf_id: None,
         id: 0,
         made: None,
         member: member.to_owned(),
@@ -66,10 +69,17 @@ fn request(
 }
 
 /// A title map holding one series and one film.
-fn titles() -> BTreeMap<(&'static str, i64), String> {
+fn titles() -> BTreeMap<(&'static str, i64), Titled> {
+    let named = |title: &str, year: Option<u16>| Titled {
+        title: title.to_owned(),
+        year,
+    };
     let mut titles = BTreeMap::new();
-    titles.insert((Kind::Sonarr.section(), 11), "The Expanse".to_owned());
-    titles.insert((Kind::Radarr.section(), 7), "Dune".to_owned());
+    titles.insert(
+        (Kind::Sonarr.section(), 11),
+        named("The Expanse", Some(2015)),
+    );
+    titles.insert((Kind::Radarr.section(), 7), named("Dune", None));
     titles
 }
 

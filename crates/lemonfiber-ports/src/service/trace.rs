@@ -14,6 +14,8 @@ pub struct FoundItem {
     pub id: i64,
     /// The item's title, as a person would name it.
     pub title: String,
+    /// The year it came out, where the service knows one.
+    pub year: Option<u16>,
     /// Whether the service is monitoring it — an unmonitored item is one nobody asked
     /// for, the first of the stages a trace tells apart.
     pub monitored: bool,

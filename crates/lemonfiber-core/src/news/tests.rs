@@ -18,6 +18,9 @@ fn record() -> Option<Record> {
 
 fn asked(id: i64, title: Option<&str>) -> MemberRequest {
     MemberRequest {
+        year: None,
+        arrived: None,
+        shelf_id: None,
         id,
         title: title.map(str::to_owned),
         media: None,

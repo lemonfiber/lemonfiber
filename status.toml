@@ -1645,6 +1645,11 @@ rows = [
     "`ARCH-R157`, `ARCH-R158`",
     "A member, and a key scoped to one, are let on to `GET /api/events` and handed a stream of their own rather than the operator's ([`events.rs`](crates/lemonfiber-api/src/events.rs)). It carries three kinds and nothing else: `household`, `held` and `playing`, each the answer that read gives the member, because [`theirs.rs`](crates/lemonfiber-api/src/events/theirs.rs) builds each command as the operator would ask it and hands it to [`entitled.rs`](crates/lemonfiber-api/src/entitled.rs) with the member as the caller, so the one decision that narrows a member's reads narrows these. What is playing is read every five seconds and the row and shelf every minute, and a reading is said only when a listener arrives or it changed; one the stack would not answer is said as unread in a sentence of its own, never as the operator's problem. It runs on a stream of its own beside the operator's, so it has the same ids, backlog, beat and resumption, and marks nothing gathered before a gap as current. It ends when this run's streams are told to end, when the listener goes (its gather stops with it), and at the next asking after the member leaves the household or their key is revoked.",
   ] },
+  { state = "done", cells = [
+    "What each of a member's requests carries",
+    "`ARCH-R161`",
+    "Each request in the household document `GET /api/requests` and `lemonfiber household --json` answer with carries, beside its kind (`media`), the `year` the \\*arr filing it gives for the title, read off the same library its title is ([`naming.rs`](crates/lemonfiber-core/src/household/run/naming.rs)), and, once the title is on the media server, when it `arrived` and the `shelf_id` the media server holds it under — Seerr's own record of the media ([`records.rs`](crates/lemonfiber-core/src/seerr/records.rs)), the identifier `GET /api/held` names the same title by. Each is left out of the document, never written as null, until it is known: the year until a request is handed to an \\*arr (which writes nought for a year it does not know, read as none), the arrival and the identifier until the title has arrived. A member, and a key scoped to one, are narrowed to their own requests exactly as before.",
+  ] },
 ]
 
 [[milestone.part]]

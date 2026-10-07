@@ -22,7 +22,7 @@ use std::collections::BTreeMap;
 
 use crate::app::targets::{jellyfin_reader, seerr_reader};
 use crate::app::{Ctx, Hostable, Whom};
-use naming::{library_titles, named_access, named_by_the_server, title_of, Naming};
+use naming::{library_titles, named_access, named_by_the_server, titled, Naming};
 
 use crate::asking::Policy;
 use crate::error::{Diagnose, Problem};
@@ -343,9 +343,13 @@ fn grouped(
         if let Some(made) = made.clone().filter(|_| state != Some(State::Declined)) {
             theirs.made.push(made);
         }
+        let named = titled(&request, naming.titles);
         theirs.requests.push(MemberRequest {
             id: request.id,
-            title: title_of(&request, naming.titles),
+            title: named.map(|named| named.title.clone()),
+            year: named.and_then(|named| named.year),
+            arrived: request.arrived.clone(),
+            shelf_id: request.shelf_id.clone(),
             media: request.kind.map(Kind::noun).map(str::to_owned),
             state,
             waiting_days: allowance::waiting(state, made.as_deref(), naming.now),

@@ -40,6 +40,9 @@ fn asked(states: &[Option<State>]) -> Panel<HouseholdReport> {
                 .iter()
                 .enumerate()
                 .map(|(at, state)| MemberRequest {
+                    year: None,
+                    arrived: None,
+                    shelf_id: None,
                     title: Some(format!("A film {at}")),
                     media: Some("film".to_owned()),
                     state: *state,

@@ -6,6 +6,8 @@ use crate::test_support::a_context;
 /// One request as the service records it, at the two statuses that decide its state.
 fn asked(id: i64, request_status: u8, media_status: u8) -> HouseholdRequest {
     HouseholdRequest {
+        arrived: None,
+        shelf_id: None,
         id,
         made: Some("2026-08-17T21:04:09".to_owned()),
         member: "Ana".to_owned(),
