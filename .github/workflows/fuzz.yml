@@ -8,15 +8,20 @@
 # Each must be answered with a diagnostic or a refusal, never a panic. These
 # targets exist to find the inputs nobody thought to write a test for.
 #
-# Two modes. Every pull request that touches the parser or the harness builds
-# the targets and gives each a short smoke run, which is enough to catch a
-# regression that crashes immediately without slowing review down. The weekly
-# run is the one that actually explores, and it keeps its corpus between runs
-# so each week starts where the last left off rather than from nothing.
+# Three modes. A pull request that touches the parser or the harness runs the
+# smoke: one job builds every target once and gives each a sixty-second run, as
+# many at a time as the runner has cores. That is enough to catch a regression
+# that crashes immediately, and it holds one runner rather than one per target.
+# A push to `main` that touches the same paths runs the same smoke and saves the
+# compiled harness, so a pull request starts from main's build rather than from
+# nothing. The weekly run is the one that actually explores: a job per target,
+# fifteen minutes each, at an hour when no review is waiting on the runners it
+# holds. Every mode carries each target's corpus between runs, so each run
+# starts where the last left off.
 name: fuzz
 on:
   pull_request:
-    paths:
+    paths: &fuzzed
       - "crates/lemonfiber/**"
       - "crates/lemonfiber-adapters/**"
       - "crates/lemonfiber-api/**"
@@ -34,6 +39,11 @@ on:
       # no entry; `fuzz/**` has it.
       - "rust-toolchain.toml"
       - "Cargo.lock"
+  # The same paths, so main's build is saved whenever a change could have made
+  # the one a pull request restores stale.
+  push:
+    branches: [main]
+    paths: *fuzzed
   schedule:
     - cron: "0 4 * * 0"
   workflow_dispatch:
@@ -49,7 +59,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  fuzz:
+  # The pull request's run and main's. One job rather than one per target:
+  # every target is built from the same dependencies, so building them together
+  # compiles those once, and the runs that follow need a core each rather than a
+  # runner each.
+  smoke:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -57,6 +72,353 @@ jobs:
     # pinned stable compiler — the action installs nightly, the file overrides it,
     # and the sanitiser flags are refused by a compiler that never had to accept
     # them. Quiet, because a job running the wrong compiler still reports normally.
+    env:
+      RUSTUP_TOOLCHAIN: nightly
+      SECONDS_TO_RUN: "60"
+      # Every target `fuzz/Cargo.toml` declares. A step below refuses a list that is
+      # not the one `cargo fuzz list` reads from there, so a target added to the
+      # harness cannot go unfuzzed here. Each also has its own corpus and artefact
+      # steps below, named after it.
+      TARGETS: >-
+        manifest_from_toml
+        manifest_validate
+        date_parse
+        plugin_from_toml
+        api_read_query
+        api_action_arguments
+        api_guard
+        env_file
+        compose_mounts
+        archive_restore
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+      # cargo-fuzz builds with a sanitizer, which needs the nightly compiler.
+      # The crate itself is still built and shipped on stable; nothing here
+      # changes what the product is compiled with.
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # nightly
+        with:
+          toolchain: nightly
+      # Saved by a push to main, never by a pull request. A cache saved on a pull
+      # request's ref is readable by that pull request alone, so it would spend the
+      # repository's cache allowance on a build no other run restores, and evict
+      # main's to make room. A pull request restores main's, which it can use for as
+      # long as both were built by the same nightly.
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: fuzz
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      # A version named here and the lockfile it was published with, so what this
+      # job builds and runs is the same tool on every run. Cargo checks the crate
+      # against the registry index's checksum before it builds it. Built rather
+      # than fetched: upstream's one Linux binary is a musl build, and cargo-fuzz
+      # builds for the platform it was built for unless told otherwise, which is a
+      # target the address sanitizer refuses.
+      - &install-cargo-fuzz
+        name: Install cargo-fuzz
+        run: cargo install cargo-fuzz --version =0.13.2 --locked
+
+      # Restoring a corpus is best-effort: the first ever run has none, and a
+      # week's findings are worth carrying forward but not worth failing over.
+      - name: Restore corpus (manifest_from_toml)
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: fuzz/corpus/manifest_from_toml
+          key: fuzz-corpus-manifest_from_toml-${{ github.run_id }}
+          restore-keys: fuzz-corpus-manifest_from_toml-
+      - name: Restore corpus (manifest_validate)
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: fuzz/corpus/manifest_validate
+          key: fuzz-corpus-manifest_validate-${{ github.run_id }}
+          restore-keys: fuzz-corpus-manifest_validate-
+      - name: Restore corpus (date_parse)
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: fuzz/corpus/date_parse
+          key: fuzz-corpus-date_parse-${{ github.run_id }}
+          restore-keys: fuzz-corpus-date_parse-
+      - name: Restore corpus (plugin_from_toml)
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: fuzz/corpus/plugin_from_toml
+          key: fuzz-corpus-plugin_from_toml-${{ github.run_id }}
+          restore-keys: fuzz-corpus-plugin_from_toml-
+      - name: Restore corpus (api_read_query)
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: fuzz/corpus/api_read_query
+          key: fuzz-corpus-api_read_query-${{ github.run_id }}
+          restore-keys: fuzz-corpus-api_read_query-
+      - name: Restore corpus (api_action_arguments)
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: fuzz/corpus/api_action_arguments
+          key: fuzz-corpus-api_action_arguments-${{ github.run_id }}
+          restore-keys: fuzz-corpus-api_action_arguments-
+      - name: Restore corpus (api_guard)
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: fuzz/corpus/api_guard
+          key: fuzz-corpus-api_guard-${{ github.run_id }}
+          restore-keys: fuzz-corpus-api_guard-
+      - name: Restore corpus (env_file)
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: fuzz/corpus/env_file
+          key: fuzz-corpus-env_file-${{ github.run_id }}
+          restore-keys: fuzz-corpus-env_file-
+      - name: Restore corpus (compose_mounts)
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: fuzz/corpus/compose_mounts
+          key: fuzz-corpus-compose_mounts-${{ github.run_id }}
+          restore-keys: fuzz-corpus-compose_mounts-
+      - name: Restore corpus (archive_restore)
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: fuzz/corpus/archive_restore
+          key: fuzz-corpus-archive_restore-${{ github.run_id }}
+          restore-keys: fuzz-corpus-archive_restore-
+
+      # `TARGETS` is a copy of what the harness declares, and a copy can fall
+      # behind. Checked before the build, so a target nothing here would fuzz is
+      # named in the first minute rather than after a quiet green run.
+      - name: Every target the harness declares is fuzzed here
+        run: |
+          set -euo pipefail
+          read -ra targets <<< "$TARGETS"
+          declared=$(cargo fuzz list | sort)
+          listed=$(printf '%s\n' "${targets[@]}" | sort)
+          if [ "$declared" != "$listed" ]; then
+            echo "::error title=Fuzz targets::TARGETS in fuzz.yml is not the list fuzz/Cargo.toml declares (< TARGETS, > fuzz/Cargo.toml)"
+            diff <(echo "$listed") <(echo "$declared") || true
+            exit 1
+          fi
+
+      # Every target at once, so the dependencies they share are compiled once.
+      # The runs below ask for the same build and find it already there.
+      - name: Build every target
+        run: cargo fuzz build
+
+      # A target that crashes is a finding, not a reason to stop the others, so
+      # every target runs to the end and the step fails afterwards, naming each one
+      # that failed. Runs share the runner a core apiece, and each run's output is
+      # held in its own file and printed whole when it ends, so runs side by side
+      # never interleave in the log.
+      - name: Fuzz every target
+        run: |
+          set -euo pipefail
+          read -ra targets <<< "$TARGETS"
+          slots=$(nproc)
+          logs="${RUNNER_TEMP}/fuzz-logs"
+          mkdir -p "$logs"
+          declare -A running=() exit_of=()
+
+          # Waits for whichever run ends next, records how it ended and prints
+          # its log as one group.
+          reap() {
+            local pid status=0 target
+            wait -n -p pid || status=$?
+            target=${running[$pid]}
+            unset "running[$pid]"
+            exit_of[$target]=$status
+            echo "::group::${target} (exit ${status})"
+            cat "${logs}/${target}.log"
+            echo "::endgroup::"
+          }
+
+          for target in "${targets[@]}"; do
+            while [ "${#running[@]}" -ge "$slots" ]; do reap; done
+            cargo fuzz run "$target" -- \
+              -max_total_time="${SECONDS_TO_RUN}" \
+              -max_len=65536 \
+              -print_final_stats=1 \
+              > "${logs}/${target}.log" 2>&1 &
+            running[$!]=$target
+          done
+          while [ "${#running[@]}" -gt 0 ]; do reap; done
+
+          # Read back per target rather than counted, so a run that was started and
+          # never waited for is a failure under its own name.
+          failed=()
+          {
+            echo "### Fuzz smoke, ${SECONDS_TO_RUN} s per target"
+            echo
+            echo "| Target | Result |"
+            echo "| --- | --- |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          for target in "${targets[@]}"; do
+            status=${exit_of[$target]:-none}
+            if [ "$status" = 0 ]; then
+              result="passed"
+            else
+              failed+=("$target")
+              if [ "$status" = none ]; then
+                result="never reported an exit"
+              else
+                result="failed with exit ${status}; any input it failed on is uploaded as fuzz-artifacts-${target}"
+              fi
+              echo "::error title=Fuzz ${target}::${target} ${result}"
+            fi
+            echo "| \`${target}\` | ${result} |" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+          if [ "${#failed[@]}" -gt 0 ]; then
+            echo "Failing targets: ${failed[*]}"
+            printf '\nFailing targets: %s\n' "${failed[*]}" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+      # A crash is the point of the exercise, so the input that caused it has to
+      # survive the job that found it. Every target's step runs when any target
+      # failed, and a target that found nothing has nothing to upload.
+      - name: Upload crash artefacts (manifest_from_toml)
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fuzz-artifacts-manifest_from_toml
+          path: fuzz/artifacts/manifest_from_toml
+          if-no-files-found: ignore
+      - name: Upload crash artefacts (manifest_validate)
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fuzz-artifacts-manifest_validate
+          path: fuzz/artifacts/manifest_validate
+          if-no-files-found: ignore
+      - name: Upload crash artefacts (date_parse)
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fuzz-artifacts-date_parse
+          path: fuzz/artifacts/date_parse
+          if-no-files-found: ignore
+      - name: Upload crash artefacts (plugin_from_toml)
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fuzz-artifacts-plugin_from_toml
+          path: fuzz/artifacts/plugin_from_toml
+          if-no-files-found: ignore
+      - name: Upload crash artefacts (api_read_query)
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fuzz-artifacts-api_read_query
+          path: fuzz/artifacts/api_read_query
+          if-no-files-found: ignore
+      - name: Upload crash artefacts (api_action_arguments)
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fuzz-artifacts-api_action_arguments
+          path: fuzz/artifacts/api_action_arguments
+          if-no-files-found: ignore
+      - name: Upload crash artefacts (api_guard)
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fuzz-artifacts-api_guard
+          path: fuzz/artifacts/api_guard
+          if-no-files-found: ignore
+      - name: Upload crash artefacts (env_file)
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fuzz-artifacts-env_file
+          path: fuzz/artifacts/env_file
+          if-no-files-found: ignore
+      - name: Upload crash artefacts (compose_mounts)
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fuzz-artifacts-compose_mounts
+          path: fuzz/artifacts/compose_mounts
+          if-no-files-found: ignore
+      - name: Upload crash artefacts (archive_restore)
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fuzz-artifacts-archive_restore
+          path: fuzz/artifacts/archive_restore
+          if-no-files-found: ignore
+
+      # Saved whether or not a target failed, so one crash does not cost every
+      # target the corpus it grew during the run.
+      - name: Save corpus (manifest_from_toml)
+        if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: fuzz/corpus/manifest_from_toml
+          key: fuzz-corpus-manifest_from_toml-${{ github.run_id }}
+      - name: Save corpus (manifest_validate)
+        if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: fuzz/corpus/manifest_validate
+          key: fuzz-corpus-manifest_validate-${{ github.run_id }}
+      - name: Save corpus (date_parse)
+        if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: fuzz/corpus/date_parse
+          key: fuzz-corpus-date_parse-${{ github.run_id }}
+      - name: Save corpus (plugin_from_toml)
+        if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: fuzz/corpus/plugin_from_toml
+          key: fuzz-corpus-plugin_from_toml-${{ github.run_id }}
+      - name: Save corpus (api_read_query)
+        if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: fuzz/corpus/api_read_query
+          key: fuzz-corpus-api_read_query-${{ github.run_id }}
+      - name: Save corpus (api_action_arguments)
+        if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: fuzz/corpus/api_action_arguments
+          key: fuzz-corpus-api_action_arguments-${{ github.run_id }}
+      - name: Save corpus (api_guard)
+        if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: fuzz/corpus/api_guard
+          key: fuzz-corpus-api_guard-${{ github.run_id }}
+      - name: Save corpus (env_file)
+        if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: fuzz/corpus/env_file
+          key: fuzz-corpus-env_file-${{ github.run_id }}
+      - name: Save corpus (compose_mounts)
+        if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: fuzz/corpus/compose_mounts
+          key: fuzz-corpus-compose_mounts-${{ github.run_id }}
+      - name: Save corpus (archive_restore)
+        if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: fuzz/corpus/archive_restore
+          key: fuzz-corpus-archive_restore-${{ github.run_id }}
+
+  # The weekly run, and the one a person starts by hand. Each target gets a job
+  # of its own and fifteen minutes, which is the exploration the smoke above is
+  # too short for.
+  fuzz:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # Named here as well as installed, for the reason given on the smoke job:
+    # `rust-toolchain.toml` would otherwise hand every step the pinned compiler.
     env:
       RUSTUP_TOOLCHAIN: nightly
     strategy:
@@ -78,23 +440,14 @@ jobs:
         with:
           persist-credentials: false
           submodules: recursive
-      # cargo-fuzz builds with a sanitizer, which needs the nightly compiler.
-      # The crate itself is still built and shipped on stable; nothing here
-      # changes what the product is compiled with.
       - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # nightly
         with:
           toolchain: nightly
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: fuzz
-      # A version named here and the lockfile it was published with, so what this
-      # job builds and runs is the same tool on every run. Cargo checks the crate
-      # against the registry index's checksum before it builds it.
-      - name: Install cargo-fuzz
-        run: cargo install cargo-fuzz --version =0.13.2 --locked
+      - *install-cargo-fuzz
 
-      # Restoring the corpus is best-effort: the first ever run has none, and a
-      # week's findings are worth carrying forward but not worth failing over.
       - name: Restore corpus
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -105,20 +458,15 @@ jobs:
       - name: Build the target
         run: cargo fuzz build ${{ matrix.target }}
 
-      # A short run on pull requests, a long one on the weekly schedule. -runs
-      # caps iterations so a pull request cannot hang on a target that happens
-      # to be fast.
       - name: Fuzz
         env:
-          SECONDS_TO_RUN: ${{ github.event_name == 'pull_request' && '60' || '900' }}
+          SECONDS_TO_RUN: "900"
         run: |
           cargo fuzz run ${{ matrix.target }} -- \
             -max_total_time="${SECONDS_TO_RUN}" \
             -max_len=65536 \
             -print_final_stats=1
 
-      # A crash is the point of the exercise, so the input that caused it has to
-      # survive the job that found it.
       - name: Upload crash artefacts
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
