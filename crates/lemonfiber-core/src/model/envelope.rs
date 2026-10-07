@@ -70,6 +70,14 @@ pub struct Envelope<T> {
     // whole would be the only thing that noticed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub host: Option<String>,
+    /// The work that said this, by the name its accepting reply gave it.
+    // Present exactly on a line said by work a job names, so a client ties each line
+    // to the start, fetch or walk it asked for; absent on
+    // everything else, which is every reply and every line a terminal or the server
+    // itself says. On the envelope rather than in `data`, so what a kind carries is
+    // the same whoever said it. Skipped when absent for the reason `host` is.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub job: Option<String>,
 }
 
 impl<T: Serialize> Envelope<T> {
@@ -99,6 +107,14 @@ impl<T> Envelope<T> {
             kind,
             data,
             host: operating(),
+            job: None,
         }
+    }
+
+    /// The same payload, said by the work a job names, or by none.
+    #[must_use]
+    pub fn said_by(mut self, job: Option<&str>) -> Self {
+        self.job = job.map(str::to_owned);
+        self
     }
 }

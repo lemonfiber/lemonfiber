@@ -38,6 +38,8 @@ use lemonfiber_core::app::{Command, Ctx, Restoring, Setting, Waiting};
 
 use crate::admission::Caller;
 use crate::entitled::{may, Door};
+use crate::events::saying::Saying;
+use crate::events::stepping::Stepping;
 use crate::jobs::{accepted, Job};
 use crate::read::carried_out;
 use crate::refusal::Refusal;
@@ -161,6 +163,7 @@ async fn taken(
             let Some(job) = Job::mint(serving.ctx.seams.random.as_ref()) else {
                 return unnameable();
             };
+            let ctx = said_by(&serving, &ctx, &job);
             serving.jobs.start(&job, &action, command, ctx).await;
             accepted(&job, &action)
         }
@@ -179,6 +182,25 @@ fn asked_of(serving: &Arc<Ctx>, rehearsing: bool) -> Arc<Ctx> {
     } else {
         Arc::clone(serving)
     }
+}
+
+/// The run a job's work is carried out in: the action's own, with what it says
+/// on the stream carrying the job's name.
+///
+/// A wait and a walk say their lines through the context they run against, so the
+/// name goes in there rather than through every place that says something. A copy,
+/// as a rehearsal is, so nothing another request runs against learns of this job.
+fn said_by(serving: &Serving, ctx: &Ctx, job: &Job) -> Arc<Ctx> {
+    let (steps, carrying) = Stepping::for_job(Arc::clone(&serving.live), job.as_str());
+    tokio::spawn(carrying.carrying());
+    Arc::new(
+        ctx.clone()
+            .with_narrator(Arc::new(Saying::for_job(
+                Arc::clone(&serving.live),
+                job.as_str(),
+            )))
+            .with_steps(Arc::new(steps)),
+    )
 }
 
 /// Work that could not be named, and therefore was not begun.

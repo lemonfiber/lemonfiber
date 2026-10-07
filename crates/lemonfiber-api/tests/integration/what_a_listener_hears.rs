@@ -515,6 +515,55 @@ async fn a_wait_says_what_it_is_waiting_for_to_whoever_is_listening() {
     );
 }
 
+/// A wait said by work a job names carries the name, and one no job said carries none.
+///
+/// A client that asked for a start holds the name the accepting reply gave it, and
+/// ties each line to that start by it.
+#[tokio::test]
+async fn a_wait_names_the_job_it_belongs_to_and_an_untied_one_names_none() {
+    let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    let mut listening = live.listening(None).await;
+
+    Saying::for_job(Arc::clone(&live), "9f2c1a7e04b3d815")
+        .say("Still starting: jellyfin — 5 seconds so far, of 180.")
+        .await;
+    let tied = listening.next().await.unwrap_or_default();
+    assert!(tied.contains(r#""job":"9f2c1a7e04b3d815""#), "{tied}");
+
+    Saying::onto(Arc::clone(&live))
+        .say("Still starting: jellyfin — 10 seconds so far, of 180.")
+        .await;
+    let untied = listening.next().await.unwrap_or_default();
+    assert!(untied.contains("10 seconds so far"), "{untied}");
+    assert!(
+        !untied.contains(r#""job""#),
+        "a line no job said names none: {untied}"
+    );
+}
+
+/// A walk's steps carry the name of the job that walks, and the carrying ends with it.
+///
+/// Its own channel rather than the surface's, so a walk's steps are tied to the walk
+/// a client asked for and nothing is left carrying once the walk is over.
+#[tokio::test]
+async fn a_walks_steps_name_its_job_and_stop_being_carried_when_it_ends() {
+    let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    let (walking, carrying) = Stepping::for_job(Arc::clone(&live), "9f2c1a7e04b3d815");
+
+    walking.said(&Line::searched(3, 12));
+    drop(walking);
+    carrying.carrying().await;
+
+    let mut listening = live.listening(Some("0-0")).await;
+    let heard = listening.next().await.unwrap_or_default();
+    assert!(heard.contains("\nevent: step\n"), "{heard}");
+    assert!(heard.contains(r#""job":"9f2c1a7e04b3d815""#), "{heard}");
+    assert!(
+        heard.contains(r#""detail":"3 indexers, 12 releases""#),
+        "the step itself is unchanged: {heard}"
+    );
+}
+
 /// A walk's steps reach whoever is listening, whole rather than written out.
 ///
 /// The words are the core's — what the step is called, and the evidence that makes

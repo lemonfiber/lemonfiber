@@ -67,6 +67,28 @@ fn a_payload_about_another_machine_says_which_one() {
 }
 
 #[test]
+fn a_line_names_the_work_that_said_it_and_nothing_else_names_any() {
+    assert_eq!(
+        json(&Envelope::new(kind::PULL, "Pulling sonarr")),
+        r#"{"api_version":1,"kind":"pull","data":"Pulling sonarr"}"#,
+        "a line no job said carries no job, so every existing document keeps its shape"
+    );
+    assert_eq!(
+        json(&Envelope::new(kind::PULL, "Pulling sonarr").said_by(Some("9f2c1a7e04b3d815"))),
+        r#"{"api_version":1,"kind":"pull","data":"Pulling sonarr","job":"9f2c1a7e04b3d815"}"#,
+        "the name sits on the envelope, beside what the kind carries"
+    );
+    assert_eq!(
+        Envelope::new(kind::PULL, "Pulling sonarr")
+            .said_by(Some("9f2c1a7e04b3d815"))
+            .said_by(None)
+            .job,
+        None,
+        "said by none is said by none, whatever was named before"
+    );
+}
+
+#[test]
 fn an_unreachable_engine_is_absent_rather_than_guessed_at() {
     let report = VersionReport {
         binary: "0.1.0".to_owned(),
