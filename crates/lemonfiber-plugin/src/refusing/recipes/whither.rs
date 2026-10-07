@@ -183,7 +183,9 @@ pub(super) fn holders(recipe: &Recipe) -> BTreeMap<&str, Held<'_>> {
         })
         .collect();
     for step in &recipe.steps {
-        let carried = super::carried(step).find_map(|name| held.get(name).copied());
+        let carried = super::carried(step)
+            .chain(super::guarded(step).map(|(_, name)| name))
+            .find_map(|name| held.get(name).copied());
         if let Some(Held { owner, .. }) = carried {
             for capture in &step.capture {
                 held.insert(
@@ -230,6 +232,35 @@ pub(super) fn returned(
         location: at.to_owned(),
         message,
     });
+}
+
+/// Refuse a guard, or a retry's end, deciding on a value held to one service on a step
+/// that calls another.
+///
+/// Deciding on a value is reading it, and what a step does after reading it tells the
+/// service it calls something about it, as carrying it would. So a guard is held where a
+/// call carrying the same value is: back to the service whose credential it is, and
+/// nowhere else.
+pub(super) fn decided(
+    holders: &BTreeMap<&str, Held<'_>>,
+    step: &Step,
+    at: &str,
+    found: &mut Vec<Violation>,
+) {
+    let to = step.call.to.as_str();
+    for (place, name) in super::guarded(step) {
+        let Some(held) = holders.get(name).filter(|held| held.owner != to) else {
+            continue;
+        };
+        found.push(Violation {
+            location: format!("{at}.{place}"),
+            message: format!(
+                "decides on {name}, held to {owner}, on a step that calls {to}; a value held \
+                 to a service is read only on a call back to {owner}",
+                owner = held.owner
+            ),
+        });
+    }
 }
 
 /// An input the credential store holds names a service of the stack's whose credential

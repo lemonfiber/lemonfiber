@@ -1,6 +1,6 @@
 //! Where each value of a run may be sent.
 
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 
 use lemonfiber_plugin::Recipe;
 
@@ -36,11 +36,11 @@ fn recipe() -> Recipe {
 fn a_credential_is_held_to_its_service_over_its_pairs() {
     let recipe = recipe();
     let approved = ["key@metadata.example.org".to_owned()];
-    let bounds = Bounds::of(&recipe, &approved);
-    assert_eq!(bounds.withheld("key", "sonarr", false), None);
+    let bounds = Bounds::of(&recipe, &approved, &[]);
+    assert_eq!(bounds.withheld("key", "v", "sonarr", false), None);
     for (to, outside) in [("komga", false), ("metadata.example.org", true)] {
         assert!(bounds
-            .withheld("key", to, outside)
+            .withheld("key", "v", to, outside)
             .is_some_and(|why| why.contains("key is held to sonarr")));
     }
 }
@@ -51,23 +51,29 @@ fn a_credential_is_held_to_its_service_over_its_pairs() {
 fn a_capture_is_held_only_where_its_call_carried_something_held() {
     let recipe = recipe();
     let approved = ["other@metadata.example.org".to_owned()];
-    let mut bounds = Bounds::of(&recipe, &approved);
+    let mut bounds = Bounds::of(&recipe, &approved, &[]);
     let other = "other".to_owned();
     bounds.traded(
-        &BTreeSet::from(["nothing".to_owned()]),
+        &BTreeMap::from([("nothing".to_owned(), "v".to_owned())]),
         [&other].into_iter(),
     );
-    assert_eq!(bounds.withheld("other", "komga", false), None);
-    assert_eq!(bounds.withheld("other", "metadata.example.org", true), None);
+    assert_eq!(bounds.withheld("other", "v", "komga", false), None);
+    assert_eq!(
+        bounds.withheld("other", "v", "metadata.example.org", true),
+        None
+    );
 
     let token = "token".to_owned();
     bounds.traded(
-        &BTreeSet::from(["other".to_owned(), "key".to_owned()]),
+        &BTreeMap::from([
+            ("other".to_owned(), "v".to_owned()),
+            ("key".to_owned(), "v".to_owned()),
+        ]),
         [&token].into_iter(),
     );
-    assert_eq!(bounds.withheld("token", "sonarr", false), None);
+    assert_eq!(bounds.withheld("token", "v", "sonarr", false), None);
     assert!(bounds
-        .withheld("token", "komga", false)
+        .withheld("token", "v", "komga", false)
         .is_some_and(|why| why.contains("token is held to sonarr")));
 }
 
@@ -75,21 +81,21 @@ fn a_capture_is_held_only_where_its_call_carried_something_held() {
 #[test]
 fn outside_a_value_needs_its_pair_and_its_approval() {
     let recipe = recipe();
-    let bounds = Bounds::of(&recipe, &[]);
+    let bounds = Bounds::of(&recipe, &[], &[]);
     assert!(bounds
-        .withheld("token", "metadata.example.org", true)
+        .withheld("token", "v", "metadata.example.org", true)
         .is_some_and(|why| why.contains("token@metadata.example.org was not approved")));
     assert!(bounds
-        .withheld("token", "elsewhere.example.org", true)
+        .withheld("token", "v", "elsewhere.example.org", true)
         .is_some_and(|why| why.contains("no pair of the recipe declares")));
-    assert_eq!(bounds.withheld("token", "komga", false), None);
+    assert_eq!(bounds.withheld("token", "v", "komga", false), None);
     let approved = ["other@metadata.example.org".to_owned()];
-    let another = Bounds::of(&recipe, &approved);
+    let another = Bounds::of(&recipe, &approved, &[]);
     assert!(another
-        .withheld("token", "metadata.example.org", true)
+        .withheld("token", "v", "metadata.example.org", true)
         .is_some_and(|why| why.contains("token@metadata.example.org was not approved")));
     assert_eq!(
-        another.withheld("other", "metadata.example.org", true),
+        another.withheld("other", "v", "metadata.example.org", true),
         None
     );
 }
@@ -105,6 +111,52 @@ fn only_a_credential_store_value_is_held_to_its_service() {
     .ok();
     let held = recipe
         .as_ref()
-        .map(|recipe| Bounds::of(recipe, &[]).withheld("typed", "komga", false));
+        .map(|recipe| Bounds::of(recipe, &[], &[]).withheld("typed", "v", "komga", false));
     assert_eq!(held, Some(None));
+}
+
+/// A value holding a credential lemonfiber holds is held to that credential's service
+/// whatever it is called, whole or inside a longer value, and a guard reading one is
+/// held the same way; what a call carrying one captures is held to it too.
+#[test]
+fn a_value_holding_a_credential_is_held_to_its_service_whatever_its_name() {
+    let recipe = recipe();
+    let credentials = [
+        ("sonarr".to_owned(), "k3y-of-sonarr".to_owned()),
+        ("radarr".to_owned(), String::new()),
+    ];
+    let approved = ["other@metadata.example.org".to_owned()];
+    let mut bounds = Bounds::of(&recipe, &approved, &credentials);
+    for (value, to) in [
+        ("k3y-of-sonarr", "komga"),
+        ("prefix k3y-of-sonarr suffix", "komga"),
+        ("k3y-of-sonarr", "metadata.example.org"),
+    ] {
+        let why = bounds.withheld("other", value, to, to.contains('.'));
+        assert!(
+            why.as_deref().is_some_and(|why| why
+                .contains("what other holds is the credential lemonfiber holds for sonarr")
+                && !why.contains("k3y")),
+            "{value} to {to}: {why:?}"
+        );
+    }
+    assert_eq!(
+        bounds.withheld("other", "k3y-of-sonarr", "sonarr", false),
+        None
+    );
+    assert_eq!(bounds.withheld("other", "anything", "komga", false), None);
+    assert!(bounds
+        .decided("other", "x k3y-of-sonarr", "komga")
+        .is_some_and(|why| why.starts_with("decides on other for a call to komga")));
+    assert_eq!(bounds.decided("other", "k3y-of-sonarr", "sonarr"), None);
+    assert_eq!(bounds.decided("other", "free", "komga"), None);
+
+    let token = "token".to_owned();
+    bounds.traded(
+        &BTreeMap::from([("other".to_owned(), "k3y-of-sonarr".to_owned())]),
+        [&token].into_iter(),
+    );
+    assert!(bounds
+        .withheld("token", "v", "komga", false)
+        .is_some_and(|why| why.contains("token is held to sonarr")));
 }

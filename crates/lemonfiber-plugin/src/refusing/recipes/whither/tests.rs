@@ -451,3 +451,70 @@ fn a_traded_value_may_go_back_to_its_service_and_nowhere_outside() {
         "{outside:?}"
     );
 }
+
+/// A recipe whose step to `to` is guarded, or waits, on sonarr's credential, and then
+/// carries what that step captured to komga.
+fn deciding(guard: &str, to: &str) -> String {
+    format!(
+        r#"[[recipe]]
+id    = "decide"
+title = "Decide on a credential"
+why   = "To see what a guard may read"
+
+[[recipe.input]]
+name   = "held"
+origin = "credential-store"
+of     = "sonarr"
+
+[[recipe.step]]
+id      = "probe"
+{guard}
+call    = {{ method = "GET", to = "{to}", path = "/x" }}
+capture = [{{ name = "state", from = "state", origin = "stack-service" }}]
+
+[[recipe.step]]
+id   = "carry"
+call = {{ method = "POST", to = "komga", path = "/y", body = "{{{{state}}}}" }}
+
+[[recipe.pair]]
+value = "held"
+to    = "sonarr"
+
+[[recipe.pair]]
+value = "state"
+to    = "komga"
+"#
+    )
+}
+
+/// A guard or a retry's end reading a credential decides on it as a call carrying it
+/// would: refused on a step to anywhere but its service, and what the step captures is
+/// held to that service.
+#[test]
+fn a_guard_reading_a_credential_is_held_where_the_credential_is() {
+    for (guard, place) in [
+        (
+            r#"when    = { value = "held", equals = "x" }"#,
+            "step probe.when",
+        ),
+        (
+            r#"retry   = { times = 1, every = "1s", until = { value = "held", equals = "x" } }"#,
+            "step probe.retry",
+        ),
+    ] {
+        let elsewhere = refused(&deciding(guard, "radarr"));
+        assert!(
+            says(&elsewhere, &[place, "decides on held", "radarr", "sonarr"]),
+            "{place}: {elsewhere:?}"
+        );
+        let home = refused(&deciding(guard, "sonarr"));
+        assert!(
+            !home.iter().any(|one| one.contains("decides on")),
+            "{place}: {home:?}"
+        );
+        assert!(
+            says(&home, &["step carry.call.body", "state", "komga", "sonarr"]),
+            "{place}: {home:?}"
+        );
+    }
+}

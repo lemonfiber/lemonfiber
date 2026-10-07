@@ -198,11 +198,13 @@ pub(super) async fn followed(
     stamp: &str,
 ) -> Result<Vec<Ran>, Unfollowed> {
     let reaching = reaching(services, would);
+    let credentials = credentials(ctx, services);
     let running = Running {
         http: ctx.seams.http.as_ref(),
         resolver: ctx.seams.resolver.as_ref(),
         reaching: &reaching,
         approved: &consent.approved,
+        credentials: &credentials,
     };
     let mut ran = Vec::new();
     let mut captured = BTreeMap::new();
@@ -222,6 +224,24 @@ pub(super) async fn followed(
     }
     kept(ctx, &would.plugin, manifest, &captured, stamp).map_err(Unfollowed::Unkept)?;
     Ok(ran)
+}
+
+/// Every key lemonfiber publishes for a service of the stack's, by the service's id,
+/// which a value holding one is held to however a recipe came by it.
+///
+/// The same lookup a credential-store input resolves through, over every service the
+/// stack declares, so no credential a recipe can be handed is missing from what its
+/// values are held against.
+fn credentials(ctx: &Ctx, services: &[lemonfiber_manifest::Service]) -> Vec<(String, String)> {
+    services
+        .iter()
+        .filter_map(|service| credential(ctx, &service.id).map(|key| (service.id.clone(), key)))
+        .collect()
+}
+
+/// The credential lemonfiber holds for one service of the stack's, where it holds one.
+fn credential(ctx: &Ctx, service: &str) -> Option<String> {
+    crate::app::targets::recorded_secret(ctx, &crate::seed::run::published_as(service))
 }
 
 /// How each service a recipe may call is reached: the stack's at the port it
@@ -260,9 +280,7 @@ fn inputs_of(
         .iter()
         .filter_map(|input| {
             let value = match input.origin {
-                Origin::CredentialStore => input.of.as_deref().and_then(|of| {
-                    crate::app::targets::recorded_secret(ctx, &crate::seed::run::published_as(of))
-                }),
+                Origin::CredentialStore => input.of.as_deref().and_then(|of| credential(ctx, of)),
                 _ => given.values().get(&input.name).cloned(),
             };
             value.map(|value| (input.name.clone(), value))
