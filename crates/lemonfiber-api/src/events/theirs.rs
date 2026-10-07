@@ -119,14 +119,13 @@ impl Theirs {
         }
         let mut said = Vec::new();
         for reading in asking {
-            let Some(rendered) = self.answered(reading).await else {
-                continue;
-            };
-            let previous = heard
-                .said
-                .insert(rendered.kind(), rendered.said().to_owned());
-            if joined || previous.as_deref() != Some(rendered.said()) {
-                said.push(rendered);
+            if let Some(rendered) = self.answered(reading).await {
+                let previous = heard
+                    .said
+                    .insert(rendered.kind(), rendered.said().to_owned());
+                if joined || previous.as_deref() != Some(rendered.said()) {
+                    said.push(rendered);
+                }
             }
         }
         said
@@ -135,9 +134,8 @@ impl Theirs {
     /// One reading, narrowed to the member by the decision every read takes, as the
     /// event it is said as. Nothing where the decision gives the member nothing.
     async fn answered(&self, reading: Reading) -> Option<Rendered> {
-        let narrowed = may(&self.caller, Door::Reading, reading.command())
-            .granted()
-            .ok()?;
+        let decided = may(&self.caller, Door::Reading, reading.command());
+        let narrowed = decided.granted().ok()?;
         let outcome = match dispatch(narrowed, &self.ctx).await {
             Ok(outcome) => outcome,
             Err(_) => reading.unread(),
