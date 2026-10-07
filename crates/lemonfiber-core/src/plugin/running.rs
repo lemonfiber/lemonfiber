@@ -19,6 +19,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::Duration;
 
+use lemonfiber_plugin::vocabulary::Constraint;
 use lemonfiber_plugin::{Recipe, Retry, Step, LARGEST_ANSWER};
 use serde::{Deserialize, Serialize};
 
@@ -57,6 +58,10 @@ pub struct Running<'a> {
     /// Every pair to a host outside the stack this act approved, as
     /// `<value>@<destination>`.
     pub approved: &'a [String],
+    /// Every credential lemonfiber holds for a service of the stack's, as the service's
+    /// id and the value, which a value holding one is held to however a recipe came by
+    /// it.
+    pub credentials: &'a [(String, String)],
 }
 
 /// What one recipe came to.
@@ -112,7 +117,7 @@ pub async fn run(
     inputs: &BTreeMap<String, String>,
 ) -> Outcome {
     let mut values = inputs.clone();
-    let mut bounds = Bounds::of(recipe, running.approved);
+    let mut bounds = Bounds::of(recipe, running.approved, running.credentials);
     let mut captured = BTreeMap::new();
     let mut answered: BTreeMap<String, u16> = BTreeMap::new();
     let mut steps = Vec::new();
@@ -122,13 +127,19 @@ pub async fn run(
             steps.push(said(step, Came::NotReached, None));
             continue;
         }
-        if let Some(guard) = &step.when {
-            if !reading::holds(guard, &answered, &values) {
-                steps.push(said(step, Came::Skipped, None));
-                continue;
+        // Asked before the guard is: a step left out because its guard read a credential
+        // would say what the credential holds by what the recipe went on to do.
+        let made = if let Some(withheld) = undecided(step, &values, &bounds) {
+            withheld
+        } else {
+            if let Some(guard) = &step.when {
+                if !reading::holds(guard, &answered, &values) {
+                    steps.push(said(step, Came::Skipped, None));
+                    continue;
+                }
             }
-        }
-        let made = made(running, step, &values, &bounds).await;
+            made(running, step, &values, &bounds).await
+        };
         if made.ran.came == Came::Answered {
             answered.extend(made.ran.status.map(|status| (step.id.clone(), status)));
             bounds.traded(&made.carried, made.captured.keys());
@@ -160,8 +171,8 @@ struct Made {
     ran: StepRan,
     /// What it captured, where it came to what it should.
     captured: BTreeMap<String, String>,
-    /// The name of every value its call carried, where it was made.
-    carried: BTreeSet<String>,
+    /// Every value its call carried or its guard read, by name, where it was made.
+    carried: BTreeMap<String, String>,
 }
 
 /// A step that was not made, or made and said in one line.
@@ -190,7 +201,7 @@ async fn made(
             let elsewhere = !running.reaching.own.contains(&step.call.to);
             Made {
                 carried,
-                ..tried(running.http, step, &request, values, elsewhere).await
+                ..tried(running.http, step, &request, values, bounds, elsewhere).await
             }
         }
         Err(unmade) => unmade,
@@ -204,7 +215,7 @@ async fn prepared(
     step: &Step,
     values: &BTreeMap<String, String>,
     bounds: &Bounds<'_>,
-) -> Result<(Request, BTreeSet<String>), Made> {
+) -> Result<(Request, BTreeMap<String, String>), Made> {
     let whither = running
         .reaching
         .ports
@@ -213,7 +224,7 @@ async fn prepared(
     let unmade = |came: Came, why: String| Made {
         ran: said(step, came, Some(why)),
         captured: BTreeMap::new(),
-        carried: BTreeSet::new(),
+        carried: BTreeMap::new(),
     };
     let built =
         calling::request(&step.call, whither, values, bounds).map_err(|unbuilt| match unbuilt {
@@ -236,7 +247,56 @@ async fn prepared(
             .map_err(refused)?,
     };
     let request = calling::sending(request, whither, &step.call.to).map_err(refused)?;
-    Ok((request, built.carried))
+    let mut carried = built.carried;
+    carried.extend(guarding(step, values));
+    Ok((request, carried))
+}
+
+/// Every value this step's guard and its retry's end read, by name, where the run
+/// holds it.
+fn guarding(step: &Step, values: &BTreeMap<String, String>) -> BTreeMap<String, String> {
+    [
+        step.when.as_ref(),
+        step.retry.as_ref().map(|retry| &retry.until),
+    ]
+    .into_iter()
+    .flatten()
+    .filter_map(|condition| condition.value.as_deref())
+    .filter_map(|name| values.get_key_value(name))
+    .map(|(name, value)| (name.clone(), value.clone()))
+    .collect()
+}
+
+/// The step said as withheld where its guard or its retry's end reads a value held to
+/// a service other than the one it calls, or nothing where it may be decided on.
+fn undecided(step: &Step, values: &BTreeMap<String, String>, bounds: &Bounds<'_>) -> Option<Made> {
+    let why = guarding(step, values)
+        .iter()
+        .find_map(|(name, value)| bounds.decided(name, value, &step.call.to))?;
+    Some(Made {
+        ran: said(
+            step,
+            Came::Withheld,
+            Some(format!("was not sent: it {why}")),
+        ),
+        captured: BTreeMap::new(),
+        carried: BTreeMap::new(),
+    })
+}
+
+/// One way an answer was not the one a step expects, said as the constraint and the
+/// place, never as what the answer held there: an answer may carry a credential, and
+/// what a step says reaches the problem an act ends with.
+///
+/// A status is said as it is, since a status is a number the protocol defines.
+fn unheld(fault: &crate::plugin::judging::Fault) -> String {
+    match (fault.constraint, &fault.place) {
+        (Constraint::Status, _) => fault.said.clone(),
+        (constraint, Some(place)) => {
+            format!("{place} is not what {} declares", constraint.as_str())
+        }
+        (constraint, None) => format!("the answer is not what {} declares", constraint.as_str()),
+    }
 }
 
 /// Why a host outside the stack was not called, as a step says it.
@@ -283,6 +343,7 @@ async fn tried(
     step: &Step,
     request: &Request,
     values: &BTreeMap<String, String>,
+    bounds: &Bounds<'_>,
     elsewhere: bool,
 ) -> Made {
     let allowed = 1 + step.retry.as_ref().map_or(0, |retry| retry.times);
@@ -296,6 +357,17 @@ async fn tried(
     loop {
         tries += 1;
         let this = read(step, http.send(request).await);
+        if let Some(why) = unwaited(step, &this, bounds) {
+            return Made {
+                ran: said(
+                    step,
+                    Came::Withheld,
+                    Some(format!("stopped waiting: it {why}")),
+                ),
+                captured: BTreeMap::new(),
+                carried: BTreeMap::new(),
+            };
+        }
         reached |= match &this {
             Read::Unreachable(unreachable) => unreachable.connected,
             Read::Oversized(_) | Read::Answered(..) => true,
@@ -309,6 +381,20 @@ async fn tried(
         }
         tokio::time::sleep(Duration::from_secs(wait)).await;
     }
+}
+
+/// Why a retry's end may not be decided on, where it reads a value this try captured
+/// that is held to a service other than the one the step calls.
+///
+/// The guard check before the step reads only what the run held then; a retry's end
+/// can also read what each try captures, so the same check is made again on that.
+fn unwaited(step: &Step, this: &Read, bounds: &Bounds<'_>) -> Option<String> {
+    let name = step.retry.as_ref()?.until.value.as_deref()?;
+    let Read::Answered(_, Ok(captured)) = this else {
+        return None;
+    };
+    let value = captured.get(name)?;
+    bounds.decided(name, value, &step.call.to)
 }
 
 /// Whether a try's answer is the one a retry waits for: the answer its `until` ends on,
@@ -359,8 +445,11 @@ fn concluded(step: &Step, last: Read, tries: u32, landed: bool) -> Made {
             let faults = step
                 .expect
                 .as_ref()
-                .map(|expect| crate::plugin::judging::judge(expect, &answer))
-                .unwrap_or_default();
+                .map(|expect| crate::plugin::judging::faults(expect, &answer))
+                .unwrap_or_default()
+                .iter()
+                .map(unheld)
+                .collect::<Vec<_>>();
             match (faults.is_empty(), captured) {
                 (false, _) => (
                     ran(
@@ -381,7 +470,7 @@ fn concluded(step: &Step, last: Read, tries: u32, landed: bool) -> Made {
     Made {
         ran,
         captured,
-        carried: BTreeSet::new(),
+        carried: BTreeMap::new(),
     }
 }
 

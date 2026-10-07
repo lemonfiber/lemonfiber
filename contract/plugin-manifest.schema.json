@@ -303,7 +303,8 @@
           "type": ["string", "null"],
           "default": null
         },
-        "origin": {"description": "Whose value it is: the credential store, or the operator.", "$ref": "#/$defs/PluginValueOrigin"}
+        "origin": {"description": "Whose value it is: the credential store, or the operator.", "$ref": "#/$defs/PluginValueOrigin"},
+        "secret": {"description": "Whether what the operator supplies may be a secret, so a terminal takes it without\nshowing it.", "type": "boolean", "default": false}
       },
       "additionalProperties": false,
       "required": ["name", "origin"]

@@ -16,7 +16,7 @@
 //! value, the body or a query value is replaced by what that name holds, a query value
 //! percent-encoded so a value can never close the parameter it stands in.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use lemonfiber_plugin::addressing::{address, carries, pieces, placed, Piece, Toward, Unaddressed};
 use lemonfiber_plugin::addressing::{CLOSES, OPENS};
@@ -40,8 +40,8 @@ pub(super) enum Whither {
 pub(super) struct Built {
     /// What is sent.
     pub(super) request: Request,
-    /// The name of every value it carries.
-    pub(super) carried: BTreeSet<String>,
+    /// Every value it carries, by name.
+    pub(super) carried: BTreeMap<String, String>,
 }
 
 /// Why a step's call was not made.
@@ -68,16 +68,15 @@ pub(super) fn request(
     bounds: &Bounds<'_>,
 ) -> Result<Built, Unbuilt> {
     let method: Method = crate::plugin::judging::method(&call.method).ok_or(Unbuilt::Method)?;
-    let carried: BTreeSet<String> = placed(call)
+    let carried: BTreeMap<String, String> = placed(call)
         .into_iter()
-        .map(|(_, name)| name)
-        .filter(|name| values.contains_key(*name))
-        .map(str::to_owned)
+        .filter_map(|(_, name)| values.get_key_value(name))
+        .map(|(name, value)| (name.clone(), value.clone()))
         .collect();
     let outside = whither == Whither::Outside;
     if let Some(why) = carried
         .iter()
-        .find_map(|name| bounds.withheld(name, &call.to, outside))
+        .find_map(|(name, value)| bounds.withheld(name, value, &call.to, outside))
     {
         return Err(Unbuilt::Withheld(why));
     }

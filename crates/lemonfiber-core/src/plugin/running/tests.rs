@@ -34,6 +34,9 @@ fn recipe(steps: &str) -> Recipe {
     })
 }
 
+/// The credential lemonfiber holds for sonarr in these runs.
+const HELD: &str = "5onarr-k3y-0123456789abcdef";
+
 /// The one pair outside the stack these runs approve.
 const APPROVED: &str = "code@plex.tv";
 
@@ -57,11 +60,13 @@ async fn ran_under(
     approved: &[String],
 ) -> Outcome {
     let reaching = reaching();
+    let credentials = [("sonarr".to_owned(), HELD.to_owned())];
     let running = Running {
         http: http.as_ref(),
         resolver: resolving.as_ref(),
         reaching: &reaching,
         approved,
+        credentials: &credentials,
     };
     let inputs = inputs
         .iter()
@@ -642,5 +647,229 @@ async fn a_retry_stops_at_an_answer_larger_than_a_recipe_reads() {
     assert_eq!(
         outcome.ran.steps.first().map(|one| (one.came, one.tries)),
         Some((Came::Oversized, 1))
+    );
+}
+
+/// A credential given to its own service and read back out of it by a later step that
+/// carried nothing is still the credential: it is held to that service wherever it
+/// appears, alone or inside a longer value, and nothing the step after it captured
+/// from carrying it goes anywhere else either.
+#[tokio::test]
+async fn a_credential_read_back_out_of_its_service_is_still_held_to_it() {
+    let laundering = r#"
+[[input]]
+name   = "key"
+origin = "credential-store"
+of     = "sonarr"
+
+[[step]]
+id   = "store"
+call = { method = "POST", to = "sonarr", path = "/api/v3/tag", body = "{\"label\":\"{{key}}\"}" }
+
+[[step]]
+id      = "read"
+call    = { method = "GET", to = "sonarr", path = "/api/v3/tag/1" }
+capture = [{ name = "label", from = "label", origin = "stack-service" }]
+
+[[step]]
+id   = "carry"
+call = { method = "POST", to = "komga", path = "/x", headers = { X-Label = "seen {{label}}" } }
+
+[[pair]]
+value = "key"
+to    = "sonarr"
+
+[[pair]]
+value = "label"
+to    = "komga"
+"#;
+    let http = Fake::in_turn(vec![
+        Answer::reply(201, "{}"),
+        Answer::reply(200, format!(r#"{{"label":"{HELD}"}}"#)),
+        Answer::reply(200, "{}"),
+    ]);
+    let outcome = ran(&http, &Resolving::anywhere(), laundering, &[("key", HELD)]).await;
+    assert_eq!(
+        came(&outcome).last(),
+        Some(&("carry".to_owned(), Came::Withheld)),
+        "{:?}",
+        outcome.ran
+    );
+    let why = outcome.ran.why.unwrap_or_default();
+    assert!(
+        why.contains("label") && why.contains("sonarr") && !why.contains(HELD),
+        "{why}"
+    );
+    assert_eq!(http.requests().len(), 2, "nothing reached komga");
+}
+
+/// A credential read out of a service that answers without asking for one is held to
+/// that service though the recipe never brought it in.
+#[tokio::test]
+async fn a_credential_a_service_hands_out_unasked_is_held_to_it() {
+    let unasked = r#"
+[[step]]
+id      = "read"
+call    = { method = "GET", to = "sonarr", path = "/api/v3/config/host" }
+capture = [{ name = "found", from = "apiKey", origin = "stack-service" }]
+
+[[step]]
+id   = "carry"
+call = { method = "POST", to = "komga", path = "/x", body = "{{found}}" }
+
+[[pair]]
+value = "found"
+to    = "komga"
+"#;
+    let http = Fake::in_turn(vec![
+        Answer::reply(200, format!(r#"{{"apiKey":"{HELD}"}}"#)),
+        Answer::reply(200, "{}"),
+    ]);
+    let outcome = ran(&http, &Resolving::anywhere(), unasked, &[]).await;
+    assert_eq!(
+        came(&outcome).last(),
+        Some(&("carry".to_owned(), Came::Withheld))
+    );
+    assert_eq!(http.requests().len(), 1);
+}
+
+/// A retry's end reads what each try captures as well as what the run held, so one that
+/// would decide on a credential another service handed back stops waiting there rather
+/// than telling the service it calls what the credential holds by trying again.
+#[tokio::test]
+async fn a_retry_end_reading_a_captured_credential_stops_waiting() {
+    let waiting = r#"
+[[step]]
+id      = "wait"
+call    = { method = "GET", to = "komga", path = "/x" }
+capture = [{ name = "echo", from = "label", origin = "stack-service" }]
+retry   = { times = 3, every = "1s", until = { value = "echo", equals = "x" } }
+"#;
+    let http = Fake::always(Answer::reply(200, format!(r#"{{"label":"{HELD}"}}"#)));
+    let outcome = ran(&http, &Resolving::anywhere(), waiting, &[]).await;
+    assert_eq!(came(&outcome), [("wait".to_owned(), Came::Withheld)]);
+    assert!(outcome
+        .ran
+        .why
+        .is_some_and(|why| why.contains("echo") && why.contains("sonarr") && !why.contains(HELD)));
+    assert_eq!(http.requests().len(), 1, "no try after the first was made");
+}
+
+/// A value captured from a call that carried a laundered credential is held as what it
+/// was traded for.
+#[tokio::test]
+async fn what_a_laundered_credential_is_traded_for_is_held_too() {
+    let traded = r#"
+[[step]]
+id      = "read"
+call    = { method = "GET", to = "sonarr", path = "/api/v3/config/host" }
+capture = [{ name = "found", from = "apiKey", origin = "stack-service" }]
+
+[[step]]
+id      = "trade"
+call    = { method = "POST", to = "sonarr", path = "/login", body = "{{found}}" }
+capture = [{ name = "session", from = "session", origin = "stack-service" }]
+
+[[step]]
+id   = "carry"
+call = { method = "POST", to = "komga", path = "/x", body = "{{session}}" }
+
+[[pair]]
+value = "found"
+to    = "sonarr"
+
+[[pair]]
+value = "session"
+to    = "komga"
+"#;
+    let http = Fake::in_turn(vec![
+        Answer::reply(200, format!(r#"{{"apiKey":"{HELD}"}}"#)),
+        Answer::reply(200, r#"{"session":"s3ss10n"}"#),
+        Answer::reply(200, "{}"),
+    ]);
+    let outcome = ran(&http, &Resolving::anywhere(), traded, &[]).await;
+    assert_eq!(
+        came(&outcome).last(),
+        Some(&("carry".to_owned(), Came::Withheld))
+    );
+    assert_eq!(http.requests().len(), 2);
+}
+
+/// A guard that reads a credential decides on it as surely as carrying it would, so
+/// the step it guards is held to that credential's service, and what the step captures
+/// is held as though it had carried the credential.
+#[tokio::test]
+async fn a_guard_reading_a_credential_holds_its_step_to_that_service() {
+    let guarded = r#"
+[[input]]
+name   = "key"
+origin = "credential-store"
+of     = "sonarr"
+
+[[step]]
+id   = "probe"
+when = { value = "key", equals = "guess" }
+call = { method = "GET", to = "komga", path = "/x" }
+
+[[pair]]
+value = "key"
+to    = "sonarr"
+"#;
+    let http = Fake::always(Answer::reply(200, "{}"));
+    let outcome = ran(&http, &Resolving::anywhere(), guarded, &[("key", "guess")]).await;
+    assert_eq!(came(&outcome), [("probe".to_owned(), Came::Withheld)]);
+    assert!(outcome.ran.why.is_some_and(|why| why.contains("key")
+        && why.contains("sonarr")
+        && !why.contains("guess")));
+    assert!(http.requests().is_empty());
+
+    let waiting = r#"
+[[input]]
+name   = "key"
+origin = "credential-store"
+of     = "sonarr"
+
+[[step]]
+id      = "wait"
+call    = { method = "GET", to = "sonarr", path = "/x" }
+capture = [{ name = "state", from = "state", origin = "stack-service" }]
+retry   = { times = 1, every = "1s", until = { value = "key", equals = "guess" } }
+
+[[step]]
+id   = "carry"
+call = { method = "POST", to = "komga", path = "/y", body = "{{state}}" }
+
+[[pair]]
+value = "state"
+to    = "komga"
+"#;
+    let http = Fake::always(Answer::reply(200, r#"{"state":"ready"}"#));
+    let outcome = ran(&http, &Resolving::anywhere(), waiting, &[("key", "guess")]).await;
+    assert_eq!(
+        came(&outcome),
+        [
+            ("wait".to_owned(), Came::Answered),
+            ("carry".to_owned(), Came::Withheld)
+        ]
+    );
+}
+
+/// An answer that was not the one a step expects is said as which constraint did not
+/// hold where, never as what the answer held there.
+#[tokio::test]
+async fn an_unexpected_answer_is_said_without_what_it_held() {
+    let expecting = r#"
+[[step]]
+id     = "in"
+call   = { method = "GET", to = "komga", path = "/x" }
+expect = { status = 200, json = { state = "ok" }, body_starts_with = "[" }
+"#;
+    let http = Fake::always(Answer::reply(200, r#"{"state":"t0k3n-that-leaks"}"#));
+    let outcome = ran(&http, &Resolving::anywhere(), expecting, &[]).await;
+    assert_eq!(came(&outcome), [("in".to_owned(), Came::Unexpected)]);
+    let why = outcome.ran.why.unwrap_or_default();
+    assert!(
+        why.contains("state") && why.contains("body_starts_with") && !why.contains("t0k3n"),
+        "{why}"
     );
 }

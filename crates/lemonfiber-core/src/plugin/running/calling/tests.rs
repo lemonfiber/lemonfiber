@@ -63,7 +63,7 @@ fn made(
 ) -> Result<Request, Unbuilt> {
     let recipe = paired();
     let approved = approved();
-    request(call, whither, values, &Bounds::of(&recipe, &approved)).map(|built| built.request)
+    request(call, whither, values, &Bounds::of(&recipe, &approved, &[])).map(|built| built.request)
 }
 
 #[test]
@@ -141,14 +141,14 @@ fn a_substitution_nothing_holds_is_carried_as_it_was_written() {
         &written,
         Whither::Stack(1),
         &values(),
-        &Bounds::of(&recipe, &[]),
+        &Bounds::of(&recipe, &[], &[]),
     );
     assert_eq!(
         built.map(|Built { request, carried }| (request.url, request.body, carried)),
         Ok((
             "http://127.0.0.1:1/x?a={{gone}}".to_owned(),
             Some("{{missing}} and abc and {{open".to_owned()),
-            ["token".to_owned()].into()
+            [("token".to_owned(), "abc".to_owned())].into()
         ))
     );
 }
@@ -231,7 +231,7 @@ fn a_value_that_may_not_go_where_the_call_goes_withholds_the_call() {
     values.insert("key".to_owned(), "s3cret".to_owned());
     let recipe = paired();
     let approved = approved();
-    let bounds = Bounds::of(&recipe, &approved);
+    let bounds = Bounds::of(&recipe, &approved, &[]);
     for (to, whither, path, said) in [
         (
             "radarr",
@@ -264,7 +264,7 @@ fn a_value_that_may_not_go_where_the_call_goes_withholds_the_call() {
             "{to} {path}: {built:?}"
         );
     }
-    let unapproved = Bounds::of(&recipe, &[]);
+    let unapproved = Bounds::of(&recipe, &[], &[]);
     let built = request(
         &call("GET", "plex.tv", "/x?t={{token}}"),
         Whither::Outside,
@@ -367,7 +367,7 @@ fn reading_and_calling_agree_on_where_every_call_goes() {
         "/a/../b",
     ];
     let recipe = paired();
-    let bounds = Bounds::of(&recipe, &[]);
+    let bounds = Bounds::of(&recipe, &[], &[]);
     for to in hosts {
         for path in paths {
             let read = passes_reading(to, path);

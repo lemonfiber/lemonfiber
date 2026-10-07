@@ -170,6 +170,7 @@ fn flows(manifest: &Manifest, recipe: &Recipe, at: &str, found: &mut Vec<Violati
         bounds::retried(step, &before, &here, found);
         bounds::read(step, &here, found);
         substituting(step, recipe, &before.values, &here, found);
+        whither::decided(&whither::holders(recipe), step, &here, found);
 
         if !before.steps.insert(&step.id) {
             found.push(Violation {
@@ -342,6 +343,21 @@ fn substituting(
 /// Every value one call carries.
 fn carried(step: &Step) -> impl Iterator<Item = &str> {
     placed(&step.call).into_iter().map(|(_, name)| name)
+}
+
+/// Every value a step's guard or its retry's end decides on, with where it is read.
+fn guarded(step: &Step) -> impl Iterator<Item = (&'static str, &str)> {
+    let when = step
+        .when
+        .as_ref()
+        .and_then(|condition| condition.value.as_deref())
+        .map(|name| ("when", name));
+    let until = step
+        .retry
+        .as_ref()
+        .and_then(|retry| retry.until.value.as_deref())
+        .map(|name| ("retry", name));
+    when.into_iter().chain(until)
 }
 
 /// Refuse a substitution where a call is written out: its destination, its path's
