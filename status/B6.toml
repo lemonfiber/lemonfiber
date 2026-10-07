@@ -1,0 +1,17 @@
+# One row per requirement this repository has worked on; read by spec's
+# status_check.py and the release gate.
+
+requirement = [
+  { id = "B6-R1", state = "done", evidence = ["crates/lemonfiber/src/ui/reach.rs", "crates/lemonfiber/src/ui.rs", "crates/lemonfiber-api/src/admission/sessions.rs"] },
+  { id = "B6-R2", state = "done", evidence = ["crates/lemonfiber/src/ui/reach.rs", "crates/lemonfiber/src/ui.rs", "crates/lemonfiber-api/src/admission/sessions.rs"] },
+  { id = "B6-R3", state = "done", evidence = ["crates/lemonfiber/src/ui/reach.rs", "crates/lemonfiber/src/ui.rs", "crates/lemonfiber-api/src/admission/sessions.rs"] },
+  { id = "B6-R4", state = "done", evidence = ["crates/lemonfiber-ports/src/docker/target.rs", "crates/lemonfiber-adapters/src/docker/context.rs", "crates/lemonfiber/src/context.rs", "crates/lemonfiber-core/src/stack/compose.rs", "crates/lemonfiber-core/src/model/envelope.rs", "crates/lemonfiber/src/render/host.rs"] },
+  { id = "B6-R5", state = "done", evidence = ["crates/lemonfiber-adapters/src/docker/presence.rs", "crates/lemonfiber-ports/src/docker/locations.rs", "crates/lemonfiber-ports/src/seams.rs", "crates/lemonfiber-core/src/app/engine/remote.rs", "crates/lemonfiber-core/tests/integration/one_host_answers_for_both.rs", "crates/lemonfiber-adapters/tests/integration/engine.rs"] },
+  { id = "B6-R6", state = "done", evidence = ["crates/lemonfiber-ports/src/docker/target.rs", "crates/lemonfiber-adapters/src/docker/context.rs", "crates/lemonfiber/src/context.rs", "crates/lemonfiber-core/src/stack/compose.rs", "crates/lemonfiber-core/src/model/envelope.rs", "crates/lemonfiber/src/render/host.rs"] },
+  { id = "B6-R7", state = "done", evidence = ["crates/lemonfiber-ports/src/docker/target.rs", "crates/lemonfiber-adapters/src/docker/context.rs", "crates/lemonfiber/src/context.rs", "crates/lemonfiber-core/src/stack/compose.rs", "crates/lemonfiber-core/src/model/envelope.rs", "crates/lemonfiber/src/render/host.rs"] },
+  { id = "B6-R8", state = "done", evidence = ["crates/lemonfiber-core/src/app/engine/lock.rs", "crates/lemonfiber-api/src/jobs.rs", "crates/lemonfiber-core/tests/integration/lock.rs"] },
+  { id = "B6-R9", state = "done", evidence = ["crates/lemonfiber/src/ui/reach.rs", "crates/lemonfiber/src/ui.rs", "crates/lemonfiber-api/src/admission/sessions.rs"] },
+  { id = "B6-R10", state = "done", evidence = ["crates/lemonfiber-core/tests/integration/one_stack_one_host.rs", "crates/lemonfiber-api/tests/integration/nothing_is_carried_through.rs", "crates/lemonfiber-core/src/app/ctx.rs", "crates/lemonfiber-core/src/stack/compose.rs"] },
+  { id = "B6-R11", state = "done", evidence = ["crates/lemonfiber-ports/src/docker/target.rs", "crates/lemonfiber-adapters/src/docker/context.rs", "crates/lemonfiber/src/context.rs", "crates/lemonfiber-core/src/stack/compose.rs", "crates/lemonfiber-core/src/model/envelope.rs", "crates/lemonfiber/src/render/host.rs"] },
+  { id = "B6-R12", state = "done", evidence = ["crates/lemonfiber-api/src/jobs.rs"] },
+]

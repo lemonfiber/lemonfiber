@@ -49,7 +49,6 @@ import re
 import shutil
 import subprocess
 import sys
-import tempfile
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -72,10 +71,9 @@ WORK = ".release-gate"
 #: fetching it again would gate a different commit.
 SELF = "lemonfiber"
 
-#: The tracker, copied beside the spec so the no-stub gate can read it. That gate
-#: resolves the catalogue from its working directory, so it has to run inside the
-#: spec checkout, and it refuses a path outside it.
-TRACKER = "IMPLEMENTATION-STATUS.md"
+#: The tracker: one file per feature, a row per requirement, which the release gate
+#: and the no-stub gate each read from the checkout `--repo` names.
+TRACKER = "status"
 
 #: The release record the binary carries, a file per release that `just changelog`
 #: writes after a tag. It may lack the release being tagged, whose notes follow the
@@ -341,9 +339,9 @@ def check(version: str, spec: Path, work: Path) -> list[Step]:
         return steps
 
     tracker = ROOT / TRACKER
-    if not tracker.is_file():
+    if not tracker.is_dir():
         steps.append(Step("the implementation status is readable", False,
-                          f"no {TRACKER} in the tree being tagged"))
+                          f"no {TRACKER}/ in the tree being tagged"))
         return steps
     steps.append(Step("the implementation status is readable", True))
 
@@ -370,30 +368,20 @@ def check(version: str, spec: Path, work: Path) -> list[Step]:
 
     ok, said = ran(
         sys.executable, str(spec / "scripts" / "gate.py"),
-        f"--manifest={manifest.as_posix()}", *repos, f"--status={TRACKER}",
+        f"--manifest={manifest.as_posix()}", *repos,
         cwd=ROOT,
     )
     steps.append(Step("every locked goal is satisfied", ok, said))
 
-    # Inside the spec checkout: the no-stub gate resolves the feature catalogue
-    # and the version directory from its working directory, and refuses a status
-    # file outside it. A copy is what the tree being tagged holds, which is the
-    # commit this gate is about.
-    #
-    # Under a name nothing else uses, and removed whatever happens. The copy was
-    # `IMPLEMENTATION-STATUS.md` with no check that one was not already there, so
-    # running this by hand against a working spec clone that had one overwrote it
-    # and then deleted it.
-    beside = Path(tempfile.mkdtemp(prefix=".release-gate-", dir=spec)) / TRACKER
-    try:
-        shutil.copyfile(tracker, beside)
-        ok, said = ran(
-            sys.executable, "scripts/check_no_stubs.py",
-            f"--version={version}", f"--status={beside.relative_to(spec).as_posix()}",
-            cwd=spec,
-        )
-    finally:
-        shutil.rmtree(beside.parent, ignore_errors=True)
+    # Inside the spec checkout, which is where the no-stub gate resolves the feature
+    # catalogue and the version directory from, so this tree is named by where it is
+    # rather than as the working directory.
+    here = f"--repo={SELF}="
+    ok, said = ran(
+        sys.executable, "scripts/check_no_stubs.py", f"--version={version}",
+        *(f"{here}{ROOT.as_posix()}" if one.startswith(here) else one for one in repos),
+        cwd=spec,
+    )
     steps.append(Step("no requirement it locks is unbuilt", ok, said))
     return steps
 

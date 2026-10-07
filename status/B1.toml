@@ -1,0 +1,26 @@
+# One row per requirement this repository has worked on; read by spec's
+# status_check.py and the release gate.
+
+requirement = [
+  { id = "B1-R1", state = "done", evidence = ["crates/lemonfiber-core/src/stack/closure.rs", "crates/lemonfiber-manifest/src/schema.rs"] },
+  { id = "B1-R2", state = "done", evidence = ["crates/lemonfiber-core/src/stack/closure.rs", "crates/lemonfiber-manifest/src/schema.rs"] },
+  { id = "B1-R3", state = "done", evidence = ["crates/lemonfiber-core/src/stack/closure.rs", "crates/lemonfiber-core/src/model/running.rs"] },
+  { id = "B1-R4", state = "done", evidence = ["crates/lemonfiber-core/src/stack/closure.rs"] },
+  { id = "B1-R5", state = "done", evidence = ["crates/lemonfiber-core/src/stack/closure.rs"] },
+  { id = "B1-R6", state = "done", evidence = ["crates/lemonfiber-core/src/stack/closure.rs", "crates/lemonfiber-core/src/model/running.rs"] },
+  { id = "B1-R7", state = "done", evidence = ["crates/lemonfiber-core/src/stack/closure.rs", "crates/lemonfiber-core/src/model/running.rs"] },
+  { id = "B1-R8", state = "done", evidence = ["crates/lemonfiber-core/src/stack/closure.rs", "crates/lemonfiber-manifest/src/schema.rs"] },
+  { id = "B1-R9", state = "done", evidence = ["crates/lemonfiber-core/src/stack/closure.rs", "crates/lemonfiber-core/src/model/running.rs"] },
+  { id = "B1-R10", state = "done", evidence = ["crates/lemonfiber-core/src/app/engine/switch.rs"] },
+  { id = "B1-R11", state = "done", evidence = ["crates/lemonfiber-core/src/app.rs", "crates/lemonfiber-core/src/app/engine.rs", "crates/lemonfiber-fixtures/src/support.rs"] },
+  { id = "B1-R12", state = "done", evidence = ["crates/lemonfiber-core/src/app.rs", "crates/lemonfiber-core/src/stack.rs", "crates/lemonfiber-manifest/src/lib.rs", "crates/lemonfiber-manifest/src/schema.rs"] },
+  { id = "B1-R13", state = "done", evidence = ["crates/lemonfiber-core/src/stack/closure.rs", "crates/lemonfiber-core/src/model/running.rs"] },
+  { id = "B1-R14", state = "done", evidence = ["crates/lemonfiber-core/src/app.rs", "crates/lemonfiber-core/src/stack.rs", "crates/lemonfiber-manifest/src/lib.rs", "crates/lemonfiber-manifest/src/schema.rs"] },
+  { id = "B1-R15", state = "done", evidence = ["crates/lemonfiber-core/src/stack/closure.rs", "crates/lemonfiber-manifest/src/schema.rs"] },
+  { id = "B1-R16", state = "done", evidence = ["crates/lemonfiber-core/src/docker.rs", "crates/lemonfiber-core/src/stack/standing.rs", "crates/lemonfiber-core/src/stack/closure.rs"] },
+  { id = "B1-R17", state = "done", evidence = ["crates/lemonfiber-core/src/docker.rs", "crates/lemonfiber-core/src/stack/standing.rs", "crates/lemonfiber-core/src/stack/closure.rs"] },
+  { id = "B1-R18", state = "done", evidence = ["crates/lemonfiber-core/src/docker.rs", "crates/lemonfiber-core/src/stack/standing.rs", "crates/lemonfiber-core/src/stack/closure.rs"] },
+  { id = "B1-R19", state = "done", evidence = ["crates/lemonfiber-core/src/docker.rs", "crates/lemonfiber-core/src/app/engine/status.rs"] },
+  { id = "B1-R20", state = "done", evidence = ["crates/lemonfiber-core/src/docker.rs", "crates/lemonfiber-core/src/app/engine/status.rs"] },
+  { id = "B1-R21", state = "done", evidence = ["crates/lemonfiber-core/src/stack/closure.rs", "crates/lemonfiber-core/src/app/engine/preview.rs"] },
+]

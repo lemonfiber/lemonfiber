@@ -1,0 +1,13 @@
+# One row per requirement this repository has worked on; read by spec's
+# status_check.py and the release gate.
+
+requirement = [
+  { id = "N1-R18", state = "done", evidence = ["crates/lemonfiber-core/src/companion.rs", "crates/lemonfiber/src/ui/encrypted.rs", "crates/lemonfiber/src/exit/reporting.rs"] },
+  { id = "N1-R47", state = "done", evidence = ["crates/lemonfiber-core/src/companion.rs", "crates/lemonfiber/src/ui/encrypted.rs", "crates/lemonfiber/src/exit/reporting.rs"] },
+  { id = "N1-R48", state = "done", evidence = ["crates/lemonfiber-core/src/companion.rs", "crates/lemonfiber/src/ui/encrypted.rs", "crates/lemonfiber/src/exit/reporting.rs"] },
+  { id = "N1-R49", state = "done", evidence = ["crates/lemonfiber-core/src/companion.rs", "crates/lemonfiber/src/ui/encrypted.rs", "crates/lemonfiber/src/exit/reporting.rs"] },
+  { id = "N1-R62", state = "done", evidence = ["crates/lemonfiber-core/src/companion.rs", "crates/lemonfiber/src/ui/encrypted.rs", "crates/lemonfiber/src/exit/reporting.rs"] },
+  { id = "N1-R73", state = "done", evidence = ["crates/lemonfiber-core/src/companion.rs", "crates/lemonfiber/src/ui/encrypted.rs", "crates/lemonfiber/src/exit/reporting.rs"] },
+  { id = "N1-R74", state = "done", evidence = ["crates/lemonfiber-core/src/companion.rs", "crates/lemonfiber/src/ui/encrypted.rs", "crates/lemonfiber/src/exit/reporting.rs"] },
+  { id = "N1-R76", state = "done", evidence = ["crates/lemonfiber-core/src/companion.rs", "crates/lemonfiber/src/ui/encrypted.rs", "crates/lemonfiber/src/exit/reporting.rs"] },
+]

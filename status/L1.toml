@@ -1,0 +1,14 @@
+# One row per requirement this repository has worked on; read by spec's
+# status_check.py and the release gate.
+
+requirement = [
+  { id = "L1-R1", state = "partial", evidence = ["crates/lemonfiber/tests/architecture/what_windows_is_waiting_on.rs", ".github/workflows/release.yml", "Cargo.toml"] },
+  { id = "L1-R2", state = "partial", evidence = ["crates/lemonfiber/tests/architecture/what_windows_is_waiting_on.rs", ".github/workflows/release.yml", "Cargo.toml"] },
+  { id = "L1-R3", state = "open" },
+  { id = "L1-R4", state = "partial", evidence = ["scripts/the_installer_refuses_what_it_cannot_check.py", ".github/workflows/release.yml"] },
+  { id = "L1-R5", state = "partial", evidence = ["scripts/the_installer_refuses_what_it_cannot_check.py", ".github/workflows/release.yml"] },
+  { id = "L1-R6", state = "open", evidence = [".github/workflows/sonar.yml", ".github/workflows/build.yml"] },
+  { id = "L1-R7", state = "partial" },
+  { id = "L1-R9", state = "partial", evidence = ["crates/lemonfiber/tests/architecture/what_windows_is_waiting_on.rs", ".github/workflows/release.yml", "Cargo.toml"] },
+  { id = "L1-R10", state = "open" },
+]

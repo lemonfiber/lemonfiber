@@ -1,0 +1,28 @@
+# One row per requirement this repository has worked on; read by spec's
+# status_check.py and the release gate.
+
+requirement = [
+  { id = "C6-R1", state = "done", evidence = ["crates/lemonfiber/tests/integration/publishing.rs"] },
+  { id = "C6-R2", state = "done", evidence = ["crates/lemonfiber/tests/integration/publishing.rs"] },
+  { id = "C6-R3", state = "done", evidence = ["crates/lemonfiber/tests/integration/publishing.rs"] },
+  { id = "C6-R4", state = "done", evidence = ["crates/lemonfiber-core/src/admission.rs", "crates/lemonfiber/tests/architecture/where_the_outside_world_is_reached.rs", "crates/lemonfiber/src/ui/password.rs", "crates/lemonfiber/src/ui/reach.rs", "crates/lemonfiber/src/ui.rs", "crates/lemonfiber-api/src/admission/sessions.rs"] },
+  { id = "C6-R5", state = "done", evidence = ["crates/lemonfiber/src/ui/reach.rs"] },
+  { id = "C6-R6", state = "done", evidence = ["crates/lemonfiber/src/ui.rs", "crates/lemonfiber-core/src/companion/certificate.rs", "crates/lemonfiber/src/ui/said.rs", "crates/lemonfiber/tests/architecture/where_it_listens.rs"] },
+  { id = "C6-R7", state = "done", evidence = ["crates/lemonfiber-core/src/companion/certificate.rs", "crates/lemonfiber/src/ui/said.rs", "crates/lemonfiber/tests/architecture/where_it_listens.rs"] },
+  { id = "C6-R8", state = "done", evidence = ["crates/lemonfiber-core/src/admission.rs", "crates/lemonfiber/tests/architecture/where_the_outside_world_is_reached.rs", "crates/lemonfiber/src/ui/password.rs", "crates/lemonfiber/src/ui/reach.rs", "crates/lemonfiber/src/ui.rs", "crates/lemonfiber-api/src/admission/sessions.rs"] },
+  { id = "C6-R9", state = "done", evidence = ["crates/lemonfiber-api/src/admission.rs", "crates/lemonfiber-api/src/admission/sessions.rs", "crates/lemonfiber/src/ui/reach.rs", "crates/lemonfiber/src/ui.rs"] },
+  { id = "C6-R10", state = "done", evidence = ["crates/lemonfiber-api/src/guard.rs", "crates/lemonfiber-api/src/serve.rs"] },
+  { id = "C6-R11", state = "done", evidence = ["crates/lemonfiber-api/src/admission/attempts.rs", "crates/lemonfiber/src/ui/answering.rs", "spec:10-functional/features/d-content/d6-household-identity.md", "crates/lemonfiber/src/render/invitation.rs", "crates/lemonfiber-core/src/invitation.rs"] },
+  { id = "C6-R12", state = "done", evidence = ["crates/lemonfiber-api/tests/integration/nothing_is_carried_through.rs"] },
+  { id = "C6-R13", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/bindings.rs", "crates/lemonfiber-ports/src/docker.rs", "crates/lemonfiber/tests/architecture/where_it_listens.rs", "crates/lemonfiber/src/ui/reach.rs", "crates/lemonfiber/src/ui.rs", "crates/lemonfiber-api/src/admission/sessions.rs"] },
+  { id = "C6-R14", state = "done", evidence = ["crates/lemonfiber/tests/architecture/where_it_listens.rs"] },
+  { id = "C6-R15", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/guarded.rs", "crates/lemonfiber-core/src/config/keys.rs", "crates/lemonfiber-core/src/doctor/guarded/tests.rs"] },
+  { id = "C6-R16", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/bindings.rs"] },
+  { id = "C6-R17", state = "done", evidence = ["crates/lemonfiber/tests/integration/publishing.rs"] },
+  { id = "C6-R18", state = "done", evidence = ["crates/lemonfiber-plugin/src/schema.rs", "crates/lemonfiber-core/src/plugin/container.rs"] },
+  { id = "C6-R19", state = "done", evidence = ["crates/lemonfiber-core/src/companion.rs", "crates/lemonfiber/src/ui/encrypted.rs", "crates/lemonfiber/src/exit/reporting.rs"] },
+  { id = "C6-R20", state = "done", evidence = ["crates/lemonfiber-core/src/seed/run/decline.rs", "crates/lemonfiber-core/src/seed/run/taken_back.rs"] },
+  { id = "C6-R21", state = "done", evidence = ["crates/lemonfiber-core/src/seed/run/cors.rs", "crates/lemonfiber-core/src/jellyfin/cors.rs"] },
+  { id = "C6-R24", state = "done", evidence = ["crates/lemonfiber-core/src/seed/run/decline.rs", "crates/lemonfiber-core/src/seed/run/taken_back.rs", "crates/lemonfiber-core/src/seed/run/gate.rs", "crates/lemonfiber-core/src/seed/run/tokens.rs", "crates/lemonfiber-core/src/app/credentials/gating.rs", "crates/lemonfiber-core/src/app/credentials/tokening.rs"] },
+  { id = "C6-R25", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/gating.rs"] },
+]

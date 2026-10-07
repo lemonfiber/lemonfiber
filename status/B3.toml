@@ -1,0 +1,20 @@
+# One row per requirement this repository has worked on; read by spec's
+# status_check.py and the release gate.
+
+requirement = [
+  { id = "B3-R1", state = "done", evidence = ["crates/lemonfiber/src/dashboard.rs", "crates/lemonfiber/src/dashboard/panels.rs", "crates/lemonfiber/src/terminal.rs"] },
+  { id = "B3-R2", state = "done", evidence = ["crates/lemonfiber-core/src/dashboard.rs", "crates/lemonfiber-core/src/dashboard/run.rs", "crates/lemonfiber-core/src/health/reach.rs", "crates/lemonfiber-core/src/storage.rs", "crates/lemonfiber-ports/src/service.rs", "crates/lemonfiber-core/src/qbittorrent.rs"] },
+  { id = "B3-R3", state = "done", evidence = ["crates/lemonfiber-core/src/dashboard.rs", "crates/lemonfiber-core/src/dashboard/run.rs", "crates/lemonfiber-core/src/health/reach.rs", "crates/lemonfiber-core/src/storage.rs", "crates/lemonfiber-ports/src/service.rs", "crates/lemonfiber-core/src/qbittorrent.rs"] },
+  { id = "B3-R4", state = "done", evidence = ["crates/lemonfiber/src/dashboard.rs", "crates/lemonfiber/src/dashboard/panels.rs", "crates/lemonfiber/src/terminal.rs"] },
+  { id = "B3-R5", state = "done", evidence = ["crates/lemonfiber-core/src/dashboard.rs", "crates/lemonfiber-core/src/dashboard/run.rs", "crates/lemonfiber-core/src/health/reach.rs", "crates/lemonfiber-core/src/storage.rs", "crates/lemonfiber-ports/src/service.rs", "crates/lemonfiber-core/src/qbittorrent.rs"] },
+  { id = "B3-R6", state = "done", evidence = ["crates/lemonfiber-core/src/dashboard.rs", "crates/lemonfiber-core/src/dashboard/run.rs", "crates/lemonfiber-core/src/health/reach.rs", "crates/lemonfiber-core/src/storage.rs", "crates/lemonfiber-ports/src/service.rs", "crates/lemonfiber-core/src/qbittorrent.rs"] },
+  { id = "B3-R7", state = "done", evidence = ["crates/lemonfiber-core/src/dashboard.rs", "crates/lemonfiber-core/src/dashboard/run.rs", "crates/lemonfiber-core/src/health/reach.rs", "crates/lemonfiber-core/src/storage.rs", "crates/lemonfiber-ports/src/service.rs", "crates/lemonfiber-core/src/qbittorrent.rs"] },
+  { id = "B3-R8", state = "done", evidence = ["crates/lemonfiber-core/src/dashboard.rs", "crates/lemonfiber-core/src/dashboard/run.rs", "crates/lemonfiber-core/src/health/reach.rs", "crates/lemonfiber-core/src/storage.rs", "crates/lemonfiber-ports/src/service.rs", "crates/lemonfiber-core/src/qbittorrent.rs"] },
+  { id = "B3-R9", state = "done", evidence = ["crates/lemonfiber/src/dashboard.rs", "crates/lemonfiber/src/dashboard/panels.rs"] },
+  { id = "B3-R10", state = "open" },
+  { id = "B3-R11", state = "done", evidence = ["crates/lemonfiber-core/src/dashboard.rs", "crates/lemonfiber-core/src/dashboard/run.rs", "crates/lemonfiber-core/src/health/reach.rs", "crates/lemonfiber-core/src/storage.rs", "crates/lemonfiber-ports/src/service.rs", "crates/lemonfiber-core/src/qbittorrent.rs"] },
+  { id = "B3-R12", state = "done", evidence = ["crates/lemonfiber/src/dashboard.rs", "crates/lemonfiber/src/dashboard/panels.rs"] },
+  { id = "B3-R13", state = "open" },
+  { id = "B3-R14", state = "open" },
+  { id = "B3-R15", state = "done", evidence = ["crates/lemonfiber-core/src/dashboard.rs", "crates/lemonfiber-core/src/dashboard/run.rs", "crates/lemonfiber-core/src/health/reach.rs", "crates/lemonfiber-core/src/storage.rs", "crates/lemonfiber-ports/src/service.rs", "crates/lemonfiber-core/src/qbittorrent.rs"] },
+]

@@ -1,0 +1,19 @@
+# One row per requirement this repository has worked on; read by spec's
+# status_check.py and the release gate.
+
+requirement = [
+  { id = "C5-R1", state = "done", evidence = ["crates/lemonfiber-core/src/stack/mounts.rs", "crates/lemonfiber-core/src/stack.rs", "crates/lemonfiber-core/src/doctor/storage.rs"] },
+  { id = "C5-R2", state = "done", evidence = ["crates/lemonfiber-core/src/wizard.rs", "crates/lemonfiber-core/src/journal.rs", "crates/lemonfiber-core/src/app/apply.rs", "crates/lemonfiber-core/src/config/store.rs", "crates/lemonfiber-core/src/stack.rs", "crates/lemonfiber-core/src/config/paths.rs"] },
+  { id = "C5-R3", state = "done", evidence = ["crates/lemonfiber-core/src/storage.rs", "crates/lemonfiber-core/src/servarr/importing.rs"] },
+  { id = "C5-R4", state = "done", evidence = ["crates/lemonfiber-core/src/storage.rs", "crates/lemonfiber-core/src/servarr/importing.rs"] },
+  { id = "C5-R5", state = "done", evidence = ["crates/lemonfiber-core/src/stack/mounts.rs", "crates/lemonfiber-core/src/stack.rs"] },
+  { id = "C5-R6", state = "done", evidence = ["crates/lemonfiber-core/src/app/targets/downloads.rs", "crates/lemonfiber-core/src/doctor/storage.rs"] },
+  { id = "C5-R7", state = "done", evidence = ["crates/lemonfiber-core/src/app.rs", "crates/lemonfiber-core/src/model.rs", "crates/lemonfiber/src/main.rs"] },
+  { id = "C5-R8", state = "done", evidence = ["crates/lemonfiber-core/src/app.rs", "crates/lemonfiber-core/src/model.rs", "crates/lemonfiber/src/main.rs"] },
+  { id = "C5-R9", state = "done", evidence = ["crates/lemonfiber-core/src/app.rs", "crates/lemonfiber-core/src/model.rs", "crates/lemonfiber/src/main.rs"] },
+  { id = "C5-R10", state = "done", evidence = ["crates/lemonfiber-core/src/app.rs", "crates/lemonfiber-core/src/config.rs", "crates/lemonfiber-core/src/doctor/storage.rs", "crates/lemonfiber/src/main.rs"] },
+  { id = "C5-R11", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/storage.rs"] },
+  { id = "C5-R12", state = "done", evidence = ["crates/lemonfiber-core/src/storage.rs", "crates/lemonfiber-core/src/servarr/importing.rs"] },
+  { id = "C5-R13", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/storage.rs"] },
+  { id = "C5-R14", state = "done", evidence = ["crates/lemonfiber-core/src/wizard.rs", "crates/lemonfiber-core/src/journal.rs", "crates/lemonfiber-core/src/app/apply.rs", "crates/lemonfiber-core/src/config/store.rs", "crates/lemonfiber-core/src/stack.rs", "crates/lemonfiber-core/src/config/paths.rs"] },
+]

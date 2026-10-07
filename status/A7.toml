@@ -1,0 +1,19 @@
+# One row per requirement this repository has worked on; read by spec's
+# status_check.py and the release gate.
+
+requirement = [
+  { id = "A7-R1", state = "done", evidence = ["crates/lemonfiber-core/src/credential.rs", "crates/lemonfiber-core/src/credential/held.rs", "crates/lemonfiber-core/src/app/credentials/reading.rs", "crates/lemonfiber/src/render/credentials.rs"] },
+  { id = "A7-R2", state = "done", evidence = ["crates/lemonfiber-core/src/credential.rs", "crates/lemonfiber-core/src/credential/held.rs", "crates/lemonfiber-core/src/app/credentials/reading.rs", "crates/lemonfiber/src/render/credentials.rs"] },
+  { id = "A7-R3", state = "done", evidence = ["crates/lemonfiber-core/src/credential.rs", "crates/lemonfiber-core/src/credential/held.rs", "crates/lemonfiber-core/src/app/credentials/reading.rs", "crates/lemonfiber/src/render/credentials.rs"] },
+  { id = "A7-R4", state = "done", evidence = ["crates/lemonfiber-core/src/app/credentials/rotating.rs", "crates/lemonfiber-core/src/credential/rotation.rs", "crates/lemonfiber-core/src/app/credentials/pending.rs", "crates/lemonfiber-core/src/app/credentials/resetting.rs"] },
+  { id = "A7-R5", state = "done", evidence = ["crates/lemonfiber-core/src/app/credentials/rotating.rs", "crates/lemonfiber-core/src/credential/rotation.rs", "crates/lemonfiber-core/src/app/credentials/pending.rs", "crates/lemonfiber-core/src/app/credentials/resetting.rs"] },
+  { id = "A7-R6", state = "done", evidence = ["crates/lemonfiber-core/src/app/credentials/rotating.rs", "crates/lemonfiber-core/src/credential/rotation.rs", "crates/lemonfiber-core/src/app/credentials/pending.rs", "crates/lemonfiber-core/src/app/credentials/resetting.rs"] },
+  { id = "A7-R7", state = "done", evidence = ["crates/lemonfiber-core/src/app/credentials/rotating.rs", "crates/lemonfiber-core/src/credential/rotation.rs", "crates/lemonfiber-core/src/app/credentials/pending.rs", "crates/lemonfiber-core/src/app/credentials/resetting.rs"] },
+  { id = "A7-R8", state = "done", evidence = ["crates/lemonfiber-core/src/config/store.rs", "crates/lemonfiber-core/src/doctor/permissions.rs"] },
+  { id = "A7-R9", state = "done", evidence = ["crates/lemonfiber-core/src/journal.rs", "crates/lemonfiber-core/src/app/recover.rs", "crates/lemonfiber-core/src/config/env.rs", "crates/lemonfiber-core/src/config/store.rs", "crates/lemonfiber/src/setup/interrupted.rs", "crates/lemonfiber/src/setup.rs"] },
+  { id = "A7-R10", state = "done", evidence = ["crates/lemonfiber-core/src/credential.rs", "crates/lemonfiber-core/src/credential/held.rs", "crates/lemonfiber-core/src/app/credentials/reading.rs", "crates/lemonfiber/src/render/credentials.rs"] },
+  { id = "A7-R11", state = "done", evidence = ["crates/lemonfiber-core/src/credential.rs", "crates/lemonfiber-core/src/credential/held.rs", "crates/lemonfiber-core/src/app/credentials/reading.rs", "crates/lemonfiber/src/render/credentials.rs"] },
+  { id = "A7-R12", state = "done", evidence = ["crates/lemonfiber-core/src/secret.rs", "crates/lemonfiber-core/src/seed/services.rs", "crates/lemonfiber-core/src/seed/run/clients.rs", "crates/lemonfiber-core/src/backup.rs"] },
+  { id = "A7-R13", state = "done", evidence = ["crates/lemonfiber-core/src/config/store.rs", "crates/lemonfiber-core/src/doctor/permissions.rs"] },
+  { id = "A7-R14", state = "done", evidence = ["crates/lemonfiber-core/src/secret.rs", "crates/lemonfiber-core/src/seed/services.rs", "crates/lemonfiber-core/src/seed/run/clients.rs", "crates/lemonfiber-core/src/backup.rs"] },
+]
