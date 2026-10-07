@@ -39,7 +39,7 @@ impl Runner for Idle {
 /// A clock stopped at a fixed moment, so what a run stamps is the same every time.
 pub struct Stopped(SystemTime);
 
-/// A day the stack manifest is not ahead of: 2026-10-04T00:00:00Z, in seconds.
+/// A day the stack manifest is not ahead of: 2026-10-06T00:00:00Z, in seconds.
 ///
 /// A test that validates the manifest is validating it against whatever day its
 /// clock says it is, and a service records the day its upstream last released — so
@@ -49,7 +49,7 @@ pub struct Stopped(SystemTime);
 ///
 /// `the_frozen_day_is_not_older_than_the_stack_it_validates` is the guard. When it
 /// fails, move this forward; do not pin an older image to satisfy it.
-const TODAY: u64 = 1_791_072_000;
+pub const TODAY: u64 = 1_791_244_800;
 
 impl Stopped {
     /// Stopped this many seconds after the epoch.
