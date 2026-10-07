@@ -282,18 +282,14 @@ fn folded(kept: Vec<Kept>) -> Record {
             .flat_map(|entry| &entry.requirements)
         {
             if let Some(requirement) = requirements.get_mut(identifier) {
-                if requirement.shipped_in.last() != Some(&release.version) {
-                    requirement.shipped_in.push(release.version.clone());
-                }
+                requirement.shipped_in.push(release.version.clone());
             }
         }
     }
-    for (_, requirement) in requirements
-        .iter_mut()
-        .filter(|(identifier, _)| gone.contains(identifier))
-    {
-        requirement.withdrawn = true;
-        requirement.url = None;
+    for (identifier, requirement) in &mut requirements {
+        requirement.shipped_in.dedup();
+        requirement.withdrawn |= gone.contains(identifier);
+        requirement.url = requirement.url.take().filter(|_| !requirement.withdrawn);
     }
     Record {
         releases,

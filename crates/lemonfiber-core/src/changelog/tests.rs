@@ -83,6 +83,23 @@ fn which_releases_shipped_a_requirement_is_read_off_their_entries() {
     );
 }
 
+#[test]
+fn a_release_citing_a_requirement_twice_shipped_it_once() {
+    let twice = NEWER.replace(
+        r##"{"summary": "Four removals", "requirements": ["A6-R1"], "reference": "#5"}"##,
+        r##"{"summary": "Four removals", "requirements": ["A6-R1"], "reference": "#5"},
+    {"summary": "A fifth", "requirements": ["A6-R1"]}"##,
+    );
+    assert_ne!(twice, NEWER);
+    let read = Record::read(&[("0.2.0.json", twice.as_str())]);
+
+    assert_eq!(
+        read.and_then(|record| record.requirements.get("A6-R1").cloned())
+            .map(|one| one.shipped_in),
+        Some(vec!["0.2.0".to_owned()])
+    );
+}
+
 /// A third release, saying the first release was taken back and a requirement the
 /// second cites was withdrawn, both after their own files were written.
 const LATER: &str = r#"{
