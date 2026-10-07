@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "changed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "consequence": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "review": {
+      "type": [
+        "anyOf(null,ref:Review)"
+      ],
+      "required": false
+    },
+    "settings": {
+      "type": [
+        "array[ref:SettingReport]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

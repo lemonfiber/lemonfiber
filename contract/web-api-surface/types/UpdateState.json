@@ -1,0 +1,10 @@
+{
+  "fields": {},
+  "variants": [
+    "\"current\"",
+    "\"failed\"",
+    "\"partial\"",
+    "\"updated\"",
+    "\"updates-available\""
+  ]
+}

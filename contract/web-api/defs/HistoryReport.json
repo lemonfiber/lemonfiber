@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Everything lemonfiber changed, most recent first.",
+  "type": "object",
+  "properties": {
+    "changes": {
+      "description": "The changes, newest first.",
+      "type": "array",
+      "items": {
+        "$ref": "ChangeReport.json"
+      }
+    },
+    "horizon": {
+      "description": "How far back the record goes, in the operator's terms.\n\nStated rather than left to be inferred from the oldest entry: a record that has\nbeen trimmed and one that has always been short look identical from the entries\nalone, and only one of them means something is missing.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "changes",
+    "horizon"
+  ]
+}

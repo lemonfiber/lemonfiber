@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Work that outlives the request that started it: its name, and what it was.\n\nThe action is carried beside the name because a client holding several has to\ntell them apart, and asking it to remember which name it gave which request is\nasking it to keep a second copy of what this already knows.",
+  "type": "object",
+  "properties": {
+    "action": {
+      "description": "The action that was asked for, as it was named.",
+      "type": "string"
+    },
+    "job": {
+      "description": "The name to ask what became of this work by.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "job",
+    "action"
+  ]
+}

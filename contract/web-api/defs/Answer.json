@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How one download client answered about the limits on it.",
+  "oneOf": [
+    {
+      "description": "It answered, in both directions.",
+      "type": "object",
+      "properties": {
+        "answered": {
+          "type": "string",
+          "const": "held"
+        },
+        "down": {
+          "description": "What became of the download limit.",
+          "$ref": "BandwidthHeld.json"
+        },
+        "period": {
+          "description": "Which side of the household's day it says it is on, where it keeps the\nhours itself.",
+          "anyOf": [
+            {
+              "$ref": "Period.json"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "up": {
+          "description": "And of the upload one.",
+          "$ref": "BandwidthHeld.json"
+        }
+      },
+      "required": [
+        "answered",
+        "down",
+        "up"
+      ]
+    },
+    {
+      "description": "It did not answer, and this is what it said.\n\nIts own line rather than an absence, because a client nobody could reach is\na client whose limits are unknown, and an unknown limit rendered as no\nlimit is the report reading better than the stack is.",
+      "type": "object",
+      "properties": {
+        "answered": {
+          "type": "string",
+          "const": "silent"
+        },
+        "said": {
+          "description": "What went wrong, in the words of whatever refused.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "answered",
+        "said"
+      ]
+    }
+  ]
+}

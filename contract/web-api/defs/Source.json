@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where a figure for the line came from.",
+  "oneOf": [
+    {
+      "description": "The operator gave it, presumably off the plan they pay for.",
+      "type": "string",
+      "const": "declared"
+    },
+    {
+      "description": "The fastest the stack has been seen to move, which is what it achieved\nrather than what the line is sold as.",
+      "type": "string",
+      "const": "observed"
+    }
+  ]
+}

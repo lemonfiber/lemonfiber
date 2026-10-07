@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A kind of device somebody in the house might watch on.",
+  "type": "object",
+  "properties": {
+    "caution": {
+      "description": "What is worth knowing before starting, where anything is.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "client": {
+      "description": "What to use on it.",
+      "type": "string"
+    },
+    "deep_link": {
+      "description": "A link that opens the app already pointed at this server, where the app is known to\ntake one, with `{address}` where the server's address goes. Absent otherwise, and a\nhand-off then carries the address alone as its code, which the app is pointed at by\nscanning or typing.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "device": {
+      "description": "What somebody would call the device they are holding.",
+      "type": "string"
+    },
+    "instead": {
+      "description": "What to do instead where this is a bad device to be stuck with.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "open_source": {
+      "description": "Whether the app named is open source. A closed one may be named, with this false\nbeside it, and is never the one recommended.",
+      "type": "boolean"
+    },
+    "support": {
+      "description": "How well served it is.",
+      "$ref": "Support.json"
+    }
+  },
+  "required": [
+    "device",
+    "support",
+    "client",
+    "open_source"
+  ]
+}

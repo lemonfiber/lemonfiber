@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How a bundle was made: what was bounded, what was replaced, and what its operator asked\nto have shown as it is.\n\nCarried in the bundle rather than known only to the command that wrote it, because the\nperson who reads one is usually not the person who chose any of this.",
+  "type": "object",
+  "properties": {
+    "filenames": {
+      "description": "Whether media filenames were shown.",
+      "$ref": "Filenames.json"
+    },
+    "revealed": {
+      "description": "The settings the operator asked to have shown as they are.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "window": {
+      "description": "How much of the logs was taken, said as it would be said aloud.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "window",
+    "filenames",
+    "revealed"
+  ]
+}

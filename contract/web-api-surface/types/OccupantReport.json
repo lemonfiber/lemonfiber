@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "adoptable": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "ports": {
+      "type": [
+        "array[integer/uint16]"
+      ],
+      "required": true
+    },
+    "running": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

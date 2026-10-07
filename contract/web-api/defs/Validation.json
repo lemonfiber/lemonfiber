@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What proving a credential against its live service established — never the\ninput, only the outcome.\n\nRead back as well as built. A surface that is not in this process asks setup to\nprove a credential and is told what came of it, so the four outcomes are tagged\nby name rather than distinguished by which field is present — the same reason an\nanswer carries the step it belongs to.",
+  "oneOf": [
+    {
+      "description": "Proven working, carrying the capability observed while proving it.",
+      "type": "object",
+      "properties": {
+        "observed": {
+          "description": "The observed fact — what the service did, not that it merely answered.",
+          "type": "string"
+        },
+        "outcome": {
+          "type": "string",
+          "const": "valid"
+        }
+      },
+      "required": [
+        "outcome",
+        "observed"
+      ]
+    },
+    {
+      "description": "The service answered and refused: the credential is wrong for it.",
+      "type": "object",
+      "properties": {
+        "detail": {
+          "description": "What the service said, in terms the operator can act on.",
+          "type": "string"
+        },
+        "outcome": {
+          "type": "string",
+          "const": "rejected"
+        }
+      },
+      "required": [
+        "outcome",
+        "detail"
+      ]
+    },
+    {
+      "description": "Nothing usable answered, so nothing can be concluded about the credential.",
+      "type": "object",
+      "properties": {
+        "detail": {
+          "description": "Why nothing usable came back.",
+          "type": "string"
+        },
+        "outcome": {
+          "type": "string",
+          "const": "unreachable"
+        }
+      },
+      "required": [
+        "outcome",
+        "detail"
+      ]
+    },
+    {
+      "description": "It authenticated, but cannot do the job it is for — exhausted, limited, or\notherwise unable.",
+      "type": "object",
+      "properties": {
+        "detail": {
+          "description": "What it can no longer do, and why where the service says.",
+          "type": "string"
+        },
+        "outcome": {
+          "type": "string",
+          "const": "degraded"
+        }
+      },
+      "required": [
+        "outcome",
+        "detail"
+      ]
+    }
+  ]
+}

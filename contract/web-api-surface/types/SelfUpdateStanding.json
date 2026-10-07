@@ -1,0 +1,9 @@
+{
+  "fields": {},
+  "variants": [
+    "\"check-failed\"",
+    "\"current\"",
+    "\"managed-externally\"",
+    "\"update-available\""
+  ]
+}

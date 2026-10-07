@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "action": {
+      "type": [
+        "ref:Action"
+      ],
+      "required": true
+    },
+    "target": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "at": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "bytes": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "files": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

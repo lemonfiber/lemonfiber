@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The entries of one kind, under the name an operator reads them by.",
+  "type": "object",
+  "properties": {
+    "entries": {
+      "description": "The changes, in the order they were made.",
+      "type": "array",
+      "items": {
+        "$ref": "Entry.json"
+      }
+    },
+    "title": {
+      "description": "What this group of changes is: new, fixed, faster, or maintenance.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "title",
+    "entries"
+  ]
+}

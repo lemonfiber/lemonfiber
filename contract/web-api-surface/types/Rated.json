@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "allows": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "fell_back": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "holds_back": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

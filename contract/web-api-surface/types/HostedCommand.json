@@ -1,0 +1,53 @@
+{
+  "fields": {
+    "command": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "definition": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "guarantees": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "missing": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "output": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "runs": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "standing": {
+      "type": [
+        "ref:Hosting"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

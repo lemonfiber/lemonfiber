@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "at": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "to": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

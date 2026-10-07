@@ -1,0 +1,11 @@
+{
+  "fields": {
+    "forms": {
+      "type": [
+        "array[ref:FormReport]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

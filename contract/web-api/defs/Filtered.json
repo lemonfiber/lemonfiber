@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A service a closure asked for that the configuration leaves out, and why.",
+  "type": "object",
+  "properties": {
+    "forms": {
+      "description": "The forms that asked for it, in the order the stack declares them.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "id": {
+      "description": "The service's identifier.",
+      "type": "string"
+    },
+    "name": {
+      "description": "What it is called in front of an operator.",
+      "type": "string"
+    },
+    "needs": {
+      "description": "The provider it cannot run without.",
+      "$ref": "StackProtocol.json"
+    },
+    "profile": {
+      "description": "The profile it belongs to, which is what the configuration leaves out.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "profile",
+    "needs",
+    "forms"
+  ]
+}

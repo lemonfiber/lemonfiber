@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "member": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "token": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "until": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

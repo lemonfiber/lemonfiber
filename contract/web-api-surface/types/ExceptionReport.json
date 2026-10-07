@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "kind": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "wanted": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

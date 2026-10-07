@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where this copy of lemonfiber stands, and what moving it would come to.",
+  "type": "object",
+  "properties": {
+    "afterwards": {
+      "description": "What updating leaves alone, and what it needs afterwards.",
+      "type": "string"
+    },
+    "asked": {
+      "description": "The version the operator asked to move to, where they asked for one.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "at": {
+      "description": "Where the running binary is, with any link followed, or nothing where this\nmachine would not say.\n\nThe answer to which of several copies on a search path is the one that ran, so\na version somebody quotes can be attributed to a file rather than to a name.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "carries": {
+      "description": "What a release brings besides the program, and when any of it is fetched.",
+      "type": "string"
+    },
+    "changed": {
+      "description": "What the version on offer says it changed, as its release page words it.\n\nThe question an operator is actually weighing. Carried as the notes were\nwritten rather than taken apart here, because what a surface does with them\nis a surface's business — a terminal flattens them, a browser renders them,\nand a script wants them as they came.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "command": {
+      "description": "Exactly what to type, where there is something exact to type.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "configuration": {
+      "description": "Whether the version named can read the configuration on this machine.\n\nOnly where a version was named, since it is the question a downgrade asks and\nnothing else does.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "installed": {
+      "description": "How this copy got onto the machine.",
+      "$ref": "Installed.json"
+    },
+    "instead": {
+      "description": "Why there is nothing exact to type, where there is not; or, where typing the\ncommand is not the whole of the move, what has to follow it.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "offered": {
+      "description": "The newest version released, where the check could read one.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "owner": {
+      "description": "The tool that owns this copy, where one does.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "replaceable": {
+      "description": "Whether the directory holding the running binary can be written to.\n\nNothing where it was not asked, which is every copy a package manager owns —\nreplacing one of those is that tool's business and not this one's. Asked by\ntrying rather than by reading permission bits, and reported rather than acted\non: a copy this operator cannot replace is a thing to say with the path, never\na reason to go looking for a way to become somebody else.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "running": {
+      "description": "The version running now.",
+      "type": "string"
+    },
+    "standing": {
+      "description": "Which of the states this is.",
+      "$ref": "SelfUpdateStanding.json"
+    },
+    "untold": {
+      "description": "Why availability could not be told, where it could not.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "standing",
+    "running",
+    "installed",
+    "afterwards",
+    "carries"
+  ]
+}

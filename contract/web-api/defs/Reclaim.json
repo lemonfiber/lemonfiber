@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What getting a line's room back costs.",
+  "oneOf": [
+    {
+      "description": "Only by deciding to lose something you chose to keep.",
+      "type": "string",
+      "const": "by_losing_content"
+    },
+    {
+      "description": "Nothing to reclaim: it is being written right now.",
+      "type": "string",
+      "const": "in_progress"
+    },
+    {
+      "description": "Yes, and it costs standing with the trackers it came from.",
+      "type": "string",
+      "const": "at_the_cost_of_ratio"
+    },
+    {
+      "description": "Yes, and it costs nothing — the usual easy win.",
+      "type": "string",
+      "const": "the_easy_win"
+    },
+    {
+      "description": "Yes: the unpacked copy is the one being used.",
+      "type": "string",
+      "const": "already_have_it"
+    },
+    {
+      "description": "A little, and rarely worth it.",
+      "type": "string",
+      "const": "marginally"
+    },
+    {
+      "description": "No, because you said so.",
+      "type": "string",
+      "const": "you_said_not"
+    }
+  ]
+}

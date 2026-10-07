@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a watch saw, once the data root it was guarding was lost.",
+  "type": "object",
+  "properties": {
+    "forms": {
+      "description": "The forms that were being watched, and are now stopped.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "reason": {
+      "description": "Why the watch ended: the data root vanished, or a different volume took\nits place — or, on a run that only said what a watch would do, that nothing\nwas watched at all.",
+      "type": "string"
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+      "type": "boolean"
+    },
+    "stopped": {
+      "description": "Whether stopping the services succeeded.",
+      "type": "boolean"
+    },
+    "would": {
+      "description": "The watch this run would have kept, where it only said what it would do.\n\nA guard is the one command with no ending of its own, so a rehearsal of it\ncannot be the command with its last step left out — it would hold until the\ndrive was pulled. What it answers with is this instead, and the fields above\nthen describe a watch that never began: nothing ended, and nothing was\nstopped. Absent on every watch that actually ran.",
+      "anyOf": [
+        {
+          "$ref": "Vigil.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "forms",
+    "reason",
+    "stopped",
+    "rehearsed"
+  ]
+}

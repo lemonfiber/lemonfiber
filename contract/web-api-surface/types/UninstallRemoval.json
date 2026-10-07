@@ -1,0 +1,37 @@
+{
+  "fields": {
+    "credentials": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "gone": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "left": {
+      "type": [
+        "array[ref:UninstallLeft]"
+      ],
+      "required": true
+    },
+    "state": {
+      "type": [
+        "const:\"complete\"",
+        "const:\"confirmed\"",
+        "const:\"partial\"",
+        "const:\"surveyed\""
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"complete\"",
+    "\"confirmed\"",
+    "\"partial\"",
+    "\"surveyed\""
+  ]
+}

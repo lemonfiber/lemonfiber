@@ -1,0 +1,10 @@
+{
+  "fields": {},
+  "variants": [
+    "\"actionable\"",
+    "\"guided\"",
+    "\"remediable\"",
+    "\"suppressed\"",
+    "\"unknown\""
+  ]
+}

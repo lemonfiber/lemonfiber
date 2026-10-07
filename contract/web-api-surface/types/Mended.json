@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "outcome": {
+      "type": [
+        "ref:RepairOutcome"
+      ],
+      "required": true
+    },
+    "repair": {
+      "type": [
+        "ref:Repair"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

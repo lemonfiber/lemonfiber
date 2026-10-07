@@ -1,0 +1,24 @@
+{
+  "fields": {
+    "chosen": {
+      "type": [
+        "const:\"derived\"",
+        "const:\"named\"",
+        "const:\"refused\""
+      ],
+      "required": true
+    },
+    "door": {
+      "type": [
+        "ref:Refusal",
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"derived\"",
+    "\"named\"",
+    "\"refused\""
+  ]
+}

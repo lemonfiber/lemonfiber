@@ -1,0 +1,15 @@
+{
+  "fields": {},
+  "variants": [
+    "\"available\"",
+    "\"downloaded\"",
+    "\"downloading\"",
+    "\"found\"",
+    "\"grabbed\"",
+    "\"imported\"",
+    "\"importing\"",
+    "\"monitored\"",
+    "\"not-monitored\"",
+    "\"searching\""
+  ]
+}

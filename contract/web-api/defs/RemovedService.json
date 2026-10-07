@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A service this stack used to carry, and what became of it.",
+  "type": "object",
+  "properties": {
+    "id": {
+      "description": "The id it was declared under, which is the name an operator will look for.",
+      "type": "string"
+    },
+    "reason": {
+      "description": "Why it went.",
+      "type": "string"
+    },
+    "removed_in": {
+      "description": "The stack version whose catalogue stopped carrying it.",
+      "type": "string"
+    },
+    "replaced_by": {
+      "description": "What took its place, where anything did.\n\nAbsent is an answer and the commonest one: most things that go are not\nreplaced, and a record that named the nearest surviving service to avoid an\nempty field would be pointing an operator at something that does not do the\njob they are looking for.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "id",
+    "removed_in",
+    "reason"
+  ]
+}

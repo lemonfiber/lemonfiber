@@ -1,0 +1,13 @@
+{
+  "fields": {},
+  "variants": [
+    "\"advisory\"",
+    "\"broken\"",
+    "\"critical\"",
+    "\"degraded\"",
+    "\"healthy\"",
+    "\"stopped\"",
+    "\"unconfigured\"",
+    "\"unknown\""
+  ]
+}

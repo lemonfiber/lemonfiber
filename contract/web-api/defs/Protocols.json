@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Which download protocols the operator actually has accounts for.\n\nA form names both, because a form describes what it *does* rather than what\nthis operator has paid for. Narrowing happens afterwards, so a tunnel is\nnever started with credentials that were never supplied.",
+  "type": "object",
+  "properties": {
+    "torrent": {
+      "description": "A VPN and torrent client are configured.",
+      "type": "boolean"
+    },
+    "usenet": {
+      "description": "A Usenet provider is configured.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "usenet",
+    "torrent"
+  ]
+}

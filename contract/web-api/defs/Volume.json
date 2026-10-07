@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One volume, as one run measured it.",
+  "type": "object",
+  "properties": {
+    "at": {
+      "description": "The path that was measured.",
+      "type": "string"
+    },
+    "committed": {
+      "description": "The bytes already committed to landing here.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "free": {
+      "description": "Bytes free, or nothing where the volume could not be read.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
+    },
+    "level": {
+      "description": "Where it stands.",
+      "$ref": "Level.json"
+    },
+    "limit": {
+      "description": "The effective limit — the mount's own size, which on a dataset given a\nquota is the quota rather than the device beneath it.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
+    },
+    "point": {
+      "description": "Where the volume holding it is mounted, which is what the limit belongs to.",
+      "type": "string"
+    },
+    "projected": {
+      "description": "What would be free once the committed content has landed.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
+    },
+    "reading": {
+      "description": "What the reading is worth.",
+      "$ref": "Freshness.json"
+    },
+    "role": {
+      "description": "Which of the two this is.",
+      "$ref": "Role.json"
+    }
+  },
+  "required": [
+    "role",
+    "at",
+    "point",
+    "committed",
+    "level",
+    "reading"
+  ]
+}

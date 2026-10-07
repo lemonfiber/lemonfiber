@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "unfilled": {
+      "type": [
+        "array[ref:Unfilled]"
+      ],
+      "required": true
+    },
+    "wired": {
+      "type": [
+        "array[ref:Wired]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

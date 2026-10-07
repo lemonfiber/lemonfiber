@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "down": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "source": {
+      "type": [
+        "ref:Source"
+      ],
+      "required": true
+    },
+    "taken": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "through_tunnel": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "up": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

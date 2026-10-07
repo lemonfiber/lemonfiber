@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What stands between one long-running command and the machine.\n\nWritten with hyphens because these are the words the operator reads and the\nrequirement names, and a reading that spelled them differently would be a\nsecond vocabulary for one set of facts.",
+  "oneOf": [
+    {
+      "description": "Nothing is installed; it runs only while a terminal holds it.",
+      "type": "string",
+      "const": "not-hosted"
+    },
+    {
+      "description": "Installed, and the manager confirms it is running.",
+      "type": "string",
+      "const": "hosted"
+    },
+    {
+      "description": "Installed, and the manager would not say whether it is running.",
+      "type": "string",
+      "const": "installed-unverified"
+    },
+    {
+      "description": "Installed, and the manager says it is not running.",
+      "type": "string",
+      "const": "stopped"
+    },
+    {
+      "description": "Installed against a program that is no longer there.",
+      "type": "string",
+      "const": "orphaned"
+    },
+    {
+      "description": "This platform has no service manager lemonfiber configures.",
+      "type": "string",
+      "const": "unsupported"
+    }
+  ]
+}

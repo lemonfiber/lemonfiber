@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "archive_path": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "label": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

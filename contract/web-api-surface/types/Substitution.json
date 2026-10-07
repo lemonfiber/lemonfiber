@@ -1,0 +1,47 @@
+{
+  "fields": {
+    "asked_by": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "capability": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "leaves_unfilled": {
+      "type": [
+        "array[ref:Unfilled]"
+      ],
+      "required": true
+    },
+    "now": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "setting": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "was": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "why": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

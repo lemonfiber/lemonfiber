@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One thing a removal reaches, said to be going or said to be kept.",
+  "type": "object",
+  "properties": {
+    "bytes": {
+      "description": "What it occupies, where that is knowable. Absent for a container or a network,\nwhose room is the image's rather than their own.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
+    },
+    "kept": {
+      "description": "Why it is being kept rather than removed, where it is being kept.\n\n`None` is the ordinary case: this line is going. A reason here is the whole of\nhow an image shared with another project, or a path this run could not\nconfirm, stays on the list without being taken.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "name": {
+      "description": "What it is called — a container name, an image reference, or a full path.",
+      "type": "string"
+    },
+    "secret": {
+      "description": "Whether it holds a credential, so a report can say what destroying it destroys.",
+      "type": "boolean"
+    },
+    "sort": {
+      "description": "Which of the four sorts of thing it is.",
+      "$ref": "Sort.json"
+    },
+    "what": {
+      "description": "What it is, in the operator's words.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "sort",
+    "what",
+    "secret"
+  ]
+}

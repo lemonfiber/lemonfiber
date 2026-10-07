@@ -1,0 +1,101 @@
+{
+  "fields": {
+    "current": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "does": {
+      "type": [
+        "const:\"delete\"",
+        "const:\"reconfigure\"",
+        "const:\"reinstate\"",
+        "const:\"remove\"",
+        "const:\"repin\"",
+        "const:\"restore\"",
+        "const:\"revoke\"",
+        "const:\"rewind\"",
+        "const:\"withdraw\""
+      ],
+      "required": true
+    },
+    "field": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "id": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "key": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "owner": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "path": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "previous": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "resource": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "value": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "written": {
+      "type": [
+        "integer/uint32"
+      ],
+      "required": true
+    },
+    "wrote": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"delete\"",
+    "\"reconfigure\"",
+    "\"reinstate\"",
+    "\"remove\"",
+    "\"repin\"",
+    "\"restore\"",
+    "\"revoke\"",
+    "\"rewind\"",
+    "\"withdraw\""
+  ]
+}

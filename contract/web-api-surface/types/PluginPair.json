@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "approval": {
+      "type": [
+        "string"
+      ],
+      "required": false
+    },
+    "origin": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "to": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "value": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Whether anything was removed on this run, and what became of it.\n\nFour states rather than the five a removal passes through. `removing` is the\ninterval between the last two and is said through the narrator as it happens — a\nvalue returned at the end cannot be the state a run is in while it runs, and a\nvariant nothing could ever answer with would be a state that is documentation\npretending to be a value.",
+  "oneOf": [
+    {
+      "description": "Everything is enumerated with its size, and nothing has been removed.",
+      "type": "object",
+      "properties": {
+        "state": {
+          "type": "string",
+          "const": "surveyed"
+        }
+      },
+      "required": [
+        "state"
+      ]
+    },
+    {
+      "description": "The tier and the manifest were agreed to, and this run changes nothing — the\nstate a rehearsal ends in.",
+      "type": "object",
+      "properties": {
+        "state": {
+          "type": "string",
+          "const": "confirmed"
+        }
+      },
+      "required": [
+        "state"
+      ]
+    },
+    {
+      "description": "Everything the manifest named as going is gone.",
+      "type": "object",
+      "properties": {
+        "credentials": {
+          "description": "The credentials this destroyed, said rather than left to be inferred.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "gone": {
+          "description": "What went, by the name the manifest gave it.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "state": {
+          "type": "string",
+          "const": "complete"
+        }
+      },
+      "required": [
+        "state",
+        "gone",
+        "credentials"
+      ]
+    },
+    {
+      "description": "Some of it could not be removed, and each of those is named with how to\nfinish it by hand.",
+      "type": "object",
+      "properties": {
+        "credentials": {
+          "description": "The credentials this destroyed.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "gone": {
+          "description": "What went, by the name the manifest gave it.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "left": {
+          "description": "What is still there, and how to remove it.",
+          "type": "array",
+          "items": {
+            "$ref": "UninstallLeft.json"
+          }
+        },
+        "state": {
+          "type": "string",
+          "const": "partial"
+        }
+      },
+      "required": [
+        "state",
+        "gone",
+        "credentials",
+        "left"
+      ]
+    }
+  ]
+}

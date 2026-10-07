@@ -1,0 +1,53 @@
+{
+  "fields": {
+    "from": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "install": {
+      "type": [
+        "ref:PluginInstall"
+      ],
+      "required": true
+    },
+    "interrupts": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "plugin": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "restored": {
+      "type": [
+        "anyOf(null,ref:PluginRestored)"
+      ],
+      "required": false
+    },
+    "stopped": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "to": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "went_back": {
+      "type": [
+        "ref:UndoReversal"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

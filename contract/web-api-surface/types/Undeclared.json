@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "describes": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "id": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "state": {
+      "type": [
+        "ref:ServiceState"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

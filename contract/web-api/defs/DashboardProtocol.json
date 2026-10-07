@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Which protocol a transfer is moving over, since the same download reads\ndifferently on each — a Usenet download has no peers, a torrent has no server.",
+  "oneOf": [
+    {
+      "description": "A Usenet download.",
+      "type": "string",
+      "const": "usenet"
+    },
+    {
+      "description": "A torrent download.",
+      "type": "string",
+      "const": "torrent"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One bundled thing a plugin declares it will change.",
+  "type": "object",
+  "properties": {
+    "setting": {
+      "description": "Which bundled setting it changes.",
+      "type": "string"
+    },
+    "why": {
+      "description": "What changing it is for.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "setting",
+    "why"
+  ]
+}

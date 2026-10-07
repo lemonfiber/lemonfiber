@@ -1,0 +1,55 @@
+{
+  "fields": {
+    "afterwards": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "detail": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "known": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "location": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "observed": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "settled": {
+      "type": [
+        "const:\"elsewhere\"",
+        "const:\"refused\"",
+        "const:\"rehearsed\"",
+        "const:\"replaced\"",
+        "const:\"replaced-unproven\"",
+        "const:\"unknown\"",
+        "const:\"unproven\""
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"elsewhere\"",
+    "\"refused\"",
+    "\"rehearsed\"",
+    "\"replaced\"",
+    "\"replaced-unproven\"",
+    "\"unknown\"",
+    "\"unproven\""
+  ]
+}

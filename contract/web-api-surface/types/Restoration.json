@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "done": {
+      "type": [
+        "anyOf(null,ref:RestoreReport)"
+      ],
+      "required": false
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "would": {
+      "type": [
+        "ref:Preview"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

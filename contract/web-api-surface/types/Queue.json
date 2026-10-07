@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "depth": {
+      "type": [
+        "integer/uint"
+      ],
+      "required": true
+    },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "stuck": {
+      "type": [
+        "integer/uint"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

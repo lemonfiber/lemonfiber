@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where one completed download stands.",
+  "oneOf": [
+    {
+      "description": "Nothing ever linked it into a library: it was never imported, and removing\nit loses nothing.",
+      "type": "object",
+      "properties": {
+        "standing": {
+          "type": "string",
+          "const": "never_imported"
+        }
+      },
+      "required": [
+        "standing"
+      ]
+    },
+    {
+      "description": "It was imported and is still seeding, so removing it has a consequence\noutside this machine.",
+      "type": "object",
+      "properties": {
+        "ratio": {
+          "description": "What it has uploaded against what it downloaded, in hundredths, as the\nclient reports it.\n\nA whole number rather than a fraction because every report this product\nmakes is compared for equality somewhere, and a fraction cannot be —\ntwo figures a client would call the same would not be. The hundredth is\nfiner than any decision made on a ratio.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "standing": {
+          "type": "string",
+          "const": "seeding"
+        }
+      },
+      "required": [
+        "standing",
+        "ratio"
+      ]
+    },
+    {
+      "description": "The operator asked for this one to be left alone.",
+      "type": "object",
+      "properties": {
+        "standing": {
+          "type": "string",
+          "const": "left_alone"
+        }
+      },
+      "required": [
+        "standing"
+      ]
+    }
+  ]
+}

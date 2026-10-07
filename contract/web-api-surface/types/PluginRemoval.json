@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "interrupts": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "leaves": {
+      "type": [
+        "array[ref:PluginUnfilled]"
+      ],
+      "required": true
+    },
+    "plugin": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "removed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "went_back": {
+      "type": [
+        "ref:UndoReversal"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

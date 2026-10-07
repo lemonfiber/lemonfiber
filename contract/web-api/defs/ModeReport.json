@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One thing an operator may do about a setup already here.",
+  "type": "object",
+  "properties": {
+    "disturbs": {
+      "description": "Whether carrying it out stops or alters what is already running.",
+      "type": "boolean"
+    },
+    "mode": {
+      "description": "The word an operator types for it.",
+      "type": "string"
+    },
+    "preselected": {
+      "description": "Whether it is offered already chosen. Only adopting is.",
+      "type": "boolean"
+    },
+    "what": {
+      "description": "What choosing it would come to, in the operator's terms.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "mode",
+    "preselected",
+    "what",
+    "disturbs"
+  ]
+}

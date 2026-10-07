@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Whose an adapter is.\n\nOne answer, and the field exists so that the answer is on the wire: an adapter a\nplugin could bring would be code a stranger wrote running with lemonfiber's\nauthority, which nothing here can load.",
+  "oneOf": [
+    {
+      "description": "lemonfiber's own, from the set `contract/adapters.json` publishes.",
+      "type": "string",
+      "const": "lemonfiber"
+    }
+  ]
+}

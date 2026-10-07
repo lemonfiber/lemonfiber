@@ -1,0 +1,9 @@
+{
+  "fields": {},
+  "variants": [
+    "\"major\"",
+    "\"minor\"",
+    "\"patch\"",
+    "\"untellable\""
+  ]
+}

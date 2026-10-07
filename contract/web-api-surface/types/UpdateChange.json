@@ -1,0 +1,47 @@
+{
+  "fields": {
+    "because": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "current": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "irreversible": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "jump": {
+      "type": [
+        "ref:Jump"
+      ],
+      "required": true
+    },
+    "refused": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "target": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

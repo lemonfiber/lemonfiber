@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How much of a traced series is here, season by season — the aggregate that turns a\nsingle furthest stage into an answer about the whole. The counts are of parts someone\nasked for; what nobody asked for is reported beside them, never folded in.",
+  "type": "object",
+  "properties": {
+    "have": {
+      "description": "How many wanted parts are here, across every season.",
+      "type": "integer",
+      "format": "uint",
+      "minimum": 0
+    },
+    "seasons": {
+      "description": "Each season, in order.",
+      "type": "array",
+      "items": {
+        "$ref": "SeasonCoverage.json"
+      }
+    },
+    "unmonitored": {
+      "description": "How many parts nobody asked for, across every season.",
+      "type": "integer",
+      "format": "uint",
+      "minimum": 0
+    },
+    "wanted": {
+      "description": "How many parts were asked for, across every season.",
+      "type": "integer",
+      "format": "uint",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "seasons",
+    "have",
+    "wanted",
+    "unmonitored"
+  ]
+}

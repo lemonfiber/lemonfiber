@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One plugin's install, as it was decided.",
+  "type": "object",
+  "properties": {
+    "adapters": {
+      "description": "Every adapter of lemonfiber's its own services name, each said to be lemonfiber's.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "PluginServiceAdapter.json"
+      }
+    },
+    "contributions": {
+      "description": "Every row it adds to a register lemonfiber already runs, as the install\nsettled them.\n\nKept here rather than read back off the plugin's own files, for the reason\neverything else on this record is: the author's directory may be gone the\nmoment an install is done, and a doctor run a month later is a question about\nthis machine rather than about a document. This record is the one answer, so a\nrow that runs is a row that was declared at install and has not changed under\nanybody since.\n\nDefaulted for a register written before this field existed, which reads as a\nplugin that contributes nothing — the same answer a plugin that contributes\nnothing gets, and the only one that can be given about a record that does not\nsay.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "Contribution.json"
+      }
+    },
+    "declared": {
+      "description": "What the plugin declared about itself: where it is published, whether it was\nreviewed, what it claims, what it may change, where it may reach and what it\nwill hold.",
+      "$ref": "PluginDeclaration.json",
+      "default": {
+        "claims": [],
+        "license": "",
+        "overrides": [],
+        "reaches": [],
+        "reviewed": false,
+        "secrets": [],
+        "upstream": ""
+      }
+    },
+    "description": {
+      "description": "What it does for the operator, in its author's words. Absent alike.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "from": {
+      "description": "The source it was installed from, as the operator named it.\n\nEmpty for a record written before this was kept. A rehearsal's account carries\nthe source it was asked about, because that is what it would record.",
+      "type": "string",
+      "default": ""
+    },
+    "installed_at": {
+      "description": "When it was installed, as the record stamps every change: whole seconds since\nthe epoch.\n\nThe install's own stamp, the one its changes are journalled under, so the\nlisting and the history name the same moment. Empty where the record predates\nit; a rehearsal's account carries the moment it was asked, which is the stamp\nthe install would have run under.",
+      "type": "string",
+      "default": ""
+    },
+    "name": {
+      "description": "What the plugin calls itself, for a person to read.\n\nAbsent on a record written before it was kept, and never filled in from the id:\na name is the author's, and one made up here would be lemonfiber's.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "plugin": {
+      "description": "The plugin's id: the name it is installed and journalled under.",
+      "type": "string"
+    },
+    "provides": {
+      "description": "Every core capability its services fill, as the install settled them.\n\nCore names only. A capability of the plugin's own is namespaced, nothing asks\nfor it, and it is inert by design — so a removal that named one as about to go\nunfilled would be warning about something nothing was reaching for.\n\nKept for the question a removal has to answer before it happens: what this\nmachine would have nothing filling once the plugin is off it. Asking the\nmanifest would be asking a file that may be gone.\n\nDefaulted for a register written before the field existed, which reads as a\nplugin that fills nothing — the answer that names no capability rather than the\none that invents one.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string"
+      }
+    },
+    "recipes": {
+      "description": "Every recipe it declares: each call in order with the adapter it reaches through,\nand every value that could leave for somewhere else.\n\nEmpty for a plugin that declares none and for a record written before these were\nkept, so a list is always there to read.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "PluginRecipe.json"
+      }
+    },
+    "revision": {
+      "description": "The commit it was installed at, where it came from a git source.\n\nThe one commit the revision named at install resolved to, so what was installed\ncan be told from whatever that source serves now. Empty for a plugin installed\nfrom a directory, which has no revision to name, and for a record written before\nthis was kept.",
+      "type": "string",
+      "default": ""
+    },
+    "services": {
+      "description": "What was placed, one entry per service the plugin declares.",
+      "type": "array",
+      "items": {
+        "$ref": "PluginPlaced.json"
+      }
+    },
+    "signed": {
+      "description": "What signed it: the key the catalogue index it was resolved through verified\nagainst, named with its fingerprint.\n\nEmpty for a plugin installed from a source the operator named, which nothing\nsigned, and for a record written before this was kept.",
+      "type": "string",
+      "default": ""
+    },
+    "version": {
+      "description": "The plugin's own content version, as it stood when it was installed.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "plugin",
+    "version",
+    "services"
+  ]
+}

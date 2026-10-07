@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One media type an upgrade covers: its chosen quality, that quality's cost, and —\nonce confirmed — what became of asking its service to re-search.\n\nReported per media type rather than as one figure, because each type carries its\nown preset and so its own cost: film at maximum and television at space-saving are\nupgraded to different bars, and a single number would misstate one of them.",
+  "type": "object",
+  "properties": {
+    "media_type": {
+      "description": "The media type — `tv` or `movies`.",
+      "type": "string"
+    },
+    "outcome": {
+      "description": "What became of the re-search, or `None` where the upgrade was not confirmed\nand only the cost was stated.",
+      "anyOf": [
+        {
+          "$ref": "Triggered.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "preset": {
+      "description": "The preset in force for it.",
+      "type": "string"
+    },
+    "size_per_hour": {
+      "description": "Roughly what an hour of it costs at that preset.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "media_type",
+    "preset",
+    "size_per_hour"
+  ]
+}

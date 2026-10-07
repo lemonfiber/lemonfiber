@@ -1,0 +1,14 @@
+{
+  "fields": {},
+  "variants": [
+    "\"absent\"",
+    "\"crash-looping\"",
+    "\"failed\"",
+    "\"healthy\"",
+    "\"host-managed\"",
+    "\"running\"",
+    "\"starting\"",
+    "\"stopped\"",
+    "\"unhealthy\""
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How a service could be put back the way it was.\n\nThe distinction is the whole of why this is reported rather than left to be\nworked out: pinning the previous image again is a minute's work, and restoring a\nbackup is an evening. Offering the first where only the second can succeed is\nworse than offering nothing, because it is acted on.",
+  "oneOf": [
+    {
+      "description": "Nothing opened its state on the newer image, so the previous one runs again\nexactly as it did.",
+      "type": "string",
+      "const": "rollback"
+    },
+    {
+      "description": "The newer image was started, so its state may already have been migrated and\nthe backup is the only way back.",
+      "type": "string",
+      "const": "restore"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One release, by its version.",
+  "type": "object",
+  "properties": {
+    "delivers": {
+      "description": "What it set out to deliver, where the record says.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "version": {
+      "description": "The version, without the tag's leading letter.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "version"
+  ]
+}

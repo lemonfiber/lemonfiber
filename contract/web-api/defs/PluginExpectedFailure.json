@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A recording an assertion fails on, the one constraint of its expectation that fails\nthere, and why.\n\nFor an assertion whose passing state nobody can record, such as a check that a server\nhas an owner where claiming one needs an account the plugin's CI does not hold: the\nstate it exists to find can be recorded, and the declaration says which constraint\ntells the two states apart. It changes the verdict on that recording and on nothing\nelse — the live service and every other recording are held to the expectation as it\nis written.\n\nIt names a constraint rather than only a recording, because a recording that began\nfailing for another reason — a truncated file, an error recorded by mistake — would\notherwise read as failing as declared, excusing a failure nobody had looked at.",
+  "type": "object",
+  "properties": {
+    "constraint": {
+      "description": "The key of the expectation that fails on the recording, and one it carries.",
+      "$ref": "PluginConstraint.json"
+    },
+    "fixture": {
+      "description": "The recording the assertion fails on. It may be the assertion's own `fixture`.",
+      "type": "string"
+    },
+    "place": {
+      "description": "Where within that constraint it fails, written exactly as the expectation writes\nit. Present for a key-wise constraint and absent for one about the whole answer.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "reason": {
+      "description": "Why this recording is one the assertion fails on. Reported with the verdict every\ntime.",
+      "type": "string"
+    },
+    "verdict": {
+      "description": "`fails`, and nothing else: passing is what the expectation already says, and\ncould-not-run is never excused.",
+      "$ref": "PluginDeclaredVerdict.json"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "fixture",
+    "verdict",
+    "constraint",
+    "reason"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One event kind the operator set apart from the preset.",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "description": "The kind of event, by the name a finding gives it.",
+      "type": "string"
+    },
+    "wanted": {
+      "description": "Whether it is heard about, whatever the preset would say.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "kind",
+    "wanted"
+  ]
+}

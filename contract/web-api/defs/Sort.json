@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What sort of thing one line of a manifest is.",
+  "oneOf": [
+    {
+      "description": "A container the engine is holding.",
+      "type": "string",
+      "const": "container"
+    },
+    {
+      "description": "A network the containers were on.",
+      "type": "string",
+      "const": "network"
+    },
+    {
+      "description": "An image that was pulled.",
+      "type": "string",
+      "const": "image"
+    },
+    {
+      "description": "A directory or file on this machine.",
+      "type": "string",
+      "const": "path"
+    }
+  ]
+}

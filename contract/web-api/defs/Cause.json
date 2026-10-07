@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One thing that could be behind a symptom, and how to tell it from the others.",
+  "type": "object",
+  "properties": {
+    "because": {
+      "description": "What is wrong.",
+      "type": "string"
+    },
+    "fix": {
+      "description": "What to do about it.",
+      "type": "string"
+    },
+    "tell": {
+      "description": "How to tell this cause from the others under the same symptom.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "because",
+    "tell",
+    "fix"
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where one member's account stands.\n\n**Switched off is its own answer rather than a flag beside another.** An account the\nmedia server switched off after too many wrong passwords reads, on every other field,\nexactly like one that works — and the person holding it has only been told their\npassword is wrong. What unlocks it is a reissue, which is the operator's to do, so the\noperator is the one who has to be able to see it.",
+  "oneOf": [
+    {
+      "description": "Offered, and the offer still stands: nobody has set a password yet.",
+      "type": "string",
+      "const": "invited"
+    },
+    {
+      "description": "Offered, and the offer ran out before anybody claimed it. The stack takes it back\nwithin a minute: an account nobody was seen in is removed and still listed as\nthis until the next invitation, and a reset is switched off and kept.",
+      "type": "string",
+      "const": "expired"
+    },
+    {
+      "description": "Offered, and the person refused it at its decline address. The account is kept,\nswitched off, until the operator removes it or reissues it; no sweep takes it\nback as run out.",
+      "type": "string",
+      "const": "declined"
+    },
+    {
+      "description": "Claimed, and able to sign in.",
+      "type": "string",
+      "const": "active"
+    },
+    {
+      "description": "Switched off — by the operator, or by the media server after too many wrong\npasswords. The account and what they watched are kept, and a reissue switches\nit back on.",
+      "type": "string",
+      "const": "suspended"
+    }
+  ]
+}

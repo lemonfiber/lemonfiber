@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One service, as it stands.",
+  "type": "object",
+  "properties": {
+    "criticality": {
+      "description": "How much its absence costs, so a summary can weigh it.",
+      "$ref": "Criticality.json"
+    },
+    "depends_on": {
+      "description": "The services it needs before it can work, as the manifest declares them.\nCarried so a failure can be attributed to the thing underneath it rather\nthan counted as one more independent thing wrong.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "describes": {
+      "description": "What it does for the operator, in the stack's own words.\n\nCarried on the service rather than looked up where it is shown, because this\nis the one struct every surface reads: a listing, the machine-readable reply,\nthe web API and the terminal's panel all render this, and a description\nfetched separately by each of them would be four chances to render three.\n\nThe stack's words rather than lemonfiber's, for the reason its absence cost is:\na stack that adds a service should not need a lemonfiber release before it can\nsay what that service is for.",
+      "type": "string"
+    },
+    "exit": {
+      "description": "How it exited, where it has exited.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "int32"
+    },
+    "forms": {
+      "description": "Every form it is running for, in the order the stack declares them.\n\nAll of them rather than one, because a service two forms share is there for\nboth, and stopping one of them leaves it running for the other. Empty where no\nform it belongs to is up: a service nobody's form holds is not missing from one.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "id": {
+      "description": "The service's identifier, which is also its Compose service name.",
+      "type": "string"
+    },
+    "name": {
+      "description": "What it is called in front of an operator.",
+      "type": "string"
+    },
+    "profile": {
+      "description": "The profile that declared it.",
+      "type": "string"
+    },
+    "state": {
+      "description": "What it is doing.",
+      "$ref": "ServiceState.json"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "describes",
+    "profile",
+    "forms",
+    "state",
+    "criticality",
+    "depends_on"
+  ]
+}

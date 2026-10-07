@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One download client, and what became of the limits it was given.",
+  "type": "object",
+  "properties": {
+    "answer": {
+      "description": "What it said.",
+      "$ref": "Answer.json"
+    },
+    "client": {
+      "description": "The client, by the name the stack knows it under.",
+      "type": "string"
+    },
+    "pulling": {
+      "description": "Whether it is fetching at all, where a declared cap made that a question.\n\nAbsent on a stack with no cap rather than assumed to be fetching: asking\nevery client whether it has stopped, on a stack where nothing would ever\nstop it, is traffic spent on a figure nothing would act on.",
+      "anyOf": [
+        {
+          "$ref": "Pulling.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "client",
+    "answer"
+  ]
+}

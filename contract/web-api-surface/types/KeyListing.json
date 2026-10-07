@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "keys": {
+      "type": [
+        "array[ref:ListedKey]"
+      ],
+      "required": true
+    },
+    "purposes": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "revoked": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

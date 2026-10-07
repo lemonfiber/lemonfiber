@@ -1,0 +1,89 @@
+{
+  "fields": {
+    "action": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "at": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "category": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "detail": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "expect": {
+      "type": [
+        "anyOf(null,ref:Expect)"
+      ],
+      "required": false
+    },
+    "expected": {
+      "type": [
+        "array[ref:PluginExpectedFailure]"
+      ],
+      "required": false
+    },
+    "fixture": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "for": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "id": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "request": {
+      "type": [
+        "anyOf(null,ref:PluginRequest)"
+      ],
+      "required": false
+    },
+    "service": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "timeout_s": {
+      "type": [
+        "integer|null/uint32"
+      ],
+      "required": false
+    },
+    "title": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "why": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

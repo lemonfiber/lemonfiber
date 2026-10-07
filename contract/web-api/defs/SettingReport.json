@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One setting, as it is safe to show.",
+  "type": "object",
+  "properties": {
+    "key": {
+      "description": "The setting's name.",
+      "type": "string"
+    },
+    "origin": {
+      "description": "Where the value came from, beside the value rather than behind a second\nrequest — reading a setting and reading what put it there are one act.",
+      "$ref": "ValueOrigin.json"
+    },
+    "secret": {
+      "description": "Whether the value was withheld.",
+      "type": "boolean"
+    },
+    "value": {
+      "description": "Its value, or a note that it is set and withheld.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "key",
+    "value",
+    "secret",
+    "origin"
+  ]
+}

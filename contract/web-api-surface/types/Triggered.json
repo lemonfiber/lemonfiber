@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "detail": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "state": {
+      "type": [
+        "const:\"failed\"",
+        "const:\"not-started\"",
+        "const:\"started\""
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"failed\"",
+    "\"not-started\"",
+    "\"started\""
+  ]
+}

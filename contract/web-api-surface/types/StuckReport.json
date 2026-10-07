@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "incomplete": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "items": {
+      "type": [
+        "array[ref:StuckEntry]"
+      ],
+      "required": true
+    },
+    "unsupported": {
+      "type": [
+        "array[ref:UnsupportedReport]"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

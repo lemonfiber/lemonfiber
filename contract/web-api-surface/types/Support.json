@@ -1,0 +1,9 @@
+{
+  "fields": {},
+  "variants": [
+    "\"fallback\"",
+    "\"good\"",
+    "\"poor\"",
+    "\"workable\""
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where one person's hand-off stands.\n\nRead from the media server each time rather than remembered, apart from when a code\nwas first issued and which devices were signed in then: whether a device is signed in\nis the server's to say, and a copy kept here would go on saying it after the person\nsigned out.",
+  "oneOf": [
+    {
+      "description": "Nobody by that name holds an account yet, so there is nothing to sign in to.\n\nNo account is made here. Making one is an invitation, which is where what the\nperson may watch is chosen; an account made on the way to handing over a phone\nwould be one nobody chose anything for.",
+      "type": "string",
+      "const": "unprovisioned"
+    },
+    {
+      "description": "The account is there and the code was issued by this run.",
+      "type": "string",
+      "const": "ready"
+    },
+    {
+      "description": "The code went out on an earlier run and no device of theirs has signed in since.\n\nTold apart from [`Failed`](Self::Failed) because nothing has gone wrong: the next\nstep is on the person's device, and until they take it there is nothing to prove.",
+      "type": "string",
+      "const": "pending"
+    },
+    {
+      "description": "The media server lists a device signed in to their account now that was not\nsigned in when the code was first given.\n\nA phone they already had proves nothing about the one just handed over, so the\ndevices signed in at that moment are not counted.",
+      "type": "string",
+      "const": "connected"
+    },
+    {
+      "description": "The hand-off could not go ahead, for the reason given beside it.",
+      "type": "string",
+      "const": "failed"
+    }
+  ]
+}

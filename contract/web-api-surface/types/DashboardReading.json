@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "reading": {
+      "type": [
+        "const:\"known\"",
+        "const:\"stale\"",
+        "const:\"unknown\""
+      ],
+      "required": true
+    },
+    "value": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"known\"",
+    "\"stale\"",
+    "\"unknown\""
+  ]
+}

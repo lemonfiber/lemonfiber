@@ -1,0 +1,10 @@
+{
+  "fields": {},
+  "variants": [
+    "\"degraded\"",
+    "\"disconnected\"",
+    "\"live\"",
+    "\"no-stack\"",
+    "\"unconfigured\""
+  ]
+}

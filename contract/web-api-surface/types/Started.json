@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "action": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "job": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where a proposed change stands once it has been read against what is in force.",
+  "oneOf": [
+    {
+      "description": "The setting already holds what was asked for. Nothing to apply, nothing to\nconfirm, and the file is not touched — a write of the same value would move\nthe file's own timestamp and read afterwards as an edit somebody made.",
+      "type": "string",
+      "const": "unchanged"
+    },
+    {
+      "description": "Staged and not applied: nothing has been written. Either it is consequential\nand nobody has said yes to it yet, or it was rehearsed.\n\nThe default, because nothing having happened yet is what every act starts as,\nand a report built and not filled in should say that rather than claim it acted.",
+      "type": "string",
+      "const": "pending"
+    },
+    {
+      "description": "Turned away. It cannot be applied safely, the file is exactly as it was, and\nthe refusal says why.",
+      "type": "string",
+      "const": "blocked"
+    },
+    {
+      "description": "Written.",
+      "type": "string",
+      "const": "applied"
+    }
+  ]
+}

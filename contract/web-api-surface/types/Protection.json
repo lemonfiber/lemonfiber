@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "against": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "not_against": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "summary": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What has become of a walkthrough.",
+  "oneOf": [
+    {
+      "description": "Presented at the end of setup, not yet answered.",
+      "type": "string",
+      "const": "offered"
+    },
+    {
+      "description": "Declined. Available later, and carrying no penalty — a stack that was set up is\nset up whether or not anyone watched it fetch something.",
+      "type": "string",
+      "const": "skipped"
+    },
+    {
+      "description": "Looking for releases.",
+      "type": "string",
+      "const": "searching"
+    },
+    {
+      "description": "Sending a release to the download client.",
+      "type": "string",
+      "const": "grabbing"
+    },
+    {
+      "description": "The download is running.",
+      "type": "string",
+      "const": "downloading"
+    },
+    {
+      "description": "Moving the finished download into the library.",
+      "type": "string",
+      "const": "importing"
+    },
+    {
+      "description": "It is in the library and playable.",
+      "type": "string",
+      "const": "complete"
+    },
+    {
+      "description": "Stopped at a named step, with a diagnosis.",
+      "type": "string",
+      "const": "failed"
+    },
+    {
+      "description": "The operator left part-way. Whatever was in flight stays in flight.",
+      "type": "string",
+      "const": "abandoned"
+    }
+  ]
+}

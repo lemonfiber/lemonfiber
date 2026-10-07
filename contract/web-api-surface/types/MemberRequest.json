@@ -1,0 +1,65 @@
+{
+  "fields": {
+    "arrived": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "estimate": {
+      "type": [
+        "anyOf(null,ref:Estimate)"
+      ],
+      "required": false
+    },
+    "id": {
+      "type": [
+        "integer/int64"
+      ],
+      "required": true
+    },
+    "media": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "refused": {
+      "type": [
+        "anyOf(null,ref:Refused)"
+      ],
+      "required": false
+    },
+    "shelf_id": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "state": {
+      "type": [
+        "anyOf(null,ref:RequestState)"
+      ],
+      "required": false
+    },
+    "title": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "waiting_days": {
+      "type": [
+        "integer|null/uint64"
+      ],
+      "required": false
+    },
+    "year": {
+      "type": [
+        "integer|null/uint16"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

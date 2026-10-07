@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "at": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "stage": {
+      "type": [
+        "ref:Stage"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Why playback here is likely to struggle, whatever app the household installs.\n\nPresent only where the preset in force asks for transcoding this platform cannot\ndo in hardware. It belongs to the guidance rather than to any one device: the\npreset and the platform decide it between them, and every device in the table\nmeets it.",
+  "type": "object",
+  "properties": {
+    "caution": {
+      "description": "What that preset asks of this machine, and what playback does where this\nmachine cannot give it.",
+      "type": "string"
+    },
+    "instead": {
+      "description": "What makes it stop.",
+      "type": "string"
+    },
+    "preset": {
+      "description": "The preset in force, under the name it was chosen by.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "preset",
+    "caution",
+    "instead"
+  ]
+}

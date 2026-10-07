@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One audio-format choice in force, for media that has no resolution — the same\nquestion as a [`PresetChoice`], answered in format terms rather than resolution.",
+  "type": "object",
+  "properties": {
+    "format": {
+      "description": "The format's plain-language name.",
+      "type": "string"
+    },
+    "means": {
+      "description": "What it means, in the operator's terms.",
+      "type": "string"
+    },
+    "note": {
+      "description": "The practical caveat worth knowing — playing it, or finding it.",
+      "type": "string"
+    },
+    "scope": {
+      "description": "What this applies to — `music`.",
+      "type": "string"
+    },
+    "size_per_hour": {
+      "description": "Roughly how much disk an hour of it takes.",
+      "type": "string"
+    },
+    "targets": {
+      "description": "The audio format it targets, in plain terms.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "scope",
+    "format",
+    "means",
+    "targets",
+    "size_per_hour",
+    "note"
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "fields": {
+    "agreement": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "backup": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "bytes": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "coming": {
+      "type": [
+        "array[ref:Coming]"
+      ],
+      "required": true
+    },
+    "confidence": {
+      "type": [
+        "ref:UninstallConfidence"
+      ],
+      "required": true
+    },
+    "foreign": {
+      "type": [
+        "array[ref:Foreign]"
+      ],
+      "required": true
+    },
+    "items": {
+      "type": [
+        "array[ref:Item]"
+      ],
+      "required": true
+    },
+    "keeps": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "outside": {
+      "type": [
+        "array[ref:Outside]"
+      ],
+      "required": true
+    },
+    "removes": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "tier": {
+      "type": [
+        "ref:Tier"
+      ],
+      "required": true
+    },
+    "volume": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

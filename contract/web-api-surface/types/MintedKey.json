@@ -1,0 +1,47 @@
+{
+  "fields": {
+    "address": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "caution": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "pin": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "purpose": {
+      "type": [
+        "ref:KeyPurpose"
+      ],
+      "required": true
+    },
+    "scope": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "secret": {
+      "type": [
+        "ref:Secret"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

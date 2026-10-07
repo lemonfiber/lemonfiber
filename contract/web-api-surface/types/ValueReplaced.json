@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "from": {
+      "type": [
+        "ref:ValueOrigin"
+      ],
+      "required": true
+    },
+    "value": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "withheld": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

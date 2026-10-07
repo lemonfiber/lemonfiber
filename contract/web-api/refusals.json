@@ -1,0 +1,452 @@
+{
+  "ADMIT-10": {
+    "name": "NOT_A_PASSWORD",
+    "status": 400,
+    "description": "Raised when what was offered at the door is not a password."
+  },
+  "ADMIT-11": {
+    "name": "KEY_IN_THE_CLEAR",
+    "status": 403,
+    "description": "Raised when a key arrived from another machine over a connection its pin does not verify."
+  },
+  "ADMIT-12": {
+    "name": "NOT_FOR_A_KEY",
+    "status": 403,
+    "description": "Raised when a key asked for something its scope does not reach."
+  },
+  "ADMIT-4": {
+    "name": "NOT_ADMITTED",
+    "status": 403,
+    "description": "Raised when a request carried no token, session or key this run admits."
+  },
+  "ADMIT-5": {
+    "name": "ELSEWHERE",
+    "status": 403,
+    "description": "Raised when a request said it came from somewhere this server is not."
+  },
+  "ADMIT-6": {
+    "name": "NOT_YOURS",
+    "status": 403,
+    "description": "Raised when an account asked for something that is not its to ask for."
+  },
+  "ADMIT-7": {
+    "name": "UNCONFIRMED",
+    "status": 403,
+    "description": "Raised when the media server could not say whether an account is still one."
+  },
+  "ADMIT-8": {
+    "name": "NOT_THE_PASSWORD",
+    "status": 401,
+    "description": "Raised when the password offered at the door was wrong, or none is set."
+  },
+  "ADMIT-9": {
+    "name": "TOO_MANY_ATTEMPTS",
+    "status": 429,
+    "description": "Raised when the door has been given too many wrong passwords lately."
+  },
+  "ASK-1": {
+    "name": "NO_SUCH_ACTION",
+    "status": 404,
+    "description": "Raised where no action goes by the name that was asked for."
+  },
+  "ASK-10": {
+    "name": "WRONG_METHOD",
+    "status": 405,
+    "description": "Raised where an endpoint was asked with a method it does not answer."
+  },
+  "ASK-11": {
+    "name": "NOT_A_KEY_REQUEST",
+    "status": 400,
+    "description": "Raised where the body of a mint is not a key's name, scope, purpose and the password."
+  },
+  "ASK-2": {
+    "name": "MISSING_ARGUMENT",
+    "status": 400,
+    "description": "Raised where an action was not given an argument it needs."
+  },
+  "ASK-3": {
+    "name": "UNRECOGNISED_ARGUMENT",
+    "status": 400,
+    "description": "Raised where an argument was given a value that names nothing."
+  },
+  "ASK-4": {
+    "name": "UNWANTED_ARGUMENT",
+    "status": 400,
+    "description": "Raised where an action was given an argument its command has nowhere to put."
+  },
+  "ASK-5": {
+    "name": "ARGUMENTS_TOGETHER",
+    "status": 400,
+    "description": "Raised where two arguments that each name a different request arrived together."
+  },
+  "ASK-6": {
+    "name": "NOT_ARGUMENTS",
+    "status": 400,
+    "description": "Raised where the body of an action is not arguments it can read."
+  },
+  "ASK-7": {
+    "name": "NO_SUCH_JOB",
+    "status": 404,
+    "description": "Raised where a job was asked about that this run did not start."
+  },
+  "ASK-8": {
+    "name": "NOT_AN_ANSWER",
+    "status": 400,
+    "description": "Raised where the body of a setup step is not an answer it can read."
+  },
+  "ASK-9": {
+    "name": "NO_ENDPOINT",
+    "status": 404,
+    "description": "Raised where a path under the endpoints is one no endpoint answers."
+  },
+  "GONE-2": {
+    "name": "ANOTHER_READING",
+    "status": 400,
+    "description": "Raised when an agreement names a reading of this machine that is not the one standing now."
+  },
+  "MIGRATE-1": {
+    "name": "OFFER_MOVED",
+    "status": 400,
+    "description": "Raised when a replacement was agreed to for an offer that is not the one standing now."
+  },
+  "PLUGIN-10": {
+    "name": "NOTHING_TO_REMOVE",
+    "status": 404,
+    "description": "Nothing by that name is installed on this machine."
+  },
+  "PLUGIN-11": {
+    "name": "NOTHING_TO_UPDATE",
+    "status": 404,
+    "description": "Nothing by that id is installed, so there is no version to replace."
+  },
+  "PLUGIN-12": {
+    "name": "STUCK",
+    "status": 500,
+    "description": "The version installed would not come off, so nothing else was touched."
+  },
+  "PLUGIN-13": {
+    "name": "ANSWERED",
+    "status": 400,
+    "description": "Raised when a plugin's service would answer on a label another plugin's already does."
+  },
+  "PLUGIN-14": {
+    "name": "TWO_SOURCES",
+    "status": 400,
+    "description": "Raised when a plugin is installed from a source other than the one its name is already installed from."
+  },
+  "PLUGIN-15": {
+    "name": "SOURCE_OFF",
+    "status": 400,
+    "description": "Raised when a plugin is named from a git source and fetching from one is switched off."
+  },
+  "PLUGIN-16": {
+    "name": "UNFETCHED",
+    "status": 500,
+    "description": "Raised when a git source could not be reached or would not hand over a revision."
+  },
+  "PLUGIN-17": {
+    "name": "NO_REVISION",
+    "status": 404,
+    "description": "Raised when a git source holds no branch, tag or commit by the name given."
+  },
+  "PLUGIN-18": {
+    "name": "CATALOGUE_OFF",
+    "status": 400,
+    "description": "Raised when a plugin is installed by name and asking the catalogue is switched off."
+  },
+  "PLUGIN-19": {
+    "name": "CATALOGUE_UNREACHABLE",
+    "status": 500,
+    "description": "Raised when the catalogue's index or its signature could not be fetched."
+  },
+  "PLUGIN-2": {
+    "name": "UNREADABLE",
+    "status": 404,
+    "description": "The source names no plugin this build can read."
+  },
+  "PLUGIN-20": {
+    "name": "SIGNATURE_UNVERIFIED",
+    "status": 500,
+    "description": "Raised when the catalogue's index has no signature, one that does not verify, or none this build carries a key to check."
+  },
+  "PLUGIN-21": {
+    "name": "CATALOGUE_UNREADABLE",
+    "status": 500,
+    "description": "Raised when the catalogue's index verified and is not one this build reads."
+  },
+  "PLUGIN-22": {
+    "name": "NOT_CATALOGUED",
+    "status": 404,
+    "description": "Raised when the catalogue holds no plugin by the name given."
+  },
+  "PLUGIN-23": {
+    "name": "NOT_AS_REVIEWED",
+    "status": 500,
+    "description": "Raised when what the catalogue's origin served is not what the catalogue reviewed."
+  },
+  "PLUGIN-24": {
+    "name": "SPELLED_ALIKE",
+    "status": 400,
+    "description": "Raised when a plugin's service would be named, where lemonfiber keeps what a service holds, as another installed plugin's service already is."
+  },
+  "PLUGIN-25": {
+    "name": "PLUGIN_OFFER_MOVED",
+    "status": 400,
+    "description": "Raised when an install, an update or a removal answers an offer that was read against a plugin, a stack or a record that has since moved."
+  },
+  "PLUGIN-26": {
+    "name": "UNAPPROVED",
+    "status": 400,
+    "description": "Raised when a value a recipe would carry to a destination was not approved as itself, or an approval names a pair the recipe does not carry."
+  },
+  "PLUGIN-27": {
+    "name": "ANOTHER_PLUGIN",
+    "status": 400,
+    "description": "Raised when the source an update names holds a different plugin from the one it was asked to update."
+  },
+  "PLUGIN-28": {
+    "name": "OCCUPIED",
+    "status": 400,
+    "description": "Raised when a plugin's service would take a name, a port or a label something already on this machine holds: a service of the stack or of the operator's overlay, another plugin's port, or a site in the proxy's live configuration."
+  },
+  "PLUGIN-29": {
+    "name": "CATALOGUE_REPLACED",
+    "status": 500,
+    "description": "Raised when the catalogue's index verifies and is older than the newest one this machine has verified."
+  },
+  "PLUGIN-3": {
+    "name": "REFUSED",
+    "status": 400,
+    "description": "The manifest is read and this build refuses what it declares."
+  },
+  "PLUGIN-30": {
+    "name": "NEWEST_UNKEPT",
+    "status": 500,
+    "description": "Raised when the record of the newest catalogue index this machine verified cannot be read or written."
+  },
+  "PLUGIN-31": {
+    "name": "SCHEME_REFUSED",
+    "status": 400,
+    "description": "Raised when a git source is named over a transport other than https, before anything is asked of it."
+  },
+  "PLUGIN-32": {
+    "name": "ADDRESS_REFUSED",
+    "status": 400,
+    "description": "Raised when a git source's host is, or stands for, an address on this machine or on a network of its own: loopback, private, link-local or unspecified."
+  },
+  "PLUGIN-33": {
+    "name": "HEADER_NAMED",
+    "status": 400,
+    "description": "Raised when a recipe substitutes a value into a header's name, which is a fixed identifier of the protocol and written out; the manifest's every other fault is listed beside it."
+  },
+  "PLUGIN-4": {
+    "name": "UNRECORDED",
+    "status": 500,
+    "description": "The record of what is installed cannot be read."
+  },
+  "PLUGIN-5": {
+    "name": "ALREADY",
+    "status": 400,
+    "description": "The plugin is installed already."
+  },
+  "PLUGIN-6": {
+    "name": "NOWHERE",
+    "status": 500,
+    "description": "There is no stack on this machine to put a plugin's container in."
+  },
+  "PLUGIN-7": {
+    "name": "UNWRITABLE",
+    "status": 500,
+    "description": "A directory or a document the install decided on would not land."
+  },
+  "PLUGIN-8": {
+    "name": "UNRECORDABLE",
+    "status": 500,
+    "description": "The wiring went down and the record of what is installed did not."
+  },
+  "PLUGIN-9": {
+    "name": "UNPROVED",
+    "status": 500,
+    "description": "The plugin's own service would not start, so nothing about it could be proved."
+  },
+  "READ-1": {
+    "name": "UNWANTED",
+    "status": 400,
+    "description": "Raised where a read was given a parameter its answer has nowhere to put."
+  },
+  "READ-10": {
+    "name": "TOO_MANY_AT_ONCE",
+    "status": 400,
+    "description": "Raised where more holdings were asked for than one read answers with."
+  },
+  "READ-11": {
+    "name": "NO_SUCH_GROUP",
+    "status": 400,
+    "description": "Raised where a diagnosis was narrowed to a group or check that is not one."
+  },
+  "READ-12": {
+    "name": "NO_SUCH_REMOVAL",
+    "status": 400,
+    "description": "Raised where a removal was named that is none of the four there are."
+  },
+  "READ-13": {
+    "name": "NO_UPDATE_OBJECT",
+    "status": 400,
+    "description": "Raised where moving forward was asked about and neither stack nor self named."
+  },
+  "READ-14": {
+    "name": "NOT_A_LINE_COUNT",
+    "status": 400,
+    "description": "Raised where how many log lines to begin with is not a number within the ceiling."
+  },
+  "READ-15": {
+    "name": "NOT_A_CHOICE",
+    "status": 400,
+    "description": "Raised where a parameter that takes a yes or a no is neither true nor false."
+  },
+  "READ-16": {
+    "name": "MEMBER_AND_DEFAULTS",
+    "status": 400,
+    "description": "Raised where a household read named a member and asked for the household's defaults as well."
+  },
+  "READ-2": {
+    "name": "REPEATED",
+    "status": 400,
+    "description": "Raised where a parameter carrying one value was given more than once."
+  },
+  "READ-3": {
+    "name": "NO_SUCH_READ",
+    "status": 404,
+    "description": "Raised where no read goes by the name that was asked for."
+  },
+  "READ-4": {
+    "name": "NO_TERM",
+    "status": 400,
+    "description": "Raised where a trace was asked for and named nothing to follow."
+  },
+  "READ-5": {
+    "name": "NOT_A_SEASON",
+    "status": 400,
+    "description": "Raised where the season to narrow a trace to is not a number."
+  },
+  "READ-6": {
+    "name": "NO_SETTING",
+    "status": 400,
+    "description": "Raised where a setting was asked for by an empty name."
+  },
+  "READ-7": {
+    "name": "NO_MEMBER",
+    "status": 400,
+    "description": "Raised where a household member was asked for by an empty name."
+  },
+  "READ-8": {
+    "name": "NO_SHELF_WITHOUT_A_MEMBER",
+    "status": 400,
+    "description": "Raised where a shelf was asked for and nobody was named whose it is."
+  },
+  "READ-9": {
+    "name": "NOT_A_COUNT",
+    "status": 400,
+    "description": "Raised where how many holdings to answer with is not a whole number."
+  },
+  "REPAIR-1": {
+    "name": "STALE",
+    "status": 400,
+    "description": "Raised when consent was given for an offer that no longer stands."
+  },
+  "RESTORE-11": {
+    "name": "MOVED_ON",
+    "status": 400,
+    "description": "Raised when consent was given for a listing that no longer stands."
+  },
+  "SERVE-6": {
+    "name": "UNRENDERABLE",
+    "status": 500,
+    "description": "Raised when an answer could not be rendered."
+  },
+  "SERVE-7": {
+    "name": "NO_JOB_NAME",
+    "status": 500,
+    "description": "Raised when this machine will not supply the randomness a job is named with."
+  },
+  "SPACE-6": {
+    "name": "ANOTHER_OFFER",
+    "status": 400,
+    "description": "Raised when an agreement names an offer that is not the one standing now."
+  },
+  "STACK-1": {
+    "name": "STACK_UNREADABLE",
+    "status": 500,
+    "description": "Raised when a stack directory holds no readable manifest."
+  },
+  "STACK-2": {
+    "name": "STACK_UNUSABLE",
+    "status": 500,
+    "description": "Raised when a manifest is readable and this build cannot use it."
+  },
+  "STACK-3": {
+    "name": "STACK_NOT_EMBEDDED",
+    "status": 500,
+    "description": "Raised when the embedded stack is not intact."
+  },
+  "STACK-4": {
+    "name": "STACK_NOT_SET_UP",
+    "status": 500,
+    "description": "Raised when lemonfiber has nowhere to write the stack."
+  },
+  "STACK-5": {
+    "name": "STACK_NOT_WRITTEN",
+    "status": 500,
+    "description": "Raised when the stack could not be written to disk."
+  },
+  "STACK-6": {
+    "name": "STACK_INVALID",
+    "status": 500,
+    "description": "Raised when a manifest parses and breaks the contract."
+  },
+  "STACK-7": {
+    "name": "STACK_MALFORMED",
+    "status": 500,
+    "description": "Raised when a manifest is not TOML at all."
+  },
+  "STACK-8": {
+    "name": "STACK_UNRECOGNISED",
+    "status": 500,
+    "description": "Raised when a manifest declares names this build does not know."
+  },
+  "STACK-9": {
+    "name": "STACK_NEEDS_NEWER",
+    "status": 500,
+    "description": "Raised when a stack names a newer lemonfiber than the one running."
+  },
+  "WIRE-1": {
+    "name": "NO_SUCH_FILLER",
+    "status": 404,
+    "description": "A capability was named that no service in this stack provides."
+  },
+  "WIRE-2": {
+    "name": "CANNOT_FILL",
+    "status": 400,
+    "description": "The service named cannot do the thing it was asked to fill."
+  },
+  "WIRE-3": {
+    "name": "NOTHING_ASKS",
+    "status": 400,
+    "description": "Nothing in this stack asks for the capability, so a choice would change nothing."
+  },
+  "WIRE-4": {
+    "name": "CHOICE_UNWRITABLE",
+    "status": 500,
+    "description": "The setting recording the choice could not be written."
+  },
+  "WIRE-5": {
+    "name": "WIRING_MOVED",
+    "status": 400,
+    "description": "Raised when a choice answers an offer that was read against a wiring that has since moved."
+  },
+  "WIRE-6": {
+    "name": "UNREASONABLE",
+    "status": 400,
+    "description": "Raised when the reason given for a choice is longer than a reason may be, or holds a line break or another control character."
+  }
+}

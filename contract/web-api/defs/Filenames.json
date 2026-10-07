@@ -1,0 +1,5 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Whether media filenames are shown as they are.\n\nReplaced unless asked otherwise. A library's contents are not a credential, but they\nare the one thing in a bundle that says something about the person rather than about\nthe machine, and replacing them costs a diagnostic a reader can still follow — the\nmarks keep two mentions of one file recognisable as one file.\n\nRead from the bare flag a surface carries rather than from a name of its own,\nbecause that is what both surfaces have: `--filenames` on a command line and a\n`filenames` in a request body are one word that is there or is not. Which way\nround it reads is decided here, once — a surface that read it the other way\nround would put a library's contents in a file people post in public.",
+  "type": "boolean"
+}

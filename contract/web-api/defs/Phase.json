@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where an in-flight or finished setup stands in its lifecycle.\n\nThe persisted marker a later run reads to tell answers still being gathered\nfrom a half-written apply. Only these four are ever written: the two states a\nrun infers instead of storing — no setup at all, and an apply that stopped\nmid-write — are read off the world rather than trusted from a file (see\n[`Status`]).",
+  "oneOf": [
+    {
+      "description": "Still gathering answers. Resumable, and nothing has touched disk.",
+      "type": "string",
+      "const": "in-progress"
+    },
+    {
+      "description": "Every applicable question answered, awaiting the operator's confirmation.",
+      "type": "string",
+      "const": "reviewing"
+    },
+    {
+      "description": "Writing configuration and starting services — the one non-atomic phase,\nand so the only marker whose persistence signals an interrupted run.",
+      "type": "string",
+      "const": "applying"
+    },
+    {
+      "description": "Configuration written and valid.",
+      "type": "string",
+      "const": "applied"
+    }
+  ]
+}

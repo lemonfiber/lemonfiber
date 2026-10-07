@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What an install came to, and what it took to get there.\n\n**The three lists below are stated whether the run wrote anything or not, and that\nis the whole of what makes a rehearsal worth running.** A rehearsal that reported\nless than the real run would be a preview of a different operation; one that\nreported it from code of its own would be a second derivation free to disagree\nwith the one that acts. So they are filled in one place, from the manifest and from\nthe very list of writes the install is carried out from, and the surface says them\nin whichever tense `recorded` calls for.",
+  "type": "object",
+  "properties": {
+    "against": {
+      "description": "What those verdicts were reached against, or nothing where none were reached.\n\nCarried rather than assumed, because the two kinds of evidence are not the\nsame claim: an author's read asks the recordings a plugin ships, and an\ninstall asks the service running on this machine. The weaker must not be\nreadable as the stronger, and a reader handed a verdict has nothing else in\nthe document to tell them apart.",
+      "anyOf": [
+        {
+          "$ref": "PluginEvidence.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "changes": {
+      "description": "Every change it makes to the machine, in the order it makes them.",
+      "type": "array",
+      "items": {
+        "$ref": "PluginChange.json"
+      }
+    },
+    "contests": {
+      "description": "Every ask of the stack's the install leaves contested that is not contested\nnow, as it would then stand.\n\nA plugin's service that claims what the stack asks for is a candidate like any\nother, so installing it leaves the ask refused until somebody chooses — which is\na change to what the stack does, and stated with the rest before it happens.",
+      "type": "array",
+      "items": {
+        "$ref": "WiringContest.json"
+      }
+    },
+    "overrides": {
+      "description": "Every bundled thing the plugin declares it will change.\n\nThe full extent rather than a sample of it: a manifest may change a bundled\nsetting only through a recipe, and a recipe reaching one no `[[override]]`\nnames is refused before anything is written.",
+      "type": "array",
+      "items": {
+        "$ref": "PluginOverriding.json"
+      }
+    },
+    "proofs": {
+      "description": "Every proof that has to hold before the plugin is installed, and on a run\nthat asked them, what each came to.",
+      "type": "array",
+      "items": {
+        "$ref": "PluginProving.json"
+      }
+    },
+    "recorded": {
+      "description": "Whether it was written down. A rehearsal leaves this false.",
+      "type": "boolean"
+    },
+    "reversed": {
+      "description": "What putting the install back came to, where something failed and it was.\n\nThe rollback layer's own report rather than a shape of this verb's: what went\nback, and what did not with the reason each is still standing. Absent on a run\nthat had nothing to put back, which is both a rehearsal and an install that\nheld.",
+      "anyOf": [
+        {
+          "$ref": "UndoReversal.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "verified": {
+      "description": "What the stack's own checks made of the install, or nothing on a run that\nasked them nothing.\n\nThe other half of what an install has to establish, and the half a plugin\ncannot establish for itself: its proofs say the plugin works, and this says the\nstack still does. Absent on a rehearsal, which writes nothing and so has\nnothing to hold a reading against.",
+      "anyOf": [
+        {
+          "$ref": "PluginVerification.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "would": {
+      "description": "What the install settled, said whether or not it was written down.",
+      "$ref": "PluginInstalled.json"
+    }
+  },
+  "required": [
+    "would",
+    "recorded",
+    "changes",
+    "proofs",
+    "contests",
+    "overrides"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "fields": {
+    "bound": {
+      "type": [
+        "const:\"bounded\"",
+        "const:\"open-ended\""
+      ],
+      "required": true
+    },
+    "seconds": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "until": {
+      "type": [
+        "ref:Awaiting"
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"bounded\"",
+    "\"open-ended\""
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "bytes": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

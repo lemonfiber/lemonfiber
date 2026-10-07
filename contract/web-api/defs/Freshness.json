@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How much a reading can be relied on.",
+  "oneOf": [
+    {
+      "description": "Read off a local disk, so it is true as of now.",
+      "type": "object",
+      "properties": {
+        "as": {
+          "type": "string",
+          "const": "live"
+        }
+      },
+      "required": [
+        "as"
+      ]
+    },
+    {
+      "description": "Read across a network share, which answers with what it was last told —\ncarrying the moment it was taken, in seconds since the epoch, so a figure\nnobody can refresh is at least dated.",
+      "type": "object",
+      "properties": {
+        "as": {
+          "type": "string",
+          "const": "as_of"
+        },
+        "at": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "as",
+        "at"
+      ]
+    }
+  ]
+}

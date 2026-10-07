@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "project": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "scope": {
+      "type": [
+        "const:\"existing\"",
+        "const:\"service\"",
+        "const:\"whole_stack\""
+      ],
+      "required": true
+    },
+    "trees": {
+      "type": [
+        "array[ref:Tree]"
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"existing\"",
+    "\"service\"",
+    "\"whole_stack\""
+  ]
+}

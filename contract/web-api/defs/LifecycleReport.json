@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a lifecycle command did, or would have done.",
+  "type": "object",
+  "properties": {
+    "action": {
+      "description": "The Compose subcommand that was run.",
+      "type": "string"
+    },
+    "command": {
+      "description": "The exact command, so what happened is never a matter of trust.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "condition": {
+      "description": "What those services amount to, as one word.",
+      "anyOf": [
+        {
+          "$ref": "Condition.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "forwarding": {
+      "description": "What starting the stack did about the VPN's forwarded port, where it did\nanything. Absent in the ordinary case — the client was already on it, or\nthere is no tunnel to forward through — and a sentence where the client was\nmoved, or could not be.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "held": {
+      "description": "Why nothing was run, where a start declined to run anything.\n\nAbsent for every ordinary command, which is what makes it readable: a\nlifecycle report with an empty plan and a status of nothing is a report of\nsomething that did not happen, and without this there is nowhere to say\nwhether that was a fault or the correct answer. A start at a login declines\nfor three reasons the operator would each act on differently — the stack was\nstopped on purpose, autostart was never asked for, or this machine is on its\nbattery and nobody said to start anyway — and a run nobody is watching has to\nleave the reason somewhere a reader finds later.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "plan": {
+      "description": "What the named forms came to: the profiles, the services they hold, and\nwhat the configuration left out.\n\nThe resolved plan itself rather than a copy of its parts, because it is\nstated to the operator before the command runs and read out of the\nreport afterwards — two accounts of one run, and a second shape for it\nwould be a way for them to differ.",
+      "$ref": "Plan.json"
+    },
+    "port_conflicts": {
+      "description": "Host ports this start wants that another Compose project on this machine\nalready answers on, each named on both sides.\n\nEmpty for every action that starts nothing, and empty on a machine running one\nstack. Reported rather than refused: a port somebody deliberately shares is\ntheir business, and the start goes ahead — what this changes is whether an\noperator meeting a bind failure knows who is holding the port.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "ConflictReport.json"
+      }
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal.",
+      "type": "boolean"
+    },
+    "services": {
+      "description": "What each service ended up doing, where the action waited to find out, or\nwhere a start did not complete, read once when it ended.\n\nEmpty for actions that do not wait. Stopping is finished when Compose\nsays it is, and surveying afterwards would only report the absence it\nwas asked to produce. A start that failed is not waited on, and names every\nservice it addressed and those they depend on as the engine had them then.",
+      "type": "array",
+      "items": {
+        "$ref": "Service.json"
+      }
+    },
+    "stack_edits": {
+      "description": "Stack files the operator has edited, left as they set them rather than\noverwritten with lemonfiber's own. Empty in the ordinary case; a named entry\nwarns that an upgrade would change a file they changed, and shows the diff.",
+      "type": "array",
+      "items": {
+        "$ref": "StackEdit.json"
+      }
+    },
+    "status": {
+      "description": "The exit status, absent for a rehearsal or a signalled process.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "int32"
+    },
+    "switched": {
+      "description": "What narrowing moved, where the command was a switch. Absent for every\nother action, which is what tells a reader that nothing was left running\non purpose.",
+      "anyOf": [
+        {
+          "$ref": "Switched.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "action",
+    "plan",
+    "command",
+    "rehearsed",
+    "services",
+    "stack_edits"
+  ]
+}

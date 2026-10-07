@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A stage in an item's journey, ordered from \"nobody asked for it\" to \"playable\". The\ndeclaration order is the pipeline order, so one stage compares less than a later one.",
+  "oneOf": [
+    {
+      "description": "Nobody has asked for it — no \\*arr is monitoring it.",
+      "type": "string",
+      "const": "not-monitored"
+    },
+    {
+      "description": "Monitored, waiting to be searched for.",
+      "type": "string",
+      "const": "monitored"
+    },
+    {
+      "description": "A search is running.",
+      "type": "string",
+      "const": "searching"
+    },
+    {
+      "description": "Releases were found by an indexer.",
+      "type": "string",
+      "const": "found"
+    },
+    {
+      "description": "A release was sent to the download client.",
+      "type": "string",
+      "const": "grabbed"
+    },
+    {
+      "description": "The download is in progress.",
+      "type": "string",
+      "const": "downloading"
+    },
+    {
+      "description": "The download finished.",
+      "type": "string",
+      "const": "downloaded"
+    },
+    {
+      "description": "The \\*arr is importing it to the library.",
+      "type": "string",
+      "const": "importing"
+    },
+    {
+      "description": "It was imported to the library on disk.",
+      "type": "string",
+      "const": "imported"
+    },
+    {
+      "description": "It is visible and playable in the media server.",
+      "type": "string",
+      "const": "available"
+    }
+  ]
+}

@@ -2,8 +2,8 @@
 #
 # Every SDK generates its types from this artefact rather than transcribing the
 # shapes. Reaching it should not mean cloning a Rust repo, so each
-# release carries it as an asset and an SDK vendors the copy from the
-# release it was generated against.
+# release carries it as an asset: the `contract/web-api/` directory as one
+# archive, `web-api.contract.tar.gz`.
 #
 # Separate from `release.yml`, which dist autogenerates and would overwrite.
 #
@@ -73,20 +73,25 @@ jobs:
           TAG: ${{ steps.tag.outputs.tag }}
         run: |
           set -euo pipefail
-          contract="contract/web-api.contract.json"
+          contract="contract/web-api"
 
           # A release without it leaves every SDK unable to sync that version,
           # which is better discovered here than by a consumer.
-          if [ ! -s "$contract" ]; then
-            echo "::error::$contract is missing or empty at $TAG"
+          if [ ! -s "$contract/index.json" ]; then
+            echo "::error::$contract/index.json is missing or empty at $TAG"
             exit 1
           fi
 
-          python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$contract"
+          # Every file is parsed, not only the index: one that is not JSON is a
+          # directory no SDK can generate from.
+          find "$contract" -type f -name '*.json' -print0 |
+            xargs -0 python3 -c 'import json,sys; [json.load(open(f)) for f in sys.argv[1:]]'
 
+          # One archive with the directory at its root, so a consumer takes a
+          # release's contract as a single asset and unpacks it as it was committed.
           mkdir -p "$RUNNER_TEMP/attached"
-          cp "$contract" "$RUNNER_TEMP/attached/"
-          echo "gathered $contract from $TAG"
+          tar -czf "$RUNNER_TEMP/attached/web-api.contract.tar.gz" -C contract web-api
+          echo "gathered $contract from $TAG as web-api.contract.tar.gz"
 
       # The three a plugin author's tooling reads, on the same terms and for the
       # same reason. An editor validating `plugin.toml`, and a catalogue checking a

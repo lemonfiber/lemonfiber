@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What choosing an audio format for music did: the choice, whether it was recorded\nor only rehearsed, and — once recorded — what became of applying it to the music\nservice.\n\nMusic has no resolution and no community profile to lean on, so unlike a resolution\npreset the choice is carried straight to the service through its API. The choice is\nstill recorded first, so it is remembered even when the service cannot be reached.",
+  "type": "object",
+  "properties": {
+    "choice": {
+      "description": "The format chosen, what it means, and what it costs.",
+      "$ref": "MusicChoice.json"
+    },
+    "disposition": {
+      "description": "Whether the choice was recorded, or only rehearsed.",
+      "$ref": "Disposition.json"
+    },
+    "outcome": {
+      "description": "What became of applying it to the music service, or `None` for a rehearsal\nthat applied nothing.",
+      "anyOf": [
+        {
+          "$ref": "Triggered.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "choice",
+    "disposition",
+    "rehearsed"
+  ]
+}

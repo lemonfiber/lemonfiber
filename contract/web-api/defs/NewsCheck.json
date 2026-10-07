@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A check found wrong, by the check and when it went wrong.",
+  "type": "object",
+  "properties": {
+    "check": {
+      "description": "The check that raised it.",
+      "type": "string"
+    },
+    "onset": {
+      "description": "When the stack first saw it wrong since it last saw it right, in whole seconds\nsince the epoch.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "check",
+    "onset"
+  ]
+}

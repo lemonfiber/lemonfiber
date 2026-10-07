@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "bytes": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "path": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "times_typical": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

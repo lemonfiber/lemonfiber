@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How sure the correlation behind a trace is — a release renamed between services can\nonly be matched fuzzily, and a guess presented as fact is worse than a marked one.",
+  "oneOf": [
+    {
+      "description": "Joined on identifiers the services agree on.",
+      "type": "string",
+      "const": "certain"
+    },
+    {
+      "description": "Joined by fuzzy matching; the trace may not be the item asked for.",
+      "type": "string",
+      "const": "uncertain"
+    }
+  ]
+}

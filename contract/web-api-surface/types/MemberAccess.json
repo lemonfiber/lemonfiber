@@ -1,0 +1,53 @@
+{
+  "fields": {
+    "administrator": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "age_limit": {
+      "type": [
+        "integer|null/uint32"
+      ],
+      "required": false
+    },
+    "disabled": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "every_library": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "libraries": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "rated": {
+      "type": [
+        "anyOf(null,ref:Rated)"
+      ],
+      "required": false
+    },
+    "restriction": {
+      "type": [
+        "ref:Restriction"
+      ],
+      "required": true
+    },
+    "unrated": {
+      "type": [
+        "ref:Unrated"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

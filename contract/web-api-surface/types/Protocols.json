@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "torrent": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "usenet": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

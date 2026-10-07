@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What the line was measured to carry.",
+  "type": "object",
+  "properties": {
+    "down": {
+      "description": "Bytes a second down.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "source": {
+      "description": "Where the figure came from.",
+      "$ref": "Source.json"
+    },
+    "taken": {
+      "description": "When it was taken, in seconds since the epoch.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "through_tunnel": {
+      "description": "Whether the path it was measured over goes through the VPN tunnel.",
+      "type": "boolean"
+    },
+    "up": {
+      "description": "Bytes a second up.\n\nMeasured apart from the download, because a home connection is asymmetric\nand a single figure for both would make every upload share far larger than\nthe operator meant.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "down",
+    "up",
+    "source",
+    "taken",
+    "through_tunnel"
+  ]
+}

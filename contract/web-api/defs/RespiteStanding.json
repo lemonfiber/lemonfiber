@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where a respite stands against the clock.",
+  "oneOf": [
+    {
+      "description": "None was asked for.",
+      "type": "object",
+      "properties": {
+        "standing": {
+          "type": "string",
+          "const": "none"
+        }
+      },
+      "required": [
+        "standing"
+      ]
+    },
+    {
+      "description": "In force, with this long left.",
+      "type": "object",
+      "properties": {
+        "seconds": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "standing": {
+          "type": "string",
+          "const": "in-force"
+        }
+      },
+      "required": [
+        "standing",
+        "seconds"
+      ]
+    },
+    {
+      "description": "It ran out, this long ago. Said once, then cleared.",
+      "type": "object",
+      "properties": {
+        "seconds": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "standing": {
+          "type": "string",
+          "const": "expired"
+        }
+      },
+      "required": [
+        "standing",
+        "seconds"
+      ]
+    }
+  ]
+}

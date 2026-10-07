@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How far a change can be put back.\n\nPublished as the closed set it is, rather than as a word a reader has to trust will\nbe one of three: a surface that lays out a history branches on it, and a set the\ncontract names is one a generated reader can match exhaustively.",
+  "oneOf": [
+    {
+      "description": "It can be put back exactly.",
+      "type": "string",
+      "const": "whole"
+    },
+    {
+      "description": "Some of it can, and the rest is stated rather than attempted.",
+      "type": "string",
+      "const": "partial"
+    },
+    {
+      "description": "None of it can.",
+      "type": "string",
+      "const": "none"
+    }
+  ]
+}

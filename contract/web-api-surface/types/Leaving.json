@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "ours": {
+      "type": [
+        "array[ref:Outbound]"
+      ],
+      "required": true
+    },
+    "theirs": {
+      "type": [
+        "array[ref:Elsewhere]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

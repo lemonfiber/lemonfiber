@@ -1,0 +1,5 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A stable identifier for a kind of problem.\n\nStability is the whole point: an operator who searches for a code should find\nthe same answer a year later. Every code is declared in the error crate's `codes`\nmodule, and a code is never recycled.",
+  "type": "string"
+}

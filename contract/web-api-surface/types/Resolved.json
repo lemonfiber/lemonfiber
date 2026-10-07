@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "bytes_per_second": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "is": {
+      "type": [
+        "const:\"at\"",
+        "const:\"unlimited\"",
+        "const:\"unmeasured\""
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"at\"",
+    "\"unlimited\"",
+    "\"unmeasured\""
+  ]
+}

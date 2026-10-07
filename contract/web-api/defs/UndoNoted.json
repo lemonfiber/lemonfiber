@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What putting one change back means beyond the change itself.",
+  "type": "object",
+  "properties": {
+    "because": {
+      "description": "What goes back, what does not go with it, and what to do instead.",
+      "type": "string"
+    },
+    "target": {
+      "description": "What the change was against.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "target",
+    "because"
+  ]
+}

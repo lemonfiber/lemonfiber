@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "data_root": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "outcome": {
+      "type": [
+        "ref:SetupOutcome"
+      ],
+      "required": true
+    },
+    "protocols": {
+      "type": [
+        "ref:Protocols"
+      ],
+      "required": true
+    },
+    "service_user": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

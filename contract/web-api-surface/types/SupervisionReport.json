@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "forms": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "reason": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "stopped": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "would": {
+      "type": [
+        "anyOf(null,ref:Vigil)"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

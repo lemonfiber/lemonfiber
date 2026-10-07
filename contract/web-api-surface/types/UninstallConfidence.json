@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "complete": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "unread": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

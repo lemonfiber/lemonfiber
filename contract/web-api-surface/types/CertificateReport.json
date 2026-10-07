@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "consequence": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "fingerprint": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "replaced": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

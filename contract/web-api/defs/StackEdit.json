@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A stack file the operator edited, preserved rather than overwritten, with the\nchange an upgrade would make shown against it.",
+  "type": "object",
+  "properties": {
+    "diff": {
+      "description": "The lines that differ between the operator's file and what lemonfiber would\nwrite — theirs marked `-`, lemonfiber's `+`, the matching head and tail left\nout. Empty where the two differ only in ways `lines` does not see.",
+      "type": "string"
+    },
+    "path": {
+      "description": "The file's path within the stack directory.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "path",
+    "diff"
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One proof that has to hold before a plugin is reported installed.",
+  "type": "object",
+  "properties": {
+    "asks": {
+      "description": "What it asks, as the method and the path it is asked at.",
+      "type": "string"
+    },
+    "came_to": {
+      "description": "What asking it came to, or nothing where it was not asked.\n\nAbsent on a rehearsal, which asks nothing. That is a different fact from a\nproof that was asked and established nothing, and the two must not read alike:\none is an account of what would happen, the other is a service that did not\nanswer.",
+      "anyOf": [
+        {
+          "$ref": "PluginVerdict.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "establishes": {
+      "description": "What it establishes, in one line.",
+      "type": "string"
+    },
+    "of": {
+      "description": "Which of the plugin's services it asks, where the manifest settles that.\n\nNothing where it does not, which is a manifest the reader has already refused\n— carried as an absence rather than as a guess, so that a report built from a\nmanifest nobody held to the reader says *this was not settled* instead of\nnaming whichever service came first.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "proof": {
+      "description": "The proof's id, which its verdict is reported against.",
+      "type": "string"
+    },
+    "why": {
+      "description": "Why it is worth asserting.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "proof",
+    "establishes",
+    "asks",
+    "why"
+  ]
+}

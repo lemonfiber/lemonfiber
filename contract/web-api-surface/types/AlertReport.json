@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "changed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "exceptions": {
+      "type": [
+        "array[ref:ExceptionReport]"
+      ],
+      "required": true
+    },
+    "means": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "preset": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

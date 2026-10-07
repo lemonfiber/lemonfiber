@@ -1,0 +1,41 @@
+{
+  "fields": {
+    "format": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "means": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "note": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "scope": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "size_per_hour": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "targets": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

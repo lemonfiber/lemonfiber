@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Something beneath the data location that the stack did not put there.",
+  "type": "object",
+  "properties": {
+    "at": {
+      "description": "The directory it is in, relative to the data location — or the file itself,\nwhere it sits directly in the data location.",
+      "type": "string"
+    },
+    "bytes": {
+      "description": "What they occupy.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "files": {
+      "description": "How many files were found under it.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "at",
+    "files",
+    "bytes"
+  ]
+}

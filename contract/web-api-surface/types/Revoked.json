@@ -1,0 +1,8 @@
+{
+  "fields": {},
+  "variants": [
+    "\"everywhere\"",
+    "\"media-server-only\"",
+    "\"nothing\""
+  ]
+}

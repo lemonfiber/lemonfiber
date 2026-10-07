@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "limit": {
+      "type": [
+        "integer|null/uint32"
+      ],
+      "required": false
+    },
+    "period": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "remaining": {
+      "type": [
+        "integer|null/uint32"
+      ],
+      "required": false
+    },
+    "used": {
+      "type": [
+        "integer/uint32"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

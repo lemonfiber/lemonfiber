@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "criticality": {
+      "type": [
+        "ref:Criticality"
+      ],
+      "required": true
+    },
+    "describes": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "id": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "without_it": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

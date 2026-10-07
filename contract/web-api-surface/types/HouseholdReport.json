@@ -1,0 +1,47 @@
+{
+  "fields": {
+    "allows": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "available": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "filtering": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "findings": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "members": {
+      "type": [
+        "array[ref:HouseholdMember]"
+      ],
+      "required": true
+    },
+    "policy": {
+      "type": [
+        "anyOf(null,ref:Policy)"
+      ],
+      "required": false
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "estimated_mib": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "unestimated": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

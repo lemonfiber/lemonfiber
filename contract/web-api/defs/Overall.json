@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a run's findings amount to.",
+  "oneOf": [
+    {
+      "description": "Everything that ran passed.",
+      "type": "string",
+      "const": "healthy"
+    },
+    {
+      "description": "Warnings, but nothing broken.",
+      "type": "string",
+      "const": "degraded"
+    },
+    {
+      "description": "Something is broken.",
+      "type": "string",
+      "const": "broken"
+    },
+    {
+      "description": "Something could not be determined, so health is not a settled fact.",
+      "type": "string",
+      "const": "unknown"
+    }
+  ]
+}

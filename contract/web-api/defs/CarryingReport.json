@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What adopting one existing service would come to.",
+  "type": "object",
+  "properties": {
+    "backup_first": {
+      "description": "Whether its database must be backed up before lemonfiber opens it.",
+      "type": "boolean"
+    },
+    "because": {
+      "description": "What that means for this service's data, in the operator's terms.",
+      "type": "string"
+    },
+    "existing": {
+      "description": "The version standing here now.",
+      "type": "string"
+    },
+    "ours": {
+      "description": "The version lemonfiber pins.",
+      "type": "string"
+    },
+    "refused": {
+      "description": "Whether lemonfiber will not do this at all.",
+      "type": "boolean"
+    },
+    "service": {
+      "description": "The service, by the name lemonfiber runs it under.",
+      "type": "string"
+    },
+    "verdict": {
+      "description": "Which of the two is the later, in one word.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "service",
+    "existing",
+    "ours",
+    "verdict",
+    "because",
+    "backup_first",
+    "refused"
+  ]
+}

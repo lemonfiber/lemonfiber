@@ -1,0 +1,12 @@
+{
+  "fields": {},
+  "variants": [
+    "\"available\"",
+    "\"choosing\"",
+    "\"downloading\"",
+    "\"grabbing\"",
+    "\"importing\"",
+    "\"scanning\"",
+    "\"searching\""
+  ]
+}

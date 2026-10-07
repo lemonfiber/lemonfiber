@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where a problem stands with respect to being fixed.",
+  "oneOf": [
+    {
+      "description": "A remedy is available here.",
+      "type": "string",
+      "const": "actionable"
+    },
+    {
+      "description": "The operator must act, somewhere else.",
+      "type": "string",
+      "const": "guided"
+    },
+    {
+      "description": "lemonfiber can fix this itself.",
+      "type": "string",
+      "const": "remediable"
+    },
+    {
+      "description": "No known remedy; escalation is offered instead.",
+      "type": "string",
+      "const": "unknown"
+    },
+    {
+      "description": "Acknowledged, and not re-shown until it recurs.",
+      "type": "string",
+      "const": "suppressed"
+    }
+  ]
+}

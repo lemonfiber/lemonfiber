@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One service standing in for another, worked out before anything is written.",
+  "type": "object",
+  "properties": {
+    "asked_by": {
+      "description": "Every service that asks for it, so the reach of the change is visible.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "capability": {
+      "description": "The capability whose filler changes.",
+      "type": "string"
+    },
+    "leaves_unfilled": {
+      "description": "What this would leave with nothing filling it, each naming what asked.\n\nThe one thing an operator cannot find out afterwards. A service filling two\ncapabilities is replaced for one of them, and the other stops being filled —\nwhich is a working stack becoming a broken one, on a change that reads as\nswapping like for like.",
+      "type": "array",
+      "items": {
+        "$ref": "Unfilled.json"
+      }
+    },
+    "now": {
+      "description": "What would fill it.",
+      "type": "string"
+    },
+    "setting": {
+      "description": "The setting the change writes.",
+      "type": "string"
+    },
+    "was": {
+      "description": "What fills it now, where anything does.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "why": {
+      "description": "What the operator said about the choice, where they said anything.\n\nRead back as the choice's own `why` wherever the choice is read, and absent\nwhere nothing was said: nothing supplies a reason on the operator's behalf.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "capability",
+    "now",
+    "asked_by",
+    "leaves_unfilled",
+    "setting"
+  ]
+}

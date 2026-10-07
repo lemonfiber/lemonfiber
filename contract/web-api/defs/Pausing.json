@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Which of the two was asked for.",
+  "oneOf": [
+    {
+      "description": "Stop every download client fetching.",
+      "type": "string",
+      "const": "pause"
+    },
+    {
+      "description": "Let every download client fetch again.",
+      "type": "string",
+      "const": "resume"
+    }
+  ]
+}

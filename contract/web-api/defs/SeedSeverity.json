@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How serious a reported connection is.\n\nDrift is normal and usually the operator's own harmless edit, so it is reported\nas information rather than a failure. It escalates to a warning only when the\ndrift breaks the stack — a root folder pointing where nothing exists, a download\nclient that no longer answers — and a warning that cannot be acted on is noise,\nso a warning always names both what broke and what to do about it.",
+  "oneOf": [
+    {
+      "description": "Nothing is broken: the connection is settled, or its drift is the operator's\nown edit that still works.",
+      "type": "object",
+      "properties": {
+        "severity": {
+          "type": "string",
+          "const": "informational"
+        }
+      },
+      "required": [
+        "severity"
+      ]
+    },
+    {
+      "description": "The connection breaks the stack. Both the breakage and a remediation are\nnamed, because a warning the operator cannot act on is noise.",
+      "type": "object",
+      "properties": {
+        "breakage": {
+          "description": "What is broken, in the operator's terms.",
+          "type": "string"
+        },
+        "remediation": {
+          "description": "What to do about it.",
+          "type": "string"
+        },
+        "severity": {
+          "type": "string",
+          "const": "warning"
+        }
+      },
+      "required": [
+        "severity",
+        "breakage",
+        "remediation"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "affected": {
+      "type": [
+        "array[ref:Affected]"
+      ],
+      "required": true
+    },
+    "standing": {
+      "type": [
+        "ref:HealthStanding"
+      ],
+      "required": true
+    },
+    "wanting_attention": {
+      "type": [
+        "integer/uint"
+      ],
+      "required": true
+    },
+    "worst": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

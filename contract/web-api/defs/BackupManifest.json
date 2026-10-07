@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The record written inside an archive, and read back to decide a restore.\n\nEverything a restore needs to know before it overwrites anything: what made\nthe archive, when, what data root it was taken against, what it covers, whether\nit is sensitive, and the contents to list. Round-trips through JSON so the same\nvalue the capture wrote is the value the restore reads.",
+  "type": "object",
+  "properties": {
+    "created_at": {
+      "description": "When it was taken. Opaque here; the surface stamps it from the clock.",
+      "type": "string"
+    },
+    "data_root": {
+      "description": "The data root it was taken against, to notice a restore to a different one.",
+      "type": "string"
+    },
+    "members": {
+      "description": "What is inside, for a listing shown before anything is overwritten.",
+      "type": "array",
+      "items": {
+        "$ref": "Member.json"
+      }
+    },
+    "product_version": {
+      "description": "The lemonfiber version that wrote it, checked against the one restoring.",
+      "type": "string"
+    },
+    "schema": {
+      "description": "The archive format, checked before anything inside is trusted.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "scope": {
+      "description": "What it covers.",
+      "$ref": "Scope.json"
+    },
+    "sensitive": {
+      "description": "Whether it carries credentials, and so must be handled as sensitive.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "schema",
+    "product_version",
+    "created_at",
+    "data_root",
+    "scope",
+    "sensitive",
+    "members"
+  ]
+}

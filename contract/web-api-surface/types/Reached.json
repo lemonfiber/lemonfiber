@@ -1,0 +1,8 @@
+{
+  "fields": {},
+  "variants": [
+    "\"exceeded\"",
+    "\"warning\"",
+    "\"within\""
+  ]
+}

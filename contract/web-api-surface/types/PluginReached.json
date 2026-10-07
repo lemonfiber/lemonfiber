@@ -1,0 +1,33 @@
+{
+  "fields": {
+    "group": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "hostname": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "port": {
+      "type": [
+        "integer/uint16"
+      ],
+      "required": true
+    },
+    "tier": {
+      "type": [
+        "const:\"household\"",
+        "const:\"loopback\""
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"household\"",
+    "\"loopback\""
+  ]
+}

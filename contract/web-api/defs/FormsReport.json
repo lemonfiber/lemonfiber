@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Every form this stack declares.",
+  "type": "object",
+  "properties": {
+    "forms": {
+      "description": "The forms, in the order the stack declares them.",
+      "type": "array",
+      "items": {
+        "$ref": "FormReport.json"
+      }
+    }
+  },
+  "required": [
+    "forms"
+  ]
+}

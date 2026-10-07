@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One request, by its number.",
+  "type": "object",
+  "properties": {
+    "by": {
+      "description": "Who asked for it, by the name the media server holds them under.",
+      "type": "string"
+    },
+    "number": {
+      "description": "The number the request service files it under.",
+      "type": "integer",
+      "format": "int64"
+    },
+    "title": {
+      "description": "What it is called, where a service has been told about it.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "number",
+    "by"
+  ]
+}

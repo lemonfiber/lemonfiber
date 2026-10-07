@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a reader needs to know before reading a word of the bundle.\n\nAn operator pasting last week's bundle into this week's thread is the commonest way one\nof those threads goes wrong, and nothing in the contents tells either of them.",
+  "type": "object",
+  "properties": {
+    "at": {
+      "description": "When, as a service writes a moment.",
+      "type": "string"
+    },
+    "lemonfiber": {
+      "description": "The lemonfiber that wrote it.",
+      "type": "string"
+    },
+    "stack": {
+      "description": "The stack it was written from.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "lemonfiber",
+    "stack",
+    "at"
+  ]
+}

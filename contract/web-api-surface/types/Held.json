@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "id": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "medium": {
+      "type": [
+        "ref:Medium"
+      ],
+      "required": true
+    },
+    "title": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "year": {
+      "type": [
+        "integer|null/uint16"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

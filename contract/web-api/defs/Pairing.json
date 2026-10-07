@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Pairing material, and what the operator is told beside it.",
+  "type": "object",
+  "properties": {
+    "caution": {
+      "description": "What is worth knowing about the address itself, where anything is.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "compare": {
+      "description": "The fingerprint in the short form a person compares with what the phone shows\nafter typing the line in, as [`comparable`] derives it.",
+      "type": "string"
+    },
+    "material": {
+      "description": "The material itself.",
+      "$ref": "PairingMaterial.json"
+    },
+    "replacing": {
+      "description": "What would make every paired phone refuse this machine, said now rather than\ndiscovered then. In words any surface can show: how the certificate is replaced\nis each surface's own to say, so this names no command.",
+      "type": "string"
+    },
+    "until": {
+      "description": "When it stops being good, as a date and a time of day.",
+      "type": "string"
+    },
+    "written": {
+      "description": "The material as the one line a code carries and a person types.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "material",
+    "written",
+    "compare",
+    "until",
+    "replacing"
+  ]
+}

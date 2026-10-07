@@ -1,0 +1,21 @@
+{
+  "fields": {
+    "as": {
+      "type": [
+        "const:\"as_of\"",
+        "const:\"live\""
+      ],
+      "required": true
+    },
+    "at": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"as_of\"",
+    "\"live\""
+  ]
+}

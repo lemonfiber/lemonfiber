@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "command": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "every": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "root": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

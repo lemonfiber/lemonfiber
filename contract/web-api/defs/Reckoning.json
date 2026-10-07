@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where the disk stands, what is on it, and what could be got back.",
+  "type": "object",
+  "properties": {
+    "agreement": {
+      "description": "What this offer names itself, so an answer to it can say which offer it was\nanswering. The answer is this name, and nothing else is a yes to a cleanup.",
+      "type": "string"
+    },
+    "candidates": {
+      "description": "The completed downloads, each with where it stands and what removing it\nwould cost.",
+      "type": "array",
+      "items": {
+        "$ref": "Candidate.json"
+      }
+    },
+    "consumption": {
+      "description": "Where the room went, one line per tree plus the services' own files, and\none line for what is committed but has not landed yet.",
+      "type": "array",
+      "items": {
+        "$ref": "Consumption.json"
+      }
+    },
+    "halted": {
+      "description": "Whether new acquisitions are halted to keep the services writable.",
+      "type": "boolean"
+    },
+    "interrupted": {
+      "description": "The imports that stopped part-way, with what is on disk for each.",
+      "type": "array",
+      "items": {
+        "$ref": "Interrupted.json"
+      }
+    },
+    "level": {
+      "description": "Where the stack stands, which is where its worst volume stands.",
+      "$ref": "Level.json"
+    },
+    "outsized": {
+      "description": "The files far enough out of line with the rest to be worth pointing at.",
+      "type": "array",
+      "items": {
+        "$ref": "Outsized.json"
+      }
+    },
+    "reclaimable": {
+      "description": "What of that room could be got back, and what each would cost.\n\nA second reading of bytes already counted above rather than more of them: a\nseeding torrent's file is in the tree it lives in *and* here. Summing the\ntwo lists together would double what is on the disk, which is the mistake\nthis whole module is arranged to avoid.",
+      "type": "array",
+      "items": {
+        "$ref": "Consumption.json"
+      }
+    },
+    "reclaimed": {
+      "description": "What became of an answered cleanup, where the offer was answered.",
+      "anyOf": [
+        {
+          "$ref": "Reclaimed.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+      "type": "boolean"
+    },
+    "volumes": {
+      "description": "The volumes watched. Either filling stops the stack, so both are reported\nwhether or not they are the same drive.",
+      "type": "array",
+      "items": {
+        "$ref": "Volume.json"
+      }
+    }
+  },
+  "required": [
+    "volumes",
+    "level",
+    "halted",
+    "consumption",
+    "reclaimable",
+    "candidates",
+    "outsized",
+    "interrupted",
+    "agreement",
+    "rehearsed"
+  ]
+}

@@ -56,8 +56,9 @@ OFFERED = re.compile(r"pub const OFFERED: &\[&str\] = &\[(.*?)\];", re.DOTALL)
 # Where a path held in a constant is declared, relative to the same root.
 DECLARING = pathlib.Path("crates/lemonfiber-api/src")
 
-# The committed artefact, relative to the repository root, and the list in it.
-ARTEFACT = pathlib.Path("contract/web-api.contract.json")
+# The committed artefact's index, relative to the repository root. It names the
+# file the reads are listed in, beside it.
+ARTEFACT = pathlib.Path("contract/web-api/index.json")
 
 # The page, relative to a spec checkout, and the heading the block sits under.
 PAGE = pathlib.Path("20-architecture/contracts/web-api.md")
@@ -179,12 +180,18 @@ def named(spec: pathlib.Path) -> tuple[set[str], list[str]]:
 
 def listed(root: pathlib.Path) -> tuple[set[str], list[str]]:
     """Every read the committed artefact lists, and anything unreadable about it."""
-    artefact = root / ARTEFACT
+    index = root / ARTEFACT
+    if not index.is_file():
+        return set(), [f"no artefact at {index}"]
+    named_file = json.loads(index.read_text(encoding="utf-8")).get("reads")
+    if not isinstance(named_file, str):
+        return set(), [f"{index} names no file of `reads`"]
+    artefact = index.parent / named_file
     if not artefact.is_file():
-        return set(), [f"no artefact at {artefact}"]
-    reads = json.loads(artefact.read_text(encoding="utf-8")).get("reads")
+        return set(), [f"{index} names {artefact} for its reads and there is none"]
+    reads = json.loads(artefact.read_text(encoding="utf-8"))
     if not isinstance(reads, list):
-        return set(), [f"{artefact} lists no `reads`"]
+        return set(), [f"{artefact} lists no reads"]
     return {read["path"] for read in reads if isinstance(read, dict) and "path" in read}, []
 
 

@@ -1,0 +1,12 @@
+{
+  "fields": {},
+  "variants": [
+    "\"declined\"",
+    "\"failed\"",
+    "\"getting\"",
+    "\"gone\"",
+    "\"here\"",
+    "\"partly-here\"",
+    "\"waiting-for-approval\""
+  ]
+}

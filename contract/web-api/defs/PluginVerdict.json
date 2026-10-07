@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What one assertion came to, whatever answered it.",
+  "oneOf": [
+    {
+      "description": "The recording answers what the binding declares.",
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "const": "passed"
+        }
+      },
+      "required": [
+        "outcome"
+      ]
+    },
+    {
+      "description": "It does not, in every way it does not.",
+      "type": "object",
+      "properties": {
+        "faults": {
+          "description": "Every way the recorded answer is not the declared one.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "outcome": {
+          "type": "string",
+          "const": "failed"
+        }
+      },
+      "required": [
+        "outcome",
+        "faults"
+      ]
+    },
+    {
+      "description": "It could not be run, and so established nothing either way.",
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "const": "unproven"
+        },
+        "why": {
+          "description": "What stopped it being run.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "outcome",
+        "why"
+      ]
+    },
+    {
+      "description": "It fails on the recordings its manifest declares it fails on, on the constraint\neach declaration names and on nothing else, and holds on every other recording it\nwas run against.\n\nApart from passed and from failed, and counted as neither. The assertion does not\nhold there, so a pass would say the opposite of what the recording shows; and the\nfailure is the one its author described and gave a reason for, so it does not\nfail the run. Only ever reached against recordings: the live service is held to\nthe expectation as it is written.",
+      "type": "object",
+      "properties": {
+        "declared": {
+          "description": "Each declared recording, what it held, and why it is one the assertion fails on.",
+          "type": "array",
+          "items": {
+            "$ref": "PluginFailingAsDeclared.json"
+          }
+        },
+        "outcome": {
+          "type": "string",
+          "const": "failing-as-declared"
+        }
+      },
+      "required": [
+        "outcome",
+        "declared"
+      ]
+    }
+  ]
+}

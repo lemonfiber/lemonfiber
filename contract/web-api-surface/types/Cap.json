@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "exceeded": {
+      "type": [
+        "ref:WhenExceeded"
+      ],
+      "required": true
+    },
+    "monthly": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

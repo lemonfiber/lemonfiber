@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One key as the listing shows it, without its secret.",
+  "type": "object",
+  "properties": {
+    "member_minted": {
+      "description": "Whether a household member minted it for themselves.",
+      "type": "boolean"
+    },
+    "minted": {
+      "description": "When it was minted.",
+      "type": "string"
+    },
+    "name": {
+      "description": "The name it was minted under.",
+      "type": "string"
+    },
+    "purpose": {
+      "description": "What the minter said it is for. A declaration, not something the core verified.",
+      "$ref": "KeyPurpose.json"
+    },
+    "revoked": {
+      "description": "When it was revoked, where it has been.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "scope": {
+      "description": "What it admits: `read`, `act` or `member:<name>`.",
+      "type": "string"
+    },
+    "state": {
+      "description": "Where it stands.",
+      "$ref": "KeyState.json"
+    },
+    "used": {
+      "description": "When it was last admitted, where it has been.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "name",
+    "scope",
+    "purpose",
+    "state",
+    "minted",
+    "member_minted"
+  ]
+}

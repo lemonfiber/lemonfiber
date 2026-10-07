@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A named front door that is not one, and why it is not.",
+  "type": "object",
+  "properties": {
+    "because": {
+      "description": "Why this stack will not send a household there.",
+      "type": "string"
+    },
+    "named": {
+      "description": "What the operator recorded, as they wrote it.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "named",
+    "because"
+  ]
+}

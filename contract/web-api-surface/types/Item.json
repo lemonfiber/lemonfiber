@@ -1,0 +1,41 @@
+{
+  "fields": {
+    "bytes": {
+      "type": [
+        "integer|null/uint64"
+      ],
+      "required": false
+    },
+    "kept": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "secret": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "sort": {
+      "type": [
+        "ref:Sort"
+      ],
+      "required": true
+    },
+    "what": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

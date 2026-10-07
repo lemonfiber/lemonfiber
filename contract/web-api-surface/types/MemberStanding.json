@@ -1,0 +1,10 @@
+{
+  "fields": {},
+  "variants": [
+    "\"active\"",
+    "\"declined\"",
+    "\"expired\"",
+    "\"invited\"",
+    "\"suspended\""
+  ]
+}

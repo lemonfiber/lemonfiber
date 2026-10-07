@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where one item is in the pipeline: how far it got, why it stopped if it did, and the\nstages it passed through — the answer to \"where is my show?\".",
+  "type": "object",
+  "properties": {
+    "confidence": {
+      "description": "How sure the trace is of the item it followed.",
+      "$ref": "TraceConfidence.json"
+    },
+    "coverage": {
+      "description": "How much of the item is actually here, season by season — present for an item\nmade of parts, absent for a film, which is the whole item and has none.\n\nThe furthest stage alone cannot answer this: a series is \"imported\" the moment one\nepisode lands, which reads as done while the rest are missing.",
+      "anyOf": [
+        {
+          "$ref": "Coverage.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "findings": {
+      "description": "Disagreements between the services about this item, each in plain language — a\nmedia server holding what no service is monitoring, and the like. Orthogonal to\nthe linear pipeline: not where the item got to, but where two services' views of\nit contradict, surfaced rather than silently reconciled.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "furthest": {
+      "description": "The furthest stage the item reached.",
+      "$ref": "Stage.json"
+    },
+    "history": {
+      "description": "The notable events in its history, oldest first — the grabs, failed downloads,\nimports and removals. Repeated attempts show here as the pattern they are, which\nthe single furthest stage cannot.",
+      "type": "array",
+      "items": {
+        "$ref": "TraceMoment.json"
+      }
+    },
+    "item": {
+      "description": "The term the item was searched for by.",
+      "type": "string"
+    },
+    "matched": {
+      "description": "Whether a monitored item matched the term at all — a false here is itself the\nanswer: nobody asked for it.",
+      "type": "boolean"
+    },
+    "stages": {
+      "description": "The stages it passed through, in order.",
+      "type": "array",
+      "items": {
+        "$ref": "TraceStage.json"
+      }
+    },
+    "stall": {
+      "description": "Why it stopped, where it plainly has — or absent where it is progressing or done.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "item",
+    "matched",
+    "furthest",
+    "stages",
+    "history",
+    "confidence",
+    "findings"
+  ]
+}

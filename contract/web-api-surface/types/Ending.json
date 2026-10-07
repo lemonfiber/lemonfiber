@@ -1,0 +1,9 @@
+{
+  "fields": {},
+  "variants": [
+    "\"not-fetched\"",
+    "\"not-reached\"",
+    "\"not-started\"",
+    "\"updated\""
+  ]
+}

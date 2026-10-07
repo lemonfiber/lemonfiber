@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A repair that has run out of chances, and where to go instead.",
+  "type": "object",
+  "properties": {
+    "check": {
+      "description": "The check whose fault has outlasted every attempt at it.",
+      "type": "string"
+    },
+    "remedy": {
+      "description": "What to do about it now that lemonfiber has stopped offering to.",
+      "$ref": "Remedy.json"
+    }
+  },
+  "required": [
+    "check",
+    "remedy"
+  ]
+}

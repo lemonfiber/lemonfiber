@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a service published to the local network is to the people in the house.",
+  "oneOf": [
+    {
+      "description": "Where asking for something begins, and where what was asked for is followed.\nIt links onward to the library, which is what makes it a place to start\nrather than one more address to be sent.",
+      "type": "string",
+      "const": "asking"
+    },
+    {
+      "description": "The library, where what arrived is watched. A place to start only where there\nis nothing to ask for, because somebody sent there has no way to ask.",
+      "type": "string",
+      "const": "watching"
+    },
+    {
+      "description": "One kind of media and no other, reached from the library rather than instead\nof it.",
+      "type": "string",
+      "const": "shelf"
+    },
+    {
+      "description": "An index over every service, including the ones nobody in the house should\nlearn exist.",
+      "type": "string",
+      "const": "operators"
+    },
+    {
+      "description": "How the others are reached, rather than one of them.",
+      "type": "string",
+      "const": "carriage"
+    },
+    {
+      "description": "Published to the household, and nothing here says what it is to them.",
+      "type": "string",
+      "const": "unstated"
+    }
+  ]
+}

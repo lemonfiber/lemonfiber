@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How lemonfiber talks to a service when seeding.\n\nThe same shape on a plugin's service as on the stack's own, which is what lets a\nplugin name one of these adapters rather than supply one of its own.",
+  "type": "object",
+  "properties": {
+    "key_source": {
+      "description": "Where the credential comes from.",
+      "$ref": "KeySource.json"
+    },
+    "kind": {
+      "description": "Selects the client implementation.",
+      "$ref": "ApiKind.json"
+    },
+    "path": {
+      "description": "The file holding the credential, where one applies.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "version": {
+      "description": "The major version of the service's HTTP API — the `/api/vN` path segment.\n\nRequired for the `servarr` shape and read there, because that one shape\nspans two versions (Sonarr and Radarr at v3, Lidarr and Prowlarr at v1),\nso the version is data rather than a guess from a service's name. Absent\nfor the other kinds, whose one fixed version their client already knows.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "default": null,
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "key_source"
+  ]
+}

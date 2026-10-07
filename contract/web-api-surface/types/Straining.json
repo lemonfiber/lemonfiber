@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "caution": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "instead": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "preset": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

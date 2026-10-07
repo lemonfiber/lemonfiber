@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "caution": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "url": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "entries": {
+      "type": [
+        "array[ref:Entry]"
+      ],
+      "required": true
+    },
+    "title": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

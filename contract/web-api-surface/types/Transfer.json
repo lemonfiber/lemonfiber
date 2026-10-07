@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "eta": {
+      "type": [
+        "anyOf(null,ref:Duration)"
+      ],
+      "required": false
+    },
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "progress": {
+      "type": [
+        "integer/uint8"
+      ],
+      "required": true
+    },
+    "protocol": {
+      "type": [
+        "ref:DashboardProtocol"
+      ],
+      "required": true
+    },
+    "speed": {
+      "type": [
+        "ref:DashboardReading"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

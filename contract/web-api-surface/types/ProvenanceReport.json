@@ -1,0 +1,11 @@
+{
+  "fields": {
+    "services": {
+      "type": [
+        "array[ref:ServiceProvenance]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

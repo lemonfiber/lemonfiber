@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One direction's limit, as declared and as it comes to.",
+  "type": "object",
+  "properties": {
+    "limit": {
+      "description": "The limit as it was expressed.",
+      "$ref": "Limit.json"
+    },
+    "resolved": {
+      "description": "What it comes to against the measured line.",
+      "$ref": "Resolved.json"
+    },
+    "says": {
+      "description": "The limit and the line it was measured against, in one sentence.\n\nCarried rather than left to each surface, so the rule that a share is never\nshown without the figure it is a share of is kept in one place instead of\nthree.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "limit",
+    "resolved",
+    "says"
+  ]
+}

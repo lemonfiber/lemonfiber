@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "address": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "expires": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "fingerprint": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "stack": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

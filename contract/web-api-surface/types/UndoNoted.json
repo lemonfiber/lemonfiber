@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "because": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "target": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "destination": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "origin": {
+      "type": [
+        "ref:ValueOrigin"
+      ],
+      "required": true
+    },
+    "purpose": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "recorded": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

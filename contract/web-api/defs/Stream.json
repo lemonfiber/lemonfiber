@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Which stream a log line arrived on.",
+  "oneOf": [
+    {
+      "description": "Standard output.",
+      "type": "string",
+      "const": "stdout"
+    },
+    {
+      "description": "Standard error.",
+      "type": "string",
+      "const": "stderr"
+    }
+  ]
+}

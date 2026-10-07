@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "agreement": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "download": {
+      "type": [
+        "ref:Candidate"
+      ],
+      "required": true
+    },
+    "goes": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "gone": {
+      "type": [
+        "anyOf(null,ref:Gone)"
+      ],
+      "required": false
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

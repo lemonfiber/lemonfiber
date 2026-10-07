@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Which of the two volumes a reading is about.",
+  "oneOf": [
+    {
+      "description": "Where the media and the downloads live.",
+      "type": "string",
+      "const": "data"
+    },
+    {
+      "description": "Where the services keep their own configuration and databases.",
+      "type": "string",
+      "const": "services"
+    }
+  ]
+}

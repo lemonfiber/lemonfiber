@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "nanos": {
+      "type": [
+        "integer/uint32"
+      ],
+      "required": true
+    },
+    "secs": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

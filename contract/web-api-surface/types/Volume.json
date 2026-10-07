@@ -1,0 +1,59 @@
+{
+  "fields": {
+    "at": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "committed": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "free": {
+      "type": [
+        "integer|null/uint64"
+      ],
+      "required": false
+    },
+    "level": {
+      "type": [
+        "ref:Level"
+      ],
+      "required": true
+    },
+    "limit": {
+      "type": [
+        "integer|null/uint64"
+      ],
+      "required": false
+    },
+    "point": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "projected": {
+      "type": [
+        "integer|null/uint64"
+      ],
+      "required": false
+    },
+    "reading": {
+      "type": [
+        "ref:Freshness"
+      ],
+      "required": true
+    },
+    "role": {
+      "type": [
+        "ref:Role"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

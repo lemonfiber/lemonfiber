@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Who is in the household, what each may watch, and what each has asked for.",
+  "type": "object",
+  "properties": {
+    "allows": {
+      "description": "What that policy allows in a period, in the words a household says it in.\n\nAbsent where nothing limits the household, which is not the same as a policy\nthat could not be read: that one leaves [`Self::policy`] absent too.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "available": {
+      "description": "Whether the household could be read at all. A false here is why the list is\nempty, and keeps an unread record from being mistaken for an empty house — the\nsame honesty a trace keeps about a silence it did not hear.",
+      "type": "boolean"
+    },
+    "filtering": {
+      "description": "What the limits on this household are and are not, where anybody carries one.\n\nAbsent on a household nobody has limited, because there is no claim to be modest\nabout. Present the moment there is one, because a parent who has set a limit is\nexactly the reader who might take it for a lock.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "findings": {
+      "description": "What could not be read, and anything else worth the operator's attention.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "members": {
+      "description": "Everybody the media server holds an account for, in name order — including\nthose who have never asked for anything, and the invitations nobody has taken\nup yet.",
+      "type": "array",
+      "items": {
+        "$ref": "HouseholdMember.json"
+      }
+    },
+    "policy": {
+      "description": "What happens to what the household asks for where nobody chose otherwise for\none person. Absent where the request service could not be asked.",
+      "anyOf": [
+        {
+          "$ref": "Policy.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "members",
+    "available",
+    "findings",
+    "rehearsed"
+  ]
+}

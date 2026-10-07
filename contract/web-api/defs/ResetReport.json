@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a full reset did, or — until it is confirmed — would do: the operator edits it\nreverts back to lemonfiber's own state, and whether it was carried out or only shown.",
+  "type": "object",
+  "properties": {
+    "confirmed": {
+      "description": "Whether the reset was carried out, or only previewed pending confirmation.",
+      "type": "boolean"
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+      "type": "boolean"
+    },
+    "reverted": {
+      "description": "The operator's edits that were reverted — or, unconfirmed, that a reset would\nrevert — each with the diff of what is lost against what lemonfiber restores.",
+      "type": "array",
+      "items": {
+        "$ref": "StackEdit.json"
+      }
+    },
+    "reverted_connections": {
+      "description": "The service connections whose drifted value was reverted to lemonfiber's — or,\nunconfirmed, would be — each named as it reads in a seed report.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "reverted",
+    "reverted_connections",
+    "confirmed",
+    "rehearsed"
+  ]
+}

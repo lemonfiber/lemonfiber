@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a proposed change comes to on this machine.\n\nEmpty on every change that comes to nothing beyond its value, which is most of\nthem: a report full of empty lists about a timezone would teach the operator to\nskip the one that matters.",
+  "type": "object",
+  "properties": {
+    "active": {
+      "description": "What is still coming down, where a reduction would interrupt it.",
+      "type": "array",
+      "items": {
+        "$ref": "Active.json"
+      }
+    },
+    "edited": {
+      "description": "The hand-edit found in the configuration file, where one was found.",
+      "anyOf": [
+        {
+          "$ref": "Edited.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "keeps": {
+      "description": "What this change leaves exactly as it is, said in full — because an operator\ndropping a way of downloading is weighing whether they lose what they built\nwith it.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "library": {
+      "description": "The library paths the services hold, and what moving the data location does\nto each. Empty for every change that does not move it.",
+      "type": "array",
+      "items": {
+        "$ref": "LibraryPath.json"
+      }
+    },
+    "opens": {
+      "description": "What this change newly asks the operator for, in the order they meet it.",
+      "type": "array",
+      "items": {
+        "$ref": "Opening.json"
+      }
+    },
+    "stops": {
+      "description": "What this change stops running, by service name.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "opens",
+    "stops",
+    "keeps",
+    "library",
+    "active"
+  ]
+}

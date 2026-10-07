@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What removing somebody costs, and what it did.\n\nRead before anything is written: the whole point of the unconfirmed run is that every\nfigure here is knowable without removing anybody.",
+  "type": "object",
+  "properties": {
+    "asks-through-the-request-service": {
+      "description": "Whether the request service holds an account for them at all.\n\nFalse where they never signed in there, which is nothing to revoke rather than a\nrevocation that failed.",
+      "type": "boolean"
+    },
+    "confirmed": {
+      "description": "Whether it was carried out, or only described pending confirmation.",
+      "type": "boolean"
+    },
+    "findings": {
+      "description": "What could not be done, and anything else worth the operator's attention.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "name": {
+      "description": "The name their account is held under, as the media server spells it rather than\nas the operator typed it.",
+      "type": "string"
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+      "type": "boolean"
+    },
+    "requests": {
+      "description": "How many of their requests go with them.\n\n**They are destroyed, not reassigned.** The request service removes them by hand\nso that a title still waiting goes back to being unrequested rather than pointing\nat nobody — so this is a count of things that will stop existing.",
+      "type": "integer",
+      "format": "uint",
+      "minimum": 0
+    },
+    "revoked": {
+      "description": "How far it got.",
+      "$ref": "Revoked.json"
+    }
+  },
+  "required": [
+    "name",
+    "confirmed",
+    "requests",
+    "asks-through-the-request-service",
+    "revoked",
+    "findings",
+    "rehearsed"
+  ]
+}

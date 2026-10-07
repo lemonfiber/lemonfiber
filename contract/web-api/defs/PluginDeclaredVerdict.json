@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The one verdict a declaration may name.",
+  "oneOf": [
+    {
+      "description": "The assertion fails on the recording, on the constraint the declaration names.",
+      "type": "string",
+      "const": "fails"
+    }
+  ]
+}

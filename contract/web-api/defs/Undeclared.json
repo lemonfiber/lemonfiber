@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A container running under this project that the stack description never declared.\n\nIts own type rather than a [`Service`] with the fields left blank. A service\ncarries a profile and a criticality, and there is no honest value for either here:\nfilling them in would have lemonfiber asserting how much something matters when\nthe only thing it knows about it is that it exists.",
+  "type": "object",
+  "properties": {
+    "describes": {
+      "description": "What it does for the operator — which is exactly what is not known.",
+      "type": "string"
+    },
+    "id": {
+      "description": "The Compose service name the engine reports it under.",
+      "type": "string"
+    },
+    "state": {
+      "description": "What it is doing, read the same way a declared service's state is.",
+      "$ref": "ServiceState.json"
+    }
+  },
+  "required": [
+    "id",
+    "state",
+    "describes"
+  ]
+}

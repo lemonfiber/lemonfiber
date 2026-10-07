@@ -1,0 +1,41 @@
+{
+  "fields": {
+    "named": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "origin": {
+      "type": [
+        "const:\"bundled\"",
+        "const:\"operator\"",
+        "const:\"orphaned\"",
+        "const:\"overridden\"",
+        "const:\"plugin\"",
+        "const:\"unknown\""
+      ],
+      "required": true
+    },
+    "replaced": {
+      "type": [
+        "ref:ValueReplaced"
+      ],
+      "required": true
+    },
+    "why": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"bundled\"",
+    "\"operator\"",
+    "\"orphaned\"",
+    "\"overridden\"",
+    "\"plugin\"",
+    "\"unknown\""
+  ]
+}

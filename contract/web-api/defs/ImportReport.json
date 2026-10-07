@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What copying an operator's own records across came to, or would come to.",
+  "type": "object",
+  "properties": {
+    "carried": {
+      "description": "What was carried across.",
+      "type": "array",
+      "items": {
+        "$ref": "RecordReport.json"
+      }
+    },
+    "not_carried": {
+      "description": "What could not be carried, and why.",
+      "type": "array",
+      "items": {
+        "$ref": "UnsupportedReport.json"
+      }
+    },
+    "project": {
+      "description": "The project the records were read from.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "refusal": {
+      "description": "Why nothing was carried, where nothing was.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+      "type": "boolean"
+    },
+    "stance": {
+      "description": "Where the act stands.",
+      "$ref": "Stance.json"
+    },
+    "would_carry": {
+      "description": "What would be, where nothing has been yet.",
+      "type": "array",
+      "items": {
+        "$ref": "RecordReport.json"
+      }
+    }
+  },
+  "required": [
+    "carried",
+    "would_carry",
+    "not_carried",
+    "stance",
+    "rehearsed"
+  ]
+}

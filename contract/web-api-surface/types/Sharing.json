@@ -1,0 +1,119 @@
+{
+  "fields": {
+    "acting": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "applied": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "cap": {
+      "type": [
+        "anyOf(null,ref:Cap)"
+      ],
+      "required": false
+    },
+    "capacity": {
+      "type": [
+        "anyOf(null,ref:Capacity)"
+      ],
+      "required": false
+    },
+    "cautions": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "clients": {
+      "type": [
+        "array[ref:Holding]"
+      ],
+      "required": true
+    },
+    "down": {
+      "type": [
+        "ref:BandwidthReading"
+      ],
+      "required": true
+    },
+    "means": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "metered": {
+      "type": [
+        "anyOf(null,ref:Metered)"
+      ],
+      "required": false
+    },
+    "ratio": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "reached": {
+      "type": [
+        "anyOf(null,ref:Reached)"
+      ],
+      "required": false
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "respite": {
+      "type": [
+        "ref:RespiteStanding"
+      ],
+      "required": true
+    },
+    "respite_says": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "restraint": {
+      "type": [
+        "ref:Restraint"
+      ],
+      "required": true
+    },
+    "rhythm": {
+      "type": [
+        "anyOf(null,ref:Rhythm)"
+      ],
+      "required": false
+    },
+    "untouched": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "up": {
+      "type": [
+        "ref:BandwidthReading"
+      ],
+      "required": true
+    },
+    "zone": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

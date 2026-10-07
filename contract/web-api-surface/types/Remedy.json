@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "action": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "detail": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

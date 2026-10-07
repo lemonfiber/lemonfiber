@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One Compose project on this machine that is not lemonfiber's.",
+  "type": "object",
+  "properties": {
+    "project": {
+      "description": "The Compose project name.",
+      "type": "string"
+    },
+    "services": {
+      "description": "Its containers, by service name.",
+      "type": "array",
+      "items": {
+        "$ref": "OccupantReport.json"
+      }
+    }
+  },
+  "required": [
+    "project",
+    "services"
+  ]
+}

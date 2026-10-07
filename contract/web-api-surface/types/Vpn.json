@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "country": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "egress_matches": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "exit_ip": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "forwarded_port": {
+      "type": [
+        "integer|null/uint16"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

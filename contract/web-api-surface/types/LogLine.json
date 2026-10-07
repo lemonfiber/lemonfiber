@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "at": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "level": {
+      "type": [
+        "anyOf(null,ref:LogLevel)"
+      ],
+      "required": false
+    },
+    "line": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "stream": {
+      "type": [
+        "ref:Stream"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

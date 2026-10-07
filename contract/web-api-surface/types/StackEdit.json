@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "diff": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "path": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One record carried across, or that would be.",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "description": "What kind of record it is, in the plural a person reads.",
+      "type": "string"
+    },
+    "name": {
+      "description": "What it is called.",
+      "type": "string"
+    },
+    "service": {
+      "description": "The service it belongs to.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "service",
+    "kind",
+    "name"
+  ]
+}

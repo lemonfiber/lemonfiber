@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What one member may ask for, where the request service could be asked.\n\nBoth counts, because the service keeps them apart and folding them would report a\nhousehold as within its limit while the half that matters is spent: television is\ncounted a season at a time, so one ask for a six-season series spends six.",
+  "type": "object",
+  "properties": {
+    "films": {
+      "description": "Films, counted one to a request.",
+      "$ref": "Counted.json"
+    },
+    "frees_up": {
+      "description": "When the count next lets go of something, so one more becomes possible.\n\nAbsent where nothing limits them, and where the request service's own dates\ncould not be read — an invented one would be a promise about a day on which\nnothing happens. The period is a window that rolls rather than a month that\nends, so this is the moment their earliest counted request ages out.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "policy": {
+      "description": "What happens to what they ask for.",
+      "$ref": "Policy.json"
+    },
+    "standing": {
+      "description": "Where they stand against what their period allows, taken over both counts.",
+      "$ref": "AskingStanding.json"
+    },
+    "television": {
+      "description": "Television, counted one to a season.",
+      "$ref": "Counted.json"
+    }
+  },
+  "required": [
+    "policy",
+    "standing",
+    "films",
+    "television"
+  ]
+}

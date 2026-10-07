@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "consumer": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "reach": {
+      "type": [
+        "ref:CredentialReach"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

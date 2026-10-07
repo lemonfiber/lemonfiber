@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One active download, as the dashboard shows it.",
+  "type": "object",
+  "properties": {
+    "eta": {
+      "description": "The time left, or `None` where it is stalled and there is none to give.",
+      "anyOf": [
+        {
+          "$ref": "Duration.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "name": {
+      "description": "What is being downloaded.",
+      "type": "string"
+    },
+    "progress": {
+      "description": "How far along, as a percentage from zero to a hundred.",
+      "type": "integer",
+      "format": "uint8",
+      "maximum": 255,
+      "minimum": 0
+    },
+    "protocol": {
+      "description": "How it is being downloaded.",
+      "$ref": "DashboardProtocol.json"
+    },
+    "speed": {
+      "description": "The current speed in bytes per second — a [`Reading`], because a genuine\nzero (stalled) and a source that has gone quiet mean opposite things here,\nand this is the very figure that difference is about.",
+      "$ref": "DashboardReading.json"
+    }
+  },
+  "required": [
+    "name",
+    "protocol",
+    "progress",
+    "speed"
+  ]
+}

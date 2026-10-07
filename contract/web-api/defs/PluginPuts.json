@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What an install puts at one path.",
+  "oneOf": [
+    {
+      "description": "A directory brought into being, which is where one service keeps its own\nconfiguration.",
+      "type": "string",
+      "const": "directory"
+    },
+    {
+      "description": "A document written, which is the container lemonfiber derives for the plugin.",
+      "type": "string",
+      "const": "document"
+    },
+    {
+      "description": "A region written into one of the stack's own files, marked out as the plugin's:\nits route through the proxy, or its entry on the dashboard.",
+      "type": "string",
+      "const": "region"
+    }
+  ]
+}

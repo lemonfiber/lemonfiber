@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where a month stands against a declared cap.",
+  "oneOf": [
+    {
+      "description": "Comfortably inside it.",
+      "type": "string",
+      "const": "within"
+    },
+    {
+      "description": "Close enough that there is still time to do something.",
+      "type": "string",
+      "const": "warning"
+    },
+    {
+      "description": "Reached, and the declared behaviour applies.",
+      "type": "string",
+      "const": "exceeded"
+    }
+  ]
+}

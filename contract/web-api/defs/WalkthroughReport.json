@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a first-content walkthrough did — the whole of it, narrated line by line as it\nhappened and gathered here so the ending can be rendered, serialised and exited on.",
+  "type": "object",
+  "properties": {
+    "already_here": {
+      "description": "Whether what was asked for was already here, and so was not acquired again.",
+      "type": "boolean"
+    },
+    "handover": {
+      "description": "Where it leaves the operator, where it worked.",
+      "anyOf": [
+        {
+          "$ref": "Handover.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "in_background": {
+      "description": "Whether the download was handed to the background rather than waited out.",
+      "type": "boolean"
+    },
+    "item": {
+      "description": "What it walked, where it got as far as choosing something.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "lines": {
+      "description": "Every line it said, in order — the same lines the operator watched arrive, kept so\na machine-readable run is not a silent one.",
+      "type": "array",
+      "items": {
+        "$ref": "Line.json"
+      }
+    },
+    "link": {
+      "description": "What the import did with the file, where it got that far.",
+      "anyOf": [
+        {
+          "$ref": "Link.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "proves": {
+      "description": "What it set out to prove, said so the operator knows what they watched.",
+      "type": "string"
+    },
+    "shape": {
+      "description": "Which walk this was.",
+      "$ref": "Shape.json"
+    },
+    "state": {
+      "description": "Where it ended up.",
+      "$ref": "WalkthroughState.json"
+    },
+    "stopped": {
+      "description": "Where and why it stopped, where it did.",
+      "anyOf": [
+        {
+          "$ref": "Stopped.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "suggestions": {
+      "description": "What could have been walked instead, where nothing was chosen — the safe first\nattempts, so an operator with an empty library is not left guessing.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "shape",
+    "state",
+    "proves",
+    "lines",
+    "suggestions",
+    "in_background",
+    "already_here"
+  ]
+}

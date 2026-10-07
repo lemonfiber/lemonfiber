@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where one person's hand-off stands, and what to hand them.\n\n**The code is an address and nothing more.** Whoever holds a copy of it can find the\nserver and still has to sign in as somebody, so a code sent to the wrong phone, or\nphotographed over a shoulder, gives away where the server is and nothing else.",
+  "type": "object",
+  "properties": {
+    "address": {
+      "description": "The address the code carries. Absent where there is no address to carry, which is\none of the ways a hand-off fails.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "caution": {
+      "description": "What is worth knowing about that address, where anything is: most often that it\nanswers only on the home network.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "clients": {
+      "description": "The apps to point a device at the stack with, each with its code.",
+      "type": "array",
+      "items": {
+        "$ref": "HandoffClient.json"
+      }
+    },
+    "issued": {
+      "description": "When a code was first issued for them, as an instant. Absent until one is.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "name": {
+      "description": "Who it is for, as the media server spells their account where it holds one, and as\nit was asked for otherwise.",
+      "type": "string"
+    },
+    "quick_connect": {
+      "description": "Whether the media server offers the sign-in by short code, where one account already\nsigned in approves another device.",
+      "type": "boolean"
+    },
+    "reason": {
+      "description": "Why it stands there, where that is not the state itself: why an account that is not\nthere stops it, and what stopped one that failed. In words any surface can show, so\nit names no command; what to do about it is [`remedy`](Self::remedy).",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal, in which no issue was written down.",
+      "type": "boolean"
+    },
+    "remedy": {
+      "description": "What there is to do next, where there is anything: named rather than said, so\nthat each surface offers it in its own way.",
+      "anyOf": [
+        {
+          "$ref": "HandoffRemedy.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "sessions": {
+      "description": "The devices signed in to the account now, as the media server lists them.",
+      "type": "array",
+      "items": {
+        "$ref": "HandoffSession.json"
+      }
+    },
+    "state": {
+      "description": "Where it stands.",
+      "$ref": "HandoffState.json"
+    },
+    "steps": {
+      "description": "How the person signs in on the new device, one step at a time.\n\nEvery step is something the person does on their device, in words any surface can\nshow. Asking again afterwards is not one of them: that is [`remedy`](Self::remedy).\n\n**Guidance and never an approval.** Where the sign-in asks for a short code to be\napproved from a device they are already signed in on, that approval is theirs: it\nis the step that proves the person holding the new device is the person the\naccount is for, and a program that took it for them would have proved nothing.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "name",
+    "state",
+    "quick_connect",
+    "steps",
+    "clients",
+    "sessions",
+    "rehearsed"
+  ]
+}

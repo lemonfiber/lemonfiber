@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "problems": {
+      "type": [
+        "array[ref:NewsCheck]"
+      ],
+      "required": true
+    },
+    "requests": {
+      "type": [
+        "array[integer/int64]"
+      ],
+      "required": true
+    },
+    "unread": {
+      "type": [
+        "array[ref:NewsKind]"
+      ],
+      "required": true
+    },
+    "updates": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

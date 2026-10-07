@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One file inside a bundle: the name it will carry, and what it holds.\n\nHeld in memory rather than written as it is gathered, because everything is read back\nbefore anything is written. A bundle that had already put one file on disk when it\nfound a credential in the next would have to be unwritten, and unwriting is the kind of\nthing that half-works.",
+  "type": "object",
+  "properties": {
+    "body": {
+      "description": "What it holds, already redacted.",
+      "type": "string"
+    },
+    "name": {
+      "description": "What it is called inside the bundle.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "body"
+  ]
+}

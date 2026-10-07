@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "kept": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "started": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "stop_command": {
+      "type": [
+        "array|null[string]"
+      ],
+      "required": false
+    },
+    "stopped": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

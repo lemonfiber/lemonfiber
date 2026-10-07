@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What adopting a setup already here came to, or would come to.",
+  "type": "object",
+  "properties": {
+    "back_up": {
+      "description": "The host paths those services keep their data in, so a backup can be taken of\nexactly the right thing.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "backed_up": {
+      "description": "Where the capture of those paths was written, once one has been taken.\n\nAbsent on a rehearsal, which captures nothing, and absent where the setup\nmounted nothing worth capturing. Present on an adoption that went through,\nbecause an operator told a backup was taken is owed the path to it.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "project": {
+      "description": "The project lemonfiber would manage, where exactly one could be adopted.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "refusal": {
+      "description": "Why nothing was done, where nothing was.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+      "type": "boolean"
+    },
+    "stance": {
+      "description": "Where the act stands.",
+      "$ref": "Stance.json"
+    },
+    "upgrades": {
+      "description": "The services whose databases a newer version would upgrade, and whose data\ntherefore has to be backed up before anything opens it.",
+      "type": "array",
+      "items": {
+        "$ref": "CarryingReport.json"
+      }
+    }
+  },
+  "required": [
+    "stance",
+    "upgrades",
+    "back_up",
+    "rehearsed"
+  ]
+}

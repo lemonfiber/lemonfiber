@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What narrowing the active set moved.\n\nThree lists rather than a before and an after, because the operator's question\nis not \"what is running now\" — they can ask that — but \"what did that do\". The\nmiddle list is the one that makes the verb worth having: it is the promise that\na download in flight was not interrupted to change the shape of the stack\naround it.",
+  "type": "object",
+  "properties": {
+    "kept": {
+      "description": "Left running: the new closure holds them too, so nothing here asked them to\nstop. Not a promise that nothing touched them — Compose recreates a container\nwhose configuration changed — but a promise that narrowing did not.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "started": {
+      "description": "Started, because the new closure holds them and they were not up.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "stop_command": {
+      "description": "The exact Compose invocation that stopped what fell outside, so a switch is\nno more a matter of trust than any other action. Absent where nothing had\nto stop.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "stopped": {
+      "description": "Stopped, because the new closure does not hold them.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "stopped",
+    "started",
+    "kept"
+  ]
+}

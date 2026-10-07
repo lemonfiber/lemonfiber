@@ -1,0 +1,64 @@
+{
+  "fields": {
+    "detail": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "ours": {
+      "type": [
+        "null|string",
+        "string"
+      ],
+      "required": false
+    },
+    "reason": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "state": {
+      "type": [
+        "const:\"adopted\"",
+        "const:\"already-wired\"",
+        "const:\"conflicted\"",
+        "const:\"drifted\"",
+        "const:\"failed\"",
+        "const:\"observed\"",
+        "const:\"refused\"",
+        "const:\"skipped\"",
+        "const:\"stale\"",
+        "const:\"unmanaged\"",
+        "const:\"unmatched\"",
+        "const:\"wired\"",
+        "const:\"would-adopt\"",
+        "const:\"would-wire\""
+      ],
+      "required": true
+    },
+    "yours": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": [
+    "\"adopted\"",
+    "\"already-wired\"",
+    "\"conflicted\"",
+    "\"drifted\"",
+    "\"failed\"",
+    "\"observed\"",
+    "\"refused\"",
+    "\"skipped\"",
+    "\"stale\"",
+    "\"unmanaged\"",
+    "\"unmatched\"",
+    "\"wired\"",
+    "\"would-adopt\"",
+    "\"would-wire\""
+  ]
+}

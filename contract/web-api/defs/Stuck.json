@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One thing that is wrong, and why.",
+  "type": "object",
+  "properties": {
+    "blocking": {
+      "description": "What the service said was blocking it, in its own words, where it said\nanything. A permission denial from an import log is worth more than any\ninterpretation of it, and it is the difference between \"stuck\" and\nsomething an operator can fix.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "held_for": {
+      "description": "How long it has been that way, in seconds — what turns \"stuck\" into a\nsentence an operator can weigh.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "items": {
+      "description": "How many items this stands for. One in the ordinary case; more where they\nshare a cause and the cause is what is wrong — twenty downloads stopped by\na full disk are one thing to fix, and twenty alerts about it are how an\noperator learns to mute the queue check.",
+      "type": "integer",
+      "format": "uint",
+      "minimum": 0
+    },
+    "name": {
+      "description": "Which item — or, where several share one cause, that cause.",
+      "type": "string"
+    },
+    "stall": {
+      "description": "What is wrong with it.",
+      "$ref": "Stall.json"
+    }
+  },
+  "required": [
+    "name",
+    "stall",
+    "held_for",
+    "items"
+  ]
+}

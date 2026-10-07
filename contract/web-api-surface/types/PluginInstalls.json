@@ -1,0 +1,53 @@
+{
+  "fields": {
+    "agreement": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "install": {
+      "type": [
+        "anyOf(null,ref:PluginInstall)"
+      ],
+      "required": false
+    },
+    "installed": {
+      "type": [
+        "array[ref:PluginInstalled]"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "removal": {
+      "type": [
+        "anyOf(null,ref:PluginRemoval)"
+      ],
+      "required": false
+    },
+    "sources": {
+      "type": [
+        "array[ref:PluginSource]"
+      ],
+      "required": false
+    },
+    "substituted": {
+      "type": [
+        "array[ref:PluginSubstituted]"
+      ],
+      "required": false
+    },
+    "update": {
+      "type": [
+        "anyOf(null,ref:PluginUpdate)"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

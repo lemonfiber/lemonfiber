@@ -1,0 +1,47 @@
+{
+  "fields": {
+    "means": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "needs_transcoding_here": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "preset": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "resolution": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "scope": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "size_per_hour": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "transcoding": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

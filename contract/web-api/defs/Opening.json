@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One thing a way of downloading newly asks the operator for.\n\nWhat is opened and nothing beside it: an operator adding Usenet is shown the\nUsenet provider and the settings its login is kept in, and never the tunnel,\nwhich they neither need nor asked about.",
+  "type": "object",
+  "properties": {
+    "because": {
+      "description": "Why this protocol needs it.",
+      "type": "string"
+    },
+    "setting": {
+      "description": "The setting its answer is kept in, where it is kept in one. Absent for an\naccount the operator has to go and obtain, which no setting holds.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "what": {
+      "description": "What it is, in the operator's terms.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "what",
+    "because"
+  ]
+}

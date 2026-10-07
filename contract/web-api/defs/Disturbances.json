@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What acting on this stack would take away, one answer per way of acting.\n\nNamed by the situation rather than by the verb, because the verb has two\nspellings: the command line stops named services with `stop` and the HTTP\nsurface spells that same operation `down`. These bytes are what both surfaces\nanswer with, so a table keyed by verb would be right for one caller and wrong\nfor the other. A field each caller maps its own word onto is right for both.\n\nCarried on the status reading because a surface deciding whether to stop\nsomething has already read that, and because none of these lengths depends on\nwhat the stack is currently doing — they are the clocks the run is held to,\nwhich is a property of the configuration. A second read to learn a length is\na read a surface would skip, and then it would estimate.",
+  "type": "object",
+  "properties": {
+    "restarting": {
+      "description": "Restarting services.",
+      "$ref": "TakesAway.json"
+    },
+    "starting": {
+      "description": "Bringing services up, whether a whole form or named services inside one.",
+      "$ref": "TakesAway.json"
+    },
+    "stopping": {
+      "description": "Taking services down, interrupting anything still arriving.",
+      "$ref": "TakesAway.json"
+    },
+    "stopping_after_downloads": {
+      "description": "Taking the stack down once everything still arriving has landed.\n\nWhole forms only: stopping named services has no such wait to ask for,\nand a caller that asks for both at once is refused.",
+      "$ref": "TakesAway.json"
+    },
+    "switching": {
+      "description": "Changing the running set, which stops whatever falls outside the new one.",
+      "$ref": "TakesAway.json"
+    }
+  },
+  "required": [
+    "starting",
+    "stopping",
+    "stopping_after_downloads",
+    "restarting",
+    "switching"
+  ]
+}

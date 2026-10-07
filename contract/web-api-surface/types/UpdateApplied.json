@@ -1,0 +1,41 @@
+{
+  "fields": {
+    "detail": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "ending": {
+      "type": [
+        "ref:Ending"
+      ],
+      "required": true
+    },
+    "from": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "reversal": {
+      "type": [
+        "ref:UpdateReversal"
+      ],
+      "required": true
+    },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "to": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

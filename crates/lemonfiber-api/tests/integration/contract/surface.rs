@@ -15,22 +15,23 @@
 
 use std::path::{Path, PathBuf};
 
-use lemonfiber_api::contract::stability::{rendered, Surface, SURFACE_PATH};
+use lemonfiber_api::contract::layout;
+use lemonfiber_api::contract::stability::{rendered, Surface, SURFACE_DIR};
 use lemonfiber_api::contract::Contract;
 
 /// Where the committed surface lives, from this crate.
 fn committed_path() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
-        .join(SURFACE_PATH)
+        .join(SURFACE_DIR)
 }
 
 /// The surface as it is checked in.
 fn committed() -> Surface {
-    let Ok(text) = std::fs::read_to_string(committed_path()) else {
+    let Ok(files) = layout::read(&committed_path()) else {
         unreachable!("the committed surface is part of this repository");
     };
-    let Some(surface) = Surface::parse(&text) else {
+    let Some(surface) = Surface::from_files(&files) else {
         unreachable!("the committed surface is this program's own output");
     };
     surface
@@ -64,16 +65,17 @@ fn this_build_still_describes_everything_the_committed_surface_does() {
 /// comparing.
 #[test]
 fn the_committed_surface_is_the_one_this_build_would_write() {
-    let Some(fresh) = Surface::of(&Contract::describe()).to_json() else {
+    let Some(fresh) = Surface::of(&Contract::describe()).files() else {
         unreachable!("a surface this build built is a surface this build can render");
     };
-    let Ok(text) = std::fs::read_to_string(committed_path()) else {
+    let Ok(stored) = layout::read(&committed_path()) else {
         unreachable!("the committed surface is part of this repository");
     };
+    let apart = layout::differing(&stored, &fresh);
 
-    assert_eq!(
-        text.trim_end(),
-        fresh.trim_end(),
-        "the committed surface is out of date — run `just surface`"
+    assert!(
+        apart.is_empty(),
+        "the committed surface is out of date — run `just surface`:\n{}",
+        apart.join("\n")
     );
 }

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Everything that leaves this machine: lemonfiber's own requests, and the stack's.",
+  "type": "object",
+  "properties": {
+    "ours": {
+      "description": "Every request lemonfiber makes on its own account, in a fixed order.",
+      "type": "array",
+      "items": {
+        "$ref": "Outbound.json"
+      }
+    },
+    "theirs": {
+      "description": "The requests made by services this stack runs, attributed to them.",
+      "type": "array",
+      "items": {
+        "$ref": "Elsewhere.json"
+      }
+    }
+  },
+  "required": [
+    "ours",
+    "theirs"
+  ]
+}

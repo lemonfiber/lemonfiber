@@ -60,12 +60,14 @@ use serde_json::Value;
 
 use super::Contract;
 
+mod committed;
 mod declared;
 
 pub use declared::{Declared, DECLARED};
 
-/// Where the committed surface is kept, relative to the workspace root.
-pub const SURFACE_PATH: &str = "contract/web-api.surface.json";
+/// Where the committed surface is kept, relative to the workspace root: a directory
+/// holding an index and one file per type.
+pub const SURFACE_DIR: &str = "contract/web-api-surface";
 
 /// The token for a schema that constrains nothing — the shape of `data` for a kind
 /// that carries no payload, and of a schema keyword this reads no further into.
@@ -189,24 +191,6 @@ impl Surface {
         // reach, and would be caught immediately by the comparison below anyway.
         let described = serde_json::to_value(contract).unwrap_or_default();
         read(&described, contract.api_version)
-    }
-
-    /// As it is committed: sorted keys, two-space indent, one trailing newline —
-    /// written the way the artefact beside it is, so the two diff alike.
-    ///
-    /// `None` only if it cannot serialise, which maps of strings cannot.
-    #[must_use]
-    pub fn to_json(&self) -> Option<String> {
-        let mut text = serde_json::to_string_pretty(self).ok()?;
-        text.push('\n');
-        Some(text)
-    }
-
-    /// What was committed, or nothing where there is no readable surface to compare
-    /// against.
-    #[must_use]
-    pub fn parse(text: &str) -> Option<Self> {
-        serde_json::from_str(text).ok()
     }
 
     /// Every promise `before` made that `after` does not keep.

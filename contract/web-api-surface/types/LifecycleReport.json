@@ -1,0 +1,77 @@
+{
+  "fields": {
+    "action": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "command": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "condition": {
+      "type": [
+        "anyOf(null,ref:Condition)"
+      ],
+      "required": false
+    },
+    "forwarding": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "held": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "plan": {
+      "type": [
+        "ref:Plan"
+      ],
+      "required": true
+    },
+    "port_conflicts": {
+      "type": [
+        "array[ref:ConflictReport]"
+      ],
+      "required": false
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "services": {
+      "type": [
+        "array[ref:Service]"
+      ],
+      "required": true
+    },
+    "stack_edits": {
+      "type": [
+        "array[ref:StackEdit]"
+      ],
+      "required": true
+    },
+    "status": {
+      "type": [
+        "integer|null/int32"
+      ],
+      "required": false
+    },
+    "switched": {
+      "type": [
+        "anyOf(null,ref:Switched)"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

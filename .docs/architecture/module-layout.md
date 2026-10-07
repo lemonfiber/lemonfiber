@@ -83,7 +83,13 @@ the api crate serves, and `just contract` and `just surface` run them.
 
 `--example codes` is a `print!` around one function; its recipe writes the output
 beside the artefact and moves it over the committed file, so a failed run leaves the
-file as it was. `--example contract` writes its artefact the same way itself.
+file as it was. `--example contract` and `--example surface` each write a directory:
+the whole set of files goes into a sibling that is then swapped in, so a failed run
+leaves the committed directory as it was and a file the types no longer generate is
+gone rather than left behind. `contract/web-api/` is an index carrying the wire
+version and naming everything else, a file per kind, a file per definition in `defs/`
+reached by a relative `$ref`, and a file each for the actions a key may call, the
+reads and the refusals. `contract/web-api-surface/` is an index and a file per type.
 `--example reference` writes a set of files rather than one: an index at
 `reference/commands.md` and a page per top-level command beside it, each carrying
 everything declared beneath that command. The grouping is clap's own tree rather than
@@ -97,9 +103,9 @@ for ever.
 `--example surface` reads the artefact it is about to replace before it writes, and
 refuses where the new one drops a name or a type the committed one describes under
 an unchanged wire version. That is the difference between the two contract
-artefacts. `web-api.contract.json` says what the surfaces exchange now, so a
+artefacts. `contract/web-api/` says what the surfaces exchange now, so a
 comparison against it can only ever say "regenerate it" — a removal and an addition
-are equally stale to it. `web-api.surface.json` is names and types with every
+are equally stale to it. `contract/web-api-surface/` is names and types with every
 description stripped out, so it moves only when the interface moves, and it is what
 a removed or retyped field is caught against.
 

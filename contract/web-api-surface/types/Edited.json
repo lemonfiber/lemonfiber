@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "found": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "secret": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "wrote": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

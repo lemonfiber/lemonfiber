@@ -1,0 +1,8 @@
+{
+  "fields": {},
+  "variants": [
+    "\"current\"",
+    "\"pending\"",
+    "\"stale\""
+  ]
+}

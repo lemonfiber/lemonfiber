@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How the front door came to be the one it is.",
+  "oneOf": [
+    {
+      "description": "Worked out from what the stack declares, which is what a stack whose\noperator has named nothing answers.",
+      "type": "object",
+      "properties": {
+        "chosen": {
+          "type": "string",
+          "const": "derived"
+        }
+      },
+      "required": [
+        "chosen"
+      ]
+    },
+    {
+      "description": "Named by the operator, by the id the stack declares it under, and it is the\ndoor.",
+      "type": "object",
+      "properties": {
+        "chosen": {
+          "type": "string",
+          "const": "named"
+        },
+        "door": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "chosen",
+        "door"
+      ]
+    },
+    {
+      "description": "Named by the operator and refused. The worked-out door stands, and this\ncarries what was named and why it is not it.",
+      "type": "object",
+      "properties": {
+        "chosen": {
+          "type": "string",
+          "const": "refused"
+        },
+        "door": {
+          "$ref": "Refusal.json"
+        }
+      },
+      "required": [
+        "chosen",
+        "door"
+      ]
+    }
+  ]
+}

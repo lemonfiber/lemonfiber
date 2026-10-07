@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A row in a register lemonfiber already runs.\n\nThe fields beyond `at` and `id` are the row its point declares, and the point is\npublished — so the required set, the optional set, the closed sets and the bounds\nare read from `extension-points.json` rather than restated here. What this type\nfixes is that a contribution is declared in this block and nowhere else, and that\nit carries nothing outside the union of the rows the published points take.",
+  "type": "object",
+  "properties": {
+    "action": {
+      "description": "What to do, in the imperative.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "at": {
+      "description": "A point the build publishes. One it does not is refused by name.",
+      "type": "string"
+    },
+    "category": {
+      "description": "Which family a check is narrowed to.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "detail": {
+      "description": "The technical half of a remedy, which must not lead.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "expect": {
+      "description": "What the answer must be.",
+      "anyOf": [
+        {
+          "$ref": "Expect.json"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "expected": {
+      "description": "Recordings the check fails on, each with the constraint that fails there and why.",
+      "type": "array",
+      "items": {
+        "$ref": "PluginExpectedFailure.json"
+      }
+    },
+    "fixture": {
+      "description": "The recorded response the check is proved against.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "for": {
+      "description": "The check a remedy is for, which must be one this same plugin declared.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "id": {
+      "description": "Namespaced with the declaring plugin's id, always.",
+      "type": "string"
+    },
+    "request": {
+      "description": "Method and path on the plugin's own service.\n\nThere is no field for a host, so a check cannot be pointed at another service,\nat the machine, or off it. A plugin wanting to say something about a service it\ndid not install is asking to speak for somebody else's software.",
+      "anyOf": [
+        {
+          "$ref": "PluginRequest.json"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "service": {
+      "description": "Which service the finding is about. Defaults to the plugin's own.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "timeout_s": {
+      "description": "How long a check may run, within the bounds the point declares.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "default": null,
+      "minimum": 0
+    },
+    "title": {
+      "description": "The one-line summary of what was checked.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "why": {
+      "description": "Why this is worth checking.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "at",
+    "id"
+  ]
+}

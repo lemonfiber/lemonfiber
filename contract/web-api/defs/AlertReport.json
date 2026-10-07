@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What the operator will be told about, and what changing it came to.",
+  "type": "object",
+  "properties": {
+    "changed": {
+      "description": "Whether this call changed the answer.",
+      "type": "boolean"
+    },
+    "exceptions": {
+      "description": "Events set apart from the preset, quietest name first.",
+      "type": "array",
+      "items": {
+        "$ref": "ExceptionReport.json"
+      }
+    },
+    "means": {
+      "description": "What that preset means, in the operator's terms.",
+      "type": "string"
+    },
+    "preset": {
+      "description": "The preset in force for events with no exception of their own.",
+      "type": "string"
+    },
+    "rehearsed": {
+      "description": "Whether it only reported what it would have written.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "preset",
+    "means",
+    "exceptions",
+    "changed",
+    "rehearsed"
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How this copy of lemonfiber got onto the machine.\n\nNothing known is the default. Every other answer is a claim about somebody's\nmachine, and a value that arrived by nobody filling it in has established none of\nthem.",
+  "oneOf": [
+    {
+      "description": "Homebrew put it here, on macOS or on Linux.",
+      "type": "string",
+      "const": "homebrew"
+    },
+    {
+      "description": "Scoop put it here.",
+      "type": "string",
+      "const": "scoop"
+    },
+    {
+      "description": "winget put it here.",
+      "type": "string",
+      "const": "winget"
+    },
+    {
+      "description": "`cargo install` built and placed it.",
+      "type": "string",
+      "const": "cargo"
+    },
+    {
+      "description": "A distribution's own package manager placed it.",
+      "type": "string",
+      "const": "distribution"
+    },
+    {
+      "description": "The shell installer this project publishes wrote it.",
+      "type": "string",
+      "const": "installer"
+    },
+    {
+      "description": "Downloaded, unpacked or built by hand, and owned by nobody but the operator.",
+      "type": "string",
+      "const": "elsewhere"
+    },
+    {
+      "description": "Running in a container, from an image. The binary is part of the image, so\nmoving to another version is pulling that version's image and recreating the\ncontainer on it; a binary replaced inside goes when the container does.",
+      "type": "string",
+      "const": "image"
+    },
+    {
+      "description": "This machine would not say where the running binary is, so none of the above\ncan be told apart. Not a failure, and not a licence to guess.",
+      "type": "string",
+      "const": "untellable"
+    }
+  ]
+}

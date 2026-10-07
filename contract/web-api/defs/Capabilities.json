@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Every capability this stack has, by the path its request is served at.",
+  "type": "object",
+  "properties": {
+    "capabilities": {
+      "description": "What each comes to for the credential that asked. A request this stack does\nnot have is absent rather than listed as anything.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "CapabilityState.json"
+      }
+    }
+  },
+  "required": [
+    "capabilities"
+  ]
+}

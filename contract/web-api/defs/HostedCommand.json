@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One long-running command, and what stands between it and this machine.",
+  "type": "object",
+  "properties": {
+    "command": {
+      "description": "How it is typed in a terminal, which is what hosting installs.",
+      "type": "string"
+    },
+    "definition": {
+      "description": "The service definition installed for it, where there is one.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "guarantees": {
+      "description": "What it does for as long as it runs, in one sentence.",
+      "type": "string"
+    },
+    "missing": {
+      "description": "The program the definition names, where nothing is there any more.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "name": {
+      "description": "lemonfiber's own name for it.",
+      "type": "string"
+    },
+    "output": {
+      "description": "Where a hosted run writes the words it would have said on a terminal.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "runs": {
+      "description": "The whole command line that definition runs.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "standing": {
+      "description": "What stands between it and the machine.",
+      "$ref": "Hosting.json"
+    }
+  },
+  "required": [
+    "name",
+    "guarantees",
+    "command",
+    "standing"
+  ]
+}

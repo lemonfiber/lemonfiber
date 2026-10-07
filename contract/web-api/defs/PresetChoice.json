@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One preset in force, and what it means for the media it applies to — the\noperator's question answered in their own terms, with no scoring vocabulary.",
+  "type": "object",
+  "properties": {
+    "means": {
+      "description": "What it means, in the operator's terms rather than the tool's.",
+      "type": "string"
+    },
+    "needs_transcoding_here": {
+      "description": "Whether this host would have to transcode it in software — the caution\nstated before a choice a household cannot smoothly play.",
+      "type": "boolean"
+    },
+    "preset": {
+      "description": "The preset's plain-language name.",
+      "type": "string"
+    },
+    "resolution": {
+      "description": "The resolution and encode it targets.",
+      "type": "string"
+    },
+    "scope": {
+      "description": "What this applies to: `everything`, or a specific media type.",
+      "type": "string"
+    },
+    "size_per_hour": {
+      "description": "Roughly how much disk an hour of it takes.",
+      "type": "string"
+    },
+    "transcoding": {
+      "description": "What playback costs, in plain terms.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "scope",
+    "preset",
+    "means",
+    "resolution",
+    "size_per_hour",
+    "transcoding",
+    "needs_transcoding_here"
+  ]
+}

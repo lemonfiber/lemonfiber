@@ -1,0 +1,59 @@
+{
+  "fields": {
+    "against": {
+      "type": [
+        "anyOf(null,ref:PluginEvidence)"
+      ],
+      "required": false
+    },
+    "changes": {
+      "type": [
+        "array[ref:PluginChange]"
+      ],
+      "required": true
+    },
+    "contests": {
+      "type": [
+        "array[ref:WiringContest]"
+      ],
+      "required": true
+    },
+    "overrides": {
+      "type": [
+        "array[ref:PluginOverriding]"
+      ],
+      "required": true
+    },
+    "proofs": {
+      "type": [
+        "array[ref:PluginProving]"
+      ],
+      "required": true
+    },
+    "recorded": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "reversed": {
+      "type": [
+        "anyOf(null,ref:UndoReversal)"
+      ],
+      "required": false
+    },
+    "verified": {
+      "type": [
+        "anyOf(null,ref:PluginVerification)"
+      ],
+      "required": false
+    },
+    "would": {
+      "type": [
+        "ref:PluginInstalled"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

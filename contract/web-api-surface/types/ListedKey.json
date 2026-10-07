@@ -1,0 +1,53 @@
+{
+  "fields": {
+    "member_minted": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "minted": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "purpose": {
+      "type": [
+        "ref:KeyPurpose"
+      ],
+      "required": true
+    },
+    "revoked": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "scope": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "state": {
+      "type": [
+        "ref:KeyState"
+      ],
+      "required": true
+    },
+    "used": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

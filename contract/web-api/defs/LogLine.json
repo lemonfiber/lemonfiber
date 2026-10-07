@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One line of output from one service, and how bad it says it is.\n\nWhat a machine-readable surface hands on, rather than the engine's line alone, so\na consumer can mark the lines that say they failed, or find the first of them,\nwithout reading the text for itself — a second reading of severity would be a\nsecond answer, and the two would disagree about some service's spelling.",
+  "type": "object",
+  "properties": {
+    "at": {
+      "description": "When the container itself says it wrote the line, where it said so.\n\nKept verbatim and unparsed. Containers disagree with the host clock and\nwith each other, and the only defensible ordering is each container's own\naccount of itself — which a reader can only apply if it is carried\nrather than replaced by an arrival time.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "level": {
+      "description": "How bad the line says it is, in one lowercase word.\n\nAbsent where the line says nothing about itself. It is never guessed from\nthe stream the line arrived on or from the words in it: most of this stack\nwrites ordinary progress to standard error, and a line saying it could not\nfind something is often a routine miss.",
+      "anyOf": [
+        {
+          "$ref": "LogLevel.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "line": {
+      "description": "The line, without its trailing newline.",
+      "type": "string"
+    },
+    "service": {
+      "description": "The Compose service it came from.",
+      "type": "string"
+    },
+    "stream": {
+      "description": "Which stream it arrived on.",
+      "$ref": "Stream.json"
+    }
+  },
+  "required": [
+    "service",
+    "stream",
+    "line"
+  ]
+}

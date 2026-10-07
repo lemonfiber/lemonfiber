@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Whether the request service has been given an account for the household yet.\n\nThe account somebody watches with is made on the media server, and it stands on its\nown from that moment — nothing has to be running for them to claim it. Being able\nto *ask* for something is a second account, on a second service, and that service\ncan be down while the first is not.\n\nSo this is reported rather than made a condition of the invitation: an operator who\ninvites somebody during an outage has still invited them, and what they cannot do\nyet is worth one line rather than a refusal.",
+  "oneOf": [
+    {
+      "description": "It holds an account for everybody the media server does.",
+      "type": "string",
+      "const": "made"
+    },
+    {
+      "description": "It could not be told. The media-server account stands, and the next run tells\nit — the service skips anybody it already knows, so nothing has to be\nremembered in between.",
+      "type": "string",
+      "const": "not-yet"
+    },
+    {
+      "description": "Nothing was tried: a rehearsal, or a stack with no request service at all.\n\nNot a failure either way, and nothing a later run would put right — which is\nwhat separates it from `NotYet`.",
+      "type": "string",
+      "const": "not-tried"
+    }
+  ]
+}

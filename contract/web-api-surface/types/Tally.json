@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "files": {
+      "type": [
+        "integer/uint"
+      ],
+      "required": true
+    },
+    "logical": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "physical": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "shared": {
+      "type": [
+        "integer/uint"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

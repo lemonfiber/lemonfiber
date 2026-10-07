@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The storage picture: what is free, when it runs out, and whether imports link.",
+  "type": "object",
+  "properties": {
+    "exhaustion": {
+      "description": "The time until the disk fills at the current rate of the queue draining\nonto it, or `None` where it is not projected to fill.",
+      "anyOf": [
+        {
+          "$ref": "Duration.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "free": {
+      "description": "Bytes free on the data volume — a [`Reading`], since a volume that could\nnot be read this refresh must not render as zero free.",
+      "$ref": "DashboardReading.json"
+    },
+    "hardlink": {
+      "description": "Whether imports are linking or copying.",
+      "$ref": "Hardlink.json"
+    }
+  },
+  "required": [
+    "free",
+    "hardlink"
+  ]
+}

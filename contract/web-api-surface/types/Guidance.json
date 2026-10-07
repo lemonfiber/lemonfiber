@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "devices": {
+      "type": [
+        "array[ref:Device]"
+      ],
+      "required": true
+    },
+    "nothing_is_installed": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "only_at_home": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "straining": {
+      "type": [
+        "anyOf(null,ref:Straining)"
+      ],
+      "required": false
+    },
+    "trouble": {
+      "type": [
+        "array[ref:Trouble]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

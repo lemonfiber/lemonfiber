@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "constraint": {
+      "type": [
+        "ref:PluginConstraint"
+      ],
+      "required": true
+    },
+    "fixture": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "place": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "reason": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "verdict": {
+      "type": [
+        "ref:PluginDeclaredVerdict"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

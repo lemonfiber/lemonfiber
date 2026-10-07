@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One request lemonfiber makes, where it goes, and what refusing it costs.",
+  "type": "object",
+  "properties": {
+    "allowed": {
+      "description": "Whether this machine's settings allow it.",
+      "type": "boolean"
+    },
+    "cost": {
+      "description": "What stops working once it is off.",
+      "type": "string"
+    },
+    "destination": {
+      "description": "Where it goes as this machine is configured. Empty where nothing is\nconfigured to reach, which is not the same as switched off.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "purpose": {
+      "description": "Why lemonfiber asks.",
+      "type": "string"
+    },
+    "reach": {
+      "description": "Which request this is.",
+      "$ref": "OutboundReach.json"
+    },
+    "sends": {
+      "description": "Exactly what travels in the request.",
+      "type": "string"
+    },
+    "switch": {
+      "description": "The setting that switches it off.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "reach",
+    "destination",
+    "purpose",
+    "sends",
+    "allowed",
+    "switch",
+    "cost"
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where one request stands, in the words the person who made it would use.\n\nDeliberately coarser than a [`crate::trace::Stage`]: a member does not need to know\nthat a release was grabbed but not imported, only that it is on its way. The trace is\nwhere that detail stays, and a request names the item so it can be asked for.",
+  "oneOf": [
+    {
+      "description": "Asked for, and nobody has approved or refused it yet.",
+      "type": "string",
+      "const": "waiting-for-approval"
+    },
+    {
+      "description": "Turned down — it will not be fetched.",
+      "type": "string",
+      "const": "declined"
+    },
+    {
+      "description": "Approved, but the attempt to fetch it failed.",
+      "type": "string",
+      "const": "failed"
+    },
+    {
+      "description": "Approved and on its way — being searched for, downloaded or imported.",
+      "type": "string",
+      "const": "getting"
+    },
+    {
+      "description": "Some of it is here: a series with only some of its episodes.",
+      "type": "string",
+      "const": "partly-here"
+    },
+    {
+      "description": "Here, and playable.",
+      "type": "string",
+      "const": "here"
+    },
+    {
+      "description": "It was here and has since been removed.",
+      "type": "string",
+      "const": "gone"
+    }
+  ]
+}

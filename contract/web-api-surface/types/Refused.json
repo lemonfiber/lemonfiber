@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "at": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "expired": {
+      "type": [
+        "boolean"
+      ],
+      "required": false
+    },
+    "reason": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "told": {
+      "type": [
+        "anyOf(null,ref:Passed)"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

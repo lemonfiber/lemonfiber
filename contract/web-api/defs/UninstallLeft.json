@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Something a removal could not take.",
+  "type": "object",
+  "properties": {
+    "by_hand": {
+      "description": "How to finish it by hand.",
+      "type": "string"
+    },
+    "name": {
+      "description": "What is still there.",
+      "type": "string"
+    },
+    "why": {
+      "description": "What the machine said about it, verbatim.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "why",
+    "by_hand"
+  ]
+}

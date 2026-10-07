@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One invitation, as it was just made.\n\nCarries what the operator has to pass on and nothing else — a name to sign in\nwith, one address, and how long it stands. The address is the media server's,\nbecause setting a first password happens there.",
+  "type": "object",
+  "properties": {
+    "address": {
+      "description": "The one address to send them.\n\nWhere a *person* reaches the media server: built from what this machine is\ncalled on the network, not from either of the hosts the stack wires itself\nwith — those resolve only on this machine or inside the stack, and an\ninvitation carrying one sends somebody an address that cannot open.",
+      "type": "string"
+    },
+    "applied": {
+      "description": "What this offer wrote on the account, where it wrote anything.",
+      "anyOf": [
+        {
+          "$ref": "InvitationApplied.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "caution": {
+      "description": "What is worth knowing about the address itself, where anything is.\n\nAn address that is a number is one a router can hand elsewhere, so a bookmark\nmade from it stops working with nothing here having changed. Carried on the\ninvitation because that is the copy somebody keeps.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "decline": {
+      "description": "Where they can decline it instead, where the stack runs the decline service.\n\nA page on the household's own network that refuses this invitation and nothing\nelse, and switches the account made for it off. Its token is in this address\nalone: offering the same person again mints a new one, and the old address stops\ndeclining anything. Absent on a rehearsal, for somebody already in the household,\nand where the stack runs no decline service.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "hours": {
+      "description": "How many hours it stands before it is withdrawn.\n\nCounted from when it was *offered*, which for an account whose password was\ntaken off is the moment of the reset rather than when the account was made.\nWhat happens at the end depends on the account: one nobody has been in is\nremoved, and one somebody has is switched off and kept.",
+      "type": "integer",
+      "format": "int64"
+    },
+    "linked": {
+      "description": "Whether the request service knows about the household yet.\n\nSeparate from `standing`, which is about the media-server account alone. The\ntwo can disagree — an account made while the request service was unreachable\nis `Made` and `NotYet` — and that disagreement is the state this reports.",
+      "$ref": "Linked.json"
+    },
+    "name": {
+      "description": "The name they sign in as.",
+      "type": "string"
+    },
+    "rehearsed": {
+      "description": "Whether the account was made, or only described.\n\nA rehearsal can say the whole answer without writing any of it — the name is\nthe one asked for, the address is the stack's, and what has run out has just\nbeen read — so the only thing separating it from the real run is this.",
+      "type": "boolean"
+    },
+    "standing": {
+      "description": "What was found where this was going.",
+      "$ref": "InvitationStanding.json"
+    },
+    "suspended": {
+      "description": "Accounts somebody had been in, reset and not claimed again in time, switched off\non the way past rather than removed.\n\nKept because removing one takes what they watched with it. Switched off because\nan account with no password that anybody may still claim is the thing a window\nexists to close. Offering it again, or reissuing it, switches it back on. On a\nrehearsal these are the ones that *would* be switched off.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "withdrawn": {
+      "description": "Invitations nobody claimed in time, removed on the way past.\n\nReported rather than done quietly: an operator who invited somebody last\nweek and hears nothing would otherwise have no way to learn the account is\ngone. On a rehearsal these are the ones that *would* be removed.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "name",
+    "address",
+    "hours",
+    "withdrawn",
+    "suspended",
+    "rehearsed",
+    "standing",
+    "linked"
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Why an item is not moving.\n\nOrdered by how much of the operator's attention each deserves, worst first, so\na summary that leads with the worst category needs no second ranking.",
+  "oneOf": [
+    {
+      "description": "Fetched over and over: import is failing silently and being retried, which\nspends bandwidth and Usenet allowance indefinitely while looking normal.",
+      "type": "string",
+      "const": "redownload-loop"
+    },
+    {
+      "description": "The same item has failed to import more than once. Structural — it will not\nresolve itself.",
+      "type": "string",
+      "const": "repeated-import-failure"
+    },
+    {
+      "description": "Downloaded successfully and never imported. The failure nobody owns: the\nclient considers it finished, the \\*arr never picked it up, and from each\nservice's own perspective there is nothing wrong.",
+      "type": "string",
+      "const": "completed-not-imported"
+    },
+    {
+      "description": "On disk, and no \\*arr knows about it.",
+      "type": "string",
+      "const": "orphaned"
+    },
+    {
+      "description": "No progress at all beyond the threshold.",
+      "type": "string",
+      "const": "stalled-download"
+    },
+    {
+      "description": "Monitored, never grabbed — nothing matched, or the indexers are answering\nwith nothing.",
+      "type": "string",
+      "const": "waiting-indefinitely"
+    },
+    {
+      "description": "Moving, but slowly enough to be worth knowing about. Deliberately its own\ncategory rather than a stall: something still arriving needs patience, not\nintervention, and reporting the two alike is how a queue check gets muted.",
+      "type": "string",
+      "const": "slow"
+    }
+  ]
+}

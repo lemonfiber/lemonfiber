@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "changes": {
+      "type": [
+        "array[ref:ChangeReport]"
+      ],
+      "required": true
+    },
+    "horizon": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

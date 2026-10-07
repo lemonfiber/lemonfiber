@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "accepted": {
+      "type": [
+        "integer|null/uint64"
+      ],
+      "required": false
+    },
+    "asked": {
+      "type": [
+        "integer|null/uint64"
+      ],
+      "required": false
+    },
+    "moving": {
+      "type": [
+        "integer|null/uint64"
+      ],
+      "required": false
+    },
+    "verdict": {
+      "type": [
+        "ref:BandwidthVerdict"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

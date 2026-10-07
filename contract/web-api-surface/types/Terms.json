@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "filenames": {
+      "type": [
+        "ref:Filenames"
+      ],
+      "required": true
+    },
+    "revealed": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "window": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

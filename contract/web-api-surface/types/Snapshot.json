@@ -1,0 +1,71 @@
+{
+  "fields": {
+    "alerts": {
+      "type": [
+        "array[ref:Alert]"
+      ],
+      "required": true
+    },
+    "door": {
+      "type": [
+        "ref:PanelFrontDoorReport"
+      ],
+      "required": true
+    },
+    "health": {
+      "type": [
+        "ref:HealthSummary"
+      ],
+      "required": true
+    },
+    "household": {
+      "type": [
+        "ref:PanelHouseholdReport"
+      ],
+      "required": true
+    },
+    "queue": {
+      "type": [
+        "ref:PanelArray_of_Queue"
+      ],
+      "required": true
+    },
+    "services": {
+      "type": [
+        "ref:PanelArray_of_Service"
+      ],
+      "required": true
+    },
+    "storage": {
+      "type": [
+        "ref:PanelStorage"
+      ],
+      "required": true
+    },
+    "stuck": {
+      "type": [
+        "array[ref:Stuck]"
+      ],
+      "required": true
+    },
+    "telemetry": {
+      "type": [
+        "ref:Telemetry"
+      ],
+      "required": true
+    },
+    "transfers": {
+      "type": [
+        "ref:PanelArray_of_Transfer"
+      ],
+      "required": true
+    },
+    "vpn": {
+      "type": [
+        "anyOf(null,ref:PanelVpn)"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

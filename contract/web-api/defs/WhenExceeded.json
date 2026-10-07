@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What to do when a declared cap is reached.",
+  "oneOf": [
+    {
+      "description": "Stop fetching until the month turns over.",
+      "type": "string",
+      "const": "pause"
+    },
+    {
+      "description": "Keep going, slowly, so what is half-finished can finish.",
+      "type": "string",
+      "const": "throttle"
+    },
+    {
+      "description": "Carry on. Some caps cost money and some only cost speed.",
+      "type": "string",
+      "const": "continue"
+    }
+  ]
+}

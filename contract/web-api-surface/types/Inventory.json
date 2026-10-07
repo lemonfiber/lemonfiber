@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "held": {
+      "type": [
+        "array[ref:CredentialHeld]"
+      ],
+      "required": true
+    },
+    "protection": {
+      "type": [
+        "ref:Protection"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "revealed": {
+      "type": [
+        "anyOf(null,ref:Revealed)"
+      ],
+      "required": false
+    },
+    "rotated": {
+      "type": [
+        "anyOf(null,ref:Rotation)"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

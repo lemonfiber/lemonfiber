@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Exactly what a place must hold.\n\nThree kinds and no nesting: a flag that must be set, a number that must match, or a\nword. A value deeper than this is asking about a document rather than about a claim\n— and where the thing worth asserting is deeper *in* the answer, the key reaches it\nrather than the value growing to match.",
+  "anyOf": [
+    {
+      "description": "A true or a false.",
+      "type": "boolean"
+    },
+    {
+      "description": "A whole number.",
+      "type": "integer",
+      "format": "int64"
+    },
+    {
+      "description": "A word.",
+      "type": "string"
+    }
+  ]
+}

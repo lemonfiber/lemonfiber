@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Which side of the household's day a moment falls on.",
+  "oneOf": [
+    {
+      "description": "People are up and using the line, so the stack is held back.",
+      "type": "string",
+      "const": "active"
+    },
+    {
+      "description": "The house is asleep and the line is the stack's.",
+      "type": "string",
+      "const": "quiet"
+    }
+  ]
+}

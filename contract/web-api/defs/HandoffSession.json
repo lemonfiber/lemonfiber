@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One device the media server lists as signed in to the account.",
+  "type": "object",
+  "properties": {
+    "client": {
+      "description": "The app it signed in with.",
+      "type": "string"
+    },
+    "device": {
+      "description": "What the device calls itself.",
+      "type": "string"
+    },
+    "last_seen": {
+      "description": "When the media server last heard from it, where it says.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "device",
+    "client"
+  ]
+}

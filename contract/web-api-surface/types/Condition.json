@@ -1,0 +1,9 @@
+{
+  "fields": {},
+  "variants": [
+    "\"active\"",
+    "\"degraded\"",
+    "\"inactive\"",
+    "\"partial\""
+  ]
+}

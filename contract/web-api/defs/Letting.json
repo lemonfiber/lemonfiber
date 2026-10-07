@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One completed download, what letting it go would cost, and what became of it.",
+  "type": "object",
+  "properties": {
+    "agreement": {
+      "description": "What this offer names itself, so an answer to it can say which offer it\nanswered.",
+      "type": "string"
+    },
+    "download": {
+      "description": "The download, in the same words the account names it in: where it stands, what\nit occupies, and what removing it costs.",
+      "$ref": "Candidate.json"
+    },
+    "goes": {
+      "description": "What goes with it, carried rather than left for a surface to remember.",
+      "type": "string"
+    },
+    "gone": {
+      "description": "What became of an answered offer, and nothing where the offer is all this is.",
+      "anyOf": [
+        {
+          "$ref": "Gone.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "download",
+    "goes",
+    "agreement",
+    "rehearsed"
+  ]
+}

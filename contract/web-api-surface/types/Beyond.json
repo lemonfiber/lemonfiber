@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "check": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "remedy": {
+      "type": [
+        "ref:Remedy"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

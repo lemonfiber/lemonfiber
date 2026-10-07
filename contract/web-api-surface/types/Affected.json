@@ -1,0 +1,53 @@
+{
+  "fields": {
+    "check": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "downstream": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "exit": {
+      "type": [
+        "integer|null/int32"
+      ],
+      "required": false
+    },
+    "meaning": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "onset": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "remedies": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "severity": {
+      "type": [
+        "ref:ProblemSeverity"
+      ],
+      "required": true
+    },
+    "summary": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

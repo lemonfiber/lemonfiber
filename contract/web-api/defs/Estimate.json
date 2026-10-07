@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "About how much room one request will want.\n\nCarried as a number and a word rather than as a rendered string, so a surface can\nput it in a column and still say what it is. The word is not decoration: a figure\nwith nothing hedging it is a promise, and this cannot keep one.",
+  "type": "object",
+  "properties": {
+    "bytes": {
+      "description": "About how many bytes it will take.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "measured": {
+      "description": "Whether this was measured. Always false — nothing here has measured anything,\nand the field is present so that a surface rendering it cannot forget to say so.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "bytes",
+    "measured"
+  ]
+}

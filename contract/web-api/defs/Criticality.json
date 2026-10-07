@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How much a service's absence costs.\n\nSerialisable as well as readable, because it reaches an operator: a status\nreport that says a service is down without saying whether that matters\nleaves them to guess, and the manifest already holds the answer.",
+  "oneOf": [
+    {
+      "description": "Its failure has consequences outside the machine.",
+      "type": "string",
+      "const": "critical"
+    },
+    {
+      "description": "The form does not work without it.",
+      "type": "string",
+      "const": "core"
+    },
+    {
+      "description": "The form works, badly.",
+      "type": "string",
+      "const": "important"
+    },
+    {
+      "description": "Makes things better.",
+      "type": "string",
+      "const": "enhancing"
+    },
+    {
+      "description": "Nice to have.",
+      "type": "string",
+      "const": "optional"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "accept": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "method": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "path": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A setting changed outside lemonfiber since it last wrote one.\n\nBoth sides, so the operator chooses between them rather than being told one of\nthem lost. Values a listing withholds are withheld here too — a report a script\ncan log must not be the one place a password is printed.",
+  "type": "object",
+  "properties": {
+    "found": {
+      "description": "What the file holds now.",
+      "type": "string"
+    },
+    "secret": {
+      "description": "Whether either value was withheld rather than shown.",
+      "type": "boolean"
+    },
+    "wrote": {
+      "description": "What lemonfiber last wrote there.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "wrote",
+    "found",
+    "secret"
+  ]
+}

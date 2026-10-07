@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What one member is held to, in the words a household would use.\n\nThe two restrictions are one decision and two services: the media server decides\nwhat may be *watched* and the request service what may be *asked for*. Setting one\nwithout the other is the hole this vocabulary exists to name — a child who cannot\nwatch something but can pull it into the library has parents who set a limit and got\nhalf of one.",
+  "oneOf": [
+    {
+      "description": "Nothing is held back from them.",
+      "type": "string",
+      "const": "unrestricted"
+    },
+    {
+      "description": "Held to a highest rating.",
+      "type": "string",
+      "const": "rating-limited"
+    },
+    {
+      "description": "Held to some of the libraries.",
+      "type": "string",
+      "const": "library-limited"
+    },
+    {
+      "description": "Held to both a rating and some of the libraries.",
+      "type": "string",
+      "const": "both"
+    },
+    {
+      "description": "What they may watch is limited and what they may ask for is not.",
+      "type": "string",
+      "const": "inconsistent"
+    }
+  ]
+}

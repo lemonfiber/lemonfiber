@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Which walkthrough this stack is offered.",
+  "oneOf": [
+    {
+      "description": "The full walk: search, grab, download, import, and see it in the library.",
+      "type": "string",
+      "const": "pipeline"
+    },
+    {
+      "description": "The walk for a stack that acquires nothing: point at media already on disk and\nconfirm the media server can see it.",
+      "type": "string",
+      "const": "library-only"
+    }
+  ]
+}

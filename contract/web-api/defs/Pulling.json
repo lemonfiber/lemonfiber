@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Whether a client is fetching at all, where a cap made it a question.\n\nApart from the limits above rather than folded in with them, because it answers\na different question and a client held to a crawl is not a client that stopped.\nA word that named both would be the vocabulary this whole path exists to avoid.",
+  "oneOf": [
+    {
+      "description": "It is fetching, or would start on the next thing handed to it.",
+      "type": "string",
+      "const": "fetching"
+    },
+    {
+      "description": "Nothing is moving and nothing new would start.",
+      "type": "string",
+      "const": "stopped"
+    }
+  ]
+}

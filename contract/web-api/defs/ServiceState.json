@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What one service is actually doing.\n\nOrdered from worst to best, so a form's condition is the minimum across its\nservices and needs no comparison table. The declaration order is therefore\nload-bearing.",
+  "oneOf": [
+    {
+      "description": "Exited without being asked to, and is not coming back on its own.",
+      "type": "string",
+      "const": "failed"
+    },
+    {
+      "description": "Exiting and restarting repeatedly.",
+      "type": "string",
+      "const": "crash-looping"
+    },
+    {
+      "description": "Running, and its own probe says it is not working.",
+      "type": "string",
+      "const": "unhealthy"
+    },
+    {
+      "description": "No container exists.",
+      "type": "string",
+      "const": "absent"
+    },
+    {
+      "description": "A container exists and is not running.",
+      "type": "string",
+      "const": "stopped"
+    },
+    {
+      "description": "Running, and still inside its probe's start period.",
+      "type": "string",
+      "const": "starting"
+    },
+    {
+      "description": "Running, and declaring no probe by which to know more.\n\nDistinct from healthy on purpose. A service that cannot be asked is not\na service that answered, and rendering the two identically is how a\ndashboard comes to be believed about something it never checked.",
+      "type": "string",
+      "const": "running"
+    },
+    {
+      "description": "Running and passing its own probe.",
+      "type": "string",
+      "const": "healthy"
+    },
+    {
+      "description": "The operating system owns this one, not lemonfiber.",
+      "type": "string",
+      "const": "host-managed"
+    }
+  ]
+}

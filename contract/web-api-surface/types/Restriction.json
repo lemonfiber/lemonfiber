@@ -1,0 +1,10 @@
+{
+  "fields": {},
+  "variants": [
+    "\"both\"",
+    "\"inconsistent\"",
+    "\"library-limited\"",
+    "\"rating-limited\"",
+    "\"unrestricted\""
+  ]
+}

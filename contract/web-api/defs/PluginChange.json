@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One change installing a plugin makes to the machine.\n\nA path and what goes at it, which is the whole of what an install touches. Two of\nthem can be edits to a file the stack already has — the proxy's and the\ndashboard's — and those say so, as a region, so an operator reading the account\nknows which of their files the install writes into.",
+  "type": "object",
+  "properties": {
+    "path": {
+      "description": "Where it lands, in full.\n\nIn full rather than relative to the stack, because *what is this about to do\nto my machine* is answered by a path somebody can go and look at — and a\nrelative one is right about a directory the reader has to work out for\nthemselves.",
+      "type": "string"
+    },
+    "puts": {
+      "description": "What lands there.",
+      "$ref": "PluginPuts.json"
+    }
+  },
+  "required": [
+    "path",
+    "puts"
+  ]
+}

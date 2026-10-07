@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "answer": {
+      "type": [
+        "ref:Answer"
+      ],
+      "required": true
+    },
+    "client": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "pulling": {
+      "type": [
+        "anyOf(null,ref:Pulling)"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "ports": {
+      "type": [
+        "array[ref:MovedReport]"
+      ],
+      "required": true
+    },
+    "refusal": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "stance": {
+      "type": [
+        "ref:Stance"
+      ],
+      "required": true
+    },
+    "written": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

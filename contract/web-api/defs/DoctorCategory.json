@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The family a check belongs to, so a run can be narrowed to one of them.\n\nThese are the diagnostic categories the product recognises; the checks that\nfill each one arrive over time, so a category may name more than lemonfiber\ncan yet establish.",
+  "oneOf": [
+    {
+      "description": "Docker present, the daemon reachable, the platform understood.",
+      "type": "string",
+      "const": "environment"
+    },
+    {
+      "description": "The data root: reachable, writable, one filesystem, room to grow.",
+      "type": "string",
+      "const": "storage"
+    },
+    {
+      "description": "Ports free, bindings matching policy, services reachable.",
+      "type": "string",
+      "const": "network"
+    },
+    {
+      "description": "Torrent traffic genuinely leaves through the tunnel.",
+      "type": "string",
+      "const": "vpn"
+    },
+    {
+      "description": "Each credential still valid.",
+      "type": "string",
+      "const": "credentials"
+    },
+    {
+      "description": "Health, crash loops, version skew, the wiring between services.",
+      "type": "string",
+      "const": "services"
+    },
+    {
+      "description": "Provider quota, subscription validity, indexer responsiveness.",
+      "type": "string",
+      "const": "providers"
+    },
+    {
+      "description": "Stuck items, repeated import failures, orphaned downloads.",
+      "type": "string",
+      "const": "queue"
+    },
+    {
+      "description": "Drift from lemonfiber-managed state, permissions, manifest validity.",
+      "type": "string",
+      "const": "config"
+    }
+  ]
+}

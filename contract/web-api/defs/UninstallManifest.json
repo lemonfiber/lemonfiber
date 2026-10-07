@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What removing would come to, shown before anything is removed.",
+  "type": "object",
+  "properties": {
+    "agreement": {
+      "description": "What this reading names itself, so an answer says which reading it answered.",
+      "type": "string"
+    },
+    "backup": {
+      "description": "Whether a backup was offered before configuration is destroyed, and how.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "bytes": {
+      "description": "What the lines that are going occupy, where that is knowable.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "coming": {
+      "description": "What is still coming down, which stopping would interrupt.",
+      "type": "array",
+      "items": {
+        "$ref": "Coming.json"
+      }
+    },
+    "confidence": {
+      "description": "How much of this was read, and what could not be.",
+      "$ref": "UninstallConfidence.json"
+    },
+    "foreign": {
+      "description": "What is beneath the data location that the stack did not put there.\n\nNot a warning. While this is non-empty the data location is never removed as\none tree, and only the stack's own directories beneath it are offered.",
+      "type": "array",
+      "items": {
+        "$ref": "Foreign.json"
+      }
+    },
+    "items": {
+      "description": "Every line it reaches, each said to be going or said to be kept.",
+      "type": "array",
+      "items": {
+        "$ref": "Item.json"
+      }
+    },
+    "keeps": {
+      "description": "What it leaves alone, in the operator's words.",
+      "type": "string"
+    },
+    "outside": {
+      "description": "What lemonfiber cannot remove, each with how to remove it by hand.",
+      "type": "array",
+      "items": {
+        "$ref": "Outside.json"
+      }
+    },
+    "removes": {
+      "description": "What it takes, in the operator's words.",
+      "type": "string"
+    },
+    "tier": {
+      "description": "Which removal this is.",
+      "$ref": "Tier.json"
+    },
+    "volume": {
+      "description": "Whether the data location is on a network share or a drive that unplugs.\n\nSaid where it is, so removing across a mount an operator forgot was a mount is\nsomething they read before agreeing rather than after.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "tier",
+    "removes",
+    "keeps",
+    "items",
+    "bytes",
+    "foreign",
+    "coming",
+    "outside",
+    "confidence",
+    "agreement"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "from": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "plugin": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "standing": {
+      "type": [
+        "ref:PluginSourceStanding"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

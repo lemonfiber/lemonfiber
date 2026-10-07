@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Something that went wrong, in the form an operator can act on.",
+  "type": "object",
+  "properties": {
+    "cause": {
+      "description": "The problem that produced this one, where several share a root.",
+      "anyOf": [
+        {
+          "$ref": "Problem.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "code": {
+      "description": "The stable identifier for this kind of problem.",
+      "$ref": "Code.json"
+    },
+    "detail": {
+      "description": "The underlying technical detail, available but never leading.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "meaning": {
+      "description": "What it means for the operator.",
+      "type": "string"
+    },
+    "remedies": {
+      "description": "What to do, most likely first.",
+      "type": "array",
+      "items": {
+        "$ref": "Remedy.json"
+      }
+    },
+    "severity": {
+      "description": "How much it matters.",
+      "$ref": "ProblemSeverity.json"
+    },
+    "state": {
+      "description": "Where it stands with respect to being fixed.",
+      "$ref": "ProblemState.json"
+    },
+    "summary": {
+      "description": "What happened, in one plain sentence.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "code",
+    "severity",
+    "state",
+    "summary",
+    "meaning",
+    "remedies"
+  ]
+}

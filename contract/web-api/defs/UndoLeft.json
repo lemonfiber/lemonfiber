@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One change a reversal did not put back, and why it did not.",
+  "type": "object",
+  "properties": {
+    "because": {
+      "description": "Why it is still standing, in the operator's terms.",
+      "type": "string"
+    },
+    "target": {
+      "description": "What the change was against — a service, or lemonfiber's own environment file.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "target",
+    "because"
+  ]
+}

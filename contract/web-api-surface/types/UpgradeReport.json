@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "confirmed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "media": {
+      "type": [
+        "array[ref:UpgradeMedia]"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

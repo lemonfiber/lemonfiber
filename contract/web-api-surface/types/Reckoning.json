@@ -1,0 +1,71 @@
+{
+  "fields": {
+    "agreement": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "candidates": {
+      "type": [
+        "array[ref:Candidate]"
+      ],
+      "required": true
+    },
+    "consumption": {
+      "type": [
+        "array[ref:Consumption]"
+      ],
+      "required": true
+    },
+    "halted": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "interrupted": {
+      "type": [
+        "array[ref:Interrupted]"
+      ],
+      "required": true
+    },
+    "level": {
+      "type": [
+        "ref:Level"
+      ],
+      "required": true
+    },
+    "outsized": {
+      "type": [
+        "array[ref:Outsized]"
+      ],
+      "required": true
+    },
+    "reclaimable": {
+      "type": [
+        "array[ref:Consumption]"
+      ],
+      "required": true
+    },
+    "reclaimed": {
+      "type": [
+        "anyOf(null,ref:Reclaimed)"
+      ],
+      "required": false
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "volumes": {
+      "type": [
+        "array[ref:Volume]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

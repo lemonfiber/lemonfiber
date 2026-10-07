@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "missing": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "pieces": {
+      "type": [
+        "array[ref:Piece]"
+      ],
+      "required": true
+    },
+    "taken": {
+      "type": [
+        "ref:Taken"
+      ],
+      "required": true
+    },
+    "terms": {
+      "type": [
+        "ref:Terms"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

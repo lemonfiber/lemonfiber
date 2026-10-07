@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Why a walkthrough could not go on.",
+  "oneOf": [
+    {
+      "description": "No indexer is configured, so there is nothing to search. Not a failure of the\nwalk — a reason not to offer it at all.",
+      "type": "string",
+      "const": "no-indexers"
+    },
+    {
+      "description": "The search could not be run: the indexers, or the service holding them, would not\nanswer.",
+      "type": "string",
+      "const": "indexers-failed"
+    },
+    {
+      "description": "The search ran cleanly and matched nothing. An entirely different problem from\nthe one above, and the one operators most often mistake for it.",
+      "type": "string",
+      "const": "nothing-matched"
+    },
+    {
+      "description": "Releases exist, but none meets the chosen quality preset. The stack is working;\nthe preset and what is out there disagree.",
+      "type": "string",
+      "const": "none-met-the-preset"
+    },
+    {
+      "description": "Torrents are in play and the tunnel is not verified up. Nothing is grabbed.",
+      "type": "string",
+      "const": "tunnel-down"
+    },
+    {
+      "description": "The release was never handed to a download client.",
+      "type": "string",
+      "const": "not-grabbed"
+    },
+    {
+      "description": "The download stopped making progress.",
+      "type": "string",
+      "const": "stalled"
+    },
+    {
+      "description": "The download finished and the library manager would not take it.",
+      "type": "string",
+      "const": "import-failed"
+    },
+    {
+      "description": "There is no media server in the running form to make it playable.",
+      "type": "string",
+      "const": "no-media-server"
+    },
+    {
+      "description": "It was imported, the media server was told, and it still cannot be found there.",
+      "type": "string",
+      "const": "not-visible"
+    }
+  ]
+}

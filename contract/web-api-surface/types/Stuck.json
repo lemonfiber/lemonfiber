@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "blocking": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "held_for": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "items": {
+      "type": [
+        "integer/uint"
+      ],
+      "required": true
+    },
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "stall": {
+      "type": [
+        "ref:Stall"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

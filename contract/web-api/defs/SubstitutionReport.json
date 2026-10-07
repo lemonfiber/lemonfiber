@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What substituting one service for another would come to.",
+  "type": "object",
+  "properties": {
+    "agreement": {
+      "description": "What this reading names itself, so a choice answering it can say which reading\nit answered.\n\nNamed part by part — the choice itself, what fills the capability now, what asks\nfor it, and what the change would leave unfilled — so a choice refused because the\nwiring moved is told which of those moved.",
+      "type": "string"
+    },
+    "applied": {
+      "description": "Whether it was written, or only worked out.\n\nA run that only says what it would do writes nothing and reports the same\nanswer, so the two are told apart here rather than by the caller remembering\nwhich flags it passed.",
+      "type": "boolean"
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+      "type": "boolean"
+    },
+    "substitution": {
+      "description": "The change itself, and what it would leave with nothing filling it.",
+      "$ref": "Substitution.json"
+    }
+  },
+  "required": [
+    "substitution",
+    "applied",
+    "agreement",
+    "rehearsed"
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Every key this machine has minted, and what became of a revoke.",
+  "type": "object",
+  "properties": {
+    "keys": {
+      "description": "In the order they were minted.",
+      "type": "array",
+      "items": {
+        "$ref": "ListedKey.json"
+      }
+    },
+    "purposes": {
+      "description": "What a purpose in the listing is worth, said with it.",
+      "type": "string"
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what revoking would come to, with nothing revoked.",
+      "type": "boolean"
+    },
+    "revoked": {
+      "description": "The key this run revoked, where it revoked one.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "keys",
+    "purposes",
+    "rehearsed"
+  ]
+}

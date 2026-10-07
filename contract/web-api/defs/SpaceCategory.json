@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What one line of the accounting is about.",
+  "oneOf": [
+    {
+      "description": "One directory beneath the data root, named as the operator named it.\n\nPer directory rather than one figure for the library, because several\nlibraries commonly share a volume and \"the library is large\" tells nobody\nwhich of them is growing.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "of": {
+          "type": "string",
+          "const": "tree"
+        }
+      },
+      "required": [
+        "of",
+        "name"
+      ]
+    },
+    {
+      "description": "What the download clients still have to write.",
+      "type": "object",
+      "properties": {
+        "of": {
+          "type": "string",
+          "const": "landing"
+        }
+      },
+      "required": [
+        "of"
+      ]
+    },
+    {
+      "description": "Completed downloads the client is still seeding.",
+      "type": "object",
+      "properties": {
+        "of": {
+          "type": "string",
+          "const": "seeding"
+        }
+      },
+      "required": [
+        "of"
+      ]
+    },
+    {
+      "description": "Downloads on disk that no service ever took.",
+      "type": "object",
+      "properties": {
+        "of": {
+          "type": "string",
+          "const": "orphaned"
+        }
+      },
+      "required": [
+        "of"
+      ]
+    },
+    {
+      "description": "Archives whose extracted contents sit beside them.",
+      "type": "object",
+      "properties": {
+        "of": {
+          "type": "string",
+          "const": "extracted"
+        }
+      },
+      "required": [
+        "of"
+      ]
+    },
+    {
+      "description": "The services' own configuration and databases.",
+      "type": "object",
+      "properties": {
+        "of": {
+          "type": "string",
+          "const": "services"
+        }
+      },
+      "required": [
+        "of"
+      ]
+    },
+    {
+      "description": "What the operator said to leave alone.",
+      "type": "object",
+      "properties": {
+        "of": {
+          "type": "string",
+          "const": "unmanaged"
+        }
+      },
+      "required": [
+        "of"
+      ]
+    }
+  ]
+}

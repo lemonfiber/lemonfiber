@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where every service in this stack comes from.",
+  "type": "object",
+  "properties": {
+    "services": {
+      "description": "The services, in the order the stack declares them.\n\nEvery service the manifest holds rather than the ones some form would start:\nwhat is *in* this stack is the question being asked, and an answer narrowed to\nwhat is running would leave the operator unable to ask about the service they\nare deciding whether to run.",
+      "type": "array",
+      "items": {
+        "$ref": "ServiceProvenance.json"
+      }
+    }
+  },
+  "required": [
+    "services"
+  ]
+}

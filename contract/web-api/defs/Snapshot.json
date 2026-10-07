@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Everything the dashboard shows at one moment.\n\nEach source's panel is filled or marked unavailable on its own, so one dead\nsource degrades one region rather than the screen. The surface builds this from\nwhat it gathered; the standing is read from the same facts so it cannot\ndisagree with the panels.",
+  "type": "object",
+  "properties": {
+    "alerts": {
+      "description": "What the operator has been told, newest first: what is owed them where a\nchannel is refusing, then what has already been said.",
+      "type": "array",
+      "items": {
+        "$ref": "Alert.json"
+      }
+    },
+    "door": {
+      "description": "The one address to hand somebody who lives here.\n\nOn the screen rather than only behind a question, because the operator who\nneeds it is not the one who thought to ask: they have just been asked \"what\ndo I open?\" by somebody in the next room. Built from the same reading as the\npanels beside it, so the screen and `front-door` cannot name different doors.",
+      "$ref": "PanelFrontDoorReport.json"
+    },
+    "health": {
+      "description": "The one-line health summary — the same computation every other surface\nuses, so no two of them can grade the same stack differently.\n\nAlways present, unlike the panels: a stack that could not be reached has a\nsummary, and it says `unknown`. An absent summary would leave the operator\nto infer health from a blank space, which is the one reading this must never\nbe open to.",
+      "$ref": "HealthSummary.json"
+    },
+    "household": {
+      "description": "What the household has asked for that is not moving.\n\nOn the screen rather than only behind a question, for the reason the door\nbeside it is: a request waiting on a decision or failed after one is waiting\non the operator, and an operator who has to think to ask is one who finds out\nwhen somebody comes to complain.",
+      "$ref": "PanelHouseholdReport.json"
+    },
+    "queue": {
+      "description": "The per-service queues.",
+      "$ref": "PanelArray_of_Queue.json"
+    },
+    "services": {
+      "description": "Every service and what it is doing.",
+      "$ref": "PanelArray_of_Service.json"
+    },
+    "storage": {
+      "description": "The storage picture.",
+      "$ref": "PanelStorage.json"
+    },
+    "stuck": {
+      "description": "What in the pipeline has stopped, worst first — assessed across the\ndownload clients and the \\*arrs together, because the failure that matters\nmost is invisible inside either.",
+      "type": "array",
+      "items": {
+        "$ref": "Stuck.json"
+      }
+    },
+    "telemetry": {
+      "description": "Whether the screen itself can be trusted to be current.",
+      "$ref": "Telemetry.json"
+    },
+    "transfers": {
+      "description": "The active transfers.",
+      "$ref": "PanelArray_of_Transfer.json"
+    },
+    "vpn": {
+      "description": "The VPN, or `None` where no VPN is configured and the panel is omitted\nrather than shown permanently red.",
+      "anyOf": [
+        {
+          "$ref": "PanelVpn.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "telemetry",
+    "health",
+    "transfers",
+    "queue",
+    "stuck",
+    "alerts",
+    "storage",
+    "services",
+    "door",
+    "household"
+  ]
+}

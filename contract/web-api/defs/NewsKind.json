@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One of the three kinds of thing a surface can mark as new.",
+  "oneOf": [
+    {
+      "description": "Releases of lemonfiber.",
+      "type": "string",
+      "const": "updates"
+    },
+    {
+      "description": "What the household has asked for.",
+      "type": "string",
+      "const": "requests"
+    },
+    {
+      "description": "Checks found wrong.",
+      "type": "string",
+      "const": "problems"
+    }
+  ]
+}

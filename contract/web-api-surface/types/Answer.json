@@ -1,0 +1,39 @@
+{
+  "fields": {
+    "answered": {
+      "type": [
+        "const:\"held\"",
+        "const:\"silent\""
+      ],
+      "required": true
+    },
+    "down": {
+      "type": [
+        "ref:BandwidthHeld"
+      ],
+      "required": true
+    },
+    "period": {
+      "type": [
+        "anyOf(null,ref:Period)"
+      ],
+      "required": false
+    },
+    "said": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "up": {
+      "type": [
+        "ref:BandwidthHeld"
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"held\"",
+    "\"silent\""
+  ]
+}

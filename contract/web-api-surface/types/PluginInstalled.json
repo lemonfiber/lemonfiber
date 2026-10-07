@@ -1,0 +1,89 @@
+{
+  "fields": {
+    "adapters": {
+      "type": [
+        "array[ref:PluginServiceAdapter]"
+      ],
+      "required": false
+    },
+    "contributions": {
+      "type": [
+        "array[ref:Contribution]"
+      ],
+      "required": false
+    },
+    "declared": {
+      "type": [
+        "ref:PluginDeclaration"
+      ],
+      "required": false
+    },
+    "description": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "from": {
+      "type": [
+        "string"
+      ],
+      "required": false
+    },
+    "installed_at": {
+      "type": [
+        "string"
+      ],
+      "required": false
+    },
+    "name": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "plugin": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "provides": {
+      "type": [
+        "array[string]"
+      ],
+      "required": false
+    },
+    "recipes": {
+      "type": [
+        "array[ref:PluginRecipe]"
+      ],
+      "required": false
+    },
+    "revision": {
+      "type": [
+        "string"
+      ],
+      "required": false
+    },
+    "services": {
+      "type": [
+        "array[ref:PluginPlaced]"
+      ],
+      "required": true
+    },
+    "signed": {
+      "type": [
+        "string"
+      ],
+      "required": false
+    },
+    "version": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

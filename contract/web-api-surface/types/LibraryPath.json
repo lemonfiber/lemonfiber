@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "because": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "carried": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "host": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "path": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

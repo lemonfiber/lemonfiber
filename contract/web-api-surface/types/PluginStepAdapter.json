@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "kind": {
+      "type": [
+        "ref:ApiKind"
+      ],
+      "required": true
+    },
+    "owner": {
+      "type": [
+        "ref:PluginAdapterOwner"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

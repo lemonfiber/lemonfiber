@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What is already on this machine, before anything is proposed.",
+  "type": "object",
+  "properties": {
+    "beside": {
+      "description": "Where each service would listen to run beside the existing setup.",
+      "type": "array",
+      "items": {
+        "$ref": "MovedReport.json"
+      }
+    },
+    "carrying": {
+      "description": "What adopting each recognised service would come to, by service name.",
+      "type": "array",
+      "items": {
+        "$ref": "CarryingReport.json"
+      }
+    },
+    "conflicts": {
+      "description": "Ports wanted by lemonfiber that an existing service already holds.",
+      "type": "array",
+      "items": {
+        "$ref": "ConflictReport.json"
+      }
+    },
+    "linking": {
+      "description": "What the existing layout costs where it cannot hold a hardlink, absent where\nit can.",
+      "anyOf": [
+        {
+          "$ref": "LinkingReport.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "modes": {
+      "description": "What may be done about what was found, least destructive first.",
+      "type": "array",
+      "items": {
+        "$ref": "ModeReport.json"
+      }
+    },
+    "not_carried": {
+      "description": "What no migration carries across, whatever mode it runs in.",
+      "type": "array",
+      "items": {
+        "$ref": "UnsupportedReport.json"
+      }
+    },
+    "read": {
+      "description": "Whether the engine answered at all.\n\nFalse means the survey found nothing because it could not look, which is a\ndifferent answer from finding nothing, and the only one that must never be\nread as an empty machine.",
+      "type": "boolean"
+    },
+    "standing": {
+      "description": "Existing projects, by project name.",
+      "type": "array",
+      "items": {
+        "$ref": "StandingReport.json"
+      }
+    },
+    "unsupported": {
+      "description": "What was found and cannot be adopted.",
+      "type": "array",
+      "items": {
+        "$ref": "UnsupportedReport.json"
+      }
+    }
+  },
+  "required": [
+    "read",
+    "standing",
+    "conflicts",
+    "unsupported",
+    "carrying",
+    "not_carried",
+    "modes",
+    "beside"
+  ]
+}

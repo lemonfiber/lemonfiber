@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a capture produced.",
+  "type": "object",
+  "properties": {
+    "pace": {
+      "description": "What the capture moved, against what a capture is meant to stay inside.\n\nRead off the room check that already ran, so saying it costs nothing: the trees\nwere walked to decide whether the archive would fit, and this is the same number\nput to a second use.",
+      "$ref": "Pace.json"
+    },
+    "path": {
+      "description": "Where the archive was written, or — on a run that only said what it would\ncapture — where it would have gone.",
+      "type": "string"
+    },
+    "pruned": {
+      "description": "The older backups retention pruned, oldest first — or would prune.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "rehearsed": {
+      "description": "Whether this run only said what it would capture.\n\nA flag rather than a second shape, because every other field means the same\nthing either way: a capture is settled before it is written — the room is\nmeasured, the manifest described, the name and the path derived, and retention\nworked out — so what a rehearsal reports is what a real run would report, with\nthe one write left out. What changes is the tense a surface says it in.",
+      "type": "boolean"
+    },
+    "scope": {
+      "description": "What the backup covers.",
+      "$ref": "Scope.json"
+    },
+    "sensitive": {
+      "description": "Whether it carries credentials, and so must be handled as sensitive.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "path",
+    "scope",
+    "sensitive",
+    "pruned",
+    "pace",
+    "rehearsed"
+  ]
+}

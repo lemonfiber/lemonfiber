@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The difference between the configuration in force and the one proposed.\n\nOne setting, because one call changes one setting. What makes it a diff rather than\na value is `from`: an operator deciding whether to go ahead is deciding between two\nthings, and a report that showed only the new one would be asking them to remember\nthe old one correctly.",
+  "type": "object",
+  "properties": {
+    "cost": {
+      "description": "Whether applying it is cheap or consequential.",
+      "$ref": "Cost.json"
+    },
+    "from": {
+      "description": "What it holds now, withheld where it is a credential, and absent where the\nsetting holds nothing yet.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "key": {
+      "description": "The setting the change names.",
+      "type": "string"
+    },
+    "to": {
+      "description": "What it would hold, withheld the same way.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "key",
+    "to",
+    "cost"
+  ]
+}

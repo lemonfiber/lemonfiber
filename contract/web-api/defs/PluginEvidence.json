@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What the verdicts in a report were reached against.\n\nOne value, because one is all this build can produce: nothing here asks a service\nanything. It is a field rather than a sentence for the reason a verdict is one — a\nreader handed `demonstrated` has nothing else in the document to tell a recording\nthat answered from a service that did, and the weaker of those two claims must not\nbe readable as the stronger. The prose says it on the page; this says it to\nwhatever consumes the report: an author's own CI, a catalogue, anything counting\npasses. Naming the axis now is what made the second kind of evidence a change the\ncompiler walked somebody through rather than one they had to remember.",
+  "oneOf": [
+    {
+      "description": "The recordings the plugin ships. No service was asked anything.",
+      "type": "string",
+      "const": "recordings"
+    },
+    {
+      "description": "The service itself, running on this machine and asked.\n\nThe stronger of the two and the one only an install can reach: an author has\nno instance to ask and the catalogue has none either, which is the whole\nreason recordings exist. A verdict reached here says the service did the\nthing on the machine it is installed on, and it must not be readable as the\nweaker claim any more than the weaker may be read as this.",
+      "type": "string",
+      "const": "service"
+    }
+  ]
+}

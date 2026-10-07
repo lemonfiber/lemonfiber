@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Every word this product explains, for somebody who asked what there is to ask\nabout.",
+  "type": "object",
+  "properties": {
+    "words": {
+      "description": "The words, in the order somebody meets them.",
+      "type": "array",
+      "items": {
+        "$ref": "Term.json"
+      }
+    }
+  },
+  "required": [
+    "words"
+  ]
+}

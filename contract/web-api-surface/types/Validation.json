@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "detail": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "observed": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "outcome": {
+      "type": [
+        "const:\"degraded\"",
+        "const:\"rejected\"",
+        "const:\"unreachable\"",
+        "const:\"valid\""
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"degraded\"",
+    "\"rejected\"",
+    "\"unreachable\"",
+    "\"valid\""
+  ]
+}

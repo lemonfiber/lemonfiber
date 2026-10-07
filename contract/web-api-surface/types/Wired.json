@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "by": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "reaches": {
+      "type": [
+        "ref:Reaches"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

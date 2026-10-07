@@ -1,0 +1,47 @@
+{
+  "fields": {
+    "created_at": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "data_root": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "members": {
+      "type": [
+        "array[ref:Member]"
+      ],
+      "required": true
+    },
+    "product_version": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "schema": {
+      "type": [
+        "integer/uint32"
+      ],
+      "required": true
+    },
+    "scope": {
+      "type": [
+        "ref:Scope"
+      ],
+      "required": true
+    },
+    "sensitive": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What was said when one request was turned down.",
+  "type": "object",
+  "properties": {
+    "at": {
+      "description": "When it was turned down, so somebody reading it later knows which answer this\nwas rather than assuming it is the newest.\n\nAbsent where the machine's clock could not be written as a date, which is a\nrefusal worth keeping the words of and not worth losing them over.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "expired": {
+      "description": "Whether nobody ruled on it and the period the household agreed to closed it,\nrather than an operator turning it down.\n\nThe words are then this program's own, which is why the two are told apart here\nand not left to be read off the sentence: an operator scanning for what happened\nwhile they were away is looking for exactly the ones nobody answered, and a\nmember is owed the difference between having been refused and having run out.\n\nAbsent from every record written before a household could arrange this, which is\nthe right reading of them — they are all somebody's own refusals.",
+      "type": "boolean",
+      "default": false
+    },
+    "reason": {
+      "description": "Why, in the words it was turned down in.",
+      "type": "string"
+    },
+    "told": {
+      "description": "Whether the words have been carried to whoever asked, and where to.\n\nAbsent until the one attempt has been made. **This is what makes a second one\nimpossible rather than unlikely**: carrying happens only where this is absent,\nand it is written whether anything was reached or not — so a member with nowhere\nto send to is asked about once, and a household is never told the same thing\ntwice by a run that happened to be started twice.",
+      "anyOf": [
+        {
+          "$ref": "Passed.json"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "reason"
+  ]
+}

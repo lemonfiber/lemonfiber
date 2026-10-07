@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How large a step from one version to another is.\n\nNamed after the part of the version that moved rather than after a size, because\nthat is the fact an operator weighs: a first-number change is where a project puts\nthe work that breaks configurations, and the two behind it are where it puts the\nwork that does not.",
+  "oneOf": [
+    {
+      "description": "The first number moved.",
+      "type": "string",
+      "const": "major"
+    },
+    {
+      "description": "The second number moved, and the first did not.",
+      "type": "string",
+      "const": "minor"
+    },
+    {
+      "description": "Nothing before the third number moved.",
+      "type": "string",
+      "const": "patch"
+    },
+    {
+      "description": "One of the tags is not a run of numbers, so the size of the step is unknown.",
+      "type": "string",
+      "const": "untellable"
+    }
+  ]
+}

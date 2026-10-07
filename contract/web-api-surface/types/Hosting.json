@@ -1,0 +1,11 @@
+{
+  "fields": {},
+  "variants": [
+    "\"hosted\"",
+    "\"installed-unverified\"",
+    "\"not-hosted\"",
+    "\"orphaned\"",
+    "\"stopped\"",
+    "\"unsupported\""
+  ]
+}

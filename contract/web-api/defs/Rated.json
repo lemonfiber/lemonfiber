@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What one age limit comes to, in the certificates named for it.\n\nBoth sides, because either alone misleads. What is allowed without what is held\nback reads as a limit that stops nothing; what is held back without what is allowed\nreads as a limit that stops everything.",
+  "type": "object",
+  "properties": {
+    "allows": {
+      "description": "The certificates at the highest age this limit still lets through.\n\nEmpty where the table names nothing at or below the limit, which is a limit\nthat lets nothing rated through at all.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "fell_back": {
+      "description": "Whether these came from lemonfiber's own mapping because the media server's\ntable named no certificates.\n\nCarried rather than hidden: a certificate said to be this household's when it\nis this program's is the kind of claim a parent would act on.",
+      "type": "boolean"
+    },
+    "holds_back": {
+      "description": "The certificates at the lowest age this limit holds back.\n\nEmpty where the table names nothing above the limit, which is a limit that\nholds nothing rated back at all.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "allows",
+    "holds_back",
+    "fell_back"
+  ]
+}

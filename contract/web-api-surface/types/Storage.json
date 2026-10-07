@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "exhaustion": {
+      "type": [
+        "anyOf(null,ref:Duration)"
+      ],
+      "required": false
+    },
+    "free": {
+      "type": [
+        "ref:DashboardReading"
+      ],
+      "required": true
+    },
+    "hardlink": {
+      "type": [
+        "ref:Hardlink"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

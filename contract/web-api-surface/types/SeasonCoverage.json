@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "have": {
+      "type": [
+        "integer/uint"
+      ],
+      "required": true
+    },
+    "outstanding": {
+      "type": [
+        "array[ref:Part]"
+      ],
+      "required": true
+    },
+    "season": {
+      "type": [
+        "integer/uint32"
+      ],
+      "required": true
+    },
+    "unmonitored": {
+      "type": [
+        "integer/uint"
+      ],
+      "required": true
+    },
+    "wanted": {
+      "type": [
+        "integer/uint"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where the stack stands against the versions this build pins.\n\nExactly one of these is true of a run at a time. A surface that had to say\n\"updates available, and also partly applied\" would be reporting the question\nrather than the answer.",
+  "oneOf": [
+    {
+      "description": "Every service is standing on the version pinned for it.",
+      "type": "string",
+      "const": "current"
+    },
+    {
+      "description": "Newer versions are pinned than what is running, and nothing has been applied.",
+      "type": "string",
+      "const": "updates-available"
+    },
+    {
+      "description": "Everything that had an update took it.",
+      "type": "string",
+      "const": "updated"
+    },
+    {
+      "description": "Some were updated and one was not; the run stopped there.",
+      "type": "string",
+      "const": "partial"
+    },
+    {
+      "description": "Nothing was updated, and the run stopped where it did.",
+      "type": "string",
+      "const": "failed"
+    }
+  ]
+}

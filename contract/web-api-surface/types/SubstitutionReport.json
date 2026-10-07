@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "agreement": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "applied": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "substitution": {
+      "type": [
+        "ref:Substitution"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "kind": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

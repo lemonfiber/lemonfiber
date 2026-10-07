@@ -1,0 +1,9 @@
+{
+  "fields": {},
+  "variants": [
+    "\"applied\"",
+    "\"applying\"",
+    "\"in-progress\"",
+    "\"reviewing\""
+  ]
+}

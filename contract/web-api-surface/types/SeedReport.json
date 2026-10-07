@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "assessment": {
+      "type": [
+        "ref:Assessment"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "unsupported": {
+      "type": [
+        "array[ref:UnsupportedReport]"
+      ],
+      "required": false
+    },
+    "wirings": {
+      "type": [
+        "array[ref:Wiring]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

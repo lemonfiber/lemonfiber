@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One `*arr`'s queue, and how much of it is stuck.",
+  "type": "object",
+  "properties": {
+    "depth": {
+      "description": "How many items are queued.",
+      "type": "integer",
+      "format": "uint",
+      "minimum": 0
+    },
+    "service": {
+      "description": "The service whose queue this is.",
+      "type": "string"
+    },
+    "stuck": {
+      "description": "How many of them are stuck rather than progressing.",
+      "type": "integer",
+      "format": "uint",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "service",
+    "depth",
+    "stuck"
+  ]
+}

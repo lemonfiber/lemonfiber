@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One host tree captured from a setup lemonfiber does not manage.\n\nBoth halves are needed to find it again: the archive path says where it sits\ninside the archive, and the host path says where it was read from. Nothing\nderives the second from the first, because a tree outside lemonfiber's layout\nhas no layout to derive it from.",
+  "type": "object",
+  "properties": {
+    "archive_path": {
+      "description": "Where it sits inside the archive.",
+      "type": "string"
+    },
+    "host_path": {
+      "description": "Where it was read from, on the machine whose setup was taken over.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "host_path",
+    "archive_path"
+  ]
+}

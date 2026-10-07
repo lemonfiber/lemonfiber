@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One thing a household member asked for, and where it stands in their words.",
+  "type": "object",
+  "properties": {
+    "arrived": {
+      "description": "When the title arrived on the media server, as the request service timestamps it.\nAbsent, not null, until it is there.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "estimate": {
+      "description": "About how much room it will want, at the quality in force.\n\nA guess and labelled as one — see [`crate::asking::Estimate`]. Absent where the\nrequest service names a kind this build does not know, since there is nothing to\nguess the length of.",
+      "anyOf": [
+        {
+          "$ref": "Estimate.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "id": {
+      "description": "The number the request service files it under, which is how one is named again\nwhen somebody rules on it.",
+      "type": "integer",
+      "format": "int64"
+    },
+    "media": {
+      "description": "What kind of thing it is — a series, a film — in the household's own words.\nAbsent where the request service names a kind this build does not know.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "refused": {
+      "description": "Why it was turned down, where it was turned down from here.\n\n**The request service keeps none**, so this is lemonfiber's own record and is\nsaid to be — a reason presented as delivered would end the operator's job at\nexactly the point it begins. Absent on a request nobody has refused, and on one\nrefused in the request service itself, where there are no words to report and\ninventing some would put them in somebody's mouth.\n\nWhether the words were carried to the person who asked is the record's own\n`told`, which is why the two travel together: what an operator does next turns\non it, and a reason read without it is a reason of unknown standing.",
+      "anyOf": [
+        {
+          "$ref": "Refused.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "shelf_id": {
+      "description": "The identifier the media server holds the title under, which is the one the held\nread names it by, so a request that has arrived can be found on the shelf. Absent,\nnot null, until it is there.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "state": {
+      "description": "Where the request stands, or absent where the request service reports a status\nthis build does not know rather than guessing it into the nearest word.",
+      "anyOf": [
+        {
+          "$ref": "RequestState.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "title": {
+      "description": "What it is called, where the service filing it has been told about it and its\nlibrary could be read. Absent for a request no service holds yet — one still\nawaiting approval has been handed to nobody, so there is no title to find.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "waiting_days": {
+      "description": "How many whole days it has been waiting on somebody, where it is waiting at all\nand the service's own date could be read.\n\nOnly on the ones nobody has ruled on. A request already answered has not been\nwaiting since it was made, and a figure beside one would be counting the wrong\nthing.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
+    },
+    "year": {
+      "description": "The year that title came out, where the service filing it knows one. Absent, not\nnull, until the request has been handed to that service, for the reason the title\nis.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0
+    }
+  },
+  "required": [
+    "id"
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "fields": {
+    "address": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "applied": {
+      "type": [
+        "anyOf(null,ref:InvitationApplied)"
+      ],
+      "required": false
+    },
+    "caution": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "decline": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "hours": {
+      "type": [
+        "integer/int64"
+      ],
+      "required": true
+    },
+    "linked": {
+      "type": [
+        "ref:Linked"
+      ],
+      "required": true
+    },
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "standing": {
+      "type": [
+        "ref:InvitationStanding"
+      ],
+      "required": true
+    },
+    "suspended": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "withdrawn": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

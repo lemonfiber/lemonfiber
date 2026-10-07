@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a whole set of services amounts to.",
+  "oneOf": [
+    {
+      "description": "Nothing is running.",
+      "type": "string",
+      "const": "inactive"
+    },
+    {
+      "description": "Running, with at least one service in a state that wants attention.",
+      "type": "string",
+      "const": "degraded"
+    },
+    {
+      "description": "Some services are up and others are not.",
+      "type": "string",
+      "const": "partial"
+    },
+    {
+      "description": "Everything expected is up and answering.",
+      "type": "string",
+      "const": "active"
+    }
+  ]
+}

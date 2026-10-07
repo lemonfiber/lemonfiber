@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A monthly allowance, and what to do at the end of it.",
+  "type": "object",
+  "properties": {
+    "exceeded": {
+      "description": "What happens when it is reached, chosen when the cap was declared.",
+      "$ref": "WhenExceeded.json"
+    },
+    "monthly": {
+      "description": "The allowance, in bytes.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "monthly",
+    "exceeded"
+  ]
+}

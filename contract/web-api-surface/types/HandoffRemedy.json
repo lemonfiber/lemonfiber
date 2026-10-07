@@ -1,0 +1,9 @@
+{
+  "fields": {},
+  "variants": [
+    "\"ask-again\"",
+    "\"invite\"",
+    "\"record-address\"",
+    "\"start-server\""
+  ]
+}

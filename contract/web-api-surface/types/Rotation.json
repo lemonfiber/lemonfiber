@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "consumers": {
+      "type": [
+        "array[ref:Propagation]"
+      ],
+      "required": true
+    },
+    "credential": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "settled": {
+      "type": [
+        "ref:Settled"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

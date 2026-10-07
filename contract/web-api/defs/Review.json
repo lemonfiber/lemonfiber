@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A proposed change, read against what is in force, and where it stands.",
+  "type": "object",
+  "properties": {
+    "change": {
+      "description": "The difference, as it would be applied.",
+      "$ref": "ConfigChange.json"
+    },
+    "findings": {
+      "description": "What the change comes to on this machine, beyond the value it changes.\n\nFilled by whoever went and asked — the services where they file, the clients\nwhat they are fetching — and empty on every change that comes to nothing\nbeyond its value. Carried on a staged proposal as well as an applied one: a\nreview that withheld this until after the yes would be asking for a yes to\nsomething unstated.",
+      "$ref": "Findings.json",
+      "default": {
+        "active": [],
+        "keeps": [],
+        "library": [],
+        "opens": [],
+        "stops": []
+      }
+    },
+    "proof": {
+      "description": "What proving the replacement credential came to, where one was proven.\n\nA replacement is proven against its live service before the credential it\nreplaces is discarded, so this is present for exactly those settings and\nabsent everywhere else.",
+      "anyOf": [
+        {
+          "$ref": "Validation.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "refusal": {
+      "description": "Why nothing was written, where nothing was and the reason is not simply that\nsomebody has yet to say yes.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "stance": {
+      "description": "Where the proposal stands.",
+      "$ref": "Stance.json"
+    }
+  },
+  "required": [
+    "change",
+    "stance"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "category": {
+      "type": [
+        "ref:SpaceCategory"
+      ],
+      "required": true
+    },
+    "reclaim": {
+      "type": [
+        "ref:Reclaim"
+      ],
+      "required": true
+    },
+    "tally": {
+      "type": [
+        "ref:Tally"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "bytes": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "gone": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "left": {
+      "type": [
+        "array[ref:SpaceLeft]"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

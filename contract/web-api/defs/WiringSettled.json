@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How an ask was settled.",
+  "oneOf": [
+    {
+      "description": "One claimant, and nothing to settle.",
+      "type": "object",
+      "properties": {
+        "settled": {
+          "type": "string",
+          "const": "outright"
+        }
+      },
+      "required": [
+        "settled"
+      ]
+    },
+    {
+      "description": "Every claimant, because the link asked for all of them rather than one.",
+      "type": "object",
+      "properties": {
+        "settled": {
+          "type": "string",
+          "const": "each"
+        }
+      },
+      "required": [
+        "settled"
+      ]
+    },
+    {
+      "description": "Several claimants and the link asked for one. Refused until somebody chooses:\ninstall order, precedence and recency are each a way of being right most of\nthe time, and the times they are wrong are somebody's stack answering to the\nwrong software.",
+      "type": "object",
+      "properties": {
+        "claimants": {
+          "description": "Every candidate, named, so a choice is made from a list.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "settled": {
+          "type": "string",
+          "const": "contested"
+        }
+      },
+      "required": [
+        "settled",
+        "claimants"
+      ]
+    },
+    {
+      "description": "Several claimants, and a choice is recorded.",
+      "type": "object",
+      "properties": {
+        "over": {
+          "description": "The ones not chosen, so the choice reads as a choice.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "settled": {
+          "type": "string",
+          "const": "chosen"
+        },
+        "whose": {
+          "description": "Who chose.",
+          "$ref": "Whose.json"
+        },
+        "why": {
+          "description": "Why, where the chooser said.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "settled",
+        "whose",
+        "over"
+      ]
+    },
+    {
+      "description": "Nothing claims it. What asked is named beside this, which is the point.",
+      "type": "object",
+      "properties": {
+        "settled": {
+          "type": "string",
+          "const": "unfilled"
+        }
+      },
+      "required": [
+        "settled"
+      ]
+    }
+  ]
+}

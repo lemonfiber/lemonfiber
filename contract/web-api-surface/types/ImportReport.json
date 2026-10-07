@@ -1,0 +1,47 @@
+{
+  "fields": {
+    "carried": {
+      "type": [
+        "array[ref:RecordReport]"
+      ],
+      "required": true
+    },
+    "not_carried": {
+      "type": [
+        "array[ref:UnsupportedReport]"
+      ],
+      "required": true
+    },
+    "project": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "refusal": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "stance": {
+      "type": [
+        "ref:Stance"
+      ],
+      "required": true
+    },
+    "would_carry": {
+      "type": [
+        "array[ref:RecordReport]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

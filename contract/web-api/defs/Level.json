@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where a volume stands.",
+  "oneOf": [
+    {
+      "description": "Usage cannot be determined.\n\nOrdered first so that it never wins a comparison against a level that was\nactually measured: a volume nobody could read must not make a stack that is\nvisibly full read as merely unknown.",
+      "type": "string",
+      "const": "unknown"
+    },
+    {
+      "description": "Comfortable headroom.",
+      "type": "string",
+      "const": "ample"
+    },
+    {
+      "description": "Below comfortable, not urgent.",
+      "type": "string",
+      "const": "advisory"
+    },
+    {
+      "description": "Projected to exhaust within the horizon.",
+      "type": "string",
+      "const": "warning"
+    },
+    {
+      "description": "Nearly exhausted.",
+      "type": "string",
+      "const": "critical"
+    },
+    {
+      "description": "Full; acquisitions halted.",
+      "type": "string",
+      "const": "exhausted"
+    }
+  ]
+}

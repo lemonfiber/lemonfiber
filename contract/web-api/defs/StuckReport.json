@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The items whose downloads are stuck, across the \\*arrs — the landing point for \"N\nitems stuck\" that queue health reports, each entry naming the item so the operator\ngoes straight to its per-item trace rather than to a count to investigate.",
+  "type": "object",
+  "properties": {
+    "incomplete": {
+      "description": "Whether an \\*arr's queue could not be read, so the list may be short — reported\nrather than read as \"nothing stuck\", the same honesty a trace keeps.",
+      "type": "boolean"
+    },
+    "items": {
+      "description": "The stuck items, each linkable to its trace.",
+      "type": "array",
+      "items": {
+        "$ref": "StuckEntry.json"
+      }
+    },
+    "unsupported": {
+      "description": "Services whose queue lemonfiber cannot read at all, each with why.\n\nApart from [`Self::incomplete`], which is a queue that was asked and would not\nanswer. This is a queue that was never asked, because the service declares an\nAPI shape this build does not speak or a Servarr declaration it cannot reach\nthrough — and a reading that dropped those would be as short as an unreadable\nqueue makes it, without the sentence that says so.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "UnsupportedReport.json"
+      }
+    }
+  },
+  "required": [
+    "items",
+    "incomplete"
+  ]
+}

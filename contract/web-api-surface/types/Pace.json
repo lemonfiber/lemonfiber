@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "brisk": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "budget": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "moved": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

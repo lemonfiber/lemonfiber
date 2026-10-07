@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What the stack amounts to.\n\nOrdered from best to worst, so the worst of several is a `max` and there is no\nsecond place to encode the ranking.",
+  "oneOf": [
+    {
+      "description": "Nothing is wrong.",
+      "type": "string",
+      "const": "healthy"
+    },
+    {
+      "description": "Nothing is running, and that was on purpose.",
+      "type": "string",
+      "const": "stopped"
+    },
+    {
+      "description": "Nothing is set up.",
+      "type": "string",
+      "const": "unconfigured"
+    },
+    {
+      "description": "Worth knowing, nothing to do.",
+      "type": "string",
+      "const": "advisory"
+    },
+    {
+      "description": "Working, with something wrong.",
+      "type": "string",
+      "const": "degraded"
+    },
+    {
+      "description": "Something is broken.",
+      "type": "string",
+      "const": "broken"
+    },
+    {
+      "description": "Something is wrong outside this machine, or data is at risk.",
+      "type": "string",
+      "const": "critical"
+    },
+    {
+      "description": "It could not be established. Never reported as healthy.",
+      "type": "string",
+      "const": "unknown"
+    }
+  ]
+}

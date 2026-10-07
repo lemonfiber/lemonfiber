@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "client": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "now": {
+      "type": [
+        "anyOf(null,ref:Pulling)"
+      ],
+      "required": false
+    },
+    "unreached": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "was": {
+      "type": [
+        "anyOf(null,ref:Pulling)"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

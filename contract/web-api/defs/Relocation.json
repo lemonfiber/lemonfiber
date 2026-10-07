@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A restore whose archive was taken against a different data root than the one\nconfigured now, so its stored paths would land where nothing exists.",
+  "type": "object",
+  "properties": {
+    "now": {
+      "description": "The data root configured now.",
+      "type": "string"
+    },
+    "was": {
+      "description": "The data root the archive was taken against.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "was",
+    "now"
+  ]
+}

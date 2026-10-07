@@ -1,0 +1,65 @@
+{
+  "fields": {
+    "affected": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "check": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "exit": {
+      "type": [
+        "integer|null/int32"
+      ],
+      "required": false
+    },
+    "id": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "kind": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "meaning": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "moment": {
+      "type": [
+        "ref:Moment"
+      ],
+      "required": true
+    },
+    "remedies": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "severity": {
+      "type": [
+        "ref:ProblemSeverity"
+      ],
+      "required": true
+    },
+    "summary": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,9 @@
+{
+  "fields": {},
+  "variants": [
+    "\"active\"",
+    "\"orphaned\"",
+    "\"revoked\"",
+    "\"unconfirmed\""
+  ]
+}

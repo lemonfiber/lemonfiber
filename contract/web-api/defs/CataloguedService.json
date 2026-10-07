@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What one service is for, as the stack declares it.",
+  "type": "object",
+  "properties": {
+    "criticality": {
+      "description": "How much its absence matters.",
+      "$ref": "Criticality.json"
+    },
+    "describes": {
+      "description": "What it does for the operator, in plain language.",
+      "type": "string"
+    },
+    "id": {
+      "description": "The service's id, which is also its Compose service name.",
+      "type": "string"
+    },
+    "name": {
+      "description": "What it is called in front of an operator.",
+      "type": "string"
+    },
+    "without_it": {
+      "description": "What going without it costs.\n\nCarried beside the description rather than left to a separate question,\nbecause the pair is what turns an inventory into a judgement: knowing that\nBazarr finds subtitles says nothing about whether its being down matters.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "describes",
+    "without_it",
+    "criticality"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "held_by": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "port": {
+      "type": [
+        "integer/uint16"
+      ],
+      "required": true
+    },
+    "wanted_by": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "at": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "outcome": {
+      "type": [
+        "ref:TraceOutcome"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One check that stands differently after an install than it did before.",
+  "type": "object",
+  "properties": {
+    "before": {
+      "description": "How the same check read before the install, or nothing where it was not\nraised at all.\n\nAbsent means the check produced no finding beforehand, which is read as it\nholding: a finding no longer raised is a fault no longer there, and the same\nrule read backwards is that one not yet raised was not yet a fault.",
+      "anyOf": [
+        {
+          "$ref": "DoctorVerdict.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "now": {
+      "description": "The check as it reads now, with everything the diagnosis says about it.\n\nThe finding itself rather than a summary of it, because what an operator does\nnext is read the remedy, the service's own output and what else is causing it\n— and a second, thinner shape of the same fact is where those stop arriving.",
+      "$ref": "Finding.json"
+    }
+  },
+  "required": [
+    "now"
+  ]
+}

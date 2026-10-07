@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Something a removal could not take away.",
+  "type": "object",
+  "properties": {
+    "at": {
+      "description": "The path that is still there.",
+      "type": "string"
+    },
+    "why": {
+      "description": "What the machine said about it, so it can be finished by hand.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "at",
+    "why"
+  ]
+}

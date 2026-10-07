@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One release as a listing shows it: everything but what it changed.\n\nKept apart from [`Release`] rather than being it with the entries left out,\nbecause the two are read for different things. A listing answers which releases\nthere have been and which of them was taken back; only the one being read needs\nto carry every line of what it changed.",
+  "type": "object",
+  "properties": {
+    "delivers": {
+      "description": "What it set out to deliver.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "patches": {
+      "description": "The version this one patched, where it is a patch.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "released_on": {
+      "description": "The day it was published, where the record of it says.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "user_facing": {
+      "description": "Whether anything in it is a change an operator would notice.",
+      "type": "boolean"
+    },
+    "version": {
+      "description": "The version.",
+      "type": "string"
+    },
+    "withdrawn": {
+      "description": "Why it was withdrawn, where it was.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "version",
+    "user_facing"
+  ]
+}

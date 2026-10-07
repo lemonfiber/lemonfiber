@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One change, as a reader meets it.",
+  "type": "object",
+  "properties": {
+    "reference": {
+      "description": "Where it was reviewed, where it was reviewed anywhere.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "requirements": {
+      "description": "The requirements it served, which are the link rather than the headline.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "summary": {
+      "description": "What changed, in the words it was written in.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "summary",
+    "requirements"
+  ]
+}

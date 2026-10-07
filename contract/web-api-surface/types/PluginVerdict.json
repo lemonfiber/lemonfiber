@@ -1,0 +1,37 @@
+{
+  "fields": {
+    "declared": {
+      "type": [
+        "array[ref:PluginFailingAsDeclared]"
+      ],
+      "required": true
+    },
+    "faults": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "outcome": {
+      "type": [
+        "const:\"failed\"",
+        "const:\"failing-as-declared\"",
+        "const:\"passed\"",
+        "const:\"unproven\""
+      ],
+      "required": true
+    },
+    "why": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"failed\"",
+    "\"failing-as-declared\"",
+    "\"passed\"",
+    "\"unproven\""
+  ]
+}
