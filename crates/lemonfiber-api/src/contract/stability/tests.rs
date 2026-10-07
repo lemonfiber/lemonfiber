@@ -599,7 +599,7 @@ fn the_committed_surface_still_describes_what_these_types_do() {
 #[test]
 fn a_surface_round_trips_through_the_form_it_is_committed_in() {
     let surface = one_field("binary", "string", true);
-    let written = surface.files().unwrap_or_default();
+    let written = surface.files();
 
     assert_eq!(
         written.keys().map(String::as_str).collect::<Vec<_>>(),
@@ -616,23 +616,17 @@ fn a_surface_round_trips_through_the_form_it_is_committed_in() {
 /// as an empty surface that would silently pass every comparison.
 #[test]
 fn a_directory_that_is_not_a_surface_reads_as_none() {
-    let mut written = one_field("binary", "string", true)
-        .files()
-        .unwrap_or_default();
+    let mut written = one_field("binary", "string", true).files();
     assert!(written
         .insert("index.json".to_owned(), "not a surface at all".to_owned())
         .is_some());
     assert_eq!(Surface::from_files(&written), None);
 
-    let mut stray = one_field("binary", "string", true)
-        .files()
-        .unwrap_or_default();
+    let mut stray = one_field("binary", "string", true).files();
     stray.insert("notes.txt".to_owned(), "{}".to_owned());
     assert_eq!(Surface::from_files(&stray), None);
 
-    let mut broken = one_field("binary", "string", true)
-        .files()
-        .unwrap_or_default();
+    let mut broken = one_field("binary", "string", true).files();
     broken.insert("types/Report.json".to_owned(), "[".to_owned());
     assert_eq!(Surface::from_files(&broken), None);
 

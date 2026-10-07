@@ -1,9 +1,11 @@
+//! The contract written as the directory it is committed as, from contracts built here.
+
 use std::collections::BTreeMap;
 
 use schemars::Schema;
 use serde_json::{json, Value};
 
-use crate::contract::{Contract, INDEX};
+use lemonfiber_api::contract::{Contract, INDEX};
 
 /// A contract holding only the kinds given, each as the schema given.
 fn holding(kinds: &[(&str, Value)]) -> Contract {
@@ -181,4 +183,17 @@ fn kinds_written_in_two_dialects_are_refused() {
         only(&faults).starts_with("kinds/repair.json is written in"),
         "{faults:?}"
     );
+}
+
+#[test]
+fn a_definition_names_no_dialect_where_no_kind_does() {
+    let mut bare = carrying_remedy();
+    if let Some(object) = bare.as_object_mut() {
+        object.remove("$schema");
+    }
+    let Ok(files) = holding(&[("doctor", bare)]).files() else {
+        unreachable!("one kind cannot disagree with itself");
+    };
+
+    assert_eq!(file(&files, "defs/Code.json"), json!({ "type": "string" }));
 }

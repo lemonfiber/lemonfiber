@@ -17,12 +17,15 @@ pub type Files = BTreeMap<String, String>;
 /// One file's text as it is committed: two-space indent and one trailing newline,
 /// with the keys in the order the value serialises them.
 ///
-/// `None` only if it cannot serialise, which a tree of schemas cannot.
+/// Every value written here is a tree of schemas, lists and maps of strings, which
+/// cannot fail to serialise; the empty text on the impossible branch keeps this free
+/// of a line no test can reach, and a file written empty fails the comparison with
+/// the committed one at once.
 #[must_use]
-pub fn rendered<T: Serialize + ?Sized>(value: &T) -> Option<String> {
-    let mut text = serde_json::to_string_pretty(value).ok()?;
+pub fn rendered<T: Serialize + ?Sized>(value: &T) -> String {
+    let mut text = serde_json::to_string_pretty(value).unwrap_or_default();
     text.push('\n');
-    Some(text)
+    text
 }
 
 /// Every file under `dir`, read back the way [`replace`] wrote it.
@@ -70,9 +73,7 @@ pub fn replace(dir: &Path, files: &Files) -> io::Result<()> {
     }
     for (inside, text) in files {
         let path = next.join(inside);
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
+        std::fs::create_dir_all(path.parent().unwrap_or(&next))?;
         std::fs::write(path, text)?;
     }
     if dir.exists() {

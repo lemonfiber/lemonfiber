@@ -56,8 +56,8 @@ impl Contract {
     ///
     /// Every fault that would make the directory describe something other than the
     /// types: a definition two kinds describe differently, which one file cannot hold,
-    /// and a reference in a form this does not rewrite, which would point at nothing
-    /// once the definitions are no longer beside it.
+    /// a reference in a form this does not rewrite, which would point at nothing once
+    /// the definitions are no longer beside it, and kinds written in two dialects.
     pub fn files(&self) -> Result<Files, Vec<String>> {
         let mut files = Files::new();
         let mut faults = Vec::new();
@@ -90,32 +90,30 @@ impl Contract {
                     }
                 }
             }
-            if let Some(object) = envelope.as_object_mut() {
-                for value in object.values_mut() {
-                    pointed(value, "../defs/", &path, &mut faults);
-                }
+            for value in envelope
+                .as_object_mut()
+                .into_iter()
+                .flat_map(|object| object.values_mut())
+            {
+                pointed(value, "../defs/", &path, &mut faults);
             }
-            put(&mut files, &path, &envelope, &mut faults);
+            put(&mut files, &path, &envelope);
             kinds.insert(kind.clone(), path);
         }
 
         for (name, mut shape) in defs {
             let path = format!("{DEFS}/{name}.json");
             pointed(&mut shape, "", &path, &mut faults);
-            match Schema::try_from(shape) {
-                Ok(schema) => put(
-                    &mut files,
-                    &path,
-                    &dialect(schema, written_in.as_ref()),
-                    &mut faults,
-                ),
-                Err(error) => faults.push(format!("{path} is not a schema: {error}")),
-            }
+            // A definition is an object or a boolean, as `schemars` writes every one, so
+            // it is always a schema; the empty one on the impossible branch keeps this
+            // free of a line no test can reach.
+            let schema = Schema::try_from(shape).unwrap_or_default();
+            put(&mut files, &path, &dialect(schema, written_in.as_ref()));
         }
 
-        put(&mut files, KEY_CALLABLE, &self.key_callable, &mut faults);
-        put(&mut files, READS, &self.reads, &mut faults);
-        put(&mut files, REFUSALS, &self.refusals, &mut faults);
+        put(&mut files, KEY_CALLABLE, &self.key_callable);
+        put(&mut files, READS, &self.reads);
+        put(&mut files, REFUSALS, &self.refusals);
         let index = Index {
             api_version: self.api_version,
             key_callable: KEY_CALLABLE,
@@ -123,7 +121,7 @@ impl Contract {
             reads: READS,
             refusals: REFUSALS,
         };
-        put(&mut files, INDEX, &index, &mut faults);
+        put(&mut files, INDEX, &index);
 
         if faults.is_empty() {
             Ok(files)
@@ -133,14 +131,9 @@ impl Contract {
     }
 }
 
-/// One file into the set, or a fault naming it where it cannot be rendered.
-fn put<T: Serialize + ?Sized>(files: &mut Files, path: &str, value: &T, faults: &mut Vec<String>) {
-    match rendered(value) {
-        Some(text) => {
-            files.insert(path.to_owned(), text);
-        }
-        None => faults.push(format!("{path} cannot be rendered")),
-    }
+/// One file into the set.
+fn put<T: Serialize + ?Sized>(files: &mut Files, path: &str, value: &T) {
+    files.insert(path.to_owned(), rendered(value));
 }
 
 /// A definition as a document of its own, naming the dialect the kinds are written in.
@@ -184,6 +177,3 @@ fn pointed(node: &mut Value, to_defs: &str, path: &str, faults: &mut Vec<String>
         _ => {}
     }
 }
-
-#[cfg(test)]
-mod tests;

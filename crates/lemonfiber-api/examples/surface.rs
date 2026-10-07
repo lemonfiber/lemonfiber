@@ -35,10 +35,7 @@ fn main() {
         std::process::exit(1);
     }
 
-    let Some(files) = fresh.files() else {
-        std::process::exit(1);
-    };
-    if let Err(error) = layout::replace(&committed, &files) {
+    if let Err(error) = layout::replace(&committed, &fresh.files()) {
         eprintln!("{}: {error}", committed.display());
         std::process::exit(1);
     }

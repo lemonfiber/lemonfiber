@@ -65,9 +65,7 @@ fn this_build_still_describes_everything_the_committed_surface_does() {
 /// comparing.
 #[test]
 fn the_committed_surface_is_the_one_this_build_would_write() {
-    let Some(fresh) = Surface::of(&Contract::describe()).files() else {
-        unreachable!("a surface this build built is a surface this build can render");
-    };
+    let fresh = Surface::of(&Contract::describe()).files();
     let Ok(stored) = layout::read(&committed_path()) else {
         unreachable!("the committed surface is part of this repository");
     };

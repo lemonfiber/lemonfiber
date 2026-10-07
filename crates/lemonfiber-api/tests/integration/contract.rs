@@ -8,6 +8,7 @@ mod definitions;
 mod reads;
 mod refusals;
 mod samples;
+mod split;
 mod surface;
 
 use std::collections::{BTreeSet, HashSet};

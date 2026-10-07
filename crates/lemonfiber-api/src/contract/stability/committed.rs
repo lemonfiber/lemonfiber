@@ -27,21 +27,19 @@ struct Index {
 impl Surface {
     /// Every file of the surface's directory, keyed by its path inside it, written the
     /// way the contract's directory is, so the two diff alike.
-    ///
-    /// `None` only if it cannot serialise, which maps of strings cannot.
     #[must_use]
-    pub fn files(&self) -> Option<Files> {
+    pub fn files(&self) -> Files {
         let mut files = Files::new();
         let index = Index {
             api_version: self.api_version,
             kinds: self.kinds.clone(),
             refusals: self.refusals.clone(),
         };
-        files.insert(INDEX.to_owned(), rendered(&index)?);
+        files.insert(INDEX.to_owned(), rendered(&index));
         for (name, shape) in &self.types {
-            files.insert(format!("{TYPES}{name}.json"), rendered(shape)?);
+            files.insert(format!("{TYPES}{name}.json"), rendered(shape));
         }
-        Some(files)
+        files
     }
 
     /// What was committed, or nothing where there is no readable surface to compare

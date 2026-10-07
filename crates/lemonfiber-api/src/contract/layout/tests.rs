@@ -40,6 +40,22 @@ fn a_file_the_new_set_no_longer_holds_is_gone() {
 }
 
 #[test]
+fn what_a_run_that_failed_left_beside_it_is_cleared_first() {
+    let dir = scratch("stale");
+    for left in [dir.with_extension("next"), dir.with_extension("old")] {
+        assert!(std::fs::create_dir_all(left.join("kinds")).is_ok());
+        assert!(std::fs::write(left.join("kinds/stray.json"), "{}\n").is_ok());
+    }
+    let written = files(&[("index.json", "{}\n")]);
+
+    assert!(replace(&dir, &written).is_ok());
+    assert_eq!(read(&dir).ok(), Some(written));
+    assert!(!dir.with_extension("next").exists());
+    assert!(!dir.with_extension("old").exists());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn agreeing_sets_say_nothing() {
     let both = files(&[("a.json", "1\n")]);
 
@@ -76,8 +92,8 @@ fn a_file_is_rendered_indented_with_one_trailing_newline() {
     let value = serde_json::json!({ "b": 1, "a": [true] });
 
     assert_eq!(
-        rendered(&value).as_deref(),
-        Some("{\n  \"a\": [\n    true\n  ],\n  \"b\": 1\n}\n")
+        rendered(&value),
+        "{\n  \"a\": [\n    true\n  ],\n  \"b\": 1\n}\n"
     );
 }
 
