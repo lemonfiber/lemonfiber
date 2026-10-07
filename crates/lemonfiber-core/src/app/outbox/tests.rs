@@ -20,6 +20,7 @@ fn ctx_at(name: &str) -> crate::app::Ctx {
 /// One alert about the given check.
 fn alert(check: &str) -> Alert {
     Alert {
+        id: None,
         check: check.to_owned(),
         kind: "service.down".to_owned(),
         moment: Moment::Onset,

@@ -49,6 +49,8 @@ kinds! {
     ADMISSION = "admission",
     /// What adopting a setup already on this machine came to.
     ADOPTION = "adoption",
+    /// One alert, at its onset or its resolution, as the stream says it happening.
+    ALERT = "alert",
     /// What the operator will be told about, and what changing it came to.
     ALERTS = "alerts",
     /// The backup archives this machine has kept.

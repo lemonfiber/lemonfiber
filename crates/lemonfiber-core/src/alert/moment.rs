@@ -35,6 +35,14 @@ impl Moment {
 /// One interruption: what happened, which way, and how much it matters.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Alert {
+    /// What names this alert rather than this event: the same on an onset and on the
+    /// resolution that ends it, and different the next time the same thing goes wrong —
+    /// the check and which recurrence of it this is.
+    ///
+    /// So a client can close what it opened without comparing sentences. Absent on an
+    /// alert recorded before alerts carried one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
     /// The check this came from, so an alert and its condition cannot drift apart.
     /// Where several were grouped, the first of them.
     pub check: String,
@@ -81,6 +89,7 @@ impl Alert {
             (told == Some(condition.recurrences)).then_some(Moment::Resolved)
         }?;
         Some(Self {
+            id: Some(Self::named(&condition.check, condition.recurrences)),
             check: condition.check.clone(),
             kind: condition.kind.clone(),
             moment,
@@ -91,6 +100,12 @@ impl Alert {
             affected: vec![condition.check.clone()],
             exit: condition.exit,
         })
+    }
+
+    /// What names the alert a check raises at one recurrence of it.
+    #[must_use]
+    pub fn named(check: &str, recurrence: impl std::fmt::Display) -> String {
+        format!("{check}#{recurrence}")
     }
 
     /// Whether this is loud enough to interrupt someone who asked for quiet.

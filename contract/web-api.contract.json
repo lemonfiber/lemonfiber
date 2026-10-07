@@ -267,6 +267,158 @@
         }
       }
     },
+    "alert": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Envelope",
+      "description": "The wrapper every machine-readable payload arrives in.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "The output contract's version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "data": {
+          "description": "The payload.",
+          "$ref": "#/$defs/Alert"
+        },
+        "host": {
+          "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "job": {
+          "description": "The work that said this, by the name its accepting reply gave it.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "api_version",
+        "kind",
+        "data"
+      ],
+      "$defs": {
+        "Alert": {
+          "description": "One interruption: what happened, which way, and how much it matters.",
+          "type": "object",
+          "properties": {
+            "affected": {
+              "description": "Every check this alert speaks for, the first being [`Self::check`]. More\nthan one where the same event was grouped across several services.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "check": {
+              "description": "The check this came from, so an alert and its condition cannot drift apart.\nWhere several were grouped, the first of them.",
+              "type": "string"
+            },
+            "exit": {
+              "description": "How the service it is about exited, where it has and the engine said;\nwhere several were grouped, how the first of them did.\n\nThe technical half of what happened, kept out of the summary so the plain\nwords lead, and here for whoever wants the code.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32"
+            },
+            "id": {
+              "description": "What names this alert rather than this event: the same on an onset and on the\nresolution that ends it, and different the next time the same thing goes wrong —\nthe check and which recurrence of it this is.\n\nSo a client can close what it opened without comparing sentences. Absent on an\nalert recorded before alerts carried one.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "description": "What kind of event it is, shared by every instance of it.",
+              "type": "string"
+            },
+            "meaning": {
+              "description": "What it costs the operator, which is the half between the event and the\nfix. \"The tunnel dropped\" and \"restart the gateway\" leave whoever reads\nthem to work out for themselves whether anything leaked.",
+              "type": "string"
+            },
+            "moment": {
+              "description": "Which way it went.",
+              "$ref": "#/$defs/Moment"
+            },
+            "remedies": {
+              "description": "What to do about it, most likely first. An alert that says what happened\nand not what to do is a notification, which is a different and worse thing.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "severity": {
+              "description": "How much it matters. A resolution takes the severity of what resolved,\nbecause \"the critical thing is over\" is itself worth the attention the\ncritical thing had.",
+              "$ref": "#/$defs/ProblemSeverity"
+            },
+            "summary": {
+              "description": "What happened, in the words the condition was raised with.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "check",
+            "kind",
+            "moment",
+            "severity",
+            "summary",
+            "meaning",
+            "remedies",
+            "affected"
+          ]
+        },
+        "Moment": {
+          "description": "Which way a condition went.\n\nBoth directions are worth saying and neither is worth saying twice. An operator\ntold a disk filled up and never told it was resolved goes on believing it — so\nresolution is an alert in its own right rather than the absence of one.",
+          "oneOf": [
+            {
+              "description": "It started.",
+              "type": "string",
+              "const": "onset"
+            },
+            {
+              "description": "It stopped, having previously started.",
+              "type": "string",
+              "const": "resolved"
+            }
+          ]
+        },
+        "ProblemSeverity": {
+          "description": "How much a problem matters.\n\nFour levels, deliberately. More would not be applied consistently, and\ninconsistent severity is worse than coarse severity.",
+          "oneOf": [
+            {
+              "description": "Informational; nothing is required.",
+              "type": "string",
+              "const": "advisory"
+            },
+            {
+              "description": "Degraded or risky, still working.",
+              "type": "string",
+              "const": "warning"
+            },
+            {
+              "description": "Something is broken.",
+              "type": "string",
+              "const": "error"
+            },
+            {
+              "description": "Consequences outside the machine, or data at risk.",
+              "type": "string",
+              "const": "critical"
+            }
+          ]
+        }
+      }
+    },
     "alerts": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "Envelope",
@@ -3644,6 +3796,13 @@
                 "null"
               ],
               "format": "int32"
+            },
+            "id": {
+              "description": "What names this alert rather than this event: the same on an onset and on the\nresolution that ends it, and different the next time the same thing goes wrong —\nthe check and which recurrence of it this is.\n\nSo a client can close what it opened without comparing sentences. Absent on an\nalert recorded before alerts carried one.",
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "kind": {
               "description": "What kind of event it is, shared by every instance of it.",
