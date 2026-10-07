@@ -33,6 +33,8 @@ rest of their milestone because something already built needed them.
   it is deferred. The release gate reads done-ness by finding an ID in a done
   row, so a sentence explaining that something is *not* done marks it done.
   Give the unfinished ones a row of their own.
+- Each requirement is claimed by exactly one row, read from the identifier
+  column; the generator refuses a second claim and a range written backwards.
 '''
 
 [[milestone]]
