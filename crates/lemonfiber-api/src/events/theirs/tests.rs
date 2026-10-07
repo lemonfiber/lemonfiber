@@ -147,3 +147,21 @@ fn an_unmade_reading_is_unread_in_a_sentence_of_its_own() {
     assert!(matches!(Reading::Playing.unread(), Outcome::Playing(report)
         if !report.available && report.findings == unread));
 }
+
+/// A stack that cannot be read is said as each of the three unread, rather than as an
+/// empty household, an empty shelf and a quiet house.
+#[tokio::test(start_paused = true)]
+async fn a_stack_that_cannot_be_read_is_said_as_each_reading_unread() {
+    let unreadable = lemonfiber_testing::a_context()
+        .over(lemonfiber_testing::nowhere())
+        .build();
+    let Some(theirs) = Theirs::for_member(Arc::new(unreadable), &a_member()) else {
+        unreachable!("a member's caller has a member's stream")
+    };
+    let said = theirs.gather(true).await;
+    assert_eq!(said.len(), 3);
+    assert!(
+        said.iter().all(|one| one.said().contains(UNREAD)),
+        "{said:?}"
+    );
+}

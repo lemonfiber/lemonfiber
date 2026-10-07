@@ -132,6 +132,11 @@ pub(crate) fn surface(ctx: Ctx, admitting: &Arc<Admitting>) -> (axum::Router, Ar
 /// a second time, and why that check cannot be reached through the assembled
 /// surface, where the outer guard answers first.
 pub(crate) fn stream_alone(admitting: &Arc<Admitting>) -> axum::Router {
+    stream_reading(admitting, crate::idle::ctx())
+}
+
+/// The same, with a member's own stream read against `reading`.
+pub(crate) fn stream_reading(admitting: &Arc<Admitting>, reading: Ctx) -> axum::Router {
     let Some(token) = Token::mint(&Chance::cycling()).map(Arc::new) else {
         unreachable!("a cycling source always mints one")
     };
@@ -142,7 +147,7 @@ pub(crate) fn stream_alone(admitting: &Arc<Admitting>) -> axum::Router {
         admitting: Arc::clone(admitting),
         live,
         clock: Stopped::at(NOW),
-        reading: Arc::new(crate::idle::ctx()),
+        reading: Arc::new(reading),
     }))
 }
 
