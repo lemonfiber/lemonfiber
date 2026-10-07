@@ -219,16 +219,14 @@ impl Record {
         let mut kept = Vec::with_capacity(files.len());
         for (name, text) in files {
             let one: Kept = serde_json::from_str(text).ok()?;
-            if name.strip_suffix(".json") != Some(one.release.version.as_str()) {
-                return None;
-            }
-            kept.push((numbered(&one.release.version)?, one));
-        }
-        if kept.is_empty() {
-            return None;
+            let named = name.strip_suffix(".json") == Some(one.release.version.as_str());
+            kept.push((
+                named.then(|| numbered(&one.release.version)).flatten()?,
+                one,
+            ));
         }
         kept.sort_by(|(older, _), (newer, _)| newer.cmp(older));
-        Some(folded(kept.into_iter().map(|(_, one)| one).collect()))
+        (!kept.is_empty()).then(|| folded(kept.into_iter().map(|(_, one)| one).collect()))
     }
 
     /// The release of one version, where the record holds it.
@@ -253,11 +251,7 @@ fn folded(kept: Vec<Kept>) -> Record {
     let mut gone: Vec<String> = Vec::new();
     let mut requirements: BTreeMap<String, Requirement> = BTreeMap::new();
     for one in &kept {
-        for (version, why) in &one.withdraws {
-            withdraws
-                .entry(version.clone())
-                .or_insert_with(|| why.clone());
-        }
+        withdraws.extend(one.withdraws.clone());
         gone.extend(one.withdrawn_requirements.iter().cloned());
         for (identifier, cited) in &one.requirements {
             requirements
@@ -294,11 +288,12 @@ fn folded(kept: Vec<Kept>) -> Record {
             }
         }
     }
-    for identifier in &gone {
-        if let Some(requirement) = requirements.get_mut(identifier) {
-            requirement.withdrawn = true;
-            requirement.url = None;
-        }
+    for (_, requirement) in requirements
+        .iter_mut()
+        .filter(|(identifier, _)| gone.contains(identifier))
+    {
+        requirement.withdrawn = true;
+        requirement.url = None;
     }
     Record {
         releases,

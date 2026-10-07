@@ -193,7 +193,7 @@ def assembled(held: dict[str, dict]) -> dict:
     requirements: dict[str, dict] = {}
     for document in releases_of(held):
         for version, why in (document.get("withdraws") or {}).items():
-            withdraws.setdefault(version, why)
+            withdraws[version] = why
         gone.update(document.get("withdrawn_requirements") or [])
         for identifier, about in (document.get("requirements") or {}).items():
             requirements.setdefault(identifier, {**about, "shipped_in": []})
