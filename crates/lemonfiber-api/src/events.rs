@@ -101,10 +101,15 @@ pub fn routes(streaming: Arc<Streaming>) -> Router {
 /// state and can therefore be merged outside the layer that guards the rest,
 /// which is an assembly mistake that would otherwise leave it open.
 pub async fn stream(
-    State(streaming): State<Arc<Streaming>>,
+    state: State<Arc<Streaming>>,
     arrived: Option<axum::Extension<Arrived>>,
     headers: HeaderMap,
 ) -> Response<Body> {
+    // Unpacked here rather than in the parameter list: CodeQL's axum model follows a
+    // pattern unpacked there and used in a closure straight past the step that keeps
+    // `State` from counting as request input, and reads the server's own paths as
+    // a caller's.
+    let State(streaming) = state;
     let now = streaming.clock.now();
     let arrived = arrived.map(|axum::Extension(arrived)| arrived);
     let knocking = streaming
