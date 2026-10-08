@@ -17,4 +17,5 @@ requirement = [
   { id = "A2-R13", state = "done", evidence = ["crates/lemonfiber-core/src/wizard.rs", "crates/lemonfiber-core/src/journal.rs", "crates/lemonfiber-core/src/app/apply.rs", "crates/lemonfiber-core/src/config/store.rs", "crates/lemonfiber-core/src/stack.rs", "crates/lemonfiber-core/src/config/paths.rs"] },
   { id = "A2-R14", state = "done", evidence = ["crates/lemonfiber-core/src/wizard.rs", "crates/lemonfiber-core/src/journal.rs", "crates/lemonfiber-core/src/app/apply.rs", "crates/lemonfiber-core/src/config/store.rs", "crates/lemonfiber-core/src/stack.rs", "crates/lemonfiber-core/src/config/paths.rs"] },
   { id = "A2-R15", state = "done", evidence = ["crates/lemonfiber-core/src/wizard.rs", "crates/lemonfiber-core/src/journal.rs", "crates/lemonfiber-core/src/app/apply.rs", "crates/lemonfiber-core/src/config/store.rs", "crates/lemonfiber-core/src/stack.rs", "crates/lemonfiber-core/src/config/paths.rs"] },
+  { id = "A2-R17", state = "done", evidence = ["crates/lemonfiber/src/setup/boot.rs", "crates/lemonfiber/src/setup/boot/tests.rs"] },
 ]
