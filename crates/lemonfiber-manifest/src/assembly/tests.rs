@@ -505,3 +505,12 @@ fn a_broken_layout_lists_every_fault() {
         "the manifest's files break the contract:\n  services/a.toml: holds no [[service]]\n  include entry x: names no file"
     );
 }
+
+#[test]
+fn a_fault_the_parser_places_nowhere_is_given_without_a_line() {
+    let placed_nowhere = <toml::de::Error as serde::de::Error>::custom("the claim is not a table");
+    assert_eq!(
+        super::said("a\nb\n", &placed_nowhere),
+        "the claim is not a table"
+    );
+}

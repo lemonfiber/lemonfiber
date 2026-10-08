@@ -86,6 +86,12 @@ fn a_problem_the_operator_wrote_is_told_apart_from_one_they_can_only_report() {
         coded(lemonfiber_core::error::codes::stack::STACK_UNRECOGNISED),
         VALIDATION
     );
+    // A stack whose files are not laid out as the contract says is the operator's own
+    // writing too.
+    assert_eq!(
+        coded(lemonfiber_core::error::codes::stack::STACK_UNASSEMBLED),
+        VALIDATION
+    );
     assert_eq!(
         coded(lemonfiber_core::error::codes::config::CONFIG_UNREADABLE),
         VALIDATION
