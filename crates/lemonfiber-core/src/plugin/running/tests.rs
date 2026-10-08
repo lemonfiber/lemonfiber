@@ -523,6 +523,29 @@ async fn a_retry_stops_at_an_answer_larger_than_a_recipe_reads() {
     );
 }
 
+/// A retry waiting on a value it captures stops at an answer larger than a recipe reads,
+/// with nothing captured to decide on.
+#[tokio::test]
+async fn a_retry_waiting_on_a_value_stops_at_an_answer_larger_than_a_recipe_reads() {
+    let http = Fake::always(Answer::reply(
+        200,
+        "x".repeat(lemonfiber_plugin::LARGEST_ANSWER + 1),
+    ));
+    let outcome = ran(
+        &http,
+        &Resolving::anywhere(),
+        "[[step]]\nid = \"wait\"\ncall = { method = \"GET\", to = \"komga\", path = \"/x\" }\n\
+         capture = [{ name = \"state\", from = \"state\", origin = \"stack-service\" }]\n\
+         retry = { times = 3, every = \"1s\", until = { value = \"state\", equals = \"done\" } }\n",
+        &[],
+    )
+    .await;
+    assert_eq!(
+        outcome.ran.steps.first().map(|one| (one.came, one.tries)),
+        Some((Came::Oversized, 1))
+    );
+}
+
 /// An answer that was not the one a step expects is said as which constraint did not
 /// hold where, never as what the answer held there.
 #[tokio::test]

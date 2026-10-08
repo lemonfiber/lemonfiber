@@ -526,6 +526,39 @@ fn a_release_that_frees_nothing_is_refused_naming_why() {
     }
 }
 
+/// An outside host's answer is held to nothing, so a release on it frees nothing.
+#[test]
+fn a_release_on_an_outside_hosts_answer_frees_nothing() {
+    let said = refused(
+        r#"[[recipe]]
+id    = "fetch"
+title = "Fetch a title"
+why   = "To name what the library holds"
+
+[[recipe.step]]
+id      = "look"
+call    = { method = "GET", to = "api.example.org", path = "/title" }
+capture = [{ name = "title", from = "title", origin = "external-response" }]
+
+[[recipe.pair]]
+value   = "title"
+to      = "sonarr"
+release = "Sonarr names it."
+"#,
+    );
+    assert!(
+        says(
+            &said,
+            &[
+                "pair #1.release",
+                "frees nothing",
+                "an outside host's answer"
+            ]
+        ),
+        "{said:?}"
+    );
+}
+
 /// A release is a sentence, so one that says nothing is refused.
 #[test]
 fn a_release_that_says_nothing_is_refused() {
