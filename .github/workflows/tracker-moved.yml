@@ -1,0 +1,59 @@
+# Tell spec that this repository's tracker has moved.
+#
+# The website shows what is built from the board snapshot, and spec's `state`
+# run is what writes that snapshot from every repository's tracker. A tracker
+# push here would otherwise wait for its hourly run. This asks it to run now;
+# when what it reads has changed, `state` rebuilds the website itself, so a push
+# that moves no tracker has nothing for the website to show.
+#
+# Only the tracker matters. Releases reach the website through the manifest
+# push in spec, not through a push here.
+name: tracker-moved
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - status/**
+  # Kept so the notifier can be driven against a real change rather than trusted.
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  tell:
+    runs-on: ubuntu-latest
+    # The release App's key is held by the `release` environment, which only
+    # `main` and `v*` tags may deploy to.
+    environment: release
+    permissions:
+      contents: read
+    steps:
+      - name: Mint a token that can reach spec
+        id: token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.RELEASE_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: spec
+
+      - name: Ask spec to read the trackers again
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          OWNER: ${{ github.repository_owner }}
+          REPOSITORY: ${{ github.event.repository.name }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # The payload is for whoever reads that run: which push asked.
+          gh api --method POST "repos/${OWNER}/spec/dispatches" \
+            -f event_type=tracker-moved \
+            -F "client_payload[repository]=${REPOSITORY}" \
+            -F "client_payload[sha]=${SHA}"
+          echo "asked spec to read the trackers again for ${REPOSITORY}@${SHA}."
