@@ -182,6 +182,56 @@ pub struct Problem {
     #[serde(skip)]
     #[schemars(skip)]
     pub amiss: Amiss,
+    /// Every step a run declares, with what each came to, where the problem ended a run
+    /// of steps part-way; absent from every other problem.
+    ///
+    /// Data beside the detail rather than in it, so a client reads what changed
+    /// somewhere going back cannot reach without parsing a sentence written for a person.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[schemars(default)]
+    pub steps: Vec<Stepped>,
+}
+
+/// What one step of a run that stopped part-way came to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(rename = "ProblemStep")]
+pub struct Stepped {
+    /// The recipe the step belongs to.
+    pub recipe: String,
+    /// The step's id within it.
+    pub step: String,
+    /// What it came to.
+    pub came: Came,
+    /// Whether it reached somewhere other than the plugin's own services, which going
+    /// back cannot undo.
+    pub landed: bool,
+}
+
+/// What one step of a recipe came to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+#[schemars(rename = "StepCame")]
+pub enum Came {
+    /// It was answered with what it should be, and took what it captures.
+    Answered,
+    /// Its guard did not hold, so it was not made.
+    Skipped,
+    /// An earlier step did not come to what it should, so this one was not made.
+    NotReached,
+    /// Nothing answered it.
+    Unreachable,
+    /// It was not sent: its host stands for an address not out on the internet, or
+    /// could not be resolved.
+    Refused,
+    /// It was not sent: a value it carries may not go where it was going.
+    Withheld,
+    /// It was answered with something other than what it expects.
+    Unexpected,
+    /// Its answer held nothing where a capture reads.
+    Uncaptured,
+    /// Its answer was larger than any answer a recipe reads.
+    Oversized,
 }
 
 impl Problem {
@@ -208,6 +258,7 @@ impl Problem {
             detail: None,
             cause: None,
             amiss: Amiss::Answering,
+            steps: Vec::new(),
         }
     }
 
@@ -239,6 +290,13 @@ impl Problem {
     #[must_use]
     pub const fn in_state(mut self, state: State) -> Self {
         self.state = state;
+        self
+    }
+
+    /// Carry what every step of a run that stopped part-way came to.
+    #[must_use]
+    pub fn with_steps(mut self, steps: Vec<Stepped>) -> Self {
+        self.steps = steps;
         self
     }
 

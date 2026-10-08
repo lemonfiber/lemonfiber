@@ -276,6 +276,24 @@ codes! {
         /// identifier of the protocol and written out; the manifest's every other fault is
         /// listed beside it.
         HEADER_NAMED = "PLUGIN-33",
+        /// Raised when a recipe of the act asks the operator for a value that was not
+        /// given, or a value was given that no recipe of the act asks for.
+        INPUT_UNMATCHED = "PLUGIN-34",
+        /// Raised when a recipe's call was not sent because its host stands for an address
+        /// not out on the internet; the install or update was put back.
+        CALL_REFUSED = "PLUGIN-35",
+        /// Raised when a recipe's step failed any other way — nothing answered, the answer
+        /// was not the one it expects, a capture found nothing, or the answer was larger
+        /// than a recipe reads; the install or update was put back.
+        STEP_FAILED = "PLUGIN-36",
+        /// Raised when a recipe's call path is not a plain absolute path; the manifest's
+        /// every other fault is listed beside it.
+        PATH_NOT_PLAIN = "PLUGIN-37",
+        /// Raised when a recipe's call was not sent because a value it carries may not go
+        /// where it was going: not where its pairs say, not back to the service a
+        /// credential belongs to, or outside without its approval; the install or update
+        /// was put back.
+        VALUE_WITHHELD = "PLUGIN-38",
     }
     /// The `PROVIDER` codes.
     provider {

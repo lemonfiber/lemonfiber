@@ -45,8 +45,9 @@ call    = { method = "POST", to = "homepage", path = "/api/services", headers = 
 expect  = { status = 200 }
 
 [[recipe.pair]]
-value = "token"
-to    = "homepage"
+value   = "token"
+to      = "homepage"
+release = "The dashboard shows the library, so it signs in with Komga's session."
 "#;
 
 /// The installable manifest, with a recipe and its declarations on the end.
@@ -70,21 +71,16 @@ fn edited(before: &str, after: &str) -> Vec<String> {
     said(&text.replace(before, after))
 }
 
-/// The fixture is refused for the one reason it is meant to be refused for.
+/// The fixture is not refused at all.
 ///
 /// The acceptance side of both rules at once, and it is asserted rather than
 /// assumed because a rule that refuses everything it is shown passes every test
-/// written as *this is refused*. What this build has to say about a recipe whose
-/// captures and changes are all declared is that it cannot run one, and nothing
-/// else.
+/// written as *this is refused*. A recipe whose captures and changes are all declared
+/// is one this build runs.
 #[test]
-fn a_recipe_whose_every_reach_is_declared_is_refused_only_for_being_a_recipe() {
+fn a_recipe_whose_every_reach_is_declared_is_not_refused() {
     let said = said(&whole());
-    assert!(
-        names(&said, &["requires.capabilities", "recipe.run"]),
-        "got: {said:?}"
-    );
-    assert_eq!(said.len(), 1, "and nothing else is said: {said:?}");
+    assert!(said.is_empty(), "nothing is said: {said:?}");
 }
 
 #[test]

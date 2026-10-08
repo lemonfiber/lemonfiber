@@ -34,6 +34,8 @@ fn recipe() -> Recipe {
             origin: "komga".to_owned(),
             to: "metadata.example.org".to_owned(),
             approval: Some("token@metadata.example.org".to_owned()),
+            release: None,
+            from: None,
         }],
     }
 }
@@ -88,6 +90,27 @@ fn a_pair_inside_the_stack_says_there_is_nothing_to_approve() {
         "{said}"
     );
     assert!(!said.contains("--approve"), "{said}");
+}
+
+#[test]
+fn a_released_pair_says_where_the_value_was_read_from_and_why() {
+    let mut released = recipe();
+    released.pairs.push(Pair {
+        value: "library".to_owned(),
+        origin: "stack-service".to_owned(),
+        to: "sonarr".to_owned(),
+        approval: Some("library@sonarr".to_owned()),
+        release: Some("Sonarr files into the library Komga made.".to_owned()),
+        from: Some("komga".to_owned()),
+    });
+    let said = recipes(&[released]).text();
+    assert!(
+        said.contains(
+            "sends library (stack-service) to sonarr — approve with --approve library@sonarr\n\
+             \x20       released from komga: Sonarr files into the library Komga made."
+        ),
+        "{said}"
+    );
 }
 
 #[test]

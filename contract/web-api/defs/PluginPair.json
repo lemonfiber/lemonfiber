@@ -4,11 +4,19 @@
   "type": "object",
   "properties": {
     "approval": {
-      "description": "What approving this pair is written as, on the command line and over the web,\nwhere it carries the value to a host outside the stack. Absent where it reaches\na service in this stack, which takes nothing off the machine and asks for no\napproval.",
+      "description": "What approving this pair is written as, on the command line and over the web,\nwhere it carries the value to a host outside the stack or carries a release.\nAbsent on any other pair to a service in this stack, which takes nothing off the\nmachine or away from the service it came from, and asks for no approval.",
+      "type": "string"
+    },
+    "from": {
+      "description": "The service in this stack the released value was read from, where the pair\nreleases it. Absent on every other pair.",
       "type": "string"
     },
     "origin": {
       "description": "Whose value it is, as its input or the step that captures it says; empty where\nneither does.",
+      "type": "string"
+    },
+    "release": {
+      "description": "Why the value is carried away from the service it was read from, in the manifest's\nown sentence, where the pair releases it. Absent on every other pair.",
       "type": "string"
     },
     "to": {

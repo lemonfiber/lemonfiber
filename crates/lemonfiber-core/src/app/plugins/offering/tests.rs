@@ -25,6 +25,7 @@ fn the_offer_standing_with_every_pair_approved_acts_and_a_rehearsal_does_not() {
     let consent = Consent {
         agreement: Some(standing()),
         approved: vec!["a@b".to_owned()],
+        inputs: crate::app::plugins::Inputs::default(),
     };
     let ctx = crate::test_support::a_context().build();
     assert!(matches!(
@@ -55,6 +56,7 @@ fn an_offer_that_moved_is_refused_naming_only_the_part_that_did() {
             &["a@b"],
         ])),
         approved: vec!["a@b".to_owned()],
+        inputs: crate::app::plugins::Inputs::default(),
     };
     let result = acting(&ctx, &consent, "komga", &standing(), &INSTALLING, &["a@b"]);
     assert_eq!(refused(&result), Some("PLUGIN-25"));
@@ -75,6 +77,7 @@ fn a_pair_not_approved_is_refused_by_name() {
     let consent = Consent {
         agreement: Some(standing()),
         approved: Vec::new(),
+        inputs: crate::app::plugins::Inputs::default(),
     };
     let result = acting(&ctx, &consent, "komga", &standing(), &INSTALLING, &["a@b"]);
     assert_eq!(refused(&result), Some("PLUGIN-26"));
@@ -90,6 +93,7 @@ fn an_approval_of_a_pair_nothing_carries_is_refused() {
     let consent = Consent {
         agreement: Some(standing()),
         approved: vec!["a@b".to_owned(), "token@elsewhere.example".to_owned()],
+        inputs: crate::app::plugins::Inputs::default(),
     };
     let result = acting(&ctx, &consent, "komga", &standing(), &INSTALLING, &["a@b"]);
     assert_eq!(refused(&result), Some("PLUGIN-26"));
@@ -107,6 +111,8 @@ fn an_approval_of_a_pair_inside_the_stack_is_refused_as_one_nothing_asks_for() {
         origin: "stack-service".to_owned(),
         to: to.to_owned(),
         approval: outside.then(|| crate::plugin::approval("token", to)),
+        release: None,
+        from: None,
     };
     let recipes = [crate::plugin::Recipe {
         id: "adopt".to_owned(),
@@ -125,6 +131,7 @@ fn an_approval_of_a_pair_inside_the_stack_is_refused_as_one_nothing_asks_for() {
             "token@meta.example.org".to_owned(),
             "token@komga".to_owned(),
         ],
+        inputs: crate::app::plugins::Inputs::default(),
     };
     let result = acting(&ctx, &consent, "komga", &standing(), &INSTALLING, &asked);
     assert_eq!(refused(&result), Some("PLUGIN-26"));
@@ -141,6 +148,7 @@ fn a_stray_approval_is_repeated_with_nothing_a_terminal_obeys() {
     let consent = Consent {
         agreement: Some(standing()),
         approved: vec!["a@b".to_owned(), "token\u{1b}[2J@elsewhere".to_owned()],
+        inputs: crate::app::plugins::Inputs::default(),
     };
     let result = acting(&ctx, &consent, "komga", &standing(), &INSTALLING, &["a@b"]);
     assert!(result.err().is_some_and(|problem| {

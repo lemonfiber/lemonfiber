@@ -224,6 +224,11 @@ pub(crate) const TAKEN: &[Taken] = &[
         given: |arguments| !arguments.approved.is_empty(),
     },
     Taken {
+        name: "inputs",
+        takers: TAKES_APPROVED,
+        given: |arguments| !arguments.inputs.is_empty(),
+    },
+    Taken {
         name: "tier",
         takers: TAKES_TIER,
         given: |arguments| arguments.tier.is_some(),

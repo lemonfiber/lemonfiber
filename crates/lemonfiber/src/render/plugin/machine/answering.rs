@@ -53,6 +53,13 @@ pub(super) fn recipes(declared: &[Recipe]) -> Lines {
                 plain(&pair.value),
                 plain(&pair.to),
             ));
+            if let Some(release) = &pair.release {
+                lines.put(format!(
+                    "        released from {}: {}",
+                    plain(pair.from.as_deref().unwrap_or_default()),
+                    plain(release)
+                ));
+            }
         }
     }
     lines

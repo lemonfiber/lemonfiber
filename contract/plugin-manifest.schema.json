@@ -303,7 +303,8 @@
           "type": ["string", "null"],
           "default": null
         },
-        "origin": {"description": "Whose value it is: the credential store, or the operator.", "$ref": "#/$defs/PluginValueOrigin"}
+        "origin": {"description": "Whose value it is: the credential store, or the operator.", "$ref": "#/$defs/PluginValueOrigin"},
+        "secret": {"description": "Whether what the operator supplies may be a secret, so a terminal takes it without\nshowing it.", "type": "boolean", "default": false}
       },
       "additionalProperties": false,
       "required": ["name", "origin"]
@@ -334,6 +335,11 @@
       "description": "One value, and the one destination it may reach.",
       "type": "object",
       "properties": {
+        "release": {
+          "description": "Why a value captured from a service in this stack is carried to another\ndestination, in the one sentence the operator is shown when asked to approve it.\n\nA capture is held to the service that answered it, and this is the one thing that\nlets it go elsewhere. Refused on a pair it frees nothing on.",
+          "type": ["string", "null"],
+          "default": null
+        },
         "to": {"description": "Where it may be carried.", "type": "string"},
         "value": {"description": "The value, by the name its capture or its input gives it.", "type": "string"}
       },

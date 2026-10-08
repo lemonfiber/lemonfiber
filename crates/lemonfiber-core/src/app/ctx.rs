@@ -13,6 +13,7 @@ use std::time::Duration;
 use crate::archive::Archiving;
 use crate::config::{Reaching, Settings};
 use crate::platform::Environment;
+use crate::ports::asking::{Asking, Nobody};
 use crate::ports::docker::{Images, Locations};
 use crate::ports::filesystem::{Eraser, Storage, Volume};
 use crate::ports::hosting::Host;
@@ -98,6 +99,12 @@ pub struct Ctx {
     /// would put the walk's words in the core and the terminal's copy of them in
     /// the binary, which is two accounts of one run.
     pub steps: Arc<dyn Stepwise>,
+    /// Where an act asks the operator for a value only they have.
+    ///
+    /// Nobody, unless a surface with a person at a keyboard says otherwise: a run for a
+    /// script or a client refuses naming what it needed rather than waiting on an
+    /// answer nobody will type.
+    pub asking: Arc<dyn Asking>,
     /// How long starting waits for services to settle before giving up.
     ///
     /// A knob rather than a constant because it is a policy: an operator on a
@@ -195,6 +202,8 @@ impl Ctx {
             narrator: Arc::new(Silent),
             // Nobody either, and for the same reason.
             steps: Arc::new(Unheard),
+            // Nobody to ask, until a surface with a person at a keyboard says so.
+            asking: Arc::new(Nobody),
             patience: PATIENCE,
             stack,
             settings,
@@ -433,6 +442,13 @@ impl Ctx {
     #[must_use]
     pub fn with_steps(mut self, steps: Arc<dyn Stepwise>) -> Self {
         self.steps = steps;
+        self
+    }
+
+    /// The same context, asking the operator for a value through this.
+    #[must_use]
+    pub fn with_asking(mut self, asking: Arc<dyn Asking>) -> Self {
+        self.asking = asking;
         self
     }
 

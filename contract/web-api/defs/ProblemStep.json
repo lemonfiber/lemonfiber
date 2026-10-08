@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What one step of a run that stopped part-way came to.",
+  "type": "object",
+  "properties": {
+    "came": {
+      "description": "What it came to.",
+      "$ref": "StepCame.json"
+    },
+    "landed": {
+      "description": "Whether it reached somewhere other than the plugin's own services, which going\nback cannot undo.",
+      "type": "boolean"
+    },
+    "recipe": {
+      "description": "The recipe the step belongs to.",
+      "type": "string"
+    },
+    "step": {
+      "description": "The step's id within it.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "recipe",
+    "step",
+    "came",
+    "landed"
+  ]
+}

@@ -70,6 +70,12 @@
       ],
       "required": true
     },
+    "steps": {
+      "type": [
+        "array[ref:ProblemStep]"
+      ],
+      "required": false
+    },
     "summary": {
       "type": [
         "string"

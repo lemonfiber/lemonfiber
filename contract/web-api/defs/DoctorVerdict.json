@@ -71,6 +71,13 @@
           "description": "Where it stands with respect to being fixed.",
           "$ref": "ProblemState.json"
         },
+        "steps": {
+          "description": "Every step a run declares, with what each came to, where the problem ended a run\nof steps part-way; absent from every other problem.\n\nData beside the detail rather than in it, so a client reads what changed\nsomewhere going back cannot reach without parsing a sentence written for a person.",
+          "type": "array",
+          "items": {
+            "$ref": "ProblemStep.json"
+          }
+        },
         "summary": {
           "description": "What happened, in one plain sentence.",
           "type": "string"
@@ -134,6 +141,13 @@
         "state": {
           "description": "Where it stands with respect to being fixed.",
           "$ref": "ProblemState.json"
+        },
+        "steps": {
+          "description": "Every step a run declares, with what each came to, where the problem ended a run\nof steps part-way; absent from every other problem.\n\nData beside the detail rather than in it, so a client reads what changed\nsomewhere going back cannot reach without parsing a sentence written for a person.",
+          "type": "array",
+          "items": {
+            "$ref": "ProblemStep.json"
+          }
         },
         "summary": {
           "description": "What happened, in one plain sentence.",

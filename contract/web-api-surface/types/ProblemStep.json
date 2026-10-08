@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "came": {
+      "type": [
+        "ref:StepCame"
+      ],
+      "required": true
+    },
+    "landed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "recipe": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "step": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

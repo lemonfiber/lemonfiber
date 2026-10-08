@@ -153,6 +153,37 @@ fn every_pair_carries_its_origin_and_what_approving_it_is_written_as() {
             origin: "stack-service".to_owned(),
             to: "metadata.example.org".to_owned(),
             approval: Some("token@metadata.example.org".to_owned()),
+            release: None,
+            from: None,
+        })
+    );
+}
+
+/// A pair releasing a capture names its release and the service the value was read
+/// from, and asks for its approval though it never leaves the stack.
+#[test]
+fn a_released_pair_says_why_where_from_and_what_approving_it_is_written_as() {
+    let released = format!(
+        "{RECIPED}\n[[recipe.pair]]\nvalue   = \"token\"\nto      = \"sonarr\"\n\
+         release = \"Sonarr files what Komga names.\"\n"
+    );
+    let pair = Manifest::from_toml(&released)
+        .ok()
+        .map(|manifest| declared(&manifest))
+        .and_then(|recipes| {
+            recipes
+                .first()
+                .and_then(|recipe| recipe.pairs.last().cloned())
+        });
+    assert_eq!(
+        pair,
+        Some(Pair {
+            value: "token".to_owned(),
+            origin: "stack-service".to_owned(),
+            to: "sonarr".to_owned(),
+            approval: Some("token@sonarr".to_owned()),
+            release: Some("Sonarr files what Komga names.".to_owned()),
+            from: Some("komga".to_owned()),
         })
     );
 }

@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What one step of a recipe came to.",
+  "oneOf": [
+    {
+      "description": "It was answered with what it should be, and took what it captures.",
+      "type": "string",
+      "const": "answered"
+    },
+    {
+      "description": "Its guard did not hold, so it was not made.",
+      "type": "string",
+      "const": "skipped"
+    },
+    {
+      "description": "An earlier step did not come to what it should, so this one was not made.",
+      "type": "string",
+      "const": "not-reached"
+    },
+    {
+      "description": "Nothing answered it.",
+      "type": "string",
+      "const": "unreachable"
+    },
+    {
+      "description": "It was not sent: its host stands for an address not out on the internet, or\ncould not be resolved.",
+      "type": "string",
+      "const": "refused"
+    },
+    {
+      "description": "It was not sent: a value it carries may not go where it was going.",
+      "type": "string",
+      "const": "withheld"
+    },
+    {
+      "description": "It was answered with something other than what it expects.",
+      "type": "string",
+      "const": "unexpected"
+    },
+    {
+      "description": "Its answer held nothing where a capture reads.",
+      "type": "string",
+      "const": "uncaptured"
+    },
+    {
+      "description": "Its answer was larger than any answer a recipe reads.",
+      "type": "string",
+      "const": "oversized"
+    }
+  ]
+}

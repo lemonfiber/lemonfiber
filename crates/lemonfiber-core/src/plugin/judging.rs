@@ -397,6 +397,22 @@ fn is(held: &Value, wanted: &str) -> bool {
     }
 }
 
+/// What one place in an answer holds, as text a later call can carry, or why the answer
+/// reaches no such place.
+///
+/// The same walk an expectation's key takes, so a capture reads a place exactly where an
+/// assertion about that place would look. A string is carried as it is and anything
+/// else as the document writes it.
+pub(crate) fn taken(answer: &Answer, key: &str) -> Result<String, String> {
+    held(answer, key)
+        .map(|found| {
+            found
+                .as_str()
+                .map_or_else(|| found.to_string(), str::to_owned)
+        })
+        .map_err(|missing| missing.about(key))
+}
+
 /// A value as a refusal prints it, cut where it stops being readable.
 fn readable(found: &Value) -> String {
     let whole = found.to_string();

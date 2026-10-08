@@ -142,7 +142,7 @@ fn an_input_says_what_its_origin_needs_and_nothing_else() {
             &keyless,
             &[
                 "of",
-                "flaresolverr is no service in this stack whose credential"
+                "flaresolverr is no service of the stack's whose credential"
             ]
         ),
         "{keyless:?}"
@@ -151,7 +151,10 @@ fn an_input_says_what_its_origin_needs_and_nothing_else() {
     assert!(
         says(
             &unknown,
-            &["of", "nowhere is no service in this stack whose credential"]
+            &[
+                "of",
+                "nowhere is no service of the stack's whose credential"
+            ]
         ),
         "{unknown:?}"
     );
@@ -175,16 +178,16 @@ fn an_input_says_what_its_origin_needs_and_nothing_else() {
     );
 }
 
-/// The plugin's own service holds a credential lemonfiber keeps only where it names one
-/// of lemonfiber's adapters.
+/// lemonfiber holds no credential for a service a plugin brings, so an input naming one
+/// is refused whether or not that service names one of lemonfiber's adapters.
 #[test]
-fn a_credential_of_the_plugins_own_service_is_held_only_where_it_names_an_adapter() {
+fn a_credential_of_the_plugins_own_service_is_refused_adapter_or_not() {
     let held = carrying("credential-store", r#"of = "komga""#, "komga");
     let without = refused(&held);
     assert!(
         says(
             &without,
-            &["komga is no service in this stack whose credential"]
+            &["of", "komga is one of this plugin's own services"]
         ),
         "{without:?}"
     );
@@ -208,7 +211,39 @@ fn a_credential_of_the_plugins_own_service_is_held_only_where_it_names_an_adapte
                 .collect()
         },
     );
-    assert!(with.is_empty(), "{with:?}");
+    assert!(
+        says(&with, &["komga is one of this plugin's own services"]),
+        "{with:?}"
+    );
+}
+
+/// Only what the operator types can be typed in secret.
+#[test]
+fn a_secret_is_what_the_operator_types_and_nothing_the_store_supplies() {
+    let typed = refused(&carrying(
+        "operator",
+        "ask = \"The claim code\"\nsecret = true",
+        "sonarr",
+    ));
+    assert!(!says(&typed, &["secret"]), "{typed:?}");
+    let stored = refused(&carrying(
+        "credential-store",
+        "of = \"sonarr\"\nsecret = true",
+        "sonarr",
+    ));
+    assert!(
+        says(&stored, &["input held.secret", "nobody types"]),
+        "{stored:?}"
+    );
+    let written = refused(&carrying(
+        "operator",
+        "ask = \"The claim code\"\nsecret = \"yes\"",
+        "sonarr",
+    ));
+    assert!(
+        written.first().is_some_and(|one| one.contains("secret")),
+        "a secret written as anything but true or false is refused by the reader: {written:?}"
+    );
 }
 
 /// A call is held to where it goes whether or not it carries anything.
@@ -293,6 +328,310 @@ call = { method = "GET", to = "komga", path = "/x?key={{held}}", body = "{{held}
         assert!(
             says(&said, &[place, "held", "sonarr", "komga", "goes back only"]),
             "{place}: {said:?}"
+        );
+    }
+}
+
+/// A recipe presenting sonarr's credential to sonarr, capturing what it answers with,
+/// trading that once more at sonarr, and carrying both on to `to` in a query value, the
+/// body and a header, beside a capture traded for nothing held, with pairs declaring each.
+fn trading(to: &str) -> String {
+    format!(
+        r#"[[recipe]]
+id    = "trade"
+title = "Trade a credential"
+why   = "To see where what it buys may go"
+
+[[recipe.input]]
+name   = "held"
+origin = "credential-store"
+of     = "sonarr"
+
+[[recipe.input]]
+name   = "typed"
+origin = "operator"
+ask    = "A value"
+
+[[recipe.step]]
+id      = "sign-in"
+call    = {{ method = "POST", to = "sonarr", path = "/login", body = "{{{{held}}}}" }}
+capture = [{{ name = "token", from = "token", origin = "stack-service" }}]
+
+[[recipe.step]]
+id      = "session"
+call    = {{ method = "POST", to = "sonarr", path = "/session", headers = {{ X-Token = "{{{{token}}}}" }} }}
+capture = [{{ name = "session", from = "id", origin = "stack-service" }}]
+
+[[recipe.step]]
+id      = "plain"
+call    = {{ method = "POST", to = "radarr", path = "/plain", body = "{{{{typed}}}}" }}
+capture = [{{ name = "free", from = "id", origin = "stack-service" }}]
+
+[[recipe.step]]
+id   = "carry"
+call = {{ method = "POST", to = "{to}", path = "/x?t={{{{token}}}}", body = "{{{{session}}}}", headers = {{ X-Free = "{{{{free}}}}", X-Token = "{{{{token}}}}" }} }}
+
+[[recipe.pair]]
+value = "held"
+to    = "sonarr"
+
+[[recipe.pair]]
+value = "token"
+to    = "sonarr"
+
+[[recipe.pair]]
+value = "typed"
+to    = "radarr"
+
+[[recipe.pair]]
+value = "token"
+to    = "{to}"
+
+[[recipe.pair]]
+value = "session"
+to    = "{to}"
+
+[[recipe.pair]]
+value = "free"
+to    = "{to}"
+"#
+    )
+}
+
+/// What a credential is traded for is held as the credential is, through as many trades
+/// as the recipe makes, at every place a call carries it and at every pair.
+#[test]
+fn what_a_credential_is_traded_for_goes_back_only_to_its_service() {
+    let said = refused(&trading("radarr"));
+    for (place, value) in [
+        ("step carry.call.path", "token"),
+        ("step carry.call.body", "session"),
+        ("step carry.call.headers.X-Token", "token"),
+        ("pair #4.to", "token"),
+        ("pair #5.to", "session"),
+    ] {
+        assert!(
+            says(
+                &said,
+                &[
+                    place,
+                    value,
+                    "radarr",
+                    "captured from a call that carried",
+                    "sonarr"
+                ]
+            ),
+            "{place}: {said:?}"
+        );
+    }
+    assert!(
+        !said.iter().any(|one| one.contains("carries free")),
+        "radarr's own answer goes back to radarr freely: {said:?}"
+    );
+}
+
+/// A host outside is refused as another service is, and every capture is held: what a
+/// credential bought to the credential's service, and what a service answered to it.
+#[test]
+fn a_capture_goes_to_a_host_outside_no_more_than_to_another_service() {
+    let outside = refused(&trading("api.example.org"));
+    for (value, held) in [
+        ("token", "captured from a call that carried"),
+        ("session", "captured from a call that carried"),
+        ("free", "captured from the answer of radarr"),
+    ] {
+        assert!(
+            says(&outside, &["step carry", value, "api.example.org", held]),
+            "{value}: {outside:?}"
+        );
+    }
+    assert!(!refused(&trading("sonarr"))
+        .iter()
+        .any(|one| one.contains("carries token") || one.contains("carries session")));
+}
+
+/// The trading recipe with each pair to `to` carrying a release.
+fn releasing(to: &str) -> String {
+    trading(to).replace(
+        &format!("to    = \"{to}\"\n"),
+        &format!("to    = \"{to}\"\nrelease = \"Komga files what Sonarr names.\"\n"),
+    )
+}
+
+/// A pair whose release says why carries a service's answer to another service, at the
+/// pair and at every call that substitutes it there.
+#[test]
+fn a_release_carries_an_answer_where_its_pair_says() {
+    let said = refused(&releasing("sonarr"));
+    assert!(
+        !said.iter().any(|one| one.contains("carries free")),
+        "{said:?}"
+    );
+}
+
+/// No release frees what a credential bought: it stays refused at every call and pair,
+/// and the release on it is refused as freeing nothing.
+#[test]
+fn a_release_never_frees_what_a_credential_was_traded_for() {
+    let said = refused(&releasing("radarr"));
+    assert!(
+        says(
+            &said,
+            &[
+                "step carry.call.path",
+                "token",
+                "captured from a call that carried"
+            ]
+        ),
+        "{said:?}"
+    );
+    assert!(
+        says(
+            &said,
+            &[
+                "pair #4.release",
+                "frees nothing",
+                "no release frees what a credential buys"
+            ]
+        ),
+        "{said:?}"
+    );
+}
+
+/// A release frees a service's answer carried away from it, and nothing else: never a
+/// credential, an operator's input, or an answer going home.
+#[test]
+fn a_release_that_frees_nothing_is_refused_naming_why() {
+    let home = refused(&releasing("sonarr"));
+    assert!(
+        says(
+            &home,
+            &[
+                "pair #1.release",
+                "frees nothing",
+                "credential lemonfiber holds for sonarr"
+            ]
+        ),
+        "{home:?}"
+    );
+    let away = refused(&releasing("radarr"));
+    for (place, frees) in [
+        ("pair #3.release", "operator's own"),
+        ("pair #6.release", "goes back to radarr"),
+    ] {
+        assert!(
+            says(&away, &[place, "frees nothing", frees]),
+            "{place}: {away:?}"
+        );
+    }
+}
+
+/// An outside host's answer is held to nothing, so a release on it frees nothing.
+#[test]
+fn a_release_on_an_outside_hosts_answer_frees_nothing() {
+    let said = refused(
+        r#"[[recipe]]
+id    = "fetch"
+title = "Fetch a title"
+why   = "To name what the library holds"
+
+[[recipe.step]]
+id      = "look"
+call    = { method = "GET", to = "api.example.org", path = "/title" }
+capture = [{ name = "title", from = "title", origin = "external-response" }]
+
+[[recipe.pair]]
+value   = "title"
+to      = "sonarr"
+release = "Sonarr names it."
+"#,
+    );
+    assert!(
+        says(
+            &said,
+            &[
+                "pair #1.release",
+                "frees nothing",
+                "an outside host's answer"
+            ]
+        ),
+        "{said:?}"
+    );
+}
+
+/// A release is a sentence, so one that says nothing is refused.
+#[test]
+fn a_release_that_says_nothing_is_refused() {
+    let said = refused(&releasing("radarr").replace("Komga files what Sonarr names.", " "));
+    assert!(
+        says(&said, &["pair #4.release", "says nothing"]),
+        "{said:?}"
+    );
+}
+
+/// A recipe whose step to `to` is guarded, or waits, on sonarr's credential, and then
+/// carries what that step captured to komga.
+fn deciding(guard: &str, to: &str) -> String {
+    format!(
+        r#"[[recipe]]
+id    = "decide"
+title = "Decide on a credential"
+why   = "To see what a guard may read"
+
+[[recipe.input]]
+name   = "held"
+origin = "credential-store"
+of     = "sonarr"
+
+[[recipe.step]]
+id      = "probe"
+{guard}
+call    = {{ method = "GET", to = "{to}", path = "/x" }}
+capture = [{{ name = "state", from = "state", origin = "stack-service" }}]
+
+[[recipe.step]]
+id   = "carry"
+call = {{ method = "POST", to = "komga", path = "/y", body = "{{{{state}}}}" }}
+
+[[recipe.pair]]
+value = "held"
+to    = "sonarr"
+
+[[recipe.pair]]
+value = "state"
+to    = "komga"
+"#
+    )
+}
+
+/// A guard or a retry's end reading a credential decides on it as a call carrying it
+/// would: refused on a step to anywhere but its service, and what the step captures is
+/// held to that service.
+#[test]
+fn a_guard_reading_a_credential_is_held_where_the_credential_is() {
+    for (guard, place) in [
+        (
+            r#"when    = { value = "held", equals = "x" }"#,
+            "step probe.when",
+        ),
+        (
+            r#"retry   = { times = 1, every = "1s", until = { value = "held", equals = "x" } }"#,
+            "step probe.retry",
+        ),
+    ] {
+        let elsewhere = refused(&deciding(guard, "radarr"));
+        assert!(
+            says(&elsewhere, &[place, "decides on held", "radarr", "sonarr"]),
+            "{place}: {elsewhere:?}"
+        );
+        let home = refused(&deciding(guard, "sonarr"));
+        assert!(
+            !home.iter().any(|one| one.contains("decides on")),
+            "{place}: {home:?}"
+        );
+        assert!(
+            says(&home, &["step carry.call.body", "state", "komga", "sonarr"]),
+            "{place}: {home:?}"
         );
     }
 }

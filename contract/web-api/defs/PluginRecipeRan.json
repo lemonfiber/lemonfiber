@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What one recipe came to.",
+  "type": "object",
+  "properties": {
+    "held": {
+      "description": "Whether every step it made came to what it should.",
+      "type": "boolean"
+    },
+    "recipe": {
+      "description": "The recipe's id.",
+      "type": "string"
+    },
+    "steps": {
+      "description": "Every step it declares, in order, with what each came to.",
+      "type": "array",
+      "items": {
+        "$ref": "PluginStepRan.json"
+      }
+    },
+    "why": {
+      "description": "Why it did not, where it did not.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "recipe",
+    "held",
+    "steps"
+  ]
+}

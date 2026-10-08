@@ -285,6 +285,7 @@ pub(super) async fn answered(
     let consent = super::Consent {
         agreement: reading.agreement,
         approved,
+        inputs: crate::app::plugins::Inputs::default(),
     };
     let yes = match asked {
         Asked::Install { source, .. } => Asked::Install { source, consent },
@@ -312,6 +313,7 @@ fn stale() -> super::Consent {
             &[""],
         ])),
         approved: Vec::new(),
+        inputs: crate::app::plugins::Inputs::default(),
     }
 }
 
@@ -534,6 +536,7 @@ fn document(ctx: &Ctx) -> String {
 
 mod cataloguing;
 mod fetching;
+mod following;
 mod fronting;
 mod installing;
 mod proving;

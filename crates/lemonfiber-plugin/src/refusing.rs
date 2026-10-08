@@ -36,7 +36,7 @@ mod naming;
 mod reaching;
 mod recipes;
 
-pub use recipes::{names_a_header_by_substitution, outside};
+pub use recipes::{names_a_header_by_substitution, names_a_path_not_plain, outside};
 
 use std::collections::BTreeSet;
 

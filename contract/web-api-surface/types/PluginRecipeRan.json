@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "held": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "recipe": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "steps": {
+      "type": [
+        "array[ref:PluginStepRan]"
+      ],
+      "required": true
+    },
+    "why": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

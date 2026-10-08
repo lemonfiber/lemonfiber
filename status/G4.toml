@@ -17,4 +17,5 @@ requirement = [
   { id = "G4-R13", state = "done", evidence = ["crates/lemonfiber-error/src/problem.rs", "crates/lemonfiber-error/src/retry.rs", "crates/lemonfiber-adapters/src/retrying.rs", "crates/lemonfiber/src/exit.rs", "crates/lemonfiber-core/src/health/observed.rs"] },
   { id = "G4-R14", state = "done", evidence = ["crates/lemonfiber-error/src/problem.rs", "crates/lemonfiber-error/src/retry.rs", "crates/lemonfiber-adapters/src/retrying.rs", "crates/lemonfiber/src/exit.rs", "crates/lemonfiber-core/src/health/observed.rs"] },
   { id = "G4-R15", state = "done", evidence = ["crates/lemonfiber-error/src/problem.rs", "crates/lemonfiber-error/src/retry.rs", "crates/lemonfiber-adapters/src/retrying.rs", "crates/lemonfiber/src/exit.rs", "crates/lemonfiber-core/src/health/observed.rs"] },
+  { id = "G4-R17", state = "done", evidence = ["crates/lemonfiber-error/src/problem.rs", "crates/lemonfiber-core/src/plugin/running.rs"] },
 ]
