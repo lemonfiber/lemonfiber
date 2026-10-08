@@ -1,0 +1,454 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Manifest",
+  "description": "A whole stack manifest.",
+  "type": "object",
+  "properties": {
+    "form": {
+      "description": "Every declared form.",
+      "type": "array",
+      "items": {"$ref": "#/$defs/Form"}
+    },
+    "include": {
+      "description": "The file each service is declared in, `services/<id>.toml`, in the order the\nservices are listed. This list alone decides which services the stack holds:\na file in `services/` it does not name is refused, not read.",
+      "type": "array",
+      "default": [],
+      "items": {"type": "string"}
+    },
+    "min_cli_version": {"description": "The oldest `lemonfiber` this stack will work with.", "type": "string"},
+    "profile": {
+      "description": "Every declared profile.",
+      "type": "array",
+      "items": {"$ref": "#/$defs/Profile"}
+    },
+    "removed": {
+      "description": "Every service this stack used to carry and no longer does.\n\nOptional, and deliberately: a stack that has never dropped anything has\nnothing to record, and requiring an empty table of it would make the record\nsomething to satisfy rather than something to read.",
+      "type": "array",
+      "items": {"$ref": "#/$defs/Removed"}
+    },
+    "schema_version": {"description": "The manifest format generation.", "type": "integer", "format": "uint32", "minimum": 0},
+    "stack_version": {"description": "The content version — which services and forms this stack has.", "type": "string"},
+    "wiring": {
+      "description": "Every link between two of this stack's services.\n\nOptional in the format because an operator's own stack directory stays\nreadable without it, and because a stack written before this table existed\nis still a stack. It is not optional of the one this project ships: a link\nthat is not declared here is one nothing can report on, substitute at, or\nshow as the exception it is.",
+      "type": "array",
+      "items": {"$ref": "#/$defs/Wiring"}
+    }
+  },
+  "additionalProperties": false,
+  "required": ["schema_version", "stack_version", "min_cli_version"],
+  "$defs": {
+    "Api": {
+      "description": "How lemonfiber talks to a service when seeding.\n\nThe same shape on a plugin's service as on the stack's own, which is what lets a\nplugin name one of these adapters rather than supply one of its own.",
+      "type": "object",
+      "properties": {
+        "key_source": {"description": "Where the credential comes from.", "$ref": "#/$defs/KeySource"},
+        "kind": {"description": "Selects the client implementation.", "$ref": "#/$defs/ApiKind"},
+        "path": {
+          "description": "The file holding the credential, where one applies.",
+          "type": ["string", "null"],
+          "default": null
+        },
+        "version": {
+          "description": "The major version of the service's HTTP API — the `/api/vN` path segment.\n\nRequired for the `servarr` shape and read there, because that one shape\nspans two versions (Sonarr and Radarr at v3, Lidarr and Prowlarr at v1),\nso the version is data rather than a guess from a service's name. Absent\nfor the other kinds, whose one fixed version their client already knows.",
+          "type": ["integer", "null"],
+          "format": "uint32",
+          "default": null,
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": ["kind", "key_source"]
+    },
+    "ApiKind": {
+      "description": "The API shapes lemonfiber knows how to speak.\n\nFour services share the `servarr` shape, which is what makes one client\nenough for them. Bindery is its own kind deliberately: it is not a Servarr\napplication and Prowlarr's app sync does not reach it. Bazarr is its own for\nthe neighbouring reason: it is told about the \\*arrs rather than being one of\nthem, in a form body a client of the shared shape could not send.",
+      "oneOf": [
+        {"description": "Sonarr, Radarr, Lidarr and Prowlarr.", "type": "string", "const": "servarr"},
+        {"description": "`SABnzbd`.", "type": "string", "const": "sabnzbd"},
+        {"description": "qBittorrent's `WebUI` API.", "type": "string", "const": "qbittorrent"},
+        {"description": "Seerr.", "type": "string", "const": "seerr"},
+        {"description": "Bindery.", "type": "string", "const": "bindery"},
+        {"description": "Jellyfin — a media server whose account lemonfiber creates rather than a\nkey it reads, so it has a `key_source` of `generated`.", "type": "string", "const": "jellyfin"},
+        {"description": "Bazarr — the subtitle finder, which is told which \\*arrs to watch.", "type": "string", "const": "bazarr"},
+        {"description": "Audiobookshelf — a listening server whose first account lemonfiber creates,\nlike Jellyfin's, so its `key_source` is `generated` too. The token it hands\nback on sign-in is stable, so it is read again rather than recorded twice.", "type": "string", "const": "audiobookshelf"},
+        {"description": "`NZBHydra2` — the Usenet indexer aggregator, which starts with no authentication,\nso lemonfiber turns it on with an administrator it names and a password it mints.", "type": "string", "const": "nzbhydra2"}
+      ]
+    },
+    "Bind": {
+      "description": "Which interface a service's port is published on.",
+      "oneOf": [
+        {"description": "Reachable only from the host.", "type": "string", "const": "loopback"},
+        {"description": "Reachable from the local network.", "type": "string", "const": "lan"}
+      ]
+    },
+    "Claim": {
+      "description": "The core capability a plugin claims, and the probes it is demonstrated by.\n\nThe vocabulary owns what must be shown; this owns where to ask. A capability is\none contract with many claimants, each answering at a path of its own, so the\npublished probe declares the question and the statuses that answer it, and the\nbinding declares the method, the path and the recorded response.",
+      "type": "object",
+      "properties": {
+        "capability": {"description": "A core name, which must also appear in the service's `provides`.", "type": "string"},
+        "probe": {
+          "description": "One binding per probe the capability declares. Every one of them, exactly once.",
+          "type": "array",
+          "items": {"$ref": "#/$defs/ClaimProbe"}
+        }
+      },
+      "additionalProperties": false,
+      "required": ["capability"]
+    },
+    "ClaimProbe": {
+      "description": "One probe of a claimed capability, bound to a request on this plugin's service.",
+      "type": "object",
+      "properties": {
+        "expect": {"description": "What the answer must be, within what the probe permits.", "$ref": "#/$defs/Expect"},
+        "fixture": {"description": "The recorded response.\n\nRequired here where it is optional on a proof: a claim nobody can demonstrate\nwithout owning the service is a claim the catalogue's own checks cannot make.", "type": "string"},
+        "id": {"description": "Names a probe the capability declares.", "type": "string"},
+        "request": {"description": "Method and path on this plugin's own service.", "$ref": "#/$defs/PluginRequest"}
+      },
+      "additionalProperties": false,
+      "required": ["id", "request", "expect", "fixture"]
+    },
+    "Criticality": {
+      "description": "How much a service's absence costs.\n\nSerialisable as well as readable, because it reaches an operator: a status\nreport that says a service is down without saying whether that matters\nleaves them to guess, and the manifest already holds the answer.",
+      "oneOf": [
+        {"description": "Its failure has consequences outside the machine.", "type": "string", "const": "critical"},
+        {"description": "The form does not work without it.", "type": "string", "const": "core"},
+        {"description": "The form works, badly.", "type": "string", "const": "important"},
+        {"description": "Makes things better.", "type": "string", "const": "enhancing"},
+        {"description": "Nice to have.", "type": "string", "const": "optional"}
+      ]
+    },
+    "Expect": {
+      "description": "What the answer has to be.\n\nA status is a claim about the network path rather than about the service: Docker\npublishes a port by putting a proxy in front of it, and that proxy accepts a\nconnection before knowing whether anything inside is listening. So a status alone\nis not evidence — except for a refusal, which is the one answer no port proxy can\nproduce.\n\n**A key of the four key-wise constraints is a place rather than a name.** A plain\nname is a top-level member, and one beginning with `/` is a JSON Pointer, extended\nwith a step that picks an entry of a list by a field it holds. A flat name was enough while every service answered a flat object, and the\nonly thing it could say about a service that nests its payload was that the envelope\nwas there — which is a probe that passes by observing that something replied.",
+      "type": "object",
+      "properties": {
+        "body_starts_with": {
+          "description": "What the body must begin with, where it is not JSON.",
+          "type": ["string", "null"],
+          "default": null
+        },
+        "content_type": {
+          "description": "A substring of the content type the answer was served as.",
+          "type": ["string", "null"],
+          "default": null
+        },
+        "json": {
+          "description": "Places the answer must carry, each with the exact value it must hold.",
+          "type": ["object", "null"],
+          "additionalProperties": {"$ref": "#/$defs/Expected"},
+          "default": null
+        },
+        "json_array_min": {
+          "description": "The answer read as an array, with at least this many entries.\n\nA catalogue is very often a list rather than an object, and none of the\nobject-shaped constraints can say anything about one.",
+          "type": ["integer", "null"],
+          "format": "uint64",
+          "default": null,
+          "minimum": 0
+        },
+        "json_at_least": {
+          "description": "Places the answer must carry, each with a number it must not be below.",
+          "type": ["object", "null"],
+          "additionalProperties": {"type": "integer", "format": "int64"},
+          "default": null
+        },
+        "json_has_keys": {
+          "description": "Places the answer must carry, whatever they hold.",
+          "type": ["array", "null"],
+          "default": null,
+          "items": {"type": "string"}
+        },
+        "json_is_absent": {
+          "description": "The answer did not parse as JSON at all.\n\nWhich is what a service that serves its application shell for every path it does\nnot implement answers — and the reason a status alone proves nothing against\none: the shell comes back `200` whether the API behind it exists or not, so what\nhas to be said is that the body was *not* a document.",
+          "type": ["boolean", "null"],
+          "default": null
+        },
+        "json_types": {
+          "description": "Places the answer must carry, each with the kind of value it must be.",
+          "type": ["object", "null"],
+          "additionalProperties": {"$ref": "#/$defs/ExpectedKind"},
+          "default": null
+        },
+        "status": {
+          "description": "The status the answer must carry.",
+          "type": ["integer", "null"],
+          "format": "uint16",
+          "default": null,
+          "maximum": 65535,
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "Expected": {
+      "description": "Exactly what a place must hold.\n\nThree kinds and no nesting: a flag that must be set, a number that must match, or a\nword. A value deeper than this is asking about a document rather than about a claim\n— and where the thing worth asserting is deeper *in* the answer, the key reaches it\nrather than the value growing to match.",
+      "anyOf": [
+        {"description": "A true or a false.", "type": "boolean"},
+        {"description": "A whole number.", "type": "integer", "format": "int64"},
+        {"description": "A word.", "type": "string"}
+      ]
+    },
+    "ExpectedKind": {
+      "description": "The kind of value a key must hold.\n\nFive, and closed. A name outside them is one no runner could evaluate, and an\nassertion nothing evaluates is a proof that silently checks less than it says —\nwhich is worse than one that fails.\n\nNamed for what it is the kind *of*, rather than `Kind`, because this is published\nand whoever generates from it flattens every definition into one scope. `Kind` is\nthe one name there a generator is certain to want for itself: every envelope this\ncontract describes is keyed by its `kind`, so the union of them is a `Kind` too, and\ntwo of them in one module is a definition nothing can be compiled against.",
+      "oneOf": [
+        {"description": "A true or a false.", "type": "string", "const": "bool"},
+        {"description": "A whole number.", "type": "string", "const": "int"},
+        {"description": "A string.", "type": "string", "const": "str"},
+        {"description": "An array.", "type": "string", "const": "list"},
+        {"description": "An object.", "type": "string", "const": "dict"}
+      ]
+    },
+    "Form": {
+      "description": "A named slice of the stack an operator can run.",
+      "type": "object",
+      "properties": {
+        "composable": {"description": "Whether this form may be combined with others.", "type": "boolean", "default": true},
+        "description": {"description": "One line, plain language.", "type": "string"},
+        "id": {"description": "Unique.", "type": "string"},
+        "name": {"description": "Human-facing name.", "type": "string"},
+        "profiles": {
+          "description": "The complete closure, written out rather than inferred.",
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      },
+      "additionalProperties": false,
+      "required": ["id", "name", "description", "profiles"]
+    },
+    "Health": {
+      "description": "How to tell a service has started.",
+      "type": "object",
+      "properties": {
+        "kind": {"description": "Which kind of probe to use.", "$ref": "#/$defs/HealthKind"},
+        "path": {
+          "description": "HTTP path, for `http` probes.",
+          "type": ["string", "null"],
+          "default": null
+        },
+        "timeout_s": {
+          "description": "How long to wait before calling it unhealthy.",
+          "type": ["integer", "null"],
+          "format": "uint32",
+          "default": null,
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": ["kind"]
+    },
+    "HealthKind": {
+      "description": "The kinds of health probe a service can declare.",
+      "oneOf": [
+        {"description": "Fetch a path on the service's port.", "type": "string", "const": "http"},
+        {"description": "Open a connection to the service's port.", "type": "string", "const": "tcp"},
+        {"description": "Trust the container's own reported state.", "type": "string", "const": "container"}
+      ]
+    },
+    "KeySource": {
+      "description": "Where a service's credential comes from.",
+      "oneOf": [
+        {"description": "The service writes it to an XML file lemonfiber reads.", "type": "string", "const": "config-xml"},
+        {"description": "The service writes it to an INI file lemonfiber reads.", "type": "string", "const": "config-ini"},
+        {"description": "The service writes it to a JSON file lemonfiber reads.", "type": "string", "const": "config-json"},
+        {"description": "The service writes it to a YAML file lemonfiber reads.", "type": "string", "const": "config-yaml"},
+        {"description": "Retrieved over the service's own API once authenticated.", "type": "string", "const": "api-settings"},
+        {"description": "The service offers nothing durable, so lemonfiber mints and records one.", "type": "string", "const": "generated"},
+        {"description": "The API needs no credential.", "type": "string", "const": "none"}
+      ]
+    },
+    "PluginRequest": {
+      "description": "What is asked, and where.\n\nThree fields and no more, and the third is the one worth explaining. A service that\nanswers XML unless a caller asks for JSON cannot satisfy a capability whose probe\nrequires a JSON assertion, and until this field there was nowhere to ask: Plex\nanswers `text/xml` at every path, including the one its health probe uses, unless\nthe request carries `Accept: application/json`.\n\n**It is one media type and not a header map, and the difference is the point.** A\nprobe declares who it is asked as, and `none` on every `guarded` probe has meant what\nit says partly because nothing could be presented. A map of headers would make that a\nconvention a reviewer has to hold — any service may name its credential header\nwhatever it likes, so no list of refused names could ever be closed — where one named\nfield keeps it a property of the format. A probe still cannot present anything,\nbecause there is nowhere to write it.",
+      "type": "object",
+      "properties": {
+        "accept": {
+          "description": "The one representation the answer is asked for, as a media type.\n\nAbsent where the service needs no asking, which is most of them.",
+          "type": ["string", "null"],
+          "default": null
+        },
+        "method": {"description": "The HTTP method.", "type": "string"},
+        "path": {"description": "The path on the service being asked.", "type": "string"}
+      },
+      "additionalProperties": false,
+      "required": ["method", "path"]
+    },
+    "Profile": {
+      "description": "A Compose profile — one service's role in the stack.",
+      "type": "object",
+      "properties": {
+        "description": {"description": "Shown in form previews.", "type": "string"},
+        "id": {"description": "Unique, and matches a Compose profile name exactly.", "type": "string"},
+        "name": {"description": "Human-facing name.", "type": "string"},
+        "protocol": {
+          "description": "The provider this profile cannot run without, where it needs one.\n\nAbsent means it is never narrowed away. Declaring it here rather than\nletting the tool recognise profile names by sight is what keeps a\nrenamed profile from silently losing its guard.",
+          "anyOf": [
+            {"$ref": "#/$defs/StackProtocol"},
+            {"type": "null"}
+          ],
+          "default": null
+        }
+      },
+      "additionalProperties": false,
+      "required": ["id", "name", "description"]
+    },
+    "Removed": {
+      "description": "A service this stack used to carry, and what became of it.\n\nKept beside the services rather than in a changelog because of who asks and when:\nan operator who remembers a service and cannot find it is holding a gap, and a gap\nis closed by a record that travels with the stack they are running rather than by a\nfile they would have to know exists. It versions with the stack for the same reason\nevery other per-service fact here does — the stack decided the removal, so the stack\nis what carries the answer, and a lemonfiber release is not needed to say what\nbecame of a service lemonfiber never chose.\n\n`replaced_by` is optional because the honest answer is sometimes that nothing\nreplaced it. Recording a replacement that does not exist to avoid an empty field is\nworse than the gap it fills.",
+      "type": "object",
+      "properties": {
+        "id": {"description": "The id it was declared under, which is the name an operator will look for.", "type": "string"},
+        "reason": {"description": "Why it went — a sentence, not a word.", "type": "string"},
+        "removed_in": {"description": "The `stack_version` whose catalogue no longer carries it.\n\nA stack version rather than a date, because the manifest already carries one\nand an operator asking what became of a service is holding a stack rather than\na calendar: *which release of this stack stopped having it* is the question a\ndate could only be translated back into.", "type": "string"},
+        "replaced_by": {
+          "description": "The service that took its place, where one did.",
+          "type": ["string", "null"],
+          "default": null
+        }
+      },
+      "additionalProperties": false,
+      "required": ["id", "removed_in", "reason"]
+    },
+    "Service": {
+      "description": "One container in the stack.",
+      "type": "object",
+      "properties": {
+        "api": {
+          "description": "How lemonfiber talks to it when seeding.",
+          "anyOf": [
+            {"$ref": "#/$defs/Api"},
+            {"type": "null"}
+          ],
+          "default": null
+        },
+        "asks_for": {
+          "description": "What it asks for out there, in the same terms.\n\nDeclared with [`Self::reaches`] or not at all: one without the other is half\nan answer, and validation refuses it by name rather than quietly using the\nhalf that is there.",
+          "type": ["string", "null"],
+          "default": null
+        },
+        "bind": {
+          "description": "Which interface the port is published on.",
+          "anyOf": [
+            {"$ref": "#/$defs/Bind"},
+            {"type": "null"}
+          ]
+        },
+        "claim": {
+          "description": "The evidence for what [`Self::provides`] names: one claim per capability, each\nbinding the capability's probes to requests on this service and to recordings.\n\nKept as the tables the stack wrote rather than read here. A claim is the plugin\ncontract's shape and that contract's reader is what holds it, so a bundled\nservice and a plugin standing in for it meet one set of binding rules; a second\nreader here would be a second answer to what a claim may say, and this crate\ncannot reach the first, which reads this one.",
+          "type": "array",
+          "items": {"$ref": "#/$defs/StackClaim"}
+        },
+        "criticality": {"description": "How much its absence costs.", "$ref": "#/$defs/Criticality"},
+        "depends_on": {
+          "description": "Same-profile dependencies only.",
+          "type": "array",
+          "default": [],
+          "items": {"type": "string"}
+        },
+        "describes": {"description": "What it does for the operator.", "type": "string"},
+        "digest": {
+          "description": "The digest of the image's multi-architecture index, `sha256:` and 64 lower-case\nhex digits.\n\nWhat actually runs. A digest names one index for good, where the tag beside it\ncould be moved to a different one tomorrow, so the stack resolves every image by\nthis and a service without one is refused by validation. Optional here so that\nrefusal can name the service, rather than the file failing to parse.",
+          "type": ["string", "null"],
+          "default": null
+        },
+        "grants": {
+          "description": "Extra kernel capabilities granted to the container, checked against an allow-list.\n\nNamed `grants` rather than `capabilities` because the word is about to mean\nsomething else entirely: what a service *can do*, which is how a plugin declares\nitself and how wiring asks for a filler. Two meanings under one spelling is how a\nsetting that decides what a container may do to the kernel gets read as a\ndescription of what it offers.\n\nThe old spelling is still accepted, because an operator's own stack description is\ntheirs and a rename is not a reason to refuse to read it.",
+          "type": "array",
+          "default": [],
+          "items": {"type": "string"}
+        },
+        "health": {
+          "description": "How to tell the service has actually started.",
+          "anyOf": [
+            {"$ref": "#/$defs/Health"},
+            {"type": "null"}
+          ]
+        },
+        "host_managed": {"description": "True where the OS owns the lifecycle rather than Compose.", "type": "boolean", "default": false},
+        "id": {"description": "Unique, and matches the Compose service name.", "type": "string"},
+        "image": {"description": "Image reference without a tag.", "type": "string"},
+        "last_release": {"description": "The latest release upstream has published, `YYYY-MM-DD`.", "type": "string"},
+        "license": {"description": "SPDX identifier.", "type": "string"},
+        "listens": {
+          "description": "The port it answers on inside the stack's network, where lemonfiber and the\nservices that ask for what it provides reach it.\n\nNot always the port it publishes: `SABnzbd` publishes 8085 and answers on 8080.\nDeclared rather than known, so a service standing in for another is reached at\nthe port it answers on rather than at the one the service it replaced did.",
+          "type": ["integer", "null"],
+          "format": "uint16",
+          "default": null,
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "media_types": {
+          "description": "Which media types it handles.",
+          "type": "array",
+          "default": [],
+          "items": {"type": "string"}
+        },
+        "memory_mib": {
+          "description": "The memory it expects to need, in MiB.\n\nThe stack's estimate, and only ever shown as one: a form's footprint is the sum\nof these over the services it would start, and a figure read as a measurement\nis one an operator believes and acts on. Optional because a stack that says\nnothing has not said zero, and the services that are silent are named beside\nthe sum rather than counted as costing nothing.",
+          "type": ["integer", "null"],
+          "format": "uint32",
+          "default": null,
+          "minimum": 0
+        },
+        "name": {"description": "Human-facing name.", "type": "string"},
+        "port": {
+          "description": "Primary UI or API port, absent for services with no listener.",
+          "type": ["integer", "null"],
+          "format": "uint16",
+          "default": null,
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "profile": {"description": "Exactly one profile.", "type": "string"},
+        "provides": {
+          "description": "What this service can be asked for, as named capabilities.\n\nAn open list of strings here and checked for shape only, deliberately. The\npublished vocabulary is the set these names come from, and it is generated from\nthis field — a reader that held the set as well would be a cycle, and one that\nheld a copy of it would be a second answer to what the vocabulary carries. The\ngenerator refuses a name the vocabulary does not carry, by name.",
+          "type": "array",
+          "default": [],
+          "items": {"type": "string"}
+        },
+        "reaches": {
+          "description": "Where this service's own requests go, in the terms an operator would\nrecognise — not in protocol names.\n\nAn empty string is an answer: this service reaches nothing. That is not the\nsame as the field being absent, which is the stack declining to say, and the\ntwo must never be read as one — an inventory of what leaves a machine that\nrendered \"we were not told\" as \"nothing leaves\" would be making a privacy\nclaim out of its own ignorance.\n\nOptional because a stack written before this existed says nothing, and a build\nthat refused such a manifest would refuse the stack it ships with. Where it is\nabsent, lemonfiber answers from what it knows about the services it ships, and\nreports that it knows nothing where it does not.",
+          "type": ["string", "null"],
+          "default": null
+        },
+        "tag": {"description": "Explicit version — a floating tag is a validation failure.\n\nThe version an operator reads, and nothing more: a tag is a label its publisher\ncan move to another image, so what runs is named by [`Self::digest`].", "type": "string"},
+        "upstream": {"description": "Project URL, for maintenance review.", "type": "string"},
+        "without_it": {"description": "The consequence of not running it.", "type": "string"}
+      },
+      "additionalProperties": false,
+      "required": ["id", "name", "profile", "image", "tag", "criticality", "license", "upstream", "last_release", "describes", "without_it"]
+    },
+    "StackClaim": {"$ref": "#/$defs/Claim"},
+    "StackProtocol": {
+      "description": "A download provider a profile can depend on.\n\nSerialisable as well as readable, for the same reason [`Criticality`] is: it\nreaches an operator. A profile left out of a closure is only half reported\nwithout the provider it wanted.",
+      "oneOf": [
+        {"description": "Needs a Usenet provider.", "type": "string", "const": "usenet"},
+        {"description": "Needs a VPN and a torrent client.", "type": "string", "const": "torrent"}
+      ]
+    },
+    "Wiring": {
+      "description": "One link between two of the stack's services, and which of the two it names.\n\nA link asks for a capability or it names a service, and the difference is the\nwhole subject. An ask is written against what the far end *does*, so anything\nthat stands in for it is reached by everything that asked and nothing else\nchanges; a name is written against what the far end *is*, which is sometimes the\nhonest answer and is always the exception.\n\nBoth halves of the pair are optional in the type and exactly one of them is\nrequired by validation. Making it an enum in the parser would report a link that\ncarried both as a shape failure, and *this has two ends where it should have one*\nis a sentence a parse error cannot say.",
+      "type": "object",
+      "properties": {
+        "asks": {
+          "description": "The capability asked for, where this is an ask.",
+          "type": ["string", "null"],
+          "default": null
+        },
+        "by": {"description": "The service the link runs from — what asked.\n\nThe name a report uses when nothing fills what was asked for. Without it an\nunfilled capability is a fact about the stack with nobody to tell, which is\nthe failure at the point of use this exists instead of.", "type": "string"},
+        "each": {"description": "Whether the link reaches every service that fills it rather than the one.\n\nSome asks are for the one service that does a thing and some are for all of\nthem, and how many claimants happen to exist today does not say which this\nis. A stack where one capability is declared four times over and another once\nwould have both reported as the same answer, and only one of the two would be\na link that worked.", "type": "boolean", "default": false},
+        "filled_by": {
+          "description": "Which claimant fills it, where the stack's own services contest it.\n\nA default the operator substitutes, not a rule: install order, precedence and\nrecency are each a way of being right most of the time, and a choice written\ndown with its reason beside it is what is done instead of them.",
+          "type": ["string", "null"],
+          "default": null
+        },
+        "to": {
+          "description": "The service named, where this link is by name.",
+          "type": ["string", "null"],
+          "default": null
+        },
+        "why": {
+          "description": "Why it is by name, or why that claimant was chosen.\n\nRequired of both, because an exception with no reason beside it reads as an\noversight and a choice with no reason beside it reads as a rule.",
+          "type": ["string", "null"],
+          "default": null
+        }
+      },
+      "additionalProperties": false,
+      "required": ["by"]
+    }
+  }
+}

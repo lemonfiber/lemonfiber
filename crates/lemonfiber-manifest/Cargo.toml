@@ -10,6 +10,8 @@ repository.workspace = true
 [dependencies]
 schemars = { workspace = true }
 serde = { workspace = true }
+# A schema is a JSON document, and the root's is the manifest's with one property taken out.
+serde_json = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
 

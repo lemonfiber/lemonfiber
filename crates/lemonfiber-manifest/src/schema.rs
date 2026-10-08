@@ -11,7 +11,7 @@ use crate::recognising::unrecognised;
 use crate::{is_compatible, Failure, SUPPORTED_SCHEMA_VERSIONS};
 
 /// A whole stack manifest.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Manifest {
     /// The manifest format generation.
@@ -20,11 +20,9 @@ pub struct Manifest {
     pub stack_version: String,
     /// The oldest `lemonfiber` this stack will work with.
     pub min_cli_version: String,
-    /// The file each service is declared in, in the order the services are listed.
-    ///
-    /// Read by [`crate::assemble`], which joins those files after the root and
-    /// refuses any that break the rules about them, so a manifest parsed here has
-    /// its services already beside it.
+    /// The file each service is declared in, `services/<id>.toml`, in the order the
+    /// services are listed. This list alone decides which services the stack holds:
+    /// a file in `services/` it does not name is refused, not read.
     #[serde(default)]
     pub include: Vec<String>,
     /// Every declared profile.
@@ -105,7 +103,7 @@ struct Generation {
 }
 
 /// A Compose profile — one service's role in the stack.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Profile {
     /// Unique, and matches a Compose profile name exactly.
@@ -151,7 +149,7 @@ pub enum Protocol {
 }
 
 /// A named slice of the stack an operator can run.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Form {
     /// Unique.
@@ -168,7 +166,7 @@ pub struct Form {
 }
 
 /// One container in the stack.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Service {
     /// Unique, and matches the Compose service name.
@@ -309,6 +307,25 @@ pub struct Claimed(pub toml::Table);
 
 impl Eq for Claimed {}
 
+/// Described as an open table here, because a claim is the plugin contract's shape and
+/// this crate cannot reach that contract's types. What publishes the stack's schema
+/// sees both, and puts the plugin manifest's own definition of a claim in its place.
+impl schemars::JsonSchema for Claimed {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        CLAIM.into()
+    }
+
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({
+            "type": "object",
+            "description": "A claim, written as the plugin manifest writes one."
+        })
+    }
+}
+
+/// The name a claim's definition is published under in the stack's schema.
+pub const CLAIM: &str = "StackClaim";
+
 impl Service {
     /// The name the engine files this service's image under: `image@digest` where the
     /// stack pins one, since the tag beside a digest is never applied to what is pulled,
@@ -356,7 +373,7 @@ pub fn majors(tag: &str) -> Vec<u32> {
 /// `replaced_by` is optional because the honest answer is sometimes that nothing
 /// replaced it. Recording a replacement that does not exist to avoid an empty field is
 /// worse than the gap it fills.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Removed {
     /// The id it was declared under, which is the name an operator will look for.
@@ -387,7 +404,7 @@ pub struct Removed {
 /// required by validation. Making it an enum in the parser would report a link that
 /// carried both as a shape failure, and *this has two ends where it should have one*
 /// is a sentence a parse error cannot say.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Wiring {
     /// The service the link runs from — what asked.
@@ -427,7 +444,7 @@ pub struct Wiring {
 }
 
 /// Which interface a service's port is published on.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Bind {
     /// Reachable only from the host.
@@ -457,7 +474,7 @@ pub enum Criticality {
 }
 
 /// How to tell a service has started.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Health {
     /// Which kind of probe to use.
@@ -471,7 +488,7 @@ pub struct Health {
 }
 
 /// The kinds of health probe a service can declare.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum HealthKind {
     /// Fetch a path on the service's port.

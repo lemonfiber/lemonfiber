@@ -93,13 +93,15 @@ jobs:
           tar -czf "$RUNNER_TEMP/attached/web-api.contract.tar.gz" -C contract web-api
           echo "gathered $contract from $TAG as web-api.contract.tar.gz"
 
-      # The three a plugin author's tooling reads, on the same terms and for the
-      # same reason. An editor validating `plugin.toml`, and a catalogue checking a
-      # claim against the vocabulary it was written for, both want the copy generated
+      # What a plugin author's tooling reads, and the schemas of a stack's own
+      # files, on the same terms and for the same reason. An editor validating
+      # `plugin.toml` or `stack.toml`, the documentation rendering a manifest's
+      # fields, and a catalogue checking a claim against the vocabulary it was
+      # written for, all want the copy generated
       # against the release they are targeting rather than whatever is on the trunk
       # today. The names are unversioned so a consumer can ask a release
       # for a fixed name and get that release's copy.
-      - name: Gather what a plugin is authored against
+      - name: Gather what a plugin or a stack is authored against
         env:
           TAG: ${{ steps.tag.outputs.tag }}
         run: |
@@ -108,7 +110,9 @@ jobs:
             contract/plugin-manifest.schema.json \
             contract/capability-vocabulary.json \
             contract/adapters.json \
-            contract/extension-points.json
+            contract/extension-points.json \
+            contract/stack-manifest.schema.json \
+            contract/stack-service.schema.json
           do
             # A release missing one leaves an author's editor with nothing to validate
             # against and a catalogue unable to check a claim, which is better

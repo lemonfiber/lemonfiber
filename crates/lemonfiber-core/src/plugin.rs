@@ -165,7 +165,7 @@ fn each(found: &[Unpublishable]) -> String {
 /// scalars on one line, and one trailing newline.
 ///
 /// `None` only where the value cannot serialise, which none of these can.
-fn rendered<T: Serialize>(artefact: &T) -> Option<String> {
+pub(crate) fn rendered<T: Serialize>(artefact: &T) -> Option<String> {
     let pretty = serde_json::to_string_pretty(artefact).ok()? + "\n";
     compact::collapsed(&pretty)
 }
