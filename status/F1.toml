@@ -13,7 +13,7 @@ requirement = [
   { id = "F1-R9", state = "done", evidence = ["crates/lemonfiber-manifest/src/validate.rs", "crates/lemonfiber-core/src/stack.rs"] },
   { id = "F1-R10", state = "done", evidence = ["crates/lemonfiber-core/src/docker.rs", "crates/lemonfiber-core/tests/integration/a_service_this_build_has_never_heard_of.rs"] },
   { id = "F1-R11", state = "done", evidence = ["crates/lemonfiber-core/src/outbound/theirs.rs", "crates/lemonfiber-core/src/app/targets/servarr.rs", "crates/lemonfiber-core/src/unsupported.rs"] },
-  { id = "F1-R12", state = "partial", evidence = ["crates/lemonfiber/src/render/plugin.rs", "crates/lemonfiber-core/src/model.rs", "contract/web-api.surface.json", "crates/lemonfiber-api/src/contract/stability.rs"] },
+  { id = "F1-R12", state = "partial", evidence = ["crates/lemonfiber/src/render/plugin.rs", "crates/lemonfiber-core/src/model.rs", "contract/web-api-surface/index.json", "crates/lemonfiber-api/src/contract/stability.rs"] },
   { id = "F1-R13", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/storage/mounts.rs", "crates/lemonfiber-core/src/stack.rs", "crates/lemonfiber-core/src/stack/mounts.rs", "crates/lemonfiber-core/src/doctor/acknowledged.rs", "crates/lemonfiber-core/tests/fixtures/split-mounts"] },
   { id = "F1-R14", state = "done", evidence = ["crates/lemonfiber-core/src/migration/standing.rs", "crates/lemonfiber-core/src/app/preflight.rs", "crates/lemonfiber-core/src/network.rs"] },
 ]

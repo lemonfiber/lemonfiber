@@ -2,7 +2,7 @@
 # status_check.py and the release gate.
 
 requirement = [
-  { id = "A4-R1", state = "done", evidence = ["contract/web-api.contract.json", "crates/lemonfiber-api/src/read.rs", "crates/lemonfiber-core/src/alert/appetite.rs", "crates/lemonfiber-core/src/app.rs"] },
+  { id = "A4-R1", state = "done", evidence = ["contract/web-api/index.json", "crates/lemonfiber-api/src/read.rs", "crates/lemonfiber-core/src/alert/appetite.rs", "crates/lemonfiber-core/src/app.rs"] },
   { id = "A4-R2", state = "done", evidence = ["crates/lemonfiber-core/src/reconfigure.rs", "crates/lemonfiber-core/src/app/configuring.rs"] },
   { id = "A4-R3", state = "done", evidence = ["crates/lemonfiber-core/src/reconfigure.rs", "crates/lemonfiber-core/src/app/configuring.rs"] },
   { id = "A4-R4", state = "done", evidence = ["crates/lemonfiber-core/src/reconfigure/review.rs", "crates/lemonfiber/src/render.rs"] },
