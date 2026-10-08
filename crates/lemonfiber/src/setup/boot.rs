@@ -1,8 +1,9 @@
-//! What setup checks before it asks, and what it starts after it writes.
+//! What setup checks before it asks, and what it starts and wires after it writes.
 //!
 //! The two ends of the walk that reach the machine rather than the operator: the
 //! environment has to work before a single question is worth asking, and the
-//! stack has to come up once the answers are applied.
+//! stack has to come up, and its services be connected to each other, once the
+//! answers are applied.
 
 use std::process::ExitCode;
 
@@ -10,6 +11,7 @@ use lemonfiber_core::app::{diagnose, dispatch, unforwarded, Command, Ctx, Outcom
 use lemonfiber_core::docker::Condition;
 use lemonfiber_core::doctor::{autostart, overall, Category, Finding, Narrowing, Overall};
 use lemonfiber_core::model::DoctorReport;
+use lemonfiber_core::PRODUCT;
 
 use crate::engine::pull_showing;
 use crate::exit::{complain, settled, PREFLIGHT};
@@ -76,13 +78,15 @@ fn gating(findings: Vec<Finding>) -> Vec<Finding> {
         .collect()
 }
 
-/// Bring the stack up and report how it settled, the last step of a fresh setup.
+/// Bring the stack up, report how it settled and wire it, the last steps of a fresh
+/// setup.
 ///
 /// The images are pulled first, with their progress on screen, so the several
 /// gigabytes come down where the operator can watch rather than as a silent wait
 /// inside `up`. Only once they are down is the stack brought up and waited on for
 /// health; a pull that failed stops here rather than starting against images that
-/// never arrived.
+/// never arrived. What came up is then wired, so a first run ends with services
+/// that already know each other rather than with one more command to find.
 pub(super) async fn start(ctx: &Ctx, surface: &dyn Surface) -> ExitCode {
     let forms = vec![STARTER_FORM.to_owned()];
     if let Err(code) = pull_showing(ctx, &forms, false).await {
@@ -92,6 +96,7 @@ pub(super) async fn start(ctx: &Ctx, surface: &dyn Surface) -> ExitCode {
     match dispatch(Command::Up { forms }, ctx).await {
         Ok(outcome) => {
             render(&outcome, false);
+            wire(ctx, condition(&outcome)).await;
             for line in afterwards(ctx).await {
                 say!("{line}");
             }
@@ -101,6 +106,44 @@ pub(super) async fn start(ctx: &Ctx, surface: &dyn Surface) -> ExitCode {
         }
         Err(problem) => complain(&problem),
     }
+}
+
+/// Connect the services that came up to each other, as `seed` does, and say how each
+/// connection went.
+///
+/// The same command `seed` dispatches rather than a second walk of the wiring, so what
+/// setup connects and what a later `seed` would are one answer. A stack that did not
+/// start has nothing answering to wire, and saying so names the command that finishes
+/// the job once it is up. A connection that could not be made is reported in the
+/// seed's own words and does not undo the setup that is otherwise done: running `seed`
+/// again picks up where this left off.
+async fn wire(ctx: &Ctx, started: Option<Condition>) -> Wired {
+    if matches!(started, None | Some(Condition::Inactive)) {
+        say!("\nNothing was wired, because nothing came up. `{PRODUCT} seed` wires the services once they are running.");
+        return Wired::NothingCameUp;
+    }
+    say!("\nConnecting the services to each other.");
+    match dispatch(Command::Seed, ctx).await {
+        Ok(outcome) => {
+            render(&outcome, false);
+            Wired::Seeded
+        }
+        Err(problem) => {
+            complain(&problem);
+            Wired::Refused
+        }
+    }
+}
+
+/// How wiring at the end of setup went, as far as setup itself goes on from it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Wired {
+    /// Nothing was running, so nothing was asked.
+    NothingCameUp,
+    /// The seed ran, and reported each connection itself.
+    Seeded,
+    /// The seed was refused before it connected anything, and said why.
+    Refused,
 }
 
 /// What setup says once the stack it started is up, in the order it says it.
