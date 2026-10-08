@@ -44,6 +44,17 @@
         },
         "type": "array"
       }
+    },
+    {
+      "name": "inputs",
+      "type": {
+        "default": [],
+        "description": "Every value the operator supplies for an input a recipe asks for, as `name=value`.\nWhat follows the `=` may be a secret, and is never repeated back.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
     }
   ],
   "consent": [
