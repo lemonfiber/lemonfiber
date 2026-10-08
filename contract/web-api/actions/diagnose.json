@@ -1,0 +1,25 @@
+{
+  "action": "diagnose",
+  "arguments": [
+    {
+      "name": "only",
+      "type": {
+        "default": null,
+        "description": "The group of checks, or the one check, a diagnosis is narrowed to.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "disruptive",
+      "type": {
+        "description": "Whether the checks that disturb the running system are included.",
+        "type": "boolean"
+      }
+    }
+  ],
+  "consent": [],
+  "rehearsal": false
+}

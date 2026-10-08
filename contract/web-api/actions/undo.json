@@ -1,0 +1,18 @@
+{
+  "action": "undo",
+  "arguments": [
+    {
+      "name": "at",
+      "type": {
+        "default": null,
+        "description": "The stamp of the run to put back, as the history writes it.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    }
+  ],
+  "consent": [],
+  "rehearsal": true
+}

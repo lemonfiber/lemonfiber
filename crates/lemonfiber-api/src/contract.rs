@@ -63,7 +63,8 @@ use lemonfiber_core::model::{
 };
 use lemonfiber_core::wiring;
 
-use crate::actions::{named, Arguments, KEY_CALLABLE};
+use crate::actions::published::Action;
+use crate::actions::{self, named, Arguments, KEY_CALLABLE};
 use crate::admission::admitted::Admitted;
 use crate::capabilities::Capabilities;
 use crate::jobs::started::Started;
@@ -86,6 +87,13 @@ pub use stability::{Surface, SURFACE_DIR};
 pub struct Contract {
     /// The wire version these shapes belong to.
     pub api_version: u32,
+    /// Every action the surface takes: the arguments each takes with their types, the
+    /// consent each asks for before it writes, and whether it takes a rehearsal.
+    ///
+    /// Beside the kinds for the reason the reads are: an action is where a change is
+    /// asked for rather than a document, and a client generating a method per action
+    /// reads this before it asks anything.
+    pub actions: Vec<Action>,
     /// Every action a key may call, with whether it disturbs the running system,
     /// whether it takes a rehearsal and whether calling it twice is calling it once.
     ///
@@ -147,6 +155,7 @@ impl Contract {
 
         Self {
             api_version: API_VERSION,
+            actions: actions::published::every(rehearsable),
             key_callable: key_callable(),
             kinds,
             reads: published::every(),

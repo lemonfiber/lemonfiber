@@ -25,6 +25,10 @@ const DEFS: &str = "defs";
 /// The actions a key may call, inside the contract's directory.
 const KEY_CALLABLE: &str = "key-callable.json";
 
+/// Where each action the surface takes is listed, a file per action, inside the
+/// contract's directory.
+const ACTIONS: &str = "actions";
+
 /// The reads the surface serves, inside the contract's directory.
 const READS: &str = "reads.json";
 
@@ -39,6 +43,8 @@ const LOCAL: &str = "#/$defs/";
 struct Index {
     /// The wire version every file in the directory belongs to.
     api_version: u32,
+    /// Each action the surface takes, to the file listing it.
+    actions: BTreeMap<String, String>,
     /// The file listing every action a key may call.
     key_callable: &'static str,
     /// `kind` to the file holding the schema of the envelope carrying it.
@@ -111,11 +117,18 @@ impl Contract {
             put(&mut files, &path, &dialect(schema, written_in.as_ref()));
         }
 
+        let mut actions = BTreeMap::new();
+        for action in &self.actions {
+            let path = format!("{ACTIONS}/{}.json", action.action);
+            put(&mut files, &path, action);
+            actions.insert(action.action.to_owned(), path);
+        }
         put(&mut files, KEY_CALLABLE, &self.key_callable);
         put(&mut files, READS, &self.reads);
         put(&mut files, REFUSALS, &self.refusals);
         let index = Index {
             api_version: self.api_version,
+            actions,
             key_callable: KEY_CALLABLE,
             kinds,
             reads: READS,

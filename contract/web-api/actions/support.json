@@ -1,0 +1,57 @@
+{
+  "action": "support",
+  "arguments": [
+    {
+      "name": "write",
+      "type": {
+        "default": false,
+        "description": "Whether to produce the bundle, rather than say what one would hold.",
+        "type": "boolean"
+      }
+    },
+    {
+      "name": "logs",
+      "type": {
+        "default": null,
+        "description": "How many log lines to take from each service.",
+        "format": "uint32",
+        "minimum": 0,
+        "type": [
+          "integer",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "filenames",
+      "type": {
+        "default": "Replaced",
+        "description": "Whether media filenames are shown rather than replaced.",
+        "type": "boolean"
+      }
+    },
+    {
+      "name": "reveal",
+      "type": {
+        "default": [],
+        "description": "The settings to show as they are, named as the bundle names them.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    {
+      "name": "confirm",
+      "type": {
+        "default": false,
+        "description": "Whether a cost the action would incur was agreed to in advance.",
+        "type": "boolean"
+      }
+    }
+  ],
+  "consent": [
+    "confirm"
+  ],
+  "rehearsal": true
+}

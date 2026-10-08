@@ -1,0 +1,18 @@
+{
+  "action": "hosting-remove",
+  "arguments": [
+    {
+      "name": "kept",
+      "type": {
+        "default": null,
+        "description": "Which command this machine is being asked to keep running, or stop keeping.\n\nA word rather than a switch, for the reason `policy` is one: there is more than\none of them, and a word this build does not know is refused by name rather than\nsilently taken for whichever the shape happened to default to.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    }
+  ],
+  "consent": [],
+  "rehearsal": false
+}

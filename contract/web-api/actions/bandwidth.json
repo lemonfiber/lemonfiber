@@ -1,0 +1,86 @@
+{
+  "action": "bandwidth",
+  "arguments": [
+    {
+      "name": "down",
+      "type": {
+        "default": null,
+        "description": "How much of the line downloads may take, as a share or a rate.\n\nCarried as it was written and read in the core, like `unrated` above and for\nthe same reason: a surface that decided what `50%` meant would be a second\nanswer to the question, and the two would part company on the first change\nto either — which a household would meet as an evening that went wrong on\none surface and not on another.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "up",
+      "type": {
+        "default": null,
+        "description": "How much of it uploads may take, set apart from the download.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "active",
+      "type": {
+        "default": null,
+        "description": "The hours the household is awake, as `HH:MM-HH:MM` on the wall clock.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "line",
+      "type": {
+        "default": null,
+        "description": "What the line carries, as `<down>/<up>`, where the operator knows.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "cap",
+      "type": {
+        "default": null,
+        "description": "A monthly allowance for what the stack itself moves.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "exceeded",
+      "type": {
+        "default": null,
+        "description": "What is to happen when that cap is reached, decided in advance.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "unrestricted_for",
+      "type": {
+        "default": null,
+        "description": "How many minutes to lift the limits for, and no longer.",
+        "format": "uint64",
+        "minimum": 0,
+        "type": [
+          "integer",
+          "null"
+        ]
+      }
+    }
+  ],
+  "consent": [],
+  "rehearsal": true
+}

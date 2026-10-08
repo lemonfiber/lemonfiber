@@ -1,0 +1,35 @@
+{
+  "action": "update",
+  "arguments": [
+    {
+      "name": "wait",
+      "type": {
+        "description": "Whether anything still downloading is let finish before the stop.",
+        "type": "boolean"
+      }
+    },
+    {
+      "name": "service",
+      "type": {
+        "default": null,
+        "description": "The one service to act on instead of the whole stack.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "confirm",
+      "type": {
+        "default": false,
+        "description": "Whether a cost the action would incur was agreed to in advance.",
+        "type": "boolean"
+      }
+    }
+  ],
+  "consent": [
+    "confirm"
+  ],
+  "rehearsal": true
+}

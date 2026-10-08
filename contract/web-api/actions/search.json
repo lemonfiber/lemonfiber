@@ -1,0 +1,38 @@
+{
+  "action": "search",
+  "arguments": [
+    {
+      "name": "disruptive",
+      "type": {
+        "description": "Whether the checks that disturb the running system are included.",
+        "type": "boolean"
+      }
+    },
+    {
+      "name": "term",
+      "type": {
+        "default": null,
+        "description": "What to follow, named as a person would say it.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "season",
+      "type": {
+        "default": null,
+        "description": "The season a followed show is narrowed to, or every season where absent.",
+        "format": "uint32",
+        "minimum": 0,
+        "type": [
+          "integer",
+          "null"
+        ]
+      }
+    }
+  ],
+  "consent": [],
+  "rehearsal": false
+}

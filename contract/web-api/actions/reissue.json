@@ -1,0 +1,18 @@
+{
+  "action": "reissue",
+  "arguments": [
+    {
+      "name": "name",
+      "type": {
+        "default": null,
+        "description": "Who an invitation is for, as they will sign in.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    }
+  ],
+  "consent": [],
+  "rehearsal": false
+}

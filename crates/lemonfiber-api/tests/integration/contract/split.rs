@@ -11,6 +11,7 @@ use lemonfiber_api::contract::{Contract, INDEX};
 fn holding(kinds: &[(&str, Value)]) -> Contract {
     Contract {
         api_version: 7,
+        actions: Vec::new(),
         key_callable: Vec::new(),
         kinds: kinds
             .iter()
@@ -115,6 +116,7 @@ fn the_index_carries_the_version_and_names_every_other_file() {
         index,
         json!({
             "api_version": 7,
+            "actions": {},
             "key_callable": "key-callable.json",
             "kinds": { "doctor": "kinds/doctor.json" },
             "reads": "reads.json",

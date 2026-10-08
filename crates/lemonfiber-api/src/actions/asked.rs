@@ -21,21 +21,27 @@ pub use takers::{
     TAKES_REASON, TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING,
     TAKES_SHARING, TAKES_SOURCE, TAKES_TERM, TAKES_TIER, TAKES_WAITING,
 };
-pub(crate) use unwanted::unwanted;
+pub(crate) use unwanted::{unwanted, TAKEN};
 
 use lemonfiber_core::app::Waiting;
 use lemonfiber_core::bundle::Filenames;
 use serde::Deserialize;
 
 /// The arguments an action was given, mirroring the flags its command takes.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize)]
+///
+/// Its schema is what the contract publishes as each argument's type, so the type a
+/// client generates is the one this deserialises.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
 #[serde(default, deny_unknown_fields)]
+#[schemars(rename = "ActionArguments")]
 pub struct Arguments {
     /// The forms to act on.
     pub forms: Vec<String>,
     /// The services to act on, leaving the rest of the form alone.
     pub services: Vec<String>,
     /// Whether anything still downloading is let finish before the stop.
+    // Read from a bare word, so published as one.
+    #[schemars(with = "bool")]
     pub wait: Waiting,
     /// The one service to act on instead of the whole stack.
     pub service: Option<String>,
@@ -73,6 +79,8 @@ pub struct Arguments {
     /// How many log lines to take from each service.
     pub logs: Option<u32>,
     /// Whether media filenames are shown rather than replaced.
+    // Read from a bare word, so published as one.
+    #[schemars(with = "bool")]
     pub filenames: Filenames,
     /// The settings to show as they are, named as the bundle names them.
     pub reveal: Vec<String>,
@@ -81,6 +89,8 @@ pub struct Arguments {
     /// The check a warning is being answered for.
     pub check: Option<String>,
     /// Whether the checks that disturb the running system are included.
+    // Read from a bare word, so published as one.
+    #[schemars(with = "bool")]
     pub disruptive: Disturbing,
     /// What was read before answering — the offer a repair's yes was read in, the
     /// listing a restore's was, what a replacement would stop — as it named itself.
@@ -164,6 +174,8 @@ pub struct Arguments {
     /// run rather than on the command, so no command gains a field for it: an action
     /// whose command reports a rehearsal answers with that report, and one whose
     /// command cannot be rehearsed is refused with the reason the command gives.
+    // Read from a bare word, so published as one.
+    #[schemars(with = "bool")]
     pub dry_run: Running,
 }
 

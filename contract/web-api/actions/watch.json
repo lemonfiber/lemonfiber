@@ -1,0 +1,18 @@
+{
+  "action": "watch",
+  "arguments": [
+    {
+      "name": "forms",
+      "type": {
+        "default": [],
+        "description": "The forms to act on.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    }
+  ],
+  "consent": [],
+  "rehearsal": true
+}

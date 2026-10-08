@@ -1,0 +1,55 @@
+{
+  "action": "household-allow",
+  "arguments": [
+    {
+      "name": "name",
+      "type": {
+        "default": null,
+        "description": "Who an invitation is for, as they will sign in.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "policy",
+      "type": {
+        "default": null,
+        "description": "What is to happen to what the household asks for, as it is written.\n\nA word rather than a switch, for the reason `unrated` is one: there are three\nanswers rather than two, and a word this build does not know is refused by name\ninstead of falling to whichever arrangement the shape happened to default to.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "requests",
+      "type": {
+        "default": null,
+        "description": "How many requests a period allows.",
+        "format": "uint32",
+        "minimum": 0,
+        "type": [
+          "integer",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "days",
+      "type": {
+        "default": null,
+        "description": "How long that period is, in days.",
+        "format": "uint32",
+        "minimum": 0,
+        "type": [
+          "integer",
+          "null"
+        ]
+      }
+    }
+  ],
+  "consent": [],
+  "rehearsal": true
+}

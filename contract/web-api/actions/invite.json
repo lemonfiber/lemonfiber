@@ -1,0 +1,63 @@
+{
+  "action": "invite",
+  "arguments": [
+    {
+      "name": "name",
+      "type": {
+        "default": null,
+        "description": "Who an invitation is for, as they will sign in.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "libraries",
+      "type": {
+        "default": [],
+        "description": "The libraries an invitation lets them open, by the names the media server\ngives those libraries. Empty is every one.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    {
+      "name": "age_limit",
+      "type": {
+        "default": null,
+        "description": "The age above which an invitation has the media server hold things back.",
+        "format": "uint32",
+        "minimum": 0,
+        "type": [
+          "integer",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "unrated",
+      "type": {
+        "default": null,
+        "description": "What is to happen to content the media server has no rating for.\n\nA word rather than a switch, because the choice has a cost either way and a\nswitch has a default nobody can see: `block` holds unrated content back, and\n`allow` lets it through. Carried as it was written and read next door, so a\nword this build does not know is refused by name rather than falling to\nwhichever answer the shape happened to default to.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "confirm",
+      "type": {
+        "default": false,
+        "description": "Whether a cost the action would incur was agreed to in advance.",
+        "type": "boolean"
+      }
+    }
+  ],
+  "consent": [
+    "confirm"
+  ],
+  "rehearsal": false
+}

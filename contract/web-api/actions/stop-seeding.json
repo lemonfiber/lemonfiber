@@ -1,0 +1,31 @@
+{
+  "action": "stop-seeding",
+  "arguments": [
+    {
+      "name": "offer",
+      "type": {
+        "default": null,
+        "description": "What was read before answering — the offer a repair's yes was read in, the\nlisting a restore's was, what a replacement would stop — as it named itself.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "download",
+      "type": {
+        "default": null,
+        "description": "The completed download the client is to be asked to let go, by the name both\nsides use.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    }
+  ],
+  "consent": [
+    "offer"
+  ],
+  "rehearsal": false
+}

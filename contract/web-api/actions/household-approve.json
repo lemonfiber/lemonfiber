@@ -1,0 +1,19 @@
+{
+  "action": "household-approve",
+  "arguments": [
+    {
+      "name": "request",
+      "type": {
+        "default": null,
+        "description": "The request being ruled on, by the number the request service files it under.",
+        "format": "int64",
+        "type": [
+          "integer",
+          "null"
+        ]
+      }
+    }
+  ],
+  "consent": [],
+  "rehearsal": false
+}

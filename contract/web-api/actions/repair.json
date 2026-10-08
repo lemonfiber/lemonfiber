@@ -1,0 +1,48 @@
+{
+  "action": "repair",
+  "arguments": [
+    {
+      "name": "disruptive",
+      "type": {
+        "description": "Whether the checks that disturb the running system are included.",
+        "type": "boolean"
+      }
+    },
+    {
+      "name": "offer",
+      "type": {
+        "default": null,
+        "description": "What was read before answering — the offer a repair's yes was read in, the\nlisting a restore's was, what a replacement would stop — as it named itself.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "agreed",
+      "type": {
+        "default": [],
+        "description": "The checks whose repairs were agreed to, as that offer names them.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    {
+      "name": "confirm",
+      "type": {
+        "default": false,
+        "description": "Whether a cost the action would incur was agreed to in advance.",
+        "type": "boolean"
+      }
+    }
+  ],
+  "consent": [
+    "offer",
+    "agreed",
+    "confirm"
+  ],
+  "rehearsal": true
+}

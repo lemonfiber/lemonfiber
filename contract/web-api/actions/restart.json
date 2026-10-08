@@ -1,0 +1,29 @@
+{
+  "action": "restart",
+  "arguments": [
+    {
+      "name": "forms",
+      "type": {
+        "default": [],
+        "description": "The forms to act on.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    {
+      "name": "services",
+      "type": {
+        "default": [],
+        "description": "The services to act on, leaving the rest of the form alone.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    }
+  ],
+  "consent": [],
+  "rehearsal": true
+}

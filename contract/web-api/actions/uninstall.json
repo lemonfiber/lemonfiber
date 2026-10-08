@@ -1,0 +1,47 @@
+{
+  "action": "uninstall",
+  "arguments": [
+    {
+      "name": "wait",
+      "type": {
+        "description": "Whether anything still downloading is let finish before the stop.",
+        "type": "boolean"
+      }
+    },
+    {
+      "name": "offer",
+      "type": {
+        "default": null,
+        "description": "What was read before answering — the offer a repair's yes was read in, the\nlisting a restore's was, what a replacement would stop — as it named itself.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "confirm",
+      "type": {
+        "default": false,
+        "description": "Whether a cost the action would incur was agreed to in advance.",
+        "type": "boolean"
+      }
+    },
+    {
+      "name": "tier",
+      "type": {
+        "default": null,
+        "description": "Which of the four removals an uninstall was asked for.\n\nA word rather than a level, for the reason `policy` is a word: they are four\ndecisions and not a scale, and one this build does not know is refused by\nname rather than falling to whichever removal the shape happened to default\nto — which on this subject would be a library gone.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    }
+  ],
+  "consent": [
+    "offer",
+    "confirm"
+  ],
+  "rehearsal": false
+}
