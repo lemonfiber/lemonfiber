@@ -59,6 +59,16 @@
     "status": 400,
     "description": "Raised where the body of a mint is not a key's name, scope, purpose and the password."
   },
+  "ASK-12": {
+    "name": "NOT_AN_IDEMPOTENCY_KEY",
+    "status": 400,
+    "description": "Raised where an action's `Idempotency-Key` is not one to 255 visible characters, or is given more than once."
+  },
+  "ASK-13": {
+    "name": "IDEMPOTENCY_KEY_REUSED",
+    "status": 400,
+    "description": "Raised where an `Idempotency-Key` already sent with one action and its arguments is sent with another."
+  },
   "ASK-2": {
     "name": "MISSING_ARGUMENT",
     "status": 400,
@@ -368,6 +378,11 @@
     "name": "NO_JOB_NAME",
     "status": 500,
     "description": "Raised when this machine will not supply the randomness a job is named with."
+  },
+  "SERVE-8": {
+    "name": "UNANSWERED",
+    "status": 500,
+    "description": "Raised when an action's work ended before it had an answer to give."
   },
   "SPACE-6": {
     "name": "ANOTHER_OFFER",
