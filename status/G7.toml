@@ -3,6 +3,7 @@
 
 requirement = [
   { id = "G7-R1", state = "done", evidence = ["crates/lemonfiber-core/src/health.rs"] },
+  { id = "G7-R2", state = "done", evidence = ["crates/lemonfiber-core/src/health.rs"] },
   { id = "G7-R3", state = "done", evidence = ["crates/lemonfiber-core/src/health.rs"] },
   { id = "G7-R4", state = "done", evidence = ["crates/lemonfiber-core/src/health.rs"] },
   { id = "G7-R5", state = "done", evidence = ["crates/lemonfiber-core/src/health.rs"] },
@@ -13,4 +14,5 @@ requirement = [
   { id = "G7-R10", state = "done", evidence = ["crates/lemonfiber-core/src/health.rs"] },
   { id = "G7-R11", state = "done", evidence = ["crates/lemonfiber-core/src/health.rs"] },
   { id = "G7-R12", state = "done", evidence = ["crates/lemonfiber-core/src/health.rs"] },
+  { id = "G7-R13", state = "done", evidence = ["crates/lemonfiber-core/src/health.rs"] },
 ]
