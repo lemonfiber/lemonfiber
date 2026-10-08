@@ -19,7 +19,7 @@ use serde::Deserialize;
 use toml::{Table, Value};
 
 use crate::recognising::unrecognised;
-use crate::{Failure, Service, Violation};
+use crate::{Failure, Manifest, Service, Violation};
 
 /// The root manifest's file name, at the top of a stack directory.
 pub const ROOT: &str = "stack.toml";
@@ -36,12 +36,35 @@ const INCLUDE: &str = "include";
 /// The one key a service file holds.
 const SERVICE: &str = "service";
 
-/// One service file, as the read of its types sees it.
-#[derive(Deserialize)]
+/// One service's file, `services/<id>.toml`: exactly one `[[service]]`, whose `id` is
+/// the name the file is filed under, and nothing else.
+#[derive(Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[schemars(rename = "StackServiceFile")]
 struct ServiceFile {
     #[serde(rename = "service")]
+    #[schemars(length(min = 1, max = 1))]
     _services: Vec<Service>,
+}
+
+/// The schema of a stack's root manifest, `stack.toml`: the manifest's own fields,
+/// with its services in files of their own rather than in it.
+#[must_use]
+pub fn root_schema() -> schemars::Schema {
+    let mut schema = schemars::schema_for!(Manifest);
+    if let Some(properties) = schema
+        .get_mut("properties")
+        .and_then(serde_json::Value::as_object_mut)
+    {
+        properties.remove(SERVICE);
+    }
+    schema
+}
+
+/// The schema of one service's file, `services/<id>.toml`.
+#[must_use]
+pub fn service_schema() -> schemars::Schema {
+    schemars::schema_for!(ServiceFile)
 }
 
 /// The manifest a root and its service files describe, as one text.

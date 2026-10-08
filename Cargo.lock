@@ -1443,6 +1443,7 @@ dependencies = [
  "lemonfiber-bundled",
  "schemars",
  "serde",
+ "serde_json",
  "thiserror",
  "toml",
 ]

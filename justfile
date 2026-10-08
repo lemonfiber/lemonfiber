@@ -147,6 +147,15 @@ plugin-schema:
     cargo run --quiet --example plugin_schema -p lemonfiber-core > contract/plugin-manifest.schema.json.next
     mv contract/plugin-manifest.schema.json.next contract/plugin-manifest.schema.json
 
+# The schemas of a stack's manifest files, from the types lemonfiber reads them into.
+stack-schema:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for which in root:stack-manifest service:stack-service; do
+        cargo run --quiet --example stack_schema -p lemonfiber-core -- "${which%%:*}" > "contract/${which#*:}.schema.json.next"
+        mv "contract/${which#*:}.schema.json.next" "contract/${which#*:}.schema.json"
+    done
+
 # Judge every claim the embedded stack makes against the recordings it carries.
 bundled-claims:
     cargo run --quiet --example bundled_claims -p lemonfiber-core

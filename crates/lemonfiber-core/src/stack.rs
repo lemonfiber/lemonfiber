@@ -28,6 +28,7 @@ pub mod declared;
 mod failure;
 pub mod mounts;
 mod remembered;
+pub mod schema;
 pub mod standing;
 
 use std::collections::BTreeMap;
