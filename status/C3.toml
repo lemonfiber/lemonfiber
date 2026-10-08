@@ -3,7 +3,18 @@
 
 requirement = [
   { id = "C3-R1", state = "done", evidence = ["crates/lemonfiber-core/src/repair.rs"] },
+  { id = "C3-R2", state = "done", evidence = ["crates/lemonfiber-core/src/repair.rs"] },
+  { id = "C3-R3", state = "done", evidence = ["crates/lemonfiber-core/src/repair.rs"] },
+  { id = "C3-R4", state = "done", evidence = ["crates/lemonfiber-core/src/repair.rs"] },
+  { id = "C3-R5", state = "done", evidence = ["crates/lemonfiber-core/src/repair.rs"] },
   { id = "C3-R6", state = "done", evidence = ["crates/lemonfiber-core/src/repair.rs"] },
   { id = "C3-R7", state = "done", evidence = ["crates/lemonfiber-core/src/repair.rs"] },
+  { id = "C3-R8", state = "done", evidence = ["crates/lemonfiber-core/src/repair.rs"] },
+  { id = "C3-R9", state = "done", evidence = ["crates/lemonfiber-core/src/repair.rs"] },
+  { id = "C3-R10", state = "done", evidence = ["crates/lemonfiber-core/src/repair.rs"] },
+  { id = "C3-R11", state = "done", evidence = ["crates/lemonfiber-core/src/repair.rs"] },
+  { id = "C3-R12", state = "done", evidence = ["crates/lemonfiber-core/src/repair.rs"] },
+  { id = "C3-R13", state = "done", evidence = ["crates/lemonfiber-core/src/repair.rs"] },
+  { id = "C3-R14", state = "done", evidence = ["crates/lemonfiber-core/src/repair.rs"] },
   { id = "C3-R15", state = "done", evidence = ["crates/lemonfiber-core/src/repair.rs"] },
 ]
