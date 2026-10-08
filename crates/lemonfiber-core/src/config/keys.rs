@@ -174,7 +174,7 @@ pub(crate) const JELLYFIN_MODE_KEY: &str = "JELLYFIN_MODE";
 /// from another device in the house. It ships pointed at this machine and nowhere
 /// else, which is the right default for a machine nobody has told where it is and
 /// the wrong address to hand anybody.
-pub(crate) const HOUSEHOLD_HOST_KEY: &str = "HOMEPAGE_VAR_LAN_HOST";
+pub const HOUSEHOLD_HOST_KEY: &str = "HOMEPAGE_VAR_LAN_HOST";
 
 /// The domain the stack's proxy publishes the household's services under.
 ///

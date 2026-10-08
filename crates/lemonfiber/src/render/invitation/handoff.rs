@@ -11,6 +11,7 @@
 //! What to do next arrives as a remedy with no words of its own, and here it is the
 //! command that does it: this surface is a terminal, so that is how it is taken.
 
+use lemonfiber_core::config::HOUSEHOLD_HOST_KEY;
 use lemonfiber_core::model::{Handoff, HandoffRemedy, HandoffState};
 use lemonfiber_core::PRODUCT;
 
@@ -59,7 +60,7 @@ fn remedied(remedy: HandoffRemedy, report: &Handoff) -> String {
             format!("`{PRODUCT} status` says whether it is running, and `{PRODUCT} up` starts it.")
         }
         (HandoffRemedy::RecordAddress, _) => format!(
-            "Record the address the household uses with `{PRODUCT} config set HOUSEHOLD_HOST \
+            "Record the address the household uses with `{PRODUCT} config set {HOUSEHOLD_HOST_KEY} \
              <address>`."
         ),
     }

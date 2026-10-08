@@ -144,3 +144,20 @@ async fn a_name_only_the_stack_on_disk_declares_is_weighed() {
     assert_eq!(refusal(&ctx, &held, "STACK_ONLY", "2").await, None);
     assert!(refusal(&ctx, &held, "NOT_DECLARED", "2").await.is_some());
 }
+
+/// The key a refusal tells the operator to record the household's address under is one
+/// `config set` accepts, so the remedy is a command that works.
+#[tokio::test]
+async fn the_household_address_a_remedy_names_is_a_key_config_set_accepts() {
+    let ctx = ctx_in(Path::new("/home/op/.config/lemonfiber"), Path::new("/data"));
+    assert_eq!(
+        refusal(
+            &ctx,
+            &EnvFile::parse(""),
+            crate::config::HOUSEHOLD_HOST_KEY,
+            "192.168.1.20"
+        )
+        .await,
+        None
+    );
+}
