@@ -35,7 +35,7 @@ This repository holds the `lemonfiber` binary: the command line, a terminal
 dashboard, and the local web API that the web console and phone app use. It is
 written in Rust.
 
-> **Status:** before 1.0. Every release is published as a pre-release.
+> **Status:** before 1.0.
 > [What is built](https://docs.lemonfiber.app/project/whats-built/) lists what
 > works today and what is still planned.
 
@@ -46,13 +46,12 @@ You need:
 - macOS or Linux. There is no native Windows build.
 - Docker with Compose v2.20 or newer, running.
 
-Install the newest release with its installer. Releases are pre-releases, so
-name the tag; the newest is on the
+Install the newest release with its installer. Every release is on the
 [releases page](https://github.com/lemonfiber/lemonfiber/releases).
 
 ```sh
 curl --proto '=https' --tlsv1.2 -LsSf \
-  https://github.com/lemonfiber/lemonfiber/releases/download/v0.16.0/lemonfiber-installer.sh | sh
+  https://github.com/lemonfiber/lemonfiber/releases/latest/download/lemonfiber-installer.sh | sh
 ```
 
 The installer puts `lemonfiber` in `~/.cargo/bin` (or `$CARGO_HOME/bin`). Check
