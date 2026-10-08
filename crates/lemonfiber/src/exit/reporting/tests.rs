@@ -153,7 +153,7 @@ fn a_refused_pairing_is_told_the_command_that_takes_its_remedy() {
         ),
         (
             NO_ADDRESS,
-            "`lemonfiber config set HOUSEHOLD_HOST <address>`",
+            "`lemonfiber config set HOMEPAGE_VAR_LAN_HOST <address>`",
         ),
     ] {
         let refused = Problem::new(

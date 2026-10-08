@@ -9,6 +9,7 @@ use std::process::ExitCode;
 
 use crate::render::Lines;
 use crate::say::complain;
+use lemonfiber_core::config::HOUSEHOLD_HOST_KEY;
 use lemonfiber_core::error::codes::{handoff, life, pair};
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::{kind, Envelope};
@@ -98,7 +99,7 @@ fn on_the_command_line(problem: &Problem) -> Option<String> {
         pair::NOT_SERVED => format!("`{PRODUCT} ui --lan --tls --port <port>` serves it so."),
         pair::NO_CERTIFICATE => format!("`{PRODUCT} companion certificate --confirm` replaces it."),
         pair::NO_ADDRESS => {
-            format!("`{PRODUCT} config set HOUSEHOLD_HOST <address>` records it.")
+            format!("`{PRODUCT} config set {HOUSEHOLD_HOST_KEY} <address>` records it.")
         }
         _ => return None,
     };
