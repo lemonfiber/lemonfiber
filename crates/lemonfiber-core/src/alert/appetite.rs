@@ -22,7 +22,7 @@ use super::class::Class;
 use crate::error::Severity;
 
 /// How much an operator wants to be told.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Appetite {
     /// Failures and risks. Silence means healthy. The one chosen when the operator

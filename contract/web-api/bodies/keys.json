@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "KeyMinting",
+  "description": "What a mint is asked with.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "description": "What to call it.",
+      "type": "string"
+    },
+    "password": {
+      "description": "The operator's password, given again.",
+      "type": "string"
+    },
+    "purpose": {
+      "description": "What it is for: `home-assistant`, `mcp` or `other`.",
+      "type": "string"
+    },
+    "scope": {
+      "description": "What it admits: `read`, `act` or `member:<account>`.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "name",
+    "scope",
+    "purpose",
+    "password"
+  ]
+}

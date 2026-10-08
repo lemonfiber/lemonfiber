@@ -44,8 +44,9 @@ pub const KEYS: &str = "/api/keys";
 pub const A_KEY: &str = "/api/keys/{name}";
 
 /// What a mint is asked with.
-#[derive(Deserialize)]
+#[derive(Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[schemars(rename = "KeyMinting")]
 struct Minting {
     /// What to call it.
     name: String,
@@ -55,6 +56,12 @@ struct Minting {
     purpose: String,
     /// The operator's password, given again.
     password: String,
+}
+
+/// The body a mint takes, with the route it is sent to, described from the type the
+/// route reads it into.
+pub(crate) fn body() -> (&'static str, schemars::Schema) {
+    (KEYS, schemars::schema_for!(Minting))
 }
 
 /// What a mint asked for, the password withheld.

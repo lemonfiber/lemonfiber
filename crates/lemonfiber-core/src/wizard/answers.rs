@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 /// How the operator wants their existing and downloaded media served, where they
 /// want it served at all.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Library {
     /// No media server; an existing player, or downloads only.
@@ -52,7 +52,7 @@ impl Library {
 /// operator may proceed with one that could not be proven, and a later diagnosis
 /// is owed the knowledge that it went in unverified rather than treating it as
 /// good.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Indexer {
     /// The indexer's API base URL.
     pub url: String,
@@ -74,7 +74,8 @@ pub struct Indexer {
 /// operator has to make knowingly — and one a later run must not quietly re-ask,
 /// nor a diagnosis mistake for an oversight. Recording the acceptance is what
 /// makes it theirs.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[schemars(rename = "SetupVpn")]
 #[serde(rename_all = "kebab-case")]
 pub enum Vpn {
     /// A VPN carries it.
@@ -107,7 +108,7 @@ pub enum Credentials {
 /// Its password rides here the way the stack holds its other secrets; `validated`
 /// records whether the live login took before it was kept, so a later diagnosis
 /// knows an unproven one went in unverified.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Provider {
     /// The provider's hostname.
     pub host: String,
@@ -190,7 +191,7 @@ pub struct Answers {
 /// Read back as well as built, because a surface that is not in this process
 /// submits one: the tag is the step, so an answer names the question it belongs
 /// to rather than arriving as a field a reader has to guess the meaning of.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Answer {
     /// The protocol choice.

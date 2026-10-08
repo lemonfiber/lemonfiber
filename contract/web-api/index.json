@@ -50,6 +50,12 @@
     "watch": "actions/watch.json",
     "wiring-fill": "actions/wiring-fill.json"
   },
+  "bodies": {
+    "/api/keys": "bodies/keys.json",
+    "/api/session": "bodies/session.json",
+    "/api/setup/answer": "bodies/setup-answer.json",
+    "/api/setup/recover": "bodies/setup-recover.json"
+  },
   "key_callable": "key-callable.json",
   "kinds": {
     "admission": "kinds/admission.json",

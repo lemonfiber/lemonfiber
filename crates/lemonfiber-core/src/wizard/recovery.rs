@@ -74,7 +74,7 @@ impl Status {
 /// Read back as well as built, because the surface offering them may not be in this
 /// process: a browser sends the one the operator picked by the name it is written
 /// under here.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Choice {
     /// Carry on from where apply stopped, keeping what was already written.

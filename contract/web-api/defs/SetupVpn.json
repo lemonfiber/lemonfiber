@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Whether a VPN carries the torrent traffic, and where none does, that the\noperator was told what that costs and chose to go on.\n\nTwo states rather than a bool, because the second is not merely \"no\". Torrents\nexpose the home address to every peer, so going without is a decision the\noperator has to make knowingly — and one a later run must not quietly re-ask,\nnor a diagnosis mistake for an oversight. Recording the acceptance is what\nmakes it theirs.",
+  "oneOf": [
+    {
+      "description": "A VPN carries it.",
+      "type": "string",
+      "const": "carrying"
+    },
+    {
+      "description": "Nothing does, and the operator confirmed they understood that.",
+      "type": "string",
+      "const": "absent"
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A Usenet provider login the operator supplied, and whether it was proven.\n\nIts password rides here the way the stack holds its other secrets; `validated`\nrecords whether the live login took before it was kept, so a later diagnosis\nknows an unproven one went in unverified.",
+  "type": "object",
+  "properties": {
+    "host": {
+      "description": "The provider's hostname.",
+      "type": "string"
+    },
+    "pass": {
+      "description": "The account password.",
+      "type": "string"
+    },
+    "port": {
+      "description": "The port it answers NNTP on.",
+      "type": "integer",
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0
+    },
+    "tls": {
+      "description": "Whether to connect over TLS, as it must be to carry the password.",
+      "type": "boolean"
+    },
+    "user": {
+      "description": "The account username.",
+      "type": "string"
+    },
+    "validated": {
+      "description": "Whether a live login proved the account before it was kept.\n\nDefaulted when it is absent, for the same reason the indexer's is.",
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "host",
+    "port",
+    "user",
+    "pass",
+    "tls"
+  ]
+}

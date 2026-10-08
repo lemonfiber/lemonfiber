@@ -25,6 +25,10 @@ const DEFS: &str = "defs";
 /// The actions a key may call, inside the contract's directory.
 const KEY_CALLABLE: &str = "key-callable.json";
 
+/// Where each request body is described, a file per route, inside the contract's
+/// directory.
+const BODIES: &str = "bodies";
+
 /// Where each action the surface takes is listed, a file per action, inside the
 /// contract's directory.
 const ACTIONS: &str = "actions";
@@ -45,6 +49,8 @@ struct Index {
     api_version: u32,
     /// Each action the surface takes, to the file listing it.
     actions: BTreeMap<String, String>,
+    /// Each route that takes a body, to the file describing that body.
+    bodies: BTreeMap<String, String>,
     /// The file listing every action a key may call.
     key_callable: &'static str,
     /// `kind` to the file holding the schema of the envelope carrying it.
@@ -71,40 +77,21 @@ impl Contract {
         let mut kinds = BTreeMap::new();
         let mut written_in: Option<Value> = None;
 
+        let mut held = Held {
+            defs: &mut defs,
+            written_in: &mut written_in,
+            faults: &mut faults,
+        };
         for (kind, schema) in &self.kinds {
             let path = format!("{KINDS}/{kind}.json");
-            let mut envelope = schema.clone();
-            match (&written_in, envelope.get("$schema")) {
-                (None, Some(dialect)) => written_in = Some(dialect.clone()),
-                (Some(held), Some(dialect)) if held != dialect => faults.push(format!(
-                    "{path} is written in {dialect} and a kind before it in {held}, so the \
-                     definitions they share have no one dialect to name"
-                )),
-                _ => {}
-            }
-            if let Some(Value::Object(carried)) = envelope.remove("$defs") {
-                for (name, shape) in carried {
-                    match defs.get(&name) {
-                        Some(held) if *held != shape => faults.push(format!(
-                            "{name} is described one way by {kind} and another way by a kind \
-                             before it, and one file can hold only one of them"
-                        )),
-                        Some(_) => {}
-                        None => {
-                            defs.insert(name, shape);
-                        }
-                    }
-                }
-            }
-            for value in envelope
-                .as_object_mut()
-                .into_iter()
-                .flat_map(|object| object.values_mut())
-            {
-                pointed(value, "../defs/", &path, &mut faults);
-            }
-            put(&mut files, &path, &envelope);
+            held.file(&mut files, &path, kind, schema);
             kinds.insert(kind.clone(), path);
+        }
+        let mut bodies = BTreeMap::new();
+        for (route, schema) in &self.bodies {
+            let path = format!("{BODIES}/{}.json", slug(route));
+            held.file(&mut files, &path, route, schema);
+            bodies.insert(route.clone(), path);
         }
 
         for (name, mut shape) in defs {
@@ -129,6 +116,7 @@ impl Contract {
         let index = Index {
             api_version: self.api_version,
             actions,
+            bodies,
             key_callable: KEY_CALLABLE,
             kinds,
             reads: READS,
@@ -145,6 +133,59 @@ impl Contract {
 }
 
 /// One file into the set.
+/// A route as the name of the file its body is described in: the path past `/api/`,
+/// its segments joined by a dash.
+fn slug(route: &str) -> String {
+    route.trim_start_matches("/api/").replace('/', "-")
+}
+
+/// What every schema written into the directory shares while it is written: the
+/// definitions pulled out of them, the dialect they are written in, and every fault
+/// found so far.
+struct Held<'a> {
+    defs: &'a mut BTreeMap<String, Value>,
+    written_in: &'a mut Option<Value>,
+    faults: &'a mut Vec<String>,
+}
+
+impl Held<'_> {
+    /// Write one schema at `path`, its definitions moved into the shared directory and
+    /// every reference to them pointed there; `named` is what a fault calls it.
+    fn file(&mut self, files: &mut Files, path: &str, named: &str, schema: &Schema) {
+        let mut envelope = schema.clone();
+        match (&*self.written_in, envelope.get("$schema")) {
+            (None, Some(dialect)) => *self.written_in = Some(dialect.clone()),
+            (Some(held), Some(dialect)) if held != dialect => self.faults.push(format!(
+                "{path} is written in {dialect} and a schema before it in {held}, so the \
+                 definitions they share have no one dialect to name"
+            )),
+            _ => {}
+        }
+        if let Some(Value::Object(carried)) = envelope.remove("$defs") {
+            for (name, shape) in carried {
+                match self.defs.get(&name) {
+                    Some(held) if *held != shape => self.faults.push(format!(
+                        "{name} is described one way by {named} and another way by a schema \
+                         before it, and one file can hold only one of them"
+                    )),
+                    Some(_) => {}
+                    None => {
+                        self.defs.insert(name, shape);
+                    }
+                }
+            }
+        }
+        for value in envelope
+            .as_object_mut()
+            .into_iter()
+            .flat_map(|object| object.values_mut())
+        {
+            pointed(value, "../defs/", path, self.faults);
+        }
+        put(files, path, &envelope);
+    }
+}
+
 fn put<T: Serialize + ?Sized>(files: &mut Files, path: &str, value: &T) {
     files.insert(path.to_owned(), rendered(value));
 }
