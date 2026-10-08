@@ -32,6 +32,12 @@ codes! {
         /// Raised where the body of a mint is not a key's name, scope, purpose and the
         /// password.
         NOT_A_KEY_REQUEST = "ASK-11",
+        /// Raised where an action's `Idempotency-Key` is not one to 255 visible
+        /// characters, or is given more than once.
+        NOT_AN_IDEMPOTENCY_KEY = "ASK-12",
+        /// Raised where an `Idempotency-Key` already sent with one action and its
+        /// arguments is sent with another.
+        IDEMPOTENCY_KEY_REUSED = "ASK-13",
     }
     /// The `BIND` codes.
     bind {
@@ -239,6 +245,8 @@ codes! {
         UNRENDERABLE = "SERVE-6",
         /// Raised when this machine will not supply the randomness a job is named with.
         NO_JOB_NAME = "SERVE-7",
+        /// Raised when an action's work ended before it had an answer to give.
+        UNANSWERED = "SERVE-8",
     }
     /// The `SETUP` codes.
     setup {

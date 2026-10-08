@@ -16,6 +16,7 @@ mod keys;
 pub mod paths;
 pub mod reaching;
 mod reading;
+pub mod resending;
 pub mod store;
 
 // Taken whole rather than named one by one, the way the readers below are. Every
@@ -40,6 +41,8 @@ use lemonfiber_manifest::Protocol;
 use serde::{Deserialize, Serialize};
 
 use crate::ports::docker::Target;
+
+pub use resending::{Resending, IDEMPOTENCY_KEYS_KEY, IDEMPOTENCY_MINUTES_KEY};
 
 pub use reaching::{
     offline, Reaching, OFFLINE_KEY, REACH_CATALOGUE_KEY, REACH_GUIDES_KEY, REACH_HOUSEHOLD_KEY,

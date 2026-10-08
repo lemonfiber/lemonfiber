@@ -31,7 +31,7 @@ pub(super) async fn refusal(ctx: &Ctx, held: &EnvFile, key: &str, value: &str) -
         DATA_ROOT_KEY => super::data_root::refusal(ctx, value).await,
         PUID_KEY | PGID_KEY => identity(key, value),
         OVERLAY_KEY => overlay(ctx, value),
-        _ => None,
+        _ => crate::config::resending::refusal(key, value),
     }
 }
 

@@ -100,6 +100,10 @@ pub enum Refusal {
     NotAnAnswer,
     /// The body of a mint is not what a key is minted with.
     NotAKeyRequest,
+    /// An action's idempotency key is not one this surface reads as a key.
+    NotAnIdempotencyKey,
+    /// An idempotency key already named an attempt that asked for something else.
+    IdempotencyKeyReused,
     /// A path under the endpoints that no endpoint answers.
     NoEndpoint,
     /// An endpoint asked with a method it does not answer.
@@ -108,6 +112,8 @@ pub enum Refusal {
     Unrenderable,
     /// Work that could not be named, and so was not begun.
     NoJobName,
+    /// An action's work ended before it had an answer to give.
+    Unanswered,
 }
 
 /// The one refusal whose own rendering is the thing that failed, already rendered.
@@ -123,7 +129,7 @@ impl Refusal {
     ///
     /// What the contract lists, so a variant added above and not here is a code no
     /// client can name. A test holds the two together.
-    pub const EVERY: [Self; 38] = [
+    pub const EVERY: [Self; 41] = [
         Self::NotAdmitted,
         Self::Elsewhere,
         Self::NotYours,
@@ -158,10 +164,13 @@ impl Refusal {
         Self::NoSuchJob,
         Self::NotAnAnswer,
         Self::NotAKeyRequest,
+        Self::NotAnIdempotencyKey,
+        Self::IdempotencyKeyReused,
         Self::NoEndpoint,
         Self::WrongMethod,
         Self::Unrenderable,
         Self::NoJobName,
+        Self::Unanswered,
     ];
 
     /// The code a client branches on.
@@ -202,10 +211,13 @@ impl Refusal {
             Self::NoSuchJob => ask::NO_SUCH_JOB,
             Self::NotAnAnswer => ask::NOT_AN_ANSWER,
             Self::NotAKeyRequest => ask::NOT_A_KEY_REQUEST,
+            Self::NotAnIdempotencyKey => ask::NOT_AN_IDEMPOTENCY_KEY,
+            Self::IdempotencyKeyReused => ask::IDEMPOTENCY_KEY_REUSED,
             Self::NoEndpoint => ask::NO_ENDPOINT,
             Self::WrongMethod => ask::WRONG_METHOD,
             Self::Unrenderable => serve::UNRENDERABLE,
             Self::NoJobName => serve::NO_JOB_NAME,
+            Self::Unanswered => serve::UNANSWERED,
         }
     }
 
@@ -230,7 +242,9 @@ impl Refusal {
                 StatusCode::NOT_FOUND
             }
             Self::WrongMethod => StatusCode::METHOD_NOT_ALLOWED,
-            Self::Unrenderable | Self::NoJobName => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::Unrenderable | Self::NoJobName | Self::Unanswered => {
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
             Self::NotAPassword
             | Self::Unwanted
             | Self::Repeated
@@ -253,7 +267,9 @@ impl Refusal {
             | Self::ArgumentsTogether
             | Self::NotArguments
             | Self::NotAnAnswer
-            | Self::NotAKeyRequest => StatusCode::BAD_REQUEST,
+            | Self::NotAKeyRequest
+            | Self::NotAnIdempotencyKey
+            | Self::IdempotencyKeyReused => StatusCode::BAD_REQUEST,
         }
     }
 
@@ -346,11 +362,22 @@ impl Refusal {
                 "The body of this request is not a key's name, scope and purpose with the \
                  password."
             }
+            Self::NotAnIdempotencyKey => {
+                "An Idempotency-Key is one to 255 visible characters, given once, and this \
+                 request's is not."
+            }
+            Self::IdempotencyKeyReused => {
+                "This Idempotency-Key was already sent with another action or other arguments."
+            }
             Self::NoEndpoint => "No endpoint answers this path.",
             Self::WrongMethod => "This endpoint does not answer that method.",
             Self::Unrenderable => "This answer could not be rendered.",
             Self::NoJobName => {
                 "This machine would not supply the randomness a job needs to be named."
+            }
+            Self::Unanswered => {
+                "This action stopped before it had an answer to give, and sending it again \
+                 runs it again."
             }
         }
     }
@@ -407,7 +434,14 @@ impl Refusal {
                 Remedy::new("Send the name, scope, purpose and password as the body's four fields")
             }
             Self::WrongMethod => Remedy::new("Ask again with the method the contract names"),
-            Self::Unrenderable | Self::NoJobName => {
+            Self::NotAnIdempotencyKey => {
+                Remedy::new("Send the key once, as up to 255 visible characters with no spaces")
+            }
+            Self::IdempotencyKeyReused => Remedy::new(
+                "Send a new key with each new attempt, and the same key only with \
+                             the same action sent again",
+            ),
+            Self::Unrenderable | Self::NoJobName | Self::Unanswered => {
                 Remedy::new("Ask again, and send a diagnostic bundle if it keeps happening")
                     .with_detail("lemonfiber support")
             }

@@ -6,14 +6,15 @@
 //! Holding them here is also what keeps that module inside one sitting as the stack
 //! gains settings, which is the one thing about it certain to keep happening.
 //!
-//! The keys the reachability switches own live beside those switches and are
-//! imported here, because the list below has to name every setting lemonfiber has —
-//! and a list that names all but seven is one nothing can be held to.
+//! The keys the reachability switches and the resend bounds own live beside them and
+//! are imported here, because the list below has to name every setting lemonfiber
+//! has — and a list that names all but a few is one nothing can be held to.
 
 use super::reaching::{
     OFFLINE_KEY, REACH_CATALOGUE_KEY, REACH_GUIDES_KEY, REACH_HOUSEHOLD_KEY, REACH_INDEXER_KEY,
     REACH_PLUGIN_SOURCE_KEY, REACH_REGISTRY_KEY, REACH_UPDATES_KEY, REACH_USENET_KEY,
 };
+use super::resending::{IDEMPOTENCY_KEYS_KEY, IDEMPOTENCY_MINUTES_KEY};
 use crate::wiring::{FILLS_KEY, FILLS_WHY_KEY};
 
 /// The setting recording that a Usenet provider is configured.
@@ -385,6 +386,8 @@ pub const SETTINGS: &[&str] = &[
     EXPLANATIONS_KEY,
     AUTOSTART_ON_BATTERY_KEY,
     MEMBER_KEYS_KEY,
+    IDEMPOTENCY_MINUTES_KEY,
+    IDEMPOTENCY_KEYS_KEY,
     PROJECT_KEY,
     OVERLAY_KEY,
     QUIET_HOURS_KEY,

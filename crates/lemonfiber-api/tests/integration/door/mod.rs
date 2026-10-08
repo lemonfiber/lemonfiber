@@ -113,6 +113,7 @@ pub(crate) fn surface(ctx: Ctx, admitting: &Arc<Admitting>) -> (axum::Router, Ar
         admitting: Arc::clone(admitting),
         live: Arc::clone(&live),
         kept: Arc::default(),
+        answered: Arc::default(),
     };
     let streaming = Arc::new(Streaming {
         token: Arc::clone(&token),

@@ -394,15 +394,14 @@ async fn serving(
         for line in recorded(&ctx, &bound, fingerprint.is_some()) {
             say!("{line}");
         }
-        let serving = Serving {
-            ctx: Arc::clone(&ctx),
-            token: Arc::clone(&token),
-            bound: bound.clone(),
-            jobs: jobs.clone(),
-            admitting: Arc::clone(&admitting),
-            live: Arc::clone(&live),
-            kept: Arc::default(),
-        };
+        let serving = Serving::for_run(
+            Arc::clone(&ctx),
+            Arc::clone(&token),
+            bound.clone(),
+            jobs.clone(),
+            Arc::clone(&admitting),
+            Arc::clone(&live),
+        );
         let streaming = Arc::new(Streaming {
             token: Arc::clone(&token),
             bound,

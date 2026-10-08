@@ -81,10 +81,9 @@ impl Refusal {
             | Self::UnrecognisedArgument
             | Self::UnwantedArgument
             | Self::ArgumentsTogether
-            | Self::NotArguments => {
-                "The action was not carried out, and nothing was changed. Carrying out \
-                 a different request from the one asked for would be worse than none."
-            }
+            | Self::NotArguments
+            | Self::NotAnIdempotencyKey
+            | Self::IdempotencyKeyReused => self.acting(),
             Self::NoSuchJob => {
                 "Jobs are named by the run that starts them, and nothing this run started \
                  goes by this name. Work from an earlier run is not tracked here."
@@ -106,6 +105,27 @@ impl Refusal {
             Self::NoJobName => {
                 "A job with no name is work nothing could ever be told about, so it was \
                  not begun, and nothing was changed."
+            }
+            Self::Unanswered => "It may have changed something before it stopped.",
+        }
+    }
+
+    /// What a refused action means, where what was refused is how it was asked: its
+    /// arguments, or the key it was sent under.
+    const fn acting(self) -> &'static str {
+        match self {
+            Self::NotAnIdempotencyKey => {
+                "The action was not carried out, and nothing was changed. A key that cannot \
+                 be read is one a second send could not be recognised by."
+            }
+            Self::IdempotencyKeyReused => {
+                "Nothing was carried out under this key a second time. The attempt it \
+                 names asked for something else, and that is what it was answered with."
+            }
+            // Every other refusal handed here is one of an action's arguments.
+            _ => {
+                "The action was not carried out, and nothing was changed. Carrying out \
+                 a different request from the one asked for would be worse than none."
             }
         }
     }

@@ -27,6 +27,7 @@ mod what_a_repair_action_means;
 mod what_a_request_meets;
 mod what_a_searching_trace_means;
 mod what_an_action_means;
+mod what_an_action_sent_again_means;
 mod what_an_agreement_covers;
 mod what_an_archive_action_means;
 mod what_an_argument_reaches;
