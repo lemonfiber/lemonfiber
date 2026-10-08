@@ -1,7 +1,8 @@
-use super::{afterwards, condition, gating, overall, preflight, start};
+use super::{afterwards, condition, gating, overall, preflight, start, wire, Wired};
 use crate::exit::{shown, success};
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::config::Protocols;
+use lemonfiber_core::docker::Condition;
 use lemonfiber_core::doctor::{autostart, Category, Finding, Overall, Verdict};
 use lemonfiber_core::error::Remedy;
 use lemonfiber_core::stack::Source;
@@ -129,4 +130,32 @@ async fn a_stack_that_came_up_reports_how_it_settled() {
         "a stack that came up is not reported as a failure"
     );
     let _ = std::fs::remove_dir_all(&stack_dir);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_stack_that_did_not_come_up_is_not_wired() {
+    // Nothing is dispatched for a stack with nothing running: a context whose stack
+    // cannot even be read would refuse a seed, and it is never asked.
+    assert_eq!(wire(&ctx(), None).await, Wired::NothingCameUp);
+    assert_eq!(
+        wire(&ctx(), Some(Condition::Inactive)).await,
+        Wired::NothingCameUp
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_stack_that_came_up_is_wired_as_seed_wires_it() {
+    let mut ctx = working_ctx();
+    ctx.seams.engine = std::sync::Arc::new(FakeEngine::quiet());
+    ctx.stack = Source::Embedded(&QUIET);
+    assert_eq!(wire(&ctx, Some(Condition::Active)).await, Wired::Seeded);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_seed_that_is_refused_is_reported_and_setup_goes_on() {
+    // A stack whose manifest cannot be read refuses the seed before it connects
+    // anything.
+    let mut ctx = working_ctx();
+    ctx.stack = Source::External(std::path::Path::new("/lemonfiber/no/such/stack"));
+    assert_eq!(wire(&ctx, Some(Condition::Partial)).await, Wired::Refused);
 }
