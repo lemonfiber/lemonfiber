@@ -1,0 +1,46 @@
+{
+  "action": "config-set",
+  "arguments": [
+    {
+      "name": "wait",
+      "type": {
+        "description": "Whether anything still downloading is let finish before the stop.",
+        "type": "boolean"
+      }
+    },
+    {
+      "name": "key",
+      "type": {
+        "default": null,
+        "description": "The setting to change.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "value",
+      "type": {
+        "default": null,
+        "description": "What to change it to.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "confirm",
+      "type": {
+        "default": false,
+        "description": "Whether a cost the action would incur was agreed to in advance.",
+        "type": "boolean"
+      }
+    }
+  ],
+  "consent": [
+    "confirm"
+  ],
+  "rehearsal": false
+}

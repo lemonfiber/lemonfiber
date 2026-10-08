@@ -1,0 +1,30 @@
+{
+  "action": "household-decline",
+  "arguments": [
+    {
+      "name": "request",
+      "type": {
+        "default": null,
+        "description": "The request being ruled on, by the number the request service files it under.",
+        "format": "int64",
+        "type": [
+          "integer",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "reason",
+      "type": {
+        "default": null,
+        "description": "Why a request is being turned down, or why a service was chosen to fill a\ncapability.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    }
+  ],
+  "consent": [],
+  "rehearsal": false
+}

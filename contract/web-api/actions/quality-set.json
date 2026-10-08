@@ -1,0 +1,39 @@
+{
+  "action": "quality-set",
+  "arguments": [
+    {
+      "name": "preset",
+      "type": {
+        "default": null,
+        "description": "The quality preset, or the music format, as it is written.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "media_type",
+      "type": {
+        "default": null,
+        "description": "The media type a quality choice applies to.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "confirm",
+      "type": {
+        "default": false,
+        "description": "Whether a cost the action would incur was agreed to in advance.",
+        "type": "boolean"
+      }
+    }
+  ],
+  "consent": [
+    "confirm"
+  ],
+  "rehearsal": false
+}

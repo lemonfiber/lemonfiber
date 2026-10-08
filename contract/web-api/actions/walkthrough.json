@@ -1,0 +1,18 @@
+{
+  "action": "walkthrough",
+  "arguments": [
+    {
+      "name": "item",
+      "type": {
+        "default": null,
+        "description": "The one thing to add end to end, as it would be said.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    }
+  ],
+  "consent": [],
+  "rehearsal": false
+}

@@ -1,0 +1,53 @@
+{
+  "action": "wiring-fill",
+  "arguments": [
+    {
+      "name": "service",
+      "type": {
+        "default": null,
+        "description": "The one service to act on instead of the whole stack.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "offer",
+      "type": {
+        "default": null,
+        "description": "What was read before answering — the offer a repair's yes was read in, the\nlisting a restore's was, what a replacement would stop — as it named itself.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "reason",
+      "type": {
+        "default": null,
+        "description": "Why a request is being turned down, or why a service was chosen to fill a\ncapability.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "capability",
+      "type": {
+        "default": null,
+        "description": "The capability whose filler is being chosen.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    }
+  ],
+  "consent": [
+    "offer"
+  ],
+  "rehearsal": false
+}
