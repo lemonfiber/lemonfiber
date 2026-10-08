@@ -1,4 +1,4 @@
-use super::{root, service, ROOT_PATH, SERVICE_PATH};
+use super::{root, service, with_claims, ROOT_PATH, SERVICE_PATH};
 
 /// What is committed at a path, read from the workspace root.
 fn committed(path: &str) -> String {
@@ -62,4 +62,18 @@ fn a_service_file_holds_one_service_whose_claims_are_the_plugin_contract_s() {
             "{name} is not defined: {schema}"
         );
     }
+}
+
+/// A definition the schema already holds is kept rather than replaced, and a schema
+/// with no definitions is left as it is.
+#[test]
+fn a_definition_already_held_is_kept_and_a_schema_without_any_is_left_alone() {
+    let held = with_claims(schemars::json_schema!({ "$defs": { "Claim": { "type": "string" } } }));
+    assert_eq!(
+        held.pointer("/$defs/Claim/type")
+            .and_then(serde_json::Value::as_str),
+        Some("string")
+    );
+    let bare = with_claims(schemars::json_schema!({ "type": "object" }));
+    assert!(bare.get("$defs").is_none(), "{bare:?}");
 }
