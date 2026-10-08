@@ -219,3 +219,25 @@ fn a_value_holding_a_credential_is_held_to_its_service_whatever_its_name() {
         |why| why.contains("token was traded for the credential lemonfiber holds for sonarr")
     ));
 }
+
+/// A value captured again is held at least as tightly as before: what a credential bought
+/// stays bought when a plain answer later lands under the same name, and a plain answer
+/// is tightened when a credential buys it.
+#[test]
+fn a_hold_only_grows_stronger_when_a_value_is_captured_again() {
+    let recipe = releasing();
+    let approved = ["bought@komga".to_owned()];
+    let mut bounds = Bounds::of(&recipe, &approved, &[]);
+    let bought = "bought".to_owned();
+    bounds.captured(&BTreeMap::new(), Some("sonarr"), [&bought].into_iter());
+    assert_eq!(bounds.withheld("bought", "v", "komga", false), None);
+    bounds.captured(
+        &BTreeMap::from([("key".to_owned(), "v".to_owned())]),
+        Some("sonarr"),
+        [&bought].into_iter(),
+    );
+    bounds.captured(&BTreeMap::new(), Some("sonarr"), [&bought].into_iter());
+    assert!(bounds
+        .withheld("bought", "v", "komga", false)
+        .is_some_and(|why| why.contains("traded for the credential lemonfiber holds for sonarr")));
+}

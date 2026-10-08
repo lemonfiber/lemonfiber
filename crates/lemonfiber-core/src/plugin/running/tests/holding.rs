@@ -347,3 +347,52 @@ to    = "komga"
         ]
     );
 }
+
+/// A run that captures one name twice holds it as tightly as the tighter capture, so a
+/// plain answer landing after a credential's trade frees nothing.
+#[tokio::test]
+async fn a_value_captured_twice_keeps_the_tighter_hold() {
+    let http = Fake::always(Answer::reply(200, r#"{"token":"t0k3n"}"#));
+    let twice = r#"
+[[input]]
+name   = "key"
+origin = "credential-store"
+of     = "sonarr"
+
+[[step]]
+id      = "in"
+call    = { method = "POST", to = "sonarr", path = "/login", body = "{{key}}" }
+capture = [{ name = "token", from = "token", origin = "stack-service" }]
+
+[[step]]
+id      = "again"
+call    = { method = "GET", to = "sonarr", path = "/token" }
+capture = [{ name = "token", from = "token", origin = "stack-service" }]
+
+[[step]]
+id   = "carry"
+call = { method = "POST", to = "komga", path = "/x", headers = { X-Token = "{{token}}" } }
+
+[[pair]]
+value = "key"
+to    = "sonarr"
+
+[[pair]]
+value   = "token"
+to      = "komga"
+release = "Komga signs in with it."
+"#;
+    let outcome = ran_under(
+        &http,
+        &Resolving::anywhere(),
+        twice,
+        &[("key", "s3cret")],
+        &["token@komga".to_owned()],
+    )
+    .await;
+    let why = outcome.ran.why.unwrap_or_default();
+    assert!(
+        why.contains("step carry was not sent") && why.contains("traded for the credential"),
+        "{why}"
+    );
+}
