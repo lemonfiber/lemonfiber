@@ -1,0 +1,20 @@
+[package]
+name = "lemonfiber-bundled"
+description = "The stack this build embeds, read as one manifest when it is built."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+authors.workspace = true
+license-file = "../../LICENSE"
+# Not published, as `lemonfiber-manifest` is not: the release ships one binary.
+publish = false
+build = "build.rs"
+
+[build-dependencies]
+# The same assembly every other reader uses, so the text compiled in here is the
+# manifest lemonfiber reads at run time and not a second idea of it.
+lemonfiber-manifest = { workspace = true }
+
+[lints]
+workspace = true

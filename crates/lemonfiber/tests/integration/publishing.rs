@@ -20,7 +20,7 @@ use std::net::IpAddr;
 use include_dir::Dir;
 use lemonfiber::carried::STACK;
 use lemonfiber_core::config::env::EnvFile;
-use lemonfiber_manifest::{Bind, Manifest, Service};
+use lemonfiber_manifest::{Bind, Service};
 
 /// The address a service reachable only from the host machine is published on.
 const LOOPBACK: &str = "127.0.0.1";
@@ -226,15 +226,10 @@ fn falls_back_to(address: &str) -> Option<&str> {
         .strip_prefix(":-")
 }
 
-/// The manifest the embedded stack declares itself with.
+/// The manifest the embedded stack declares itself with: its root and every service's
+/// file, read the way the binary reads them.
 fn declared() -> Vec<Service> {
-    let Some(file) = STACK.get_file("stack.toml") else {
-        unreachable!("the build refuses to produce this binary without the embedded manifest")
-    };
-    let Some(text) = file.contents_utf8() else {
-        unreachable!("the embedded manifest is the text the build has already parsed")
-    };
-    let Ok(manifest) = Manifest::from_toml(text) else {
+    let Ok(manifest) = lemonfiber_core::stack::Source::Embedded(&STACK).manifest() else {
         unreachable!("the build refuses to produce this binary against a manifest it cannot read")
     };
     manifest.services

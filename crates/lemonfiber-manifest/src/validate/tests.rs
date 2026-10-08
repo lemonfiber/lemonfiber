@@ -27,7 +27,7 @@ fn the_licence_list_holds_what_the_stack_s_own_copy_holds() {
     );
 }
 
-const STACK: &str = include_str!("../../../../assets/media-stack/stack.toml");
+const STACK: &str = lemonfiber_bundled::STACK;
 
 /// After every date the stack records, and not the real clock.
 ///

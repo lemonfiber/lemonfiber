@@ -219,6 +219,7 @@ async fn a_torrent_stack_with_no_vpn_pair_does_not_apply() {
         schema_version: 1,
         stack_version: String::new(),
         min_cli_version: String::new(),
+        include: Vec::new(),
         profiles: Vec::new(),
         forms: Vec::new(),
         services: Vec::new(),

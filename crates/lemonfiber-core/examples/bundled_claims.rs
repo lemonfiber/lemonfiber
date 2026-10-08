@@ -12,11 +12,9 @@ const STACK: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/media-sta
 
 fn main() {
     let stack = Path::new(STACK);
-    let manifest = match std::fs::read_to_string(stack.join("stack.toml"))
-        .map_err(|unreadable| unreadable.to_string())
-        .and_then(|text| {
-            lemonfiber_manifest::Manifest::from_toml(&text).map_err(|why| why.to_string())
-        }) {
+    let manifest = match lemonfiber_manifest::read(stack)
+        .and_then(|text| lemonfiber_manifest::Manifest::from_toml(&text))
+    {
         Ok(manifest) => manifest,
         Err(why) => {
             eprintln!("the embedded stack could not be read: {why}");

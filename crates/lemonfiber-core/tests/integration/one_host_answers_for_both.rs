@@ -37,7 +37,7 @@ use lemonfiber_fixtures::support::{Recording, Reporting};
 use lemonfiber_manifest::Manifest;
 
 /// The stack this repository carries, so a plan can be resolved without a machine.
-const STACK: &str = include_str!("../../../../assets/media-stack/stack.toml");
+const STACK: &str = lemonfiber_bundled::STACK;
 
 /// A fixed directory, so an invocation does not depend on where it was built.
 const STACK_DIR: &str = "/opt/lemonfiber/stack";

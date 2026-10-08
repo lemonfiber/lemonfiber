@@ -21,33 +21,16 @@ use lemonfiber_sidecar::decline::{Table, TokenHash};
 /// The shipped stack with the decline service taken out, written under a scratch
 /// directory named for `tag`.
 fn stack_without_decline(tag: &str) -> PathBuf {
-    let from = Path::new(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../assets/media-stack"
-    ));
     let to = lemonfiber_fixtures::scratch::Scratch::named(&format!("undeclinable-{tag}")).kept();
-    let _ = std::fs::create_dir_all(&to);
-    let read = std::fs::read_to_string(from.join("stack.toml")).unwrap_or_default();
-    // Split at every table, so the service and the wiring it declares both go.
-    let kept: Vec<&str> = read
-        .split("\n[[")
-        .filter(|table| !table.contains("id = \"decline\"") && !table.contains("by = \"decline\""))
-        .collect();
-    let _ = std::fs::write(to.join("stack.toml"), kept.join("\n[["));
+    lemonfiber_fixtures::stack::manifest_without(&to, "decline");
     to
 }
 
 /// The shipped stack, which runs the decline service, written under a scratch directory
 /// named for `tag` so a test can write the service's files beside it.
 fn stack_with_decline(tag: &str) -> PathBuf {
-    let from = Path::new(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../assets/media-stack"
-    ));
     let to = lemonfiber_fixtures::scratch::Scratch::named(&format!("declinable-{tag}")).kept();
-    let _ = std::fs::create_dir_all(&to);
-    let read = std::fs::read_to_string(from.join("stack.toml")).unwrap_or_default();
-    let _ = std::fs::write(to.join("stack.toml"), read);
+    lemonfiber_fixtures::stack::manifest_into(&to);
     to
 }
 

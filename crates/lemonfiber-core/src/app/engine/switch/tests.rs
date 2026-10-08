@@ -2,7 +2,7 @@ use super::{leaving, moved};
 use crate::docker::{Criticality, Service, State};
 use lemonfiber_manifest::Manifest;
 
-const STACK: &str = include_str!("../../../../../../assets/media-stack/stack.toml");
+const STACK: &str = lemonfiber_bundled::STACK;
 
 fn service(id: &str, state: State) -> Service {
     Service {

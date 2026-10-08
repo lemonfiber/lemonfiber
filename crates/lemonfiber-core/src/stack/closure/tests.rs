@@ -6,7 +6,7 @@ use super::{
 };
 use crate::error::{Severity, State};
 
-const STACK: &str = include_str!("../../../../../assets/media-stack/stack.toml");
+const STACK: &str = lemonfiber_bundled::STACK;
 
 fn named(forms: &[&str]) -> Vec<String> {
     forms.iter().map(|form| (*form).to_owned()).collect()

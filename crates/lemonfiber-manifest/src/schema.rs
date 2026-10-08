@@ -20,6 +20,13 @@ pub struct Manifest {
     pub stack_version: String,
     /// The oldest `lemonfiber` this stack will work with.
     pub min_cli_version: String,
+    /// The file each service is declared in, in the order the services are listed.
+    ///
+    /// Read by [`crate::assemble`], which joins those files after the root and
+    /// refuses any that break the rules about them, so a manifest parsed here has
+    /// its services already beside it.
+    #[serde(default)]
+    pub include: Vec<String>,
     /// Every declared profile.
     #[serde(default, rename = "profile")]
     pub profiles: Vec<Profile>,

@@ -67,7 +67,12 @@ crates/
 │                              detail passes through, retry wording, plurals.
 │                              Depends on nothing of ours.
 │
-└── lemonfiber-manifest/  lib — stack.toml parse + validate
+├── lemonfiber-bundled/   lib — the embedded stack's manifest, assembled from its
+│                              files when it is built. Depends on nothing of ours at
+│                              run time; its build reads the manifest crate.
+│
+└── lemonfiber-manifest/  lib — a stack manifest's files assembled, parsed and
+                               validated: stack.toml and services/<id>.toml
 ```
 
 The `lemonfiber` package carries a library alongside its binary. The library holds

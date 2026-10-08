@@ -37,6 +37,12 @@ fn the_binary_carries_the_stack_it_operates() {
         STACK.get_file("stack.toml").is_some(),
         "the stack has no manifest, so this binary has nothing to operate"
     );
+    assert!(
+        STACK
+            .get_dir("services")
+            .is_some_and(|services| services.files().count() > 0),
+        "the stack carries no service files, so its manifest describes no services"
+    );
 }
 
 /// The app is a built tree, not the repository that builds it.

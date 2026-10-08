@@ -2,7 +2,8 @@ use std::path::Path;
 
 use include_dir::{include_dir, Dir};
 
-use super::{Diagnose, Failure, Source};
+use super::{Failure, Source};
+use crate::error::Diagnose;
 use crate::error::{Severity, State};
 use crate::test_support::frozen_day as today;
 
@@ -254,7 +255,7 @@ fn a_build_that_lost_its_stack_admits_it_rather_than_guessing() {
 }
 
 /// One of every way a stack fails to be read.
-fn every_failure() -> [Failure; 9] {
+fn every_failure() -> [Failure; 10] {
     [
         Failure::Unreadable {
             path: "/tmp/x/stack.toml".into(),
@@ -281,6 +282,9 @@ fn every_failure() -> [Failure; 9] {
         },
         Failure::Invalid {
             violations: vec!["service sonarr: port 8989 is published twice".to_owned()],
+        },
+        Failure::Unassembled {
+            faults: vec!["include entry services/sonarr.toml: names no file".to_owned()],
         },
     ]
 }
@@ -338,12 +342,12 @@ fn headline(source: Source) -> String {
         .unwrap_or_default()
 }
 
-/// A stack directory holding one `stack.toml`, written for a single test.
+/// A stack directory holding the manifest `toml` describes, laid out as a stack is
+/// written, for a single test.
 fn written(named: &str, toml: &str) -> &'static Path {
     let dir = lemonfiber_fixtures::scratch::Scratch::named(named).kept();
     let _ = std::fs::remove_dir_all(&dir);
-    assert!(std::fs::create_dir_all(&dir).is_ok());
-    assert!(std::fs::write(dir.join("stack.toml"), toml).is_ok());
+    lemonfiber_fixtures::stack::manifest_written(&dir, toml);
     // Leaked deliberately, as the split-mount fixture above is and for the same
     // reason: `Source::External` holds a `&'static Path`.
     Box::leak(dir.into_boxed_path())
@@ -525,4 +529,34 @@ fn a_stack_is_run_from_its_own_files_and_the_overlay_and_not_the_plugins() {
         ]
     );
     assert!(!Source::Embedded(&EMBEDDED).run_from(&[]).is_empty());
+}
+
+/// A stack whose files are not laid out as the contract says is refused for that,
+/// naming each file, and not as a manifest that contradicts itself.
+#[test]
+fn a_stack_whose_files_break_the_layout_names_each_one() {
+    let dir = written("unassembled", "schema_version = 1\n");
+    let _ = std::fs::write(dir.join("services").join("stray.toml"), "");
+    let source = Source::External(dir);
+    assert!(
+        headline(source).contains("manifest files break the contract"),
+        "{}",
+        headline(source)
+    );
+    assert_eq!(
+        refusal(source),
+        "services/stray.toml: is in services/ and no include entry names it"
+    );
+}
+
+/// The embedded stack's service files are read from where the build put them.
+#[test]
+fn the_embedded_stack_assembles_from_its_own_files() {
+    let text = Source::Embedded(&EMBEDDED)
+        .manifest_text()
+        .unwrap_or_default();
+    assert!(
+        text.contains("\n# services/"),
+        "the service files were not joined"
+    );
 }

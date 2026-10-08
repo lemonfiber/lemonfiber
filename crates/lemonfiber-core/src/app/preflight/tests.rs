@@ -22,6 +22,7 @@ fn manifest() -> lemonfiber_manifest::Manifest {
             schema_version: 0,
             stack_version: String::new(),
             min_cli_version: String::new(),
+            include: Vec::new(),
             profiles: Vec::new(),
             forms: Vec::new(),
             services: Vec::new(),

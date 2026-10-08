@@ -108,7 +108,7 @@ fn swept(tree: &Value, declared: &[(&str, &[Closed])]) -> (usize, Vec<String>) {
 
 /// The shipped stack, and what a sweep of it found a given table failing to name.
 fn sweeping(declared: &[(&str, &[Closed])]) -> (usize, Vec<String>) {
-    let embedded = include_str!("../../../../assets/media-stack/stack.toml");
+    let embedded = lemonfiber_bundled::STACK;
     toml::from_str::<Value>(embedded)
         .map(|tree| swept(&tree, declared))
         .unwrap_or_default()

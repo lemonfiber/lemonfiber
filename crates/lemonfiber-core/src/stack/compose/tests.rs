@@ -7,7 +7,7 @@ use crate::config::Protocols;
 use crate::platform::Environment;
 use crate::stack::closure::resolve;
 
-const STACK: &str = include_str!("../../../../../assets/media-stack/stack.toml");
+const STACK: &str = lemonfiber_bundled::STACK;
 
 fn stack_dir() -> &'static Path {
     Path::new("/opt/lemonfiber/stack")

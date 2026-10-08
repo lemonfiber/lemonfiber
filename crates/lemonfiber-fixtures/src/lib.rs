@@ -46,5 +46,6 @@ pub mod ports;
 pub mod program;
 pub mod pulled;
 pub mod scratch;
+pub mod stack;
 pub mod support;
 pub mod walking;

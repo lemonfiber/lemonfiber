@@ -27,8 +27,8 @@ const SPELLED: [(&str, &str); 1] = [(
 
 /// The pinned stack, read the way lemonfiber reads it.
 fn pinned() -> Option<Manifest> {
-    let path = workspace_root().join("assets/media-stack/stack.toml");
-    let text = std::fs::read_to_string(&path).unwrap_or_default();
+    let path = workspace_root().join("assets/media-stack");
+    let text = lemonfiber_manifest::read(&path).unwrap_or_default();
     assert!(
         !text.is_empty(),
         "the pinned stack is not at {} — the submodule is not checked out, so this \

@@ -1377,6 +1377,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "lemonfiber-bundled"
+version = "0.17.0"
+dependencies = [
+ "lemonfiber-manifest",
+]
+
+[[package]]
 name = "lemonfiber-core"
 version = "0.17.0"
 dependencies = [
@@ -1390,6 +1397,7 @@ dependencies = [
  "include_dir",
  "jiff",
  "lemonfiber-adapters",
+ "lemonfiber-bundled",
  "lemonfiber-error",
  "lemonfiber-fixtures",
  "lemonfiber-manifest",
@@ -1423,6 +1431,7 @@ name = "lemonfiber-fixtures"
 version = "0.17.0"
 dependencies = [
  "async-trait",
+ "lemonfiber-manifest",
  "lemonfiber-ports",
  "tokio",
 ]
@@ -1431,6 +1440,7 @@ dependencies = [
 name = "lemonfiber-manifest"
 version = "0.17.0"
 dependencies = [
+ "lemonfiber-bundled",
  "schemars",
  "serde",
  "thiserror",
@@ -1441,6 +1451,7 @@ dependencies = [
 name = "lemonfiber-plugin"
 version = "0.17.0"
 dependencies = [
+ "lemonfiber-bundled",
  "lemonfiber-manifest",
  "schemars",
  "serde",

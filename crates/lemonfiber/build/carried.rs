@@ -6,7 +6,7 @@
 //! what is carried is chosen here and copied beside this build's other outputs, and
 //! the binary embeds that copy:
 //!
-//! - **Whole:** the manifest, the compose files and every fragment, the stack
+//! - **Whole:** the manifest and its service files, the compose files and every fragment, the stack
 //!   variants, the services' starting configuration, the settings file the
 //!   configuration surface reads, and the licence the stack is published under.
 //! - **What a compose file names:** a file on the host a service mounts, or reads its
@@ -22,7 +22,7 @@ use std::path::{Component, Path, PathBuf};
 const WHOLE_FILES: [&str; 4] = ["stack.toml", "compose.yml", ".env.example", "LICENSE"];
 
 /// The directories carried whole, relative to the stack's root.
-const WHOLE_DIRECTORIES: [&str; 3] = ["compose", "stacks", "config"];
+const WHOLE_DIRECTORIES: [&str; 4] = ["services", "compose", "stacks", "config"];
 
 /// What a reference to a file beside the compose file starts with.
 const BESIDE: &str = "./";
@@ -153,7 +153,7 @@ fn listed(field: Option<&serde_yaml_ng::Value>) -> Vec<&serde_yaml_ng::Value> {
 
 /// Every recording the manifest's claims are proven against, relative to the root.
 fn proven(root: &Path) -> BTreeSet<PathBuf> {
-    let manifest = std::fs::read_to_string(root.join("stack.toml")).unwrap_or_default();
+    let manifest = lemonfiber_manifest::read(root).unwrap_or_default();
     let mut named = Vec::new();
     if let Ok(document) = manifest.parse::<toml::Table>() {
         fixtures(&toml::Value::Table(document), &mut named);

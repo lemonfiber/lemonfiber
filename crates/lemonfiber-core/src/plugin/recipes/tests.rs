@@ -72,7 +72,7 @@ fn manifest() -> Option<Manifest> {
 }
 
 /// The stack this build pins.
-const STACK: &str = include_str!("../../../../../assets/media-stack/stack.toml");
+const STACK: &str = lemonfiber_bundled::STACK;
 
 /// The stack this build pins, read the way a run reads it.
 fn stack() -> Option<lemonfiber_manifest::Manifest> {

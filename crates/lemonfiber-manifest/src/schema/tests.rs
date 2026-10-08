@@ -352,7 +352,7 @@ fn a_removal_declaring_a_field_this_build_does_not_know_is_refused() {
 
 #[test]
 fn parses_the_stack_this_binary_embeds() {
-    let embedded = include_str!("../../../../assets/media-stack/stack.toml");
+    let embedded = lemonfiber_bundled::STACK;
     let counted = parse(embedded).map(|manifest| {
         (
             manifest.profiles.len(),

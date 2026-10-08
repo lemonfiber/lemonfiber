@@ -5,7 +5,7 @@ use lemonfiber_manifest::{Claimed, Manifest};
 use super::{judged, said};
 use crate::plugin::Verdict;
 
-const STACK: &str = include_str!("../../../../../assets/media-stack/stack.toml");
+const STACK: &str = lemonfiber_bundled::STACK;
 
 /// Both probes `media.serve` declares, bound under Jellyfin's own recordings.
 const CLAIM: &str = r#"

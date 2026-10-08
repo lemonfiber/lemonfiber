@@ -335,27 +335,8 @@ async fn a_sweep_that_cannot_run_still_makes_the_invitation() {
 async fn offering_an_account_without_a_media_server_says_there_is_nowhere_to_make_one() {
     static WITHOUT: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
     let dir = WITHOUT.get_or_init(|| {
-        let from = std::path::Path::new(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../assets/media-stack"
-        ));
         let to = lemonfiber_fixtures::scratch::Scratch::named("no-server").kept();
-        let _ = std::fs::create_dir_all(&to);
-        let read = std::fs::read_to_string(from.join("stack.toml")).unwrap_or_default();
-        // Every block but the media server's, kept in order — and the links that
-        // named it with it, because a stack that drops a service drops what
-        // reached it, and one that kept them is refused before this asks anything.
-        let services: String = read
-            .split("[[service]]")
-            .filter(|block| !block.contains("id = \"jellyfin\""))
-            .collect::<Vec<_>>()
-            .join("[[service]]");
-        let kept: String = services
-            .split("[[wiring]]")
-            .filter(|block| !block.contains("\"jellyfin\""))
-            .collect::<Vec<_>>()
-            .join("[[wiring]]");
-        let _ = std::fs::write(to.join("stack.toml"), kept);
+        lemonfiber_fixtures::stack::manifest_without(&to, "jellyfin");
         to
     });
     let ctx = a_context()

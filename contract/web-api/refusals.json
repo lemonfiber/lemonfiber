@@ -419,6 +419,11 @@
     "status": 500,
     "description": "Raised when a stack directory holds no readable manifest."
   },
+  "STACK-10": {
+    "name": "STACK_UNASSEMBLED",
+    "status": 500,
+    "description": "Raised when a manifest's files are not laid out as the contract says."
+  },
   "STACK-2": {
     "name": "STACK_UNUSABLE",
     "status": 500,

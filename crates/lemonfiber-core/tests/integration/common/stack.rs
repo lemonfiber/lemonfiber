@@ -26,14 +26,8 @@ pub fn stack() -> Source {
 /// The shipped stack, which runs the request gate, written under a scratch directory
 /// named for `tag` so a test can write the gate's files beside it.
 pub fn with_the_gate(tag: &str) -> std::path::PathBuf {
-    let from = Path::new(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../assets/media-stack"
-    ));
     let to = lemonfiber_fixtures::scratch::Scratch::named(&format!("gated-{tag}")).kept();
-    let _ = std::fs::create_dir_all(&to);
-    let read = std::fs::read_to_string(from.join("stack.toml")).unwrap_or_default();
-    let _ = std::fs::write(to.join("stack.toml"), read);
+    lemonfiber_fixtures::stack::manifest_into(&to);
     to
 }
 

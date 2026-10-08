@@ -19,6 +19,7 @@ authors = ["NightWorks.io"]
 [workspace.dependencies]
 lemonfiber-adapters = { path = "crates/lemonfiber-adapters" }
 lemonfiber-api = { path = "crates/lemonfiber-api" }
+lemonfiber-bundled = { path = "crates/lemonfiber-bundled" }
 lemonfiber-core = { path = "crates/lemonfiber-core" }
 lemonfiber-error = { path = "crates/lemonfiber-error" }
 lemonfiber-fixtures = { path = "crates/lemonfiber-fixtures" }

@@ -1,7 +1,7 @@
 use crate::validate::tests::TODAY;
 use crate::{validate, Manifest};
 
-const STACK: &str = include_str!("../../../../../assets/media-stack/stack.toml");
+const STACK: &str = lemonfiber_bundled::STACK;
 
 /// Everything wrong with a manifest, as one line each.
 fn messages(text: &str) -> Vec<String> {

@@ -12,7 +12,7 @@ fn bundled(services: &[&str]) -> std::collections::BTreeMap<String, crate::origi
         .collect()
 }
 
-const STACK: &str = include_str!("../../../../assets/media-stack/stack.toml");
+const STACK: &str = lemonfiber_bundled::STACK;
 
 /// The stack this crate is compiled with, if it reads.
 ///

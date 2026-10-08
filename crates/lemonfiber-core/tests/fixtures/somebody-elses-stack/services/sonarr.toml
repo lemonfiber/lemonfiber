@@ -1,0 +1,24 @@
+[[service]]
+id           = "sonarr"
+name         = "Sonarr"
+profile      = "tv"
+image        = "linuxserver/sonarr"
+tag          = "4.0.10"
+digest = "sha256:abababababababababababababababababababababababababababababababab"
+port         = 8989
+listens      = 8989
+bind         = "loopback"
+criticality  = "core"
+license      = "GPL-3.0-only"
+upstream     = "https://github.com/Sonarr/Sonarr"
+last_release = "2026-01-01"
+describes    = "Watches for series and files them into the library."
+without_it   = "Nothing files series; you move the downloads yourself."
+reaches      = "television metadata providers"
+asks_for     = "Reads series, season and episode information for what this operator's library holds."
+
+[service.api]
+kind       = "servarr"
+key_source = "config-xml"
+path       = "/config/config.xml"
+version    = 3

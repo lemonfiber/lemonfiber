@@ -7,7 +7,7 @@ use super::{
 use crate::config::Protocols;
 use crate::ports::docker::{Container, Health, Lifecycle};
 
-const STACK: &str = include_str!("../../../../assets/media-stack/stack.toml");
+const STACK: &str = lemonfiber_bundled::STACK;
 
 fn manifest() -> Option<Manifest> {
     Manifest::from_toml(STACK).ok()
