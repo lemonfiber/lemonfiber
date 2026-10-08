@@ -4,6 +4,7 @@
     {
       "name": "wait",
       "type": {
+        "default": false,
         "description": "Whether anything still downloading is let finish before the stop.",
         "type": "boolean"
       }

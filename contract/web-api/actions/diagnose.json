@@ -15,6 +15,7 @@
     {
       "name": "disruptive",
       "type": {
+        "default": false,
         "description": "Whether the checks that disturb the running system are included.",
         "type": "boolean"
       }

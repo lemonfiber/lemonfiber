@@ -84,3 +84,22 @@ fn a_rehearsal_is_what_the_core_says_of_the_action() {
         .iter()
         .all(|one| one.rehearsal == (one.action == "update")));
 }
+
+/// Every argument says what leaving it out reads as, in its own type, because the
+/// carrier fills in every field a request leaves out; a flag read from a bare word
+/// defaults to false.
+#[test]
+fn every_argument_defaults_to_a_value_of_its_own_type() {
+    for argument in every(|_| false).iter().flat_map(|one| &one.arguments) {
+        let default = argument.shape.get("default");
+        assert!(default.is_some(), "{} names no default", argument.name);
+        if argument.shape.get("type") == Some(&serde_json::json!("boolean")) {
+            assert_eq!(
+                default,
+                Some(&serde_json::json!(false)),
+                "{} is a flag",
+                argument.name
+            );
+        }
+    }
+}

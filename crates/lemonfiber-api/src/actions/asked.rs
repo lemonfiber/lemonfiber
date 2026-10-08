@@ -41,7 +41,7 @@ pub struct Arguments {
     pub services: Vec<String>,
     /// Whether anything still downloading is let finish before the stop.
     // Read from a bare word, so published as one.
-    #[schemars(with = "bool")]
+    #[schemars(with = "bool", extend("default" = false))]
     pub wait: Waiting,
     /// The one service to act on instead of the whole stack.
     pub service: Option<String>,
@@ -80,7 +80,7 @@ pub struct Arguments {
     pub logs: Option<u32>,
     /// Whether media filenames are shown rather than replaced.
     // Read from a bare word, so published as one.
-    #[schemars(with = "bool")]
+    #[schemars(with = "bool", extend("default" = false))]
     pub filenames: Filenames,
     /// The settings to show as they are, named as the bundle names them.
     pub reveal: Vec<String>,
@@ -90,7 +90,7 @@ pub struct Arguments {
     pub check: Option<String>,
     /// Whether the checks that disturb the running system are included.
     // Read from a bare word, so published as one.
-    #[schemars(with = "bool")]
+    #[schemars(with = "bool", extend("default" = false))]
     pub disruptive: Disturbing,
     /// What was read before answering — the offer a repair's yes was read in, the
     /// listing a restore's was, what a replacement would stop — as it named itself.
@@ -175,7 +175,7 @@ pub struct Arguments {
     /// whose command reports a rehearsal answers with that report, and one whose
     /// command cannot be rehearsed is refused with the reason the command gives.
     // Read from a bare word, so published as one.
-    #[schemars(with = "bool")]
+    #[schemars(with = "bool", extend("default" = false))]
     pub dry_run: Running,
 }
 
