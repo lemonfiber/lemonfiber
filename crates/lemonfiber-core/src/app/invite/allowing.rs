@@ -101,7 +101,6 @@ async fn chosen(
 fn no_libraries_read() -> crate::error::Problem {
     crate::error::Problem::new(
         crate::error::codes::invite::NO_LIBRARIES_READ,
-        crate::error::Severity::Error,
         "the media server would not say what libraries it holds, so nobody was invited",
         "Choosing which libraries somebody may open starts by finding them, and that \
          read did not answer",
@@ -116,7 +115,6 @@ fn no_such_library(named: &str, held: &[NamedLibrary]) -> crate::error::Problem 
     let there: Vec<&str> = held.iter().map(|library| library.name.as_str()).collect();
     crate::error::Problem::new(
         crate::error::codes::invite::NO_SUCH_LIBRARY,
-        crate::error::Severity::Error,
         format!("this media server holds no library called {named}, so nobody was invited"),
         "Libraries are named the way the media server's own screens name them, though \
          not necessarily in the same capitalisation",
@@ -140,7 +138,6 @@ pub(crate) fn would_not_allow(name: &str, new: bool) -> crate::error::Problem {
     };
     crate::error::Problem::new(
         crate::error::codes::invite::WOULD_NOT_ALLOW,
-        crate::error::Severity::Error,
         format!("the media server would not set what {name} may watch"),
         meaning,
         crate::error::Remedy::new(

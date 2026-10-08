@@ -26,7 +26,7 @@
 //! answerable, so `lemonfiber doctor --accept storage.single-mount` settles it once and
 //! it stops leading afterwards, the way running torrents with no tunnel does.
 
-use super::{finding, Finding, Problem, Remedy, Severity, State, Verdict};
+use super::{finding, Finding, Problem, Remedy, State, Verdict};
 use crate::error::codes::storage::SPLIT_MOUNTS;
 use crate::stack::mounts::Crowded;
 use crate::storage::COPY_CONSEQUENCE;
@@ -56,7 +56,6 @@ pub(super) fn findings(crowded: &[Crowded]) -> Vec<Finding> {
 fn split(crowded: &Crowded) -> Finding {
     let problem = Problem::new(
         SPLIT_MOUNTS,
-        Severity::Warning,
         format!(
             "Imports into {} will copy rather than link",
             crowded.service

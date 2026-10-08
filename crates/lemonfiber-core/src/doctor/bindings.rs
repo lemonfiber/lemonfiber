@@ -31,7 +31,7 @@ use lemonfiber_manifest::{Bind, Service};
 
 use super::{Category, Check, Finding, Verdict};
 use crate::error::codes::bind::{AROUND_THE_FIREWALL, BEYOND_LOOPBACK, DELIBERATE};
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 use crate::platform::Environment;
 use crate::ports::docker::{Container, Engine};
 
@@ -205,7 +205,6 @@ fn around_the_firewall(environment: Environment, running: &[&Container]) -> Opti
 fn bypassed(reached: &[String]) -> Finding {
     let problem = Problem::new(
         AROUND_THE_FIREWALL,
-        Severity::Warning,
         "A firewall rule on this machine may not apply to these".to_owned(),
         "The container engine runs directly on this machine here, and it writes its own \
          forwarding rules ahead of the ones you add. A rule you wrote to close one of these \
@@ -230,7 +229,6 @@ fn bypassed(reached: &[String]) -> Finding {
 fn violation(service: &str, published: &str) -> Finding {
     let problem = Problem::new(
         BEYOND_LOOPBACK,
-        Severity::Error,
         format!("{service} is reachable from your network"),
         "The stack declares this one as an admin service, which means it is meant to answer \
          this machine and nothing else. It can change how your stack works and most services \
@@ -262,7 +260,6 @@ fn violation(service: &str, published: &str) -> Finding {
 fn acknowledged(service: &str, published: &str, why: &str) -> Finding {
     let problem = Problem::new(
         DELIBERATE,
-        Severity::Warning,
         format!("{service} is reachable from your network, and you said so"),
         format!(
             "The stack calls this one an admin service, so it is reported wherever it answers \

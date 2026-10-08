@@ -16,7 +16,7 @@ use crate::archive::{Archive, Fault, Space};
 use crate::bundle::{self, Contents, Filenames, Marks, Piece, Residual, Taken, Terms};
 use crate::bytes::humanize;
 use crate::doctor::Verdict;
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 use crate::instant;
 use crate::ports::docker::LogQuery;
 
@@ -278,7 +278,6 @@ const HEADROOM: u64 = 64 * 1024 * 1024;
 pub fn unconfirmed(fields: &[String]) -> Problem {
     Problem::new(
         BUNDLE_UNCONFIRMED,
-        Severity::Error,
         "Showing a setting as it is has to be confirmed",
         "A bundle is a thing people post in public. Showing one of its settings as it is puts that value in the file, so it takes saying twice.",
         Remedy::new("Run it again with --confirm if you meant it"),
@@ -295,7 +294,6 @@ pub fn unconfirmed(fields: &[String]) -> Problem {
 pub(crate) fn without_marks() -> Problem {
     Problem::new(
         BUNDLE_NO_MARKS,
-        Severity::Error,
         "A bundle could not be made on this machine",
         "Every replaced value carries a stand-in derived with randomness this machine would not provide, and a stand-in anyone can reproduce is a way back to the value it stands for. Nothing has been written.",
         Remedy::new("Report this: a machine that cannot produce random bytes is a fault in its own right"),
@@ -391,7 +389,6 @@ pub async fn write(
 fn leaking(residual: &Residual) -> Problem {
     Problem::new(
         BUNDLE_LEAK,
-        Severity::Critical,
         "The bundle still held something that reads as a credential",
         "Nothing has been written. A bundle is a thing people post in public, so anything in one that still reads like a key is treated as one — even where it turns out not to be.",
         Remedy::new(
@@ -411,7 +408,6 @@ fn leaking(residual: &Residual) -> Problem {
 fn no_room(space: &Space) -> Problem {
     Problem::new(
         BUNDLE_NO_ROOM,
-        Severity::Error,
         "There is not enough room to write the bundle",
         "The bundle would not fit where it was to be written, with room left over for the machine to keep working in.",
         Remedy::new("Free some space, or write the bundle somewhere with more room"),
@@ -428,7 +424,6 @@ fn no_room(space: &Space) -> Problem {
 fn unwritten(dest: &Path, fault: &Fault) -> Problem {
     Problem::new(
         BUNDLE_UNWRITTEN,
-        Severity::Error,
         "The bundle could not be written",
         "Nothing was left behind: a bundle is written whole or not at all, so there is no half-file to mistake for one.",
         Remedy::new("Check the path is writable, then ask for the bundle again"),

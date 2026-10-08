@@ -7,7 +7,7 @@
 use std::path::Path;
 
 use crate::config::store;
-use crate::error::{Diagnose as _, Problem, Remedy, Severity};
+use crate::error::{Diagnose as _, Problem, Remedy};
 use crate::journal::{kept, Change, Journal, Seal};
 use crate::ports::random::Random;
 
@@ -129,7 +129,6 @@ pub fn journalled(
 pub fn unrecorded(what: &str, failure: &store::Failure) -> Problem {
     Problem::new(
         crate::error::codes::undo::CANNOT_SUCCEED,
-        Severity::Error,
         format!("{what} was done and could not be recorded, so it cannot be put back"),
         "The change stands. A reversal reads the change journal, and the journal does not \
          have this change in it.",

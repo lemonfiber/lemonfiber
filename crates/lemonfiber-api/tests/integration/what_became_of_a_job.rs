@@ -618,18 +618,17 @@ async fn sweeping_on_the_beat_lets_go_of_what_a_sweep_asked_for_would() {
 /// first alone passes on a door that ignores what it carries — which is the shape of
 /// the defect, so a test that stopped there would be testing the wrong half.
 #[test]
-fn where_a_refusal_lies_decides_the_status_a_job_is_answered_with() {
-    use lemonfiber_core::error::{Amiss, Code, Problem, Remedy, Severity};
+fn the_code_a_refusal_carries_decides_the_status_a_job_is_answered_with() {
+    use lemonfiber_core::error::codes::{docker, form, life, word};
+    use lemonfiber_core::error::{Code, Problem, Remedy};
 
-    let refusing = |amiss| {
+    let refusing = |code: Code| {
         let problem = Problem::new(
-            Code::new("TEST-1"),
-            Severity::Error,
+            code,
             "the form was not declared",
             "nothing by that name is in this stack",
             Remedy::new("name a form the stack declares"),
-        )
-        .lies_in(amiss);
+        );
         match Standing::failed(&problem) {
             Standing::Failed(_, status) => Some(status.as_u16()),
             _ => None,
@@ -637,22 +636,22 @@ fn where_a_refusal_lies_decides_the_status_a_job_is_answered_with() {
     };
 
     assert_eq!(
-        refusing(Amiss::Naming),
+        refusing(word::UNRECOGNISED),
         Some(StatusCode::NOT_FOUND.as_u16()),
         "a thing there is no such thing as"
     );
     assert_eq!(
-        refusing(Amiss::Asking),
+        refusing(form::NO_FORM_NAMED),
         Some(StatusCode::BAD_REQUEST.as_u16()),
         "a request that could not be answered as it stands"
     );
     assert_eq!(
-        refusing(Amiss::Held),
+        refusing(life::ALREADY_WORKING),
         Some(StatusCode::CONFLICT.as_u16()),
         "work that found other work holding the stack, which is busy and not broken"
     );
     assert_eq!(
-        refusing(Amiss::Answering),
+        refusing(docker::ENGINE_UNREACHABLE),
         Some(StatusCode::INTERNAL_SERVER_ERROR.as_u16()),
         "and this product's own failure"
     );

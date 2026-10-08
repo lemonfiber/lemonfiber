@@ -21,7 +21,7 @@ use futures_util::StreamExt as _;
 use crate::app::Ctx;
 use crate::config::REACH_PLUGIN_SOURCE_KEY;
 use crate::error::codes::plugin::{NO_REVISION, SOURCE_OFF, UNFETCHED};
-use crate::error::{Diagnose, Problem, Remedy, Severity, State};
+use crate::error::{Diagnose, Problem, Remedy, State};
 use crate::plugin::{Fetchable, Installed, Installs, Register, Source, Sourced};
 
 /// Where an install came from, where that is not the directory it read.
@@ -179,7 +179,6 @@ async fn fetched_into(
 fn switched_off(url: &str) -> Problem {
     Problem::new(
         SOURCE_OFF,
-        Severity::Error,
         format!("fetching a plugin from a git source is switched off, so {url} was not asked"),
         "Nothing was fetched and nothing was installed. This machine's settings keep lemonfiber \
          from fetching from a git source you name.",
@@ -195,7 +194,6 @@ fn switched_off(url: &str) -> Problem {
 pub(super) fn unfetched(url: &str, why: &str) -> Problem {
     Problem::new(
         UNFETCHED,
-        Severity::Error,
         format!("{url} could not be fetched"),
         "Nothing was installed. The source did not answer, or would not hand over the \
          revision asked for.",
@@ -209,7 +207,6 @@ pub(super) fn unfetched(url: &str, why: &str) -> Problem {
 fn no_revision(url: &str, asked: &str) -> Problem {
     Problem::new(
         NO_REVISION,
-        Severity::Error,
         format!("{url} holds no branch, tag or commit called {asked}"),
         "Nothing was fetched and nothing was installed.",
         Remedy::new(

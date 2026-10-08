@@ -17,7 +17,7 @@ use lemonfiber_error::codes::docker::{
     ENDPOINT_UNSUPPORTED, ENGINE_UNREACHABLE, HOST_REFUSED, HOST_SILENT, HOST_UNRESOLVED,
     LOGIN_REJECTED, NO_SUCH_CONTAINER, UNKNOWN_CONTEXT,
 };
-use lemonfiber_error::{Diagnose, Problem, Remedy, Severity, State};
+use lemonfiber_error::{Diagnose, Problem, Remedy, State};
 
 mod locations;
 mod target;
@@ -298,7 +298,6 @@ pub enum Failure {
 fn down(reason: &str) -> Problem {
     Problem::new(
         ENGINE_UNREACHABLE,
-        Severity::Error,
         "The container engine is not running",
         "Nothing about your stack can be read or changed while the engine is down, so this is the first thing to fix.",
         Remedy::new("Start Docker Desktop, or the docker service on Linux"),
@@ -311,7 +310,6 @@ fn down(reason: &str) -> Problem {
 fn absent(name: &str) -> Problem {
     Problem::new(
         NO_SUCH_CONTAINER,
-        Severity::Warning,
         format!("{name} is not running"),
         "The service was expected to be up. It may have stopped on its own, or never been started.",
         Remedy::new("Start the form that includes it").with_detail("lemonfiber ps"),
@@ -327,7 +325,6 @@ fn absent(name: &str) -> Problem {
 fn unresolved(host: &str, reason: &str) -> Problem {
     Problem::new(
         HOST_UNRESOLVED,
-        Severity::Error,
         format!("{host} could not be found on the network"),
         "The name was looked up and nothing answered to it, so no connection was attempted. This is a name problem rather than a Docker one: the daemon may be running perfectly on a machine this one cannot name.",
         Remedy::new("Check the host name, and that this machine can resolve it")
@@ -341,7 +338,6 @@ fn unresolved(host: &str, reason: &str) -> Problem {
 fn declined(host: &str, reason: &str) -> Problem {
     Problem::new(
         HOST_REFUSED,
-        Severity::Error,
         format!("{host} refused the connection"),
         "The machine was found and answered by declining, so the name is right and something about the endpoint is not. Either Docker is not running over there, or it is not listening where this endpoint says it is.",
         Remedy::new("Check Docker is running on that machine, and on the port the endpoint names"),
@@ -354,7 +350,6 @@ fn declined(host: &str, reason: &str) -> Problem {
 fn rejected(host: &str, reason: &str) -> Problem {
     Problem::new(
         LOGIN_REJECTED,
-        Severity::Error,
         format!("{host} did not accept the SSH login"),
         "The machine was reached and the login was refused, so this is about keys and accounts rather than about Docker. lemonfiber uses the SSH configuration you already have and makes no keys of its own.",
         Remedy::new("Check the login works on its own, then try again")
@@ -372,7 +367,6 @@ fn rejected(host: &str, reason: &str) -> Problem {
 fn unsupported(endpoint: &str) -> Problem {
     Problem::new(
         ENDPOINT_UNSUPPORTED,
-        Severity::Error,
         format!("{endpoint} is not an endpoint lemonfiber can reach"),
         "lemonfiber drives the engine over a local socket, over plain TCP, or over SSH. Nothing was read and nothing was changed, because reading one machine while writing to another is worse than not reaching either.",
         Remedy::new("Point DOCKER_HOST at an ssh:// or tcp:// endpoint, or at a local socket"),
@@ -388,7 +382,6 @@ fn unsupported(endpoint: &str) -> Problem {
 fn unknown(name: &str) -> Problem {
     Problem::new(
         UNKNOWN_CONTEXT,
-        Severity::Error,
         format!("there is no Docker context named {name} on this machine"),
         "A context was named and this machine records no endpoint under that name. Nothing was read and nothing was changed, because falling back to the local daemon would answer about this machine while you were asking about another one.",
         Remedy::new("List the contexts this machine has, and name one of those")
@@ -405,7 +398,6 @@ fn unknown(name: &str) -> Problem {
 fn silent(host: &str, reason: &str) -> Problem {
     Problem::new(
         HOST_SILENT,
-        Severity::Error,
         format!("{host} did not answer"),
         "The endpoint was reached for and nothing usable came back. What the transport said is below; it is the most specific thing known about this, and it names the machine rather than this one.",
         Remedy::new("Check the other machine is up and its Docker is running")

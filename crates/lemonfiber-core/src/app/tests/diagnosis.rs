@@ -182,7 +182,6 @@ async fn a_failing_finding_carries_what_its_service_said() {
             "Jellyfin answers",
             crate::doctor::Verdict::Fail(crate::error::Problem::new(
                 crate::error::Code::new("TEST-1"),
-                crate::error::Severity::Error,
                 "it is not answering",
                 "it means what it says",
                 crate::error::Remedy::new("put it right"),
@@ -306,7 +305,6 @@ async fn what_it_said(ctx: &Ctx) -> String {
             "Jellyfin answers",
             crate::doctor::Verdict::Fail(crate::error::Problem::new(
                 crate::error::Code::new("TEST-1"),
-                crate::error::Severity::Error,
                 "it is not answering",
                 "it means what it says",
                 crate::error::Remedy::new("put it right"),

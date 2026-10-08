@@ -25,7 +25,7 @@ pub(crate) use telling::told;
 
 use crate::config::paths::Paths;
 use crate::doctor::{Check, Finding};
-use crate::error::{Diagnose as _, Problem, Remedy, Severity, State};
+use crate::error::{Diagnose as _, Problem, Remedy, State};
 use crate::journal::Undo;
 use crate::repair::{self, Outcome, Repair, Stance, Writing};
 
@@ -385,7 +385,6 @@ pub async fn retracting(ctx: &Ctx, paths: &Paths) -> Result<Reversal, Box<Proble
 fn offer_cannot_disturb() -> Problem {
     Problem::new(
         OFFER_CANNOT_DISTURB,
-        Severity::Error,
         "Saying what could be put right does not include the checks that disturb",
         "The checks that disturb prove themselves by disturbing: the killswitch test takes \
          the tunnel away from the download client, and the release check spends one of the \
@@ -407,7 +406,6 @@ fn offer_cannot_disturb() -> Problem {
 fn nowhere_to_look() -> Problem {
     Problem::new(
         NOWHERE_TO_LOOK,
-        Severity::Error,
         "This run has nowhere it knows to look for what a repair changed",
         "What each repair changed is recorded in lemonfiber's own directory, and this \
          machine would not say where that is. Nothing was put back.",

@@ -254,7 +254,6 @@ fn what_the_accounts_say_travels_beside_the_stall() {
 fn problem(summary: &str) -> Problem {
     Problem::new(
         crate::error::codes::provider::PROVIDER_EMPTY,
-        Severity::Warning,
         summary,
         "why it matters",
         Remedy::new("do something"),

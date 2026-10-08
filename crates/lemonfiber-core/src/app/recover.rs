@@ -13,7 +13,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::config::store;
-use crate::error::{Diagnose, Problem, Remedy, Severity};
+use crate::error::{Diagnose, Problem, Remedy};
 use crate::journal::{is_sealed, Action, Undo};
 use crate::ports::filesystem::Confined;
 use crate::ports::service::Client as _;
@@ -434,7 +434,6 @@ impl Fault {
             Self::Store(failure) => failure.problem(),
             Self::NotRemoved { path, reason } => Problem::new(
                 NOT_REMOVED,
-                Severity::Error,
                 "A directory from the interrupted setup could not be removed",
                 "The rest of the setup was reversed; this one directory is still there. It holds nothing.",
                 Remedy::new("Remove it by hand, or leave it where it is"),
@@ -442,7 +441,6 @@ impl Fault {
             .with_detail(format!("{}: {reason}", path.display())),
             Self::NotRewound { path, reason } => Problem::new(
                 NOT_REWOUND,
-                Severity::Error,
                 "A file lemonfiber wrote over could not be written back to what it held",
                 "Everything before it was put back; this file still holds what lemonfiber wrote.",
                 Remedy::new("Run it again once the file can be written"),
@@ -450,7 +448,6 @@ impl Fault {
             .with_detail(format!("{}: {reason}", path.display())),
             Self::NotWithdrawn { path, reason } => Problem::new(
                 NOT_WITHDRAWN,
-                Severity::Error,
                 "A region lemonfiber wrote into one of the stack's files could not be taken out",
                 "Everything before it was put back; this region is still in the file, between \
                  the markers that name whose it is.",
@@ -466,7 +463,6 @@ impl Fault {
 fn needs_service(resources: &[String]) -> Problem {
     Problem::new(
         NEEDS_SERVICE,
-        Severity::Error,
         "Some changes cannot be undone without the service that made them",
         "This reversal restores settings and removes directories; a resource a service was told to create is undone through that service, not here. Everything else was reversed.",
         Remedy::new("Reverse them from the service once it is reachable"),
@@ -488,7 +484,6 @@ fn needs_service(resources: &[String]) -> Problem {
 fn not_put_back(settings: &[String]) -> Problem {
     Problem::new(
         NOT_PUT_BACK,
-        Severity::Warning,
         "Some settings hold what you chose, so they were left alone",
         "Undoing a change puts back what lemonfiber replaced, and these settings no longer hold \
          what it wrote — so they were changed after it, and writing the old value over that \
@@ -510,7 +505,6 @@ fn not_put_back(settings: &[String]) -> Problem {
 fn not_opened(settings: &[String]) -> Problem {
     Problem::new(
         NOT_OPENED,
-        Severity::Warning,
         "Some settings hold credentials this machine can no longer read back",
         "The journal keeps a credential sealed, under a key kept beside it. These entries \
          would not open — the key is missing, or the record was changed after it was \
@@ -534,7 +528,6 @@ fn not_opened(settings: &[String]) -> Problem {
 fn left_holding(paths: &[String]) -> Problem {
     Problem::new(
         STILL_HOLDING,
-        Severity::Warning,
         "Some directories hold something this run did not put there",
         "A directory lemonfiber made comes off on the way back only while it is empty. \
          These still hold files — something else keeps its own documents in one of them, \

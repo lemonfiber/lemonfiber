@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use crate::app::Ctx;
 use crate::config::paths::CATALOGUE;
 use crate::error::codes::plugin::{CATALOGUE_REPLACED, NEWEST_UNKEPT};
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 
 /// What is remembered about the catalogue.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -65,7 +65,6 @@ fn remembered(at: &Path) -> Result<u64, Box<Problem>> {
 fn replaced(serial: u64, newest: u64) -> Problem {
     Problem::new(
         CATALOGUE_REPLACED,
-        Severity::Error,
         "The catalogue's index is older than one this machine has already verified",
         format!(
             "Nothing was resolved through it and nothing was installed. It is release {serial}, \
@@ -89,7 +88,6 @@ fn unreadable(at: &Path, why: &str) -> Problem {
 fn unkept(why: &str) -> Problem {
     Problem::new(
         NEWEST_UNKEPT,
-        Severity::Error,
         "This machine cannot tell whether the catalogue's index is its newest",
         "Nothing was resolved through it and nothing was installed. Without the record of the \
          newest index this machine verified, a release the catalogue has replaced would verify \

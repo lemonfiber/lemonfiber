@@ -16,7 +16,7 @@ use lemonfiber_manifest::Date;
 
 use crate::bytes::humanize;
 use crate::doctor::{Category, Finding, Verdict};
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 use crate::plural;
 use crate::ports::service::{Standing, UsenetAccount};
 use crate::provider::trouble::Trouble;
@@ -222,7 +222,6 @@ fn left(allowance: Allowance) -> String {
 fn empty(allowance: Allowance, said: Option<&str>) -> Problem {
     Problem::new(
         PROVIDER_EMPTY,
-        Severity::Error,
         "A Usenet account has nothing left",
         "The account authenticates perfectly and can download nothing, which looks exactly like a broken stack from the outside. A block account does not refill on its own.",
         Remedy::new("Top the account up, or point the client at one that has data left"),
@@ -240,7 +239,6 @@ fn empty(allowance: Allowance, said: Option<&str>) -> Problem {
 fn refused(said: Option<&str>) -> Problem {
     Problem::new(
         PROVIDER_REFUSED,
-        Severity::Error,
         "A Usenet account is refusing the login",
         "The provider answered the download client and rejected the credentials it offered. Nothing downloads through this account until they are right, and every service in the stack stays green while that is true.",
         Remedy::new(
@@ -260,7 +258,6 @@ fn refused(said: Option<&str>) -> Problem {
 fn silent(said: Option<&str>) -> Problem {
     Problem::new(
         PROVIDER_SILENT,
-        Severity::Warning,
         "A Usenet account is not answering",
         "The download client has stopped using this account because it could not reach it. That is the provider being down or the connection to it failing, rather than anything about the account itself — which is why it is worth telling apart from a rejected login before anything is changed.",
         Remedy::new(
@@ -282,7 +279,6 @@ fn silent(said: Option<&str>) -> Problem {
 fn too_many(configured: u64, words: &str) -> Problem {
     Problem::new(
         PROVIDER_CROWDED,
-        Severity::Warning,
         "A Usenet account is set to more connections than it allows",
         "The provider is refusing the connections beyond what the plan includes. Downloads still run on the ones it allows, and the refusals it sends back look like an unreliable provider rather than a setting that is one too high.",
         Remedy::new(
@@ -321,7 +317,6 @@ fn beside(detail: String, said: Option<&str>) -> String {
 fn low(allowance: Allowance) -> Problem {
     Problem::new(
         PROVIDER_LOW,
-        Severity::Warning,
         "A Usenet account is running out",
         "At the rate it is being used, this account runs out shortly. Downloads will stop with nothing else changing, which reads as a fault in the stack rather than an account that needs topping up.",
         Remedy::new("Top the account up before it runs out"),
@@ -336,7 +331,6 @@ fn low(allowance: Allowance) -> Problem {
 fn ending(days: u64) -> Problem {
     Problem::new(
         PROVIDER_ENDING,
-        Severity::Warning,
         "A Usenet subscription is ending",
         "The subscription behind this account ends on the date recorded for it in the download client. When it lapses the account stops serving, with nothing in the stack having changed.",
         Remedy::new("Renew the subscription, or clear its date in the client if it renews itself"),

@@ -20,14 +20,12 @@
 //! **An answer refused for naming what has since moved is one refusal, wherever it
 //! is raised.** It is the one a client answers by reading again and offering what it
 //! reads now, rather than by reporting a failure, so it has to be told from every
-//! other by its code alone. [`MOVED`] is every code it carries, and [`moved`] is how
-//! each is raised: the web API publishes the list among the refusals it answers
-//! with, and answers each at the status [`MOVED_AMISS`] gives, so a code added here
-//! reaches a client as a regenerated diff and a refusal raised without [`moved`]
-//! would be answered as a failure of the machine.
+//! other by its code alone. [`MOVED`] is every code it carries, and the web API
+//! publishes the list among the refusals it answers with, each at the status its code
+//! is declared with, so a code added here reaches a client as a regenerated diff.
 
 use crate::error::codes::{gone, migrate, plugin, repair, restore, space, wire};
-use crate::error::{Amiss, Code, Problem};
+use crate::error::Code;
 
 /// Every code an answer is refused with for naming an offer or a listing that has
 /// since moved.
@@ -45,20 +43,6 @@ pub const MOVED: [Code; 7] = [
     wire::WIRING_MOVED,
     plugin::PLUGIN_OFFER_MOVED,
 ];
-
-/// Where the fault lies in an answer that named what has since moved.
-///
-/// In how it asked: nothing is broken, and the same request with the name that
-/// stands now is answered. Not a failure of the machine, which is what a client
-/// gives up on, and not other work holding the stack, which a client waits out.
-pub const MOVED_AMISS: Amiss = Amiss::Asking;
-
-/// The refusal of an answer that named what has since moved, as every command
-/// raising one raises it.
-#[must_use]
-pub fn moved(refusal: Problem) -> Problem {
-    refusal.lies_in(MOVED_AMISS)
-}
 
 /// A checksum over every word an operator read before agreeing.
 ///

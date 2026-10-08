@@ -24,7 +24,7 @@ use crate::error::codes::plugin::{
     CALL_REFUSED, INPUT_UNMATCHED, STEP_FAILED, UNRECORDABLE, VALUE_WITHHELD,
 };
 use crate::error::Diagnose;
-use crate::error::{Came, Problem, Remedy, Severity, State, Stepped};
+use crate::error::{Came, Problem, Remedy, State, Stepped};
 use crate::journal::{Change, Kind};
 use crate::plugin::running::{run, Ran, Reaching, Running};
 use crate::plugin::Installed;
@@ -134,7 +134,6 @@ fn unmatched(plugin: &str, missing: &[&str], unasked: &[&str]) -> Problem {
     }
     Problem::new(
         INPUT_UNMATCHED,
-        Severity::Error,
         format!("{plugin}'s recipes were not given what they ask for"),
         format!(
             "Nothing was installed and nothing was written: {}.",
@@ -170,7 +169,6 @@ impl Unfollowed {
             Self::Failed(ran) => failed(plugin, &ran, meaning),
             Self::Unkept(why) => Problem::new(
                 UNRECORDABLE,
-                Severity::Error,
                 format!("{plugin}'s recipes held, and what they captured could not be kept"),
                 meaning,
                 Remedy::new(
@@ -336,7 +334,6 @@ fn failed(plugin: &str, ran: &[Ran], meaning: String) -> Problem {
     };
     Problem::new(
         code,
-        Severity::Error,
         summary,
         meaning,
         Remedy::new(

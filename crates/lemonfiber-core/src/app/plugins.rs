@@ -28,7 +28,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 
 use crate::plugin::{Installed, Installs, Register};
 
@@ -191,14 +191,10 @@ use crate::error::codes::plugin::{NOWHERE, UNPROVED, UNWRITABLE};
 /// cannot be written. Every one of those after the first write puts the install back
 /// before it answers.
 pub(crate) async fn plugins(ctx: &Ctx, action: &Asked) -> Result<Installs, Box<Problem>> {
-    Box::pin(asked(ctx, action)).await.map_err(|mut problem| {
-        refusals::place(&mut problem);
-        problem
-    })
+    Box::pin(asked(ctx, action)).await
 }
 
-/// What is installed, or what installing, updating or removing one came to, before its
-/// refusal is placed where the published list says its fault lies.
+/// What is installed, or what installing, updating or removing one came to.
 async fn asked(ctx: &Ctx, action: &Asked) -> Result<Installs, Box<Problem>> {
     let held = read(ctx)?;
     match action {
@@ -376,7 +372,6 @@ pub(crate) fn kept_at(ctx: &Ctx) -> Option<PathBuf> {
 fn unreadable_source(why: &crate::plugin::Unreadable) -> Problem {
     Problem::new(
         UNREADABLE,
-        Severity::Error,
         "That is not a plugin lemonfiber can read",
         "Nothing was installed and nothing was written.",
         Remedy::new("Point at the plugin's directory, or the `plugin.toml` inside it"),
@@ -407,7 +402,6 @@ fn refused(
         .join("; ");
     Problem::new(
         code,
-        Severity::Error,
         format!("{plugin} declares things lemonfiber will not install"),
         "Nothing was installed and nothing was written. A manifest is refused whole, so none \
          of it was acted on.",
@@ -421,7 +415,6 @@ fn refused(
 fn unrecorded(at: &Path, why: &str) -> Problem {
     Problem::new(
         UNRECORDED,
-        Severity::Error,
         format!(
             "The record of what is installed, at {}, could not be read",
             at.display()
@@ -451,7 +444,6 @@ fn unrecorded(at: &Path, why: &str) -> Problem {
 fn unrecordable(plugin: &str, why: Problem, back: &super::putting_back::Reversal) -> Problem {
     Problem::new(
         UNRECORDABLE,
-        Severity::Error,
         format!("{plugin} held every proof and could not be recorded as installed"),
         left_behind(back),
         Remedy::new("Check the permissions on the configuration directory, then install it again"),

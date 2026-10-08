@@ -12,7 +12,7 @@ use super::Pair;
 use super::{Category, Finding, Verdict};
 use crate::config::PortForward;
 use crate::error::codes::vpn::{NO_TUNNEL, PORT_MISMATCH};
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 
 pub(super) fn assemble(
     pair: &Pair,
@@ -88,7 +88,6 @@ pub(super) fn unprotected() -> Finding {
         Verdict::Warn(
             Problem::new(
                 NO_TUNNEL,
-                Severity::Warning,
                 "Torrent traffic is not contained by a VPN",
                 "This stack declares torrents and no VPN-contained client to run them \
                  through, so every torrent it runs is visible under this connection's own \
@@ -140,7 +139,6 @@ pub(super) fn port_mismatch(granted: u16, listening: u16) -> Finding {
         Verdict::Warn(
             Problem::new(
                 PORT_MISMATCH,
-                Severity::Warning,
                 format!(
                     "The provider forwards port {granted} and the download client is listening \
                      on {listening}"

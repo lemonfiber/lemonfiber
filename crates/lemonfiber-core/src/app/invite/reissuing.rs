@@ -125,7 +125,6 @@ fn renewed(name: String, reachable: crate::door::Address, rehearsed: bool) -> In
 fn unreadable() -> crate::error::Problem {
     crate::error::Problem::new(
         crate::error::codes::reissue::UNREADABLE,
-        crate::error::Severity::Error,
         "the media server would not say who holds an account, so nothing was reset",
         "Making an account claimable again starts by finding it, and that read did not \
          answer",
@@ -136,7 +135,6 @@ fn unreadable() -> crate::error::Problem {
 fn nobody_here(name: &str) -> crate::error::Problem {
     crate::error::Problem::new(
         crate::error::codes::reissue::NOBODY_HERE,
-        crate::error::Severity::Error,
         format!("nobody called {name} is in this household"),
         "Nothing was reset. The name has to match an account the media server holds, \
          though not its capitalisation",
@@ -147,7 +145,6 @@ fn nobody_here(name: &str) -> crate::error::Problem {
 fn runs_the_server(name: &str) -> crate::error::Problem {
     crate::error::Problem::new(
         crate::error::codes::reissue::RUNS_THE_SERVER,
-        crate::error::Severity::Error,
         format!("{name} administers the media server, so its password is not one to reset"),
         "This is the account lemonfiber signs in as, and taking its password away would \
          leave nothing to sign in with",
@@ -161,7 +158,6 @@ fn runs_the_server(name: &str) -> crate::error::Problem {
 fn would_not_reissue(name: &str) -> crate::error::Problem {
     crate::error::Problem::new(
         crate::error::codes::reissue::WOULD_NOT_REISSUE,
-        crate::error::Severity::Error,
         format!("the media server would not reset {name}'s password, so nothing changed"),
         "Their existing password still works and the account is untouched",
         crate::error::Remedy::new("Check the media server is running, then run this again"),

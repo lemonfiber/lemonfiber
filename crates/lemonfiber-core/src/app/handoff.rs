@@ -26,7 +26,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use crate::app::Ctx;
-use crate::error::{Problem, Remedy, Severity};
+use crate::error::{Problem, Remedy};
 use crate::model::{HandedClient, HandedSession, Handoff, HandoffRemedy, HandoffState};
 use crate::ports::service::{Household as _, Member};
 
@@ -322,7 +322,6 @@ const STILL_THEIRS: &str = "No device of theirs has signed in since the code was
 fn nobody_named() -> Problem {
     Problem::new(
         crate::error::codes::handoff::NOBODY_NAMED,
-        Severity::Error,
         "a hand-off needs somebody to be for",
         "The name is the account their device signs in to, so a blank one leads nowhere",
         Remedy::new("Give the name they sign in as"),
@@ -333,7 +332,6 @@ fn nobody_named() -> Problem {
 fn no_media_server() -> Problem {
     Problem::new(
         crate::error::codes::handoff::NO_MEDIA_SERVER,
-        Severity::Error,
         "this stack has no media server, so there is nothing for a device to sign in to",
         "A hand-off points somebody's device at the media server and proves it signed in",
         Remedy::new("Add a media server to the stack and run setup"),
@@ -344,7 +342,6 @@ fn no_media_server() -> Problem {
 fn not_set_up() -> Problem {
     Problem::new(
         crate::error::codes::handoff::NOT_SET_UP,
-        Severity::Error,
         "the media server's own account has not been set up yet",
         "Finding somebody's account and the devices signed in to it is done as the \
          administrator, and this machine has not recorded one",
@@ -356,7 +353,6 @@ fn not_set_up() -> Problem {
 fn runs_the_server(name: &str) -> Problem {
     Problem::new(
         crate::error::codes::handoff::RUNS_THE_SERVER,
-        Severity::Error,
         format!("{name} administers the media server, so it is not an account to hand over"),
         "This is the account lemonfiber signs in as, and a device handed it could change \
          what everybody else in the household may watch",

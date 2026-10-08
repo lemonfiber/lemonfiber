@@ -30,7 +30,7 @@ use lemonfiber_plugin::{Contribution, Expect};
 
 use super::{Category, Check, Finding, Reported, Verdict};
 use crate::error::codes::plugin::CONTRIBUTED_FAILED;
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 use crate::plugin::judging::{judge, live, method};
 use crate::plugin::recorded::Answer;
 use crate::plugin::Installed;
@@ -341,7 +341,6 @@ impl Contributed {
         let leading = declared.next();
         let problem = Problem::new(
             CONTRIBUTED_FAILED,
-            Severity::Error,
             format!("{} did not hold", self.of()),
             leading.map_or_else(
                 || format!("{} declared no remedy that could be rendered", self.plugin),

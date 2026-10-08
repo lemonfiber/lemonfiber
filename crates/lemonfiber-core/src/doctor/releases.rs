@@ -31,7 +31,7 @@ use async_trait::async_trait;
 use super::{Category, Check, Finding, Verdict};
 use crate::doctor::credentials::Target;
 use crate::error::codes::qual::{NONE_AVAILABLE, PRESET_UNMET};
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 use crate::ports::filesystem::FileSystem;
 use crate::ports::http::Http;
 use crate::ports::service::{QualityReleases, ReleaseProbe};
@@ -198,7 +198,6 @@ async fn ran(check: &ReleasesCheck) -> Vec<Finding> {
 fn unmet(media: &str) -> Problem {
     Problem::new(
         PRESET_UNMET,
-        Severity::Warning,
         format!("The chosen quality finds no {media} releases"),
         format!(
             "Releases for wanted {media} are available, but the chosen quality preset wants none \
@@ -219,7 +218,6 @@ fn unmet(media: &str) -> Problem {
 fn none_available(media: &str) -> Problem {
     Problem::new(
         NONE_AVAILABLE,
-        Severity::Warning,
         format!("No {media} releases were found for wanted content"),
         format!(
             "The indexer answered but returned no releases at all for wanted {media} — few or \

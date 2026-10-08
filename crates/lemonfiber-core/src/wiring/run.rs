@@ -8,12 +8,13 @@
 //! for the same reason: an operator told afterwards that something stopped being
 //! filled has been told about a thing they can no longer choose.
 
-use crate::error::{Amiss, Problem, Remedy, Severity};
+use crate::error::{Problem, Remedy};
 
 use super::Refused;
 use crate::app::Ctx;
 use crate::error::codes::wire::{
-    CANNOT_FILL, CHOICE_UNWRITABLE, NOTHING_ASKS, NO_SUCH_FILLER, UNREASONABLE, WIRING_MOVED,
+    ALREADY_FILLS, CANNOT_FILL, CHOICE_UNWRITABLE, NOTHING_ASKS, NO_SUCH_FILLER, UNREASONABLE,
+    WIRING_MOVED,
 };
 use crate::error::Diagnose;
 use crate::model::{SubstitutionReport, WiringReport};
@@ -238,20 +239,17 @@ fn problem(refused: &Refused) -> Problem {
     match refused {
         Refused::NoSuchService(service) => Problem::new(
             NO_SUCH_FILLER,
-            Severity::Error,
             format!("there is no service called {service} in this stack"),
             "Nothing was changed. A capability is filled by a service this stack \
              declares, and that name is not one of them.",
             Remedy::new("List the services this stack has").with_detail("lemonfiber catalogue"),
         )
-        .or_try(listing)
-        .lies_in(Amiss::Naming),
+        .or_try(listing),
         Refused::DoesNotProvide {
             service,
             capability,
         } => Problem::new(
             CANNOT_FILL,
-            Severity::Error,
             format!("{service} does not provide {capability}"),
             "Nothing was changed. Filling a capability with a service that does not \
              declare it would point everything that asked at something that cannot \
@@ -259,29 +257,24 @@ fn problem(refused: &Refused) -> Problem {
             Remedy::new("See which services declare it")
                 .with_detail("lemonfiber plugin capabilities"),
         )
-        .or_try(listing)
-        .lies_in(Amiss::Asking),
+        .or_try(listing),
         Refused::NothingAsks(capability) => Problem::new(
             NOTHING_ASKS,
-            Severity::Warning,
             format!("nothing in this stack asks for {capability}"),
             "Nothing was changed. Choosing who fills a capability nothing asks for \
              would record a setting no wiring reads.",
             listing,
-        )
-        .lies_in(Amiss::Asking),
+        ),
         Refused::AlreadyFills {
             service,
             capability,
         } => Problem::new(
-            CANNOT_FILL,
-            Severity::Advisory,
+            ALREADY_FILLS,
             format!("{service} already fills {capability}"),
             "Nothing was changed, and nothing needed to be.",
             listing,
         )
-        .in_state(crate::error::State::Guided)
-        .lies_in(Amiss::Asking),
+        .in_state(crate::error::State::Guided),
     }
 }
 
@@ -289,7 +282,6 @@ fn problem(refused: &Refused) -> Problem {
 fn nowhere_to_record() -> Problem {
     Problem::new(
         CHOICE_UNWRITABLE,
-        Severity::Error,
         "there is no settings file to record the choice in",
         "Nothing was changed. Which service fills a capability is a setting, and \
          this run has no settings file to put it in.",
@@ -302,21 +294,18 @@ fn nowhere_to_record() -> Problem {
 /// Every part that moved is named, because an operator told only that something
 /// changed has to read the whole choice again to find out what.
 fn offer_moved(capability: &str, moved: &[&str], standing: &str) -> Problem {
-    crate::agreement::moved(
-        Problem::new(
-            WIRING_MOVED,
-            Severity::Error,
-            format!("That choice was agreed to against a different reading of {capability}"),
-            format!(
-                "Since it was read, {} changed, so nothing was changed. Agreeing to it now \
-                 would be agreeing to something nobody saw.",
-                moved.join(" and ")
-            ),
-            Remedy::new("Read the choice again, and answer the name it prints")
-                .with_detail(format!("the offer standing now is {standing}")),
-        )
-        .in_state(crate::error::State::Guided),
+    Problem::new(
+        WIRING_MOVED,
+        format!("That choice was agreed to against a different reading of {capability}"),
+        format!(
+            "Since it was read, {} changed, so nothing was changed. Agreeing to it now \
+             would be agreeing to something nobody saw.",
+            moved.join(" and ")
+        ),
+        Remedy::new("Read the choice again, and answer the name it prints")
+            .with_detail(format!("the offer standing now is {standing}")),
     )
+    .in_state(crate::error::State::Guided)
 }
 
 /// A reason that cannot be recorded beside a choice.
@@ -334,12 +323,10 @@ fn unreasonable(long: bool) -> Problem {
     };
     Problem::new(
         UNREASONABLE,
-        Severity::Error,
         "That reason cannot be recorded with the choice",
         format!("{why} Nothing was changed."),
         Remedy::new("Say why in one shorter line, or make the choice with no reason"),
     )
-    .lies_in(Amiss::Asking)
 }
 
 #[cfg(test)]

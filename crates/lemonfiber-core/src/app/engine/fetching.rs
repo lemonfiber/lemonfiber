@@ -9,7 +9,7 @@
 
 use crate::app::Ctx;
 use crate::config::REACH_REGISTRY_KEY;
-use crate::error::{Amiss, Problem, Remedy, Severity};
+use crate::error::{Problem, Remedy};
 use crate::stack::compose::Action;
 
 /// Whether this action would ask a registry for anything the operator has refused.
@@ -26,7 +26,6 @@ pub(crate) fn refused(ctx: &Ctx, action: &Action) -> bool {
 pub(crate) fn refusal() -> Problem {
     Problem::new(
         crate::app::REGISTRY_REFUSED,
-        Severity::Error,
         "fetching images is switched off",
         format!(
             "Nothing was fetched. {REACH_REGISTRY_KEY} is off, so this machine asks no \
@@ -38,7 +37,6 @@ pub(crate) fn refusal() -> Problem {
              run this again"
         )),
     )
-    .lies_in(Amiss::Asking)
 }
 
 #[cfg(test)]

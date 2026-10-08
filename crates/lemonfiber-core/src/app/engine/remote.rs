@@ -27,7 +27,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::app::Ctx;
-use crate::error::{Diagnose, Problem, Remedy, Severity, State};
+use crate::error::{Diagnose, Problem, Remedy, State};
 use crate::ports::docker::{Failure, Presence};
 
 /// What is asked about, to find out whether the asking still works.
@@ -148,7 +148,6 @@ fn refusal(host: &str, path: &Path) -> Problem {
     let location = path.display();
     Problem::new(
         super::super::ABSENT_THERE,
-        Severity::Error,
         format!("{location} is not on {host}"),
         format!(
             "A remote Docker context is in force, so this command would run against {host} — and \

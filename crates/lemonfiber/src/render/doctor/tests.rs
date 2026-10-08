@@ -1,7 +1,7 @@
 use super::*;
 use crate::render::fixtures::*;
 use lemonfiber_core::doctor::{Category, Finding, Overall, Verdict};
-use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
+use lemonfiber_core::error::{Code, Problem, Remedy};
 
 /// A finding that failed, for the tests that are about what is shown beside one.
 fn a_failing_finding() -> Finding {
@@ -245,7 +245,6 @@ fn an_unverified_finding_without_detail_still_carries_its_remedy() {
 fn a_remedy_without_detail_prints_only_its_action() {
     let problem = Problem::new(
         Code::new("TEST"),
-        Severity::Warning,
         "it broke",
         "nothing imports",
         Remedy::new("restart it"),

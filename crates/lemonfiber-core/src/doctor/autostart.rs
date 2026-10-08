@@ -34,7 +34,7 @@ use async_trait::async_trait;
 
 use super::{Category, Check, Finding, Verdict};
 use crate::error::codes::env::ENGINE_NOT_AT_BOOT;
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 use crate::platform::Environment;
 use crate::ports::{FileSystem, Runner};
 
@@ -191,7 +191,6 @@ fn verdict(found: Prerequisite) -> Verdict {
         Prerequisite::Absent { what, how } => Verdict::Warn(
             Problem::new(
                 ENGINE_NOT_AT_BOOT,
-                Severity::Warning,
                 what,
                 "The containers carry a restart policy, and a restart policy only brings a \
                  container back once the engine behind it is running. Nothing starts the engine, \

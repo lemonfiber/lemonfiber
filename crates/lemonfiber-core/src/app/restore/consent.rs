@@ -18,7 +18,7 @@
 //! This is a race and replay guard, not a permission. Whoever can send the second
 //! request could have sent the first.
 
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 
 use super::Preview;
 use crate::error::codes::restore::MOVED_ON;
@@ -82,19 +82,16 @@ impl Consent {
 /// from a data root that moved under them, and the two ask for opposite things
 /// next.
 fn moved_on(agreed: &str, stands: &str) -> Problem {
-    crate::agreement::moved(
-        Problem::new(
-            MOVED_ON,
-            Severity::Warning,
-            "What you agreed to is not what this backup would do now",
-            format!(
-                "The listing you answered was {agreed}, and a fresh look at the archive lists \
-                 {stands}. Something has changed since you read it, so nothing was overwritten."
-            ),
-            Remedy::new("Ask what the backup holds again, and read what it says now"),
-        )
-        .in_state(State::Guided),
+    Problem::new(
+        MOVED_ON,
+        "What you agreed to is not what this backup would do now",
+        format!(
+            "The listing you answered was {agreed}, and a fresh look at the archive lists \
+             {stands}. Something has changed since you read it, so nothing was overwritten."
+        ),
+        Remedy::new("Ask what the backup holds again, and read what it says now"),
     )
+    .in_state(State::Guided)
 }
 
 #[cfg(test)]

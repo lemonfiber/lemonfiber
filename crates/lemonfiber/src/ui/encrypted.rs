@@ -16,7 +16,7 @@ use lemonfiber_api::guard::Binding;
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::companion::{answers_to, certificate};
 use lemonfiber_core::error::codes::serve::{NO_CERTIFICATE, UNSETTLED_PORT};
-use lemonfiber_core::error::{Problem, Remedy, Severity};
+use lemonfiber_core::error::{Problem, Remedy};
 use lemonfiber_core::PRODUCT;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 use tokio_rustls::TlsAcceptor;
@@ -98,7 +98,6 @@ pub(crate) async fn bound(ctx: &Ctx, port: u16, network: bool, encrypted: bool) 
 fn unsettled() -> Problem {
     Problem::new(
         UNSETTLED_PORT,
-        Severity::Error,
         format!("{PRODUCT} serves encrypted only on a port you name"),
         "Serving encrypted is for a paired phone, and a phone keeps the address it was \
          given — a port chosen afresh every run would be one it stopped reaching the next \
@@ -111,7 +110,6 @@ fn unsettled() -> Problem {
 fn uncertified(why: &str) -> Problem {
     Problem::new(
         NO_CERTIFICATE,
-        Severity::Error,
         format!("{PRODUCT} could not serve encrypted"),
         format!("It presents a certificate it keeps beside its configuration, and {why}."),
         Remedy::new("Replace the certificate, knowing every paired phone will need pairing again")

@@ -493,5 +493,10 @@
     "name": "UNREASONABLE",
     "status": 400,
     "description": "Raised when the reason given for a choice is longer than a reason may be, or holds a line break or another control character."
+  },
+  "WIRE-7": {
+    "name": "ALREADY_FILLS",
+    "status": 400,
+    "description": "Raised where the service chosen already fills the capability, so there is nothing to change."
   }
 }

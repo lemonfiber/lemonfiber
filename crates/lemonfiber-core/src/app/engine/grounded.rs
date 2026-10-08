@@ -26,7 +26,7 @@
 use std::path::Path;
 use std::time::Duration;
 
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 use crate::ports::filesystem::Presence;
 use crate::stack::compose::Action;
 
@@ -120,7 +120,6 @@ async fn present(ctx: &Ctx, root: &Path) -> bool {
 fn never_appeared(root: &Path) -> Problem {
     Problem::new(
         NO_DATA_LOCATION,
-        Severity::Error,
         format!("The data location {} is not there", root.display()),
         "Nothing was started. Starting over a location that is not mounted does not fail — the \
          engine makes the directory on whatever is underneath the mount point, which is usually \

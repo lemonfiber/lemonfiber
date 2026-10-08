@@ -5,7 +5,7 @@
 //! fixture copied per module is a fixture that drifts per module.
 
 use super::{Category, Finding, Verdict};
-use crate::error::{Code, Problem, Remedy, Severity};
+use crate::error::{Code, Problem, Remedy};
 
 /// The code every diagnosis built here carries.
 const CODE: Code = Code::new("TEST-1");
@@ -30,7 +30,6 @@ pub(super) fn finding(title: &str, verdict: Verdict) -> Finding {
 pub(super) fn problem() -> Problem {
     Problem::new(
         CODE,
-        Severity::Error,
         "It broke",
         "The thing did not happen",
         Remedy::new("Try again"),

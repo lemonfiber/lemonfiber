@@ -61,10 +61,7 @@ fn an_offer_that_moved_is_refused_naming_only_the_part_that_did() {
     let result = acting(&ctx, &consent, "komga", &standing(), &INSTALLING, &["a@b"]);
     assert_eq!(refused(&result), Some("PLUGIN-25"));
     let problem = result.err();
-    assert_eq!(
-        problem.as_ref().map(|problem| problem.amiss),
-        Some(crate::agreement::MOVED_AMISS)
-    );
+    assert_eq!(problem.as_ref().map(|problem| problem.status()), Some(400));
     assert!(
         problem.is_some_and(|problem| problem.meaning.contains("what it would write")
             && !problem.meaning.contains("the plugin "))

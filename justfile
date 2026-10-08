@@ -198,11 +198,14 @@ extension-points:
 reference:
     cargo run --quiet --example reference -p lemonfiber
 
-# Rewrite the error-code reference from the codes the crates declare.
+# Rewrite the published code registry from the codes the crates declare, then the
+# error-code reference from that file.
 codes:
     #!/usr/bin/env bash
     set -euo pipefail
-    cargo run --quiet --example codes -p lemonfiber > reference/error-codes.md.next
+    cargo run --quiet --example codes -p lemonfiber -- json > contract/codes.json.next
+    mv contract/codes.json.next contract/codes.json
+    cargo run --quiet --example codes -p lemonfiber -- reference > reference/error-codes.md.next
     mv reference/error-codes.md.next reference/error-codes.md
 
 # Rewrite the release record from the commits that made each release.

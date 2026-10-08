@@ -31,7 +31,7 @@ use crate::bandwidth::{
     NOTHING_MEASURED, NOTHING_TO_LIMIT, NO_ZONE,
 };
 use crate::config::store;
-use crate::error::{Amiss, Diagnose, Problem, Remedy, Severity};
+use crate::error::{Diagnose, Problem, Remedy};
 use crate::ports::service::{Rates, Wanted, Window};
 
 use crate::app::command::BandwidthAsked as Asked;
@@ -357,7 +357,6 @@ fn keep(ctx: &Ctx, declared: &Declared) {
 fn nothing_to_limit() -> Problem {
     Problem::new(
         NOTHING_TO_LIMIT,
-        Severity::Error,
         "There is no download client on this stack to hold to a limit",
         "Limits here are set inside the download clients themselves. With none \
          running there is nothing to set them on, and nothing taking the line \
@@ -365,14 +364,12 @@ fn nothing_to_limit() -> Problem {
         Remedy::new("Start a form that has a download client in it")
             .with_detail("lemonfiber up tv"),
     )
-    .lies_in(Amiss::Asking)
 }
 
 /// A share was asked for and nothing has measured the line.
 fn nothing_measured() -> Problem {
     Problem::new(
         NOTHING_MEASURED,
-        Severity::Error,
         "Nothing has measured this line, so a share of it is not a limit",
         "Half of an unknown number holds nothing back. Rather than write a setting \
          that would do nothing while looking like it was working, this is refused \
@@ -380,14 +377,12 @@ fn nothing_measured() -> Problem {
         Remedy::new("Say what the line carries, or give a figure instead of a share")
             .with_detail("lemonfiber bandwidth --line 60MiB/6MiB, or --down 2MiB"),
     )
-    .lies_in(Amiss::Asking)
 }
 
 /// A schedule was asked for on a stack that names no zone.
 fn no_zone() -> Problem {
     Problem::new(
         NO_ZONE,
-        Severity::Error,
         "Nothing says which zone the download clients read a clock in",
         "The household's hours are kept by the clients themselves, on their own \
          clocks, which is what makes them follow your wall clock through the \
@@ -397,7 +392,6 @@ fn no_zone() -> Problem {
         Remedy::new("Set the zone, then ask again")
             .with_detail("lemonfiber config set TZ Europe/Amsterdam"),
     )
-    .lies_in(Amiss::Asking)
 }
 
 #[cfg(test)]

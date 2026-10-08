@@ -18,7 +18,7 @@ use async_trait::async_trait;
 
 use super::{Category, Check, Finding, Verdict};
 use crate::error::codes::env::{API_MISMATCH, COMPOSE_UNUSABLE, DAEMON_DOWN, DOCKER_ABSENT};
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 use crate::ports::docker::Target;
 use crate::ports::process::Failure;
 use crate::ports::Runner;
@@ -216,7 +216,6 @@ fn api_verdict(engine: &Engine) -> Verdict {
 fn mismatch(ours: &str, theirs: &str) -> Problem {
     Problem::new(
         API_MISMATCH,
-        Severity::Warning,
         format!("this machine speaks Docker API {ours} and the daemon speaks {theirs}"),
         "Both ends settle on the older of the two, so everything works and anything newer than that generation is simply not available. It is worth knowing about when a feature that should be there is not, and it is ordinary where the two machines were updated at different times.",
         Remedy::new("Bring both to the same Docker release, or carry on with the older set"),
@@ -267,7 +266,6 @@ fn engine_verdict(engine: Engine) -> Verdict {
         Engine::Absent => Verdict::Fail(
             Problem::new(
                 DOCKER_ABSENT,
-                Severity::Error,
                 "Docker is not installed",
                 "lemonfiber runs your stack in containers, so a container engine has to be installed before any of it can start.",
                 Remedy::new("Install Docker Desktop, or Docker Engine on Linux")
@@ -278,7 +276,6 @@ fn engine_verdict(engine: Engine) -> Verdict {
         Engine::DaemonDown(detail) => Verdict::Fail(
             Problem::new(
                 DAEMON_DOWN,
-                Severity::Error,
                 "Docker is installed but its daemon is not running",
                 "The client is here, so this is the daemon being stopped rather than a missing install — starting it is usually all this needs.",
                 Remedy::new("Start Docker Desktop, or the docker service on Linux"),
@@ -289,7 +286,6 @@ fn engine_verdict(engine: Engine) -> Verdict {
         Engine::Unusable(reason) => Verdict::Fail(
             Problem::new(
                 DAEMON_DOWN,
-                Severity::Error,
                 "Docker is installed but would not start",
                 "The client is present, so this is usually a permission problem rather than a missing install.",
                 Remedy::new("Check that you may run docker, then try again"),
@@ -304,7 +300,6 @@ fn engine_verdict(engine: Engine) -> Verdict {
 fn compose_absent() -> Problem {
     Problem::new(
         COMPOSE_UNUSABLE,
-        Severity::Error,
         "The Docker Compose plugin is not available",
         "lemonfiber drives your stack through Compose v2. Docker is here, but its Compose plugin is not, so nothing can be composed.",
         Remedy::new("Install the Docker Compose plugin")
@@ -318,7 +313,6 @@ fn compose_outdated(found: &str) -> Problem {
     let (major, minor, patch) = MINIMUM_COMPOSE;
     Problem::new(
         COMPOSE_UNUSABLE,
-        Severity::Error,
         format!("Docker Compose {found} is too old to drive this stack"),
         "The stack's compose file assembles its parts with `include:`, which older Compose plugins do not read, so nothing in it could be started.",
         Remedy::new(format!("Update the Docker Compose plugin to {major}.{minor}.{patch} or newer"))

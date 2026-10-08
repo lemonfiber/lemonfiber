@@ -2,7 +2,7 @@ use super::reported;
 use lemonfiber_core::error::codes::handoff::{NOBODY_NAMED, NOT_SET_UP};
 use lemonfiber_core::error::codes::life::ALREADY_WORKING;
 use lemonfiber_core::error::codes::pair::{NOT_SERVED, NO_ADDRESS, NO_CERTIFICATE};
-use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
+use lemonfiber_core::error::{Code, Problem, Remedy};
 
 /// A failure carries text this product did not write, and a terminal is not a
 /// text box: one escape clears the screen, another writes over the line just
@@ -16,7 +16,6 @@ fn a_failure_cannot_carry_an_instruction_to_the_terminal() {
     let escape = char::from(27);
     let problem = Problem::new(
         Code::new("WORD-9"),
-        Severity::Error,
         format!("the service refused{escape}[2J"),
         "it gave a reason of its own.",
         Remedy::new("Try again"),
@@ -42,7 +41,6 @@ fn a_failure_cannot_carry_an_instruction_to_the_terminal() {
 fn a_failure_explains_its_own_words() {
     let problem = Problem::new(
         Code::new("WORD-8"),
-        Severity::Error,
         "no indexer answered in time",
         "nothing could be searched for.",
         Remedy::new("Check the indexer is reachable"),
@@ -64,7 +62,6 @@ fn a_failure_explains_its_own_words() {
 fn a_failure_a_script_asked_for_is_one_document_it_can_parse() {
     let problem = Problem::new(
         Code::new("WORD-7"),
-        Severity::Error,
         "no indexer answered in time",
         "nothing could be searched for.",
         Remedy::new("Check the indexer is reachable"),
@@ -89,7 +86,6 @@ fn a_failure_a_script_asked_for_is_one_document_it_can_parse() {
 fn a_stack_held_by_another_run_is_told_the_flag_that_takes_it() {
     let held = Problem::new(
         ALREADY_WORKING,
-        Severity::Error,
         "another lemonfiber run is still working on this stack",
         "this one stopped without doing anything.",
         Remedy::new("Wait for it to finish, then try again"),
@@ -97,7 +93,6 @@ fn a_stack_held_by_another_run_is_told_the_flag_that_takes_it() {
     .with_detail("The claim is at /tmp/stack.lock.");
     let other = Problem::new(
         Code::new("WORD-7"),
-        Severity::Error,
         "something else went wrong",
         "nothing was done.",
         Remedy::new("Try again"),
@@ -118,14 +113,12 @@ fn a_stack_held_by_another_run_is_told_the_flag_that_takes_it() {
 fn a_refused_hand_off_is_told_the_command_that_takes_its_remedy() {
     let blank = Problem::new(
         NOBODY_NAMED,
-        Severity::Error,
         "a hand-off needs somebody to be for",
         "The name is the account their device signs in to.",
         Remedy::new("Give the name they sign in as"),
     );
     let unset = Problem::new(
         NOT_SET_UP,
-        Severity::Error,
         "the media server's own account has not been set up yet",
         "This machine has not recorded one.",
         Remedy::new("Run setup so the media server's account is made and recorded"),
@@ -158,7 +151,6 @@ fn a_refused_pairing_is_told_the_command_that_takes_its_remedy() {
     ] {
         let refused = Problem::new(
             code,
-            Severity::Error,
             "a phone has nothing to reach",
             "Pairing needs it.",
             Remedy::new("Put it right"),

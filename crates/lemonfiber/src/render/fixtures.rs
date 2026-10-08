@@ -5,7 +5,7 @@
 
 use lemonfiber_core::changelog::{told, Notes, Record};
 use lemonfiber_core::docker::{Criticality, Service, State};
-use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
+use lemonfiber_core::error::{Code, Problem, Remedy};
 use lemonfiber_core::glossary::{explain, Term};
 use lemonfiber_core::model::{
     FormReport, FormsReport, LifecycleReport, MusicChoice, PresetChoice, SupervisionReport,
@@ -40,7 +40,6 @@ pub(super) fn seed_report(wirings: Vec<Wiring>) -> SeedReport {
 pub(super) fn a_problem() -> Problem {
     Problem::new(
         Code::new("TEST"),
-        Severity::Error,
         "it broke",
         "nothing will import",
         Remedy::new("restart it").with_detail("docker compose restart"),

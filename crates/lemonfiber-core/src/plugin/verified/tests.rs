@@ -1,6 +1,6 @@
 use super::{against, standing, Standing, Verification};
 use crate::doctor::{Category, Finding, Verdict};
-use crate::error::{Code, Problem, Remedy, Severity};
+use crate::error::{Code, Problem, Remedy};
 
 /// A finding under a named check, which is the key the whole rule turns on.
 fn finding(check: &str, verdict: Verdict) -> Finding {
@@ -22,7 +22,6 @@ fn finding(check: &str, verdict: Verdict) -> Finding {
 fn raised(failing: bool) -> Verdict {
     let problem = Problem::new(
         Code::new("TEST-1"),
-        Severity::Error,
         "It broke",
         "The thing did not happen",
         Remedy::new("Try again"),

@@ -43,7 +43,7 @@ use lemonfiber_api::guard::{Binding, Token};
 use lemonfiber_api::jobs::{Jobs, LEASE};
 use lemonfiber_api::router::{self, Serving};
 use lemonfiber_core::app::Ctx;
-use lemonfiber_core::error::{Problem, Remedy, Severity, State as Standing};
+use lemonfiber_core::error::{Problem, Remedy, State as Standing};
 use lemonfiber_core::frontend::Source;
 use lemonfiber_core::keys::run as keys;
 use lemonfiber_core::platform::HOST_OS;
@@ -533,7 +533,6 @@ async fn revoked(admitting: Arc<Admitting>, offered: Offered, look: Duration) {
 fn tokenless() -> Problem {
     Problem::new(
         NO_TOKEN,
-        Severity::Error,
         format!("{PRODUCT} could not mint a token for this run"),
         "Every request to this surface has to carry a secret that only this run knows, and \
          this machine would not supply the unpredictable bytes one is made of.",

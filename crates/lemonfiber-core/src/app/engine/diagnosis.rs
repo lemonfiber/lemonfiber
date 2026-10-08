@@ -26,7 +26,7 @@ use crate::doctor::indexer::IndexerCheck;
 use crate::doctor::releases::ReleasesCheck;
 use crate::doctor::telling::TellingCheck;
 use crate::doctor::{examine, Check, Finding, Narrowing, Verdict};
-use crate::error::{Diagnose, Problem, Remedy, Severity};
+use crate::error::{Diagnose, Problem, Remedy};
 use crate::model::DoctorReport;
 
 use crate::app::targets::{project_directory, servarr_targets};
@@ -80,7 +80,6 @@ fn answered(narrowing: &Narrowing, report: DoctorReport) -> Result<DoctorReport,
 fn no_such_check(named: &str) -> Problem {
     Problem::new(
         NO_SUCH_CHECK,
-        Severity::Error,
         format!("No check on this stack reports as {named}"),
         "A check is named by the identifier its finding carries, and this run holds no \
          finding under that one. A report of nothing found would read as nothing wrong.",

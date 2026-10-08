@@ -7,7 +7,7 @@ use super::{
     Reads, TraceReport,
 };
 use crate::doctor::{Category, Finding, Verdict};
-use crate::error::{Problem, Remedy, Severity};
+use crate::error::{Problem, Remedy};
 use crate::jellyfin::Jellyfin;
 use crate::ports::service::{ItemPart, QueueItem, TraceEvent};
 use crate::recyclarr::Kind;

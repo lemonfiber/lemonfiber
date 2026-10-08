@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 
-use lemonfiber_error::{Diagnose, Problem, Remedy, Severity, State};
+use lemonfiber_error::{Diagnose, Problem, Remedy, State};
 
 mod addressing;
 mod aggregators;

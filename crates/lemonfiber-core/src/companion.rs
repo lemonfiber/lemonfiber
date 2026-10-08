@@ -24,7 +24,7 @@ use serde::Serialize;
 
 use crate::app::Ctx;
 use crate::error::codes::pair::{NOT_SERVED, NOWHERE, NO_ADDRESS, NO_CERTIFICATE, UNNAMED};
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 use crate::PRODUCT;
 
 /// What was asked of pairing.
@@ -327,7 +327,6 @@ fn encrypted(url: &str) -> String {
 fn nowhere() -> Problem {
     Problem::new(
         NOWHERE,
-        Severity::Error,
         "there is nowhere on this machine to keep what pairing a phone needs",
         "The certificate a phone pins and the name it knows this stack by are kept beside the \
          configuration, and this machine would not say where its configuration directory is.",
@@ -341,7 +340,6 @@ fn nowhere() -> Problem {
 fn not_served() -> Problem {
     Problem::new(
         NOT_SERVED,
-        Severity::Error,
         format!("{PRODUCT} has not been served encrypted on your network, so a phone has nothing to reach"),
         "A phone refuses an address that presents no certificate, and reaches this machine \
          from the network rather than from here. The material names the port the surface \
@@ -355,7 +353,6 @@ fn not_served() -> Problem {
 fn no_certificate(why: &str) -> Problem {
     Problem::new(
         NO_CERTIFICATE,
-        Severity::Error,
         "the certificate this machine presents to a phone could not be read",
         format!(
             "A phone pins the certificate the surface presents, and {why}. It is not made \
@@ -369,7 +366,6 @@ fn no_certificate(why: &str) -> Problem {
 fn no_address() -> Problem {
     Problem::new(
         NO_ADDRESS,
-        Severity::Error,
         "this machine has no address a phone could reach it at",
         "Pairing material names the address a phone reaches, and this machine answers to no \
          name on the network and has none written down.",
@@ -381,7 +377,6 @@ fn no_address() -> Problem {
 fn unnamed(why: &str) -> Problem {
     Problem::new(
         UNNAMED,
-        Severity::Error,
         "this stack's own identifier could not be read or made",
         format!(
             "A phone knows this stack by an identifier it keeps whatever else changes, and \

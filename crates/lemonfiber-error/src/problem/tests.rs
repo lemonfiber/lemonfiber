@@ -1,11 +1,10 @@
-use super::{folded, Amiss, Code, Diagnose, Problem, Remedy, Repeated, Severity, State};
+use super::{folded, Code, Diagnose, Problem, Remedy, Repeated, Severity, State};
 
 const TEST: Code = Code::new("TEST-1");
 
 fn a_problem() -> Problem {
     Problem::new(
         TEST,
-        Severity::Error,
         "Something broke",
         "The thing you asked for did not happen",
         Remedy::new("Try it again"),
@@ -28,7 +27,7 @@ fn every_problem_carries_a_remedy() {
 
 #[test]
 fn a_problem_with_no_known_remedy_still_offers_escalation() {
-    let problem = Problem::unknown(TEST, Severity::Error, "Something broke", "Unclear");
+    let problem = Problem::unknown(TEST, "Something broke", "Unclear");
     assert_eq!(problem.state, State::Unknown);
     assert_eq!(
         problem
@@ -61,7 +60,6 @@ fn detail_and_state_are_recorded_without_displacing_the_plain_words() {
 fn a_symptom_can_name_the_cause_it_came_from() {
     let cause = Problem::new(
         Code::new("TEST-2"),
-        Severity::Critical,
         "The disk is full",
         "Nothing can be written",
         Remedy::new("Free some space"),
@@ -74,36 +72,25 @@ fn a_symptom_can_name_the_cause_it_came_from() {
 }
 
 #[test]
-fn a_problem_lies_in_the_answering_until_it_says_otherwise() {
-    // The safe default: a surface told nothing reports that it could not
-    // answer, which is what it did.
-    assert_eq!(a_problem().amiss, Amiss::Answering);
-    assert_eq!(
-        Problem::unknown(TEST, Severity::Error, "Something broke", "Unclear").amiss,
-        Amiss::Answering
+fn a_problem_carries_the_severity_and_status_its_code_is_declared_with() {
+    let leaking = Problem::new(
+        crate::codes::vpn::LEAKING,
+        "Traffic is leaving the tunnel",
+        "Peers can see this address",
+        Remedy::new("Stop the client"),
     );
+    assert_eq!(leaking.severity, Severity::Critical);
+    assert_eq!(leaking.status(), 500);
+
+    let unexplained = Problem::unknown(crate::codes::word::UNRECOGNISED, "No entry", "Unclear");
+    assert_eq!(unexplained.status(), 404);
 }
 
 #[test]
-fn where_a_problem_lies_is_recorded_beside_what_it_says() {
-    // Both halves matter: a problem that recorded the naming and lost its
-    // words would be a status with nothing to read behind it.
-    let named = a_problem().lies_in(Amiss::Naming);
-    assert_eq!(named.amiss, Amiss::Naming);
-    assert_eq!(named.summary, "Something broke");
-
-    assert_eq!(a_problem().lies_in(Amiss::Asking).amiss, Amiss::Asking);
-}
-
-#[test]
-fn where_a_problem_lies_is_not_written_into_the_document() {
-    // A surface says this in its own terms — a status, an exit code — and the
-    // same fact in the body as well would be two things to keep agreeing.
-    let rendered = serde_json::to_string(&a_problem().lies_in(Amiss::Naming));
-    assert!(
-        rendered.is_ok_and(|json| !json.contains("amiss") && json.contains("Something broke")),
-        "the document is what it always was"
-    );
+fn a_code_nothing_declares_is_an_error_answered_as_a_failure() {
+    assert_eq!(a_problem().severity, Severity::Error);
+    assert_eq!(a_problem().status(), 500);
+    assert_eq!(TEST.declaration(), None);
 }
 
 #[test]
@@ -133,7 +120,6 @@ fn detailed(detail: &str) -> Problem {
 fn about(summary: &str) -> Problem {
     Problem::new(
         TEST,
-        Severity::Error,
         summary,
         "The thing you asked for did not happen",
         Remedy::new("Try it again"),

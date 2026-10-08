@@ -8,7 +8,7 @@ use crate::error::codes::stack::{
     STACK_INVALID, STACK_MALFORMED, STACK_NEEDS_NEWER, STACK_NOT_EMBEDDED, STACK_NOT_SET_UP,
     STACK_NOT_WRITTEN, STACK_UNASSEMBLED, STACK_UNREADABLE, STACK_UNRECOGNISED, STACK_UNUSABLE,
 };
-use crate::error::{Code, Diagnose, Problem, Remedy, Severity, State};
+use crate::error::{Code, Diagnose, Problem, Remedy, State};
 
 /// Every code a stack that could not be read is refused with.
 ///
@@ -104,7 +104,6 @@ impl Diagnose for Failure {
         match self {
             Self::Unreadable { path, reason } => Problem::new(
                 STACK_UNREADABLE,
-                Severity::Error,
                 format!("No stack was found at {}", path.display()),
                 "A stack directory holds a stack.toml beside its compose files. Without one there is nothing describing what would be started.",
                 Remedy::new("Point at a directory containing stack.toml")
@@ -117,7 +116,6 @@ impl Diagnose for Failure {
             .with_detail(reason.clone()),
             Self::Unusable { reason } => Problem::new(
                 STACK_UNUSABLE,
-                Severity::Error,
                 "This stack was written for a different version of lemonfiber",
                 "Stacks and lemonfiber are versioned separately so each can move on its own. This pairing does not line up, and guessing at the difference would fail later in a way that looks unrelated.",
                 Remedy::new("Update lemonfiber, or point at a stack this version reads"),
@@ -126,7 +124,6 @@ impl Diagnose for Failure {
             .with_detail(reason.clone()),
             Self::TooOld { required, running } => Problem::new(
                 STACK_NEEDS_NEWER,
-                Severity::Error,
                 format!("This stack needs lemonfiber {required} or newer"),
                 format!(
                     "The stack names the oldest lemonfiber it works with, and this is \
@@ -141,7 +138,6 @@ impl Diagnose for Failure {
             .in_state(State::Guided),
             Self::Malformed { reason } => Problem::new(
                 STACK_MALFORMED,
-                Severity::Error,
                 "This stack file could not be read",
                 "A stack.toml is written in a strict format, and this one breaks it — so nothing in the file has been read at all. The detail below is where the reader stopped, and that line is where the answer is.",
                 Remedy::new("Fix the file at the line named below"),
@@ -154,7 +150,6 @@ impl Diagnose for Failure {
             // guessing game.
             Self::Unrecognised { names } => Problem::new(
                 STACK_UNRECOGNISED,
-                Severity::Error,
                 format!("This stack declares {} names this build does not know", names.len()),
                 "The file is well-formed and says things about itself in words this version has no meaning for — usually a stack from a newer lemonfiber, or a fork that has added something of its own. Starting it would quietly leave out whatever was named.",
                 Remedy::new("Update lemonfiber, or change the names listed below to ones it knows"),
@@ -164,7 +159,6 @@ impl Diagnose for Failure {
             // Every fault at once, for the reason the contract faults below are.
             Self::Unassembled { faults } => Problem::new(
                 STACK_UNASSEMBLED,
-                Severity::Error,
                 format!("This stack's manifest files break the contract in {} places", faults.len()),
                 "A stack is described by stack.toml and a file per service in services/, which stack.toml's include list names. These files are not laid out that way, so which services the stack holds cannot be told.",
                 Remedy::new("Fix the files named below, all of which were found in one pass"),
@@ -175,7 +169,6 @@ impl Diagnose for Failure {
             // guessing game — and the whole list was knowable in one pass.
             Self::Invalid { violations } => Problem::new(
                 STACK_INVALID,
-                Severity::Error,
                 format!("This stack describes {} things that cannot work", violations.len()),
                 "The file is well-formed, so this is not a typo — it says things about itself that contradict each other, and starting it would fail somewhere unrelated.",
                 Remedy::new("Fix the faults listed below, all of which were found in one pass"),
@@ -184,7 +177,6 @@ impl Diagnose for Failure {
             .with_detail(violations.join("\n")),
             Self::NowhereToWrite => Problem::new(
                 STACK_NOT_SET_UP,
-                Severity::Error,
                 "lemonfiber has not been set up on this machine yet",
                 "The stack ships inside lemonfiber and has to be written somewhere before Docker can read it, and no location has been chosen.",
                 Remedy::new("Run setup").with_detail("lemonfiber setup"),
@@ -194,7 +186,6 @@ impl Diagnose for Failure {
             .in_state(State::Guided),
             Self::NotWritten { path, reason } => Problem::new(
                 STACK_NOT_WRITTEN,
-                Severity::Error,
                 format!("The stack could not be written to {}", path.display()),
                 "Docker reads the stack from disk, so nothing can start until this succeeds. It is usually a permission problem or a full disk.",
                 Remedy::new("Check that the location is writable and has space"),
@@ -203,7 +194,6 @@ impl Diagnose for Failure {
             .with_detail(reason.clone()),
             Self::NotEmbedded => Problem::unknown(
                 STACK_NOT_EMBEDDED,
-                Severity::Critical,
                 "This build of lemonfiber is not intact",
                 "The stack that ships inside the binary is missing, which the build is supposed to make impossible.",
             ),

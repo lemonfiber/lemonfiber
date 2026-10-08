@@ -23,7 +23,7 @@ pub(crate) use staging::OPERATION;
 use lemonfiber_manifest::Manifest;
 use serde::Serialize;
 
-use crate::error::{Diagnose, Problem, Remedy, Severity, State};
+use crate::error::{Diagnose, Problem, Remedy, State};
 use crate::migration::{pins, Ours};
 use crate::model::StackEdit;
 use crate::plural::s;
@@ -194,7 +194,6 @@ fn named(active: &[Interrupted]) -> Vec<String> {
 fn not_checked() -> Problem {
     Problem::new(
         NOT_CHECKED,
-        Severity::Error,
         "What is running could not be read, so no update was worked out",
         "Which version each service stands on is the engine's answer, and it did not give one. \
          Nothing was pulled, started or stopped.",
@@ -212,7 +211,6 @@ fn no_such_service(named: &str, manifest: &Manifest) -> Problem {
         .collect();
     Problem::new(
         NO_SUCH_SERVICE,
-        Severity::Error,
         format!("`{named}` is not a service this stack declares"),
         "An update narrowed to one service has to name one, and a name that matches nothing \
          would read as a stack already up to date.",
@@ -232,7 +230,6 @@ fn no_such_service(named: &str, manifest: &Manifest) -> Problem {
 fn left_down(cause: Problem) -> Problem {
     Problem::new(
         CAPTURE_LEFT_IT_DOWN,
-        Severity::Error,
         "the stack was stopped for the backup, and the backup would not write",
         "Nothing was updated and nothing opened its state on a newer image, so there is \
          nothing to undo. The stack is down, because it was stopped so the capture could \
@@ -255,7 +252,6 @@ fn still_transferring(active: &[String]) -> Problem {
     let count = active.len();
     Problem::new(
         STILL_TRANSFERRING,
-        Severity::Warning,
         format!("{count} download{} still coming down", s(count)),
         "Updating stops the download clients, and what is part-way down does not always resume \
          where it left off. Nothing has been pulled, stopped or changed.",

@@ -21,7 +21,7 @@ mod gathering;
 mod lines;
 mod removing;
 
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 use crate::uninstall::{
     against, naming, reclaimable, Manifest, Removal, Tier, Uninstall, ANOTHER_READING, BESIDE,
     NEEDS_AGREEING,
@@ -131,7 +131,6 @@ fn needs_agreeing(agreement: &str, bytes: u64) -> Problem {
     let size = crate::bytes::humanize(bytes);
     Problem::new(
         NEEDS_AGREEING,
-        Severity::Error,
         format!("Removing your library would destroy {size}, and that takes its own answer"),
         format!(
             "Every other removal here leaves your library where it is, and this one \
@@ -147,20 +146,17 @@ fn needs_agreeing(agreement: &str, bytes: u64) -> Problem {
 
 /// The agreement names a reading that is not the one standing now.
 fn another_reading(agreement: &str) -> Problem {
-    crate::agreement::moved(
-        Problem::new(
-            ANOTHER_READING,
-            Severity::Error,
-            "That agreement was given for a different reading of this machine",
-            "Everything you read before answering is in the name a reading goes by — the \
-             list, what each line occupies, what was found beside the library, and what \
-             sort of drive it is on. Something has changed since, so acting on this answer \
-             would be acting on something nobody saw.",
-            Remedy::new("Read it again, and answer the name it prints")
-                .with_detail(format!("the reading standing now is {agreement}")),
-        )
-        .in_state(State::Guided),
+    Problem::new(
+        ANOTHER_READING,
+        "That agreement was given for a different reading of this machine",
+        "Everything you read before answering is in the name a reading goes by — the \
+         list, what each line occupies, what was found beside the library, and what \
+         sort of drive it is on. Something has changed since, so acting on this answer \
+         would be acting on something nobody saw.",
+        Remedy::new("Read it again, and answer the name it prints")
+            .with_detail(format!("the reading standing now is {agreement}")),
     )
+    .in_state(State::Guided)
 }
 
 #[cfg(test)]

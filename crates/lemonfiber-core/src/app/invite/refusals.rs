@@ -9,7 +9,6 @@
 pub(crate) fn no_media_server() -> crate::error::Problem {
     crate::error::Problem::new(
         crate::error::codes::invite::NO_MEDIA_SERVER,
-        crate::error::Severity::Error,
         "this stack has no media server, so there is no account to offer",
         "An invitation is an account on the media server; without one there is nothing \
          for somebody to sign in to",
@@ -25,7 +24,6 @@ pub(crate) fn no_media_server() -> crate::error::Problem {
 pub(crate) fn nobody_named() -> crate::error::Problem {
     crate::error::Problem::new(
         crate::error::codes::invite::NOBODY_NAMED,
-        crate::error::Severity::Error,
         "an invitation needs somebody to be for",
         "The name is what they will sign in as, so a blank one is an account nobody \
          could use",
@@ -42,7 +40,6 @@ pub(crate) fn nobody_named() -> crate::error::Problem {
 pub(crate) fn nowhere_to_send() -> crate::error::Problem {
     crate::error::Problem::new(
         crate::error::codes::invite::NOWHERE_TO_SEND,
-        crate::error::Severity::Error,
         "this machine has no address the household could arrive at",
         "An invitation is an address somebody else opens, and this machine answers to \
          no name on the network and has none written down",
@@ -65,7 +62,6 @@ pub(crate) fn nowhere_to_send() -> crate::error::Problem {
 pub(crate) fn would_not_renew(name: &str) -> crate::error::Problem {
     crate::error::Problem::new(
         crate::error::codes::invite::WOULD_NOT_RENEW,
-        crate::error::Severity::Error,
         format!("{name}'s invitation could not be offered again"),
         "Their account is still there as it was; what could not be written down is when it \
          was offered, which is what the window is counted from",
@@ -82,7 +78,6 @@ pub(crate) fn would_not_renew(name: &str) -> crate::error::Problem {
 pub(crate) fn runs_the_server(name: &str) -> crate::error::Problem {
     crate::error::Problem::new(
         crate::error::codes::invite::RUNS_THE_SERVER,
-        crate::error::Severity::Error,
         format!("{name} administers the media server, so it is not an account to offer"),
         "This is the account lemonfiber signs in as, and an invitation would put a \
          household member's limits on it",
@@ -94,7 +89,6 @@ pub(crate) fn runs_the_server(name: &str) -> crate::error::Problem {
 pub(crate) fn no_credential() -> crate::error::Problem {
     crate::error::Problem::new(
         crate::error::codes::invite::NO_CREDENTIAL,
-        crate::error::Severity::Error,
         "the media server's own account has not been set up yet",
         "Making somebody else an account is done as the administrator, and this machine \
          has not recorded one",

@@ -18,7 +18,7 @@
 
 use std::path::Path;
 
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 use crate::plugin::{Install, Installed, Installs, Register, Restored, Update};
 
 use super::super::Ctx;
@@ -434,7 +434,6 @@ fn installed_as(held: &Register, plugin: &str) -> Result<Installed, Box<Problem>
 fn not_installed(plugin: &str) -> Problem {
     Problem::new(
         NOTHING_TO_UPDATE,
-        Severity::Error,
         format!("{plugin} is not installed, so there is nothing to update"),
         "Nothing was changed. An update replaces a version this machine already has.",
         Remedy::new("Install it instead: `lemonfiber plugin install` on the same source"),
@@ -448,7 +447,6 @@ fn another_plugin(named: &str, holds: &str) -> Problem {
     let named = crate::text::plain(named);
     Problem::new(
         ANOTHER_PLUGIN,
-        Severity::Error,
         format!("That source holds {holds}, not {named}"),
         format!(
             "Nothing was changed. An update puts a new version of {named} in place of the one \
@@ -465,7 +463,6 @@ fn another_plugin(named: &str, holds: &str) -> Problem {
 fn stuck(was: &Installed) -> Problem {
     Problem::new(
         STUCK,
-        Severity::Error,
         format!(
             "{} {} would not stop, so it was not updated",
             was.plugin, was.version

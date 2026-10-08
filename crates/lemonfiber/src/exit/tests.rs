@@ -19,19 +19,18 @@ use lemonfiber_core::config::paths::Paths;
 use std::path::Path;
 
 use super::{
-    complain, exit_code, no_config_home, settled, shown, success, FAILURE, NEVER_SETTLED, USAGE,
-    VALIDATION,
+    complain, exit_code, no_config_home, settled, shown, success, FAILURE, USAGE, VALIDATION,
 };
 
 /// A problem of the given severity and state.
 fn problem(severity: Severity, state: State) -> Problem {
     let mut problem = Problem::new(
         Code::new("TEST"),
-        severity,
         "it broke",
         "nothing imports",
         Remedy::new("restart it"),
     );
+    problem.severity = severity;
     problem.state = state;
     problem
 }
@@ -102,7 +101,7 @@ fn a_problem_the_operator_wrote_is_told_apart_from_one_they_can_only_report() {
     );
     assert_eq!(
         coded(lemonfiber_core::error::codes::life::NEVER_SETTLED),
-        NEVER_SETTLED
+        lemonfiber_core::error::codes::Leaves::NeverSettled.exit()
     );
     assert_eq!(coded(Code::new("SOMETHING-ELSE")), FAILURE);
 }

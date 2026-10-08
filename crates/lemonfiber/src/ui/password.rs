@@ -17,7 +17,7 @@ use std::path::Path;
 
 use lemonfiber_core::admission::{self as credential, Credential};
 use lemonfiber_core::config::store::Failure;
-use lemonfiber_core::error::{Diagnose as _, Problem, Remedy, Severity, State};
+use lemonfiber_core::error::{Diagnose as _, Problem, Remedy, State};
 use lemonfiber_core::ports::random::Random;
 use lemonfiber_core::PRODUCT;
 
@@ -74,7 +74,6 @@ fn said() -> Vec<String> {
 fn mistyped() -> Problem {
     Problem::new(
         MISTYPED,
-        Severity::Error,
         "Those two passwords were not the same",
         "Nothing was changed. The password is asked for twice because nothing here can read \
          one back afterwards, so the second answer is the only check there is that the first \

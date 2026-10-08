@@ -147,7 +147,6 @@ fn found(check: &str, verdict: Checked) -> Finding {
 fn wrong(summary: &str) -> lemonfiber_core::error::Problem {
     lemonfiber_core::error::Problem::new(
         lemonfiber_core::error::Code::new("TEST-1"),
-        lemonfiber_core::error::Severity::Error,
         summary,
         "The thing did not happen",
         lemonfiber_core::error::Remedy::new("Try again"),

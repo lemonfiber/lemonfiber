@@ -14,7 +14,7 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use crate::error::codes::space::ANOTHER_OFFER;
-use crate::error::{Amiss, Diagnose, Problem, Remedy, Severity, State};
+use crate::error::{Diagnose, Problem, Remedy, State};
 use crate::ports::service::{Queued, Queues, Seeded, Seeding};
 use crate::space::{
     reckon, Counting, Left, Level, Measured, Reckoning, Reclaimed, Role, Stalled, Survey, Tally,
@@ -87,7 +87,6 @@ pub(crate) async fn admits(ctx: &Ctx) -> Result<(), Box<Problem>> {
     Err(Box::new(
         Problem::new(
             HALTED,
-            Severity::Critical,
             "There is no room left, so nothing new is being fetched",
             "A service that cannot write its database may not merely stop — it can \
              take the file with it, which turns a disk that is full into work that \
@@ -354,39 +353,33 @@ async fn reclaim(ctx: &Ctx, reckoned: &Reckoning, measured: &Measured) -> Reclai
 
 /// The answer names an offer that is not the one standing now.
 fn another_offer(standing: &str) -> Problem {
-    crate::agreement::moved(
-        Problem::new(
-            ANOTHER_OFFER,
-            Severity::Error,
-            "That answer was given for a different reading of the disk",
-            "Every path a cleanup would take, and what each occupies, is in the name an \
-             offer goes by, so an offer that has moved since it was read is a different \
-             offer. Taking this one would be taking something nobody saw.",
-            Remedy::new("Read the offer again, and answer the name it prints")
-                .with_detail(format!("the offer standing now is {standing}")),
-        )
-        .in_state(State::Guided),
+    Problem::new(
+        ANOTHER_OFFER,
+        "That answer was given for a different reading of the disk",
+        "Every path a cleanup would take, and what each occupies, is in the name an \
+         offer goes by, so an offer that has moved since it was read is a different \
+         offer. Taking this one would be taking something nobody saw.",
+        Remedy::new("Read the offer again, and answer the name it prints")
+            .with_detail(format!("the offer standing now is {standing}")),
     )
+    .in_state(State::Guided)
 }
 
 /// There is nowhere to measure.
 fn nowhere() -> Problem {
     Problem::new(
         NOWHERE_TO_MEASURE,
-        Severity::Error,
         "No data location is configured, so there is no disk to account for",
         "Where the media lives is what everything here is measured against, and \
          nothing has said where that is yet.",
         Remedy::new("Set the data location").with_detail("lemonfiber setup"),
     )
-    .lies_in(Amiss::Asking)
 }
 
 /// The data location is there and will not be read.
 fn unreadable(root: &Path, said: &str) -> Problem {
     Problem::new(
         WALK_REFUSED,
-        Severity::Error,
         format!("The data location at {} could not be read", root.display()),
         "Nothing can be said about where the disk went without looking at what is \
          on it, and reporting an empty answer would read as an empty disk.",

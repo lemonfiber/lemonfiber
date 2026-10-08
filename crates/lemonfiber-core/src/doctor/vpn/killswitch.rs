@@ -158,7 +158,6 @@ pub(super) fn verdict(held: &Held) -> Verdict {
         Held::No { seen } => Verdict::Fail(
             crate::error::Problem::new(
                 KILLSWITCH_LEAKS,
-                crate::error::Severity::Error,
                 "your traffic survives the tunnel going down",
                 "The tunnel was dropped and the download client still reached the internet, \
                  which means every torrent would continue in the open the moment the VPN \
@@ -188,7 +187,6 @@ pub(super) fn verdict(held: &Held) -> Verdict {
         Held::NotRestored => Verdict::Fail(
             crate::error::Problem::new(
                 TUNNEL_NOT_RESTORED,
-                crate::error::Severity::Error,
                 "the tunnel was dropped for the test and did not come back",
                 "This check takes the tunnel away on purpose and puts it back. Putting it \
                  back could not be confirmed, so the stack is left without one — and \

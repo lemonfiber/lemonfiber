@@ -30,19 +30,16 @@ use lemonfiber_core::model::{Disposition, HandoffState, Triggered};
 
 /// A general failure. Codes are meaningful so a script can branch on *why*
 /// something failed rather than merely on whether it did.
-pub(crate) const FAILURE: u8 = 1;
+pub(crate) const FAILURE: u8 = Leaves::Failure.exit();
 
 /// A flag or argument the operator gave could not be understood.
 pub(crate) const USAGE: u8 = 2;
 
 /// Something outside lemonfiber has to be fixed before it can act.
-pub(crate) const PREFLIGHT: u8 = 3;
-
-/// Started, and a service never became usable.
-pub(crate) const NEVER_SETTLED: u8 = 4;
+pub(crate) const PREFLIGHT: u8 = Leaves::Preflight.exit();
 
 /// Something the operator wrote was refused.
-pub(crate) const VALIDATION: u8 = 5;
+pub(crate) const VALIDATION: u8 = Leaves::Validation.exit();
 
 /// Which exit code a problem deserves.
 ///
@@ -50,12 +47,7 @@ pub(crate) const VALIDATION: u8 = 5;
 /// start Docker, or wait longer, and one code for all three tells it nothing.
 /// Which of those a code means is declared beside the code, in the registry.
 pub(crate) fn exit_code(problem: &Problem) -> u8 {
-    match leaves(problem.code) {
-        Leaves::NeverSettled => NEVER_SETTLED,
-        Leaves::Preflight => PREFLIGHT,
-        Leaves::Validation => VALIDATION,
-        Leaves::Failure => FAILURE,
-    }
+    leaves(problem.code).exit()
 }
 
 /// Most answers are simply produced, so their success is that they arrived. A

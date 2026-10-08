@@ -19,7 +19,7 @@ use std::path::Path;
 
 use crate::app::{Ctx, Waiting};
 use crate::error::codes::gone::NOT_BACKED_UP;
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 use crate::platform::Environment;
 use crate::stack::compose::Action;
 use crate::uninstall::{Left, Manifest, Removal, Sort, Tier};
@@ -102,7 +102,6 @@ pub(super) async fn remove(
 fn not_backed_up(cause: &Problem) -> Problem {
     Problem::new(
         NOT_BACKED_UP,
-        Severity::Error,
         "The backup that comes before a removal could not be taken",
         format!(
             "Nothing has been removed. What this destroys cannot be made again, so it is \

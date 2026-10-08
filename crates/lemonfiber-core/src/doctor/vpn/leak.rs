@@ -4,7 +4,7 @@
 use super::Pair;
 use crate::doctor::Verdict;
 use crate::error::codes::vpn::{CLIENT_ISOLATED, LEAKING, VPN_CONTAINER_DOWN};
-use crate::error::{Problem, Remedy, Severity};
+use crate::error::{Problem, Remedy};
 
 /// What a container answered when asked for its public address.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -41,7 +41,6 @@ pub(super) fn tunnel_verdict(gateway: &Reach, pair: &Pair, note: Option<String>)
         Reach::Down => Verdict::Fail(
             Problem::new(
                 VPN_CONTAINER_DOWN,
-                Severity::Error,
                 format!("The VPN container {} is not running", pair.gateway_name),
                 "Nothing routes through a tunnel that is not up. Torrents cannot \
                  transfer, though nothing is leaking while it is down.",
@@ -127,7 +126,6 @@ pub(super) fn egress_verdict(gateway: &Reach, client: &Reach, pair: &Pair) -> Ve
 fn mismatch(pair: &Pair) -> Problem {
     Problem::new(
         LEAKING,
-        Severity::Critical,
         format!(
             "{}'s traffic is not going through the VPN",
             pair.client_name
@@ -145,7 +143,6 @@ fn mismatch(pair: &Pair) -> Problem {
 fn uncontained(pair: &Pair) -> Problem {
     Problem::new(
         LEAKING,
-        Severity::Critical,
         format!("{} has connectivity the VPN does not", pair.client_name),
         "The client reached the internet while the tunnel did not, so its traffic \
          is not being carried by the VPN. Your home address is exposed to peers.",
@@ -159,7 +156,6 @@ fn uncontained(pair: &Pair) -> Problem {
 fn isolated(pair: &Pair) -> Problem {
     Problem::new(
         CLIENT_ISOLATED,
-        Severity::Warning,
         format!("{} has no connectivity", pair.client_name),
         "The tunnel is up but the client could not reach the internet through it. \
          Nothing is leaking, but torrents will not transfer until it can.",
