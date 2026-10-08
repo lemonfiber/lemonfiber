@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What the import did with the finished download — the difference between one copy of a\nfile and two.",
+  "oneOf": [
+    {
+      "description": "The library entry and the download are the same file under two names, which is\nwhat a correctly-shared volume allows and what costs no extra disk.",
+      "type": "string",
+      "const": "hardlinked"
+    },
+    {
+      "description": "The file was copied, so it now exists twice. Works, but every import costs its own\nsize again and seeding a torrent holds the second copy for as long as it seeds.",
+      "type": "string",
+      "const": "copied"
+    }
+  ]
+}

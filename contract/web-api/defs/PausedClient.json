@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What one download client said about being paused or resumed.",
+  "type": "object",
+  "properties": {
+    "client": {
+      "description": "The client, by the name the stack knows it under.",
+      "type": "string"
+    },
+    "now": {
+      "description": "What it read back after it was asked. Absent on a rehearsal, which asks nothing,\nand where the client could not be reached.",
+      "anyOf": [
+        {
+          "$ref": "Pulling.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "unreached": {
+      "description": "Why it could not be reached, in its own words where it gave any.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "was": {
+      "description": "Whether it was fetching before it was asked, where it said.",
+      "anyOf": [
+        {
+          "$ref": "Pulling.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "client"
+  ]
+}

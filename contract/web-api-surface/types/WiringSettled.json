@@ -1,0 +1,45 @@
+{
+  "fields": {
+    "claimants": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "over": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "settled": {
+      "type": [
+        "const:\"chosen\"",
+        "const:\"contested\"",
+        "const:\"each\"",
+        "const:\"outright\"",
+        "const:\"unfilled\""
+      ],
+      "required": true
+    },
+    "whose": {
+      "type": [
+        "ref:Whose"
+      ],
+      "required": true
+    },
+    "why": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": [
+    "\"chosen\"",
+    "\"contested\"",
+    "\"each\"",
+    "\"outright\"",
+    "\"unfilled\""
+  ]
+}

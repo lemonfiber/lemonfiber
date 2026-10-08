@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One thing that is wrong, as the expanded summary lists it.",
+  "type": "object",
+  "properties": {
+    "check": {
+      "description": "The check that raised it.",
+      "type": "string"
+    },
+    "downstream": {
+      "description": "What is also wrong because of this, counted with it rather than again.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "exit": {
+      "description": "How the service it is about exited, where it has and the engine said.\n\nThe technical half of what happened, kept out of the summary so the plain\nwords lead, and here for whoever wants the code.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "int32"
+    },
+    "meaning": {
+      "description": "What it costs the operator. The line expands to items an operator can act\non, and an item that states only the event leaves the judgement it was\nsupposed to save them.",
+      "type": "string"
+    },
+    "onset": {
+      "description": "When the stack first saw it wrong since it last saw it right, in whole\nseconds since the epoch.\n\nThe condition's own stamp, kept between runs, so every surface that reports\nthe check names the same moment and a restart does not make an old fault new.",
+      "type": "string"
+    },
+    "remedies": {
+      "description": "What to do about it, most likely first.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "severity": {
+      "description": "How bad it is.",
+      "$ref": "ProblemSeverity.json"
+    },
+    "summary": {
+      "description": "What is wrong, in one line.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "check",
+    "onset",
+    "severity",
+    "summary",
+    "meaning",
+    "remedies",
+    "downstream"
+  ]
+}

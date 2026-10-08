@@ -1,0 +1,10 @@
+{
+  "fields": {},
+  "variants": [
+    "\"core\"",
+    "\"critical\"",
+    "\"enhancing\"",
+    "\"important\"",
+    "\"optional\""
+  ]
+}

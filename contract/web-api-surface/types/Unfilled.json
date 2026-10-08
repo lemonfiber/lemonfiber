@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "by": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "capability": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

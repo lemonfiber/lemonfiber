@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One change lemonfiber made, and whether it could be put back.",
+  "type": "object",
+  "properties": {
+    "alongside": {
+      "description": "How many changes that one operation made, this one among them.\n\nAn operation is the unit an operator agreed to, and undoing half of one leaves a\nmachine in a state nobody chose — so what a single line would take with it is on\nthe line rather than left to be counted off the list.",
+      "type": "integer",
+      "format": "uint",
+      "minimum": 0
+    },
+    "at": {
+      "description": "When it was made, as whole seconds since the Unix epoch, written in decimal.\n\nA string of digits rather than a number, because it is the stamp the record keeps\nand a stamp is compared and stored as text; what it counts is stated here so a\nreader can turn it into a time without guessing at a format.\n\n**`0` means the clock was unreadable when the change was written**, not that it\nwas made at the epoch: it is how a machine whose clock would not answer stamps a\nchange. It is not an instant, so two changes both stamped `0` were not made at\nthe same moment, and a reader showing it as a date in 1970 would be inventing\none.",
+      "type": "string",
+      "pattern": "^[0-9]+$"
+    },
+    "because": {
+      "description": "Why it could not go further, where it could not.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "did": {
+      "description": "What it did, in the operator's terms.",
+      "type": "string"
+    },
+    "instead": {
+      "description": "What to do instead, where there is something.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "operation": {
+      "description": "The operation that made it — a seed, a reconfigure, an applied fix — so a\nhistory reads as what happened rather than as bare diffs.",
+      "type": "string"
+    },
+    "reversal": {
+      "description": "How far it could be put back.",
+      "$ref": "ChangeReversal.json"
+    },
+    "target": {
+      "description": "What it was made to.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "at",
+    "operation",
+    "target",
+    "did",
+    "reversal",
+    "alongside"
+  ]
+}

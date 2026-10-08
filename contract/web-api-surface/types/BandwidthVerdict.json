@@ -1,0 +1,10 @@
+{
+  "fields": {},
+  "variants": [
+    "\"holding\"",
+    "\"ignored\"",
+    "\"nothing-to-limit\"",
+    "\"overrunning\"",
+    "\"unasked\""
+  ]
+}

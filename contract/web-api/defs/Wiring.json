@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One connection, and how it turned out.",
+  "type": "object",
+  "properties": {
+    "connection": {
+      "description": "What was being connected, such as `SABnzbd into Sonarr`.",
+      "type": "string"
+    },
+    "severity": {
+      "description": "How serious the outcome is — information by default, a warning where the\nconnection breaks the stack.",
+      "$ref": "SeedSeverity.json"
+    },
+    "state": {
+      "description": "How it turned out.",
+      "$ref": "SeedState.json"
+    }
+  },
+  "required": [
+    "connection",
+    "state",
+    "severity"
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "available": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "findings": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "member": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "sessions": {
+      "type": [
+        "array[ref:Playback]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

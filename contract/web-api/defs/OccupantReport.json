@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One container of somebody else's stack, as the engine reports it.",
+  "type": "object",
+  "properties": {
+    "adoptable": {
+      "description": "Whether lemonfiber knows this service and could take it over as it stands.",
+      "type": "boolean"
+    },
+    "ports": {
+      "description": "Every host port it publishes, lowest first.",
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "format": "uint16",
+        "maximum": 65535,
+        "minimum": 0
+      }
+    },
+    "running": {
+      "description": "Whether it is running now, as against present but stopped.",
+      "type": "boolean"
+    },
+    "service": {
+      "description": "The Compose service name it answers to.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "service",
+    "running",
+    "ports",
+    "adoptable"
+  ]
+}

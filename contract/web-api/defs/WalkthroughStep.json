@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One step of the walk, ordered from picking something to watching it play.",
+  "oneOf": [
+    {
+      "description": "Picking something to add, and confirming it is not already here.",
+      "type": "string",
+      "const": "choosing"
+    },
+    {
+      "description": "The indexers are being searched for releases.",
+      "type": "string",
+      "const": "searching"
+    },
+    {
+      "description": "A release is being sent to the download client.",
+      "type": "string",
+      "const": "grabbing"
+    },
+    {
+      "description": "The download is running.",
+      "type": "string",
+      "const": "downloading"
+    },
+    {
+      "description": "The \\*arr is moving the finished download into the library.",
+      "type": "string",
+      "const": "importing"
+    },
+    {
+      "description": "The media server is being told to look at what arrived.",
+      "type": "string",
+      "const": "scanning"
+    },
+    {
+      "description": "It is in the library and playable.",
+      "type": "string",
+      "const": "available"
+    }
+  ]
+}

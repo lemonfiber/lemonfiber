@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One consumer, and how far the rotation reached it.",
+  "type": "object",
+  "properties": {
+    "consumer": {
+      "description": "What authenticates with the credential.",
+      "type": "string"
+    },
+    "reach": {
+      "description": "How far the rotation reached it.",
+      "$ref": "CredentialReach.json"
+    }
+  },
+  "required": [
+    "consumer",
+    "reach"
+  ]
+}

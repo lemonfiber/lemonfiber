@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What is asked, and where.\n\nThree fields and no more, and the third is the one worth explaining. A service that\nanswers XML unless a caller asks for JSON cannot satisfy a capability whose probe\nrequires a JSON assertion, and until this field there was nowhere to ask: Plex\nanswers `text/xml` at every path, including the one its health probe uses, unless\nthe request carries `Accept: application/json`.\n\n**It is one media type and not a header map, and the difference is the point.** A\nprobe declares who it is asked as, and `none` on every `guarded` probe has meant what\nit says partly because nothing could be presented. A map of headers would make that a\nconvention a reviewer has to hold — any service may name its credential header\nwhatever it likes, so no list of refused names could ever be closed — where one named\nfield keeps it a property of the format. A probe still cannot present anything,\nbecause there is nowhere to write it.",
+  "type": "object",
+  "properties": {
+    "accept": {
+      "description": "The one representation the answer is asked for, as a media type.\n\nAbsent where the service needs no asking, which is most of them.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "method": {
+      "description": "The HTTP method.",
+      "type": "string"
+    },
+    "path": {
+      "description": "The path on the service being asked.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "method",
+    "path"
+  ]
+}

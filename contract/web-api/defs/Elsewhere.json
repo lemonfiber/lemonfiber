@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A request one of the stack's services makes, which is not lemonfiber's.",
+  "type": "object",
+  "properties": {
+    "destination": {
+      "description": "Where its requests go, in the terms an operator would recognise.\n\nEmpty means it reaches nothing, which is an answer. It never means *and we\ndo not know*: that is [`Self::recorded`], and the two must not be read as one\n— an unknown service rendered as an empty destination would be this product\nclaiming nothing leaves the machine on the strength of having no idea.",
+      "type": "string"
+    },
+    "origin": {
+      "description": "Whose request it is: the stack's own, or an installed plugin's, named.\n\nA column in this account rather than an account of its own, because what leaves\nthis machine is one question however many parties are asking it.",
+      "$ref": "ValueOrigin.json"
+    },
+    "purpose": {
+      "description": "What it asks for.",
+      "type": "string"
+    },
+    "recorded": {
+      "description": "Whether lemonfiber ships a record of what this service reaches.\n\nFalse for a service that arrived in the stack after this build was made, or\nfrom an operator's own fork. It is listed anyway, because the alternative —\nleaving it out — is a privacy inventory that is complete-looking and short,\nand a reader counting the services on their machine against the ones on this\nlist is the reader this surface exists for.",
+      "type": "boolean"
+    },
+    "service": {
+      "description": "The service, by the id the stack declares it under.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "service",
+    "destination",
+    "purpose",
+    "recorded",
+    "origin"
+  ]
+}

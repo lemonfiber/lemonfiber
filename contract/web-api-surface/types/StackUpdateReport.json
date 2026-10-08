@@ -1,0 +1,65 @@
+{
+  "fields": {
+    "applied": {
+      "type": [
+        "array[ref:UpdateApplied]"
+      ],
+      "required": true
+    },
+    "backup": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "changelog": {
+      "type": [
+        "ref:Notes"
+      ],
+      "required": true
+    },
+    "changes": {
+      "type": [
+        "array[ref:UpdateChange]"
+      ],
+      "required": true
+    },
+    "confirmed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "halted": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "in_flight": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "stack_edits": {
+      "type": [
+        "array[ref:StackEdit]"
+      ],
+      "required": true
+    },
+    "state": {
+      "type": [
+        "ref:UpdateState"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

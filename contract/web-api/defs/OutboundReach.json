@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One of the requests lemonfiber makes on its own account.\n\nNine, and the closed set is the claim. A tenth is a decision somebody makes by\nadding a variant here and answering four questions about it, rather than one\nthat happens by somebody building a request.\n\nThe sixth is the one that carries somebody's words rather than a credential or a\nname, and it was added deliberately and late: five of these prove or fetch\nsomething and could say what travels in a phrase, and this one travels to a\nperson. What that costs is the same four answers as the rest, and one more thing\nthe others do not owe — it is the only entry whose destination is somebody else's\nchoice, so the list names the two services it can reach and the sender is handed\nthem rather than holding addresses of its own.\n\nThe seventh is the only one this program makes about *itself*, and the one most easily\nleft off a list of what this program reaches. What it costs to allow is the shortest\nanswer on the list: it carries nothing at all, so the only thing switching it off\nkeeps from anybody is the knowledge that a version came out.\n\nThe eighth goes where the operator points it and nowhere else: a plugin's git\nsource, named at install. It is the only entry whose destination nobody chose in\nadvance, which is why it is made only when somebody names one.\n\nThe ninth goes to one place this build names, and only when an operator installs a\nplugin by name: the catalogue's newest release, for its index and the signature over\nit.",
+  "oneOf": [
+    {
+      "description": "Fetching the service images the stack runs.",
+      "type": "string",
+      "const": "registry"
+    },
+    {
+      "description": "Probing the source the community quality guides are synced from.",
+      "type": "string",
+      "const": "guides"
+    },
+    {
+      "description": "Asking what public address this machine's traffic comes out of.",
+      "type": "string",
+      "const": "echo"
+    },
+    {
+      "description": "Proving an indexer key against the indexer.",
+      "type": "string",
+      "const": "indexer"
+    },
+    {
+      "description": "Proving a Usenet login against the provider.",
+      "type": "string",
+      "const": "usenet"
+    },
+    {
+      "description": "Telling a household member the one thing the request service cannot carry.",
+      "type": "string",
+      "const": "household"
+    },
+    {
+      "description": "Asking which version of lemonfiber itself has been released.",
+      "type": "string",
+      "const": "updates"
+    },
+    {
+      "description": "Fetching a plugin from a git source the operator names.",
+      "type": "string",
+      "const": "plugin-source"
+    },
+    {
+      "description": "Reading the catalogue's index to resolve a plugin installed by name.",
+      "type": "string",
+      "const": "catalogue"
+    }
+  ]
+}

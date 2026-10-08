@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "confirmed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "reverted": {
+      "type": [
+        "array[ref:StackEdit]"
+      ],
+      "required": true
+    },
+    "reverted_connections": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

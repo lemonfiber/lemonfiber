@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One of the two counts the request service keeps, and what it has left.",
+  "type": "object",
+  "properties": {
+    "limit": {
+      "description": "How many the period allows. Absent where nothing limits them, which is a\ndifferent answer from a limit of nought.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "minimum": 0
+    },
+    "period": {
+      "description": "How long the period is, in the words a household says it in — absent where\nthe count runs from the beginning rather than over a window.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "remaining": {
+      "description": "How many more they may ask for. Absent where nothing limits them.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "minimum": 0
+    },
+    "used": {
+      "description": "How many the period has already counted against them.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "used"
+  ]
+}

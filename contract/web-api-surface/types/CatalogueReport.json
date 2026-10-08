@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "removed": {
+      "type": [
+        "array[ref:RemovedService]"
+      ],
+      "required": true
+    },
+    "services": {
+      "type": [
+        "array[ref:CataloguedService]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

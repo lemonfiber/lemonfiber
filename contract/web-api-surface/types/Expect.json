@@ -1,0 +1,59 @@
+{
+  "fields": {
+    "body_starts_with": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "content_type": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "json": {
+      "type": [
+        "null|object{ref:Expected}"
+      ],
+      "required": false
+    },
+    "json_array_min": {
+      "type": [
+        "integer|null/uint64"
+      ],
+      "required": false
+    },
+    "json_at_least": {
+      "type": [
+        "null|object{integer/int64}"
+      ],
+      "required": false
+    },
+    "json_has_keys": {
+      "type": [
+        "array|null[string]"
+      ],
+      "required": false
+    },
+    "json_is_absent": {
+      "type": [
+        "boolean|null"
+      ],
+      "required": false
+    },
+    "json_types": {
+      "type": [
+        "null|object{ref:ExpectedKind}"
+      ],
+      "required": false
+    },
+    "status": {
+      "type": [
+        "integer|null/uint16"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What became of a rotation.",
+  "oneOf": [
+    {
+      "description": "The replacement was proven and is now the value in force.",
+      "type": "object",
+      "properties": {
+        "observed": {
+          "description": "What the service did while proving it — an observation, never the value.",
+          "type": "string"
+        },
+        "settled": {
+          "type": "string",
+          "const": "replaced"
+        }
+      },
+      "required": [
+        "settled",
+        "observed"
+      ]
+    },
+    {
+      "description": "The service answered and refused the replacement. Nothing was changed.",
+      "type": "object",
+      "properties": {
+        "detail": {
+          "description": "What the service said, with any credential in it withheld.",
+          "type": "string"
+        },
+        "settled": {
+          "type": "string",
+          "const": "refused"
+        }
+      },
+      "required": [
+        "settled",
+        "detail"
+      ]
+    },
+    {
+      "description": "Nothing usable answered, so the replacement could not be proven. Nothing\nwas changed, because an unproven replacement is not a better one.",
+      "type": "object",
+      "properties": {
+        "detail": {
+          "description": "Why nothing could be concluded.",
+          "type": "string"
+        },
+        "settled": {
+          "type": "string",
+          "const": "unproven"
+        }
+      },
+      "required": [
+        "settled",
+        "detail"
+      ]
+    },
+    {
+      "description": "The service replaced the credential itself, and the replacement did not answer.\n\nThe one way of not landing that keeps nothing: a service asked to replace its\nown key drops the old one the moment it makes the new one, so there is no order\nthat proves first. What is owed is the command that hands the new one out once\nthe service answers.",
+      "type": "object",
+      "properties": {
+        "detail": {
+          "description": "What did not answer, and what to run once it does.",
+          "type": "string"
+        },
+        "settled": {
+          "type": "string",
+          "const": "replaced-unproven"
+        }
+      },
+      "required": [
+        "settled",
+        "detail"
+      ]
+    },
+    {
+      "description": "Nothing was attempted, because this run only said what a rotation would do.\n\nIts own outcome rather than one of the refusals above, because it is not a\nrefusal: nothing went wrong, and what an operator is being told is what would\nhappen if they ran it again meaning it. Carrying its own three fields rather\nthan one sentence, because \"it would rotate the qBittorrent password\" is not a\nreport — where the value lives is what would be written over, and what is owed\nafterwards is the half nobody finds out about until a consumer stops working.\n\nNo value appears here and none is generated to put here. A replacement minted\nto describe a rotation is a secret that exists because somebody asked a\nquestion, and it would then have to be kept or thrown away — and one thrown\naway may be one the service has already taken.",
+      "type": "object",
+      "properties": {
+        "afterwards": {
+          "description": "What would still need doing before every consumer held the replacement.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "detail": {
+          "description": "What a real run would do, step by step, in lemonfiber's own words.",
+          "type": "string"
+        },
+        "location": {
+          "description": "Where the value that would be replaced is kept.",
+          "type": "string"
+        },
+        "settled": {
+          "type": "string",
+          "const": "rehearsed"
+        }
+      },
+      "required": [
+        "settled",
+        "detail",
+        "location",
+        "afterwards"
+      ]
+    },
+    {
+      "description": "Nothing in this stack holds a credential by that name.",
+      "type": "object",
+      "properties": {
+        "known": {
+          "description": "The names that would have been accepted.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "settled": {
+          "type": "string",
+          "const": "unknown"
+        }
+      },
+      "required": [
+        "settled",
+        "known"
+      ]
+    },
+    {
+      "description": "A replacement for this one does not come from here.\n\nEither the operator's provider issued it, in which case inventing one would\nproduce a credential no service has ever heard of; or the service that holds\nit offers no way to change it in place. Either way what is owed is a\nsentence saying where a replacement does come from, not an attempt.",
+      "type": "object",
+      "properties": {
+        "detail": {
+          "description": "Where a replacement comes from, and what to do once it exists.",
+          "type": "string"
+        },
+        "settled": {
+          "type": "string",
+          "const": "elsewhere"
+        }
+      },
+      "required": [
+        "settled",
+        "detail"
+      ]
+    }
+  ]
+}

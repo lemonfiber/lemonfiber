@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What standing lemonfiber beside an existing setup came to, or would come to.",
+  "type": "object",
+  "properties": {
+    "ports": {
+      "description": "Where each service would listen instead, lowest original port first.",
+      "type": "array",
+      "items": {
+        "$ref": "MovedReport.json"
+      }
+    },
+    "refusal": {
+      "description": "Why nothing was written, where nothing was.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+      "type": "boolean"
+    },
+    "stance": {
+      "description": "Where the act stands.",
+      "$ref": "Stance.json"
+    },
+    "written": {
+      "description": "Where the Compose file that says so was written.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "ports",
+    "stance",
+    "rehearsed"
+  ]
+}

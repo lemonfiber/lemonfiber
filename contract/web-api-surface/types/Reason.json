@@ -1,0 +1,15 @@
+{
+  "fields": {},
+  "variants": [
+    "\"import-failed\"",
+    "\"indexers-failed\"",
+    "\"no-indexers\"",
+    "\"no-media-server\"",
+    "\"none-met-the-preset\"",
+    "\"not-grabbed\"",
+    "\"not-visible\"",
+    "\"nothing-matched\"",
+    "\"stalled\"",
+    "\"tunnel-down\""
+  ]
+}

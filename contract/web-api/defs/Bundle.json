@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a support request said: what a bundle holds, and where it is if it exists.\n\nOne record with an absent path rather than two shapes, because the two answers\nare the same answer at two moments: both list what goes in the file and say how\nlarge it is, and only one of them has a file to point at. A caller reads whether\nthere is a path to know which it has.",
+  "type": "object",
+  "properties": {
+    "bytes": {
+      "description": "How large the file is, or would be.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "contents": {
+      "description": "Everything it holds, gathered, redacted and read back.",
+      "$ref": "Contents.json"
+    },
+    "path": {
+      "description": "Where it was written, or nothing where a run that writes nothing described it.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+      "type": "boolean"
+    },
+    "would_go": {
+      "description": "Where it would be written, on the run that only describes one.\n\nThe other half of what a description is for. What goes in the file and how\nlarge it is answer *whether* to make it; where it lands answers *where to find\nit*, and an operator deciding at a shell needs both at the one moment the\nanswer can still change what they do. Resolved by the same function the run\nthat writes resolves it with, so the path shown and the path written are one.\n\nAbsent on a run that wrote one — `path` is then where it went — and absent on a\nmachine that would not say where lemonfiber keeps its own files, which is the\none destination of the three that needs that answer.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "contents",
+    "bytes",
+    "rehearsed"
+  ]
+}

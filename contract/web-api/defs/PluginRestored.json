@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where an update did not hold: what putting the version it replaced back came to.",
+  "type": "object",
+  "properties": {
+    "placed": {
+      "description": "Whether everything its record says it placed is on the machine again.",
+      "type": "boolean"
+    },
+    "running": {
+      "description": "Whether its containers are running again.\n\nApart from `placed`, because the two fail differently: a document that would not\nland is a disk, and a container that would not start is the engine — and an\noperator fixes them in different places.",
+      "type": "boolean"
+    },
+    "version": {
+      "description": "The version put back, which is the one the record still names.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "version",
+    "placed",
+    "running"
+  ]
+}

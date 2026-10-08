@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A directory everything lemonfiber keeps sits under.",
+  "type": "object",
+  "properties": {
+    "at": {
+      "description": "The directory itself.",
+      "type": "string"
+    },
+    "what": {
+      "description": "What lives under it, and what losing it would cost.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "at",
+    "what"
+  ]
+}

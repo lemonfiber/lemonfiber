@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What this stack holds, and what it used to.",
+  "type": "object",
+  "properties": {
+    "removed": {
+      "description": "The services this stack has dropped, in the order it records them.\n\nEmpty for a stack that has never dropped anything, which is a different thing\nfrom a stack that keeps no record — and told apart by the fact that a stack\nkeeping no record cannot be read as having dropped something it did.",
+      "type": "array",
+      "items": {
+        "$ref": "RemovedService.json"
+      }
+    },
+    "services": {
+      "description": "The services, in the order the stack declares them.\n\nEvery service the manifest holds rather than the ones some form would start:\nwhat a service is *for* is the question being asked, and an answer narrowed to\nwhat is running would leave the operator unable to ask about the one they are\ndeciding whether to run.",
+      "type": "array",
+      "items": {
+        "$ref": "CataloguedService.json"
+      }
+    }
+  },
+  "required": [
+    "services",
+    "removed"
+  ]
+}

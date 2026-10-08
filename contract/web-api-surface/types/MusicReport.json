@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "choice": {
+      "type": [
+        "ref:MusicChoice"
+      ],
+      "required": true
+    },
+    "disposition": {
+      "type": [
+        "ref:Disposition"
+      ],
+      "required": true
+    },
+    "outcome": {
+      "type": [
+        "anyOf(null,ref:Triggered)"
+      ],
+      "required": false
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The newest of each kind, by what names them and nothing else.\n\nWhat the event stream says. A surface marks a tab from it without reading the\nitems, and reads [`News`] on the screen that lists them.",
+  "type": "object",
+  "properties": {
+    "problems": {
+      "description": "The checks most recently found wrong, each with its onset.",
+      "type": "array",
+      "items": {
+        "$ref": "NewsCheck.json"
+      }
+    },
+    "requests": {
+      "description": "The numbers of the household's newest requests.",
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "format": "int64"
+      }
+    },
+    "unread": {
+      "description": "The kinds that could not be read, as [`News::unread`] names them.",
+      "type": "array",
+      "items": {
+        "$ref": "NewsKind.json"
+      }
+    },
+    "updates": {
+      "description": "The versions of the newest releases in the record this build carries.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "updates",
+    "requests",
+    "problems",
+    "unread"
+  ]
+}

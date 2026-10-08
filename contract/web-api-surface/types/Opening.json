@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "because": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "setting": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "what": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

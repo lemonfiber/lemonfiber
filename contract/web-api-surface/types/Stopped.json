@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "logs": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "reason": {
+      "type": [
+        "ref:Reason"
+      ],
+      "required": true
+    },
+    "remedy": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "step": {
+      "type": [
+        "ref:WalkthroughStep"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

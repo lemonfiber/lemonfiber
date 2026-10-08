@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "placed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "running": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "version": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

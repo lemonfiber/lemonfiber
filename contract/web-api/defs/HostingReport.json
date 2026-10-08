@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What this machine keeps running on lemonfiber's behalf.\n\nDefaultable so a test can read one out of a `Result` without a branch it can\nnever take: a closure standing in for the impossible arm is a region no\npassing run enters, and the coverage gate counts those.",
+  "type": "object",
+  "properties": {
+    "caveat": {
+      "description": "What is true of this manager and worth knowing before it is relied on.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "changed": {
+      "description": "What this run changed, where it was asked to change something.",
+      "anyOf": [
+        {
+          "$ref": "Changed.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "commands": {
+      "description": "Every long-running command there is, hosted or not.",
+      "type": "array",
+      "items": {
+        "$ref": "HostedCommand.json"
+      }
+    },
+    "instruction": {
+      "description": "What to do instead, where lemonfiber cannot configure this platform.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "manager": {
+      "description": "The service manager this platform has, or the absence of one.",
+      "$ref": "Manager.json"
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "manager",
+    "commands",
+    "rehearsed"
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One line of the accounting.",
+  "type": "object",
+  "properties": {
+    "category": {
+      "description": "What it is about.",
+      "$ref": "SpaceCategory.json"
+    },
+    "reclaim": {
+      "description": "What getting it back would cost.",
+      "$ref": "Reclaim.json"
+    },
+    "tally": {
+      "description": "What it occupies, counted both ways.",
+      "$ref": "Tally.json"
+    }
+  },
+  "required": [
+    "category",
+    "tally",
+    "reclaim"
+  ]
+}

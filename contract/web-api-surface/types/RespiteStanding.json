@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "seconds": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "standing": {
+      "type": [
+        "const:\"expired\"",
+        "const:\"in-force\"",
+        "const:\"none\""
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"expired\"",
+    "\"in-force\"",
+    "\"none\""
+  ]
+}

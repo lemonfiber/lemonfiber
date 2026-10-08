@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "binary": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "changelog": {
+      "type": [
+        "ref:Notes"
+      ],
+      "required": true
+    },
+    "compose": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "stack": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "supported_schema": {
+      "type": [
+        "array[integer/uint32]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

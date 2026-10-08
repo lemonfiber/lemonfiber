@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "leaving": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "outcome": {
+      "type": [
+        "const:\"declined\"",
+        "const:\"fix_failed\"",
+        "const:\"fixed\"",
+        "const:\"stopped\"",
+        "const:\"unmanaged\"",
+        "const:\"would_overwrite\""
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"declined\"",
+    "\"fix_failed\"",
+    "\"fixed\"",
+    "\"stopped\"",
+    "\"unmanaged\"",
+    "\"would_overwrite\""
+  ]
+}

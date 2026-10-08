@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One thing a check established, and how it turned out.",
+  "type": "object",
+  "properties": {
+    "category": {
+      "description": "The family this belongs to.",
+      "$ref": "DoctorCategory.json"
+    },
+    "caused_by": {
+      "description": "The check whose finding explains this one, where another does.\n\nSet after the run rather than by the check itself: a check is independent\nby construction and cannot see what any other found, which is a property\nworth keeping.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "check": {
+      "description": "A stable identifier for the thing checked, such as `vpn.egress-match`.",
+      "type": "string"
+    },
+    "onset": {
+      "description": "When the stack first saw this check wrong since it last saw it right, in whole\nseconds since the epoch.\n\nSet after the run from the store of conditions, like [`Self::said`], so it is\nthe moment the health summary names for the same check and a restart does not\nmove it. Absent where the finding says nothing is wrong, and where the checks\nran for something other than a diagnosis.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "origin": {
+      "description": "Whose check this is: one this build ships, or one a named plugin contributed.\n\nCarried rather than read off the identifier. A contributed check's id is\nnamespaced with the plugin's, and a reader could decode that from the colon —\nbut an origin a reader has to decode is one a reader gets wrong, and the day a\nbundled id grew a colon every such reader would misattribute it in silence.",
+      "$ref": "ValueOrigin.json"
+    },
+    "said": {
+      "description": "What the service said for itself, lately.\n\nCarried on the finding rather than left for the operator to go and fetch,\nbecause the explanation is almost always in it: a check can say a service is\nnot answering, and only the service can say why. Absent where the finding is\nnot about a service, where the service is fine, or where the engine would not\nsay — an empty section would be a promise of evidence that is not there.\n\nSet after the run, like [`Self::caused_by`], since reading a service's output\nis not the check's own business and a check that did it would be doing two\nthings.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "service": {
+      "description": "The service this is about, where it is about one.\n\nAbsent for the checks that are about the machine rather than about\nsomething running on it — the environment, the filesystem, the operator's\nown choices. Carried so that one service's trouble can be attributed to\nthe service underneath it rather than counted as one more independent\nthing wrong.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "service_name": {
+      "description": "What the stack calls that service in front of an operator.\n\nCarried beside the id rather than left for a surface to derive, because the id is\na key and not a name: capitalising `qbittorrent` does not arrive at qBittorrent,\nand the stack has already written the name down. Absent where the finding is about\nno service, and where the stack declares no service by that id — an id standing in\nfor a name would put the key back in front of the operator.\n\nSet after the run, like [`Self::caused_by`], from the same manifest that says\nwhich service depends on which.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "title": {
+      "description": "The one-line summary of what was checked.",
+      "type": "string"
+    },
+    "verdict": {
+      "description": "How it turned out.",
+      "$ref": "DoctorVerdict.json"
+    }
+  },
+  "required": [
+    "check",
+    "category",
+    "title",
+    "verdict",
+    "origin"
+  ]
+}

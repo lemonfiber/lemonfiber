@@ -1,0 +1,32 @@
+[
+  {
+    "action": "restart",
+    "disturbs": true,
+    "rehearsal": true,
+    "idempotent": true
+  },
+  {
+    "action": "diagnose",
+    "disturbs": true,
+    "rehearsal": false,
+    "idempotent": false
+  },
+  {
+    "action": "update",
+    "disturbs": true,
+    "rehearsal": true,
+    "idempotent": false
+  },
+  {
+    "action": "downloads-pause",
+    "disturbs": false,
+    "rehearsal": true,
+    "idempotent": true
+  },
+  {
+    "action": "downloads-resume",
+    "disturbs": false,
+    "rehearsal": true,
+    "idempotent": true
+  }
+]

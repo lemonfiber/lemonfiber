@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "needs": {
+      "type": [
+        "ref:StackProtocol"
+      ],
+      "required": true
+    },
+    "profile": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

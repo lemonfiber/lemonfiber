@@ -1,0 +1,5 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Whether a walk through setup was carried out or rehearsed, written as the bare\n`true` or `false` every other report writes its `rehearsed` as.\n\nTwo words rather than a fourth switch on a report that already holds three, which\nis a report somebody reads by remembering which `true` means what. On the wire it\nis the same boolean every report carries, so a client reads one shape.",
+  "type": "boolean"
+}

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One repair lemonfiber could carry out.",
+  "type": "object",
+  "properties": {
+    "check": {
+      "description": "The check whose finding this answers, as the finding names it.",
+      "type": "string"
+    },
+    "does": {
+      "description": "What it would do, in the words the operator will read before confirming.",
+      "type": "string"
+    },
+    "effects": {
+      "description": "What else changes if it does.\n\nStated before it is confirmed and never afterwards, because an effect an operator\nlearns about after the fact is not something they agreed to. Empty where a repair\ntouches nothing but the thing it names.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "reversible": {
+      "description": "Whether carrying it out is recorded well enough to be undone.\n\nA repair that cannot be reversed is still worth offering — restarting a container\nis not undoable and is usually right — but the operator confirming one deserves to\nknow which kind they are agreeing to.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "check",
+    "does",
+    "effects",
+    "reversible"
+  ]
+}

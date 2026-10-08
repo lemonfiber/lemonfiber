@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where a value in force came from.\n\nPublished under a name of its own because the generated schema keys on the type's\nbare name, and a second `Origin` in the crate would be merged with this one into a\nsingle definition carrying the variants of both — a published contract saying a\ncredential may be *unknown* and a setting may be *service*, neither of which is\ntrue, and neither of which the additive-only surface check would refuse.",
+  "oneOf": [
+    {
+      "description": "This build's own, out of what lemonfiber ships rather than out of a choice.",
+      "type": "object",
+      "properties": {
+        "origin": {
+          "type": "string",
+          "const": "bundled"
+        }
+      },
+      "required": [
+        "origin"
+      ]
+    },
+    {
+      "description": "The operator settled it, whether by answering for it or by editing it since.",
+      "type": "object",
+      "properties": {
+        "origin": {
+          "type": "string",
+          "const": "operator"
+        }
+      },
+      "required": [
+        "origin"
+      ]
+    },
+    {
+      "description": "A named plugin set it.",
+      "type": "object",
+      "properties": {
+        "named": {
+          "description": "Which one, so the thread back to it is a name rather than a search.",
+          "type": "string"
+        },
+        "origin": {
+          "type": "string",
+          "const": "plugin"
+        }
+      },
+      "required": [
+        "origin",
+        "named"
+      ]
+    },
+    {
+      "description": "It could not be established, and what stopped it.",
+      "type": "object",
+      "properties": {
+        "origin": {
+          "type": "string",
+          "const": "unknown"
+        },
+        "why": {
+          "description": "What stopped it being established, so the gap reads as a reason rather\nthan as a shrug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "origin",
+        "why"
+      ]
+    },
+    {
+      "description": "An installed plugin set it over a value that was there before, and that value\nis carried with it: what is in force and what it replaced are read together.",
+      "type": "object",
+      "properties": {
+        "named": {
+          "description": "Which plugin set what is in force.",
+          "type": "string"
+        },
+        "origin": {
+          "type": "string",
+          "const": "overridden"
+        },
+        "replaced": {
+          "description": "What it replaced, and where that came from.",
+          "$ref": "ValueReplaced.json"
+        }
+      },
+      "required": [
+        "origin",
+        "named",
+        "replaced"
+      ]
+    },
+    {
+      "description": "A plugin set it and is no longer installed, and the value is still in force.\n\nOnly where the record of what is installed was read and does not hold that\nplugin. A record that would not read cannot say a plugin is gone, so that is\nan unknown rather than this.",
+      "type": "object",
+      "properties": {
+        "named": {
+          "description": "Which plugin set it.",
+          "type": "string"
+        },
+        "origin": {
+          "type": "string",
+          "const": "orphaned"
+        }
+      },
+      "required": [
+        "origin",
+        "named"
+      ]
+    }
+  ]
+}

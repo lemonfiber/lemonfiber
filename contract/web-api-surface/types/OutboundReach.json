@@ -1,0 +1,14 @@
+{
+  "fields": {},
+  "variants": [
+    "\"catalogue\"",
+    "\"echo\"",
+    "\"guides\"",
+    "\"household\"",
+    "\"indexer\"",
+    "\"plugin-source\"",
+    "\"registry\"",
+    "\"updates\"",
+    "\"usenet\""
+  ]
+}

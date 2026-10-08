@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A walkthrough that stopped: where, why, what the services were saying, and what to do.",
+  "type": "object",
+  "properties": {
+    "logs": {
+      "description": "What the services involved were saying at the time, shown inline rather than left\nfor the operator to go and find — a fault report they have to research is a fault\nreport they abandon.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "reason": {
+      "description": "Why.",
+      "$ref": "Reason.json"
+    },
+    "remedy": {
+      "description": "The one thing to try.",
+      "type": "string"
+    },
+    "step": {
+      "description": "The step it stopped at.",
+      "$ref": "WalkthroughStep.json"
+    }
+  },
+  "required": [
+    "step",
+    "reason",
+    "logs",
+    "remedy"
+  ]
+}

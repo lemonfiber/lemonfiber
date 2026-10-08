@@ -1,0 +1,41 @@
+{
+  "fields": {
+    "pace": {
+      "type": [
+        "ref:Pace"
+      ],
+      "required": true
+    },
+    "path": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "pruned": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "scope": {
+      "type": [
+        "ref:Scope"
+      ],
+      "required": true
+    },
+    "sensitive": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The whole answer to a question about credentials.\n\nEvery ask answers with the inventory as it now stands, and adds what became of\nwhatever else was asked for. An operator who has just rotated something wants to\nsee the inventory that rotation produced, not a receipt they have to go and check\nagainst one.",
+  "type": "object",
+  "properties": {
+    "held": {
+      "description": "Every credential, whether or not it is present.",
+      "type": "array",
+      "items": {
+        "$ref": "CredentialHeld.json"
+      }
+    },
+    "protection": {
+      "description": "What keeping them in files does and does not protect against.",
+      "$ref": "Protection.json"
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+      "type": "boolean"
+    },
+    "revealed": {
+      "description": "One value, where one was asked for.",
+      "anyOf": [
+        {
+          "$ref": "Revealed.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "rotated": {
+      "description": "What became of a rotation, where one was asked for.",
+      "anyOf": [
+        {
+          "$ref": "Rotation.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "held",
+    "protection",
+    "rehearsed"
+  ]
+}

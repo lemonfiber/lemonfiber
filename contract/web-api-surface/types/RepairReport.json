@@ -1,0 +1,41 @@
+{
+  "fields": {
+    "acted": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "agreement": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "beyond": {
+      "type": [
+        "array[ref:Beyond]"
+      ],
+      "required": true
+    },
+    "mended": {
+      "type": [
+        "array[ref:Mended]"
+      ],
+      "required": true
+    },
+    "offered": {
+      "type": [
+        "array[ref:Repair]"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

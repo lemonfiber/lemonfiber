@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One thing the operator can do about a problem.",
+  "type": "object",
+  "properties": {
+    "action": {
+      "description": "The action, phrased as something to do rather than something to know.",
+      "type": "string"
+    },
+    "detail": {
+      "description": "Where to look, when that helps.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "action"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "check": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "onset": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

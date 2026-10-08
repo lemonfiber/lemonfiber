@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A capability that would have nothing filling it.",
+  "type": "object",
+  "properties": {
+    "capability": {
+      "description": "The core name nothing would fill.",
+      "type": "string"
+    },
+    "filled_by": {
+      "description": "The plugin that is filling it now, which is the one going.\n\nNamed rather than left to the reader, because the sentence an operator has to\nact on is *this is the only thing filling it* and a capability on its own does\nnot say that.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "capability",
+    "filled_by"
+  ]
+}

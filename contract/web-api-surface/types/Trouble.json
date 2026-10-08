@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "causes": {
+      "type": [
+        "array[ref:Cause]"
+      ],
+      "required": true
+    },
+    "symptom": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One form the stack declares, as a listing shows it.\n\nThe manifest's own words rather than lemonfiber's: forms come from the stack, so a\nstack of somebody's own names and describes them however it likes, and a listing that\nparaphrased would be describing a different stack from the one being run.",
+  "type": "object",
+  "properties": {
+    "composable": {
+      "description": "Whether it can be started alongside another form.\n\nWorth saying in the listing rather than only when a combination is refused: an\noperator choosing between two forms is exactly who needs to know they are a choice.",
+      "type": "boolean"
+    },
+    "description": {
+      "description": "What it is for, in one line.",
+      "type": "string"
+    },
+    "id": {
+      "description": "What to type to start it.",
+      "type": "string"
+    },
+    "name": {
+      "description": "What it is called.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "description",
+    "composable"
+  ]
+}

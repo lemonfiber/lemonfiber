@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "at": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "lemonfiber": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "stack": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "from": {
+      "type": [
+        "integer/uint16"
+      ],
+      "required": true
+    },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "to": {
+      "type": [
+        "integer/uint16"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

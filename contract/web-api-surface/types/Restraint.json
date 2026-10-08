@@ -1,0 +1,12 @@
+{
+  "fields": {},
+  "variants": [
+    "\"cap-exceeded\"",
+    "\"cap-warning\"",
+    "\"limited\"",
+    "\"overridden\"",
+    "\"scheduled-active\"",
+    "\"scheduled-quiet\"",
+    "\"unlimited\""
+  ]
+}

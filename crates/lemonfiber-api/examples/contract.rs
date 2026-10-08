@@ -1,23 +1,29 @@
-//! Writes the machine-readable contract over the committed artefact.
+//! Writes the machine-readable contract over the committed directory.
 //!
-//! `just contract` runs it. It writes beside the artefact and renames over it, so a
-//! run that fails leaves the committed file as it was. The comparison lives in a
-//! test, so a stale artefact fails the build rather than this binary.
+//! `just contract` runs it. It writes beside the directory and swaps it in, so a run
+//! that fails leaves the committed one as it was. The comparison lives in a test, so
+//! a stale directory fails the build rather than this binary.
 
 use std::path::Path;
 
-use lemonfiber_api::contract::{Contract, CONTRACT_PATH};
+use lemonfiber_api::contract::{layout, Contract, CONTRACT_DIR};
 
 fn main() {
-    let Some(text) = Contract::describe().to_json() else {
-        std::process::exit(1);
+    let files = match Contract::describe().files() {
+        Ok(files) => files,
+        Err(faults) => {
+            eprintln!(
+                "the contract cannot be written as a directory:\n{}",
+                faults.join("\n")
+            );
+            std::process::exit(1);
+        }
     };
-    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
-        .join(CONTRACT_PATH);
-    let next = path.with_extension("json.next");
-    if let Err(error) = std::fs::write(&next, text).and_then(|()| std::fs::rename(&next, &path)) {
-        eprintln!("{}: {error}", path.display());
+        .join(CONTRACT_DIR);
+    if let Err(error) = layout::replace(&dir, &files) {
+        eprintln!("{}: {error}", dir.display());
         std::process::exit(1);
     }
 }

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where one service would listen to run beside what is already here.",
+  "type": "object",
+  "properties": {
+    "from": {
+      "description": "The port it would ordinarily take.",
+      "type": "integer",
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0
+    },
+    "service": {
+      "description": "The lemonfiber service being moved.",
+      "type": "string"
+    },
+    "to": {
+      "description": "The port it would take instead.",
+      "type": "integer",
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0
+    }
+  },
+  "required": [
+    "service",
+    "from",
+    "to"
+  ]
+}

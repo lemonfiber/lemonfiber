@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where a copy of lemonfiber stands, in the words the specification uses.\n\nNothing known is the default, and it is the right one: a report built before\nanything has been read has not established that this copy is current, and a\ndefault that said so would be a claim made by an empty value.",
+  "oneOf": [
+    {
+      "description": "The version running is the newest known.",
+      "type": "string",
+      "const": "current"
+    },
+    {
+      "description": "A newer version exists, and replacing this copy is lemonfiber's own to do.",
+      "type": "string",
+      "const": "update-available"
+    },
+    {
+      "description": "A newer version exists and a package manager owns this copy, so the update\nis that tool's to make.",
+      "type": "string",
+      "const": "managed-externally"
+    },
+    {
+      "description": "Availability could not be determined, which is not a fault and stops nothing.",
+      "type": "string",
+      "const": "check-failed"
+    }
+  ]
+}

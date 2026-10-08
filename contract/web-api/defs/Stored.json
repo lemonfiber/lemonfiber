@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Everything lemonfiber keeps on this machine, and what became of it.",
+  "type": "object",
+  "properties": {
+    "beside": {
+      "description": "What is on this machine that is not lemonfiber's to keep or remove.",
+      "type": "array",
+      "items": {
+        "$ref": "StoredBeside.json"
+      }
+    },
+    "kept": {
+      "description": "Each thing kept, configuration first and then what can be made again.",
+      "type": "array",
+      "items": {
+        "$ref": "Kept.json"
+      }
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+      "type": "boolean"
+    },
+    "removal": {
+      "description": "Whether this run removed any of it.",
+      "$ref": "StoredRemoval.json"
+    },
+    "roots": {
+      "description": "The two directories all of it lives under.",
+      "type": "array",
+      "items": {
+        "$ref": "Root.json"
+      }
+    }
+  },
+  "required": [
+    "roots",
+    "kept",
+    "beside",
+    "removal",
+    "rehearsed"
+  ]
+}

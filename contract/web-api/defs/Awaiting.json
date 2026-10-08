@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What an operation with no bound on it is waiting for.\n\nA case rather than a sentence, so what an operation is waiting for is a value\nsomething can be asked about. The words are built from it in one place below;\na phrase carried here instead would be a phrase every later surface had to\nparse back into the fact it came from.",
+  "oneOf": [
+    {
+      "description": "Everything still coming down has finished arriving.",
+      "type": "string",
+      "const": "downloads"
+    }
+  ]
+}

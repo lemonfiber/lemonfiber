@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How much a problem matters.\n\nFour levels, deliberately. More would not be applied consistently, and\ninconsistent severity is worse than coarse severity.",
+  "oneOf": [
+    {
+      "description": "Informational; nothing is required.",
+      "type": "string",
+      "const": "advisory"
+    },
+    {
+      "description": "Degraded or risky, still working.",
+      "type": "string",
+      "const": "warning"
+    },
+    {
+      "description": "Something is broken.",
+      "type": "string",
+      "const": "error"
+    },
+    {
+      "description": "Consequences outside the machine, or data at risk.",
+      "type": "string",
+      "const": "critical"
+    }
+  ]
+}

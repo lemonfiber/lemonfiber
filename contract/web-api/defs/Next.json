@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One thing to do next.",
+  "oneOf": [
+    {
+      "description": "Add more content, now that the shape of it is understood.",
+      "type": "string",
+      "const": "more-content"
+    },
+    {
+      "description": "Let the rest of the household ask for things themselves.",
+      "type": "string",
+      "const": "household"
+    },
+    {
+      "description": "Watch it somewhere other than the machine it is running on.",
+      "type": "string",
+      "const": "client-apps"
+    }
+  ]
+}

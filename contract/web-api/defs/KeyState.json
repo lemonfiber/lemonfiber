@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where a key stands.",
+  "oneOf": [
+    {
+      "description": "Admitted within its scope.",
+      "type": "string",
+      "const": "active"
+    },
+    {
+      "description": "Refused as a wrong token is, and kept in the listing with when it was revoked.",
+      "type": "string",
+      "const": "revoked"
+    },
+    {
+      "description": "A member's key whose account has left the household: refused, and listed so it\ncan be revoked.",
+      "type": "string",
+      "const": "orphaned"
+    },
+    {
+      "description": "A member's key whose account the media server could not be asked about just now.",
+      "type": "string",
+      "const": "unconfirmed"
+    }
+  ]
+}

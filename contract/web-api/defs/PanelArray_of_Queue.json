@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A panel's content, or the reason its source could not fill it.\n\nThe difference between \"this panel is up to date\" and \"this panel's source is\nunreachable\" is the whole of degrading honestly: an unavailable panel says so,\nin its own words, rather than showing stale data as current or blank data as\nzero — and the panels beside it stay live.",
+  "oneOf": [
+    {
+      "description": "The source answered; here is the panel.",
+      "type": "object",
+      "properties": {
+        "data": {
+          "type": "array",
+          "items": {
+            "$ref": "Queue.json"
+          }
+        },
+        "panel": {
+          "type": "string",
+          "const": "ready"
+        }
+      },
+      "required": [
+        "panel",
+        "data"
+      ]
+    },
+    {
+      "description": "The source could not be reached, for this stated reason.",
+      "type": "object",
+      "properties": {
+        "data": {
+          "type": "object",
+          "properties": {
+            "reason": {
+              "description": "Why the panel could not be filled, in the operator's terms.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "reason"
+          ]
+        },
+        "panel": {
+          "type": "string",
+          "const": "unavailable"
+        }
+      },
+      "required": [
+        "panel",
+        "data"
+      ]
+    }
+  ]
+}

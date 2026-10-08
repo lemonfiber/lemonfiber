@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The one-line summary, and what it expands to.",
+  "type": "object",
+  "properties": {
+    "affected": {
+      "description": "Everything that is wrong, worst first, so the line expands to the affected\nitems and their remedies rather than to a number nobody can act on.",
+      "type": "array",
+      "items": {
+        "$ref": "Affected.json"
+      }
+    },
+    "standing": {
+      "description": "The one word.",
+      "$ref": "HealthStanding.json"
+    },
+    "wanting_attention": {
+      "description": "How many things are wrong — root causes, counted once each, so a disk that\nfilled and the nine imports that then failed is one thing and not ten.",
+      "type": "integer",
+      "format": "uint",
+      "minimum": 0
+    },
+    "worst": {
+      "description": "The worst thing, named, so the line says something rather than only\ngrading. Absent where nothing is wrong.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "standing",
+    "wanting_attention",
+    "affected"
+  ]
+}

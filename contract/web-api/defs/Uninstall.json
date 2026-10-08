@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A removal, before or after it happened.",
+  "type": "object",
+  "properties": {
+    "manifest": {
+      "description": "What removing would come to, or what it came to.",
+      "$ref": "UninstallManifest.json"
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+      "type": "boolean"
+    },
+    "removal": {
+      "description": "Whether anything was removed on this run.",
+      "$ref": "UninstallRemoval.json"
+    }
+  },
+  "required": [
+    "manifest",
+    "removal",
+    "rehearsed"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "fields": {
+    "breakage": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "remediation": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "severity": {
+      "type": [
+        "const:\"informational\"",
+        "const:\"warning\""
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"informational\"",
+    "\"warning\""
+  ]
+}

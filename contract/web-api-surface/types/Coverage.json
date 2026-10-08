@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "have": {
+      "type": [
+        "integer/uint"
+      ],
+      "required": true
+    },
+    "seasons": {
+      "type": [
+        "array[ref:SeasonCoverage]"
+      ],
+      "required": true
+    },
+    "unmonitored": {
+      "type": [
+        "integer/uint"
+      ],
+      "required": true
+    },
+    "wanted": {
+      "type": [
+        "integer/uint"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

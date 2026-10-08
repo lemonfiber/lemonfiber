@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where a service's credential comes from.",
+  "oneOf": [
+    {
+      "description": "The service writes it to an XML file lemonfiber reads.",
+      "type": "string",
+      "const": "config-xml"
+    },
+    {
+      "description": "The service writes it to an INI file lemonfiber reads.",
+      "type": "string",
+      "const": "config-ini"
+    },
+    {
+      "description": "The service writes it to a JSON file lemonfiber reads.",
+      "type": "string",
+      "const": "config-json"
+    },
+    {
+      "description": "The service writes it to a YAML file lemonfiber reads.",
+      "type": "string",
+      "const": "config-yaml"
+    },
+    {
+      "description": "Retrieved over the service's own API once authenticated.",
+      "type": "string",
+      "const": "api-settings"
+    },
+    {
+      "description": "The service offers nothing durable, so lemonfiber mints and records one.",
+      "type": "string",
+      "const": "generated"
+    },
+    {
+      "description": "The API needs no credential.",
+      "type": "string",
+      "const": "none"
+    }
+  ]
+}

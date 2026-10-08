@@ -1,0 +1,11 @@
+{
+  "fields": {
+    "words": {
+      "type": [
+        "array[ref:Term]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

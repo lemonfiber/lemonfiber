@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How a single check turned out.\n\n\"Could not check\" (`Unverified`) is its own variant rather than a level of\nseverity, so a check that could not run can never be mistaken for one that\npassed — the dishonesty this whole subsystem exists to prevent.",
+  "oneOf": [
+    {
+      "description": "Verified working, with the evidence worth showing.",
+      "type": "object",
+      "properties": {
+        "note": {
+          "description": "What was observed, where stating it helps — an address, a port.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "outcome": {
+          "type": "string",
+          "const": "pass"
+        }
+      },
+      "required": [
+        "outcome"
+      ]
+    },
+    {
+      "description": "Working, but degraded or risky.",
+      "type": "object",
+      "properties": {
+        "cause": {
+          "description": "The problem that produced this one, where several share a root.",
+          "anyOf": [
+            {
+              "$ref": "Problem.json"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "code": {
+          "description": "The stable identifier for this kind of problem.",
+          "$ref": "Code.json"
+        },
+        "detail": {
+          "description": "The underlying technical detail, available but never leading.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "meaning": {
+          "description": "What it means for the operator.",
+          "type": "string"
+        },
+        "outcome": {
+          "type": "string",
+          "const": "warn"
+        },
+        "remedies": {
+          "description": "What to do, most likely first.",
+          "type": "array",
+          "items": {
+            "$ref": "Remedy.json"
+          }
+        },
+        "severity": {
+          "description": "How much it matters.",
+          "$ref": "ProblemSeverity.json"
+        },
+        "state": {
+          "description": "Where it stands with respect to being fixed.",
+          "$ref": "ProblemState.json"
+        },
+        "summary": {
+          "description": "What happened, in one plain sentence.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "outcome",
+        "code",
+        "severity",
+        "state",
+        "summary",
+        "meaning",
+        "remedies"
+      ]
+    },
+    {
+      "description": "Not working.",
+      "type": "object",
+      "properties": {
+        "cause": {
+          "description": "The problem that produced this one, where several share a root.",
+          "anyOf": [
+            {
+              "$ref": "Problem.json"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "code": {
+          "description": "The stable identifier for this kind of problem.",
+          "$ref": "Code.json"
+        },
+        "detail": {
+          "description": "The underlying technical detail, available but never leading.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "meaning": {
+          "description": "What it means for the operator.",
+          "type": "string"
+        },
+        "outcome": {
+          "type": "string",
+          "const": "fail"
+        },
+        "remedies": {
+          "description": "What to do, most likely first.",
+          "type": "array",
+          "items": {
+            "$ref": "Remedy.json"
+          }
+        },
+        "severity": {
+          "description": "How much it matters.",
+          "$ref": "ProblemSeverity.json"
+        },
+        "state": {
+          "description": "Where it stands with respect to being fixed.",
+          "$ref": "ProblemState.json"
+        },
+        "summary": {
+          "description": "What happened, in one plain sentence.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "outcome",
+        "code",
+        "severity",
+        "state",
+        "summary",
+        "meaning",
+        "remedies"
+      ]
+    },
+    {
+      "description": "Could not be established. Never a pass.",
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "const": "unverified"
+        },
+        "reason": {
+          "description": "Why it could not be determined.",
+          "type": "string"
+        },
+        "remedy": {
+          "description": "What the operator can do to get an answer.",
+          "$ref": "Remedy.json"
+        }
+      },
+      "required": [
+        "outcome",
+        "reason",
+        "remedy"
+      ]
+    },
+    {
+      "description": "A prerequisite was absent, so the check did not apply.",
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "const": "skipped"
+        },
+        "reason": {
+          "description": "Why the check did not apply.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "outcome",
+        "reason"
+      ]
+    }
+  ]
+}

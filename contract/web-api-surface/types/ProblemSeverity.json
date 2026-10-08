@@ -1,0 +1,9 @@
+{
+  "fields": {},
+  "variants": [
+    "\"advisory\"",
+    "\"critical\"",
+    "\"error\"",
+    "\"warning\""
+  ]
+}

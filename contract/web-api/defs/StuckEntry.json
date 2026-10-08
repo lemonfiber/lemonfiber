@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One stuck item queue health found, named so it links straight to its own trace.",
+  "type": "object",
+  "properties": {
+    "service": {
+      "description": "The \\*arr whose queue is holding it.",
+      "type": "string"
+    },
+    "stage": {
+      "description": "The stage its download is stuck at.",
+      "$ref": "Stage.json"
+    },
+    "title": {
+      "description": "The item's title — the term a `trace` searches by.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "title",
+    "service",
+    "stage"
+  ]
+}

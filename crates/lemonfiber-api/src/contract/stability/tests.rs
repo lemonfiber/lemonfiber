@@ -1,4 +1,5 @@
-use super::{gather, read, rendered, token, Break, Field, Moved, Shape, Surface, SURFACE_PATH};
+use super::{gather, read, rendered, token, Break, Field, Moved, Shape, Surface, SURFACE_DIR};
+use crate::contract::layout;
 use crate::contract::Contract;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
@@ -6,8 +7,8 @@ use std::collections::{BTreeMap, BTreeSet};
 /// The committed surface, read from the workspace root.
 fn committed() -> Option<Surface> {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let text = std::fs::read_to_string(root.join(SURFACE_PATH)).ok()?;
-    Surface::parse(&text)
+    let files = layout::read(&root.join(SURFACE_DIR)).ok()?;
+    Surface::from_files(&files)
 }
 
 /// A surface holding one type with one required string field.
@@ -589,8 +590,8 @@ fn the_committed_surface_still_describes_what_these_types_do() {
     // words is held in memory beside a fresh surface and is never written, so a
     // stored surface has none and comparing the values would compare that too.
     assert_eq!(
-        stored.to_json(),
-        fresh.to_json(),
+        stored.files(),
+        fresh.files(),
         "the surface is out of date — rewrite it with `just surface`"
     );
 }
@@ -598,13 +599,38 @@ fn the_committed_surface_still_describes_what_these_types_do() {
 #[test]
 fn a_surface_round_trips_through_the_form_it_is_committed_in() {
     let surface = one_field("binary", "string", true);
-    let written = surface.to_json().unwrap_or_default();
+    let written = surface.files();
 
-    assert!(written.ends_with("}\n"), "{written}");
-    assert_eq!(Surface::parse(&written), Some(surface));
-    // And anything that is not one reads as nothing to compare against, rather
-    // than as an empty surface that would silently pass every comparison.
-    assert_eq!(Surface::parse("not a surface at all"), None);
+    assert_eq!(
+        written.keys().map(String::as_str).collect::<Vec<_>>(),
+        ["index.json", "types/Report.json"]
+    );
+    assert!(
+        written.values().all(|text| text.ends_with("}\n")),
+        "{written:?}"
+    );
+    assert_eq!(Surface::from_files(&written), Some(surface));
+}
+
+/// Anything that is not a surface reads as nothing to compare against, rather than
+/// as an empty surface that would silently pass every comparison.
+#[test]
+fn a_directory_that_is_not_a_surface_reads_as_none() {
+    let mut written = one_field("binary", "string", true).files();
+    assert!(written
+        .insert("index.json".to_owned(), "not a surface at all".to_owned())
+        .is_some());
+    assert_eq!(Surface::from_files(&written), None);
+
+    let mut stray = one_field("binary", "string", true).files();
+    stray.insert("notes.txt".to_owned(), "{}".to_owned());
+    assert_eq!(Surface::from_files(&stray), None);
+
+    let mut broken = one_field("binary", "string", true).files();
+    broken.insert("types/Report.json".to_owned(), "[".to_owned());
+    assert_eq!(Surface::from_files(&broken), None);
+
+    assert_eq!(Surface::from_files(&layout::Files::new()), None);
 }
 
 #[test]

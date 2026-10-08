@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Who settled a contest between claimants.",
+  "oneOf": [
+    {
+      "description": "The stack shipped the choice, in the file the operator can read.",
+      "type": "string",
+      "const": "stack"
+    },
+    {
+      "description": "The operator chose, and the change is in the journal.",
+      "type": "string",
+      "const": "operator"
+    }
+  ]
+}

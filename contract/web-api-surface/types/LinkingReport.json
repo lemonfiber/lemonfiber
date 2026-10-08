@@ -1,0 +1,41 @@
+{
+  "fields": {
+    "because": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "cost": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "filesystems": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "forced": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "links": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "remedy": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

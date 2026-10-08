@@ -1,0 +1,239 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How one connection turned out after a seed pass.",
+  "oneOf": [
+    {
+      "description": "Written and read back.",
+      "type": "object",
+      "properties": {
+        "state": {
+          "type": "string",
+          "const": "wired"
+        }
+      },
+      "required": [
+        "state"
+      ]
+    },
+    {
+      "description": "Present and correct; nothing was done.",
+      "type": "object",
+      "properties": {
+        "state": {
+          "type": "string",
+          "const": "already-wired"
+        }
+      },
+      "required": [
+        "state"
+      ]
+    },
+    {
+      "description": "Present but operator-changed; preserved.",
+      "type": "object",
+      "properties": {
+        "state": {
+          "type": "string",
+          "const": "drifted"
+        }
+      },
+      "required": [
+        "state"
+      ]
+    },
+    {
+      "description": "Present and still lemonfiber's own value, but behind lemonfiber's intent —\nit should be brought up to date. Reported until an update path applies it,\nand never overwritten in the meantime.",
+      "type": "object",
+      "properties": {
+        "state": {
+          "type": "string",
+          "const": "stale"
+        }
+      },
+      "required": [
+        "state"
+      ]
+    },
+    {
+      "description": "Both the service's value and lemonfiber's intent moved away from the\nbaseline. The conflict is presented — the value the operator set beside the\none lemonfiber would write — and the value left as it is; lemonfiber does not\nresolve it on its own.\n\nBoth values are shown in the report and serialized with it, so a\nsecret-bearing field must not report a conflict through this variant: a\nconflict in a secret is to be reported without either value on show, and\nwants a masked shape of its own rather than this one.",
+      "type": "object",
+      "properties": {
+        "ours": {
+          "description": "The value lemonfiber would write in its place.",
+          "type": "string"
+        },
+        "state": {
+          "type": "string",
+          "const": "conflicted"
+        },
+        "yours": {
+          "description": "The value the service now holds, as the operator set it; `None` where\nthey cleared it.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "state",
+        "ours"
+      ]
+    },
+    {
+      "description": "An operator's edit adopted as the accepted state, kept across seeds and\nrestores. Settled: lemonfiber leaves it as it is.",
+      "type": "object",
+      "properties": {
+        "state": {
+          "type": "string",
+          "const": "adopted"
+        }
+      },
+      "required": [
+        "state"
+      ]
+    },
+    {
+      "description": "A value the service already held that lemonfiber never wrote — the operator's\nown, pre-existing. Adopted as the baseline this run rather than reported as\ndrift, so an existing setup is taken on instead of flagged wholesale. Its\nvalue is not shown, so a secret among the adopted is never put on display.",
+      "type": "object",
+      "properties": {
+        "state": {
+          "type": "string",
+          "const": "unmanaged"
+        }
+      },
+      "required": [
+        "state"
+      ]
+    },
+    {
+      "description": "Not there, or not at what lemonfiber would have it be, and this run only said\nso.\n\nThe one outcome a pass that writes nothing can reach where a pass that writes\nwould have written. What a real run would leave the service holding sits beside\nwhat it holds now, because a report saying a connection would be made without\nsaying what it would be made *to* is a count rather than an account — and a\ncount is what an operator asking for a rehearsal already has.\n\nBoth values are serialized, so a secret-bearing field must not report through\nthis variant carrying one. It does not have to: `ours` is absent exactly where\na real run would generate the value rather than read it, which is the only\nplace a credential arises — the torrent client's web UI password and the media\nserver's admin account. A value minted to describe a rehearsal is a secret that\nexists because somebody asked a question, and it would then have to be kept or\nthrown away.\n\n`yours` is absent where the service holds nothing, and where this run could not\nask without writing — reading the household's telling means signing in as the\nowner, and a session is state on somebody else's service.",
+      "type": "object",
+      "properties": {
+        "ours": {
+          "description": "What a real run would leave it holding, or `None` where that value would be\ngenerated rather than read.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state": {
+          "type": "string",
+          "const": "would-wire"
+        },
+        "yours": {
+          "description": "What the service holds now, or `None` where it holds nothing or could not\nbe asked.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "state"
+      ]
+    },
+    {
+      "description": "An operator's own value a real run would take on as the accepted state, and\nthis one did not.\n\nApart from [`Self::WouldWire`] because it is the other direction: nothing would\nbe written to the service at all, and what would move is lemonfiber's record of\nwhat it expects. Its value is not shown, exactly as [`Self::Unmanaged`] does not\nshow one, so a secret among the adopted is never put on display by a question.",
+      "type": "object",
+      "properties": {
+        "state": {
+          "type": "string",
+          "const": "would-adopt"
+        }
+      },
+      "required": [
+        "state"
+      ]
+    },
+    {
+      "description": "An area the operator declared unmanaged. Nothing was read from the service and\nnothing was written to it, and the reason they gave is carried so a report says\nwhose decision it was.\n\nApart from [`Self::Unmanaged`], which lemonfiber *infers* from a value it has\nno record of having written, and which it adopts as the baseline so that later\nruns recognise it. This one is a decision somebody wrote down, and it holds\nwhether or not lemonfiber would have had anything to say — nothing is adopted,\nbecause adopting would be the first half of managing it again.",
+      "type": "object",
+      "properties": {
+        "reason": {
+          "description": "Why the operator said to leave it alone, in their own words.",
+          "type": "string"
+        },
+        "state": {
+          "type": "string",
+          "const": "observed"
+        }
+      },
+      "required": [
+        "state",
+        "reason"
+      ]
+    },
+    {
+      "description": "Something on this machine fills what a service asks for, and nothing lemonfiber\ndoes connects the two — the filler names no adapter, or none lemonfiber pairs with\nwhat the asker speaks.\n\nSettled, because no run changes it: the stack, or what is installed, has to. Said\nrather than left out, because a filler nothing reaches and a filler lemonfiber\nforgot would otherwise read the same, and the operator who installed one to stand\nin for another is the one who needs to know which.",
+      "type": "object",
+      "properties": {
+        "reason": {
+          "description": "What fills it, what asked, and why nothing connects them.",
+          "type": "string"
+        },
+        "state": {
+          "type": "string",
+          "const": "unmatched"
+        }
+      },
+      "required": [
+        "state",
+        "reason"
+      ]
+    },
+    {
+      "description": "Prerequisite unavailable; a later run will complete it.",
+      "type": "object",
+      "properties": {
+        "reason": {
+          "description": "Why it could not be attempted.",
+          "type": "string"
+        },
+        "state": {
+          "type": "string",
+          "const": "skipped"
+        }
+      },
+      "required": [
+        "state",
+        "reason"
+      ]
+    },
+    {
+      "description": "Attempted and rejected, carrying the service's own words.",
+      "type": "object",
+      "properties": {
+        "detail": {
+          "description": "What the service said.",
+          "type": "string"
+        },
+        "state": {
+          "type": "string",
+          "const": "failed"
+        }
+      },
+      "required": [
+        "state",
+        "detail"
+      ]
+    },
+    {
+      "description": "Refused by lemonfiber's own policy, carrying the reason a re-run will not\nresolve — such as two \\*arrs pointed at one root folder, or a service that\ndoes not serve the API version this build speaks. Either way nothing it\nnames was written, whether it was refused before the write or the write\nitself found nothing to land in.",
+      "type": "object",
+      "properties": {
+        "reason": {
+          "description": "Why it was refused, in lemonfiber's own words.",
+          "type": "string"
+        },
+        "state": {
+          "type": "string",
+          "const": "refused"
+        }
+      },
+      "required": [
+        "state",
+        "reason"
+      ]
+    }
+  ]
+}

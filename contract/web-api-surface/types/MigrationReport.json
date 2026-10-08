@@ -1,0 +1,59 @@
+{
+  "fields": {
+    "beside": {
+      "type": [
+        "array[ref:MovedReport]"
+      ],
+      "required": true
+    },
+    "carrying": {
+      "type": [
+        "array[ref:CarryingReport]"
+      ],
+      "required": true
+    },
+    "conflicts": {
+      "type": [
+        "array[ref:ConflictReport]"
+      ],
+      "required": true
+    },
+    "linking": {
+      "type": [
+        "anyOf(null,ref:LinkingReport)"
+      ],
+      "required": false
+    },
+    "modes": {
+      "type": [
+        "array[ref:ModeReport]"
+      ],
+      "required": true
+    },
+    "not_carried": {
+      "type": [
+        "array[ref:UnsupportedReport]"
+      ],
+      "required": true
+    },
+    "read": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "standing": {
+      "type": [
+        "array[ref:StandingReport]"
+      ],
+      "required": true
+    },
+    "unsupported": {
+      "type": [
+        "array[ref:UnsupportedReport]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

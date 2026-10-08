@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One download still coming down when a reduction was asked for.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "description": "What it is, as the client names it.",
+      "type": "string"
+    },
+    "progress": {
+      "description": "How far along, from zero to a hundred.",
+      "type": "integer",
+      "format": "uint8",
+      "maximum": 255,
+      "minimum": 0
+    },
+    "protocol": {
+      "description": "Which client has it.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "protocol",
+    "name",
+    "progress"
+  ]
+}

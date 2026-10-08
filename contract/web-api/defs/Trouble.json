@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Something somebody reports, and what is likely behind it.\n\nKeyed by the symptom rather than the cause: the person asking has the symptom,\nand which cause it is is the thing they cannot yet say.",
+  "type": "object",
+  "properties": {
+    "causes": {
+      "description": "What is likely behind it, most likely first.",
+      "type": "array",
+      "items": {
+        "$ref": "Cause.json"
+      }
+    },
+    "symptom": {
+      "description": "What somebody says is happening, in their words.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "symptom",
+    "causes"
+  ]
+}

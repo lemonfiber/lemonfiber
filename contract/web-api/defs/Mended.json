@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One repair, and what became of it.",
+  "type": "object",
+  "properties": {
+    "outcome": {
+      "description": "How it turned out, once the check was asked again.",
+      "$ref": "RepairOutcome.json"
+    },
+    "repair": {
+      "description": "What was proposed.",
+      "$ref": "Repair.json"
+    }
+  },
+  "required": [
+    "repair",
+    "outcome"
+  ]
+}

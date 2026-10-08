@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One stage a traced item reached, named as the operator would read it: the stage,\nthe service that recorded it, and when.",
+  "type": "object",
+  "properties": {
+    "at": {
+      "description": "When it happened, as the service reported it — absent for a stage inferred\nrather than timed, such as being monitored.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "service": {
+      "description": "The service that recorded it.",
+      "type": "string"
+    },
+    "stage": {
+      "description": "The stage reached.",
+      "$ref": "Stage.json"
+    }
+  },
+  "required": [
+    "stage",
+    "service"
+  ]
+}

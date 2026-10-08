@@ -1,0 +1,53 @@
+{
+  "fields": {
+    "alongside": {
+      "type": [
+        "integer/uint"
+      ],
+      "required": true
+    },
+    "at": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "because": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "did": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "instead": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "operation": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "reversal": {
+      "type": [
+        "ref:ChangeReversal"
+      ],
+      "required": true
+    },
+    "target": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

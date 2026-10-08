@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How much of the line something may take.",
+  "oneOf": [
+    {
+      "description": "Nothing holds it back.",
+      "type": "object",
+      "properties": {
+        "as": {
+          "type": "string",
+          "const": "unlimited"
+        }
+      },
+      "required": [
+        "as"
+      ]
+    },
+    {
+      "description": "A proportion of what the line was measured to carry, in whole per cent.",
+      "type": "object",
+      "properties": {
+        "as": {
+          "type": "string",
+          "const": "share"
+        },
+        "at": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        }
+      },
+      "required": [
+        "as",
+        "at"
+      ]
+    },
+    {
+      "description": "A figure in bytes a second, as it was given.",
+      "type": "object",
+      "properties": {
+        "as": {
+          "type": "string",
+          "const": "absolute"
+        },
+        "at": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "as",
+        "at"
+      ]
+    }
+  ]
+}

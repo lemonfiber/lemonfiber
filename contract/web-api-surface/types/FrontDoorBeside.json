@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "address": {
+      "type": [
+        "anyOf(null,ref:Address)"
+      ],
+      "required": false
+    },
+    "because": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "facing": {
+      "type": [
+        "ref:Facing"
+      ],
+      "required": true
+    },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How much of one season is actually here, and what is outstanding — the season-level\nanswer, which for a series is the one an operator can act on.",
+  "type": "object",
+  "properties": {
+    "have": {
+      "description": "How many of the wanted parts are here.",
+      "type": "integer",
+      "format": "uint",
+      "minimum": 0
+    },
+    "outstanding": {
+      "description": "The wanted parts that are not here yet, each carrying the stage it rests at, so\none that stalled is told apart from one still downloading.",
+      "type": "array",
+      "items": {
+        "$ref": "Part.json"
+      }
+    },
+    "season": {
+      "description": "The season number. Season zero is where a service files specials.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "unmonitored": {
+      "description": "How many parts nobody asked for — unmonitored and not on disk.",
+      "type": "integer",
+      "format": "uint",
+      "minimum": 0
+    },
+    "wanted": {
+      "description": "How many parts were asked for, or are already here — the denominator. Parts\nnobody asked for are counted separately rather than inflating this, so a season\nwith every wanted episode present reads as complete even where specials are not.",
+      "type": "integer",
+      "format": "uint",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "season",
+    "have",
+    "wanted",
+    "unmonitored",
+    "outstanding"
+  ]
+}

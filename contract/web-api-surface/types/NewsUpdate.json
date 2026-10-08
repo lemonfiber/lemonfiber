@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "delivers": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "version": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

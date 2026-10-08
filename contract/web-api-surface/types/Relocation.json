@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "now": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "was": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

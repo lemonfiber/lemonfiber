@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A capability the operator chose one of a plugin's services to fill.\n\nThe only way anything a plugin brought comes to fill what the stack asks for in\nplace of the stack's own: a plugin cannot choose, and wiring by name is not\nsomething a plugin can introduce. So what a plugin substituted is what the operator\nsubstituted with it, and it is read off the recorded choices rather than off the\nplugin.",
+  "type": "object",
+  "properties": {
+    "capability": {
+      "description": "The capability it fills.",
+      "type": "string"
+    },
+    "plugin": {
+      "description": "The plugin whose service it is.",
+      "type": "string"
+    },
+    "service": {
+      "description": "The service chosen.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "plugin",
+    "capability",
+    "service"
+  ]
+}

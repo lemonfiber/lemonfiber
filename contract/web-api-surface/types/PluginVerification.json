@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "broke": {
+      "type": [
+        "array[ref:PluginChangedCheck]"
+      ],
+      "required": true
+    },
+    "unsettled": {
+      "type": [
+        "array[ref:PluginChangedCheck]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What there is to do next about a hand-off, which each surface says in its own words.\n\nCarried as a name rather than as a sentence because the act is the same everywhere\nand the way to take it is not: a terminal names a command, and an app offers a\ncontrol. A sentence written here would have to pick one of them, and every other\nsurface would then be showing somebody an instruction it cannot carry out.",
+  "oneOf": [
+    {
+      "description": "Invite them, which makes the account and is where what they may watch is chosen.",
+      "type": "string",
+      "const": "invite"
+    },
+    {
+      "description": "Ask again: once they have signed in on the device, or once the media server\nanswers the question it would not.",
+      "type": "string",
+      "const": "ask-again"
+    },
+    {
+      "description": "See whether the media server is running, and start it where it is not.",
+      "type": "string",
+      "const": "start-server"
+    },
+    {
+      "description": "Record the address the household reaches this machine at.",
+      "type": "string",
+      "const": "record-address"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "An ask several services claim and nothing has chosen between, so it reaches\nnothing.",
+  "type": "object",
+  "properties": {
+    "by": {
+      "description": "The service that asked.",
+      "type": "string"
+    },
+    "capability": {
+      "description": "What it asked for.",
+      "type": "string"
+    },
+    "claimants": {
+      "description": "Every claimant, named — a plugin's with the plugin beside it.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "by",
+    "capability",
+    "claimants"
+  ]
+}

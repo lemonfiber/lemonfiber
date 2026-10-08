@@ -1,0 +1,11 @@
+{
+  "fields": {},
+  "variants": [
+    "\"advisory\"",
+    "\"ample\"",
+    "\"critical\"",
+    "\"exhausted\"",
+    "\"unknown\"",
+    "\"warning\""
+  ]
+}

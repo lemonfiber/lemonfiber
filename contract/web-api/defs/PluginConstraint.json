@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A kind of constraint an expectation can put on a body.\n\nThe same vocabulary a proof's expectation and a contributed check's use, so that\n\"a status alone is not evidence\" is one rule rather than three. Read as well as\nwritten: a declaration that an assertion fails on a recording names the one of these\nthat fails there.",
+  "oneOf": [
+    {
+      "description": "The status alone.",
+      "type": "string",
+      "const": "status"
+    },
+    {
+      "description": "Keys carrying exactly these values.",
+      "type": "string",
+      "const": "json"
+    },
+    {
+      "description": "Keys that must be present, whatever they hold.",
+      "type": "string",
+      "const": "json_has_keys"
+    },
+    {
+      "description": "Keys that must hold a given kind of thing.",
+      "type": "string",
+      "const": "json_types"
+    },
+    {
+      "description": "Keys that must hold at least a given number.",
+      "type": "string",
+      "const": "json_at_least"
+    },
+    {
+      "description": "The answer read as an array, with at least a given number of entries.",
+      "type": "string",
+      "const": "json_array_min"
+    },
+    {
+      "description": "The answer did not parse as JSON at all.",
+      "type": "string",
+      "const": "json_is_absent"
+    },
+    {
+      "description": "The content type it is served as.",
+      "type": "string",
+      "const": "content_type"
+    },
+    {
+      "description": "What the body must begin with.",
+      "type": "string",
+      "const": "body_starts_with"
+    }
+  ]
+}

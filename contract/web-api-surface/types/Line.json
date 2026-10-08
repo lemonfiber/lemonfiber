@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "detail": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "said": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "step": {
+      "type": [
+        "ref:WalkthroughStep"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Which way a condition went.\n\nBoth directions are worth saying and neither is worth saying twice. An operator\ntold a disk filled up and never told it was resolved goes on believing it — so\nresolution is an alert in its own right rather than the absence of one.",
+  "oneOf": [
+    {
+      "description": "It started.",
+      "type": "string",
+      "const": "onset"
+    },
+    {
+      "description": "It stopped, having previously started.",
+      "type": "string",
+      "const": "resolved"
+    }
+  ]
+}

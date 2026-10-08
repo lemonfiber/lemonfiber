@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The API shapes lemonfiber knows how to speak.\n\nFour services share the `servarr` shape, which is what makes one client\nenough for them. Bindery is its own kind deliberately: it is not a Servarr\napplication and Prowlarr's app sync does not reach it. Bazarr is its own for\nthe neighbouring reason: it is told about the \\*arrs rather than being one of\nthem, in a form body a client of the shared shape could not send.",
+  "oneOf": [
+    {
+      "description": "Sonarr, Radarr, Lidarr and Prowlarr.",
+      "type": "string",
+      "const": "servarr"
+    },
+    {
+      "description": "`SABnzbd`.",
+      "type": "string",
+      "const": "sabnzbd"
+    },
+    {
+      "description": "qBittorrent's `WebUI` API.",
+      "type": "string",
+      "const": "qbittorrent"
+    },
+    {
+      "description": "Seerr.",
+      "type": "string",
+      "const": "seerr"
+    },
+    {
+      "description": "Bindery.",
+      "type": "string",
+      "const": "bindery"
+    },
+    {
+      "description": "Jellyfin — a media server whose account lemonfiber creates rather than a\nkey it reads, so it has a `key_source` of `generated`.",
+      "type": "string",
+      "const": "jellyfin"
+    },
+    {
+      "description": "Bazarr — the subtitle finder, which is told which \\*arrs to watch.",
+      "type": "string",
+      "const": "bazarr"
+    },
+    {
+      "description": "Audiobookshelf — a listening server whose first account lemonfiber creates,\nlike Jellyfin's, so its `key_source` is `generated` too. The token it hands\nback on sign-in is stable, so it is read again rather than recorded twice.",
+      "type": "string",
+      "const": "audiobookshelf"
+    },
+    {
+      "description": "`NZBHydra2` — the Usenet indexer aggregator, which starts with no authentication,\nso lemonfiber turns it on with an administrator it names and a password it mints.",
+      "type": "string",
+      "const": "nzbhydra2"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "fields": {},
+  "variants": [
+    "\"config\"",
+    "\"credentials\"",
+    "\"environment\"",
+    "\"network\"",
+    "\"providers\"",
+    "\"queue\"",
+    "\"services\"",
+    "\"storage\"",
+    "\"vpn\""
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The archives this machine has kept.",
+  "type": "object",
+  "properties": {
+    "archives": {
+      "description": "Each one by the name it was written under, newest first.\n\nThe name is the whole of what another surface needs: it is what a restore\nasks for, and it carries the moment the archive was taken and what it\ncovers, because that is how a capture names one.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "archives"
+  ]
+}

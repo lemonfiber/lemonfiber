@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "left": {
+      "type": [
+        "array[ref:UndoLeft]"
+      ],
+      "required": true
+    },
+    "noted": {
+      "type": [
+        "array[ref:UndoNoted]"
+      ],
+      "required": false
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "reversed": {
+      "type": [
+        "array[ref:Undo]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

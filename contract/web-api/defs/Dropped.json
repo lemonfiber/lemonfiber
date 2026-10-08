@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A profile left out of a closure, and what it would have needed.\n\nThe provider travels with the profile because a name on its own sends the\noperator looking for a fault. What they have is a stack not configured for\none of the two ways of downloading, which is a sentence rather than a word.",
+  "type": "object",
+  "properties": {
+    "needs": {
+      "description": "The provider it cannot run without.",
+      "$ref": "StackProtocol.json"
+    },
+    "profile": {
+      "description": "The profile that will not run.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "profile",
+    "needs"
+  ]
+}

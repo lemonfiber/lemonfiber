@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What changing a decision costs.",
+  "oneOf": [
+    {
+      "description": "Applied with a restart of the services it affects, and nothing else moves.",
+      "type": "string",
+      "const": "cheap"
+    },
+    {
+      "description": "Said and confirmed before it is applied: it may move data, invalidate library\npaths, or take a service away.",
+      "type": "string",
+      "const": "consequential"
+    }
+  ]
+}

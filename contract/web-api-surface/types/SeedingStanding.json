@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "ratio": {
+      "type": [
+        "integer/uint32"
+      ],
+      "required": true
+    },
+    "standing": {
+      "type": [
+        "const:\"left_alone\"",
+        "const:\"never_imported\"",
+        "const:\"seeding\""
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"left_alone\"",
+    "\"never_imported\"",
+    "\"seeding\""
+  ]
+}

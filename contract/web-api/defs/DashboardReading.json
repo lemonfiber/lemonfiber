@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A figure a source reports, kept apart from the two ways it can be missing.\n\nZero is a value a source gave; stale is the last value a source that has since\ngone quiet gave; unknown is a source that never answered at all. Collapsing any\ntwo of them sends an operator after the wrong problem — a stalled download and\na dashboard that simply stopped polling look identical only if the code lets\nthem.",
+  "oneOf": [
+    {
+      "description": "The source answered this refresh with a value — which may legitimately be\nzero.",
+      "type": "object",
+      "properties": {
+        "reading": {
+          "type": "string",
+          "const": "known"
+        },
+        "value": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "reading",
+        "value"
+      ]
+    },
+    {
+      "description": "The source did not answer this refresh; this is the last value it gave.",
+      "type": "object",
+      "properties": {
+        "reading": {
+          "type": "string",
+          "const": "stale"
+        },
+        "value": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "reading",
+        "value"
+      ]
+    },
+    {
+      "description": "The source has never answered, so nothing can be said about it.",
+      "type": "object",
+      "properties": {
+        "reading": {
+          "type": "string",
+          "const": "unknown"
+        }
+      },
+      "required": [
+        "reading"
+      ]
+    }
+  ]
+}

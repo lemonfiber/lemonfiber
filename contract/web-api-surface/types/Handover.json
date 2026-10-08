@@ -1,0 +1,11 @@
+{
+  "fields": {
+    "next": {
+      "type": [
+        "array[ref:Next]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

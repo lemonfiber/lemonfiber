@@ -1,0 +1,8 @@
+{
+  "fields": {},
+  "variants": [
+    "\"continue\"",
+    "\"pause\"",
+    "\"throttle\""
+  ]
+}

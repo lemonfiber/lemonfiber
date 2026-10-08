@@ -1,0 +1,51 @@
+{
+  "fields": {
+    "capability": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "how": {
+      "type": [
+        "const:\"asked\"",
+        "const:\"by-name\""
+      ],
+      "required": true
+    },
+    "origins": {
+      "type": [
+        "object{ref:ValueOrigin}"
+      ],
+      "required": true
+    },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "services": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "settled": {
+      "type": [
+        "ref:WiringSettled"
+      ],
+      "required": true
+    },
+    "why": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"asked\"",
+    "\"by-name\""
+  ]
+}

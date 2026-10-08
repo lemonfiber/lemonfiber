@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Whether anything was removed on this run, and what became of it.",
+  "oneOf": [
+    {
+      "description": "Nobody asked. This is a listing.",
+      "type": "object",
+      "properties": {
+        "state": {
+          "type": "string",
+          "const": "not-asked"
+        }
+      },
+      "required": [
+        "state"
+      ]
+    },
+    {
+      "description": "Asked for without the agreement it takes, so nothing was touched.",
+      "type": "object",
+      "properties": {
+        "state": {
+          "type": "string",
+          "const": "unconfirmed"
+        }
+      },
+      "required": [
+        "state"
+      ]
+    },
+    {
+      "description": "Carried out.",
+      "type": "object",
+      "properties": {
+        "gone": {
+          "description": "The directories that are gone.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "left": {
+          "description": "What could not be removed, each with the reason.",
+          "type": "array",
+          "items": {
+            "$ref": "StoredLeft.json"
+          }
+        },
+        "state": {
+          "type": "string",
+          "const": "done"
+        }
+      },
+      "required": [
+        "state",
+        "gone",
+        "left"
+      ]
+    }
+  ]
+}

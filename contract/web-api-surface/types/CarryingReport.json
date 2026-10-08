@@ -1,0 +1,47 @@
+{
+  "fields": {
+    "backup_first": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "because": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "existing": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "ours": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "refused": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "verdict": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

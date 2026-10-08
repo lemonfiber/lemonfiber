@@ -1,0 +1,41 @@
+{
+  "fields": {
+    "available": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "findings": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "holdings": {
+      "type": [
+        "array[ref:Held]"
+      ],
+      "required": true
+    },
+    "id": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "member": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "capability": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "plugin": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

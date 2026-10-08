@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "by_hand": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "found": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "what": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "why": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

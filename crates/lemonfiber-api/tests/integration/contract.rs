@@ -8,21 +8,33 @@ mod definitions;
 mod reads;
 mod refusals;
 mod samples;
+mod split;
 mod surface;
 
 use std::collections::{BTreeSet, HashSet};
 
 use serde_json::Value;
 
-use lemonfiber_api::contract::{Contract, CONTRACT_PATH};
+use lemonfiber_api::contract::layout::{self, Files};
+use lemonfiber_api::contract::{Contract, CONTRACT_DIR};
 use lemonfiber_core::app::Outcome;
 
 use samples::samples;
 
 /// What is committed, read from the workspace root.
-fn committed() -> Option<String> {
+fn committed() -> Files {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    std::fs::read_to_string(root.join(CONTRACT_PATH)).ok()
+    layout::read(&root.join(CONTRACT_DIR)).unwrap_or_default()
+}
+
+/// The directory this build writes, with whatever kept it from being written.
+fn fresh() -> Files {
+    let written = Contract::describe().files();
+    assert!(
+        written.is_ok(),
+        "the contract cannot be written: {written:?}"
+    );
+    written.unwrap_or_default()
 }
 
 /// The schema the contract publishes for one kind's `data`, with its `$ref`
@@ -80,62 +92,116 @@ fn written(outcome: Outcome) -> (String, BTreeSet<String>) {
     (named, fields)
 }
 
-/// How much of each rendering is shown either side of the first difference.
-const AROUND: usize = 140;
-
-/// Where two renderings of the contract first part company, in words.
-///
-/// Nothing where they agree. A gate saying only that the artefact is stale costs
-/// whoever reads it a whole regeneration to find out what moved, and the answer is
-/// already in the two strings it is holding.
-fn differing(stored: &str, fresh: &str) -> String {
-    let alike = stored
-        .chars()
-        .zip(fresh.chars())
-        .take_while(|(held, made)| held == made)
-        .count();
-    if alike == stored.chars().count() && alike == fresh.chars().count() {
-        return String::new();
-    }
-    let held: String = stored.chars().skip(alike).take(AROUND).collect();
-    let made: String = fresh.chars().skip(alike).take(AROUND).collect();
-    format!(
-        " — they part company {alike} characters in: the file has {held:?} where the \
-         types make {made:?}"
-    )
-}
-
-/// The committed artefact and the types must agree.
+/// The committed directory and the types must agree, file for file.
 ///
 /// A change to a serialised shape that forgets to regenerate fails here
 /// rather than reaching an SDK.
 #[test]
 fn the_committed_contract_still_matches_the_types() {
-    let fresh = Contract::describe().to_json().unwrap_or_default();
-    let stored = committed().unwrap_or_default();
-    // Bound rather than written into the assertion's own message, which is
-    // evaluated only where the assertion fails — and a rendering nothing runs is
-    // a rendering nothing holds to being readable.
-    let apart = differing(&stored, &fresh);
+    let apart = layout::differing(&committed(), &fresh());
 
-    assert_eq!(
-        stored, fresh,
-        "the contract is out of date — regenerate it with `just contract`{apart}"
+    assert!(
+        apart.is_empty(),
+        "the contract is out of date — regenerate it with `just contract`:\n{}",
+        apart.join("\n")
     );
 }
 
-/// Two renderings that agree say nothing, and two that do not say where.
+/// Every reference in the directory, with the file it appears in and the file it
+/// names, resolved against the one it appears in.
+fn references(files: &Files) -> Vec<(String, String)> {
+    fn walk(node: &Value, base: &str, found: &mut Vec<(String, String)>, at: &str) {
+        match node {
+            Value::Object(fields) => {
+                if let Some(Value::String(reference)) = fields.get("$ref") {
+                    let named = std::path::Path::new(base).join(reference);
+                    found.push((at.to_owned(), normalised(&named)));
+                }
+                fields
+                    .values()
+                    .for_each(|value| walk(value, base, found, at));
+            }
+            Value::Array(items) => items.iter().for_each(|item| walk(item, base, found, at)),
+            _ => {}
+        }
+    }
+    let mut found = Vec::new();
+    for (path, text) in files {
+        let base = path.rsplit_once('/').map_or("", |(dir, _)| dir);
+        let document: Value = serde_json::from_str(text).unwrap_or_default();
+        walk(&document, base, &mut found, path);
+    }
+    found
+}
+
+/// A path with each `..` taken back out against the part before it.
+fn normalised(path: &std::path::Path) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    for part in path.components() {
+        match part {
+            std::path::Component::ParentDir => {
+                parts.pop();
+            }
+            std::path::Component::Normal(name) => parts.push(name.to_string_lossy().into_owned()),
+            _ => {}
+        }
+    }
+    parts.join("/")
+}
+
+/// Every reference names a file the directory holds.
+///
+/// A reader resolves a `$ref` against the file it appears in, and one naming nothing
+/// leaves that reader a field it cannot describe.
 #[test]
-fn what_a_stale_artefact_is_told_is_where_it_went_wrong() {
-    assert_eq!(differing("the same", "the same"), String::new());
+fn every_reference_names_a_file_the_directory_holds() {
+    let files = fresh();
+    let dangling: Vec<String> = references(&files)
+        .into_iter()
+        .filter(|(_, named)| !files.contains_key(named))
+        .map(|(at, named)| format!("{at} refers to {named}"))
+        .collect();
 
-    let apart = differing("the same up to here", "the same up to there");
-    assert!(apart.contains("15 characters in"), "{apart}");
-    assert!(apart.contains("\"here\""), "{apart}");
-    assert!(apart.contains("\"there\""), "{apart}");
+    assert!(
+        !references(&files).is_empty(),
+        "the sweep found no reference to check"
+    );
+    assert!(dangling.is_empty(), "{}", dangling.join("\n"));
+}
 
-    let shorter = differing("the same", "the same and more");
-    assert!(shorter.contains("8 characters in"), "{shorter}");
+/// Every file in the directory is something the index names or a definition a named
+/// file reaches, so nothing is written that no reader would ever open.
+#[test]
+fn every_file_is_reached_from_the_index() {
+    let files = fresh();
+    let index: Value = files
+        .get(lemonfiber_api::contract::INDEX)
+        .and_then(|text| serde_json::from_str(text).ok())
+        .unwrap_or_default();
+    let mut reached: BTreeSet<String> =
+        BTreeSet::from([lemonfiber_api::contract::INDEX.to_owned()]);
+    let mut named = |value: &Value| {
+        if let Some(path) = value.as_str() {
+            reached.insert(path.to_owned());
+        }
+    };
+    ["key_callable", "reads", "refusals"]
+        .iter()
+        .filter_map(|key| index.get(key))
+        .for_each(&mut named);
+    index
+        .get("kinds")
+        .and_then(Value::as_object)
+        .into_iter()
+        .flat_map(|kinds| kinds.values())
+        .for_each(&mut named);
+    reached.extend(references(&files).into_iter().map(|(_, named)| named));
+
+    let unreached: Vec<&String> = files
+        .keys()
+        .filter(|path| !reached.contains(*path))
+        .collect();
+    assert!(unreached.is_empty(), "nothing reaches these: {unreached:?}");
 }
 
 /// The contract and the emitters must name the same set of kinds.
@@ -220,19 +286,26 @@ fn it_describes_the_wire_version_it_belongs_to() {
 
 #[test]
 fn every_kind_carries_the_whole_envelope_not_just_its_payload() {
-    let contract = Contract::describe();
-    let text = contract.to_json().unwrap_or_default();
+    let files = fresh();
+    let word: Value = files
+        .get("kinds/word.json")
+        .and_then(|text| serde_json::from_str(text).ok())
+        .unwrap_or_default();
 
-    assert!(contract.kinds.contains_key("word"), "{:?}", contract.kinds);
-    assert!(text.contains("api_version"), "{text}");
-    assert!(text.contains("kind"), "{text}");
+    assert!(word.pointer("/properties/api_version").is_some(), "{word}");
+    assert!(word.pointer("/properties/kind").is_some(), "{word}");
+    assert!(word.pointer("/properties/data").is_some(), "{word}");
 }
 
 #[test]
 fn it_is_written_the_same_way_twice() {
-    let once = Contract::describe().to_json();
-    let twice = Contract::describe().to_json();
+    let once = fresh();
 
-    assert_eq!(once, twice);
-    assert!(once.unwrap_or_default().ends_with("}\n"));
+    assert_eq!(once, fresh());
+    for (path, text) in &once {
+        assert!(
+            text.ends_with("}\n") || text.ends_with("]\n"),
+            "{path} ends {text:?}"
+        );
+    }
 }

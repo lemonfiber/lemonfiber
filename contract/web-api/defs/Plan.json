@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What will be run, and what was left out.\n\nSerialisable because it is an answer in its own right: asking what a form\nwould do is a question a script asks as readily as a person, and the plan a\nlifecycle report carries is this same value rather than a retelling of it.",
+  "type": "object",
+  "properties": {
+    "dropped": {
+      "description": "Profiles the closure asked for that the configuration does not support.",
+      "type": "array",
+      "items": {
+        "$ref": "Dropped.json"
+      }
+    },
+    "filtered": {
+      "description": "The services those profiles hold, each with what it needed and who asked.\n\nThe same answer as [`Self::dropped`], a service at a time. A surface showing what\ndid not start shows services, and one holding its own copy of which service sits\nin which profile would be a second copy of the stack's vocabulary.",
+      "type": "array",
+      "items": {
+        "$ref": "Filtered.json"
+      }
+    },
+    "footprint": {
+      "description": "What the stack estimates the services that would start need.",
+      "$ref": "Footprint.json"
+    },
+    "forms": {
+      "description": "The forms the operator named, in the order they named them.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "profiles": {
+      "description": "The profiles to activate, sorted so the command is reproducible.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "running": {
+      "description": "Which of [`Self::services`] are already running, where a form's introspection\nasked the engine.\n\nStarting a form leaves what is already running as it is, so a running service\nis not one the start would bring up. Absent where nothing asked, which is every\nplan but a preview's; `null` where the engine would not say, which is never said\nas nothing running.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "services": {
+      "description": "The services those profiles start, in the order the stack declares them.\n\nA service belongs to exactly one profile, so a service two named forms\nboth reach is here once. That is a property of the manifest rather than\nof a pass over this list: the union is over profiles, and a service\nappearing twice is not a state this can hold.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "forms",
+    "profiles",
+    "services",
+    "dropped",
+    "filtered",
+    "footprint"
+  ]
+}

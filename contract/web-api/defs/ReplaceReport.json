@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What standing in place of a setup already here came to, or would come to.",
+  "type": "object",
+  "properties": {
+    "agreement": {
+      "description": "What this offer names itself: the project and every service it would stop.\n\nThe answer to it is this name, and nothing else is a yes to a replacement. Empty\nwhere there is nothing to stand in place of, because there is nothing to agree to.",
+      "type": "string"
+    },
+    "project": {
+      "description": "The project that would be stood in place of.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "refusal": {
+      "description": "Why nothing was stopped, where nothing was.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+      "type": "boolean"
+    },
+    "stance": {
+      "description": "Where the act stands.",
+      "$ref": "Stance.json"
+    },
+    "still_running": {
+      "description": "The services that would not stop and are still up.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "stopped": {
+      "description": "The services that were stopped.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "would_stop": {
+      "description": "The services that would be stopped, by name.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "would_stop",
+    "agreement",
+    "stopped",
+    "still_running",
+    "stance",
+    "rehearsed"
+  ]
+}

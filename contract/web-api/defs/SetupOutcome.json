@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How a setup run ended.",
+  "oneOf": [
+    {
+      "description": "The reviewed answers were written.",
+      "type": "string",
+      "const": "applied"
+    },
+    {
+      "description": "The plan was seen and not applied; nothing was written.",
+      "type": "string",
+      "const": "abandoned"
+    },
+    {
+      "description": "Nothing was asked, because this machine was already set up.",
+      "type": "string",
+      "const": "already-set-up"
+    }
+  ]
+}

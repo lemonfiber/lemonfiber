@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The honest account of what the credential store protects against.\n\nTwo lists and a sentence, carried as data rather than printed here, so the API\nserves the same words the terminal prints and neither can drift into a claim the\nother does not make.",
+  "type": "object",
+  "properties": {
+    "against": {
+      "description": "What it protects against.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "not_against": {
+      "description": "What it does not protect against.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "summary": {
+      "description": "What the storage is, before any claim about it.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "summary",
+    "against",
+    "not_against"
+  ]
+}

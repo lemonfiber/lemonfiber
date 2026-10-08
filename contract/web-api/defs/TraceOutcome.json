@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A notable thing that happened to an item, as an \\*arr's history records it. Where the\nfurthest stage answers \"how far did it get?\", the sequence of outcomes answers \"what\nhas been tried?\" — a release grabbed more than once, a download that failed and was\ntried again, a file imported and later removed. Repeated failed grabs are a pattern\nworth seeing, not something a single furthest-stage reading can show.",
+  "oneOf": [
+    {
+      "description": "A release was sent to the download client.",
+      "type": "string",
+      "const": "grabbed"
+    },
+    {
+      "description": "The download client failed the release it was handed.",
+      "type": "string",
+      "const": "download-failed"
+    },
+    {
+      "description": "The item was imported to the library on disk.",
+      "type": "string",
+      "const": "imported"
+    },
+    {
+      "description": "The item's file was removed.",
+      "type": "string",
+      "const": "removed"
+    }
+  ]
+}

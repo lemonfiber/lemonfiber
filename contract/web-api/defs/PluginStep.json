@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One call a recipe makes, in the order it makes them.",
+  "type": "object",
+  "properties": {
+    "adapter": {
+      "description": "The adapter the destination is reached through, or nothing where it is a name\noutside the stack, which no adapter of lemonfiber's speaks to.",
+      "anyOf": [
+        {
+          "$ref": "PluginStepAdapter.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "id": {
+      "description": "The step's id within its recipe.",
+      "type": "string"
+    },
+    "method": {
+      "description": "The HTTP method it calls with.",
+      "type": "string"
+    },
+    "path": {
+      "description": "The path it calls.",
+      "type": "string"
+    },
+    "to": {
+      "description": "Where it calls: a service of this stack's or the plugin's own, or a name outside\nboth, as the manifest wrote it. Never a resolved address.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "method",
+    "to",
+    "path"
+  ]
+}

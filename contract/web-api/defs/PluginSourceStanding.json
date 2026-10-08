@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What asking a plugin's source came to.\n\n**Unreachable is not untrusted.** A plugin whose source has gone keeps running as it\nwas installed; what it loses is the way to a newer version, and that is said now\nrather than found out at the next update.",
+  "oneOf": [
+    {
+      "description": "It answered, so the plugin can be updated from it.",
+      "type": "object",
+      "properties": {
+        "standing": {
+          "type": "string",
+          "const": "reachable"
+        }
+      },
+      "required": [
+        "standing"
+      ]
+    },
+    {
+      "description": "It did not answer, or is no longer there, so the plugin cannot be updated from it.",
+      "type": "object",
+      "properties": {
+        "standing": {
+          "type": "string",
+          "const": "unreachable"
+        },
+        "why": {
+          "description": "What asking it said.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "standing",
+        "why"
+      ]
+    },
+    {
+      "description": "Nothing was asked, so nothing is known either way.",
+      "type": "object",
+      "properties": {
+        "standing": {
+          "type": "string",
+          "const": "unasked"
+        },
+        "why": {
+          "description": "Why nothing was asked.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "standing",
+        "why"
+      ]
+    }
+  ]
+}

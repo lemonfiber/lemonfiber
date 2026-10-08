@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "agreement": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "downgrade": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "manifest": {
+      "type": [
+        "ref:BackupManifest"
+      ],
+      "required": true
+    },
+    "relocation": {
+      "type": [
+        "anyOf(null,ref:Relocation)"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

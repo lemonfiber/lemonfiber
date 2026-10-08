@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where one member stands against what a period allows them.\n\nFour, and the one worth having is the middle: somebody told only when they have run\nout has been told too late to do anything but wait, which is the answer this whole\nfeature exists to avoid handing anybody.",
+  "oneOf": [
+    {
+      "description": "Nothing is counted against them.",
+      "type": "string",
+      "const": "unlimited"
+    },
+    {
+      "description": "There is room, and comfortably.",
+      "type": "string",
+      "const": "within-quota"
+    },
+    {
+      "description": "A fifth of the period's limit or less is left, and at least one of it.",
+      "type": "string",
+      "const": "near-quota"
+    },
+    {
+      "description": "Nothing is left, so the next thing they ask for is refused as they ask.",
+      "type": "string",
+      "const": "quota-exhausted"
+    }
+  ]
+}

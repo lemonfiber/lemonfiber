@@ -1,0 +1,14 @@
+{
+  "fields": {},
+  "variants": [
+    "\"abandoned\"",
+    "\"complete\"",
+    "\"downloading\"",
+    "\"failed\"",
+    "\"grabbing\"",
+    "\"importing\"",
+    "\"offered\"",
+    "\"searching\"",
+    "\"skipped\""
+  ]
+}

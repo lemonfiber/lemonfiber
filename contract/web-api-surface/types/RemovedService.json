@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "id": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "reason": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "removed_in": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "replaced_by": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

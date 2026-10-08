@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How the line is shared, and what that costs.",
+  "type": "object",
+  "properties": {
+    "acting": {
+      "description": "What a spent cap is doing to the figures above, where one is spent.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "applied": {
+      "description": "Whether this run wrote the limits to the clients or only read them.",
+      "type": "boolean"
+    },
+    "cap": {
+      "description": "The monthly cap, where one was declared.",
+      "anyOf": [
+        {
+          "$ref": "Cap.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "capacity": {
+      "description": "What the line was measured to carry.",
+      "anyOf": [
+        {
+          "$ref": "Capacity.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "cautions": {
+      "description": "What is worth knowing about that reading before trusting it.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "clients": {
+      "description": "What each download client was asked and what it is doing about it.",
+      "type": "array",
+      "items": {
+        "$ref": "Holding.json"
+      }
+    },
+    "down": {
+      "description": "The download limit.",
+      "$ref": "BandwidthReading.json"
+    },
+    "means": {
+      "description": "What that means for the household.",
+      "type": "string"
+    },
+    "metered": {
+      "description": "What the stack itself moved this month.",
+      "anyOf": [
+        {
+          "$ref": "Metered.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "ratio": {
+      "description": "What throttling the upload costs, where an upload limit is in force.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "reached": {
+      "description": "Where the month stands against it.",
+      "anyOf": [
+        {
+          "$ref": "Reached.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+      "type": "boolean"
+    },
+    "respite": {
+      "description": "The override, where one is running or has just run out.",
+      "$ref": "RespiteStanding.json"
+    },
+    "respite_says": {
+      "description": "What the override amounts to, in words.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "restraint": {
+      "description": "Where the line stands.",
+      "$ref": "Restraint.json"
+    },
+    "rhythm": {
+      "description": "The household's hours, where any were declared.",
+      "anyOf": [
+        {
+          "$ref": "Rhythm.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "untouched": {
+      "description": "What is outside every limit here.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "up": {
+      "description": "The upload limit, which is declared apart and defaults lower.",
+      "$ref": "BandwidthReading.json"
+    },
+    "zone": {
+      "description": "The zone the clients read those hours in, where the stack says.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "restraint",
+    "means",
+    "cautions",
+    "down",
+    "up",
+    "respite",
+    "clients",
+    "untouched",
+    "applied",
+    "rehearsed"
+  ]
+}

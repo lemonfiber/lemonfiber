@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One library path a service files into, and what moving the data location does\nto it.",
+  "type": "object",
+  "properties": {
+    "because": {
+      "description": "Why it does or does not, in the operator's terms.",
+      "type": "string"
+    },
+    "carried": {
+      "description": "Whether the library at this path survives the move.",
+      "type": "boolean"
+    },
+    "host": {
+      "description": "The host directory it would resolve to after the move, where the move can\nresolve it at all.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "path": {
+      "description": "The path as that service holds it, which is a path inside its container.",
+      "type": "string"
+    },
+    "service": {
+      "description": "The service holding it.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "service",
+    "path",
+    "carried",
+    "because"
+  ]
+}

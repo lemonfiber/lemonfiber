@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One household member: who they are, what they may watch, when they were last\nseen, and everything they have asked for.",
+  "type": "object",
+  "properties": {
+    "access": {
+      "description": "What they may watch.",
+      "$ref": "MemberAccess.json"
+    },
+    "asking": {
+      "description": "What they may ask for, and what their period has left of it.\n\nAbsent where the request service holds no account for them, and where it could\nnot be asked — an unread answer is not an unlimited member, and reporting one as\nthe other would tell an operator their quota was never applied.",
+      "anyOf": [
+        {
+          "$ref": "MemberAsking.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "claimed": {
+      "description": "Whether somebody has set a password on the account. False is an invitation\nnobody has taken up rather than a member who is not here.",
+      "type": "boolean"
+    },
+    "last_seen": {
+      "description": "When the media server last saw them, as it timestamps it. Absent where nobody\nhas ever signed in, which is exactly the unclaimed invitations.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "name": {
+      "description": "The member, by the name their account is held under.",
+      "type": "string"
+    },
+    "requests": {
+      "description": "What they asked for, newest first.",
+      "type": "array",
+      "items": {
+        "$ref": "MemberRequest.json"
+      }
+    },
+    "standing": {
+      "description": "Where the account stands: an invitation still out or run out, a member who can\nsign in, or one switched off.",
+      "$ref": "MemberStanding.json"
+    },
+    "to_hand_over": {
+      "description": "What this member would be told, in the words they would read it in.\n\nEverything a household member is owed at the moment of asking and cannot be\nshown where they ask: what happens to what they ask for, what their period has\nleft and when it makes room, roughly what a thing costs before they choose one,\nwhat is still waiting on an answer, and what was refused and why. Written to\nthem rather than about them, so it can be handed over as it stands.\n\nEmpty where there is nothing to tell them — a member the request service holds\nno account for has no standing to report and nothing waiting.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "name",
+    "requests",
+    "access",
+    "claimed",
+    "standing",
+    "to_hand_over"
+  ]
+}

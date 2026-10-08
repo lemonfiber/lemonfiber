@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "id": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "pairs": {
+      "type": [
+        "array[ref:PluginPair]"
+      ],
+      "required": true
+    },
+    "steps": {
+      "type": [
+        "array[ref:PluginStep]"
+      ],
+      "required": true
+    },
+    "title": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "why": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

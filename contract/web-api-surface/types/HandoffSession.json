@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "client": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "device": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "last_seen": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

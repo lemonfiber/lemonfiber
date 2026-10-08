@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One app a device can be pointed at the stack with, and the code that points it.",
+  "type": "object",
+  "properties": {
+    "client": {
+      "description": "What to use on it.",
+      "type": "string"
+    },
+    "code": {
+      "description": "What the code for this app carries: a link that opens the app at this server where\nthe app takes one, and the server's address otherwise.",
+      "type": "string"
+    },
+    "deep_link": {
+      "description": "Whether [`code`](Self::code) is such a link rather than the address alone.",
+      "type": "boolean"
+    },
+    "device": {
+      "description": "What somebody would call the device they are holding.",
+      "type": "string"
+    },
+    "open_source": {
+      "description": "Whether that app is open source. A closed one is never the recommended path.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "device",
+    "client",
+    "open_source",
+    "code",
+    "deep_link"
+  ]
+}

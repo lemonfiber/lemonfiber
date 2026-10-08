@@ -115,11 +115,13 @@ rebased:
 fmt:
     cargo fmt
 
-# Rewrite the machine-readable contract from the types that serialise the reply.
+# Rewrite the machine-readable contract from the types that serialise the reply: the
+# `contract/web-api/` directory, an index beside one file per kind and per definition.
 contract:
     cargo run --quiet --example contract -p lemonfiber-api
 
-# Rewrite the stable surface the contract is held to between releases.
+# Rewrite the stable surface the contract is held to between releases: the
+# `contract/web-api-surface/` directory, an index beside one file per type.
 #
 # Not a second rendering of the artefact above: that one says what the surfaces
 # exchange now, and regenerating it without a diff proves only that it is not stale.

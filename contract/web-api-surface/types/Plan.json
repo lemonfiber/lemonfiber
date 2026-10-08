@@ -1,0 +1,47 @@
+{
+  "fields": {
+    "dropped": {
+      "type": [
+        "array[ref:Dropped]"
+      ],
+      "required": true
+    },
+    "filtered": {
+      "type": [
+        "array[ref:Filtered]"
+      ],
+      "required": true
+    },
+    "footprint": {
+      "type": [
+        "ref:Footprint"
+      ],
+      "required": true
+    },
+    "forms": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "profiles": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "running": {
+      "type": [
+        "array|null[string]"
+      ],
+      "required": false
+    },
+    "services": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

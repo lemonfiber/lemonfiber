@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The value a plugin's change replaced, and where that value came from.\n\nIts own origin rather than assumed to be this build's default: before a plugin\nset a value, the operator may have, or another plugin, and calling that value\n*bundled* would tell somebody putting it back that they are returning to a\ndefault when they are returning to a choice.",
+  "type": "object",
+  "properties": {
+    "from": {
+      "description": "Where the replaced value came from, read from the record of the change that\nwrote it, and unknown where nothing recorded one.",
+      "$ref": "ValueOrigin.json"
+    },
+    "value": {
+      "description": "What it held, where there was a value and it may be shown. Nothing where nothing\nwas set — this build's default was in force — or where it is withheld.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "withheld": {
+      "description": "Whether a value is withheld because the setting holds a credential. A replaced\ncredential is shown as sealed and never in clear, as the one in force is.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "withheld",
+    "from"
+  ]
+}

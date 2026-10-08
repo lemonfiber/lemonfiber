@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How far a removal got, across the two services a household member exists on.\n\nThe media server is removed first and the request service second, because the\nrequest service authenticates *through* the media server — so once the first is gone\nthey can do nothing either way, and a failure at the second leaves an account that\ncannot sign in rather than somebody who can still watch.",
+  "oneOf": [
+    {
+      "description": "Both, which is what removal means.",
+      "type": "string",
+      "const": "everywhere"
+    },
+    {
+      "description": "The media server only, and the request service still holds an account.\n\nThey can neither watch nor ask — the account left behind signs in through the one\nthat is gone — but something is there that should not be, and the next run of this\ncommand takes it.",
+      "type": "string",
+      "const": "media-server-only"
+    },
+    {
+      "description": "Nothing was removed, because nothing was confirmed.",
+      "type": "string",
+      "const": "nothing"
+    }
+  ]
+}

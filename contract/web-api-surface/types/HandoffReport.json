@@ -1,0 +1,77 @@
+{
+  "fields": {
+    "address": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "caution": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "clients": {
+      "type": [
+        "array[ref:HandoffClient]"
+      ],
+      "required": true
+    },
+    "issued": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "quick_connect": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "reason": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "remedy": {
+      "type": [
+        "anyOf(null,ref:HandoffRemedy)"
+      ],
+      "required": false
+    },
+    "sessions": {
+      "type": [
+        "array[ref:HandoffSession]"
+      ],
+      "required": true
+    },
+    "state": {
+      "type": [
+        "ref:HandoffState"
+      ],
+      "required": true
+    },
+    "steps": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

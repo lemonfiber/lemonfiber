@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a quality command did to the stored choice.",
+  "oneOf": [
+    {
+      "description": "The choice was only shown; nothing was asked to change.",
+      "type": "string",
+      "const": "shown"
+    },
+    {
+      "description": "The choice was recorded.",
+      "type": "string",
+      "const": "recorded"
+    },
+    {
+      "description": "The choice would be recorded; this was a rehearsal, so it was not.",
+      "type": "string",
+      "const": "rehearsed"
+    },
+    {
+      "description": "The choice needs transcoding this host cannot do well, so it was held\nrather than recorded without explicit confirmation.",
+      "type": "string",
+      "const": "held"
+    },
+    {
+      "description": "The recorded preset was re-asserted over the Recyclarr config, overwriting\na hand-edit where an ordinary run would have preserved it.",
+      "type": "string",
+      "const": "reapplied"
+    },
+    {
+      "description": "A re-assert that was a rehearsal: it reports whether it would overwrite a\nhand-edit, and writes nothing.",
+      "type": "string",
+      "const": "would-reapply"
+    }
+  ]
+}

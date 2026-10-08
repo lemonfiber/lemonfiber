@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One check found wrong, by the check and when it went wrong.",
+  "type": "object",
+  "properties": {
+    "check": {
+      "description": "The check that raised it.",
+      "type": "string"
+    },
+    "onset": {
+      "description": "When the stack first saw it wrong since it last saw it right, in whole seconds\nsince the epoch: the same moment the health summary names for it.",
+      "type": "string"
+    },
+    "summary": {
+      "description": "What is wrong, in one line.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "check",
+    "onset",
+    "summary"
+  ]
+}

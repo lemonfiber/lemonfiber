@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "project": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "services": {
+      "type": [
+        "array[ref:OccupantReport]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Whether imports are hardlinking or copying — the difference between an import\nthat is free and one that doubles the disk it uses.",
+  "oneOf": [
+    {
+      "description": "Imports hardlink, as they should.",
+      "type": "string",
+      "const": "linking"
+    },
+    {
+      "description": "Imports copy, doubling space and slowing every import.",
+      "type": "string",
+      "const": "copying"
+    },
+    {
+      "description": "It could not be established which.",
+      "type": "string",
+      "const": "unknown"
+    }
+  ]
+}

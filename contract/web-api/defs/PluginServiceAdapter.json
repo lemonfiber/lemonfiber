@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One adapter of lemonfiber's that one of the plugin's own services names.",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "description": "Which of lemonfiber's adapters it is.",
+      "$ref": "ApiKind.json"
+    },
+    "owner": {
+      "description": "Whose it is, which is lemonfiber's.",
+      "$ref": "PluginAdapterOwner.json"
+    },
+    "service": {
+      "description": "The service that names it.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "service",
+    "kind",
+    "owner"
+  ]
+}

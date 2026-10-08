@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "filtering": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "libraries": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "limit": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "requesting": {
+      "type": [
+        "ref:Linked"
+      ],
+      "required": true
+    },
+    "unrated": {
+      "type": [
+        "ref:Unrated"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

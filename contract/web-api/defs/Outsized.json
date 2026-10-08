@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One file far larger than the rest.",
+  "type": "object",
+  "properties": {
+    "bytes": {
+      "description": "What it occupies.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "path": {
+      "description": "Where it is.",
+      "type": "string"
+    },
+    "times_typical": {
+      "description": "How many times the middle file of this walk it is.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "path",
+    "bytes",
+    "times_typical"
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "fields": {
+    "confidence": {
+      "type": [
+        "ref:TraceConfidence"
+      ],
+      "required": true
+    },
+    "coverage": {
+      "type": [
+        "anyOf(null,ref:Coverage)"
+      ],
+      "required": false
+    },
+    "findings": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "furthest": {
+      "type": [
+        "ref:Stage"
+      ],
+      "required": true
+    },
+    "history": {
+      "type": [
+        "array[ref:TraceMoment]"
+      ],
+      "required": true
+    },
+    "item": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "matched": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "stages": {
+      "type": [
+        "array[ref:TraceStage]"
+      ],
+      "required": true
+    },
+    "stall": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The answer to a configuration command.",
+  "type": "object",
+  "properties": {
+    "changed": {
+      "description": "Whether this command changed, or would change, a setting.",
+      "type": "boolean"
+    },
+    "consequence": {
+      "description": "What this change costs, where making it decides something with a\nconsequence — moving the library, turning port forwarding off, or naming a\nfront door. Stated for a change that is only staged as well as one that\nlanded, since the moment before it happens is the moment it is worth reading.\nAbsent for a read, and for a change to a setting nobody catalogued a cost for.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal, so a change that `changed` reports was one\nthat *would* be made rather than one that was.",
+      "type": "boolean"
+    },
+    "review": {
+      "description": "The difference between the configuration in force and the one proposed, and\nwhere that proposal stands: applied, staged for a confirmation, turned away,\nor nothing to do. Absent for a read, which proposes nothing.",
+      "anyOf": [
+        {
+          "$ref": "Review.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "settings": {
+      "description": "The settings asked about — one for a lookup, all of them for a listing.",
+      "type": "array",
+      "items": {
+        "$ref": "SettingReport.json"
+      }
+    }
+  },
+  "required": [
+    "settings",
+    "changed",
+    "rehearsed"
+  ]
+}

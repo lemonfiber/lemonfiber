@@ -1,0 +1,65 @@
+{
+  "fields": {
+    "category": {
+      "type": [
+        "ref:DoctorCategory"
+      ],
+      "required": true
+    },
+    "caused_by": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "check": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "onset": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "origin": {
+      "type": [
+        "ref:ValueOrigin"
+      ],
+      "required": true
+    },
+    "said": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "service": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "service_name": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "title": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "verdict": {
+      "type": [
+        "ref:DoctorVerdict"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

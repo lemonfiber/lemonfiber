@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where the line stands.",
+  "oneOf": [
+    {
+      "description": "Nothing is configured.",
+      "type": "string",
+      "const": "unlimited"
+    },
+    {
+      "description": "Limits are in force, with no schedule to switch them.",
+      "type": "string",
+      "const": "limited"
+    },
+    {
+      "description": "Inside the household's active hours, so the limits apply.",
+      "type": "string",
+      "const": "scheduled-active"
+    },
+    {
+      "description": "Outside them, so the line is the stack's.",
+      "type": "string",
+      "const": "scheduled-quiet"
+    },
+    {
+      "description": "A temporary override is lifting the limits, and will expire.",
+      "type": "string",
+      "const": "overridden"
+    },
+    {
+      "description": "The month is close enough to a declared cap to say so.",
+      "type": "string",
+      "const": "cap-warning"
+    },
+    {
+      "description": "The cap has been reached and the declared behaviour applies.",
+      "type": "string",
+      "const": "cap-exceeded"
+    }
+  ]
+}

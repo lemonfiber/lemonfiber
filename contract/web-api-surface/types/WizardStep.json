@@ -1,0 +1,19 @@
+{
+  "fields": {},
+  "variants": [
+    "\"autostart\"",
+    "\"credentials\"",
+    "\"data-location\"",
+    "\"household\"",
+    "\"library\"",
+    "\"notifications\"",
+    "\"preflight\"",
+    "\"prerequisites\"",
+    "\"protocols\"",
+    "\"provider\"",
+    "\"review\"",
+    "\"service-user\"",
+    "\"vpn\"",
+    "\"welcome\""
+  ]
+}

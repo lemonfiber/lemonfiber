@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The household's one front door: which service it is, where it stands, and what\nelse they can reach that is not it.",
+  "type": "object",
+  "properties": {
+    "address": {
+      "description": "The address to hand them, read from this machine at the moment of asking\nrather than remembered. Absent where there is no door, and where there is\none on a machine that will say neither what it is called nor where it is.",
+      "anyOf": [
+        {
+          "$ref": "Address.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "beside": {
+      "description": "Everything else the household can reach, and why none of it is the door.",
+      "type": "array",
+      "items": {
+        "$ref": "FrontDoorBeside.json"
+      }
+    },
+    "chosen": {
+      "description": "How this came to be the door: worked out from what the stack declares, named\nby the operator, or named by them and refused.\n\nCarried as a state rather than left to the sentence beneath it, for the reason\nthe standing is: an operator whose setting was refused reads the sentence, and\na browser, a script or a dashboard reads this.",
+      "$ref": "Chosen.json"
+    },
+    "facing": {
+      "description": "What that service is to them. Absent for the same reason.",
+      "anyOf": [
+        {
+          "$ref": "Facing.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "meaning": {
+      "description": "What this comes to, in the words an operator would say it in — including,\nwhere there is no door, that there is none.",
+      "type": "string"
+    },
+    "service": {
+      "description": "The service the household begins at, by the name it shows itself under.\nAbsent where this stack publishes nothing they could begin at.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "standing": {
+      "description": "Where the front door stands.",
+      "$ref": "FrontDoorStanding.json"
+    }
+  },
+  "required": [
+    "standing",
+    "chosen",
+    "meaning",
+    "beside"
+  ]
+}

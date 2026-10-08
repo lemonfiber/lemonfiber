@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "An import that stopped part-way, in the words of whatever stopped it.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "description": "What the service calls it.",
+      "type": "string"
+    },
+    "partial": {
+      "description": "What is on disk for it already, where the walk could find it.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "said": {
+      "description": "What the service said, verbatim.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "partial",
+    "said"
+  ]
+}

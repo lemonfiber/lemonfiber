@@ -1,0 +1,10 @@
+{
+  "fields": {},
+  "variants": [
+    "\"established\"",
+    "\"library-only\"",
+    "\"none\"",
+    "\"stranded\"",
+    "\"unreachable\""
+  ]
+}

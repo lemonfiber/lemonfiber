@@ -1,0 +1,9 @@
+{
+  "fields": {},
+  "variants": [
+    "\"broken\"",
+    "\"degraded\"",
+    "\"healthy\"",
+    "\"unknown\""
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "by": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "capability": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "claimants": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

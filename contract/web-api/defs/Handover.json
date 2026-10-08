@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where a finished walkthrough leaves the operator.",
+  "type": "object",
+  "properties": {
+    "next": {
+      "description": "What to do next, in order.",
+      "type": "array",
+      "items": {
+        "$ref": "Next.json"
+      }
+    }
+  },
+  "required": [
+    "next"
+  ]
+}

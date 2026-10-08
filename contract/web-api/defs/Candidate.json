@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One completed download, and what reclaiming it would come to.",
+  "type": "object",
+  "properties": {
+    "bytes": {
+      "description": "What it occupies.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "consequence": {
+      "description": "What removing it costs, where it costs anything.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "name": {
+      "description": "What both sides call it.",
+      "type": "string"
+    },
+    "standing": {
+      "description": "Where it stands.",
+      "$ref": "SeedingStanding.json"
+    }
+  },
+  "required": [
+    "name",
+    "bytes",
+    "standing"
+  ]
+}

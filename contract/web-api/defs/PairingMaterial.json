@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a phone is handed, exactly as it reads it.\n\nFour fields and no more: a reader refuses one it does not know, which is what keeps a\ncredential from ever riding along under a name nobody thought to forbid.",
+  "type": "object",
+  "properties": {
+    "address": {
+      "description": "Where the phone reaches the stack: an `https` address on the household network.",
+      "type": "string"
+    },
+    "expires": {
+      "description": "When the material stops being good, in seconds since the Unix epoch.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "fingerprint": {
+      "description": "The certificate that address presents: SHA-256 over its DER encoding, in\nlower-case hex. Not the digest of its public key.",
+      "type": "string"
+    },
+    "stack": {
+      "description": "The stack's own identifier: opaque, minted once from nothing and kept, and the\nsame across every issue of the material, a change of address and a replacement of\nthe certificate. Not the stack's name and not its version, and it carries nothing\nabout the household or anybody in it.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "address",
+    "fingerprint",
+    "expires",
+    "stack"
+  ]
+}

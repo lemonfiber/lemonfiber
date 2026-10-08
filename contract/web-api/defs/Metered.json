@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What the stack itself moved in a calendar month, and what that leaves out.",
+  "type": "object",
+  "properties": {
+    "down": {
+      "description": "Bytes pulled down, as far as the clients count them.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "excludes": {
+      "description": "What this count does not include, always said.",
+      "type": "string"
+    },
+    "incomplete": {
+      "description": "What is known to be missing from the count itself, where anything is.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "month": {
+      "description": "The month, as the client that dated the figures dates them.",
+      "type": "string"
+    },
+    "up": {
+      "description": "Bytes given back.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "month",
+    "down",
+    "up",
+    "excludes",
+    "incomplete"
+  ]
+}

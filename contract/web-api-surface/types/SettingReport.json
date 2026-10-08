@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "key": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "origin": {
+      "type": [
+        "ref:ValueOrigin"
+      ],
+      "required": true
+    },
+    "secret": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "value": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

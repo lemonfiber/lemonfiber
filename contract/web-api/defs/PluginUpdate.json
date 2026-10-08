@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What updating a plugin came to, or would come to, as one account.\n\n**One account, because it is one operation.** An update is the version installed\ngoing back and another coming on, and a report that gave those as a removal and an\ninstall side by side would invite reading them as two things that might each have\nhappened. What an operator has to be able to read off this is which version the\nmachine is on, and there are exactly two answers: the new one, where\n`install.recorded` is true, or the one it replaced, which `restored` says the state\nof.",
+  "type": "object",
+  "properties": {
+    "from": {
+      "description": "The version the record named before this run.",
+      "type": "string"
+    },
+    "install": {
+      "description": "The new version's own account: what it writes, what it has to prove, what it\nproved and what the stack's checks made of it — the same one an install gives,\nbecause it is the same work. `recorded` is whether the update holds.",
+      "$ref": "PluginInstall.json"
+    },
+    "interrupts": {
+      "description": "Every service of the installed version that stops, named before any of them\ndoes.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "plugin": {
+      "description": "The plugin this is about.",
+      "type": "string"
+    },
+    "restored": {
+      "description": "Where the update did not hold, what putting the version it replaced back came\nto. Absent on a rehearsal and on an update that held.",
+      "anyOf": [
+        {
+          "$ref": "PluginRestored.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "stopped": {
+      "description": "What stopped the new version before its proofs could be asked, where something\ndid: a write that would not land, a container that would not start, or a record\nthat could not be written. A proof or a check that did not hold is in `install`.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "to": {
+      "description": "The version this run installs, or would.",
+      "type": "string"
+    },
+    "went_back": {
+      "description": "What putting the installed version's changes back came to, or would come to.\n\nWhere the plugin's own configuration directory holds what its service wrote, it\nis named here as still standing, which on an update is the point: the new\nversion is started against the same directory, and an update that took it would\nbe a reinstall that lost everything the old one knew.",
+      "$ref": "UndoReversal.json"
+    }
+  },
+  "required": [
+    "plugin",
+    "from",
+    "to",
+    "interrupts",
+    "went_back",
+    "install"
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What the minter said a key is for.\n\nA label and nothing more. The core cannot tell what a program does with a key, so the\nlisting shows this as the minter's own declaration rather than as anything verified.",
+  "oneOf": [
+    {
+      "description": "Home Assistant.",
+      "type": "string",
+      "const": "home-assistant"
+    },
+    {
+      "description": "An assistant reaching the stack through the Model Context Protocol.",
+      "type": "string",
+      "const": "mcp"
+    },
+    {
+      "description": "Anything else.",
+      "type": "string",
+      "const": "other"
+    }
+  ]
+}

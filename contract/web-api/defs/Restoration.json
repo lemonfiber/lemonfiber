@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a restore said: what it would overwrite, and whether it did.\n\nThe listing is present either way, and that is the point of the shape. It is not\na separate request a surface may or may not make — it is the half of a restore\nthat happens before anything is overwritten, so every answer carries it and an\nanswer that overwrote nothing is one whose `done` is absent.",
+  "type": "object",
+  "properties": {
+    "done": {
+      "description": "What was put back, or nothing where nothing was.",
+      "anyOf": [
+        {
+          "$ref": "RestoreReport.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+      "type": "boolean"
+    },
+    "would": {
+      "description": "What the archive holds and what restoring it would come to, read before\nanything was touched.",
+      "$ref": "Preview.json"
+    }
+  },
+  "required": [
+    "would",
+    "rehearsed"
+  ]
+}

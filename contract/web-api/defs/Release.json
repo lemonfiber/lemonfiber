@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One release, and everything the record holds about it.",
+  "type": "object",
+  "properties": {
+    "carried": {
+      "description": "The version whose goals this tag carried, where that is not its own.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "delivers": {
+      "description": "What it set out to deliver, in the words the version was staged under.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "groups": {
+      "description": "The changes, gathered by what kind of change each is.",
+      "type": "array",
+      "items": {
+        "$ref": "Group.json"
+      }
+    },
+    "patches": {
+      "description": "The version this one patched, where it is a patch.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "released_on": {
+      "description": "The day it was published, where the record of it says.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "tag": {
+      "description": "The tag it was cut from.",
+      "type": "string"
+    },
+    "user_facing": {
+      "description": "Whether anything in it is a change an operator would notice.",
+      "type": "boolean"
+    },
+    "version": {
+      "description": "The version, without the tag's leading letter.",
+      "type": "string"
+    },
+    "withdrawn": {
+      "description": "Why it was withdrawn, where it was.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "version",
+    "tag",
+    "user_facing",
+    "groups"
+  ]
+}

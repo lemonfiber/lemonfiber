@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One requirement, and every release that shipped something citing it.",
+  "type": "object",
+  "properties": {
+    "feature": {
+      "description": "The feature it belongs to, in words.",
+      "type": "string"
+    },
+    "shipped_in": {
+      "description": "Every version that shipped something citing it, newest first.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "url": {
+      "description": "Where it is defined, unless it has since been withdrawn.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "withdrawn": {
+      "description": "Whether it was withdrawn after it shipped.",
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "feature",
+    "shipped_in"
+  ]
+}

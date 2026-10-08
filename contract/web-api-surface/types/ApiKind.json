@@ -1,0 +1,14 @@
+{
+  "fields": {},
+  "variants": [
+    "\"audiobookshelf\"",
+    "\"bazarr\"",
+    "\"bindery\"",
+    "\"jellyfin\"",
+    "\"nzbhydra2\"",
+    "\"qbittorrent\"",
+    "\"sabnzbd\"",
+    "\"seerr\"",
+    "\"servarr\""
+  ]
+}

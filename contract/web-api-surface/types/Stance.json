@@ -1,0 +1,9 @@
+{
+  "fields": {},
+  "variants": [
+    "\"applied\"",
+    "\"blocked\"",
+    "\"pending\"",
+    "\"unchanged\""
+  ]
+}

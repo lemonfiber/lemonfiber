@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "films": {
+      "type": [
+        "ref:Counted"
+      ],
+      "required": true
+    },
+    "frees_up": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "policy": {
+      "type": [
+        "ref:Policy"
+      ],
+      "required": true
+    },
+    "standing": {
+      "type": [
+        "ref:AskingStanding"
+      ],
+      "required": true
+    },
+    "television": {
+      "type": [
+        "ref:Counted"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

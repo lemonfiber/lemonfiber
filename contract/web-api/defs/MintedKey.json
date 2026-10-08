@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A key minted, with everything a client on another machine needs to use it.\n\nThe only document that ever carries the secret. Every surface that renders it does so\nonce, and nothing here writes it down.",
+  "type": "object",
+  "properties": {
+    "address": {
+      "description": "Where a client on another machine reaches the stack: the `https` address it was\nlast served at on the network. Absent where it has never been served that way.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "caution": {
+      "description": "What is worth knowing before handing the key over, where anything is: how to\nserve the stack so another machine can reach it.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "name": {
+      "description": "The name it was minted under.",
+      "type": "string"
+    },
+    "pin": {
+      "description": "The certificate that address presents: SHA-256 over its DER encoding, in\nlower-case hex. A client off this machine pins it.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "purpose": {
+      "description": "What the minter said it is for.",
+      "$ref": "KeyPurpose.json"
+    },
+    "scope": {
+      "description": "What it admits: `read`, `act` or `member:<name>`.",
+      "type": "string"
+    },
+    "secret": {
+      "description": "The secret, sent in `X-Lemonfiber-Token`. It is not shown again.",
+      "$ref": "Secret.json"
+    }
+  },
+  "required": [
+    "name",
+    "scope",
+    "purpose",
+    "secret"
+  ]
+}

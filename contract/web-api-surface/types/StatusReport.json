@@ -1,0 +1,53 @@
+{
+  "fields": {
+    "active_forms": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "condition": {
+      "type": [
+        "ref:Condition"
+      ],
+      "required": true
+    },
+    "disturbs": {
+      "type": [
+        "ref:Disturbances"
+      ],
+      "required": true
+    },
+    "filtered": {
+      "type": [
+        "array[ref:Filtered]"
+      ],
+      "required": true
+    },
+    "forms": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "services": {
+      "type": [
+        "array[ref:Service]"
+      ],
+      "required": true
+    },
+    "undeclared": {
+      "type": [
+        "array[ref:Undeclared]"
+      ],
+      "required": true
+    },
+    "unsupported": {
+      "type": [
+        "array[ref:UnsupportedReport]"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

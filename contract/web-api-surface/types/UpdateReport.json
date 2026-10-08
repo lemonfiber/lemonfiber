@@ -1,0 +1,95 @@
+{
+  "fields": {
+    "afterwards": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "asked": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "at": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "carries": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "changed": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "command": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "configuration": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "installed": {
+      "type": [
+        "ref:Installed"
+      ],
+      "required": true
+    },
+    "instead": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "offered": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "owner": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "replaceable": {
+      "type": [
+        "boolean|null"
+      ],
+      "required": false
+    },
+    "running": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "standing": {
+      "type": [
+        "ref:SelfUpdateStanding"
+      ],
+      "required": true
+    },
+    "untold": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

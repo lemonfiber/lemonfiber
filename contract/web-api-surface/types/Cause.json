@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "because": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "fix": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "tell": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

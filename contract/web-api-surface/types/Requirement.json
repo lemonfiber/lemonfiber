@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "feature": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "shipped_in": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "url": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "withdrawn": {
+      "type": [
+        "boolean"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

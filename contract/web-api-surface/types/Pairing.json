@@ -1,0 +1,41 @@
+{
+  "fields": {
+    "caution": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "compare": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "material": {
+      "type": [
+        "ref:PairingMaterial"
+      ],
+      "required": true
+    },
+    "replacing": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "until": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "written": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

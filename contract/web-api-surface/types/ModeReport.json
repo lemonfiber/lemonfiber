@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "disturbs": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "mode": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "preselected": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "what": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Envelope",
+  "description": "The wrapper every machine-readable payload arrives in.",
+  "type": "object",
+  "properties": {
+    "api_version": {
+      "description": "The output contract's version.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "data": {
+      "description": "The payload.",
+      "$ref": "../defs/FormsReport.json"
+    },
+    "host": {
+      "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "job": {
+      "description": "The work that said this, by the name its accepting reply gave it.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "kind": {
+      "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "api_version",
+    "kind",
+    "data"
+  ]
+}

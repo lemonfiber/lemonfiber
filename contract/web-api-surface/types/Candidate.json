@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "bytes": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "consequence": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "standing": {
+      "type": [
+        "ref:SeedingStanding"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

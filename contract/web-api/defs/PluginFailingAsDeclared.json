@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One recording an assertion fails on as its manifest declares.",
+  "type": "object",
+  "properties": {
+    "constraint": {
+      "description": "The constraint of the expectation that fails there.",
+      "$ref": "PluginConstraint.json"
+    },
+    "fixture": {
+      "description": "The recording.",
+      "type": "string"
+    },
+    "held": {
+      "description": "What the recording held there.",
+      "type": "string"
+    },
+    "place": {
+      "description": "Where within that constraint, for one that looks at places.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "reason": {
+      "description": "Why the manifest says this recording is one the assertion fails on.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "fixture",
+    "constraint",
+    "held",
+    "reason"
+  ]
+}

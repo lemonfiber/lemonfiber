@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What updating one service would change.",
+  "type": "object",
+  "properties": {
+    "because": {
+      "description": "What the step means, in the words an operator decides on.",
+      "type": "string"
+    },
+    "current": {
+      "description": "The version it is standing on now.",
+      "type": "string"
+    },
+    "irreversible": {
+      "description": "Whether taking it is a step nothing walks back.",
+      "type": "boolean"
+    },
+    "jump": {
+      "description": "How large the step between them is.",
+      "$ref": "Jump.json"
+    },
+    "refused": {
+      "description": "Whether lemonfiber refuses to take it at all.",
+      "type": "boolean"
+    },
+    "service": {
+      "description": "The service, by its manifest id, which is also its Compose service name.",
+      "type": "string"
+    },
+    "target": {
+      "description": "The version this build pins for it.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "service",
+    "current",
+    "target",
+    "jump",
+    "irreversible",
+    "refused",
+    "because"
+  ]
+}

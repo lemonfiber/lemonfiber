@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "number": {
+      "type": [
+        "integer/uint32"
+      ],
+      "required": true
+    },
+    "season": {
+      "type": [
+        "integer/uint32"
+      ],
+      "required": true
+    },
+    "stage": {
+      "type": [
+        "ref:Stage"
+      ],
+      "required": true
+    },
+    "title": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

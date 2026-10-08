@@ -1,0 +1,47 @@
+{
+  "fields": {
+    "asks-through-the-request-service": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "confirmed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "findings": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "requests": {
+      "type": [
+        "integer/uint"
+      ],
+      "required": true
+    },
+    "revoked": {
+      "type": [
+        "ref:Revoked"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

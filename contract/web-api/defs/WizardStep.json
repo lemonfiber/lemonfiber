@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A step of setup, in the order the operator meets it.\n\nSome steps only inform (they detect and state, and the operator acknowledges);\nothers ask a question whose answer the wizard records. The apply-and-onward\nsteps — writing config, pulling images, wiring services — are not modelled\nhere yet: they arrive with the features they drive, and this machine covers\nthe read-only phase that precedes them.",
+  "oneOf": [
+    {
+      "description": "States what is about to happen and roughly how long it takes. Informs.",
+      "type": "string",
+      "const": "welcome"
+    },
+    {
+      "description": "Detects the environment: OS, Docker, Compose, daemon reachability. Informs.",
+      "type": "string",
+      "const": "preflight"
+    },
+    {
+      "description": "The account checklist derived from the protocol choice. Informs.",
+      "type": "string",
+      "const": "prerequisites"
+    },
+    {
+      "description": "Usenet, torrents, both, or neither.",
+      "type": "string",
+      "const": "protocols"
+    },
+    {
+      "description": "Whether a VPN carries the torrent traffic. Asked only where torrents were\nchosen, and after the checklist has explained what one is for.",
+      "type": "string",
+      "const": "vpn"
+    },
+    {
+      "description": "Where downloads and the library are kept.",
+      "type": "string",
+      "const": "data-location"
+    },
+    {
+      "description": "The indexer credential, tested against the live service. Asked only where a\ndownload protocol was chosen.",
+      "type": "string",
+      "const": "credentials"
+    },
+    {
+      "description": "The Usenet provider login, tested over NNTP. Asked only where Usenet was\nchosen.",
+      "type": "string",
+      "const": "provider"
+    },
+    {
+      "description": "The user and group the containers run as. Asked only where it is visible.",
+      "type": "string",
+      "const": "service-user"
+    },
+    {
+      "description": "Whether to run Jellyfin, and if so how.",
+      "type": "string",
+      "const": "library"
+    },
+    {
+      "description": "Whether others in the home will use it.",
+      "type": "string",
+      "const": "household"
+    },
+    {
+      "description": "How much the operator wants to be told about — one question, three presets.",
+      "type": "string",
+      "const": "notifications"
+    },
+    {
+      "description": "Whether to start on boot.",
+      "type": "string",
+      "const": "autostart"
+    },
+    {
+      "description": "The complete summary, before anything is written. Informs.",
+      "type": "string",
+      "const": "review"
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What one service's update came to.",
+  "type": "object",
+  "properties": {
+    "detail": {
+      "description": "What went wrong, where anything did.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "ending": {
+      "description": "How it ended.",
+      "$ref": "Ending.json"
+    },
+    "from": {
+      "description": "The version it was standing on before the run.",
+      "type": "string"
+    },
+    "reversal": {
+      "description": "How it could be put back, given how it ended.",
+      "$ref": "UpdateReversal.json"
+    },
+    "service": {
+      "description": "The service it is about.",
+      "type": "string"
+    },
+    "to": {
+      "description": "The version the run was moving it to.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "service",
+    "from",
+    "to",
+    "ending",
+    "reversal"
+  ]
+}

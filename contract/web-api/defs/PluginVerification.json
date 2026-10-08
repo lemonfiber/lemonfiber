@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What the stack's own checks made of an install.",
+  "type": "object",
+  "properties": {
+    "broke": {
+      "description": "Every check this install made worse.\n\nEmpty is the answer an install needs, and it is the common one. What is here\nis what takes the install back.",
+      "type": "array",
+      "items": {
+        "$ref": "PluginChangedCheck.json"
+      }
+    },
+    "unsettled": {
+      "description": "Every check nothing could be concluded about across the two readings.\n\nReported and never acted on. *I could not tell* is not *it is still broken*,\nand an install reversed because a check could not reach a provider it also\ncould not reach an hour ago would be punishing a plugin for the weather. It is\nsaid out loud rather than dropped, because the assurance an operator thought\nthey had is the thing that went.",
+      "type": "array",
+      "items": {
+        "$ref": "PluginChangedCheck.json"
+      }
+    }
+  },
+  "required": [
+    "broke",
+    "unsettled"
+  ]
+}

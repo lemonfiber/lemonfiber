@@ -1,0 +1,47 @@
+{
+  "fields": {
+    "address": {
+      "type": [
+        "anyOf(null,ref:Address)"
+      ],
+      "required": false
+    },
+    "beside": {
+      "type": [
+        "array[ref:FrontDoorBeside]"
+      ],
+      "required": true
+    },
+    "chosen": {
+      "type": [
+        "ref:Chosen"
+      ],
+      "required": true
+    },
+    "facing": {
+      "type": [
+        "anyOf(null,ref:Facing)"
+      ],
+      "required": false
+    },
+    "meaning": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "service": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "standing": {
+      "type": [
+        "ref:FrontDoorStanding"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

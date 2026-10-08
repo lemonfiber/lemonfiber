@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A single reversal, for the surface to carry out.",
+  "type": "object",
+  "properties": {
+    "action": {
+      "description": "What reversing it does.",
+      "$ref": "Action.json"
+    },
+    "target": {
+      "description": "The service or file to reverse it against.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "target",
+    "action"
+  ]
+}

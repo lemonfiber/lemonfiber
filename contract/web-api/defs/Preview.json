@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a restore would do, shown before anything is overwritten.",
+  "type": "object",
+  "properties": {
+    "agreement": {
+      "description": "What this listing is, so consent given for it can name which listing it read.\n\nCarried on every listing rather than only on the ones that would re-point\nsomething: a surface that has to look for it is a surface that can fail to\nfind it, and a restore that would overwrite the same configuration in place\nis still one somebody may agree to.",
+      "type": "string"
+    },
+    "downgrade": {
+      "description": "Whether the archive is old enough that a compatibility warning applies.",
+      "type": "boolean"
+    },
+    "manifest": {
+      "description": "The archive's own account of itself — its scope, version and contents.",
+      "$ref": "BackupManifest.json"
+    },
+    "relocation": {
+      "description": "The data-root difference, where the archive was taken against another one.",
+      "anyOf": [
+        {
+          "$ref": "Relocation.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "manifest",
+    "downgrade",
+    "agreement"
+  ]
+}

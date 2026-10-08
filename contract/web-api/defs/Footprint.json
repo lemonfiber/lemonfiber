@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The memory the stack estimates a set of services needs.\n\nAn estimate by name as well as by description, because a figure read as a\nmeasurement is one an operator believes and acts on. It is the sum of what each\nservice declares; nothing here has looked at anything running.",
+  "type": "object",
+  "properties": {
+    "estimated_mib": {
+      "description": "The sum of the estimates the services declare, in MiB.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "unestimated": {
+      "description": "The services that declare no estimate, and so are not in the sum.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "estimated_mib",
+    "unestimated"
+  ]
+}

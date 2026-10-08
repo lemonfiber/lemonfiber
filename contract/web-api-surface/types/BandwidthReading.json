@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "limit": {
+      "type": [
+        "ref:Limit"
+      ],
+      "required": true
+    },
+    "resolved": {
+      "type": [
+        "ref:Resolved"
+      ],
+      "required": true
+    },
+    "says": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

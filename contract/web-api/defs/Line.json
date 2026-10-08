@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One narrated line: a step, and what was specifically true of it.",
+  "type": "object",
+  "properties": {
+    "detail": {
+      "description": "What was specifically true — the evidence that makes the line worth reading\nrather than a spinner. Empty where there is nothing particular to say.",
+      "type": "string"
+    },
+    "said": {
+      "description": "What it is doing, in plain language.",
+      "type": "string"
+    },
+    "step": {
+      "description": "The step being narrated.",
+      "$ref": "WalkthroughStep.json"
+    }
+  },
+  "required": [
+    "step",
+    "said",
+    "detail"
+  ]
+}

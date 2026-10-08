@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "by": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "number": {
+      "type": [
+        "integer/int64"
+      ],
+      "required": true
+    },
+    "title": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

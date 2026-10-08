@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What upgrading existing content did, or — unconfirmed — would do.\n\nUpgrading re-acquires the existing library at the chosen quality, which is a\nlarge, bandwidth-expensive operation, so it is a separate explicit action whose\ncost is stated before it runs and which does nothing until confirmed. Each *arr\nre-searches against its own current cutoff, so the report speaks per media type\nrather than asserting one preset across the library.",
+  "type": "object",
+  "properties": {
+    "confirmed": {
+      "description": "Whether the operator confirmed; without it nothing was triggered, only the\ncost stated.",
+      "type": "boolean"
+    },
+    "media": {
+      "description": "Per media type: its preset, that preset's cost, and — confirmed — the outcome.",
+      "type": "array",
+      "items": {
+        "$ref": "UpgradeMedia.json"
+      }
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "confirmed",
+    "media",
+    "rehearsed"
+  ]
+}

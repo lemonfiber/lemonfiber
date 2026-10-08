@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "also_called": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "deep": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "forms": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "short": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "word": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

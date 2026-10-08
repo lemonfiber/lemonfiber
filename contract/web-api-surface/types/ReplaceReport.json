@@ -1,0 +1,53 @@
+{
+  "fields": {
+    "agreement": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "project": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "refusal": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "stance": {
+      "type": [
+        "ref:Stance"
+      ],
+      "required": true
+    },
+    "still_running": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "stopped": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "would_stop": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

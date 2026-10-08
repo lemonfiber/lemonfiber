@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Everything gathered for a bundle, and everything that could not be.",
+  "type": "object",
+  "properties": {
+    "missing": {
+      "description": "What could not be collected, named.\n\nNamed rather than passed over: a bundle from a machine whose diagnostics will not\nrun is exactly the bundle worth having, and a gap nobody mentions reads as an\nabsence of trouble rather than as an absence of information.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "pieces": {
+      "description": "The files, in the order a reader would want them.",
+      "type": "array",
+      "items": {
+        "$ref": "Piece.json"
+      }
+    },
+    "taken": {
+      "description": "Where and when it came from.",
+      "$ref": "Taken.json"
+    },
+    "terms": {
+      "description": "How it was made, and what its operator chose.",
+      "$ref": "Terms.json"
+    }
+  },
+  "required": [
+    "pieces",
+    "missing",
+    "taken",
+    "terms"
+  ]
+}

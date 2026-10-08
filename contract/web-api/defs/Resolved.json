@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a limit comes to once it is weighed against a measured line.",
+  "oneOf": [
+    {
+      "description": "Nothing holds it back.",
+      "type": "object",
+      "properties": {
+        "is": {
+          "type": "string",
+          "const": "unlimited"
+        }
+      },
+      "required": [
+        "is"
+      ]
+    },
+    {
+      "description": "This many bytes a second.",
+      "type": "object",
+      "properties": {
+        "bytes_per_second": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "is": {
+          "type": "string",
+          "const": "at"
+        }
+      },
+      "required": [
+        "is",
+        "bytes_per_second"
+      ]
+    },
+    {
+      "description": "A proportion was asked for and nothing has measured the line.\n\nDeliberately not folded into [`Self::Unlimited`]. \"Half of an unknown\nnumber\" resolving to \"no limit at all\" is the shape of a setting an\noperator believes is in force while the stack takes the whole line.",
+      "type": "object",
+      "properties": {
+        "is": {
+          "type": "string",
+          "const": "unmeasured"
+        }
+      },
+      "required": [
+        "is"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Who produced a credential, which decides what can be done about it.",
+  "oneOf": [
+    {
+      "description": "The operator supplied it, from an account they hold somewhere else.",
+      "type": "string",
+      "const": "operator"
+    },
+    {
+      "description": "The service minted it for itself and wrote it into its own configuration.",
+      "type": "string",
+      "const": "service"
+    },
+    {
+      "description": "lemonfiber minted it, because the service offers nothing durable to read.",
+      "type": "string",
+      "const": "lemonfiber"
+    }
+  ]
+}

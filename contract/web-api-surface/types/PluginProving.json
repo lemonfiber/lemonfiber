@@ -1,0 +1,41 @@
+{
+  "fields": {
+    "asks": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "came_to": {
+      "type": [
+        "anyOf(null,ref:PluginVerdict)"
+      ],
+      "required": false
+    },
+    "establishes": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "of": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "proof": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "why": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

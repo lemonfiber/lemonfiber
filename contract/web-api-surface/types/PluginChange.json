@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "path": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "puts": {
+      "type": [
+        "ref:PluginPuts"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

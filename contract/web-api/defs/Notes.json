@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a surface shows about the record, given the version asking.",
+  "type": "object",
+  "properties": {
+    "releases": {
+      "description": "Every release the record holds, newest first.",
+      "type": "array",
+      "items": {
+        "$ref": "ReleaseSummary.json"
+      }
+    },
+    "requirements": {
+      "description": "What each requirement the running release cites is, and where it is defined.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "Requirement.json"
+      }
+    },
+    "running": {
+      "description": "What the running version changed, where the record holds its release.",
+      "anyOf": [
+        {
+          "$ref": "Release.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "state": {
+      "description": "Whether the record describes what this build could have shipped.",
+      "$ref": "ChangelogState.json"
+    }
+  },
+  "required": [
+    "state",
+    "releases",
+    "requirements"
+  ]
+}

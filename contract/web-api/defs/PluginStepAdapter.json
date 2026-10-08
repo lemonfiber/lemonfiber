@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The adapter a call reaches its destination through.",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "description": "Which of lemonfiber's adapters it is.",
+      "$ref": "ApiKind.json"
+    },
+    "owner": {
+      "description": "Whose it is, which is lemonfiber's.",
+      "$ref": "PluginAdapterOwner.json"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "owner"
+  ]
+}

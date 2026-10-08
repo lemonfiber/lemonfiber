@@ -1,7 +1,7 @@
-//! Writes the machine-readable contract's stable surface over the committed artefact.
+//! Writes the machine-readable contract's stable surface over the committed directory.
 //!
-//! `just surface` runs it, and it writes beside the artefact and renames over it, so
-//! a run that fails leaves the committed file as it was. It refuses rather than
+//! `just surface` runs it, and it writes beside the directory and swaps it in, so a
+//! run that fails leaves the committed one as it was. It refuses rather than
 //! writing where the new surface drops something the committed one describes under
 //! an unchanged wire version and no declaration accepts it — which is the whole
 //! reason this is a program of its own instead of a redirect: a surface regenerated
@@ -10,18 +10,18 @@
 
 use std::path::Path;
 
-use lemonfiber_api::contract::stability::{rendered, Surface, SURFACE_PATH};
-use lemonfiber_api::contract::Contract;
+use lemonfiber_api::contract::stability::{rendered, Surface, SURFACE_DIR};
+use lemonfiber_api::contract::{layout, Contract};
 
 fn main() {
     let fresh = Surface::of(&Contract::describe());
     let committed = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
-        .join(SURFACE_PATH);
-    let before = std::fs::read_to_string(&committed)
+        .join(SURFACE_DIR);
+    let before = layout::read(&committed)
         .ok()
-        .as_deref()
-        .and_then(Surface::parse)
+        .as_ref()
+        .and_then(Surface::from_files)
         .unwrap_or_default();
 
     let broken = Surface::refused(&before, &fresh);
@@ -35,13 +35,7 @@ fn main() {
         std::process::exit(1);
     }
 
-    let Some(text) = fresh.to_json() else {
-        std::process::exit(1);
-    };
-    let next = committed.with_extension("json.next");
-    if let Err(error) =
-        std::fs::write(&next, text).and_then(|()| std::fs::rename(&next, &committed))
-    {
+    if let Err(error) = layout::replace(&committed, &fresh.files()) {
         eprintln!("{}: {error}", committed.display());
         std::process::exit(1);
     }

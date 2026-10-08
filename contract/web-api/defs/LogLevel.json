@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How bad a line says it is.\n\nOrdered, so a filter can ask for \"warnings and worse\" without a table of which\nlevel outranks which. Deliberately coarse: these six are what services agree\non, and a seventh that only one of them writes would be a level nobody could filter\nby across the stack.",
+  "oneOf": [
+    {
+      "description": "Detail a developer asked for.",
+      "type": "string",
+      "const": "trace"
+    },
+    {
+      "description": "Detail beyond the ordinary account of what happened.",
+      "type": "string",
+      "const": "debug"
+    },
+    {
+      "description": "The ordinary account of what happened.",
+      "type": "string",
+      "const": "info"
+    },
+    {
+      "description": "Something the operator may want to know about, that did not stop the service.",
+      "type": "string",
+      "const": "warn"
+    },
+    {
+      "description": "Something that failed.",
+      "type": "string",
+      "const": "error"
+    },
+    {
+      "description": "Something that failed and stopped the service.",
+      "type": "string",
+      "const": "fatal"
+    }
+  ]
+}

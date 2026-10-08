@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "key_source": {
+      "type": [
+        "ref:KeySource"
+      ],
+      "required": true
+    },
+    "kind": {
+      "type": [
+        "ref:ApiKind"
+      ],
+      "required": true
+    },
+    "path": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "version": {
+      "type": [
+        "integer|null/uint32"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,89 @@
+{
+  "fields": {
+    "api": {
+      "type": [
+        "anyOf(null,ref:Api)"
+      ],
+      "required": false
+    },
+    "config_path": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "description": {
+      "type": [
+        "string"
+      ],
+      "required": false
+    },
+    "digest": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "image": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "listens": {
+      "type": [
+        "integer|null/uint16"
+      ],
+      "required": false
+    },
+    "media_types": {
+      "type": [
+        "array[string]"
+      ],
+      "required": false
+    },
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": false
+    },
+    "networks": {
+      "type": [
+        "array[string]"
+      ],
+      "required": false
+    },
+    "provides": {
+      "type": [
+        "array[string]"
+      ],
+      "required": false
+    },
+    "reached": {
+      "type": [
+        "anyOf(null,ref:PluginReached)"
+      ],
+      "required": false
+    },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "tag": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "takes_data": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

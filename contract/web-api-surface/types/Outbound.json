@@ -1,0 +1,47 @@
+{
+  "fields": {
+    "allowed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "cost": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "destination": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "purpose": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "reach": {
+      "type": [
+        "ref:OutboundReach"
+      ],
+      "required": true
+    },
+    "sends": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "switch": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One direction on one client: what it was asked for, took, and is doing.",
+  "type": "object",
+  "properties": {
+    "accepted": {
+      "description": "What it reports as in force.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
+    },
+    "asked": {
+      "description": "What it was asked to hold to, in bytes a second, where anything was.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
+    },
+    "moving": {
+      "description": "What it is moving right now, where it reported a figure.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
+    },
+    "verdict": {
+      "description": "What that adds up to.",
+      "$ref": "BandwidthVerdict.json"
+    }
+  },
+  "required": [
+    "verdict"
+  ]
+}

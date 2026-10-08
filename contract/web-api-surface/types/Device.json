@@ -1,0 +1,47 @@
+{
+  "fields": {
+    "caution": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "client": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "deep_link": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "device": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "instead": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "open_source": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "support": {
+      "type": [
+        "ref:Support"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

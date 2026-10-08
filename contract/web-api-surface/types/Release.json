@@ -1,0 +1,59 @@
+{
+  "fields": {
+    "carried": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "delivers": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "groups": {
+      "type": [
+        "array[ref:Group]"
+      ],
+      "required": true
+    },
+    "patches": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "released_on": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "tag": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "user_facing": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "version": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "withdrawn": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

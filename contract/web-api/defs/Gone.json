@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What became of a download the client was asked to let go.",
+  "type": "object",
+  "properties": {
+    "bytes": {
+      "description": "What it occupied, as the client reported it.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "name": {
+      "description": "What the client is no longer holding.",
+      "type": "string"
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal, which asks the client for nothing.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "name",
+    "bytes",
+    "rehearsed"
+  ]
+}

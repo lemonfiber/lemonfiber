@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "releases": {
+      "type": [
+        "array[ref:ReleaseSummary]"
+      ],
+      "required": true
+    },
+    "requirements": {
+      "type": [
+        "object{ref:Requirement}"
+      ],
+      "required": true
+    },
+    "running": {
+      "type": [
+        "anyOf(null,ref:Release)"
+      ],
+      "required": false
+    },
+    "state": {
+      "type": [
+        "ref:ChangelogState"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

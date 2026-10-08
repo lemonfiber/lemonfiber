@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What one member may watch, in the household's own words.\n\nRead off the media server's account rather than kept here: that is where access is\ndecided, and a second copy is a copy able to disagree.",
+  "type": "object",
+  "properties": {
+    "administrator": {
+      "description": "Whether the account administers the media server.",
+      "type": "boolean"
+    },
+    "age_limit": {
+      "description": "The highest rating they may watch, where the operator set a limit.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "minimum": 0
+    },
+    "disabled": {
+      "description": "Whether the account is switched off — held, but unable to sign in.",
+      "type": "boolean"
+    },
+    "every_library": {
+      "description": "Every library, rather than a chosen few. The ordinary case.",
+      "type": "boolean"
+    },
+    "libraries": {
+      "description": "The libraries they may watch where it is not every one, by the names the\noperator gave them — or by the server's identifiers where the library list\ncould not be read, which a finding says.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "rated": {
+      "description": "What that limit comes to in the certificates this media server names, in the\noperator's own country. Absent where no limit is set.",
+      "anyOf": [
+        {
+          "$ref": "Rated.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "restriction": {
+      "description": "What they are held to, in one word — including where what they may watch and\nwhat they may ask for disagree.",
+      "$ref": "Restriction.json"
+    },
+    "unrated": {
+      "description": "What becomes of content the media server has no rating for.\n\nSaid either way, because an unexplained absence is the thing this answers: a\nrestricted member missing half the library is either this setting or a defect,\nand an operator cannot tell which from silence.",
+      "$ref": "Unrated.json"
+    }
+  },
+  "required": [
+    "every_library",
+    "libraries",
+    "unrated",
+    "restriction",
+    "administrator",
+    "disabled"
+  ]
+}

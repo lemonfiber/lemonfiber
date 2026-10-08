@@ -1,0 +1,41 @@
+{
+  "fields": {
+    "choices": {
+      "type": [
+        "array[ref:PresetChoice]"
+      ],
+      "required": true
+    },
+    "customised": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "disposition": {
+      "type": [
+        "ref:Disposition"
+      ],
+      "required": true
+    },
+    "music": {
+      "type": [
+        "anyOf(null,ref:MusicChoice)"
+      ],
+      "required": false
+    },
+    "overwritten": {
+      "type": [
+        "anyOf(null,ref:StackEdit)"
+      ],
+      "required": false
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The hours the household is awake, declared once for every download client.",
+  "type": "object",
+  "properties": {
+    "from": {
+      "description": "When the household's day starts.",
+      "type": "string"
+    },
+    "to": {
+      "description": "When it ends, which may be the next morning.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "from",
+    "to"
+  ]
+}

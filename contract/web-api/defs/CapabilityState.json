@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What one capability comes to for the credential that asked.",
+  "oneOf": [
+    {
+      "description": "This stack can do it, and this credential may.",
+      "type": "string",
+      "const": "available"
+    },
+    {
+      "description": "The stack has it, and a setting this machine has switched off has to be turned\nback on first.",
+      "type": "string",
+      "const": "unconfigured"
+    },
+    {
+      "description": "The stack has it, and this credential may not ask for it.",
+      "type": "string",
+      "const": "unpermitted"
+    }
+  ]
+}

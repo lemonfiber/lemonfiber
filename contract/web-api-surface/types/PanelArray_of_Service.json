@@ -1,0 +1,28 @@
+{
+  "fields": {
+    "data": {
+      "type": [
+        "array[ref:Service]",
+        "object"
+      ],
+      "required": true
+    },
+    "panel": {
+      "type": [
+        "const:\"ready\"",
+        "const:\"unavailable\""
+      ],
+      "required": true
+    },
+    "reason": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"ready\"",
+    "\"unavailable\""
+  ]
+}

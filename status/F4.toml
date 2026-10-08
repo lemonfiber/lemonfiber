@@ -2,17 +2,17 @@
 # status_check.py and the release gate.
 
 requirement = [
-  { id = "F4-R1", state = "done", evidence = ["contract/web-api.contract.json", "contract/web-api.surface.json", "crates/lemonfiber-core/src/app.rs", "crates/lemonfiber-core/src/app/command.rs"] },
+  { id = "F4-R1", state = "done", evidence = ["contract/web-api/index.json", "contract/web-api-surface/index.json", "crates/lemonfiber-core/src/app.rs", "crates/lemonfiber-core/src/app/command.rs"] },
   { id = "F4-R2", state = "done", evidence = ["contract/capability-vocabulary.json"] },
   { id = "F4-R3", state = "done", evidence = ["crates/lemonfiber-core/src/filling.rs", "crates/lemonfiber-core/src/lib.rs", "crates/lemonfiber-core/src/plugin.rs", "crates/lemonfiber-core/src/plugin/claimed.rs"] },
   { id = "F4-R4", state = "done", evidence = ["crates/lemonfiber-core/src/filling.rs", "crates/lemonfiber-core/src/lib.rs", "crates/lemonfiber-core/src/plugin.rs", "crates/lemonfiber-core/src/plugin/claimed.rs"] },
   { id = "F4-R6", state = "done", evidence = ["crates/lemonfiber-core/src/filling.rs", "crates/lemonfiber-core/src/lib.rs", "crates/lemonfiber-core/src/plugin.rs", "crates/lemonfiber-core/src/plugin/claimed.rs"] },
   { id = "F4-R7", state = "done", evidence = ["crates/lemonfiber-core/src/filling.rs", "crates/lemonfiber-core/src/lib.rs", "crates/lemonfiber-core/src/plugin.rs", "crates/lemonfiber-core/src/plugin/claimed.rs"] },
   { id = "F4-R8", state = "done", evidence = ["crates/lemonfiber-core/src/filling.rs", "crates/lemonfiber-core/src/lib.rs", "crates/lemonfiber-core/src/plugin.rs", "crates/lemonfiber-core/src/plugin/claimed.rs"] },
-  { id = "F4-R9", state = "done", evidence = ["contract/web-api.contract.json", "contract/web-api.surface.json", "crates/lemonfiber-core/src/app.rs", "crates/lemonfiber-core/src/app/command.rs"] },
-  { id = "F4-R10", state = "done", evidence = ["contract/web-api.contract.json", "contract/web-api.surface.json", "crates/lemonfiber-core/src/app.rs", "crates/lemonfiber-core/src/app/command.rs"] },
-  { id = "F4-R11", state = "done", evidence = ["contract/web-api.contract.json", "contract/web-api.surface.json", "crates/lemonfiber-core/src/app.rs", "crates/lemonfiber-core/src/app/command.rs"] },
-  { id = "F4-R12", state = "done", evidence = ["contract/web-api.contract.json", "contract/web-api.surface.json", "crates/lemonfiber-core/src/app.rs", "crates/lemonfiber-core/src/app/command.rs"] },
+  { id = "F4-R9", state = "done", evidence = ["contract/web-api/index.json", "contract/web-api-surface/index.json", "crates/lemonfiber-core/src/app.rs", "crates/lemonfiber-core/src/app/command.rs"] },
+  { id = "F4-R10", state = "done", evidence = ["contract/web-api/index.json", "contract/web-api-surface/index.json", "crates/lemonfiber-core/src/app.rs", "crates/lemonfiber-core/src/app/command.rs"] },
+  { id = "F4-R11", state = "done", evidence = ["contract/web-api/index.json", "contract/web-api-surface/index.json", "crates/lemonfiber-core/src/app.rs", "crates/lemonfiber-core/src/app/command.rs"] },
+  { id = "F4-R12", state = "done", evidence = ["contract/web-api/index.json", "contract/web-api-surface/index.json", "crates/lemonfiber-core/src/app.rs", "crates/lemonfiber-core/src/app/command.rs"] },
   { id = "F4-R13", state = "done", evidence = ["crates/lemonfiber-core/src/filling.rs", "crates/lemonfiber-core/src/lib.rs", "crates/lemonfiber-core/src/plugin.rs", "crates/lemonfiber-core/src/plugin/claimed.rs"] },
   { id = "F4-R14", state = "done", evidence = ["contract/capability-vocabulary.json"] },
   { id = "F4-R15", state = "done", evidence = ["contract/extension-points.json", "contract/plugin-manifest.schema.json"] },

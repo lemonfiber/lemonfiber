@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The guidance in full, for a surface that shows all of it.",
+  "type": "object",
+  "properties": {
+    "devices": {
+      "description": "Every device, in the order somebody is likely to be holding one.",
+      "type": "array",
+      "items": {
+        "$ref": "Device.json"
+      }
+    },
+    "nothing_is_installed": {
+      "description": "What this will not do for them.",
+      "type": "string"
+    },
+    "only_at_home": {
+      "description": "True of every device, said once.",
+      "type": "string"
+    },
+    "straining": {
+      "description": "Why playback here is likely to struggle before any app is chosen, or `None`\nwhere the preset in force asks for nothing this platform cannot serve.\n\nAbsent far more often than present, and it must be: a caution shown to\neverybody says nothing about anybody's machine, and a reader who meets one\nevery time stops reading it.",
+      "anyOf": [
+        {
+          "$ref": "Straining.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "trouble": {
+      "description": "What to do when it does not work, keyed by the symptom.",
+      "type": "array",
+      "items": {
+        "$ref": "Trouble.json"
+      }
+    }
+  },
+  "required": [
+    "devices",
+    "trouble",
+    "only_at_home",
+    "nothing_is_installed"
+  ]
+}

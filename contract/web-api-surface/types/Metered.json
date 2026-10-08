@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "down": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "excludes": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "incomplete": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "month": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "up": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

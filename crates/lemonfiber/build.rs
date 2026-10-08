@@ -77,7 +77,7 @@ fn main() {
 fn app_speaks_this_version() {
     let root = workspace_root();
     let declared = root.join(APP).join(DECLARED);
-    let contract = root.join(CONTRACT_PATH);
+    let contract = root.join(CONTRACT_DIR).join(INDEX);
 
     println!("cargo::rerun-if-changed={}", declared.display());
     println!("cargo::rerun-if-changed={}", contract.display());

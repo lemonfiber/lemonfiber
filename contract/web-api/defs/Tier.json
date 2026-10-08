@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Which of the four removals was asked for.",
+  "oneOf": [
+    {
+      "description": "Nothing removed. The services are stopped and everything stays where it is.",
+      "type": "string",
+      "const": "stop"
+    },
+    {
+      "description": "The containers, the networks between them, and the images that were pulled.",
+      "type": "string",
+      "const": "services"
+    },
+    {
+      "description": "Each service's own configuration, lemonfiber's own state, and the credentials\nin both.",
+      "type": "string",
+      "const": "configuration"
+    },
+    {
+      "description": "The library and the downloads.",
+      "type": "string",
+      "const": "media"
+    }
+  ]
+}

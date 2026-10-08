@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a plugin declared about itself, as its install read it.",
+  "type": "object",
+  "properties": {
+    "claims": {
+      "description": "Every capability it claims, core and its own, in the order it declares them.\n\nApart from what its services fill: a claim is what it says it can do and has to\ndemonstrate, and a capability of its own is claimed without anything asking for\nit.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string"
+      }
+    },
+    "license": {
+      "description": "The licence it is distributed under.",
+      "type": "string",
+      "default": ""
+    },
+    "overrides": {
+      "description": "Every bundled setting it declares it may change.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "PluginOverriding.json"
+      }
+    },
+    "reaches": {
+      "description": "Every destination a recipe of its could reach that is not one of its own\nservices: a service of this stack's, or a name outside it.\n\nRecorded as declared rather than sorted into the two here, because which names\nare this stack's is a question about the stack, and the stack a record is read\nagainst is the one on the machine when it is read.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string"
+      }
+    },
+    "reviewed": {
+      "description": "Whether anybody reviewed it before it was installed.\n\nTrue for a plugin installed by name through a catalogue index whose signature\nverified, and false for every install from a source an operator named. Carried\nrather than left implicit, because an unreviewed plugin is to be said to be one\nfor as long as it is installed.",
+      "type": "boolean",
+      "default": false
+    },
+    "secrets": {
+      "description": "Every credential it says it will hold.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "PluginSecret.json"
+      }
+    },
+    "upstream": {
+      "description": "Where its source is published, as the plugin names it.",
+      "type": "string",
+      "default": ""
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,47 @@
+{
+  "fields": {
+    "back_up": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "backed_up": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "project": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "refusal": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "stance": {
+      "type": [
+        "ref:Stance"
+      ],
+      "required": true
+    },
+    "upgrades": {
+      "type": [
+        "array[ref:CarryingReport]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

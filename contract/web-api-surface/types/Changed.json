@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "installed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "started": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "touched": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

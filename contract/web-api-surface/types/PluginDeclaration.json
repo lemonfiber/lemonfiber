@@ -1,0 +1,47 @@
+{
+  "fields": {
+    "claims": {
+      "type": [
+        "array[string]"
+      ],
+      "required": false
+    },
+    "license": {
+      "type": [
+        "string"
+      ],
+      "required": false
+    },
+    "overrides": {
+      "type": [
+        "array[ref:PluginOverriding]"
+      ],
+      "required": false
+    },
+    "reaches": {
+      "type": [
+        "array[string]"
+      ],
+      "required": false
+    },
+    "reviewed": {
+      "type": [
+        "boolean"
+      ],
+      "required": false
+    },
+    "secrets": {
+      "type": [
+        "array[ref:PluginSecret]"
+      ],
+      "required": false
+    },
+    "upstream": {
+      "type": [
+        "string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

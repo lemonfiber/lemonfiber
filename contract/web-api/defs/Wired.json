@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One of the stack's links, answered.",
+  "type": "object",
+  "properties": {
+    "by": {
+      "description": "The service the link runs from — what asked.",
+      "type": "string"
+    },
+    "reaches": {
+      "description": "What it reaches.",
+      "$ref": "Reaches.json"
+    }
+  },
+  "required": [
+    "by",
+    "reaches"
+  ]
+}

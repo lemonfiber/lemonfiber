@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How well a device is served.",
+  "oneOf": [
+    {
+      "description": "An official app that works. Most people, most of the time.",
+      "type": "string",
+      "const": "good"
+    },
+    {
+      "description": "It works, with something worth knowing before starting.",
+      "type": "string",
+      "const": "workable"
+    },
+    {
+      "description": "Poorly served. Said plainly, with somewhere else to go.",
+      "type": "string",
+      "const": "poor"
+    },
+    {
+      "description": "No installation, works anywhere, and is never unavailable.",
+      "type": "string",
+      "const": "fallback"
+    }
+  ]
+}

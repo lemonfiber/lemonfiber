@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where the front door is reached, and what is worth knowing about the address.",
+  "type": "object",
+  "properties": {
+    "caution": {
+      "description": "What is worth knowing about the address itself, where anything is. Absent\nfor one that keeps working on its own.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "url": {
+      "description": "The whole address, as it would be typed or followed.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "url"
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What is playing now, and whose sessions were asked about.",
+  "type": "object",
+  "properties": {
+    "available": {
+      "description": "Whether the media server could be asked at all.\n\nNobody watching and a server that would not say are different answers, and\ncollapsing them would report a quiet house on the day the media server was down.\nAnything that could not be read is said in `findings` and this goes false.",
+      "type": "boolean"
+    },
+    "findings": {
+      "description": "What is worth saying about this reading, in the words its reader would use.\n\nAlways written, empty or not, so a reader never has to guess what an absent\nfield means.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "member": {
+      "description": "The member this was narrowed to, by the name they are known by, or empty where\nit is every session in the house.",
+      "type": "string"
+    },
+    "sessions": {
+      "description": "Every session playing something, in the order the media server lists them. How\nmany are playing is how many these are, rather than a count kept beside them.",
+      "type": "array",
+      "items": {
+        "$ref": "Playback.json"
+      }
+    }
+  },
+  "required": [
+    "member",
+    "sessions",
+    "available",
+    "findings"
+  ]
+}

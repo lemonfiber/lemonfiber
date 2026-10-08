@@ -1,0 +1,71 @@
+{
+  "fields": {
+    "already_here": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "handover": {
+      "type": [
+        "anyOf(null,ref:Handover)"
+      ],
+      "required": false
+    },
+    "in_background": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "item": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "lines": {
+      "type": [
+        "array[ref:Line]"
+      ],
+      "required": true
+    },
+    "link": {
+      "type": [
+        "anyOf(null,ref:Link)"
+      ],
+      "required": false
+    },
+    "proves": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "shape": {
+      "type": [
+        "ref:Shape"
+      ],
+      "required": true
+    },
+    "state": {
+      "type": [
+        "ref:WalkthroughState"
+      ],
+      "required": true
+    },
+    "stopped": {
+      "type": [
+        "anyOf(null,ref:Stopped)"
+      ],
+      "required": false
+    },
+    "suggestions": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

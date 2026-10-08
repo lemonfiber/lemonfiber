@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "asked": {
+      "type": [
+        "ref:Pausing"
+      ],
+      "required": true
+    },
+    "caution": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "clients": {
+      "type": [
+        "array[ref:PausedClient]"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

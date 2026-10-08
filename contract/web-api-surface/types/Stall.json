@@ -1,0 +1,12 @@
+{
+  "fields": {},
+  "variants": [
+    "\"completed-not-imported\"",
+    "\"orphaned\"",
+    "\"redownload-loop\"",
+    "\"repeated-import-failure\"",
+    "\"slow\"",
+    "\"stalled-download\"",
+    "\"waiting-indefinitely\""
+  ]
+}

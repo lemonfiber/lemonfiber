@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Something on this machine that lemonfiber neither keeps nor removes.",
+  "type": "object",
+  "properties": {
+    "what": {
+      "description": "What it is.",
+      "type": "string"
+    },
+    "why": {
+      "description": "Whose it is, and why it is not lemonfiber's to take away.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "what",
+    "why"
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "media_type": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "outcome": {
+      "type": [
+        "anyOf(null,ref:Triggered)"
+      ],
+      "required": false
+    },
+    "preset": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "size_per_hour": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

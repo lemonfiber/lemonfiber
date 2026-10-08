@@ -1,0 +1,14 @@
+{
+  "fields": {},
+  "variants": [
+    "\"body_starts_with\"",
+    "\"content_type\"",
+    "\"json\"",
+    "\"json_array_min\"",
+    "\"json_at_least\"",
+    "\"json_has_keys\"",
+    "\"json_is_absent\"",
+    "\"json_types\"",
+    "\"status\""
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Something lemonfiber cannot act on, named rather than passed over.\n\nWritten for a migration survey and read by two reports now. The second is the\nstatus of a stack the operator maintains themselves, where a service declaring an\nAPI this build cannot reach is named the same way — what, and why — rather than\nbeing dropped from every feature that would have used it. One shape for both,\nbecause \"named rather than passed over\" is the whole of what either is saying and\ntwo shapes would be two ways of saying it.",
+  "type": "object",
+  "properties": {
+    "because": {
+      "description": "Why lemonfiber cannot act on it, in the operator's terms.",
+      "type": "string"
+    },
+    "what": {
+      "description": "What was found, by the name the thing that found it gives it — a project and\nservice for a survey, a service id for a stack lemonfiber runs.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "what",
+    "because"
+  ]
+}

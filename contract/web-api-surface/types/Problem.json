@@ -1,0 +1,53 @@
+{
+  "fields": {
+    "cause": {
+      "type": [
+        "anyOf(null,ref:Problem)"
+      ],
+      "required": false
+    },
+    "code": {
+      "type": [
+        "ref:Code"
+      ],
+      "required": true
+    },
+    "detail": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "meaning": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "remedies": {
+      "type": [
+        "array[ref:Remedy]"
+      ],
+      "required": true
+    },
+    "severity": {
+      "type": [
+        "ref:ProblemSeverity"
+      ],
+      "required": true
+    },
+    "state": {
+      "type": [
+        "ref:ProblemState"
+      ],
+      "required": true
+    },
+    "summary": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

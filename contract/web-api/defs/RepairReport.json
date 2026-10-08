@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a repairing run offered, and what it did.",
+  "type": "object",
+  "properties": {
+    "acted": {
+      "description": "Whether this run was allowed to act at all.",
+      "type": "boolean"
+    },
+    "agreement": {
+      "description": "What this offer is, so consent given for it can name which offer it read.\n\nCarried on every report rather than only on the ones that offer something: a\nsurface that has to look for it is a surface that can fail to find it, and an\noffer of nothing is still an offer somebody may agree to nothing of.",
+      "type": "string"
+    },
+    "beyond": {
+      "description": "What has been tried too often to keep offering.\n\nSaid rather than passed over. A repair that quietly stopped being offered leaves\nthe operator watching a fault nobody mentions any more, which is worse than being\ntold plainly that this is past what lemonfiber can work out.",
+      "type": "array",
+      "items": {
+        "$ref": "Beyond.json"
+      }
+    },
+    "mended": {
+      "description": "What was carried out, in the order it was.",
+      "type": "array",
+      "items": {
+        "$ref": "Mended.json"
+      }
+    },
+    "offered": {
+      "description": "What could be put right, whether or not it was.",
+      "type": "array",
+      "items": {
+        "$ref": "Repair.json"
+      }
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "offered",
+    "agreement",
+    "mended",
+    "beyond",
+    "acted",
+    "rehearsed"
+  ]
+}

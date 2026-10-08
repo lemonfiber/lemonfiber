@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The service manager a machine has, or the absence of one lemonfiber configures.\n\nThe absence is the default, because a machine nobody has told is a machine\nnothing is known about, and guessing at a manager is how a report comes to\nclaim a platform it never asked.",
+  "oneOf": [
+    {
+      "description": "macOS, through a launch agent in the operator's own login session.",
+      "type": "string",
+      "const": "launchd"
+    },
+    {
+      "description": "Linux, through a user service in the operator's own session.",
+      "type": "string",
+      "const": "systemd"
+    },
+    {
+      "description": "A platform lemonfiber does not configure.",
+      "type": "string",
+      "const": "unsupported"
+    }
+  ]
+}

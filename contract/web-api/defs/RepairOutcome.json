@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How a repair turned out, once the check that raised the finding has been asked again.\n\nDeliberately not a boolean. \"It ran\" and \"it worked\" are different claims, and a model\nthat cannot tell them apart will eventually report the first as the second.",
+  "oneOf": [
+    {
+      "description": "It ran, and the check now passes.",
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "const": "fixed"
+        }
+      },
+      "required": [
+        "outcome"
+      ]
+    },
+    {
+      "description": "It ran, and the check still fails.",
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "const": "fix_failed"
+        }
+      },
+      "required": [
+        "outcome"
+      ]
+    },
+    {
+      "description": "It stopped partway, leaving this.\n\nNamed precisely rather than as \"failed\": a half-applied change is a different\nstate to be in from an unchanged one, and the operator has to know which they are\nlooking at before they try anything else.",
+      "type": "object",
+      "properties": {
+        "leaving": {
+          "description": "What the machine is now in, said plainly.",
+          "type": "string"
+        },
+        "outcome": {
+          "type": "string",
+          "const": "stopped"
+        }
+      },
+      "required": [
+        "outcome",
+        "leaving"
+      ]
+    },
+    {
+      "description": "Not carried out, because the operator said no.",
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "const": "declined"
+        }
+      },
+      "required": [
+        "outcome"
+      ]
+    },
+    {
+      "description": "Refused, because it would have written over something changed by hand.",
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "const": "would_overwrite"
+        }
+      },
+      "required": [
+        "outcome"
+      ]
+    },
+    {
+      "description": "Not carried out, because the operator declared the area it would write\nunmanaged.\n\nApart from [`Self::WouldOverwrite`], which is lemonfiber declining to write over\na change it can see. This is lemonfiber obeying an instruction it was given, and\ntelling somebody the first when they wrote the second would send them looking\nfor a change they did not make.",
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "const": "unmanaged"
+        }
+      },
+      "required": [
+        "outcome"
+      ]
+    }
+  ]
+}

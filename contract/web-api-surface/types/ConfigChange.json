@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "cost": {
+      "type": [
+        "ref:Cost"
+      ],
+      "required": true
+    },
+    "from": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "key": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "to": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a restore did.",
+  "type": "object",
+  "properties": {
+    "from_version": {
+      "description": "The lemonfiber version the archive was written by.",
+      "type": "string"
+    },
+    "relocated": {
+      "description": "The data root that was re-pointed, where the restore accepted one.",
+      "anyOf": [
+        {
+          "$ref": "Relocation.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "scope": {
+      "description": "What was restored.",
+      "$ref": "Scope.json"
+    }
+  },
+  "required": [
+    "scope",
+    "from_version"
+  ]
+}

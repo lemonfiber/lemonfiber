@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One part of a traced item — an episode of a series. A film has no parts: the item is\nthe whole, and a trace of it says all there is to say. A series does not, which is the\ngap this closes: \"the show is imported\" is true the moment one episode lands, and reads\nas done while nine are still missing.",
+  "type": "object",
+  "properties": {
+    "number": {
+      "description": "Its number within that season.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "season": {
+      "description": "Which season it belongs to.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "stage": {
+      "description": "How far this one part got, on the same scale as the item as a whole.",
+      "$ref": "Stage.json"
+    },
+    "title": {
+      "description": "Its title, as a person would name it.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "season",
+    "number",
+    "title",
+    "stage"
+  ]
+}

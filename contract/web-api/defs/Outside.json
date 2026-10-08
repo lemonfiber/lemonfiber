@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Something an uninstall leaves behind, and how to remove it by hand.",
+  "type": "object",
+  "properties": {
+    "by_hand": {
+      "description": "How to remove it on this platform, as the operator would type or do it.",
+      "type": "string"
+    },
+    "found": {
+      "description": "Whether this machine was found to have it.\n\nA survey that could not look says nothing was found rather than that nothing\nis there, which is why the entry is listed either way and this field carries\nthe difference.",
+      "type": "boolean"
+    },
+    "what": {
+      "description": "What it is.",
+      "type": "string"
+    },
+    "why": {
+      "description": "Why it is not lemonfiber's to take away.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "what",
+    "why",
+    "by_hand",
+    "found"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One entry in an archive's contents listing.",
+  "type": "object",
+  "properties": {
+    "archive_path": {
+      "description": "Where it sits inside the archive.",
+      "type": "string"
+    },
+    "label": {
+      "description": "What it is, in the operator's terms.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "archive_path",
+    "label"
+  ]
+}

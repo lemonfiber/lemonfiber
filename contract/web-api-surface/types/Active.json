@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "progress": {
+      "type": [
+        "integer/uint8"
+      ],
+      "required": true
+    },
+    "protocol": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "check": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "does": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "effects": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "reversible": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

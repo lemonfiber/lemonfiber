@@ -1,0 +1,41 @@
+{
+  "fields": {
+    "caveat": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "changed": {
+      "type": [
+        "anyOf(null,ref:Changed)"
+      ],
+      "required": false
+    },
+    "commands": {
+      "type": [
+        "array[ref:HostedCommand]"
+      ],
+      "required": true
+    },
+    "instruction": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "manager": {
+      "type": [
+        "ref:Manager"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

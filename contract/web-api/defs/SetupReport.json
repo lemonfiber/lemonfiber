@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a setup run came to, and what it settled on.\n\n**Deliberately not the settings themselves.** Setup writes an indexer key and a\nservice password among them, and a report a script can read is a report a script\ncan log — into a file, a CI transcript, somebody's terminal history. So this says\nwhat was *decided* and never what was *entered*, and the fields are chosen one at\na time rather than by serialising a struct that might later gain a secret.\n\nThe indexer's address is left out for that reason rather than because it is\nitself a secret: it is entered beside its key, and the two travel together in\nevery place an operator copies them from.",
+  "type": "object",
+  "properties": {
+    "data_root": {
+      "description": "Where the library was put, where a location was chosen.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "outcome": {
+      "description": "How the run ended.",
+      "$ref": "SetupOutcome.json"
+    },
+    "protocols": {
+      "description": "Which ways of downloading the stack was set up for.",
+      "$ref": "Protocols.json"
+    },
+    "service_user": {
+      "description": "The user the services run as, as `uid:gid`, where one was set.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "outcome",
+    "protocols"
+  ]
+}

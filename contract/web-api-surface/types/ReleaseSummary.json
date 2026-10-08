@@ -1,0 +1,41 @@
+{
+  "fields": {
+    "delivers": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "patches": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "released_on": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "user_facing": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "version": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "withdrawn": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

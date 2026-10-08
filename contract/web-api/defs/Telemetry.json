@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How the screen itself is doing, which is a different question from how the\nstack is doing.\n\nThe stack's own verdict is [`crate::health::Standing`]; this is only whether the\npicture can be trusted to be current. Kept apart because they disagree in both\ndirections: a healthy stack can be shown through half-failing telemetry, and a\nperfectly refreshing screen can be reporting a stack that is on fire.",
+  "oneOf": [
+    {
+      "description": "Telemetry is current and refreshing normally.",
+      "type": "string",
+      "const": "live"
+    },
+    {
+      "description": "Some sources are unavailable; their panels are marked.",
+      "type": "string",
+      "const": "degraded"
+    },
+    {
+      "description": "The engine cannot be reached, though the CLI path may still work.",
+      "type": "string",
+      "const": "disconnected"
+    },
+    {
+      "description": "Configured, but nothing is running.",
+      "type": "string",
+      "const": "no-stack"
+    },
+    {
+      "description": "No configuration; setup is offered instead.",
+      "type": "string",
+      "const": "unconfigured"
+    }
+  ]
+}

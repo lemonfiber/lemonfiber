@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What asking for the certificate to be replaced came to.",
+  "type": "object",
+  "properties": {
+    "consequence": {
+      "description": "What replacing it means for every phone already paired.",
+      "type": "string"
+    },
+    "fingerprint": {
+      "description": "What a phone would pin now: the new certificate where it was replaced, the one\nkept where it was not, and nothing where none has been made.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+      "type": "boolean"
+    },
+    "replaced": {
+      "description": "Whether it was replaced. Unconfirmed, it is not, and what replacing it costs is\nwhat is said.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "replaced",
+    "consequence",
+    "rehearsed"
+  ]
+}

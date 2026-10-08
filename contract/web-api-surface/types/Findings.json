@@ -1,0 +1,41 @@
+{
+  "fields": {
+    "active": {
+      "type": [
+        "array[ref:Active]"
+      ],
+      "required": true
+    },
+    "edited": {
+      "type": [
+        "anyOf(null,ref:Edited)"
+      ],
+      "required": false
+    },
+    "keeps": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "library": {
+      "type": [
+        "array[ref:LibraryPath]"
+      ],
+      "required": true
+    },
+    "opens": {
+      "type": [
+        "array[ref:Opening]"
+      ],
+      "required": true
+    },
+    "stops": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

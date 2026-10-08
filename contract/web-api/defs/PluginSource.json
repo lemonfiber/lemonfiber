@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Whether one installed plugin's source can still be fetched.",
+  "type": "object",
+  "properties": {
+    "from": {
+      "description": "The source the record says it came from.",
+      "type": "string"
+    },
+    "plugin": {
+      "description": "The plugin, by its id.",
+      "type": "string"
+    },
+    "standing": {
+      "description": "What asking it came to.",
+      "$ref": "PluginSourceStanding.json"
+    }
+  },
+  "required": [
+    "plugin",
+    "from",
+    "standing"
+  ]
+}

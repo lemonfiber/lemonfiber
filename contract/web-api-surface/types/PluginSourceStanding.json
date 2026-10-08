@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "standing": {
+      "type": [
+        "const:\"reachable\"",
+        "const:\"unasked\"",
+        "const:\"unreachable\""
+      ],
+      "required": true
+    },
+    "why": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"reachable\"",
+    "\"unasked\"",
+    "\"unreachable\""
+  ]
+}

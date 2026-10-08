@@ -1,0 +1,12 @@
+{
+  "fields": {},
+  "variants": [
+    "\"api-settings\"",
+    "\"config-ini\"",
+    "\"config-json\"",
+    "\"config-xml\"",
+    "\"config-yaml\"",
+    "\"generated\"",
+    "\"none\""
+  ]
+}

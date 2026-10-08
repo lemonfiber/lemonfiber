@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What became of asking one service to re-search its existing content.",
+  "oneOf": [
+    {
+      "description": "The re-search was accepted and now runs in the service's background.",
+      "type": "object",
+      "properties": {
+        "state": {
+          "type": "string",
+          "const": "started"
+        }
+      },
+      "required": [
+        "state"
+      ]
+    },
+    {
+      "description": "The service had not finished starting — no key yet — so nothing was asked of\nit; running the upgrade again once it is up will reach it.",
+      "type": "object",
+      "properties": {
+        "state": {
+          "type": "string",
+          "const": "not-started"
+        }
+      },
+      "required": [
+        "state"
+      ]
+    },
+    {
+      "description": "The service refused the command or could not be reached.",
+      "type": "object",
+      "properties": {
+        "detail": {
+          "description": "The service's own account of why.",
+          "type": "string"
+        },
+        "state": {
+          "type": "string",
+          "const": "failed"
+        }
+      },
+      "required": [
+        "state",
+        "detail"
+      ]
+    }
+  ]
+}

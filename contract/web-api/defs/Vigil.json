@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The watch a run would keep, and what it would do at the end of it.",
+  "type": "object",
+  "properties": {
+    "command": {
+      "description": "The invocation it would run the moment that location went, word for word.\n\nBuilt by the same path a real watch stops the services through, rather than\ndescribed beside it: an argv reported from a second reckoning is one nobody\nruns, and the one nobody runs is the one that stops being right.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "every": {
+      "description": "How often it would look, in seconds.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "root": {
+      "description": "The data location it would hold.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "root",
+    "every",
+    "command"
+  ]
+}

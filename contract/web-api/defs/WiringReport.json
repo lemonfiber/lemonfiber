@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What this stack wires to what.",
+  "type": "object",
+  "properties": {
+    "unfilled": {
+      "description": "Every capability something asks for and nothing fills, naming what asked.\n\nRepeated out of the links above rather than left to be found among them: a\nstack with one unfilled ask among twenty working ones is a stack whose one\nproblem is a line in a list, and a consumer that had to notice it would be\nthe reason nobody did.",
+      "type": "array",
+      "items": {
+        "$ref": "Unfilled.json"
+      }
+    },
+    "wired": {
+      "description": "Every link, in the order the stack declares them.",
+      "type": "array",
+      "items": {
+        "$ref": "Wired.json"
+      }
+    }
+  },
+  "required": [
+    "wired",
+    "unfilled"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "before": {
+      "type": [
+        "anyOf(null,ref:DoctorVerdict)"
+      ],
+      "required": false
+    },
+    "now": {
+      "type": [
+        "ref:Finding"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "findings": {
+      "type": [
+        "array[ref:Finding]"
+      ],
+      "required": true
+    },
+    "overall": {
+      "type": [
+        "ref:Overall"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

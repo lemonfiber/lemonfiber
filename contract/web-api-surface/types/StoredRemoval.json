@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "gone": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "left": {
+      "type": [
+        "array[ref:StoredLeft]"
+      ],
+      "required": true
+    },
+    "state": {
+      "type": [
+        "const:\"done\"",
+        "const:\"not-asked\"",
+        "const:\"unconfirmed\""
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"done\"",
+    "\"not-asked\"",
+    "\"unconfirmed\""
+  ]
+}

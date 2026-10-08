@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "stage": {
+      "type": [
+        "ref:Stage"
+      ],
+      "required": true
+    },
+    "title": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

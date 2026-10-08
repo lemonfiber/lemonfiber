@@ -1,0 +1,9 @@
+{
+  "fields": {},
+  "variants": [
+    "\"download-failed\"",
+    "\"grabbed\"",
+    "\"imported\"",
+    "\"removed\""
+  ]
+}

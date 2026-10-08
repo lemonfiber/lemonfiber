@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What the answer has to be.\n\nA status is a claim about the network path rather than about the service: Docker\npublishes a port by putting a proxy in front of it, and that proxy accepts a\nconnection before knowing whether anything inside is listening. So a status alone\nis not evidence — except for a refusal, which is the one answer no port proxy can\nproduce.\n\n**A key of the four key-wise constraints is a place rather than a name.** A plain\nname is a top-level member, and one beginning with `/` is a JSON Pointer, extended\nwith a step that picks an entry of a list by a field it holds. A flat name was enough while every service answered a flat object, and the\nonly thing it could say about a service that nests its payload was that the envelope\nwas there — which is a probe that passes by observing that something replied.",
+  "type": "object",
+  "properties": {
+    "body_starts_with": {
+      "description": "What the body must begin with, where it is not JSON.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "content_type": {
+      "description": "A substring of the content type the answer was served as.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "json": {
+      "description": "Places the answer must carry, each with the exact value it must hold.",
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "$ref": "Expected.json"
+      },
+      "default": null
+    },
+    "json_array_min": {
+      "description": "The answer read as an array, with at least this many entries.\n\nA catalogue is very often a list rather than an object, and none of the\nobject-shaped constraints can say anything about one.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "default": null,
+      "minimum": 0
+    },
+    "json_at_least": {
+      "description": "Places the answer must carry, each with a number it must not be below.",
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "type": "integer",
+        "format": "int64"
+      },
+      "default": null
+    },
+    "json_has_keys": {
+      "description": "Places the answer must carry, whatever they hold.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "default": null,
+      "items": {
+        "type": "string"
+      }
+    },
+    "json_is_absent": {
+      "description": "The answer did not parse as JSON at all.\n\nWhich is what a service that serves its application shell for every path it does\nnot implement answers — and the reason a status alone proves nothing against\none: the shell comes back `200` whether the API behind it exists or not, so what\nhas to be said is that the body was *not* a document.",
+      "type": [
+        "boolean",
+        "null"
+      ],
+      "default": null
+    },
+    "json_types": {
+      "description": "Places the answer must carry, each with the kind of value it must be.",
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "$ref": "ExpectedKind.json"
+      },
+      "default": null
+    },
+    "status": {
+      "description": "The status the answer must carry.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint16",
+      "default": null,
+      "maximum": 65535,
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false
+}

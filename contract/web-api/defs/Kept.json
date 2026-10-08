@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One thing lemonfiber keeps on this machine.",
+  "type": "object",
+  "properties": {
+    "at": {
+      "description": "Where it is, in full.",
+      "type": "string"
+    },
+    "secret": {
+      "description": "Whether it holds a credential, which is what decides how carefully a copy of\nit has to be treated.",
+      "type": "boolean"
+    },
+    "what": {
+      "description": "What it is, in the operator's words.",
+      "type": "string"
+    },
+    "why": {
+      "description": "Why it is kept.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "what",
+    "at",
+    "why",
+    "secret"
+  ]
+}

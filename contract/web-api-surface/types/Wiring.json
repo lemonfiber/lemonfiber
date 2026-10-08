@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "connection": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "severity": {
+      "type": [
+        "ref:SeedSeverity"
+      ],
+      "required": true
+    },
+    "state": {
+      "type": [
+        "ref:SeedState"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

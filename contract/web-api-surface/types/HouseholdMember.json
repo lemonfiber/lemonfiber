@@ -1,0 +1,53 @@
+{
+  "fields": {
+    "access": {
+      "type": [
+        "ref:MemberAccess"
+      ],
+      "required": true
+    },
+    "asking": {
+      "type": [
+        "anyOf(null,ref:MemberAsking)"
+      ],
+      "required": false
+    },
+    "claimed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "last_seen": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "requests": {
+      "type": [
+        "array[ref:MemberRequest]"
+      ],
+      "required": true
+    },
+    "standing": {
+      "type": [
+        "ref:MemberStanding"
+      ],
+      "required": true
+    },
+    "to_hand_over": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

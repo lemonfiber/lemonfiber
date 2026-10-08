@@ -7,14 +7,16 @@
 //!
 //! The shapes are generated rather than written, and regenerating must
 //! produce no diff — a serialised type that changes without the artefact
-//! changing with it fails the build instead of reaching an SDK.
+//! changing with it fails the build instead of reaching an SDK. The artefact is a
+//! directory: an index carrying the wire version, one file per kind, one per
+//! definition, and one for each list that is not a kind.
 //!
 //! A kind is described by the report it carries rather than by the [`Outcome`]
 //! union those reports belong to. `Outcome` serialises as the report itself, with
 //! no variant name around it, so the union's own shape is never what reaches a
 //! client — and a schema derived from it would describe a document nothing writes.
 //!
-//! # Names, and the direction a change to them travels
+//! # Names, and where a definition is kept
 //!
 //! A `$defs` key is what a generator keys a type by, so a key has to mean one type.
 //! `schemars` names a definition after the bare Rust type and describes each kind on
@@ -25,25 +27,22 @@
 //! type and nothing in the diff said so. Every type that collided now carries a
 //! `#[schemars(rename = "...")]` of its own, and the sweeps below keep it that way.
 //!
-//! Two changes settle the shape of this artefact, and **they travel in opposite
-//! directions**. Each one taken the wrong way round fails silently rather than loudly,
-//! which is why it is written beside the code rather than left in a pull request.
+//! `sdk-ts` compensates for the old clashes by prefixing every divergent name with the
+//! kind carrying it. That compensation is redundant rather than wrong, and may be
+//! deleted on its side.
 //!
-//! **Renaming travels producer first, and has happened here.** `sdk-ts` compensates for
-//! the old clashes by prefixing every divergent name with the kind carrying it. That
-//! compensation is now redundant rather than wrong, and may be deleted — but only after
-//! it has taken this artefact. The other order keys four different `Left`s to one name
-//! and keeps whichever kind was written last, with nothing anywhere reporting it.
-//!
-//! **Hoisting `$defs` to the document root travels consumers first, and has not
-//! happened.** Both SDKs resolve a reference against the kind carrying it, so a root
-//! `$defs` leaves every reference unresolvable — and `sdk-php` answers an unresolvable
-//! reference with `mixed` and exits nought. Every consumer has to resolve against the
-//! root, and be released, before anything moves here.
+//! Every definition is committed as a file of its own in `defs/`, and a reference is a
+//! path to that file rather than a pointer into the kind carrying it, so a definition
+//! nine kinds share is written once. What a reader has to do in return is resolve a
+//! `$ref` against the file it appears in. A reader that cannot resolve one has to
+//! refuse rather than describe the field as anything at all, because a reference left
+//! unread produces a type that accepts everything and a build that reports nothing.
 //!
 //! [`Outcome`]: lemonfiber_core::app::Outcome
 
+pub mod layout;
 mod path;
+mod split;
 pub mod stability;
 
 use std::collections::BTreeMap;
@@ -76,8 +75,8 @@ use lemonfiber_core::logs::Line as LogLine;
 use lemonfiber_core::news::Newest;
 use lemonfiber_core::walkthrough::Line;
 
-pub use path::CONTRACT_PATH;
-pub use stability::{Surface, SURFACE_PATH};
+pub use path::{CONTRACT_DIR, INDEX};
+pub use stability::{Surface, SURFACE_DIR};
 
 /// Every wire shape a surface may receive, keyed by its `kind`.
 ///
@@ -153,16 +152,6 @@ impl Contract {
             reads: published::every(),
             refusals: refusals(),
         }
-    }
-
-    /// As it is committed: sorted keys, two-space indent, one trailing newline.
-    ///
-    /// `None` only if it cannot serialise, which a tree of schemas cannot.
-    #[must_use]
-    pub fn to_json(&self) -> Option<String> {
-        let mut text = serde_json::to_string_pretty(self).ok()?;
-        text.push('\n');
-        Some(text)
     }
 }
 

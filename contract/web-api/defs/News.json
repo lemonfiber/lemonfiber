@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a surface can mark as new, newest first within each kind.",
+  "type": "object",
+  "properties": {
+    "problems": {
+      "description": "The checks found wrong, the most recent onset first.",
+      "type": "array",
+      "items": {
+        "$ref": "NewsProblem.json"
+      }
+    },
+    "requests": {
+      "description": "What the household has asked for, highest number first.",
+      "type": "array",
+      "items": {
+        "$ref": "NewsRequest.json"
+      }
+    },
+    "unread": {
+      "description": "The kinds that could not be read.\n\nA kind named here has an empty list because nothing could be read, not because\nnothing is there. A surface that took the empty list as everything there is\nwould mark all of it as new once it could be read again.",
+      "type": "array",
+      "items": {
+        "$ref": "NewsKind.json"
+      }
+    },
+    "updates": {
+      "description": "The releases in the record this build carries, newest first.",
+      "type": "array",
+      "items": {
+        "$ref": "NewsUpdate.json"
+      }
+    }
+  },
+  "required": [
+    "updates",
+    "requests",
+    "problems",
+    "unread"
+  ]
+}

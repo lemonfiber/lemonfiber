@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where a refusal's words were carried, and when.",
+  "type": "object",
+  "properties": {
+    "at": {
+      "description": "When the attempt was made, absent where the clock could not be written down.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "to": {
+      "description": "The services they reached, by the names the member knows them by. Empty where\nthere was nowhere this could send.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "to"
+  ]
+}

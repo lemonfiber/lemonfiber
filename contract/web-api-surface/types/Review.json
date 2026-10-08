@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "change": {
+      "type": [
+        "ref:ConfigChange"
+      ],
+      "required": true
+    },
+    "findings": {
+      "type": [
+        "ref:Findings"
+      ],
+      "required": false
+    },
+    "proof": {
+      "type": [
+        "anyOf(null,ref:Validation)"
+      ],
+      "required": false
+    },
+    "refusal": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "stance": {
+      "type": [
+        "ref:Stance"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

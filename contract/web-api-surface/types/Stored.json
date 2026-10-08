@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "beside": {
+      "type": [
+        "array[ref:StoredBeside]"
+      ],
+      "required": true
+    },
+    "kept": {
+      "type": [
+        "array[ref:Kept]"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "removal": {
+      "type": [
+        "ref:StoredRemoval"
+      ],
+      "required": true
+    },
+    "roots": {
+      "type": [
+        "array[ref:Root]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

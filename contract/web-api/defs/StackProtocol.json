@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A download provider a profile can depend on.\n\nSerialisable as well as readable, for the same reason [`Criticality`] is: it\nreaches an operator. A profile left out of a closure is only half reported\nwithout the provider it wanted.",
+  "oneOf": [
+    {
+      "description": "Needs a Usenet provider.",
+      "type": "string",
+      "const": "usenet"
+    },
+    {
+      "description": "Needs a VPN and a torrent client.",
+      "type": "string",
+      "const": "torrent"
+    }
+  ]
+}

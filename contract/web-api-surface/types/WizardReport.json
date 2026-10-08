@@ -1,0 +1,65 @@
+{
+  "fields": {
+    "asks": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "at": {
+      "type": [
+        "ref:WizardStep"
+      ],
+      "required": true
+    },
+    "offered": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "phase": {
+      "type": [
+        "ref:Phase"
+      ],
+      "required": true
+    },
+    "plan": {
+      "type": [
+        "array[ref:SettingReport]"
+      ],
+      "required": true
+    },
+    "proof": {
+      "type": [
+        "anyOf(null,ref:Validation)"
+      ],
+      "required": false
+    },
+    "ready_for_review": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "ref:Ran"
+      ],
+      "required": true
+    },
+    "unanswered": {
+      "type": [
+        "array[ref:WizardStep]"
+      ],
+      "required": true
+    },
+    "written": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

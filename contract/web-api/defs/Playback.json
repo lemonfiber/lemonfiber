@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Somebody watching something now, as the media server lists the session.\n\nWho and what, and where: what a household recognises about somebody watching. No\nstream, no bitrate and no transcode reason, because a member is not choosing one and\na surface handed those would have to decide not to draw them.",
+  "type": "object",
+  "properties": {
+    "device": {
+      "description": "What the device it plays on calls itself.",
+      "type": "string"
+    },
+    "episode": {
+      "description": "The episode's number within its season, where the server numbers one.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "minimum": 0
+    },
+    "medium": {
+      "description": "Which of the kinds this product deals in it is. An episode is of a series.",
+      "$ref": "Medium.json"
+    },
+    "member": {
+      "description": "The name the account is known by.",
+      "type": "string"
+    },
+    "member_id": {
+      "description": "The identifier the server files the account under.",
+      "type": "string"
+    },
+    "paused": {
+      "description": "Whether it is paused rather than playing.",
+      "type": "boolean"
+    },
+    "season": {
+      "description": "The season an episode is in, where the server numbers one.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "minimum": 0
+    },
+    "series": {
+      "description": "The series an episode belongs to, where it is one.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "title": {
+      "description": "What is playing, in the words the server holds it under: an episode's own name\nwhere it is an episode.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "member_id",
+    "member",
+    "title",
+    "medium",
+    "paused",
+    "device"
+  ]
+}

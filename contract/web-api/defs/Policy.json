@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What happens to what a household member asks for.\n\nThree, and they are the three the request service can actually be put into. A\nhousehold is in one of them because of two settings taken together — whether requests\narrive unseen, and whether a period limits how many — so the words here are a reading\nof that pair rather than a fourth setting kept beside it.\n\nChoosing per person is not a fourth policy. It is one of these three chosen for one\nmember rather than for the house, which is why what a surface offers is a policy and,\nseparately, who it is for.",
+  "oneOf": [
+    {
+      "description": "Everything asked for arrives, and nothing is counted against anybody.",
+      "type": "string",
+      "const": "trusted"
+    },
+    {
+      "description": "Everything asked for arrives until the period's limit is spent, and what\nwould go past it is refused at the moment of asking.",
+      "type": "string",
+      "const": "within-a-limit"
+    },
+    {
+      "description": "Everything asked for waits for the operator to rule on it.",
+      "type": "string",
+      "const": "everything-waits"
+    }
+  ]
+}

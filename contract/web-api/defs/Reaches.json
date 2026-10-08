@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What one link reaches, and how that was settled.",
+  "oneOf": [
+    {
+      "description": "An ask for a capability.",
+      "type": "object",
+      "properties": {
+        "capability": {
+          "description": "The capability asked for.",
+          "type": "string"
+        },
+        "how": {
+          "type": "string",
+          "const": "asked"
+        },
+        "origins": {
+          "description": "Where each service that claims it came from: this build's stack, or a\nnamed plugin.\n\nEvery claimant rather than only what the ask reaches, because a contest\nreaches nothing and is exactly where an operator most needs to know which of\nthe names in front of them is not the stack's.",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "ValueOrigin.json"
+          }
+        },
+        "services": {
+          "description": "What the ask reaches — empty where nothing fills it or a contest stands.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "settled": {
+          "description": "How it was settled.",
+          "$ref": "WiringSettled.json"
+        }
+      },
+      "required": [
+        "how",
+        "capability",
+        "services",
+        "settled",
+        "origins"
+      ]
+    },
+    {
+      "description": "A link deliberately kept to a named service, shown as the exception it is.",
+      "type": "object",
+      "properties": {
+        "how": {
+          "type": "string",
+          "const": "by-name"
+        },
+        "service": {
+          "description": "The service named.",
+          "type": "string"
+        },
+        "why": {
+          "description": "Why it is by name.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "how",
+        "service",
+        "why"
+      ]
+    }
+  ]
+}

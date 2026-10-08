@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The operator's quality choice, what each preset means, and what the command\ndid with it.",
+  "type": "object",
+  "properties": {
+    "choices": {
+      "description": "The global choice first, then each media type set apart from it.",
+      "type": "array",
+      "items": {
+        "$ref": "PresetChoice.json"
+      }
+    },
+    "customised": {
+      "description": "Whether the Recyclarr config has been hand-edited since lemonfiber wrote it —\nthe `customised` state, in which the preset is no longer authoritative until\nit is deliberately re-asserted. For a reapply, whether an edit was overwritten.",
+      "type": "boolean"
+    },
+    "disposition": {
+      "description": "What became of the choice.",
+      "$ref": "Disposition.json"
+    },
+    "music": {
+      "description": "The audio-format choice for music, where one is set — media that has no\nresolution, so it is reported apart from the resolution presets rather than\nforced into their shape.",
+      "anyOf": [
+        {
+          "$ref": "MusicChoice.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "overwritten": {
+      "description": "The hand-edited config a reapply replaced — or, rehearsed, would replace — with\nthe diff of what goes against what lands in its place.\n\nAbsent everywhere else, and absent for a reapply over a config already in\nlemonfiber's own hand. Consent given against a yes-or-no is consent to\nsomething the operator was never shown: they know a file they edited is about\nto go, and not which of their lines is in it. The lines are masked the way\nevery stack-file diff is, so a key that drifted is named without its value.",
+      "anyOf": [
+        {
+          "$ref": "StackEdit.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "choices",
+    "customised",
+    "disposition",
+    "rehearsed"
+  ]
+}

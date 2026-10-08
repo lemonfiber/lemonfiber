@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One stored value, handed back because the operator asked for it and said so.\n\nSeparate from [`Held`] rather than a field on it, so that the inventory cannot\ncarry a value by accident: a surface that renders the inventory has nothing to\nrender, whatever it does.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "description": "Which credential this is.",
+      "type": "string"
+    },
+    "value": {
+      "description": "The value, present only where the ask was confirmed.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "warning": {
+      "description": "What the operator is told before it appears, whether or not it appears.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "warning"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "from_version": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "relocated": {
+      "type": [
+        "anyOf(null,ref:Relocation)"
+      ],
+      "required": false
+    },
+    "scope": {
+      "type": [
+        "ref:Scope"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

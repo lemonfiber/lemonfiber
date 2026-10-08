@@ -1,0 +1,24 @@
+{
+  "fields": {
+    "as": {
+      "type": [
+        "const:\"absolute\"",
+        "const:\"share\"",
+        "const:\"unlimited\""
+      ],
+      "required": true
+    },
+    "at": {
+      "type": [
+        "integer/uint64",
+        "integer/uint8"
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"absolute\"",
+    "\"share\"",
+    "\"unlimited\""
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How much of a manifest was read and how much stood in for what could not be.",
+  "type": "object",
+  "properties": {
+    "complete": {
+      "description": "Whether every source this tier needed answered.",
+      "type": "boolean"
+    },
+    "unread": {
+      "description": "What could not be read, each in the words of whatever refused.\n\nThe point of the field: a manifest that is short says so and says why, rather\nthan reading as a machine with less on it than it has.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "complete",
+    "unread"
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "fields": {
+    "device": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "episode": {
+      "type": [
+        "integer|null/uint32"
+      ],
+      "required": false
+    },
+    "medium": {
+      "type": [
+        "ref:Medium"
+      ],
+      "required": true
+    },
+    "member": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "member_id": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "paused": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "season": {
+      "type": [
+        "integer|null/uint32"
+      ],
+      "required": false
+    },
+    "series": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "title": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,11 @@
+{
+  "fields": {
+    "archives": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

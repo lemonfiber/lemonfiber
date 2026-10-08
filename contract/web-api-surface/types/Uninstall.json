@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "manifest": {
+      "type": [
+        "ref:UninstallManifest"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "removal": {
+      "type": [
+        "ref:UninstallRemoval"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

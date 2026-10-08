@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The kinds of thing a household holds.\n\nNamed rather than passed through as the server's own word, because a surface\ndrawing \"Series\" against one server and \"tvshow\" against another would be\nrendering a detail of which server this household runs.\n\n`Medium` rather than `Kind`, `Holding` or `Sort`: this product already calls the two\nrequest services a [`crate::media::Kind`], a request's suspension a\n[`crate::service::asking::Holding`], and what one line of a manifest is a\n`uninstall::Sort` — and one word meaning two things in one vocabulary is how a\nreader comes to trust the wrong one. The contract flattens every type name into one\nnamespace, so a clash there is a clash for anything reading it by name.",
+  "oneOf": [
+    {
+      "description": "One film.",
+      "type": "string",
+      "const": "film"
+    },
+    {
+      "description": "A television series, rather than one episode of one.",
+      "type": "string",
+      "const": "series"
+    },
+    {
+      "description": "Something the server holds that is neither, and is not hidden for that.",
+      "type": "string",
+      "const": "other"
+    }
+  ]
+}

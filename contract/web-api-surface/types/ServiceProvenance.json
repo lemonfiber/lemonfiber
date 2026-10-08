@@ -1,0 +1,47 @@
+{
+  "fields": {
+    "digest": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "id": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "image": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "license": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "pinned": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "upstream": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

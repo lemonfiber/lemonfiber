@@ -1,0 +1,9 @@
+{
+  "fields": {},
+  "variants": [
+    "\"near-quota\"",
+    "\"quota-exhausted\"",
+    "\"unlimited\"",
+    "\"within-quota\""
+  ]
+}

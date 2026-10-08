@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What became of one limit, in one direction, on one client.",
+  "oneOf": [
+    {
+      "description": "Nothing was asked for, so there is nothing to hold to.",
+      "type": "string",
+      "const": "unasked"
+    },
+    {
+      "description": "This client has no such direction to limit at all.\n\nApart from a limit that was ignored, and deliberately: a Usenet client does\nnot upload, so an upload limit on one is not a setting it refused.",
+      "type": "string",
+      "const": "nothing-to-limit"
+    },
+    {
+      "description": "It took the limit and is inside it.",
+      "type": "string",
+      "const": "holding"
+    },
+    {
+      "description": "It reports a figure other than the one it was given.",
+      "type": "string",
+      "const": "ignored"
+    },
+    {
+      "description": "It reports the right figure and is moving faster than it.",
+      "type": "string",
+      "const": "overrunning"
+    }
+  ]
+}

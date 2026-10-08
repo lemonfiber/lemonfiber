@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "adapter": {
+      "type": [
+        "anyOf(null,ref:PluginStepAdapter)"
+      ],
+      "required": false
+    },
+    "id": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "method": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "path": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "to": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

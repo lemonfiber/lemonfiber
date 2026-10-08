@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "restarting": {
+      "type": [
+        "ref:TakesAway"
+      ],
+      "required": true
+    },
+    "starting": {
+      "type": [
+        "ref:TakesAway"
+      ],
+      "required": true
+    },
+    "stopping": {
+      "type": [
+        "ref:TakesAway"
+      ],
+      "required": true
+    },
+    "stopping_after_downloads": {
+      "type": [
+        "ref:TakesAway"
+      ],
+      "required": true
+    },
+    "switching": {
+      "type": [
+        "ref:TakesAway"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}
