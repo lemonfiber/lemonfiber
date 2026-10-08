@@ -42,6 +42,13 @@
         "$ref": "PluginProving.json"
       }
     },
+    "recipes_ran": {
+      "description": "Every install recipe the act ran, in order, with what each step came to; an\nempty list where none ran, which is every rehearsal and every plugin declaring no\ninstall recipe.\n\nA recipe that did not hold ends the act with a problem carrying the same account,\nso this is the account of recipes that held.",
+      "type": "array",
+      "items": {
+        "$ref": "PluginRecipeRan.json"
+      }
+    },
     "recorded": {
       "description": "Whether it was written down. A rehearsal leaves this false.",
       "type": "boolean"
@@ -79,6 +86,7 @@
     "changes",
     "proofs",
     "contests",
-    "overrides"
+    "overrides",
+    "recipes_ran"
   ]
 }

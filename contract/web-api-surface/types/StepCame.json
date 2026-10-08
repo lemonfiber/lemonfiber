@@ -1,0 +1,14 @@
+{
+  "fields": {},
+  "variants": [
+    "\"answered\"",
+    "\"not-reached\"",
+    "\"oversized\"",
+    "\"refused\"",
+    "\"skipped\"",
+    "\"uncaptured\"",
+    "\"unexpected\"",
+    "\"unreachable\"",
+    "\"withheld\""
+  ]
+}

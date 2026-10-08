@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What one step came to.",
+  "type": "object",
+  "properties": {
+    "came": {
+      "description": "What it came to.",
+      "$ref": "StepCame.json"
+    },
+    "landed": {
+      "description": "Whether it reached somewhere other than this plugin's own services, which an\ninstall going back cannot undo.",
+      "type": "boolean"
+    },
+    "status": {
+      "description": "The status its last answer carried, where anything answered.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0
+    },
+    "step": {
+      "description": "The step's id.",
+      "type": "string"
+    },
+    "to": {
+      "description": "Where it calls, by the name the manifest gives it.",
+      "type": "string"
+    },
+    "tries": {
+      "description": "How many times it was made.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "why": {
+      "description": "Why it came to what it did, where that wants saying.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "step",
+    "to",
+    "came",
+    "tries",
+    "landed"
+  ]
+}

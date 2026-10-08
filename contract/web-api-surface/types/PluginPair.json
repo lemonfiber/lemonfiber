@@ -6,11 +6,23 @@
       ],
       "required": false
     },
+    "from": {
+      "type": [
+        "string"
+      ],
+      "required": false
+    },
     "origin": {
       "type": [
         "string"
       ],
       "required": true
+    },
+    "release": {
+      "type": [
+        "string"
+      ],
+      "required": false
     },
     "to": {
       "type": [

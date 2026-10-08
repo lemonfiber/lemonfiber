@@ -249,6 +249,31 @@
     "status": 400,
     "description": "Raised when a recipe substitutes a value into a header's name, which is a fixed identifier of the protocol and written out; the manifest's every other fault is listed beside it."
   },
+  "PLUGIN-34": {
+    "name": "INPUT_UNMATCHED",
+    "status": 400,
+    "description": "Raised when a recipe of the act asks the operator for a value that was not given, or a value was given that no recipe of the act asks for."
+  },
+  "PLUGIN-35": {
+    "name": "CALL_REFUSED",
+    "status": 500,
+    "description": "Raised when a recipe's call was not sent because its host stands for an address not out on the internet; the install or update was put back."
+  },
+  "PLUGIN-36": {
+    "name": "STEP_FAILED",
+    "status": 500,
+    "description": "Raised when a recipe's step failed any other way — nothing answered, the answer was not the one it expects, a capture found nothing, or the answer was larger than a recipe reads; the install or update was put back."
+  },
+  "PLUGIN-37": {
+    "name": "PATH_NOT_PLAIN",
+    "status": 400,
+    "description": "Raised when a recipe's call path is not a plain absolute path; the manifest's every other fault is listed beside it."
+  },
+  "PLUGIN-38": {
+    "name": "VALUE_WITHHELD",
+    "status": 400,
+    "description": "Raised when a recipe's call was not sent because a value it carries may not go where it was going: not where its pairs say, not back to the service a credential belongs to, or outside without its approval; the install or update was put back."
+  },
   "PLUGIN-4": {
     "name": "UNRECORDED",
     "status": 500,

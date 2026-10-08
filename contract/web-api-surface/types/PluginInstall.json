@@ -30,6 +30,12 @@
       ],
       "required": true
     },
+    "recipes_ran": {
+      "type": [
+        "array[ref:PluginRecipeRan]"
+      ],
+      "required": true
+    },
     "recorded": {
       "type": [
         "boolean"

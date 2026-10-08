@@ -1,0 +1,47 @@
+{
+  "fields": {
+    "came": {
+      "type": [
+        "ref:StepCame"
+      ],
+      "required": true
+    },
+    "landed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "status": {
+      "type": [
+        "integer|null/uint16"
+      ],
+      "required": false
+    },
+    "step": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "to": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "tries": {
+      "type": [
+        "integer/uint32"
+      ],
+      "required": true
+    },
+    "why": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}
