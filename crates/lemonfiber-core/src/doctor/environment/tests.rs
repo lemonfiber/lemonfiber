@@ -356,3 +356,21 @@ fn a_version_is_read_leniently_and_compared_on_what_matters() {
     assert_eq!(parse_version(""), None);
     assert_eq!(parse_version("nonsense"), None);
 }
+
+#[tokio::test]
+async fn a_compose_v2_too_old_to_read_include_fails_and_the_first_one_that_reads_it_passes() {
+    let at = |version: &'static str| async move {
+        let bench = Bench::default()
+            .docker(Ok(spoke("27.1.1")))
+            .compose(Ok(spoke(version)));
+        verdict(&run(bench).await, "environment.compose").cloned()
+    };
+    assert!(matches!(
+        at("v2.19.1").await,
+        Some(Verdict::Fail(problem))
+            if problem.code == COMPOSE_UNUSABLE
+                && problem.summary.contains("2.19.1")
+                && problem.remedies.iter().any(|remedy| remedy.action.contains("2.20.0"))
+    ));
+    assert!(matches!(at("v2.20.0").await, Some(Verdict::Pass { .. })));
+}
