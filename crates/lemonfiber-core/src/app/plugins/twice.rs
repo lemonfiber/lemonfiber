@@ -7,7 +7,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::error::codes::plugin::{ALREADY, TWO_SOURCES};
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 
 /// This plugin is installed, so what was asked for is an update, or a second plugin
 /// under a name the first already holds.
@@ -21,7 +21,6 @@ pub(super) fn already(held: &crate::plugin::Already, path: &Path) -> Problem {
     if !held.from.is_empty() && !same_source(&held.from, path) {
         return Problem::new(
             TWO_SOURCES,
-            Severity::Error,
             format!(
                 "{} is already installed from {}, and this is another source for it: {}",
                 held.plugin,
@@ -47,7 +46,6 @@ pub(super) fn already(held: &crate::plugin::Already, path: &Path) -> Problem {
     }
     Problem::new(
         ALREADY,
-        Severity::Error,
         format!("{} is already installed", held.plugin),
         "Nothing was written. Installing over an installation is an update, which puts one set \
          of changes back before it applies another — doing it as an install would leave the \

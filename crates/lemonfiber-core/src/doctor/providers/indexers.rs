@@ -14,7 +14,7 @@
 use std::time::{Duration, SystemTime};
 
 use crate::doctor::{Category, Finding, Verdict};
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 use crate::instant;
 use crate::plural;
 use crate::ports::service::IndexerUse;
@@ -202,7 +202,6 @@ fn window_reading(window: Duration) -> String {
 fn capped(spent: &Spent) -> Problem {
     Problem::new(
         INDEXER_CAPPED,
-        Severity::Warning,
         "An indexer has used everything it allows for now",
         "Searches through this indexer will come back empty until its allowance resets, and neither it nor the aggregator says so anywhere — the searches simply find nothing. Nothing is broken and nothing needs fixing; what it needs is either waiting out or a larger allowance.",
         Remedy::new(
@@ -251,7 +250,6 @@ fn rested(indexer: &IndexerUse) -> Problem {
     };
     Problem::new(
         INDEXER_RESTED,
-        Severity::Warning,
         "An indexer is not answering",
         "Searches through this indexer are not coming back. The others still are, so releases will still be found — from a smaller pool, which reads as a quality or availability problem rather than as one indexer being down.",
         Remedy::new("Check the indexer's subscription and its status page, then test it in the aggregator"),
@@ -270,7 +268,6 @@ fn all_failing(querying: &[&IndexerUse]) -> Finding {
         .collect();
     let problem = Problem::new(
         INDEXERS_ALL_FAILING,
-        Severity::Error,
         "Every indexer is failing at once",
         "Indexers do not all fail on the same afternoon. When every one of them stops answering together, the cause is almost always on this side of the connection — the machine's network, its DNS, or a VPN that is up but routing nothing.",
         Remedy::new("Check this machine's network and DNS, and the tunnel if searches run through one"),

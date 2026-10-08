@@ -12,7 +12,7 @@
 
 use crate::bandwidth::limit::UPLOAD_SHARE;
 use crate::bandwidth::{Cap, Capacity, Declared, Limit, Respite, Rhythm, WhenExceeded, UNREADABLE};
-use crate::error::{Amiss, Problem, Remedy, Severity};
+use crate::error::{Problem, Remedy};
 
 use super::Asked;
 
@@ -137,19 +137,15 @@ fn declared_cap(text: &str, asked: &Asked, held: Option<Cap>) -> Result<Cap, Box
         None => held.map(|cap| cap.exceeded),
     };
     let Some(exceeded) = exceeded else {
-        return Err(Box::new(
-            Problem::new(
-                UNREADABLE,
-                Severity::Error,
-                "A cap needs to be told what happens when it is reached",
-                "The point of declaring it in advance is that the answer is not \
+        return Err(Box::new(Problem::new(
+            UNREADABLE,
+            "A cap needs to be told what happens when it is reached",
+            "The point of declaring it in advance is that the answer is not \
                  decided at two in the morning by whatever is running. Say now what \
                  the stack should do, and it will do that.",
-                Remedy::new("Say what happens at the cap")
-                    .with_detail("--when-exceeded pause, throttle or continue"),
-            )
-            .lies_in(Amiss::Asking),
-        ));
+            Remedy::new("Say what happens at the cap")
+                .with_detail("--when-exceeded pause, throttle or continue"),
+        )));
     };
     Ok(Cap { monthly, exceeded })
 }
@@ -157,21 +153,17 @@ fn declared_cap(text: &str, asked: &Asked, held: Option<Cap>) -> Result<Cap, Box
 /// The override, or a refusal saying what may be asked for.
 fn respite(now: u64, minutes: u64) -> Result<Respite, Box<Problem>> {
     Respite::asked_for(now, minutes.saturating_mul(60)).ok_or_else(|| {
-        Box::new(
-            Problem::new(
-                UNREADABLE,
-                Severity::Error,
-                format!("{minutes} minutes is not a length the limits may be lifted for"),
-                "An override is time-boxed on purpose. Something switched off just \
+        Box::new(Problem::new(
+            UNREADABLE,
+            format!("{minutes} minutes is not a length the limits may be lifted for"),
+            "An override is time-boxed on purpose. Something switched off just \
                  for now at eleven at night is the thing nobody remembers at eight \
                  the next morning, and the household finds out during the school run.",
-                Remedy::new("Ask for an hour or two").with_detail(format!(
-                    "anything from a minute up to {} minutes",
-                    crate::bandwidth::respite::LONGEST / 60
-                )),
-            )
-            .lies_in(Amiss::Asking),
-        )
+            Remedy::new("Ask for an hour or two").with_detail(format!(
+                "anything from a minute up to {} minutes",
+                crate::bandwidth::respite::LONGEST / 60
+            )),
+        ))
     })
 }
 
@@ -219,13 +211,11 @@ fn read<T>(
 fn unreadable(what: &str, given: &str, shape: &str) -> Problem {
     Problem::new(
         UNREADABLE,
-        Severity::Error,
         format!("`{given}` could not be read as {what}"),
         "A limit read wrongly is a household wondering all evening why the calls \
          keep dropping. Nothing here guesses at one.",
         Remedy::new(format!("Write {what} as {shape}")),
     )
-    .lies_in(Amiss::Asking)
 }
 
 #[cfg(test)]

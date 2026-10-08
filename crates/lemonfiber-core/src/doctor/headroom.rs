@@ -22,7 +22,7 @@ use async_trait::async_trait;
 use super::storage::LOW_SPACE_FLOOR;
 use super::{Category, Check, Finding, Verdict};
 use crate::error::codes::qual::HEADROOM_LOW;
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 use crate::ports::filesystem::FileSystem;
 use crate::quality::Preset;
 
@@ -136,7 +136,6 @@ async fn ran(check: &HeadroomCheck) -> Vec<Finding> {
 fn low(preset: Preset, hours: u64) -> Problem {
     Problem::new(
         HEADROOM_LOW,
-        Severity::Warning,
         format!("The disk is small for {} quality", preset.label()),
         format!(
             "Content kept at the {} preset takes {}, and the free space here holds only about \

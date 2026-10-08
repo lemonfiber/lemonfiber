@@ -5,7 +5,7 @@
 //! refusal are kept apart so the temporary never reads as the permanent.
 
 use crate::error::codes::rehearse::{CANNOT, NOT_YET};
-use crate::error::{Amiss, Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 
 use super::{Asked, Rehearsal};
 
@@ -46,7 +46,6 @@ pub fn verdict(asked: &Asked) -> Result<(), Box<Problem>> {
 pub(super) fn refused(asked: &Asked, why: &'static str) -> Problem {
     Problem::new(
         CANNOT,
-        Severity::Error,
         format!("`{}` cannot be rehearsed", asked.named),
         format!(
             "Nothing was done. {why}, so a rehearsal of this would be a report with \
@@ -57,7 +56,6 @@ pub(super) fn refused(asked: &Asked, why: &'static str) -> Problem {
             asked.named
         )),
     )
-    .lies_in(Amiss::Asking)
     .in_state(State::Guided)
 }
 
@@ -77,7 +75,6 @@ pub(super) fn refused(asked: &Asked, why: &'static str) -> Problem {
 pub fn not_taught_yet(named: &str) -> Problem {
     Problem::new(
         NOT_YET,
-        Severity::Error,
         format!("`{named}` does not rehearse yet"),
         "Nothing was done. This command changes things and has not yet been taught to \
          say what it would change, so it refuses the flag rather than accepting it and \
@@ -87,6 +84,5 @@ pub fn not_taught_yet(named: &str) -> Problem {
             "Run `lemonfiber {named}` without `--dry-run` when you mean it"
         )),
     )
-    .lies_in(Amiss::Asking)
     .in_state(State::Guided)
 }

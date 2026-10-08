@@ -13,7 +13,7 @@ use async_trait::async_trait;
 
 use super::{Category, Check, Finding, Verdict};
 use crate::error::codes::config::AGGREGATOR_EXPOSED;
-use crate::error::{Problem, Remedy, Severity};
+use crate::error::{Problem, Remedy};
 use crate::ports::service::Failure;
 
 /// A service that can be asked whether it answers its configuration to anybody.
@@ -98,7 +98,6 @@ fn finding(verdict: Verdict) -> Finding {
 fn unknown(name: &str, failure: &Failure) -> Problem {
     Problem::new(
         AGGREGATOR_EXPOSED,
-        Severity::Warning,
         format!("{name} may answer its configuration to anybody"),
         format!(
             "{name} could not be asked whether it answers its configuration, the indexer \
@@ -116,7 +115,6 @@ fn unknown(name: &str, failure: &Failure) -> Problem {
 fn exposed(name: &str) -> Problem {
     Problem::new(
         AGGREGATOR_EXPOSED,
-        Severity::Warning,
         format!("{name} answers its configuration to anybody"),
         crate::seed::run::exposure(name),
         Remedy::new(format!(

@@ -24,9 +24,9 @@ use serde::Serialize;
 
 use crate::error::codes::plugin::UNRECORDED;
 use crate::error::codes::wire::{
-    CANNOT_FILL, CHOICE_UNWRITABLE, NOTHING_ASKS, NO_SUCH_FILLER, UNREASONABLE,
+    ALREADY_FILLS, CANNOT_FILL, CHOICE_UNWRITABLE, NOTHING_ASKS, NO_SUCH_FILLER, UNREASONABLE,
 };
-use crate::error::{Amiss, Code};
+use crate::error::Code;
 
 mod chosen;
 mod fillers;
@@ -49,24 +49,17 @@ pub use settling::{contested_by, filled, settle, unfilled};
 /// name each of these.
 pub const UNREAD: [&[Code]; 2] = [&crate::stack::FAILURES, &[UNRECORDED]];
 
-/// Where the fault lies in a read refused for something it could not read.
-///
-/// In the machine: nothing about the request was wrong, and the same request is
-/// answered once the file is put right.
-pub const UNREAD_AMISS: Amiss = Amiss::Answering;
-
 /// Every code a choice of what fills a capability is refused with, apart from the one
-/// an answer to a moved reading is, and where the fault lies in each.
+/// an answer to a moved reading is.
 ///
-/// Listed so a client can name each one and read its status before it meets it: a
-/// service this stack does not have is absent, a choice that would mean nothing is
-/// asked wrongly, and nowhere to record it is the machine.
-pub const REFUSED: [(Code, Amiss); 5] = [
-    (NO_SUCH_FILLER, Amiss::Naming),
-    (CANNOT_FILL, Amiss::Asking),
-    (NOTHING_ASKS, Amiss::Asking),
-    (CHOICE_UNWRITABLE, Amiss::Answering),
-    (UNREASONABLE, Amiss::Asking),
+/// Listed so a client can name each one and read its status before it meets it.
+pub const REFUSED: [Code; 6] = [
+    NO_SUCH_FILLER,
+    CANNOT_FILL,
+    ALREADY_FILLS,
+    NOTHING_ASKS,
+    CHOICE_UNWRITABLE,
+    UNREASONABLE,
 ];
 
 /// The setting holding which service the operator chose to fill a capability.

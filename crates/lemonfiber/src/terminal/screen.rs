@@ -113,7 +113,6 @@ impl Drop for Screen {
 pub(super) fn drawing(what: &str, reason: &str) -> lemonfiber_core::error::Problem {
     lemonfiber_core::error::Problem::new(
         lemonfiber_core::error::codes::tui::DRAWING,
-        lemonfiber_core::error::Severity::Error,
         format!("the {what} could not be drawn"),
         "The terminal stopped accepting output, which usually means it was closed or resized \
          out from under the process.",

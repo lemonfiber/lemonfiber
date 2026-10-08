@@ -4,7 +4,7 @@ use super::{findings, reading, write};
 use crate::app::fixtures::FakeArchive;
 use crate::bundle::{Contents, Piece, Taken, Terms, MANIFEST};
 use crate::doctor::Verdict;
-use crate::error::{Code, Problem, Remedy, Severity};
+use crate::error::{Code, Problem, Remedy};
 
 /// Naming a field and agreeing to publish it are two acts. The refusal names what
 /// would have been shown, so what gets confirmed is those settings rather than a
@@ -32,7 +32,6 @@ fn a_machine_that_offers_no_randomness_is_told_why_it_gets_no_bundle() {
 fn problem() -> Problem {
     Problem::new(
         Code::new("BUNDLE-0"),
-        Severity::Warning,
         "something is wrong",
         "why it matters",
         Remedy::new("do something"),

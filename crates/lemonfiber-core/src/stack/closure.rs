@@ -21,7 +21,7 @@ use thiserror::Error;
 
 use crate::config::Protocols;
 use crate::error::codes::form::{FORMS_CONFLICT, NOTHING_TO_RUN, NO_FORM_NAMED, NO_SUCH_FORM};
-use crate::error::{Amiss, Diagnose, Problem, Remedy, Severity, State};
+use crate::error::{Diagnose, Problem, Remedy, State};
 
 /// What will be run, and what was left out.
 ///
@@ -413,13 +413,11 @@ impl Diagnose for Failure {
         match self {
             Self::NothingNamed => Problem::new(
                 NO_FORM_NAMED,
-                Severity::Error,
                 "No form was named",
                 "A form says which part of the stack to run. Without one there is nothing to start.",
                 Remedy::new("Name a form, or list the ones this stack has")
                     .with_detail("lemonfiber forms"),
-            )
-            .lies_in(Amiss::Asking),
+            ),
             // The suggestion leads and the full list follows, because a typo is
             // the common case and reading eleven names to find the one you
             // already meant is work the tool can do.
@@ -429,7 +427,6 @@ impl Diagnose for Failure {
                 nearest,
             } => Problem::new(
                 NO_SUCH_FORM,
-                Severity::Error,
                 format!("This stack has no form called {name}"),
                 "Forms come from the stack rather than from lemonfiber, so a stack of your own may name them differently.",
                 Remedy::new(nearest.as_ref().map_or_else(
@@ -444,21 +441,17 @@ impl Diagnose for Failure {
                     },
                 ))
                 .with_detail("lemonfiber forms"),
-            )
-            .lies_in(Amiss::Naming),
+            ),
             Self::NotComposable { form } => Problem::new(
                 FORMS_CONFLICT,
-                Severity::Error,
                 format!("{form} has to run on its own"),
                 "Most forms layer together. This one does not, because what it starts would conflict with the others rather than add to them.",
                 Remedy::new(format!("Run {form} by itself")),
-            )
-            .lies_in(Amiss::Asking),
+            ),
             // Not a failure of the stack or of the request: the operator asked
             // for something reasonable and has not finished setting up yet.
             Self::NothingLeft { forms } => Problem::new(
                 NOTHING_TO_RUN,
-                Severity::Warning,
                 format!("Nothing in {} can run yet", forms.join(" and ")),
                 "Everything these forms would start needs a download provider, and none is configured. Starting them anyway would give you services that cannot fetch anything.",
                 Remedy::new("Add a Usenet provider or a VPN and torrent client")

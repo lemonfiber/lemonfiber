@@ -13,7 +13,7 @@
 use std::path::Path;
 use std::time::Duration;
 
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 use crate::model::{SupervisionReport, Vigil};
 use crate::ports::filesystem::{Presence, Volume};
 use crate::stack::compose::Action;
@@ -190,7 +190,6 @@ fn describe_loss(loss: &Loss) -> String {
 fn nothing_to_watch() -> Problem {
     Problem::new(
         NOTHING_TO_WATCH,
-        Severity::Error,
         "There is no data location to watch",
         "A watch guards the directory your downloads and library live in, and none is configured \
          yet, so there is nothing for it to guard.",
@@ -203,7 +202,6 @@ fn nothing_to_watch() -> Problem {
 fn already_gone(root: &Path) -> Problem {
     Problem::new(
         ALREADY_GONE,
-        Severity::Error,
         format!("The data location {} is not available", root.display()),
         "A watch can only guard a location that is present when it begins; this one is already \
          gone, so there is nothing running over it to protect.",

@@ -17,7 +17,7 @@ use serde::Serialize;
 use std::collections::BTreeMap;
 
 use crate::error::codes::plugin::{PLUGIN_OFFER_MOVED, UNAPPROVED};
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 use crate::plugin::{Changing, Installed};
 use crate::wiring::Contest;
 
@@ -234,28 +234,24 @@ fn json(value: &(impl Serialize + ?Sized)) -> String {
 
 /// An answer naming a reading that has since moved.
 fn offer_moved(plugin: &str, moved: &[&str], standing: &str) -> Problem {
-    crate::agreement::moved(
-        Problem::new(
-            PLUGIN_OFFER_MOVED,
-            Severity::Error,
-            format!("That agreement was given for a different reading of {plugin}"),
-            format!(
-                "Since it was read, {} changed, so nothing was changed. Agreeing to it now \
-                 would be agreeing to something nobody saw.",
-                moved.join(" and ")
-            ),
-            Remedy::new("Read it again, and answer the name it prints")
-                .with_detail(format!("the offer standing now is {standing}")),
-        )
-        .in_state(State::Guided),
+    Problem::new(
+        PLUGIN_OFFER_MOVED,
+        format!("That agreement was given for a different reading of {plugin}"),
+        format!(
+            "Since it was read, {} changed, so nothing was changed. Agreeing to it now \
+             would be agreeing to something nobody saw.",
+            moved.join(" and ")
+        ),
+        Remedy::new("Read it again, and answer the name it prints")
+            .with_detail(format!("the offer standing now is {standing}")),
     )
+    .in_state(State::Guided)
 }
 
 /// A value a recipe would carry elsewhere that nobody approved.
 fn unapproved(plugin: &str, missing: &[&str]) -> Problem {
     Problem::new(
         UNAPPROVED,
-        Severity::Error,
         format!("{plugin} would send values elsewhere that were not approved"),
         "Nothing was changed. A value a recipe would carry to another host is agreed to as \
          itself, apart from the plugin, and these were not.",
@@ -270,7 +266,6 @@ fn unapproved(plugin: &str, missing: &[&str]) -> Problem {
 fn approves_nothing(plugin: &str, stray: &str) -> Problem {
     Problem::new(
         UNAPPROVED,
-        Severity::Error,
         format!(
             "{} is not something {plugin} would send",
             crate::text::plain(stray)

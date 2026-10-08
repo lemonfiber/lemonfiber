@@ -10,7 +10,7 @@ use thiserror::Error;
 use tokio::sync::mpsc::{channel, Receiver};
 
 use lemonfiber_error::codes::proc::{MISSING_PROGRAM, UNUSABLE_PROGRAM};
-use lemonfiber_error::{Diagnose, Problem, Remedy, Severity, State};
+use lemonfiber_error::{Diagnose, Problem, Remedy, State};
 
 /// What a finished process left behind.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -55,7 +55,6 @@ impl Diagnose for Failure {
         match self {
             Self::NotFound { program } => Problem::new(
                 MISSING_PROGRAM,
-                Severity::Error,
                 format!("{program} is not installed"),
                 "lemonfiber drives your container engine through this program, so nothing can be started or stopped without it.",
                 Remedy::new("Install Docker Desktop, or Docker Engine on Linux")
@@ -64,7 +63,6 @@ impl Diagnose for Failure {
             .in_state(State::Guided),
             Self::Unusable { program, reason } => Problem::new(
                 UNUSABLE_PROGRAM,
-                Severity::Error,
                 format!("{program} is installed but would not start"),
                 "The program is present, so this is usually a permission or daemon problem rather than a missing install.",
                 Remedy::new("Check that the container engine is running, then try again"),

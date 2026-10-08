@@ -25,7 +25,7 @@ use crate::app::Ctx;
 use crate::config::paths::Paths;
 use crate::config::store;
 use crate::error::codes::setup::{ALREADY_SET_UP, NOTHING_TO_RECOVER};
-use crate::error::{Amiss, Diagnose, Problem, Remedy, Severity, State};
+use crate::error::{Diagnose, Problem, Remedy, State};
 use crate::model::{SettingReport, WizardReport};
 use crate::validate::{Credential, Validation, Validator};
 use crate::wizard::{
@@ -288,28 +288,24 @@ async fn proven(validator: &dyn Validator, answer: Answer) -> (Answer, Option<Va
 fn nothing_to_recover() -> Problem {
     Problem::new(
         NOTHING_TO_RECOVER,
-        Severity::Error,
         "No setup here stopped part-way through applying",
         "Recovering chooses what to do about a half-written apply, and there is none to \
          choose about. Nothing has been changed.",
         Remedy::new("Ask where setup stands before offering a way out of it"),
     )
     .in_state(State::Guided)
-    .lies_in(Amiss::Asking)
 }
 
 /// The problem of answering setup on a machine that already holds configuration.
 fn already_set_up() -> Problem {
     Problem::new(
         ALREADY_SET_UP,
-        Severity::Error,
         "This machine is already set up",
         "Setup asks what a fresh install needs to be told, so answering it again would walk a working stack back to its first question. Nothing has been changed.",
         Remedy::new("Change a setting rather than running setup again")
             .with_detail("lemonfiber config set <key> <value>"),
     )
     .in_state(State::Guided)
-    .lies_in(Amiss::Asking)
 }
 
 #[cfg(test)]

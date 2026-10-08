@@ -24,7 +24,7 @@
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
-use lemonfiber_core::error::{Problem, Remedy, Severity, State};
+use lemonfiber_core::error::{Problem, Remedy, State};
 use lemonfiber_core::PRODUCT;
 use tokio::net::TcpListener;
 
@@ -163,7 +163,6 @@ fn unavailable(asked: [SocketAddr; 2], reason: &str) -> Problem {
     };
     Problem::new(
         ADDRESS_TAKEN,
-        Severity::Error,
         format!("{PRODUCT} could not start serving: {asked}"),
         "Usually something else on this machine is already listening there. Whatever the \
          reason, there is nowhere for a browser to connect, and the words below are the \
@@ -186,7 +185,6 @@ fn unavailable(asked: [SocketAddr; 2], reason: &str) -> Problem {
 pub(crate) fn unauthenticated() -> Problem {
     Problem::new(
         NO_PASSWORD,
-        Severity::Error,
         format!("{PRODUCT} will not offer this to your network without a password"),
         "This surface can start, stop and reconfigure everything and reaches every password \
          the system holds. Offered to a network with nothing in front of it, anything on that \

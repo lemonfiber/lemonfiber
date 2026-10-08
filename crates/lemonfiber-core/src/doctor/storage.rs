@@ -25,7 +25,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use super::{Category, Check, Finding, Verdict};
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 use crate::platform::Environment;
 use crate::ports::filesystem::{FileSystem, Ownership, StorageFacts};
 use crate::stack::mounts::Crowded;
@@ -246,7 +246,6 @@ async fn ran(check: &StorageCheck) -> Vec<Finding> {
 fn absent(root: &Path, detail: &str) -> Vec<Finding> {
     let problem = Problem::new(
         ROOT_ABSENT,
-        Severity::Error,
         format!("The data location {} could not be reached", root.display()),
         "Nothing can be stored where there is no reachable directory, and a stack that \
          wrote into a missing mount point would build a phantom library on the system disk.",
@@ -267,7 +266,6 @@ fn absent(root: &Path, detail: &str) -> Vec<Finding> {
 fn unwritable(detail: &str) -> Vec<Finding> {
     let problem = Problem::new(
         ROOT_UNWRITABLE,
-        Severity::Error,
         "The data location cannot be written to",
         "The services run as a user that has to own what they import, so a data root they \
          cannot write to fails every import far from where the cause shows.",

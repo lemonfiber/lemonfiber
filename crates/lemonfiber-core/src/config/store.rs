@@ -35,7 +35,7 @@ use super::env::{is_one_line, EnvFile};
 use crate::error::codes::config::{
     CONFIG_NOT_WRITTEN, CONFIG_NOWHERE, CONFIG_SPANS_LINES, CONFIG_TOO_NEW, CONFIG_UNREADABLE,
 };
-use crate::error::{Diagnose, Problem, Remedy, Severity, State};
+use crate::error::{Diagnose, Problem, Remedy, State};
 
 /// Withholding a credential from text that has no field names to read.
 ///
@@ -430,7 +430,6 @@ impl Diagnose for Failure {
         match self {
             Self::Unreadable { path, reason } => Problem::new(
                 CONFIG_UNREADABLE,
-                Severity::Error,
                 format!("Your settings at {} could not be read", path.display()),
                 "Nothing has been changed. lemonfiber will not guess at settings it cannot read, because guessing wrong here starts the wrong things.",
                 Remedy::new("Check that the file is readable"),
@@ -439,7 +438,6 @@ impl Diagnose for Failure {
             .with_detail(reason.clone()),
             Self::NotWritten { path, reason } => Problem::new(
                 CONFIG_NOT_WRITTEN,
-                Severity::Error,
                 format!("Your settings at {} could not be saved", path.display()),
                 "The change was not made. Your existing settings are untouched.",
                 Remedy::new("Check that the location is writable and has space"),
@@ -448,7 +446,6 @@ impl Diagnose for Failure {
             .with_detail(reason.clone()),
             Self::Nowhere => Problem::new(
                 CONFIG_NOWHERE,
-                Severity::Error,
                 "lemonfiber has not been set up on this machine yet",
                 "There is nowhere to keep settings until setup has chosen a location for them.",
                 Remedy::new("Run setup").with_detail("lemonfiber setup"),
@@ -456,7 +453,6 @@ impl Diagnose for Failure {
             .in_state(State::Guided),
             Self::SpansLines { path, key } => Problem::new(
                 CONFIG_SPANS_LINES,
-                Severity::Error,
                 format!("The value for {key} could not be saved"),
                 "Nothing has been changed. A settings file is one setting per line, so a value with a line break in it would not be saved as that value — it would be saved as that setting and then whatever the rest of the text spells, which the stack would run as settings you never chose.",
                 Remedy::new("Check where this value came from, and set it to a single line"),
@@ -469,7 +465,6 @@ impl Diagnose for Failure {
                 running,
             } => Problem::new(
                 CONFIG_TOO_NEW,
-                Severity::Error,
                 format!("Your settings were written by lemonfiber {wrote}, and this is {running}"),
                 "Nothing has been changed. An older lemonfiber writing over settings a newer one wrote would leave you with a file neither version can make sense of, and no way back to the one you had.",
                 Remedy::new(format!("Run this with lemonfiber {wrote} or newer"))

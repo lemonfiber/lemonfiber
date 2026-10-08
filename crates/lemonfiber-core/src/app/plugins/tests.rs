@@ -415,7 +415,7 @@ fn counted(outcome: Result<Installs, Box<crate::error::Problem>>) -> Option<usiz
 fn refusal(outcome: Result<Installs, Box<crate::error::Problem>>) -> String {
     outcome
         .err()
-        .map(|problem| placed(&problem).code.to_string())
+        .map(|problem| problem.code.to_string())
         .unwrap_or_default()
 }
 
@@ -424,20 +424,8 @@ fn refusal(outcome: Result<Installs, Box<crate::error::Problem>>) -> String {
 fn refused(outcome: Result<Installs, Box<crate::error::Problem>>) -> (String, String) {
     outcome
         .err()
-        .map(|problem| (placed(&problem).code.to_string(), problem.meaning))
+        .map(|problem| (problem.code.to_string(), problem.meaning))
         .unwrap_or_default()
-}
-
-/// A refusal, held to the place the published list gives its code, so a client that
-/// read the list first meets the status it read.
-fn placed(problem: &crate::error::Problem) -> &crate::error::Problem {
-    if let Some((_, amiss)) = super::REFUSALS
-        .iter()
-        .find(|(code, _)| *code == problem.code)
-    {
-        assert_eq!(problem.amiss, *amiss, "{}", problem.code);
-    }
-    problem
 }
 
 /// Every change the record holds, oldest first, as a later run reads them back.

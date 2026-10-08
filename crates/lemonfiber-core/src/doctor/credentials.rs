@@ -25,7 +25,7 @@ use async_trait::async_trait;
 
 use super::{Category, Check, Finding, Verdict};
 use crate::error::codes::cred::CREDENTIAL_REJECTED;
-use crate::error::{Problem, Remedy, Severity};
+use crate::error::{Problem, Remedy};
 use crate::ports::filesystem::FileSystem;
 use crate::ports::http::Http;
 use crate::ports::service::{Client, Failure};
@@ -176,7 +176,6 @@ fn not_started(target: &Target) -> Verdict {
 fn rejected(target: &Target) -> Problem {
     Problem::new(
         CREDENTIAL_REJECTED,
-        Severity::Error,
         format!("{} refused its own credential", target.name),
         "The key in the service's configuration no longer matches the one the running service expects, usually because the configuration was regenerated after the service last started.",
         Remedy::new("Restart the service so it reloads its configuration, then check again")

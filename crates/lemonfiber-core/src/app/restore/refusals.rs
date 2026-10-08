@@ -16,13 +16,12 @@ use crate::error::codes::restore::{
     CORRUPT, INCOMPATIBLE, NEEDS_REPOINT, NOT_KEPT_HERE, NOT_OURS, NOT_REPOINTED, NOT_RESTORED,
     NOWHERE_KEPT, TOO_NEW, UNSAFE,
 };
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 
 /// The refusal for a run that cannot say where its own files go.
 pub(crate) fn nowhere() -> Problem {
     Problem::new(
         NOWHERE_KEPT,
-        Severity::Error,
         "This run has nowhere it knows to look for a backup",
         "Backups are kept in lemonfiber's own directory, and this machine would not say where \
          that is. Nothing was touched.",
@@ -40,7 +39,6 @@ pub(crate) fn nowhere() -> Problem {
 pub(crate) fn not_kept_here(name: &str) -> Problem {
     Problem::new(
         NOT_KEPT_HERE,
-        Severity::Error,
         format!("`{name}` is not one of the backups kept here"),
         "A restore asked for by name restores one of the archives this machine took, which are \
          files in one directory. A name holding a path, or climbing out of that directory, is \
@@ -58,7 +56,6 @@ pub(crate) fn not_kept_here(name: &str) -> Problem {
 pub(crate) fn not_repointed(cause: &Problem) -> Problem {
     Problem::new(
         NOT_REPOINTED,
-        Severity::Error,
         "The restored settings still name the backup's own data root",
         "The archive was unpacked, and the data root it recorded could not be changed to this \
          machine's — so the restored settings point at a library that is not here.",
@@ -72,7 +69,6 @@ pub(crate) fn not_repointed(cause: &Problem) -> Problem {
 pub(crate) fn corrupt(fault: &Fault) -> Problem {
     Problem::new(
         CORRUPT,
-        Severity::Error,
         "The backup could not be read",
         "A restore verifies the archive before it changes anything, and this one could not be read — most often it is truncated or not a lemonfiber backup. Nothing was touched.",
         Remedy::new("Check the archive, or restore from a different backup"),
@@ -85,7 +81,6 @@ pub(crate) fn corrupt(fault: &Fault) -> Problem {
 pub(crate) fn too_new(archive: &str, current: &str) -> Problem {
     Problem::new(
         TOO_NEW,
-        Severity::Error,
         "This backup is from a newer lemonfiber",
         "It may hold configuration this version would not restore correctly, so it is refused rather than half-applied. Nothing was touched.",
         Remedy::new("Update lemonfiber to at least the version that made the backup, then restore"),
@@ -98,7 +93,6 @@ pub(crate) fn too_new(archive: &str, current: &str) -> Problem {
 pub(crate) fn incompatible(detail: &str) -> Problem {
     Problem::new(
         INCOMPATIBLE,
-        Severity::Error,
         "This backup is not in a format this lemonfiber can restore",
         "Restoring it could leave the configuration in a state neither version expects, so it is refused. Nothing was touched.",
         Remedy::new("Restore it with the lemonfiber version that made it"),
@@ -118,7 +112,6 @@ pub(crate) fn incompatible(detail: &str) -> Problem {
 pub(crate) fn not_ours(project: &str, paths: &[String]) -> Problem {
     Problem::new(
         NOT_OURS,
-        Severity::Error,
         "This backup holds a setup lemonfiber does not manage",
         "It was captured before lemonfiber took over, so what is inside it belongs to the setup \
          that was already here rather than to lemonfiber's own layout. Putting it back means \
@@ -137,7 +130,6 @@ pub(crate) fn not_ours(project: &str, paths: &[String]) -> Problem {
 pub(crate) fn unsafe_paths(escaping: &[String]) -> Problem {
     Problem::new(
         UNSAFE,
-        Severity::Critical,
         "This backup would write outside where it should",
         "One or more of its entries name a path that leaves the directory they belong in, which a genuine lemonfiber backup never does. It is refused, and nothing was touched.",
         Remedy::new("Do not restore this archive; it is corrupt or was tampered with"),
@@ -149,7 +141,6 @@ pub(crate) fn unsafe_paths(escaping: &[String]) -> Problem {
 pub(crate) fn needs_repoint(relocation: &Relocation) -> Problem {
     Problem::new(
         NEEDS_REPOINT,
-        Severity::Warning,
         "This backup was taken against a different data root",
         "Restoring it unchanged would keep the data-root setting the backup was taken with, which names a location that is not on this machine. Accepting re-pointing continues the restore and records that it must use this machine's data root instead.",
         Remedy::new("Re-run the restore accepting the re-point to continue"),
@@ -162,7 +153,6 @@ pub(crate) fn needs_repoint(relocation: &Relocation) -> Problem {
 pub(crate) fn not_restored(fault: &Fault) -> Problem {
     Problem::new(
         NOT_RESTORED,
-        Severity::Error,
         "The backup could not be unpacked",
         "The restore was stopped part-way through writing the configuration back. Run it again once the cause is fixed; a seed afterwards will reconcile anything left half-written.",
         Remedy::new("Check the configuration location is writable and restore again"),

@@ -24,10 +24,10 @@
 use axum::body::Body;
 use axum::http::{Response, StatusCode};
 use lemonfiber_core::error::codes::{admit, ask, read, serve};
-use lemonfiber_core::error::{Amiss, Code, Problem, Remedy, Severity};
+use lemonfiber_core::error::{Code, Problem, Remedy};
 use lemonfiber_core::model::{kind, Envelope};
 
-use crate::read::enveloped;
+use crate::read::{answered_with, enveloped};
 
 /// Why a request was not answered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -221,56 +221,15 @@ impl Refusal {
         }
     }
 
-    /// The status a refusal answers with.
+    /// The status a refusal answers with: the one its code is declared with.
     ///
     /// `401` is the door's alone, and only for the password it was just offered. A
     /// session this run no longer admits is `403` like every other refusal of who is
     /// asking: `401` invites a browser to ask for credentials it has no way to supply,
     /// and whether signing in again would help is what the code says.
     #[must_use]
-    pub const fn status(self) -> StatusCode {
-        match self {
-            Self::NotAdmitted
-            | Self::Elsewhere
-            | Self::NotYours
-            | Self::Unconfirmed
-            | Self::KeyInTheClear
-            | Self::NotForAKey => StatusCode::FORBIDDEN,
-            Self::NotThePassword => StatusCode::UNAUTHORIZED,
-            Self::TooManyAttempts => StatusCode::TOO_MANY_REQUESTS,
-            Self::NoSuchRead | Self::NoSuchAction | Self::NoSuchJob | Self::NoEndpoint => {
-                StatusCode::NOT_FOUND
-            }
-            Self::WrongMethod => StatusCode::METHOD_NOT_ALLOWED,
-            Self::Unrenderable | Self::NoJobName | Self::Unanswered => {
-                StatusCode::INTERNAL_SERVER_ERROR
-            }
-            Self::NotAPassword
-            | Self::Unwanted
-            | Self::Repeated
-            | Self::NoTerm
-            | Self::NotASeason
-            | Self::NoSetting
-            | Self::NoMember
-            | Self::NoShelfWithoutAMember
-            | Self::NotACount
-            | Self::TooManyAtOnce
-            | Self::NoSuchGroup
-            | Self::NoSuchRemoval
-            | Self::NoUpdateObject
-            | Self::NotALineCount
-            | Self::NotAChoice
-            | Self::MemberAndDefaults
-            | Self::MissingArgument
-            | Self::UnrecognisedArgument
-            | Self::UnwantedArgument
-            | Self::ArgumentsTogether
-            | Self::NotArguments
-            | Self::NotAnAnswer
-            | Self::NotAKeyRequest
-            | Self::NotAnIdempotencyKey
-            | Self::IdempotencyKeyReused => StatusCode::BAD_REQUEST,
-        }
+    pub fn status(self) -> StatusCode {
+        answered_with(self.code())
     }
 
     /// What the refusal says, in the one line a reader gets.
@@ -448,45 +407,10 @@ impl Refusal {
         }
     }
 
-    /// How much it matters.
-    ///
-    /// Three of these are the system working rather than failing: a door that has
-    /// stopped listening for a while, an account refused what is not its own, and a
-    /// media server that could not be asked. Raising any of them as an error would have
-    /// somebody looking for a fault that is not there.
-    const fn severity(self) -> Severity {
-        match self {
-            Self::NotYours | Self::Unconfirmed | Self::TooManyAttempts | Self::NotForAKey => {
-                Severity::Warning
-            }
-            _ => Severity::Error,
-        }
-    }
-
-    /// Where the refusal lies, as a problem records it.
-    ///
-    /// Read by the one door that answers a problem at the status its origin warrants,
-    /// which must agree with [`Self::status`] for the two refusals raised as problems
-    /// before they are answered.
-    const fn amiss(self) -> Amiss {
-        match self.status() {
-            StatusCode::NOT_FOUND => Amiss::Naming,
-            StatusCode::INTERNAL_SERVER_ERROR => Amiss::Answering,
-            _ => Amiss::Asking,
-        }
-    }
-
     /// The refusal as a problem, saying `summary` as its one line.
     #[must_use]
     pub fn problem(self, summary: impl Into<String>) -> Problem {
-        Problem::new(
-            self.code(),
-            self.severity(),
-            summary,
-            self.meaning(),
-            self.remedy(),
-        )
-        .lies_in(self.amiss())
+        Problem::new(self.code(), summary, self.meaning(), self.remedy())
     }
 
     /// The refusal as a response, in its own words.

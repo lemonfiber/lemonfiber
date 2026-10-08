@@ -17,7 +17,7 @@
 //! asked to guard a volume this afternoon has not asked for something on their
 //! machine that starts at every login.
 
-use crate::error::{Diagnose, Problem, Remedy, Severity, State};
+use crate::error::{Diagnose, Problem, Remedy, State};
 use crate::model::{Changed, HostedCommand, Hosting, HostingReport};
 use crate::ports::hosting::{Held, Hosted, Manager, Standing};
 
@@ -243,7 +243,6 @@ fn wanted(ctx: &Ctx, what: Hostable, forms: &[String]) -> Result<Hosted, Box<Pro
 fn nothing_to_guard() -> Problem {
     Problem::new(
         NOTHING_NAMED_TO_GUARD,
-        Severity::Error,
         "The guard was not told what to guard",
         "A guard stops the forms it was started against, so one started against none would \
          watch the data location and then have nothing to stop.",
@@ -256,7 +255,6 @@ fn nothing_to_guard() -> Problem {
 fn no_program() -> Problem {
     Problem::new(
         NO_PROGRAM,
-        Severity::Error,
         "This machine would not say where lemonfiber itself is",
         "A service names the program it runs, and one naming a guessed path would fail at \
          every login with nothing to say why.",
@@ -269,7 +267,6 @@ fn no_program() -> Problem {
 fn nowhere_to_write() -> Problem {
     Problem::new(
         NOWHERE_TO_WRITE,
-        Severity::Error,
         "This machine would not say where lemonfiber keeps its files",
         "A hosted command has no terminal to speak in, so without somewhere to write what it \
          says, nothing it did would be readable afterwards.",

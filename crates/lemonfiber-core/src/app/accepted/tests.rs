@@ -105,7 +105,6 @@ fn warning(check: &str) -> crate::doctor::Finding {
         "Torrent traffic is contained",
         crate::doctor::Verdict::Warn(crate::error::Problem::new(
             crate::error::codes::vpn::NO_TUNNEL,
-            crate::error::Severity::Warning,
             "Torrent traffic is not contained by a VPN",
             "It leaves under this connection's own address.",
             crate::error::Remedy::new("Put the client behind a VPN container"),
@@ -185,7 +184,6 @@ fn a_failure_cannot_be_answered_at_all() {
         "The tunnel",
         crate::doctor::Verdict::Fail(crate::error::Problem::new(
             crate::error::codes::vpn::LEAKING,
-            crate::error::Severity::Critical,
             "Traffic is leaving outside the tunnel",
             "Every torrent is visible under this machine's own address.",
             crate::error::Remedy::new("Stop the download client"),

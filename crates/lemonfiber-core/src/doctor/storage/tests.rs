@@ -8,9 +8,9 @@ use super::{
     Check, Crowded, Environment, Finding, StorageCheck, Verdict, COPY_ONLY, ROOT_ABSENT,
     ROOT_UNWRITABLE,
 };
-use crate::error::codes::storage::DEGRADED;
 use crate::error::codes::storage::SERVICE_DENIED;
 use crate::error::codes::storage::SPACE_LOW;
+use crate::error::codes::storage::{COPYING_SINCE_DEGRADED, DEGRADED};
 use crate::ports::filesystem::{
     Fault, FileSystem, FsKind, Identity, Ownership, Storage, StorageFacts,
 };
@@ -436,7 +436,7 @@ async fn a_location_that_used_to_link_and_stopped_is_reported_as_a_regression() 
     );
     assert!(matches!(
         verdict(&findings, "storage.mode"),
-        Some(Verdict::Warn(problem)) if problem.code == DEGRADED
+        Some(Verdict::Warn(problem)) if problem.code == COPYING_SINCE_DEGRADED
     ));
     // The failure is not written over the good baseline, so the next run
     // still sees it and keeps shouting rather than downgrading to a warning.

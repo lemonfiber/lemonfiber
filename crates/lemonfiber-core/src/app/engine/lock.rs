@@ -62,7 +62,7 @@ use std::sync::Arc;
 use std::time::{Duration, UNIX_EPOCH};
 
 use crate::app::Ctx;
-use crate::error::{Amiss, Problem, Remedy, Severity};
+use crate::error::{Problem, Remedy};
 use crate::plural::s;
 use crate::ports::FileSystem;
 
@@ -336,7 +336,6 @@ async fn refusal(ctx: &Ctx, path: &Path, waited: Duration) -> Problem {
 
     Problem::new(
         super::super::ALREADY_WORKING,
-        Severity::Error,
         format!(
             "{} is still working on this stack{}",
             another(&held.pid),
@@ -351,7 +350,6 @@ async fn refusal(ctx: &Ctx, path: &Path, waited: Duration) -> Problem {
         ),
         Remedy::new("Wait for it to finish, then try again"),
     )
-    .lies_in(Amiss::Held)
     .with_detail(format!(
         "The claim is at {}{}.",
         path.display(),

@@ -23,7 +23,7 @@ use std::path::PathBuf;
 
 use crate::doctor::acknowledged::{suppressing, Accepted};
 use crate::doctor::Verdict;
-use crate::error::{Problem, Remedy, Severity};
+use crate::error::{Problem, Remedy};
 use crate::model::DoctorReport;
 
 use super::Ctx;
@@ -124,7 +124,6 @@ fn not_warned(report: &DoctorReport, check: &str) -> Problem {
     };
     Problem::new(
         NOT_WARNED,
-        Severity::Error,
         format!("Nothing in this run warns about {check}"),
         "An answer is only meaningful against something the tool is currently saying. \
          Recording one for anything else would leave a question settled that is still \

@@ -22,7 +22,7 @@ use crate::app::apply::{self, Applying};
 use crate::config::paths::Paths;
 use crate::config::{store, Protocols};
 use crate::error::codes::setup::{ALREADY_UNDERWAY, DOES_NOT_APPLY};
-use crate::error::{Amiss, Diagnose as _, Problem, Remedy, Severity};
+use crate::error::{Diagnose as _, Problem, Remedy};
 use crate::ports::filesystem::FileSystem;
 use crate::prerequisites::{prerequisites, PrerequisiteMap};
 use crate::validate::{Validation, Validator};
@@ -439,12 +439,10 @@ fn wants(wizard: &Wizard, step: Step) -> bool {
 fn does_not_apply(rejected: Rejected) -> Problem {
     Problem::new(
         DOES_NOT_APPLY,
-        Severity::Error,
         "An answer does not apply on this platform",
         "Setup only offers what applies where it runs, so the answer was not recorded. Nothing has been applied.",
         Remedy::new("Answer with a choice this platform offers"),
     )
-    .lies_in(Amiss::Asking)
     .with_detail(format!("{rejected:?}"))
 }
 
@@ -452,7 +450,6 @@ fn does_not_apply(rejected: Rejected) -> Problem {
 fn already_underway() -> Problem {
     Problem::new(
         ALREADY_UNDERWAY,
-        Severity::Error,
         "Setup is past the point of gathering answers",
         "This wizard has already been reviewed, is part-way through applying, or is finished, so running it again here would write over what a recovery needs. Nothing has been changed.",
         Remedy::new("Resume or recover the setup in progress, or reconfigure a finished one"),

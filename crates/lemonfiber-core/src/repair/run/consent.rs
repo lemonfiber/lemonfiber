@@ -12,7 +12,7 @@
 //! held between the two requests, which is also why a browser tab closed halfway
 //! through leaves nothing half-consented: there is nothing to leave.
 
-use crate::error::{Problem, Remedy, Severity};
+use crate::error::{Problem, Remedy};
 use crate::repair::{self, Repair, Stance};
 
 use super::{Confirm, Report};
@@ -97,16 +97,15 @@ impl Confirm for Consent {
 /// tell a repair whose effects were rewritten from a fault that has cleared, and
 /// the two ask for opposite things next.
 fn stale(agreed: &str, stands: &str) -> Problem {
-    crate::agreement::moved(Problem::new(
+    Problem::new(
         STALE,
-        Severity::Warning,
         "What you agreed to is not what is offered now",
         format!(
             "The offer you answered was {agreed}, and a fresh look offers {stands}. \
-             Something has changed since you read it, so nothing was carried out."
+         Something has changed since you read it, so nothing was carried out."
         ),
         Remedy::new("Ask what could be put right again, and read what it says now"),
-    ))
+    )
 }
 
 #[cfg(test)]

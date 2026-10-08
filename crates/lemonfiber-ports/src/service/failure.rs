@@ -15,7 +15,7 @@
 /// acts on what they type.
 pub const ASK_FOR_REPAIRS: &str = "lemonfiber doctor --fix";
 
-use super::{Diagnose, Problem, Remedy, Severity, State};
+use super::{Diagnose, Problem, Remedy, State};
 use lemonfiber_error::codes::seed::{
     SERVICE_REFUSED, SERVICE_UNAUTHORISED, SERVICE_UNAVAILABLE, SERVICE_UNSUPPORTED,
 };
@@ -61,7 +61,6 @@ impl Diagnose for Failure {
         match self {
             Self::Unavailable { service } => Problem::new(
                 SERVICE_UNAVAILABLE,
-                Severity::Warning,
                 format!("{service} was not ready, so it was skipped"),
                 "Wiring is resumable. Nothing was changed for this service, and running seed again picks it up once it is answering.",
                 Remedy::new("Wait for it to finish starting, then run seed again")
@@ -69,7 +68,6 @@ impl Diagnose for Failure {
             ),
             Self::Unauthorised { service } => Problem::new(
                 SERVICE_UNAUTHORISED,
-                Severity::Error,
                 format!("{service} rejected the credential"),
                 "The credential lemonfiber holds no longer matches the one the service expects, usually because it was changed in the service's own interface.",
                 Remedy::new("Re-read the service's credential").with_detail(ASK_FOR_REPAIRS),
@@ -77,14 +75,12 @@ impl Diagnose for Failure {
             .in_state(State::Remediable),
             Self::Refused { service, detail } => Problem::unknown(
                 SERVICE_REFUSED,
-                Severity::Error,
                 format!("{service} answered in a way lemonfiber did not expect"),
                 "This is not a failure lemonfiber recognises, so it will not guess at what would fix it.",
             )
             .with_detail(detail.clone()),
             Self::Unsupported { service, detail } => Problem::new(
                 SERVICE_UNSUPPORTED,
-                Severity::Error,
                 format!("{service} does not serve the API version this build speaks"),
                 "The service was upgraded past — or stands before — the API version lemonfiber knows how to speak, so writing to it would mean writing something malformed. Nothing was changed for it.",
                 Remedy::new("Match the service to the version lemonfiber supports, or update lemonfiber, then run seed again")

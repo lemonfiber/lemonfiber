@@ -17,7 +17,7 @@ use std::path::Path;
 
 use crate::app::Ctx;
 use crate::error::codes::plugin::OCCUPIED;
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 use crate::plugin::Installed;
 use crate::stack::declared::{self, Declared, Published};
 
@@ -139,7 +139,6 @@ fn answered(would: &Installed, proxy: &str) -> Vec<String> {
 fn occupied(plugin: &str, clashes: &[String]) -> Problem {
     Problem::new(
         OCCUPIED,
-        Severity::Error,
         format!("{plugin} would take what this machine already uses"),
         "Nothing was written. Each service lemonfiber writes for a plugin is a container by \
          its id, published on its port and proxied at its label, and each of those is already \

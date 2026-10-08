@@ -315,8 +315,8 @@ fn every_code_a_failure_raises_is_listed_and_every_listed_one_is_raised() {
     }
     for failure in every_failure() {
         assert_eq!(
-            failure.problem().amiss,
-            crate::wiring::UNREAD_AMISS,
+            failure.problem().status(),
+            500,
             "{failure} is listed at the status a failure of the machine is answered with"
         );
     }

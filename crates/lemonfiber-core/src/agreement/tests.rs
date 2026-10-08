@@ -44,17 +44,9 @@ fn every_moved_offer_code_is_listed_once() {
 /// it is answered as one a caller corrects rather than as a failure of the machine.
 #[test]
 fn a_moved_offer_lies_in_how_it_was_asked() {
-    use crate::error::{Amiss, Problem, Remedy, Severity};
-
-    let raised = super::moved(Problem::new(
-        crate::error::codes::repair::STALE,
-        Severity::Warning,
-        "moved",
-        "moved",
-        Remedy::new("read again"),
-    ));
-    assert_eq!(raised.amiss, Amiss::Asking);
-    assert_eq!(super::MOVED_AMISS, Amiss::Asking);
+    for code in super::MOVED {
+        assert_eq!(code.status(), 400, "{code}");
+    }
 }
 
 /// Each part is named on its own, so the same parts read twice name the same offer.

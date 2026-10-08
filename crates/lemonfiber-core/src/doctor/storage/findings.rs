@@ -3,10 +3,8 @@
 //! One function per verdict, so the words an operator reads for a given state have a
 //! single definition rather than being assembled at each site.
 
-use super::{
-    finding, pair, Finding, Ownership, Problem, Remedy, Severity, State, StorageFacts, Verdict,
-};
-use crate::error::codes::storage::{COPY_ONLY, DEGRADED, SERVICE_DENIED};
+use super::{finding, pair, Finding, Ownership, Problem, Remedy, State, StorageFacts, Verdict};
+use crate::error::codes::storage::{COPYING_SINCE_DEGRADED, COPY_ONLY, DEGRADED, SERVICE_DENIED};
 use crate::storage;
 
 /// The findings when the link was made and confirmed: a pass naming how many
@@ -50,7 +48,6 @@ pub(super) fn copying(facts: &StorageFacts, regressed: bool) -> Vec<Finding> {
     };
     let problem = Problem::new(
         COPY_ONLY,
-        Severity::Warning,
         summary,
         storage::COPY_CONSEQUENCE,
         Remedy::new("Choose a location that hardlinks, or continue in copy mode")
@@ -65,7 +62,6 @@ pub(super) fn copying(facts: &StorageFacts, regressed: bool) -> Vec<Finding> {
 pub(super) fn degraded() -> Problem {
     Problem::new(
         DEGRADED,
-        Severity::Error,
         "Hardlinks have stopped working here",
         "This location used to hardlink and no longer does — usually a drive that came back \
          mounted with different options. Every import since has been copying, using twice the \
@@ -80,8 +76,7 @@ pub(super) fn degraded() -> Problem {
 pub(super) fn degraded_mode() -> Verdict {
     Verdict::Warn(
         Problem::new(
-            DEGRADED,
-            Severity::Warning,
+            COPYING_SINCE_DEGRADED,
             "degraded — was linking, now copying",
             "The stack is running in copy mode it was not set up for, because the location \
              changed under it.",
@@ -151,7 +146,6 @@ pub(super) fn service_verdict(owner: Ownership, uid: u32, gid: u32) -> Finding {
         Verdict::Fail(
             Problem::new(
                 SERVICE_DENIED,
-                Severity::Error,
                 "The services cannot write to the data location",
                 format!(
                     "The containers run as {uid}:{gid}, but the data location is owned by {}:{} \

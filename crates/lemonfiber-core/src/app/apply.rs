@@ -28,7 +28,7 @@ use crate::baseline::Baseline;
 use crate::config::paths::Paths;
 use crate::config::store::{self, is_secret};
 use crate::error::codes::setup::{DIR_NOT_MADE, NOT_REVIEWED};
-use crate::error::{Amiss, Diagnose, Problem, Remedy, Severity};
+use crate::error::{Diagnose, Problem, Remedy};
 use crate::journal::{Change, Journal, Kind, Seal};
 use crate::ports::filesystem::Confined;
 use crate::ports::random::Random;
@@ -116,7 +116,6 @@ impl Fault {
             Self::Stack(failure) => failure.problem(),
             Self::DirNotMade { path, reason } => Problem::new(
                 DIR_NOT_MADE,
-                Severity::Error,
                 "The data directory could not be created",
                 "lemonfiber makes the directory the library and downloads live under before it starts anything. Setup has stopped, and the next run recovers it.",
                 Remedy::new("Check the location is on a writable disk and try again"),
@@ -363,12 +362,10 @@ fn lines(journal: &Journal, seal: &Seal, random: &dyn Random) -> String {
 pub(crate) fn not_reviewed() -> Problem {
     Problem::new(
         NOT_REVIEWED,
-        Severity::Error,
         "Setup cannot be applied before it is reviewed",
         "Applying writes the answers to disk, so it runs only once they are all gathered and confirmed. Nothing has been written.",
         Remedy::new("Answer every question, then confirm the review before applying"),
     )
-    .lies_in(Amiss::Asking)
 }
 
 #[cfg(test)]

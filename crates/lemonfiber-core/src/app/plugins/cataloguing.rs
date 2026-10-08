@@ -24,7 +24,7 @@ use crate::error::codes::plugin::{
     CATALOGUE_OFF, CATALOGUE_UNREACHABLE, CATALOGUE_UNREADABLE, NOT_AS_REVIEWED, NOT_CATALOGUED,
     SIGNATURE_UNVERIFIED,
 };
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 use crate::plugin::catalogue::{self, Entry, Refused};
 use crate::plugin::{Installs, Register};
 use crate::ports::http::{Method, Request};
@@ -155,7 +155,6 @@ async fn asset(ctx: &Ctx, url: &str) -> Result<Option<String>, String> {
 fn switched_off(name: &str) -> Problem {
     Problem::new(
         CATALOGUE_OFF,
-        Severity::Error,
         format!("asking the catalogue is switched off, so {name} was not looked up"),
         "Nothing was fetched and nothing was installed. This machine's settings keep lemonfiber \
          from reading the catalogue's index.",
@@ -171,7 +170,6 @@ fn switched_off(name: &str) -> Problem {
 fn unreachable(why: &str) -> Problem {
     Problem::new(
         CATALOGUE_UNREACHABLE,
-        Severity::Error,
         "The catalogue's index could not be read",
         "Nothing was installed. What is installed already is unaffected, and installing from a \
          git source or a directory you name does not ask the catalogue.",
@@ -188,7 +186,6 @@ fn unreachable(why: &str) -> Problem {
 fn unverified(why: &str) -> Problem {
     Problem::new(
         SIGNATURE_UNVERIFIED,
-        Severity::Error,
         "The catalogue's index is not signed by the key this build carries",
         "Nothing was resolved through it and nothing was installed. An index nobody can show \
          the catalogue signed is not evidence that anybody reviewed anything.",
@@ -205,7 +202,6 @@ fn unverified(why: &str) -> Problem {
 fn unreadable(why: &str) -> Problem {
     Problem::new(
         CATALOGUE_UNREADABLE,
-        Severity::Error,
         "The catalogue's index is signed and this build cannot read it",
         "Nothing was resolved through it and nothing was installed.",
         Remedy::new(
@@ -221,7 +217,6 @@ fn unreadable(why: &str) -> Problem {
 fn not_catalogued(name: &str) -> Problem {
     Problem::new(
         NOT_CATALOGUED,
-        Severity::Error,
         format!("The catalogue holds no plugin called {name}"),
         "Nothing was fetched and nothing was installed.",
         Remedy::new(format!(
@@ -236,7 +231,6 @@ fn not_catalogued(name: &str) -> Problem {
 pub(super) fn not_as_reviewed(entry: &Entry) -> Problem {
     Problem::new(
         NOT_AS_REVIEWED,
-        Severity::Error,
         format!(
             "{} at {} is not what the catalogue reviewed",
             entry.origin, entry.revision

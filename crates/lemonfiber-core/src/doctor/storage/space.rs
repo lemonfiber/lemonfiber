@@ -5,7 +5,7 @@
 
 use crate::bytes::humanize;
 
-use super::{finding, Finding, Problem, Remedy, Severity, State, StorageFacts, Verdict};
+use super::{finding, Finding, Problem, Remedy, State, StorageFacts, Verdict};
 use crate::error::codes::storage::SPACE_LOW;
 
 /// The free-space finding for the volume the data root sits on.
@@ -42,7 +42,6 @@ pub(super) fn space(facts: &StorageFacts, committed: Option<u64>) -> Finding {
         Verdict::Warn(
             Problem::new(
                 SPACE_LOW,
-                Severity::Warning,
                 format!(
                     "Storage is projected to run out — {} of downloads still to land, {} free",
                     humanize(underway),
@@ -62,7 +61,6 @@ pub(super) fn space(facts: &StorageFacts, committed: Option<u64>) -> Finding {
         Verdict::Warn(
             Problem::new(
                 SPACE_LOW,
-                Severity::Warning,
                 format!("Free space is low — {} left", humanize(facts.available)),
                 "A disk that fills partway through an import leaves half a file behind and \
                  stalls the queue, so what is left has to cover what is still to come.",

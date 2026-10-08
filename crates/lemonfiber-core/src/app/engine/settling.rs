@@ -10,7 +10,7 @@ use super::super::Ctx;
 use super::waiting;
 use crate::docker::{condition, survey, unsettled, Service};
 use crate::error::Problem;
-use crate::error::{Diagnose, Remedy, Severity, State};
+use crate::error::{Diagnose, Remedy, State};
 use crate::model::LifecycleReport;
 use crate::ports::docker::{LogLine, LogQuery};
 
@@ -136,7 +136,6 @@ async fn never_settled(
 
     let problem = Problem::new(
         crate::app::NEVER_SETTLED,
-        Severity::Error,
         format!("{named} did not finish starting"),
         explanation,
         Remedy::new("Look at what the service said, then start it again")

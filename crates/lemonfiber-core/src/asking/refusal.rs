@@ -15,7 +15,7 @@
 use crate::error::codes::quota::{
     NEVER_HERE, NOBODY, NOTHING_AGREED, NOT_WAITING, NO_LIMIT, NO_REASON, TOO_SOON, UNREACHABLE,
 };
-use crate::error::{Amiss, Problem, Remedy, Severity};
+use crate::error::{Problem, Remedy};
 
 /// Said where the request service could not be asked or would not answer.
 ///
@@ -26,7 +26,6 @@ use crate::error::{Amiss, Problem, Remedy, Severity};
 pub fn unreachable(doing: &str) -> Problem {
     Problem::new(
         UNREACHABLE,
-        Severity::Error,
         format!("the request service would not answer, so {doing}"),
         "What the household may ask for is that service's to hold, so nothing here \
          could be changed and nothing was — what it had before is what it still has",
@@ -43,14 +42,12 @@ pub fn unreachable(doing: &str) -> Problem {
 pub(crate) fn no_limit_named() -> Problem {
     Problem::new(
         NO_LIMIT,
-        Severity::Error,
         "living within a limit needs a limit, and none was named",
         "This policy lets everything through until somebody has used up their share of \
          a period, so without a share it would be the same as trusting everybody — \
          which is a policy of its own and would be chosen by name",
         Remedy::new("Say how many requests a period allows, and how long the period is"),
     )
-    .lies_in(Amiss::Asking)
 }
 
 /// Said where the request named is not one anybody is waiting on.
@@ -62,14 +59,12 @@ pub(crate) fn no_limit_named() -> Problem {
 pub(crate) fn nothing_to_decide(request: i64) -> Problem {
     Problem::new(
         NOT_WAITING,
-        Severity::Error,
         format!("request {request} is not one that is waiting on anybody"),
         "Only a request nobody has ruled on can be approved or turned down — one \
          already decided keeps the answer it was given",
         Remedy::new("Ask what the household has asked for, to see what is still waiting")
             .with_detail("lemonfiber household"),
     )
-    .lies_in(Amiss::Naming)
 }
 
 /// Said where a decline carried a reason that says nothing.
@@ -80,14 +75,12 @@ pub(crate) fn nothing_to_decide(request: i64) -> Problem {
 pub(crate) fn no_reason_given() -> Problem {
     Problem::new(
         NO_REASON,
-        Severity::Error,
         "turning a request down needs a reason, and the one given was blank",
         "Somebody asked for this and will see that it was refused; a refusal with \
          nothing beside it is indistinguishable from being ignored, which is the \
          conversation this is here to save you",
         Remedy::new("Say why in a few words, and pass them on to whoever asked"),
     )
-    .lies_in(Amiss::Asking)
 }
 
 /// Said where nobody in the household goes by the name that was given.
@@ -95,13 +88,11 @@ pub(crate) fn no_reason_given() -> Problem {
 pub(crate) fn nobody_called(named: &str, household: &[String]) -> Problem {
     Problem::new(
         NOBODY,
-        Severity::Error,
         format!("nobody in this household goes by {named}, so nothing was changed"),
         "A limit is set on somebody the media server holds an account for, matched the \
          way you would say their name rather than exactly",
         Remedy::new("Name somebody who is here").with_detail(household.join(", ")),
     )
-    .lies_in(Amiss::Naming)
 }
 
 /// Said where somebody has an account here and none on the request service.
@@ -113,7 +104,6 @@ pub(crate) fn nobody_called(named: &str, household: &[String]) -> Problem {
 pub(crate) fn never_asked_here(name: &str) -> Problem {
     Problem::new(
         NEVER_HERE,
-        Severity::Warning,
         format!(
             "{name} has never signed in to the request service, so there is nobody \
                  there to hold to a limit"
@@ -123,7 +113,6 @@ pub(crate) fn never_asked_here(name: &str) -> Problem {
          household is held to applies to them in the meantime",
         Remedy::new("Ask them to open the request service once, then set this again"),
     )
-    .lies_in(Amiss::Naming)
 }
 
 /// Said where a run was asked to close old requests and nobody has said what old means.
@@ -136,7 +125,6 @@ pub(crate) fn never_asked_here(name: &str) -> Problem {
 pub(crate) fn nothing_agreed() -> Problem {
     Problem::new(
         NOTHING_AGREED,
-        Severity::Error,
         "nothing is closed for waiting here, because no period has been agreed to",
         "Requests wait until somebody rules on them unless this household has said how \
          long is too long, and there is no figure this could choose on your behalf — a \
@@ -144,7 +132,6 @@ pub(crate) fn nothing_agreed() -> Problem {
         Remedy::new("Say how many days a request may wait, then start this again")
             .with_detail("lemonfiber household expiring --after 30"),
     )
-    .lies_in(Amiss::Asking)
 }
 
 /// Said where the period named is shorter than the reminder that comes before it.
@@ -157,7 +144,6 @@ pub(crate) fn nothing_agreed() -> Problem {
 pub(crate) fn sooner_than_the_reminder(after: u32) -> Problem {
     Problem::new(
         TOO_SOON,
-        Severity::Error,
         format!(
             "{after} days is sooner than you are reminded that anything is waiting, so \
              nothing was arranged"
@@ -170,7 +156,6 @@ pub(crate) fn sooner_than_the_reminder(after: u32) -> Problem {
             super::REMINDING_AFTER
         )),
     )
-    .lies_in(Amiss::Asking)
 }
 
 #[cfg(test)]

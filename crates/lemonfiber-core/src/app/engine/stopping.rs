@@ -13,7 +13,7 @@ use lemonfiber_manifest::Manifest;
 
 use crate::app::Ctx;
 use crate::docker::survey;
-use crate::error::{Diagnose, Problem, Remedy, Severity, State};
+use crate::error::{Diagnose, Problem, Remedy, State};
 use crate::stack::standing::needed_by;
 
 /// What stopping these forms would take from something else that is running.
@@ -68,7 +68,6 @@ fn refusal(forms: &[String], needed: &[String]) -> Problem {
 
     Problem::new(
         super::super::STILL_NEEDED,
-        Severity::Error,
         format!(
             "{stopping} shares services with {named}, which {} running",
             is(needed)

@@ -8,7 +8,7 @@ use crate::acting::{Press, Stage, Wanted};
 use lemonfiber_api::actions::{OFFERED as WEB, TAKES_CONSENT, TAKES_DISRUPTION};
 use lemonfiber_core::app::{Command, Diagnosing, Outcome};
 use lemonfiber_core::doctor::{Category, Finding, Narrowing, Overall, Verdict};
-use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
+use lemonfiber_core::error::{Code, Problem, Remedy};
 use lemonfiber_core::model::DoctorReport;
 use lemonfiber_core::repair::run::{Confirm as _, Consent, Report};
 use lemonfiber_core::repair::{agreement, Repair};
@@ -66,7 +66,6 @@ pub(crate) fn a_diagnosis() -> DoctorReport {
 fn a_problem() -> Problem {
     Problem::new(
         Code::new("VPN-9"),
-        Severity::Warning,
         "Traffic leaves this machine outside the tunnel",
         "The download client's traffic was seen on this machine's own address.",
         Remedy::new("Put the client behind the gateway"),

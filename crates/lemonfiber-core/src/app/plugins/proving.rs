@@ -25,7 +25,7 @@ use std::time::Duration;
 
 use lemonfiber_plugin::{Manifest, Proof};
 
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 use crate::plugin::judging::{judge, live, method};
 use crate::plugin::{Evidence, Installed, Proving, Verdict};
 use crate::ports::http::Request;
@@ -336,7 +336,6 @@ pub(crate) const AGAINST: Evidence = Evidence::Service;
 fn unstarted(plugin: &str, back: &Reversal) -> Problem {
     Problem::new(
         UNPROVED,
-        Severity::Error,
         format!("{plugin}'s service would not start, so nothing about it could be proved"),
         super::left_behind(back),
         Remedy::new("Check that the stack is set up and the container engine is running"),

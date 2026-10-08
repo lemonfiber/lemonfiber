@@ -9,7 +9,7 @@ use super::NOT_ENABLED;
 use crate::config::PortForward;
 use crate::doctor::{Finding, Verdict};
 use crate::error::codes::vpn::NO_FORWARDED_PORT;
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 use crate::ports::docker::{Container, Engine};
 use lemonfiber_manifest::Manifest;
 
@@ -97,7 +97,6 @@ fn knowledge(provider: Option<&str>) -> Knowledge {
 fn proton_trap() -> Problem {
     Problem::new(
         NO_FORWARDED_PORT,
-        Severity::Warning,
         "The VPN granted no forwarded port",
         "The tunnel is up, but no port was forwarded, so peers cannot open connections to your \
          client and both download connectivity and seeding are reduced. With ProtonVPN the usual \
@@ -119,7 +118,6 @@ fn proton_trap() -> Problem {
 fn generic_trap() -> Problem {
     Problem::new(
         NO_FORWARDED_PORT,
-        Severity::Warning,
         "The VPN granted no forwarded port",
         "The tunnel is up, but no port was forwarded, so peers cannot open connections to your \
          client and both download connectivity and seeding are reduced. On providers that support \

@@ -19,7 +19,7 @@
 //! cannot afford.
 
 use crate::error::codes::migrate::OFFER_MOVED;
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 use crate::model::{MigrationReport, ReplaceReport};
 use crate::ports::docker::Container;
 use crate::reconfigure::Stance;
@@ -126,24 +126,21 @@ fn refused(survey: &MigrationReport) -> ReplaceReport {
 /// started since from a different project standing here. Both names are said, for
 /// the reason a stale repair offer says both.
 fn another_offer(agreed: &str, stands: &str, project: &str, would_stop: &[String]) -> Problem {
-    crate::agreement::moved(
-        Problem::new(
-            OFFER_MOVED,
-            Severity::Warning,
-            "What you agreed to is not what standing in place of this setup would stop now",
-            format!(
-                "The offer you answered was {agreed}, and a fresh look offers {stands}. \
-                 Something has started, stopped or changed since you read it, so nothing \
-                 was stopped."
-            ),
-            Remedy::new("Ask what replacing would stop again, and read what it says now"),
-        )
-        .in_state(State::Guided)
-        .with_detail(format!(
-            "standing in place of {project} would now stop {}",
-            would_stop.join(", ")
-        )),
+    Problem::new(
+        OFFER_MOVED,
+        "What you agreed to is not what standing in place of this setup would stop now",
+        format!(
+            "The offer you answered was {agreed}, and a fresh look offers {stands}. \
+             Something has started, stopped or changed since you read it, so nothing \
+             was stopped."
+        ),
+        Remedy::new("Ask what replacing would stop again, and read what it says now"),
     )
+    .in_state(State::Guided)
+    .with_detail(format!(
+        "standing in place of {project} would now stop {}",
+        would_stop.join(", ")
+    ))
 }
 
 #[cfg(test)]

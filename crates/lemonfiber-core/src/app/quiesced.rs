@@ -8,7 +8,7 @@
 //! surface that had to remember to ask would be a surface that could forget, and the one
 //! that forgot would be the one nobody had run yet.
 
-use crate::error::{Code, Problem, Remedy, Severity, State};
+use crate::error::{Code, Problem, Remedy, State};
 use crate::ports::docker::Lifecycle;
 
 use super::Ctx;
@@ -106,7 +106,6 @@ fn answered(stack: Stack, code: Code, operation: &str) -> Result<(), Box<Problem
 fn running(code: Code, operation: &str) -> Problem {
     Problem::new(
         code,
-        Severity::Error,
         format!("The stack is running, so a {operation} would not be safe"),
         format!(
             "A {operation} touches the service databases, which must not happen while the \
@@ -121,7 +120,6 @@ fn running(code: Code, operation: &str) -> Problem {
 fn unproven(code: Code, operation: &str) -> Problem {
     Problem::new(
         code,
-        Severity::Error,
         format!("The stack cannot be confirmed stopped, so a {operation} was not attempted"),
         format!(
             "lemonfiber could not reach the container engine, so it cannot prove nothing is \

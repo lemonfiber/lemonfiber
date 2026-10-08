@@ -3,7 +3,6 @@ use std::collections::BTreeSet;
 use axum::body::to_bytes;
 use axum::http::StatusCode;
 use lemonfiber_core::error::codes::declared;
-use lemonfiber_core::error::Amiss;
 use lemonfiber_core::model::{kind, Envelope};
 use serde_json::Value;
 
@@ -52,17 +51,13 @@ fn every_refusal_says_its_own_sentence_and_what_it_means() {
 }
 
 #[test]
-fn a_refusal_raised_as_a_problem_lies_where_its_status_says() {
-    // The two refusals raised as problems before they are answered are answered at the
-    // status their origin warrants, so the origin has to agree with the status.
+fn a_refusal_raised_as_a_problem_answers_at_its_status() {
     for refusal in Refusal::EVERY {
-        let amiss = refusal.problem("").amiss;
-        let expected = match refusal.status() {
-            StatusCode::NOT_FOUND => Amiss::Naming,
-            StatusCode::INTERNAL_SERVER_ERROR => Amiss::Answering,
-            _ => Amiss::Asking,
-        };
-        assert_eq!(amiss, expected, "{refusal:?}");
+        assert_eq!(
+            refusal.problem("").status(),
+            refusal.status().as_u16(),
+            "{refusal:?}"
+        );
     }
 }
 

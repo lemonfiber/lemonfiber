@@ -23,7 +23,7 @@ use async_trait::async_trait;
 use super::{Category, Check, Finding, Verdict};
 use crate::baseline::Record;
 use crate::error::codes::telling::BEHIND;
-use crate::error::{Problem, Remedy, Severity};
+use crate::error::{Problem, Remedy};
 use crate::ports::service::Requests;
 use crate::seed::drift::Observed;
 use crate::seed::observed_telling;
@@ -146,7 +146,6 @@ fn verdict(observed: Observed, sending: bool) -> Verdict {
 fn behind() -> Problem {
     Problem::new(
         BEHIND,
-        Severity::Warning,
         "the household is told about less than lemonfiber now sets out to tell them",
         "Somebody asks for something and hears nothing back on one of the occasions \
          this is meant to close the loop on, so they come and ask you instead",

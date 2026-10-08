@@ -28,7 +28,7 @@ use async_trait::async_trait;
 use super::{Category, Check, Finding, Verdict};
 use crate::config::Indexer;
 use crate::error::codes::cred::{INDEXER_LIMITED, INDEXER_REJECTED};
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 use crate::validate::{Credential, Validation, Validator};
 
 /// Re-proves the configured indexer against its live service.
@@ -100,7 +100,6 @@ async fn ran(check: &IndexerCheck) -> Vec<Finding> {
 fn rejected(detail: &str) -> Problem {
     Problem::new(
         INDEXER_REJECTED,
-        Severity::Error,
         "The indexer refused its key",
         "The indexer answered and rejected the API key configured for it. The key is wrong, expired, or for a different indexer — searches through it will simply come back empty.",
         Remedy::new("Correct the indexer's API key in configuration, then check again"),
@@ -114,7 +113,6 @@ fn rejected(detail: &str) -> Problem {
 fn limited(detail: &str) -> Problem {
     Problem::new(
         INDEXER_LIMITED,
-        Severity::Warning,
         "The indexer is limiting its key",
         "The indexer accepted the key but would not serve the request, usually a rate or quota limit that lifts on its own. The key is not wrong.",
         Remedy::new("Leave it a while and check again"),

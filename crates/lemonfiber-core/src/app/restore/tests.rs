@@ -517,8 +517,8 @@ async fn a_yes_is_not_spent_on_a_listing_that_moved_between_the_two_requests() {
     )
     .await
     .err()
-    .map(|problem| (problem.code, problem.amiss));
-    assert_eq!(refusal, Some((MOVED_ON, crate::agreement::MOVED_AMISS)));
+    .map(|problem| (problem.code, problem.status()));
+    assert_eq!(refusal, Some((MOVED_ON, 400)));
     assert!(vault.extractions().is_empty(), "nothing was unpacked");
 
     let carried = run(&moved, &kept(), true, &Consent::Given { listing: stands })

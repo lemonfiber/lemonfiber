@@ -22,7 +22,7 @@
 
 use std::collections::BTreeSet;
 
-use crate::error::{Diagnose, Problem, Remedy, Severity, State};
+use crate::error::{Diagnose, Problem, Remedy, State};
 use crate::plugin::{Installed, Register, Removal, Unfilled};
 use crate::stack::closure::Plan;
 use crate::stack::compose::{build, Action};
@@ -320,7 +320,6 @@ fn not_installed(plugin: &str, held: &[Installed]) -> Problem {
     };
     Problem::new(
         NOTHING_TO_REMOVE,
-        Severity::Error,
         format!("{plugin} is not installed"),
         meaning,
         Remedy::new("Run `lemonfiber plugin installed` to see what is on this machine"),

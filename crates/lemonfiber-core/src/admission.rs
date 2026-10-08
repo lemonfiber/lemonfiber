@@ -48,7 +48,7 @@ use thiserror::Error;
 
 use crate::config::store::{self, Failure};
 use crate::error::codes::admit::{NO_SALT, TOO_SHORT};
-use crate::error::{Diagnose, Problem, Remedy, Severity, State};
+use crate::error::{Diagnose, Problem, Remedy, State};
 use crate::ports::random::Random;
 use crate::PRODUCT;
 
@@ -105,7 +105,6 @@ impl Diagnose for Weak {
         match self {
             Self::Short { least } => Problem::new(
                 TOO_SHORT,
-                Severity::Error,
                 "That password is too short to be the one",
                 "This is the only thing standing in front of a surface that can start, stop \
                  and reconfigure everything, and what is on the other side of it is a program \
@@ -116,7 +115,6 @@ impl Diagnose for Weak {
             .in_state(State::Guided),
             Self::Unsalted => Problem::new(
                 NO_SALT,
-                Severity::Error,
                 format!("{PRODUCT} could not record that password"),
                 "Every stored password is mixed with unpredictable bytes so that two of them \
                  are never written down the same way, and this machine would not supply any.",

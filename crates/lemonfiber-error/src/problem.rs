@@ -7,6 +7,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::codes::Declared;
+
 /// A stable identifier for a kind of problem.
 ///
 /// Stability is the whole point: an operator who searches for a code should find
@@ -37,6 +39,20 @@ impl Code {
     pub const fn as_str(self) -> &'static str {
         self.0
     }
+
+    /// How the code is declared, with everything published about it.
+    #[must_use]
+    pub fn declaration(self) -> Option<Declared> {
+        crate::codes::declared(self)
+    }
+
+    /// The HTTP status a surface answering requests says a problem carrying this code
+    /// with: the one it is declared with.
+    #[must_use]
+    pub fn status(self) -> u16 {
+        self.declaration()
+            .map_or(UNDECLARED_STATUS, Declared::status)
+    }
 }
 
 impl std::fmt::Display for Code {
@@ -63,34 +79,6 @@ pub enum Severity {
     Error,
     /// Consequences outside the machine, or data at risk.
     Critical,
-}
-
-/// Where a problem lies: in what a request named, in how it asked, in other work
-/// holding what it needed, or in the answering of it.
-///
-/// Nothing else here carries this. Severity is how much a problem matters and
-/// state is whether there is a remedy, and a word this product does not explain
-/// and a container engine that is not running can agree on both — so a surface
-/// holding only those two cannot tell a caller which of them it met. This is
-/// what tells them apart, and a surface that answers requests needs it: one of
-/// them is worth asking again, and the other never will be.
-///
-/// Not blame. Asking about a word with no entry is a reasonable thing to have
-/// done and the wording says so; where the answer would have to come from is a
-/// separate question from whose mistake it was.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub enum Amiss {
-    /// The answering. Nothing about the request was wrong.
-    #[default]
-    Answering,
-    /// What the request named, which is not one of the things there are.
-    Naming,
-    /// How the request asked, which cannot be answered as it stands.
-    Asking,
-    /// Other work, holding what this needed for as long as it runs. Nothing about the
-    /// request was wrong and nothing is broken: the same request is answered once
-    /// that work is done.
-    Held,
 }
 
 /// Where a problem stands with respect to being fixed.
@@ -173,15 +161,6 @@ pub struct Problem {
     pub detail: Option<String>,
     /// The problem that produced this one, where several share a root.
     pub cause: Option<Box<Problem>>,
-    /// Where the problem lies.
-    ///
-    /// Not carried in the document. What a surface does with this is say it in
-    /// its own terms — a status, an exit code — and writing it into the body as
-    /// well would be the same fact stated twice, which is two things to keep
-    /// agreeing.
-    #[serde(skip)]
-    #[schemars(skip)]
-    pub amiss: Amiss,
     /// Every step a run declares, with what each came to, where the problem ended a run
     /// of steps part-way; absent from every other problem.
     ///
@@ -240,24 +219,27 @@ impl Problem {
     /// A remedy is required rather than optional because an error without one is
     /// a dead end, and "I'll add the remedy later" is how a model like this
     /// erodes one message at a time.
+    ///
+    /// Its severity is the one its code is declared with, so what a problem says
+    /// and what the registry publishes about its code cannot differ.
     #[must_use]
     pub fn new(
         code: Code,
-        severity: Severity,
         summary: impl Into<String>,
         meaning: impl Into<String>,
         remedy: Remedy,
     ) -> Self {
         Self {
             code,
-            severity,
+            severity: code
+                .declaration()
+                .map_or(Severity::Error, Declared::severity),
             state: State::Actionable,
             summary: summary.into(),
             meaning: meaning.into(),
             remedies: vec![remedy],
             detail: None,
             cause: None,
-            amiss: Amiss::Answering,
             steps: Vec::new(),
         }
     }
@@ -267,15 +249,10 @@ impl Problem {
     /// Constructing this is the honest path when no remedy is known, and it
     /// still carries somewhere to go, so the four parts hold.
     #[must_use]
-    pub fn unknown(
-        code: Code,
-        severity: Severity,
-        summary: impl Into<String>,
-        meaning: impl Into<String>,
-    ) -> Self {
+    pub fn unknown(code: Code, summary: impl Into<String>, meaning: impl Into<String>) -> Self {
         Self {
             state: State::Unknown,
-            ..Self::new(code, severity, summary, meaning, escalation())
+            ..Self::new(code, summary, meaning, escalation())
         }
     }
 
@@ -300,18 +277,6 @@ impl Problem {
         self
     }
 
-    /// Record where the problem lies, when it is not in the answering.
-    ///
-    /// Said at the point the problem is raised, because that is the only place
-    /// that knows. A surface reading the code afterwards would be keeping a
-    /// second list of which codes mean what, and a list kept away from the thing
-    /// it describes is a list that goes stale without anybody noticing.
-    #[must_use]
-    pub const fn lies_in(mut self, amiss: Amiss) -> Self {
-        self.amiss = amiss;
-        self
-    }
-
     /// Attach the underlying technical detail, verbatim.
     #[must_use]
     /// Attach the underlying technical detail, with any credential in it withheld.
@@ -332,7 +297,17 @@ impl Problem {
         self.cause = Some(Box::new(cause));
         self
     }
+
+    /// The HTTP status a surface answering requests says this problem with: the one
+    /// its code is declared with.
+    #[must_use]
+    pub fn status(&self) -> u16 {
+        self.code.status()
+    }
 }
+
+/// The status of a problem whose code no family declares, which only a test builds.
+const UNDECLARED_STATUS: u16 = 500;
 
 /// A problem's schema, written out rather than referred to.
 ///

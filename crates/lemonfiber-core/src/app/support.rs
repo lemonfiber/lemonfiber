@@ -17,10 +17,8 @@ use std::path::PathBuf;
 
 use serde::Serialize;
 
-use crate::error::Amiss;
-
 use crate::bundle::Contents;
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 
 use super::bundle::{collect, measure, unconfirmed, without_marks, write, Wanted};
 use super::Ctx;
@@ -176,7 +174,6 @@ fn named_for_the_moment(contents: &Contents) -> String {
 fn nowhere_to_keep() -> Problem {
     Problem::new(
         NOWHERE_TO_KEEP,
-        Severity::Error,
         "This run cannot write an archive",
         "A bundle is one archive, and this run holds neither anywhere of its own to keep one \
          nor anything to pack one with — which is what a machine that will not say where its \
@@ -236,7 +233,6 @@ pub fn held(ctx: &Ctx, name: &str) -> Result<Held, Box<Problem>> {
 fn nowhere_held() -> Problem {
     Problem::new(
         NOWHERE_HELD,
-        Severity::Error,
         "This run has nowhere it knows to look for a bundle",
         "Bundles asked for here are kept with lemonfiber's own files, and this machine would \
          not say where those are — so there is nowhere to read one back from.",
@@ -254,14 +250,12 @@ fn nowhere_held() -> Problem {
 fn not_held(name: &str) -> Problem {
     Problem::new(
         NOT_HELD,
-        Severity::Error,
         format!("`{name}` is not one of the bundles kept here"),
         "A bundle asked for by name is one of the files this run wrote into lemonfiber's own \
          directory. A name holding a path, or climbing out of that directory, is refused \
          rather than followed.",
         Remedy::new("Ask for a bundle by the name the run that produced it reported"),
     )
-    .lies_in(Amiss::Naming)
     .in_state(State::Guided)
 }
 

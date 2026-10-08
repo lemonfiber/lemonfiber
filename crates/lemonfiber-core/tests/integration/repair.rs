@@ -19,7 +19,7 @@ use async_trait::async_trait;
 use lemonfiber_core::app::{dispatch, Command, Ctx};
 use lemonfiber_core::config::{Protocols, Settings};
 use lemonfiber_core::doctor::{Category, Check, Finding, Mend, Verdict};
-use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
+use lemonfiber_core::error::{Code, Problem, Remedy};
 use lemonfiber_core::repair::run::{mend, mending, Confirm, Consent, Report};
 use lemonfiber_core::repair::{Attempt, Outcome, Repair, Stance, Writing};
 
@@ -124,7 +124,6 @@ impl Check for Sticky {
             "something this test can mend",
             Verdict::Warn(Problem::new(
                 Code::new("TEST-1"),
-                Severity::Warning,
                 "it is wrong",
                 "it matters",
                 Remedy::new("put it right"),
@@ -631,7 +630,6 @@ impl Check for Offering {
             "something this test can mend",
             Verdict::Warn(Problem::new(
                 Code::new("TEST-1"),
-                Severity::Warning,
                 "it is wrong",
                 "it matters",
                 Remedy::new("put it right"),

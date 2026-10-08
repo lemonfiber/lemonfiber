@@ -26,7 +26,7 @@ use std::net::IpAddr;
 
 use crate::app::Ctx;
 use crate::error::codes::plugin::{ADDRESS_REFUSED, SCHEME_REFUSED};
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 use crate::outward::{literal, located, Inward};
 
 /// The git setting the checked addresses are handed over in.
@@ -93,7 +93,6 @@ fn pinned(host: &str, port: u16, addresses: &[IpAddr]) -> String {
 pub(super) fn scheme_refused(url: &str, scheme: &str) -> Problem {
     Problem::new(
         SCHEME_REFUSED,
-        Severity::Error,
         format!("{url} is not fetched over https"),
         format!(
             "Nothing was asked of it and nothing was installed. It begins with {scheme}, and \
@@ -109,7 +108,6 @@ pub(super) fn scheme_refused(url: &str, scheme: &str) -> Problem {
 fn address_refused(url: &str, address: IpAddr) -> Problem {
     Problem::new(
         ADDRESS_REFUSED,
-        Severity::Error,
         format!("{url} is not out on the internet"),
         format!(
             "Nothing was fetched and nothing was installed. Its host stands for {address}, \

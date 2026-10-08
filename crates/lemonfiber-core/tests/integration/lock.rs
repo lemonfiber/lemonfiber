@@ -23,7 +23,6 @@ use std::time::Duration;
 use async_trait::async_trait;
 use lemonfiber_core::app::{claimed, dispatch, released, Command, Ctx};
 use lemonfiber_core::config::Settings;
-use lemonfiber_core::error::Amiss;
 use lemonfiber_core::ports::filesystem::{
     Fault, FileSystem, FsKind, Identity, Ownership, Storage, StorageFacts,
 };
@@ -288,7 +287,7 @@ async fn a_refusal_for_other_work_lies_in_that_work() {
 
     let refused = claimed(&ctx(&files), "down").await.err();
 
-    assert_eq!(refused.map(|problem| problem.amiss), Some(Amiss::Held));
+    assert_eq!(refused.map(|problem| problem.status()), Some(409));
 }
 
 /// The case a pid was always the wrong noun for.

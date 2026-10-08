@@ -3,7 +3,7 @@ use super::{
     nothing_to_decide, sooner_than_the_reminder, unreachable, NEVER_HERE, NOBODY, NOTHING_AGREED,
     NOT_WAITING, NO_LIMIT, NO_REASON, TOO_SOON, UNREACHABLE,
 };
-use crate::error::{Amiss, Severity};
+use crate::error::Severity;
 
 /// A service that would not answer is said as nothing having changed.
 #[test]
@@ -21,7 +21,7 @@ fn the_policy_that_is_a_limit_refuses_to_be_chosen_without_one() {
     let problem = no_limit_named();
 
     assert_eq!(problem.code, NO_LIMIT);
-    assert_eq!(problem.amiss, Amiss::Asking);
+    assert_eq!(problem.status(), 400);
     assert!(problem.remedies.first().is_some_and(|remedy| {
         remedy.action.contains("how many") && remedy.action.contains("how long")
     }));
@@ -33,7 +33,7 @@ fn a_request_already_ruled_on_is_named_rather_than_decided_again() {
     let problem = nothing_to_decide(42);
 
     assert_eq!(problem.code, NOT_WAITING);
-    assert_eq!(problem.amiss, Amiss::Naming);
+    assert_eq!(problem.status(), 404);
     assert!(problem.summary.contains("42"), "{problem:?}");
 }
 
@@ -43,7 +43,7 @@ fn a_blank_reason_is_refused_as_the_silence_it_would_be() {
     let problem = no_reason_given();
 
     assert_eq!(problem.code, NO_REASON);
-    assert_eq!(problem.amiss, Amiss::Asking);
+    assert_eq!(problem.status(), 400);
     assert!(problem.meaning.contains("ignored"), "{problem:?}");
 }
 
@@ -53,7 +53,7 @@ fn nobody_by_that_name_is_refused_with_the_household_named() {
     let problem = nobody_called("sam", &["ana".to_owned(), "bea".to_owned()]);
 
     assert_eq!(problem.code, NOBODY);
-    assert_eq!(problem.amiss, Amiss::Naming);
+    assert_eq!(problem.status(), 404);
     assert!(problem.summary.contains("sam"), "{problem:?}");
     let there = problem
         .remedies
@@ -83,7 +83,7 @@ fn a_household_that_named_no_period_is_asked_for_one() {
     let problem = nothing_agreed();
 
     assert_eq!(problem.code, NOTHING_AGREED);
-    assert_eq!(problem.amiss, Amiss::Asking);
+    assert_eq!(problem.status(), 400);
     assert!(
         problem.meaning.contains("nobody agreed to close"),
         "{problem:?}"
@@ -105,7 +105,7 @@ fn a_period_sooner_than_the_reminder_is_refused_with_the_reminder_named() {
     let problem = sooner_than_the_reminder(3);
 
     assert_eq!(problem.code, TOO_SOON);
-    assert_eq!(problem.amiss, Amiss::Asking);
+    assert_eq!(problem.status(), 400);
     assert!(problem.summary.contains('3'), "{problem:?}");
     assert!(
         problem

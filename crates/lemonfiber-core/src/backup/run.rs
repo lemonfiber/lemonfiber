@@ -19,7 +19,7 @@ use serde::Serialize;
 use crate::archive::{Archive, Fault, Space};
 use crate::backup::{self, Manifest, Pace, Retention, Scope};
 use crate::config::paths::Paths;
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 
 use crate::app::{quiesced, Ctx};
 use crate::error::codes::backup::{
@@ -287,7 +287,6 @@ pub async fn existing(
 fn nowhere_to_keep() -> Problem {
     Problem::new(
         NOWHERE_TO_KEEP,
-        Severity::Error,
         "This run has nowhere it knows to keep a backup",
         "An archive is written into lemonfiber's own directory, and this machine would not say \
          where that is. Nothing was written.",
@@ -385,7 +384,6 @@ async fn surplus(
 fn no_room(space: Space) -> Problem {
     Problem::new(
         NO_ROOM,
-        Severity::Error,
         "There is not enough room for a backup",
         "A backup is written to the same disk it protects, and this one would not fit with room to spare. Nothing was captured.",
         Remedy::new("Free some space on the backups volume, or lower how many backups are kept"),
@@ -400,7 +398,6 @@ fn no_room(space: Space) -> Problem {
 fn not_written(fault: &Fault) -> Problem {
     Problem::new(
         NOT_WRITTEN,
-        Severity::Error,
         "The backup could not be written",
         "The capture was stopped part-way. A configuration backup is what makes the rest recoverable, so this is worth fixing before a risky change.",
         Remedy::new("Check the backups volume is writable and try again"),
@@ -412,7 +409,6 @@ fn not_written(fault: &Fault) -> Problem {
 fn not_measured(fault: &Fault) -> Problem {
     Problem::new(
         NOT_MEASURED,
-        Severity::Error,
         "The room for a backup could not be measured",
         "lemonfiber checks a backup will fit before it starts one, and could not read the space this time. Nothing was captured.",
         Remedy::new("Check the backups location is reachable and try again"),

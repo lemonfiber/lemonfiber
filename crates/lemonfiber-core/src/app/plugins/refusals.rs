@@ -1,21 +1,6 @@
-//! Where the fault lies in each refusal of an install, an update or a removal.
-//!
-//! Listed so a client can name each code and read its status before it meets it, and
-//! applied where every refusal leaves the plugin verbs, so the status a refusal is
-//! answered with is the one the list gives its code: the list is the one statement of
-//! it rather than a second one kept in step with the places that raise them.
-//!
-//! A source that holds no plugin, a plugin that is not installed, a revision the
-//! repository does not have and a name the catalogue does not hold are each something
-//! named that is not one of the things there are. A manifest this build refuses, a
-//! plugin that would collide with what is installed or take what this machine already
-//! holds, a source this machine is set not to ask, a source not fetched over https or
-//! standing for an address on this machine or a network of its own, an update whose
-//! source holds another plugin and a yes that leaves a value unapproved are each asked
-//! in a way that cannot be answered as it stands. A machine that could not write, start, fetch or verify, a
-//! catalogue entry whose source no longer holds what was reviewed, a catalogue serving
-//! a release older than one this machine verified, and a record of the newest one that
-//! cannot be kept, are the answering.
+//! Every refusal of an install, an update or a removal, listed so a client can name
+//! each code and read its status before it meets it. The status is the one each code
+//! is declared with in the registry.
 //!
 //! The record that cannot be read and the offer that moved are listed with the reads
 //! and with every other moved offer, so they are not listed twice. A machine setup has
@@ -30,56 +15,47 @@ use crate::error::codes::plugin::{
     SOURCE_OFF, SPELLED_ALIKE, STEP_FAILED, STUCK, TWO_SOURCES, UNAPPROVED, UNFETCHED, UNPROVED,
     UNREADABLE, UNRECORDABLE, UNWRITABLE, VALUE_WITHHELD,
 };
-use crate::error::{Amiss, Code, Problem};
+use crate::error::Code;
 
 /// Every plugin code an install, an update or a removal is refused with, apart from the
-/// record that cannot be read and the offer that moved, and where the fault lies in
-/// each.
-pub const REFUSALS: [(Code, Amiss); 35] = [
-    (UNREADABLE, Amiss::Naming),
-    (REFUSED, Amiss::Asking),
-    (ALREADY, Amiss::Asking),
-    (NOWHERE, Amiss::Answering),
-    (UNWRITABLE, Amiss::Answering),
-    (UNRECORDABLE, Amiss::Answering),
-    (UNPROVED, Amiss::Answering),
-    (NOTHING_TO_REMOVE, Amiss::Naming),
-    (NOTHING_TO_UPDATE, Amiss::Naming),
-    (STUCK, Amiss::Answering),
-    (ANSWERED, Amiss::Asking),
-    (TWO_SOURCES, Amiss::Asking),
-    (SOURCE_OFF, Amiss::Asking),
-    (UNFETCHED, Amiss::Answering),
-    (NO_REVISION, Amiss::Naming),
-    (CATALOGUE_OFF, Amiss::Asking),
-    (CATALOGUE_UNREACHABLE, Amiss::Answering),
-    (SIGNATURE_UNVERIFIED, Amiss::Answering),
-    (CATALOGUE_UNREADABLE, Amiss::Answering),
-    (NOT_CATALOGUED, Amiss::Naming),
-    (NOT_AS_REVIEWED, Amiss::Answering),
-    (SPELLED_ALIKE, Amiss::Asking),
-    (UNAPPROVED, Amiss::Asking),
-    (ANOTHER_PLUGIN, Amiss::Asking),
-    (OCCUPIED, Amiss::Asking),
-    (SCHEME_REFUSED, Amiss::Asking),
-    (ADDRESS_REFUSED, Amiss::Asking),
-    (HEADER_NAMED, Amiss::Asking),
-    (INPUT_UNMATCHED, Amiss::Asking),
-    (CALL_REFUSED, Amiss::Answering),
-    (STEP_FAILED, Amiss::Answering),
-    (PATH_NOT_PLAIN, Amiss::Asking),
-    (VALUE_WITHHELD, Amiss::Asking),
-    (CATALOGUE_REPLACED, Amiss::Answering),
-    (NEWEST_UNKEPT, Amiss::Answering),
+/// record that cannot be read and the offer that moved.
+pub const REFUSALS: [Code; 35] = [
+    UNREADABLE,
+    REFUSED,
+    ALREADY,
+    NOWHERE,
+    UNWRITABLE,
+    UNRECORDABLE,
+    UNPROVED,
+    NOTHING_TO_REMOVE,
+    NOTHING_TO_UPDATE,
+    STUCK,
+    ANSWERED,
+    TWO_SOURCES,
+    SOURCE_OFF,
+    UNFETCHED,
+    NO_REVISION,
+    CATALOGUE_OFF,
+    CATALOGUE_UNREACHABLE,
+    SIGNATURE_UNVERIFIED,
+    CATALOGUE_UNREADABLE,
+    NOT_CATALOGUED,
+    NOT_AS_REVIEWED,
+    SPELLED_ALIKE,
+    UNAPPROVED,
+    ANOTHER_PLUGIN,
+    OCCUPIED,
+    SCHEME_REFUSED,
+    ADDRESS_REFUSED,
+    HEADER_NAMED,
+    INPUT_UNMATCHED,
+    CALL_REFUSED,
+    STEP_FAILED,
+    PATH_NOT_PLAIN,
+    VALUE_WITHHELD,
+    CATALOGUE_REPLACED,
+    NEWEST_UNKEPT,
 ];
-
-/// Place a refusal where the list says its fault lies. A code the list does not hold
-/// keeps the place it was raised with.
-pub(super) fn place(problem: &mut Problem) {
-    if let Some((_, amiss)) = REFUSALS.iter().find(|(code, _)| *code == problem.code) {
-        problem.amiss = *amiss;
-    }
-}
 
 #[cfg(test)]
 mod tests;

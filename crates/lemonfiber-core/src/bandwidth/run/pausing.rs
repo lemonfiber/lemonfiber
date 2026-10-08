@@ -11,7 +11,7 @@
 use crate::bandwidth::pausing::{Paused, Pauses, Pausing, CAP_STILL_SPENT};
 use crate::bandwidth::Pulling;
 use crate::error::codes::rate::NOTHING_TO_PAUSE;
-use crate::error::{Amiss, Diagnose, Problem, Remedy, Severity};
+use crate::error::{Diagnose, Problem, Remedy};
 use crate::ports::service::Pulling as Answered;
 use crate::PRODUCT;
 
@@ -131,7 +131,6 @@ fn declaring(declared: &[DeclaredDownload], asked: Pausing) -> Result<(), Box<Pr
 fn nothing_to_pause(asked: Pausing) -> Problem {
     Problem::new(
         NOTHING_TO_PAUSE,
-        Severity::Error,
         format!(
             "There is no download client on this stack to {}",
             asked.word()
@@ -141,7 +140,6 @@ fn nothing_to_pause(asked: Pausing) -> Problem {
         Remedy::new("Start a form that has a download client in it")
             .with_detail("lemonfiber up tv"),
     )
-    .lies_in(Amiss::Asking)
 }
 
 #[cfg(test)]

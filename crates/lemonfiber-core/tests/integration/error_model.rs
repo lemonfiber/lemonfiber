@@ -23,7 +23,6 @@ const CODE: Code = Code::new("test.failing");
 fn problem() -> Problem {
     Problem::new(
         CODE,
-        Severity::Error,
         "the indexer refused the key",
         "searches will return nothing until it is replaced",
         Remedy::new("issue a new key in the indexer and run setup again"),
@@ -46,7 +45,6 @@ fn a_problem_with_no_known_remedy_still_says_where_to_go() {
     // problem that says so and offers escalation.
     let unknown = Problem::unknown(
         CODE,
-        Severity::Error,
         "the service answered in a way lemonfiber does not recognise",
         "it may still be working; this cannot be established from here",
     );
@@ -116,7 +114,7 @@ fn building_a_problem_has_no_failure_path_to_cascade_through() {
     // the alarm.
     let built: Problem = problem();
     let with_detail: Problem = built.clone().with_detail("anything at all");
-    let escalating: Problem = Problem::unknown(CODE, Severity::Error, "a", "b");
+    let escalating: Problem = Problem::unknown(CODE, "a", "b");
     let deep: Problem = with_detail.caused_by(escalating);
     // And a problem carrying a cause still renders its own words rather than
     // recursing into the one underneath.

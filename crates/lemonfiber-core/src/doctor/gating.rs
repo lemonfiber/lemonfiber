@@ -19,7 +19,7 @@ use lemonfiber_sidecar::gate::{Entry, Outcome, Record};
 
 use super::{Category, Check, Finding, Verdict};
 use crate::error::codes::gate::{LOST, REFUSED};
-use crate::error::{Problem, Remedy, Severity};
+use crate::error::{Problem, Remedy};
 use crate::ports::filesystem::FileSystem;
 
 /// The name this check and anything answering it share.
@@ -158,7 +158,6 @@ fn refusals(refused: &[&Entry]) -> Problem {
     let calls = if refused.len() == 1 { "call" } else { "calls" };
     Problem::new(
         REFUSED,
-        Severity::Warning,
         format!(
             "the request gate refused {} {calls} since the last check: {}",
             refused.len(),
@@ -177,7 +176,6 @@ fn refusals(refused: &[&Entry]) -> Problem {
 fn dropped(lost: u64) -> Problem {
     Problem::new(
         LOST,
-        Severity::Warning,
         format!(
             "{lost} entries were dropped before they were read, because more than {} arrived \
              between checks",

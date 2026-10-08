@@ -32,7 +32,6 @@ fn nothing_is_grabbed_where_the_tunnel_could_not_be_proved() {
     // a leak, but neither is it proof.
     let problem = crate::error::Problem::unknown(
         crate::error::codes::vpn::LEAKING,
-        crate::error::Severity::Error,
         "traffic is leaving outside the tunnel",
         "the two ends report different addresses",
     );

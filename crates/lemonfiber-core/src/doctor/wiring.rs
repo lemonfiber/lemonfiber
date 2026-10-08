@@ -23,7 +23,7 @@ use super::credentials::Target;
 use super::{Category, Check, Finding, Mend, Verdict};
 use crate::baseline::Record;
 use crate::error::codes::wiring::DRIFTED;
-use crate::error::{Problem, Remedy, Severity};
+use crate::error::{Problem, Remedy};
 use crate::ports::filesystem::FileSystem;
 use crate::ports::http::Http;
 use crate::ports::service::{Client as _, DownloadClient, RegisteredClient};
@@ -323,7 +323,6 @@ fn verdict(
 fn stale(managed: &Managed, wired: &Wired) -> Problem {
     Problem::new(
         DRIFTED,
-        Severity::Warning,
         format!(
             "{} files {} downloads under a category lemonfiber has since moved on from",
             managed.target.name, wired.want.name
@@ -343,7 +342,6 @@ fn stale(managed: &Managed, wired: &Wired) -> Problem {
 fn unreachable(managed: &Managed, wired: &Wired) -> Problem {
     Problem::new(
         DRIFTED,
-        Severity::Warning,
         format!(
             "{} cannot reach {}, which you moved off lemonfiber's category",
             managed.target.name, wired.want.name

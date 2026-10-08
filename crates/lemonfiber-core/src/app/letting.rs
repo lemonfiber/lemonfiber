@@ -20,7 +20,7 @@ use crate::error::codes::space::ANOTHER_OFFER;
 use crate::error::codes::space::NOTHING_TO_ASK;
 use crate::error::codes::space::NOT_HELD;
 use crate::error::codes::space::STILL_HELD;
-use crate::error::{Amiss, Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 use crate::ports::service::Failure;
 use crate::space::letting::{offering, standing_of, Letting};
 use crate::space::waste;
@@ -99,7 +99,6 @@ fn went(mut offer: Letting, rehearsed: bool) -> Letting {
 fn nothing_to_ask(download: &str) -> Problem {
     Problem::new(
         NOTHING_TO_ASK,
-        Severity::Error,
         format!("Nothing here is holding a download called {download}"),
         "Seeding is a torrent client's business, and this stack has no torrent \
          client lemonfiber can reach and prove itself to. There is nothing to ask \
@@ -107,14 +106,12 @@ fn nothing_to_ask(download: &str) -> Problem {
         Remedy::new("Check the download client is running and lemonfiber knows its password")
             .with_detail("lemonfiber doctor"),
     )
-    .lies_in(Amiss::Asking)
 }
 
 /// The client answered, and is holding nothing of that name.
 fn not_held(download: &str) -> Problem {
     Problem::new(
         NOT_HELD,
-        Severity::Error,
         format!("The download client is not holding a completed download called {download}"),
         "It is matched by the name both sides use, which is the name the account \
          prints. One that has finished seeding, or was removed already, is not there \
@@ -122,32 +119,27 @@ fn not_held(download: &str) -> Problem {
         Remedy::new("Read the account and name one of the completed downloads it lists")
             .with_detail("lemonfiber space"),
     )
-    .lies_in(Amiss::Asking)
 }
 
 /// The agreement names a reading that is not the one standing now.
 fn another_offer(download: &str, standing: &str) -> Problem {
-    crate::agreement::moved(
-        Problem::new(
-            ANOTHER_OFFER,
-            Severity::Error,
-            format!("That agreement was given for a different reading of {download}"),
-            "What it occupies, where it stands and the ratio it has earned are all in \
-             the name an offer goes by, so an offer that has moved since it was read is \
-             a different offer. Acting on this one would be acting on something nobody \
-             saw.",
-            Remedy::new("Read the offer again, and answer the name it prints")
-                .with_detail(format!("the offer standing now is {standing}")),
-        )
-        .in_state(State::Guided),
+    Problem::new(
+        ANOTHER_OFFER,
+        format!("That agreement was given for a different reading of {download}"),
+        "What it occupies, where it stands and the ratio it has earned are all in \
+         the name an offer goes by, so an offer that has moved since it was read is \
+         a different offer. Acting on this one would be acting on something nobody \
+         saw.",
+        Remedy::new("Read the offer again, and answer the name it prints")
+            .with_detail(format!("the offer standing now is {standing}")),
     )
+    .in_state(State::Guided)
 }
 
 /// The client could not be reached, or would not let it go.
 fn still_held(download: &str, failure: &Failure) -> Problem {
     Problem::new(
         STILL_HELD,
-        Severity::Error,
         format!("The download client did not let {download} go"),
         "It is still being seeded and the room is still spent, which is the honest \
          reading: a removal reported as done while the client goes on holding the \

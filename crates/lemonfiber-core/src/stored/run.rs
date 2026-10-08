@@ -11,7 +11,7 @@
 //! else; it reports what a confirmed run would take rather than taking it.
 
 use crate::config::paths::Paths;
-use crate::error::{Amiss, Problem, Remedy, Severity};
+use crate::error::{Problem, Remedy};
 use crate::stored::{stored, Left, Removal, Stored};
 
 use crate::app::Ctx;
@@ -68,7 +68,6 @@ fn layout(ctx: &Ctx) -> Result<&Paths, Box<Problem>> {
 fn nowhere() -> Problem {
     Problem::new(
         NOWHERE_KNOWN,
-        Severity::Error,
         "this run cannot say where lemonfiber keeps its own files",
         "The configuration and data directories are resolved from this machine's own \
          conventions, and that did not work here — so there is nothing to list and nothing \
@@ -79,5 +78,4 @@ fn nowhere() -> Problem {
              directory it can read",
         ),
     )
-    .lies_in(Amiss::Answering)
 }

@@ -226,7 +226,6 @@ fn a_finding_carries_the_name_its_service_is_known_by() {
 fn failing() -> Verdict {
     Verdict::Fail(Problem::new(
         crate::error::Code::new("TEST-1"),
-        crate::error::Severity::Error,
         "it is not working",
         "it means what it says",
         Remedy::new("put it right"),

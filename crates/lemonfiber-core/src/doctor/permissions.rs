@@ -26,7 +26,7 @@ use async_trait::async_trait;
 use super::{Category, Check, Finding, Verdict};
 use crate::config::paths::Paths;
 use crate::error::codes::config::CREDENTIALS_EXPOSED;
-use crate::error::{Problem, Remedy, Severity};
+use crate::error::{Problem, Remedy};
 use crate::ports::filesystem::FileSystem;
 
 /// The permission bits that grant anyone but the owner anything at all.
@@ -170,7 +170,6 @@ fn exposed(open: &[Open]) -> Problem {
     let tighten: Vec<String> = open.iter().map(Open::tighten).collect();
     Problem::new(
         CREDENTIALS_EXPOSED,
-        Severity::Warning,
         format!(
             "{} file{} holding credentials can be read by others on this machine",
             open.len(),

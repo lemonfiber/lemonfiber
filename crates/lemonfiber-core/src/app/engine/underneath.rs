@@ -24,7 +24,7 @@ use crate::app::Ctx;
 use crate::config::Settings;
 use crate::contained::behind;
 use crate::error::codes::life::{ELSEWHERE_UNDERNEATH, NOT_ON_THIS_ENGINE, NO_ENGINE_IN_HERE};
-use crate::error::{Diagnose, Problem, Remedy, Severity, State};
+use crate::error::{Diagnose, Problem, Remedy, State};
 use crate::ports::docker::Failure;
 use crate::stack::Source;
 
@@ -121,14 +121,7 @@ fn elsewhere(path: &Path, host: Option<&Path>) -> Problem {
             )),
         ),
     };
-    Problem::new(
-        ELSEWHERE_UNDERNEATH,
-        Severity::Error,
-        summary,
-        meaning,
-        remedy,
-    )
-    .in_state(State::Guided)
+    Problem::new(ELSEWHERE_UNDERNEATH, summary, meaning, remedy).in_state(State::Guided)
 }
 
 /// What to tell an operator whose container has no way to Docker.
@@ -138,7 +131,6 @@ fn elsewhere(path: &Path, host: Option<&Path>) -> Problem {
 fn unreached(failure: &Failure) -> Problem {
     Problem::new(
         NO_ENGINE_IN_HERE,
-        Severity::Error,
         "lemonfiber cannot reach Docker from inside this container",
         format!(
             "lemonfiber drives the stack through the host's Docker socket, which the templates \
@@ -155,7 +147,6 @@ fn unreached(failure: &Failure) -> Problem {
 fn unseen(container: &str) -> Problem {
     Problem::new(
         NOT_ON_THIS_ENGINE,
-        Severity::Error,
         "the Docker lemonfiber reaches is not the one running its container",
         format!(
             "lemonfiber runs in container {container}, and the engine at the socket it was given \

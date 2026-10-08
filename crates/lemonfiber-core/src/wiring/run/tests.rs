@@ -1,5 +1,6 @@
 use super::{listing, substituting, wiring, CANNOT_FILL, CHOICE_UNWRITABLE, NOTHING_ASKS};
 use crate::app::{Filling, Linking, Outcome};
+use crate::error::codes::wire::ALREADY_FILLS;
 use crate::wiring::{Reaches, FILLS_KEY};
 
 /// A scratch layout with somewhere to keep a setting and somewhere to keep a
@@ -137,15 +138,10 @@ fn each_refusal_carries_the_code_that_says_which_mistake_it_was() {
     let (ctx, _at) = ctx("refused");
     let refused = |capability: &str, service: &str| {
         let problem = substituting(&ctx, &fill(capability, service)).err();
-        // Answered at the status the published list gives its code, so a client
-        // reading the list before it meets one reads the status it will meet.
+        // Listed, so a client reading the list before it meets one can name it.
         if let Some(problem) = &problem {
-            assert_eq!(
-                crate::wiring::REFUSED
-                    .iter()
-                    .find(|(code, _)| *code == problem.code)
-                    .map(|(_, amiss)| *amiss),
-                Some(problem.amiss),
+            assert!(
+                crate::wiring::REFUSED.contains(&problem.code),
                 "{}",
                 problem.code
             );
@@ -155,7 +151,7 @@ fn each_refusal_carries_the_code_that_says_which_mistake_it_was() {
 
     assert_eq!(refused("indexer.search", "sabnzbd"), Some(CANNOT_FILL));
     assert_eq!(refused("media.serve", "jellyfin"), Some(NOTHING_ASKS));
-    assert_eq!(refused("identity.source", "jellyfin"), Some(CANNOT_FILL));
+    assert_eq!(refused("identity.source", "jellyfin"), Some(ALREADY_FILLS));
     assert_eq!(
         refused("indexer.search", "plex").map(lemonfiber_error::Code::as_str),
         Some("WIRE-1")
@@ -169,11 +165,8 @@ fn a_run_with_nowhere_to_record_the_choice_refuses_rather_than_pretending() {
     let ctx = crate::test_support::a_context().build();
     let refused = agreed(&ctx, fill("indexer.search", "nzbhydra2"))
         .err()
-        .map(|problem| (problem.code, problem.amiss));
-    assert_eq!(
-        refused,
-        Some((CHOICE_UNWRITABLE, crate::error::Amiss::Answering))
-    );
+        .map(|problem| (problem.code, problem.status()));
+    assert_eq!(refused, Some((CHOICE_UNWRITABLE, 500)));
 }
 
 /// A stack nothing can read answers neither question. Both halves read the
@@ -321,10 +314,7 @@ fn an_answer_to_a_moved_reading_is_refused_naming_what_moved() {
         refused.as_ref().map(|problem| problem.code),
         Some(super::WIRING_MOVED)
     );
-    assert_eq!(
-        refused.as_ref().map(|problem| problem.amiss),
-        Some(crate::agreement::MOVED_AMISS)
-    );
+    assert_eq!(refused.as_ref().map(|problem| problem.status()), Some(400));
     assert!(
         refused.is_some_and(|problem| problem.meaning.contains("what fills it now")
             && !problem.meaning.contains("what asks for it")
@@ -394,10 +384,7 @@ fn a_reason_that_cannot_be_recorded_is_refused() {
             refused.as_ref().map(|problem| problem.code),
             Some(super::UNREASONABLE)
         );
-        assert_eq!(
-            refused.map(|problem| problem.amiss),
-            Some(crate::error::Amiss::Asking)
-        );
+        assert_eq!(refused.map(|problem| problem.status()), Some(400));
     }
     let longest = "x".repeat(crate::wiring::REASON_MOST);
     assert!(substituting(

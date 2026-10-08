@@ -223,7 +223,6 @@ fn here(household: &[Member], name: &str) -> Option<Member> {
 fn nobody_named() -> crate::error::Problem {
     crate::error::Problem::new(
         crate::error::codes::remove::NOBODY_NAMED,
-        crate::error::Severity::Error,
         "no name was given, so there is nobody to remove",
         "Removing somebody takes the name their account is held under",
         crate::error::Remedy::new("Name the person, as they appear in `lemonfiber household`"),
@@ -234,7 +233,6 @@ fn nobody_named() -> crate::error::Problem {
 fn no_media_server() -> crate::error::Problem {
     crate::error::Problem::new(
         crate::error::codes::remove::NO_MEDIA_SERVER,
-        crate::error::Severity::Error,
         "this stack has no media server, so there is no household to remove anybody from",
         "A household member is an account on the media server; without one there is \
          nobody to take away",
@@ -246,7 +244,6 @@ fn no_media_server() -> crate::error::Problem {
 fn unreadable() -> crate::error::Problem {
     crate::error::Problem::new(
         crate::error::codes::remove::UNREADABLE,
-        crate::error::Severity::Error,
         "the media server would not say who holds an account, so nobody was removed",
         "Removing somebody starts by finding their account, and that read did not answer",
         crate::error::Remedy::new("Check the media server is running, then run this again"),
@@ -257,7 +254,6 @@ fn unreadable() -> crate::error::Problem {
 fn nobody_here(name: &str) -> crate::error::Problem {
     crate::error::Problem::new(
         crate::error::codes::remove::NOBODY_HERE,
-        crate::error::Severity::Error,
         format!("nobody called {name} is in this household"),
         "Nothing was removed. The name has to match an account the media server holds, \
          though not its capitalisation",
@@ -269,7 +265,6 @@ fn nobody_here(name: &str) -> crate::error::Problem {
 fn runs_the_server(name: &str) -> crate::error::Problem {
     crate::error::Problem::new(
         crate::error::codes::remove::RUNS_THE_SERVER,
-        crate::error::Severity::Error,
         format!("{name} administers the media server, so it is not an account to remove"),
         "The media server refuses to be left without an administrator, and this is also \
          the account lemonfiber signs in as — removing it would take away what every \
@@ -285,7 +280,6 @@ fn runs_the_server(name: &str) -> crate::error::Problem {
 fn would_not_remove(name: &str) -> crate::error::Problem {
     crate::error::Problem::new(
         crate::error::codes::remove::WOULD_NOT_REMOVE,
-        crate::error::Severity::Error,
         format!("the media server would not remove {name}, so nothing was removed"),
         "Nothing else was touched: the request service is only asked once the media \
          server's account is gone",

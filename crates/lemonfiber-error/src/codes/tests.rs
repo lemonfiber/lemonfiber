@@ -86,3 +86,92 @@ fn no_code_is_declared_under_a_retired_number() {
         "a retired number is declared again: {reused:?}"
     );
 }
+
+#[test]
+fn every_code_is_declared_in_the_family_its_prefix_names() {
+    for family in super::families() {
+        for declared in family.declared() {
+            let code = declared.code().as_str();
+            assert_eq!(
+                code.rsplit_once('-').map(|(prefix, _)| prefix),
+                Some(family.prefix()),
+                "{code}"
+            );
+        }
+    }
+}
+
+#[test]
+fn families_are_listed_in_prefix_order_and_each_once() {
+    let prefixes: Vec<&str> = super::families()
+        .iter()
+        .map(|family| family.prefix())
+        .collect();
+    let mut sorted = prefixes.clone();
+    sorted.sort_unstable();
+    sorted.dedup();
+    assert_eq!(prefixes, sorted);
+}
+
+/// A `since` is a version this crate has reached, or the one it is on the way to: a
+/// code is first published by the release that follows the commit adding it.
+#[test]
+fn a_code_appeared_in_a_released_version_or_the_next_one() {
+    let version = |text: &str| -> Option<(u32, u32, u32)> {
+        let mut parts = text.split('.').map(str::parse);
+        match (parts.next(), parts.next(), parts.next(), parts.next()) {
+            (Some(Ok(major)), Some(Ok(minor)), Some(Ok(patch)), None) => {
+                Some((major, minor, patch))
+            }
+            _ => None,
+        }
+    };
+    let running = version(env!("CARGO_PKG_VERSION"));
+    let next = running.map(|(major, minor, _)| (major, minor + 1, 0));
+    for declared in super::every_declared() {
+        let since = version(declared.since());
+        assert!(since.is_some(), "{}: {}", declared.code(), declared.since());
+        assert!(since <= next, "{}: {}", declared.code(), declared.since());
+    }
+}
+
+#[test]
+fn every_code_says_what_it_means_what_to_do_and_how_it_is_answered() {
+    for declared in super::every_declared() {
+        assert!(!declared.meaning().trim().is_empty(), "{}", declared.code());
+        assert!(!declared.remedy().trim().is_empty(), "{}", declared.code());
+        assert!(
+            (400..600).contains(&declared.status()),
+            "{}: {}",
+            declared.code(),
+            declared.status()
+        );
+    }
+}
+
+#[test]
+fn each_way_a_run_leaves_has_its_own_exit_and_none_is_success_or_usage() {
+    let exits = [
+        Leaves::Failure.exit(),
+        Leaves::Preflight.exit(),
+        Leaves::NeverSettled.exit(),
+        Leaves::Validation.exit(),
+    ];
+    let unique: BTreeSet<u8> = exits.into_iter().collect();
+    assert_eq!(unique.len(), exits.len());
+    assert!(!unique.contains(&0) && !unique.contains(&2));
+}
+
+#[test]
+fn a_code_nothing_declares_leaves_with_a_failure() {
+    assert_eq!(leaves(crate::Code::new("NOWHERE-1")), Leaves::Failure);
+}
+
+#[test]
+fn a_family_says_what_it_covers() {
+    let stack = super::families()
+        .iter()
+        .find(|family| family.prefix() == "STACK")
+        .map(|family| family.covers());
+    assert_eq!(stack, Some("the stack description"));
+}

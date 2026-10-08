@@ -15,7 +15,7 @@ use lemonfiber_sidecar::decline::{Lapses, Refusals};
 
 use super::{Category, Check, Finding, Verdict};
 use crate::error::codes::decline::UNEXPLAINED;
-use crate::error::{Problem, Remedy, Severity};
+use crate::error::{Problem, Remedy};
 use crate::jellyfin::Dated;
 use crate::ports::filesystem::{Beneath, FileSystem};
 
@@ -242,7 +242,6 @@ fn unexplained(used: u64, explained: Option<u64>) -> Problem {
     );
     Problem::new(
         UNEXPLAINED,
-        Severity::Warning,
         format!(
             "the decline service's key was used at {}, {after}",
             instant(used)

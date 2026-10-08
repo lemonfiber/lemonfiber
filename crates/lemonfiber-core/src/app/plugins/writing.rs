@@ -14,7 +14,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 
 use crate::error::Diagnose as _;
 use crate::journal::{Change, Kind};
@@ -305,7 +305,6 @@ pub(crate) fn overwritten(overwrites: &[Overwrite]) -> Result<(), Box<Problem>> 
 fn moved_since(at: &Path) -> Problem {
     Problem::new(
         crate::error::codes::wire::WIRING_MOVED,
-        Severity::Error,
         "What is installed changed while that choice was being made",
         format!(
             "{} no longer holds what it held when the choice was read, so nothing was changed.",
@@ -320,7 +319,6 @@ fn moved_since(at: &Path) -> Problem {
 fn not_overwritten(at: &Path, why: &str) -> Problem {
     Problem::new(
         crate::error::codes::wire::CHOICE_UNWRITABLE,
-        Severity::Error,
         format!("{} could not be written", at.display()),
         "The choice is recorded, and the change record holds what this file held, so \
          `lemonfiber history` says what is there and it can be put back.",
@@ -416,7 +414,6 @@ pub(crate) fn unanswered(
         Err(Box::new(
             Problem::new(
                 ANSWERED,
-                Severity::Error,
                 format!(
                     "{} would answer on {label}, which {plugin} already does",
                     would.plugin
@@ -447,7 +444,6 @@ pub(crate) fn unshared(
         Err(Box::new(
             Problem::new(
                 SPELLED_ALIKE,
-                Severity::Error,
                 format!(
                     "{}'s service {ours} would be named as {plugin}'s {theirs} already is",
                     would.plugin
@@ -471,7 +467,6 @@ pub(crate) fn unshared(
 pub(crate) fn nowhere_to_write(plugin: &str) -> Problem {
     Problem::new(
         NOWHERE,
-        Severity::Error,
         format!("there is nowhere to install {plugin} to"),
         "Nothing was installed and nothing was written. A plugin's service is a container in \
          the stack, and this machine has no stack directory configured to put one in.",
@@ -484,7 +479,6 @@ pub(crate) fn nowhere_to_write(plugin: &str) -> Problem {
 fn unwritable(at: &Path, why: &str) -> Problem {
     Problem::new(
         UNWRITABLE,
-        Severity::Error,
         format!("{} could not be written", at.display()),
         "The install stopped where it was. What it had already written is in the change \
          record, so `lemonfiber history` says what is there and it can be put back.",

@@ -6,7 +6,6 @@
 
 use super::common::stack::project;
 use super::{driven, over, replacing, replacing_as, somebody_elses};
-use lemonfiber_core::agreement;
 use lemonfiber_core::app::{Ctx, MigrateAction};
 use lemonfiber_core::error::codes::migrate::OFFER_MOVED;
 use lemonfiber_core::migration::mode::Mode;
@@ -120,8 +119,8 @@ async fn an_offer_that_has_moved_is_refused_by_name_and_stops_nothing() {
         Some(OFFER_MOVED)
     );
     assert_eq!(
-        refused.as_ref().map(|problem| problem.amiss),
-        Some(agreement::MOVED_AMISS),
+        refused.as_ref().map(|problem| problem.status()),
+        Some(400),
         "answered as an answer to correct, never as a failure of the machine"
     );
     // What moved is named: what it would stop now, beside both names.

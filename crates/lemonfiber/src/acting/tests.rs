@@ -18,7 +18,7 @@ use lemonfiber_core::backup::{Manifest, Relocation, Scope, SCHEMA};
 use lemonfiber_core::bundle::run::Wanted as Bundled;
 use lemonfiber_core::bundle::{Contents, Filenames};
 use lemonfiber_core::doctor::{Category, Finding, Narrowing, Overall, Verdict};
-use lemonfiber_core::error::{Code, Problem, Remedy, Severity};
+use lemonfiber_core::error::{Code, Problem, Remedy};
 use lemonfiber_core::model::{
     Disposition, DoctorReport, FormsReport, PresetChoice, QualityReport, ResetReport, StackEdit,
     StuckEntry, StuckReport, SupervisionReport, TraceReport, UpgradeMedia, UpgradeReport,
@@ -183,7 +183,6 @@ fn a_diagnosis() -> DoctorReport {
 fn a_failure() -> Problem {
     Problem::new(
         Code::new("TEST-1"),
-        Severity::Error,
         "the container engine could not be reached",
         "Nothing can be started or stopped until it answers.",
         Remedy::new("Start the container engine"),

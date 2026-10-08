@@ -64,7 +64,6 @@ pub(super) async fn guarded(
 pub(super) fn unrecorded(name: &str) -> crate::error::Problem {
     crate::error::Problem::new(
         crate::error::codes::invite::UNRECORDED,
-        crate::error::Severity::Error,
         format!(
             "when {name} was offered an account could not be written down, so it was not offered"
         ),
@@ -80,7 +79,6 @@ pub(super) fn unrecorded(name: &str) -> crate::error::Problem {
 pub(super) fn unguarded(name: &str) -> crate::error::Problem {
     crate::error::Problem::new(
         crate::error::codes::invite::UNGUARDED,
-        crate::error::Severity::Error,
         format!("the media server would not ready {name}'s account to be claimed"),
         "An account is offered switched on, with a limit on wrong passwords, and the media \
          server would not write either",

@@ -1,6 +1,6 @@
 use super::{suppressing, Accepted};
 use crate::doctor::{Category, Finding, Verdict};
-use crate::error::{Code, Problem, Remedy, Severity, State};
+use crate::error::{Code, Problem, Remedy, State};
 
 const CODE: Code = Code::new("test.choice");
 
@@ -25,7 +25,6 @@ fn warned(check: &str) -> Finding {
         "Running without a tunnel",
         Verdict::Warn(Problem::new(
             CODE,
-            Severity::Warning,
             "No VPN is configured",
             "Torrent traffic leaves this machine under its own address.",
             Remedy::new("Configure a VPN, or accept this deliberately"),
@@ -83,7 +82,6 @@ fn a_failure_is_never_acknowledged_away() {
         "Traffic is behind the tunnel",
         Verdict::Fail(Problem::new(
             CODE,
-            Severity::Critical,
             "Traffic is leaving outside the tunnel",
             "Every torrent this machine runs is visible under its own address.",
             Remedy::new("Stop the download client"),

@@ -2,12 +2,11 @@
 //! by the stamp named, more than one, and a change that cannot be put back.
 
 use crate::error::codes::undo::{CANNOT_SUCCEED, MORE_THAN_ONE_RUN, NOWHERE_TO_LOOK, NO_SUCH_RUN};
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 
 pub(super) fn nowhere_to_look() -> Problem {
     Problem::new(
         NOWHERE_TO_LOOK,
-        Severity::Error,
         "This run has nowhere it knows to look for what was changed",
         "What lemonfiber changed is recorded in its own directory, and this machine \
          would not say where that is. Nothing was put back.",
@@ -19,7 +18,6 @@ pub(super) fn nowhere_to_look() -> Problem {
 pub(super) fn no_such_run(at: &str) -> Problem {
     Problem::new(
         NO_SUCH_RUN,
-        Severity::Error,
         format!("Nothing was changed at {at}"),
         format!(
             "No run in the record carries the stamp {at}. It may have fallen outside the \
@@ -33,7 +31,6 @@ pub(super) fn no_such_run(at: &str) -> Problem {
 pub(super) fn more_than_one(at: &str, operations: &[&str]) -> Problem {
     Problem::new(
         MORE_THAN_ONE_RUN,
-        Severity::Error,
         format!("More than one run is stamped {at}"),
         format!(
             "{at} names {}, and putting back the wrong one is not something to guess at. \
@@ -48,7 +45,6 @@ pub(super) fn more_than_one(at: &str, operations: &[&str]) -> Problem {
 pub(super) fn cannot_succeed(at: &str, target: &str, why: &str) -> Problem {
     Problem::new(
         CANNOT_SUCCEED,
-        Severity::Error,
         format!("The run stamped {at} cannot be put back"),
         format!(
             "One of its changes, against {target}, cannot be reversed: {why}. A run goes \

@@ -26,7 +26,7 @@ use serde::Serialize;
 use thiserror::Error;
 
 use lemonfiber_error::codes::host::{DEFINITION_UNWRITABLE, MANAGER_REFUSED, NOTHING_TO_HOST_WITH};
-use lemonfiber_error::{Diagnose, Problem, Remedy, Severity, State};
+use lemonfiber_error::{Diagnose, Problem, Remedy, State};
 
 /// The service manager a machine has, or the absence of one lemonfiber configures.
 ///
@@ -187,7 +187,6 @@ impl Diagnose for Failure {
         match self {
             Self::Unhostable => Problem::new(
                 NOTHING_TO_HOST_WITH,
-                Severity::Warning,
                 "this machine has no service manager lemonfiber can configure",
                 "The command can still be run, and it will still stop when the terminal running it closes.",
                 Remedy::new(
@@ -197,7 +196,6 @@ impl Diagnose for Failure {
             .in_state(State::Guided),
             Self::Unwritable { at, reason } => Problem::new(
                 DEFINITION_UNWRITABLE,
-                Severity::Error,
                 format!("the service could not be written to {}", at.display()),
                 "Nothing was installed, so nothing is running and nothing was left behind.",
                 Remedy::new("Check that the directory exists and belongs to you, then try again"),
@@ -205,7 +203,6 @@ impl Diagnose for Failure {
             .with_detail(reason.clone()),
             Self::Refused { manager, reason } => Problem::new(
                 MANAGER_REFUSED,
-                Severity::Error,
                 format!("{manager} would not take the service"),
                 "The definition that had been written was removed again, so nothing is half-installed.",
                 Remedy::new("Read what it said below, then try again once that is dealt with"),

@@ -16,7 +16,7 @@
 use serde::Serialize;
 
 use crate::archive::Fault;
-use crate::error::{Problem, Remedy, Severity, State};
+use crate::error::{Problem, Remedy, State};
 
 use super::Ctx;
 use crate::error::codes::backup::{NOT_LISTED, NOWHERE_KEPT};
@@ -65,7 +65,6 @@ pub async fn archives(ctx: &Ctx) -> Result<Listing, Box<Problem>> {
 fn nowhere() -> Problem {
     Problem::new(
         NOWHERE_KEPT,
-        Severity::Error,
         "This run has nowhere it knows to look for backups",
         "Backups are kept in lemonfiber's own directory, and this machine would not say where \
          that is — so there is nowhere to read a list of them from.",
@@ -78,7 +77,6 @@ fn nowhere() -> Problem {
 fn not_listed(fault: &Fault) -> Problem {
     Problem::new(
         NOT_LISTED,
-        Severity::Error,
         "The backups kept here could not be listed",
         "The directory lemonfiber keeps backups in would not be read, so what is in it is not \
          known. Nothing was touched.",

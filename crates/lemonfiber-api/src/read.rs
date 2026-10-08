@@ -32,7 +32,7 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 use lemonfiber_core::app::{dispatch, Command, Ctx};
-use lemonfiber_core::error::{Amiss, Problem};
+use lemonfiber_core::error::{Code, Problem};
 use lemonfiber_core::model::{kind, Envelope};
 
 use crate::admission::Caller;
@@ -146,10 +146,10 @@ pub(crate) fn went_wrong(problem: &Problem) -> Response {
 /// what cannot succeed, and would have to word its message so as to be true of a
 /// broken stack as well.
 ///
-/// Read from the problem rather than decided here. Which of these a code means is
-/// known where the code is raised and nowhere else; a list of codes kept on this
-/// side would be a second place to remember, and a code added later would answer
-/// wrongly until somebody thought to come back.
+/// Read from the code rather than decided here. Each code is declared with its
+/// status in the registry; a list of codes kept on this side would be a second
+/// place to remember, and a code added later would answer wrongly until somebody
+/// thought to come back.
 ///
 /// The two a caller can act on are told apart the way the write surface tells its
 /// own apart: what a request *named* and this product does not have is absent,
@@ -158,21 +158,14 @@ pub(crate) fn went_wrong(problem: &Problem) -> Response {
 /// never this product failing. Every surface that answers with a problem
 /// reads this one, so a single refusal cannot carry two statuses depending on
 /// which door it arrived through.
-pub(crate) const fn refusing(problem: &Problem) -> StatusCode {
-    answering(problem.amiss)
+pub(crate) fn refusing(problem: &Problem) -> StatusCode {
+    answered_with(problem.code)
 }
 
-/// The status a refusal whose fault lies in `amiss` is answered with.
-///
-/// Apart from [`refusing`] so that what publishes a refusal before any is raised —
-/// the contract, listing the codes a client branches on — reads the same answer.
-pub(crate) const fn answering(amiss: Amiss) -> StatusCode {
-    match amiss {
-        Amiss::Naming => StatusCode::NOT_FOUND,
-        Amiss::Asking => StatusCode::BAD_REQUEST,
-        Amiss::Held => StatusCode::CONFLICT,
-        Amiss::Answering => FAILED,
-    }
+/// The status a problem carrying `code` is answered with: the one the code is
+/// declared with, or a failure of this surface where that is not a status at all.
+pub(crate) fn answered_with(code: Code) -> StatusCode {
+    StatusCode::from_u16(code.status()).unwrap_or(FAILED)
 }
 
 /// A rendered envelope as a response, at the status the answer warrants.

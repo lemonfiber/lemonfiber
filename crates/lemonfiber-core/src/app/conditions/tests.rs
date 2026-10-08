@@ -95,7 +95,6 @@ fn found(verdict: Verdict) -> Finding {
 fn full() -> Problem {
     Problem::new(
         CODE,
-        Severity::Error,
         "the volume has no room left",
         "nothing can be written, so imports will fail where they stand",
         Remedy::new("delete something, or move the library"),

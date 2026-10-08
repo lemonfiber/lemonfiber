@@ -10,7 +10,6 @@ use crate::repair::{Attempt, Outcome, Repair, ATTEMPTS};
 fn problem() -> Problem {
     Problem::new(
         crate::error::codes::vpn::PORT_MISMATCH,
-        Severity::Warning,
         "it is on the wrong port",
         "peers cannot reach it",
         Remedy::new("move it"),
@@ -253,15 +252,9 @@ async fn consent_given_for_an_offer_that_has_moved_on_is_refused() {
     let refused = putting_right(&ctx_at("repair-stale"), &consent, false)
         .await
         .err()
-        .map(|problem| (problem.code, problem.amiss));
+        .map(|problem| (problem.code, problem.status()));
 
-    assert_eq!(
-        refused,
-        Some((
-            crate::error::codes::repair::STALE,
-            crate::agreement::MOVED_AMISS
-        ))
-    );
+    assert_eq!(refused, Some((crate::error::codes::repair::STALE, 400)));
 }
 
 /// A run that cannot say where lemonfiber keeps its own files has nothing to
