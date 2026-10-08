@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What to do about an interrupted apply, once one is found.\n\nThe three exits the setup wizard promises for its one dangerous state: keep\ngoing, walk it back, or drop it entirely. A surface offers these; [`Recovery`]\nturns the chosen one into the work it means.\n\nRead back as well as built, because the surface offering them may not be in this\nprocess: a browser sends the one the operator picked by the name it is written\nunder here.",
+  "oneOf": [
+    {
+      "description": "Carry on from where apply stopped, keeping what was already written.",
+      "type": "string",
+      "const": "resume"
+    },
+    {
+      "description": "Undo what was written and return to the reviewed answers, ready to apply\nagain.",
+      "type": "string",
+      "const": "roll-back"
+    },
+    {
+      "description": "Undo what was written and discard the answers too, back to a clean slate.",
+      "type": "string",
+      "const": "start-over"
+    }
+  ]
+}

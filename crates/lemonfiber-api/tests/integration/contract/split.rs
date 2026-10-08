@@ -12,6 +12,7 @@ fn holding(kinds: &[(&str, Value)]) -> Contract {
     Contract {
         api_version: 7,
         actions: Vec::new(),
+        bodies: BTreeMap::new(),
         key_callable: Vec::new(),
         kinds: kinds
             .iter()
@@ -117,6 +118,7 @@ fn the_index_carries_the_version_and_names_every_other_file() {
         json!({
             "api_version": 7,
             "actions": {},
+            "bodies": {},
             "key_callable": "key-callable.json",
             "kinds": { "doctor": "kinds/doctor.json" },
             "reads": "reads.json",
@@ -198,4 +200,35 @@ fn a_definition_names_no_dialect_where_no_kind_does() {
     };
 
     assert_eq!(file(&files, "defs/Code.json"), json!({ "type": "string" }));
+}
+
+/// A body is written under its route, its definitions moved beside the kinds' and
+/// pointed at there, and the index names the file by the route.
+#[test]
+fn a_body_is_filed_under_its_route_with_its_definitions_shared() {
+    let mut contract = holding(&[("doctor", carrying_remedy())]);
+    let Ok(body) = Schema::try_from(json!({
+        "type": "object",
+        "properties": { "choice": { "$ref": "#/$defs/Choice" } },
+        "$defs": { "Choice": { "type": "string", "enum": ["resume"] } }
+    })) else {
+        unreachable!("the body is an object");
+    };
+    contract
+        .bodies
+        .insert("/api/setup/recover".to_owned(), body);
+    let Ok(files) = contract.files() else {
+        unreachable!("one body cannot disagree with itself");
+    };
+    let index = file(&files, INDEX);
+    assert_eq!(
+        index.pointer("/bodies/~1api~1setup~1recover"),
+        Some(&json!("bodies/setup-recover.json"))
+    );
+    let written = file(&files, "bodies/setup-recover.json");
+    assert_eq!(
+        written.pointer("/properties/choice/$ref"),
+        Some(&json!("../defs/Choice.json"))
+    );
+    assert!(files.contains_key("defs/Choice.json"));
 }

@@ -44,15 +44,21 @@ use crate::read::{enveloped, refusing};
 use crate::refusal::Refusal;
 use crate::router::Serving;
 
+/// Where one answer to a question setup asks is given.
+pub const ANSWER: &str = "/api/setup/answer";
+
+/// Where the way out of an interrupted apply is chosen.
+pub const RECOVER: &str = "/api/setup/recover";
+
 /// The six requests setup is walked with.
 pub fn routes() -> Router<Serving> {
     Router::new()
         .route("/api/setup", get(standing))
-        .route("/api/setup/answer", post(answered))
+        .route(ANSWER, post(answered))
         .route("/api/setup/next", post(onward))
         .route("/api/setup/back", post(backward))
         .route("/api/setup/apply", post(applied))
-        .route("/api/setup/recover", post(recovered))
+        .route(RECOVER, post(recovered))
 }
 
 /// Where setup stands, and what it is still asking for.
@@ -116,11 +122,21 @@ async fn recovered(
 /// A named field rather than a bare word, so the body is an object like every other
 /// this surface takes and a second thing to decide can be added without the shape
 /// changing under a caller.
-#[derive(Deserialize)]
+#[derive(Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[schemars(rename = "SetupRecovery")]
 struct Chosen {
     /// Which of the three ways out.
     choice: Choice,
+}
+
+/// The bodies setup's routes take, each with the route it is sent to, described from
+/// the types the routes read them into.
+pub(crate) fn bodies() -> [(&'static str, schemars::Schema); 2] {
+    [
+        (ANSWER, schemars::schema_for!(Answer)),
+        (RECOVER, schemars::schema_for!(Chosen)),
+    ]
 }
 
 /// One step of the walk, carried out and answered with where it left setup.

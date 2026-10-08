@@ -189,7 +189,7 @@ fn every_file_is_reached_from_the_index() {
         .iter()
         .filter_map(|key| index.get(key))
         .for_each(&mut named);
-    ["kinds", "actions"]
+    ["kinds", "actions", "bodies"]
         .iter()
         .filter_map(|key| index.get(key).and_then(Value::as_object))
         .flat_map(|listed| listed.values())

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SignIn",
+  "description": "What a caller offers at the door.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "description": "Who they say they are, where they say so. Absent from an operator signing in\nwith the machine's own password, which is nobody's name.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "password": {
+      "description": "What was typed.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "password"
+  ]
+}

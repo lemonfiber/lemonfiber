@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Answer",
+  "description": "One answer, tagged by the step it belongs to.\n\nRead back as well as built, because a surface that is not in this process\nsubmits one: the tag is the step, so an answer names the question it belongs\nto rather than arriving as a field a reader has to guess the meaning of.",
+  "oneOf": [
+    {
+      "description": "The protocol choice.",
+      "type": "object",
+      "properties": {
+        "protocols": {
+          "$ref": "../defs/Protocols.json"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "protocols"
+      ]
+    },
+    {
+      "description": "Whether a VPN carries the torrents, and where none does, that the operator\naccepted what that means.",
+      "type": "object",
+      "properties": {
+        "vpn": {
+          "$ref": "../defs/SetupVpn.json"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "vpn"
+      ]
+    },
+    {
+      "description": "The data location.",
+      "type": "object",
+      "properties": {
+        "data-location": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "data-location"
+      ]
+    },
+    {
+      "description": "The indexer credential the operator settled on, or none where they entered\nnothing.",
+      "type": "object",
+      "properties": {
+        "credentials": {
+          "anyOf": [
+            {
+              "$ref": "../defs/Indexer.json"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "credentials"
+      ]
+    },
+    {
+      "description": "The Usenet provider the operator settled on, or none where they entered\nnothing.",
+      "type": "object",
+      "properties": {
+        "provider": {
+          "anyOf": [
+            {
+              "$ref": "../defs/Provider.json"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "provider"
+      ]
+    },
+    {
+      "description": "The container user and group, or none where it is not needed.",
+      "type": "object",
+      "properties": {
+        "service-user": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "service-user"
+      ]
+    },
+    {
+      "description": "How the library is served.",
+      "type": "object",
+      "properties": {
+        "library": {
+          "$ref": "../defs/Library.json"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "library"
+      ]
+    },
+    {
+      "description": "How much the operator wants to be told about.",
+      "type": "object",
+      "properties": {
+        "notifications": {
+          "$ref": "../defs/Appetite.json"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "notifications"
+      ]
+    },
+    {
+      "description": "Whether the household uses it.",
+      "type": "object",
+      "properties": {
+        "household": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "household"
+      ]
+    },
+    {
+      "description": "Whether to start on boot.",
+      "type": "object",
+      "properties": {
+        "autostart": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "autostart"
+      ]
+    }
+  ]
+}

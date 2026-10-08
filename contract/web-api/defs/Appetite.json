@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How much an operator wants to be told.",
+  "oneOf": [
+    {
+      "description": "Failures and risks. Silence means healthy. The one chosen when the operator\nexpresses no preference.",
+      "type": "string",
+      "const": "problems-only"
+    },
+    {
+      "description": "The above, plus downloads and imports that succeeded.",
+      "type": "string",
+      "const": "with-completions"
+    },
+    {
+      "description": "The above, plus advisories such as an available update.",
+      "type": "string",
+      "const": "everything"
+    }
+  ]
+}

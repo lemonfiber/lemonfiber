@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SetupRecovery",
+  "description": "The way out of an interrupted apply a caller picked.\n\nA named field rather than a bare word, so the body is an object like every other\nthis surface takes and a second thing to decide can be added without the shape\nchanging under a caller.",
+  "type": "object",
+  "properties": {
+    "choice": {
+      "description": "Which of the three ways out.",
+      "$ref": "../defs/Choice.json"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "choice"
+  ]
+}

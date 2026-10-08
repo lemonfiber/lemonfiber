@@ -94,6 +94,13 @@ pub struct Contract {
     /// asked for rather than a document, and a client generating a method per action
     /// reads this before it asks anything.
     pub actions: Vec<Action>,
+    /// The route each request body is sent to, to the schema of that body: every
+    /// route's but an action's, whose arguments `actions` lists one by one.
+    ///
+    /// Beside the kinds for the reason the reads are: a body is what a request carries
+    /// rather than a document any request answers with, and a client building a
+    /// request reads it before it asks anything.
+    pub bodies: BTreeMap<String, Schema>,
     /// Every action a key may call, with whether it disturbs the running system,
     /// whether it takes a rehearsal and whether calling it twice is calling it once.
     ///
@@ -156,6 +163,7 @@ impl Contract {
         Self {
             api_version: API_VERSION,
             actions: actions::published::every(rehearsable),
+            bodies: bodies(),
             key_callable: key_callable(),
             kinds,
             reads: published::every(),
@@ -244,6 +252,15 @@ fn refusals() -> BTreeMap<String, Listed> {
                 },
             ))
         })
+        .collect()
+}
+
+/// Every body a route takes, keyed by the route, from the type the route reads it into.
+fn bodies() -> BTreeMap<String, Schema> {
+    crate::setup::bodies()
+        .into_iter()
+        .chain([crate::keys::body(), crate::admission::body()])
+        .map(|(route, schema)| (route.to_owned(), schema))
         .collect()
 }
 

@@ -427,7 +427,8 @@ impl<S: Send + Sync> FromRequestParts<S> for Caller {
 }
 
 /// What a caller offers at the door.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+#[schemars(rename = "SignIn")]
 struct Given {
     /// Who they say they are, where they say so. Absent from an operator signing in
     /// with the machine's own password, which is nobody's name.
@@ -435,6 +436,12 @@ struct Given {
     name: Option<String>,
     /// What was typed.
     password: String,
+}
+
+/// The body signing in takes, with the route it is sent to, described from the type
+/// the route reads it into.
+pub(crate) fn body() -> (&'static str, schemars::Schema) {
+    (SESSION, schemars::schema_for!(Given))
 }
 
 /// The one route.

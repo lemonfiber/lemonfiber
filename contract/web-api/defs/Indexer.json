@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "An indexer credential the operator supplied, and whether it was proven.\n\n`validated` records whether the live test passed before this was kept — an\noperator may proceed with one that could not be proven, and a later diagnosis\nis owed the knowledge that it went in unverified rather than treating it as\ngood.",
+  "type": "object",
+  "properties": {
+    "key": {
+      "description": "The API key it authenticates with.",
+      "type": "string"
+    },
+    "url": {
+      "description": "The indexer's API base URL.",
+      "type": "string"
+    },
+    "validated": {
+      "description": "Whether a live test proved the key before it was kept.\n\nDefaulted when it is absent, so a surface submitting an answer states only\nwhat was entered; what a test decided is not a caller's to assert.",
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "url",
+    "key"
+  ]
+}
