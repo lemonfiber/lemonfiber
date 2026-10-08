@@ -25,17 +25,13 @@ updates:
     commit-message:
       prefix: chore
       include: scope
-    # A release waits three days before it is offered. The shared gates are
-    # excluded from that wait: a repo running a stale gate is the failure this
-    # grouping exists to prevent, and the delay is the whole cost of it.
-    # Security updates are never subject to cooldown.
     cooldown:
       default-days: 3
-      exclude: ["lemonfiber/spec*"]
+    # lemonfiber/spec's workflows are moved by the release train's one rolling
+    # bump pull request (OPS-R85), never by this updater.
+    ignore:
+      - dependency-name: "lemonfiber/spec*"
     groups:
-      # First match wins, so the shared gates are claimed before the wildcard.
-      shared-workflows:
-        patterns: ["lemonfiber/spec*"]
       # `init`, `autobuild` and `analyze` here, and `upload-sarif` in the
       # scorecard workflow, are one action published from one repository, and
       # CodeQL refuses a run whose `init` and `analyze` are different revisions
@@ -51,7 +47,6 @@ updates:
         update-types: ["major", "minor", "patch"]
       actions:
         patterns: ["*"]
-        exclude-patterns: ["lemonfiber/spec*"]
         # Majors are left out, so each arrives on its own carrying `major`.
         update-types: ["minor", "patch"]
 
