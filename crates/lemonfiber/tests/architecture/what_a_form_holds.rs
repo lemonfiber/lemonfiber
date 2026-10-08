@@ -36,8 +36,8 @@ const DECLARED: &str = "const LIBRARY: [&str;";
 /// Through the manifest reader rather than by matching text, so a stack that renames a
 /// profile or moves a service between them is read the way lemonfiber reads it.
 fn declared() -> BTreeSet<String> {
-    let path = workspace_root().join("assets/media-stack/stack.toml");
-    let text = std::fs::read_to_string(&path).unwrap_or_default();
+    let path = workspace_root().join("assets/media-stack");
+    let text = lemonfiber_manifest::read(&path).unwrap_or_default();
     assert!(
         !text.is_empty(),
         "the pinned stack is not at {} — the submodule is not checked out, so this \

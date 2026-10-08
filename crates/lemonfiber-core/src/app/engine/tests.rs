@@ -1,7 +1,7 @@
 use super::settling::costs;
 use lemonfiber_manifest::Manifest;
 
-const STACK: &str = include_str!("../../../../../assets/media-stack/stack.toml");
+const STACK: &str = lemonfiber_bundled::STACK;
 
 /// What the stack this repository ships would say about these services.
 fn said(waiting: &[&str]) -> Option<String> {

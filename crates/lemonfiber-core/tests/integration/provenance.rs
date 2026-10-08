@@ -89,7 +89,7 @@ async fn the_pin_is_an_exact_version_and_the_image_it_belongs_to() {
 async fn the_order_is_the_one_the_stack_declares_rather_than_one_of_lemonfibers_own() {
     let report = listed().await;
     let manifest = lemonfiber_manifest::Manifest::from_toml(
-        &std::fs::read_to_string(project().join("stack.toml")).unwrap_or_default(),
+        &lemonfiber_manifest::read(project()).unwrap_or_default(),
     );
 
     let declared: Vec<String> = manifest

@@ -20,14 +20,8 @@ use lemonfiber_sidecar::decline::{Lapse, Lapses, Left, Outcome as Lapsed, TokenH
 /// The shipped stack, which runs the decline service, under a scratch directory of its
 /// own.
 fn stack_with_decline(tag: &str) -> PathBuf {
-    let from = Path::new(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../assets/media-stack"
-    ));
     let to = lemonfiber_fixtures::scratch::Scratch::named(&format!("lapsed-{tag}")).kept();
-    let _ = std::fs::create_dir_all(&to);
-    let read = std::fs::read_to_string(from.join("stack.toml")).unwrap_or_default();
-    let _ = std::fs::write(to.join("stack.toml"), read);
+    lemonfiber_fixtures::stack::manifest_into(&to);
     to
 }
 

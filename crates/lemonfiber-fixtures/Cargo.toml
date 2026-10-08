@@ -16,6 +16,9 @@ publish = false
 # builds that crate twice, once plain and once under `cfg(test)`, and a fake implementing
 # one copy's trait is not the other copy's. That cycle is why these fakes existed twice.
 lemonfiber-ports = { workspace = true }
+# Where a stack's manifest files are, for writing the carried stack where a test can
+# change it.
+lemonfiber-manifest = { workspace = true }
 async-trait = { workspace = true }
 tokio = { workspace = true, features = ["sync", "time"] }
 

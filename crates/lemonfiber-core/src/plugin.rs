@@ -114,7 +114,7 @@ pub use lemonfiber_plugin::vocabulary::{
 pub use lemonfiber_plugin::Violation;
 
 /// The stack this build pins, which is what says who declares each capability.
-const STACK: &str = include_str!("../../../assets/media-stack/stack.toml");
+const STACK: &str = lemonfiber_bundled::STACK;
 
 /// Where the generated manifest schema is kept, relative to the workspace root.
 pub const SCHEMA_PATH: &str = "contract/plugin-manifest.schema.json";

@@ -15,6 +15,7 @@
 schema_version  = 1
 stack_version   = "1.0.0"
 min_cli_version = "0.1.0"
+include = ["services/sonarr.toml", "services/pantograph.toml"]
 
 [[profile]]
 id          = "tv"
@@ -26,44 +27,3 @@ id          = "tv"
 name        = "Television"
 description = "Series."
 profiles    = ["tv"]
-
-[[service]]
-id           = "sonarr"
-name         = "Sonarr"
-profile      = "tv"
-image        = "linuxserver/sonarr"
-tag          = "4.0.10"
-digest = "sha256:abababababababababababababababababababababababababababababababab"
-port         = 8989
-listens      = 8989
-bind         = "loopback"
-criticality  = "core"
-license      = "GPL-3.0-only"
-upstream     = "https://github.com/Sonarr/Sonarr"
-last_release = "2026-01-01"
-describes    = "Watches for series and files them into the library."
-without_it   = "Nothing files series; you move the downloads yourself."
-reaches      = "television metadata providers"
-asks_for     = "Reads series, season and episode information for what this operator's library holds."
-
-[service.api]
-kind       = "servarr"
-key_source = "config-xml"
-path       = "/config/config.xml"
-version    = 3
-
-[[service]]
-id           = "pantograph"
-name         = "Pantograph"
-profile      = "tv"
-image        = "somebody/pantograph"
-tag          = "2.1.0"
-digest = "sha256:abababababababababababababababababababababababababababababababab"
-port         = 9411
-bind         = "loopback"
-criticality  = "enhancing"
-license      = "MIT"
-upstream     = "https://example.invalid/pantograph"
-last_release = "2026-02-01"
-describes    = "Does something this operator wanted and lemonfiber does not ship."
-without_it   = "Whatever it does stops; lemonfiber cannot say what that is."

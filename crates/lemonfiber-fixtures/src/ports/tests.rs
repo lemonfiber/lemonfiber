@@ -12,10 +12,8 @@ use super::TODAY;
 /// the stack moves.
 #[test]
 fn the_frozen_day_is_not_older_than_the_stack_it_validates() {
-    let manifest = include_str!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../assets/media-stack/stack.toml"
-    ));
+    let manifest =
+        lemonfiber_manifest::read(std::path::Path::new(crate::stack::CARRIED)).unwrap_or_default();
     let latest = manifest
         .lines()
         .filter_map(|line| line.trim().strip_prefix("last_release = "))

@@ -4,7 +4,7 @@ use crate::docker::{Criticality, Service, State};
 use crate::stack::closure::{Dropped, Protocol};
 use lemonfiber_manifest::Manifest;
 
-const STACK: &str = include_str!("../../../../../assets/media-stack/stack.toml");
+const STACK: &str = lemonfiber_bundled::STACK;
 
 /// The stack this repository ships, which is what every form here is declared by.
 fn stack() -> Option<Manifest> {

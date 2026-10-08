@@ -20,7 +20,7 @@ use lemonfiber_manifest::Manifest;
 use tokio::sync::mpsc::Receiver;
 
 /// The stack this repository carries, whose torrent pair the check resolves.
-const STACK: &str = include_str!("../../../../../assets/media-stack/stack.toml");
+const STACK: &str = lemonfiber_bundled::STACK;
 
 /// How one container should answer the check.
 #[derive(Clone)]
@@ -332,6 +332,7 @@ pub fn empty() -> Manifest {
         schema_version: 1,
         stack_version: String::new(),
         min_cli_version: String::new(),
+        include: Vec::new(),
         profiles: Vec::new(),
         forms: Vec::new(),
         services: Vec::new(),

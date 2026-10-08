@@ -595,14 +595,8 @@ async fn offered_without_writing(named: &str, dry_run: bool, confirm: bool) {
 #[tokio::test]
 async fn an_offer_on_a_stack_running_the_decline_service_carries_its_decline_address() {
     let env = recorded_admin("offers-declinable");
-    let from = std::path::Path::new(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../assets/media-stack"
-    ));
     let stack = lemonfiber_fixtures::scratch::Scratch::named("offers-declinable-stack").kept();
-    let _ = std::fs::create_dir_all(&stack);
-    let read = std::fs::read_to_string(from.join("stack.toml")).unwrap_or_default();
-    let _ = std::fs::write(stack.join("stack.toml"), read);
+    lemonfiber_fixtures::stack::manifest_into(&stack);
     let stack: &'static std::path::Path = Box::leak(stack.into_boxed_path());
     let http = Fake::by_path_in_turn(vec![
         (

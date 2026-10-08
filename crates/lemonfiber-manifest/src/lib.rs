@@ -1,4 +1,5 @@
-//! Parsing of `stack.toml`, the contract between `lemonfiber` and `lemonfiber-media-stack`.
+//! Parsing of a stack manifest, the contract between `lemonfiber` and
+//! `lemonfiber-media-stack`: `stack.toml` and the service files it includes.
 //! See spec `20-architecture/contracts/stack-manifest.md`.
 //!
 //! This crate is deliberately inert: it reads a manifest into types and refuses
@@ -6,6 +7,7 @@
 //! `lemonfiber-core`, which is what lets both be tested with no Docker, no
 //! terminal and no configuration.
 
+pub mod assembly;
 mod binary;
 mod date;
 mod error;
@@ -15,6 +17,7 @@ mod schema;
 mod spelling;
 mod validate;
 
+pub use assembly::{assemble, read};
 pub use date::Date;
 pub use error::Failure;
 pub use schema::{

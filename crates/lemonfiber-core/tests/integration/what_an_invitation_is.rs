@@ -262,18 +262,8 @@ async fn somebody_already_here_is_named_once() {
 async fn a_stack_with_no_request_service_calls_it_nothing_tried() {
     static WITHOUT: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
     let dir = WITHOUT.get_or_init(|| {
-        let from = std::path::Path::new(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../assets/media-stack"
-        ));
         let to = lemonfiber_fixtures::scratch::Scratch::named("no-asking").kept();
-        let _ = std::fs::create_dir_all(&to);
-        let read = std::fs::read_to_string(from.join("stack.toml")).unwrap_or_default();
-        // Every block but the request service's, kept in order — and the links that
-        // named it with it, because a stack that drops a service drops what reached
-        // it, and one that kept them would be refused before this test asked
-        // anything.
-        let _ = std::fs::write(to.join("stack.toml"), without(&read, "seerr"));
+        lemonfiber_fixtures::stack::manifest_without(&to, "seerr");
         to
     });
 
@@ -403,23 +393,4 @@ async fn an_invitation_serialises_under_its_own_name() {
     assert!(json.contains("\"invitation\""), "{json}");
     assert!(json.contains("ana"), "{json}");
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
-}
-
-/// A stack description with one service gone, and every link that named it.
-///
-/// A fork removing a service removes what reached it too, so a fixture that kept
-/// the links would be refused for naming a service the manifest no longer declares
-/// — which is the rule working, and not what this test is about.
-fn without(stack: &str, service: &str) -> String {
-    let named = format!("\"{service}\"");
-    let services: String = stack
-        .split("[[service]]")
-        .filter(|block| !block.contains(&format!("id = {named}")))
-        .collect::<Vec<_>>()
-        .join("[[service]]");
-    services
-        .split("[[wiring]]")
-        .filter(|block| !block.contains(&named))
-        .collect::<Vec<_>>()
-        .join("[[wiring]]")
 }

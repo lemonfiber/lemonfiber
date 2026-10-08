@@ -139,4 +139,5 @@ requirement = [
   { id = "ARCH-R167", state = "done", evidence = ["crates/lemonfiber-api/src/actions/again.rs", "crates/lemonfiber-api/src/actions.rs", "crates/lemonfiber-core/src/config/resending.rs", "crates/lemonfiber-api/tests/integration/what_an_action_sent_again_means.rs"] },
   { id = "ARCH-R168", state = "done", evidence = ["crates/lemonfiber-api/src/actions/again.rs", "crates/lemonfiber-api/src/actions.rs", "crates/lemonfiber-core/src/config/resending.rs", "crates/lemonfiber-api/tests/integration/what_an_action_sent_again_means.rs"] },
   { id = "ARCH-R169", state = "done", evidence = ["crates/lemonfiber-api/src/actions/again.rs", "crates/lemonfiber-api/src/actions.rs", "crates/lemonfiber-core/src/config/resending.rs", "crates/lemonfiber-api/tests/integration/what_an_action_sent_again_means.rs"] },
+  { id = "ARCH-R171", state = "done", evidence = ["crates/lemonfiber-manifest/src/assembly.rs", "crates/lemonfiber-manifest/src/assembly/tests.rs", "crates/lemonfiber-bundled/build.rs", "crates/lemonfiber-core/src/stack.rs"] },
 ]

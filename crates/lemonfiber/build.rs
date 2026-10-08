@@ -29,11 +29,15 @@ include!("../lemonfiber-api/src/contract/path.rs");
 
 fn main() {
     let root = workspace_root().join(STACK);
-    let manifest = root.join("stack.toml");
+    let manifest = root.join(lemonfiber_manifest::assembly::ROOT);
 
     println!("cargo::rerun-if-changed={}", manifest.display());
+    println!(
+        "cargo::rerun-if-changed={}",
+        root.join(lemonfiber_manifest::assembly::SERVICES).display()
+    );
 
-    let Ok(text) = std::fs::read_to_string(&manifest) else {
+    if !manifest.is_file() {
         refuse(&[
             &format!("the embedded stack is missing at {}", root.display()),
             "",
@@ -41,9 +45,11 @@ fn main() {
             "",
             "  git submodule update --init --recursive",
         ]);
-    };
+    }
 
-    if let Err(err) = lemonfiber_manifest::Manifest::from_toml(&text) {
+    if let Err(err) = lemonfiber_manifest::read(&root)
+        .and_then(|text| lemonfiber_manifest::Manifest::from_toml(&text))
+    {
         refuse(&[
             "the embedded stack cannot be read by this build",
             "",

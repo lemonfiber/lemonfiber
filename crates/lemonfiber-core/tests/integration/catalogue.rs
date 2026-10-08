@@ -112,7 +112,7 @@ async fn what_going_without_costs_travels_with_what_it_is_for() {
 async fn the_order_is_the_one_the_stack_declares_rather_than_one_of_lemonfibers_own() {
     let report = listed(Source::External(project())).await;
     let manifest = lemonfiber_manifest::Manifest::from_toml(
-        &std::fs::read_to_string(project().join("stack.toml")).unwrap_or_default(),
+        &lemonfiber_manifest::read(project()).unwrap_or_default(),
     );
 
     let declared: Vec<String> = manifest
@@ -176,7 +176,7 @@ async fn a_service_that_went_is_recorded_with_its_reason_and_its_replacement() {
 async fn what_the_stack_records_as_gone_is_what_the_listing_hands_back() {
     let report = listed(Source::External(project())).await;
     let manifest = lemonfiber_manifest::Manifest::from_toml(
-        &std::fs::read_to_string(project().join("stack.toml")).unwrap_or_default(),
+        &lemonfiber_manifest::read(project()).unwrap_or_default(),
     );
 
     let declared: Vec<String> = manifest

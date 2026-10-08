@@ -15,7 +15,7 @@ const STACK: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/media-sta
 #[test]
 fn nothing_the_embedded_stack_claims_is_refuted() {
     let stack = Path::new(STACK);
-    let text = std::fs::read_to_string(stack.join("stack.toml")).unwrap_or_default();
+    let text = lemonfiber_manifest::read(stack).unwrap_or_default();
     let manifest = lemonfiber_manifest::Manifest::from_toml(&text)
         .unwrap_or_else(|why| unreachable!("the embedded stack does not read: {why}"));
 

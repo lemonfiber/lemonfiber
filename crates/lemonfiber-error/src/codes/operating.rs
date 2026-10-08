@@ -297,6 +297,8 @@ codes! {
         STACK_UNRECOGNISED = "STACK-8" => Validation,
         /// Raised when a stack names a newer lemonfiber than the one running.
         STACK_NEEDS_NEWER = "STACK-9",
+        /// Raised when a manifest's files are not laid out as the contract says.
+        STACK_UNASSEMBLED = "STACK-10" => Validation,
     }
     /// The `GATE` codes.
     gate {

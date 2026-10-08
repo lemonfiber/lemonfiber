@@ -1,12 +1,14 @@
 //! What can go wrong reading a manifest.
 
+use std::path::{Path, PathBuf};
+
 use thiserror::Error;
 
 use crate::Violation;
 
 /// A manifest could not be read.
 ///
-/// The four refusals are separate variants rather than one "invalid manifest"
+/// The refusals are separate variants rather than one "invalid manifest"
 /// because they have nothing to do with each other: an unreadable *format*, a
 /// stack that needs a newer binary, a word this build has never heard of, and a
 /// file whose *contents* are wrong each need a different response from whoever
@@ -37,6 +39,26 @@ pub enum Failure {
         Vec<Violation>,
     ),
 
+    /// A file of the manifest, or the directory its service files are in, could not
+    /// be read from disk.
+    #[error("{} could not be read: {reason}", path.display())]
+    Unreadable {
+        /// The file or directory, in full.
+        path: PathBuf,
+        /// The operating system's own words.
+        reason: String,
+    },
+
+    /// The manifest's files are not laid out as the contract says.
+    ///
+    /// Every fault at once, each naming the `include` entry or the file it is in,
+    /// for the reason [`Failure::Unrecognised`] lists every name.
+    #[error("the manifest's files break the contract:{}", each(.0))]
+    Assembly(
+        /// Each fault, naming the entry or file.
+        Vec<Violation>,
+    ),
+
     /// The stack requires a newer `lemonfiber` than the one running.
     #[error("the stack requires lemonfiber {required} or newer, and this is {running}")]
     BinaryTooOld {
@@ -45,6 +67,16 @@ pub enum Failure {
         /// The version actually running.
         running: String,
     },
+}
+
+impl Failure {
+    /// A file or directory that could not be read, and why.
+    pub(crate) fn unreadable(path: &Path, why: &std::io::Error) -> Self {
+        Self::Unreadable {
+            path: path.to_path_buf(),
+            reason: why.to_string(),
+        }
+    }
 }
 
 /// Each refusal on its own indented line, so a list of them reads as a list.

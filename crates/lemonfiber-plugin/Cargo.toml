@@ -8,6 +8,8 @@ rust-version.workspace = true
 repository.workspace = true
 
 [dependencies]
+# The bundled stack's manifest as one text, for the names a plugin may not take.
+lemonfiber-bundled = { workspace = true }
 # The stack description, for the one thing the vocabulary cannot state about itself:
 # which bundled services declare each capability. The direction is one-way — nothing
 # in `lemonfiber-manifest` may reach back here, or the two would be a cycle.

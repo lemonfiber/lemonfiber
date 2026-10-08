@@ -3,9 +3,9 @@
 //! Checking a manifest parses it and validates it, and for the stack this build
 //! carries it parses every compose file as well. The dashboard alone asks for it
 //! on every refresh, and the household beside it asks again; the answer changes only
-//! when the file does. So the last answer is kept with what it was read from — the
-//! stack this binary carries, or the operator's file as it stood, by its size and
-//! when it was last written — and handed back while that still holds.
+//! when the files do. So the last answer is kept with what it was read from — the
+//! stack this binary carries, or the operator's files as they stood, each by its size
+//! and when it was last written — and handed back while that still holds.
 //!
 //! Only a manifest that checked is kept. A refusal is worked out afresh each time,
 //! so a stack the operator is in the middle of fixing is read again on the next ask.
@@ -14,6 +14,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::SystemTime;
 
+use lemonfiber_manifest::assembly::SERVICES;
 use lemonfiber_manifest::{Date, Manifest};
 
 use super::{Failure, Source, MANIFEST};
@@ -32,8 +33,9 @@ struct Read {
 enum From {
     /// The stack this binary carries, by where it is held in memory.
     Embedded(usize),
-    /// The operator's file, by where it is, when it was last written and its size.
-    External(PathBuf, SystemTime, u64),
+    /// The operator's files — the root and everything in `services/` — by where each
+    /// is, when it was last written and its size.
+    External(Vec<(PathBuf, SystemTime, u64)>),
 }
 
 /// The last manifest that checked, and what it was read from.
@@ -71,9 +73,23 @@ fn read(source: Source, today: Date) -> Option<Read> {
     let from = match source {
         Source::Embedded(dir) => From::Embedded(std::ptr::from_ref(dir).addr()),
         Source::External(path) => {
-            let manifest = path.join(MANIFEST);
-            let meta = std::fs::metadata(&manifest).ok()?;
-            From::External(manifest, meta.modified().ok()?, meta.len())
+            let mut files = vec![path.join(MANIFEST)];
+            files.extend(
+                std::fs::read_dir(path.join(SERVICES))
+                    .into_iter()
+                    .flatten()
+                    .flatten()
+                    .map(|entry| entry.path()),
+            );
+            files.sort();
+            let stood = files
+                .into_iter()
+                .map(|file| {
+                    let meta = std::fs::metadata(&file).ok()?;
+                    Some((file, meta.modified().ok()?, meta.len()))
+                })
+                .collect::<Option<Vec<_>>>()?;
+            From::External(stood)
         }
     };
     Some(Read { from, today })

@@ -10,11 +10,7 @@ use crate::test_support::frozen_day as today;
 fn stack(name: &str) -> &'static Path {
     let dir = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
     let _ = std::fs::remove_dir_all(&dir);
-    let _ = std::fs::create_dir_all(&dir);
-    let _ = std::fs::write(
-        dir.join("stack.toml"),
-        include_str!("../../../../../assets/media-stack/stack.toml"),
-    );
+    lemonfiber_fixtures::stack::manifest_into(&dir);
     Box::leak(dir.into_boxed_path())
 }
 

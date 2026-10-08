@@ -30,7 +30,7 @@ use lemonfiber_core::stack::compose::{build, Action};
 use lemonfiber_manifest::Manifest;
 
 /// The stack this repository carries.
-const STACK: &str = include_str!("../../../../assets/media-stack/stack.toml");
+const STACK: &str = lemonfiber_bundled::STACK;
 
 /// A fixed directory, so a golden file does not depend on where it was written.
 const STACK_DIR: &str = "/opt/lemonfiber/stack";

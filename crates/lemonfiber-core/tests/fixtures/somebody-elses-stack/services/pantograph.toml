@@ -1,0 +1,15 @@
+[[service]]
+id           = "pantograph"
+name         = "Pantograph"
+profile      = "tv"
+image        = "somebody/pantograph"
+tag          = "2.1.0"
+digest = "sha256:abababababababababababababababababababababababababababababababab"
+port         = 9411
+bind         = "loopback"
+criticality  = "enhancing"
+license      = "MIT"
+upstream     = "https://example.invalid/pantograph"
+last_release = "2026-02-01"
+describes    = "Does something this operator wanted and lemonfiber does not ship."
+without_it   = "Whatever it does stops; lemonfiber cannot say what that is."

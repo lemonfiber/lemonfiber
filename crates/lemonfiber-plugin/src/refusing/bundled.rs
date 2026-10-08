@@ -19,7 +19,7 @@ use std::sync::LazyLock;
 use lemonfiber_manifest::{Manifest, Service};
 
 /// The stack description this build ships, which says which ids and ports are taken.
-const STACK: &str = include_str!("../../../../assets/media-stack/stack.toml");
+const STACK: &str = lemonfiber_bundled::STACK;
 
 /// The proxy configuration beside it, which says which names the stack answers on.
 ///

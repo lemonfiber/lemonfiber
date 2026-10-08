@@ -13,5 +13,10 @@ serde = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
 
+[dev-dependencies]
+# The bundled stack, assembled, which the tests hold the contract against. A cycle
+# only in tests: that crate reads this one when it is built, never at run time.
+lemonfiber-bundled = { workspace = true }
+
 [lints]
 workspace = true
