@@ -31,7 +31,30 @@ concurrency:
 # refused unless it is the one regular file expected, and reaches the scanner as
 # an argument, so it can overwrite nothing the scanner reads and is never run.
 jobs:
+  # Whether the change reaches what the jobs below judge. A change that touches
+  # only workflow files they do not read skips them, and a skipped job satisfies
+  # a required context. The suite reads this file, so a change to it is code.
+  scope:
+    name: what changed
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      code: ${{ steps.changed.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          filter: blob:none
+      - id: changed
+        uses: ./.github/actions/what-changed
+        with:
+          reads: |
+            .github/workflows/sonar.yml
+
   coverage:
+    needs: scope
+    if: ${{ !cancelled() && (needs.scope.result != 'success' || needs.scope.outputs.code == 'true') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -104,12 +127,13 @@ jobs:
           if-no-files-found: error
 
   sonar:
-    needs: coverage
+    needs: [scope, coverage]
     # Runs whatever coverage did, and fails at once when it failed: a skipped job
     # reports as passing, so the required `sonar` would read green over a coverage
     # gate that was not met. `!cancelled()` rather than `always()`, because a
-    # cancelled run is somebody pressing stop.
-    if: ${{ !cancelled() }}
+    # cancelled run is somebody pressing stop. Skipped with coverage where the
+    # change reached no code.
+    if: ${{ !cancelled() && (needs.scope.result != 'success' || needs.scope.outputs.code == 'true') }}
     runs-on: ubuntu-latest
     steps:
       - name: The coverage gate held
@@ -210,7 +234,7 @@ jobs:
   # fails on any new issue, and posts a sticky verdict on the pull request. A summary
   # that never arrived, or one it cannot read, warns rather than blocks.
   gate:
-    needs: sonar
+    needs: [scope, sonar]
     # Runs whatever the scan did: `needs` alone would drop this job when the scan
     # fails, and a required check that never reports blocks a pull request with no
     # line saying why. A failed scan still leaves `sonar` red, which is required in
@@ -230,5 +254,8 @@ jobs:
       # SonarCloud login. A ceiling rather than an allowance: it may not rise past
       # what stands against `main`, and at zero the gate refuses the first issue.
       allowed-open: 0
+      # Whether a scan ran. Where the change reached no code none did, and the gate
+      # waits for no summary while still holding the open count to `allowed-open`.
+      code: ${{ needs.scope.result != 'success' || needs.scope.outputs.code == 'true' }}
     secrets:
       sonar-token: ${{ secrets.SONAR_TOKEN }}
