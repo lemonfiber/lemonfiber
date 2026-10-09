@@ -8,7 +8,7 @@
 
 use crate::app::Ctx;
 use crate::invitation::{recorded, Offer, HOURS_TO_CLAIM, RECORD};
-use crate::ports::service::{Allowed, Household as _, Member};
+use crate::ports::service::{Allowed, Member};
 
 use super::standing::Held;
 
@@ -41,7 +41,7 @@ pub(super) fn recorded_now(ctx: &Ctx, held: &Held, member: &Member) -> bool {
 /// was chosen, since that is what the operator asked for, and otherwise as a refusal to
 /// ready the account. `new` says which account a refusal to narrow leaves behind.
 pub(super) async fn guarded(
-    server: &crate::jellyfin::Jellyfin,
+    server: &dyn crate::ports::service::Household,
     member: &Member,
     allowed: Option<&Allowed>,
     new: bool,

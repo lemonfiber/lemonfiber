@@ -46,9 +46,8 @@ use super::Refused;
 
 /// Every action this surface offers, in the order they are worth reading.
 ///
-/// Held as a list so that what the surface offers can be counted and checked
-/// against what it translates, rather than being knowable only by reading a
-/// match arm at a time.
+/// Held as a list so what the surface offers can be counted and checked against what
+/// it translates, rather than knowable only one match arm at a time.
 pub const OFFERED: &[&str] = &[
     "up",
     "down",
@@ -102,6 +101,7 @@ pub const OFFERED: &[&str] = &[
     "plugin-install",
     "plugin-update",
     "plugin-remove",
+    "plugin-prove",
 ];
 
 /// One action a key may call, as the contract publishes it.

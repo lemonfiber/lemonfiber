@@ -51,7 +51,7 @@ impl Server {
 }
 
 /// A context whose media server can be reached: the admin password is recorded, so
-/// `jellyfin_reader` resolves a client. Tagged so each case keeps its own env file
+/// the media server is asked as its administrator. Tagged so each case keeps its own env file
 /// rather than racing on a shared one.
 fn ctx_with(server: &Server, tag: &str) -> Ctx {
     ctx_over(server.transport(), tag)

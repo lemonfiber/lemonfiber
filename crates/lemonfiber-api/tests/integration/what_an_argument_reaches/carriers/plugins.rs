@@ -10,7 +10,9 @@ pub(super) fn carries_plugin(command: &Command) -> bool {
     matches!(
         command,
         Command::Plugins(
-            Installing::Update { plugin, .. } | Installing::Remove { plugin, .. }
+            Installing::Update { plugin, .. }
+                | Installing::Remove { plugin, .. }
+                | Installing::Prove { plugin, .. }
         ) if plugin == PLUGIN
     )
 }

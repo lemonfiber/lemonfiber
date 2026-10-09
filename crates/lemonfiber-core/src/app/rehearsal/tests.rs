@@ -440,6 +440,10 @@ fn taught_to_report() -> Vec<Command> {
             plugin: "komga".to_owned(),
             consent: plugins::Consent::default(),
         }),
+        Command::Plugins(plugins::Asked::Prove {
+            plugin: "komga".to_owned(),
+            consent: plugins::Consent::default(),
+        }),
     ]
 }
 

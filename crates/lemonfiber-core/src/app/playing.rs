@@ -5,11 +5,11 @@
 //! another member's session is read and then left out. An operator may name a member
 //! to see what that person is watching, or name nobody to see the whole house.
 
-use super::targets::jellyfin_reader;
+use super::targets::media;
 use super::{Ctx, Outcome};
 use crate::error::{Diagnose, Problem};
 use crate::model::{Playback, PlayingReport};
-use crate::ports::service::{Failure, Household as _, Member, Playback as Session, Screening as _};
+use crate::ports::service::{Failure, Member, Playback as Session};
 
 /// Read what is playing now, for one member where `member` names them, or for
 /// everybody.
@@ -26,7 +26,7 @@ pub(crate) async fn playing(
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
 
-    let Some(server) = jellyfin_reader(ctx, &manifest) else {
+    let Some(server) = media(ctx, &manifest).await else {
         return Ok(unread(
             member,
             "there is no media server to ask what is playing, or no recorded password to \
@@ -35,10 +35,10 @@ pub(crate) async fn playing(
     };
 
     let Some(member) = member else {
-        return Ok(answered(server.playing(None).await, String::new()));
+        return Ok(answered(server.serve.playing(None).await, String::new()));
     };
 
-    let Ok(accounts) = server.household().await else {
+    let Ok(accounts) = server.identity.household().await else {
         return Ok(unread(
             Some(member),
             "the media server would not say who holds an account, so whose sessions these \
@@ -55,7 +55,7 @@ pub(crate) async fn playing(
     };
 
     Ok(answered(
-        server.playing(Some(&account.id)).await,
+        server.serve.playing(Some(&account.id)).await,
         account.name.clone(),
     ))
 }

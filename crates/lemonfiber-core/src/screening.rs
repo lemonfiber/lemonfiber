@@ -13,18 +13,15 @@
 pub mod door;
 pub mod grants;
 
-use crate::app::targets::jellyfin_reader;
+use crate::app::targets::{media, Media};
 use crate::app::{Ctx, Outcome, Viewing, Whom};
 use crate::error::codes::play::{
     NOBODY_NAMED, NOTHING_TO_PLAY_FROM, NOT_AN_ITEM, NOT_A_DEVICE, NOT_IN_THE_HOUSEHOLD,
     NOT_ON_THEIR_SHELF, NO_SUCH_PICTURE, SERVER_SILENT, SIGNS_NO_DEVICE_IN,
 };
 use crate::error::{Code, Diagnose as _, Problem, Remedy, State};
-use crate::jellyfin::Jellyfin;
 use crate::model::{GrantReport, PartWayReport, TitleReport, WatchedReport};
-use crate::ports::service::{
-    Household as _, HowFar, Image, Member, Picture, Screening as _, PICTURE_MOST,
-};
+use crate::ports::service::{Household, HowFar, Image, Member, Picture, PICTURE_MOST};
 
 use door::{placed, progressed};
 
@@ -118,12 +115,13 @@ async fn title(ctx: &Ctx, whose: &Whom, id: &str) -> Result<TitleReport, Box<Pro
             "That is not a title the household could hold",
         ));
     }
-    let server = server(ctx)?;
+    let server = server(ctx).await?;
     let member = match whose {
-        Whom::Named(named) => Some(member(&server, named).await?),
+        Whom::Named(named) => Some(member(server.identity.as_ref(), named).await?),
         Whom::Defaults => None,
     };
     let title = server
+        .serve
         .title(member.as_ref().map(|member| member.id.as_str()), id)
         .await
         .map_err(|_| unanswered())?
@@ -158,12 +156,13 @@ pub async fn picture(
             "That is not a title the household could hold",
         ));
     }
-    let server = server(ctx)?;
+    let server = server(ctx).await?;
     let member = match whose {
-        Whom::Named(named) => Some(member(&server, named).await?),
+        Whom::Named(named) => Some(member(server.identity.as_ref(), named).await?),
         Whom::Defaults => None,
     };
     server
+        .serve
         .picture(member.as_ref().map(|member| member.id.as_str()), id, which)
         .await
         .map_err(|_| unanswered())?
@@ -181,9 +180,9 @@ async fn part_way(ctx: &Ctx, whose: &Whom, most: u32) -> Result<PartWayReport, B
     let Whom::Named(named) = whose else {
         return Err(nobody());
     };
-    let server = server(ctx)?;
-    let member = member(&server, named).await?;
-    let Ok(part_way) = server.part_way(&member.id, most).await else {
+    let server = server(ctx).await?;
+    let member = member(server.identity.as_ref(), named).await?;
+    let Ok(part_way) = server.serve.part_way(&member.id, most).await else {
         return Ok(PartWayReport {
             member: member.name,
             id: member.id,
@@ -220,8 +219,8 @@ async fn granted(ctx: &Ctx, named: &str, device: &str) -> Result<GrantReport, Bo
     if !a_device(device) {
         return Err(refused(NOT_A_DEVICE, "That is not a device id"));
     }
-    let server = server(ctx)?;
-    let member = member(&server, named).await?;
+    let server = server(ctx).await?;
+    let member = member(server.identity.as_ref(), named).await?;
     let lasts_until = grants::until(ctx.today())
         .map(grants::written)
         .unwrap_or_default();
@@ -234,6 +233,7 @@ async fn granted(ctx: &Ctx, named: &str, device: &str) -> Result<GrantReport, Bo
         });
     }
     let token = server
+        .serve
         .signed_in(&member.id, device)
         .await
         .map_err(|_| unanswered())?
@@ -271,10 +271,11 @@ async fn watched(
             "That is not a title the household could hold",
         ));
     }
-    let server = server(ctx)?;
-    let member = member(&server, named).await?;
+    let server = server(ctx).await?;
+    let member = member(server.identity.as_ref(), named).await?;
     if !ctx.dry_run {
         server
+            .serve
             .progressed(&member.id, id, &how_far)
             .await
             .map_err(|_| unanswered())?;
@@ -305,7 +306,7 @@ pub(crate) async fn lapsed(ctx: &Ctx) {
     let Ok(manifest) = ctx.stack.checked_manifest(ctx.today()) else {
         return;
     };
-    if let Some(server) = jellyfin_reader(ctx, &manifest) {
+    if let Some(server) = media(ctx, &manifest).await {
         grants::ended(ctx, &server).await;
     }
 }
@@ -345,12 +346,12 @@ const DEVICE_SHORTEST: usize = 8;
 const DEVICE_LONGEST: usize = 64;
 
 /// The stack's media server, signed in as its administrator.
-fn server(ctx: &Ctx) -> Result<Jellyfin, Box<Problem>> {
+async fn server(ctx: &Ctx) -> Result<Media, Box<Problem>> {
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
-    jellyfin_reader(ctx, &manifest).ok_or_else(|| {
+    media(ctx, &manifest).await.ok_or_else(|| {
         refused(
             NOTHING_TO_PLAY_FROM,
             "There is no media server to play from",
@@ -359,7 +360,7 @@ fn server(ctx: &Ctx) -> Result<Jellyfin, Box<Problem>> {
 }
 
 /// The member a name or an id means.
-async fn member(server: &Jellyfin, named: &str) -> Result<Member, Box<Problem>> {
+async fn member(server: &dyn Household, named: &str) -> Result<Member, Box<Problem>> {
     if named.trim().is_empty() {
         return Err(nobody());
     }

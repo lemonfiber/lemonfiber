@@ -10,11 +10,24 @@ fn speaking(speaks: &str, rest: &str) -> String {
 
 #[test]
 fn an_adapter_speaking_contracts_this_build_speaks_is_refused_nothing() {
-    let text = speaking(
+    let text = speaking(r#"["media.serve@1"]"#, "listens     = 8080\n");
+    assert_eq!(said(&text), Vec::<String>::new());
+}
+
+#[test]
+fn a_contract_of_a_capability_the_service_does_not_provide_is_refused_by_name() {
+    let said = said(&speaking(
         r#"["media.serve@1", "identity.source@1"]"#,
         "listens     = 8080\n",
+    ));
+    assert!(
+        names(
+            &said,
+            &["service komga.speaks", "does not provide identity.source"]
+        ),
+        "{said:?}"
     );
-    assert_eq!(said(&text), Vec::<String>::new());
+    assert_eq!(said.len(), 1, "{said:?}");
 }
 
 #[test]

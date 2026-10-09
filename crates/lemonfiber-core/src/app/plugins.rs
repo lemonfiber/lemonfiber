@@ -48,7 +48,9 @@ mod verifying;
 // layer's work with a name on it, and what is here is only the three things that are
 // not a journal entry: the containers, the register, and what the machine is left
 // without.
+pub(crate) mod conformance;
 mod removing;
+mod reproving;
 // Carrying the writes out, and journalling each before it is made. Its own file
 // because the deciding and the touching are two concerns, and only one of them has a
 // disk under it.
@@ -136,6 +138,15 @@ pub enum Asked {
         /// reading.
         consent: Consent,
     },
+    /// Ask an installed plugin's adapters again whether they speak what they declare,
+    /// and clear every answer kept against it as outside its contracts where each does.
+    Prove {
+        /// The plugin's id, as `lemonfiber plugin installed` lists it.
+        plugin: String,
+        /// The offer this answers, or nothing for the reading. Proving sends nothing
+        /// anywhere, so it approves no pair.
+        consent: Consent,
+    },
 }
 
 /// What a source is read for, once it is a directory this run can read.
@@ -207,6 +218,9 @@ async fn asked(ctx: &Ctx, action: &Asked) -> Result<Installs, Box<Problem>> {
         }
         Asked::Remove { plugin, consent } => {
             Box::pin(removing::remove(ctx, held, plugin, consent)).await
+        }
+        Asked::Prove { plugin, consent } => {
+            Box::pin(reproving::prove(ctx, held, plugin, consent)).await
         }
         Asked::Update {
             plugin,

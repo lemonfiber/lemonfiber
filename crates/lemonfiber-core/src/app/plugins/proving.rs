@@ -247,7 +247,7 @@ pub(crate) async fn asked(
 
 /// What asking an adapter what it speaks came to: whether it speaks exactly the
 /// contracts its manifest declares, asked again while it has not answered yet.
-async fn spoken(
+pub(super) async fn spoken(
     ctx: &Ctx,
     stack: &Path,
     placed: &crate::plugin::Placed,

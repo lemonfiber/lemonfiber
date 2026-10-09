@@ -48,6 +48,9 @@ pub(super) const REMOVING: [&str; 3] = [
     "what it would leave unfilled",
 ];
 
+/// The parts proving a plugin again is offered over, as a refusal names them.
+pub(super) const PROVING: [&str; 2] = ["the plugin it proves", "what is kept against it"];
+
 /// What the operator gave as their yes.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Consent {
@@ -153,6 +156,12 @@ pub(super) fn removing(going: &Installed, leaves: &[crate::plugin::Unfilled]) ->
     let stops = stopping(going).join("\n");
     let unfilled = json(leaves);
     crate::agreement::parted(&[&[&plugin], &[&stops], &[&unfilled]])
+}
+
+/// What proving a plugin again is offered as: the plugin as the record holds it, and
+/// every answer kept against it that a pass would clear.
+pub(super) fn proving(plugin: &Installed, kept: &[crate::plugin::Nonconforming]) -> String {
+    crate::agreement::parted(&[&[&json(plugin)], &[&json(kept)]])
 }
 
 /// Every service a plugin's going stops.

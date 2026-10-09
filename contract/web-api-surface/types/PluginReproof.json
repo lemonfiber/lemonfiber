@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "asked": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "cleared": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "kept": {
+      "type": [
+        "array[ref:PluginNonconforming]"
+      ],
+      "required": true
+    },
+    "plugin": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "proofs": {
+      "type": [
+        "array[ref:PluginProving]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

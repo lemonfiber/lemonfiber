@@ -106,15 +106,16 @@ pub enum Request {
     },
     /// Run the checks that prove the stack is doing what it should.
     Doctor(RawDoctor),
-    /// Install, update and remove plugins, and read what one may declare.
+    /// Install, update, remove and prove plugins, and read what one may declare.
     ///
     /// Five of the words under this one are documents for somebody writing a plugin,
     /// answered with no network, no catalogue and no stack running, each saying which
     /// generation it reports — so an author who has to know whether a difference is
-    /// their build or their manifest can tell. The other four are about this machine:
+    /// their build or their manifest can tell. The other five are about this machine:
     /// `install` writes down what installing a plugin decides, `installed` reads that
-    /// back, `update` replaces one version with another as one operation, and `remove`
-    /// takes one off. Each of the three that acts can be rehearsed with `--dry-run`.
+    /// back, `update` replaces one version with another as one operation, `remove`
+    /// takes one off, and `prove` asks its adapters again whether they speak what they
+    /// declare. Each of the four that acts can be rehearsed with `--dry-run`.
     Plugin {
         /// Which of them to ask for.
         #[command(subcommand)]

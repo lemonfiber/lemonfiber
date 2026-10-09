@@ -96,7 +96,7 @@ impl Served {
     /// What it speaks, as `capability@major`.
     #[must_use]
     pub fn spoken(&self) -> String {
-        format!("{}@{}", self.capability, self.major)
+        crate::spoken(self.capability, self.major)
     }
 
     /// Serve `operation`, asked with `body`.

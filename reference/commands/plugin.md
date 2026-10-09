@@ -6,9 +6,9 @@ Part of the [command reference](../commands.md).
 ## `lemonfiber plugin`
 
 ```text
-Install, update and remove plugins, and read what one may declare.
+Install, update, remove and prove plugins, and read what one may declare.
 
-Five of the words under this one are documents for somebody writing a plugin, answered with no network, no catalogue and no stack running, each saying which generation it reports — so an author who has to know whether a difference is their build or their manifest can tell. The other four are about this machine: `install` writes down what installing a plugin decides, `installed` reads that back, `update` replaces one version with another as one operation, and `remove` takes one off. Each of the three that acts can be rehearsed with `--dry-run`.
+Five of the words under this one are documents for somebody writing a plugin, answered with no network, no catalogue and no stack running, each saying which generation it reports — so an author who has to know whether a difference is their build or their manifest can tell. The other five are about this machine: `install` writes down what installing a plugin decides, `installed` reads that back, `update` replaces one version with another as one operation, `remove` takes one off, and `prove` asks its adapters again whether they speak what they declare. Each of the four that acts can be rehearsed with `--dry-run`.
 
 Usage: lemonfiber plugin [OPTIONS] <COMMAND>
 
@@ -21,6 +21,7 @@ Commands:
   install           Install a plugin, recording what installing it decided
   installed         Say what is installed, and what each plugin is doing
   remove            Take a plugin off this machine, putting back everything installing it wrote
+  prove             Ask an installed plugin's adapters again whether they speak what they declare
   update            Replace an installed plugin with another version of it, as one operation
   help              Print this message or the help of the given subcommand(s)
 
@@ -335,6 +336,45 @@ There is no *disable*. A plugin is installed or it is not — a third state in w
 Named on its own it says what it would stop, what it would put back and what the machine would be left without, touches nothing, and prints a name for that offer; answering with that name is the yes. The record is read again first, and an answer given for a different reading is refused, naming what moved.
 
 Usage: lemonfiber plugin remove [OPTIONS] <PLUGIN>
+
+Arguments:
+  <PLUGIN>
+          The plugin's id, as `lemonfiber plugin installed` lists it
+
+Options:
+      --json
+          Print machine-readable output
+
+      --offer <NAME>
+          The offer being answered, as the run that made it printed it
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber plugin prove`
+
+```text
+Ask an installed plugin's adapters again whether they speak what they declare.
+
+Every answer an adapter gave outside its contract is kept against the plugin, and the plugin fills none of that capability until a proof it passes clears it. Named on its own it says what it would ask and what a pass would clear, asks nothing, and prints a name for that offer; answering with that name is the yes.
+
+Usage: lemonfiber plugin prove [OPTIONS] <PLUGIN>
 
 Arguments:
   <PLUGIN>

@@ -7,6 +7,8 @@ use super::*;
 #[test]
 fn a_proof_that_settles_no_service_is_shown_without_one() {
     let said = installs(&Installs {
+        nonconforming: Vec::new(),
+        proof: None,
         rehearsed: false,
         agreement: None,
         removal: None,
@@ -35,6 +37,8 @@ fn a_proof_that_settles_no_service_is_shown_without_one() {
 fn an_install_that_asked_says_what_each_proof_came_to_and_what_answered() {
     let one = recorded("komga", Some(household()));
     let said = installs(&Installs {
+        nonconforming: Vec::new(),
+        proof: None,
         rehearsed: false,
         agreement: None,
         removal: None,
@@ -67,6 +71,8 @@ fn an_install_that_asked_says_what_each_proof_came_to_and_what_answered() {
 fn a_proof_that_failed_says_how_and_one_that_established_nothing_says_why() {
     let one = recorded("komga", Some(household()));
     let said = installs(&Installs {
+        nonconforming: Vec::new(),
+        proof: None,
         rehearsed: false,
         agreement: None,
         removal: None,
@@ -160,6 +166,8 @@ fn wrong(summary: &str) -> lemonfiber_core::error::Problem {
 fn an_install_the_checks_were_content_with_says_so_rather_than_showing_nothing() {
     let one = recorded("komga", Some(household()));
     let said = installs(&Installs {
+        nonconforming: Vec::new(),
+        proof: None,
         rehearsed: false,
         agreement: None,
         removal: None,
@@ -192,6 +200,8 @@ fn an_install_the_checks_were_content_with_says_so_rather_than_showing_nothing()
 fn a_check_the_install_made_worse_is_shown_at_both_readings() {
     let one = recorded("komga", Some(household()));
     let said = installs(&Installs {
+        nonconforming: Vec::new(),
+        proof: None,
         rehearsed: false,
         agreement: None,
         removal: None,
@@ -277,6 +287,8 @@ fn every_way_a_check_can_read_has_a_sentence_of_its_own() {
 fn a_rehearsal_says_nothing_about_the_stacks_own_checks() {
     let one = recorded("komga", Some(household()));
     let said = installs(&Installs {
+        nonconforming: Vec::new(),
+        proof: None,
         rehearsed: false,
         agreement: None,
         removal: None,
@@ -300,6 +312,8 @@ fn a_rehearsal_says_nothing_about_the_stacks_own_checks() {
 fn an_install_that_would_contest_an_ask_says_so_and_one_that_would_not_is_silent() {
     let one = recorded("komga", None);
     let quiet = installs(&Installs {
+        nonconforming: Vec::new(),
+        proof: None,
         rehearsed: false,
         agreement: None,
         installed: Vec::new(),
@@ -313,6 +327,8 @@ fn an_install_that_would_contest_an_ask_says_so_and_one_that_would_not_is_silent
     assert!(!quiet.contains("contested"), "{quiet}");
 
     let said = installs(&Installs {
+        nonconforming: Vec::new(),
+        proof: None,
         rehearsed: false,
         agreement: None,
         installed: Vec::new(),
@@ -350,4 +366,70 @@ fn an_install_that_would_contest_an_ask_says_so_and_one_that_would_not_is_silent
     )
     .text();
     assert!(done.contains("What is now contested"), "{done}");
+}
+
+/// Proving `komga` again, asked or only read, with one answer kept against it.
+fn proved_again(asked: bool, cleared: bool) -> Installs {
+    Installs {
+        nonconforming: Vec::new(),
+        proof: Some(lemonfiber_core::plugin::Reproof {
+            plugin: "komga".to_owned(),
+            proofs: vec![proof()],
+            kept: vec![lemonfiber_core::plugin::Nonconforming {
+                plugin: "komga".to_owned(),
+                capability: "media.serve".to_owned(),
+                operation: "holdings".to_owned(),
+                why: "the answer did not read".to_owned(),
+                at: "2026-10-09T20:00:00Z".to_owned(),
+            }],
+            asked,
+            cleared,
+        }),
+        rehearsed: false,
+        agreement: Some("a-reading".to_owned()),
+        removal: None,
+        installed: Vec::new(),
+        install: None,
+        update: None,
+        substituted: Vec::new(),
+        sources: Vec::new(),
+    }
+}
+
+#[test]
+fn proving_again_says_what_it_would_ask_and_what_it_came_to() {
+    for (asked, cleared, opening, closing) in [
+        (
+            false,
+            false,
+            "Would prove komga:",
+            "A pass clears every answer kept",
+        ),
+        (
+            true,
+            true,
+            "Proved komga:",
+            "Every answer kept against it is cleared",
+        ),
+        (
+            true,
+            false,
+            "Did not prove komga:",
+            "What is kept against it stays",
+        ),
+    ] {
+        let said = installs(&proved_again(asked, cleared)).text();
+        for expected in [
+            opening,
+            closing,
+            "kept       media.serve holdings at 2026-10-09T20:00:00Z: the answer did not read",
+            "answers — the library API answers",
+        ] {
+            assert!(
+                said.contains(expected),
+                "{expected:?} missing from:\n{said}"
+            );
+        }
+        assert_eq!(said.contains("--offer a-reading"), !asked, "{said}");
+    }
 }

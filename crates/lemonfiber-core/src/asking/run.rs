@@ -24,12 +24,10 @@ pub(crate) use deciding::deciding;
 use crate::asking::Policy;
 use crate::error::{Diagnose, Problem};
 use crate::model::HouseholdReport;
-use crate::ports::service::{
-    Approving as _, Asking, Headroom, Household as _, Member, Quota, Requests as _,
-};
+use crate::ports::service::{Approving as _, Asking, Headroom, Member, Quota, Requests as _};
 
 use crate::app::command::Chosen;
-use crate::app::targets::{jellyfin_reader, HouseholdAccess};
+use crate::app::targets::{identity, HouseholdAccess};
 use crate::app::Ctx;
 
 /// Choose the policy, the limit, or both — for the household or for one person.
@@ -195,7 +193,7 @@ async fn found(
     manifest: &lemonfiber_manifest::Manifest,
     name: &str,
 ) -> Result<Member, Box<Problem>> {
-    let Some(server) = jellyfin_reader(ctx, manifest) else {
+    let Some(server) = identity(ctx, manifest).await else {
         return Err(Box::new(crate::asking::unreachable(NOTHING_SET)));
     };
     let Ok(accounts) = server.household().await else {

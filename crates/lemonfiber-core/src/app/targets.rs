@@ -14,6 +14,7 @@
 //! three from each deciding it differently.
 
 mod downloads;
+mod filled;
 mod layout;
 pub(crate) use layout::services_config_dir;
 mod media;
@@ -43,6 +44,7 @@ pub(crate) fn unsupported_here(
 }
 
 pub(crate) use downloads::*;
+pub(crate) use filled::{identity, media, serving, Media};
 pub(crate) use layout::*;
 pub(crate) use media::*;
 pub(crate) use opening::*;

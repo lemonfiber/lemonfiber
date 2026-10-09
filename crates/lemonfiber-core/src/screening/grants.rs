@@ -10,8 +10,9 @@ use std::collections::BTreeMap;
 
 use lemonfiber_manifest::Date;
 
+use crate::app::targets::Media;
 use crate::app::Ctx;
-use crate::ports::service::{Household, Screening, PLAYER};
+use crate::ports::service::PLAYER;
 
 /// How many days a grant lasts after the member's client last spoke to the core.
 pub const LASTS: i64 = 30;
@@ -102,7 +103,7 @@ fn lapsed(spoken: &Spoken, today: Date) -> Vec<String> {
 ///
 /// A grant whose devices could not all be signed out is kept, so the next run tries
 /// again rather than forgetting a session that is still open.
-pub(crate) async fn ended<S: Household + Screening>(ctx: &Ctx, server: &S) {
+pub(crate) async fn ended(ctx: &Ctx, server: &Media) {
     let mut spoken = read(ctx);
     let mut changed = false;
     for member in lapsed(&spoken, ctx.today()) {
@@ -117,13 +118,13 @@ pub(crate) async fn ended<S: Household + Screening>(ctx: &Ctx, server: &S) {
 }
 
 /// Sign out every device `member` played on through a grant; whether all of them went.
-async fn signed_out<S: Household + Screening>(server: &S, member: &str) -> bool {
-    let Ok(sessions) = server.sessions(member).await else {
+async fn signed_out(server: &Media, member: &str) -> bool {
+    let Ok(sessions) = server.identity.sessions(member).await else {
         return false;
     };
     let mut all = true;
     for session in sessions.iter().filter(|session| session.client == PLAYER) {
-        all &= server.sign_out(&session.device_id).await.is_ok();
+        all &= server.serve.sign_out(&session.device_id).await.is_ok();
     }
     all
 }

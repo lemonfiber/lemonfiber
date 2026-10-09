@@ -3,7 +3,7 @@ use std::sync::Arc;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::scratch::Scratch;
 
-use super::reached;
+use super::{filling, reached};
 use crate::app::Ctx;
 use crate::ports::docker::{Health, Lifecycle};
 use crate::test_support::{a_context, a_placed, Reporting};
@@ -143,5 +143,55 @@ async fn an_engine_that_will_not_list_is_said() {
             .as_deref()
             .is_some_and(|why| why.contains("would not say")),
         "{refused:?}"
+    );
+}
+
+/// The adapter as the service filling a capability, configured beneath `stack` where one
+/// is given.
+fn filler(stack: Option<&std::path::Path>) -> crate::wiring::Filler {
+    crate::wiring::Filler {
+        id: ADAPTER.to_owned(),
+        name: ADAPTER.to_owned(),
+        origin: crate::origin::Origin::Plugin {
+            named: "plex".to_owned(),
+        },
+        address: Some(crate::wiring::Address {
+            host: ADAPTER.to_owned(),
+            port: 8080,
+        }),
+        adapter: None,
+        published: None,
+        key_file: None,
+        confined_to: stack.map(|stack| {
+            crate::plugin::key_file(stack, ADAPTER)
+                .parent()
+                .map(std::path::Path::to_path_buf)
+                .unwrap_or_default()
+        }),
+        media_types: Vec::new(),
+        provides: vec!["media.serve".to_owned()],
+        contracts: vec!["media.serve@1".to_owned()],
+        majors: Vec::new(),
+    }
+}
+
+#[tokio::test]
+async fn the_service_filling_a_capability_is_asked_beside_its_configuration() {
+    let (stack, ctx, fake) = keyed("filling", Some("the-key"), &[(ADAPTER, "127.0.0.1", 8080)]);
+    let about = match filling(&ctx, &filler(Some(&stack))).await {
+        Ok(adapter) => adapter.about().await.ok(),
+        Err(why) => unreachable!("{why}"),
+    };
+    assert!(about.is_some());
+    assert!(fake.request().is_some_and(|request| request
+        .headers
+        .contains(&("Authorization".to_owned(), "Bearer the-key".to_owned()))));
+
+    let unwritten = filling(&ctx, &filler(None)).await;
+    assert!(
+        unwritten
+            .as_ref()
+            .is_err_and(|why| why.contains("no configuration on this machine")),
+        "{unwritten:?}"
     );
 }

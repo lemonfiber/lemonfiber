@@ -383,6 +383,17 @@ fn the_words_about_this_machine_become_commands() {
         "a removal names the plugin rather than a path, because the source may be gone"
     );
     assert_eq!(
+        door(lemonfiber::cli::PluginCommand::Prove {
+            plugin: "komga".to_owned(),
+            offer: Some("1a2b3c4d".to_owned()),
+        }),
+        Some(Command::Plugins(plugins::Asked::Prove {
+            plugin: "komga".to_owned(),
+            consent: consent(Some("1a2b3c4d"), &[]),
+        })),
+        "a proof names the plugin and carries the offer it answers"
+    );
+    assert_eq!(
         door(lemonfiber::cli::PluginCommand::Update {
             plugin: "komga".to_owned(),
             source: "https://example.org/komga@v2".to_owned(),

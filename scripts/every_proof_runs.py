@@ -81,7 +81,7 @@ SELF_TEST = re.compile(
 # A condition that holds only once something has already gone wrong. A proof
 # behind one of these runs when the run is already red, which is not a chance to
 # fail while somebody can still act on it — by then it is a diagnostic.
-AFTER_A_FAILURE = re.compile(r"\b(?:failure|cancelled)\s*\(\s*\)")
+AFTER_A_FAILURE = re.compile(r"(?<![!\w])\s*(?:failure|cancelled)\s*\(\s*\)")
 
 
 def carries_a_proof(text: str) -> bool:
@@ -286,6 +286,11 @@ def self_test() -> int:
     # run — a rule that refused every `if:` would be a different, wronger rule.
     if not proven_in_time("a.py", "", {"w.yml": guarded("step", "    if: matrix.slow\n")}):
         failures.append("a proof on one leg of a matrix was not counted as run")
+    # `!cancelled()` is the ordinary case, a job that runs unless somebody pressed
+    # stop, and not one that waits for something to go wrong.
+    unless_stopped = "    if: ${{ !cancelled() && needs.scope.outputs.code == 'true' }}\n"
+    if not proven_in_time("a.py", "", {"w.yml": guarded("job", unless_stopped)}):
+        failures.append("a proof behind `!cancelled()` was not counted as run")
     if proven_in_time("a.py", "", {"w.yml": "- unreadable\n" + "a.py --self-test"}):
         failures.append("a proof in a workflow that could not be read was counted")
 

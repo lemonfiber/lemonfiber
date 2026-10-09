@@ -424,4 +424,14 @@ codes! {
             back.",
         remedy: "Read what the message says, and take it up with whoever published the plugin.",
     }
+    /// Nothing by that id is installed, so there is nothing to prove again.
+    NOTHING_TO_PROVE = "PLUGIN-39" {
+        severity: Error,
+        status: 404,
+        since: "0.18.0",
+        meaning: "The plugin is not installed, so nothing was asked and nothing was cleared. The \
+            message lists what is installed.",
+        remedy: "See what is on this machine with `lemonfiber plugin installed`, and prove it by \
+            that id.",
+    }
 }

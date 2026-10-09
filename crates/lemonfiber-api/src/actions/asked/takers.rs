@@ -185,6 +185,7 @@ pub const TAKES_CONSENT: &[&str] = &[
     "plugin-install",
     "plugin-update",
     "plugin-remove",
+    "plugin-prove",
 ];
 
 /// The action whose command carries which completed download it is about.
@@ -488,7 +489,7 @@ pub const TAKES_KEPT: &[&str] = &["hosting-install", "hosting-remove"];
 ///
 /// An update and a removal, and not an install: what an install puts on is named by its
 /// source, and the plugin it holds is the source's to say.
-pub const TAKES_PLUGIN: &[&str] = &["plugin-update", "plugin-remove"];
+pub const TAKES_PLUGIN: &[&str] = &["plugin-update", "plugin-remove", "plugin-prove"];
 
 /// The actions whose command carries where a plugin comes from: a name in the
 /// catalogue, a directory on the machine, or a git repository at a revision.

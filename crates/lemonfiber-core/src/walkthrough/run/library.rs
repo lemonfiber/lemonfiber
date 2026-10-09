@@ -7,9 +7,8 @@
 //! everything after the first play is the same for both.
 
 use super::walk::Walk;
-use crate::app::targets::{jellyfin_reader, seerr_reader};
+use crate::app::targets::{seerr_reader, serving};
 use crate::model::WalkthroughReport;
-use crate::ports::service::Library;
 use crate::recyclarr::Kind;
 use crate::walkthrough::{Line, Reason, Shape, Step};
 
@@ -19,7 +18,7 @@ pub(super) async fn walk(
     manifest: &lemonfiber_manifest::Manifest,
     term: Option<&str>,
 ) -> WalkthroughReport {
-    let Some(jellyfin) = jellyfin_reader(walk.ctx, manifest) else {
+    let Some(server) = serving(walk.ctx, manifest).await else {
         return walk.stopped(Shape::LibraryOnly, None, Reason::NoMediaServer);
     };
 
@@ -30,12 +29,12 @@ pub(super) async fn walk(
     // Asked for rather than waited on: a library scans on its own schedule, and a
     // household that has just pointed it at a volume should not have to wait an hour to
     // find out whether it worked.
-    let _ = jellyfin.rescan().await;
+    let _ = server.rescan().await;
 
     // With nothing named, the question is whether the library holds anything at all —
     // which an empty search term answers, since every title contains it.
     let looking_for = term.unwrap_or_default();
-    let found = holds(&jellyfin, looking_for).await;
+    let found = holds(server.as_ref(), looking_for).await;
     if !found {
         return walk.stopped(
             Shape::LibraryOnly,
@@ -57,9 +56,9 @@ pub(super) async fn walk(
 /// Both are asked because a library-only household's media is whatever they have, and
 /// answering "no" about films to someone whose library is entirely television would be a
 /// wrong answer to a question they did not ask.
-async fn holds(jellyfin: &crate::jellyfin::Jellyfin, term: &str) -> bool {
+async fn holds(server: &dyn crate::ports::service::Library, term: &str) -> bool {
     for kind in Kind::ALL {
-        if jellyfin.has_item(kind, term).await.unwrap_or(false) {
+        if server.has_item(kind, term).await.unwrap_or(false) {
             return true;
         }
     }
