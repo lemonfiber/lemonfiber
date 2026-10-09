@@ -530,5 +530,6 @@ mod installing;
 mod proving;
 mod reaching;
 mod removing;
+mod speaking;
 mod updating;
 mod writing;

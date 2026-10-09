@@ -139,7 +139,7 @@ pub(super) async fn install(
         // plugin rather than reading it back: the register is what layers a plugin's
         // document into the stack, and it is deliberately not written yet.
         proving::started(ctx, &would, stack, &stamp).await?;
-        proving::asked(ctx, &manifest, &would, &mut stated).await;
+        proving::asked(ctx, &manifest, &would, stack, &mut stated).await;
         against = Some(proving::AGAINST);
 
         // The stack is asked only where the plugin's own proofs held. A run that has

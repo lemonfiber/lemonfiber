@@ -17,6 +17,9 @@ use lemonfiber_ports::service::Failure;
 
 use crate::wire::{self, Refusal};
 
+/// What an adapter's own account of itself is named in what is witnessed about it.
+const ABOUT: &str = "about";
+
 /// The most an answer may carry, in bytes, where its operation declares no more.
 pub const LARGEST: usize = 1024 * 1024;
 
@@ -105,18 +108,26 @@ impl Contracted {
         A: serde::Serialize + Sync,
         R: serde::de::DeserializeOwned,
     {
-        let fetched = self
-            .exchange(
-                capability,
-                major,
-                operation,
-                largest,
-                serde_json::to_string(asked),
-            )
-            .await?;
+        let path = crate::path(capability, major, operation);
+        let written = Some(serde_json::to_string(asked));
+        let fetched = self.exchange(Method::Post, &path, written, largest).await?;
         let answer = self.answer(operation, &fetched)?;
         serde_json::from_str(answer)
             .map_err(|why| self.outside(operation, &format!("the answer did not read: {why}")))
+    }
+
+    /// What the adapter says it is: the contracts it speaks and the upstream releases it
+    /// supports.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::call`].
+    pub async fn about(&self) -> Result<crate::adapter::About, Failure> {
+        let path = crate::adapter::about_path();
+        let fetched = self.exchange(Method::Get, &path, None, LARGEST).await?;
+        let answer = self.answer(ABOUT, &fetched)?;
+        serde_json::from_str(answer)
+            .map_err(|why| self.outside(ABOUT, &format!("the answer did not read: {why}")))
     }
 
     /// Send what was asked, written, and wait for the adapter's response.
@@ -126,26 +137,23 @@ impl Contracted {
     /// once per operation.
     async fn exchange(
         &self,
-        capability: &str,
-        major: u32,
-        operation: &str,
+        method: Method,
+        path: &str,
+        written: Option<serde_json::Result<String>>,
         largest: usize,
-        written: serde_json::Result<String>,
     ) -> Result<Fetched, Failure> {
-        let body = written.map_err(|why| self.refused(&why.to_string()))?;
+        let body = written
+            .transpose()
+            .map_err(|why| self.refused(&why.to_string()))?;
         let request = Request {
-            method: Method::Post,
-            url: format!(
-                "{}{}",
-                self.base.trim_end_matches('/'),
-                crate::path(capability, major, operation)
-            ),
+            method,
+            url: format!("{}{path}", self.base.trim_end_matches('/')),
             headers: vec![
                 ("Authorization".to_owned(), format!("Bearer {}", self.key)),
                 ("Content-Type".to_owned(), wire::JSON.to_owned()),
                 ("Accept".to_owned(), wire::JSON.to_owned()),
             ],
-            body: Some(body),
+            body,
             pinned: None,
         };
         let sent = tokio::time::timeout(DEADLINE, self.http.fetch(&request, largest)).await;

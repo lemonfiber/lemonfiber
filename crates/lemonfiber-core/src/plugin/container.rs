@@ -94,8 +94,8 @@ const LIBRARY: &str = "${DATA_ROOT:-./data}:/data";
 /// prevent.
 const HOUSEHOLD: &str = "${LAN_BIND:-0.0.0.0}";
 
-/// The interface an operator surface is published on.
-const OPERATOR: &str = "127.0.0.1";
+/// The interface an operator surface or an adapter's contracts are published on.
+pub(super) const LOOPBACK: &str = "127.0.0.1";
 
 /// What the container may not do once it has started: gain a privilege, through a
 /// setuid program or a file capability.
@@ -237,6 +237,12 @@ fn entry(plugin: &str, placed: &Placed) -> Entry {
             format!("{}:{port}:{port}", published(reached))
         })
         .into_iter()
+        .chain(
+            placed
+                .listens
+                .filter(|_| !placed.speaks.is_empty())
+                .map(|listens| format!("{LOOPBACK}::{listens}")),
+        )
         .collect();
     let mut volumes = Vec::new();
     if placed.takes_data {
@@ -273,7 +279,7 @@ fn literal(text: &str) -> String {
 /// network without touching anything the web-security checks inspect.
 const fn published(reached: &Reached) -> &'static str {
     match reached {
-        Reached::Loopback { .. } => OPERATOR,
+        Reached::Loopback { .. } => LOOPBACK,
         Reached::Household { .. } => HOUSEHOLD,
     }
 }

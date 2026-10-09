@@ -74,6 +74,8 @@ pub struct Published {
     pub address: std::net::IpAddr,
     /// The port on the host, which is the one an operator types.
     pub port: u16,
+    /// The port inside the container it carries to.
+    pub private: u16,
 }
 
 /// One container, correlated back to the service that declared it.

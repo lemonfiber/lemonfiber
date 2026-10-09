@@ -38,6 +38,14 @@ pub(super) fn spoken(service: &Service, found: &mut Vec<Violation>) {
                 .to_owned(),
         });
     }
+    if service.port.is_some() && service.port == service.listens {
+        found.push(Violation {
+            location: format!("{at}.port"),
+            message: "is the port the service speaks its contracts on, which lemonfiber publishes \
+                      on this machine's loopback alone"
+                .to_owned(),
+        });
+    }
     if service.api.is_some() {
         found.push(Violation {
             location: format!("{at}.api"),

@@ -183,11 +183,13 @@ async fn the_cores_client_asks_a_served_adapter_over_the_wire() {
             key,
         ))
     };
+    let about = client(KEY).0.about().await;
     let watching = client(KEY).watching(Kind::Tv).await;
     let refused = client("not-the-key").watching(Kind::Tv).await;
     let _ = stop.send(());
     assert!(matches!(server.await, Ok(Ok(()))));
     assert_eq!(watching.ok().map(|held| held.enabled), Some(false));
+    assert_eq!(about.ok(), Some(super::tests::about()));
     assert!(matches!(refused, Err(Failure::Unauthorised { .. })));
 }
 

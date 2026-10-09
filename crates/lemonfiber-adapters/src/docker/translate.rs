@@ -108,6 +108,7 @@ fn published(ports: Vec<PortSummary>) -> Vec<Published> {
             Some(Published {
                 address: port.ip?.parse().ok()?,
                 port: port.public_port?,
+                private: port.private_port,
             })
         })
         .collect()

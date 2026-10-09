@@ -15,6 +15,7 @@ pub(crate) fn container(project: &str, service: &str, ports: &[u16]) -> Containe
             .map(|port| Published {
                 address: IpAddr::V4(Ipv4Addr::LOCALHOST),
                 port: *port,
+                private: *port,
             })
             .collect(),
         mounts: Vec::new(),

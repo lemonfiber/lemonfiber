@@ -20,6 +20,7 @@
 //! container leaves something Compose will never be asked about again. So the container
 //! comes off first and the rest is somebody else's machinery.
 
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::time::Duration;
 
@@ -215,6 +216,7 @@ pub(crate) async fn asked(
     ctx: &Ctx,
     manifest: &Manifest,
     installed: &Installed,
+    stack: &Path,
     stated: &mut [Proving],
 ) {
     let deadline = ctx.seams.clock.now() + ctx.patience;
@@ -233,6 +235,46 @@ pub(crate) async fn asked(
             },
             Some(address) => answering(ctx, proof, address, deadline).await,
         });
+    }
+    let speaking = installed
+        .services
+        .iter()
+        .filter(|placed| !placed.speaks.is_empty());
+    for (placed, stated) in speaking.zip(stated.iter_mut().skip(manifest.proofs.len())) {
+        stated.came_to = Some(spoken(ctx, stack, placed, deadline).await);
+    }
+}
+
+/// What asking an adapter what it speaks came to: whether it speaks exactly the
+/// contracts its manifest declares, asked again while it has not answered yet.
+async fn spoken(
+    ctx: &Ctx,
+    stack: &Path,
+    placed: &crate::plugin::Placed,
+    deadline: std::time::SystemTime,
+) -> Verdict {
+    let declared: BTreeSet<&str> = placed.speaks.iter().map(String::as_str).collect();
+    loop {
+        let asked = match crate::plugin::reaching::reached(ctx, stack, placed).await {
+            Ok(adapter) => adapter.about().await.map_err(|failure| failure.to_string()),
+            Err(why) => Err(why),
+        };
+        match asked {
+            Ok(about) => {
+                let said: BTreeSet<&str> = about.speaks.iter().map(String::as_str).collect();
+                return if said == declared {
+                    Verdict::Passed
+                } else {
+                    Verdict::Failed {
+                        faults: vec![format!(
+                            "it says it speaks {said:?}, and its manifest says {declared:?}"
+                        )],
+                    }
+                };
+            }
+            Err(why) if ctx.seams.clock.now() >= deadline => return Verdict::Unproven { why },
+            Err(_) => tokio::time::sleep(POLL).await,
+        }
     }
 }
 
