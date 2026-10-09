@@ -156,10 +156,8 @@ pub struct Placed {
     /// is wired to, rather than one wired to on a guess.
     #[serde(default)]
     pub provides: Vec<String>,
-    /// What it is called, for a reader, which is what its dashboard entry is listed as.
-    ///
-    /// Defaulted for a record written before this was kept, which lists it by its id
-    /// rather than leaving it off the panel.
+    /// What it is called, for a reader, which is what its dashboard entry is listed as;
+    /// a record written before this was kept lists it by its id.
     #[serde(default)]
     pub name: String,
     /// What the plugin says it does for the operator, which is what its dashboard entry
@@ -176,10 +174,7 @@ pub struct Placed {
     #[serde(default)]
     pub listens: Option<u16>,
     /// The media it files, in the stack manifest's vocabulary, which decides what it
-    /// comes to in each service that asks for what it provides.
-    ///
-    /// Defaulted for a record written before this was kept, which reads as filing
-    /// nothing named.
+    /// comes to in each service that asks for what it provides; none in an older record.
     #[serde(default)]
     pub media_types: Vec<String>,
     /// The stack's own networks it joins beside the default one, because a stack service
@@ -191,12 +186,10 @@ pub struct Placed {
     /// and staying on the default network.
     #[serde(default)]
     pub networks: Vec<String>,
-    /// Each capability contract it answers as an adapter, as `capability@major`; none in
-    /// a record written before this was kept.
+    /// Each capability contract it answers as an adapter, as `capability@major`.
     #[serde(default)]
     pub speaks: Vec<String>,
-    /// The service of the same plugin it stands in front of, as an adapter; none in a
-    /// record written before this was kept.
+    /// The service of the same plugin it stands in front of, as an adapter.
     #[serde(default)]
     pub fronts: Option<String>,
 }
