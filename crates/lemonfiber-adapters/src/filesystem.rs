@@ -88,7 +88,7 @@ impl FileSystem for Disk {
         let (path, within) = (path.to_path_buf(), within.to_path_buf());
         tokio::task::spawn_blocking(move || confined::make(&path, &within))
             .await
-            .unwrap_or_else(|error| Err(Fault::new(error.to_string())))
+            .unwrap_or(Err(Fault::new("the directory was not made")))
     }
 
     /// One syscall, which is the whole point: `create_new` asks the kernel to create

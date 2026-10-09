@@ -476,23 +476,27 @@ async fn a_missing_directory_is_made_with_every_one_above_it() {
     assert!(wanted.is_dir());
 }
 
-/// A link on the way is refused, and nothing is made where it leads.
+/// A link at the leaf or on the way is refused, and nothing is made where it leads.
 #[cfg(unix)]
 #[tokio::test]
 async fn a_directory_is_never_made_through_a_link() {
     let dir = scratch();
     let owned = dir.join("owned");
-    let _ = std::fs::create_dir_all(&owned);
+    let _ = std::fs::create_dir_all(owned.join("media"));
     let elsewhere = dir.join("elsewhere");
     let _ = std::fs::create_dir_all(&elsewhere);
-    let _ = std::os::unix::fs::symlink(&elsewhere, owned.join("media"));
+    let _ = std::os::unix::fs::symlink(&elsewhere, owned.join("media").join("tv"));
+    let _ = std::os::unix::fs::symlink(&elsewhere, owned.join("books"));
 
-    let refused = Disk
-        .make_beneath(&owned.join("media").join("tv"), &owned)
-        .await;
-
-    assert!(refused.is_err_and(|fault| fault.message.contains("through a link")));
-    assert!(!elsewhere.join("tv").exists());
+    for through in [
+        owned.join("media").join("tv"),
+        owned.join("media").join("tv").join("Season 01"),
+        owned.join("books").join("audio"),
+    ] {
+        let refused = Disk.make_beneath(&through, &owned).await;
+        assert!(refused.is_err(), "{through:?}");
+    }
+    assert!(std::fs::read_dir(&elsewhere).is_ok_and(|mut held| held.next().is_none()));
 }
 
 /// A file on the way, a path outside the tree and a step back up out of it are each
@@ -526,6 +530,10 @@ async fn a_directory_that_cannot_be_made_is_said_in_the_platforms_words() {
     let gone = owned.join("gone");
 
     let refused = Disk.make_beneath(&gone.join("tv"), &gone).await;
+    let long = Disk
+        .make_beneath(&owned.join("n".repeat(1024)), &owned)
+        .await;
 
-    assert!(refused.is_err_and(|fault| !fault.message.contains("lemonfiber")));
+    assert!(refused.is_err_and(|fault| fault.message.contains("was not made")));
+    assert!(long.is_err_and(|fault| fault.message.contains("was not made")));
 }
