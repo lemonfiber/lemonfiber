@@ -210,7 +210,7 @@ pub(super) fn wanted_clients(arr: &Arr, fillers: &Fillers, held: &Held) -> Vec<D
         if pairing.ask.by != arr.target.id {
             continue;
         }
-        let Ok((Connection::DownloadClient(kind), at, _)) = pairing.made else {
+        let Ok((Connection::DownloadClient(protocol), at, _)) = &pairing.made else {
             continue;
         };
         let Some(credential) = held.of(&super::clients::Holder::of(pairing.filler)) else {
@@ -220,7 +220,7 @@ pub(super) fn wanted_clients(arr: &Arr, fillers: &Fillers, held: &Held) -> Vec<D
             name: pairing.filler.name.clone(),
             host: at.host.clone(),
             port: at.port,
-            kind,
+            protocol: protocol.clone(),
             credential: credential.clone(),
             category: category.clone(),
         });

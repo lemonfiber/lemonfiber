@@ -1,0 +1,169 @@
+{
+  "post": {
+    "operationId": "add",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$defs": {
+              "AddPlan": {
+                "additionalProperties": false,
+                "description": "Where a new item will be filed and to what standard — read from the service rather\nthan chosen here, because the operator's own root folder and quality profile are\nalready set up and a walkthrough that ignored them would file its first item somewhere\nthe rest of the library is not.",
+                "properties": {
+                  "quality_profile": {
+                    "description": "The quality profile it will be judged against.",
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "root_folder": {
+                    "description": "The path the service files this kind of media under.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "root_folder",
+                  "quality_profile"
+                ],
+                "type": "object"
+              },
+              "CatalogueEntry": {
+                "additionalProperties": false,
+                "description": "Something the service's catalogue knows about, whether or not it holds it yet.",
+                "properties": {
+                  "held_as": {
+                    "description": "The service's own id, where it is already holding this. Its presence *is* the\nalready-here answer: a walkthrough must detect that rather than acquire it twice.",
+                    "format": "int64",
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "reference": {
+                    "description": "The external identifier the service files it under, which is what an add is made\nby. Zero where the catalogue returned none, which makes the entry unusable for an\nadd and is why it is checked rather than assumed.",
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "title": {
+                    "description": "What it is called.",
+                    "type": "string"
+                  },
+                  "year": {
+                    "description": "The year it came out, where the catalogue gives one — the only thing that tells\ntwo films of the same name apart.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "title",
+                  "reference"
+                ],
+                "type": "object"
+              },
+              "Kind": {
+                "description": "The two kinds of video a household files by resolution, and so the two the quality\nmodel speaks to. Music and books have a different axis and are not resolution\npresets, so they are not here.\n\nNamed for what is filed, never for the service that files it: whatever curates\ntelevision is asked about `Tv`. Read as the media type a service declares, and\naccepting the old service-named spellings where a record still holds one.",
+                "oneOf": [
+                  {
+                    "const": "tv",
+                    "description": "Television: series, seasons and episodes.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "movies",
+                    "description": "Film.",
+                    "type": "string"
+                  }
+                ]
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "entry": {
+                "$ref": "#/$defs/CatalogueEntry",
+                "description": "The port's `entry`."
+              },
+              "kind": {
+                "$ref": "#/$defs/Kind",
+                "description": "The port's `kind`."
+              },
+              "plan": {
+                "$ref": "#/$defs/AddPlan",
+                "description": "The port's `plan`."
+              }
+            },
+            "required": [
+              "kind",
+              "entry",
+              "plan"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "additionalProperties": false,
+              "description": "An item the service has taken on.",
+              "properties": {
+                "id": {
+                  "description": "The service's own id for it, which every later read follows it by.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "title": {
+                  "description": "What the service calls it, which may be tidier than what was searched for.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "title"
+              ],
+              "title": "Added",
+              "type": "object"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ]
+  }
+}

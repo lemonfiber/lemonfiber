@@ -1,0 +1,127 @@
+{
+  "post": {
+    "operationId": "queue",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$defs": {
+                "Queued": {
+                  "additionalProperties": false,
+                  "description": "One thing in a service's queue, in the service's own terms.\n\nDeliberately close to what the API returns: interpreting it is\nthe queue model's, and a port that decided what counted as stuck would put\nthe judgement in the one place a test cannot reach it.",
+                  "properties": {
+                    "download_id": {
+                      "description": "The download client's own identifier for it, where the service knows one.\nA surer correlation than the title, which either side may have rewritten.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "grabs": {
+                      "description": "How many times the service has grabbed this item since it last imported\nit — at least the one that put it here.\n\nCounted per item rather than per release, because a loop commonly grabs a\ndifferent release each time for the same episode, and counted only since\nthe last import, which is what separates a loop from an upgrade. A history\nnobody could read leaves it at one: a count that could not be taken is not\na loop.",
+                      "format": "uint32",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "message": {
+                      "description": "What the service said went wrong, where it said anything. The blocking\ncause, in the words of the thing that refused — a permission denial in an\nimport log is worth more than any interpretation of it.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "state": {
+                      "description": "The service's own word for what stage it is at, such as `importPending`.",
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "The service's own word for how it is tracking: `ok`, `warning`, `error`.",
+                      "type": "string"
+                    },
+                    "title": {
+                      "description": "What the service calls it — the name the download client also knows it by,\nwhich is what correlates the two sides.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status",
+                    "state",
+                    "grabs"
+                  ],
+                  "type": "object"
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "additionalProperties": false,
+              "description": "A service's queue as one read of it found it.",
+              "properties": {
+                "items": {
+                  "description": "The items on the page that was read.",
+                  "items": {
+                    "$ref": "#/$defs/Queued"
+                  },
+                  "type": "array"
+                },
+                "total": {
+                  "description": "How many items the service says it has, whatever fitted on the page.",
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "total",
+                "items"
+              ],
+              "title": "Queue",
+              "type": "object"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ]
+  }
+}

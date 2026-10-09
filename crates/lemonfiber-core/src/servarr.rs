@@ -19,12 +19,13 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use lemonfiber_manifest::ApiKind;
 use serde::Deserialize;
 
 use crate::endpoint::Endpoint;
 use crate::ports::http::{Http, Method, Request, Response};
 use crate::ports::service::{
-    Client, ClientKind, ClientProbe, Credential, DownloadClient, Failure, Identity, QualityProfile,
+    Client, ClientProbe, Credential, DownloadClient, Failure, Identity, QualityProfile,
     RegisteredClient, RegisteredFolder, RootFolder,
 };
 
@@ -157,14 +158,7 @@ impl Client for Servarr {
     }
 
     async fn register_download_client(&self, client: &DownloadClient) -> Result<(), Failure> {
-        let response = self
-            .probe(&self.request(
-                Method::Post,
-                "/downloadclient",
-                Some(download_client_body(client, None)),
-            ))
-            .await?;
-        self.endpoint.expect_success(&response)
+        register_download_client(self, client).await
     }
 
     async fn update_download_client(
@@ -310,10 +304,64 @@ fn set_field(fields: &mut Vec<serde_json::Value>, field: &str, value: Option<&st
     fields.push(serde_json::json!({ "name": field, "value": value }));
 }
 
-fn download_client_body(client: &DownloadClient, id: Option<i64>) -> String {
-    let (implementation, config_contract, protocol) = match client.kind {
-        ClientKind::Sabnzbd => ("Sabnzbd", "SabnzbdSettings", "usenet"),
-        ClientKind::Qbittorrent => ("QBittorrent", "QBittorrentSettings", "torrent"),
+/// Register a download client, in the protocol it is reached in.
+///
+/// Beside the impl rather than inside it because it decides, and nothing inside an
+/// `#[async_trait]` body is attributed to a line in the coverage report.
+async fn register_download_client(
+    servarr: &Servarr,
+    client: &DownloadClient,
+) -> Result<(), Failure> {
+    let body = download_client_body(servarr, client, None)?;
+    let response = servarr
+        .probe(&servarr.request(Method::Post, "/downloadclient", Some(body)))
+        .await?;
+    servarr.endpoint.expect_success(&response)
+}
+
+/// How a Servarr app files a download client of one kind.
+struct Filed {
+    /// The adapter the download client is spoken to through.
+    spoken: ApiKind,
+    /// The implementation the app files it under.
+    implementation: &'static str,
+    /// The settings schema its fields are read against.
+    settings: &'static str,
+    /// The word the app groups download clients by.
+    protocol: &'static str,
+}
+
+/// Every kind of download client a Servarr app files.
+const FILED: [Filed; 2] = [
+    Filed {
+        spoken: ApiKind::Sabnzbd,
+        implementation: "Sabnzbd",
+        settings: "SabnzbdSettings",
+        protocol: "usenet",
+    },
+    Filed {
+        spoken: ApiKind::Qbittorrent,
+        implementation: "QBittorrent",
+        settings: "QBittorrentSettings",
+        protocol: "torrent",
+    },
+];
+
+/// The registration a Servarr app takes for `client`, or the refusal for a protocol it
+/// does not speak.
+fn download_client_body(
+    servarr: &Servarr,
+    client: &DownloadClient,
+    id: Option<i64>,
+) -> Result<String, Failure> {
+    let Some(filed) = FILED
+        .iter()
+        .find(|filed| filed.spoken.name() == client.protocol.0)
+    else {
+        return Err(servarr.endpoint.unsupported(&format!(
+            "it files no download client spoken to as `{}`",
+            client.protocol.0
+        )));
     };
 
     let mut fields = vec![
@@ -333,10 +381,10 @@ fn download_client_body(client: &DownloadClient, id: Option<i64>) -> String {
 
     let mut document = serde_json::json!({
         "enable": true,
-        "protocol": protocol,
+        "protocol": filed.protocol,
         "name": client.name,
-        "implementation": implementation,
-        "configContract": config_contract,
+        "implementation": filed.implementation,
+        "configContract": filed.settings,
         "fields": fields,
     });
     // An update names the client the service already assigned, so the same document
@@ -344,7 +392,7 @@ fn download_client_body(client: &DownloadClient, id: Option<i64>) -> String {
     if let (Some(id), Some(object)) = (id, document.as_object_mut()) {
         object.insert("id".to_owned(), serde_json::json!(id));
     }
-    document.to_string()
+    Ok(document.to_string())
 }
 
 async fn identity(servarr: &Servarr) -> Result<Identity, Failure> {
@@ -426,7 +474,7 @@ async fn update_download_client(
         .probe(&servarr.request(
             Method::Put,
             &format!("/downloadclient/{id}"),
-            Some(download_client_body(client, Some(numeric))),
+            Some(download_client_body(servarr, client, Some(numeric))?),
         ))
         .await?;
     servarr.endpoint.expect_success(&response)

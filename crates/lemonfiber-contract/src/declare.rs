@@ -16,7 +16,7 @@
 //! trait implementations go through `#[async_trait]`, which gives every reference in a
 //! signature its own lifetime and can only see a reference written as a type.
 //!
-//! It expands to a module holding, per operation, the request it crosses as; a `Client`
+//! It expands to a module holding, per operation, the request it crosses as; an `Adapter`
 //! that implements every listed trait by asking an adapter; `dispatch`, which serves a
 //! call to anything implementing those traits; and `capability()`, the descriptor the
 //! published documents are generated from.
@@ -75,11 +75,11 @@ macro_rules! contract {
 
             /// An adapter that fills this capability, asked over its contract.
             #[derive(Debug, Clone)]
-            pub struct Client(pub $crate::Contracted);
+            pub struct Adapter(pub $crate::Contracted);
 
             $(
                 #[::async_trait::async_trait]
-                impl $Trait for Client {
+                impl $Trait for Adapter {
                     $(
                         async fn $op(
                             &self,

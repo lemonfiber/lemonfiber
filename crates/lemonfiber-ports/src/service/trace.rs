@@ -8,7 +8,10 @@ use super::Failure;
 
 /// One library item a trace could follow: its id, the title it was found by, and
 /// whether the service is monitoring it — the entry point for "where is my show?".
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct FoundItem {
     /// The service's own id for the item, used to read its history.
     pub id: i64,
@@ -25,7 +28,10 @@ pub struct FoundItem {
 /// outcomes — a grab, an import — mark how far the item got; the rest — a failed
 /// download, a removal — are the history of what has been tried, shown even though they
 /// advance no stage.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct TraceEvent {
     /// What happened.
     pub outcome: crate::service::stage::Outcome,
@@ -42,7 +48,10 @@ pub struct TraceEvent {
 /// A series holds one record per episode, so this is per-record rather than collapsed to
 /// the item: an episode downloading now and one grabbed and lost look identical once
 /// flattened, and telling those apart is the whole value of a trace.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct QueueItem {
     /// The part of the item this record is for — an episode — where the service names
     /// one. A film's queue record names no part; the record is for the whole item.
@@ -59,7 +68,10 @@ pub struct QueueItem {
 /// release was grabbed is deliberately not here — the television service defines such a
 /// field on its episode type but never populates it on this listing, so reading it would
 /// have reported every grabbed episode as one the indexers never found.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct ItemPart {
     /// The service's own id for the part, which its queue records name.
     pub id: i64,
@@ -78,7 +90,10 @@ pub struct ItemPart {
 /// A stuck item the queue is holding — one queue health reports so it can be traced. Its
 /// title is the human term a trace searches by, so "3 items stuck" leads straight to the
 /// per-item explanation rather than to a count the operator must go and investigate.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct StuckItem {
     /// The item's title, as a person would name it — the term its trace is searched by.
     pub title: String,

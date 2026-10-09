@@ -20,7 +20,7 @@ use lemonfiber_core::error::codes::wiring::DRIFTED;
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::journal::{Change, Kind};
 use lemonfiber_core::ports::http::Method;
-use lemonfiber_core::ports::service::{ClientKind, Credential, DownloadClient};
+use lemonfiber_core::ports::service::{Credential, DownloadClient, Protocol};
 use lemonfiber_core::repair::{Attempt, Repair, Writing, OPERATION};
 use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::http::{Answer, Fake};
@@ -54,7 +54,7 @@ fn want() -> DownloadClient {
         name: "SABnzbd".to_owned(),
         host: "sabnzbd".to_owned(),
         port: 8080,
-        kind: ClientKind::Sabnzbd,
+        protocol: Protocol("sabnzbd".to_owned()),
         credential: Credential::ApiKey("the-key".to_owned()),
         category: lemonfiber_core::ports::service::Category {
             field: "tvCategory".to_owned(),

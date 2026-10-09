@@ -16,7 +16,7 @@
 
 use lemonfiber_manifest::ApiKind;
 
-use crate::ports::service::{ApplicationKind, ClientKind, Subtitled};
+use crate::ports::service::{ApplicationKind, Protocol, Subtitled};
 use crate::seed::{State, Wiring};
 use crate::wiring::{Address, Ask, Filler, Fillers};
 
@@ -47,10 +47,10 @@ pub(super) const MUSIC: &str = "music";
 const ANSWERED: [&str; 4] = [USENET, TORRENT, CURATES, SEARCHES];
 
 /// What one asker and one filler come to.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum Connection {
     /// The filler, registered in the asker as a download client of this kind.
-    DownloadClient(ClientKind),
+    DownloadClient(Protocol),
     /// The filler, registered in the indexer as an application of this kind, so the
     /// indexer pushes it what it searches.
     Application(ApplicationKind),
@@ -73,7 +73,7 @@ impl Connection {
     /// The indexer gives every application it syncs its own API key, and that key opens
     /// every indexer it holds. Every other connection hands the asker the filler's
     /// credential, which is the filler's to give.
-    const fn hands_over_the_askers_key(self) -> bool {
+    const fn hands_over_the_askers_key(&self) -> bool {
         matches!(self, Self::Application(_))
     }
 }
@@ -140,11 +140,9 @@ fn connection(
     media: &[String],
 ) -> Result<Connection, Unmade> {
     match (asker, capability, filler) {
-        (ApiKind::Servarr, USENET, ApiKind::Sabnzbd) => {
-            Ok(Connection::DownloadClient(ClientKind::Sabnzbd))
-        }
-        (ApiKind::Servarr, TORRENT, ApiKind::Qbittorrent) => {
-            Ok(Connection::DownloadClient(ClientKind::Qbittorrent))
+        (ApiKind::Servarr, USENET, ApiKind::Sabnzbd)
+        | (ApiKind::Servarr, TORRENT, ApiKind::Qbittorrent) => {
+            Ok(Connection::DownloadClient(Protocol(filler.name())))
         }
         (ApiKind::Servarr, CURATES, ApiKind::Servarr) => {
             super::applications::application_kind(media)
@@ -219,7 +217,7 @@ pub(super) fn unmatched(fillers: &Fillers) -> Vec<Wiring> {
         .iter()
         .filter(|pairing| !from_its_end(fillers, pairing))
         .filter_map(|pairing| {
-            let why = pairing.made.err()?;
+            let why = *pairing.made.as_ref().err()?;
             Some(Wiring::settled(
                 format!("{} into {}", pairing.filler.name, pairing.asker.name),
                 State::Unmatched {

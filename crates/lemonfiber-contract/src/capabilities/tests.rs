@@ -16,6 +16,8 @@ use lemonfiber_ports::service::{
 use super::download::{torrent, usenet};
 use crate::{wire, Contracted};
 
+mod library;
+
 /// A download client that answers every question with something recognisable.
 struct Client;
 
@@ -100,20 +102,24 @@ impl UsenetAccounts for Client {
     }
 }
 
-/// A transport that hands every call to one capability's dispatcher.
+/// A transport that hands every call to the dispatcher of the capability its path names.
+#[derive(Default)]
 struct Served {
-    torrent: bool,
+    /// The curator every `library.curate` call reaches.
+    curator: Arc<library::Curator>,
 }
 
 #[async_trait]
 impl Http for Served {
     async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-        let operation = request.url.rsplit('/').next().unwrap_or_default();
+        let mut segments = request.url.rsplit('/');
+        let operation = segments.next().unwrap_or_default();
+        let capability = segments.nth(1).unwrap_or_default();
         let body = request.body.as_deref().unwrap_or_default().as_bytes();
-        let served = if self.torrent {
-            torrent::dispatch(&Client, operation, body).await
-        } else {
-            usenet::dispatch(&Client, operation, body).await
+        let served = match capability {
+            "download.torrent" => torrent::dispatch(&Client, operation, body).await,
+            "download.usenet" => usenet::dispatch(&Client, operation, body).await,
+            _ => super::library::curate::dispatch(&*self.curator, operation, body).await,
         };
         Ok(match served {
             Ok(body) => Response {
@@ -130,18 +136,17 @@ impl Http for Served {
     }
 }
 
-fn contracted(torrent: bool) -> Contracted {
-    Contracted::new(
-        Arc::new(Served { torrent }),
-        "http://adapter",
-        "adapter",
-        "k",
-    )
+/// The service the core knows every adapter here as, and names its failures after.
+const SERVICE: &str = "adapter";
+
+/// The core's end of a contract, over a transport serving `served`.
+fn contracted(served: Served) -> Contracted {
+    Contracted::new(Arc::new(served), "http://adapter", SERVICE, "k")
 }
 
 #[tokio::test]
 async fn a_torrent_client_answers_through_its_contract_as_it_answers_in_process() {
-    let asked = torrent::Client(contracted(true));
+    let asked = torrent::Adapter(contracted(Served::default()));
     assert_eq!(asked.transfers().await.ok(), Client.transfers().await.ok());
     assert_eq!(asked.pulling().await.ok(), Some(Pulling::Fetching));
     assert_eq!(asked.stop().await.ok(), Some(Pulling::Stopped));
@@ -172,7 +177,7 @@ async fn a_torrent_client_answers_through_its_contract_as_it_answers_in_process(
 
 #[tokio::test]
 async fn a_usenet_client_answers_its_accounts_and_not_seeding() {
-    let asked = usenet::Client(contracted(false));
+    let asked = usenet::Adapter(contracted(Served::default()));
     assert_eq!(asked.accounts().await.ok(), Some(Vec::new()));
     let unserved = usenet::dispatch(&Client, "seeding", b"{}").await;
     assert_eq!(
@@ -221,5 +226,8 @@ fn every_operation_has_a_path_of_its_own_and_a_schema_each_way() {
         .iter()
         .map(|capability| capability.name)
         .collect();
-    assert_eq!(names, vec!["download.usenet", "download.torrent"]);
+    assert_eq!(
+        names,
+        vec!["download.usenet", "download.torrent", "library.curate"]
+    );
 }

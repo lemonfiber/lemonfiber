@@ -12,7 +12,10 @@ use super::Failure;
 use crate::media::Kind;
 
 /// Something the service's catalogue knows about, whether or not it holds it yet.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct CatalogueEntry {
     /// What it is called.
     pub title: String,
@@ -56,7 +59,10 @@ impl CatalogueEntry {
 /// than chosen here, because the operator's own root folder and quality profile are
 /// already set up and a walkthrough that ignored them would file its first item somewhere
 /// the rest of the library is not.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct AddPlan {
     /// The path the service files this kind of media under.
     pub root_folder: String,
@@ -65,7 +71,10 @@ pub struct AddPlan {
 }
 
 /// An item the service has taken on.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Added {
     /// The service's own id for it, which every later read follows it by.
     pub id: i64,

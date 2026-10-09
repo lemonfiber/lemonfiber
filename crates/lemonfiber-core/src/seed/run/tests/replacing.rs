@@ -49,7 +49,7 @@ fn plan(fillers: &Fillers, by: &str, capability: &str) -> Plan {
         .iter()
         .filter(|pairing| pairing.ask.by == by && pairing.ask.capability == capability)
         .map(|pairing| {
-            let made = pairing.made.map(|(made, at, _)| (made, at.url()));
+            let made = pairing.made.clone().map(|(made, at, _)| (made, at.url()));
             (pairing.filler.id.clone(), made)
         })
         .collect()
@@ -67,7 +67,7 @@ fn expected(before: &Plan, replaced: &str, at: &str) -> Plan {
             }
             let made = match made {
                 Ok((Connection::Application(_), _)) => Err(Unmade::Withheld),
-                Ok((connection, _)) => Ok((*connection, at.to_owned())),
+                Ok((connection, _)) => Ok((connection.clone(), at.to_owned())),
                 Err(why) => Err(*why),
             };
             (STAND_IN.to_owned(), made)

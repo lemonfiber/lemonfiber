@@ -1,5 +1,5 @@
 use super::{made, pairings, unmatched, Connection, Unmade};
-use crate::ports::service::{ApplicationKind, ClientKind, Subtitled};
+use crate::ports::service::{ApplicationKind, Protocol, Subtitled};
 use crate::seed::State;
 use crate::test_support::{a_placed, an_installed};
 use crate::wiring::{Chosen, Fillers};
@@ -69,14 +69,18 @@ fn every_download_ask_the_shipped_stack_makes_comes_to_a_client() {
         .map(|pairing| {
             (
                 pairing.filler.id.clone(),
-                pairing.made.ok().map(|(connection, _, _)| connection),
+                pairing
+                    .made
+                    .clone()
+                    .ok()
+                    .map(|(connection, _, _)| connection),
             )
         })
         .collect();
     assert_eq!(made.len(), 6, "two asks from each of three *arrs: {made:?}");
-    assert!(made.iter().all(|(id, connection)| match id.as_str() {
-        "sabnzbd" => *connection == Some(Connection::DownloadClient(ClientKind::Sabnzbd)),
-        _ => *connection == Some(Connection::DownloadClient(ClientKind::Qbittorrent)),
+    // Each shipped download client is named after the API it is spoken to in.
+    assert!(made.iter().all(|(id, connection)| {
+        *connection == Some(Connection::DownloadClient(Protocol(id.clone())))
     }));
 }
 
@@ -92,7 +96,11 @@ fn every_curation_ask_the_shipped_stack_makes_is_connected_or_said() {
         .iter()
         .filter(|pairing| pairing.ask.capability == "library.curate")
         .filter_map(|pairing| {
-            let connection = pairing.made.ok().map(|(connection, _, _)| connection);
+            let connection = pairing
+                .made
+                .clone()
+                .ok()
+                .map(|(connection, _, _)| connection);
             connection.is_some().then(|| {
                 (
                     pairing.asker.id.clone(),
@@ -270,7 +278,7 @@ fn an_asker_naming_no_adapter_is_connected_to_nothing() {
     let sonarrs: Vec<Result<Connection, Unmade>> = pairings(&fillers)
         .iter()
         .filter(|pairing| pairing.ask.by == "sonarr")
-        .map(|pairing| pairing.made.map(|(connection, _, _)| connection))
+        .map(|pairing| pairing.made.clone().map(|(connection, _, _)| connection))
         .collect();
     assert_eq!(sonarrs, vec![Err(Unmade::Unpaired); 2]);
 }
@@ -349,7 +357,7 @@ fn a_plugin_asker_is_connected_to_nothing() {
         .map(|pairing| {
             (
                 pairing.filler.id.as_str(),
-                pairing.made.map(|(connection, _, _)| connection),
+                pairing.made.clone().map(|(connection, _, _)| connection),
             )
         })
         .collect();

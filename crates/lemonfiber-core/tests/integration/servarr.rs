@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use lemonfiber_core::ports::http::{Http, Request};
 use lemonfiber_core::ports::service::{
-    AddPlan, Added, CatalogueEntry, Category, ClientKind, Credential, DownloadClient,
+    AddPlan, Added, CatalogueEntry, Category, Credential, DownloadClient, Protocol,
 };
 use lemonfiber_core::recyclarr::Kind;
 use lemonfiber_core::servarr::Servarr;
@@ -30,7 +30,7 @@ fn sabnzbd() -> DownloadClient {
         name: "SABnzbd".to_owned(),
         host: "sabnzbd".to_owned(),
         port: 8080,
-        kind: ClientKind::Sabnzbd,
+        protocol: Protocol("sabnzbd".to_owned()),
         credential: Credential::ApiKey("sab-key".to_owned()),
         category: Category {
             field: "tvCategory".to_owned(),

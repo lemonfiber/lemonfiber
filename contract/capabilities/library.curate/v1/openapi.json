@@ -1,0 +1,170 @@
+{
+  "components": {
+    "responses": {
+      "Refused": {
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Refusal"
+            }
+          }
+        },
+        "description": "A refusal the contract declares."
+      }
+    },
+    "schemas": {
+      "Refusal": {
+        "$defs": {
+          "Kind": {
+            "description": "Why an adapter refused a call, as the contract declares it.",
+            "oneOf": [
+              {
+                "const": "unavailable",
+                "description": "The upstream did not answer.",
+                "type": "string"
+              },
+              {
+                "const": "unauthorised",
+                "description": "The upstream refused the credential the adapter holds for it.",
+                "type": "string"
+              },
+              {
+                "const": "refused",
+                "description": "The upstream answered in a way the adapter did not expect.",
+                "type": "string"
+              },
+              {
+                "const": "unsupported",
+                "description": "The upstream speaks a release the adapter does not support.",
+                "type": "string"
+              },
+              {
+                "const": "unknown-operation",
+                "description": "The operation is not one this adapter serves.",
+                "type": "string"
+              },
+              {
+                "const": "not-asked",
+                "description": "What was asked did not read as the operation's request.",
+                "type": "string"
+              }
+            ]
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A refusal, as a problem document.",
+        "properties": {
+          "detail": {
+            "description": "What the adapter said, for a person reading a log. Never decided on.",
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/$defs/Kind",
+            "description": "Which refusal it is."
+          }
+        },
+        "required": [
+          "type",
+          "detail"
+        ],
+        "title": "Refusal",
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "key": {
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "title": "library.curate contract",
+    "version": "1"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/lemonfiber/library.curate/v1/add": {
+      "$ref": "operations/add.json"
+    },
+    "/lemonfiber/library.curate/v1/add_plan": {
+      "$ref": "operations/add_plan.json"
+    },
+    "/lemonfiber/library.curate/v1/apply_music_format": {
+      "$ref": "operations/apply_music_format.json"
+    },
+    "/lemonfiber/library.curate/v1/carry": {
+      "$ref": "operations/carry.json"
+    },
+    "/lemonfiber/library.curate/v1/download_clients": {
+      "$ref": "operations/download_clients.json"
+    },
+    "/lemonfiber/library.curate/v1/find_items": {
+      "$ref": "operations/find_items.json"
+    },
+    "/lemonfiber/library.curate/v1/hardlinks": {
+      "$ref": "operations/hardlinks.json"
+    },
+    "/lemonfiber/library.curate/v1/identity": {
+      "$ref": "operations/identity.json"
+    },
+    "/lemonfiber/library.curate/v1/indexer_count": {
+      "$ref": "operations/indexer_count.json"
+    },
+    "/lemonfiber/library.curate/v1/item_history": {
+      "$ref": "operations/item_history.json"
+    },
+    "/lemonfiber/library.curate/v1/item_parts": {
+      "$ref": "operations/item_parts.json"
+    },
+    "/lemonfiber/library.curate/v1/item_queue": {
+      "$ref": "operations/item_queue.json"
+    },
+    "/lemonfiber/library.curate/v1/library": {
+      "$ref": "operations/library.json"
+    },
+    "/lemonfiber/library.curate/v1/lookup": {
+      "$ref": "operations/lookup.json"
+    },
+    "/lemonfiber/library.curate/v1/probe_releases": {
+      "$ref": "operations/probe_releases.json"
+    },
+    "/lemonfiber/library.curate/v1/quality_profiles": {
+      "$ref": "operations/quality_profiles.json"
+    },
+    "/lemonfiber/library.curate/v1/queue": {
+      "$ref": "operations/queue.json"
+    },
+    "/lemonfiber/library.curate/v1/records": {
+      "$ref": "operations/records.json"
+    },
+    "/lemonfiber/library.curate/v1/register_download_client": {
+      "$ref": "operations/register_download_client.json"
+    },
+    "/lemonfiber/library.curate/v1/register_root_folder": {
+      "$ref": "operations/register_root_folder.json"
+    },
+    "/lemonfiber/library.curate/v1/root_folders": {
+      "$ref": "operations/root_folders.json"
+    },
+    "/lemonfiber/library.curate/v1/search_upgrades": {
+      "$ref": "operations/search_upgrades.json"
+    },
+    "/lemonfiber/library.curate/v1/set_client_field": {
+      "$ref": "operations/set_client_field.json"
+    },
+    "/lemonfiber/library.curate/v1/set_hardlinks": {
+      "$ref": "operations/set_hardlinks.json"
+    },
+    "/lemonfiber/library.curate/v1/stuck_items": {
+      "$ref": "operations/stuck_items.json"
+    },
+    "/lemonfiber/library.curate/v1/test_download_clients": {
+      "$ref": "operations/test_download_clients.json"
+    },
+    "/lemonfiber/library.curate/v1/update_download_client": {
+      "$ref": "operations/update_download_client.json"
+    }
+  }
+}

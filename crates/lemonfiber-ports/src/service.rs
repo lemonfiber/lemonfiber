@@ -39,8 +39,8 @@ pub use asking::{Approving, Asking, Headroom, Holding, Left, Quota};
 pub use carrying::{Carried, Carrying, Record};
 pub use catalogue::{AddPlan, Added, Catalogue, CatalogueEntry};
 pub use clients::{
-    Category, ClientKind, ClientProbe, Credential, Download, DownloadClient, Endpoint,
-    FulfilmentTarget, QualityProfile, Queue, QueueDepth, Queued, Queues, RegisteredClient,
+    Category, ClientProbe, Credential, Download, DownloadClient, Endpoint, FulfilmentTarget,
+    Protocol, QualityProfile, Queue, QueueDepth, Queued, Queues, RegisteredClient,
     RegisteredFolder, RegisteredTarget, RootFolder, Seeded, Seeding, Transfers,
 };
 pub use failure::{Failure, ASK_FOR_REPAIRS};
@@ -65,7 +65,10 @@ pub use throttling::{Hours, Rates, Throttled, Throttling, Wanted, Window};
 pub use trace::{FoundItem, ItemPart, Library, Pipeline, QueueItem, StuckItem, TraceEvent};
 
 /// Who a service says it is, once it answers.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Identity {
     /// The service's own name for itself.
     pub name: String,

@@ -86,7 +86,7 @@ impl Kind {
 /// How good the operator wants their music to sound, and how much disk they will
 /// spend on it — chosen as a format preference, since music has no resolution to
 /// choose.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Format {
     /// Small lossy files that sound great on phones, earbuds, and in the car:

@@ -1,0 +1,121 @@
+{
+  "post": {
+    "operationId": "download_clients",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$defs": {
+                "Category": {
+                  "additionalProperties": false,
+                  "description": "The category a download is filed under, named after the media the requesting\napplication manages.\n\nThe field is not shared across applications — Sonarr names it `tvCategory`,\nRadarr `movieCategory`, Lidarr `musicCategory` — so it travels with the client\nrather than being assumed by the writer.",
+                  "properties": {
+                    "field": {
+                      "description": "The field the target application names its category.",
+                      "type": "string"
+                    },
+                    "value": {
+                      "description": "The value a download is filed under.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "value"
+                  ],
+                  "type": "object"
+                },
+                "RegisteredClient": {
+                  "additionalProperties": false,
+                  "description": "A download client a service already holds, with the identifier it gave it.\n\nRead back so a client already registered can be told from an absent one —\nmatched by the endpoint it reaches, the host and port, rather than by its\nlabel, so a differently-named but equivalent client is not duplicated — and so\na later undo names exactly the one created.",
+                  "properties": {
+                    "category": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/Category"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The category the client currently files under, where the service reports\none — read back so an operator's change to it can be seen and preserved\nrather than reverted. Absent where the service names no category field."
+                    },
+                    "host": {
+                      "description": "The host the client is reached on.",
+                      "type": "string"
+                    },
+                    "id": {
+                      "description": "The identifier the service assigned.",
+                      "type": "string"
+                    },
+                    "port": {
+                      "description": "The port it listens on.",
+                      "format": "uint16",
+                      "maximum": 65535,
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "host",
+                    "port"
+                  ],
+                  "type": "object"
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "items": {
+                "$ref": "#/$defs/RegisteredClient"
+              },
+              "title": "Array_of_RegisteredClient",
+              "type": "array"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ]
+  }
+}

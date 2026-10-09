@@ -10,7 +10,10 @@ use super::Failure;
 /// What a search for the operator's wanted content found, read against the quality
 /// profile in force — the basis for telling "the preset yields no matching releases"
 /// apart from "the indexer failed" (which surfaces as a [`Failure`], not a probe).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
 pub enum ReleaseProbe {
     /// Nothing is wanted, so there was nothing to search for — the preset cannot be
     /// judged against releases yet.
