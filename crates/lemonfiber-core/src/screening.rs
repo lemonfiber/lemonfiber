@@ -17,17 +17,56 @@ use crate::app::targets::jellyfin_reader;
 use crate::app::{Ctx, Outcome, Viewing, Whom};
 use crate::error::codes::play::{
     NOBODY_NAMED, NOTHING_TO_PLAY_FROM, NOT_AN_ITEM, NOT_A_DEVICE, NOT_IN_THE_HOUSEHOLD,
-    NOT_ON_THEIR_SHELF, SIGNS_NO_DEVICE_IN, UNANSWERED,
+    NOT_ON_THEIR_SHELF, NO_SUCH_PICTURE, SIGNS_NO_DEVICE_IN, UNANSWERED,
 };
 use crate::error::{Diagnose as _, Problem, Remedy, State};
 use crate::jellyfin::Jellyfin;
 use crate::model::{GrantReport, PartWayReport, TitleReport, WatchedReport};
-use crate::ports::service::{Household as _, HowFar, Member, Screening as _};
+use crate::ports::service::{
+    Household as _, HowFar, Image, Member, Picture, Screening as _, PICTURE_MOST,
+};
 
 use door::{placed, progressed};
 
 /// How many titles a member's part-way list answers with.
 pub const A_FEW: u32 = 24;
+
+/// The media types a picture is passed on as: raster images, which carry nothing a
+/// browser runs.
+pub const RASTER: [&str; 5] = [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/gif",
+    "image/avif",
+];
+
+/// A picture as the core passes it on.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Pictured {
+    /// Its media type, one of [`RASTER`].
+    pub media_type: &'static str,
+    /// Its bytes, at most [`PICTURE_MOST`] of them.
+    pub bytes: Vec<u8>,
+}
+
+/// The picture as the core passes it on, where it is a raster image of at most
+/// [`PICTURE_MOST`] bytes.
+fn passed_on(image: Image) -> Option<Pictured> {
+    let declared = image
+        .media_type
+        .split(';')
+        .next()
+        .unwrap_or_default()
+        .trim();
+    let media_type = RASTER
+        .into_iter()
+        .find(|raster| raster.eq_ignore_ascii_case(declared))?;
+    (image.bytes.len() <= PICTURE_MOST).then_some(Pictured {
+        media_type,
+        bytes: image.bytes,
+    })
+}
 
 /// What one of a member's viewing requests comes to.
 ///
@@ -84,6 +123,39 @@ async fn title(ctx: &Ctx, whose: &Whom, id: &str) -> Result<TitleReport, Box<Pro
         title: Some(placed(title, &door)),
         rehearsed: false,
     })
+}
+
+/// One of a title's pictures, as the member it was asked for may see it.
+///
+/// # Errors
+///
+/// A [`Problem`] where the id names nothing the server could hold, where the title is
+/// not on the member's shelf or has no such picture, where what the server answered is
+/// not a raster image of at most [`PICTURE_MOST`] bytes, and where there is no server or
+/// it does not answer.
+pub async fn picture(
+    ctx: &Ctx,
+    whose: &Whom,
+    id: &str,
+    which: Picture,
+) -> Result<Pictured, Box<Problem>> {
+    if !an_item(id) {
+        return Err(refused(
+            NOT_AN_ITEM,
+            "That is not a title the household could hold",
+        ));
+    }
+    let server = server(ctx)?;
+    let member = match whose {
+        Whom::Named(named) => Some(member(&server, named).await?),
+        Whom::Defaults => None,
+    };
+    server
+        .picture(member.as_ref().map(|member| member.id.as_str()), id, which)
+        .await
+        .map_err(|_| unanswered())?
+        .and_then(passed_on)
+        .ok_or_else(|| refused(NO_SUCH_PICTURE, "That title has no such picture"))
 }
 
 /// What one member was part-way through, most recent first.

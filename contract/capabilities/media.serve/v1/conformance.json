@@ -58,6 +58,15 @@
       "operation": "sign_out"
     },
     {
+      "case": "picture-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "picture"
+    },
+    {
       "case": "holdings-answers",
       "expect": {
         "conforms": true

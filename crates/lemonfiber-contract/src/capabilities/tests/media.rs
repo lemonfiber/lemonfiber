@@ -4,8 +4,8 @@
 use async_trait::async_trait;
 use lemonfiber_ports::media::Kind;
 use lemonfiber_ports::service::{
-    AppKeys, Dated, EpisodeDetail, Failure, Fronted, Holds, HowFar, Item, ItemDetail, ItemProgress,
-    Library, Medium, Playback, Screening, SeasonDetail,
+    AppKeys, Dated, EpisodeDetail, Failure, Fronted, Holds, HowFar, Image, Item, ItemDetail,
+    ItemProgress, Library, Medium, Picture, Playback, Screening, SeasonDetail,
 };
 
 use super::{crosses_alike, serve, Upstream};
@@ -65,6 +65,17 @@ impl Screening for Upstream {
     async fn sign_out(&self, device: &str) -> Result<(), Failure> {
         self.tell(format!("sign out {device}"));
         Ok(())
+    }
+    async fn picture(
+        &self,
+        member: Option<&str>,
+        id: &str,
+        which: Picture,
+    ) -> Result<Option<Image>, Failure> {
+        Ok(member.map(|member| Image {
+            media_type: "image/jpeg".to_owned(),
+            bytes: format!("{member} {id} {which:?}").into_bytes(),
+        }))
     }
     async fn holdings(&self, member: Option<&str>, most: u32) -> Result<Vec<Item>, Failure> {
         Ok((0..most)
@@ -156,6 +167,11 @@ async fn script<M: Screening + Library + Fronted + AppKeys>(server: &M) -> Vec<S
         format!("{:?}", server.part_way("a7f3", 2).await),
         format!("{:?}", server.progressed("a7f3", "f1", &how_far).await),
         format!("{:?}", server.sign_out("phone").await),
+        format!(
+            "{:?}",
+            server.picture(Some("a7f3"), "f1", Picture::Backdrop).await
+        ),
+        format!("{:?}", server.picture(None, "f1", Picture::Poster).await),
         format!("{:?}", server.holdings(Some("a7f3"), 2).await),
         format!("{:?}", server.holdings(None, 1).await),
         format!("{:?}", server.playing(None).await),

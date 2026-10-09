@@ -71,4 +71,13 @@ codes! {
             can be opened for the member's device without their password. Nothing was changed.",
         remedy: "Turn Quick Connect on in the media server's dashboard, then grant again.",
     }
+    /// Said where a title on the member's shelf has no picture of the kind asked for.
+    NO_SUCH_PICTURE = "PLAY-9" {
+        severity: Error,
+        status: 404,
+        since: "0.18.0",
+        meaning: "That title has no picture of that kind the media server serves as an image of \
+            at most two megabytes, so there is nothing to show.",
+        remedy: "Draw the title by its name where it has no picture.",
+    }
 }

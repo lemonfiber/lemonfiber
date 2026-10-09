@@ -61,8 +61,8 @@ pub use requests::{
     Requesting, Requests, Telling,
 };
 pub use screening::{
-    EpisodeDetail, Holds, HowFar, Item, ItemDetail, ItemProgress, Medium, Screening, SeasonDetail,
-    PLAYER,
+    EpisodeDetail, Holds, HowFar, Image, Item, ItemDetail, ItemProgress, Medium, Picture,
+    Screening, SeasonDetail, PICTURE_MOST, PLAYER,
 };
 pub use subtitles::{Subtitles, Watched, Watching};
 pub use throttling::{Hours, Rates, Throttled, Throttling, Wanted, Window};

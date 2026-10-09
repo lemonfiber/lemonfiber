@@ -24,7 +24,7 @@
 use async_trait::async_trait;
 
 use lemonfiber_error::retry;
-use lemonfiber_ports::http::{Http, Method, Request, Response, Unreachable};
+use lemonfiber_ports::http::{Fetched, Http, Method, Request, Response, Unreachable};
 
 /// A transport that retries what is safe to retry.
 pub struct Retrying<H> {
@@ -50,6 +50,10 @@ const fn is_idempotent(method: Method) -> bool {
 impl<H: Http> Http for Retrying<H> {
     async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
         sent(&self.inner, request).await
+    }
+
+    async fn fetch(&self, request: &Request, most: usize) -> Result<Fetched, Unreachable> {
+        self.inner.fetch(request, most).await
     }
 }
 

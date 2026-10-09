@@ -11,8 +11,8 @@ use super::Jellyfin;
 use crate::endpoint::form_encoded;
 use crate::ports::http::{Method, Request};
 use crate::ports::service::{
-    EpisodeDetail, Failure, HowFar, Item, ItemDetail, ItemProgress, Playback, Screening,
-    SeasonDetail, PLAYER,
+    EpisodeDetail, Failure, HowFar, Image, Item, ItemDetail, ItemProgress, Picture, Playback,
+    Screening, SeasonDetail, PICTURE_MOST, PLAYER,
 };
 
 /// How many of the server's ticks make a second.
@@ -128,6 +128,15 @@ impl Screening for Jellyfin {
         progress(self, member, id, *how_far).await
     }
 
+    async fn picture(
+        &self,
+        member: Option<&str>,
+        id: &str,
+        which: Picture,
+    ) -> Result<Option<Image>, Failure> {
+        pictured(self, member, id, which).await
+    }
+
     async fn sign_out(&self, device: &str) -> Result<(), Failure> {
         let asked = form_encoded(&[("id", device)]);
         let response = self
@@ -197,6 +206,47 @@ async fn opened(
             .refused("the media server opened a session with no token"));
     }
     Ok(Some(opened.token))
+}
+
+/// Where the server serves one of a title's pictures, beneath its address.
+#[must_use]
+pub(crate) fn pictured_at(id: &str, which: Picture) -> String {
+    let named = match which {
+        Picture::Poster => "Primary",
+        Picture::Backdrop => "Backdrop",
+    };
+    format!("/Items/{id}/Images/{named}")
+}
+
+/// One of a title's pictures as `member` may see it, or nothing where they may not see
+/// the title, the server holds no such picture, or it is larger than [`PICTURE_MOST`].
+///
+/// The server serves pictures to anybody, so whether the member may see the title is
+/// asked first, as the member.
+async fn pictured(
+    jellyfin: &Jellyfin,
+    member: Option<&str>,
+    id: &str,
+    which: Picture,
+) -> Result<Option<Image>, Failure> {
+    if !crate::screening::an_item(id) || titled(jellyfin, member, id).await?.is_none() {
+        return Ok(None);
+    }
+    let request = jellyfin.request(Method::Get, &pictured_at(id, which), None);
+    let fetched = jellyfin.endpoint.fetch(&request, PICTURE_MOST).await?;
+    if fetched.status == ABSENT {
+        return Ok(None);
+    }
+    if !fetched.is_success() {
+        return Err(jellyfin
+            .endpoint
+            .refused("the media server would not answer the picture"));
+    }
+    let media_type = fetched
+        .header("content-type")
+        .unwrap_or_default()
+        .to_owned();
+    Ok(fetched.bytes.map(|bytes| Image { media_type, bytes }))
 }
 
 /// A request a member's device makes, named as [`PLAYER`] on that device.

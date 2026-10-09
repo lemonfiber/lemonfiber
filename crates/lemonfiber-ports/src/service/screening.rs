@@ -67,6 +67,19 @@ pub trait Screening: Send + Sync {
     /// Returns [`Failure`] when the server is unreachable or refuses.
     async fn sign_out(&self, device: &str) -> Result<(), Failure>;
 
+    /// One of a title's pictures, as this member's own account reads it, or nothing
+    /// where the server holds none or it is larger than [`PICTURE_MOST`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the server is unreachable or refuses.
+    async fn picture(
+        &self,
+        member: Option<&str>,
+        id: &str,
+        which: Picture,
+    ) -> Result<Option<Image>, Failure>;
+
     /// What this member may watch, as the media server answers it for them.
     ///
     /// **Asked for that member, never filtered for them.** The server holds the age
@@ -247,4 +260,59 @@ pub enum Medium {
     Episode,
     /// Something the server holds that is neither, and is not hidden for that.
     Other,
+}
+
+/// The most bytes a title's picture may carry.
+pub const PICTURE_MOST: usize = 2 * 1024 * 1024;
+
+/// Which of a title's pictures.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
+pub enum Picture {
+    /// The upright one a shelf shows.
+    Poster,
+    /// The wide one behind a title's page.
+    Backdrop,
+}
+
+/// A picture, with the media type the server answered it as.
+#[derive(Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Image {
+    /// The media type it was answered as.
+    pub media_type: String,
+    /// Its bytes, written as base64 on the wire.
+    #[serde(with = "base64_bytes")]
+    #[schemars(with = "String")]
+    pub bytes: Vec<u8>,
+}
+
+impl std::fmt::Debug for Image {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Image")
+            .field("media_type", &self.media_type)
+            .field("bytes", &self.bytes.len())
+            .finish()
+    }
+}
+
+/// Bytes as standard base64 text.
+mod base64_bytes {
+    use base64::engine::general_purpose::STANDARD;
+    use base64::Engine as _;
+    use serde::{Deserialize as _, Deserializer, Serializer};
+
+    pub(super) fn serialize<S: Serializer>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&STANDARD.encode(bytes))
+    }
+
+    pub(super) fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Vec<u8>, D::Error> {
+        let text = String::deserialize(deserializer)?;
+        STANDARD.decode(text).map_err(serde::de::Error::custom)
+    }
 }

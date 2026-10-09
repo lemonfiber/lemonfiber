@@ -33,7 +33,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::error::withheld::{withheld, without_credentials};
-use crate::ports::http::{Http, Request, Response, Unreachable};
+use crate::ports::http::{Fetched, Http, Request, Response, Unreachable};
 use crate::ports::time::Clock;
 
 mod inside;
@@ -137,26 +137,43 @@ fn line(at: u64, request: &Request, answered: Option<u16>) -> String {
 #[async_trait]
 impl<H: Http + Send + Sync> Http for Recording<H> {
     async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-        send(self, request).await
+        let answer = self.inner.send(request).await;
+        noted(
+            self,
+            request,
+            answer.as_ref().ok().map(|answered| answered.status),
+        )
+        .await;
+        answer
+    }
+
+    async fn fetch(&self, request: &Request, most: usize) -> Result<Fetched, Unreachable> {
+        let answer = self.inner.fetch(request, most).await;
+        noted(
+            self,
+            request,
+            answer.as_ref().ok().map(|answered| answered.status),
+        )
+        .await;
+        answer
     }
 }
 
-async fn send<H: Http + Send + Sync>(
+/// Note a request in the ledger, where it left this machine.
+async fn noted<H: Http + Send + Sync>(
     recording: &Recording<H>,
     request: &Request,
-) -> Result<Response, Unreachable> {
-    let answer = recording.inner.send(request).await;
+    status: Option<u16>,
+) {
     let Some(ledger) = recording
         .ledger
         .as_ref()
         .filter(|_| leaves_this_machine(&request.url))
     else {
-        return answer;
+        return;
     };
-    let status = answer.as_ref().ok().map(|answered| answered.status);
     let when = stamped(recording.clock.as_ref());
     ledger.note(line(when, request, status)).await;
-    answer
 }
 
 /// The record is asserted about without being quoted.

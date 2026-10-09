@@ -1,6 +1,6 @@
 use super::{
     Application, ApplicationKind, Category, Credential, Diagnose, DownloadClient, Failure,
-    Identity, Protocol, RegisteredApplication, RootFolder, Signed,
+    Identity, Image, Protocol, RegisteredApplication, RootFolder, Signed,
 };
 use lemonfiber_error::{Severity, State};
 
@@ -141,4 +141,25 @@ fn a_secret_never_reaches_a_debug_rendering() {
         "{rendered:?}"
     );
     assert!(rendered[1].contains("admin") && rendered[2].contains("id-alex"));
+}
+
+#[test]
+fn a_picture_crosses_as_base64_and_is_debugged_by_its_size() {
+    let image = Image {
+        media_type: "image/png".to_owned(),
+        bytes: vec![0, 159, 255],
+    };
+    let written = serde_json::to_value(&image).ok();
+    assert_eq!(
+        written,
+        Some(serde_json::json!({ "media_type": "image/png", "bytes": "AJ//" }))
+    );
+    let read: Option<Image> = written.and_then(|value| serde_json::from_value(value).ok());
+    assert_eq!(read.as_ref(), Some(&image));
+    assert_eq!(
+        format!("{image:?}"),
+        r#"Image { media_type: "image/png", bytes: 3 }"#
+    );
+    let unreadable = serde_json::json!({ "media_type": "image/png", "bytes": "not base64!" });
+    assert!(serde_json::from_value::<Image>(unreadable).is_err());
 }

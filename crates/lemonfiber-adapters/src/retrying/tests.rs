@@ -161,3 +161,14 @@ async fn a_service_that_took_the_connection_and_said_nothing_is_asked_once() {
     assert_eq!(asked.load(Ordering::SeqCst), 1);
     assert_eq!(failure.map(|failure| failure.attempts), Some(1));
 }
+
+#[tokio::test]
+async fn a_fetch_is_handed_to_what_it_wraps() {
+    let (transport, asked) = failing(0);
+    let fetched = transport.fetch(&request(Method::Get), 64).await;
+    assert_eq!(
+        fetched.map(|fetched| fetched.bytes),
+        Ok(Some(b"answered".to_vec()))
+    );
+    assert_eq!(asked.load(Ordering::SeqCst), 1);
+}

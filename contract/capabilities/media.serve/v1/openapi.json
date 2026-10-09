@@ -115,6 +115,9 @@
     "/lemonfiber/media.serve/v1/part_way": {
       "$ref": "operations/part_way.json"
     },
+    "/lemonfiber/media.serve/v1/picture": {
+      "$ref": "operations/picture.json"
+    },
     "/lemonfiber/media.serve/v1/playing": {
       "$ref": "operations/playing.json"
     },

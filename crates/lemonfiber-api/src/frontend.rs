@@ -29,8 +29,10 @@ use crate::serve::{carrying, SENTENCE};
 /// What this page may load, and what may load it.
 ///
 /// Styles are allowed inline because a build inlines the first paint's rules to
-/// avoid a flash of unstyled text; scripts are not, because nothing needs it.
-const POLICY: &str = "default-src 'self'; img-src 'self' data:; \
+/// avoid a flash of unstyled text; scripts are not, because nothing needs it. Images may
+/// be `blob:`, because a title's picture is fetched with the page's token and drawn from
+/// memory.
+const POLICY: &str = "default-src 'self'; img-src 'self' data: blob:; \
                       style-src 'self' 'unsafe-inline'; font-src 'self'; \
                       connect-src 'self'; base-uri 'none'; frame-ancestors 'none'";
 

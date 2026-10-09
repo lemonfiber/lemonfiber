@@ -406,5 +406,35 @@
     "parameters": [],
     "kinds": [],
     "file": true
+  },
+  {
+    "path": "/api/held/{id}/poster",
+    "parameters": [
+      {
+        "name": "member",
+        "repeatable": false
+      },
+      {
+        "name": "defaults",
+        "repeatable": false
+      }
+    ],
+    "kinds": [],
+    "file": true
+  },
+  {
+    "path": "/api/held/{id}/backdrop",
+    "parameters": [
+      {
+        "name": "member",
+        "repeatable": false
+      },
+      {
+        "name": "defaults",
+        "repeatable": false
+      }
+    ],
+    "kinds": [],
+    "file": true
   }
 ]

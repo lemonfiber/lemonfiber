@@ -38,10 +38,12 @@ fn a_removal_that_did_not_happen_is_read_by_why() {
 }
 
 /// A fresh, empty directory of its own, so tests cannot collide over a file
-/// name. Built from the process id and a counter rather than a random name,
-/// which the workspace has no dependency for.
+/// name. Named by a counter rather than at random, which the workspace has no
+/// dependency for.
 fn scratch() -> lemonfiber_fixtures::scratch::Scratch {
-    lemonfiber_fixtures::scratch::Scratch::new("fs")
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let next = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    lemonfiber_fixtures::scratch::Scratch::new(&format!("fs-{next}"))
 }
 
 #[tokio::test]

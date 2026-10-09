@@ -1,0 +1,125 @@
+{
+  "post": {
+    "operationId": "picture",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$defs": {
+              "Picture": {
+                "description": "Which of a title's pictures.",
+                "oneOf": [
+                  {
+                    "const": "poster",
+                    "description": "The upright one a shelf shows.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "backdrop",
+                    "description": "The wide one behind a title's page.",
+                    "type": "string"
+                  }
+                ]
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "id": {
+                "description": "The port's `id`.",
+                "type": "string"
+              },
+              "member": {
+                "description": "The port's `member`.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "which": {
+                "$ref": "#/$defs/Picture",
+                "description": "The port's `which`."
+              }
+            },
+            "required": [
+              "id",
+              "which"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$defs": {
+                "Image": {
+                  "additionalProperties": false,
+                  "description": "A picture, with the media type the server answered it as.",
+                  "properties": {
+                    "bytes": {
+                      "description": "Its bytes, written as base64 on the wire.",
+                      "type": "string"
+                    },
+                    "media_type": {
+                      "description": "The media type it was answered as.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "media_type",
+                    "bytes"
+                  ],
+                  "type": "object"
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Image"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Nullable_Image"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ]
+  }
+}

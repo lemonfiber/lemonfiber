@@ -16,7 +16,7 @@ use reqwest::Url;
 
 use lemonfiber_error::withheld::without_credentials;
 use lemonfiber_error::withheld::REDACTED;
-use lemonfiber_ports::http::{Http, Method, Request, Response, Unreachable};
+use lemonfiber_ports::http::{Fetched, Http, Method, Request, Response, Unreachable};
 
 /// How long to wait for a service to accept a connection before treating it as
 /// not answering. One that is up answers a local connection at once; the wait is
@@ -118,8 +118,36 @@ impl Default for Web {
 #[async_trait]
 impl Http for Web {
     async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
+        read_as_text(self, request).await
+    }
+
+    async fn fetch(&self, request: &Request, most: usize) -> Result<Fetched, Unreachable> {
         let client = self.client_for(request)?;
-        sent(&client, request, self.limit).await
+        sent(&client, request, most.min(self.limit)).await
+    }
+}
+
+/// The answer as text, or the failure to reach it where it was larger than the limit.
+async fn read_as_text(web: &Web, request: &Request) -> Result<Response, Unreachable> {
+    let client = web.client_for(request)?;
+    let fetched = sent(&client, request, web.limit).await?;
+    let Some(bytes) = fetched.bytes else {
+        return Err(oversized(request, web.limit));
+    };
+    Ok(Response {
+        status: fetched.status,
+        headers: fetched.headers,
+        body: String::from_utf8_lossy(&bytes).into_owned(),
+    })
+}
+
+/// That an answer was larger than `limit`, as the failure to reach it.
+fn oversized(request: &Request, limit: usize) -> Unreachable {
+    Unreachable {
+        url: without_credentials(&request.url),
+        reason: format!("the answer was larger than {limit} bytes, so it was not read"),
+        attempts: 1,
+        connected: true,
     }
 }
 
@@ -181,7 +209,7 @@ async fn sent(
     client: &reqwest::Client,
     request: &Request,
     limit: usize,
-) -> Result<Response, Unreachable> {
+) -> Result<Fetched, Unreachable> {
     let mut builder = match request.method {
         Method::Get => client.get(&request.url),
         Method::Post => client.post(&request.url),
@@ -234,33 +262,25 @@ async fn sent(
                 .map(|value| (name.as_str().to_owned(), value.to_owned()))
         })
         .collect();
-    // Refused before a byte of it is read where it announces more than the limit, and
-    // as soon as it passes the limit where it announces nothing or less than it sends.
-    let oversized = || Unreachable {
-        url: without_credentials(&request.url),
-        reason: format!("the answer was larger than {limit} bytes, so it was not read"),
-        attempts: 1,
-        // The service answered: asking again would only be sent the same answer.
-        connected: true,
-    };
-    if response
-        .content_length()
-        .is_some_and(|announced| announced > limit as u64)
-    {
-        return Err(oversized());
-    }
+    // Not read where it announces more than the limit, and no further than the limit
+    // where it announces nothing or less than it sends.
     let mut bytes = Vec::new();
-    while let Some(chunk) = response.chunk().await.map_err(unreachable)? {
-        if bytes.len() + chunk.len() > limit {
-            return Err(oversized());
+    let mut whole = response
+        .content_length()
+        .is_none_or(|announced| announced <= limit as u64);
+    while whole {
+        let Some(chunk) = response.chunk().await.map_err(unreachable)? else {
+            break;
+        };
+        whole = bytes.len() + chunk.len() <= limit;
+        if whole {
+            bytes.extend_from_slice(&chunk);
         }
-        bytes.extend_from_slice(&chunk);
     }
-    let body = String::from_utf8_lossy(&bytes).into_owned();
-    Ok(Response {
+    Ok(Fetched {
         status,
         headers,
-        body,
+        bytes: whole.then_some(bytes),
     })
 }
 

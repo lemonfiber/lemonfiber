@@ -9,8 +9,9 @@ use std::path::{Path, PathBuf};
 
 use crate::app::Ctx;
 use crate::certificate::{self, Kept, Unkept};
+use crate::jellyfin::pictured_at;
 use crate::model::{Episode, Held, Located, PartWay, Pinned, Season, Title};
-use crate::ports::service::{Item, ItemDetail, ItemProgress, Medium};
+use crate::ports::service::{Item, ItemDetail, ItemProgress, Medium, Picture};
 
 /// The port the guarded front door serves encrypted on.
 ///
@@ -179,11 +180,11 @@ pub(crate) fn located(item: Item, door: &Door) -> Held {
                 poster: item
                     .holds
                     .poster
-                    .then(|| format!("{base}/Items/{id}/Images/Primary")),
+                    .then(|| format!("{base}{}", pictured_at(id, Picture::Poster))),
                 backdrop: item
                     .holds
                     .backdrop
-                    .then(|| format!("{base}/Items/{id}/Images/Backdrop")),
+                    .then(|| format!("{base}{}", pictured_at(id, Picture::Backdrop))),
                 stream_from: streams(&item).then(|| {
                     format!("{base}/Videos/{id}/master.m3u8?MediaSourceId={id}&{STREAMED}")
                 }),

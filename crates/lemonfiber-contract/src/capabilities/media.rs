@@ -2,13 +2,15 @@
 //! holds on.
 //!
 //! What the house holds and what one member may watch; what is playing; one title, what
-//! is part-way and how far it got; opening and closing a device's own session; whether
+//! is part-way and how far it got; a title's pictures; opening and closing a device's own
+//! session; whether
 //! the library holds something yet; and standing behind the front door, with the keys it
 //! holds for the stack's own services.
 
 use lemonfiber_ports::media::Kind;
 use lemonfiber_ports::service::{
-    AppKeys, Dated, Fronted, HowFar, Item, ItemDetail, ItemProgress, Library, Playback, Screening,
+    AppKeys, Dated, Fronted, HowFar, Image, Item, ItemDetail, ItemProgress, Library, Picture,
+    Playback, Screening,
 };
 
 crate::contract! {
@@ -25,6 +27,8 @@ crate::contract! {
             fn progressed(str member: &str, str id: &str, refer how_far: &HowFar as HowFar) -> ();
             /// Sign one device out of the session it was opened.
             fn sign_out(str device: &str) -> ();
+            /// One of a title's pictures, as one member may see it.
+            fn picture(opt_str member: Option<&str>, str id: &str, value which: Picture) -> Option<Image>;
             /// What one member may watch, or what an account with every library holds.
             fn holdings(opt_str member: Option<&str>, value most: u32) -> Vec<Item>;
             /// What is playing, for one member or everybody.

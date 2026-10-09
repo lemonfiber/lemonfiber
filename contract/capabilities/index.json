@@ -527,7 +527,7 @@
       "files": [
         {
           "path": "media.serve/v1/openapi.json",
-          "sha256": "331ecd18b99d9ef50d77ffcc146b15ece6d1b83e9efb557eaa6bf07eb89d3c46"
+          "sha256": "9a35c331e469a4f7a24ea9ebd9882c5017d5ebe00c91ca5ed5ccf26ce6385291"
         },
         {
           "path": "media.serve/v1/operations/signed_in.json",
@@ -548,6 +548,10 @@
         {
           "path": "media.serve/v1/operations/sign_out.json",
           "sha256": "77e9d670accd8f29171213e1f98bec161252f6891d3721931e980212f4c968e4"
+        },
+        {
+          "path": "media.serve/v1/operations/picture.json",
+          "sha256": "31b933fd29cd68d03d69fcc2b559e15e71a5dcbbacb050ed347ce81a3028912a"
         },
         {
           "path": "media.serve/v1/operations/holdings.json",
@@ -607,14 +611,14 @@
         },
         {
           "path": "media.serve/v1/conformance.json",
-          "sha256": "0407640f6a05f4d1612666f07b7f711fa607297b77cc4279bd3d49a4f2de391f"
+          "sha256": "f2a2718927446af26dac4ddc185c25159f1faf54d846e31bc0741a91255b9e30"
         }
       ],
       "majors": [
         1
       ],
       "openapi": "media.serve/v1/openapi.json",
-      "operations": 19
+      "operations": 20
     }
   ]
 }

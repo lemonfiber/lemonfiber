@@ -139,6 +139,40 @@ async fn a_member_reaches_what_they_are_playing_whoever_they_named() {
     let _ = fs::remove_dir_all(a_directory("member-playing"));
 }
 
+/// A title's pictures are theirs as the title is, and are refused nothing a title read
+/// would not be: a parameter no read takes, and a title named by anything but an id.
+#[tokio::test]
+async fn a_member_reaches_a_titles_pictures_as_they_reach_the_title() {
+    let (router, carried) = as_a_member("member-pictures").await;
+    let film = "0123456789abcdef0123456789abcdef";
+    for path in [
+        format!("/api/held/{film}/poster"),
+        format!("/api/held/{film}/backdrop?member=bo"),
+    ] {
+        let answer = asked(router.clone(), "GET", &path, &carried, "").await;
+        assert_ne!(
+            answer.status,
+            StatusCode::FORBIDDEN,
+            "{path}: {}",
+            answer.body
+        );
+    }
+    for path in [
+        format!("/api/held/{film}/poster?most=3"),
+        format!("/api/held/{film}/poster?defaults=perhaps"),
+        "/api/held/not-an-item/backdrop".to_owned(),
+    ] {
+        let answer = asked(router.clone(), "GET", &path, &carried, "").await;
+        assert_eq!(
+            answer.status,
+            StatusCode::BAD_REQUEST,
+            "{path}: {}",
+            answer.body
+        );
+    }
+    let _ = fs::remove_dir_all(a_directory("member-pictures"));
+}
+
 /// What the stack can do is told to a member as it is theirs, through every layer a
 /// run puts in front of it: the read that is theirs is available, and an action that
 /// is not is said to be unpermitted rather than left out.

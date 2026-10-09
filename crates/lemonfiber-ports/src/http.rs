@@ -98,11 +98,41 @@ impl Response {
     /// service contradicting itself rather than adding to what it said.
     #[must_use]
     pub fn header(&self, name: &str) -> Option<&str> {
-        self.headers
-            .iter()
-            .find(|(held, _)| held.eq_ignore_ascii_case(name))
-            .map(|(_, value)| value.as_str())
+        header_in(&self.headers, name)
     }
+}
+
+/// What a service answered, read as bytes and no more than a caller would hold.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Fetched {
+    /// The status code, whatever it was.
+    pub status: u16,
+    /// The headers it answered with, in the order they arrived.
+    pub headers: Vec<(String, String)>,
+    /// The body it returned, or nothing where it was larger than was asked for.
+    pub bytes: Option<Vec<u8>>,
+}
+
+impl Fetched {
+    /// Whether the status is in the 2xx range.
+    #[must_use]
+    pub const fn is_success(&self) -> bool {
+        self.status >= 200 && self.status < 300
+    }
+
+    /// What one header holds, whatever case the service spelled its name in.
+    #[must_use]
+    pub fn header(&self, name: &str) -> Option<&str> {
+        header_in(&self.headers, name)
+    }
+}
+
+/// The first value of the header `name`, matched without regard to case.
+fn header_in<'a>(headers: &'a [(String, String)], name: &str) -> Option<&'a str> {
+    headers
+        .iter()
+        .find(|(held, _)| held.eq_ignore_ascii_case(name))
+        .map(|(_, value)| value.as_str())
 }
 
 /// The service could not be reached at all.
@@ -152,6 +182,19 @@ pub trait Http: Send + Sync {
     /// Returns [`Unreachable`] when nothing answered. A status code — including a
     /// refusal — is a [`Response`], never an error.
     async fn send(&self, request: &Request) -> Result<Response, Unreachable>;
+
+    /// Send a request and read the body as bytes, holding no more than `most` of them.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Unreachable`] when nothing answered.
+    async fn fetch(&self, request: &Request, most: usize) -> Result<Fetched, Unreachable> {
+        self.send(request).await.map(|response| Fetched {
+            status: response.status,
+            headers: response.headers,
+            bytes: Some(response.body.into_bytes()).filter(|bytes| bytes.len() <= most),
+        })
+    }
 }
 
 /// A shared handle to a transport is a transport.
@@ -165,6 +208,10 @@ pub trait Http: Send + Sync {
 impl Http for std::sync::Arc<dyn Http> {
     async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
         (**self).send(request).await
+    }
+
+    async fn fetch(&self, request: &Request, most: usize) -> Result<Fetched, Unreachable> {
+        (**self).fetch(request, most).await
     }
 }
 

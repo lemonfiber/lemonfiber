@@ -1,7 +1,9 @@
 use lemonfiber_core::app::answered_under;
 
 use super::{every, Read};
-use crate::read::table::{self, Wanted, BUNDLE, LOGS, OFFERED, THE_STACK, THIS_BINARY};
+use crate::read::table::{
+    self, Wanted, BACKDROP, BUNDLE, LOGS, OFFERED, POSTER, THE_STACK, THIS_BINARY,
+};
 
 /// The read served at `path`, as it is published.
 fn published(path: &str) -> Option<Read> {
@@ -11,7 +13,11 @@ fn published(path: &str) -> Option<Read> {
 /// Every read this surface serves is published, and nothing it does not serve.
 #[test]
 fn every_read_served_is_published_and_nothing_else() {
-    let mut served: Vec<&str> = OFFERED.iter().copied().chain([LOGS, BUNDLE]).collect();
+    let mut served: Vec<&str> = OFFERED
+        .iter()
+        .copied()
+        .chain([LOGS, BUNDLE, POSTER, BACKDROP])
+        .collect();
     let mut listed: Vec<&str> = every().iter().map(|read| read.path).collect();
     served.sort_unstable();
     listed.sort_unstable();
@@ -31,7 +37,9 @@ fn every_read_answers_under_a_kind_or_with_a_file() {
             read.file
         );
     }
-    assert!(published(BUNDLE).is_some_and(|bundle| bundle.file));
+    for file in [BUNDLE, POSTER, BACKDROP] {
+        assert!(published(file).is_some_and(|read| read.file), "{file}");
+    }
 }
 
 /// A read that forks on a parameter answers under the kind of each command it reaches.
