@@ -12,7 +12,7 @@ use super::*;
 /// the operator has no way to check.
 #[test]
 fn an_event_set_apart_reads_as_the_answer_it_was_given() {
-    let told = super::super::alerts(&AlertReport {
+    let told = super::super::alerts::alerts(&AlertReport {
         preset: "problems-only".to_owned(),
         means: "Told when something is wrong.".to_owned(),
         exceptions: vec![
@@ -35,7 +35,7 @@ fn an_event_set_apart_reads_as_the_answer_it_was_given() {
 
     // A reading changes nothing, so it says nothing about saving — the branch the
     // three assertions above never enter.
-    let read = super::super::alerts(&AlertReport {
+    let read = super::super::alerts::alerts(&AlertReport {
         preset: "everything".to_owned(),
         means: "Told about everything.".to_owned(),
         exceptions: Vec::new(),

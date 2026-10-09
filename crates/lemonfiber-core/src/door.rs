@@ -122,6 +122,7 @@ const NAMED: &[(&str, Facing)] = &[
     ("navidrome", Facing::Shelf),
     ("homepage", Facing::Operators),
     ("caddy", Facing::Carriage),
+    (crate::screening::door::SERVICE, Facing::Watching),
 ];
 
 /// What this service is to the household, or nothing where it is not published to
@@ -188,9 +189,23 @@ pub struct Candidate<'a> {
 /// them, then each installed plugin's.
 #[must_use]
 pub fn candidates<'a>(services: &'a [Service], installed: &'a [Installed]) -> Vec<Candidate<'a>> {
-    let bundled = services.iter().map(|service| Candidate {
+    // The guard in front of the media server is met as the media server: what the
+    // household arrives at through it is the library, under the library's own name.
+    let library = services
+        .iter()
+        .find(|service| {
+            service
+                .api
+                .as_ref()
+                .is_some_and(|api| api.kind == ApiKind::Jellyfin)
+        })
+        .map(|service| service.name.as_str());
+    let bundled = services.iter().map(move |service| Candidate {
         id: &service.id,
-        name: &service.name,
+        name: match library {
+            Some(library) if service.id == crate::screening::door::SERVICE => library,
+            _ => &service.name,
+        },
         facing: facing(service),
         reached: Reached::Port(service.port),
     });

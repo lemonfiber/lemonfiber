@@ -26,8 +26,8 @@ use crate::refusal::Refusal;
 use super::{
     Wanted, ALERTS, BACKUPS, BANDWIDTH, BUNDLE, CATALOGUE, CHECKS, CLIENTS, CONFIG, CREDENTIALS,
     EXPLAIN, FORMS, FRONT_DOOR, HELD, HOSTING, LOGS, NEWS, OUTBOUND, PLAYING, PLUGINS, QUALITY,
-    REQUESTS, SERVICES, SPACE, STATUS, STORAGE, STORED, STUCK, TRACE, UNINSTALL, UPDATE, VERSION,
-    WIRING,
+    REQUESTS, SERVICES, SPACE, STATUS, STORAGE, STORED, STUCK, TITLE, TRACE, UNINSTALL, UPDATE,
+    VERSION, WATCHING, WIRING,
 };
 
 /// The parameter naming a form to narrow to.
@@ -100,6 +100,8 @@ const TAKEN: &[(&str, &[&str])] = &[
     (REQUESTS, &[MEMBER, DEFAULTS]),
     (HELD, &[MEMBER, DEFAULTS, MOST]),
     (PLAYING, &[MEMBER]),
+    (TITLE, &[MEMBER, DEFAULTS]),
+    (WATCHING, &[MEMBER, MOST]),
     (HOSTING, &[]),
     (FRONT_DOOR, &[]),
     (NEWS, &[]),
@@ -207,6 +209,7 @@ impl Asked {
             to: self.one(TO).map(str::to_owned),
             what: self.one(WHAT).map(str::to_owned),
             most: self.one(MOST).map(str::to_owned),
+            title: None,
         }
     }
 }

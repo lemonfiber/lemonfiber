@@ -1,6 +1,7 @@
 {
   "fields": {},
   "variants": [
+    "\"episode\"",
     "\"film\"",
     "\"other\"",
     "\"series\""

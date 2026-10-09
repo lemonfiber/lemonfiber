@@ -159,6 +159,10 @@ fn report(outcome: Result<Outcome, Box<super::Problem>>) -> Option<crate::model:
             | Outcome::Household(_)
             | Outcome::Held(_)
             | Outcome::Playing(_)
+            | Outcome::Title(_)
+            | Outcome::PartWay(_)
+            | Outcome::Granted(_)
+            | Outcome::Watched(_)
             | Outcome::FrontDoor(_)
             | Outcome::News(_)
             | Outcome::Stuck(_)
@@ -226,8 +230,9 @@ fn watching(engine: Reporting) -> Ctx {
 }
 
 /// Everything the `library` form declares.
-const LIBRARY: [&str; 7] = [
+const LIBRARY: [&str; 8] = [
     "jellyfin",
+    "door",
     "seerr",
     "request-gate",
     "decline",
@@ -267,6 +272,10 @@ fn stated(outcome: Result<Outcome, Box<super::Problem>>) -> Option<Vec<(String, 
             | Outcome::Household(_)
             | Outcome::Held(_)
             | Outcome::Playing(_)
+            | Outcome::Title(_)
+            | Outcome::PartWay(_)
+            | Outcome::Granted(_)
+            | Outcome::Watched(_)
             | Outcome::FrontDoor(_)
             | Outcome::News(_)
             | Outcome::Stuck(_)

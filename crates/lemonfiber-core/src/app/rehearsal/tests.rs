@@ -395,7 +395,30 @@ fn always_reported() -> Vec<Command> {
 /// Taught to report rather than to act: each stops short of the write and says
 /// what the write would have been.
 fn taught_to_report() -> Vec<Command> {
+    use crate::app::{Viewing, Whom};
+    use crate::ports::service::HowFar;
+    let title = "0123456789abcdef0123456789abcdef".to_owned();
     vec![
+        Command::Viewing(Viewing::Title {
+            member: Whom::Defaults,
+            id: title.clone(),
+        }),
+        Command::Viewing(Viewing::PartWay {
+            member: Whom::Named("ana".to_owned()),
+            most: 3,
+        }),
+        Command::Viewing(Viewing::Grant {
+            member: "ana".to_owned(),
+            device: "a-phone-0123".to_owned(),
+        }),
+        Command::Viewing(Viewing::Watched {
+            member: "ana".to_owned(),
+            id: title,
+            how_far: HowFar {
+                position: 1,
+                ended: false,
+            },
+        }),
         examining_accepting(),
         Command::Watch { forms: Vec::new() },
         Command::Undo { run: None },

@@ -105,6 +105,7 @@ async fn a_switch_that_succeeds_stops_starts_and_then_waits_for_health() {
         .engine(Arc::new(Reporting::holding(
             &[
                 "jellyfin",
+                "door",
                 "seerr",
                 "request-gate",
                 "decline",

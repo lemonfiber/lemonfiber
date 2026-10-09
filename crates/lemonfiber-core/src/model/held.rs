@@ -47,3 +47,16 @@ pub struct HeldReport {
     /// its wording alone.
     pub rehearsed: bool,
 }
+
+impl HeldReport {
+    /// The same shelf with every holding located at the guarded front door.
+    #[must_use]
+    pub(crate) fn located(mut self, door: &crate::screening::door::Door) -> Self {
+        self.holdings = self
+            .holdings
+            .into_iter()
+            .map(|held| crate::screening::door::located(held, door))
+            .collect();
+        self
+    }
+}

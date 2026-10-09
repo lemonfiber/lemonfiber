@@ -390,6 +390,7 @@ fn a_plan_names_the_services_the_profiles_hold() {
         started,
         Some(named(&[
             "jellyfin",
+            "door",
             "seerr",
             "request-gate",
             "decline",

@@ -26,7 +26,7 @@ pub mod published;
 pub mod table;
 
 use axum::body::Body;
-use axum::extract::{RawQuery, State};
+use axum::extract::{Path, RawQuery, State};
 use axum::http::StatusCode;
 use axum::response::Response;
 use axum::routing::get;
@@ -37,7 +37,7 @@ use lemonfiber_core::model::{kind, Envelope};
 
 use crate::admission::Caller;
 use crate::entitled::{may, Door};
-use crate::read::table::{named, wanted, OFFERED};
+use crate::read::table::{named, wanted, Wanted, OFFERED, TITLE};
 use crate::refusal::{Refusal, UNRENDERED};
 use crate::router::Serving;
 use crate::serve::{answered, carrying, JSON};
@@ -54,6 +54,7 @@ const FAILED: StatusCode = StatusCode::INTERNAL_SERVER_ERROR;
 pub fn routes() -> Router<Serving> {
     OFFERED
         .iter()
+        .filter(|read| **read != TITLE)
         .fold(Router::new(), |router, &read| {
             router.route(
                 read,
@@ -66,8 +67,28 @@ pub fn routes() -> Router<Serving> {
                 ),
             )
         })
+        .route(TITLE, get(title))
         .merge(logs::routes())
         .merge(bundle::routes())
+}
+
+/// One title, named in the path, carried out as every other read is.
+async fn title(
+    State(serving): State<Serving>,
+    caller: Caller,
+    Path(id): Path<String>,
+    RawQuery(query): RawQuery,
+) -> Response {
+    match wanted(TITLE, query.as_deref()) {
+        Ok(given) => {
+            let given = Wanted {
+                title: Some(id),
+                ..given
+            };
+            answering(&serving, &caller, TITLE, given).await
+        }
+        Err(problem) => went_wrong(&problem),
+    }
 }
 
 /// Carry out the read a name reaches, or say why it cannot be.
@@ -82,15 +103,25 @@ pub(crate) async fn reading(
     read: &str,
     query: Option<&str>,
 ) -> Response {
-    let given = match wanted(read, query) {
-        Ok(given) => given,
-        Err(problem) => return went_wrong(&problem),
-    };
+    match wanted(read, query) {
+        Ok(given) => answering(serving, caller, read, given).await,
+        Err(problem) => went_wrong(&problem),
+    }
+}
+
+/// Carry out the read a name reaches with what it was given, or say why it cannot be.
+async fn answering(serving: &Serving, caller: &Caller, read: &str, given: Wanted) -> Response {
     match named(read, given) {
         // Ruled on between naming the command and carrying it out, so what is
         // carried out is what this caller may have — narrowed where they may have
         // part of it, and nothing where it is not theirs at all.
-        Ok(command) => match may(caller, Door::Reading, command).granted() {
+        Ok(command) => match may(caller, Door::Reading, command).granted().inspect(|_| {
+            // A member's client speaking renews their grant to play, so a phone in use
+            // keeps playing and one left unused stops.
+            if let Some(member) = caller.member() {
+                lemonfiber_core::screening::spoke(&serving.ctx, member);
+            }
+        }) {
             // A member's household is the operator's whole reading narrowed to them,
             // so it is kept a few seconds rather than read again at every asking —
             // whether the member asked with their session or with a key of theirs.

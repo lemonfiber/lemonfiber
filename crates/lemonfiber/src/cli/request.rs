@@ -11,7 +11,7 @@
 
 use std::path::PathBuf;
 
-use clap::Subcommand;
+use clap::{Args, Subcommand};
 
 use super::{
     AlertCommand, Asked, ConfigAction, HostingCommand, HouseholdCommand, MigrateCommand,
@@ -195,9 +195,9 @@ pub enum Request {
         /// Whose shelf.
         #[command(flatten)]
         whom: RawWhom,
-        /// How many to show, newest first.
-        #[arg(long)]
-        most: Option<u32>,
+        /// How much of it, or what part of it.
+        #[command(flatten)]
+        shelf: RawShelf,
     },
     /// Show what the media server is playing now: who is watching what, and where.
     ///
@@ -503,4 +503,19 @@ pub enum Request {
         #[arg(long)]
         repoint: bool,
     },
+}
+
+/// How much of a shelf to show, or which part of it.
+#[derive(Debug, Clone, Default, Args)]
+pub struct RawShelf {
+    /// How many to show, newest first.
+    #[arg(long)]
+    pub most: Option<u32>,
+    /// Show one title instead: what it is, its seasons and episodes, and where it is
+    /// served — named by the id the shelf lists it under.
+    #[arg(long, conflicts_with_all = ["most", "part_way"])]
+    pub title: Option<String>,
+    /// Show what they were part-way through instead, and how far.
+    #[arg(long, conflicts_with = "defaults")]
+    pub part_way: bool,
 }

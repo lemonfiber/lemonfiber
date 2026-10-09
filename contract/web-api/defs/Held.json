@@ -3,6 +3,24 @@
   "description": "One thing the household holds, as a member is shown it.\n\nWhat a person recognises and nothing else. There is no file path, no container,\nno bitrate and no library id: a member deciding what to watch is not choosing a\ntranscode, and a surface handed those would have to decide not to draw them.",
   "type": "object",
   "properties": {
+    "backdrop": {
+      "description": "Where its backdrop is served, where it has one.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "door": {
+      "description": "The certificate the door presents, which a client pins, beside any location.",
+      "anyOf": [
+        {
+          "$ref": "Pinned.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "id": {
       "description": "The identifier the server tells it apart by, which is what asking to play one\nof them names.",
       "type": "string"
@@ -11,9 +29,30 @@
       "description": "Which of the kinds this product deals in it is.",
       "$ref": "Medium.json"
     },
+    "poster": {
+      "description": "Where its poster is served, where it has one.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "stream_from": {
+      "description": "Where it streams from, where it plays.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "title": {
       "description": "What it is called, in the words the server holds it under.",
       "type": "string"
+    },
+    "unlocated": {
+      "description": "Why no location is stated, where none is.",
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "year": {
       "description": "The year it came out, where the server knows one. Absent rather than guessed:\ntwo films share a title far more often than they share a title and a year.",

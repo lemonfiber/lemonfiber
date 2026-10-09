@@ -88,6 +88,32 @@ pub enum HouseholdCommand {
         /// Who it is for, named the way they sign in.
         name: String,
     },
+    /// Open a session on somebody's own account for one of their devices.
+    ///
+    /// What the device then plays is under their own limits, and nobody learns their
+    /// password. The token it plays with is answered once, under `--json` alone, and
+    /// nothing keeps it. The grant lasts thirty days from the last time their client
+    /// spoke to lemonfiber.
+    Grant {
+        /// Who the device plays as, named the way they sign in.
+        name: String,
+        /// The id the player keeps for the device: eight to sixty-four letters, digits
+        /// and dashes.
+        device: String,
+    },
+    /// Record how far somebody got through a title, as their own progress.
+    Watched {
+        /// Whose progress, named the way they sign in.
+        name: String,
+        /// The title or episode, by the id the shelf lists it under.
+        id: String,
+        /// How far in, in whole seconds.
+        #[arg(long)]
+        at: u64,
+        /// Record it as finished.
+        #[arg(long)]
+        ended: bool,
+    },
 }
 
 /// What to do about a setup already on this machine.

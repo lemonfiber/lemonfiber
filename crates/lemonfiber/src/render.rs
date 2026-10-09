@@ -11,6 +11,7 @@
 #[cfg(test)]
 pub(crate) mod fixtures;
 
+mod alerts;
 mod archive;
 mod bandwidth;
 mod catalogue;
@@ -47,12 +48,13 @@ mod stored;
 mod trace;
 mod uninstall;
 mod update;
+mod viewing;
 pub(crate) mod walkthrough;
 mod wiring;
 
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::model::{
-    AlertReport, ConfigReport, FormsReport, SettingReport, VersionReport, WizardReport,
+    ConfigReport, FormsReport, SettingReport, VersionReport, WizardReport,
 };
 use lemonfiber_core::origin::Origin;
 use lemonfiber_core::reconfigure::{Review, Stance};
@@ -226,7 +228,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Forms(report) => forms(report),
         Outcome::Preview(plan) => stack::preview(plan),
         Outcome::Config(report) => settings(report),
-        Outcome::Alerts(report) => alerts(report),
+        Outcome::Alerts(report) => alerts::alerts(report),
         Outcome::History(report) => history::history(report),
         Outcome::Migration(report) => migration::migration(report),
         Outcome::Adoption(report) => migration::adoption(report),
@@ -240,6 +242,10 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Household(report) => trace::household(report),
         Outcome::Held(report) => held::held(report),
         Outcome::Playing(report) => playing::playing(report),
+        Outcome::Title(report) => viewing::title(report),
+        Outcome::PartWay(report) => viewing::part_way(report),
+        Outcome::Granted(report) => viewing::grant(report),
+        Outcome::Watched(report) => viewing::watched(report),
         Outcome::Hosting(report) => hosting::hosting(report),
         Outcome::FrontDoor(report) => door::front_door(report),
         Outcome::News(report) => news::news(report),
@@ -372,36 +378,6 @@ fn forms(report: &FormsReport) -> Lines {
         if !form.composable {
             lines.put("    on its own; it cannot be combined with another form");
         }
-    }
-    lines
-}
-
-/// What the operator is told about, what that means, and anything set apart from it.
-fn alerts(report: &AlertReport) -> Lines {
-    let mut lines = Lines::default();
-    lines.put(format!("telling you about: {}", report.preset));
-    lines.put(report.means.clone());
-    for exception in &report.exceptions {
-        // Named apart from the preset, so the operator can see why one kind does not
-        // follow the answer they just read.
-        lines.put(format!(
-            "  {} — {}",
-            exception.kind,
-            if exception.wanted {
-                "always told"
-            } else {
-                "never told"
-            }
-        ));
-    }
-    if report.changed {
-        lines.put(String::new());
-        // A rehearsal reports what it would do, so it must not claim it saved.
-        lines.put(if report.rehearsed {
-            "would save"
-        } else {
-            "saved"
-        });
     }
     lines
 }

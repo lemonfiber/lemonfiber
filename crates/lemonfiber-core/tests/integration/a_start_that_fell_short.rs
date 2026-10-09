@@ -24,8 +24,9 @@ use lemonfiber_fixtures::ports::Following;
 use lemonfiber_fixtures::support::{Reporting, Scripted};
 
 /// Everything the `library` form declares.
-const LIBRARY: [&str; 7] = [
+const LIBRARY: [&str; 8] = [
     "jellyfin",
+    "door",
     "seerr",
     "request-gate",
     "decline",

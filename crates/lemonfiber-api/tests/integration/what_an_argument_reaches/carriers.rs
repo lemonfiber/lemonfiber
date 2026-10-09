@@ -26,6 +26,8 @@ use plugins::{
     give_plugin, give_source,
 };
 
+mod viewing;
+
 /// One form named, which is what most of the rest are asked with.
 pub(super) fn naming(form: &str) -> Arguments {
     Arguments {
@@ -662,7 +664,7 @@ type Sweep = (&'static str, fn(&mut Arguments), fn(&Command) -> bool);
 /// One row per argument rather than one test per argument, because the rule is one
 /// thing: an action may accept an argument only if the command it reaches has
 /// somewhere to put it, and must refuse it by that name otherwise.
-pub(super) const SWEEPS: [Sweep; 47] = [
+pub(super) const SWEEPS: [Sweep; 51] = [
     ("forms", give_forms, carries_forms),
     ("services", give_services, carries_services),
     ("wait", give_wait, carries_wait),
@@ -714,6 +716,14 @@ pub(super) const SWEEPS: [Sweep; 47] = [
         give_unrestricted_for,
         carries_unrestricted_for,
     ),
+    ("device", viewing::give_device, viewing::carries_device),
+    ("id", viewing::give_title, viewing::carries_title),
+    (
+        "position",
+        viewing::give_position,
+        viewing::carries_position,
+    ),
+    ("ended", viewing::give_ended, viewing::carries_ended),
 ];
 
 /// Every offered action given one argument on top of what it takes, gathering what

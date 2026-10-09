@@ -175,6 +175,23 @@ async fn a_member_is_refused_an_action_whatever_the_app_would_have_shown() {
     let _ = fs::remove_dir_all(a_directory("member-action"));
 }
 
+/// A member's own progress is not refused at the door: it reaches the core, which here
+/// answers that there is no stack to read the media server from.
+#[tokio::test]
+async fn a_members_progress_reaches_the_core_rather_than_a_refusal() {
+    let (router, carried) = as_a_member("member-progress").await;
+    let body = r#"{"id":"0123456789abcdef0123456789abcdef","position":1}"#;
+    let answer = asked(router, "POST", "/api/actions/watched", &carried, body).await;
+
+    assert_ne!(answer.status, StatusCode::FORBIDDEN, "{}", answer.body);
+    assert!(
+        answer.body.contains(r#""code":"STACK-1""#),
+        "{}",
+        answer.body
+    );
+    let _ = fs::remove_dir_all(a_directory("member-progress"));
+}
+
 /// And so does setup, which builds its commands by a third route of its own.
 #[tokio::test]
 async fn a_member_is_refused_a_step_of_setup() {
@@ -625,4 +642,18 @@ async fn an_empty_password_opens_no_session() {
     .await;
     assert_eq!(answer.status, StatusCode::UNAUTHORIZED, "{}", answer.body);
     let _ = fs::remove_dir_all(a_directory(named));
+}
+
+/// A member's grant and progress are answered in the reply to their own request: a
+/// job's name is redeemed by the operator alone, so behind one the member would never
+/// read the token their grant answers, and the operator would.
+#[test]
+fn a_members_viewing_is_answered_at_once() {
+    use lemonfiber_api::actions::{answering, Answering};
+    use lemonfiber_core::app::{Command, Viewing};
+    let grant = Command::Viewing(Viewing::Grant {
+        member: MEMBER.to_owned(),
+        device: "a-phone-0123".to_owned(),
+    });
+    assert_eq!(answering(&grant), Answering::Now);
 }

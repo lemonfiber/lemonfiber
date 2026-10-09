@@ -13,7 +13,6 @@
 //! [`identifier`], and how the surface was last [`served`] — the port being the one part
 //! of the address nothing but a serving run knows.
 
-pub mod certificate;
 pub mod identifier;
 pub mod served;
 
@@ -143,7 +142,7 @@ pub async fn paired(ctx: &Ctx) -> Result<Pairing, Box<Problem>> {
     let served = served::last(directory)
         .filter(|served| served.encrypted && served.network)
         .ok_or_else(|| Box::new(not_served()))?;
-    let held = certificate::kept(directory)
+    let held = crate::certificate::kept(directory)
         .map_err(|why| Box::new(no_certificate(&why.to_string())))?
         .ok_or_else(|| Box::new(no_certificate("none has been made")))?;
     let reached = reached(ctx, served.port)
@@ -244,7 +243,7 @@ pub async fn reaching(ctx: &Ctx) -> Reaching {
             ..Reaching::default()
         };
     };
-    let pin = certificate::kept_or_made(directory)
+    let pin = crate::certificate::kept_or_made(directory)
         .ok()
         .map(|kept| kept.fingerprint);
     let address = match served::last(directory).filter(|served| served.encrypted && served.network)
@@ -292,9 +291,9 @@ async fn reached(ctx: &Ctx, port: u16) -> Option<crate::door::Address> {
 pub fn replacing(ctx: &Ctx, confirm: bool) -> Result<Replacement, Box<Problem>> {
     let directory = kept_in(ctx)?;
     let held = if confirm {
-        Some(certificate::replaced(directory))
+        Some(crate::certificate::replaced(directory))
     } else {
-        certificate::kept(directory).transpose()
+        crate::certificate::kept(directory).transpose()
     }
     .transpose()
     .map_err(|why| Box::new(no_certificate(&why.to_string())))?;

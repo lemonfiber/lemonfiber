@@ -14,6 +14,10 @@ fn everything(confirm: bool) -> Arguments {
         wait: true.into(),
         service: Some("sonarr".to_owned()),
         name: Some("ana".to_owned()),
+        device: Some("a-phone-0123".to_owned()),
+        id: Some("0123456789abcdef0123456789abcdef".to_owned()),
+        position: Some(1),
+        ended: Some(true),
         libraries: vec!["Films".to_owned()],
         age_limit: Some(12),
         unrated: Some("allow".to_owned()),
@@ -177,4 +181,26 @@ fn a_key_callable_action_answers_an_offer_exactly_where_it_can_be_rehearsed() {
             );
         }
     }
+}
+
+/// Progress without how far in is refused by the argument it lacks, and a grant
+/// without a device likewise.
+#[test]
+fn progress_without_a_position_and_a_grant_without_a_device_are_refused_by_name() {
+    let missing = |action: &str, argument: &str| crate::actions::Refused::Missing {
+        action: action.to_owned(),
+        argument: argument.to_owned(),
+    };
+    let watched = Arguments {
+        id: Some("0123456789abcdef0123456789abcdef".to_owned()),
+        ..Arguments::default()
+    };
+    assert_eq!(
+        super::viewing::asked_for("watched", watched).err(),
+        Some(missing("watched", "position"))
+    );
+    assert_eq!(
+        super::viewing::asked_for("grant", Arguments::default()).err(),
+        Some(missing("grant", "device"))
+    );
 }

@@ -55,11 +55,11 @@ use again::{Answer, Asked, Claim, Key};
 
 pub use asked::{
     Arguments, Disturbing, Running, TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_APPROVED,
-    TAKES_ARCHIVE, TAKES_BUNDLING, TAKES_CAPABILITY, TAKES_CHECK, TAKES_CONSENT, TAKES_DISRUPTION,
-    TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_NAME, TAKES_NARROWING, TAKES_PLUGIN,
-    TAKES_POLICY, TAKES_PRESET, TAKES_REASON, TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE,
-    TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING, TAKES_SOURCE, TAKES_TERM, TAKES_TIER,
-    TAKES_WAITING,
+    TAKES_ARCHIVE, TAKES_BUNDLING, TAKES_CAPABILITY, TAKES_CHECK, TAKES_CONSENT, TAKES_DEVICE,
+    TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_NAME,
+    TAKES_NARROWING, TAKES_PLUGIN, TAKES_POLICY, TAKES_PRESET, TAKES_PROGRESS, TAKES_REASON,
+    TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING,
+    TAKES_SOURCE, TAKES_TERM, TAKES_TIER, TAKES_WAITING,
 };
 pub(crate) use named::carried as reached;
 pub use named::{named, ByAKey, KEY_CALLABLE, OFFERED};
@@ -109,6 +109,10 @@ pub const fn answering(command: &Command) -> Answering {
         // Choosing what fills a capability writes one setting and its journal entry,
         // both lemonfiber's own files, and asks nothing of a service.
         | Command::Wiring(_)
+        // A member's grant and progress are a few questions to the media server, and
+        // a job's name is redeemed by the operator alone: behind one, the member would
+        // never read the token their grant answers, and the operator would.
+        | Command::Viewing(_)
         | Command::Restore(Restoring {
             consent: RestoreConsent::List,
             ..
@@ -171,6 +175,9 @@ async fn taken(
         Ok(command) => command,
         Err(refused) => return *refused,
     };
+    if let Some(member) = caller.member() {
+        lemonfiber_core::screening::spoke(&serving.ctx, member);
+    }
     let job = match answering(&command) {
         Answering::Now => None,
         Answering::Later => match Job::mint(serving.ctx.seams.random.as_ref()) {

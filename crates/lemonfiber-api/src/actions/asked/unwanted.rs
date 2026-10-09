@@ -6,10 +6,11 @@
 
 use super::takers::{
     TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_APPROVED, TAKES_ARCHIVE, TAKES_BUNDLING,
-    TAKES_CAPABILITY, TAKES_CHECK, TAKES_CONSENT, TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS,
-    TAKES_ITEM, TAKES_KEPT, TAKES_NAME, TAKES_NARROWING, TAKES_PLUGIN, TAKES_POLICY, TAKES_PRESET,
-    TAKES_REASON, TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING,
-    TAKES_SHARING, TAKES_SOURCE, TAKES_TERM, TAKES_TIER, TAKES_WAITING,
+    TAKES_CAPABILITY, TAKES_CHECK, TAKES_CONSENT, TAKES_DEVICE, TAKES_DISRUPTION, TAKES_DOWNLOAD,
+    TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_NAME, TAKES_NARROWING, TAKES_PLUGIN, TAKES_POLICY,
+    TAKES_PRESET, TAKES_PROGRESS, TAKES_REASON, TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE,
+    TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING, TAKES_SOURCE, TAKES_TERM, TAKES_TIER,
+    TAKES_WAITING,
 };
 use super::Arguments;
 use crate::actions::Refused;
@@ -87,6 +88,26 @@ pub(crate) const TAKEN: &[Taken] = &[
         name: "name",
         takers: TAKES_NAME,
         given: |arguments| arguments.name.is_some(),
+    },
+    Taken {
+        name: "device",
+        takers: TAKES_DEVICE,
+        given: |arguments| arguments.device.is_some(),
+    },
+    Taken {
+        name: "id",
+        takers: TAKES_PROGRESS,
+        given: |arguments| arguments.id.is_some(),
+    },
+    Taken {
+        name: "position",
+        takers: TAKES_PROGRESS,
+        given: |arguments| arguments.position.is_some(),
+    },
+    Taken {
+        name: "ended",
+        takers: TAKES_PROGRESS,
+        given: |arguments| arguments.ended.is_some(),
     },
     Taken {
         name: "libraries",

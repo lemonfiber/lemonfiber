@@ -40,7 +40,7 @@ use super::disturbance::Situation;
 use super::engine::Waiting;
 use super::plugins;
 use super::setup::SetupAction;
-use super::{Command, Ctx};
+use super::{Command, Ctx, Viewing};
 
 /// Why a search cannot be rehearsed.
 ///
@@ -166,6 +166,17 @@ const fn cannot(named: &'static str, why: &'static str) -> Asked {
         rehearsal: Rehearsal::Cannot(why),
         disturbs: None,
         answers: &[],
+    }
+}
+
+/// What a member's viewing requests are: each reports, and a rehearsal of a grant or of
+/// progress writes nothing to the media server.
+const fn viewed(viewing: &Viewing) -> Asked {
+    match viewing {
+        Viewing::Title { .. } => reports("title", &[kind::TITLE]),
+        Viewing::PartWay { .. } => reports("part-way", &[kind::PART_WAY]),
+        Viewing::Grant { .. } => reports("grant", &[kind::GRANT]),
+        Viewing::Watched { .. } => reports("watched", &[kind::WATCHED]),
     }
 }
 
@@ -298,6 +309,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::QualityMusic { .. } => reports("quality music", &[kind::MUSIC]),
         Command::Household { .. } => reports("household", HOUSEHOLD),
         Command::Held { .. } => reports("held", &[kind::HELD]),
+        Command::Viewing(viewing) => viewed(viewing),
         Command::Allowing(_) => reports("allow", HOUSEHOLD),
         Command::Deciding(_) => reports("decide", HOUSEHOLD),
         Command::Expiring(_) => reports("expiring", HOUSEHOLD),

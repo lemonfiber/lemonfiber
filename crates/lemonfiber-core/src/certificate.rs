@@ -1,15 +1,16 @@
-//! The certificate the web surface presents when it is served encrypted.
+//! The certificates this machine presents where it serves encrypted: the web surface's,
+//! and the guarded front door's in front of the media server.
 //!
 //! Made here and kept beside the configuration, because no public authority signs the
-//! names a stack is reachable under — a phone pins this certificate from pairing
-//! material instead, and a browser warns about it. It is made once, on the first run
-//! asked to serve encrypted, and presented unchanged every run after, so a phone paired
-//! once goes on recognising this machine.
+//! names a stack is reachable under — a phone pins each certificate from what the core
+//! states instead, and a browser warns about it. Each is made once, the first time it is
+//! wanted, and presented unchanged every run after, so a phone that pinned it once goes
+//! on recognising this machine.
 //!
-//! **Nothing renews it.** It is valid until long after anybody will be running this
-//! build, so the only way it changes is somebody asking for it to be [`replaced`] — and
-//! replacing it means every paired phone refuses this machine until it is paired again,
-//! which is said before it is done rather than discovered afterwards.
+//! **Nothing renews them.** Each is valid until long after anybody will be running this
+//! build, so the only way one changes is somebody asking for it to be [`replaced`] — and
+//! replacing it means every phone that pinned it refuses this machine until it pins the
+//! new one, which is said before it is done rather than discovered afterwards.
 //!
 //! **What a phone pins is the certificate's digest**: SHA-256 over its DER encoding,
 //! lower-case hex. Not the digest of its public key, which is the same length and a

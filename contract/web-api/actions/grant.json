@@ -1,0 +1,29 @@
+{
+  "action": "grant",
+  "arguments": [
+    {
+      "name": "name",
+      "type": {
+        "default": null,
+        "description": "Who an invitation is for, as they will sign in.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "device",
+      "type": {
+        "default": null,
+        "description": "The id a player keeps for the device it plays on, which a grant opens a session\nfor.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    }
+  ],
+  "consent": [],
+  "rehearsal": false
+}

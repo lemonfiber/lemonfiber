@@ -36,8 +36,14 @@ Options:
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
+      --title <TITLE>
+          Show one title instead: what it is, its seasons and episodes, and where it is served — named by the id the shelf lists it under
+
       --config-dir <PATH>
           Keep lemonfiber's own configuration under a directory of your own
+
+      --part-way
+          Show what they were part-way through instead, and how far
 
       --data-dir <PATH>
           Keep lemonfiber's own data under a directory of your own

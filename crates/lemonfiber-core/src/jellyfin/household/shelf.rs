@@ -5,30 +5,9 @@
 //! them — and the answer is the server's rather than this product's, which is worth a
 //! module of its own to say once.
 
-use super::{item_type, Jellyfin, Kind, Medium, Method};
+use super::{item_type, Jellyfin, Kind, Method};
+use crate::jellyfin::item::{ItemResource, ItemsResource};
 use crate::ports::service::{Failure, Held};
-
-/// One item as the media server describes it.
-#[derive(serde::Deserialize)]
-struct ItemResource {
-    #[serde(rename = "Id", default)]
-    id: String,
-    #[serde(rename = "Name", default)]
-    name: String,
-    /// Absent wherever the server holds no year, which it does for anything it could
-    /// not match against a catalogue.
-    #[serde(rename = "ProductionYear", default)]
-    year: Option<u16>,
-    #[serde(rename = "Type", default)]
-    medium: String,
-}
-
-/// A page of items.
-#[derive(serde::Deserialize)]
-struct ItemsResource {
-    #[serde(rename = "Items", default)]
-    items: Vec<ItemResource>,
-}
 
 /// What this member may watch, as the server answers it for them.
 ///
@@ -68,30 +47,4 @@ fn asked(member: Option<&str>, most: u32) -> String {
         "{whose}/Items?Recursive=true&IncludeItemTypes={kinds}\
          &SortBy=DateCreated&SortOrder=Descending&Limit={most}"
     )
-}
-
-/// Which of the two a held item is, from the word the server uses for it.
-///
-/// Read through [`item_type`] rather than against words of its own, so the filter the
-/// query asks for and the answer it reads back cannot drift apart.
-fn medium(word: &str) -> Medium {
-    if word == item_type(Kind::Radarr) {
-        Medium::Film
-    } else if word == item_type(Kind::Sonarr) {
-        Medium::Series
-    } else {
-        Medium::Other
-    }
-}
-
-impl ItemResource {
-    /// The same item in this product's own words.
-    fn held(self) -> Held {
-        Held {
-            id: self.id,
-            title: self.name,
-            year: self.year,
-            medium: medium(&self.medium),
-        }
-    }
 }

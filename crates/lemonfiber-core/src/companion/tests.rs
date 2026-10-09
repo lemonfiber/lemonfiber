@@ -6,10 +6,11 @@ use lemonfiber_fixtures::scratch::Scratch;
 use lemonfiber_fixtures::support::FixedRandom;
 
 use super::{
-    answers_to, certificate, comparable, encrypted, no_address, no_certificate, not_served,
-    nowhere, paired, replacing, served, unnamed, Material,
+    answers_to, comparable, encrypted, no_address, no_certificate, not_served, nowhere, paired,
+    replacing, served, unnamed, Material,
 };
 use crate::app::Ctx;
+use crate::certificate;
 use crate::config::Settings;
 use crate::error::codes::pair::{NOT_SERVED, NOWHERE, NO_ADDRESS, NO_CERTIFICATE, UNNAMED};
 use crate::platform::Environment;

@@ -95,7 +95,8 @@ pub mod watch;
 pub use command::{
     AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
     Diagnosing, Filling, Gathering, Hostable, Inviting, Keeping, LettingGo, Linking, MigrateAction,
-    QualityAction, Removing, Restarting, Restoring, Setting, Teardown, Tracing, Whom, HOSTABLE,
+    QualityAction, Removing, Restarting, Restoring, Setting, Teardown, Tracing, Viewing, Whom,
+    HOSTABLE,
 };
 pub(crate) mod outcome;
 pub use answering::answered_under;
@@ -431,6 +432,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Trace(tracing) => traced(ctx, tracing).await,
         Command::Held { member, most } => held::held(ctx, &member, most).await.map(Outcome::Held),
         Command::Playing { member } => playing::asked(ctx, member.as_deref()).await,
+        Command::Viewing(viewing) => crate::screening::viewed(ctx, viewing).await,
         Command::Household { member } => household::household(ctx, member.as_ref())
             .await
             .map(Outcome::Household),

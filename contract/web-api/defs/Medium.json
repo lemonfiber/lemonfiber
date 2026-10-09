@@ -13,6 +13,11 @@
       "const": "series"
     },
     {
+      "description": "One episode of a series.",
+      "type": "string",
+      "const": "episode"
+    },
+    {
       "description": "Something the server holds that is neither, and is not hidden for that.",
       "type": "string",
       "const": "other"

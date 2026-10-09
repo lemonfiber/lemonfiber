@@ -128,6 +128,14 @@ outcomes! {
     Held(crate::model::HeldReport) => HELD [rehearsed],
     /// What the media server is playing now, for everybody or for one member.
     Playing(crate::model::PlayingReport) => PLAYING,
+    /// One title, as a member may see it, with where it is served.
+    Title(crate::model::TitleReport) => TITLE [rehearsed],
+    /// What a member was part-way through, and how far.
+    PartWay(crate::model::PartWayReport) => PART_WAY [rehearsed],
+    /// A device granted to play on a member's own account.
+    Granted(crate::model::GrantReport) => GRANT [rehearsed],
+    /// How far a member got, as the media server now holds it.
+    Watched(crate::model::WatchedReport) => WATCHED [rehearsed],
     /// What this machine keeps running for lemonfiber, and what a change to it did.
     Hosting(HostingReport) => HOSTING [rehearsed],
     /// The one address to hand somebody who lives here.

@@ -44,12 +44,14 @@ pub(crate) async fn held(ctx: &Ctx, whose: &Whom, most: u32) -> Result<HeldRepor
         ));
     };
 
+    let door = crate::screening::door::standing(ctx).await;
     let Whom::Named(member) = whose else {
         return Ok(shelved(
             server.holdings(None, most).await,
             String::new(),
             String::new(),
-        ));
+        )
+        .located(&door));
     };
 
     let Ok(accounts) = server.household().await else {
@@ -72,7 +74,8 @@ pub(crate) async fn held(ctx: &Ctx, whose: &Whom, most: u32) -> Result<HeldRepor
         server.holdings(Some(&account.id), most).await,
         account.name.clone(),
         account.id.clone(),
-    ))
+    )
+    .located(&door))
 }
 
 /// What the server answered about one shelf, said as a report about whoever it is.
@@ -102,7 +105,7 @@ fn shelved(answered: Result<Vec<Held>, Failure>, member: String, id: String) -> 
 }
 
 /// The account a name or an id means, or nobody.
-fn account<'a>(accounts: &'a [Member], named: &str) -> Option<&'a Member> {
+pub(crate) fn account<'a>(accounts: &'a [Member], named: &str) -> Option<&'a Member> {
     accounts.iter().find(|held| held.id == named).or_else(|| {
         accounts
             .iter()

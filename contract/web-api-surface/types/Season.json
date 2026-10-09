@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "episodes": {
+      "type": [
+        "array[ref:Episode]"
+      ],
+      "required": true
+    },
+    "id": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "number": {
+      "type": [
+        "integer|null/uint32"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

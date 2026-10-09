@@ -367,6 +367,8 @@ pub const TAKES_NAME: &[&str] = &[
     "remove",
     "household-handoff",
     "household-allow",
+    "grant",
+    "watched",
 ];
 
 /// The action whose command carries what the household may ask for.
@@ -498,3 +500,13 @@ pub const TAKES_SOURCE: &[&str] = &["plugin-install", "plugin-update"];
 /// Apart from the offer, so agreeing to what a plugin does is never agreeing to what it
 /// sends. A removal sends nothing anywhere, so it approves nothing.
 pub const TAKES_APPROVED: &[&str] = &["plugin-install", "plugin-update"];
+
+/// The action whose command carries the id a player keeps for the device it plays on.
+///
+/// A grant and nothing else: the device is what the session it opens belongs to, so
+/// asking again for the same one replaces that session rather than adding another.
+pub const TAKES_DEVICE: &[&str] = &["grant"];
+
+/// The action whose command carries how far a member got through one title: the
+/// title, the position and whether they finished it, which are one report.
+pub const TAKES_PROGRESS: &[&str] = &["watched"];

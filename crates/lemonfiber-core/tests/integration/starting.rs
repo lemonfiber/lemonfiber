@@ -21,8 +21,9 @@ use lemonfiber_fixtures::support::{spoke, Reporting, Scripted};
 
 /// Everything the `library` form declares — the services carrying the `media`
 /// profile, which is the one that form holds.
-const LIBRARY: [&str; 7] = [
+const LIBRARY: [&str; 8] = [
     "jellyfin",
+    "door",
     "seerr",
     "request-gate",
     "decline",

@@ -1,0 +1,11 @@
+{
+  "fields": {
+    "fingerprint": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

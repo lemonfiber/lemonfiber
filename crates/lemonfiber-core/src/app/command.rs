@@ -23,11 +23,13 @@ mod inviting;
 mod letting_go;
 mod migrate;
 mod quality;
+mod restarting;
 mod restoring;
 mod setting;
 mod teardown;
 mod tracing;
 mod uninstall;
+mod viewing;
 
 pub use alerts::AlertAction;
 pub use allowance::Allowance;
@@ -42,11 +44,13 @@ pub use inviting::Inviting;
 pub use letting_go::LettingGo;
 pub use migrate::MigrateAction;
 pub use quality::QualityAction;
+pub use restarting::Restarting;
 pub use restoring::Restoring;
 pub use setting::Setting;
 pub use teardown::Teardown;
 pub use tracing::Tracing;
 pub use uninstall::Removing;
+pub use viewing::Viewing;
 
 /// What a surface is asking for.
 ///
@@ -203,6 +207,9 @@ pub enum Command {
         /// How many to answer with, newest first.
         most: u32,
     },
+    /// One title, what a member was part-way through, a grant for a device to play on,
+    /// or how far a member got.
+    Viewing(Viewing),
     /// Report what the media server is playing now: who is watching what, and where.
     ///
     /// Every session in the house, or one member's. A member asking is answered with
@@ -510,17 +517,4 @@ pub enum Command {
     /// a conversation must still be able to have one — and the answers gathered so far live in the
     /// resumable progress file between them, which is where a terminal run keeps them too.
     Setup(SetupAction),
-}
-
-/// What a restart was asked to restart, and the offer it answers where it carries one.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Restarting {
-    /// The forms holding those services.
-    pub forms: Vec<String>,
-    /// The services to restart; empty restarts the whole form.
-    pub services: Vec<String>,
-    /// The offer a rehearsal answered, where the restart carries one back: refused
-    /// where the services it would restart are no longer those. None acts as without
-    /// one.
-    pub offer: Option<String>,
 }

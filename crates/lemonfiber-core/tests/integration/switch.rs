@@ -150,6 +150,7 @@ async fn a_real_switch_stops_then_starts_then_waits() {
         .engine(Arc::new(Reporting::holding(
             &[
                 "jellyfin",
+                "door",
                 "seerr",
                 "request-gate",
                 "decline",

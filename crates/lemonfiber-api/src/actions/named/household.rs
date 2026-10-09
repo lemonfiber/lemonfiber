@@ -38,7 +38,7 @@ const ADDRESSED: [&str; 7] = [
 /// Whether this action is one of them.
 #[must_use]
 pub(super) fn about_the_household(action: &str) -> bool {
-    ADDRESSED.contains(&action)
+    ADDRESSED.contains(&action) || super::viewing::about_viewing(action)
 }
 
 /// The command one of them names, or why it names none.
@@ -48,6 +48,10 @@ pub(super) fn about_the_household(action: &str) -> bool {
 /// place to keep the answer, and the one place that already keeps it is the table of
 /// which action takes which.
 pub(super) fn asked_for(action: &str, given: Arguments) -> Result<Command, Refused> {
+    // A member's own requests, which carry nothing the rest of these read.
+    if super::viewing::about_viewing(action) {
+        return super::viewing::asked_for(action, given);
+    }
     let Arguments {
         name,
         confirm,

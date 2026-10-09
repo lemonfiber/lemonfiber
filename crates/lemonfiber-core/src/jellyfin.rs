@@ -19,9 +19,12 @@ use crate::recyclarr::Kind;
 
 mod cors;
 mod household;
+mod item;
 mod keys;
 mod library;
 mod password;
+mod proxies;
+mod screening;
 mod sessions;
 mod setup;
 

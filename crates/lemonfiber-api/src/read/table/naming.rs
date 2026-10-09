@@ -10,7 +10,7 @@
 //! The reads that take nothing have no function here, which is the shape of the file
 //! rather than an omission: there is nothing for them to mean.
 
-use lemonfiber_core::app::{Command, Diagnosing, Removing, Tracing, Waiting, Whom};
+use lemonfiber_core::app::{Command, Diagnosing, Removing, Tracing, Viewing, Waiting, Whom};
 use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::uninstall::Tier;
 use lemonfiber_core::update::run as update;
@@ -183,24 +183,62 @@ pub(super) fn shelf(
     defaults: Option<&str>,
     most: Option<String>,
 ) -> Result<Command, Refusal> {
-    let member = if as_the_defaults(member.as_ref(), defaults)? {
-        Whom::Defaults
-    } else {
-        match member.filter(|member| !member.is_empty()) {
-            Some(member) => Whom::Named(member),
-            None => return Err(Refusal::NoShelfWithoutAMember),
-        }
-    };
-    let most = match most.map(|most| most.parse::<u32>()) {
-        None => A_SHELF,
-        Some(Ok(most)) if most > MOST_AT_ONCE => return Err(Refusal::TooManyAtOnce),
-        Some(Ok(most)) if most > 0 => most,
+    let member = whose_shelf(member, defaults)?;
+    let most = counted(most, A_SHELF)?;
+    Ok(Command::Held { member, most })
+}
+
+/// Whose shelf a read is about: a member, or the household's defaults.
+fn whose_shelf(member: Option<String>, defaults: Option<&str>) -> Result<Whom, Refusal> {
+    if as_the_defaults(member.as_ref(), defaults)? {
+        return Ok(Whom::Defaults);
+    }
+    match member.filter(|member| !member.is_empty()) {
+        Some(member) => Ok(Whom::Named(member)),
+        None => Err(Refusal::NoShelfWithoutAMember),
+    }
+}
+
+/// How many a read answers with: `otherwise` where none was asked for.
+fn counted(most: Option<String>, otherwise: u32) -> Result<u32, Refusal> {
+    match most.map(|most| most.parse::<u32>()) {
+        None => Ok(otherwise),
+        Some(Ok(most)) if most > MOST_AT_ONCE => Err(Refusal::TooManyAtOnce),
+        Some(Ok(most)) if most > 0 => Ok(most),
         // Nought and anything that is not a number at all. A shelf of no holdings is a
         // request for an answer that says nothing, and an empty shelf is a fact about a
         // household rather than a thing a count should be able to manufacture.
-        Some(_) => return Err(Refusal::NotACount),
+        Some(_) => Err(Refusal::NotACount),
+    }
+}
+
+/// One title on a shelf, or why the request cannot be answered.
+///
+/// Whose shelf is decided as it is for the shelf itself, so a title is read as the
+/// member whose shelf it is on, or as the household's defaults.
+pub(super) fn titled(
+    member: Option<String>,
+    defaults: Option<&str>,
+    title: Option<String>,
+) -> Result<Command, Refusal> {
+    let member = whose_shelf(member, defaults)?;
+    let id = title.ok_or(Refusal::NoSuchRead)?;
+    Ok(Command::Viewing(Viewing::Title { member, id }))
+}
+
+/// What a member was part-way through, `most` of it, or why it cannot be answered.
+///
+/// Somebody has to be named: there is nobody whose place in a film the household's
+/// defaults hold.
+pub(super) fn part_way(member: Option<String>, most: Option<String>) -> Result<Command, Refusal> {
+    let Some(member) = member.filter(|member| !member.is_empty()) else {
+        return Err(Refusal::NoShelfWithoutAMember);
     };
-    Ok(Command::Held { member, most })
+    let most = counted(most, lemonfiber_core::screening::A_FEW)?;
+    Ok(Command::Viewing(Viewing::PartWay {
+        member: Whom::Named(member),
+        most,
+    }))
 }
 
 /// Following one item, or why the request could not be followed.

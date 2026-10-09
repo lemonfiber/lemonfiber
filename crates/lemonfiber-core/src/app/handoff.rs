@@ -110,7 +110,10 @@ pub(crate) async fn handoff(ctx: &Ctx, name: String) -> Result<Handoff, Box<Prob
         let Some(server) = media.administered(ctx) else {
             return Err(Box::new(not_set_up()));
         };
-        (server, media.port)
+        (
+            server,
+            crate::screening::door::household_port(&manifest, media.port),
+        )
     };
     let reachable = super::invite::household_address(ctx, port).await;
     let mut report = Handoff {

@@ -61,6 +61,9 @@ pub(crate) async fn household(
 /// The household as the media server holds it, narrowed to one member where one is
 /// named.
 async fn everybody(ctx: &Ctx, member: Option<&str>) -> Result<HouseholdReport, Box<Problem>> {
+    // Every read of the household ends the grants that ran out, so a phone left in a
+    // drawer stops playing without anything having to run on a schedule.
+    crate::screening::lapsed(ctx).await;
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())

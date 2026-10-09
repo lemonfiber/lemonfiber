@@ -41,7 +41,7 @@ fn reads_a_manifest_compiled_into_the_binary() {
         .manifest()
         .ok()
         .map(|manifest| (manifest.schema_version, manifest.services.len()));
-    assert_eq!(read, Some((1, 22)));
+    assert_eq!(read, Some((1, 23)));
 }
 
 #[test]
@@ -65,7 +65,7 @@ fn reads_a_manifest_from_a_directory() {
         .manifest()
         .ok()
         .map(|manifest| (manifest.schema_version, manifest.services.len()));
-    assert_eq!(read, Some((1, 22)));
+    assert_eq!(read, Some((1, 23)));
 }
 
 #[test]

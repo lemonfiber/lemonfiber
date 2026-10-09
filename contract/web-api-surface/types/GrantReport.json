@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "granted": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "lasts_until": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "member": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "token": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

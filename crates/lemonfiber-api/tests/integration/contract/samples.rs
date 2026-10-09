@@ -209,6 +209,10 @@ fn serving() -> Vec<Outcome> {
         Outcome::Household(HouseholdReport::default()),
         Outcome::Held(lemonfiber_core::model::HeldReport::default()),
         Outcome::Playing(lemonfiber_core::model::PlayingReport::default()),
+        Outcome::Title(a_title()),
+        Outcome::PartWay(lemonfiber_core::model::PartWayReport::default()),
+        Outcome::Granted(lemonfiber_core::model::GrantReport::default()),
+        Outcome::Watched(lemonfiber_core::model::WatchedReport::default()),
         Outcome::Stuck(StuckReport::default()),
         Outcome::Invitation(lemonfiber_core::model::Invitation {
             name: "ana".to_owned(),
@@ -441,5 +445,56 @@ fn a_pairing() -> lemonfiber_core::companion::Pairing {
         until: "2026-10-01T00:10:00".to_owned(),
         replacing: "It changes only when somebody replaces it.".to_owned(),
         caution: Some("That address is a number.".to_owned()),
+    }
+}
+
+/// A series as a member sees it, located at the door, with one episode in one season:
+/// every field a title, a season and an episode carry.
+fn a_title() -> lemonfiber_core::model::TitleReport {
+    use lemonfiber_core::model::{Episode, Held, Medium, Season, Title, TitleReport};
+    use lemonfiber_core::ports::service::{Holds, Located, Pinned};
+    let located = |id: &str, medium: Medium| Held {
+        id: id.to_owned(),
+        title: "The Wire".to_owned(),
+        year: Some(2002),
+        medium,
+        at: Located {
+            poster: Some(format!(
+                "https://house.local:8920/Items/{id}/Images/Primary"
+            )),
+            backdrop: Some(format!(
+                "https://house.local:8920/Items/{id}/Images/Backdrop"
+            )),
+            stream_from: Some(format!("https://house.local:8920/Videos/{id}/master.m3u8")),
+            door: Some(Pinned {
+                fingerprint: "ab".repeat(32),
+            }),
+            unlocated: None,
+        },
+        holds: Holds::default(),
+    };
+    TitleReport {
+        member: "ana".to_owned(),
+        id: "a7f3".to_owned(),
+        title: Some(Title {
+            held: located("s1", Medium::Series),
+            overview: Some("Baltimore.".to_owned()),
+            minutes: Some(60),
+            genres: vec!["Crime".to_owned()],
+            certificate: Some("16".to_owned()),
+            released: Some("2002-06-02".to_owned()),
+            seasons: vec![Season {
+                id: "x1".to_owned(),
+                name: "Season 1".to_owned(),
+                number: Some(1),
+                episodes: vec![Episode {
+                    held: located("e1", Medium::Episode),
+                    number: Some(1),
+                    overview: Some("The Target.".to_owned()),
+                    minutes: Some(62),
+                }],
+            }],
+        }),
+        rehearsed: false,
     }
 }

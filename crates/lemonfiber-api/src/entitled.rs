@@ -19,7 +19,7 @@
 //! fact about the wire, and it is what the requirement about one member seeing
 //! another's requests asks for.
 
-use lemonfiber_core::app::{Command, Diagnosing, Whom};
+use lemonfiber_core::app::{Command, Diagnosing, Viewing, Whom};
 use lemonfiber_core::keys::Scope;
 
 use crate::admission::Caller;
@@ -151,6 +151,30 @@ pub(crate) fn their_playing(id: &str) -> Command {
     }
 }
 
+/// One of a member's viewing requests, narrowed to them whatever it named.
+#[must_use]
+pub(crate) fn their_viewing(id: &str, viewing: &Viewing) -> Viewing {
+    let them = Whom::Named(id.to_owned());
+    match viewing.clone() {
+        Viewing::Title { id: title, .. } => Viewing::Title {
+            member: them,
+            id: title,
+        },
+        Viewing::PartWay { most, .. } => Viewing::PartWay { member: them, most },
+        Viewing::Grant { device, .. } => Viewing::Grant {
+            member: id.to_owned(),
+            device,
+        },
+        Viewing::Watched {
+            id: title, how_far, ..
+        } => Viewing::Watched {
+            member: id.to_owned(),
+            id: title,
+            how_far,
+        },
+    }
+}
+
 /// What a household member may have of a command.
 fn members(id: &str, command: &Command) -> Permitted {
     match command {
@@ -169,6 +193,11 @@ fn members(id: &str, command: &Command) -> Permitted {
         // Whatever the request named is discarded, so an operator's narrowing cannot
         // be borrowed to read another member's sessions.
         Command::Playing { .. } => Permitted::This(their_playing(id)),
+        // Theirs, narrowed the same way: a title, what they were part-way through, a
+        // grant for their own device and their own progress. Whoever the request named
+        // is discarded, so a member cannot grant a device to somebody else's account or
+        // move somebody else's place in a film.
+        Command::Viewing(viewing) => Permitted::This(Command::Viewing(their_viewing(id, viewing))),
         // **Everything not named above is refused**, and the catch-all is the
         // statement rather than an omission: a command added later is not a
         // member's until somebody decides it is and writes it down. Listing what

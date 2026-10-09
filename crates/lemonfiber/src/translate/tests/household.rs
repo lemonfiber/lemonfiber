@@ -49,7 +49,7 @@ fn the_two_things_an_update_can_mean_go_to_two_commands() {
 #[test]
 fn a_shelf_with_no_count_takes_the_one_both_surfaces_share() {
     assert_eq!(
-        super::super::held(whom(Some("Ada".to_owned()), false), None),
+        super::super::held(whom(Some("Ada".to_owned()), false), counted(None)),
         Ok(Command::Held {
             member: Whom::Named("Ada".to_owned()),
             most: lemonfiber_api::read::table::A_SHELF,
@@ -62,9 +62,15 @@ fn a_shelf_with_no_count_takes_the_one_both_surfaces_share() {
 #[test]
 fn a_count_outside_what_one_shelf_shows_is_refused_at_either_end() {
     let ceiling = lemonfiber_api::read::table::MOST_AT_ONCE;
-    assert!(super::super::held(whom(Some("Ada".to_owned()), false), Some(0)).is_err());
-    assert!(super::super::held(whom(Some("Ada".to_owned()), false), Some(ceiling + 1)).is_err());
-    assert!(super::super::held(whom(Some("Ada".to_owned()), false), Some(ceiling)).is_ok());
+    assert!(super::super::held(whom(Some("Ada".to_owned()), false), counted(Some(0))).is_err());
+    assert!(super::super::held(
+        whom(Some("Ada".to_owned()), false),
+        counted(Some(ceiling + 1))
+    )
+    .is_err());
+    assert!(
+        super::super::held(whom(Some("Ada".to_owned()), false), counted(Some(ceiling))).is_ok()
+    );
 }
 
 /// One choice about what the household may ask for, as the command line took it.
@@ -326,13 +332,16 @@ fn a_hand_off_names_whose_device_it_is() {
 #[test]
 fn a_shelf_is_a_members_or_the_defaults() {
     assert_eq!(
-        super::super::held(whom(None, true), None),
+        super::super::held(whom(None, true), counted(None)),
         Ok(Command::Held {
             member: Whom::Defaults,
             most: lemonfiber_api::read::table::A_SHELF,
         })
     );
-    assert_eq!(super::super::held(whom(None, false), None), Err(USAGE));
+    assert_eq!(
+        super::super::held(whom(None, false), counted(None)),
+        Err(USAGE)
+    );
 }
 
 /// The reading narrowed to the household's defaults is what somebody invited with
@@ -351,5 +360,82 @@ fn the_reading_narrowed_to_the_defaults_is_no_part_of_a_decision() {
             Some(HouseholdCommand::Approve { request: 7 })
         ),
         Err(USAGE)
+    );
+}
+
+/// A shelf read asked for nothing but how much of it.
+fn counted(most: Option<u32>) -> lemonfiber::cli::RawShelf {
+    lemonfiber::cli::RawShelf {
+        most,
+        title: None,
+        part_way: false,
+    }
+}
+
+/// One title, or what was part-way through, is its own read on the same shelf.
+#[test]
+fn a_title_or_what_was_part_way_through_is_read_off_the_same_shelf() {
+    use lemonfiber_core::app::Viewing;
+    let asked = |title: Option<&str>, part_way: bool| lemonfiber::cli::RawShelf {
+        most: None,
+        title: title.map(str::to_owned),
+        part_way,
+    };
+    assert_eq!(
+        super::super::held(
+            whom(Some("Ada".to_owned()), false),
+            asked(Some("f1"), false)
+        ),
+        Ok(Command::Viewing(Viewing::Title {
+            member: Whom::Named("Ada".to_owned()),
+            id: "f1".to_owned(),
+        }))
+    );
+    assert_eq!(
+        super::super::held(whom(Some("Ada".to_owned()), false), asked(None, true)),
+        Ok(Command::Viewing(Viewing::PartWay {
+            member: Whom::Named("Ada".to_owned()),
+            most: lemonfiber_core::screening::A_FEW,
+        }))
+    );
+}
+
+/// A grant and a player's progress are a member's, named the way they sign in.
+#[test]
+fn a_grant_and_progress_are_addressed_to_somebody() {
+    use lemonfiber::cli::HouseholdCommand;
+    use lemonfiber_core::app::Viewing;
+    use lemonfiber_core::ports::service::HowFar;
+    assert_eq!(
+        super::super::household(
+            whom(None, false),
+            Some(HouseholdCommand::Grant {
+                name: "ana".to_owned(),
+                device: "a-phone-0123".to_owned(),
+            })
+        ),
+        Ok(Command::Viewing(Viewing::Grant {
+            member: "ana".to_owned(),
+            device: "a-phone-0123".to_owned(),
+        }))
+    );
+    assert_eq!(
+        super::super::household(
+            whom(None, false),
+            Some(HouseholdCommand::Watched {
+                name: "ana".to_owned(),
+                id: "f1".to_owned(),
+                at: 90,
+                ended: true,
+            })
+        ),
+        Ok(Command::Viewing(Viewing::Watched {
+            member: "ana".to_owned(),
+            id: "f1".to_owned(),
+            how_far: HowFar {
+                position: 90,
+                ended: true,
+            },
+        }))
     );
 }

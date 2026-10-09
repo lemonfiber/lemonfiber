@@ -1,0 +1,53 @@
+{
+  "action": "watched",
+  "arguments": [
+    {
+      "name": "name",
+      "type": {
+        "default": null,
+        "description": "Who an invitation is for, as they will sign in.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "id",
+      "type": {
+        "default": null,
+        "description": "The title or episode a player's progress is about, by the identifier the shelf\nlists it under.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "position",
+      "type": {
+        "default": null,
+        "description": "How far into it the member is, in whole seconds.",
+        "format": "uint64",
+        "minimum": 0,
+        "type": [
+          "integer",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "ended",
+      "type": {
+        "default": null,
+        "description": "Whether the member finished it. Absent says nothing about finishing, which is\na position like any other.",
+        "type": [
+          "boolean",
+          "null"
+        ]
+      }
+    }
+  ],
+  "consent": [],
+  "rehearsal": false
+}
