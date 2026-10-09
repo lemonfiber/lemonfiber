@@ -258,6 +258,41 @@ fn a_rehearsal_states_every_change_every_proof_and_every_override() {
     assert!(said.contains("seerr.settings"), "{said}");
 }
 
+/// An adapter service's key is named by the file it lands in, and the line ends at
+/// the path: a rehearsal has no key to show, and an install shows none.
+#[test]
+fn a_rehearsal_names_an_adapter_services_key_file_and_nothing_of_the_key() {
+    let mut one = recorded("komga", Some(household()));
+    for service in &mut one.services {
+        service.speaks = vec!["library.curate@1".to_owned()];
+        service.listens = Some(25600);
+    }
+    let key = "/opt/lemonfiber/stack/config/komga/lemonfiber.key";
+    let said = installs(&Installs {
+        rehearsed: false,
+        agreement: None,
+        removal: None,
+        installed: Vec::new(),
+        install: Some(Box::new(Install {
+            changes: vec![Changing {
+                path: key.to_owned(),
+                puts: Puts::Key,
+            }],
+            ..install(one, false)
+        })),
+        update: None,
+        substituted: Vec::new(),
+        sources: Vec::new(),
+    })
+    .text();
+    let keyed = said
+        .lines()
+        .filter(|line| line.contains("lemonfiber.key"))
+        .map(str::trim)
+        .collect::<Vec<&str>>();
+    assert_eq!(keyed, [format!("a key        {key}")], "{said}");
+}
+
 /// The same three, in the tense of a run that happened. A rehearsal that said
 /// more or less than the install would be a rehearsal of something else.
 #[test]

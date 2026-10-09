@@ -102,6 +102,31 @@ fn every_write_is_stated_as_a_path_and_what_goes_at_it() {
     );
 }
 
+/// The key an adapter service is asked under is stated by where it lands and that it
+/// is a key, so a rehearsal names the file without there being a value to show.
+#[test]
+fn an_adapter_service_states_its_key_by_path() {
+    let speaking = manifest(|read| {
+        for service in &mut read.services {
+            service.speaks = vec!["library.curate@1".to_owned()];
+            service.listens = Some(25600);
+        }
+    });
+    let planned = speaking
+        .map(|read| crate::plugin::writes(&Installed::of(&read), stack()))
+        .unwrap_or_default();
+    assert_eq!(
+        changes(&planned)
+            .into_iter()
+            .filter(|one| one.puts == Puts::Key)
+            .collect::<Vec<Changing>>(),
+        vec![Changing {
+            path: "/opt/lemonfiber/stack/config/komga/lemonfiber.key".to_owned(),
+            puts: Puts::Key,
+        }]
+    );
+}
+
 /// Stated in the order the install makes them, which is the order a reversal
 /// walks backwards — so what an operator reads and what a reversal would do are
 /// one list read in opposite directions.
