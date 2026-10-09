@@ -8,11 +8,34 @@
 
 use super::{addressed, lock, worked};
 use crate::agreement::over;
-use crate::app::Ctx;
+use crate::app::{Command, Ctx, Outcome};
 use crate::error::codes::life::RESTART_MOVED;
 use crate::error::{Problem, Remedy, State};
 use crate::model::LifecycleReport;
 use crate::stack::compose::Action;
+
+/// Restart what the forms hold, or the services named within them, answering the offer
+/// its rehearsal made where the restart carries one back.
+///
+/// Handed the command whole so the dispatch table keeps one line for it; anything but a
+/// restart is answered as one that names nothing to restart.
+///
+/// # Errors
+///
+/// What [`answering`] returns.
+pub(crate) async fn restarted(ctx: &Ctx, restart: Command) -> Result<Outcome, Box<Problem>> {
+    let (forms, services, offer) = match restart {
+        Command::Restart {
+            forms,
+            services,
+            offer,
+        } => (forms, services, offer),
+        _ => (Vec::new(), Vec::new(), None),
+    };
+    answering(ctx, &forms, &Action::Restart(services), offer.as_deref())
+        .await
+        .map(Outcome::Lifecycle)
+}
 
 /// A lifecycle action, answering the offer a rehearsal of it made where one is carried
 /// back: refused, before anything runs, where the offer built now is another.

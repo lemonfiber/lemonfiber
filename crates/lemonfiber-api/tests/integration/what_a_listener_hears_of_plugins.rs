@@ -104,7 +104,8 @@ async fn a_record_that_will_not_read_is_not_said_as_nothing_installed() {
 }
 
 /// The stream has one gather, and what it says from several sources is said from one
-/// that asks each in turn: the dashboard first, then the plugins and the wiring.
+/// that asks each in turn: the dashboard first, with what is playing after what is new,
+/// then the plugins and the wiring.
 #[tokio::test]
 async fn several_sources_are_gathered_as_one_in_the_order_given() {
     use lemonfiber_api::events::extending::Together;
@@ -116,12 +117,12 @@ async fn several_sources_are_gathered_as_one_in_the_order_given() {
     live.refresh(&together).await;
 
     let mut names = Vec::new();
-    for _ in 0..4 {
+    for _ in 0..5 {
         let said = listening.next().await.unwrap_or_default();
         names.push(named(&said).map(str::to_owned));
     }
     assert_eq!(
         names,
-        ["dashboard", "news", "plugins", "wiring"].map(|name| Some(name.to_owned()))
+        ["dashboard", "news", "playing", "plugins", "wiring"].map(|name| Some(name.to_owned()))
     );
 }

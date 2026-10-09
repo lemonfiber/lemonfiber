@@ -19,7 +19,7 @@ pub(crate) mod halted;
 mod inflight;
 mod lock;
 mod offered;
-pub(crate) use offered::answering;
+pub(crate) use offered::{answering, restarted};
 mod preview;
 pub(crate) use preview::preview;
 mod remote;

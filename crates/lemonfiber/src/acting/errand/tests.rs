@@ -1,7 +1,7 @@
 use super::{all, every, Accepts, Errand, Given, Going, Needs, Outcome, Stage, KEY, LINES};
 use crate::acting::offer::OFFERED as KEYED;
 use lemonfiber::reaching::{ACTS, ALSO};
-use lemonfiber_api::actions::{OFFERED as WEB, TAKES_AGREEMENT, TAKES_CONSENT};
+use lemonfiber_api::actions::{KEY_CALLABLE, OFFERED as WEB, TAKES_AGREEMENT, TAKES_CONSENT};
 use lemonfiber_core::app::restore::{Consent, Kept};
 use lemonfiber_core::app::{Command, Gathering, LettingGo, Restoring, Waiting};
 use lemonfiber_core::bundle::Filenames;
@@ -180,11 +180,20 @@ fn every_action_this_screen_offers_is_published_for_the_parity_table() {
 /// them are answers to something read. Most carry a flag, and the one that lets a
 /// download go carries the name the offer gave itself — which is the stronger of
 /// the two and, on that action, the only one there is.
+///
+/// An offer a key's action may go without is not one of them. Pausing every download
+/// is undone by resuming, and its offer is there for a caller that asked somebody
+/// first; one pressed on this screen is the operator asking now.
 #[test]
 fn an_errand_whose_action_takes_an_answer_says_what_it_would_do_first() {
+    let optional = |action: &str| {
+        KEY_CALLABLE.iter().any(|by| {
+            by.action == action && by.moved.is_some() && !TAKES_AGREEMENT.contains(&action)
+        })
+    };
     for errand in every() {
-        let takes =
-            TAKES_AGREEMENT.contains(&errand.action) || TAKES_CONSENT.contains(&errand.action);
+        let takes = TAKES_AGREEMENT.contains(&errand.action)
+            || (TAKES_CONSENT.contains(&errand.action) && !optional(errand.action));
         let says = errand.would(&typed("a-backup.tar.gz")).is_some();
         assert_eq!(says, takes, "{}", errand.name);
     }

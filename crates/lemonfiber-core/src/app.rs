@@ -130,29 +130,9 @@ async fn lifecycle(ctx: &Ctx, forms: &[String], action: Action) -> Result<Outcom
         .map(Outcome::Lifecycle)
 }
 
-/// Restart what the forms hold, or the services named within them, answering the offer
-/// its rehearsal made where the restart carries one back.
-///
-/// Beside the table because its row, spelled out, is longer than one line. Handed the
-/// command whole for the same reason; anything but a restart is answered as one that
-/// names nothing to restart.
-async fn restarted(ctx: &Ctx, restart: Command) -> Result<Outcome, Box<Problem>> {
-    let Command::Restart {
-        forms,
-        services,
-        offer,
-    } = restart
-    else {
-        return lifecycle(ctx, &[], Action::Restart(Vec::new())).await;
-    };
-    engine::answering(ctx, &forms, &Action::Restart(services), offer.as_deref())
-        .await
-        .map(Outcome::Lifecycle)
-}
-
 /// Upgrade existing content to the chosen preset, or state what that would cost.
 ///
-/// Beside the table for the reason [`restarted`] is.
+/// Beside the table for the reason [`engine::restarted`] is.
 async fn upgraded(ctx: &Ctx, confirm: bool) -> Result<Outcome, Box<Problem>> {
     upgrade::upgrade(ctx, confirm).await.map(Outcome::Upgrade)
 }
@@ -438,7 +418,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Down(Teardown { forms, wait }) => down(ctx, &forms, wait).await,
         Command::Halt { forms, services } => lifecycle(ctx, &forms, Action::Stop(services)).await,
         Command::Switch { forms } => engine::switch(ctx, &forms).await.map(Outcome::Lifecycle),
-        restart @ Command::Restart { .. } => restarted(ctx, restart).await,
+        restart @ Command::Restart { .. } => engine::restarted(ctx, restart).await,
         Command::Pull { forms } => lifecycle(ctx, &forms, Action::Pull(Vec::new())).await,
         Command::ConfigGet { key } => configuring::get(ctx, Some(&key)).await.map(Outcome::Config),
         Command::ConfigSet(change) => configuring::set(ctx, change).await.map(Outcome::Config),

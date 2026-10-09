@@ -444,7 +444,7 @@ fn named(said: &str) -> Option<&str> {
 
 /// What is new is said to a listener when it arrives, and to everyone when it
 /// changes, and not on every tick: a phone marks a tab from it, and an unchanged mark
-/// is nothing to wake it for.
+/// is nothing to wake it for. What is playing is said on the same terms, after it.
 #[tokio::test]
 async fn what_is_new_is_said_to_a_listener_arriving_and_not_on_every_tick() {
     let live = Live::opening(Stopped::at(0).as_ref());
@@ -457,11 +457,11 @@ async fn what_is_new_is_said_to_a_listener_arriving_and_not_on_every_tick() {
     live.refresh(&dashboard).await;
 
     let mut heard_first = Vec::new();
-    for _ in 0..5 {
+    for _ in 0..7 {
         heard_first.push(first.next().await.unwrap_or_default());
     }
     let mut heard_second = Vec::new();
-    for _ in 0..2 {
+    for _ in 0..3 {
         heard_second.push(second.next().await.unwrap_or_default());
     }
 
@@ -471,16 +471,21 @@ async fn what_is_new_is_said_to_a_listener_arriving_and_not_on_every_tick() {
         vec![
             Some("dashboard"),
             Some("news"),
+            Some("playing"),
             Some("dashboard"),
             Some("dashboard"),
             Some("news"),
+            Some("playing"),
         ]
     );
     let names: Vec<Option<&str>> = heard_second.iter().map(|said| named(said)).collect();
-    assert_eq!(names, vec![Some("dashboard"), Some("news")]);
+    assert_eq!(
+        names,
+        vec![Some("dashboard"), Some("news"), Some("playing")]
+    );
     assert!(
         heard_second
-            .last()
+            .get(1)
             .is_some_and(|said| said.contains(r#""kind":"news""#)
                 && said.contains(r#""unread":["requests"]"#)),
         "the newest of each kind by what names them: {heard_second:?}"
