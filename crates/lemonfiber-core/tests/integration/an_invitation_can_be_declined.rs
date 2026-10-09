@@ -278,7 +278,7 @@ async fn ana_stands_in(
     Vec<lemonfiber_core::ports::http::Request>,
 ) {
     let env = recorded_admin(&format!("declined-{tag}"));
-    let stack: &'static Path = Box::leak(stack_with_decline(tag).into_boxed_path());
+    let stack: &'static Path = Box::leak(stack_with_decline(&format!("declined-{tag}")).into_boxed_path());
     offered_and_maybe_refused(&env, stack, "ana-token", refused);
     let http = holding_ana(disabled, policy);
     let ctx = lemonfiber_testing::a_context()
