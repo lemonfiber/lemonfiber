@@ -12,6 +12,9 @@
 //! | `refer name: &T as T` | `T` |
 //! | `value name: T` | `T` |
 //!
+//! An operation whose answer may be larger than [`crate::client::LARGEST`] says so after
+//! its return type, as `where largest = BYTES`.
+//!
 //! The port's own type is written out, rather than derived from the mark, because the
 //! trait implementations go through `#[async_trait]`, which gives every reference in a
 //! signature its own lifetime and can only see a reference written as a type.
@@ -33,7 +36,7 @@ macro_rules! contract {
                 impl $Trait:path {
                     $(
                         $(#[$op_meta:meta])*
-                        fn $op:ident( $( $mark:ident $arg:ident : $param:ty $(as $wire:ty)? ),* $(,)? ) -> $ret:ty;
+                        fn $op:ident( $( $mark:ident $arg:ident : $param:ty $(as $wire:ty)? ),* $(,)? ) -> $ret:ty $(where largest = $largest:expr)?;
                     )*
                 }
             )*
@@ -87,7 +90,15 @@ macro_rules! contract {
                             let asked = $op::Asked {
                                 $( $arg: $crate::contract!(@to_wire $mark $arg), )*
                             };
-                            self.0.call(CAPABILITY, MAJOR, stringify!($op), &asked).await
+                            self.0
+                                .call(
+                                    CAPABILITY,
+                                    MAJOR,
+                                    stringify!($op),
+                                    $crate::contract!(@largest $($largest)?),
+                                    &asked,
+                                )
+                                .await
                         }
                     )*
                 }
@@ -122,6 +133,20 @@ macro_rules! contract {
                 Err($crate::Refusal::unknown_operation(operation))
             }
 
+            /// This capability, served from `adapter` by an adapter kit.
+            #[must_use]
+            pub fn served<A>(adapter: ::std::sync::Arc<A>) -> $crate::Served
+            where
+                A: Send + Sync + 'static $( + $Trait )*,
+            {
+                $crate::Served::new(CAPABILITY, MAJOR, move |operation, body| {
+                    let adapter = ::std::sync::Arc::clone(&adapter);
+                    ::std::boxed::Box::pin(async move {
+                        dispatch(&*adapter, &operation, &body).await
+                    })
+                })
+            }
+
             /// This capability's contract: its name, its major and every operation.
             #[must_use]
             pub fn capability() -> $crate::Capability {
@@ -134,13 +159,17 @@ macro_rules! contract {
                                 CAPABILITY,
                                 MAJOR,
                                 stringify!($op),
-                            ),
+                            )
+                            .within($crate::contract!(@largest $($largest)?)),
                         )*)*
                     ],
                 }
             }
         }
     };
+
+    (@largest) => { $crate::client::LARGEST };
+    (@largest $largest:expr) => { $largest };
 
     (@wire str $p:ty) => { ::std::string::String };
     (@wire opt_str $p:ty) => { ::core::option::Option<::std::string::String> };

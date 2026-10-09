@@ -219,9 +219,13 @@ pub struct Service {
     #[serde(default)]
     pub api: Option<lemonfiber_manifest::Api>,
     /// The port it answers on inside the stack's network, where lemonfiber and the
-    /// services that ask reach it. Required where `api` is.
+    /// services that ask reach it. Required where `api` or `speaks` is.
     #[serde(default)]
     pub listens: Option<u16>,
+    /// Each capability contract it answers, as `capability@major`: the service is an
+    /// adapter, and lemonfiber asks it over those contracts.
+    #[serde(default)]
+    pub speaks: Vec<String>,
 }
 
 /// Where a service's own configuration directory lands when it names nowhere.

@@ -27,4 +27,4 @@ pub fn all() -> Vec<crate::Capability> {
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

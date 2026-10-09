@@ -119,6 +119,7 @@ pub fn path_item(operation: &crate::Operation) -> Value {
     json!({
         "post": {
             "operationId": operation.name,
+            "x-lemonfiber-largest": operation.largest,
             "security": [{ KEY: [] }],
             "requestBody": {
                 "required": true,

@@ -19,7 +19,7 @@ use crate::error::codes::play::{
     NOBODY_NAMED, NOTHING_TO_PLAY_FROM, NOT_AN_ITEM, NOT_A_DEVICE, NOT_IN_THE_HOUSEHOLD,
     NOT_ON_THEIR_SHELF, NO_SUCH_PICTURE, SIGNS_NO_DEVICE_IN, UNANSWERED,
 };
-use crate::error::{Diagnose as _, Problem, Remedy, State};
+use crate::error::{Code, Diagnose as _, Problem, Remedy, State};
 use crate::jellyfin::Jellyfin;
 use crate::model::{GrantReport, PartWayReport, TitleReport, WatchedReport};
 use crate::ports::service::{
@@ -27,6 +27,19 @@ use crate::ports::service::{
 };
 
 use door::{placed, progressed};
+
+/// Every refusal a member's viewing answers with, which a client names by its code.
+pub const REFUSALS: [Code; 9] = [
+    NOT_AN_ITEM,
+    NOT_ON_THEIR_SHELF,
+    NOT_A_DEVICE,
+    NOTHING_TO_PLAY_FROM,
+    UNANSWERED,
+    NOBODY_NAMED,
+    NOT_IN_THE_HOUSEHOLD,
+    SIGNS_NO_DEVICE_IN,
+    NO_SUCH_PICTURE,
+];
 
 /// How many titles a member's part-way list answers with.
 pub const A_FEW: u32 = 24;

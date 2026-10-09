@@ -10,8 +10,11 @@
 use lemonfiber_ports::media::Kind;
 use lemonfiber_ports::service::{
     AppKeys, Dated, Fronted, HowFar, Image, Item, ItemDetail, ItemProgress, Library, Picture,
-    Playback, Screening,
+    Playback, Screening, PICTURE_MOST,
 };
+
+/// The most a picture's answer carries: its bytes written as base64, and room for the rest.
+const PICTURE_ANSWER: usize = PICTURE_MOST.div_ceil(3) * 4 + 1024;
 
 crate::contract! {
     /// `media.serve`: a media server.
@@ -28,7 +31,7 @@ crate::contract! {
             /// Sign one device out of the session it was opened.
             fn sign_out(str device: &str) -> ();
             /// One of a title's pictures, as one member may see it.
-            fn picture(opt_str member: Option<&str>, str id: &str, value which: Picture) -> Option<Image>;
+            fn picture(opt_str member: Option<&str>, str id: &str, value which: Picture) -> Option<Image> where largest = PICTURE_ANSWER;
             /// What one member may watch, or what an account with every library holds.
             fn holdings(opt_str member: Option<&str>, value most: u32) -> Vec<Item>;
             /// What is playing, for one member or everybody.

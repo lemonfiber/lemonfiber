@@ -1332,6 +1332,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "lemonfiber-adapter-kit"
+version = "0.17.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "lemonfiber-adapters",
+ "lemonfiber-contract",
+ "lemonfiber-ports",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower",
+]
+
+[[package]]
 name = "lemonfiber-adapters"
 version = "0.17.0"
 dependencies = [
@@ -1466,6 +1481,7 @@ name = "lemonfiber-plugin"
 version = "0.17.0"
 dependencies = [
  "lemonfiber-bundled",
+ "lemonfiber-contract",
  "lemonfiber-manifest",
  "schemars",
  "serde",

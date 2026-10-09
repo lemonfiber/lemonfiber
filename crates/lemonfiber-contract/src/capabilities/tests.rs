@@ -118,7 +118,7 @@ impl UsenetAccounts for Client {
 ///
 /// Each capability's tests implement that capability's ports for it.
 #[derive(Default)]
-struct Upstream {
+pub(crate) struct Upstream {
     told: Mutex<Vec<String>>,
 }
 
@@ -129,7 +129,7 @@ impl Upstream {
         }
     }
 
-    fn told(&self) -> Vec<String> {
+    pub(crate) fn told(&self) -> Vec<String> {
         self.told
             .lock()
             .map(|told| told.clone())
@@ -282,7 +282,7 @@ async fn a_request_with_a_field_the_operation_does_not_take_is_not_asked() {
 #[tokio::test]
 async fn a_capability_nobody_serves_refuses_every_operation() {
     let asked: Result<(), Failure> = contracted(Served::default())
-        .call("nothing.served", 1, "anything", &())
+        .call("nothing.served", 1, "anything", crate::client::LARGEST, &())
         .await;
     assert!(matches!(asked, Err(Failure::Refused { .. })));
 }

@@ -98,6 +98,11 @@ const ENCRYPTS: &[(&str, &str)] = &[
 /// anybody asks what address it took.
 const LISTENS: &[(&str, &str)] = &[
     (
+        "crates/lemonfiber-adapter-kit/src/lib.rs",
+        "a plugin's adapter answering the core on the plugin's own network, in the adapter's \
+         container and never in this binary, under the key the core wrote for that plugin",
+    ),
+    (
         "crates/lemonfiber/src/ui/reach.rs",
         "the web surface's sockets, and the policy that decides which addresses it may \
          ask for at all",

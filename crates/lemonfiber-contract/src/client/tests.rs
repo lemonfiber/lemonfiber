@@ -1,7 +1,8 @@
 use std::sync::{Arc, Mutex};
 
+use async_trait::async_trait;
 use lemonfiber_fixtures::http::{Answer, Fake};
-use lemonfiber_ports::http::Method;
+use lemonfiber_ports::http::{Fetched, Http, Method, Request, Response, Unreachable};
 use lemonfiber_ports::service::Failure;
 
 use super::{Contracted, Witness, LARGEST};
@@ -35,7 +36,7 @@ fn adapter(answer: Answer) -> (Arc<Fake>, Contracted, Arc<Told>) {
 
 async fn asked<R: serde::de::DeserializeOwned>(client: &Contracted) -> Result<R, Failure> {
     client
-        .call("download.torrent", 1, "moved", &"2026-10")
+        .call("download.torrent", 1, "moved", LARGEST, &"2026-10")
         .await
 }
 
@@ -155,9 +156,54 @@ async fn a_request_that_cannot_be_written_is_refused_and_never_sent() {
     let unwritable = std::collections::BTreeMap::from([((1_u8, 2_u8), 3_u8)]);
     assert!(matches!(
         client
-            .call::<_, u32>("download.torrent", 1, "moved", &unwritable)
+            .call::<_, u32>("download.torrent", 1, "moved", LARGEST, &unwritable)
             .await,
         Err(Failure::Refused { .. })
     ));
     assert!(fake.request().is_none());
+}
+
+/// An adapter answering bytes that are not text.
+struct Binary;
+
+#[async_trait]
+impl Http for Binary {
+    async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
+        Err(Unreachable::once(&request.url, "only fetched"))
+    }
+
+    async fn fetch(&self, _request: &Request, _most: usize) -> Result<Fetched, Unreachable> {
+        Ok(Fetched {
+            status: 200,
+            headers: Vec::new(),
+            bytes: Some(vec![0xff, 0xfe]),
+        })
+    }
+}
+
+#[tokio::test]
+async fn an_answer_that_is_not_text_is_refused_and_witnessed() {
+    let told = Arc::new(Told::default());
+    let client = Contracted::new(
+        Arc::new(Binary),
+        "http://adapter:8080",
+        "plex-adapter",
+        "k3y",
+    )
+    .witnessed_by(told.clone());
+    assert!(matches!(
+        asked::<u32>(&client).await,
+        Err(Failure::Refused { .. })
+    ));
+    assert_eq!(told.count(), 1);
+}
+
+#[tokio::test]
+async fn an_answer_is_read_up_to_the_bound_its_operation_declares() {
+    let (_, client, told) = adapter(Answer::reply(200, format!("\"{}\"", "a".repeat(LARGEST))));
+    let read: Result<String, Failure> = client
+        .call("media.serve", 1, "picture", LARGEST * 2, &())
+        .await;
+    assert_eq!(read.ok().map(|answer| answer.len()), Some(LARGEST));
+    assert_eq!(told.count(), 0);
 }

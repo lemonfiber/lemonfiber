@@ -3,7 +3,8 @@
 //! Every call is a `POST` of what is asked to the operation's path, under the plugin's own
 //! key. What comes back is read only if it is one of the answers the contract declares: a
 //! success whose body decodes as the operation's answer, or a refusal whose body decodes
-//! as one. Anything else, a status nobody declared, a body past [`LARGEST`], an answer
+//! as one. Anything else, a status nobody declared, a body past the operation's bound
+//! ([`LARGEST`] unless it declares more), an answer
 //! after [`DEADLINE`], a field the type does not have, is refused, never read, and told
 //! to the [`Witness`], so the plugin's standing records that it answered outside its
 //! contract.
@@ -11,12 +12,12 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use lemonfiber_ports::http::{Http, Method, Request, Response};
+use lemonfiber_ports::http::{Fetched, Http, Method, Request};
 use lemonfiber_ports::service::Failure;
 
 use crate::wire::{self, Refusal};
 
-/// The most an answer may carry, in bytes.
+/// The most an answer may carry, in bytes, where its operation declares no more.
 pub const LARGEST: usize = 1024 * 1024;
 
 /// How long an answer may take.
@@ -56,10 +57,6 @@ impl std::fmt::Debug for Contracted {
 
 impl Contracted {
     /// The adapter at `base`, named `service`, asked under `key`.
-    ///
-    /// `http` is expected to stop reading an answer at [`LARGEST`], as the adapters'
-    /// transport does when it is `limited`, so a stranger's body is never read whole
-    /// before it is refused. The check here holds whatever transport is given.
     #[must_use]
     pub fn new(
         http: Arc<dyn Http>,
@@ -101,16 +98,23 @@ impl Contracted {
         capability: &str,
         major: u32,
         operation: &str,
+        largest: usize,
         asked: &A,
     ) -> Result<R, Failure>
     where
         A: serde::Serialize + Sync,
         R: serde::de::DeserializeOwned,
     {
-        let response = self
-            .exchange(capability, major, operation, serde_json::to_string(asked))
+        let fetched = self
+            .exchange(
+                capability,
+                major,
+                operation,
+                largest,
+                serde_json::to_string(asked),
+            )
             .await?;
-        let answer = self.answer(operation, &response)?;
+        let answer = self.answer(operation, &fetched)?;
         serde_json::from_str(answer)
             .map_err(|why| self.outside(operation, &format!("the answer did not read: {why}")))
     }
@@ -125,8 +129,9 @@ impl Contracted {
         capability: &str,
         major: u32,
         operation: &str,
+        largest: usize,
         written: serde_json::Result<String>,
-    ) -> Result<Response, Failure> {
+    ) -> Result<Fetched, Failure> {
         let body = written.map_err(|why| self.refused(&why.to_string()))?;
         let request = Request {
             method: Method::Post,
@@ -143,29 +148,30 @@ impl Contracted {
             body: Some(body),
             pinned: None,
         };
-        let sent = tokio::time::timeout(DEADLINE, self.http.send(&request)).await;
-        let Ok(Ok(response)) = sent else {
+        let sent = tokio::time::timeout(DEADLINE, self.http.fetch(&request, largest)).await;
+        let Ok(Ok(fetched)) = sent else {
             return Err(Failure::Unavailable {
                 service: self.service.clone(),
             });
         };
-        Ok(response)
+        Ok(fetched)
     }
 
     /// The JSON one response answers with, if it is an answer the contract declares.
-    fn answer<'r>(&self, operation: &str, response: &'r Response) -> Result<&'r str, Failure> {
-        if response.body.len() > LARGEST {
+    fn answer<'r>(&self, operation: &str, fetched: &'r Fetched) -> Result<&'r str, Failure> {
+        let Some(bytes) = fetched.bytes.as_deref() else {
             return Err(self.outside(operation, "the answer is larger than the contract allows"));
-        }
-        match response.status {
-            200 => Ok(&response.body),
-            // Only an answer with nothing to say may be empty, and it reads as nothing.
-            204 if response.body.is_empty() => Ok("null"),
+        };
+        let Ok(body) = std::str::from_utf8(bytes) else {
+            return Err(self.outside(operation, "the answer is not text"));
+        };
+        match fetched.status {
+            200 => Ok(body),
+            204 if body.is_empty() => Ok("null"),
             401 => Err(Failure::Unauthorised {
                 service: self.service.clone(),
             }),
-            status if is_problem(response) => match serde_json::from_str::<Refusal>(&response.body)
-            {
+            status if is_problem(fetched) => match serde_json::from_str::<Refusal>(body) {
                 Ok(refusal) if refusal.kind.status() == status => {
                     Err(refusal.failure(&self.service))
                 }
@@ -194,8 +200,8 @@ impl Contracted {
 }
 
 /// Whether a response declares itself a problem document.
-fn is_problem(response: &Response) -> bool {
-    response
+fn is_problem(fetched: &Fetched) -> bool {
+    fetched
         .header("content-type")
         .is_some_and(|kind| kind.starts_with(wire::PROBLEM))
 }
