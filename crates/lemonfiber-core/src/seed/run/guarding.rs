@@ -22,7 +22,6 @@ use lemonfiber_manifest::ApiKind;
 
 use super::Ctx;
 use crate::nzbhydra2::{Credential, Nzbhydra2, Unguarded};
-use crate::origin::Origin;
 use crate::seed::{State, Wiring};
 use crate::wiring::Fillers;
 
@@ -57,7 +56,7 @@ struct Aggregator {
 fn aggregator(ctx: &Ctx, fillers: &Fillers) -> Option<Aggregator> {
     let own = fillers
         .speaking(ApiKind::Nzbhydra2)
-        .find(|filler| crate::wiring::crosses(&Origin::Bundled, &filler.origin))?;
+        .find(|filler| crate::wiring::crosses(crate::wiring::Holder::Stack, filler.holder()))?;
     Some(Aggregator {
         client: Nzbhydra2::new(
             ctx.seams.http.clone(),

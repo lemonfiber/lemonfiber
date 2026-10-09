@@ -338,16 +338,82 @@ fn a_plugin_setting_another_service_takes_is_refused() {
     assert_eq!(setting("sonarr", "_KEY").as_deref(), Some("SONARR_KEY"));
 }
 
-/// The gate lets a credential reach the stack's own services and the owner's own plugin,
-/// and nothing whose origin it cannot name as either.
+/// The gate lets a credential reach the stack's own services, the owner's own plugin, and
+/// a first-party plugin from the stack or another first-party plugin; nothing else.
 #[test]
-fn the_gate_lets_nothing_reach_an_origin_it_cannot_name() {
-    let unknown = Origin::Unknown {
-        why: "nothing recorded it".to_owned(),
+fn a_credential_crosses_to_the_stack_its_own_plugin_and_first_party_alone() {
+    use super::Holder::{FirstParty, Nobody, Stack, ThirdParty};
+
+    for (owner, recipient, crosses) in [
+        (Stack, Stack, true),
+        (ThirdParty("plex"), Stack, true),
+        (Nobody, Stack, true),
+        (Stack, FirstParty("bazarr"), true),
+        (FirstParty("sonarr"), FirstParty("bazarr"), true),
+        (FirstParty("bazarr"), FirstParty("bazarr"), true),
+        (ThirdParty("plex"), ThirdParty("plex"), true),
+        (ThirdParty("plex"), FirstParty("bazarr"), false),
+        (FirstParty("sonarr"), ThirdParty("plex"), false),
+        (Stack, ThirdParty("plex"), false),
+        (ThirdParty("emby"), ThirdParty("plex"), false),
+        (Stack, Nobody, false),
+        (Nobody, Nobody, false),
+    ] {
+        assert_eq!(
+            super::crosses(owner, recipient),
+            crosses,
+            "{owner:?} to {recipient:?}"
+        );
+    }
+}
+
+/// A plugin's service is first-party only where the build trusts the plugin by id and
+/// manifest, and the stack's own and an unnamed origin are never a plugin.
+#[test]
+fn a_plugins_service_holds_as_first_party_only_where_the_build_trusts_it() {
+    let mut installed = crate::test_support::an_installed(
+        "bazarr",
+        vec![crate::test_support::a_placed(
+            "subber",
+            &[],
+            None,
+            Some(6767),
+        )],
+    );
+    installed.manifest = "ab12".to_owned();
+    let trusted = [crate::plugin::first_party::FirstParty {
+        plugin: "bazarr",
+        manifest: "ab12",
+    }];
+    let holder = |trusted: &[crate::plugin::first_party::FirstParty]| {
+        let fillers = crate::test_support::stack()
+            .manifest()
+            .map(|manifest| {
+                super::Fillers::trusting(
+                    &manifest,
+                    std::slice::from_ref(&installed),
+                    &super::super::Chosen::default(),
+                    None,
+                    trusted,
+                )
+            })
+            .unwrap_or_default();
+        fillers
+            .service("subber")
+            .map(|one| format!("{:?}", one.holder()))
     };
 
-    assert!(super::crosses(&Origin::Bundled, &Origin::Bundled));
-    assert!(!super::crosses(&Origin::Bundled, &Origin::Operator));
-    assert!(!super::crosses(&Origin::Operator, &Origin::Operator));
-    assert!(!super::crosses(&unknown, &unknown));
+    assert_eq!(holder(&trusted), Some("FirstParty(\"bazarr\")".to_owned()));
+    assert_eq!(holder(&[]), Some("ThirdParty(\"bazarr\")".to_owned()));
+
+    let shipped = crate::test_support::stack()
+        .manifest()
+        .map(|manifest| super::Fillers::of(&manifest, &[], &super::super::Chosen::default(), None))
+        .unwrap_or_default();
+    let Some(mut unnamed) = shipped.services().next().cloned() else {
+        unreachable!("the stack ships a service")
+    };
+    assert_eq!(unnamed.holder(), super::Holder::Stack);
+    unnamed.origin = Origin::Operator;
+    assert_eq!(unnamed.holder(), super::Holder::Nobody);
 }

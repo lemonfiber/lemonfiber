@@ -228,6 +228,7 @@ pub(super) fn what_is_installed() -> lemonfiber_core::plugin::Installs {
         from: String::new(),
         revision: String::new(),
         signed: String::new(),
+        manifest: String::new(),
         installed_at: String::new(),
     };
     lemonfiber_core::plugin::Installs {

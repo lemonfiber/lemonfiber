@@ -144,6 +144,7 @@ pub(crate) fn an_installed(
         from: String::new(),
         revision: String::new(),
         signed: String::new(),
+        manifest: String::new(),
         installed_at: String::new(),
     }
 }

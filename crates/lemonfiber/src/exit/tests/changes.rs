@@ -337,6 +337,7 @@ fn komga() -> lemonfiber_core::plugin::Installed {
         from: String::new(),
         revision: String::new(),
         signed: String::new(),
+        manifest: String::new(),
         installed_at: String::new(),
     }
 }

@@ -38,6 +38,7 @@ fn installed(services: Vec<Placed>) -> Installed {
         from: String::new(),
         revision: String::new(),
         signed: String::new(),
+        manifest: String::new(),
         installed_at: String::new(),
     }
 }

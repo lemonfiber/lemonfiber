@@ -37,7 +37,14 @@ async fn the_install_says_what_it_recorded_and_what_it_joined() {
         install.map(|one| one.would.plugin),
         Some("komga".to_owned())
     );
-    assert_eq!(shown.map(|one| one.installed.len()), Some(1));
+    assert_eq!(shown.as_ref().map(|one| one.installed.len()), Some(1));
+    let digest = crate::secret::render(
+        ring::digest::digest(&ring::digest::SHA256, MANIFEST.as_bytes()).as_ref(),
+    );
+    assert_eq!(
+        shown.and_then(|one| one.installed.first().map(|kept| kept.manifest.clone())),
+        Some(digest)
+    );
 }
 
 /// The gate a rehearsal exists to pass: the account is the same and the file is

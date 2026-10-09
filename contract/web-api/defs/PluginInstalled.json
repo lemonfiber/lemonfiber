@@ -50,6 +50,11 @@
       "type": "string",
       "default": ""
     },
+    "manifest": {
+      "description": "The SHA-256 of the manifest it was installed from, in lower-case hexadecimal.",
+      "type": "string",
+      "default": ""
+    },
     "name": {
       "description": "What the plugin calls itself, for a person to read.\n\nAbsent on a record written before it was kept, and never filled in from the id:\na name is the author's, and one made up here would be lemonfiber's.",
       "type": [
@@ -91,7 +96,7 @@
       }
     },
     "signed": {
-      "description": "What signed it: the key the catalogue index it was resolved through verified\nagainst, named with its fingerprint.\n\nEmpty for a plugin installed from a source the operator named, which nothing\nsigned, and for a record written before this was kept.",
+      "description": "What signed it: the key the catalogue index it was resolved through verified\nagainst, named with its fingerprint; empty where nothing signed it.",
       "type": "string",
       "default": ""
     },

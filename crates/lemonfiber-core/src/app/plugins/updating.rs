@@ -45,12 +45,12 @@ pub(crate) async fn update(
     from: Option<&super::fetching::Fetched<'_>>,
     consent: &super::Consent,
 ) -> Result<Installs, Box<Problem>> {
-    let (manifest, digest) = super::installing::accepted(path, from)?;
+    let read = super::installing::accepted(path, from)?;
     // The plugin named and the plugin the source holds have to be the one plugin: an
     // update asked for one and carried out on another would replace something nobody
     // named with something nobody read.
-    if manifest.plugin.id != plugin {
-        return Err(Box::new(another_plugin(plugin, &manifest.plugin.id)));
+    if read.manifest.plugin.id != plugin {
+        return Err(Box::new(another_plugin(plugin, &read.manifest.plugin.id)));
     }
     // The stamp the whole update is journalled under, taken before anything is decided
     // so the record of the new version says it was installed at that moment.
@@ -60,7 +60,7 @@ pub(crate) async fn update(
         ctx,
         &stack_manifest,
         held.installed(),
-        &manifest,
+        &read,
         path,
         from,
         &stamp,
@@ -79,7 +79,7 @@ pub(crate) async fn update(
         ctx,
         crate::plugin::writes(&would, stack),
     ));
-    let offer = super::offering::updating(&digest, &was, &would, &changes, &contests);
+    let offer = super::offering::updating(&read.digest, &was, &would, &changes, &contests);
     let acting = super::offering::acting(
         ctx,
         consent,
@@ -88,7 +88,7 @@ pub(crate) async fn update(
         &super::offering::UPDATING,
         &crate::plugin::approvals(&would.recipes),
     )?;
-    let mut account = started(&was, &would, &manifest, changes, contests);
+    let mut account = started(&was, &would, &read.manifest, changes, contests);
     let at = crate::plugin::owner(&was.plugin);
     let whose = |change: &crate::journal::Change| crate::plugin::owns(&was.plugin, change);
 
@@ -102,7 +102,7 @@ pub(crate) async fn update(
 
     // Every value a recipe asks the operator for is given, and nothing else is, before
     // anything moves.
-    let consent = &super::following::consented(ctx, &would.plugin, &manifest, consent)?;
+    let consent = &super::following::consented(ctx, &would.plugin, &read.manifest, consent)?;
 
     // Judged before anything is taken, for the reason a removal judges first: a refusal
     // heard after the containers were already off would leave the version the record
@@ -152,7 +152,7 @@ pub(crate) async fn update(
     // The one stamp, taken at the start, so what the new version writes and what putting
     // the old one back rewrites read in the history as the one run they are.
     let coming = Coming {
-        manifest: &manifest,
+        manifest: &read.manifest,
         would: &would,
         stack,
         stamp: &stamp,

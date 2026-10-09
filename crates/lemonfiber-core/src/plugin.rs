@@ -30,6 +30,7 @@ mod conforming;
 // is the one that derives.
 mod container;
 mod declared;
+pub mod first_party;
 mod fronting;
 mod installed;
 mod joining;

@@ -360,12 +360,12 @@ pub struct Installed {
     #[serde(default)]
     pub revision: String,
     /// What signed it: the key the catalogue index it was resolved through verified
-    /// against, named with its fingerprint.
-    ///
-    /// Empty for a plugin installed from a source the operator named, which nothing
-    /// signed, and for a record written before this was kept.
+    /// against, named with its fingerprint; empty where nothing signed it.
     #[serde(default)]
     pub signed: String,
+    /// The SHA-256 of the manifest it was installed from, in lower-case hexadecimal.
+    #[serde(default)]
+    pub manifest: String,
     /// When it was installed, as the record stamps every change: whole seconds since
     /// the epoch.
     ///
@@ -418,6 +418,7 @@ impl Installed {
             from: String::new(),
             revision: String::new(),
             signed: String::new(),
+            manifest: String::new(),
             installed_at: String::new(),
         }
     }
