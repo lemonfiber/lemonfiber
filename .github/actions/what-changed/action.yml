@@ -1,0 +1,53 @@
+# Whether a change reaches what the Rust jobs judge.
+#
+# A change is code unless every path it touches is under `.github/` and none of
+# them is one of the files named in `reads`: the workflow whose jobs this scopes,
+# and any workflow file the suite itself reads. A change with no base to compare
+# against is code. A caller reads a failed run of this as code too, so a fault
+# here runs every job rather than skipping one.
+#
+# Each job it scopes is skipped rather than filtered out by `on.paths`: a skipped
+# job reports, and satisfies a required context; a filtered workflow reports
+# nothing, and a required context waits on it for ever.
+name: what changed
+description: Whether a change reaches what the Rust jobs judge.
+inputs:
+  reads:
+    description: The files under `.github/` whose change is a change to what the caller's jobs judge, one per line.
+    required: true
+outputs:
+  code:
+    description: "`true` where the change reaches code, `false` where it touches only `.github/` files the caller's jobs do not read."
+    value: ${{ steps.diff.outputs.code }}
+runs:
+  using: composite
+  steps:
+    - id: diff
+      shell: bash
+      env:
+        BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+        READS: ${{ inputs.reads }}
+      run: |
+        set -euo pipefail
+        if [ -z "${BASE}" ] || ! git cat-file -e "${BASE}^{commit}" 2>/dev/null; then
+          echo "code=true" >> "$GITHUB_OUTPUT"
+          echo "No commit to compare against, so every job runs."
+          exit 0
+        fi
+        changed="$(git diff --no-renames --name-only "${BASE}" HEAD)"
+        code=false
+        while IFS= read -r path; do
+          [ -n "${path}" ] || continue
+          case "${path}" in
+          .github/*)
+            if grep -Fxq -- "${path}" <<< "${READS}"; then
+              code=true
+            fi
+            ;;
+          *) code=true ;;
+          esac
+        done <<< "${changed}"
+        echo "code=${code}" >> "$GITHUB_OUTPUT"
+        if [ "${code}" = false ]; then
+          echo "Only workflow files the jobs here do not read changed, so they are skipped."
+        fi

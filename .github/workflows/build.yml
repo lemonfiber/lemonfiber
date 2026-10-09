@@ -16,7 +16,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Whether the change reaches what the jobs below judge. A change that touches
+  # only workflow files they do not read skips them, and a skipped job satisfies
+  # a required context.
+  scope:
+    name: what changed
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      code: ${{ steps.changed.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          filter: blob:none
+      - id: changed
+        uses: ./.github/actions/what-changed
+        with:
+          reads: |
+            .github/workflows/build.yml
+
   check:
+    needs: scope
+    if: ${{ !cancelled() && (needs.scope.result != 'success' || needs.scope.outputs.code == 'true') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -120,6 +143,8 @@ jobs:
         run: python3 scripts/the_templates_name_the_image.py --self-test
 
   msrv:
+    needs: scope
+    if: ${{ !cancelled() && (needs.scope.result != 'success' || needs.scope.outputs.code == 'true') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -154,19 +179,26 @@ jobs:
         run: |
           rustc --version
           cargo check --workspace --locked
+  # cargo-deny as a binary rather than through its action, which builds a Docker
+  # image from a Docker Hub base on every run and fails whenever Hub rate-limits
+  # the runners. The version and the arguments are the ones that action ran.
   deny:
+    needs: scope
+    if: ${{ !cancelled() && (needs.scope.result != 'success' || needs.scope.outputs.code == 'true') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+      - uses: taiki-e/install-action@75a348306ce8f67c0b06fc62c32a8546140ba955 # cargo-deny
+        with:
+          tool: cargo-deny@0.20.2
+      - name: The workspace's dependencies
+        run: cargo deny --log-level warn --manifest-path ./Cargo.toml --all-features check
       # The fuzz harness is its own workspace with its own lockfile, so the check
       # above does not reach it. Held to the same `deny.toml`.
       - name: The fuzz harness's dependencies
-        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
-        with:
-          manifest-path: fuzz/Cargo.toml
+        run: cargo deny --log-level warn --manifest-path fuzz/Cargo.toml --all-features check
 
   # The record the binary carries is generated, and a generated file that is
   # committed is a file somebody can edit. This is what makes that visible: the
@@ -184,6 +216,8 @@ jobs:
   # different about one it does — the two ways a kept file can contradict what
   # shipped.
   changelog:
+    needs: scope
+    if: ${{ !cancelled() && (needs.scope.result != 'success' || needs.scope.outputs.code == 'true') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
