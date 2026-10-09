@@ -17,7 +17,18 @@ use async_trait::async_trait;
 use super::Failure;
 
 /// What one download client has moved.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Default,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Moved {
     /// Bytes pulled down.
     pub down: u64,

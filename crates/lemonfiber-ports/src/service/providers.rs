@@ -24,7 +24,10 @@ use super::Failure;
 /// The two travel together because neither means anything alone: a client measures
 /// everything an account has ever pulled, so a block bought halfway through its life
 /// is only readable against what had already gone when it was recorded.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Recorded {
     /// The allowance itself, in bytes.
     pub cap: u64,
@@ -38,7 +41,10 @@ pub struct Recorded {
 /// last actually spoke to it, which no total can show — a hundred gigabytes pulled last
 /// week is no evidence the account answers this morning. So the two are kept apart, and
 /// only this half is a reply from the provider.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Standing {
     /// Connections the client has open and ready to it.
     ///
@@ -63,7 +69,10 @@ pub struct Standing {
 }
 
 /// One Usenet account as its download client holds it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct UsenetAccount {
     /// What the operator calls it.
     pub name: String,

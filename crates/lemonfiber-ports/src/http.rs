@@ -15,6 +15,12 @@ use std::net::IpAddr;
 use async_trait::async_trait;
 use thiserror::Error;
 
+/// The media type of a JSON body, asked or answered.
+pub const JSON: &str = "application/json";
+
+/// The media type of a refusal written as a problem document.
+pub const PROBLEM: &str = "application/problem+json";
+
 /// The method a request uses.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Method {

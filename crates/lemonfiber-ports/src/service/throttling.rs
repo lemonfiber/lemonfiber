@@ -25,7 +25,18 @@ use async_trait::async_trait;
 use super::Failure;
 
 /// What a client is limited to, or is moving, in bytes a second.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Default,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Rates {
     /// Down, or `None` where nothing holds it back.
     pub down: Option<u64>,
@@ -37,7 +48,10 @@ pub struct Rates {
 ///
 /// Hours and minutes and nothing else. No date, no zone, no offset — see this
 /// module's own note on why.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Window {
     /// The hour the household's day starts.
     pub from_hour: u8,
@@ -50,7 +64,10 @@ pub struct Window {
 }
 
 /// Which side of the household's day a client's own scheduler has it on.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
 pub enum Hours {
     /// Inside the household's active hours, so the constrained limits apply.
     Active,
@@ -59,7 +76,10 @@ pub enum Hours {
 }
 
 /// What a download client should be held to.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Wanted {
     /// The rates that apply while the household is awake.
     pub active: Rates,
@@ -72,7 +92,10 @@ pub struct Wanted {
 }
 
 /// How a download client answered about the limits on it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Throttled {
     /// The limits in force this moment, as the client reports them.
     pub rates: Rates,

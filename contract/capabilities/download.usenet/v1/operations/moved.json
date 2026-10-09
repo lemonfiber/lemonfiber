@@ -1,0 +1,93 @@
+{
+  "post": {
+    "operationId": "moved",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "month": {
+                "description": "The port's `month`.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "month"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "additionalProperties": false,
+              "description": "What one download client has moved.",
+              "properties": {
+                "down": {
+                  "description": "Bytes pulled down.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "since_start": {
+                  "description": "Whether this is only what has moved since the client last started, rather\nthan the month that was asked for.\n\nTrue is an under-count of unknown size, and it must reach the report as\nsuch: a cap that reads three-quarters spent when the provider's own meter\nsays nearly all of it is worse than no figure, because it is believed.",
+                  "type": "boolean"
+                },
+                "up": {
+                  "description": "Bytes given back. Zero for a client that does not upload.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "down",
+                "up",
+                "since_start"
+              ],
+              "title": "Moved",
+              "type": "object"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ]
+  }
+}

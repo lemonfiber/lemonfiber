@@ -19,7 +19,7 @@ pub(crate) const API_KEY_HEADER: &str = "X-Api-Key";
 
 /// The media type a JSON request declares, so a service binds the body rather
 /// than refusing it.
-const JSON: &str = "application/json";
+use crate::ports::http::JSON;
 
 /// The `Content-Type` header a JSON request carries: present only where the
 /// request has a body, absent on a bodiless GET. Returned as an `Option` so a

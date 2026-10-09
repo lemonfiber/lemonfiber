@@ -112,3 +112,32 @@ fn the_day_count_agrees_with_the_moment_it_came_from() {
 const fn day(year: u16, month: u8, day: u8) -> Date {
     Date { year, month, day }
 }
+
+/// A date crosses as the `YYYY-MM-DD` it is written as, and reads back as itself.
+#[test]
+fn a_date_crosses_as_the_shape_it_is_written_in() {
+    let date = Date::parse("2026-10-09");
+    assert_eq!(
+        date.map(|date| date.to_string()).as_deref(),
+        Some("2026-10-09")
+    );
+    let crossed = date.and_then(|date| serde_json::to_string(&date).ok());
+    assert_eq!(crossed.as_deref(), Some("\"2026-10-09\""));
+    let read: Option<Date> = crossed.and_then(|text| serde_json::from_str(&text).ok());
+    assert_eq!(read, date);
+}
+
+/// Anything but that one shape is refused rather than read as some other day.
+#[test]
+fn a_date_in_any_other_shape_is_refused() {
+    for written in [
+        "\"2026-10-9\"",
+        "\"09-10-2026\"",
+        "\"2026-13-01\"",
+        "20261009",
+    ] {
+        assert!(serde_json::from_str::<Date>(written).is_err(), "{written}");
+    }
+    let schema = serde_json::to_value(schemars::schema_for!(Date)).unwrap_or_default();
+    assert_eq!(schema.pointer("/format"), Some(&serde_json::json!("date")));
+}

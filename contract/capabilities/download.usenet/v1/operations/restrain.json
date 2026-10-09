@@ -1,0 +1,235 @@
+{
+  "post": {
+    "operationId": "restrain",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$defs": {
+              "Rates": {
+                "additionalProperties": false,
+                "description": "What a client is limited to, or is moving, in bytes a second.",
+                "properties": {
+                  "down": {
+                    "description": "Down, or `None` where nothing holds it back.",
+                    "format": "uint64",
+                    "minimum": 0,
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "up": {
+                    "description": "Up, or `None` where nothing holds it back.",
+                    "format": "uint64",
+                    "minimum": 0,
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  }
+                },
+                "type": "object"
+              },
+              "Wanted": {
+                "additionalProperties": false,
+                "description": "What a download client should be held to.",
+                "properties": {
+                  "active": {
+                    "$ref": "#/$defs/Rates",
+                    "description": "The rates that apply while the household is awake."
+                  },
+                  "quiet": {
+                    "$ref": "#/$defs/Rates",
+                    "description": "The rates that apply outside those hours."
+                  },
+                  "window": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Window"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The household's hours, or `None` to hold the client to the active rates\naround the clock — the conservative direction, and the only honest one for\na client with no scheduler of its own."
+                  }
+                },
+                "required": [
+                  "active",
+                  "quiet"
+                ],
+                "type": "object"
+              },
+              "Window": {
+                "additionalProperties": false,
+                "description": "A stretch of the day on the client's own clock.\n\nHours and minutes and nothing else. No date, no zone, no offset — see this\nmodule's own note on why.",
+                "properties": {
+                  "from_hour": {
+                    "description": "The hour the household's day starts.",
+                    "format": "uint8",
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "from_minute": {
+                    "description": "The minute of it.",
+                    "format": "uint8",
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "to_hour": {
+                    "description": "The hour it ends, which may be the next morning.",
+                    "format": "uint8",
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "to_minute": {
+                    "description": "The minute of that.",
+                    "format": "uint8",
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "from_hour",
+                  "from_minute",
+                  "to_hour",
+                  "to_minute"
+                ],
+                "type": "object"
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "wanted": {
+                "$ref": "#/$defs/Wanted",
+                "description": "The port's `wanted`."
+              }
+            },
+            "required": [
+              "wanted"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$defs": {
+                "Hours": {
+                  "description": "Which side of the household's day a client's own scheduler has it on.",
+                  "oneOf": [
+                    {
+                      "const": "active",
+                      "description": "Inside the household's active hours, so the constrained limits apply.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "quiet",
+                      "description": "Outside them, where the line is the stack's.",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "Rates": {
+                  "additionalProperties": false,
+                  "description": "What a client is limited to, or is moving, in bytes a second.",
+                  "properties": {
+                    "down": {
+                      "description": "Down, or `None` where nothing holds it back.",
+                      "format": "uint64",
+                      "minimum": 0,
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "up": {
+                      "description": "Up, or `None` where nothing holds it back.",
+                      "format": "uint64",
+                      "minimum": 0,
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "additionalProperties": false,
+              "description": "How a download client answered about the limits on it.",
+              "properties": {
+                "hours": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/Hours"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Which side of the household's day its own scheduler has it on, or `None`\nwhere it keeps no schedule to be on a side of."
+                },
+                "rates": {
+                  "$ref": "#/$defs/Rates",
+                  "description": "The limits in force this moment, as the client reports them."
+                },
+                "uploads": {
+                  "description": "Whether this client uploads at all.\n\nA Usenet client does not, so an upload limit on one is not a limit it\nignored — it is a limit with nothing to apply to, and the two must not be\nreported alike.",
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "rates",
+                "uploads"
+              ],
+              "title": "Throttled",
+              "type": "object"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ]
+  }
+}

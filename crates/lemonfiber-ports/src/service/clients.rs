@@ -196,7 +196,10 @@ pub struct RegisteredFolder {
 /// The protocol is not carried here: it is intrinsic to which client answered —
 /// a torrent from qBittorrent, a Usenet download from `SABnzbd` — so the gatherer
 /// sets it from the target it asked rather than trusting each client to name it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Download {
     /// What is being downloaded.
     pub name: String,
@@ -242,7 +245,10 @@ pub trait Transfers: Send + Sync {
 /// client with no notion of ratio — Usenet has none to have — has nothing to
 /// answer here, which is why this is a port of its own rather than another method
 /// every download client would have to pretend to implement.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Seeded {
     /// What the client calls it, which is what both sides call it.
     pub name: String,

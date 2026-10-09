@@ -1,0 +1,98 @@
+{
+  "capability": "download.usenet",
+  "cases": [
+    {
+      "case": "refuses-without-the-key",
+      "expect": {
+        "status": [
+          401
+        ]
+      },
+      "keyed": false,
+      "live": true,
+      "operation": "transfers"
+    },
+    {
+      "case": "transfers-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "transfers"
+    },
+    {
+      "case": "pulling-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "pulling"
+    },
+    {
+      "case": "stop-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "stop"
+    },
+    {
+      "case": "resume-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "resume"
+    },
+    {
+      "case": "throttled-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "throttled"
+    },
+    {
+      "case": "restrain-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "restrain"
+    },
+    {
+      "case": "moving-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "moving"
+    },
+    {
+      "case": "moved-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "moved"
+    },
+    {
+      "case": "accounts-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "accounts"
+    }
+  ],
+  "major": 1
+}

@@ -1,0 +1,116 @@
+{
+  "components": {
+    "responses": {
+      "Refused": {
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Refusal"
+            }
+          }
+        },
+        "description": "A refusal the contract declares."
+      }
+    },
+    "schemas": {
+      "Refusal": {
+        "$defs": {
+          "Kind": {
+            "description": "Why an adapter refused a call, as the contract declares it.",
+            "oneOf": [
+              {
+                "const": "unavailable",
+                "description": "The upstream did not answer.",
+                "type": "string"
+              },
+              {
+                "const": "unauthorised",
+                "description": "The upstream refused the credential the adapter holds for it.",
+                "type": "string"
+              },
+              {
+                "const": "refused",
+                "description": "The upstream answered in a way the adapter did not expect.",
+                "type": "string"
+              },
+              {
+                "const": "unsupported",
+                "description": "The upstream speaks a release the adapter does not support.",
+                "type": "string"
+              },
+              {
+                "const": "unknown-operation",
+                "description": "The operation is not one this adapter serves.",
+                "type": "string"
+              },
+              {
+                "const": "not-asked",
+                "description": "What was asked did not read as the operation's request.",
+                "type": "string"
+              }
+            ]
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A refusal, as a problem document.",
+        "properties": {
+          "detail": {
+            "description": "What the adapter said, for a person reading a log. Never decided on.",
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/$defs/Kind",
+            "description": "Which refusal it is."
+          }
+        },
+        "required": [
+          "type",
+          "detail"
+        ],
+        "title": "Refusal",
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "key": {
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "title": "download.torrent contract",
+    "version": "1"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/lemonfiber/download.torrent/v1/moved": {
+      "$ref": "operations/moved.json"
+    },
+    "/lemonfiber/download.torrent/v1/moving": {
+      "$ref": "operations/moving.json"
+    },
+    "/lemonfiber/download.torrent/v1/pulling": {
+      "$ref": "operations/pulling.json"
+    },
+    "/lemonfiber/download.torrent/v1/restrain": {
+      "$ref": "operations/restrain.json"
+    },
+    "/lemonfiber/download.torrent/v1/resume": {
+      "$ref": "operations/resume.json"
+    },
+    "/lemonfiber/download.torrent/v1/seeding": {
+      "$ref": "operations/seeding.json"
+    },
+    "/lemonfiber/download.torrent/v1/stop": {
+      "$ref": "operations/stop.json"
+    },
+    "/lemonfiber/download.torrent/v1/throttled": {
+      "$ref": "operations/throttled.json"
+    },
+    "/lemonfiber/download.torrent/v1/transfers": {
+      "$ref": "operations/transfers.json"
+    }
+  }
+}
