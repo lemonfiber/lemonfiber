@@ -6,7 +6,7 @@ use crate::ports::docker::{Health, Lifecycle};
 use lemonfiber_fixtures::support::Reporting;
 
 /// The proving manifest with an adapter beside its service, speaking one contract.
-fn speaking() -> String {
+pub(super) fn speaking() -> String {
     PROVING.replace(
         "\n[[proof]]",
         r#"
@@ -33,6 +33,13 @@ async fn adapted(
     published: &[(&str, &str, u16)],
     speaks: &str,
 ) -> Result<Installs, Box<crate::error::Problem>> {
+    let ctx = adapting(name, published, speaks);
+    installing(&ctx, &source(name, &speaking())).await
+}
+
+/// A context the speaking manifest installs into, its adapter published as `published`
+/// and saying it speaks `speaks`.
+pub(super) fn adapting(name: &str, published: &[(&str, &str, u16)], speaks: &str) -> Ctx {
     let about = format!(r#"{{"speaks":{speaks},"upstream":"Komga","releases":[]}}"#);
     let http = Fake::by_path(vec![
         (
@@ -49,7 +56,7 @@ async fn adapted(
         Reporting::holding(&["komga-adapter"], Lifecycle::Running, Health::Healthy)
             .publishing(published),
     );
-    installing(&ctx, &source(name, &speaking())).await
+    ctx
 }
 
 #[tokio::test]

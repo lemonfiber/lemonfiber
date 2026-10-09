@@ -34,6 +34,10 @@ pub const GATE_READ: &str = "gate-read.json";
 /// this layout, so the two spellings have to be one.
 pub(crate) const PLUGINS: &str = "plugins.json";
 
+/// The file name of the record of every answer an installed plugin's adapter gave
+/// outside its contract, named once for the reason the install record's is.
+pub(crate) const NONCONFORMING: &str = "nonconforming.json";
+
 /// The file name of the record of the newest catalogue index this machine verified,
 /// named once for the reason the install record's is.
 pub(crate) const CATALOGUE: &str = "catalogue.json";

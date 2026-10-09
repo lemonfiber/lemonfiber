@@ -306,6 +306,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `PLUGIN-36` | `STEP_FAILED` | error | 1 | 500 | 0.18.0 | Raised when a recipe's step failed any other way — nothing answered, the answer was not the one it expects, a capture found nothing, or the answer was larger than a recipe reads; the install or update was put back. |
 | `PLUGIN-37` | `PATH_NOT_PLAIN` | error | 1 | 400 | 0.18.0 | Raised when a recipe's call path is not a plain absolute path; the manifest's every other fault is listed beside it. |
 | `PLUGIN-38` | `VALUE_WITHHELD` | error | 1 | 400 | 0.18.0 | Raised when a recipe's call was not sent because a value it carries may not go where it was going: not where its pairs say, not back to the service a credential belongs to, or outside without its approval; the install or update was put back. |
+| `PLUGIN-39` | `NOTHING_TO_PROVE` | error | 1 | 404 | 0.18.0 | Nothing by that id is installed, so there is nothing to prove again. |
 
 ## `PROC` — the program underneath
 

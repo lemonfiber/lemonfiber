@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "at": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "capability": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "operation": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "plugin": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "why": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

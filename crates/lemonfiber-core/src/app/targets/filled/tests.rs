@@ -43,10 +43,11 @@ fn adapted(tag: &str, keyed: bool) -> (Scratch, Ctx, Arc<Fake>) {
     let engine = Reporting::holding(&[ADAPTER], Lifecycle::Running, Health::Healthy)
         .publishing(&[(ADAPTER, "127.0.0.1", 8080)]);
     let fake = Fake::always(Answer::reply(200, "[]"));
-    let ctx = a_context()
+    let mut ctx = a_context()
         .engine(Arc::new(engine))
         .build()
         .with_http(fake.clone());
+    ctx.settings.env_file = Some(project.join(".env"));
     (project, ctx, fake)
 }
 
@@ -152,4 +153,30 @@ async fn the_bundled_server_is_asked_as_its_administrator_where_its_password_is_
     assert!(media(&unseeded, &manifest).await.is_none());
     assert!(identity(&unseeded, &manifest).await.is_none());
     assert!(serving(&unseeded, &manifest).await.is_none());
+}
+
+#[tokio::test]
+async fn an_answer_outside_the_contract_is_kept_and_the_plugin_is_asked_no_more() {
+    let (project, ctx, _) = adapted("outside", true);
+    let ctx = ctx.with_http(Fake::always(Answer::reply(200, "\"nobody\"")));
+    let fillers = settled_on_the_adapter(
+        &[adapting(&BOTH, &["identity.source@1", "media.serve@1"])],
+        &project,
+    );
+
+    let answered = match identified(&ctx, &fillers).await {
+        Some(identity) => identity.household().await.is_err(),
+        None => false,
+    };
+    assert!(answered);
+    assert!(
+        crate::app::plugins::conformance::held(&ctx).is_ok_and(|kept| kept.iter().any(|one| one
+            .plugin
+            == "plex"
+            && one.capability == "identity.source"
+            && one.operation == "household"))
+    );
+
+    assert!(identified(&ctx, &fillers).await.is_none());
+    assert!(served(&ctx, &fillers).await.is_some());
 }

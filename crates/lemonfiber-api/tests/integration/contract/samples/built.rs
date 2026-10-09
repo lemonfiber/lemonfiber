@@ -230,6 +230,8 @@ pub(super) fn what_is_installed() -> lemonfiber_core::plugin::Installs {
         installed_at: String::new(),
     };
     lemonfiber_core::plugin::Installs {
+        nonconforming: Vec::new(),
+        proof: None,
         rehearsed: false,
         agreement: None,
         removal: None,

@@ -487,6 +487,16 @@ pub(crate) fn plugin(read: PluginCommand) -> Result<Under, u8> {
                 },
             }))
         }
+        PluginCommand::Prove { plugin, offer } => {
+            Under::Dispatched(Command::Plugins(plugins::Asked::Prove {
+                plugin,
+                consent: plugins::Consent {
+                    agreement: offer,
+                    approved: Vec::new(),
+                    inputs: plugins::Inputs::default(),
+                },
+            }))
+        }
         PluginCommand::Update {
             plugin,
             source,

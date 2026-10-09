@@ -253,6 +253,15 @@ pub struct Installs {
     /// run that installs, updates or removes one leaves it empty.
     #[serde(default)]
     pub sources: Vec<Sourced>,
+    /// Every answer an installed plugin's adapter gave outside its contract, kept until a
+    /// proof it passes clears it: the plugin fills none of those capabilities meanwhile.
+    ///
+    /// Filled on the reading of what is installed, as `substituted` is.
+    #[serde(default)]
+    pub nonconforming: Vec<Nonconforming>,
+    /// What proving a plugin again came to, or nothing where nothing was proved.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proof: Option<Reproof>,
     /// What this run's reading names itself, so an answer to it can say which reading
     /// it answered; nothing on the reading of what is installed, which offers nothing.
     ///
@@ -264,6 +273,39 @@ pub struct Installs {
     /// Said in a field of its own so that a rehearsal is never told from the real run by
     /// its wording alone.
     pub rehearsed: bool,
+}
+
+/// What asking an installed plugin's adapters again came to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "PluginReproof")]
+pub struct Reproof {
+    /// The plugin proved.
+    pub plugin: String,
+    /// Each proof asked, or that would be asked, with what it came to.
+    pub proofs: Vec<super::Proving>,
+    /// Every answer kept against the plugin when it was proved, which a pass clears.
+    pub kept: Vec<Nonconforming>,
+    /// Whether its adapters were asked, rather than only said to be.
+    pub asked: bool,
+    /// Whether every answer kept against the plugin was cleared, which a proof that did
+    /// not hold never does.
+    pub cleared: bool,
+}
+
+/// One answer a plugin's adapter gave outside a contract it speaks.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[schemars(rename = "PluginNonconforming")]
+pub struct Nonconforming {
+    /// The plugin whose adapter answered.
+    pub plugin: String,
+    /// The capability it was asked as.
+    pub capability: String,
+    /// The operation it was asked.
+    pub operation: String,
+    /// What was outside the contract.
+    pub why: String,
+    /// When it answered so, as RFC 3339.
+    pub at: String,
 }
 
 /// Whether one installed plugin's source can still be fetched.

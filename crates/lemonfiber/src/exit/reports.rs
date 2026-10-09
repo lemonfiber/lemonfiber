@@ -67,6 +67,13 @@ pub(super) fn installing(report: &lemonfiber_core::plugin::Installs) -> ExitCode
     {
         return ExitCode::from(VALIDATION);
     }
+    if report
+        .proof
+        .as_ref()
+        .is_some_and(|one| one.asked && !one.cleared)
+    {
+        return ExitCode::from(VALIDATION);
+    }
     match &report.install {
         None => ExitCode::SUCCESS,
         Some(install) if install.recorded || install.reversed.is_none() => ExitCode::SUCCESS,

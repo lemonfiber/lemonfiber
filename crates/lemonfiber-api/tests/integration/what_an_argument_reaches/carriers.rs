@@ -223,13 +223,14 @@ fn carries_offer(command: &Command) -> bool {
         Command::Wiring(Linking::Fill(Filling { agreement, .. })) => {
             agreement.as_deref() == Some(OFFER)
         }
-        // And a plugin's install, update and removal, the same way: the offer is the only
-        // yes, so dropped none could act, and kept silently one would act on terms nobody
-        // read.
+        // And a plugin's install, update, removal and proof, the same way: the offer is the
+        // only yes, so dropped none could act, and kept silently one would act on terms
+        // nobody read.
         Command::Plugins(
             Installing::Install { consent, .. }
             | Installing::Update { consent, .. }
-            | Installing::Remove { consent, .. },
+            | Installing::Remove { consent, .. }
+            | Installing::Prove { consent, .. },
         ) => consent.agreement.as_deref() == Some(OFFER),
         // And the actions a key may call, where the offer is what the call is checked
         // against: dropped, a moved restart, pause or update would go ahead unseen.

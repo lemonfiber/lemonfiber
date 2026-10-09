@@ -8,7 +8,7 @@
 //! from, whether it was reviewed and when it was installed, which are said for every
 //! plugin because *not recorded* is itself the answer an operator needs.
 
-use lemonfiber_core::plugin::{Fetchable, Installed, Sourced, Substituted};
+use lemonfiber_core::plugin::{Fetchable, Installed, Installs};
 
 use super::super::super::Lines;
 
@@ -37,11 +37,8 @@ pub(super) fn origin(one: &Installed) -> String {
 }
 
 /// Everything the record says a plugin is doing.
-pub(super) fn provenance(
-    one: &Installed,
-    substituted: &[Substituted],
-    sources: &[Sourced],
-) -> Lines {
+pub(super) fn provenance(one: &Installed, report: &Installs) -> Lines {
+    let (substituted, sources) = (&report.substituted, &report.sources);
     let mut lines = Lines::default();
     let declared = &one.declared;
     lines.put(format!("    from       {}", origin(one)));
@@ -91,6 +88,17 @@ pub(super) fn provenance(
         lines.put(format!(
             "    stands in  {} fills {}, because you chose it",
             stands.service, stands.capability
+        ));
+    }
+    for answered in report
+        .nonconforming
+        .iter()
+        .filter(|answered| answered.plugin == one.plugin)
+    {
+        lines.put(format!(
+            "    outside    {} {} at {}: {} — it fills none of {} until a proof it passes \
+             clears this",
+            answered.capability, answered.operation, answered.at, answered.why, answered.capability
         ));
     }
     for change in &declared.overrides {
