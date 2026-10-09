@@ -115,10 +115,9 @@ pub(super) async fn escalate_broken_roots(
         ) {
             continue;
         }
-        // The host directory backing the container path — the `media/<type>` layout
-        // `wanted_roots` builds, resolved against the operator's data root. A path that
-        // does not resolve is one nothing is there to answer for.
-        let host = data_root.join("media").join(&folder.media_type);
+        let Some(host) = crate::seed::on_host(folder, DATA_ROOT, data_root) else {
+            continue;
+        };
         if filesystem.canonicalize(&host).await.is_err() {
             wiring.escalate(
                 format!(

@@ -91,10 +91,16 @@ pub fn surveyed(
         .flat_map(|project| carrying::carrying(images, &project.project, ours))
         .collect();
 
+    let beside = if standing.iter().any(standing::runs_ours) {
+        mode::beside(ours, &standing::taken(&standing))
+    } else {
+        Vec::new()
+    };
+
     MigrationReport {
         read: true,
         conflicts: standing::conflicts(ours, &standing),
-        beside: mode::beside(ours, &standing::taken(&standing)),
+        beside,
         modes: mode::offered(),
         not_carried: carrying::not_carried(),
         carrying: carried,
@@ -119,7 +125,7 @@ pub(crate) fn one_setup(survey: &MigrationReport) -> Option<String> {
     let mut candidates = survey
         .standing
         .iter()
-        .filter(|project| project.services.iter().any(|service| service.adoptable));
+        .filter(|project| standing::runs_ours(project));
     let first = candidates.next()?;
     if candidates.next().is_some() {
         return None;

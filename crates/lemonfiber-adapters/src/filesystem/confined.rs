@@ -1,4 +1,5 @@
-//! Reading and writing a file somebody else's container can write.
+//! Reading and writing a file, and making a directory, somebody else's container can
+//! write.
 //!
 //! The container owns the directory, so it can put a link where a file is expected, link
 //! a directory on the way to one, or leave a pipe there. A plain open follows the first
@@ -13,7 +14,7 @@
 //! await; the asynchronous read runs the same function on a thread that may block.
 
 use std::io::{Read as _, Write as _};
-use std::path::Path;
+use std::path::{Component, Path};
 
 use lemonfiber_ports::filesystem::{Beneath, Confined, Fault, READ_LIMIT};
 
@@ -78,6 +79,33 @@ pub(super) fn overwrite(path: &Path, within: &Path, contents: &[u8]) -> Result<(
         return Err(Fault::escaped(path, within));
     }
     landed(file.set_len(0).and_then(|()| (&file).write_all(contents)))
+}
+
+/// Make `path` and every directory missing above it, one at a time from `within` down,
+/// where each that is already there is a directory rather than a link.
+pub(super) fn make(path: &Path, within: &Path) -> Result<(), Fault> {
+    let refused = || {
+        Fault::new(format!(
+            "{} leads outside {} or through a link or a file, and lemonfiber makes its own \
+             directory there rather than following one",
+            path.display(),
+            within.display()
+        ))
+    };
+    let rest = path.strip_prefix(within).map_err(|_| refused())?;
+    let mut here = within.to_path_buf();
+    for part in rest.components() {
+        let Component::Normal(name) = part else {
+            return Err(refused());
+        };
+        here.push(name);
+        match std::fs::symlink_metadata(&here) {
+            Ok(found) if found.is_dir() => {}
+            Ok(_) => return Err(refused()),
+            Err(_) => std::fs::create_dir(&here).map_err(|error| Fault::new(error.to_string()))?,
+        }
+    }
+    Ok(())
 }
 
 /// What emptying and writing the checked file came to, a failure in the platform's own

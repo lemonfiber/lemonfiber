@@ -4,13 +4,18 @@
 //! same path claimed by two *arrs is an operator decision, not something to resolve on
 //! their behalf.
 
+use std::path::{Path, PathBuf};
+
 use super::{
     canonical_root, observe_or_skip, same_path, wire_one, BTreeMap, Client, Journal, Naming,
     RootFolder, State, Wiring,
 };
+use crate::ports::filesystem::FileSystem;
 
 /// What a wanted root folder is judged against before it may be written: the paths
-/// another \*arr also claims, and the data tree lemonfiber mounts.
+/// another \*arr also claims, and the data tree lemonfiber mounts. And where that tree
+/// is on the host, so the folder's directory is made before the service is asked to
+/// file into it.
 ///
 /// Two refusals answering one question — may this service file here? — so they arrive
 /// as one thing rather than as two parameters a caller could pass one of. Neither is a
@@ -26,6 +31,18 @@ pub struct Placing<'a> {
     /// refused: the service would file where its downloads are neither hardlinked to
     /// nor visible to the rest of the stack.
     pub root: &'a str,
+    /// Where `root` is on the host, for making a folder's directory before it is
+    /// registered, or `None` where no data root is known.
+    pub backing: Option<Backing<'a>>,
+}
+
+/// The host directory the data root is mounted from, and the filesystem it is on.
+#[derive(Clone, Copy)]
+pub struct Backing<'a> {
+    /// The filesystem the data root is on.
+    pub filesystem: &'a dyn FileSystem,
+    /// The host directory mounted at [`Placing::root`].
+    pub data_root: &'a Path,
 }
 
 /// Wire a service's root folders: register the ones it lacks, leave the ones it
@@ -45,14 +62,17 @@ pub struct Placing<'a> {
 /// its downloads are neither hardlinked to nor visible to the rest of the stack.
 /// Both refusals are made only once the service is reachable, so a service still
 /// starting is skipped and retried rather than handed a verdict a re-run cannot
-/// lift.
+/// lift. A folder within the data tree has its directory made on the host where
+/// [`Placing::backing`] says the tree is, before it is registered, because a service
+/// refuses a folder that is not there; a directory that cannot be made fails the
+/// folder with the platform's reason.
 ///
 /// `rehearsing` changes one thing: a folder that would be registered is reported as
-/// the folder it would be rather than written. Everything above that — the read, the
-/// two refusals and the already-there match — is the same walk either way, because
-/// each of them is a fact about the service rather than a consequence of writing to
-/// it, and a rehearsal that reported them differently would be describing a different
-/// run from the one it claims to be describing.
+/// the folder it would be rather than made and written. Everything above that — the
+/// read, the two refusals and the already-there match — is the same walk either way,
+/// because each of them is a fact about the service rather than a consequence of
+/// writing to it, and a rehearsal that reported them differently would be describing a
+/// different run from the one it claims to be describing.
 pub async fn wire_root_folders(
     client: &dyn Client,
     service: &str,
@@ -80,6 +100,8 @@ pub async fn wire_root_folders(
             State::Refused { reason }
         } else if already {
             State::AlreadyWired
+        } else if let Some(detail) = unmade(&placing, folder, rehearsing).await {
+            State::Failed { detail }
         } else {
             wire_one(
                 client.register_root_folder(folder),
@@ -154,14 +176,43 @@ pub(super) fn contest_reason(
     ))
 }
 
+/// Why a folder's directory could not be made on the host before it is registered,
+/// or `None` where it is there, where this pass only rehearses, or where no data
+/// root is known to make it in.
+async fn unmade(placing: &Placing<'_>, folder: &RootFolder, rehearsing: bool) -> Option<String> {
+    let backing = placing.backing.filter(|_| !rehearsing)?;
+    let host = on_host(folder, placing.root, backing.data_root)?;
+    let made = backing.filesystem.make_beneath(&host, backing.data_root);
+    made.await.err().map(|fault| {
+        format!(
+            "the directory {} could not be made: {}",
+            host.display(),
+            fault.message
+        )
+    })
+}
+
+/// The host directory backing a folder registered under `root`, or `None` where
+/// the folder is not beneath `root`.
+pub(crate) fn on_host(folder: &RootFolder, root: &str, data_root: &Path) -> Option<PathBuf> {
+    beneath(folder, root).map(|rest| data_root.join(rest))
+}
+
+/// A folder's path below `root`, or `None` where it is not beneath `root`.
+fn beneath(folder: &RootFolder, root: &str) -> Option<String> {
+    let within = format!("{}/", canonical_root(root));
+    canonical_root(&folder.path)
+        .strip_prefix(&within)
+        .map(str::to_owned)
+}
+
 /// Why a wanted folder is refused for falling outside the data root: its path, or
 /// `None` where it sits within `root` — as every folder lemonfiber builds does,
 /// under the tree it mounts at `root`. A root folder outside that tree would have
 /// the service file where its downloads are neither hardlinked to nor visible to
 /// the rest of the stack, so it is refused rather than created.
 pub(super) fn outside_root_reason(folder: &RootFolder, root: &str) -> Option<String> {
-    let within = format!("{}/", canonical_root(root));
-    if canonical_root(&folder.path).starts_with(&within) {
+    if beneath(folder, root).is_some() {
         return None;
     }
     Some(format!(

@@ -60,6 +60,7 @@ async fn a_sabnzbd_client_is_posted_as_its_usenet_implementation() {
         r#""implementation":"Sabnzbd""#,
         r#""configContract":"SabnzbdSettings""#,
         r#""protocol":"usenet""#,
+        r#""priority":1"#,
         r#""name":"apiKey""#,
         "sab-key",
         r#""name":"tvCategory""#,
@@ -89,6 +90,7 @@ async fn a_qbittorrent_client_is_posted_as_its_torrent_implementation() {
         r#""implementation":"QBittorrent""#,
         r#""configContract":"QBittorrentSettings""#,
         r#""protocol":"torrent""#,
+        r#""priority":1"#,
         r#""name":"username""#,
         r#""name":"password""#,
         "web-pass",
@@ -133,7 +135,9 @@ async fn an_updated_download_client_is_put_to_its_id_carrying_it() {
             && request.url.ends_with("/api/v3/downloadclient/7")));
     // The document rewrites the one that is there rather than adding a second: it names
     // the id the service assigned.
-    assert!(sent.is_some_and(|request| request.body.is_some_and(|body| body.contains(r#""id":7"#))));
+    assert!(sent.is_some_and(|request| request
+        .body
+        .is_some_and(|body| body.contains(r#""id":7"#) && body.contains(r#""priority":1"#))));
 }
 
 /// Putting one field back reads the client, changes that field, and writes the rest of the

@@ -84,6 +84,13 @@ impl FileSystem for Disk {
             .unwrap_or(Beneath::Absent)
     }
 
+    async fn make_beneath(&self, path: &Path, within: &Path) -> Result<(), Fault> {
+        let (path, within) = (path.to_path_buf(), within.to_path_buf());
+        tokio::task::spawn_blocking(move || confined::make(&path, &within))
+            .await
+            .unwrap_or_else(|error| Err(Fault::new(error.to_string())))
+    }
+
     /// One syscall, which is the whole point: `create_new` asks the kernel to create
     /// the file *and* fail if it already exists, so two processes racing here get one
     /// `true` between them. Anything built from a separate look-then-write would have

@@ -8,7 +8,8 @@ use std::collections::BTreeMap;
 
 use crate::common;
 use lemonfiber_core::ports::service::RegisteredFolder;
-use lemonfiber_core::seed::{contested_roots, State};
+use lemonfiber_core::seed::{contested_roots, Backing, State};
+use lemonfiber_fixtures::support::SeedFs;
 
 /// A rehearsal names the folder it would register, registers none, and leaves the
 /// service holding exactly what it held.
@@ -32,6 +33,67 @@ async fn a_rehearsed_pass_names_the_folder_it_would_register_and_registers_none(
     assert!(
         service.registered().is_empty(),
         "the folder was registered anyway"
+    );
+}
+
+/// The host directory a folder files into, under the data root a test names.
+const DATA_ROOT: &str = "/srv/data";
+
+/// Wire one folder whose host directory `filesystem` makes, or reports it cannot.
+async fn backed(filesystem: &SeedFs, service: &FakeService, rehearsing: bool) -> Vec<State> {
+    let backing = Backing {
+        filesystem,
+        data_root: std::path::Path::new(DATA_ROOT),
+    };
+    wire_with(
+        service,
+        &[folder("/data/media/tv")],
+        Some(backing),
+        rehearsing,
+    )
+    .await
+}
+
+/// A folder's directory is made under the data root before the service is asked to
+/// file into it, and the folder is then registered.
+#[tokio::test]
+async fn a_folder_within_the_data_root_is_made_and_then_registered() {
+    let service = FakeService::with(Mode::Normal, Vec::new());
+
+    let states = backed(&SeedFs::keyed(None, None), &service, false).await;
+
+    assert_eq!(states, vec![State::Wired]);
+    assert_eq!(service.registered().len(), 1);
+}
+
+/// A directory that cannot be made fails the folder, naming the host path, and the
+/// service is never asked to file where nothing is.
+#[tokio::test]
+async fn a_folder_whose_directory_cannot_be_made_is_failed_and_not_registered() {
+    let service = FakeService::with(Mode::Normal, Vec::new());
+    let filesystem = SeedFs::keyed(None, None).missing(vec!["media/tv"]);
+
+    let states = backed(&filesystem, &service, false).await;
+
+    assert!(
+        matches!(states.as_slice(), [State::Failed { detail }] if detail.contains("/srv/data/media/tv")),
+        "{states:?}"
+    );
+    assert!(service.registered().is_empty());
+}
+
+/// A rehearsal makes nothing, so a directory that is not there yet does not stop it
+/// naming the folder a real run would register.
+#[tokio::test]
+async fn a_rehearsal_names_the_folder_without_making_its_directory() {
+    let service = FakeService::with(Mode::Normal, Vec::new());
+    let filesystem = SeedFs::keyed(None, None).missing(vec!["media/tv"]);
+
+    let states = backed(&filesystem, &service, true).await;
+
+    assert!(
+        matches!(states.as_slice(), [State::WouldWire { .. }]),
+        "{states:?}"
     );
 }
 

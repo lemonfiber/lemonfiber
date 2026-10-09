@@ -151,6 +151,10 @@ pub(super) async fn seed_arr(
         crate::seed::Placing {
             contested: seeding.contested,
             root: DATA_ROOT,
+            backing: seeding.data_root.map(|data_root| crate::seed::Backing {
+                filesystem: ctx.seams.filesystem.as_ref(),
+                data_root,
+            }),
         },
         &mut journal,
         &at,

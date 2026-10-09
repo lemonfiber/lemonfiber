@@ -140,3 +140,16 @@ fn a_second_copy_steps_over_the_ports_the_existing_stack_holds() {
         .map(|moved| moved.to);
     assert_eq!(sonarr, Some(8991), "{:?}", found.beside);
 }
+
+/// Nothing but lemonfiber's own stack on the machine: no port is in the way, and no
+/// service is proposed anywhere else.
+#[test]
+fn a_machine_holding_only_lemonfiber_moves_no_service() {
+    let seen = [
+        container("lemonfiber", "sonarr", &[8989]),
+        container("shop", "postgres", &[5432]),
+    ];
+    let found = surveyed("lemonfiber", &seen, &[], &running(), &[]);
+    assert!(found.conflicts.is_empty(), "{:?}", found.conflicts);
+    assert!(found.beside.is_empty(), "{:?}", found.beside);
+}

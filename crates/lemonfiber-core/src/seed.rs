@@ -52,7 +52,8 @@ use drift::{canonical_root, same_base_url, same_path};
 pub use drift::{intent, reconcile, same_endpoint, wholesale_drift, Intent, Observed};
 use report::{observe_or_skip, observe_or_untold, record_outcome, unreached, unread};
 pub use report::{Assessment, Report, Severity, State, Wiring};
-pub use roots::{contested_roots, wire_root_folders, Placing};
+pub(crate) use roots::on_host;
+pub use roots::{contested_roots, wire_root_folders, Backing, Placing};
 pub(crate) use services::{
     as_request_target, described_target, observed_telling, reached_at, said, wanted_telling,
     TELLING,

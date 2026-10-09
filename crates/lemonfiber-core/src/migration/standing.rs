@@ -101,7 +101,7 @@ pub fn conflicts(ours: &[Ours], standing: &[StandingReport]) -> Vec<ConflictRepo
 pub fn unsupported(standing: &[StandingReport]) -> Vec<UnsupportedReport> {
     standing
         .iter()
-        .filter(|project| project.services.iter().any(|service| service.adoptable))
+        .filter(|project| runs_ours(project))
         .flat_map(|project| {
             project
                 .services
@@ -115,6 +115,13 @@ pub fn unsupported(standing: &[StandingReport]) -> Vec<UnsupportedReport> {
                 })
         })
         .collect()
+}
+
+/// Whether a project holds a service lemonfiber runs: a setup lemonfiber could act on,
+/// rather than somebody's unrelated work.
+#[must_use]
+pub fn runs_ours(project: &StandingReport) -> bool {
+    project.services.iter().any(|service| service.adoptable)
 }
 
 #[cfg(test)]
