@@ -18,6 +18,12 @@
       ],
       "required": true
     },
+    "nonconforming": {
+      "type": [
+        "array[ref:PluginNonconforming]"
+      ],
+      "required": false
+    },
     "rehearsed": {
       "type": [
         "boolean"

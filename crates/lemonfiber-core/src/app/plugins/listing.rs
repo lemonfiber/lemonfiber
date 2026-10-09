@@ -23,6 +23,7 @@ use super::{fetching, read, standing};
 pub fn recorded(ctx: &Ctx) -> Result<Installs, Box<Problem>> {
     let held = read(ctx)?;
     Ok(Installs {
+        nonconforming: super::conformance::held(ctx)?,
         rehearsed: false,
         substituted: standing::substituted(
             held.installed(),

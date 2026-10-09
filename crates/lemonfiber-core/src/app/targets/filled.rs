@@ -13,6 +13,7 @@ use lemonfiber_contract::capabilities::media::serve;
 use lemonfiber_contract::Contracted;
 use lemonfiber_manifest::Manifest;
 
+use crate::app::plugins::conformance;
 use crate::app::Ctx;
 use crate::jellyfin::Jellyfin;
 use crate::wiring::Fillers;
@@ -76,9 +77,11 @@ enum Reached {
 
 /// How the service filling the identity source is asked for `capability`.
 ///
-/// Nothing where it does not provide `capability`, where it speaks the contract and
-/// cannot be reached, and where it speaks none and is not a server this build holds an
-/// adapter and a recorded password for.
+/// Nothing where it does not provide `capability`, where it speaks the contract and is
+/// a plugin with an answer kept against it as outside that contract, or cannot be
+/// reached, and where it speaks none and is not a server this build holds an adapter
+/// and a recorded password for. Every answer outside the contract is kept against the
+/// plugin.
 async fn reached(ctx: &Ctx, fillers: &Fillers, capability: &str, major: u32) -> Option<Reached> {
     let (filler, _) = settled(fillers)?;
     if !filler
@@ -89,10 +92,15 @@ async fn reached(ctx: &Ctx, fillers: &Fillers, capability: &str, major: u32) -> 
         return None;
     }
     if filler.contracted(capability, major) {
+        let named = filler.brought_by()?;
+        if !conformance::fills(ctx, named, capability) {
+            return None;
+        }
+        let witness = conformance::witness(ctx, named, capability);
         return crate::plugin::reaching::filling(ctx, filler)
             .await
             .ok()
-            .map(Reached::Contracted);
+            .map(|adapter| Reached::Contracted(adapter.witnessed_by(witness)));
     }
     let server = MediaServer::of(fillers)?.administered(ctx)?;
     Some(Reached::Bundled(

@@ -206,6 +206,7 @@ async fn recorded(
         )
     })?;
     account.install.recorded = true;
+    let _ = super::conformance::cleared(ctx, &would.plugin);
     let proxy = stack.join(crate::plugin::PROXY).display().to_string();
     let written = account
         .install
@@ -413,6 +414,7 @@ async fn restored(ctx: &Ctx, was: &Installed, stack: &Path, stamp: &str) -> Rest
 /// The report: the listing as the record stands, and this run's one account.
 fn answering(installed: Vec<Installed>, update: Update, offer: String) -> Installs {
     Installs {
+        nonconforming: Vec::new(),
         agreement: Some(offer),
         rehearsed: false,
         installed,

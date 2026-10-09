@@ -28,6 +28,14 @@
         "$ref": "PluginInstalled.json"
       }
     },
+    "nonconforming": {
+      "description": "Every answer an installed plugin's adapter gave outside its contract, kept until a\nproof it passes clears it: the plugin fills none of those capabilities meanwhile.\n\nFilled on the reading of what is installed, as `substituted` is.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "PluginNonconforming.json"
+      }
+    },
     "rehearsed": {
       "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
       "type": "boolean"

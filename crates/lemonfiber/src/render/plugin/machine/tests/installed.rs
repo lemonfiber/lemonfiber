@@ -13,6 +13,7 @@ fn override_of() -> Overriding {
 #[test]
 fn a_machine_with_no_plugins_says_so_rather_than_drawing_an_empty_heading() {
     let said = installs(&Installs {
+        nonconforming: Vec::new(),
         rehearsed: false,
         agreement: None,
         removal: None,
@@ -31,6 +32,7 @@ fn a_machine_with_no_plugins_says_so_rather_than_drawing_an_empty_heading() {
 #[test]
 fn the_listing_says_where_each_service_keeps_its_state_and_what_pins_it() {
     let said = installs(&Installs {
+        nonconforming: Vec::new(),
         rehearsed: false,
         agreement: None,
         removal: None,
@@ -56,6 +58,7 @@ fn the_listing_says_where_each_service_keeps_its_state_and_what_pins_it() {
 #[test]
 fn more_than_one_installed_is_counted_rather_than_listed_as_one() {
     let said = installs(&Installs {
+        nonconforming: Vec::new(),
         rehearsed: false,
         agreement: None,
         removal: None,
@@ -80,6 +83,7 @@ fn more_than_one_installed_is_counted_rather_than_listed_as_one() {
 #[test]
 fn an_operator_surface_is_shown_as_this_machine_only_and_still_on_the_panel() {
     let said = installs(&Installs {
+        nonconforming: Vec::new(),
         rehearsed: false,
         agreement: None,
         removal: None,
@@ -107,6 +111,7 @@ fn an_operator_surface_is_shown_as_this_machine_only_and_still_on_the_panel() {
 #[test]
 fn a_service_the_manifest_named_no_group_for_is_shown_without_one() {
     let said = installs(&Installs {
+        nonconforming: Vec::new(),
         rehearsed: false,
         agreement: None,
         removal: None,
@@ -131,6 +136,7 @@ fn a_service_the_manifest_named_no_group_for_is_shown_without_one() {
 fn an_install_leads_with_what_it_recorded_and_says_what_it_joined() {
     let one = recorded("komga", Some(household()));
     let said = installs(&Installs {
+        nonconforming: Vec::new(),
         rehearsed: false,
         agreement: None,
         removal: None,
@@ -158,6 +164,7 @@ fn an_install_leads_with_what_it_recorded_and_says_what_it_joined() {
 fn the_install_shows_the_container_that_is_written_for_it() {
     let one = recorded("komga", Some(household()));
     let said = installs(&Installs {
+        nonconforming: Vec::new(),
         rehearsed: false,
         agreement: None,
         removal: None,
@@ -188,6 +195,7 @@ fn a_rehearsal_is_shown_the_same_container_the_install_is() {
     let one = recorded("komga", Some(household()));
     let shown = |recorded: bool| {
         installs(&Installs {
+            nonconforming: Vec::new(),
             rehearsed: false,
             agreement: None,
             removal: None,
@@ -214,6 +222,7 @@ fn a_rehearsal_is_shown_the_same_container_the_install_is() {
 fn a_rehearsal_states_every_change_every_proof_and_every_override() {
     let one = recorded("komga", Some(household()));
     let said = installs(&Installs {
+        nonconforming: Vec::new(),
         rehearsed: false,
         agreement: None,
         removal: None,
@@ -269,6 +278,7 @@ fn a_rehearsal_names_an_adapter_services_key_file_and_nothing_of_the_key() {
     }
     let key = "/opt/lemonfiber/stack/config/komga/lemonfiber.key";
     let said = installs(&Installs {
+        nonconforming: Vec::new(),
         rehearsed: false,
         agreement: None,
         removal: None,
@@ -299,6 +309,7 @@ fn a_rehearsal_names_an_adapter_services_key_file_and_nothing_of_the_key() {
 fn an_install_states_the_same_three_in_the_past_tense() {
     let one = recorded("komga", Some(household()));
     let said = installs(&Installs {
+        nonconforming: Vec::new(),
         rehearsed: false,
         agreement: None,
         removal: None,
@@ -328,6 +339,7 @@ fn an_install_states_the_same_three_in_the_past_tense() {
 #[test]
 fn a_plugin_that_proves_nothing_and_overrides_nothing_says_so() {
     let said = installs(&Installs {
+        nonconforming: Vec::new(),
         rehearsed: false,
         agreement: None,
         removal: None,
@@ -383,6 +395,22 @@ fn the_listing_says_what_each_plugin_is_doing() {
         }],
     };
     let said = installs(&Installs {
+        nonconforming: vec![
+            lemonfiber_core::plugin::Nonconforming {
+                plugin: "komga".to_owned(),
+                capability: "media.serve".to_owned(),
+                operation: "playing".to_owned(),
+                why: "the answer did not read".to_owned(),
+                at: "2026-10-09T20:00:00Z".to_owned(),
+            },
+            lemonfiber_core::plugin::Nonconforming {
+                plugin: "elsewhere".to_owned(),
+                capability: "identity.source".to_owned(),
+                operation: "household".to_owned(),
+                why: "not this plugin's".to_owned(),
+                at: "2026-10-09T20:00:00Z".to_owned(),
+            },
+        ],
         rehearsed: false,
         agreement: None,
         installed: vec![full, recorded("bare", None)],
@@ -404,6 +432,8 @@ fn the_listing_says_what_each_plugin_is_doing() {
         "claims     media.serve, komga:kobo-sync",
         "fills      media.serve",
         "stands in  komga fills media.serve, because you chose it",
+        "outside    media.serve playing at 2026-10-09T20:00:00Z: the answer did not read — it \
+         fills none of media.serve until a proof it passes clears this",
         "may change homepage.services — Add its own entry",
         "reaches    metadata.example.org",
         "holds      api-key for komga — Read the library counts",
@@ -415,6 +445,7 @@ fn the_listing_says_what_each_plugin_is_doing() {
             "{expected:?} missing from:\n{said}"
         );
     }
+    assert!(!said.contains("not this plugin's"));
 }
 
 /// A reviewed plugin says so and what signed it, and one row it adds is counted in the
@@ -429,6 +460,7 @@ fn a_reviewed_plugin_says_so_and_one_row_reads_as_one() {
     )
     .unwrap_or_default();
     let said = installs(&Installs {
+        nonconforming: Vec::new(),
         rehearsed: false,
         agreement: None,
         installed: vec![one],
@@ -455,6 +487,7 @@ fn a_reviewed_plugin_says_so_and_one_row_reads_as_one() {
 fn a_rehearsed_install_says_it_would_and_says_nothing_was_written() {
     let one = recorded("komga", Some(household()));
     let said = installs(&Installs {
+        nonconforming: Vec::new(),
         rehearsed: true,
         agreement: None,
         removal: None,
@@ -482,6 +515,7 @@ fn an_install_says_where_the_plugin_came_from_and_that_nobody_vouched_for_it() {
     };
     for recorded in [false, true] {
         let said = installs(&Installs {
+            nonconforming: Vec::new(),
             rehearsed: false,
             agreement: None,
             removal: None,
@@ -505,6 +539,7 @@ fn an_install_says_where_the_plugin_came_from_and_that_nobody_vouched_for_it() {
 #[test]
 fn a_rehearsed_install_on_an_empty_machine_still_says_none_are_installed() {
     let said = installs(&Installs {
+        nonconforming: Vec::new(),
         rehearsed: true,
         agreement: None,
         removal: None,
@@ -531,6 +566,7 @@ fn a_rehearsed_install_on_an_empty_machine_still_says_none_are_installed() {
 #[test]
 fn the_printer_reaches_this_renderer_for_this_outcome() {
     let drawn = crate::render::shaped(&lemonfiber_core::app::Outcome::Plugins(Installs {
+        nonconforming: Vec::new(),
         rehearsed: false,
         agreement: None,
         removal: None,
@@ -553,6 +589,7 @@ fn a_plugin_from_a_git_source_is_said_with_its_commit() {
         ..recorded("komga", Some(household()))
     };
     let said = installs(&Installs {
+        nonconforming: Vec::new(),
         rehearsed: false,
         agreement: None,
         removal: None,
@@ -580,6 +617,7 @@ fn a_source_that_cannot_be_fetched_is_said_to_leave_the_plugin_unupdatable() {
         standing,
     };
     let said = installs(&Installs {
+        nonconforming: Vec::new(),
         rehearsed: false,
         agreement: None,
         installed: vec![

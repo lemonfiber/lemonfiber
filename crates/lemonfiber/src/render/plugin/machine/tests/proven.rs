@@ -7,6 +7,7 @@ use super::*;
 #[test]
 fn a_proof_that_settles_no_service_is_shown_without_one() {
     let said = installs(&Installs {
+        nonconforming: Vec::new(),
         rehearsed: false,
         agreement: None,
         removal: None,
@@ -35,6 +36,7 @@ fn a_proof_that_settles_no_service_is_shown_without_one() {
 fn an_install_that_asked_says_what_each_proof_came_to_and_what_answered() {
     let one = recorded("komga", Some(household()));
     let said = installs(&Installs {
+        nonconforming: Vec::new(),
         rehearsed: false,
         agreement: None,
         removal: None,
@@ -67,6 +69,7 @@ fn an_install_that_asked_says_what_each_proof_came_to_and_what_answered() {
 fn a_proof_that_failed_says_how_and_one_that_established_nothing_says_why() {
     let one = recorded("komga", Some(household()));
     let said = installs(&Installs {
+        nonconforming: Vec::new(),
         rehearsed: false,
         agreement: None,
         removal: None,
@@ -160,6 +163,7 @@ fn wrong(summary: &str) -> lemonfiber_core::error::Problem {
 fn an_install_the_checks_were_content_with_says_so_rather_than_showing_nothing() {
     let one = recorded("komga", Some(household()));
     let said = installs(&Installs {
+        nonconforming: Vec::new(),
         rehearsed: false,
         agreement: None,
         removal: None,
@@ -192,6 +196,7 @@ fn an_install_the_checks_were_content_with_says_so_rather_than_showing_nothing()
 fn a_check_the_install_made_worse_is_shown_at_both_readings() {
     let one = recorded("komga", Some(household()));
     let said = installs(&Installs {
+        nonconforming: Vec::new(),
         rehearsed: false,
         agreement: None,
         removal: None,
@@ -277,6 +282,7 @@ fn every_way_a_check_can_read_has_a_sentence_of_its_own() {
 fn a_rehearsal_says_nothing_about_the_stacks_own_checks() {
     let one = recorded("komga", Some(household()));
     let said = installs(&Installs {
+        nonconforming: Vec::new(),
         rehearsed: false,
         agreement: None,
         removal: None,
@@ -300,6 +306,7 @@ fn a_rehearsal_says_nothing_about_the_stacks_own_checks() {
 fn an_install_that_would_contest_an_ask_says_so_and_one_that_would_not_is_silent() {
     let one = recorded("komga", None);
     let quiet = installs(&Installs {
+        nonconforming: Vec::new(),
         rehearsed: false,
         agreement: None,
         installed: Vec::new(),
@@ -313,6 +320,7 @@ fn an_install_that_would_contest_an_ask_says_so_and_one_that_would_not_is_silent
     assert!(!quiet.contains("contested"), "{quiet}");
 
     let said = installs(&Installs {
+        nonconforming: Vec::new(),
         rehearsed: false,
         agreement: None,
         installed: Vec::new(),

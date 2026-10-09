@@ -12,7 +12,6 @@ use lemonfiber_manifest::{ApiKind, Manifest};
 
 use crate::app::Ctx;
 use crate::jellyfin::Jellyfin;
-use crate::origin::Origin;
 use crate::ports::service::Protocol;
 use crate::wiring::{Address, Filler, Fillers};
 
@@ -101,10 +100,7 @@ impl MediaServer {
     /// The plugin that brought this server, or nothing where the stack ships it.
     #[must_use]
     pub(crate) fn brought_by(&self) -> Option<&str> {
-        match &self.filler.origin {
-            Origin::Plugin { named } => Some(named),
-            _ => None,
-        }
+        self.filler.brought_by()
     }
 
     /// Where the host reaches the request service that asks for it, where it is the

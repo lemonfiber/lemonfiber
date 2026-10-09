@@ -146,6 +146,7 @@ pub(crate) async fn remove(
     let at = super::kept_at(ctx);
     super::super::record::keep(at.as_deref(), &after)
         .map_err(|why| Box::new(super::unrecordable(&going.plugin, *why, &went_back)))?;
+    let _ = super::conformance::cleared(ctx, &going.plugin);
 
     // And taken away where nothing is left in it. **A machine that has had a plugin
     // and has none must answer exactly as one that never had one**, and an empty
@@ -209,6 +210,7 @@ fn answering(
     offer: String,
 ) -> crate::plugin::Installs {
     crate::plugin::Installs {
+        nonconforming: Vec::new(),
         agreement: Some(offer),
         rehearsed: false,
         installed,

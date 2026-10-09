@@ -99,6 +99,15 @@ impl Filler {
         })
     }
 
+    /// The plugin that brought it, or nothing where the stack ships it.
+    #[must_use]
+    pub fn brought_by(&self) -> Option<&str> {
+        match &self.origin {
+            Origin::Plugin { named } => Some(named),
+            _ => None,
+        }
+    }
+
     /// Whether it is asked over `capability`'s contract at `major`.
     #[must_use]
     pub fn contracted(&self, capability: &str, major: u32) -> bool {

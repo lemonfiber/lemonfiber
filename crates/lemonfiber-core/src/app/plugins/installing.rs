@@ -177,6 +177,7 @@ pub(super) async fn install(
                 return Err(Box::new(unrecordable(&would.plugin, *why, &back)));
             }
             recorded = true;
+            let _ = super::conformance::cleared(ctx, &would.plugin);
             proving::refronted(ctx, stack, proving::routes_written(&planned)).await;
         } else {
             put_back = Some(reversing(ctx, &would, stack, &stamp).await);
@@ -190,6 +191,7 @@ pub(super) async fn install(
     let standing = if recorded { after } else { held };
 
     Ok(Installs {
+        nonconforming: Vec::new(),
         rehearsed: false,
         removal: None,
         installed: standing.installed().to_vec(),

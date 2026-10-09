@@ -101,11 +101,7 @@ pub(crate) fn installs(report: &Installs) -> Lines {
     }
     for one in &report.installed {
         lines.spaced(format!("  {}", named(one)));
-        lines.extend(listed::provenance(
-            one,
-            &report.substituted,
-            &report.sources,
-        ));
+        lines.extend(listed::provenance(one, report));
         lines.extend(services(one));
     }
     lines

@@ -48,6 +48,7 @@ mod verifying;
 // layer's work with a name on it, and what is here is only the three things that are
 // not a journal entry: the containers, the register, and what the machine is left
 // without.
+pub(crate) mod conformance;
 mod removing;
 // Carrying the writes out, and journalling each before it is made. Its own file
 // because the deciding and the touching are two concerns, and only one of them has a
