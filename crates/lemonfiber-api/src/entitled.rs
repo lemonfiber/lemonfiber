@@ -116,7 +116,7 @@ pub fn may(caller: &Caller, door: Door, command: Command) -> Permitted {
 pub const fn callable_by_a_key(command: &Command) -> bool {
     matches!(
         command,
-        Command::Restart { .. }
+        Command::Restart(_)
             | Command::Doctor(Diagnosing { accept: None, .. })
             | Command::Update(_)
             | Command::Downloads { .. }

@@ -21,6 +21,7 @@
 
 use lemonfiber_core::app::restore::Kept;
 use lemonfiber_core::app::support::Destination;
+use lemonfiber_core::app::Restarting;
 use lemonfiber_core::app::{
     Command, Diagnosing, Gathering, Hostable, Keeping, LettingGo, Removing, Restoring, Setting,
     Teardown, Waiting, HOSTABLE,
@@ -338,11 +339,11 @@ pub(crate) fn carried(action: &str, given: Arguments) -> Result<Command, Refused
         "down" if services.is_empty() => Ok(Command::Down(Teardown { forms, wait })),
         "down" => Ok(Command::Halt { forms, services }),
         "switch" => Ok(Command::Switch { forms }),
-        "restart" => Ok(Command::Restart {
+        "restart" => Ok(Command::Restart(Restarting {
             forms,
             services,
             offer,
-        }),
+        })),
         "pull" => Ok(Command::Pull { forms }),
         "config-set" => setting(key, value, confirm, wait),
         "seed" => Ok(Command::Seed),

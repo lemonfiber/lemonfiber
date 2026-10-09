@@ -95,7 +95,7 @@ pub mod watch;
 pub use command::{
     AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
     Diagnosing, Filling, Gathering, Hostable, Inviting, Keeping, LettingGo, Linking, MigrateAction,
-    QualityAction, Removing, Restoring, Setting, Teardown, Tracing, Whom, HOSTABLE,
+    QualityAction, Removing, Restarting, Restoring, Setting, Teardown, Tracing, Whom, HOSTABLE,
 };
 pub(crate) mod outcome;
 pub use answering::answered_under;
@@ -418,7 +418,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Down(Teardown { forms, wait }) => down(ctx, &forms, wait).await,
         Command::Halt { forms, services } => lifecycle(ctx, &forms, Action::Stop(services)).await,
         Command::Switch { forms } => engine::switch(ctx, &forms).await.map(Outcome::Lifecycle),
-        restart @ Command::Restart { .. } => engine::restarted(ctx, restart).await,
+        Command::Restart(restart) => engine::restarted(ctx, restart).await,
         Command::Pull { forms } => lifecycle(ctx, &forms, Action::Pull(Vec::new())).await,
         Command::ConfigGet { key } => configuring::get(ctx, Some(&key)).await.map(Outcome::Config),
         Command::ConfigSet(change) => configuring::set(ctx, change).await.map(Outcome::Config),

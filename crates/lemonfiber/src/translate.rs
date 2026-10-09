@@ -33,6 +33,7 @@ use lemonfiber::cli::{
     RawCompanion, RawCredentials, RawDownloads, RawKey, RawRemoval, RawRemoving, RawRestart,
     UpdateCommand, WiringCommand,
 };
+use lemonfiber_core::app::Restarting;
 
 mod people;
 
@@ -251,11 +252,11 @@ pub(crate) fn sharing(asked: RawBandwidth) -> Command {
 
 /// A restart of named services, or of everything the form holds where none are named.
 pub(crate) fn restarting(asked: RawRestart) -> Command {
-    Command::Restart {
+    Command::Restart(Restarting {
         forms: vec![asked.form],
         services: asked.services,
         offer: asked.offer,
-    }
+    })
 }
 
 /// Which completed download to stop seeding, and the offer being answered.

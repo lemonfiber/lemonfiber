@@ -1,6 +1,7 @@
 //! Acting on some of a form's services rather than the whole form.
 
 use super::*;
+use lemonfiber_core::app::Restarting;
 
 /// Some of a form's services are started rather than the whole of it, which is
 /// the argument this screen had no way to name: the form is taken off the list it
@@ -73,11 +74,11 @@ fn a_restart_names_the_services_it_restarts_inside_the_form_it_was_given() {
 
     assert_eq!(
         acting.pressed(&Press::Typed('y')),
-        Wanted::Carry(Command::Restart {
+        Wanted::Carry(Command::Restart(Restarting {
             forms: vec!["full".to_owned()],
             services: vec!["sonarr".to_owned()],
             offer: None,
-        })
+        }))
     );
 }
 

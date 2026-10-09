@@ -266,7 +266,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Down(_) => reports("down", LIFECYCLE).disturbing(Situation::Stopping),
         Command::Halt { .. } => reports("stop", LIFECYCLE).disturbing(Situation::Stopping),
         Command::Switch { .. } => reports("switch", LIFECYCLE).disturbing(Situation::Switching),
-        Command::Restart { .. } => reports("restart", LIFECYCLE).disturbing(Situation::Restarting),
+        Command::Restart(_) => reports("restart", LIFECYCLE).disturbing(Situation::Restarting),
         Command::Pull { .. } => reports("pull", LIFECYCLE),
         Command::ConfigSet(_) => reports("config set", &[kind::CONFIG]),
         // Everything it changes is settled before anything is touched: the manifest

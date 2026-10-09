@@ -1,6 +1,7 @@
 //! A sample of every command, grouped by what it acts on.
 
 use super::a_plugin_source;
+use lemonfiber_core::app::Restarting;
 use lemonfiber_core::app::{
     plugins, AlertAction, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision, Diagnosing,
     Filling, Gathering, Inviting, Keeping, LettingGo, Linking, MigrateAction, QualityAction,
@@ -65,11 +66,11 @@ fn over_the_stack() -> Vec<(&'static str, Command)> {
         ),
         (
             "restart",
-            Command::Restart {
+            Command::Restart(Restarting {
                 forms: Vec::new(),
                 services: Vec::new(),
                 offer: None,
-            },
+            }),
         ),
         ("pull", Command::Pull { forms: Vec::new() }),
         ("ps", Command::Status { forms: Vec::new() }),

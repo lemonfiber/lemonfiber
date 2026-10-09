@@ -2,6 +2,7 @@ use lemonfiber_core::app::{Command, Diagnosing, Whom};
 
 use super::{callable_by_a_key, may, Door, Permitted};
 use crate::admission::Caller;
+use lemonfiber_core::app::Restarting;
 
 /// The member asking, by the id the media server files them under.
 const ASKING: &str = "a7f3";
@@ -191,11 +192,11 @@ fn key(scope: lemonfiber_core::keys::Scope) -> Caller {
 
 /// A restart, which a key may call.
 fn a_restart() -> Command {
-    Command::Restart {
+    Command::Restart(Restarting {
         forms: vec!["tv".to_owned()],
         services: Vec::new(),
         offer: None,
-    }
+    })
 }
 
 /// An uninstall, which no key may ever call.

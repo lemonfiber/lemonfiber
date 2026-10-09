@@ -1,6 +1,7 @@
 //! Choosing an action: the key, the forms marked, and the question asked.
 
 use super::*;
+use lemonfiber_core::app::Restarting;
 use lemonfiber_core::app::Teardown;
 
 /// The whole flow, which is the claim this screen exists to make: a key, a
@@ -16,11 +17,11 @@ fn an_action_takes_a_key_a_choice_and_an_answer_before_it_reaches_a_command() {
 
     assert_eq!(
         carried,
-        Wanted::Carry(Command::Restart {
+        Wanted::Carry(Command::Restart(Restarting {
             forms: vec!["full".to_owned()],
             services: Vec::new(),
             offer: None,
-        })
+        }))
     );
 }
 
@@ -42,11 +43,11 @@ fn moving_over_the_list_and_typing_at_it_take_nothing() {
 
     assert_eq!(
         carried,
-        Wanted::Carry(Command::Restart {
+        Wanted::Carry(Command::Restart(Restarting {
             forms: vec!["full".to_owned()],
             services: Vec::new(),
             offer: None,
-        })
+        }))
     );
 }
 
@@ -99,11 +100,11 @@ fn marking_several_forms_acts_on_every_one_of_them() {
     assert!(asked.contains("Lean stack"), "{asked}");
     assert_eq!(
         carried,
-        Wanted::Carry(Command::Restart {
+        Wanted::Carry(Command::Restart(Restarting {
             forms: vec!["full".to_owned(), "lean".to_owned()],
             services: Vec::new(),
             offer: None,
-        })
+        }))
     );
 }
 
@@ -123,11 +124,11 @@ fn taking_every_mark_off_again_leaves_the_row_under_the_cursor() {
     assert!(listed.contains("enter takes this one"), "{listed}");
     assert_eq!(
         carried,
-        Wanted::Carry(Command::Restart {
+        Wanted::Carry(Command::Restart(Restarting {
             forms: vec!["full".to_owned()],
             services: Vec::new(),
             offer: None,
-        })
+        }))
     );
 }
 
@@ -207,11 +208,11 @@ fn what_was_selected_is_what_is_acted_on() {
 
     assert_eq!(
         carried,
-        Wanted::Carry(Command::Restart {
+        Wanted::Carry(Command::Restart(Restarting {
             forms: vec!["lean".to_owned()],
             services: Vec::new(),
             offer: None,
-        })
+        }))
     );
 }
 

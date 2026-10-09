@@ -10,6 +10,7 @@ use crate::app::command::{
 use crate::app::engine::Waiting;
 use crate::app::plugins;
 use crate::app::setup::SetupAction;
+use crate::app::Restarting;
 use crate::app::{repair, restore, update};
 use crate::app::{
     Command, Diagnosing, Gathering, Inviting, LettingGo, Restoring, Teardown, Tracing,
@@ -324,11 +325,11 @@ fn always_reported() -> Vec<Command> {
         Command::Switch {
             forms: vec!["library".to_owned()],
         },
-        Command::Restart {
+        Command::Restart(Restarting {
             forms: Vec::new(),
             services: Vec::new(),
             offer: None,
-        },
+        }),
         Command::Pull { forms: Vec::new() },
         Command::ConfigSet(Setting::to("DATA_ROOT", "/srv/library").agreed(true)),
         Command::Quality(QualityAction::Set {

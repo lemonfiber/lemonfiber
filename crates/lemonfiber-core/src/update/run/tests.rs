@@ -167,3 +167,21 @@ async fn an_update_answering_an_offer_that_moved_is_refused() {
         Some(crate::error::codes::update::UPDATE_MOVED)
     );
 }
+
+/// One step named differently is a different offer, and the same steps are the same one.
+#[test]
+fn an_offer_names_every_step_it_was_made_over() {
+    let step = |target: &str| crate::update::Change {
+        service: "sonarr".to_owned(),
+        current: "4.0.1".to_owned(),
+        target: target.to_owned(),
+        jump: crate::migration::version::Jump::Patch,
+        irreversible: false,
+        refused: false,
+        because: String::new(),
+    };
+    let offer = super::offered(&[step("4.0.2")]);
+    assert_eq!(offer, super::offered(&[step("4.0.2")]));
+    assert_ne!(offer, super::offered(&[step("4.0.3")]));
+    assert_ne!(offer, super::offered(&[]));
+}

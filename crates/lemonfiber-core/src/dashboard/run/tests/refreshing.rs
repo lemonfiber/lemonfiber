@@ -316,3 +316,16 @@ fn each_download_client_says_whether_it_is_paused_or_that_it_could_not_be_asked(
         Panel::Unavailable { reason } if reason == "the stack could not be read"
     ));
 }
+
+/// A stack with no directory of its own has no configuration volume to measure, and
+/// says so rather than reading the data volume twice.
+#[tokio::test]
+async fn no_stack_directory_leaves_the_configuration_volume_unknown() {
+    let ctx = a_context().build();
+    let due = super::super::Due(std::collections::BTreeSet::from([
+        super::super::Paced::FreeSpace,
+    ]));
+    let (_, kept, _) =
+        super::super::volume(&ctx, Some(std::path::Path::new("/")), None, &due).await;
+    assert!(matches!(kept, super::super::Asked::Read(Reading::Unknown)));
+}

@@ -107,16 +107,7 @@ pub enum Command {
         forms: Vec<String>,
     },
     /// Restart services without touching the rest.
-    Restart {
-        /// The forms holding those services.
-        forms: Vec<String>,
-        /// The services to restart; empty restarts the whole form.
-        services: Vec<String>,
-        /// The offer a rehearsal answered, where the restart carries one back: refused
-        /// where the services it would restart are no longer those. None acts as
-        /// without one.
-        offer: Option<String>,
-    },
+    Restart(Restarting),
     /// Fetch newer images without applying them.
     Pull {
         /// The forms whose images to fetch.
@@ -519,4 +510,17 @@ pub enum Command {
     /// a conversation must still be able to have one — and the answers gathered so far live in the
     /// resumable progress file between them, which is where a terminal run keeps them too.
     Setup(SetupAction),
+}
+
+/// What a restart was asked to restart, and the offer it answers where it carries one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Restarting {
+    /// The forms holding those services.
+    pub forms: Vec<String>,
+    /// The services to restart; empty restarts the whole form.
+    pub services: Vec<String>,
+    /// The offer a rehearsal answered, where the restart carries one back: refused
+    /// where the services it would restart are no longer those. None acts as without
+    /// one.
+    pub offer: Option<String>,
 }
