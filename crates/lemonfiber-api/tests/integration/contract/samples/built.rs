@@ -217,6 +217,7 @@ pub(super) fn what_is_installed() -> lemonfiber_core::plugin::Installs {
             listens: None,
             media_types: Vec::new(),
             networks: Vec::new(),
+            speaks: Vec::new(),
         }],
         provides: Vec::new(),
         contributions: Vec::new(),

@@ -13,6 +13,11 @@
       "const": "document"
     },
     {
+      "description": "The key lemonfiber asks one of the plugin's adapters with, minted as it is\nwritten and never shown.",
+      "type": "string",
+      "const": "key"
+    },
+    {
       "description": "A region written into one of the stack's own files, marked out as the plugin's:\nits route through the proxy, or its entry on the dashboard.",
       "type": "string",
       "const": "region"

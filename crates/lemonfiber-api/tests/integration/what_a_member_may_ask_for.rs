@@ -17,22 +17,29 @@ use crate::door;
 use door::*;
 
 /// The id the media server files the member under, and the account they sign in to.
-const MEMBER: &str = "a7f3";
+pub(crate) const MEMBER: &str = "a7f3";
 
 /// The name that member signs in with. The password beside it is built rather than
 /// written, in `door`, for the reason every other one here is.
-const WHO: &str = "ana";
+pub(crate) const WHO: &str = "ana";
 
 /// A surface with a household in it, and the headers a member's own session travels
 /// on.
-async fn as_a_member(named: &str) -> (axum::Router, Vec<(&'static str, String)>) {
+pub(crate) async fn as_a_member(named: &str) -> (axum::Router, Vec<(&'static str, String)>) {
     let (router, _, _) = door_with(
         Some(keeping(named)),
         AHousehold::knowing(MEMBER),
         not_the_token(),
     );
+    let mut carried = from_here();
+    carried.push((TOKEN_HEADER, signed_in(router.clone()).await));
+    (router, carried)
+}
+
+/// The session a member is handed once they signed in at `router`.
+pub(crate) async fn signed_in(router: axum::Router) -> String {
     let answer = asked(
-        router.clone(),
+        router,
         "POST",
         SESSION,
         &from_here(),
@@ -47,9 +54,7 @@ async fn as_a_member(named: &str) -> (axum::Router, Vec<(&'static str, String)>)
 
     let opened = session(&answer.body);
     assert!(!opened.is_empty(), "no session was handed out");
-    let mut carried = from_here();
-    carried.push((TOKEN_HEADER, opened));
-    (router, carried)
+    opened
 }
 
 /// The same surface, carrying the token printed at the machine instead.

@@ -1,4 +1,6 @@
-use super::{Method, Request, Response, Unreachable};
+use async_trait::async_trait;
+
+use super::{Fetched, Http, Method, Request, Response, Unreachable};
 
 /// An answer with nothing said about how it was served.
 fn answered(status: u16) -> Response {
@@ -75,4 +77,61 @@ fn a_request_is_plain_data() {
     };
     assert_eq!(request.clone(), request);
     assert_eq!(request.method, Method::Post);
+}
+
+/// A transport that answers every request with a short JPEG-typed body.
+struct Answering;
+
+#[async_trait]
+impl Http for Answering {
+    async fn send(&self, _request: &Request) -> Result<Response, Unreachable> {
+        Ok(Response {
+            status: 200,
+            headers: vec![("Content-Type".to_owned(), "image/jpeg".to_owned())],
+            body: "four".to_owned(),
+        })
+    }
+}
+
+fn get() -> Request {
+    Request {
+        method: Method::Get,
+        url: "http://media:8096/Items/f1/Images/Primary".to_owned(),
+        headers: Vec::new(),
+        body: None,
+        pinned: None,
+    }
+}
+
+#[tokio::test]
+async fn a_fetch_holds_what_fits_and_nothing_of_what_does_not() {
+    let fetched = Answering.fetch(&get(), 4).await;
+    assert_eq!(
+        fetched,
+        Ok(Fetched {
+            status: 200,
+            headers: vec![("Content-Type".to_owned(), "image/jpeg".to_owned())],
+            bytes: Some(b"four".to_vec()),
+        })
+    );
+    let over = Answering.fetch(&get(), 3).await;
+    assert_eq!(over.map(|fetched| fetched.bytes), Ok(None));
+}
+
+#[tokio::test]
+async fn a_fetched_answer_says_its_success_and_headers_as_a_response_does() {
+    let shared: std::sync::Arc<dyn Http> = std::sync::Arc::new(Answering);
+    let fetched = shared.fetch(&get(), 4).await.ok();
+    assert_eq!(
+        fetched
+            .as_ref()
+            .map(|fetched| (fetched.is_success(), fetched.header("content-type"))),
+        Some((true, Some("image/jpeg")))
+    );
+    let refused = Fetched {
+        status: 404,
+        headers: Vec::new(),
+        bytes: None,
+    };
+    assert!(!refused.is_success() && refused.header("content-type").is_none());
 }

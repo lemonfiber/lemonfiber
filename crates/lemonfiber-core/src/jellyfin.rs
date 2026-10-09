@@ -25,10 +25,12 @@ mod library;
 mod password;
 mod proxies;
 mod screening;
+mod serving;
 mod sessions;
 mod setup;
 
-pub use keys::{Dated, DECLINE_APP, GATE_APP, SEERR_APP};
+pub use keys::SEERR_APP;
+pub(crate) use screening::pictured_at;
 pub use sessions::Sessions;
 
 /// The header Jellyfin identifies a client through on the sign-in that mints an access

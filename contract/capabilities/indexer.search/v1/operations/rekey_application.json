@@ -8,14 +8,14 @@
             "$defs": {
               "RegisteredApplication": {
                 "additionalProperties": false,
-                "description": "An application Prowlarr already holds, with the identifier it gave it.\n\nRead back so an application already registered can be told from an absent one\n— matched by the address it reaches, the `base_url`, rather than by its label,\nso a differently-named but equivalent application is not duplicated — and so a\nlater undo names exactly the one created.",
+                "description": "An application the indexer manager already holds, with the identifier it gave it.\n\nRead back so an application already registered can be told from an absent one\n— matched by the address it reaches, the `base_url`, rather than by its label,\nso a differently-named but equivalent application is not duplicated — and so a\nlater undo names exactly the one created.",
                 "properties": {
                   "base_url": {
-                    "description": "The address it reaches the \\*arr on.",
+                    "description": "The address it reaches the curator on.",
                     "type": "string"
                   },
                   "id": {
-                    "description": "The identifier Prowlarr assigned.",
+                    "description": "The identifier the indexer manager assigned.",
                     "type": "string"
                   }
                 },
@@ -89,6 +89,7 @@
       {
         "key": []
       }
-    ]
+    ],
+    "x-lemonfiber-largest": 1048576
   }
 }

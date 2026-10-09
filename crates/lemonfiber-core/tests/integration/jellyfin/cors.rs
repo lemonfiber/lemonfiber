@@ -3,6 +3,7 @@
 
 use super::{reader, SIGNED_IN};
 use lemonfiber_core::ports::http::Method;
+use lemonfiber_core::ports::service::Fronted as _;
 use lemonfiber_fixtures::http::{Answer, Fake};
 
 /// The front door's origin, as the household is handed it.
@@ -23,7 +24,7 @@ async fn the_allow_list_is_read_out_of_the_configuration() {
         Answer::reply(200, OPEN),
     ]);
 
-    let held = reader(&fake).cors_hosts().await;
+    let held = reader(&fake).allowed_origins().await;
 
     assert_eq!(held.ok(), Some(vec!["*".to_owned()]));
 }

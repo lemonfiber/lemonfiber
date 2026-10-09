@@ -81,14 +81,20 @@ pub enum KeySource {
 }
 
 impl ApiKind {
-    /// The name the manifest writes this adapter under, read from the one place it is
-    /// spelled.
+    /// The name the manifest writes this adapter under.
     #[must_use]
-    pub fn name(self) -> String {
-        serde_json::to_value(self)
-            .ok()
-            .and_then(|value| value.as_str().map(str::to_owned))
-            .unwrap_or_default()
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Servarr => "servarr",
+            Self::Sabnzbd => "sabnzbd",
+            Self::Qbittorrent => "qbittorrent",
+            Self::Seerr => "seerr",
+            Self::Bindery => "bindery",
+            Self::Jellyfin => "jellyfin",
+            Self::Bazarr => "bazarr",
+            Self::Audiobookshelf => "audiobookshelf",
+            Self::Nzbhydra2 => "nzbhydra2",
+        }
     }
 
     /// Every adapter lemonfiber implements, which is the whole of what a plugin's

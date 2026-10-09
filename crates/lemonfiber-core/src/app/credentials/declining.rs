@@ -20,8 +20,10 @@ use lemonfiber_sidecar::decline::{File, Key};
 use super::rotating::{said, unproven, would_rotate};
 use crate::app::invite::declining;
 use crate::app::Ctx;
+use crate::app_keys::DECLINE_APP;
 use crate::credential::{fingerprint, Held, Origin, Propagation, Reach, Rotation, State};
-use crate::jellyfin::{Jellyfin, DECLINE_APP};
+use crate::jellyfin::Jellyfin;
+use crate::ports::service::AppKeys as _;
 use crate::seed::run::identity;
 
 /// What the key is recorded as: where it lives inside the stack's configuration.

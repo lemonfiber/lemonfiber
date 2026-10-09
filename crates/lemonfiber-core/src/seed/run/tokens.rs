@@ -64,7 +64,7 @@ impl Kept {
             let at = through_the_gate(&route);
             let holding = held
                 .iter()
-                .find(|have| have.at == at && have.television == target.television)
+                .find(|have| have.at == at && have.kind == target.kind)
                 .map(|have| have.key.clone())
                 .filter(|key| self.accepts(&route, key));
             let Some(key) = holding.or_else(|| crate::secret::generate(ctx.seams.random.as_ref()))

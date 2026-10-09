@@ -28,7 +28,8 @@ use super::Failure;
 /// Carries the credential that reaches them, so it is never printed: [`Debug`] names the
 /// service and stops there. A line recording a delivery that included the token would be
 /// the leak the delivery itself is careful not to be.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "kebab-case")]
 pub enum Address {
     /// Pushover, by the two halves the member gave: whose devices this reaches, and the
     /// application it arrives under.

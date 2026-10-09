@@ -4,25 +4,19 @@
 //! that confirm what a service already holds.
 
 use super::{Duration, Failure};
+use crate::media::Kind;
 use async_trait::async_trait;
 
 /// The protocol a download client is reached in: the name of the API a curator speaks
 /// to it, as the download client declares it.
-///
-/// Open rather than a list, because which protocols a curator speaks is the curator's to
-/// know: one it does not speak is its refusal to give, and a new download client
-/// needs no change here to be offered to every curator that speaks its protocol.
 #[derive(
     Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
 )]
 #[serde(transparent)]
 pub struct Protocol(pub String);
 
-/// How a download client proves itself, which differs by client — a single API
-/// key for one, a username and its password for the other.
-#[derive(
-    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
-)]
+/// How a service proves itself: a single API key, or a username and its password.
+#[derive(Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Credential {
     /// A single API key.
@@ -36,12 +30,23 @@ pub enum Credential {
     },
 }
 
+impl std::fmt::Debug for Credential {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ApiKey(_) => formatter.write_str("ApiKey(..)"),
+            Self::UserPass { username, .. } => formatter
+                .debug_struct("UserPass")
+                .field("username", username)
+                .finish_non_exhaustive(),
+        }
+    }
+}
+
 /// The category a download is filed under, named after the media the requesting
 /// application manages.
 ///
-/// The field is not shared across applications — Sonarr names it `tvCategory`,
-/// Radarr `movieCategory`, Lidarr `musicCategory` — so it travels with the client
-/// rather than being assumed by the writer.
+/// Each curator names the field after the media it files, so it travels with the
+/// client rather than being assumed by the writer.
 #[derive(
     Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
 )]
@@ -131,52 +136,60 @@ pub struct QualityProfile {
     pub name: String,
 }
 
-/// Where the request service reaches an \*arr: a host, a port, and the path it answers
+/// Where the request service reaches a curator: a host, a port, and the path it answers
 /// under there.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Endpoint {
     /// The host.
     pub host: String,
     /// The port.
     pub port: u16,
-    /// The path the \*arr answers under at that host: empty where it answers at the
+    /// The path the curator answers under at that host: empty where it answers at the
     /// root, and a route of its own where something in front of it answers for
     /// several.
     pub base: String,
 }
 
-/// An \*arr the request service should hand a request to.
+/// A curator the request service hands requests of one kind to.
 ///
 /// Everything the request service needs to reach it and to file what it fetches:
-/// where it is, how to authenticate, and which profile and folder to use. The
-/// media it fulfils is intrinsic to which \*arr it is rather than a field here.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// which kind it fetches, where it is, how to authenticate, and which profile and
+/// folder to use.
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct FulfilmentTarget {
     /// The name the operator will see in the request service's own interface.
     pub name: String,
     /// Where the request service should reach it.
     pub at: Endpoint,
     /// Where the request service may hold it from before, reached another way. A
-    /// target held there is the same \*arr, and is moved here in place rather than
+    /// target held there is the same curator, and is moved here in place rather than
     /// registered a second time.
     pub moved_from: Option<Endpoint>,
     /// The key the request service authenticates with.
     pub key: String,
-    /// Whether it fetches television rather than film — which of the request
-    /// service's two target lists this belongs in.
-    pub television: bool,
+    /// The kind of video it fetches, which selects the request service's list for it.
+    pub kind: Kind,
     /// The quality profile requests are fetched at.
     pub profile: QualityProfile,
     /// Where what it fetches is filed.
     pub folder: String,
 }
 
-/// An \*arr the request service already holds, with the identifier it gave it.
+/// A curator the request service already holds, with the identifier it gave it.
 ///
 /// Read back so one already registered can be told from an absent one — matched by
 /// the endpoint it reaches rather than by its label, the way a download client is,
 /// so an operator who renamed it is not handed a duplicate.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct RegisteredTarget {
     /// The identifier the request service assigned.
     pub id: String,
@@ -184,8 +197,8 @@ pub struct RegisteredTarget {
     pub at: Endpoint,
     /// The key the request service presents there.
     pub key: String,
-    /// Whether it is the television list rather than the film one.
-    pub television: bool,
+    /// The kind of video the list it is in fetches.
+    pub kind: Kind,
 }
 
 /// Where a service should file the media it imports.
@@ -219,9 +232,8 @@ pub struct RegisteredFolder {
 /// shows — the point at which each client's own idea of progress becomes the
 /// same three figures.
 ///
-/// The protocol is not carried here: it is intrinsic to which client answered —
-/// a torrent from qBittorrent, a Usenet download from `SABnzbd` — so the gatherer
-/// sets it from the target it asked rather than trusting each client to name it.
+/// The protocol is not carried here: the gatherer sets it from the client it asked
+/// rather than trusting each client to name it.
 #[derive(
     Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
 )]

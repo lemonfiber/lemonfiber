@@ -55,11 +55,11 @@ pub(super) enum Connection {
     /// The filler, registered in the indexer as an application of this kind, so the
     /// indexer pushes it what it searches.
     Application(ApplicationKind),
-    /// The filler, handed the requests the request service accepts for television where
-    /// this is true and for film where it is not.
+    /// The filler, handed the requests the request service accepts for the kind of video
+    /// it fetches.
     Fulfilment {
-        /// Whether it fetches television rather than film.
-        television: bool,
+        /// The kind of video it fetches.
+        kind: Kind,
     },
     /// The filler, watched by the subtitle finder as this kind.
     Subtitles(Kind),
@@ -142,19 +142,16 @@ fn connection(
 ) -> Result<Connection, Unmade> {
     match (asker, capability, filler) {
         (ApiKind::Servarr, USENET, ApiKind::Sabnzbd)
-        | (ApiKind::Servarr, TORRENT, ApiKind::Qbittorrent) => {
-            Ok(Connection::DownloadClient(Protocol(filler.name())))
-        }
+        | (ApiKind::Servarr, TORRENT, ApiKind::Qbittorrent) => Ok(Connection::DownloadClient(
+            Protocol(filler.name().to_owned()),
+        )),
         (ApiKind::Servarr, CURATES, ApiKind::Servarr) => {
             super::applications::application_kind(media)
                 .map(Connection::Application)
                 .ok_or(Unmade::Files)
         }
-        // Lidarr and Bindery file media the request service does not deal in at all.
         (ApiKind::Seerr, CURATES, ApiKind::Servarr) => Kind::of_declared(media)
-            .map(|kind| Connection::Fulfilment {
-                television: kind == Kind::Tv,
-            })
+            .map(|kind| Connection::Fulfilment { kind })
             .ok_or(Unmade::Files),
         (ApiKind::Bazarr, CURATES, ApiKind::Servarr) => Kind::of_declared(media)
             .map(Connection::Subtitles)

@@ -87,6 +87,14 @@
       "description": "The service's id, which is the name its container is written under.",
       "type": "string"
     },
+    "speaks": {
+      "description": "Each capability contract it answers as an adapter, as `capability@major`; none in\na record written before this was kept.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string"
+      }
+    },
     "tag": {
       "description": "The readable name that digest went by when it was installed.",
       "type": "string"

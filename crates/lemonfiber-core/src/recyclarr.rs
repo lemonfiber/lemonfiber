@@ -24,8 +24,6 @@
 
 pub use lemonfiber_ports::media::Kind;
 
-use crate::servarr::Shape as _;
-
 use crate::quality::{Preset, Selection};
 
 /// The file a preset's guidance is shipped in, as `recyclarr.yml` names it.
@@ -96,6 +94,20 @@ fn without_comment(line: &str) -> &str {
     }
 }
 
+/// The top-level section the curator of `kind` is configured under.
+pub(crate) const fn section(kind: Kind) -> &'static str {
+    match kind {
+        Kind::Tv => "sonarr",
+        Kind::Movies => "radarr",
+    }
+}
+
+/// The kind whose section a top-level key names, or `None` for any other key, so an
+/// operator's own additions are left alone.
+fn of_section(key: &str) -> Option<Kind> {
+    Kind::ALL.into_iter().find(|kind| section(*kind) == key)
+}
+
 /// The section a top-level key names — the bare key, with its colon and any inline
 /// comment stripped.
 fn section_key(line: &str) -> &str {
@@ -148,7 +160,7 @@ pub fn rewrite(config: &str, selection: &Selection) -> String {
 
     while let Some(line) = lines.next() {
         if top_level_key(line) {
-            section = Kind::for_section(section_key(line));
+            section = of_section(section_key(line));
             push_line(&mut out, line);
             continue;
         }

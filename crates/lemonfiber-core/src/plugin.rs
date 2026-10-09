@@ -85,7 +85,7 @@ pub use installed::{answering, spelled_alike, Installed, Placed, Reached};
 pub use joining::Joins;
 pub use owning::{owner, owns};
 pub(crate) use placing::OVERLAYS;
-pub use placing::{documents, overlay, writes, Lands, Write};
+pub use placing::{documents, key_file, overlay, writes, Lands, Write};
 pub use provenance::{held, vouched, Key, Provenance, Unusable, Vouch, Vouched};
 pub use recipes::{approval, approvals, Adapter, Named, Owner, Pair, Recipe, Step};
 pub use recorded::{Answer, Asked, Recording};

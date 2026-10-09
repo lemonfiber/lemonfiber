@@ -118,7 +118,7 @@ fn serving(lists: &[&[&str]], minted: u16, revoked: u16, proved: u16, holding: &
     let listed = |keys: &[&str]| {
         let items: Vec<serde_json::Value> = keys
             .iter()
-            .map(|key| serde_json::json!({ "AppName": crate::jellyfin::DECLINE_APP, "AccessToken": key }))
+            .map(|key| serde_json::json!({ "AppName": crate::app_keys::DECLINE_APP, "AccessToken": key }))
             .collect();
         Answer::reply(200, serde_json::json!({ "Items": items }).to_string())
     };

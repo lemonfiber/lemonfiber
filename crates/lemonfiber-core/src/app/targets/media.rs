@@ -13,6 +13,7 @@ use lemonfiber_manifest::{ApiKind, Manifest};
 use crate::app::Ctx;
 use crate::jellyfin::Jellyfin;
 use crate::origin::Origin;
+use crate::ports::service::Protocol;
 use crate::wiring::{Address, Filler, Fillers};
 
 use super::downloads::host_fillers;
@@ -29,6 +30,8 @@ pub(crate) const IDENTITY: &str = "identity.source";
 pub(crate) struct MediaServer {
     /// The service, as the lookup resolved it.
     pub filler: Filler,
+    /// The adapter it is spoken to through.
+    pub adapter: ApiKind,
     /// The service that asks for it, which is the request service — nothing where that
     /// is a service its administrator's password may not be handed to.
     pub asked_by: Option<Filler>,
@@ -43,6 +46,11 @@ pub(crate) struct MediaServer {
 }
 
 impl MediaServer {
+    /// The protocol it is spoken to in: the adapter its service names.
+    pub(crate) fn protocol(&self) -> Protocol {
+        Protocol(self.adapter.name().to_owned())
+    }
+
     /// Whatever fills the identity source, where one service alone does, it speaks the
     /// media server's adapter, the host and the stack's network can each reach it, and
     /// a setting can be kept for its administrator.
@@ -66,7 +74,8 @@ impl MediaServer {
             }
             None => (serving_unasked(fillers)?, None),
         };
-        if !filler.speaks(ApiKind::Jellyfin) {
+        let adapter = ApiKind::Jellyfin;
+        if !filler.speaks(adapter) {
             return None;
         }
         let port = filler.published?;
@@ -81,6 +90,7 @@ impl MediaServer {
             network: filler.address.clone()?,
             setting: fillers.setting(filler, crate::config::ADMIN_PASSWORD_SUFFIX)?,
             filler: filler.clone(),
+            adapter,
         })
     }
 

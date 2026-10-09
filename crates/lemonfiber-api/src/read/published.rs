@@ -13,7 +13,9 @@ use lemonfiber_core::app::answered_under;
 use lemonfiber_core::model::kind::Kind;
 
 use super::logs;
-use super::table::{self, taken, Wanted, BUNDLE, LOGS, OFFERED, REPEATABLE, THIS_BINARY};
+use super::table::{
+    self, taken, Wanted, BACKDROP, BUNDLE, LOGS, OFFERED, POSTER, REPEATABLE, THIS_BINARY,
+};
 
 /// One read, as the contract lists it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -56,14 +58,17 @@ pub fn every() -> Vec<Read> {
                 })
                 .collect(),
             kinds: answering(path).iter().map(|kind| kind.as_str()).collect(),
-            file: *path == BUNDLE,
+            file: FILES.contains(path),
         })
         .collect()
 }
 
 /// The reads served beside the table's own, by the modules that answer them: the logs,
-/// which open a stream, and the bundle, which is a file.
-pub(crate) const BESIDE: &[&str] = &[LOGS, BUNDLE];
+/// which open a stream, and the bundle and a title's pictures, which are files.
+pub(crate) const BESIDE: &[&str] = &[LOGS, BUNDLE, POSTER, BACKDROP];
+
+/// The reads that answer with a file rather than an envelope.
+const FILES: [&str; 3] = [BUNDLE, POSTER, BACKDROP];
 
 /// Every kind a read answers under, by name.
 ///

@@ -1,6 +1,6 @@
+use lemonfiber_core::model::{Episode, Located, Pinned, Season};
 use lemonfiber_core::model::{GrantReport, Held, Medium, PartWay, PartWayReport, TitleReport};
 use lemonfiber_core::model::{Title, WatchedReport};
-use lemonfiber_core::ports::service::{Episode, Holds, Located, Pinned, Season};
 
 use super::{clock, grant, part_way, title, watched};
 
@@ -11,7 +11,6 @@ fn held(at: Located) -> Held {
         year: Some(1995),
         medium: Medium::Film,
         at,
-        holds: Holds::default(),
     }
 }
 

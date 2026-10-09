@@ -1,0 +1,171 @@
+{
+  "post": {
+    "operationId": "holdings",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "member": {
+                "description": "The port's `member`.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "most": {
+                "description": "The port's `most`.",
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "most"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$defs": {
+                "Holds": {
+                  "additionalProperties": false,
+                  "description": "What the media server holds for one item: its pictures, and whether it streams.",
+                  "properties": {
+                    "backdrop": {
+                      "description": "Whether it has a backdrop.",
+                      "type": "boolean"
+                    },
+                    "plays": {
+                      "description": "Whether it is something that plays, rather than something that holds what plays.",
+                      "type": "boolean"
+                    },
+                    "poster": {
+                      "description": "Whether it has a poster.",
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "poster",
+                    "backdrop",
+                    "plays"
+                  ],
+                  "type": "object"
+                },
+                "Item": {
+                  "additionalProperties": false,
+                  "description": "One thing the household holds, as the server holds it.",
+                  "properties": {
+                    "holds": {
+                      "$ref": "#/$defs/Holds",
+                      "description": "What the server holds for it."
+                    },
+                    "id": {
+                      "description": "The identifier the server tells it apart by.",
+                      "type": "string"
+                    },
+                    "medium": {
+                      "$ref": "#/$defs/Medium",
+                      "description": "Which of the kinds this product deals in it is."
+                    },
+                    "title": {
+                      "description": "What it is called, in the words the server holds it under.",
+                      "type": "string"
+                    },
+                    "year": {
+                      "description": "The year it came out, where the server knows one.",
+                      "format": "uint16",
+                      "maximum": 65535,
+                      "minimum": 0,
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "medium",
+                    "holds"
+                  ],
+                  "type": "object"
+                },
+                "Medium": {
+                  "description": "The kinds of thing a household holds.\n\nNamed rather than passed through as the server's own word, because a surface\ndrawing \"Series\" against one server and \"tvshow\" against another would be\nrendering a detail of which server this household runs.\n\n`Medium` rather than `Kind`, `Holding` or `Sort`: this product already calls the two\nrequest services a [`crate::media::Kind`], a request's suspension a\n[`crate::service::asking::Holding`], and what one line of a manifest is a\n`uninstall::Sort` — and one word meaning two things in one vocabulary is how a\nreader comes to trust the wrong one. The contract flattens every type name into one\nnamespace, so a clash there is a clash for anything reading it by name.",
+                  "oneOf": [
+                    {
+                      "const": "film",
+                      "description": "One film.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "series",
+                      "description": "A television series, rather than one episode of one.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "episode",
+                      "description": "One episode of a series.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "other",
+                      "description": "Something the server holds that is neither, and is not hidden for that.",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "items": {
+                "$ref": "#/$defs/Item"
+              },
+              "title": "Array_of_Item",
+              "type": "array"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ],
+    "x-lemonfiber-largest": 1048576
+  }
+}

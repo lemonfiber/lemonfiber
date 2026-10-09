@@ -7,7 +7,7 @@ use lemonfiber_sidecar::decline::{Lapse, Lapses, Outcome, Refusal, Refusals, Tok
 use super::{Decline, DeclineKeyCheck, KeyDates, MARGIN, UNEXPLAINED};
 use crate::config::store;
 use crate::doctor::{Check, Verdict};
-use crate::jellyfin::Dated;
+use crate::ports::service::Dated;
 
 /// 2026-10-05T00:00:00Z, in seconds since the Unix epoch.
 const MIDNIGHT: u64 = 1_791_158_400;

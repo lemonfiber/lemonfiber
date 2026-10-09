@@ -22,7 +22,8 @@ use super::Ctx;
 use crate::baseline::Baseline;
 use crate::credential::{Reach, Settled};
 use crate::jellyfin::{Jellyfin, SEERR_APP};
-use crate::ports::service::{RegisteredTarget, Requests};
+use crate::ports::media::Kind;
+use crate::ports::service::{AppKeys as _, RegisteredTarget, Requests};
 use crate::seed::{State, Wiring};
 use crate::wiring::Fillers;
 
@@ -194,7 +195,7 @@ async fn still_direct(
     let held = seerr.fulfilment_targets().await?;
     for fulfils in fulfilling(fillers) {
         let host = &fulfils.at.host;
-        if !gated_target(seerr, &held, &kept, host, fulfils.television).await {
+        if !gated_target(seerr, &held, &kept, host, fulfils.kind).await {
             direct.push(fulfils.filler.name.clone());
         }
     }
@@ -208,18 +209,15 @@ async fn gated_target(
     held: &[RegisteredTarget],
     kept: &Kept,
     host: &str,
-    television: bool,
+    kind: Kind,
 ) -> bool {
     let at = through_the_gate(host);
-    let Some(one) = held
-        .iter()
-        .find(|one| one.at == at && one.television == television)
-    else {
+    let Some(one) = held.iter().find(|one| one.at == at && one.kind == kind) else {
         return false;
     };
     kept.accepts(host, &one.key)
         && seerr
-            .test_fulfilment_target(television, &one.at, &one.key)
+            .test_fulfilment_target(kind, &one.at, &one.key)
             .await
             .is_ok()
 }

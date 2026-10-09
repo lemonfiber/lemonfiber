@@ -1,0 +1,163 @@
+{
+  "post": {
+    "operationId": "playing",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "member": {
+                "description": "The port's `member`.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$defs": {
+                "Medium": {
+                  "description": "The kinds of thing a household holds.\n\nNamed rather than passed through as the server's own word, because a surface\ndrawing \"Series\" against one server and \"tvshow\" against another would be\nrendering a detail of which server this household runs.\n\n`Medium` rather than `Kind`, `Holding` or `Sort`: this product already calls the two\nrequest services a [`crate::media::Kind`], a request's suspension a\n[`crate::service::asking::Holding`], and what one line of a manifest is a\n`uninstall::Sort` — and one word meaning two things in one vocabulary is how a\nreader comes to trust the wrong one. The contract flattens every type name into one\nnamespace, so a clash there is a clash for anything reading it by name.",
+                  "oneOf": [
+                    {
+                      "const": "film",
+                      "description": "One film.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "series",
+                      "description": "A television series, rather than one episode of one.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "episode",
+                      "description": "One episode of a series.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "other",
+                      "description": "Something the server holds that is neither, and is not hidden for that.",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "Playback": {
+                  "additionalProperties": false,
+                  "description": "Somebody watching something now, as the media server lists the session.\n\nWho and what, and where: what a household recognises about somebody watching. No\nstream, no bitrate and no transcode reason, because a member is not choosing one and\na surface handed those would have to decide not to draw them.",
+                  "properties": {
+                    "device": {
+                      "description": "What the device it plays on calls itself.",
+                      "type": "string"
+                    },
+                    "episode": {
+                      "description": "The episode's number within its season, where the server numbers one.",
+                      "format": "uint32",
+                      "minimum": 0,
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "medium": {
+                      "$ref": "#/$defs/Medium",
+                      "description": "Which of the kinds this product deals in it is. An episode is of a series."
+                    },
+                    "member": {
+                      "description": "The name the account is known by.",
+                      "type": "string"
+                    },
+                    "member_id": {
+                      "description": "The identifier the server files the account under.",
+                      "type": "string"
+                    },
+                    "paused": {
+                      "description": "Whether it is paused rather than playing.",
+                      "type": "boolean"
+                    },
+                    "season": {
+                      "description": "The season an episode is in, where the server numbers one.",
+                      "format": "uint32",
+                      "minimum": 0,
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "series": {
+                      "description": "The series an episode belongs to, where it is one.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "title": {
+                      "description": "What is playing, in the words the server holds it under: an episode's own name\nwhere it is an episode.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "member_id",
+                    "member",
+                    "title",
+                    "medium",
+                    "paused",
+                    "device"
+                  ],
+                  "type": "object"
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "items": {
+                "$ref": "#/$defs/Playback"
+              },
+              "title": "Array_of_Playback",
+              "type": "array"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ],
+    "x-lemonfiber-largest": 1048576
+  }
+}

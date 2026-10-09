@@ -1,8 +1,8 @@
-use crate::servarr::Shape as _;
 use std::collections::BTreeSet;
 
-use super::{guidance, rewrite, Kind};
+use super::{guidance, of_section, rewrite, section, Kind};
 use crate::quality::{Preset, Selection};
+use crate::servarr::Shape as _;
 
 /// The `recyclarr.yml` that ships in the stack — its defaults are the Balanced
 /// templates, which makes it the fixture the rewriter is checked against.
@@ -24,7 +24,7 @@ fn every_preset_names_an_include_the_stack_ships_for_that_service() {
             let path = guidance(kind, preset).path();
             let file = path.rsplit('/').next().unwrap_or_default();
             assert!(
-                file.starts_with(kind.section()),
+                file.starts_with(section(kind)),
                 "{path} is not a {kind:?} include"
             );
             let shipped = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -59,14 +59,14 @@ fn each_service_names_its_own_cutoff_unmet_upgrade_command() {
     // The upgrade action re-searches existing content; the command is named per
     // service, and a compose id round-trips to the right one.
     assert_eq!(
-        Kind::for_section("sonarr").map(Kind::upgrade_command),
+        of_section("sonarr").map(Kind::upgrade_command),
         Some("CutoffUnmetEpisodeSearch")
     );
     assert_eq!(
-        Kind::for_section("radarr").map(Kind::upgrade_command),
+        of_section("radarr").map(Kind::upgrade_command),
         Some("CutoffUnmetMoviesSearch")
     );
-    assert_eq!(Kind::for_section("prowlarr"), None);
+    assert_eq!(of_section("prowlarr"), None);
 }
 
 #[test]
@@ -144,7 +144,7 @@ fn every_preset_leaves_each_service_with_templates() {
         let config = rewrite(SHIPPED, &Selection::everywhere(preset));
         for kind in Kind::ALL {
             let included = config.lines().filter(|line| {
-                line.trim().starts_with("- config:") && line.contains(kind.section())
+                line.trim().starts_with("- config:") && line.contains(section(kind))
             });
             assert_eq!(
                 included.count(),

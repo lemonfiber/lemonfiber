@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use lemonfiber_fixtures::scratch::Scratch;
 use lemonfiber_ports::filesystem::{Beneath, Confined, READ_LIMIT};
@@ -7,9 +8,14 @@ use super::super::Disk;
 use super::landed;
 
 /// A container's own directory holding one plain file, and a file of the operator's
-/// beside it that nothing written into the directory may reach.
+/// beside it that nothing written into the directory may reach. Each of its own, by a
+/// counter, so tests running side by side never share one.
 fn owned() -> (Scratch, PathBuf, PathBuf) {
-    let dir = Scratch::new("confined");
+    static NEXT: AtomicUsize = AtomicUsize::new(0);
+    let dir = Scratch::new(&format!(
+        "confined-{}",
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
     let owned = dir.join("config").join("stand-in");
     let _ = std::fs::create_dir_all(&owned);
     let _ = std::fs::write(owned.join("kept.yml"), "theirs");

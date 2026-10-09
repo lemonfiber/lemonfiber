@@ -12,6 +12,7 @@
 
 use super::Ctx;
 use crate::app::targets::MediaServer;
+use crate::ports::service::Fronted as _;
 use crate::seed::{State, Wiring};
 
 /// What the report calls this connection.
@@ -72,7 +73,7 @@ pub(super) async fn seed_cors(
         ));
     };
     let client = server.signed_in(ctx, password);
-    let state = match client.cors_hosts().await {
+    let state = match client.allowed_origins().await {
         Err(failure) => crate::seed::unreached(&failure),
         Ok(held) if held == [origin.as_str()] => State::AlreadyWired,
         Ok(held) if ctx.dry_run => State::WouldWire {

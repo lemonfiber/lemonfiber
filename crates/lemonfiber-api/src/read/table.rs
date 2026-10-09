@@ -102,6 +102,12 @@ pub const PLAYING: &str = "/api/playing";
 /// query; held to every rule the other reads are.
 pub const TITLE: &str = "/api/held/{id}";
 
+/// A title's poster, as the member whose shelf holds it may see it.
+pub const POSTER: &str = "/api/held/{id}/poster";
+
+/// A title's backdrop, as the member whose shelf holds it may see it.
+pub const BACKDROP: &str = "/api/held/{id}/backdrop";
+
 /// What a member was part-way through, and how far, most recent first.
 pub const WATCHING: &str = "/api/watching";
 

@@ -1,13 +1,11 @@
 //! `subtitles.fetch` across its contract: one script run against a subtitle finder in
 //! process and through the contract, which must answer alike and be told alike.
 
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use lemonfiber_ports::media::Kind;
 use lemonfiber_ports::service::{Failure, Subtitles, Watched, Watching};
 
-use super::{contracted, fetch, Served, Upstream};
+use super::{crosses_alike, fetch, Upstream};
 
 #[async_trait]
 impl Subtitles for Upstream {
@@ -42,12 +40,5 @@ async fn script<S: Subtitles>(finder: &S) -> Vec<String> {
 
 #[tokio::test]
 async fn a_subtitle_finder_answers_and_is_told_through_its_contract_as_it_is_in_process() {
-    let in_process = Upstream::default();
-    let local = script(&in_process).await;
-    let served = Served::default();
-    let reached = Arc::clone(&served.upstream);
-    let crossed = script(&fetch::Adapter(contracted(served))).await;
-    assert_eq!(crossed, local);
-    assert_eq!(reached.told(), in_process.told());
-    assert_eq!(in_process.told().len(), 1);
+    crosses_alike!(script, fetch::Adapter, ["watch"]);
 }

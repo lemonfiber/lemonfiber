@@ -169,7 +169,7 @@ async fn identity_mints_records_and_wires_a_fresh_household() {
         records
             .entry("seerr", crate::seed::TELLING)
             .map(|record| record.value.as_str()),
-        Some(crate::seed::said(crate::seed::wanted_telling()).as_str()),
+        Some(crate::seed::said(&crate::seed::wanted_telling()).as_str()),
         "what was written down is not what was written to the service"
     );
     let written = std::fs::read_to_string(&env).unwrap_or_default();
@@ -396,7 +396,7 @@ async fn a_telling_the_operator_switched_off_is_reported_rather_than_overruled()
     baseline.record(
         "seerr",
         crate::seed::TELLING,
-        &crate::seed::said(crate::seed::wanted_telling()),
+        &crate::seed::said(&crate::seed::wanted_telling()),
         "2026-08-28T00:00:00Z",
     );
 

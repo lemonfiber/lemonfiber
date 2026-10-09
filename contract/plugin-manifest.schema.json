@@ -546,7 +546,7 @@
         "id": {"description": "Unique across the stack **and** every installed plugin.", "type": "string"},
         "image": {"description": "Registry path, without tag or digest.", "type": "string"},
         "listens": {
-          "description": "The port it answers on inside the stack's network, where lemonfiber and the\nservices that ask reach it. Required where `api` is.",
+          "description": "The port it answers on inside the stack's network, where lemonfiber and the\nservices that ask reach it. Required where `api` or `speaks` is.",
           "type": ["integer", "null"],
           "format": "uint16",
           "default": null,
@@ -570,6 +570,12 @@
         },
         "provides": {
           "description": "The capabilities this service claims.\n\nA core name comes from the published vocabulary and means the contracted thing\nthat vocabulary defines; a plugin's own must be namespaced with the plugin's id\nand is inert until something asks for it.",
+          "type": "array",
+          "default": [],
+          "items": {"type": "string"}
+        },
+        "speaks": {
+          "description": "Each capability contract it answers, as `capability@major`: the service is an\nadapter, and lemonfiber asks it over those contracts.",
           "type": "array",
           "default": [],
           "items": {"type": "string"}

@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use super::{files, DIRECTORY};
+use super::{files, path_item, DIRECTORY};
 
 /// The committed documents are exactly what the types generate: run `just capability-contracts`
 /// after changing a capability.
@@ -94,4 +94,26 @@ fn no_document_is_longer_than_the_line_cap() {
             text.lines().count()
         );
     }
+}
+
+/// An operation's answer bound is published with it, and a picture's is larger than the
+/// default because it carries the picture's bytes.
+#[test]
+fn an_operation_publishes_the_bound_its_answer_is_held_to() {
+    let largest = |name: &str| {
+        crate::capabilities::media::serve::capability()
+            .operations
+            .iter()
+            .find(|operation| operation.name == name)
+            .and_then(|operation| {
+                path_item(operation)
+                    .get("post")
+                    .and_then(|post| post.get("x-lemonfiber-largest"))
+                    .cloned()
+            })
+    };
+    assert_eq!(largest("title"), Some(crate::client::LARGEST.into()));
+    assert!(largest("picture")
+        .and_then(|bound| bound.as_u64())
+        .is_some_and(|bound| bound > 2 * 1024 * 1024 * 4 / 3));
 }

@@ -221,7 +221,7 @@ fn beside(kinds: &mut BTreeMap<String, Schema>) {
 /// And the refusals of the plugins and wiring reads where what they are read from could
 /// not be read, which a client has to tell apart from an empty answer by name, and of a
 /// choice of what fills a capability and of an install, an update or a removal, each at
-/// the status its code is declared with.
+/// the status its code is declared with. And every refusal of a member's viewing.
 ///
 /// A code the registry does not declare cannot be built, so every refusal is found;
 /// one missing here would be a code no client can name, and a test counts them.
@@ -237,6 +237,7 @@ fn refusals() -> BTreeMap<String, Listed> {
         )
         .chain(wiring::REFUSED)
         .chain(REFUSALS)
+        .chain(lemonfiber_core::screening::REFUSALS)
         .filter_map(|code| {
             let declared = declared(code)?;
             Some((

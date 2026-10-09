@@ -5,7 +5,7 @@ use lemonfiber_sidecar::gate::{Credential, File, Kind, Upstream, Upstreams};
 use super::*;
 
 /// The name the gate's Jellyfin key is filed under.
-const APP: &str = crate::jellyfin::GATE_APP;
+const APP: &str = crate::app_keys::GATE_APP;
 
 /// A stack with the media server, the request service, Sonarr, Radarr and Lidarr — which
 /// files music the request service never asks for, so the gate has no route to it — and,

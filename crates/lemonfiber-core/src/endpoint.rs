@@ -8,7 +8,7 @@
 
 use std::sync::Arc;
 
-use crate::ports::http::{Http, Method, Request, Response};
+use crate::ports::http::{Fetched, Http, Method, Request, Response};
 use crate::ports::service::Failure;
 use crate::text::fitted;
 
@@ -129,9 +129,22 @@ impl Endpoint {
         self.http
             .send(request)
             .await
-            .map_err(|_| Failure::Unavailable {
-                service: self.service.clone(),
-            })
+            .map_err(|_| self.unavailable())
+    }
+
+    /// Send a request and read its body as bytes, holding no more than `most`.
+    pub(crate) async fn fetch(&self, request: &Request, most: usize) -> Result<Fetched, Failure> {
+        self.http
+            .fetch(request, most)
+            .await
+            .map_err(|_| self.unavailable())
+    }
+
+    /// That this service is not answering.
+    fn unavailable(&self) -> Failure {
+        Failure::Unavailable {
+            service: self.service.clone(),
+        }
     }
 
     /// What a non-success response amounts to: a refused credential, or an answer

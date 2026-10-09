@@ -124,6 +124,51 @@
     "status": 400,
     "description": "Raised when a replacement was agreed to for an offer that is not the one standing now."
   },
+  "PLAY-1": {
+    "name": "NOT_AN_ITEM",
+    "status": 400,
+    "description": "Said where the title named is not something the media server could hold."
+  },
+  "PLAY-2": {
+    "name": "NOT_ON_THEIR_SHELF",
+    "status": 404,
+    "description": "Said where the title is not one this member may watch, or is not there at all."
+  },
+  "PLAY-3": {
+    "name": "NOT_A_DEVICE",
+    "status": 400,
+    "description": "Said where what names a member's device is not a device id."
+  },
+  "PLAY-4": {
+    "name": "NOTHING_TO_PLAY_FROM",
+    "status": 503,
+    "description": "Said where there is no media server to play from, or it was never set up."
+  },
+  "PLAY-5": {
+    "name": "SERVER_SILENT",
+    "status": 502,
+    "description": "Said where the media server would not answer for a member."
+  },
+  "PLAY-6": {
+    "name": "NOBODY_NAMED",
+    "status": 400,
+    "description": "Said where nobody is named for something only a member can be."
+  },
+  "PLAY-7": {
+    "name": "NOT_IN_THE_HOUSEHOLD",
+    "status": 404,
+    "description": "Said where the member named is not somebody in the household."
+  },
+  "PLAY-8": {
+    "name": "SIGNS_NO_DEVICE_IN",
+    "status": 503,
+    "description": "Said where the media server will not sign a device in by code."
+  },
+  "PLAY-9": {
+    "name": "NO_SUCH_PICTURE",
+    "status": 404,
+    "description": "Said where a title on the member's shelf has no picture of the kind asked for."
+  },
   "PLUGIN-10": {
     "name": "NOTHING_TO_REMOVE",
     "status": 404,

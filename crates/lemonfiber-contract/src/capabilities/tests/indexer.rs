@@ -1,7 +1,6 @@
 //! `indexer.search` across its contract: one script run against an indexer in process and
 //! through the contract, which must answer alike and be told alike.
 
-use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
@@ -10,7 +9,7 @@ use lemonfiber_ports::service::{
     KnownAggregator, Limits, RegisteredApplication,
 };
 
-use super::{contracted, search, Served, Upstream, SERVICE};
+use super::{crosses_alike, search, Upstream, SERVICE};
 
 #[async_trait]
 impl AppSync for Upstream {
@@ -110,12 +109,9 @@ async fn script<I: AppSync + Indexers + Aggregators>(indexer: &I) -> Vec<String>
 
 #[tokio::test]
 async fn an_indexer_answers_and_is_told_through_its_contract_as_it_is_in_process() {
-    let in_process = Upstream::default();
-    let local = script(&in_process).await;
-    let served = Served::default();
-    let reached = Arc::clone(&served.upstream);
-    let crossed = script(&search::Adapter(contracted(served))).await;
-    assert_eq!(crossed, local);
-    assert_eq!(reached.told(), in_process.told());
-    assert_eq!(in_process.told().len(), 4);
+    crosses_alike!(
+        script,
+        search::Adapter,
+        ["register", "test", "rekey", "aggregator"]
+    );
 }

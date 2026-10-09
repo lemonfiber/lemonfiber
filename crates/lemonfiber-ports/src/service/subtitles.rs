@@ -8,7 +8,7 @@ use super::Failure;
 use crate::media::Kind;
 use async_trait::async_trait;
 
-/// An \*arr, as a subtitle finder needs to be told about it.
+/// A curator, as a subtitle finder needs to be told about it.
 ///
 /// The host is a name on the stack's own network rather than an address: the finder
 /// is a container beside them, so `127.0.0.1` there is the finder itself.
@@ -24,13 +24,13 @@ pub struct Watched {
     pub host: String,
     /// The port it listens on.
     pub port: u16,
-    /// The \*arr's own key, which is what lets the finder read what it has.
+    /// The curator's own key, which is what lets the finder read what it has.
     pub api_key: String,
 }
 
-/// What a subtitle finder already holds for one \*arr.
+/// What a subtitle finder already holds for one curator.
 ///
-/// Read back so one already pointed at an \*arr is left alone rather than written
+/// Read back so one already pointed at a curator is left alone rather than written
 /// again, and so a write can be confirmed by reading it.
 ///
 /// **The base path is not part of this**, deliberately: it is normalised on the way
@@ -40,7 +40,7 @@ pub struct Watched {
 )]
 #[serde(deny_unknown_fields)]
 pub struct Watching {
-    /// Whether the finder is set to use this \*arr at all. Off is the default, and
+    /// Whether the finder is set to use this curator at all. Off is the default, and
     /// an address written with this left off is an address nothing reads.
     pub enabled: bool,
     /// The host it holds.
@@ -52,9 +52,9 @@ pub struct Watching {
     pub keyed: bool,
 }
 
-/// A subtitle finder, told which \*arrs to watch.
+/// A subtitle finder, told which curators to watch.
 ///
-/// A port of its own rather than a method on the shared \*arr shape, because this is
+/// A port of its own rather than a method on the shared curator shape, because this is
 /// the one service that is told about the others rather than being one of them —
 /// the same reason the indexer's application sync is its own port.
 #[async_trait]
@@ -66,7 +66,7 @@ pub trait Subtitles: Send + Sync {
     /// Returns [`Failure`] when it is unreachable or refuses.
     async fn watching(&self, which: Kind) -> Result<Watching, Failure>;
 
-    /// Point the finder at an \*arr, and switch it on.
+    /// Point the finder at a curator, and switch it on.
     ///
     /// Both at once, because either alone is nothing: an address the finder is not
     /// set to use is never read, and switching it on with no address gives it

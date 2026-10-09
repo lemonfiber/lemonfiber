@@ -1,3 +1,4 @@
+use crate::ports::service::{MediaStatus, RequestStatus};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -23,7 +24,7 @@ fn ctx(name: &str) -> crate::app::Ctx {
 }
 
 /// One request as the service records it, at the status that decides its state.
-fn asked(id: i64, made: Option<&str>, request_status: u8) -> HouseholdRequest {
+fn asked(id: i64, made: Option<&str>, request_status: RequestStatus) -> HouseholdRequest {
     HouseholdRequest {
         arrived: None,
         shelf_id: None,
@@ -33,8 +34,8 @@ fn asked(id: i64, made: Option<&str>, request_status: u8) -> HouseholdRequest {
         member_id: None,
         kind: Some(crate::recyclarr::Kind::Movies),
         item: None,
-        request_status,
-        media_status: 2,
+        request_status: Some(request_status),
+        media_status: Some(MediaStatus::Pending),
     }
 }
 
@@ -156,9 +157,9 @@ fn only_what_nobody_ruled_on_and_waited_long_enough_is_closed() {
     // the same on purpose: what tells them apart here is the status, and the period
     // is what the second reading below turns on.
     let held = [
-        asked(1, Some(ASKED), 1),
-        asked(2, Some(ASKED), 1),
-        asked(3, Some(ASKED), 2),
+        asked(1, Some(ASKED), RequestStatus::Pending),
+        asked(2, Some(ASKED), RequestStatus::Pending),
+        asked(3, Some(ASKED), RequestStatus::Approved),
     ];
     let closing = overdue(&held, 30, when() + Duration::from_secs(86_400 * 45));
 
@@ -179,7 +180,10 @@ fn only_what_nobody_ruled_on_and_waited_long_enough_is_closed() {
 /// the opposite of what a period is for.
 #[test]
 fn a_request_with_no_readable_date_is_never_closed() {
-    let held = [asked(1, None, 1), asked(2, Some("tuesday"), 1)];
+    let held = [
+        asked(1, None, RequestStatus::Pending),
+        asked(2, Some("tuesday"), RequestStatus::Pending),
+    ];
 
     assert!(overdue(&held, 30, when() + Duration::from_secs(86_400 * 400)).is_empty());
 }

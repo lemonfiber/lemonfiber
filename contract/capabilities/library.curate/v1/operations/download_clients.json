@@ -23,7 +23,7 @@
               "$defs": {
                 "Category": {
                   "additionalProperties": false,
-                  "description": "The category a download is filed under, named after the media the requesting\napplication manages.\n\nThe field is not shared across applications — Sonarr names it `tvCategory`,\nRadarr `movieCategory`, Lidarr `musicCategory` — so it travels with the client\nrather than being assumed by the writer.",
+                  "description": "The category a download is filed under, named after the media the requesting\napplication manages.\n\nEach curator names the field after the media it files, so it travels with the\nclient rather than being assumed by the writer.",
                   "properties": {
                     "field": {
                       "description": "The field the target application names its category.",
@@ -116,6 +116,7 @@
       {
         "key": []
       }
-    ]
+    ],
+    "x-lemonfiber-largest": 1048576
   }
 }

@@ -78,9 +78,13 @@ async fn a_telling_nobody_has_set_up_is_seedings_errand_rather_than_a_fault() {
 async fn a_household_told_everything_passes_and_says_so() {
     let held = format!(
         r#"{{"enabled":true,"types":{}}}"#,
-        wanted_telling().occasions
+        crate::seerr::bits(&wanted_telling().occasions)
     );
-    let verdict = verdict_for(Answer::reply(200, held), &recorded(&said(wanted_telling()))).await;
+    let verdict = verdict_for(
+        Answer::reply(200, held),
+        &recorded(&said(&wanted_telling())),
+    )
+    .await;
 
     assert!(
         matches!(&verdict, Verdict::Pass { note } if note.as_deref().is_some_and(|said| said.contains("decided"))),
@@ -96,7 +100,11 @@ async fn a_household_told_everything_passes_and_says_so() {
 #[tokio::test]
 async fn a_setting_the_operator_chose_is_reported_as_theirs_whichever_way_they_set_it() {
     // Narrowed: still sending, but not what lemonfiber would choose.
-    let narrowed = verdict_for(Answer::reply(200, SOME), &recorded(&said(wanted_telling()))).await;
+    let narrowed = verdict_for(
+        Answer::reply(200, SOME),
+        &recorded(&said(&wanted_telling())),
+    )
+    .await;
     assert!(
         matches!(&narrowed, Verdict::Pass { note } if note.as_deref().is_some_and(|said| said.contains("not what"))),
         "{narrowed:?}"
@@ -105,7 +113,7 @@ async fn a_setting_the_operator_chose_is_reported_as_theirs_whichever_way_they_s
     // Switched off entirely: the household hears nothing, and they chose that.
     let silent = verdict_for(
         Answer::reply(200, r#"{"enabled":false,"types":0}"#),
-        &recorded(&said(wanted_telling())),
+        &recorded(&said(&wanted_telling())),
     )
     .await;
     assert!(

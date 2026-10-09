@@ -15,6 +15,8 @@ pub(crate) mod run;
 
 use serde::Serialize;
 
+use crate::ports::service::{MediaStatus, RequestStatus};
+
 /// Where one request stands, in the words the person who made it would use.
 ///
 /// Deliberately coarser than a [`crate::trace::Stage`]: a member does not need to know
@@ -40,39 +42,9 @@ pub enum State {
     Gone,
 }
 
-/// What became of the request itself, as the request service numbers them.
-mod request_status {
-    /// Nobody has approved or refused it yet.
-    pub(crate) const PENDING: u8 = 1;
-    /// Approved — the services were asked for it.
-    pub(crate) const APPROVED: u8 = 2;
-    /// Turned down.
-    pub(crate) const DECLINED: u8 = 3;
-    /// The attempt to fetch it failed.
-    pub const FAILED: u8 = 4;
-    /// The request is finished with; where the media stands is the answer now.
-    pub(crate) const COMPLETED: u8 = 5;
-}
-
-/// What became of the media the request asked for, as the request service numbers them.
-mod media_status {
-    /// Nothing is known about it yet.
-    pub(crate) const UNKNOWN: u8 = 1;
-    /// Known and waiting.
-    pub(crate) const PENDING: u8 = 2;
-    /// Being fetched.
-    pub(crate) const PROCESSING: u8 = 3;
-    /// Some of it is here.
-    pub(crate) const PARTIALLY_AVAILABLE: u8 = 4;
-    /// All of it is here.
-    pub(crate) const AVAILABLE: u8 = 5;
-    /// It was here and has been removed.
-    pub(crate) const DELETED: u8 = 7;
-}
-
 impl State {
     /// Where a request stands, from the request service's two statuses — or `None` where
-    /// it reports a status this build does not know.
+    /// it reports a status the contract does not name.
     ///
     /// Neither status alone is the answer. What became of the *request* settles it while
     /// it is still waiting, refused, or failed; once it has been approved the request has
@@ -81,21 +53,22 @@ impl State {
     /// nearest word — a member told "on its way" about something that will never arrive
     /// is worse off than one told the answer could not be read.
     #[must_use]
-    pub const fn of(request: u8, media: u8) -> Option<Self> {
-        match request {
-            request_status::PENDING => Some(Self::WaitingForApproval),
-            request_status::DECLINED => Some(Self::Declined),
-            request_status::FAILED => Some(Self::Failed),
-            request_status::APPROVED | request_status::COMPLETED => match media {
-                media_status::UNKNOWN | media_status::PENDING | media_status::PROCESSING => {
-                    Some(Self::Getting)
-                }
-                media_status::PARTIALLY_AVAILABLE => Some(Self::PartlyHere),
-                media_status::AVAILABLE => Some(Self::Here),
-                media_status::DELETED => Some(Self::Gone),
-                _ => None,
-            },
-            _ => None,
+    pub const fn of(request: Option<RequestStatus>, media: Option<MediaStatus>) -> Option<Self> {
+        match (request, media) {
+            (Some(RequestStatus::Pending), _) => Some(Self::WaitingForApproval),
+            (Some(RequestStatus::Declined), _) => Some(Self::Declined),
+            (Some(RequestStatus::Failed), _) => Some(Self::Failed),
+            (Some(RequestStatus::Approved | RequestStatus::Completed), Some(media)) => {
+                Some(match media {
+                    MediaStatus::Unknown | MediaStatus::Pending | MediaStatus::Processing => {
+                        Self::Getting
+                    }
+                    MediaStatus::PartlyAvailable => Self::PartlyHere,
+                    MediaStatus::Available => Self::Here,
+                    MediaStatus::Deleted => Self::Gone,
+                })
+            }
+            (Some(RequestStatus::Approved | RequestStatus::Completed), None) | (None, _) => None,
         }
     }
 

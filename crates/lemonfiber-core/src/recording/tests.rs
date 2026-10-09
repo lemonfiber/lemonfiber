@@ -289,3 +289,26 @@ async fn a_run_with_nowhere_to_write_still_sends() {
     let answered = transport.send(&asking()).await;
     assert_eq!(answered.map(|response| response.status), Ok(200));
 }
+
+/// A fetch that went somewhere is written down as a send is, and what came back with it.
+#[tokio::test]
+async fn a_fetch_that_went_somewhere_is_written_down_there() {
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("fetched");
+    let _ = std::fs::remove_dir_all(&dir);
+    let at = dir.join("outbound.log");
+    let transport = Recording::around(
+        Shared(Fake::always(Answer::Reply(200, "picture".to_owned()))),
+        Some(at.clone()),
+        Stopped::at(1),
+    );
+
+    let fetched = transport.fetch(&asking(), 64).await;
+    assert_eq!(
+        fetched.map(|fetched| fetched.bytes),
+        Ok(Some(b"picture".to_vec()))
+    );
+    let written = std::fs::read_to_string(&at).unwrap_or_default();
+    assert!(written.starts_with("1 Get ") && written.trim_end().ends_with(" 200"));
+
+    let _ = std::fs::remove_dir_all(&dir);
+}

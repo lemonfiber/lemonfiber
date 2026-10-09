@@ -1,0 +1,184 @@
+{
+  "post": {
+    "operationId": "add_fulfilment_target",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$defs": {
+              "Endpoint": {
+                "additionalProperties": false,
+                "description": "Where the request service reaches a curator: a host, a port, and the path it answers\nunder there.",
+                "properties": {
+                  "base": {
+                    "description": "The path the curator answers under at that host: empty where it answers at the\nroot, and a route of its own where something in front of it answers for\nseveral.",
+                    "type": "string"
+                  },
+                  "host": {
+                    "description": "The host.",
+                    "type": "string"
+                  },
+                  "port": {
+                    "description": "The port.",
+                    "format": "uint16",
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "host",
+                  "port",
+                  "base"
+                ],
+                "type": "object"
+              },
+              "FulfilmentTarget": {
+                "additionalProperties": false,
+                "description": "A curator the request service hands requests of one kind to.\n\nEverything the request service needs to reach it and to file what it fetches:\nwhich kind it fetches, where it is, how to authenticate, and which profile and\nfolder to use.",
+                "properties": {
+                  "at": {
+                    "$ref": "#/$defs/Endpoint",
+                    "description": "Where the request service should reach it."
+                  },
+                  "folder": {
+                    "description": "Where what it fetches is filed.",
+                    "type": "string"
+                  },
+                  "key": {
+                    "description": "The key the request service authenticates with.",
+                    "type": "string"
+                  },
+                  "kind": {
+                    "$ref": "#/$defs/Kind",
+                    "description": "The kind of video it fetches, which selects the request service's list for it."
+                  },
+                  "moved_from": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Endpoint"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Where the request service may hold it from before, reached another way. A\ntarget held there is the same curator, and is moved here in place rather than\nregistered a second time."
+                  },
+                  "name": {
+                    "description": "The name the operator will see in the request service's own interface.",
+                    "type": "string"
+                  },
+                  "profile": {
+                    "$ref": "#/$defs/QualityProfile",
+                    "description": "The quality profile requests are fetched at."
+                  }
+                },
+                "required": [
+                  "name",
+                  "at",
+                  "key",
+                  "kind",
+                  "profile",
+                  "folder"
+                ],
+                "type": "object"
+              },
+              "Kind": {
+                "description": "The two kinds of video a household files by resolution.",
+                "oneOf": [
+                  {
+                    "const": "tv",
+                    "description": "Television: series, seasons and episodes.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "movies",
+                    "description": "Film.",
+                    "type": "string"
+                  }
+                ]
+              },
+              "QualityProfile": {
+                "additionalProperties": false,
+                "description": "One of the quality profiles a service holds, as the request service needs to\nname it.\n\nBoth halves are carried because the request service wants both: the identifier\nit will send, and the name it will show. Reading the name back rather than\nassuming it means an operator who renamed a profile still sees their own word.",
+                "properties": {
+                  "id": {
+                    "description": "The identifier the service assigned.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "name": {
+                    "description": "What the operator calls it.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "type": "object"
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "target": {
+                "$ref": "#/$defs/FulfilmentTarget",
+                "description": "The port's `target`."
+              }
+            },
+            "required": [
+              "target"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "title": "null",
+              "type": "null"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ],
+    "x-lemonfiber-largest": 1048576
+  }
+}

@@ -1,0 +1,161 @@
+{
+  "capability": "identity.source",
+  "cases": [
+    {
+      "case": "refuses-without-the-key",
+      "expect": {
+        "status": [
+          401
+        ]
+      },
+      "keyed": false,
+      "live": true,
+      "operation": "startup_completed"
+    },
+    {
+      "case": "startup_completed-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "startup_completed"
+    },
+    {
+      "case": "create_admin-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "create_admin"
+    },
+    {
+      "case": "household-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "household"
+    },
+    {
+      "case": "whoever-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "whoever"
+    },
+    {
+      "case": "standing-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "standing"
+    },
+    {
+      "case": "invite-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "invite"
+    },
+    {
+      "case": "unclaim-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "unclaim"
+    },
+    {
+      "case": "withdraw-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "withdraw"
+    },
+    {
+      "case": "when_invited-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "when_invited"
+    },
+    {
+      "case": "libraries-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "libraries"
+    },
+    {
+      "case": "ratings-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "ratings"
+    },
+    {
+      "case": "allow-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "allow"
+    },
+    {
+      "case": "claimable-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "claimable"
+    },
+    {
+      "case": "suspend-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "suspend"
+    },
+    {
+      "case": "sessions-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "sessions"
+    },
+    {
+      "case": "signs_devices_in-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "signs_devices_in"
+    }
+  ],
+  "major": 1
+}

@@ -1,0 +1,234 @@
+{
+  "post": {
+    "operationId": "requests",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$defs": {
+                "HouseholdRequest": {
+                  "additionalProperties": false,
+                  "description": "One thing a household member asked for, as the request service records it.\n\nWhat became of the request and what became of the media it asked for are two\nstatuses; the household model turns the pair into the one word a member reads.",
+                  "properties": {
+                    "arrived": {
+                      "description": "When the media it asked for arrived on the media server, as the request service\ntimestamps it, or nothing until it is there.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "id": {
+                      "description": "The number the request service files this request under, which is how one is\nnamed to it again when somebody rules on it.",
+                      "format": "int64",
+                      "type": "integer"
+                    },
+                    "item": {
+                      "description": "The id the curator filing this media knows it by, where the request service has\nhanded it over yet. Nothing for a request still awaiting approval, which no\ncurator has been told about — so the item cannot be named from the library, and\nis not claimed to be.",
+                      "format": "int64",
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "kind": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/Kind"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Which service files the media — television or film — or `None` where the\nrequest service names a media type this build does not know."
+                    },
+                    "made": {
+                      "description": "When it was asked for, as the service timestamps it — what a request waiting\non somebody is measured against, and what a counting period runs from.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "media_status": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/MediaStatus"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "What became of the media it asked for, or `None` likewise."
+                    },
+                    "member": {
+                      "description": "The member who asked, by the name the request service shows them under.\n\nA name for saying, not for telling people apart: the request service lets\nanybody change the name it shows them by.",
+                      "type": "string"
+                    },
+                    "member_id": {
+                      "description": "The id the media server files the member who asked under, where the request\nservice records one — which is how a request is told to be somebody's.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "request_status": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/RequestStatus"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "What became of the request, or `None` where the service reports a status this\ncontract does not name."
+                    },
+                    "shelf_id": {
+                      "description": "The identifier the media server holds that media under, as the request service\nrecords it, or nothing until it is there.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "member"
+                  ],
+                  "type": "object"
+                },
+                "Kind": {
+                  "description": "The two kinds of video a household files by resolution.",
+                  "oneOf": [
+                    {
+                      "const": "tv",
+                      "description": "Television: series, seasons and episodes.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "movies",
+                      "description": "Film.",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "MediaStatus": {
+                  "description": "What became of the media one request asked for.",
+                  "oneOf": [
+                    {
+                      "const": "unknown",
+                      "description": "Nothing is known about it yet.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "pending",
+                      "description": "Known and waiting.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "processing",
+                      "description": "Being fetched.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "partly-available",
+                      "description": "Some of it is here.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "available",
+                      "description": "All of it is here.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "deleted",
+                      "description": "It was here and has been removed.",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "RequestStatus": {
+                  "description": "What became of one request itself.",
+                  "oneOf": [
+                    {
+                      "const": "pending",
+                      "description": "Nobody has approved or refused it yet.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "approved",
+                      "description": "Approved: the services were asked for it.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "declined",
+                      "description": "Turned down.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "failed",
+                      "description": "The attempt to fetch it failed.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "completed",
+                      "description": "Finished with: where the media stands is the answer now.",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "items": {
+                "$ref": "#/$defs/HouseholdRequest"
+              },
+              "title": "Array_of_HouseholdRequest",
+              "type": "array"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ],
+    "x-lemonfiber-largest": 1048576
+  }
+}

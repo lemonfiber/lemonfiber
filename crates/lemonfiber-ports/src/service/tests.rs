@@ -1,6 +1,6 @@
 use super::{
     Application, ApplicationKind, Category, Credential, Diagnose, DownloadClient, Failure,
-    Identity, Protocol, RegisteredApplication, RootFolder,
+    Identity, Image, Protocol, RegisteredApplication, RootFolder, Signed,
 };
 use lemonfiber_error::{Severity, State};
 
@@ -115,4 +115,51 @@ fn the_things_a_service_is_told_about_are_plain_data() {
         base_url: "http://sonarr:8989".to_owned(),
     };
     assert_eq!(registered.clone(), registered);
+}
+
+#[test]
+fn a_secret_never_reaches_a_debug_rendering() {
+    let rendered = [
+        format!("{:?}", Credential::ApiKey("key-secret".to_owned())),
+        format!(
+            "{:?}",
+            Credential::UserPass {
+                username: "admin".to_owned(),
+                password: "password-secret".to_owned(),
+            }
+        ),
+        format!(
+            "{:?}",
+            Signed {
+                id: "id-alex".to_owned(),
+                token: "token-secret".to_owned(),
+            }
+        ),
+    ];
+    assert!(
+        rendered.iter().all(|one| !one.contains("secret")),
+        "{rendered:?}"
+    );
+    assert!(rendered[1].contains("admin") && rendered[2].contains("id-alex"));
+}
+
+#[test]
+fn a_picture_crosses_as_base64_and_is_debugged_by_its_size() {
+    let image = Image {
+        media_type: "image/png".to_owned(),
+        bytes: vec![0, 159, 255],
+    };
+    let written = serde_json::to_value(&image).ok();
+    assert_eq!(
+        written,
+        Some(serde_json::json!({ "media_type": "image/png", "bytes": "AJ//" }))
+    );
+    let read: Option<Image> = written.and_then(|value| serde_json::from_value(value).ok());
+    assert_eq!(read.as_ref(), Some(&image));
+    assert_eq!(
+        format!("{image:?}"),
+        r#"Image { media_type: "image/png", bytes: 3 }"#
+    );
+    let unreadable = serde_json::json!({ "media_type": "image/png", "bytes": "not base64!" });
+    assert!(serde_json::from_value::<Image>(unreadable).is_err());
 }

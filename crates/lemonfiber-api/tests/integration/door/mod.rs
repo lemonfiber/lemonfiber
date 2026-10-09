@@ -26,7 +26,7 @@ pub(crate) use lemonfiber_core::admission::{self as credential, Credential};
 pub(crate) use lemonfiber_core::app::Ctx;
 pub(crate) use lemonfiber_core::config::Settings;
 pub(crate) use lemonfiber_core::ports::service::{
-    Allowed, Certificate, Failure, Held, Household, Invited, Member, NamedLibrary, Signed,
+    Allowed, Certificate, Failure, Household, Invited, Member, NamedLibrary, Signed,
 };
 pub(crate) use lemonfiber_fixtures::http::Fake;
 pub(crate) use lemonfiber_fixtures::ports::{Chance, Idle, Stopped};
@@ -488,9 +488,6 @@ impl Household for AHousehold {
     async fn libraries(&self) -> Result<Vec<NamedLibrary>, Failure> {
         unreachable!("the door asks this household who somebody is and nothing else")
     }
-    async fn holdings(&self, _: Option<&str>, _: u32) -> Result<Vec<Held>, Failure> {
-        unreachable!("the door asks this household who somebody is and nothing else")
-    }
     async fn ratings(&self) -> Result<Vec<Certificate>, Failure> {
         unreachable!("the door asks this household who somebody is and nothing else")
     }
@@ -509,13 +506,7 @@ impl Household for AHousehold {
     ) -> Result<Vec<lemonfiber_core::ports::service::Session>, Failure> {
         unreachable!("the door asks this household who somebody is and nothing else")
     }
-    async fn quick_connect(&self) -> Result<bool, Failure> {
-        unreachable!("the door asks this household who somebody is and nothing else")
-    }
-    async fn playing(
-        &self,
-        _: Option<&str>,
-    ) -> Result<Vec<lemonfiber_core::ports::service::Playback>, Failure> {
+    async fn signs_devices_in(&self) -> Result<bool, Failure> {
         unreachable!("the door asks this household who somebody is and nothing else")
     }
 }
@@ -542,6 +533,16 @@ pub(crate) fn door_with(
     let (router, token) = surface(world(path, random), &admitting);
     (router, token, admitting)
 }
+
+/// What the stack's media server answers a name and password it recognises with.
+pub(crate) const SIGNED_IN: &str = r#"{"AccessToken":"a-session","User":{"Id":"a7f3"}}"#;
+
+/// What it answers when asked whether that member's account still stands.
+pub(crate) const STANDING: &str = r#"{"Id":"a7f3","HasPassword":true}"#;
+
+/// The household it holds: Ana, and nobody else.
+pub(crate) const HOUSEHOLD: &str = r#"[{"Id":"a7f3","Name":"ana","HasPassword":true,
+    "Policy":{"IsAdministrator":false,"EnableAllFolders":true}}]"#;
 
 /// The world a stack runs in: the repository's stack, whose media server answers
 /// through `transport`, with an env file of the test's own.

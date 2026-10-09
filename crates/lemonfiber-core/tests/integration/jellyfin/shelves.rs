@@ -1,9 +1,8 @@
 //! What one member can watch.
 
 use super::{reader, A_SHELF, SIGNED_IN};
-use lemonfiber_core::ports::service::{Failure, Medium};
+use lemonfiber_core::ports::service::{Failure, Medium, Screening as _};
 use lemonfiber_fixtures::http::{Answer, Fake};
-use lemonfiber_ports::service::Household;
 
 /// **The design claim, asserted rather than described.** The account whose shelf this
 /// is appears in the path, not in a filter applied afterwards — which is what makes the

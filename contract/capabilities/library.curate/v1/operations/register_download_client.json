@@ -8,7 +8,7 @@
             "$defs": {
               "Category": {
                 "additionalProperties": false,
-                "description": "The category a download is filed under, named after the media the requesting\napplication manages.\n\nThe field is not shared across applications — Sonarr names it `tvCategory`,\nRadarr `movieCategory`, Lidarr `musicCategory` — so it travels with the client\nrather than being assumed by the writer.",
+                "description": "The category a download is filed under, named after the media the requesting\napplication manages.\n\nEach curator names the field after the media it files, so it travels with the\nclient rather than being assumed by the writer.",
                 "properties": {
                   "field": {
                     "description": "The field the target application names its category.",
@@ -26,7 +26,7 @@
                 "type": "object"
               },
               "Credential": {
-                "description": "How a download client proves itself, which differs by client — a single API\nkey for one, a username and its password for the other.",
+                "description": "How a service proves itself: a single API key, or a username and its password.",
                 "oneOf": [
                   {
                     "additionalProperties": false,
@@ -113,7 +113,7 @@
                 "type": "object"
               },
               "Protocol": {
-                "description": "The protocol a download client is reached in: the name of the API a curator speaks\nto it, as the download client declares it.\n\nOpen rather than a list, because which protocols a curator speaks is the curator's to\nknow: one it does not speak is its refusal to give, and a new download client\nneeds no change here to be offered to every curator that speaks its protocol.",
+                "description": "The protocol a download client is reached in: the name of the API a curator speaks\nto it, as the download client declares it.",
                 "type": "string"
               }
             },
@@ -175,6 +175,7 @@
       {
         "key": []
       }
-    ]
+    ],
+    "x-lemonfiber-largest": 1048576
   }
 }

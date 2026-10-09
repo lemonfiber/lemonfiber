@@ -3,7 +3,7 @@
 
 use super::{reader, OURS_TOO, SIGNED_IN, SOMEONE_ELSES};
 use lemonfiber_core::ports::http::Method;
-use lemonfiber_core::ports::service::Allowed;
+use lemonfiber_core::ports::service::{Allowed, AppKeys as _};
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_ports::service::Household;
 
@@ -18,7 +18,7 @@ async fn the_key_filed_under_our_name_is_revoked_and_no_other() {
         Answer::reply(200, OURS_TOO),
         Answer::reply(204, ""),
     ]);
-    let revoked = reader(&fake).revoke_our_key().await;
+    let revoked = lemonfiber_core::app_keys::revoke_ours(&reader(&fake)).await;
 
     assert!(matches!(revoked, Ok(true)), "{revoked:?}");
     let deleted: Vec<String> = fake
@@ -42,7 +42,10 @@ async fn with_no_key_of_ours_nothing_is_revoked() {
         Answer::reply(200, SOMEONE_ELSES),
     ]);
 
-    assert!(matches!(reader(&fake).revoke_our_key().await, Ok(false)));
+    assert!(matches!(
+        lemonfiber_core::app_keys::revoke_ours(&reader(&fake)).await,
+        Ok(false)
+    ));
     assert!(
         !fake
             .requests()
@@ -60,7 +63,9 @@ async fn a_revocation_the_server_refuses_is_reported() {
         Answer::reply(200, OURS_TOO),
         Answer::reply(500, ""),
     ]);
-    assert!(reader(&fake).revoke_our_key().await.is_err());
+    assert!(lemonfiber_core::app_keys::revoke_ours(&reader(&fake))
+        .await
+        .is_err());
 }
 
 /// A key list that cannot be read is a failure, not an absent key.
@@ -70,7 +75,9 @@ async fn a_key_list_that_cannot_be_read_is_reported() {
         Answer::reply(200, SIGNED_IN),
         Answer::reply(200, "not json"),
     ]);
-    assert!(reader(&fake).revoke_our_key().await.is_err());
+    assert!(lemonfiber_core::app_keys::revoke_ours(&reader(&fake))
+        .await
+        .is_err());
 }
 
 /// The account's own policy, as the media server hands it back.
@@ -150,18 +157,18 @@ async fn every_key_filed_under_the_decline_service_s_name_is_dated() {
     ]);
 
     let dated = reader(&fake)
-        .dated(lemonfiber_core::jellyfin::DECLINE_APP)
+        .dated(lemonfiber_core::app_keys::DECLINE_APP)
         .await
         .ok();
 
     assert_eq!(
         dated,
         Some(vec![
-            lemonfiber_core::jellyfin::Dated {
+            lemonfiber_core::ports::service::Dated {
                 created: Some("2026-10-05T00:00:00Z".to_owned()),
                 last_used: Some("2026-10-05T01:00:00Z".to_owned()),
             },
-            lemonfiber_core::jellyfin::Dated {
+            lemonfiber_core::ports::service::Dated {
                 created: Some("2026-10-05T02:00:00Z".to_owned()),
                 last_used: None,
             },
@@ -178,7 +185,7 @@ async fn an_unreadable_key_list_is_no_list_of_dates() {
     ]);
 
     assert!(reader(&fake)
-        .dated(lemonfiber_core::jellyfin::DECLINE_APP)
+        .dated(lemonfiber_core::app_keys::DECLINE_APP)
         .await
         .is_err());
 }

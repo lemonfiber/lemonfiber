@@ -120,6 +120,7 @@ pub(crate) fn a_placed(
         listens,
         media_types: Vec::new(),
         networks: Vec::new(),
+        speaks: Vec::new(),
     }
 }
 

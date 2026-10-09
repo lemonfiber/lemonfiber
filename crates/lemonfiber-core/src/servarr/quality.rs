@@ -3,11 +3,10 @@
 //! indexers actually carry. Built on the same [`Servarr`](super::Servarr) client as the
 //! provisioning adapter; the quality concern lives apart from it so each grows on its own.
 
-use super::Shape as _;
 use async_trait::async_trait;
 use serde::Deserialize;
 
-use super::Servarr;
+use super::{Servarr, Shape as _};
 use crate::ports::http::Method;
 use crate::ports::service::{Failure, MusicQuality, QualityReleases, ReleaseProbe};
 

@@ -8,7 +8,9 @@ use std::sync::Mutex;
 
 use crate::common;
 use async_trait::async_trait;
-use lemonfiber_core::ports::service::{Failure, HouseholdRequest, MediaServer, Requests, Telling};
+use lemonfiber_core::ports::service::{
+    Failure, HouseholdRequest, MediaServer, Protocol, Requests, Telling,
+};
 use lemonfiber_core::seed::{wire_jellyfin_admin, wire_seerr_identity, State};
 
 // ---- Jellyfin as Seerr's identity: two services and a minted credential. ----
@@ -159,7 +161,7 @@ impl Requests for FakeReq {
 
     async fn test_fulfilment_target(
         &self,
-        _television: bool,
+        _kind: lemonfiber_core::ports::media::Kind,
         _at: &lemonfiber_core::ports::service::Endpoint,
         _key: &str,
     ) -> Result<(), Failure> {
@@ -216,10 +218,11 @@ impl Requests for FakeReq {
     async fn telling(&self) -> Result<Telling, Failure> {
         match self.gate {
             Init::Down => Err(down("seerr")),
-            Init::Fresh | Init::Done => Ok(*self
+            Init::Fresh | Init::Done => Ok(self
                 .told
                 .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)),
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clone()),
         }
     }
 
@@ -229,7 +232,7 @@ impl Requests for FakeReq {
             Init::Down => Err(down("seerr")),
             Init::Fresh | Init::Done => {
                 if let Ok(mut told) = self.told.lock() {
-                    *told = *telling;
+                    *told = telling.clone();
                 }
                 Ok(())
             }
@@ -238,9 +241,7 @@ impl Requests for FakeReq {
 
     async fn configure_identity(
         &self,
-        _username: &str,
-        _password: &str,
-        _server_url: &str,
+        _source: &lemonfiber_core::ports::service::IdentitySource,
     ) -> Result<(), Failure> {
         match self.configure {
             Configure::Ok => Ok(()),
@@ -284,9 +285,15 @@ async fn identity_keeping(
     };
     let state = match wire_jellyfin_admin(&media, &random, recorded, false, &keep).await {
         Ok(password) => {
-            wire_seerr_identity(&seerr, &password, "http://jellyfin:8096", false)
-                .await
-                .state
+            wire_seerr_identity(
+                &seerr,
+                Protocol("jellyfin".to_owned()),
+                &password,
+                "http://jellyfin:8096",
+                false,
+            )
+            .await
+            .state
         }
         Err(state) => state,
     };
@@ -311,9 +318,15 @@ async fn would_identity(
     };
     let state = match wire_jellyfin_admin(&media, &random, recorded, true, &keep).await {
         Ok(password) => {
-            wire_seerr_identity(&seerr, &password, "http://jellyfin:8096", true)
-                .await
-                .state
+            wire_seerr_identity(
+                &seerr,
+                Protocol("jellyfin".to_owned()),
+                &password,
+                "http://jellyfin:8096",
+                true,
+            )
+            .await
+            .state
         }
         Err(state) => state,
     };

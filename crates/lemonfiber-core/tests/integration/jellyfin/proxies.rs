@@ -1,6 +1,7 @@
 //! The address Jellyfin trusts to name the client, written whole and held to it.
 
 use super::{reader, SIGNED_IN};
+use lemonfiber_core::ports::service::Fronted as _;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_ports::http::Method;
 

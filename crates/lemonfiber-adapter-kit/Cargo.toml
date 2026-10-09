@@ -1,0 +1,27 @@
+[package]
+name = "lemonfiber-adapter-kit"
+description = "What a plugin's adapter runs to speak lemonfiber's capability contracts."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+authors.workspace = true
+license-file = "../../LICENSE"
+publish = false
+
+[dependencies]
+lemonfiber-contract = { workspace = true }
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["net"] }
+
+[dev-dependencies]
+lemonfiber-adapters = { workspace = true }
+lemonfiber-ports = { workspace = true }
+async-trait = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt"] }
+tower = { workspace = true, features = ["util"] }
+
+[lints]
+workspace = true

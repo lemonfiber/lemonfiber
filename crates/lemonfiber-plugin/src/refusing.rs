@@ -35,6 +35,7 @@ mod failing;
 mod naming;
 mod reaching;
 mod recipes;
+mod speaking;
 
 pub use recipes::{names_a_header_by_substitution, names_a_path_not_plain, outside};
 
@@ -179,6 +180,7 @@ fn running(manifest: &Manifest, found: &mut Vec<Violation>) {
         pinned(service, found);
         placed(service, found);
         adapting::adapted(service, found);
+        speaking::spoken(service, found);
     }
 }
 

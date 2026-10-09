@@ -6,6 +6,7 @@
 //! exercised from only one of those leaves the other copy counted as never run.
 
 use lemonfiber_core::journal::Journal;
+use lemonfiber_core::ports::media::Kind;
 use lemonfiber_core::ports::service::{
     Client as _, Endpoint, FulfilmentTarget, QualityProfile, Requests as _,
 };
@@ -27,7 +28,7 @@ fn sonarr() -> FulfilmentTarget {
         },
         moved_from: None,
         key: "the-key".to_owned(),
-        television: true,
+        kind: Kind::Tv,
         profile: QualityProfile {
             id: 4,
             name: "HD-1080p".to_owned(),
@@ -199,7 +200,8 @@ async fn the_targets_it_holds_are_read_from_both_lists() {
 
     assert_eq!(held.len(), 2, "both lists were not read: {held:?}");
     assert!(
-        held.iter().any(|target| target.television) && held.iter().any(|target| !target.television),
+        held.iter().any(|target| target.kind == Kind::Tv)
+            && held.iter().any(|target| target.kind == Kind::Movies),
         "film and television were not told apart: {held:?}"
     );
 }
@@ -424,7 +426,7 @@ async fn a_move_that_does_not_land_is_reported() {
         id: "7".to_owned(),
         at: sonarr().at,
         key: String::new(),
-        television: true,
+        kind: Kind::Tv,
     };
     let said = seerr
         .move_fulfilment_target(&gone, &gated().at, "the-token")
@@ -465,10 +467,10 @@ async fn a_film_target_moves_within_the_film_list() {
             base: String::new(),
         },
         key: "old".to_owned(),
-        television: false,
+        kind: Kind::Movies,
     };
     let film = FulfilmentTarget {
-        television: false,
+        kind: Kind::Movies,
         ..gated()
     };
 
@@ -491,7 +493,7 @@ async fn a_move_or_registration_the_service_does_not_answer_fails() {
         id: "1".to_owned(),
         at: sonarr().at,
         key: "the-key".to_owned(),
-        television: true,
+        kind: Kind::Tv,
     };
     for (name, listed, put) in [
         ("unlisted", Answer::Silent, Answer::reply(200, "")),

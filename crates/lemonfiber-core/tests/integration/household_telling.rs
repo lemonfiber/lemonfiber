@@ -14,8 +14,11 @@ use lemonfiber_core::doctor::narrowing::Narrowing;
 use lemonfiber_core::doctor::telling::TellingCheck;
 use lemonfiber_core::doctor::{examine, Category, Check, Verdict};
 use lemonfiber_core::ports::service::Requests;
-use lemonfiber_core::seerr::{Seerr, OCCASIONS};
+use lemonfiber_core::seerr::Seerr;
 use lemonfiber_fixtures::http::{Answer, Fake};
+
+/// Every occasion, as Seerr keeps the set: the bit field it answers and is written.
+const OCCASIONS: u32 = 222;
 
 /// The real client over a scripted request service.
 fn asking(answer: Answer) -> Arc<dyn Requests> {

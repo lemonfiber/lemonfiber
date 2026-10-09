@@ -1,6 +1,7 @@
 //! What each member is limited to, and where the services disagree.
 
 use super::*;
+use crate::ports::service::{MediaStatus, RequestStatus};
 
 /// The same, over this household's own certificates and what the request service
 /// says about each member.
@@ -184,7 +185,12 @@ fn a_reason_this_machine_holds_reaches_the_request_it_belongs_to() {
 
     let report = assemble(
         vec![account("Ana", true)],
-        vec![request("Ana", Some(Kind::Movies), Some(7), (3, 2))],
+        vec![request(
+            "Ana",
+            Some(Kind::Movies),
+            Some(7),
+            (RequestStatus::Declined, MediaStatus::Pending),
+        )],
         &Naming {
             libraries: &unnamed(),
             titles: &titles(),
@@ -230,7 +236,12 @@ fn a_reason_this_machine_holds_reaches_the_request_it_belongs_to() {
 fn a_full_disk_reaches_whoever_is_about_to_ask() {
     let report = assemble(
         vec![account("Ana", true)],
-        vec![request("Ana", Some(Kind::Movies), Some(7), (1, 2))],
+        vec![request(
+            "Ana",
+            Some(Kind::Movies),
+            Some(7),
+            (RequestStatus::Pending, MediaStatus::Pending),
+        )],
         &Naming {
             libraries: &unnamed(),
             titles: &titles(),

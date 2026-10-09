@@ -17,6 +17,7 @@ authors = ["NightWorks.io"]
 # features. `deny.toml` refuses a second version of any crate, so a declaration
 # here that differs from what the graph already carries fails rather than drifts.
 [workspace.dependencies]
+lemonfiber-adapter-kit = { path = "crates/lemonfiber-adapter-kit" }
 lemonfiber-adapters = { path = "crates/lemonfiber-adapters" }
 lemonfiber-api = { path = "crates/lemonfiber-api" }
 lemonfiber-bundled = { path = "crates/lemonfiber-bundled" }

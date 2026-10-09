@@ -20,7 +20,9 @@ use super::minted;
 use super::Ctx;
 use crate::app::gating;
 use crate::app::targets::MediaServer;
-use crate::jellyfin::{Jellyfin, GATE_APP};
+use crate::app_keys::GATE_APP;
+use crate::jellyfin::Jellyfin;
+use crate::ports::service::AppKeys as _;
 use crate::seed::{State, Wiring};
 
 /// What the report calls this connection.
@@ -186,11 +188,7 @@ async fn arr_routes(ctx: &Ctx, fillers: &crate::wiring::Fillers) -> Vec<Upstream
         };
         routes.push(Upstream {
             route: fulfils.filler.id.clone(),
-            kind: if fulfils.television {
-                Kind::Sonarr
-            } else {
-                Kind::Radarr
-            },
+            kind: gating::route_for(fulfils.kind),
             address: fulfils.at.url(),
             credential: Credential::new(key),
             majors: Vec::new(),

@@ -10,19 +10,29 @@
 
 use async_trait::async_trait;
 
-use super::{Failure, Held, Medium};
+use super::{Failure, Medium};
 
 /// Who a sign-in proved somebody to be, and the access the server granted for it.
 ///
 /// Both, because the second is what a session is held against: the id says whose
 /// session it is, and the access is what the server takes back when the password it
 /// was proved with changes.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct Signed {
     /// The id the server files the account under.
     pub id: String,
     /// The access the server granted this sign-in.
     pub token: String,
+}
+
+impl std::fmt::Debug for Signed {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Signed")
+            .field("id", &self.id)
+            .finish_non_exhaustive()
+    }
 }
 
 /// Making and withdrawing the accounts a household signs in with.
@@ -152,28 +162,6 @@ pub trait Household: Send + Sync {
     /// Returns [`Failure`] when the server is unreachable or refuses.
     async fn libraries(&self) -> Result<Vec<NamedLibrary>, Failure>;
 
-    /// What this member may watch, as the media server answers it for them.
-    ///
-    /// **Asked for that member, never filtered for them.** The server holds the age
-    /// limit, the library access and the blocked kinds, and answering about one
-    /// account is a thing it already does — so what comes back is what they may see
-    /// because the server said so, whoever's credential carried the question. A read
-    /// taken about the household and narrowed here would be a second copy of every one
-    /// of those rules, able to disagree with the first on the day either moved.
-    ///
-    /// Sorted and bounded by the server rather than here: a household library is
-    /// larger than a screen, and deciding which part of it to ask for is the caller's
-    /// errand rather than this one's.
-    ///
-    /// `None` names no member and reads what an account with every library and no age
-    /// limit holds, which is what an invitation that chose nothing grants. It is asked
-    /// about no account, so it carries nothing of anybody's.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Failure`] when the server is unreachable or refuses.
-    async fn holdings(&self, member: Option<&str>, most: u32) -> Result<Vec<Held>, Failure>;
-
     /// The certificates this server's own rating table names, and the ages it holds
     /// them against.
     ///
@@ -238,29 +226,20 @@ pub trait Household: Send + Sync {
     /// Returns [`Failure`] when the server is unreachable or refuses.
     async fn sessions(&self, member: &str) -> Result<Vec<Session>, Failure>;
 
-    /// What the media server is playing now: one entry a session playing something,
-    /// for one account where `member` names its identifier, or for every account.
-    ///
-    /// Asked of the server each time rather than kept, because what is playing is the
-    /// fact most likely to have changed since anybody last asked. A session signed in
-    /// and playing nothing is not listed: it is a device, not somebody watching.
+    /// Whether the server signs a new device in by a short code that a device already
+    /// signed in approves.
     ///
     /// # Errors
     ///
     /// Returns [`Failure`] when the server is unreachable or refuses.
-    async fn playing(&self, member: Option<&str>) -> Result<Vec<Playback>, Failure>;
-
-    /// Whether the server offers the sign-in by short code, in which a device already
-    /// signed in approves a new one.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Failure`] when the server is unreachable or refuses.
-    async fn quick_connect(&self) -> Result<bool, Failure>;
+    async fn signs_devices_in(&self) -> Result<bool, Failure>;
 }
 
 /// One device signed in to an account, as the media server lists it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Session {
     /// What the media server tells the device apart by, which stays the same while
     /// what it calls itself may not.
@@ -279,7 +258,10 @@ pub struct Session {
 /// Who and what, and where: what a household recognises about somebody watching. No
 /// stream, no bitrate and no transcode reason, because a member is not choosing one and
 /// a surface handed those would have to decide not to draw them.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema, serde::Deserialize,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Playback {
     /// The identifier the server files the account under.
     pub member_id: String,
@@ -309,7 +291,10 @@ pub struct Playback {
 ///
 /// Named apart from the [`Library`](crate::service::Library) trait beside it: that is
 /// a service which *has* a library, and this is one library it holds.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct NamedLibrary {
     /// The identifier the server tells it apart by, which is what an [`Access`]
     /// naming a few libraries names them with.
@@ -327,7 +312,10 @@ pub struct NamedLibrary {
 /// The server's table also carries an entry for content it has no rating for, and that
 /// entry carries no age. It is not a certificate and is not one of these — what to do
 /// about unrated content is a separate choice, carried separately by [`Allowed`].
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Certificate {
     /// What the certificate is called where the operator lives.
     pub name: String,
@@ -352,7 +340,17 @@ pub struct Certificate {
 /// Letting it through is the default because it is the media server's: a new account
 /// is made holding nothing back, so that is the state an account is found in rather
 /// than a decision anybody took.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    schemars::JsonSchema,
+    serde::Deserialize,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum Unrated {
     /// Content with no rating is held back.
@@ -378,7 +376,10 @@ pub enum Unrated {
 /// watched on it. So there is deliberately nothing here that says "every library" or
 /// "no limit": naming neither is saying nothing, which on a new account is the media
 /// server's own opening state and on an existing one is what its household chose.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Allowed {
     /// The libraries chosen, by the server's own identifier.
     ///
@@ -398,7 +399,10 @@ pub struct Allowed {
 ///
 /// Read off the account rather than stored here: the media server is where access is
 /// decided, so anything written down would be a second copy able to disagree with it.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Access {
     /// Every library the server holds, rather than a chosen few.
     ///
@@ -422,7 +426,10 @@ pub struct Access {
 }
 
 /// Somebody the media server holds an account for.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Member {
     /// The identifier the server assigned.
     pub id: String,
@@ -447,7 +454,10 @@ pub struct Member {
 }
 
 /// When one account was made, as the media server recorded it happening.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Invited {
     /// The account it is about, matching a [`Member::id`].
     pub member: String,

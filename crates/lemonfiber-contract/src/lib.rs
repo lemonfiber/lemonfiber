@@ -13,6 +13,7 @@
 //! unknown field, a wrong type, a status the contract does not declare, a body past the
 //! bound or an answer past the deadline is refused and never read ([`client`]).
 
+pub mod adapter;
 pub mod capabilities;
 pub mod client;
 mod declare;
@@ -21,6 +22,7 @@ pub mod documents;
 use declare::contract;
 pub mod wire;
 
+pub use adapter::Served;
 pub use client::Contracted;
 pub use lemonfiber_ports::service::Failure;
 pub use wire::Refusal;
@@ -45,6 +47,8 @@ pub struct Operation {
     pub asked: schemars::Schema,
     /// The schema of what is answered.
     pub answered: schemars::Schema,
+    /// The most its answer may carry, in bytes.
+    pub largest: usize,
 }
 
 impl Operation {
@@ -61,7 +65,15 @@ impl Operation {
             name,
             asked: schemars::schema_for!(A),
             answered: schemars::schema_for!(R),
+            largest: client::LARGEST,
         }
+    }
+
+    /// The same operation, its answer bounded at `largest` bytes.
+    #[must_use]
+    pub const fn within(mut self, largest: usize) -> Self {
+        self.largest = largest;
+        self
     }
 
     /// Where it is asked.

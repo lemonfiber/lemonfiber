@@ -17,6 +17,8 @@ use std::path::Path;
 use lemonfiber_manifest::Service;
 use lemonfiber_sidecar::gate::{File, Kind, Upstreams};
 
+use crate::ports::media;
+
 use super::rotating::{said, unproven, would_rotate};
 use crate::app::gating;
 use crate::app::Ctx;
@@ -84,11 +86,11 @@ pub(super) async fn held(ctx: &Ctx, services: &[Service], project: Option<&Path>
     routes
         .iter()
         .map(|route| {
-            let found = match route.kind {
-                Kind::Jellyfin => link.as_ref().map(|link| linked(link, route)),
-                Kind::Sonarr | Kind::Radarr => targets
+            let found = match gating::fetching(route.kind) {
+                None => link.as_ref().map(|link| linked(link, route)),
+                Some(kind) => targets
                     .as_deref()
-                    .map(|targets| targeted(targets, route).map(|target| target.key.clone())),
+                    .map(|targets| targeted(targets, route, kind).map(|target| target.key.clone())),
             };
             let found = match found {
                 None => Found::Unread,
@@ -175,9 +177,9 @@ pub(super) async fn rotate(
         Ok(beside) => beside,
         Err(reason) => return unproven(held, &kept.unwritten(&reason)),
     };
-    let proven = match route.kind {
-        Kind::Jellyfin => relinked(&seerr, &route, &token).await,
-        Kind::Sonarr | Kind::Radarr => retargeted(&seerr, &route, &token).await,
+    let proven = match gating::fetching(route.kind) {
+        None => relinked(&seerr, &route, &token).await,
+        Some(kind) => retargeted(&seerr, &route, &token, kind).await,
     };
     if let Err(detail) = proven {
         let _ = kept.restore();
@@ -198,25 +200,25 @@ pub(super) async fn rotate(
 
 /// Give the request service's target at `route` the new token and have it prove it,
 /// putting the old one back where the proof fails.
-async fn retargeted(seerr: &dyn Requests, route: &Route, token: &str) -> Result<(), String> {
+async fn retargeted(
+    seerr: &dyn Requests,
+    route: &Route,
+    token: &str,
+    kind: media::Kind,
+) -> Result<(), String> {
     let at = through_the_gate(&route.id);
     let targets = seerr
         .fulfilment_targets()
         .await
         .map_err(|failure| said(&failure))?;
-    let Some(held) = targeted(&targets, route) else {
+    let Some(held) = targeted(&targets, route, kind) else {
         return Err(not_handed(&name(route)));
     };
     seerr
         .move_fulfilment_target(held, &at, token)
         .await
         .map_err(|failure| said(&failure))?;
-    let television = route.kind == Kind::Sonarr;
-    if seerr
-        .test_fulfilment_target(television, &at, token)
-        .await
-        .is_ok()
-    {
+    if seerr.test_fulfilment_target(kind, &at, token).await.is_ok() {
         return Ok(());
     }
     let moved = RegisteredTarget {
@@ -251,12 +253,15 @@ fn unreached(route: &Route) -> String {
 }
 
 /// The target the request service holds at `route` through the gate.
-fn targeted<'a>(targets: &'a [RegisteredTarget], route: &Route) -> Option<&'a RegisteredTarget> {
+fn targeted<'a>(
+    targets: &'a [RegisteredTarget],
+    route: &Route,
+    kind: media::Kind,
+) -> Option<&'a RegisteredTarget> {
     let at = through_the_gate(&route.id);
-    let television = route.kind == Kind::Sonarr;
     targets
         .iter()
-        .find(|target| target.at == at && target.television == television)
+        .find(|target| target.at == at && target.kind == kind)
 }
 
 /// The token the request service presents to Jellyfin, where it reaches it at `route`.

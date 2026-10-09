@@ -22,57 +22,56 @@ const CONFIGURATION: &str = "/System/Configuration";
 /// The field that holds the cross-origin allow-list.
 const CORS_HOSTS: &str = "CorsHosts";
 
-impl Jellyfin {
-    /// The origins the allow-list names now.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Failure`] where Jellyfin is unreachable, refuses the sign-in, or answers
-    /// with a configuration that cannot be read.
-    pub async fn cors_hosts(&self) -> Result<Vec<String>, Failure> {
-        let configuration = self.configuration().await?;
-        Ok(hosts(&configuration))
-    }
+/// The origins the allow-list names now.
+///
+/// # Errors
+///
+/// Returns [`Failure`] where Jellyfin is unreachable, refuses the sign-in, or answers
+/// with a configuration that cannot be read.
+pub(super) async fn allowed_origins(jellyfin: &Jellyfin) -> Result<Vec<String>, Failure> {
+    let configuration = configuration(jellyfin).await?;
+    Ok(hosts(&configuration))
+}
 
-    /// Name `origin` alone in the allow-list, and hold the server to having kept it.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Failure`] where the origin is empty or a wildcard, where Jellyfin is
-    /// unreachable, refuses the sign-in or the write, or reads back a list other than
-    /// the one written.
-    pub async fn allow_only(&self, origin: &str) -> Result<(), Failure> {
-        if origin.trim().is_empty() || origin.contains('*') {
-            return Err(self.endpoint.refused(&format!(
-                "{origin:?} is not an origin the allow-list may be written as"
-            )));
-        }
-        let mut configuration = self.configuration().await?;
-        let Some(fields) = configuration.as_object_mut() else {
-            return Err(self
-                .endpoint
-                .refused("the server configuration is not an object"));
-        };
-        fields.insert(CORS_HOSTS.to_owned(), serde_json::json!([origin]));
-        let response = self
-            .as_admin(Method::Post, CONFIGURATION, Some(configuration.to_string()))
-            .await?;
-        self.endpoint.expect_success(&response)?;
-        let kept = self.cors_hosts().await?;
-        if kept != [origin] {
-            return Err(self.endpoint.refused(&format!(
-                "the allow-list was written as {origin} and reads back as {kept:?}"
-            )));
-        }
-        Ok(())
+/// Name `origin` alone in the allow-list, and hold the server to having kept it.
+///
+/// # Errors
+///
+/// Returns [`Failure`] where the origin is empty or a wildcard, where Jellyfin is
+/// unreachable, refuses the sign-in or the write, or reads back a list other than
+/// the one written.
+pub(super) async fn allow_only(jellyfin: &Jellyfin, origin: &str) -> Result<(), Failure> {
+    if origin.trim().is_empty() || origin.contains('*') {
+        return Err(jellyfin.endpoint.refused(&format!(
+            "{origin:?} is not an origin the allow-list may be written as"
+        )));
     }
+    let mut configuration = configuration(jellyfin).await?;
+    let Some(fields) = configuration.as_object_mut() else {
+        return Err(jellyfin
+            .endpoint
+            .refused("the server configuration is not an object"));
+    };
+    fields.insert(CORS_HOSTS.to_owned(), serde_json::json!([origin]));
+    let response = jellyfin
+        .as_admin(Method::Post, CONFIGURATION, Some(configuration.to_string()))
+        .await?;
+    jellyfin.endpoint.expect_success(&response)?;
+    let kept = allowed_origins(jellyfin).await?;
+    if kept != [origin] {
+        return Err(jellyfin.endpoint.refused(&format!(
+            "the allow-list was written as {origin} and reads back as {kept:?}"
+        )));
+    }
+    Ok(())
+}
 
-    /// The server's whole configuration, as it answers it.
-    async fn configuration(&self) -> Result<serde_json::Value, Failure> {
-        let response = self.as_admin(Method::Get, CONFIGURATION, None).await?;
-        self.endpoint
-            .decode(&response, "the server configuration could not be read")
-    }
+/// The server's whole configuration, as it answers it.
+async fn configuration(jellyfin: &Jellyfin) -> Result<serde_json::Value, Failure> {
+    let response = jellyfin.as_admin(Method::Get, CONFIGURATION, None).await?;
+    jellyfin
+        .endpoint
+        .decode(&response, "the server configuration could not be read")
 }
 
 /// The origins a configuration's allow-list names, in the order it names them.

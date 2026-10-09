@@ -170,16 +170,6 @@ async fn a_mint_from_another_machine_in_the_clear_is_refused_before_the_password
     assert!(!env.with_file_name("keys.json").exists());
 }
 
-/// What the media server answers a name and password it recognises with.
-const SIGNED_IN: &str = r#"{"AccessToken":"a-session","User":{"Id":"a7f3"}}"#;
-
-/// What it answers when asked whether that member's account still stands.
-const STANDING: &str = r#"{"Id":"a7f3","HasPassword":true}"#;
-
-/// The household it holds: Ana, and nobody else.
-const HOUSEHOLD: &str = r#"[{"Id":"a7f3","Name":"ana","HasPassword":true,
-    "Policy":{"IsAdministrator":false,"EnableAllFolders":true}}]"#;
-
 /// A machine over the stack's own media server, where Ana holds a session, the operator
 /// having allowed members to mint keys or not.
 ///

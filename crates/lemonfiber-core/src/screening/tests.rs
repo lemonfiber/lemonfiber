@@ -2,11 +2,11 @@ use std::sync::Arc;
 
 use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
-use super::{a_device, an_item, lapsed, viewed};
+use super::{a_device, an_item, lapsed, picture, viewed, Pictured, PICTURE_MOST};
 use crate::app::{Ctx, Outcome, Viewing, Whom};
 use crate::error::codes::play;
 use crate::ports::http::Method;
-use crate::ports::service::HowFar;
+use crate::ports::service::{HowFar, Picture};
 use crate::test_support::{a_context, a_password, SeedFs};
 
 /// A Servarr config carrying a readable key, so the stack resolves its targets.
@@ -631,4 +631,136 @@ async fn every_episode_of_a_series_is_located_like_the_series() {
     assert!(episodes
         .iter()
         .all(|episode| episode.held.at.unlocated.is_some()));
+}
+
+/// The film on the shelf, as the media server answers it for a member.
+const ON_THE_SHELF: &str = r#"{"Id":"0123456789abcdef0123456789abcdef","Name":"Heat",
+    "Type":"Movie","IsFolder":false}"#;
+
+/// A picture asked for as Ada, with the media server answering the picture `answer`
+/// and the title `title`, and the code it was refused with.
+async fn pictured(tag: &str, answer: Answer, title: Answer) -> Result<Pictured, String> {
+    let transport = server(vec![("/Images/", answer), ("/Items/", title)]);
+    let ctx = ctx_over(transport, &format!("picture-{tag}"));
+    picture(
+        &ctx,
+        &Whom::Named("ada".to_owned()),
+        FILM,
+        Picture::Backdrop,
+    )
+    .await
+    .map_err(|problem| problem.code.to_string())
+}
+
+#[tokio::test]
+async fn a_picture_is_asked_after_the_title_as_the_member_and_passed_on_as_a_raster() {
+    let transport = server(vec![
+        (
+            "/Images/",
+            Answer::served(200, "IMAGE/JPEG; q=1", "the-backdrop"),
+        ),
+        ("/Items/", Answer::reply(200, ON_THE_SHELF)),
+    ]);
+    let ctx = ctx_over(Arc::clone(&transport), "picture");
+    let shown = picture(
+        &ctx,
+        &Whom::Named("ada".to_owned()),
+        FILM,
+        Picture::Backdrop,
+    )
+    .await;
+    assert_eq!(
+        shown.ok(),
+        Some(Pictured {
+            media_type: "image/jpeg",
+            bytes: b"the-backdrop".to_vec(),
+        })
+    );
+    let asked = asked(&transport);
+    let title = asked
+        .iter()
+        .position(|one| one.1 == format!("/Items/{FILM}?userId=a7f3"));
+    let image = asked
+        .iter()
+        .position(|one| one.1 == format!("/Items/{FILM}/Images/Backdrop"));
+    assert!(title.is_some() && title < image, "{asked:?}");
+}
+
+#[tokio::test]
+async fn a_picture_off_the_shelf_missing_or_not_a_raster_is_absent() {
+    let jpeg = || Answer::served(200, "image/jpeg", "x");
+    let on_the_shelf = || Answer::reply(200, ON_THE_SHELF);
+    for (tag, answer, title) in [
+        ("off-the-shelf", jpeg(), Answer::reply(404, "")),
+        ("missing", Answer::reply(404, ""), on_the_shelf()),
+        (
+            "vector",
+            Answer::served(200, "image/svg+xml", "<svg/>"),
+            on_the_shelf(),
+        ),
+        ("untyped", Answer::reply(200, "x"), on_the_shelf()),
+        (
+            "oversized",
+            Answer::served(200, "image/png", "x".repeat(PICTURE_MOST + 1)),
+            on_the_shelf(),
+        ),
+    ] {
+        assert_eq!(
+            pictured(tag, answer, title).await.err().as_deref(),
+            Some("PLAY-9"),
+            "{tag}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_picture_the_server_will_not_answer_is_unanswered_and_a_bad_id_is_never_asked() {
+    for (tag, answer) in [
+        ("silent", Answer::Silent),
+        ("failing", Answer::reply(500, "")),
+    ] {
+        assert_eq!(
+            pictured(tag, answer, Answer::reply(200, ON_THE_SHELF))
+                .await
+                .err()
+                .as_deref(),
+            Some("PLAY-5"),
+            "{tag}"
+        );
+    }
+    let transport = server(Vec::new());
+    let ctx = ctx_over(Arc::clone(&transport), "picture-not-an-item");
+    let refused = picture(&ctx, &Whom::Defaults, "../System", Picture::Poster).await;
+    assert_eq!(
+        refused
+            .err()
+            .map(|problem| problem.code.to_string())
+            .as_deref(),
+        Some("PLAY-1")
+    );
+    assert!(transport.requests().is_empty());
+}
+
+#[tokio::test]
+async fn the_households_defaults_are_shown_a_picture_without_naming_a_member() {
+    let transport = server(vec![
+        ("/Images/", Answer::served(200, "image/png", "the-poster")),
+        ("/Items/", Answer::reply(200, ON_THE_SHELF)),
+    ]);
+    let ctx = ctx_over(Arc::clone(&transport), "picture-defaults");
+    let shown = picture(&ctx, &Whom::Defaults, FILM, Picture::Poster).await;
+    assert_eq!(
+        shown.ok(),
+        Some(Pictured {
+            media_type: "image/png",
+            bytes: b"the-poster".to_vec(),
+        })
+    );
+    assert_eq!(
+        asked(&transport),
+        vec![
+            (Method::Get, format!("/Items/{FILM}")),
+            (Method::Get, format!("/Items/{FILM}/Images/Primary")),
+        ]
+    );
 }

@@ -1,5 +1,5 @@
 //! The reads: one endpoint per question a command already answers, plus
-//! the two that answer with something other than a value.
+//! the ones that answer with something other than a value.
 //!
 //! Nothing here serialises anything. An endpoint turns its path and its query
 //! into the command a person would type, hands that to the dispatcher the
@@ -17,11 +17,12 @@
 //! reach the same command. What a read takes is named there too, beside the
 //! command, so one place refuses a parameter no read takes — including on the
 //! reads that take nothing at all. What is left here is the carrying out: one route
-//! per name in that table, and the two reads that answer with a stream and a file.
+//! per name in that table, and the reads that answer with a stream or a file.
 
 mod bundle;
 pub mod kept;
 mod logs;
+mod pictures;
 pub mod published;
 pub mod table;
 
@@ -49,7 +50,7 @@ use crate::serve::{answered, carrying, JSON};
 const FAILED: StatusCode = StatusCode::INTERNAL_SERVER_ERROR;
 
 /// The reads this surface answers: every read [`OFFERED`] names, each carried out by
-/// [`reading`] under its own name, and the two that answer with something other than
+/// [`reading`] under its own name, and the ones that answer with something other than
 /// an envelope.
 pub fn routes() -> Router<Serving> {
     OFFERED
@@ -70,6 +71,7 @@ pub fn routes() -> Router<Serving> {
         .route(TITLE, get(title))
         .merge(logs::routes())
         .merge(bundle::routes())
+        .merge(pictures::routes())
 }
 
 /// One title, named in the path, carried out as every other read is.

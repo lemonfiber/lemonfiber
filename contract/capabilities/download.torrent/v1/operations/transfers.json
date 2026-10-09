@@ -23,7 +23,7 @@
               "$defs": {
                 "Download": {
                   "additionalProperties": false,
-                  "description": "One active download a client is working, normalised to what the dashboard\nshows — the point at which each client's own idea of progress becomes the\nsame three figures.\n\nThe protocol is not carried here: it is intrinsic to which client answered —\na torrent from qBittorrent, a Usenet download from `SABnzbd` — so the gatherer\nsets it from the target it asked rather than trusting each client to name it.",
+                  "description": "One active download a client is working, normalised to what the dashboard\nshows — the point at which each client's own idea of progress becomes the\nsame three figures.\n\nThe protocol is not carried here: the gatherer sets it from the client it asked\nrather than trusting each client to name it.",
                   "properties": {
                     "eta": {
                       "anyOf": [
@@ -129,6 +129,7 @@
       {
         "key": []
       }
-    ]
+    ],
+    "x-lemonfiber-largest": 1048576
   }
 }

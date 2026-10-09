@@ -7,7 +7,7 @@
           "schema": {
             "$defs": {
               "Kind": {
-                "description": "The two kinds of video a household files by resolution, and so the two the quality\nmodel speaks to. Music and books have a different axis and are not resolution\npresets, so they are not here.\n\nNamed for what is filed, never for the service that files it: whatever curates\ntelevision is asked about `Tv`. Read as the media type a service declares, and\naccepting the old service-named spellings where a record still holds one.",
+                "description": "The two kinds of video a household files by resolution.",
                 "oneOf": [
                   {
                     "const": "tv",
@@ -48,10 +48,10 @@
             "schema": {
               "$schema": "https://json-schema.org/draft/2020-12/schema",
               "additionalProperties": false,
-              "description": "What a subtitle finder already holds for one \\*arr.\n\nRead back so one already pointed at an \\*arr is left alone rather than written\nagain, and so a write can be confirmed by reading it.\n\n**The base path is not part of this**, deliberately: it is normalised on the way\nin — `/` is stored as empty — so comparing it reports a difference nobody made.",
+              "description": "What a subtitle finder already holds for one curator.\n\nRead back so one already pointed at a curator is left alone rather than written\nagain, and so a write can be confirmed by reading it.\n\n**The base path is not part of this**, deliberately: it is normalised on the way\nin — `/` is stored as empty — so comparing it reports a difference nobody made.",
               "properties": {
                 "enabled": {
-                  "description": "Whether the finder is set to use this \\*arr at all. Off is the default, and\nan address written with this left off is an address nothing reads.",
+                  "description": "Whether the finder is set to use this curator at all. Off is the default, and\nan address written with this left off is an address nothing reads.",
                   "type": "boolean"
                 },
                 "host": {
@@ -109,6 +109,7 @@
       {
         "key": []
       }
-    ]
+    ],
+    "x-lemonfiber-largest": 1048576
   }
 }

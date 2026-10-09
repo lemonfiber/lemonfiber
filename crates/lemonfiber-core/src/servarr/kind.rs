@@ -9,16 +9,6 @@ use crate::ports::media::Kind;
 
 /// The Servarr spelling of each kind of video.
 pub(crate) trait Shape: Sized {
-    /// The top-level `recyclarr.yml` section this service is configured under.
-    #[must_use]
-    fn section(self) -> &'static str;
-
-    /// The service whose section a top-level `recyclarr.yml` key names — also the
-    /// service a compose id such as `sonarr` names, since the two share the word —
-    /// or `None` for any other key, so an operator's own additions are left alone.
-    #[must_use]
-    fn for_section(key: &str) -> Option<Kind>;
-
     /// The Servarr command that re-searches existing content for a better release
     /// meeting the current quality profile — the "upgrade what is already here"
     /// action. Named per service, verified against each app's command set.
@@ -65,17 +55,6 @@ pub(crate) trait Shape: Sized {
 }
 
 impl Shape for Kind {
-    fn section(self) -> &'static str {
-        match self {
-            Kind::Tv => "sonarr",
-            Kind::Movies => "radarr",
-        }
-    }
-
-    fn for_section(key: &str) -> Option<Kind> {
-        Kind::ALL.into_iter().find(|kind| kind.section() == key)
-    }
-
     fn upgrade_command(self) -> &'static str {
         match self {
             Kind::Tv => "CutoffUnmetEpisodeSearch",

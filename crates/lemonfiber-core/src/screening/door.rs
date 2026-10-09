@@ -9,7 +9,9 @@ use std::path::{Path, PathBuf};
 
 use crate::app::Ctx;
 use crate::certificate::{self, Kept, Unkept};
-use crate::ports::service::{Held, Located, Medium, Pinned};
+use crate::jellyfin::pictured_at;
+use crate::model::{Episode, Held, Located, PartWay, Pinned, Season, Title};
+use crate::ports::service::{Item, ItemDetail, ItemProgress, Medium, Picture};
 
 /// The port the guarded front door serves encrypted on.
 ///
@@ -156,27 +158,34 @@ const NO_ADDRESS: &str = "This machine's household address is not known, so noth
                           located at its front door. Record the address the household reaches \
                           it at, and every title says where it is served.";
 
+/// Why an item the media server named by something other than an item id is not located.
+const NOT_AN_ITEM: &str = "the media server named this item by something that is not an item id";
+
 /// The same item, located at the door: its pictures where it has them, and where it
 /// streams from where it plays.
 #[must_use]
-pub(crate) fn located(mut held: Held, door: &Door) -> Held {
-    held.at = match door {
+pub(crate) fn located(item: Item, door: &Door) -> Held {
+    let at = match door {
+        _ if !super::an_item(&item.id) => Located {
+            unlocated: Some(NOT_AN_ITEM.to_owned()),
+            ..Located::default()
+        },
         Door::Unknown(why) => Located {
             unlocated: Some(why.clone()),
             ..Located::default()
         },
         Door::At { base, fingerprint } => {
-            let id = &held.id;
+            let id = &item.id;
             Located {
-                poster: held
+                poster: item
                     .holds
                     .poster
-                    .then(|| format!("{base}/Items/{id}/Images/Primary")),
-                backdrop: held
+                    .then(|| format!("{base}{}", pictured_at(id, Picture::Poster))),
+                backdrop: item
                     .holds
                     .backdrop
-                    .then(|| format!("{base}/Items/{id}/Images/Backdrop")),
-                stream_from: streams(&held).then(|| {
+                    .then(|| format!("{base}{}", pictured_at(id, Picture::Backdrop))),
+                stream_from: streams(&item).then(|| {
                     format!("{base}/Videos/{id}/master.m3u8?MediaSourceId={id}&{STREAMED}")
                 }),
                 door: Some(Pinned {
@@ -186,13 +195,59 @@ pub(crate) fn located(mut held: Held, door: &Door) -> Held {
             }
         }
     };
-    held
+    Held {
+        id: item.id,
+        title: item.title,
+        year: item.year,
+        medium: item.medium,
+        at,
+    }
+}
+
+/// A title and every episode in it, located at the door.
+pub(crate) fn placed(detail: ItemDetail, door: &Door) -> Title {
+    Title {
+        held: located(detail.item, door),
+        overview: detail.overview,
+        minutes: detail.minutes,
+        genres: detail.genres,
+        certificate: detail.certificate,
+        released: detail.released,
+        seasons: detail
+            .seasons
+            .into_iter()
+            .map(|season| Season {
+                id: season.id,
+                name: season.name,
+                number: season.number,
+                episodes: season
+                    .episodes
+                    .into_iter()
+                    .map(|episode| Episode {
+                        held: located(episode.item, door),
+                        number: episode.number,
+                        overview: episode.overview,
+                        minutes: episode.minutes,
+                    })
+                    .collect(),
+            })
+            .collect(),
+    }
+}
+
+/// How far a member got through one item, located at the door.
+pub(crate) fn progressed(progress: ItemProgress, door: &Door) -> PartWay {
+    PartWay {
+        held: located(progress.item, door),
+        position: progress.position,
+        length: progress.length,
+    }
 }
 
 /// Whether an item is one that streams: a film or an episode, rather than a series that
 /// holds episodes or something this product does not play.
-fn streams(held: &Held) -> bool {
-    held.holds.plays && matches!(held.medium, Medium::Film | Medium::Episode)
+fn streams(item: &Item) -> bool {
+    item.holds.plays && matches!(item.medium, Medium::Film | Medium::Episode)
 }
 
 #[cfg(test)]

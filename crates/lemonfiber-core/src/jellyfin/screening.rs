@@ -10,7 +10,10 @@ use super::item::ItemResource;
 use super::Jellyfin;
 use crate::endpoint::form_encoded;
 use crate::ports::http::{Method, Request};
-use crate::ports::service::{Episode, Failure, HowFar, PartWay, Screening, Season, Title, PLAYER};
+use crate::ports::service::{
+    EpisodeDetail, Failure, HowFar, Image, Item, ItemDetail, ItemProgress, Picture, Playback,
+    Screening, SeasonDetail, PICTURE_MOST, PLAYER,
+};
 
 /// How many of the server's ticks make a second.
 const TICKS: u64 = 10_000_000;
@@ -86,15 +89,23 @@ struct UserDataUpdate {
 
 #[async_trait]
 impl Screening for Jellyfin {
+    async fn holdings(&self, member: Option<&str>, most: u32) -> Result<Vec<Item>, Failure> {
+        super::household::holdings(self, member, most).await
+    }
+
+    async fn playing(&self, member: Option<&str>) -> Result<Vec<Playback>, Failure> {
+        super::household::now_playing(self, member).await
+    }
+
     async fn signed_in(&self, member: &str, device: &str) -> Result<Option<String>, Failure> {
         opened(self, member, device).await
     }
 
-    async fn title(&self, member: Option<&str>, id: &str) -> Result<Option<Title>, Failure> {
+    async fn title(&self, member: Option<&str>, id: &str) -> Result<Option<ItemDetail>, Failure> {
         titled(self, member, id).await
     }
 
-    async fn part_way(&self, member: &str, most: u32) -> Result<Vec<PartWay>, Failure> {
+    async fn part_way(&self, member: &str, most: u32) -> Result<Vec<ItemProgress>, Failure> {
         let asked = form_encoded(&[
             ("userId", member),
             ("Limit", &most.to_string()),
@@ -115,6 +126,15 @@ impl Screening for Jellyfin {
 
     async fn progressed(&self, member: &str, id: &str, how_far: &HowFar) -> Result<(), Failure> {
         progress(self, member, id, *how_far).await
+    }
+
+    async fn picture(
+        &self,
+        member: Option<&str>,
+        id: &str,
+        which: Picture,
+    ) -> Result<Option<Image>, Failure> {
+        pictured(self, member, id, which).await
     }
 
     async fn sign_out(&self, device: &str) -> Result<(), Failure> {
@@ -188,6 +208,47 @@ async fn opened(
     Ok(Some(opened.token))
 }
 
+/// Where the server serves one of a title's pictures, beneath its address.
+#[must_use]
+pub(crate) fn pictured_at(id: &str, which: Picture) -> String {
+    let named = match which {
+        Picture::Poster => "Primary",
+        Picture::Backdrop => "Backdrop",
+    };
+    format!("/Items/{id}/Images/{named}")
+}
+
+/// One of a title's pictures as `member` may see it, or nothing where they may not see
+/// the title, the server holds no such picture, or it is larger than [`PICTURE_MOST`].
+///
+/// The server serves pictures to anybody, so whether the member may see the title is
+/// asked first, as the member.
+async fn pictured(
+    jellyfin: &Jellyfin,
+    member: Option<&str>,
+    id: &str,
+    which: Picture,
+) -> Result<Option<Image>, Failure> {
+    if !crate::screening::an_item(id) || titled(jellyfin, member, id).await?.is_none() {
+        return Ok(None);
+    }
+    let request = jellyfin.request(Method::Get, &pictured_at(id, which), None);
+    let fetched = jellyfin.endpoint.fetch(&request, PICTURE_MOST).await?;
+    if fetched.status == ABSENT {
+        return Ok(None);
+    }
+    if !fetched.is_success() {
+        return Err(jellyfin
+            .endpoint
+            .refused("the media server would not answer the picture"));
+    }
+    let media_type = fetched
+        .header("content-type")
+        .unwrap_or_default()
+        .to_owned();
+    Ok(fetched.bytes.map(|bytes| Image { media_type, bytes }))
+}
+
 /// A request a member's device makes, named as [`PLAYER`] on that device.
 ///
 /// `device` is held to letters, digits and dashes before it gets here, so it cannot
@@ -209,7 +270,7 @@ async fn titled(
     jellyfin: &Jellyfin,
     member: Option<&str>,
     id: &str,
-) -> Result<Option<Title>, Failure> {
+) -> Result<Option<ItemDetail>, Failure> {
     let response = jellyfin
         .as_admin(Method::Get, &format!("/Items/{id}{}", whose(member)), None)
         .await?;
@@ -260,7 +321,7 @@ async fn seasons(
     jellyfin: &Jellyfin,
     member: Option<&str>,
     id: &str,
-) -> Result<Vec<Season>, Failure> {
+) -> Result<Vec<SeasonDetail>, Failure> {
     let response = jellyfin
         .as_admin(
             Method::Get,
@@ -292,8 +353,8 @@ fn whose(member: Option<&str>) -> String {
 }
 
 /// Each season with the episodes the server files under it, in order.
-fn grouped(seasons: Vec<DetailResource>, episodes: Vec<DetailResource>) -> Vec<Season> {
-    let mut episodes: Vec<(Option<String>, Episode)> = episodes
+fn grouped(seasons: Vec<DetailResource>, episodes: Vec<DetailResource>) -> Vec<SeasonDetail> {
+    let mut episodes: Vec<(Option<String>, EpisodeDetail)> = episodes
         .into_iter()
         .map(|episode| (episode.season.clone(), episode.episode()))
         .collect();
@@ -305,9 +366,9 @@ fn grouped(seasons: Vec<DetailResource>, episodes: Vec<DetailResource>) -> Vec<S
                 .drain(..)
                 .partition(|(of, _)| of.as_deref() == Some(id.as_str()));
             episodes = rest;
-            Season {
+            SeasonDetail {
                 number: season.number,
-                name: season.item.held().title,
+                name: season.item.item().title,
                 id,
                 episodes: within.into_iter().map(|(_, episode)| episode).collect(),
             }
@@ -322,8 +383,8 @@ fn minutes(ticks: Option<u64>) -> Option<u32> {
 
 impl DetailResource {
     /// The title, with the seasons read beside it.
-    fn titled(self, seasons: Vec<Season>) -> Title {
-        Title {
+    fn titled(self, seasons: Vec<SeasonDetail>) -> ItemDetail {
+        ItemDetail {
             overview: self.overview,
             minutes: minutes(self.ticks),
             genres: self.genres,
@@ -332,26 +393,26 @@ impl DetailResource {
                 .premiered
                 .map(|premiered| premiered.chars().take(10).collect()),
             seasons,
-            held: self.item.held(),
+            item: self.item.item(),
         }
     }
 
     /// One episode of a season.
-    fn episode(self) -> Episode {
-        Episode {
+    fn episode(self) -> EpisodeDetail {
+        EpisodeDetail {
             number: self.number,
             overview: self.overview,
             minutes: minutes(self.ticks),
-            held: self.item.held(),
+            item: self.item.item(),
         }
     }
 
     /// Something a member was part-way through, and how far.
-    fn part_way(self) -> PartWay {
-        PartWay {
+    fn part_way(self) -> ItemProgress {
+        ItemProgress {
             position: self.watched.map_or(0, |watched| watched.position / TICKS),
             length: self.ticks.map(|ticks| ticks / TICKS),
-            held: self.item.held(),
+            item: self.item.item(),
         }
     }
 }

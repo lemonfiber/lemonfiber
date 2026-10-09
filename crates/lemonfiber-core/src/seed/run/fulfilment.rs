@@ -19,6 +19,7 @@ use lemonfiber_manifest::Service;
 use super::connecting::{pairings, Connection};
 use super::Ctx;
 use crate::ports::filesystem::Beneath;
+use crate::ports::media::Kind;
 use crate::ports::service::{Client as _, Endpoint, FulfilmentTarget, QualityProfile, Requests};
 use crate::seed::{State, Wiring};
 use crate::wiring::{Address, Filler, Fillers};
@@ -30,8 +31,8 @@ pub(super) struct Fulfils<'a> {
     pub(super) filler: &'a Filler,
     /// Where the request service reaches it beside the others.
     pub(super) at: &'a Address,
-    /// Whether it fetches television rather than film.
-    pub(super) television: bool,
+    /// The kind of video it fetches.
+    pub(super) kind: Kind,
 }
 
 /// Every curator the request service asks for and lemonfiber hands it, as the stack's
@@ -41,10 +42,10 @@ pub(super) fn fulfilling(fillers: &Fillers) -> Vec<Fulfils<'_>> {
     pairings(fillers)
         .into_iter()
         .filter_map(|pairing| match pairing.made {
-            Ok((Connection::Fulfilment { television }, at, _)) => Some(Fulfils {
+            Ok((Connection::Fulfilment { kind }, at, _)) => Some(Fulfils {
                 filler: pairing.filler,
                 at,
-                television,
+                kind,
             }),
             _ => None,
         })
@@ -110,7 +111,7 @@ async fn wanted_targets(ctx: &Ctx, fillers: &Fillers) -> (Vec<FulfilmentTarget>,
             },
             moved_from,
             key,
-            television: fulfils.television,
+            kind: fulfils.kind,
             profile,
             folder,
         });

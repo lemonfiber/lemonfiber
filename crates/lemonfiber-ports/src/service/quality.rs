@@ -31,8 +31,8 @@ pub enum ReleaseProbe {
 }
 
 /// Searching a resolution service for the operator's wanted content, to judge the
-/// quality preset against what the indexers actually carry — Sonarr and Radarr, which
-/// parse each release's quality and say whether their profile would grab it.
+/// quality preset against what the indexers actually carry: a video curator parses
+/// each release's quality and says whether its profile would grab it.
 #[async_trait]
 pub trait QualityReleases: Send + Sync {
     /// Search for one wanted item of `kind` and read what came back against the
@@ -45,9 +45,8 @@ pub trait QualityReleases: Send + Sync {
     async fn probe_releases(&self, kind: crate::media::Kind) -> Result<ReleaseProbe, Failure>;
 }
 
-/// Applying an audio quality to a service that has one — Lidarr, whose quality axis is
-/// a format rather than a resolution and which no community profile configures, so the
-/// choice is carried straight to its own quality profiles.
+/// Applying an audio quality to a music curator, whose quality axis is a format rather
+/// than a resolution, so the choice is carried straight to its own quality profiles.
 #[async_trait]
 pub trait MusicQuality: Send + Sync {
     /// Set every quality profile to the format, and — for a hi-res choice — ensure the

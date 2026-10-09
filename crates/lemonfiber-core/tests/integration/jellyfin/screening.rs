@@ -116,7 +116,7 @@ async fn a_film_is_answered_with_its_details_as_the_member_reads_it() {
             title.genres,
             title.certificate,
             title.released,
-            title.held.holds.plays,
+            title.item.holds.plays,
             title.seasons.len(),
         )
     });
@@ -171,7 +171,7 @@ async fn a_series_carries_each_season_with_its_own_episodes() {
         .unwrap_or_default()
         .into_iter()
         .map(|season| {
-            let ids = season.episodes.into_iter().map(|one| one.held.id).collect();
+            let ids = season.episodes.into_iter().map(|one| one.item.id).collect();
             (season.number, ids)
         })
         .collect();
@@ -198,7 +198,7 @@ async fn part_way_says_how_far_in_whole_seconds() {
         .await
         .unwrap_or_default()
         .into_iter()
-        .map(|one| (one.held.medium, one.position, one.length))
+        .map(|one| (one.item.medium, one.position, one.length))
         .collect();
     assert_eq!(read, vec![(Medium::Episode, 1200, Some(3600))]);
     assert_eq!(

@@ -516,6 +516,43 @@ async fn an_answer_past_the_limit_is_refused_rather_than_held() {
     );
 }
 
+/// A fetch holds what fits, and nothing of an answer that announces or sends more than
+/// it may hold, whichever of the caller's and the client's limits is lower.
+#[tokio::test]
+async fn a_fetch_holds_what_fits_and_nothing_past_the_lower_limit() {
+    let within = serve(Reply::Whole(200, "short")).await;
+    let read = Web::new()
+        .limited(16)
+        .fetch(&asking(&within.base), 64)
+        .await;
+    within.stop().await;
+    assert_eq!(
+        read.ok().and_then(|fetched| fetched.bytes),
+        Some(b"short".to_vec())
+    );
+
+    let announcing = serve(Reply::Announcing(1_000_000)).await;
+    let held = Web::new().fetch(&asking(&announcing.base), 16).await;
+    announcing.stop().await;
+    assert_eq!(
+        held.map(|fetched| (fetched.status, fetched.bytes)),
+        Ok((200, None))
+    );
+
+    let unannounced = serve(Reply::Unannounced("a body a good deal longer than sixteen")).await;
+    let held = Web::new()
+        .fetch(&asking(&unannounced.base), 1024)
+        .await
+        .map(|fetched| fetched.bytes.map(|bytes| bytes.len()));
+    let clipped = Web::new()
+        .limited(16)
+        .fetch(&asking(&unannounced.base), 1024)
+        .await;
+    unannounced.stop().await;
+    assert_eq!(held, Ok(Some(38)));
+    assert_eq!(clipped.map(|fetched| fetched.bytes), Ok(None));
+}
+
 /// A change to part of a resource is sent as one, with its body.
 #[tokio::test]
 async fn a_change_to_part_of_a_resource_is_sent_as_a_patch() {

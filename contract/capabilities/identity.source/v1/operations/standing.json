@@ -1,0 +1,90 @@
+{
+  "post": {
+    "operationId": "standing",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$defs": {
+              "Signed": {
+                "additionalProperties": false,
+                "description": "Who a sign-in proved somebody to be, and the access the server granted for it.\n\nBoth, because the second is what a session is held against: the id says whose\nsession it is, and the access is what the server takes back when the password it\nwas proved with changes.",
+                "properties": {
+                  "id": {
+                    "description": "The id the server files the account under.",
+                    "type": "string"
+                  },
+                  "token": {
+                    "description": "The access the server granted this sign-in.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "token"
+                ],
+                "type": "object"
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "signed": {
+                "$ref": "#/$defs/Signed",
+                "description": "The port's `signed`."
+              }
+            },
+            "required": [
+              "signed"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "title": "boolean",
+              "type": "boolean"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ],
+    "x-lemonfiber-largest": 1048576
+  }
+}

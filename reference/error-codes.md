@@ -258,10 +258,11 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `PLAY-2` | `NOT_ON_THEIR_SHELF` | error | 1 | 404 | 0.18.0 | Said where the title is not one this member may watch, or is not there at all. |
 | `PLAY-3` | `NOT_A_DEVICE` | error | 1 | 400 | 0.18.0 | Said where what names a member's device is not a device id. |
 | `PLAY-4` | `NOTHING_TO_PLAY_FROM` | error | 1 | 503 | 0.18.0 | Said where there is no media server to play from, or it was never set up. |
-| `PLAY-5` | `UNANSWERED` | error | 1 | 502 | 0.18.0 | Said where the media server would not answer for a member. |
+| `PLAY-5` | `SERVER_SILENT` | error | 1 | 502 | 0.18.0 | Said where the media server would not answer for a member. |
 | `PLAY-6` | `NOBODY_NAMED` | error | 1 | 400 | 0.18.0 | Said where nobody is named for something only a member can be. |
 | `PLAY-7` | `NOT_IN_THE_HOUSEHOLD` | error | 1 | 404 | 0.18.0 | Said where the member named is not somebody in the household. |
 | `PLAY-8` | `SIGNS_NO_DEVICE_IN` | error | 1 | 503 | 0.18.0 | Said where the media server will not sign a device in by code. |
+| `PLAY-9` | `NO_SUCH_PICTURE` | error | 1 | 404 | 0.18.0 | Said where a title on the member's shelf has no picture of the kind asked for. |
 
 ## `PLUGIN` — installing and running plugins
 

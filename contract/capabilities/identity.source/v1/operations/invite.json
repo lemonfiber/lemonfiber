@@ -1,0 +1,165 @@
+{
+  "post": {
+    "operationId": "invite",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "name": {
+                "description": "The port's `name`.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$defs": {
+                "Access": {
+                  "additionalProperties": false,
+                  "description": "What one household member may watch.\n\nRead off the account rather than stored here: the media server is where access is\ndecided, so anything written down would be a second copy able to disagree with it.",
+                  "properties": {
+                    "administrator": {
+                      "description": "Whether this account administers the server.",
+                      "type": "boolean"
+                    },
+                    "age_limit": {
+                      "description": "The highest rating they may watch, where the operator set a limit.",
+                      "format": "uint32",
+                      "minimum": 0,
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "disabled": {
+                      "description": "Whether the account is switched off — held, but unable to sign in.",
+                      "type": "boolean"
+                    },
+                    "every_library": {
+                      "description": "Every library the server holds, rather than a chosen few.\n\nTrue is the ordinary case and the one an operator does not have to think\nabout; where it is false, `libraries` says which.",
+                      "type": "boolean"
+                    },
+                    "libraries": {
+                      "description": "The libraries chosen, by the server's own identifier, where not every one.",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "unrated": {
+                      "$ref": "#/$defs/Unrated",
+                      "description": "What becomes of content the server has no rating for.\n\nThe server keeps this as the list of kinds of unrated thing to hold back, and\nwhat a household means by it is all of them or none — so it is read as the one\nanswer that question actually has."
+                    }
+                  },
+                  "required": [
+                    "every_library",
+                    "libraries",
+                    "unrated",
+                    "administrator",
+                    "disabled"
+                  ],
+                  "type": "object"
+                },
+                "Unrated": {
+                  "description": "What is to happen to content the media server has no rating for.\n\nA choice rather than a default, because a great deal of content carries no rating\nand either answer is wrong for somebody: holding it back makes legitimate content\ninvisible, and letting it through lets through the one thing nobody vetted.\n\nSpelled `HeldBack` and `LetThrough` rather than blocked and allowed, because\n[`Allowed`] is the shape this sits on and a field called `unrated: Allowed` would\nread as the opposite of what it is.\n\nA word rather than a flag on both the read and the write, so the setting is named\nthe same in the answer that reports it as in the call that made it — and so neither\n[`Access`] nor the report built from it becomes a row of four unlabelled booleans.\n\nLetting it through is the default because it is the media server's: a new account\nis made holding nothing back, so that is the state an account is found in rather\nthan a decision anybody took.",
+                  "oneOf": [
+                    {
+                      "const": "held-back",
+                      "description": "Content with no rating is held back.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "let-through",
+                      "description": "Content with no rating is let through.",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "additionalProperties": false,
+              "description": "Somebody the media server holds an account for.",
+              "properties": {
+                "access": {
+                  "$ref": "#/$defs/Access",
+                  "description": "What they may watch."
+                },
+                "claimed": {
+                  "description": "Whether they have set a password.\n\nAn account nobody has set one on is an invitation nobody has taken up: the\nwhole of what makes it an invitation rather than an account, and the reason\nnothing needs to be written down about it here.",
+                  "type": "boolean"
+                },
+                "id": {
+                  "description": "The identifier the server assigned.",
+                  "type": "string"
+                },
+                "last_seen": {
+                  "description": "When the server last saw them, as it timestamps it.\n\n`None` before anybody has signed in, so an absence here is a fact about the\naccount rather than a gap in what was read.\n\nAbsent on every unclaimed invitation and on nothing else, so it is what a\nhousehold read shows as never having arrived.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "description": "What they are called.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "claimed",
+                "access"
+              ],
+              "title": "Member",
+              "type": "object"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ],
+    "x-lemonfiber-largest": 1048576
+  }
+}

@@ -13,12 +13,60 @@
 
 use serde::Serialize;
 
-/// The item and its kind, as the port that reads them defines them.
+pub use crate::ports::service::Medium;
+
+/// One thing the household holds, as a member is shown it.
 ///
-/// Re-exported rather than restated. A facing copy of the same four fields would be a
-/// second shape for one thing, and the day one of them grew a field would be the day
-/// the two stopped agreeing about what a household holds.
-pub use crate::ports::service::{Held, Medium};
+/// What a person recognises and nothing else. There is no file path, no container,
+/// no bitrate and no library id: a member deciding what to watch is not choosing a
+/// transcode, and a surface handed those would have to decide not to draw them.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+pub struct Held {
+    /// The identifier the server tells it apart by, which is what asking to play one
+    /// of them names.
+    pub id: String,
+    /// What it is called, in the words the server holds it under.
+    pub title: String,
+    /// The year it came out, where the server knows one. Absent rather than guessed:
+    /// two films share a title far more often than they share a title and a year.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub year: Option<u16>,
+    /// Which of the kinds this product deals in it is.
+    pub medium: Medium,
+    /// Where it is served at the guarded front door, or why it is not.
+    #[serde(flatten)]
+    pub at: Located,
+}
+
+/// Where one item is served at the guarded front door, or why it is not.
+///
+/// Every location is built by the core from the household address the stack publishes
+/// for the media server, so a client never puts one together.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+pub struct Located {
+    /// Where its poster is served, where it has one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub poster: Option<String>,
+    /// Where its backdrop is served, where it has one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub backdrop: Option<String>,
+    /// Where it streams from, where it plays.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream_from: Option<String>,
+    /// The certificate the door presents, which a client pins, beside any location.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub door: Option<Pinned>,
+    /// Why no location is stated, where none is.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unlocated: Option<String>,
+}
+
+/// The certificate a guarded door presents, as a client pins it.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+pub struct Pinned {
+    /// SHA-256 over the certificate's DER encoding, lower-case hex.
+    pub fingerprint: String,
+}
 
 /// What one member can watch, and who they are.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
@@ -46,17 +94,4 @@ pub struct HeldReport {
     /// Said in a field of its own so that a rehearsal is never told from the real run by
     /// its wording alone.
     pub rehearsed: bool,
-}
-
-impl HeldReport {
-    /// The same shelf with every holding located at the guarded front door.
-    #[must_use]
-    pub(crate) fn located(mut self, door: &crate::screening::door::Door) -> Self {
-        self.holdings = self
-            .holdings
-            .into_iter()
-            .map(|held| crate::screening::door::located(held, door))
-            .collect();
-        self
-    }
 }

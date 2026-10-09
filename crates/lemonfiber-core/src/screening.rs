@@ -17,17 +17,69 @@ use crate::app::targets::jellyfin_reader;
 use crate::app::{Ctx, Outcome, Viewing, Whom};
 use crate::error::codes::play::{
     NOBODY_NAMED, NOTHING_TO_PLAY_FROM, NOT_AN_ITEM, NOT_A_DEVICE, NOT_IN_THE_HOUSEHOLD,
-    NOT_ON_THEIR_SHELF, SIGNS_NO_DEVICE_IN, UNANSWERED,
+    NOT_ON_THEIR_SHELF, NO_SUCH_PICTURE, SERVER_SILENT, SIGNS_NO_DEVICE_IN,
 };
-use crate::error::{Diagnose as _, Problem, Remedy, State};
+use crate::error::{Code, Diagnose as _, Problem, Remedy, State};
 use crate::jellyfin::Jellyfin;
 use crate::model::{GrantReport, PartWayReport, TitleReport, WatchedReport};
-use crate::ports::service::{Household as _, HowFar, Member, Screening as _, Title};
+use crate::ports::service::{
+    Household as _, HowFar, Image, Member, Picture, Screening as _, PICTURE_MOST,
+};
 
-use door::{located, Door};
+use door::{placed, progressed};
+
+/// Every refusal a member's viewing answers with, which a client names by its code.
+pub const REFUSALS: [Code; 9] = [
+    NOT_AN_ITEM,
+    NOT_ON_THEIR_SHELF,
+    NOT_A_DEVICE,
+    NOTHING_TO_PLAY_FROM,
+    SERVER_SILENT,
+    NOBODY_NAMED,
+    NOT_IN_THE_HOUSEHOLD,
+    SIGNS_NO_DEVICE_IN,
+    NO_SUCH_PICTURE,
+];
 
 /// How many titles a member's part-way list answers with.
 pub const A_FEW: u32 = 24;
+
+/// The media types a picture is passed on as: raster images, which carry nothing a
+/// browser runs.
+pub const RASTER: [&str; 5] = [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/gif",
+    "image/avif",
+];
+
+/// A picture as the core passes it on.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Pictured {
+    /// Its media type, one of [`RASTER`].
+    pub media_type: &'static str,
+    /// Its bytes, at most [`PICTURE_MOST`] of them.
+    pub bytes: Vec<u8>,
+}
+
+/// The picture as the core passes it on, where it is a raster image of at most
+/// [`PICTURE_MOST`] bytes.
+fn passed_on(image: Image) -> Option<Pictured> {
+    let declared = image
+        .media_type
+        .split(';')
+        .next()
+        .unwrap_or_default()
+        .trim();
+    let media_type = RASTER
+        .into_iter()
+        .find(|raster| raster.eq_ignore_ascii_case(declared))?;
+    (image.bytes.len() <= PICTURE_MOST).then_some(Pictured {
+        media_type,
+        bytes: image.bytes,
+    })
+}
 
 /// What one of a member's viewing requests comes to.
 ///
@@ -86,6 +138,39 @@ async fn title(ctx: &Ctx, whose: &Whom, id: &str) -> Result<TitleReport, Box<Pro
     })
 }
 
+/// One of a title's pictures, as the member it was asked for may see it.
+///
+/// # Errors
+///
+/// A [`Problem`] where the id names nothing the server could hold, where the title is
+/// not on the member's shelf or has no such picture, where what the server answered is
+/// not a raster image of at most [`PICTURE_MOST`] bytes, and where there is no server or
+/// it does not answer.
+pub async fn picture(
+    ctx: &Ctx,
+    whose: &Whom,
+    id: &str,
+    which: Picture,
+) -> Result<Pictured, Box<Problem>> {
+    if !an_item(id) {
+        return Err(refused(
+            NOT_AN_ITEM,
+            "That is not a title the household could hold",
+        ));
+    }
+    let server = server(ctx)?;
+    let member = match whose {
+        Whom::Named(named) => Some(member(&server, named).await?),
+        Whom::Defaults => None,
+    };
+    server
+        .picture(member.as_ref().map(|member| member.id.as_str()), id, which)
+        .await
+        .map_err(|_| unanswered())?
+        .and_then(passed_on)
+        .ok_or_else(|| refused(NO_SUCH_PICTURE, "That title has no such picture"))
+}
+
 /// What one member was part-way through, most recent first.
 ///
 /// # Errors
@@ -112,10 +197,7 @@ async fn part_way(ctx: &Ctx, whose: &Whom, most: u32) -> Result<PartWayReport, B
         id: member.id,
         part_way: part_way
             .into_iter()
-            .map(|mut one| {
-                one.held = located(one.held, &door);
-                one
-            })
+            .map(|one| progressed(one, &door))
             .collect(),
         available: true,
         findings: Vec::new(),
@@ -228,17 +310,6 @@ pub(crate) async fn lapsed(ctx: &Ctx) {
     }
 }
 
-/// A title and every episode in it, located at the door.
-fn placed(mut title: Title, door: &Door) -> Title {
-    title.held = located(title.held, door);
-    for season in &mut title.seasons {
-        for episode in &mut season.episodes {
-            episode.held = located(episode.held.clone(), door);
-        }
-    }
-    title
-}
-
 /// Whether `id` is shaped like an item the media server files: thirty-two hex digits,
 /// with or without the four dashes.
 ///
@@ -328,7 +399,7 @@ fn nobody() -> Box<Problem> {
 
 /// The refusal for a server that did not answer.
 fn unanswered() -> Box<Problem> {
-    refused(UNANSWERED, "The media server did not answer")
+    refused(SERVER_SILENT, "The media server did not answer")
 }
 
 #[cfg(test)]

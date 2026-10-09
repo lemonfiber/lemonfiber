@@ -36,7 +36,7 @@ codes! {
         remedy: "Add a media server to the stack and run `lemonfiber setup`.",
     }
     /// Said where the media server would not answer for a member.
-    UNANSWERED = "PLAY-5" {
+    SERVER_SILENT = "PLAY-5" {
         severity: Error,
         status: 502,
         since: "0.18.0",
@@ -70,5 +70,14 @@ codes! {
         meaning: "The media server has signing devices in by code turned off, so no session \
             can be opened for the member's device without their password. Nothing was changed.",
         remedy: "Turn Quick Connect on in the media server's dashboard, then grant again.",
+    }
+    /// Said where a title on the member's shelf has no picture of the kind asked for.
+    NO_SUCH_PICTURE = "PLAY-9" {
+        severity: Error,
+        status: 404,
+        since: "0.18.0",
+        meaning: "That title has no picture of that kind the media server serves as an image of \
+            at most two megabytes, so there is nothing to show.",
+        remedy: "Draw the title by its name where it has no picture.",
     }
 }

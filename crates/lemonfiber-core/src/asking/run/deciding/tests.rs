@@ -1,10 +1,11 @@
 use super::{deciding, reason_given, said_of, still_waiting};
 use crate::app::command::{Answer, Decision};
 use crate::ports::service::HouseholdRequest;
+use crate::ports::service::{MediaStatus, RequestStatus};
 use crate::test_support::a_context;
 
 /// One request as the service records it, at the two statuses that decide its state.
-fn asked(id: i64, request_status: u8, media_status: u8) -> HouseholdRequest {
+fn asked(id: i64, request_status: RequestStatus, media_status: MediaStatus) -> HouseholdRequest {
     HouseholdRequest {
         arrived: None,
         shelf_id: None,
@@ -14,8 +15,8 @@ fn asked(id: i64, request_status: u8, media_status: u8) -> HouseholdRequest {
         member_id: None,
         kind: Some(crate::recyclarr::Kind::Movies),
         item: None,
-        request_status,
-        media_status,
+        request_status: Some(request_status),
+        media_status: Some(media_status),
     }
 }
 
@@ -50,7 +51,7 @@ async fn a_stack_that_cannot_be_read_rules_on_nothing() {
 /// A request nobody has ruled on is the one that can be ruled on.
 #[test]
 fn a_request_nobody_has_ruled_on_is_the_one_that_can_be_decided() {
-    let held = [asked(7, 1, 1)];
+    let held = [asked(7, RequestStatus::Pending, MediaStatus::Unknown)];
 
     assert!(still_waiting(&held, 7).is_some());
 }
@@ -58,7 +59,10 @@ fn a_request_nobody_has_ruled_on_is_the_one_that_can_be_decided() {
 /// One already decided, and one this service does not hold, are both nothing.
 #[test]
 fn one_already_decided_and_one_it_does_not_hold_are_both_nothing() {
-    let held = [asked(7, 2, 5), asked(8, 3, 1)];
+    let held = [
+        asked(7, RequestStatus::Approved, MediaStatus::Available),
+        asked(8, RequestStatus::Declined, MediaStatus::Unknown),
+    ];
 
     assert!(
         still_waiting(&held, 7).is_none(),
@@ -109,7 +113,10 @@ fn a_reason_that_says_nothing_is_refused() {
 /// know until it has tried.
 #[test]
 fn a_decline_says_the_reason_back_and_that_the_service_holds_none() {
-    let said = said_of(&asked(7, 1, 1), Some("we are out of room"));
+    let said = said_of(
+        &asked(7, RequestStatus::Pending, MediaStatus::Unknown),
+        Some("we are out of room"),
+    );
 
     assert!(said.contains("Ana"), "{said}");
     assert!(said.contains("we are out of room"), "{said}");
@@ -120,7 +127,10 @@ fn a_decline_says_the_reason_back_and_that_the_service_holds_none() {
 /// An approval says it is being fetched, and says nothing about a reason.
 #[test]
 fn an_approval_says_it_is_being_fetched() {
-    let said = said_of(&asked(7, 1, 1), None);
+    let said = said_of(
+        &asked(7, RequestStatus::Pending, MediaStatus::Unknown),
+        None,
+    );
 
     assert!(said.contains("Ana"), "{said}");
     assert!(said.contains("approved"), "{said}");
