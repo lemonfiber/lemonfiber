@@ -73,6 +73,8 @@ pub struct Filler {
     pub provides: Vec<String>,
     /// Every contract it is asked over, each `capability@major`.
     pub contracts: Vec<String>,
+    /// Whether the plugin that brought it is one this build embeds as first-party.
+    pub first_party: bool,
     /// The majors of its image that run here: the first number of the tag it is pinned
     /// by, or nothing where the tag does not open with one.
     pub majors: Vec<u32>,
@@ -97,6 +99,17 @@ impl Filler {
             confined_to: self.confined_to.clone(),
             kind: crate::ports::media::Kind::of_declared(&self.media_types),
         })
+    }
+
+    /// Who holds what it holds, as a credential crossing to or from it is judged.
+    #[must_use]
+    pub fn holder(&self) -> Holder<'_> {
+        match &self.origin {
+            Origin::Bundled => Holder::Stack,
+            Origin::Plugin { named } if self.first_party => Holder::FirstParty(named),
+            Origin::Plugin { named } => Holder::ThirdParty(named),
+            _ => Holder::Nobody,
+        }
     }
 
     /// The plugin that brought it, or nothing where the stack ships it.
@@ -156,14 +169,33 @@ impl Fillers {
         chosen: &Chosen,
         project: Option<&Path>,
     ) -> Self {
+        Self::trusting(
+            manifest,
+            installed,
+            chosen,
+            project,
+            crate::plugin::first_party::EMBEDDED,
+        )
+    }
+
+    /// As [`Self::of`], with `trusted` as the plugins that are first-party.
+    #[must_use]
+    pub fn trusting(
+        manifest: &Manifest,
+        installed: &[Installed],
+        chosen: &Chosen,
+        project: Option<&Path>,
+        trusted: &[crate::plugin::first_party::FirstParty],
+    ) -> Self {
         let bundled = manifest
             .services
             .iter()
             .map(|service| bundled(service, &manifest.services, project));
         let brought = installed.iter().flat_map(|one| {
+            let first_party = crate::plugin::first_party::holds(trusted, one);
             one.services
                 .iter()
-                .map(|placed| brought(&one.plugin, placed, project))
+                .map(move |placed| brought(&one.plugin, placed, project, first_party))
         });
         let services: Vec<Filler> = bundled.chain(brought).collect();
         let asks = settle(manifest, installed, chosen)
@@ -259,22 +291,37 @@ impl Fillers {
     }
 }
 
-/// Whether a credential a service of `owner`'s origin holds may be handed to a service
-/// of `recipient`'s: the one gate every credential crosses between two services here.
+/// Whether a credential `owner` holds may be handed to `recipient`: the one gate every
+/// credential crosses between two services here.
 ///
-/// **Only to the stack's own, or to the owner's own plugin.** A plugin's service is a
-/// stranger's code: what it is handed it can keep, and nothing could take it back. So
-/// no credential of the stack's reaches a plugin's service, and no plugin's credential
-/// reaches another plugin's. A plugin's credential reaching the stack's own service is
-/// a plugin standing in for a bundled one being wired, which is what it was installed
-/// for.
+/// **To the stack's own, to the owner's own plugin, and to a first-party plugin from
+/// the stack or another first-party plugin.** Any other plugin's service is a stranger's
+/// code: what it is handed it can keep, and nothing could take it back. A plugin's
+/// credential reaching the stack's own service is a plugin standing in for a bundled one
+/// being wired, which is what it was installed for.
 #[must_use]
-pub fn crosses(owner: &Origin, recipient: &Origin) -> bool {
-    match recipient {
-        Origin::Bundled => true,
-        Origin::Plugin { .. } => owner == recipient,
+pub fn crosses(owner: Holder<'_>, recipient: Holder<'_>) -> bool {
+    match (owner, recipient) {
+        (_, Holder::Stack) | (Holder::Stack | Holder::FirstParty(_), Holder::FirstParty(_)) => true,
+        (
+            Holder::FirstParty(owner) | Holder::ThirdParty(owner),
+            Holder::FirstParty(recipient) | Holder::ThirdParty(recipient),
+        ) => owner == recipient,
         _ => false,
     }
+}
+
+/// Who holds a credential, as whether it may cross to another is judged.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Holder<'a> {
+    /// The stack's own services.
+    Stack,
+    /// A plugin this build embeds as first-party.
+    FirstParty(&'a str),
+    /// Any other plugin.
+    ThirdParty(&'a str),
+    /// Nothing that can be named as holding it.
+    Nobody,
 }
 
 /// The name a credential `filler` holds would be kept under, ending in `holds`, before
@@ -310,6 +357,7 @@ fn bundled(service: &Service, services: &[Service], project: Option<&Path>) -> F
         media_types: service.media_types.clone(),
         provides: service.provides.clone(),
         contracts: Vec::new(),
+        first_party: false,
         majors: service.majors(),
     }
 }
@@ -318,7 +366,7 @@ fn bundled(service: &Service, services: &[Service], project: Option<&Path>) -> F
 ///
 /// Reached at its own id: a plugin's service has no way to share another container's
 /// network, so there is no tunnel in front of it to be reached through.
-fn brought(plugin: &str, placed: &Placed, project: Option<&Path>) -> Filler {
+fn brought(plugin: &str, placed: &Placed, project: Option<&Path>, first_party: bool) -> Filler {
     Filler {
         id: placed.service.clone(),
         name: placed.called().to_owned(),
@@ -338,6 +386,7 @@ fn brought(plugin: &str, placed: &Placed, project: Option<&Path>) -> Filler {
         media_types: placed.media_types.clone(),
         provides: placed.provides.clone(),
         contracts: placed.speaks.clone(),
+        first_party,
         majors: lemonfiber_manifest::majors(&placed.tag),
     }
 }

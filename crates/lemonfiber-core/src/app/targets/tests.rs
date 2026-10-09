@@ -183,6 +183,7 @@ fn keyed_in(file: &str, within: Option<&str>) -> crate::wiring::Filler {
         media_types: Vec::new(),
         provides: Vec::new(),
         contracts: Vec::new(),
+        first_party: false,
         majors: Vec::new(),
     }
 }

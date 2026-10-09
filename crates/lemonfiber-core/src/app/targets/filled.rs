@@ -16,7 +16,7 @@ use lemonfiber_manifest::Manifest;
 use crate::app::plugins::conformance;
 use crate::app::Ctx;
 use crate::jellyfin::Jellyfin;
-use crate::wiring::Fillers;
+use crate::wiring::{Filler, Fillers};
 
 use super::media::{fillers_here, settled, MediaServer};
 
@@ -67,6 +67,35 @@ async fn served(ctx: &Ctx, fillers: &Fillers) -> Option<Arc<dyn serve::Fills>> {
     )
 }
 
+/// How a service is asked for one capability's contract.
+pub(crate) enum Spoken {
+    /// Over the contract, every answer outside it kept against the plugin.
+    Over(Contracted),
+    /// Not at all: it speaks the contract and has an answer kept against it as outside
+    /// it, or cannot be reached.
+    Unanswered,
+    /// It speaks no contract for the capability, so this build's own adapter is the way.
+    Not,
+}
+
+/// How `filler` is asked for `capability` at `major`.
+pub(crate) async fn spoken(ctx: &Ctx, filler: &Filler, capability: &str, major: u32) -> Spoken {
+    if !filler.contracted(capability, major) {
+        return Spoken::Not;
+    }
+    let Some(named) = filler
+        .brought_by()
+        .filter(|named| conformance::fills(ctx, named, capability))
+    else {
+        return Spoken::Unanswered;
+    };
+    let witness = conformance::witness(ctx, named, capability);
+    match crate::plugin::reaching::filling(ctx, filler).await {
+        Ok(adapter) => Spoken::Over(adapter.witnessed_by(witness)),
+        Err(_) => Spoken::Unanswered,
+    }
+}
+
 /// How the media server is asked for one capability.
 enum Reached {
     /// Over the contract it speaks.
@@ -91,16 +120,10 @@ async fn reached(ctx: &Ctx, fillers: &Fillers, capability: &str, major: u32) -> 
     {
         return None;
     }
-    if filler.contracted(capability, major) {
-        let named = filler.brought_by()?;
-        if !conformance::fills(ctx, named, capability) {
-            return None;
-        }
-        let witness = conformance::witness(ctx, named, capability);
-        return crate::plugin::reaching::filling(ctx, filler)
-            .await
-            .ok()
-            .map(|adapter| Reached::Contracted(adapter.witnessed_by(witness)));
+    match spoken(ctx, filler, capability, major).await {
+        Spoken::Over(adapter) => return Some(Reached::Contracted(adapter)),
+        Spoken::Unanswered => return None,
+        Spoken::Not => {}
     }
     let server = MediaServer::of(fillers)?.administered(ctx)?;
     Some(Reached::Bundled(

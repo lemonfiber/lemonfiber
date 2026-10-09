@@ -36,6 +36,12 @@
       ],
       "required": false
     },
+    "manifest": {
+      "type": [
+        "string"
+      ],
+      "required": false
+    },
     "name": {
       "type": [
         "null|string"

@@ -35,7 +35,7 @@ pub use run::listing;
 mod settling;
 
 pub use chosen::{Chosen, REASON_MOST};
-pub use fillers::{crosses, Address, Ask, Filler, Fillers};
+pub use fillers::{crosses, Address, Ask, Filler, Fillers, Holder};
 use settling::claimants;
 pub use settling::{contested_by, filled, settle, unfilled};
 

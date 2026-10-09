@@ -63,7 +63,7 @@ pub(super) async fn install(
     from: Option<&Fetched<'_>>,
     consent: &Consent,
 ) -> Result<Installs, Box<Problem>> {
-    let (manifest, digest) = accepted(path, from)?;
+    let read = accepted(path, from)?;
 
     // One stamp for the run, taken before anything is decided, so the record says it
     // was installed at the moment its changes are journalled under. A plugin fetched
@@ -75,7 +75,7 @@ pub(super) async fn install(
         ctx,
         &stack_manifest,
         held.installed(),
-        &manifest,
+        &read,
         path,
         from,
         &stamp,
@@ -100,7 +100,7 @@ pub(super) async fn install(
     let planned = writing::landing(ctx, crate::plugin::writes(&would, stack));
     let contests = standing::contested(ctx, &stack_manifest, &held, &would);
     let changes = crate::plugin::changes(&planned);
-    let offer = offering::installing(&digest, &would, &changes, &contests);
+    let offer = offering::installing(&read.digest, &would, &changes, &contests);
     let acting = offering::acting(
         ctx,
         consent,
@@ -110,7 +110,7 @@ pub(super) async fn install(
         &crate::plugin::approvals(&would.recipes),
     )?;
 
-    let mut stated = crate::plugin::proofs(&manifest);
+    let mut stated = crate::plugin::proofs(&read.manifest);
     let mut against = None;
     let mut checked = None;
     let mut put_back = None;
@@ -120,7 +120,7 @@ pub(super) async fn install(
     if acting {
         // Every value a recipe asks the operator for is given, and nothing else is,
         // before anything is written.
-        let consent = &super::following::consented(ctx, &would.plugin, &manifest, consent)?;
+        let consent = &super::following::consented(ctx, &would.plugin, &read.manifest, consent)?;
 
         // An install starts containers, so it owes the pre-flight every start does,
         // and owes it before anything is written: a machine that would resolve the
@@ -139,7 +139,7 @@ pub(super) async fn install(
         // plugin rather than reading it back: the register is what layers a plugin's
         // document into the stack, and it is deliberately not written yet.
         proving::started(ctx, &would, stack, &stamp).await?;
-        proving::asked(ctx, &manifest, &would, stack, &mut stated).await;
+        proving::asked(ctx, &read.manifest, &would, stack, &mut stated).await;
         against = Some(proving::AGAINST);
 
         // The stack is asked only where the plugin's own proofs held. A run that has
@@ -161,7 +161,7 @@ pub(super) async fn install(
         {
             // The recipes run once the install holds and before it is recorded, so a
             // recipe that does not hold puts back an install nothing has recorded.
-            let coming = Following::of(&manifest, &would, &stack_manifest, stack, &stamp);
+            let coming = Following::of(&read.manifest, &would, &stack_manifest, stack, &stamp);
             recipes_ran = followed(ctx, &coming, consent).await?;
             // Answered for here rather than passed on. The record writer is shared and
             // says *your settings could not be saved, your existing settings are
@@ -204,7 +204,7 @@ pub(super) async fn install(
             against,
             verified: checked,
             contests,
-            overrides: crate::plugin::overrides(&manifest),
+            overrides: crate::plugin::overrides(&read.manifest),
             reversed: put_back,
             recipes_ran,
         })),
@@ -292,18 +292,14 @@ pub(super) fn settled(
     ctx: &Ctx,
     stack: &lemonfiber_manifest::Manifest,
     held: &[Installed],
-    manifest: &lemonfiber_plugin::Manifest,
+    read: &Accepted,
     path: &Path,
     from: Option<&Fetched<'_>>,
     stamp: &str,
 ) -> (Installed, PathBuf) {
-    let settled = writing::joined(
-        ctx,
-        stack,
-        held,
-        Installed::of(manifest).installed(path, stamp),
-    )
-    .reaching(stack);
+    let mut installed = Installed::of(&read.manifest).installed(path, stamp);
+    installed.manifest.clone_from(&read.digest);
+    let settled = writing::joined(ctx, stack, held, installed).reaching(stack);
     match from {
         Some(fetched) => {
             let fetched_at = settled.fetched(fetched.url, fetched.commit);
@@ -319,6 +315,14 @@ pub(super) fn settled(
     }
 }
 
+/// A manifest read and held to everything this build refuses.
+pub(super) struct Accepted {
+    /// The manifest.
+    pub(super) manifest: lemonfiber_plugin::Manifest,
+    /// The SHA-256 of the bytes it was read from, in lower-case hexadecimal.
+    pub(super) digest: String,
+}
+
 /// The manifest at this path, read and held to everything this build refuses, and the
 /// SHA-256 of the bytes it was read from.
 ///
@@ -332,10 +336,7 @@ pub(super) fn settled(
 ///
 /// Where the path holds no manifest this build can read, where the catalogue vouched
 /// for a different one, or where this build refuses it.
-pub(super) fn accepted(
-    path: &Path,
-    from: Option<&Fetched<'_>>,
-) -> Result<(lemonfiber_plugin::Manifest, String), Box<Problem>> {
+pub(super) fn accepted(path: &Path, from: Option<&Fetched<'_>>) -> Result<Accepted, Box<Problem>> {
     let (manifest, digest) = crate::plugin::read_digested(path)
         .map_err(|unreadable| Box::new(unreadable_source(&unreadable)))?;
     if let Some(vouched) = from.and_then(|fetched| fetched.vouched) {
@@ -345,7 +346,7 @@ pub(super) fn accepted(
     }
     let refusals = lemonfiber_plugin::refusals(&manifest, BUNDLED_CHECKS);
     if refusals.is_empty() {
-        Ok((manifest, digest))
+        Ok(Accepted { manifest, digest })
     } else {
         Err(Box::new(refused(&manifest, &refusals)))
     }

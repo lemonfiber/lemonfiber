@@ -74,7 +74,7 @@ impl MediaServer {
             // The request service is handed the server's administrator's password once,
             // to be set up, so it is named only where the gate lets that password reach it.
             asked_by: asker
-                .filter(|asker| crate::wiring::crosses(&filler.origin, &asker.origin))
+                .filter(|asker| crate::wiring::crosses(filler.holder(), asker.holder()))
                 .cloned(),
             loopback: loopback(port),
             port,

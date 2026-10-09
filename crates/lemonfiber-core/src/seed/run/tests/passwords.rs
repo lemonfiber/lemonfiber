@@ -34,6 +34,7 @@ fn torrent_client() -> crate::wiring::Filler {
         media_types: Vec::new(),
         provides: Vec::new(),
         contracts: Vec::new(),
+        first_party: false,
         majors: Vec::new(),
     }
 }

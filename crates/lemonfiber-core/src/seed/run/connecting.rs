@@ -195,14 +195,15 @@ fn made<'a>(
 ) -> Result<(Connection, &'a Address, Cleared<'a>), Unmade> {
     // Every connection here hands the asker the filler's credential, so an asker that
     // credential may not reach is connected to nothing, whatever fills what it asked for.
-    if !crate::wiring::crosses(&filler.origin, &asker.origin) {
+    if !crate::wiring::crosses(filler.holder(), asker.holder()) {
         return Err(Unmade::Asked);
     }
     let speaks = filler.adapter.as_ref().ok_or(Unmade::NoAdapter)?.kind;
     let at = filler.address.as_ref().ok_or(Unmade::NoPort)?;
     let asks = asker.adapter.as_ref().ok_or(Unmade::Unpaired)?.kind;
     let made = connection(asks, &ask.capability, speaks, &filler.media_types)?;
-    if made.hands_over_the_askers_key() && !crate::wiring::crosses(&asker.origin, &filler.origin) {
+    if made.hands_over_the_askers_key() && !crate::wiring::crosses(asker.holder(), filler.holder())
+    {
         return Err(Unmade::Withheld);
     }
     Ok((made, at, Cleared(asker)))
