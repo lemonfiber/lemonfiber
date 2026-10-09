@@ -24,6 +24,12 @@
       ],
       "required": true
     },
+    "fronts": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "image": {
       "type": [
         "string"

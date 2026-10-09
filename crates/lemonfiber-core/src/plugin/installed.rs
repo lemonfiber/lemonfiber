@@ -195,6 +195,10 @@ pub struct Placed {
     /// a record written before this was kept.
     #[serde(default)]
     pub speaks: Vec<String>,
+    /// The service of the same plugin it stands in front of, as an adapter; none in a
+    /// record written before this was kept.
+    #[serde(default)]
+    pub fronts: Option<String>,
 }
 
 impl Placed {
@@ -221,6 +225,7 @@ impl Placed {
             media_types: service.media_types.clone(),
             networks: Vec::new(),
             speaks: service.speaks.clone(),
+            fronts: service.fronts.clone(),
         }
     }
 

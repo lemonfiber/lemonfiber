@@ -23,6 +23,9 @@ const ABOUT: &str = "about";
 /// The most an answer may carry, in bytes, where its operation declares no more.
 pub const LARGEST: usize = 1024 * 1024;
 
+/// What a call made without the key carries: nothing an operation could read.
+const UNKEYED_ASKED: &str = "{}";
+
 /// How long an answer may take.
 pub const DEADLINE: Duration = Duration::from_secs(15);
 
@@ -110,7 +113,9 @@ impl Contracted {
     {
         let path = crate::path(capability, major, operation);
         let written = Some(serde_json::to_string(asked));
-        let fetched = self.exchange(Method::Post, &path, written, largest).await?;
+        let fetched = self
+            .exchange(Method::Post, &path, written, largest, true)
+            .await?;
         let answer = self.answer(operation, &fetched)?;
         serde_json::from_str(answer)
             .map_err(|why| self.outside(operation, &format!("the answer did not read: {why}")))
@@ -124,10 +129,25 @@ impl Contracted {
     /// As [`Self::call`].
     pub async fn about(&self) -> Result<crate::adapter::About, Failure> {
         let path = crate::adapter::about_path();
-        let fetched = self.exchange(Method::Get, &path, None, LARGEST).await?;
+        let fetched = self
+            .exchange(Method::Get, &path, None, LARGEST, true)
+            .await?;
         let answer = self.answer(ABOUT, &fetched)?;
         serde_json::from_str(answer)
             .map_err(|why| self.outside(ABOUT, &format!("the answer did not read: {why}")))
+    }
+
+    /// The status the adapter answers `operation` with when it is asked without the key.
+    ///
+    /// # Errors
+    ///
+    /// [`Failure::Unavailable`] where the adapter cannot be reached or does not answer in
+    /// time.
+    pub async fn unkeyed(&self, operation: &crate::Operation) -> Result<u16, Failure> {
+        let asked = Some(Ok(UNKEYED_ASKED.to_owned()));
+        self.exchange(Method::Post, &operation.path(), asked, LARGEST, false)
+            .await
+            .map(|fetched| fetched.status)
     }
 
     /// Send what was asked, written, and wait for the adapter's response.
@@ -141,18 +161,22 @@ impl Contracted {
         path: &str,
         written: Option<serde_json::Result<String>>,
         largest: usize,
+        keyed: bool,
     ) -> Result<Fetched, Failure> {
         let body = written
             .transpose()
             .map_err(|why| self.refused(&why.to_string()))?;
+        let key = keyed.then(|| ("Authorization".to_owned(), format!("Bearer {}", self.key)));
         let request = Request {
             method,
             url: format!("{}{path}", self.base.trim_end_matches('/')),
-            headers: vec![
-                ("Authorization".to_owned(), format!("Bearer {}", self.key)),
-                ("Content-Type".to_owned(), wire::JSON.to_owned()),
-                ("Accept".to_owned(), wire::JSON.to_owned()),
-            ],
+            headers: key
+                .into_iter()
+                .chain([
+                    ("Content-Type".to_owned(), wire::JSON.to_owned()),
+                    ("Accept".to_owned(), wire::JSON.to_owned()),
+                ])
+                .collect(),
             body,
             pinned: None,
         };

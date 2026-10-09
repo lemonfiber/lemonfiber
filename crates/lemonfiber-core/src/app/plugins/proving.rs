@@ -241,7 +241,7 @@ pub(crate) async fn asked(
         .iter()
         .filter(|placed| !placed.speaks.is_empty());
     for (placed, stated) in speaking.zip(stated.iter_mut().skip(manifest.proofs.len())) {
-        stated.came_to = Some(spoken(ctx, stack, placed, deadline).await);
+        stated.came_to = Some(spoken(ctx, stack, installed, placed, deadline).await);
     }
 }
 
@@ -250,31 +250,83 @@ pub(crate) async fn asked(
 pub(super) async fn spoken(
     ctx: &Ctx,
     stack: &Path,
+    installed: &Installed,
     placed: &crate::plugin::Placed,
     deadline: std::time::SystemTime,
 ) -> Verdict {
-    let declared: BTreeSet<&str> = placed.speaks.iter().map(String::as_str).collect();
     loop {
-        let asked = match crate::plugin::reaching::reached(ctx, stack, placed).await {
+        let reached = crate::plugin::reaching::reached(ctx, stack, placed).await;
+        let asked = match &reached {
             Ok(adapter) => adapter.about().await.map_err(|failure| failure.to_string()),
-            Err(why) => Err(why),
+            Err(why) => Err(why.clone()),
         };
-        match asked {
-            Ok(about) => {
-                let said: BTreeSet<&str> = about.speaks.iter().map(String::as_str).collect();
-                return if said == declared {
-                    Verdict::Passed
-                } else {
-                    Verdict::Failed {
-                        faults: vec![format!(
-                            "it says it speaks {said:?}, and its manifest says {declared:?}"
-                        )],
-                    }
-                };
-            }
-            Err(why) if ctx.seams.clock.now() >= deadline => return Verdict::Unproven { why },
-            Err(_) => tokio::time::sleep(POLL).await,
+        match (reached, asked) {
+            (Ok(adapter), Ok(about)) => return held_to(&adapter, installed, placed, &about).await,
+            (_, Err(why)) if ctx.seams.clock.now() >= deadline => return Verdict::Unproven { why },
+            _ => tokio::time::sleep(POLL).await,
         }
+    }
+}
+
+/// Every way an adapter's account of itself and its live cases depart from what its
+/// plugin declares: the contracts it speaks, a release at the digest its upstream is
+/// pinned by, and each live case of each contract answered as the contract says.
+async fn held_to(
+    adapter: &lemonfiber_contract::Contracted,
+    installed: &Installed,
+    placed: &crate::plugin::Placed,
+    about: &lemonfiber_contract::adapter::About,
+) -> Verdict {
+    let mut faults = Vec::new();
+    let declared: BTreeSet<&str> = placed.speaks.iter().map(String::as_str).collect();
+    let said: BTreeSet<&str> = about.speaks.iter().map(String::as_str).collect();
+    if said != declared {
+        faults.push(format!(
+            "it says it speaks {said:?}, and its manifest says {declared:?}"
+        ));
+    }
+    let upstream = placed
+        .fronts
+        .as_deref()
+        .and_then(|fronted| installed.services.iter().find(|one| one.service == fronted));
+    if let Some(upstream) = upstream.filter(|upstream| {
+        !about
+            .releases
+            .iter()
+            .any(|release| release.digest == upstream.digest)
+    }) {
+        faults.push(format!(
+            "it lists no release recorded at {}, the digest {} is pinned by",
+            upstream.digest, upstream.service
+        ));
+    }
+    let spoken: Vec<_> = lemonfiber_contract::capabilities::all()
+        .into_iter()
+        .filter(|one| {
+            placed
+                .speaks
+                .contains(&lemonfiber_contract::spoken(one.name, one.major))
+        })
+        .collect();
+    for capability in &spoken {
+        for case in lemonfiber_contract::conformance::cases(capability) {
+            let lemonfiber_contract::conformance::Expect::Status(statuses) = case.expect else {
+                continue;
+            };
+            match adapter.unkeyed(case.operation).await {
+                Ok(status) if statuses.contains(&status) => {}
+                Ok(status) => faults.push(format!(
+                    "{} answered {status}, and the contract refuses it with {statuses:?}",
+                    case.case
+                )),
+                Err(failure) => faults.push(format!("{}: {failure}", case.case)),
+            }
+        }
+    }
+    if faults.is_empty() {
+        Verdict::Passed
+    } else {
+        Verdict::Failed { faults }
     }
 }
 

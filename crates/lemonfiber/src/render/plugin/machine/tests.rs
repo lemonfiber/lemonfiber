@@ -36,6 +36,7 @@ fn recorded(plugin: &str, reached: Option<Reached>) -> Installed {
             media_types: Vec::new(),
             networks: Vec::new(),
             speaks: Vec::new(),
+            fronts: None,
         }],
         provides: Vec::new(),
         contributions: Vec::new(),

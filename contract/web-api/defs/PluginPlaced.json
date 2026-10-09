@@ -28,6 +28,14 @@
       "description": "The digest that fixes what runs.",
       "type": "string"
     },
+    "fronts": {
+      "description": "The service of the same plugin it stands in front of, as an adapter; none in a\nrecord written before this was kept.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
     "image": {
       "description": "The registry path, carrying no pin of its own.",
       "type": "string"

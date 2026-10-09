@@ -66,6 +66,7 @@ fn placed() -> Placed {
         media_types: Vec::new(),
         networks: Vec::new(),
         speaks: Vec::new(),
+        fronts: None,
     }
 }
 
@@ -206,6 +207,7 @@ fn the_port_an_adapter_speaks_on_is_published_on_loopback_at_a_port_the_engine_p
         reached: None,
         listens: Some(8080),
         speaks: vec!["media.serve@1".to_owned()],
+        fronts: None,
         ..placed()
     });
     assert!(

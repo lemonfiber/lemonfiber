@@ -64,7 +64,7 @@ pub(crate) async fn prove(
         .ok_or_else(|| Box::new(super::writing::nowhere_to_write(plugin)))?;
     let deadline = ctx.seams.clock.now() + ctx.patience;
     for (placed, stated) in speaking.iter().zip(proof.proofs.iter_mut()) {
-        stated.came_to = Some(proving::spoken(ctx, stack, placed, deadline).await);
+        stated.came_to = Some(proving::spoken(ctx, stack, &proved, placed, deadline).await);
     }
     proof.cleared = proving::held(&proof.proofs) && conformance::cleared(ctx, plugin).is_ok();
     Ok(answering(&held, proof, offer))
