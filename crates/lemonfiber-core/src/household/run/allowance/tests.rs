@@ -328,8 +328,8 @@ fn each_kind_is_estimated_at_the_quality_it_is_fetched_at() {
     let mut quality = Selection::everywhere(Preset::SpaceSaving);
     quality.set_type("tv", Preset::Maximum);
 
-    let season = estimated(Some(Kind::Sonarr), &quality);
-    let film = estimated(Some(Kind::Radarr), &quality);
+    let season = estimated(Some(Kind::Tv), &quality);
+    let film = estimated(Some(Kind::Movies), &quality);
 
     assert!(season.is_some_and(|estimate| !estimate.measured));
     assert!(

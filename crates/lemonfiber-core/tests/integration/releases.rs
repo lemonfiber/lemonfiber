@@ -35,6 +35,7 @@ fn sonarr() -> Target {
         config: config_path(),
         version: 3,
         confined_to: None,
+        kind: Some(lemonfiber_core::ports::media::Kind::Tv),
     }
 }
 
@@ -286,6 +287,7 @@ async fn a_film_service_is_searched_by_its_own_id() {
         config: PathBuf::from("/stack/config/radarr/config.xml"),
         version: 3,
         confined_to: None,
+        kind: Some(lemonfiber_core::ports::media::Kind::Movies),
     };
     let fs = Files::at(vec![(
         PathBuf::from("/stack/config/radarr/config.xml"),

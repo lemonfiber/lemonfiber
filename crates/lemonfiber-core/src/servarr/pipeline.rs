@@ -3,6 +3,7 @@
 //! provisioning adapter is built on; only the reads a trace needs live here, kept apart
 //! from the writes that wire the stack together so the two concerns grow separately.
 
+use super::Shape as _;
 use async_trait::async_trait;
 use serde::Deserialize;
 

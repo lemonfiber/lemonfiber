@@ -6,8 +6,8 @@ use crate::walkthrough::Suggestion;
 fn nothing_asked_for_falls_back_to_the_safest_thing_this_stack_can_handle() {
     // The fallback is what an operator with an empty library actually gets, so it has
     // to be something the running services could file.
-    let television = Suggestion::safest(&[Kind::Sonarr]).map(|s| s.kind);
-    assert_eq!(television, Some(Kind::Sonarr));
+    let television = Suggestion::safest(&[Kind::Tv]).map(|s| s.kind);
+    assert_eq!(television, Some(Kind::Tv));
     assert_eq!(Suggestion::safest(&[]), None);
 }
 

@@ -276,8 +276,8 @@ pub(super) fn estimated(kind: Option<Kind>, quality: &Selection) -> Option<Estim
 pub(super) fn for_kind(kind: Kind, quality: &Selection) -> Estimate {
     let preset = quality.for_type(kind.media_type());
     match kind {
-        Kind::Sonarr => Estimate::season(preset),
-        Kind::Radarr => Estimate::film(preset),
+        Kind::Tv => Estimate::season(preset),
+        Kind::Movies => Estimate::film(preset),
     }
 }
 

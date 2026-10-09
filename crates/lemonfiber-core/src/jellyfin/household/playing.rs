@@ -77,9 +77,9 @@ pub(super) async fn playing(
 /// An episode is of a series. Read through [`item_type`] for the two the shelf reads,
 /// so the words cannot drift from the ones the shelf asks for.
 fn medium(word: &str) -> Medium {
-    if word == item_type(Kind::Radarr) {
+    if word == item_type(Kind::Movies) {
         Medium::Film
-    } else if word == EPISODE || word == item_type(Kind::Sonarr) {
+    } else if word == EPISODE || word == item_type(Kind::Tv) {
         Medium::Series
     } else {
         Medium::Other

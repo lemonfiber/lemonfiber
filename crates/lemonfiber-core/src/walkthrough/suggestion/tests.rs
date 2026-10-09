@@ -25,10 +25,10 @@ fn the_safest_suggestions_come_first() {
 #[test]
 fn a_stack_is_only_suggested_what_it_can_handle() {
     // A stack with no film service should not be offered a film, however safe.
-    let television = Suggestion::safest(&[Kind::Sonarr]);
-    assert_eq!(television.map(|s| s.kind), Some(Kind::Sonarr));
-    let film = Suggestion::safest(&[Kind::Radarr]);
-    assert_eq!(film.map(|s| s.kind), Some(Kind::Radarr));
+    let television = Suggestion::safest(&[Kind::Tv]);
+    assert_eq!(television.map(|s| s.kind), Some(Kind::Tv));
+    let film = Suggestion::safest(&[Kind::Movies]);
+    assert_eq!(film.map(|s| s.kind), Some(Kind::Movies));
     assert_eq!(
         Suggestion::safest(&[]),
         None,
@@ -36,7 +36,7 @@ fn a_stack_is_only_suggested_what_it_can_handle() {
     );
     assert!(Suggestion::for_kinds(&[]).is_empty());
     assert_eq!(
-        Suggestion::for_kinds(&[Kind::Sonarr, Kind::Radarr]).len(),
+        Suggestion::for_kinds(&[Kind::Tv, Kind::Movies]).len(),
         SUGGESTIONS.len(),
         "a stack running both is offered everything"
     );
@@ -46,7 +46,7 @@ fn a_stack_is_only_suggested_what_it_can_handle() {
 fn both_kinds_have_something_to_suggest() {
     // A stack running only one of the two is still walked, so each kind needs at
     // least one thing to try.
-    for kind in [Kind::Sonarr, Kind::Radarr] {
+    for kind in [Kind::Tv, Kind::Movies] {
         assert!(
             !Suggestion::for_kinds(&[kind]).is_empty(),
             "nothing to suggest for {kind:?}"
@@ -58,7 +58,7 @@ fn both_kinds_have_something_to_suggest() {
 fn every_kind_has_something_safe_to_be_asked_for_without_a_maybe() {
     // A caller holding a running service should never have to handle "and if there
     // were nothing to suggest" — a branch it could not reach and could not test.
-    for kind in [Kind::Sonarr, Kind::Radarr] {
+    for kind in [Kind::Tv, Kind::Movies] {
         let safe = Suggestion::safe_for(kind);
         assert!(
             Suggestion::for_kinds(&[kind])

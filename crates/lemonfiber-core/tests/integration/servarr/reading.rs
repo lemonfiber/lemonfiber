@@ -342,7 +342,7 @@ async fn a_queue_that_is_not_answered_is_unavailable() {
 /// the whole body, so a single shape sent to both takes nothing on anywhere.
 #[tokio::test]
 async fn each_kind_is_asked_in_the_vocabulary_its_own_service_answers_to() {
-    let television = taking_on(Kind::Sonarr)
+    let television = taking_on(Kind::Tv)
         .await
         .and_then(|request| request.body)
         .unwrap_or_default();
@@ -356,7 +356,7 @@ async fn each_kind_is_asked_in_the_vocabulary_its_own_service_answers_to() {
         "television was asked in the film service's words: {television}"
     );
 
-    let film = taking_on(Kind::Radarr)
+    let film = taking_on(Kind::Movies)
         .await
         .and_then(|request| request.body)
         .unwrap_or_default();
@@ -375,13 +375,13 @@ async fn each_kind_is_asked_in_the_vocabulary_its_own_service_answers_to() {
 #[tokio::test]
 async fn each_kind_is_asked_at_its_own_library() {
     assert!(
-        taking_on(Kind::Sonarr)
+        taking_on(Kind::Tv)
             .await
             .is_some_and(|request| request.url.ends_with("/series")),
         "television was not put to the series library"
     );
     assert!(
-        taking_on(Kind::Radarr)
+        taking_on(Kind::Movies)
             .await
             .is_some_and(|request| request.url.ends_with("/movie")),
         "a film was not put to the film library"

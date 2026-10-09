@@ -52,6 +52,9 @@ pub struct Target {
     /// The directory the key file has to stay beneath, where a plugin's container owns
     /// the directory it is in; nothing for the stack's own services.
     pub confined_to: Option<PathBuf>,
+    /// The kind of video it files, read from the media types it declares; nothing for
+    /// one that files video by no resolution, such as music or an indexer.
+    pub kind: Option<crate::ports::media::Kind>,
 }
 
 impl Target {

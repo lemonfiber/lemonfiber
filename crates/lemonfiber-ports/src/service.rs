@@ -214,19 +214,20 @@ pub trait MediaServer: Send + Sync {
     async fn create_admin(&self, name: &str, password: &str) -> Result<(), Failure>;
 }
 
-/// Asking a Servarr-shape service to run one of its background commands — the
-/// operator-triggered maintenance a stack sometimes needs, such as re-searching
-/// existing content for a better release when the quality bar is raised.
+/// Asking a curator to start the operator-triggered maintenance a stack sometimes
+/// needs, such as re-searching existing content for a better release when the
+/// quality bar is raised.
 #[async_trait]
 pub trait Maintenance: Send + Sync {
-    /// Ask the service to run the named command. Returns once the service has
-    /// accepted it; the work itself then runs in the background there, so this is
-    /// the request to start it, not a wait for it to finish.
+    /// Ask the curator to re-search what it already holds of `kind` for a release
+    /// that meets its current quality bar. Returns once it has accepted the request;
+    /// the work then runs in the background there, so this is the request to start
+    /// it, not a wait for it to finish.
     ///
     /// # Errors
     ///
-    /// Returns [`Failure`] when the service is unreachable or refuses the command.
-    async fn run_command(&self, name: &str) -> Result<(), Failure>;
+    /// Returns [`Failure`] when the curator is unreachable or refuses.
+    async fn search_upgrades(&self, kind: crate::media::Kind) -> Result<(), Failure>;
 }
 
 /// Telling a service how to move files from the download directory into the

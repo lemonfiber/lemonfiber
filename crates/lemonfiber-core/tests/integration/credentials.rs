@@ -35,6 +35,7 @@ fn sonarr(config: &Path) -> Target {
         config: config.to_path_buf(),
         version: 3,
         confined_to: None,
+        kind: None,
     }
 }
 
@@ -212,6 +213,7 @@ async fn each_service_is_reported_independently() {
         config: radarr_config,
         version: 3,
         confined_to: None,
+        kind: None,
     };
 
     let check = CredentialsCheck::new(http, fs, vec![sonarr(&sonarr_config), radarr]);

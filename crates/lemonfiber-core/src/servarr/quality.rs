@@ -3,6 +3,7 @@
 //! indexers actually carry. Built on the same [`Servarr`](super::Servarr) client as the
 //! provisioning adapter; the quality concern lives apart from it so each grows on its own.
 
+use super::Shape as _;
 use async_trait::async_trait;
 use serde::Deserialize;
 
@@ -47,8 +48,11 @@ impl Servarr {
 
 #[async_trait]
 impl QualityReleases for Servarr {
-    async fn probe_releases(&self, id_param: &str) -> Result<ReleaseProbe, Failure> {
-        probe_releases(self, id_param).await
+    async fn probe_releases(
+        &self,
+        kind: crate::ports::media::Kind,
+    ) -> Result<ReleaseProbe, Failure> {
+        probe_releases(self, kind.release_id_param()).await
     }
 }
 

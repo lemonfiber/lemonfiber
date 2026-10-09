@@ -39,7 +39,7 @@ async fn find_items_matches_the_library_by_human_title() {
     )]);
     // Case-insensitive substring of the title, never an internal id.
     let found = sonarr_routed(&router)
-        .find_items(Kind::Sonarr, "expanse")
+        .find_items(Kind::Tv, "expanse")
         .await
         .unwrap_or_default();
     assert_eq!(found.len(), 1);
@@ -65,7 +65,7 @@ async fn find_items_reads_the_library_for_the_service_kind() {
         Servarr::new(http, "http://radarr:7878", "the-key", "radarr", 3)
     };
     let found = radarr
-        .find_items(Kind::Radarr, "dune")
+        .find_items(Kind::Movies, "dune")
         .await
         .unwrap_or_default();
     assert_eq!(found.len(), 1);
@@ -93,7 +93,7 @@ async fn item_history_keeps_the_notable_events_and_drops_the_rest() {
         ),
     )]);
     let events = sonarr_routed(&router)
-        .item_history(Kind::Sonarr, 1)
+        .item_history(Kind::Tv, 1)
         .await
         .unwrap_or_default();
     // The import, the failed download and the grab are all notable history — the failure
@@ -134,7 +134,7 @@ async fn an_unreadable_library_is_a_failure() {
         Answer::reply(200, "not json".to_owned()),
     )]);
     assert!(sonarr_routed(&router)
-        .find_items(Kind::Sonarr, "x")
+        .find_items(Kind::Tv, "x")
         .await
         .is_err());
 }
@@ -147,7 +147,7 @@ async fn an_unreadable_history_is_a_failure() {
         Answer::reply(200, "not json".to_owned()),
     )]);
     assert!(sonarr_routed(&router)
-        .item_history(Kind::Sonarr, 1)
+        .item_history(Kind::Tv, 1)
         .await
         .is_err());
 }
@@ -159,7 +159,7 @@ async fn item_queue_reads_a_downloading_item_by_series() {
         ]}"#
         .to_owned()))]);
     let queue = sonarr_routed(&router)
-        .item_queue(Kind::Sonarr, 1)
+        .item_queue(Kind::Tv, 1)
         .await
         .unwrap_or_default();
     // The record names the episode it is for, so a series' queue can be read per episode
@@ -193,7 +193,7 @@ async fn item_queue_reads_a_film_by_movie_and_flags_stuck() {
         let http: Arc<dyn Http> = router.clone();
         Servarr::new(http, "http://radarr:7878", "the-key", "radarr", 3)
     };
-    let queue = radarr.item_queue(Kind::Radarr, 7).await.unwrap_or_default();
+    let queue = radarr.item_queue(Kind::Movies, 7).await.unwrap_or_default();
     // A film's record names no part — the record is for the whole item.
     assert_eq!(
         queue,
@@ -227,7 +227,7 @@ async fn item_queue_walks_past_the_first_page_to_find_the_item() {
         (Method::Get, "/queue?page=2", Answer::reply(200, page_two)),
     ]);
     let queue = sonarr_routed(&router)
-        .item_queue(Kind::Sonarr, 1)
+        .item_queue(Kind::Tv, 1)
         .await
         .unwrap_or_default();
     // Both of the item's records come back, so the furthest is the caller's to take —
@@ -255,7 +255,7 @@ async fn item_queue_holding_nothing_for_the_item_is_empty() {
         ),
     )]);
     let queue = sonarr_routed(&router)
-        .item_queue(Kind::Sonarr, 1)
+        .item_queue(Kind::Tv, 1)
         .await
         .unwrap_or_default();
     assert!(queue.is_empty());
@@ -270,7 +270,7 @@ async fn item_parts_reads_the_episodes_of_a_series() {
         ]"#
         .to_owned()))]);
     let parts = sonarr_routed(&router)
-        .item_parts(Kind::Sonarr, 1, None)
+        .item_parts(Kind::Tv, 1, None)
         .await
         .unwrap_or_default();
     let read: Vec<(i64, u32, u32, &str, bool, bool)> = parts
@@ -311,7 +311,7 @@ async fn item_parts_narrows_to_one_season_at_the_service() {
         Answer::reply(200, "[]".to_owned()),
     )]);
     let parts = sonarr_routed(&router)
-        .item_parts(Kind::Sonarr, 1, Some(2))
+        .item_parts(Kind::Tv, 1, Some(2))
         .await
         .unwrap_or_default();
     assert!(parts.is_empty());
@@ -332,7 +332,7 @@ async fn a_film_has_no_parts_and_is_never_asked_for_them() {
         Servarr::new(http, "http://radarr:7878", "the-key", "radarr", 3)
     };
     let parts = radarr
-        .item_parts(Kind::Radarr, 7, None)
+        .item_parts(Kind::Movies, 7, None)
         .await
         .unwrap_or_default();
     assert!(parts.is_empty());
@@ -347,7 +347,7 @@ async fn unreadable_episodes_are_a_failure() {
         Answer::reply(200, "not json".to_owned()),
     )]);
     assert!(sonarr_routed(&router)
-        .item_parts(Kind::Sonarr, 1, None)
+        .item_parts(Kind::Tv, 1, None)
         .await
         .is_err());
 }
@@ -365,7 +365,7 @@ async fn stuck_items_names_each_stuck_show_once() {
         ]}"#
         .to_owned()))]);
     let items = sonarr_routed(&router)
-        .stuck_items(Kind::Sonarr)
+        .stuck_items(Kind::Tv)
         .await
         .unwrap_or_default();
     // The show is listed once though two of its episodes are stuck; the healthy one is
@@ -391,7 +391,7 @@ async fn stuck_items_names_a_stuck_film_by_its_movie() {
         let http: Arc<dyn Http> = router.clone();
         Servarr::new(http, "http://radarr:7878", "the-key", "radarr", 3)
     };
-    let items = radarr.stuck_items(Kind::Radarr).await.unwrap_or_default();
+    let items = radarr.stuck_items(Kind::Movies).await.unwrap_or_default();
     assert_eq!(items.first().map(|item| item.title.as_str()), Some("Dune"));
     assert!(router
         .requests()
@@ -407,7 +407,7 @@ async fn an_unreadable_queue_is_a_failure() {
         Answer::reply(200, "not json".to_owned()),
     )]);
     assert!(sonarr_routed(&router)
-        .item_queue(Kind::Sonarr, 1)
+        .item_queue(Kind::Tv, 1)
         .await
         .is_err());
 }
@@ -595,7 +595,7 @@ async fn the_library_says_the_year_each_item_came_out_and_no_year_where_it_knows
         ),
     )]);
     let years: Vec<Option<u16>> = sonarr_routed(&router)
-        .library(Kind::Sonarr)
+        .library(Kind::Tv)
         .await
         .unwrap_or_default()
         .iter()

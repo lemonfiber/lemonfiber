@@ -80,8 +80,8 @@ fn before_you_ask(quality: &Selection) -> String {
         "Before you ask, roughly what things take at the quality this house is set to: a \
          film {}, a season of television {} — a guess from the quality and how long a \
          thing of that kind usually runs, not a measurement.",
-        super::allowance::for_kind(Kind::Radarr, quality).reading(),
-        super::allowance::for_kind(Kind::Sonarr, quality).reading(),
+        super::allowance::for_kind(Kind::Movies, quality).reading(),
+        super::allowance::for_kind(Kind::Tv, quality).reading(),
     )
 }
 

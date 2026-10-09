@@ -53,7 +53,7 @@ pub(crate) enum Searched {
 /// indexer that could not be reached is not an indexer carrying nothing, and reading it
 /// as one would send an operator to ease a preset that was never the problem.
 pub(crate) async fn asking(service: &Servarr, kind: Kind) -> Searched {
-    match service.probe_releases(kind.release_id_param()).await {
+    match service.probe_releases(kind).await {
         Ok(ReleaseProbe::NoneMatch) => Searched::NoneAtTheQuality,
         Ok(ReleaseProbe::NoneFound) => Searched::Nothing,
         Ok(ReleaseProbe::NothingWanted | ReleaseProbe::Matching) | Err(_) => Searched::Unsettled,

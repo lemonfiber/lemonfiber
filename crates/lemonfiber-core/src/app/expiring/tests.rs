@@ -31,7 +31,7 @@ fn asked(id: i64, made: Option<&str>, request_status: u8) -> HouseholdRequest {
         made: made.map(str::to_owned),
         member: "Ana".to_owned(),
         member_id: None,
-        kind: Some(crate::recyclarr::Kind::Radarr),
+        kind: Some(crate::recyclarr::Kind::Movies),
         item: None,
         request_status,
         media_status: 2,

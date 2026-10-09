@@ -32,14 +32,14 @@ pub enum ReleaseProbe {
 /// parse each release's quality and say whether their profile would grab it.
 #[async_trait]
 pub trait QualityReleases: Send + Sync {
-    /// Search for one wanted item and read what came back against the profile. The
-    /// item's id fills `id_param` (`episodeId` for television, `movieId` for film).
+    /// Search for one wanted item of `kind` and read what came back against the
+    /// profile.
     ///
     /// # Errors
     ///
     /// Returns [`Failure`] when the service or its indexers are unreachable or refuse
     /// the search — the indexer-failure case, kept distinct from an empty result.
-    async fn probe_releases(&self, id_param: &str) -> Result<ReleaseProbe, Failure>;
+    async fn probe_releases(&self, kind: crate::media::Kind) -> Result<ReleaseProbe, Failure>;
 }
 
 /// Applying an audio quality to a service that has one — Lidarr, whose quality axis is

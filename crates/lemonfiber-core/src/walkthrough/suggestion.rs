@@ -55,22 +55,22 @@ pub struct Suggestion {
 pub const SUGGESTIONS: &[Suggestion] = &[
     Suggestion {
         title: "Big Buck Bunny",
-        kind: Kind::Radarr,
+        kind: Kind::Movies,
         availability: Availability::FreelyLicensed,
     },
     Suggestion {
         title: "Sintel",
-        kind: Kind::Radarr,
+        kind: Kind::Movies,
         availability: Availability::FreelyLicensed,
     },
     Suggestion {
         title: "Tears of Steel",
-        kind: Kind::Radarr,
+        kind: Kind::Movies,
         availability: Availability::FreelyLicensed,
     },
     Suggestion {
         title: "Pioneer One",
-        kind: Kind::Sonarr,
+        kind: Kind::Tv,
         availability: Availability::FreelyLicensed,
     },
 ];
@@ -103,8 +103,8 @@ impl Suggestion {
     #[must_use]
     pub(crate) const fn safe_for(kind: Kind) -> &'static str {
         match kind {
-            Kind::Sonarr => "Pioneer One",
-            Kind::Radarr => "Big Buck Bunny",
+            Kind::Tv => "Pioneer One",
+            Kind::Movies => "Big Buck Bunny",
         }
     }
 

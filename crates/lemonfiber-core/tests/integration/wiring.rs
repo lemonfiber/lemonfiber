@@ -44,6 +44,7 @@ fn sonarr() -> Target {
         config: config(),
         version: 3,
         confined_to: None,
+        kind: None,
     }
 }
 

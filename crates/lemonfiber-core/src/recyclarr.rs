@@ -24,6 +24,8 @@
 
 pub use lemonfiber_ports::media::Kind;
 
+use crate::servarr::Shape as _;
+
 use crate::quality::{Preset, Selection};
 
 /// The file a preset's guidance is shipped in, as `recyclarr.yml` names it.
@@ -54,20 +56,20 @@ pub const fn guidance(kind: Kind, preset: Preset) -> Guidance {
     match (kind, preset) {
         // Television: only WEB-1080p and WEB-2160p exist, so the 1080p presets
         // are one and the same.
-        (Kind::Sonarr, Preset::SpaceSaving | Preset::Balanced | Preset::HighQuality) => {
+        (Kind::Tv, Preset::SpaceSaving | Preset::Balanced | Preset::HighQuality) => {
             Guidance("/config/includes/sonarr-web-1080p.yml")
         }
-        (Kind::Sonarr, Preset::Maximum) => Guidance("/config/includes/sonarr-web-2160p.yml"),
+        (Kind::Tv, Preset::Maximum) => Guidance("/config/includes/sonarr-web-2160p.yml"),
         // Film: a streaming-sized profile, the Bluray+WEB default, a 1080p remux,
         // then 4K Bluray+WEB.
-        (Kind::Radarr, Preset::SpaceSaving) => {
+        (Kind::Movies, Preset::SpaceSaving) => {
             Guidance("/config/includes/radarr-sqp-1-web-1080p.yml")
         }
-        (Kind::Radarr, Preset::Balanced) => Guidance("/config/includes/radarr-hd-bluray-web.yml"),
-        (Kind::Radarr, Preset::HighQuality) => {
+        (Kind::Movies, Preset::Balanced) => Guidance("/config/includes/radarr-hd-bluray-web.yml"),
+        (Kind::Movies, Preset::HighQuality) => {
             Guidance("/config/includes/radarr-remux-web-1080p.yml")
         }
-        (Kind::Radarr, Preset::Maximum) => Guidance("/config/includes/radarr-uhd-bluray-web.yml"),
+        (Kind::Movies, Preset::Maximum) => Guidance("/config/includes/radarr-uhd-bluray-web.yml"),
     }
 }
 

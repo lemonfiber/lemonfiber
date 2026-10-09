@@ -145,7 +145,7 @@ async fn a_media_server_with_nothing_reads_as_absent() {
             wanted: "",
             releases: "",
         })),
-        Kind::Sonarr,
+        Kind::Tv,
         "The Expanse",
     )
     .await;
@@ -158,7 +158,7 @@ async fn a_media_server_that_will_not_answer_leaves_presence_unknown() {
     // presence is unknown — never inferred as absent.
     let presence = library_presence(
         Some(&jellyfin(&Fake::arr("", "", ""))),
-        Kind::Radarr,
+        Kind::Movies,
         "The Expanse",
     )
     .await;

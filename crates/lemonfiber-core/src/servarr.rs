@@ -30,6 +30,10 @@ use crate::ports::service::{
 
 mod carrying;
 mod catalogue;
+pub(crate) mod kind;
+
+pub(crate) use kind::Shape;
+
 mod importing;
 mod pipeline;
 mod wire;
@@ -252,8 +256,8 @@ impl Client for Servarr {
 
 #[async_trait]
 impl crate::ports::service::Maintenance for Servarr {
-    async fn run_command(&self, name: &str) -> Result<(), Failure> {
-        let body = serde_json::json!({ "name": name }).to_string();
+    async fn search_upgrades(&self, kind: crate::ports::media::Kind) -> Result<(), Failure> {
+        let body = serde_json::json!({ "name": kind.upgrade_command() }).to_string();
         let response = self
             .probe(&self.request(Method::Post, "/command", Some(body)))
             .await?;

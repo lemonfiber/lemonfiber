@@ -97,8 +97,8 @@ impl QueueRecord {
     /// kind files under.
     pub(super) fn is_for(&self, kind: crate::recyclarr::Kind, id: i64) -> bool {
         let owner = match kind {
-            crate::recyclarr::Kind::Sonarr => self.series_id,
-            crate::recyclarr::Kind::Radarr => self.movie_id,
+            crate::recyclarr::Kind::Tv => self.series_id,
+            crate::recyclarr::Kind::Movies => self.movie_id,
         };
         owner == Some(id)
     }
@@ -109,8 +109,8 @@ impl QueueRecord {
     /// stuck list rather than linked to a search that would come back empty.
     pub(super) fn item_title(&self, kind: crate::recyclarr::Kind) -> Option<String> {
         match kind {
-            crate::recyclarr::Kind::Sonarr => self.series.as_ref(),
-            crate::recyclarr::Kind::Radarr => self.movie.as_ref(),
+            crate::recyclarr::Kind::Tv => self.series.as_ref(),
+            crate::recyclarr::Kind::Movies => self.movie.as_ref(),
         }
         .map(|resource| resource.title.clone())
         .filter(|title| !title.is_empty())

@@ -2,6 +2,7 @@
 
 use super::sonarr;
 use lemonfiber_core::ports::http::Method;
+use lemonfiber_core::ports::media::Kind;
 use lemonfiber_core::ports::service::Failure;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_ports::service::Maintenance;
@@ -41,9 +42,9 @@ async fn the_app_name_is_used_when_no_instance_name_is_set() {
 }
 
 #[tokio::test]
-async fn a_command_is_posted_by_name_and_accepted() {
+async fn an_upgrade_search_is_posted_as_the_command_for_its_kind_and_accepted() {
     let fake = Fake::always(Answer::reply(201, r#"{"name":"CutoffUnmetEpisodeSearch"}"#));
-    let accepted = sonarr(&fake).run_command("CutoffUnmetEpisodeSearch").await;
+    let accepted = sonarr(&fake).search_upgrades(Kind::Tv).await;
     assert!(accepted.is_ok());
 
     // The command rode a POST to the command route, named in the body.
@@ -58,12 +59,9 @@ async fn a_command_is_posted_by_name_and_accepted() {
 }
 
 #[tokio::test]
-async fn a_command_a_service_refuses_is_a_failure() {
+async fn an_upgrade_search_a_service_refuses_is_a_failure() {
     let fake = Fake::always(Answer::reply(500, "boom"));
-    assert!(sonarr(&fake)
-        .run_command("CutoffUnmetEpisodeSearch")
-        .await
-        .is_err());
+    assert!(sonarr(&fake).search_upgrades(Kind::Tv).await.is_err());
 }
 
 #[tokio::test]

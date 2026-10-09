@@ -85,7 +85,7 @@ pub(crate) async fn open_servarrs(
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     let mut open = Vec::new();
     for target in servarr_targets(services, project.as_deref()) {
-        let Some(kind) = Kind::for_section(&target.id) else {
+        let Some(kind) = target.kind else {
             continue;
         };
         let Some(service) = target

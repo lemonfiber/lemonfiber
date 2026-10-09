@@ -73,6 +73,7 @@ pub(crate) fn target_for(service: &lemonfiber_manifest::Service, project: &Path)
         config,
         version,
         confined_to: None,
+        kind: crate::ports::media::Kind::of_declared(&service.media_types),
     })
 }
 

@@ -184,7 +184,7 @@ fn a_reason_this_machine_holds_reaches_the_request_it_belongs_to() {
 
     let report = assemble(
         vec![account("Ana", true)],
-        vec![request("Ana", Some(Kind::Radarr), Some(7), (3, 2))],
+        vec![request("Ana", Some(Kind::Movies), Some(7), (3, 2))],
         &Naming {
             libraries: &unnamed(),
             titles: &titles(),
@@ -230,7 +230,7 @@ fn a_reason_this_machine_holds_reaches_the_request_it_belongs_to() {
 fn a_full_disk_reaches_whoever_is_about_to_ask() {
     let report = assemble(
         vec![account("Ana", true)],
-        vec![request("Ana", Some(Kind::Radarr), Some(7), (1, 2))],
+        vec![request("Ana", Some(Kind::Movies), Some(7), (1, 2))],
         &Naming {
             libraries: &unnamed(),
             titles: &titles(),
