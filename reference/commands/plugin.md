@@ -17,6 +17,7 @@ Commands:
   extension-points  List the places a plugin may extend lemonfiber itself
   schema            Print the schema an editor validates `plugin.toml` against
   claims            Read a plugin's source and say what its claims come to
+  conform           Judge a plugin's conformance recordings against the contracts its adapters speak
   provenance        Ask each image's registry whether anybody has said it is theirs
   install           Install a plugin, recording what installing it decided
   installed         Say what is installed, and what each plugin is doing
@@ -158,6 +159,42 @@ It then says what asking for each capability would come to on the stack this bui
 A refusal, or a claim its own recordings refute, exits non-zero. Nothing is installed, nothing is written, and no service is asked anything.
 
 Usage: lemonfiber plugin claims [OPTIONS] <PATH>
+
+Arguments:
+  <PATH>
+          The plugin's source: its directory, or the `plugin.toml` inside it
+
+Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber plugin conform`
+
+```text
+Judge a plugin's conformance recordings against the contracts its adapters speak.
+
+Each case of each contract has one recording beside the manifest, at `conformance/<capability>@<major>/<case>.json`, taken against the service the adapter `fronts` at the digest the manifest pins it by. A recorded answer is read as lemonfiber reads a running adapter's. A refusal, or a case a recording fails or cannot prove, exits non-zero. Nothing is installed and nothing is asked.
+
+Usage: lemonfiber plugin conform [OPTIONS] <PATH>
 
 Arguments:
   <PATH>

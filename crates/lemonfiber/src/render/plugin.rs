@@ -24,7 +24,10 @@ use lemonfiber_core::plugin::{
 // to. Its own file because it answers a different question from a different source —
 // this one reads the documents the build publishes, that one reads one machine's
 // record — and because two readers in one file is two files nobody split.
+mod conformance;
 mod machine;
+
+pub(crate) use conformance::conformed;
 
 pub(crate) use machine::installs;
 

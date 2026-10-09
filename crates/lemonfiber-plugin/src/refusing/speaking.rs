@@ -6,13 +6,22 @@ use crate::schema::Service;
 use crate::Violation;
 
 /// Whether every contract the service speaks is one this build speaks, named once, of a
-/// capability it provides, and whether the service says where it answers and is reached
-/// no other way.
-pub(super) fn spoken(service: &Service, found: &mut Vec<Violation>) {
+/// capability it provides, whether the service says where it answers and is reached no
+/// other way, and whether it names the upstream it stands in front of among `services`.
+pub(super) fn spoken(service: &Service, services: &[Service], found: &mut Vec<Violation>) {
+    let at = format!("service {}", service.id);
     if service.speaks.is_empty() {
+        if service.fronts.is_some() {
+            found.push(Violation {
+                location: format!("{at}.fronts"),
+                message: "names an upstream, and only a service that speaks a contract stands \
+                          in front of one"
+                    .to_owned(),
+            });
+        }
         return;
     }
-    let at = format!("service {}", service.id);
+    fronting(service, services, &at, found);
     let mut seen = BTreeSet::new();
     for named in &service.speaks {
         if !contracted(named) {
@@ -61,6 +70,35 @@ pub(super) fn spoken(service: &Service, found: &mut Vec<Violation>) {
             message: "names an adapter in lemonfiber beside contracts the service speaks, and a \
                       service is asked one way"
                 .to_owned(),
+        });
+    }
+}
+
+/// Whether the adapter names one other service of its plugin, one that speaks nothing,
+/// as the upstream it stands in front of.
+fn fronting(service: &Service, services: &[Service], at: &str, found: &mut Vec<Violation>) {
+    let refused = match service.fronts.as_deref() {
+        None => Some(
+            "is absent, and an adapter has to name the plugin's service it stands in front of"
+                .to_owned(),
+        ),
+        Some(fronted) if fronted == service.id => {
+            Some("names the adapter itself, and an adapter stands in front of another".to_owned())
+        }
+        Some(fronted) => match services.iter().find(|one| one.id == fronted) {
+            None => Some(format!(
+                "names {fronted}, which this plugin does not declare"
+            )),
+            Some(upstream) if !upstream.speaks.is_empty() => Some(format!(
+                "names {fronted}, which speaks a contract itself rather than being the upstream"
+            )),
+            Some(_) => None,
+        },
+    };
+    if let Some(message) = refused {
+        found.push(Violation {
+            location: format!("{at}.fronts"),
+            message,
         });
     }
 }

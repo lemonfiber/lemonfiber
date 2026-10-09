@@ -226,6 +226,11 @@ pub struct Service {
     /// adapter, and lemonfiber asks it over those contracts.
     #[serde(default)]
     pub speaks: Vec<String>,
+    /// The plugin's own service this adapter stands in front of: the upstream it answers
+    /// its contracts for, whose pinned digest its conformance recordings are taken
+    /// against. Required where `speaks` is.
+    #[serde(default)]
+    pub fronts: Option<String>,
 }
 
 /// Where a service's own configuration directory lands when it names nowhere.

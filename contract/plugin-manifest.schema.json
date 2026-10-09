@@ -536,6 +536,11 @@
         },
         "criticality": {"description": "How much its absence costs.", "$ref": "#/$defs/PluginCriticality"},
         "digest": {"description": "`sha256:…`. What actually runs.\n\nA tag is not a pin: it is a name the publisher can repoint, so the image\nreviewed and the image run can differ with nothing in the manifest changing.\nThe digest is what lemonfiber writes into the generated entry.", "type": "string"},
+        "fronts": {
+          "description": "The plugin's own service this adapter stands in front of: the upstream it answers\nits contracts for, whose pinned digest its conformance recordings are taken\nagainst. Required where `speaks` is.",
+          "type": ["string", "null"],
+          "default": null
+        },
         "health": {
           "description": "How to tell the service has actually started.",
           "anyOf": [

@@ -142,29 +142,26 @@ pub fn path_item(operation: &crate::Operation) -> Value {
     })
 }
 
-/// The cases an adapter's recordings and its live pass must answer for one capability.
-///
-/// Every operation answers inside its contract, and every adapter refuses a call made
-/// without its key. A capability whose answers have meaning beyond their shape adds
-/// cases of its own beside these.
+/// The cases an adapter's recordings and its live pass must answer for one capability,
+/// as [`crate::conformance::cases`] lists them.
 #[must_use]
 pub fn conformance(capability: &Capability) -> Value {
-    let mut cases: Vec<Value> = vec![json!({
-        "case": "refuses-without-the-key",
-        "operation": capability.operations.first().map(|operation| operation.name),
-        "keyed": false,
-        "expect": { "status": [401] },
-        "live": true
-    })];
-    cases.extend(capability.operations.iter().map(|operation| {
-        json!({
-            "case": format!("{}-answers", operation.name),
-            "operation": operation.name,
-            "keyed": true,
-            "expect": { "conforms": true },
-            "live": false
+    let cases: Vec<Value> = crate::conformance::cases(capability)
+        .into_iter()
+        .map(|case| {
+            let expect = match case.expect {
+                crate::conformance::Expect::Status(statuses) => json!({ "status": statuses }),
+                crate::conformance::Expect::Conforms => json!({ "conforms": true }),
+            };
+            json!({
+                "case": case.case,
+                "operation": case.operation.name,
+                "keyed": case.keyed,
+                "expect": expect,
+                "live": case.live
+            })
         })
-    }));
+        .collect();
     json!({
         "capability": capability.name,
         "major": capability.major,

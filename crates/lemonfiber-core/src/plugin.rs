@@ -23,6 +23,7 @@ pub mod bundled;
 pub mod catalogue;
 mod claimed;
 mod compact;
+mod conforming;
 // The container written from a record, rather than anything read out of a manifest.
 // Beside the record because it is the derivation the record deliberately does not
 // hold: a copy of one is free to disagree with it, so there is one of each and this
@@ -79,6 +80,7 @@ pub use claimed::{
     claimed, read, read_digested, Asserted, Assertion, Claimed, Claiming, Contributed, Evidence,
     FailingAsDeclared, Ran, Unreadable, Verdict,
 };
+pub use conforming::{conformed, Conformed, Judged};
 pub use container::{profile, written};
 pub use declared::{Declaration, Secret};
 pub use fronting::{proxied as fronting_proxied, taken as label_taken, DASHBOARD, PROXY};

@@ -20,6 +20,7 @@ criticality = "optional"
 listens     = 8080
 provides    = ["media.serve"]
 speaks      = ["media.serve@1"]
+fronts      = "komga"
 
 [[proof]]
 service = "komga""#,
