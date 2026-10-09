@@ -157,14 +157,13 @@ pub(crate) async fn update(ctx: &Ctx, asked: Asked) -> Result<Report, Box<Proble
         return Err(Box::new(moved(answered, &offer)));
     }
 
-    let mut report = if asked.confirm {
-        staging::apply(ctx, &manifest, changes, asked.wait).await?
+    let report = if asked.confirm {
+        staging::apply(ctx, &manifest, changes, asked.wait).await
     } else {
         let active = waiting(ctx, &changes).await;
-        Report::proposed(changes, active, false)
+        Ok(Report::proposed(changes, active, false))
     };
-    report.offer = offer;
-    Ok(report)
+    report.map(|report| Report { offer, ..report })
 }
 
 /// The offer an update answers: each step, by the service it moves and the releases
