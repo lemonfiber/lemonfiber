@@ -24,6 +24,7 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 use lemonfiber_core::app::{switched, Command, Ctx};
+use lemonfiber_core::keys::Scope as KeyScope;
 use lemonfiber_core::model::{kind, Envelope};
 use serde::Serialize;
 
@@ -31,8 +32,10 @@ use crate::actions::{reached, Arguments, ACTION};
 use crate::admission::Caller;
 use crate::entitled::{may, Door, Permitted};
 use crate::read::enveloped;
+use crate::read::published::BESIDE;
 use crate::read::table::{self, Wanted};
 use crate::router::Serving;
+use crate::serve::operator_only;
 
 /// Where what this stack can do is read.
 pub const CAPABILITIES: &str = "/api/capabilities";
@@ -51,10 +54,51 @@ pub enum Standing {
     Unpermitted,
 }
 
+/// Whose credential asked, as a client is told it.
+///
+/// Said rather than left to be inferred from which requests are permitted: a client
+/// guessing a member from a missing read would guess wrong the day that read moves.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+#[schemars(rename = "CredentialScope")]
+pub enum Scope {
+    /// The operator: the password's session, or the token printed at this machine.
+    Operator,
+    /// A key that reads and acts on nothing.
+    Read,
+    /// A key that reads, and calls the actions the contract publishes for a key.
+    Act,
+    /// A household member: their own session, or a key scoped to them.
+    Member,
+}
+
+impl Scope {
+    /// The scope of `caller`.
+    #[must_use]
+    pub const fn of(caller: &Caller) -> Self {
+        match caller {
+            Caller::Machine | Caller::Operator => Self::Operator,
+            Caller::Member(_) => Self::Member,
+            Caller::Key(keyed) => match keyed.scope {
+                KeyScope::Read => Self::Read,
+                KeyScope::Act => Self::Act,
+                KeyScope::Member { .. } => Self::Member,
+            },
+        }
+    }
+}
+
 /// Every capability this stack has, by the path its request is served at.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[schemars(rename = "Capabilities")]
 pub struct Capabilities {
+    /// The stack's own identifier, the one pairing material carries, to every credential
+    /// alike: what tells two credentials apart from two stacks. Never the address or the
+    /// certificate, which re-pairing exists to change. Absent only where this machine
+    /// has nowhere to keep one.
+    pub stack: Option<String>,
+    /// Whose credential asked.
+    pub scope: Scope,
     /// What each comes to for the credential that asked. A request this stack does
     /// not have is absent rather than listed as anything.
     pub capabilities: BTreeMap<String, Standing>,
@@ -95,10 +139,22 @@ pub fn declared(ctx: &Ctx, caller: &Caller) -> Capabilities {
             table::named(read, Wanted::naming_everything()).ok(),
         )
     });
+    // The logs and the bundle are answered beside the table, by the one check their
+    // own routes make: everyone but a member may have them.
+    let beside = BESIDE.iter().map(|read| {
+        let standing = match operator_only(caller) {
+            Some(_) => Standing::Unpermitted,
+            None => Standing::Available,
+        };
+        ((*read).to_owned(), standing)
+    });
     Capabilities {
+        stack: lemonfiber_core::companion::identified(ctx),
+        scope: Scope::of(caller),
         capabilities: actions
             .chain(reads)
             .filter_map(|(path, door, command)| Some((path, standing(ctx, caller, door, command?))))
+            .chain(beside)
             .collect(),
     }
 }

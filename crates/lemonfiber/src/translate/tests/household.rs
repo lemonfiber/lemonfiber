@@ -28,13 +28,15 @@ fn the_two_things_an_update_can_mean_go_to_two_commands() {
         service: Some("sonarr".to_owned()),
         confirm: true,
         wait: true,
+        offer: Some("1a2b3c4d".to_owned()),
     });
     assert!(
         matches!(stack, Command::Update(asked)
                  if asked.service.as_deref() == Some("sonarr")
                  && asked.confirm
-                 && asked.wait == Waiting::ForTheDownloads),
-        "the stack's own three fields are carried"
+                 && asked.wait == Waiting::ForTheDownloads
+                 && asked.offer.as_deref() == Some("1a2b3c4d")),
+        "the stack's own four fields are carried"
     );
     assert_eq!(
         moving(UpdateCommand::Itself { to: None }),

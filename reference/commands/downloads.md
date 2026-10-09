@@ -25,6 +25,9 @@ Options:
       --force
           Take the stack from a run that claimed it and did not give it back
 
+      --offer <NAME>
+          The offer being answered, as the rehearsal printed it. Carrying one, no client is told anything where the clients, or what each said it was doing, have moved
+
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
@@ -57,6 +60,9 @@ Options:
       --force
           Take the stack from a run that claimed it and did not give it back
 
+      --offer <NAME>
+          The offer being answered, as the rehearsal printed it. Carrying one, no client is told anything where the clients, or what each said it was doing, have moved
+
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 
@@ -86,6 +92,9 @@ Options:
 
       --force
           Take the stack from a run that claimed it and did not give it back
+
+      --offer <NAME>
+          The offer being answered, as the rehearsal printed it. Carrying one, no client is told anything where the clients, or what each said it was doing, have moved
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one

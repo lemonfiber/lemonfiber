@@ -156,3 +156,25 @@ fn only_what_a_second_call_leaves_where_the_first_did_is_published_as_idempotent
         ["restart", "downloads-pause", "downloads-resume"]
     );
 }
+
+/// Only an action that can be rehearsed has an offer to answer, and every key-callable
+/// one that can be rehearsed answers one.
+#[test]
+fn a_key_callable_action_answers_an_offer_exactly_where_it_can_be_rehearsed() {
+    for callable in crate::contract::Contract::describe().key_callable {
+        assert_eq!(
+            callable.moved.is_some(),
+            callable.rehearsal,
+            "{}",
+            callable.action
+        );
+        if let Some(code) = callable.moved {
+            assert!(
+                lemonfiber_core::agreement::MOVED
+                    .iter()
+                    .any(|moved| moved.as_str() == code),
+                "{code} is not a published moved offer"
+            );
+        }
+    }
+}

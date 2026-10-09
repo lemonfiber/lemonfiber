@@ -39,8 +39,18 @@ pub(super) fn about_the_line(action: &str) -> bool {
 /// answers, and the two would part company on the first change to either.
 pub(super) fn asked_for(action: &str, given: Arguments) -> Command {
     match action {
-        PAUSING => return Command::Downloads(Pausing::Pause),
-        RESUMING => return Command::Downloads(Pausing::Resume),
+        PAUSING => {
+            return Command::Downloads {
+                asked: Pausing::Pause,
+                offer: given.offer,
+            }
+        }
+        RESUMING => {
+            return Command::Downloads {
+                asked: Pausing::Resume,
+                offer: given.offer,
+            }
+        }
         _ => {}
     }
     Command::Bandwidth(BandwidthAsked {

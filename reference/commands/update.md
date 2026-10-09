@@ -68,6 +68,9 @@ Options:
       --wait
           Let anything still downloading finish before the services are stopped
 
+      --offer <NAME>
+          The offer being answered, as the rehearsal printed it. An update carrying one is refused where the steps it would take are no longer those
+
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 

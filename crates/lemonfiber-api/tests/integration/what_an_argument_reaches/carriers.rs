@@ -8,6 +8,7 @@ use super::acting::{
 use lemonfiber_api::actions::{named, Arguments, Disturbing, Refused, OFFERED};
 use lemonfiber_core::app::plugins::Asked as Installing;
 use lemonfiber_core::app::restore::{Consent as RestoreConsent, Kept};
+use lemonfiber_core::app::Restarting;
 use lemonfiber_core::app::{Answer, Chosen, Decision, Filling, Keeping, Linking};
 use lemonfiber_core::app::{Command, MigrateAction, QualityAction, Setting, Waiting};
 use lemonfiber_core::app::{Diagnosing, Gathering, Restoring, Teardown, Tracing};
@@ -53,7 +54,7 @@ fn carries_forms(command: &Command) -> bool {
         | Command::Watch { forms }
         | Command::Start { forms, .. }
         | Command::Halt { forms, .. }
-        | Command::Restart { forms, .. }
+        | Command::Restart(Restarting { forms, .. })
         | Command::Hosting(Keeping::Install { forms, .. }) => !forms.is_empty(),
         _ => false,
     }
@@ -78,7 +79,7 @@ fn carries_services(command: &Command) -> bool {
     match command {
         Command::Start { services, .. }
         | Command::Halt { services, .. }
-        | Command::Restart { services, .. } => !services.is_empty(),
+        | Command::Restart(Restarting { services, .. }) => !services.is_empty(),
         _ => false,
     }
 }
@@ -228,6 +229,13 @@ fn carries_offer(command: &Command) -> bool {
             | Installing::Update { consent, .. }
             | Installing::Remove { consent, .. },
         ) => consent.agreement.as_deref() == Some(OFFER),
+        // And the actions a key may call, where the offer is what the call is checked
+        // against: dropped, a moved restart, pause or update would go ahead unseen.
+        Command::Restart(Restarting { offer, .. })
+        | Command::Downloads { offer, .. }
+        | Command::Update(lemonfiber_core::update::run::Asked { offer, .. }) => {
+            offer.as_deref() == Some(OFFER)
+        }
         _ => false,
     }
 }

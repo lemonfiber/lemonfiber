@@ -95,7 +95,7 @@ pub mod watch;
 pub use command::{
     AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
     Diagnosing, Filling, Gathering, Hostable, Inviting, Keeping, LettingGo, Linking, MigrateAction,
-    QualityAction, Removing, Restoring, Setting, Teardown, Tracing, Whom, HOSTABLE,
+    QualityAction, Removing, Restarting, Restoring, Setting, Teardown, Tracing, Whom, HOSTABLE,
 };
 pub(crate) mod outcome;
 pub use answering::answered_under;
@@ -130,20 +130,9 @@ async fn lifecycle(ctx: &Ctx, forms: &[String], action: Action) -> Result<Outcom
         .map(Outcome::Lifecycle)
 }
 
-/// Restart what the forms hold, or the services named within them.
-///
-/// Beside the table because its row, spelled out, is longer than one line.
-async fn restarted(
-    ctx: &Ctx,
-    forms: &[String],
-    services: Vec<String>,
-) -> Result<Outcome, Box<Problem>> {
-    lifecycle(ctx, forms, Action::Restart(services)).await
-}
-
 /// Upgrade existing content to the chosen preset, or state what that would cost.
 ///
-/// Beside the table for the reason [`restarted`] is.
+/// Beside the table for the reason [`engine::restarted`] is.
 async fn upgraded(ctx: &Ctx, confirm: bool) -> Result<Outcome, Box<Problem>> {
     upgrade::upgrade(ctx, confirm).await.map(Outcome::Upgrade)
 }
@@ -429,7 +418,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Down(Teardown { forms, wait }) => down(ctx, &forms, wait).await,
         Command::Halt { forms, services } => lifecycle(ctx, &forms, Action::Stop(services)).await,
         Command::Switch { forms } => engine::switch(ctx, &forms).await.map(Outcome::Lifecycle),
-        Command::Restart { forms, services } => restarted(ctx, &forms, services).await,
+        Command::Restart(restart) => engine::restarted(ctx, restart).await,
         Command::Pull { forms } => lifecycle(ctx, &forms, Action::Pull(Vec::new())).await,
         Command::ConfigGet { key } => configuring::get(ctx, Some(&key)).await.map(Outcome::Config),
         Command::ConfigSet(change) => configuring::set(ctx, change).await.map(Outcome::Config),
@@ -513,7 +502,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         // And the same shape over the line rather than the disk: asked nothing it
         // reads, asked for a limit it declares one and tells every client.
         Command::Bandwidth(asked) => bandwidth::shared(ctx, &asked).await,
-        Command::Downloads(asked) => bandwidth::pausing::paused(ctx, asked).await,
+        Command::Downloads { asked, offer } => bandwidth::pausing::paused(ctx, asked, offer).await,
         Command::Keys(asked) => crate::keys::run::asked(ctx, asked).await,
         Command::Watch { forms } => watching(ctx, &forms).await,
         // Said onto whatever the surface is listening with, which is how a walk is

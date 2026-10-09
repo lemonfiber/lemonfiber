@@ -263,5 +263,6 @@ pub(crate) fn a_lifecycle(action: &str, plan: Plan) -> LifecycleReport {
         forwarding: None,
         switched: None,
         held: None,
+        offer: None,
     }
 }

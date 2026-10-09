@@ -63,7 +63,7 @@ pub fn every() -> Vec<Read> {
 
 /// The reads served beside the table's own, by the modules that answer them: the logs,
 /// which open a stream, and the bundle, which is a file.
-const BESIDE: &[&str] = &[LOGS, BUNDLE];
+pub(crate) const BESIDE: &[&str] = &[LOGS, BUNDLE];
 
 /// Every kind a read answers under, by name.
 ///

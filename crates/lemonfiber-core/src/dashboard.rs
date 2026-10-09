@@ -194,12 +194,38 @@ pub enum Hardlink {
     Unknown,
 }
 
+/// One download client, and whether it is paused.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct Downloader {
+    /// The client, by the name the stack knows it under.
+    pub client: String,
+    /// Whether it is paused, as the client reads it back.
+    pub state: Fetching,
+}
+
+/// Whether a download client is fetching, as it reads it back.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+#[schemars(rename = "DownloaderState")]
+pub enum Fetching {
+    /// It said it is paused.
+    Paused,
+    /// It said it is fetching.
+    Fetching,
+    /// It could not be asked, which is a different thing from either.
+    Unknown,
+}
+
 /// The storage picture: what is free, when it runs out, and whether imports link.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Storage {
     /// Bytes free on the data volume — a [`Reading`], since a volume that could
     /// not be read this refresh must not render as zero free.
     pub free: Reading<u64>,
+    /// Bytes free on the volume the services keep their configuration and databases
+    /// on, which fills apart from the data volume where the two are different disks
+    /// and stops every service when it does. A [`Reading`] for the same reason.
+    pub config_free: Reading<u64>,
     /// The time until the disk fills at the current rate of the queue draining
     /// onto it, or `None` where it is not projected to fill.
     pub exhaustion: Option<Duration>,
@@ -294,6 +320,8 @@ pub struct Snapshot {
     pub transfers: Panel<Vec<Transfer>>,
     /// The per-service queues.
     pub queue: Panel<Vec<Queue>>,
+    /// Every download client the stack runs, and whether each is paused.
+    pub downloaders: Panel<Vec<Downloader>>,
     /// What in the pipeline has stopped, worst first — assessed across the
     /// download clients and the \*arrs together, because the failure that matters
     /// most is invisible inside either.

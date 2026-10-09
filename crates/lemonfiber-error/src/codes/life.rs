@@ -105,4 +105,15 @@ codes! {
         remedy: "Mount the socket of the engine running this container at \
             `/var/run/docker.sock`.",
     }
+    /// Raised where a restart names an offer that is not the one a fresh look at the
+    /// stack builds.
+    RESTART_MOVED = "LIFE-10" {
+        severity: Warning,
+        status: 400,
+        since: "0.18.0",
+        meaning: "What was agreed to is not what a restart would restart now. A fresh look \
+            names other services — one added, removed or renamed since the restart was \
+            rehearsed — so nothing was restarted.",
+        remedy: "Rehearse the restart again, and answer the offer it gives now.",
+    }
 }

@@ -114,6 +114,7 @@ pub(super) async fn apply(
         applied,
         halted,
         changelog: super::brought(),
+        offer: String::new(),
     })
 }
 

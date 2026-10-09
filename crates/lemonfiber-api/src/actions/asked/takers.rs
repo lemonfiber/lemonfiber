@@ -165,8 +165,16 @@ pub const TAKES_AGREEMENT: &[&str] = &[
 /// would leave unfilled, and one to an install from somebody who had not read what a
 /// stranger's manifest would write.
 ///
+/// The actions a key may call and rehearse take one too, and there it is optional: a
+/// program on a schedule calls them without one and is answered as before, and one that
+/// asked somebody first carries back the offer they read, refused where it has moved.
+///
 /// Everywhere else the reply is the answer.
 pub const TAKES_CONSENT: &[&str] = &[
+    "restart",
+    "update",
+    "downloads-pause",
+    "downloads-resume",
     "migrate-replace",
     "repair",
     "restore",

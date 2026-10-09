@@ -465,14 +465,22 @@ fn a_pause_and_a_resume_each_reach_every_download_client() {
     use lemonfiber_core::bandwidth::Pausing;
     assert_eq!(
         super::super::pausing(&RawDownloads {
-            action: DownloadsCommand::Pause
+            action: DownloadsCommand::Pause,
+            offer: None,
         }),
-        Command::Downloads(Pausing::Pause)
+        Command::Downloads {
+            asked: Pausing::Pause,
+            offer: None,
+        }
     );
     assert_eq!(
         super::super::pausing(&RawDownloads {
-            action: DownloadsCommand::Resume
+            action: DownloadsCommand::Resume,
+            offer: Some("1a2b3c4d".to_owned()),
         }),
-        Command::Downloads(Pausing::Resume)
+        Command::Downloads {
+            asked: Pausing::Resume,
+            offer: Some("1a2b3c4d".to_owned()),
+        }
     );
 }

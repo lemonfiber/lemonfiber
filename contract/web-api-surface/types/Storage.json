@@ -1,5 +1,11 @@
 {
   "fields": {
+    "config_free": {
+      "type": [
+        "ref:DashboardReading"
+      ],
+      "required": true
+    },
     "exhaustion": {
       "type": [
         "anyOf(null,ref:Duration)"

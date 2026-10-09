@@ -15,6 +15,7 @@
 
 mod downloads;
 mod layout;
+pub(crate) use layout::services_config_dir;
 mod media;
 mod opening;
 mod secrets;

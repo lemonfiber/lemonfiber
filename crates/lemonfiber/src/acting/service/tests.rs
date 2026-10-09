@@ -5,6 +5,7 @@ use crate::acting::offer::tests::{a_form_taken, offering};
 use crate::acting::offer::Choice;
 use crate::acting::{Press, Stage};
 use lemonfiber_api::actions::{named, Arguments, TAKES_SERVICE, TAKES_SERVICES};
+use lemonfiber_core::app::Restarting;
 use lemonfiber_core::app::{Command, Teardown, Waiting};
 use lemonfiber_core::dashboard::Panel;
 use lemonfiber_core::docker::{Criticality, Service, State};
@@ -228,10 +229,11 @@ fn naming_a_service_reaches_whatever_command_that_action_forks_to() {
     );
     assert_eq!(
         carried(&taking("restart", "Sonarr")),
-        Some(Command::Restart {
+        Some(Command::Restart(Restarting {
             forms: vec!["full".to_owned()],
             services: vec!["sonarr".to_owned()],
-        })
+            offer: None,
+        }))
     );
 }
 

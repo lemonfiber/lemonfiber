@@ -1,6 +1,7 @@
 //! Starting, stopping and pulling, as the engine is asked to.
 
 use super::*;
+use crate::app::Restarting;
 use crate::app::Teardown;
 
 #[tokio::test]
@@ -225,10 +226,11 @@ async fn a_pull_that_cannot_spawn_compose_is_a_problem_not_a_stream() {
 #[tokio::test]
 async fn restarting_names_the_services_and_nothing_else() {
     let ctx = rehearsing(crate::config::Protocols::both());
-    let command = Command::Restart {
+    let command = Command::Restart(Restarting {
         forms: vec!["library".to_owned()],
         services: vec!["jellyfin".to_owned()],
-    };
+        offer: None,
+    });
     let produced = report(dispatch(command, &ctx).await);
 
     assert_eq!(

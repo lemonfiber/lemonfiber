@@ -266,7 +266,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Down(_) => reports("down", LIFECYCLE).disturbing(Situation::Stopping),
         Command::Halt { .. } => reports("stop", LIFECYCLE).disturbing(Situation::Stopping),
         Command::Switch { .. } => reports("switch", LIFECYCLE).disturbing(Situation::Switching),
-        Command::Restart { .. } => reports("restart", LIFECYCLE).disturbing(Situation::Restarting),
+        Command::Restart(_) => reports("restart", LIFECYCLE).disturbing(Situation::Restarting),
         Command::Pull { .. } => reports("pull", LIFECYCLE),
         Command::ConfigSet(_) => reports("config set", &[kind::CONFIG]),
         // Everything it changes is settled before anything is touched: the manifest
@@ -309,7 +309,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Space { .. } => reports("space", &[kind::SPACE]),
         Command::StopSeeding(_) => reports("stop-seeding", &[kind::STOP_SEEDING]),
         Command::Bandwidth(_) => reports("bandwidth", &[kind::BANDWIDTH]),
-        Command::Downloads(_) => reports("downloads", &[kind::PAUSING]),
+        Command::Downloads { .. } => reports("downloads", &[kind::PAUSING]),
         Command::Keys(asked) => keyed::keyed(asked),
         Command::Uninstall(_) => reports("uninstall", &[kind::UNINSTALL]),
         // A guard is the one command with no ending of its own, so a rehearsal of it

@@ -506,5 +506,6 @@ fn a_pause() -> lemonfiber_core::bandwidth::Pauses {
         ],
         caution: None,
         rehearsed: false,
+        offer: String::new(),
     }
 }

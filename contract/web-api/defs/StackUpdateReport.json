@@ -46,6 +46,10 @@
         "type": "string"
       }
     },
+    "offer": {
+      "description": "The offer this answers: every step, from the release each service stands on to\nthe one it would move to, named so that an update carrying it back takes those\nsteps or is refused.",
+      "type": "string"
+    },
     "rehearsed": {
       "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
       "type": "boolean"
@@ -70,6 +74,7 @@
     "stack_edits",
     "applied",
     "changelog",
-    "rehearsed"
+    "rehearsed",
+    "offer"
   ]
 }

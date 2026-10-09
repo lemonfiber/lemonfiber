@@ -21,6 +21,9 @@ Options:
       --json
           Print machine-readable output
 
+      --offer <NAME>
+          The offer being answered, as the rehearsal printed it. A restart carrying one is refused where the services it would restart are no longer those
+
       --dry-run
           Say what would happen, and change nothing
 

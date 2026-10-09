@@ -107,12 +107,7 @@ pub enum Command {
         forms: Vec<String>,
     },
     /// Restart services without touching the rest.
-    Restart {
-        /// The forms holding those services.
-        forms: Vec<String>,
-        /// The services to restart; empty restarts the whole form.
-        services: Vec<String>,
-    },
+    Restart(Restarting),
     /// Fetch newer images without applying them.
     Pull {
         /// The forms whose images to fetch.
@@ -428,7 +423,14 @@ pub enum Command {
     /// setting and does not apply it looks exactly like one that did.
     Bandwidth(BandwidthAsked),
     /// Pause every download client the stack runs, or let them all fetch again.
-    Downloads(crate::bandwidth::Pausing),
+    Downloads {
+        /// Which of the two.
+        asked: crate::bandwidth::Pausing,
+        /// The offer a rehearsal answered, where the request carries one back: no client
+        /// is told anything where the clients, or what each said it was doing, have
+        /// moved. None acts as without one.
+        offer: Option<String>,
+    },
     /// Mint, list or revoke the keys another program reaches the web surface with.
     Keys(crate::keys::run::Asked),
     /// Guard the data location while the given forms run, stopping them the moment
@@ -508,4 +510,17 @@ pub enum Command {
     /// a conversation must still be able to have one — and the answers gathered so far live in the
     /// resumable progress file between them, which is where a terminal run keeps them too.
     Setup(SetupAction),
+}
+
+/// What a restart was asked to restart, and the offer it answers where it carries one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Restarting {
+    /// The forms holding those services.
+    pub forms: Vec<String>,
+    /// The services to restart; empty restarts the whole form.
+    pub services: Vec<String>,
+    /// The offer a rehearsal answered, where the restart carries one back: refused
+    /// where the services it would restart are no longer those. None acts as without
+    /// one.
+    pub offer: Option<String>,
 }

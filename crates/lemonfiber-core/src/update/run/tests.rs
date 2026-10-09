@@ -12,6 +12,7 @@ fn asking() -> Asked {
         service: None,
         confirm: false,
         wait: Waiting::Never,
+        offer: None,
     }
 }
 
@@ -127,4 +128,76 @@ fn a_proposal_carries_nothing_a_run_would_have_left_behind() {
     assert_eq!(report.backup, None);
     assert_eq!(report.halted, None);
     assert!(report.applied.is_empty());
+}
+
+/// A rehearsal answers an offer, and carrying it back unchanged is answered as asked.
+#[tokio::test]
+async fn an_update_answering_the_offer_it_was_rehearsed_with_goes_ahead() {
+    let ctx = nothing_pulled();
+    let rehearsed = update(&ctx, asking()).await.map(|report| report.offer);
+    let offer = rehearsed.unwrap_or_default();
+    assert!(!offer.is_empty());
+    let answered = update(
+        &ctx,
+        Asked {
+            offer: Some(offer.clone()),
+            ..asking()
+        },
+    )
+    .await;
+    assert!(answered.is_ok_and(|report| report.offer == offer));
+}
+
+/// An offer for other steps is refused before anything is pulled, stopped or started.
+#[tokio::test]
+async fn an_update_answering_an_offer_that_moved_is_refused() {
+    let ctx = nothing_pulled();
+    let refused = update(
+        &ctx,
+        Asked {
+            confirm: true,
+            offer: Some("ffffffff".to_owned()),
+            ..asking()
+        },
+    )
+    .await
+    .err();
+    assert_eq!(
+        refused.map(|problem| problem.code),
+        Some(crate::error::codes::update::UPDATE_MOVED)
+    );
+}
+
+/// One step named differently is a different offer, and the same steps are the same one.
+#[test]
+fn an_offer_names_every_step_it_was_made_over() {
+    let step = |target: &str| crate::update::Change {
+        service: "sonarr".to_owned(),
+        current: "4.0.1".to_owned(),
+        target: target.to_owned(),
+        jump: crate::migration::version::Jump::Patch,
+        irreversible: false,
+        refused: false,
+        because: String::new(),
+    };
+    let offer = super::offered(&[step("4.0.2")]);
+    assert_eq!(offer, super::offered(&[step("4.0.2")]));
+    assert_ne!(offer, super::offered(&[step("4.0.3")]));
+    assert_ne!(offer, super::offered(&[]));
+}
+
+/// A confirmed update with nothing to move is answered as confirmed, and moves nothing.
+#[tokio::test]
+async fn a_confirmed_update_with_nothing_to_move_moves_nothing() {
+    let ctx = nothing_pulled();
+    let confirmed = update(
+        &ctx,
+        Asked {
+            confirm: true,
+            ..asking()
+        },
+    )
+    .await
+    .map(|report| (report.confirmed, report.changes.len(), report.applied.len()));
+    assert_eq!(confirmed.ok(), Some((true, 0, 0)));
 }

@@ -17,4 +17,6 @@ requirement = [
   { id = "B3-R13", state = "open" },
   { id = "B3-R14", state = "open" },
   { id = "B3-R15", state = "done", evidence = ["crates/lemonfiber-core/src/dashboard.rs", "crates/lemonfiber-core/src/dashboard/run.rs", "crates/lemonfiber-core/src/health/reach.rs", "crates/lemonfiber-core/src/storage.rs", "crates/lemonfiber-ports/src/service.rs", "crates/lemonfiber-core/src/qbittorrent.rs"] },
+  { id = "B3-R16", state = "done", evidence = ["crates/lemonfiber-core/src/dashboard.rs", "crates/lemonfiber-core/src/dashboard/run.rs", "crates/lemonfiber-core/src/dashboard/run/panels.rs", "crates/lemonfiber-core/src/dashboard/run/tests/refreshing.rs"] },
+  { id = "B3-R17", state = "done", evidence = ["crates/lemonfiber-core/src/dashboard.rs", "crates/lemonfiber-core/src/dashboard/run.rs", "crates/lemonfiber-core/src/bandwidth/run/pausing.rs", "crates/lemonfiber-core/src/dashboard/run/tests/refreshing.rs"] },
 ]

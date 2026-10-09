@@ -14,6 +14,10 @@
       "description": "The one address to hand somebody who lives here.\n\nOn the screen rather than only behind a question, because the operator who\nneeds it is not the one who thought to ask: they have just been asked \"what\ndo I open?\" by somebody in the next room. Built from the same reading as the\npanels beside it, so the screen and `front-door` cannot name different doors.",
       "$ref": "PanelFrontDoorReport.json"
     },
+    "downloaders": {
+      "description": "Every download client the stack runs, and whether each is paused.",
+      "$ref": "PanelArray_of_Downloader.json"
+    },
     "health": {
       "description": "The one-line health summary — the same computation every other surface\nuses, so no two of them can grade the same stack differently.\n\nAlways present, unlike the panels: a stack that could not be reached has a\nsummary, and it says `unknown`. An absent summary would leave the operator\nto infer health from a blank space, which is the one reading this must never\nbe open to.",
       "$ref": "HealthSummary.json"
@@ -66,6 +70,7 @@
     "health",
     "transfers",
     "queue",
+    "downloaders",
     "stuck",
     "alerts",
     "storage",

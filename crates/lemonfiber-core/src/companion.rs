@@ -307,6 +307,19 @@ pub fn replacing(ctx: &Ctx, confirm: bool) -> Result<Replacement, Box<Problem>> 
 }
 
 /// Where what pairing needs is kept, or why there is nowhere.
+/// The stack's own identifier, as pairing material carries it, minted and kept first
+/// where there is none; nothing where this machine has nowhere to keep one, or what it
+/// keeps is not one.
+///
+/// Read by whatever answers a credential that holds no pairing material, so that a
+/// client holding a key for a member and one for the operator can tell both reach one
+/// stack.
+#[must_use]
+pub fn identified(ctx: &Ctx) -> Option<String> {
+    let directory = kept_in(ctx).ok()?;
+    identifier::kept_or_minted(directory, ctx.seams.random.as_ref()).ok()
+}
+
 fn kept_in(ctx: &Ctx) -> Result<&Path, Box<Problem>> {
     ctx.settings
         .companion

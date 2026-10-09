@@ -9,9 +9,21 @@
       "additionalProperties": {
         "$ref": "CapabilityState.json"
       }
+    },
+    "scope": {
+      "description": "Whose credential asked.",
+      "$ref": "CredentialScope.json"
+    },
+    "stack": {
+      "description": "The stack's own identifier, the one pairing material carries, to every credential\nalike: what tells two credentials apart from two stacks. Never the address or the\ncertificate, which re-pairing exists to change. Absent only where this machine\nhas nowhere to keep one.",
+      "type": [
+        "string",
+        "null"
+      ]
     }
   },
   "required": [
+    "scope",
     "capabilities"
   ]
 }

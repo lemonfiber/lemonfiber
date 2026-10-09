@@ -24,7 +24,9 @@
 //! publishes the list among the refusals it answers with, each at the status its code
 //! is declared with, so a code added here reaches a client as a regenerated diff.
 
-use crate::error::codes::{gone, migrate, plugin, repair, restore, space, wire};
+use crate::error::codes::{
+    gone, life, migrate, plugin, rate, repair, restore, space, update, wire,
+};
 use crate::error::Code;
 
 /// Every code an answer is refused with for naming an offer or a listing that has
@@ -34,7 +36,7 @@ use crate::error::Code;
 /// an operator searching for the code reads what else that command refuses. Letting a
 /// download go raises the disk account's, because its offer is one line of that
 /// account.
-pub const MOVED: [Code; 7] = [
+pub const MOVED: [Code; 10] = [
     repair::STALE,
     restore::MOVED_ON,
     migrate::OFFER_MOVED,
@@ -42,6 +44,9 @@ pub const MOVED: [Code; 7] = [
     gone::ANOTHER_READING,
     wire::WIRING_MOVED,
     plugin::PLUGIN_OFFER_MOVED,
+    life::RESTART_MOVED,
+    update::UPDATE_MOVED,
+    rate::PAUSING_MOVED,
 ];
 
 /// A checksum over every word an operator read before agreeing.

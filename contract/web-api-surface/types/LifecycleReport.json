@@ -30,6 +30,12 @@
       ],
       "required": false
     },
+    "offer": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "plan": {
       "type": [
         "ref:Plan"

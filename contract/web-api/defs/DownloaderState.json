@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Whether a download client is fetching, as it reads it back.",
+  "oneOf": [
+    {
+      "description": "It said it is paused.",
+      "type": "string",
+      "const": "paused"
+    },
+    {
+      "description": "It said it is fetching.",
+      "type": "string",
+      "const": "fetching"
+    },
+    {
+      "description": "It could not be asked, which is a different thing from either.",
+      "type": "string",
+      "const": "unknown"
+    }
+  ]
+}

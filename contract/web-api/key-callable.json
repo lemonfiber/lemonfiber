@@ -3,7 +3,8 @@
     "action": "restart",
     "disturbs": true,
     "rehearsal": true,
-    "idempotent": true
+    "idempotent": true,
+    "moved": "LIFE-10"
   },
   {
     "action": "diagnose",
@@ -15,18 +16,21 @@
     "action": "update",
     "disturbs": true,
     "rehearsal": true,
-    "idempotent": false
+    "idempotent": false,
+    "moved": "UPDATE-5"
   },
   {
     "action": "downloads-pause",
     "disturbs": false,
     "rehearsal": true,
-    "idempotent": true
+    "idempotent": true,
+    "moved": "RATE-6"
   },
   {
     "action": "downloads-resume",
     "disturbs": false,
     "rehearsal": true,
-    "idempotent": true
+    "idempotent": true,
+    "moved": "RATE-6"
   }
 ]

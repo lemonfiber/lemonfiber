@@ -183,8 +183,14 @@ impl Reading {
     }
 }
 
+/// What is playing where the stack could not be read, said as unread rather than as
+/// nothing playing.
+pub(super) fn playing_unread() -> Outcome {
+    Reading::Playing.unread()
+}
+
 /// Whether a pace that last came round at `last` has come round again.
-fn due(last: Option<Instant>, every: Duration, now: Instant) -> bool {
+pub(super) fn due(last: Option<Instant>, every: Duration, now: Instant) -> bool {
     last.is_none_or(|last| now.duration_since(last) >= every)
 }
 

@@ -45,4 +45,15 @@ codes! {
             taking the line either.",
         remedy: "Start a form that has a download client in it, as in `lemonfiber up tv`.",
     }
+    /// Raised where pausing or resuming the download clients names an offer that is not
+    /// the one a fresh look at them builds.
+    PAUSING_MOVED = "RATE-6" {
+        severity: Warning,
+        status: 400,
+        since: "0.18.0",
+        meaning: "What was agreed to is not what pausing or resuming would change now. A \
+            download client was added or removed, or one changed by itself, since this was \
+            rehearsed, so no client was told anything.",
+        remedy: "Rehearse it again, and answer the offer it gives now.",
+    }
 }

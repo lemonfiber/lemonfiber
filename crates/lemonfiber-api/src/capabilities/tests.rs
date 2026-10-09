@@ -20,6 +20,7 @@ fn every_path() -> Vec<String> {
         .chain(
             crate::read::table::OFFERED
                 .iter()
+                .chain(crate::read::published::BESIDE)
                 .map(|read| (*read).to_owned()),
         )
         .collect();
@@ -105,8 +106,10 @@ fn a_key_is_offered_what_its_scope_admits_at_each_door() {
             .map(|(path, _)| path.clone())
             .collect()
     };
+    // Every served read, the logs and the bundle among them, and the event stream.
     let reads: Vec<String> = crate::read::table::OFFERED
         .iter()
+        .chain(crate::read::published::BESIDE)
         .map(|read| (*read).to_owned())
         .collect();
 
@@ -128,5 +131,67 @@ fn a_key_is_offered_what_its_scope_admits_at_each_door() {
     assert_eq!(
         acting.capabilities.get("/api/actions/uninstall"),
         Some(&Standing::Unpermitted)
+    );
+}
+
+/// Every credential is told the same identifier, the one pairing material carries, so
+/// a member's key and the operator's are known to reach one stack.
+#[test]
+fn every_credential_is_told_the_stack_it_reaches() {
+    let kept = lemonfiber_fixtures::scratch::Scratch::new("capabilities-stack").kept();
+    let ctx = lemonfiber_testing::a_context()
+        .settings(Settings {
+            companion: Some(kept),
+            ..Settings::default()
+        })
+        .build()
+        .with_random(std::sync::Arc::new(
+            lemonfiber_fixtures::support::FixedRandom(Some((0..16).collect())),
+        ));
+    let operator = declared(&ctx, &Caller::Operator).stack;
+    let member = declared(&ctx, &Caller::Member("ana".to_owned())).stack;
+    assert!(operator.as_deref().is_some_and(|stack| !stack.is_empty()));
+    assert_eq!(operator, member);
+}
+
+#[test]
+fn a_machine_with_nowhere_to_keep_an_identifier_says_none() {
+    assert_eq!(declared(&reaching(None), &Caller::Operator).stack, None);
+}
+
+/// The logs and the bundle are listed like every read, and a member may have neither.
+#[test]
+fn the_logs_and_the_bundle_are_listed_and_kept_from_a_member() {
+    let operator = declared(&reaching(None), &Caller::Operator);
+    let member = declared(&reaching(None), &Caller::Member("ana".to_owned()));
+    for read in crate::read::published::BESIDE {
+        assert_eq!(operator.capabilities.get(*read), Some(&Standing::Available));
+        assert_eq!(member.capabilities.get(*read), Some(&Standing::Unpermitted));
+    }
+}
+
+/// Each credential is told whose it is.
+#[test]
+fn each_credential_is_told_its_scope() {
+    use super::Scope as Said;
+    use lemonfiber_core::keys::Scope;
+    let key = |scope| {
+        Caller::Key(crate::admission::Keyed {
+            name: "home-assistant".to_owned(),
+            scope,
+        })
+    };
+    let told = |caller: &Caller| declared(&reaching(None), caller).scope;
+    assert_eq!(told(&Caller::Machine), Said::Operator);
+    assert_eq!(told(&Caller::Operator), Said::Operator);
+    assert_eq!(told(&Caller::Member("ana".to_owned())), Said::Member);
+    assert_eq!(told(&key(Scope::Read)), Said::Read);
+    assert_eq!(told(&key(Scope::Act)), Said::Act);
+    assert_eq!(
+        told(&key(Scope::Member {
+            id: "ana".to_owned(),
+            name: "Ana".to_owned(),
+        })),
+        Said::Member
     );
 }

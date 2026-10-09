@@ -1,6 +1,7 @@
 use super::*;
 use crate::app::engine::Waiting;
 use crate::app::plugins::Asked;
+use crate::app::Restarting;
 use crate::app::Teardown;
 
 /// A patience unlike any default, so a length read from it cannot be a
@@ -28,10 +29,11 @@ fn every_verb_that_starts_something_is_bounded_the_same_way() {
             forms: Vec::new(),
             services: vec!["sonarr".to_owned()],
         },
-        Command::Restart {
+        Command::Restart(Restarting {
             forms: Vec::new(),
             services: Vec::new(),
-        },
+            offer: None,
+        }),
         Command::Switch { forms: Vec::new() },
     ];
 
@@ -247,10 +249,11 @@ fn the_payload_and_the_command_agree_on_every_length() {
             payload.stopping_after_downloads,
         ),
         (
-            Command::Restart {
+            Command::Restart(Restarting {
                 forms: forms(),
                 services: services(),
-            },
+                offer: None,
+            }),
             payload.restarting,
         ),
         (Command::Switch { forms: forms() }, payload.switching),

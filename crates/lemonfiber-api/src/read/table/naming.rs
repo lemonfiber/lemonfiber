@@ -48,6 +48,7 @@ pub(super) fn moving(what: Option<&str>, to: Option<String>) -> Result<Command, 
             service: None,
             confirm: false,
             wait: Waiting::Never,
+            offer: None,
         })),
         _ => Err(Refusal::NoUpdateObject),
     }

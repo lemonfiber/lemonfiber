@@ -29,10 +29,12 @@ pub(crate) fn a_snapshot() -> Snapshot {
         vpn: None,
         transfers: Panel::Ready(vec![a_transfer()]),
         queue: Panel::Ready(Vec::new()),
+        downloaders: Panel::Ready(Vec::new()),
         stuck: Vec::new(),
         alerts: Vec::new(),
         storage: Panel::Ready(Storage {
             free: Reading::Known(500_000_000_000),
+            config_free: Reading::Known(500_000_000_000),
             exhaustion: None,
             hardlink: Hardlink::Linking,
         }),

@@ -21,6 +21,7 @@
 
 use lemonfiber_core::app::restore::Kept;
 use lemonfiber_core::app::support::Destination;
+use lemonfiber_core::app::Restarting;
 use lemonfiber_core::app::{
     Command, Diagnosing, Gathering, Hostable, Keeping, LettingGo, Removing, Restoring, Setting,
     Teardown, Waiting, HOSTABLE,
@@ -28,6 +29,8 @@ use lemonfiber_core::app::{
 use lemonfiber_core::bundle::run::{Wanted, LINES};
 use lemonfiber_core::companion::Asked as Paired;
 use lemonfiber_core::doctor::Narrowing;
+use lemonfiber_core::error::codes::{life, rate, update};
+use lemonfiber_core::error::Code;
 use lemonfiber_core::uninstall::{Tier, TIERS};
 use lemonfiber_core::update::run::Asked;
 
@@ -117,6 +120,9 @@ pub struct ByAKey {
     /// takes the tunnel away each time to prove it comes back, so whether it does is the
     /// outcome of every call rather than of the first.
     pub idempotent: bool,
+    /// The code a call carrying back an offer that has moved is refused with, where its
+    /// rehearsal answers one; none where it answers no offer.
+    pub moved: Option<Code>,
 }
 
 /// Every action a key may call, in the order they are worth reading.
@@ -130,26 +136,31 @@ pub const KEY_CALLABLE: &[ByAKey] = &[
         action: "restart",
         disturbs: true,
         idempotent: true,
+        moved: Some(life::RESTART_MOVED),
     },
     ByAKey {
         action: "diagnose",
         disturbs: true,
         idempotent: false,
+        moved: None,
     },
     ByAKey {
         action: "update",
         disturbs: true,
         idempotent: false,
+        moved: Some(update::UPDATE_MOVED),
     },
     ByAKey {
         action: "downloads-pause",
         disturbs: false,
         idempotent: true,
+        moved: Some(rate::PAUSING_MOVED),
     },
     ByAKey {
         action: "downloads-resume",
         disturbs: false,
         idempotent: true,
+        moved: Some(rate::PAUSING_MOVED),
     },
 ];
 
@@ -328,7 +339,11 @@ pub(crate) fn carried(action: &str, given: Arguments) -> Result<Command, Refused
         "down" if services.is_empty() => Ok(Command::Down(Teardown { forms, wait })),
         "down" => Ok(Command::Halt { forms, services }),
         "switch" => Ok(Command::Switch { forms }),
-        "restart" => Ok(Command::Restart { forms, services }),
+        "restart" => Ok(Command::Restart(Restarting {
+            forms,
+            services,
+            offer,
+        })),
         "pull" => Ok(Command::Pull { forms }),
         "config-set" => setting(key, value, confirm, wait),
         "seed" => Ok(Command::Seed),
@@ -347,7 +362,7 @@ pub(crate) fn carried(action: &str, given: Arguments) -> Result<Command, Refused
         // browser agrees to is what it was shown. Which removal is required: one
         // with none named has lost the only part of it that decides what goes.
         "uninstall" => removing(tier, confirm, offer, wait),
-        "update" => Ok(updating(service, confirm, wait)),
+        "update" => Ok(updating(service, confirm, wait, offer.clone())),
         "backup" => Ok(Command::Backup { service }),
         // The two reads this surface serves twice, each reaching the same command its
         // own endpoint reaches and widened by the same word the command line widens
@@ -466,11 +481,17 @@ fn removing(
 /// Apart from the table for the reason [`removing`] is: what it builds is longer than
 /// a row. Nothing here can refuse, because a service the stack does not declare is the
 /// core's answer rather than this surface's.
-fn updating(service: Option<String>, confirm: bool, wait: Waiting) -> Command {
+fn updating(
+    service: Option<String>,
+    confirm: bool,
+    wait: Waiting,
+    offer: Option<String>,
+) -> Command {
     Command::Update(Asked {
         service,
         confirm,
         wait,
+        offer,
     })
 }
 

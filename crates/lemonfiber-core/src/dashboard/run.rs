@@ -31,8 +31,8 @@ use crate::queue::run::Answered;
 use crate::queue::Thresholds;
 
 use panels::{
-    download_rate, downloading, egress, free, front_door, last_free, linking, observe, queues,
-    storage, summarise, transfers, vpn, waiting_on,
+    download_rate, downloading, egress, free, front_door, last_config_free, last_free, linking,
+    observe, queues, storage, summarise, transfers, vpn, waiting_on,
 };
 
 /// How many alerts the screen carries. Enough to see what happened, few enough
@@ -124,7 +124,7 @@ pub async fn paced(ctx: &Ctx, previous: Option<&Gathered>) -> Gathered {
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     let root = ctx.settings.data_root.as_deref();
 
-    let (seen, tunnel, household, named, moving, queued, (space, linked)) = tokio::join!(
+    let (seen, tunnel, household, named, moving, queued, asked, (space, kept, linked)) = tokio::join!(
         within(PANEL_WITHIN, observe(ctx, manifest)),
         when(due.is(Paced::Vpn), PANEL_WITHIN, vpn(ctx, manifest)),
         when(due.is(Paced::Household), HOUSEHOLD_WITHIN, waiting_on(ctx)),
@@ -138,7 +138,8 @@ pub async fn paced(ctx: &Ctx, previous: Option<&Gathered>) -> Gathered {
             PANEL_WITHIN,
             queues(ctx, manifest, project.as_deref())
         ),
-        volume(ctx, root, &due),
+        within(PANEL_WITHIN, crate::bandwidth::run::pausing::standing(ctx)),
+        volume(ctx, root, project.as_deref(), &due),
     );
 
     let (seen, undeclared) = match seen.unwrap_or_else(|| Err(late(ENGINE))) {
@@ -183,7 +184,10 @@ pub async fn paced(ctx: &Ctx, previous: Option<&Gathered>) -> Gathered {
 
     let storage = stored(
         root,
-        carried_free(space, last),
+        (
+            carried(space, last_free(last)),
+            carried(kept, last_config_free(last)),
+        ),
         carried_link(linked, last),
         &transfers,
     );
@@ -210,6 +214,7 @@ pub async fn paced(ctx: &Ctx, previous: Option<&Gathered>) -> Gathered {
             vpn,
             transfers,
             queue,
+            downloaders: downloaders(asked),
             stuck: watched.stuck,
             alerts,
             storage,
@@ -285,13 +290,18 @@ async fn told(
 /// reading is current.
 fn stored(
     root: Option<&std::path::Path>,
-    free: Reading<u64>,
+    (free, config_free): (Reading<u64>, Reading<u64>),
     hardlink: Hardlink,
     transfers: &Panel<Vec<crate::dashboard::Transfer>>,
 ) -> Panel<crate::dashboard::Storage> {
     match root {
         None => Panel::unavailable("no data location is configured"),
-        Some(_) => Panel::Ready(storage(free, hardlink, download_rate(transfers))),
+        Some(_) => Panel::Ready(storage(
+            free,
+            config_free,
+            hardlink,
+            download_rate(transfers),
+        )),
     }
 }
 
@@ -318,14 +328,12 @@ impl<T> Asked<T> {
     }
 }
 
-/// What the free space reads as this refresh: what was read now, carried forward
+/// What a free space reads as this refresh: what was read now, carried forward
 /// marked stale where it could not be, or the last reading where none was due.
-fn carried_free(space: Asked<Reading<u64>>, last: Option<&Snapshot>) -> Reading<u64> {
+fn carried(space: Asked<Reading<u64>>, last: Option<&Reading<u64>>) -> Reading<u64> {
     match space {
-        Asked::NotDue => last_free(last).copied().unwrap_or(Reading::Unknown),
-        asked => asked
-            .settled(None, Reading::Unknown)
-            .or_stale(last_free(last)),
+        Asked::NotDue => last.copied().unwrap_or(Reading::Unknown),
+        asked => asked.settled(None, Reading::Unknown).or_stale(last),
     }
 }
 
@@ -339,20 +347,29 @@ fn carried_link(linked: Asked<Hardlink>, last: Option<&Snapshot>) -> Hardlink {
     linked.settled(shown, Hardlink::Unknown)
 }
 
-/// The data location's free space and whether imports into it link, each where it
-/// is due — and neither where no location is configured, since then there is nothing
-/// to read. A rehearsal never probes, since the probe writes: it carries what an
-/// earlier refresh found, or says it does not know.
+/// The data location's free space, the free space where the services keep their
+/// configuration, and whether imports into the data location link, each where it is
+/// due — and none where no location is configured, since then there is nothing to
+/// read. A rehearsal never probes, since the probe writes: it carries what an earlier
+/// refresh found, or says it does not know.
 async fn volume(
     ctx: &Ctx,
     root: Option<&std::path::Path>,
+    project: Option<&std::path::Path>,
     due: &Due,
-) -> (Asked<Reading<u64>>, Asked<Hardlink>) {
+) -> (Asked<Reading<u64>>, Asked<Reading<u64>>, Asked<Hardlink>) {
     let Some(root) = root else {
-        return (Asked::NotDue, Asked::NotDue);
+        return (Asked::NotDue, Asked::NotDue, Asked::NotDue);
     };
+    let kept = project.map(crate::app::targets::services_config_dir);
     tokio::join!(
         when(due.is(Paced::FreeSpace), PANEL_WITHIN, free(ctx, root)),
+        async {
+            match kept.as_deref() {
+                Some(kept) => when(due.is(Paced::FreeSpace), PANEL_WITHIN, free(ctx, kept)).await,
+                None => Asked::Read(Reading::Unknown),
+            }
+        },
         when(
             due.is(Paced::Hardlink) && !ctx.dry_run,
             PANEL_WITHIN,
@@ -375,6 +392,32 @@ async fn when<T>(due: bool, bound: Duration, reading: impl Future<Output = T>) -
     within(bound, reading)
         .await
         .map_or(Asked::Late, Asked::Read)
+}
+
+/// Whether each download client is paused, from what each said it is doing: unknown
+/// for a client that could not be asked, and the panel unavailable where the stack
+/// could not be read or the clients did not answer in time.
+fn downloaders(
+    asked: Option<Result<Vec<crate::bandwidth::pausing::Paused>, Box<crate::error::Problem>>>,
+) -> Panel<Vec<crate::dashboard::Downloader>> {
+    use crate::bandwidth::Pulling;
+    use crate::dashboard::Fetching;
+    match asked {
+        None => Panel::unavailable(late(DOWNLOADS)),
+        Some(Err(problem)) => Panel::unavailable(problem.summary),
+        Some(Ok(each)) => Panel::Ready(
+            each.into_iter()
+                .map(|said| crate::dashboard::Downloader {
+                    client: said.client,
+                    state: match said.was {
+                        Some(Pulling::Stopped) => Fetching::Paused,
+                        Some(Pulling::Fetching) => Fetching::Fetching,
+                        None => Fetching::Unknown,
+                    },
+                })
+                .collect(),
+        ),
+    }
 }
 
 /// The services panel's source, as a panel that did not answer names it.

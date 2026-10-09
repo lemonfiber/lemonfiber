@@ -30,9 +30,10 @@ use crate::say::complain;
 use lemonfiber::cli::{
     AlertCommand, Asked, Authoring, CompanionCommand, ConfigAction, DownloadsCommand,
     HostingCommand, Kept, KeyCommand, MigrateCommand, PluginCommand, QualityCommand, RawBandwidth,
-    RawCompanion, RawCredentials, RawDownloads, RawKey, RawRemoval, RawRemoving, UpdateCommand,
-    WiringCommand,
+    RawCompanion, RawCredentials, RawDownloads, RawKey, RawRemoval, RawRemoving, RawRestart,
+    UpdateCommand, WiringCommand,
 };
+use lemonfiber_core::app::Restarting;
 
 mod people;
 
@@ -250,11 +251,12 @@ pub(crate) fn sharing(asked: RawBandwidth) -> Command {
 }
 
 /// A restart of named services, or of everything the form holds where none are named.
-pub(crate) fn restarting(form: String, services: Vec<String>) -> Command {
-    Command::Restart {
-        forms: vec![form],
-        services,
-    }
+pub(crate) fn restarting(asked: RawRestart) -> Command {
+    Command::Restart(Restarting {
+        forms: vec![asked.form],
+        services: asked.services,
+        offer: asked.offer,
+    })
 }
 
 /// Which completed download to stop seeding, and the offer being answered.
@@ -384,21 +386,26 @@ pub(crate) fn moving(object: UpdateCommand) -> Command {
             service,
             confirm,
             wait,
+            offer,
         } => Command::Update(update::Asked {
             service,
             confirm,
             wait: wait.into(),
+            offer,
         }),
         UpdateCommand::Itself { to } => Command::SelfUpdate { to },
     }
 }
 
 /// Which of the two is asked of every download client.
-pub(crate) const fn pausing(asked: &RawDownloads) -> Command {
-    Command::Downloads(match asked.action {
-        DownloadsCommand::Pause => Pausing::Pause,
-        DownloadsCommand::Resume => Pausing::Resume,
-    })
+pub(crate) fn pausing(asked: &RawDownloads) -> Command {
+    Command::Downloads {
+        asked: match asked.action {
+            DownloadsCommand::Pause => Pausing::Pause,
+            DownloadsCommand::Resume => Pausing::Resume,
+        },
+        offer: asked.offer.clone(),
+    }
 }
 
 /// Which of the two is asked of pairing.

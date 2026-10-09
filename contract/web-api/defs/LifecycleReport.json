@@ -39,6 +39,13 @@
         "null"
       ]
     },
+    "offer": {
+      "description": "The offer a restart answers: the services it would restart, named so that a\nrestart carrying it back is carried out against those services or refused.\nAbsent for every other action.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "plan": {
       "description": "What the named forms came to: the profiles, the services they hold, and\nwhat the configuration left out.\n\nThe resolved plan itself rather than a copy of its parts, because it is\nstated to the operator before the command runs and read out of the\nreport afterwards — two accounts of one run, and a second shape for it\nwould be a way for them to differ.",
       "$ref": "Plan.json"

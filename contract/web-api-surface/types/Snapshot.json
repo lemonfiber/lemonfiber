@@ -12,6 +12,12 @@
       ],
       "required": true
     },
+    "downloaders": {
+      "type": [
+        "ref:PanelArray_of_Downloader"
+      ],
+      "required": true
+    },
     "health": {
       "type": [
         "ref:HealthSummary"

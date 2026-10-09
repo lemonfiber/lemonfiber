@@ -242,6 +242,7 @@ fn paused(asked: Pausing, torrent: Option<Pulling>, rehearsed: bool) -> Pauses {
         ],
         caution: None,
         rehearsed,
+        offer: String::new(),
     }
 }
 

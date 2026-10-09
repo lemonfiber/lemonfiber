@@ -16,8 +16,8 @@ use clap::Subcommand;
 use super::{
     AlertCommand, Asked, ConfigAction, HostingCommand, HouseholdCommand, MigrateCommand,
     PluginCommand, QualityCommand, RawAllowance, RawBandwidth, RawCompanion, RawCredentials,
-    RawDoctor, RawDown, RawDownloads, RawKey, RawLogs, RawRemoving, RawSetup, RawTrace, RawUi,
-    RawUp, RawWhom, UpdateCommand,
+    RawDoctor, RawDown, RawDownloads, RawKey, RawLogs, RawRemoving, RawRestart, RawSetup, RawTrace,
+    RawUi, RawUp, RawWhom, UpdateCommand,
 };
 
 /// What the operator asked for.
@@ -72,12 +72,7 @@ pub enum Request {
         forms: Vec<String>,
     },
     /// Restart services without touching the rest.
-    Restart {
-        /// The form holding them.
-        form: String,
-        /// The services to restart; none restarts the whole form.
-        services: Vec<String>,
-    },
+    Restart(RawRestart),
     /// Fetch newer images without applying them.
     Pull {
         /// The forms whose images to fetch.

@@ -138,6 +138,14 @@ pub(super) fn last_speed<'a>(
     }
 }
 
+/// What the configuration volume's free space last read as, where it read at all.
+pub(super) fn last_config_free(previous: Option<&Snapshot>) -> Option<&Reading<u64>> {
+    match previous.map(|was| &was.storage) {
+        Some(Panel::Ready(storage)) => Some(&storage.config_free),
+        _ => None,
+    }
+}
+
 /// What the volume's free space last read as, where it read at all.
 pub(super) fn last_free(previous: Option<&Snapshot>) -> Option<&Reading<u64>> {
     match previous.map(|snapshot| &snapshot.storage) {
@@ -325,7 +333,7 @@ pub(super) async fn queues(
     (Panel::Ready(depths), answers)
 }
 
-/// How much of the data volume is free, as a reading of this refresh.
+/// How much of the volume holding `path` is free, as a reading of this refresh.
 ///
 /// A volume that could not be attributed to any mount reports a zero total, and its
 /// free space is then unknown rather than zero: "cannot read the volume" and "the
@@ -350,7 +358,12 @@ pub(super) async fn linking(ctx: &Ctx, root: &Path) -> Hardlink {
 /// at (`download_rate`), so a stalled queue projects no exhaustion rather than one
 /// that never arrives — and it is worked out on every refresh, from whichever free
 /// space reading is current, because the rate is read every refresh.
-pub(super) fn storage(free: Reading<u64>, hardlink: Hardlink, download_rate: u64) -> Storage {
+pub(super) fn storage(
+    free: Reading<u64>,
+    config_free: Reading<u64>,
+    hardlink: Hardlink,
+    download_rate: u64,
+) -> Storage {
     // Exhaustion is the free space divided by the rate it is draining at: a rate of
     // zero divides to no estimate rather than an infinite one, and a volume that
     // could not be read projects nothing rather than a wrong time.
@@ -360,6 +373,7 @@ pub(super) fn storage(free: Reading<u64>, hardlink: Hardlink, download_rate: u64
     };
     Storage {
         free,
+        config_free,
         exhaustion,
         hardlink,
     }

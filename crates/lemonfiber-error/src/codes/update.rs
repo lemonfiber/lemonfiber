@@ -43,4 +43,15 @@ codes! {
         remedy: "Bring the stack back up with `lemonfiber up`, then fix what stopped the capture \
             and ask again.",
     }
+    /// Raised where an update names an offer that is not the one a fresh look at the
+    /// releases builds.
+    UPDATE_MOVED = "UPDATE-5" {
+        severity: Warning,
+        status: 400,
+        since: "0.18.0",
+        meaning: "What was agreed to is not what the update would apply now. A newer release \
+            arrived, or one was withdrawn, since the update was rehearsed, so nothing was \
+            updated.",
+        remedy: "Rehearse the update again, and answer the offer it gives now.",
+    }
 }

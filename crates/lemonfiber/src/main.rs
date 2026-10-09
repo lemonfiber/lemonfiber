@@ -269,7 +269,7 @@ async fn main() -> ExitCode {
         // announcement — what stopped, what started, and what was left alone — and
         // saying "starts eight services" first would name the wrong set twice over.
         Request::Switch { forms } => Command::Switch { forms },
-        Request::Restart { form, services } => restarting(form, services),
+        Request::Restart(asked) => restarting(asked),
         // A pull is watched as it happens rather than waited on in silence, so like
         // streaming and watching it runs its own way instead of through dispatch.
         Request::Pull { forms } => return pull(&ctx, &forms, cli.json).await,

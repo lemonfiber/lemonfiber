@@ -1,4 +1,4 @@
-# Architecture (repo-local)
+# How the core is built
 
 How the subsystems are built in Rust. The *what* and *why* are in the spec's
 [20-architecture](https://github.com/lemonfiber/spec/blob/main/20-architecture/);

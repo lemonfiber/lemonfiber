@@ -399,6 +399,7 @@ fn asking(confirm: bool, wait: Waiting) -> Command {
         service: None,
         confirm,
         wait,
+        offer: None,
     })
 }
 
