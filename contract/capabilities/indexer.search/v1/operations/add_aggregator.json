@@ -1,0 +1,94 @@
+{
+  "post": {
+    "operationId": "add_aggregator",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$defs": {
+              "Aggregator": {
+                "additionalProperties": false,
+                "description": "An aggregator, as the service pulling from it needs to be told about it.",
+                "properties": {
+                  "key": {
+                    "description": "The aggregator's own key, which is what lets the list be read at all.",
+                    "type": "string"
+                  },
+                  "name": {
+                    "description": "What it is called where somebody reads the list.",
+                    "type": "string"
+                  },
+                  "url": {
+                    "description": "Where it is reached — a name on the stack's own network, since the service\ndoing the reading is a container beside it.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "url",
+                  "key"
+                ],
+                "type": "object"
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "aggregator": {
+                "$ref": "#/$defs/Aggregator",
+                "description": "The port's `aggregator`."
+              }
+            },
+            "required": [
+              "aggregator"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "title": "null",
+              "type": "null"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ]
+  }
+}

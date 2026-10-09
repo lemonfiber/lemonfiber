@@ -120,7 +120,10 @@ pub trait UsenetAccounts: Send + Sync {
 /// the aggregator counts against a *rolling* window: a count taken from midnight would
 /// report headroom that is not there every morning, which is the same calendar trap the
 /// download client's weekly totals set.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Limits {
     /// Searches allowed in the window, where the operator recorded a cap.
     pub queries: Option<u64>,
@@ -136,7 +139,10 @@ pub struct Limits {
 /// against. What the aggregator always knows is how many times it asked, how many of
 /// those failed, and whether it has since given up on the indexer; what it knows only
 /// sometimes is what the subscription behind it allows.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct IndexerUse {
     /// What the operator calls it.
     pub name: String,

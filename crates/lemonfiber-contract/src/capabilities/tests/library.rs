@@ -2,7 +2,7 @@
 //! against the same curator through the contract, which must answer alike and be told
 //! alike: a failure is named after the service the core called, as the core names it.
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use lemonfiber_ports::media::{Format, Kind};
@@ -14,33 +14,10 @@ use lemonfiber_ports::service::{
 };
 use lemonfiber_ports::Client;
 
-use super::{contracted, Served, SERVICE};
-use crate::capabilities::library::curate;
-
-/// A curator that writes down every argument it is handed and answers from them, so an
-/// argument lost or altered on the way shows in what it was told and in what it said.
-#[derive(Default)]
-pub(super) struct Curator {
-    told: Mutex<Vec<String>>,
-}
-
-impl Curator {
-    fn tell(&self, what: String) {
-        if let Ok(mut told) = self.told.lock() {
-            told.push(what);
-        }
-    }
-
-    fn told(&self) -> Vec<String> {
-        self.told
-            .lock()
-            .map(|told| told.clone())
-            .unwrap_or_default()
-    }
-}
+use super::{contracted, curate, Served, Upstream, SERVICE};
 
 #[async_trait]
-impl Client for Curator {
+impl Client for Upstream {
     async fn identity(&self) -> Result<Identity, Failure> {
         Ok(Identity {
             name: "curator".to_owned(),
@@ -89,7 +66,7 @@ impl Client for Curator {
 }
 
 #[async_trait]
-impl Maintenance for Curator {
+impl Maintenance for Upstream {
     async fn search_upgrades(&self, kind: Kind) -> Result<(), Failure> {
         self.tell(format!("upgrades {kind:?}"));
         Ok(())
@@ -97,7 +74,7 @@ impl Maintenance for Curator {
 }
 
 #[async_trait]
-impl Importing for Curator {
+impl Importing for Upstream {
     async fn hardlinks(&self) -> Result<bool, Failure> {
         Ok(true)
     }
@@ -108,7 +85,7 @@ impl Importing for Curator {
 }
 
 #[async_trait]
-impl Carrying for Curator {
+impl Carrying for Upstream {
     async fn records(&self, sort: Record) -> Result<Vec<Carried>, Failure> {
         Ok(vec![Carried {
             name: format!("{sort:?}"),
@@ -124,7 +101,7 @@ impl Carrying for Curator {
 }
 
 #[async_trait]
-impl Catalogue for Curator {
+impl Catalogue for Upstream {
     async fn lookup(&self, kind: Kind, term: &str) -> Result<Vec<CatalogueEntry>, Failure> {
         Ok(vec![CatalogueEntry {
             title: format!("{term} ({kind:?})"),
@@ -157,14 +134,14 @@ impl Catalogue for Curator {
 }
 
 #[async_trait]
-impl Queues for Curator {
+impl Queues for Upstream {
     async fn queue(&self) -> Result<Queue, Failure> {
         Ok(Queue::default())
     }
 }
 
 #[async_trait]
-impl QualityReleases for Curator {
+impl QualityReleases for Upstream {
     async fn probe_releases(&self, kind: Kind) -> Result<ReleaseProbe, Failure> {
         Ok(match kind {
             Kind::Tv => ReleaseProbe::Matching,
@@ -174,7 +151,7 @@ impl QualityReleases for Curator {
 }
 
 #[async_trait]
-impl MusicQuality for Curator {
+impl MusicQuality for Upstream {
     async fn apply_music_format(&self, format: Format) -> Result<(), Failure> {
         self.tell(format!("format {format:?}"));
         Ok(())
@@ -182,7 +159,7 @@ impl MusicQuality for Curator {
 }
 
 #[async_trait]
-impl Pipeline for Curator {
+impl Pipeline for Upstream {
     async fn library(&self, kind: Kind) -> Result<Vec<FoundItem>, Failure> {
         self.tell(format!("library {kind:?}"));
         Ok(Vec::new())
@@ -305,10 +282,10 @@ where
 
 #[tokio::test]
 async fn a_curator_answers_and_is_told_through_its_contract_as_it_is_in_process() {
-    let in_process = Curator::default();
+    let in_process = Upstream::default();
     let local = script(&in_process).await;
     let served = Served::default();
-    let reached = Arc::clone(&served.curator);
+    let reached = Arc::clone(&served.upstream);
     let crossed = script(&curate::Adapter(contracted(served))).await;
     assert_eq!(crossed, local);
     assert_eq!(reached.told(), in_process.told());

@@ -63,13 +63,18 @@ impl Kind {
             .find(|kind| kind.media_type() == media_type)
     }
 
-    /// The kind of video a service files, read from the media types it declares: the
-    /// first that names one, or `None` for a service that files video by no resolution.
+    /// The kind of video a service files, read from the media types it declares, or
+    /// `None` for a service that files no video.
+    ///
+    /// Television before film whatever order they are declared in: a service filing
+    /// both is filed as one, and which one has to be the same every run.
     #[must_use]
     pub fn of_declared(media_types: &[String]) -> Option<Self> {
-        media_types
-            .iter()
-            .find_map(|media| Self::for_media_type(media))
+        Self::ALL.into_iter().find(|kind| {
+            media_types
+                .iter()
+                .any(|media| media.as_str() == kind.media_type())
+        })
     }
 
     /// The plain word for what is filed, as a household would say it — the noun a
@@ -177,3 +182,6 @@ impl Format {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

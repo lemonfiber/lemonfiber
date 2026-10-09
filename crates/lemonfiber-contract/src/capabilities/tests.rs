@@ -3,7 +3,7 @@
 //! an adapter answers is what the core reads.
 
 use std::collections::HashSet;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -14,9 +14,14 @@ use lemonfiber_ports::service::{
 };
 
 use super::download::{torrent, usenet};
+use super::indexer::search;
+use super::library::curate;
+use super::subtitles::fetch;
 use crate::{wire, Contracted};
 
+mod indexer;
 mod library;
+mod subtitles;
 
 /// A download client that answers every question with something recognisable.
 struct Client;
@@ -102,11 +107,35 @@ impl UsenetAccounts for Client {
     }
 }
 
+/// An upstream that writes down every argument it is handed and answers from them, so an
+/// argument lost or altered on the way shows in what it was told and in what it said.
+///
+/// Each capability's tests implement that capability's ports for it.
+#[derive(Default)]
+struct Upstream {
+    told: Mutex<Vec<String>>,
+}
+
+impl Upstream {
+    fn tell(&self, what: String) {
+        if let Ok(mut told) = self.told.lock() {
+            told.push(what);
+        }
+    }
+
+    fn told(&self) -> Vec<String> {
+        self.told
+            .lock()
+            .map(|told| told.clone())
+            .unwrap_or_default()
+    }
+}
+
 /// A transport that hands every call to the dispatcher of the capability its path names.
 #[derive(Default)]
 struct Served {
-    /// The curator every `library.curate` call reaches.
-    curator: Arc<library::Curator>,
+    /// The upstream every call that is not a download client's reaches.
+    upstream: Arc<Upstream>,
 }
 
 #[async_trait]
@@ -119,7 +148,10 @@ impl Http for Served {
         let served = match capability {
             "download.torrent" => torrent::dispatch(&Client, operation, body).await,
             "download.usenet" => usenet::dispatch(&Client, operation, body).await,
-            _ => super::library::curate::dispatch(&*self.curator, operation, body).await,
+            "library.curate" => curate::dispatch(&*self.upstream, operation, body).await,
+            "indexer.search" => search::dispatch(&*self.upstream, operation, body).await,
+            "subtitles.fetch" => fetch::dispatch(&*self.upstream, operation, body).await,
+            _ => Err(wire::Refusal::unknown_operation(operation)),
         };
         Ok(match served {
             Ok(body) => Response {
@@ -208,6 +240,14 @@ async fn a_request_with_a_field_the_operation_does_not_take_is_not_asked() {
     );
 }
 
+#[tokio::test]
+async fn a_capability_nobody_serves_refuses_every_operation() {
+    let asked: Result<(), Failure> = contracted(Served::default())
+        .call("nothing.served", 1, "anything", &())
+        .await;
+    assert!(matches!(asked, Err(Failure::Refused { .. })));
+}
+
 #[test]
 fn every_operation_has_a_path_of_its_own_and_a_schema_each_way() {
     for capability in super::all() {
@@ -228,6 +268,12 @@ fn every_operation_has_a_path_of_its_own_and_a_schema_each_way() {
         .collect();
     assert_eq!(
         names,
-        vec!["download.usenet", "download.torrent", "library.curate"]
+        vec![
+            "download.usenet",
+            "download.torrent",
+            "library.curate",
+            "indexer.search",
+            "subtitles.fetch"
+        ]
     );
 }

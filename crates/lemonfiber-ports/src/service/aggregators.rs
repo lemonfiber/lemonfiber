@@ -13,7 +13,10 @@ use super::Failure;
 use async_trait::async_trait;
 
 /// An aggregator, as the service pulling from it needs to be told about it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Aggregator {
     /// What it is called where somebody reads the list.
     pub name: String,
@@ -30,7 +33,10 @@ pub struct Aggregator {
 /// registration can be confirmed by reading it. **Whether it holds a key is part of
 /// this**: the service accepts a registration whose key it did not understand and
 /// answers success, so an entry without one is the failure this reads for.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct KnownAggregator {
     /// The identifier the service gave it.
     pub id: String,

@@ -1,0 +1,114 @@
+{
+  "post": {
+    "operationId": "watching",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$defs": {
+              "Kind": {
+                "description": "The two kinds of video a household files by resolution, and so the two the quality\nmodel speaks to. Music and books have a different axis and are not resolution\npresets, so they are not here.\n\nNamed for what is filed, never for the service that files it: whatever curates\ntelevision is asked about `Tv`. Read as the media type a service declares, and\naccepting the old service-named spellings where a record still holds one.",
+                "oneOf": [
+                  {
+                    "const": "tv",
+                    "description": "Television: series, seasons and episodes.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "movies",
+                    "description": "Film.",
+                    "type": "string"
+                  }
+                ]
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "which": {
+                "$ref": "#/$defs/Kind",
+                "description": "The port's `which`."
+              }
+            },
+            "required": [
+              "which"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "additionalProperties": false,
+              "description": "What a subtitle finder already holds for one \\*arr.\n\nRead back so one already pointed at an \\*arr is left alone rather than written\nagain, and so a write can be confirmed by reading it.\n\n**The base path is not part of this**, deliberately: it is normalised on the way\nin — `/` is stored as empty — so comparing it reports a difference nobody made.",
+              "properties": {
+                "enabled": {
+                  "description": "Whether the finder is set to use this \\*arr at all. Off is the default, and\nan address written with this left off is an address nothing reads.",
+                  "type": "boolean"
+                },
+                "host": {
+                  "description": "The host it holds.",
+                  "type": "string"
+                },
+                "keyed": {
+                  "description": "Whether it holds a key. The key itself is not read back for comparison — a\ncredential is not something to carry around to decide whether to write one.",
+                  "type": "boolean"
+                },
+                "port": {
+                  "description": "The port it holds.",
+                  "format": "uint16",
+                  "maximum": 65535,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "enabled",
+                "host",
+                "port",
+                "keyed"
+              ],
+              "title": "Watching",
+              "type": "object"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ]
+  }
+}

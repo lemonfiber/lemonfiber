@@ -60,7 +60,7 @@ pub use screening::{
     Episode, Held, Holds, HowFar, Located, Medium, PartWay, Pinned, Screening, Season, Title,
     PLAYER,
 };
-pub use subtitles::{Subtitled, Subtitles, Watched, Watching};
+pub use subtitles::{Subtitles, Watched, Watching};
 pub use throttling::{Hours, Rates, Throttled, Throttling, Wanted, Window};
 pub use trace::{FoundItem, ItemPart, Library, Pipeline, QueueItem, StuckItem, TraceEvent};
 

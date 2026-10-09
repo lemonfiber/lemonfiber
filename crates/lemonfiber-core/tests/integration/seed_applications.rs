@@ -139,8 +139,8 @@ impl AppSync for FakeProwlarr {
 fn app(base_url: &str) -> Application {
     Application {
         name: "Sonarr".to_owned(),
-        kind: ApplicationKind::Sonarr,
-        prowlarr_url: "http://prowlarr:9696".to_owned(),
+        kind: ApplicationKind::Tv,
+        indexer_url: "http://prowlarr:9696".to_owned(),
         base_url: base_url.to_owned(),
         api_key: "arr-key".to_owned(),
     }

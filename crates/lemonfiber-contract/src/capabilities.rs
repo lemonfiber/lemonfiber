@@ -4,7 +4,9 @@
 //! published documents are generated from [`all`], in the vocabulary's order.
 
 pub mod download;
+pub mod indexer;
 pub mod library;
+pub mod subtitles;
 
 /// Every capability this build speaks, in the vocabulary's order.
 #[must_use]
@@ -13,6 +15,8 @@ pub fn all() -> Vec<crate::Capability> {
         download::usenet::capability(),
         download::torrent::capability(),
         library::curate::capability(),
+        indexer::search::capability(),
+        subtitles::fetch::capability(),
     ]
 }
 

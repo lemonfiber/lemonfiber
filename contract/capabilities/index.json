@@ -236,6 +236,80 @@
       ],
       "openapi": "library.curate/v1/openapi.json",
       "operations": 27
+    },
+    {
+      "capability": "indexer.search",
+      "conformance": "indexer.search/v1/conformance.json",
+      "files": [
+        {
+          "path": "indexer.search/v1/openapi.json",
+          "sha256": "df8cf68d8b72c83d977dfcdce036c0254c52c328be905892825096ea3f4f0493"
+        },
+        {
+          "path": "indexer.search/v1/operations/register_application.json",
+          "sha256": "1f967d1086061969c25806e2769ae81724ac43ffe2175b59891a34a68f31e963"
+        },
+        {
+          "path": "indexer.search/v1/operations/applications.json",
+          "sha256": "fae797e6d0b79932c8ab39369cffc98a4d500a53a7cbad6292d74026048df596"
+        },
+        {
+          "path": "indexer.search/v1/operations/test_application.json",
+          "sha256": "4880db775631798919eaf2afac5705bcf3992672bbcced6dbed7a76821a52fd8"
+        },
+        {
+          "path": "indexer.search/v1/operations/rekey_application.json",
+          "sha256": "32d44c7d6965335b55c81b2892ae8e500608d25ef11b5835fa1553ccf428d752"
+        },
+        {
+          "path": "indexer.search/v1/operations/indexers.json",
+          "sha256": "f3be43642727dbd84d75e2d9f09bb4d3d9ddd83f2734620cb4b3aa31840cc0be"
+        },
+        {
+          "path": "indexer.search/v1/operations/aggregators.json",
+          "sha256": "16afd84888f6062aefa4291e33c2d5e4506d87aad8a7114d57a041d4e4386f8f"
+        },
+        {
+          "path": "indexer.search/v1/operations/add_aggregator.json",
+          "sha256": "ec5149f2411c0c020dbc2e3afa6d308a4c4655b321c1955dd53300a046bdd831"
+        },
+        {
+          "path": "indexer.search/v1/conformance.json",
+          "sha256": "b8bd55170e824bcbbf27ecf700584f1853d16bc2fc60428f7de908a6580f6492"
+        }
+      ],
+      "majors": [
+        1
+      ],
+      "openapi": "indexer.search/v1/openapi.json",
+      "operations": 7
+    },
+    {
+      "capability": "subtitles.fetch",
+      "conformance": "subtitles.fetch/v1/conformance.json",
+      "files": [
+        {
+          "path": "subtitles.fetch/v1/openapi.json",
+          "sha256": "be5659876c4b9072fc01e107c80bf45f0ee1c5551533d4801052657545f7d9a1"
+        },
+        {
+          "path": "subtitles.fetch/v1/operations/watching.json",
+          "sha256": "65a0c0b5870b9533499e3bdeb13cb9303dd09164186844270d8ef82014acc821"
+        },
+        {
+          "path": "subtitles.fetch/v1/operations/watch.json",
+          "sha256": "16df78f92aadd7a7909d50381ed39108dfbe48b6c20da1c8049e7f9c21758ad7"
+        },
+        {
+          "path": "subtitles.fetch/v1/conformance.json",
+          "sha256": "bc35c9759e7ec3c89546b5322354cc25bb682b446fe152445ca1c24239f3f4d8"
+        }
+      ],
+      "majors": [
+        1
+      ],
+      "openapi": "subtitles.fetch/v1/openapi.json",
+      "operations": 2
     }
   ]
 }

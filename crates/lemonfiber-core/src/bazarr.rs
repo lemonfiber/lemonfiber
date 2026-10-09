@@ -20,7 +20,8 @@ use serde::Deserialize;
 
 use crate::endpoint::{form_content_type, form_encoded, Endpoint};
 use crate::ports::http::{Http, Method, Request};
-use crate::ports::service::{Failure, Subtitled, Subtitles, Watched, Watching};
+use crate::ports::media::Kind;
+use crate::ports::service::{Failure, Subtitles, Watched, Watching};
 
 /// The header the key is presented in.
 const KEY: &str = "X-API-KEY";
@@ -160,12 +161,12 @@ fn field(section: &str, name: &str) -> String {
 
 #[async_trait]
 impl Subtitles for Bazarr {
-    async fn watching(&self, which: Subtitled) -> Result<Watching, Failure> {
+    async fn watching(&self, which: Kind) -> Result<Watching, Failure> {
         watching(self, which).await
     }
 
     async fn watch(&self, watched: &Watched) -> Result<(), Failure> {
-        let section = watched.which.section();
+        let section = section(watched.which);
         let port = watched.port.to_string();
         let used = field("general", &format!("use_{section}"));
         let body = form_encoded(&[
@@ -185,7 +186,15 @@ impl Subtitles for Bazarr {
     }
 }
 
-async fn watching(bazarr: &Bazarr, which: Subtitled) -> Result<Watching, Failure> {
+/// The section the finder files the curator of `kind` under.
+const fn section(kind: Kind) -> &'static str {
+    match kind {
+        Kind::Tv => "sonarr",
+        Kind::Movies => "radarr",
+    }
+}
+
+async fn watching(bazarr: &Bazarr, which: Kind) -> Result<Watching, Failure> {
     let response = bazarr
         .endpoint
         .send(&bazarr.request(Method::Get, None))
@@ -195,8 +204,8 @@ async fn watching(bazarr: &Bazarr, which: Subtitled) -> Result<Watching, Failure
         "the subtitle finder's settings could not be read",
     )?;
     let (enabled, arr) = match which {
-        Subtitled::Sonarr => (held.general.use_sonarr, held.sonarr),
-        Subtitled::Radarr => (held.general.use_radarr, held.radarr),
+        Kind::Tv => (held.general.use_sonarr, held.sonarr),
+        Kind::Movies => (held.general.use_radarr, held.radarr),
     };
     let arr = arr.unwrap_or(ArrSettings {
         ip: String::new(),

@@ -16,7 +16,8 @@
 
 use lemonfiber_manifest::ApiKind;
 
-use crate::ports::service::{ApplicationKind, Protocol, Subtitled};
+use crate::ports::media::Kind;
+use crate::ports::service::{ApplicationKind, Protocol};
 use crate::seed::{State, Wiring};
 use crate::wiring::{Address, Ask, Filler, Fillers};
 
@@ -34,11 +35,11 @@ const CURATES: &str = "library.curate";
 const SEARCHES: &str = "indexer.search";
 
 /// Television, as the stack manifest names the media a curator files.
-pub(super) const TELEVISION: &str = "tv";
+pub(super) const TELEVISION: &str = Kind::Tv.media_type();
 /// Film, likewise.
-pub(super) const FILM: &str = "movies";
+pub(super) const FILM: &str = Kind::Movies.media_type();
 /// Music, likewise.
-pub(super) const MUSIC: &str = "music";
+pub(super) const MUSIC: &str = ApplicationKind::Music.media_type();
 
 /// Every capability an ask is answered for here.
 ///
@@ -61,7 +62,7 @@ pub(super) enum Connection {
         television: bool,
     },
     /// The filler, watched by the subtitle finder as this kind.
-    Subtitles(Subtitled),
+    Subtitles(Kind),
     /// The filler, told to the asker as an aggregator it pulls indexers from, with the
     /// filler's own key to read it with.
     Aggregator,
@@ -149,10 +150,13 @@ fn connection(
                 .map(Connection::Application)
                 .ok_or(Unmade::Files)
         }
-        (ApiKind::Seerr, CURATES, ApiKind::Servarr) => super::fulfilment::fetches(media)
-            .map(|television| Connection::Fulfilment { television })
+        // Lidarr and Bindery file media the request service does not deal in at all.
+        (ApiKind::Seerr, CURATES, ApiKind::Servarr) => Kind::of_declared(media)
+            .map(|kind| Connection::Fulfilment {
+                television: kind == Kind::Tv,
+            })
             .ok_or(Unmade::Files),
-        (ApiKind::Bazarr, CURATES, ApiKind::Servarr) => super::subtitles::subtitled(media)
+        (ApiKind::Bazarr, CURATES, ApiKind::Servarr) => Kind::of_declared(media)
             .map(Connection::Subtitles)
             .ok_or(Unmade::Files),
         (ApiKind::Bindery, SEARCHES, ApiKind::Servarr) => Ok(Connection::Aggregator),

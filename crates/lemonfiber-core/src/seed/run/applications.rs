@@ -3,7 +3,7 @@
 //! The indexer needs to know what to search on behalf of, which is the one connection
 //! that runs from the indexer outward rather than into it.
 
-use super::connecting::{pairings, Cleared, Connection, FILM, MUSIC, TELEVISION};
+use super::connecting::{pairings, Cleared, Connection};
 use super::Ctx;
 use crate::ports::filesystem::Beneath;
 use crate::ports::service::Application;
@@ -92,7 +92,7 @@ async fn sync(ctx: &Ctx, syncing: &Syncing<'_>, only: Option<&str>) -> Vec<crate
         wanted.push(Application {
             name: curator.name.clone(),
             kind: *kind,
-            prowlarr_url: back.url(),
+            indexer_url: back.url(),
             base_url: reached.clone(),
             api_key: key,
         });
@@ -143,18 +143,15 @@ pub(crate) async fn resync_application(
     found
 }
 
-/// The Prowlarr application kind for an \*arr's media, or nothing where its media
-/// is not one Prowlarr's app sync covers — the same by-media mapping the download
-/// clients' categories use, so the two stay in step.
+/// The application kind for an \*arr's media, read from the first media type it
+/// declares, or nothing where that is not one an indexer's app sync covers — the same
+/// by-media mapping the download clients' categories use, so the two stay in step.
 pub(super) fn application_kind(
     media_types: &[String],
 ) -> Option<crate::ports::service::ApplicationKind> {
-    match media_types.first().map(String::as_str) {
-        Some(TELEVISION) => Some(crate::ports::service::ApplicationKind::Sonarr),
-        Some(FILM) => Some(crate::ports::service::ApplicationKind::Radarr),
-        Some(MUSIC) => Some(crate::ports::service::ApplicationKind::Lidarr),
-        _ => None,
-    }
+    media_types
+        .first()
+        .and_then(|media| crate::ports::service::ApplicationKind::for_media_type(media))
 }
 
 /// A `Wiring` skipped because the service has not written the key it needs yet — a

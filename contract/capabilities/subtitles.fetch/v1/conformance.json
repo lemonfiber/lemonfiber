@@ -1,0 +1,35 @@
+{
+  "capability": "subtitles.fetch",
+  "cases": [
+    {
+      "case": "refuses-without-the-key",
+      "expect": {
+        "status": [
+          401
+        ]
+      },
+      "keyed": false,
+      "live": true,
+      "operation": "watching"
+    },
+    {
+      "case": "watching-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "watching"
+    },
+    {
+      "case": "watch-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "watch"
+    }
+  ],
+  "major": 1
+}

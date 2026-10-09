@@ -1,5 +1,6 @@
 use super::{made, pairings, unmatched, Connection, Unmade};
-use crate::ports::service::{ApplicationKind, Protocol, Subtitled};
+use crate::ports::media::Kind;
+use crate::ports::service::{ApplicationKind, Protocol};
 use crate::seed::State;
 use crate::test_support::{a_placed, an_installed};
 use crate::wiring::{Chosen, Fillers};
@@ -121,17 +122,17 @@ fn every_curation_ask_the_shipped_stack_makes_is_connected_or_said() {
             (
                 "prowlarr".to_owned(),
                 "sonarr".to_owned(),
-                Some(Connection::Application(ApplicationKind::Sonarr))
+                Some(Connection::Application(ApplicationKind::Tv))
             ),
             (
                 "prowlarr".to_owned(),
                 "radarr".to_owned(),
-                Some(Connection::Application(ApplicationKind::Radarr))
+                Some(Connection::Application(ApplicationKind::Movies))
             ),
             (
                 "prowlarr".to_owned(),
                 "lidarr".to_owned(),
-                Some(Connection::Application(ApplicationKind::Lidarr))
+                Some(Connection::Application(ApplicationKind::Music))
             ),
             (
                 "seerr".to_owned(),
@@ -146,12 +147,12 @@ fn every_curation_ask_the_shipped_stack_makes_is_connected_or_said() {
             (
                 "bazarr".to_owned(),
                 "sonarr".to_owned(),
-                Some(Connection::Subtitles(Subtitled::Sonarr))
+                Some(Connection::Subtitles(Kind::Tv))
             ),
             (
                 "bazarr".to_owned(),
                 "radarr".to_owned(),
-                Some(Connection::Subtitles(Subtitled::Radarr))
+                Some(Connection::Subtitles(Kind::Movies))
             ),
         ]
     );

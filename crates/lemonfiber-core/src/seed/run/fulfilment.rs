@@ -16,7 +16,7 @@ use std::path::Path;
 
 use lemonfiber_manifest::Service;
 
-use super::connecting::{pairings, Connection, FILM, TELEVISION};
+use super::connecting::{pairings, Connection};
 use super::Ctx;
 use crate::ports::filesystem::Beneath;
 use crate::ports::service::{Client as _, Endpoint, FulfilmentTarget, QualityProfile, Requests};
@@ -116,20 +116,6 @@ async fn wanted_targets(ctx: &Ctx, fillers: &Fillers) -> (Vec<FulfilmentTarget>,
         });
     }
     (wanted, refused)
-}
-
-/// Whether this \*arr fetches television, film, or neither.
-///
-/// `None` is not a failure: it is Lidarr or Bindery, which file media the request
-/// service does not deal in at all.
-pub(super) fn fetches(media_types: &[String]) -> Option<bool> {
-    if media_types.iter().any(|kind| kind == TELEVISION) {
-        return Some(true);
-    }
-    if media_types.iter().any(|kind| kind == FILM) {
-        return Some(false);
-    }
-    None
 }
 
 /// The profile requests are fetched at.

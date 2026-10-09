@@ -13,7 +13,8 @@ use std::sync::Arc;
 
 use lemonfiber_core::bazarr::{api_key, Bazarr};
 use lemonfiber_core::ports::http::Http;
-use lemonfiber_core::ports::service::{Failure, Subtitled, Subtitles, Watched};
+use lemonfiber_core::ports::media::Kind;
+use lemonfiber_core::ports::service::{Failure, Subtitles, Watched};
 use lemonfiber_fixtures::http::{Answer, Fake};
 
 /// The key this client presents, assembled rather than written down: a literal
@@ -35,10 +36,10 @@ const HOLDING_SONARR: &str = r#"{
 }"#;
 
 /// An \*arr as the finder is told about it.
-fn watched(which: Subtitled) -> Watched {
+fn watched(which: Kind) -> Watched {
     let (host, port) = match which {
-        Subtitled::Sonarr => ("sonarr", 8989),
-        Subtitled::Radarr => ("radarr", 7878),
+        Kind::Tv => ("sonarr", 8989),
+        Kind::Movies => ("radarr", 7878),
     };
     Watched {
         which,
@@ -57,7 +58,7 @@ async fn what_the_finder_holds_is_read_for_one_arr_at_a_time() {
     let fake = Fake::always(Answer::reply(200, HOLDING_SONARR));
     let finder = bazarr(&fake);
 
-    let television = finder.watching(Subtitled::Sonarr).await.ok();
+    let television = finder.watching(Kind::Tv).await.ok();
     assert!(
         television.as_ref().is_some_and(|held| held.enabled
             && held.host == "sonarr"
@@ -66,7 +67,7 @@ async fn what_the_finder_holds_is_read_for_one_arr_at_a_time() {
         "{television:?}"
     );
 
-    let film = finder.watching(Subtitled::Radarr).await.ok();
+    let film = finder.watching(Kind::Movies).await.ok();
     assert!(
         film.as_ref()
             .is_some_and(|held| !held.enabled && !held.keyed),
@@ -78,7 +79,7 @@ async fn what_the_finder_holds_is_read_for_one_arr_at_a_time() {
 #[tokio::test]
 async fn the_key_is_presented_where_the_service_looks_for_it() {
     let fake = Fake::always(Answer::reply(200, HOLDING_SONARR));
-    let _ = bazarr(&fake).watching(Subtitled::Sonarr).await;
+    let _ = bazarr(&fake).watching(Kind::Tv).await;
 
     let sent = fake.requests();
     let carried = sent
@@ -103,7 +104,7 @@ async fn the_key_is_presented_where_the_service_looks_for_it() {
 #[tokio::test]
 async fn pointing_it_at_an_arr_sets_the_address_and_the_switch_at_once() {
     let fake = Fake::always(Answer::reply(204, ""));
-    let told = bazarr(&fake).watch(&watched(Subtitled::Sonarr)).await;
+    let told = bazarr(&fake).watch(&watched(Kind::Tv)).await;
     assert!(told.is_ok(), "{told:?}");
 
     let sent = fake.requests();
@@ -134,7 +135,7 @@ async fn pointing_it_at_an_arr_sets_the_address_and_the_switch_at_once() {
 #[tokio::test]
 async fn each_arr_is_written_under_the_name_the_service_files_it_by() {
     let fake = Fake::always(Answer::reply(204, ""));
-    let _ = bazarr(&fake).watch(&watched(Subtitled::Radarr)).await;
+    let _ = bazarr(&fake).watch(&watched(Kind::Movies)).await;
 
     let sent = fake.requests();
     let body = sent
@@ -159,13 +160,13 @@ async fn each_arr_is_written_under_the_name_the_service_files_it_by() {
 async fn a_service_that_will_not_take_it_is_reported() {
     let refused = Fake::always(Answer::reply(401, ""));
     assert!(matches!(
-        bazarr(&refused).watch(&watched(Subtitled::Sonarr)).await,
+        bazarr(&refused).watch(&watched(Kind::Tv)).await,
         Err(Failure::Unauthorised { .. })
     ));
 
     let silent = Fake::silent();
     assert!(matches!(
-        bazarr(&silent).watching(Subtitled::Sonarr).await,
+        bazarr(&silent).watching(Kind::Tv).await,
         Err(Failure::Unavailable { .. })
     ));
 }

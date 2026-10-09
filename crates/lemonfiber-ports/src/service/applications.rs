@@ -3,31 +3,63 @@
 //! The one connection that runs outward from the indexer rather than into it.
 
 use super::Failure;
+use crate::media::Kind;
 use async_trait::async_trait;
 
-/// Which media-filing \*arr a Prowlarr application entry syncs to, selecting the
-/// field schema Prowlarr files it under and the release categories it syncs —
-/// see the Prowlarr-application contract in the spec.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// What an application the indexer searches for files, selecting how the indexer
+/// files the application and which release categories it syncs to it.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
 pub enum ApplicationKind {
-    /// Sonarr — television.
-    Sonarr,
-    /// Radarr — movies.
-    Radarr,
-    /// Lidarr — music.
-    Lidarr,
+    /// Television.
+    #[serde(alias = "sonarr")]
+    Tv,
+    /// Film.
+    #[serde(alias = "radarr")]
+    Movies,
+    /// Music.
+    #[serde(alias = "lidarr")]
+    Music,
+}
+
+impl ApplicationKind {
+    /// Every kind, in the order they are offered.
+    pub const ALL: [Self; 3] = [Self::Tv, Self::Movies, Self::Music];
+
+    /// The media type a service declares for this kind.
+    #[must_use]
+    pub const fn media_type(self) -> &'static str {
+        match self {
+            Self::Tv => Kind::Tv.media_type(),
+            Self::Movies => Kind::Movies.media_type(),
+            Self::Music => "music",
+        }
+    }
+
+    /// The kind a declared media type names, or `None` for one no application files.
+    #[must_use]
+    pub fn for_media_type(media_type: &str) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|kind| kind.media_type() == media_type)
+    }
 }
 
 /// A media-filing \*arr, as Prowlarr needs to be told about it so it syncs that
 /// \*arr its indexers.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Application {
     /// The name the operator will see in Prowlarr's own interface.
     pub name: String,
     /// Which application it is, selecting the field schema and sync categories.
     pub kind: ApplicationKind,
-    /// The address the \*arr reaches Prowlarr back on, on the stack's network.
-    pub prowlarr_url: String,
+    /// The address the application reaches the indexer back on, on the stack's network.
+    pub indexer_url: String,
     /// The address Prowlarr reaches the \*arr on, on the stack's network — the
     /// connection an existing application is matched by.
     pub base_url: String,
@@ -42,7 +74,10 @@ pub struct Application {
 /// — matched by the address it reaches, the `base_url`, rather than by its label,
 /// so a differently-named but equivalent application is not duplicated — and so a
 /// later undo names exactly the one created.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct RegisteredApplication {
     /// The identifier Prowlarr assigned.
     pub id: String,
