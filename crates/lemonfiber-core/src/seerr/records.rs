@@ -1,9 +1,9 @@
 //! How the request service's own records are read.
 //!
 //! Its shapes rather than this product's: what it calls a page, what it puts in one,
-//! and the two statuses it keeps apart. They are carried as the service's own numbers
-//! and turned into the household's words above this, because what became of a request
-//! and what became of the media it asked for are separate facts.
+//! and the two statuses it keeps apart, read from its numbers into the contract's words.
+//! The two stay apart, because what became of a request and what became of the media it
+//! asked for are separate facts.
 //!
 //! In a file of its own because `seerr.rs` is the client — signing in, pointing the
 //! service at things, asking it questions — and this is the vocabulary one of those
@@ -11,7 +11,7 @@
 
 use serde::Deserialize;
 
-use crate::ports::service::HouseholdRequest;
+use crate::ports::service::{HouseholdRequest, MediaStatus, RequestStatus};
 use crate::recyclarr::Kind;
 
 /// How many requests are read per page. Seerr answers ten at a time unless told
@@ -109,8 +109,39 @@ impl RequestRecord {
             item: self.media.external_service_id,
             arrived: self.media.media_added_at,
             shelf_id: self.media.jellyfin_media_id,
-            request_status: self.status,
-            media_status: self.media.status,
+            request_status: request_status(self.status),
+            media_status: media_status(self.media.status),
         }
     }
 }
+
+/// What became of a request, from the number the service files it under, or `None` for
+/// a number it does not document.
+pub(super) const fn request_status(number: u8) -> Option<RequestStatus> {
+    match number {
+        1 => Some(RequestStatus::Pending),
+        2 => Some(RequestStatus::Approved),
+        3 => Some(RequestStatus::Declined),
+        4 => Some(RequestStatus::Failed),
+        5 => Some(RequestStatus::Completed),
+        _ => None,
+    }
+}
+
+/// What became of the media a request asked for, from the service's number, or `None`
+/// for one it does not document. Six is the service's "blacklisted", which no request
+/// lemonfiber reads is ever in.
+pub(super) const fn media_status(number: u8) -> Option<MediaStatus> {
+    match number {
+        1 => Some(MediaStatus::Unknown),
+        2 => Some(MediaStatus::Pending),
+        3 => Some(MediaStatus::Processing),
+        4 => Some(MediaStatus::PartlyAvailable),
+        5 => Some(MediaStatus::Available),
+        7 => Some(MediaStatus::Deleted),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests;

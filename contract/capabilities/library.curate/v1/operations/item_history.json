@@ -7,7 +7,7 @@
           "schema": {
             "$defs": {
               "Kind": {
-                "description": "The two kinds of video a household files by resolution, and so the two the quality\nmodel speaks to. Music and books have a different axis and are not resolution\npresets, so they are not here.\n\nNamed for what is filed, never for the service that files it: whatever curates\ntelevision is asked about `Tv`. Read as the media type a service declares, and\naccepting the old service-named spellings where a record still holds one.",
+                "description": "The two kinds of video a household files by resolution.",
                 "oneOf": [
                   {
                     "const": "tv",

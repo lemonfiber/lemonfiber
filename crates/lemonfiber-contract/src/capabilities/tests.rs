@@ -14,13 +14,19 @@ use lemonfiber_ports::service::{
 };
 
 use super::download::{torrent, usenet};
+use super::identity::source;
 use super::indexer::search;
 use super::library::curate;
+use super::media::serve;
+use super::request::intake;
 use super::subtitles::fetch;
 use crate::{wire, Contracted};
 
+mod identity;
 mod indexer;
 mod library;
+mod media;
+mod request;
 mod subtitles;
 
 /// A download client that answers every question with something recognisable.
@@ -129,6 +135,36 @@ impl Upstream {
             .map(|told| told.clone())
             .unwrap_or_default()
     }
+
+    /// The operations it was told about, each by the word its entry starts with.
+    fn operations(&self) -> Vec<String> {
+        self.told()
+            .iter()
+            .map(|told| told.split(' ').next().unwrap_or_default().to_owned())
+            .collect()
+    }
+}
+
+/// One script run against an upstream in process and through the contract by `$adapter`:
+/// both must answer alike, the upstream must be told alike, and it must be told exactly
+/// the operations named.
+macro_rules! crosses_alike {
+    ($script:ident, $adapter:path, [$($told:literal),* $(,)?]) => {{
+        let in_process = super::Upstream::default();
+        let local = $script(&in_process).await;
+        let served = super::Served::default();
+        let reached = std::sync::Arc::clone(&served.upstream);
+        let crossed = $script(&$adapter(super::contracted(served))).await;
+        assert_eq!(crossed, local);
+        assert_eq!(reached.told(), in_process.told());
+        assert_eq!(in_process.operations(), [$($told),*]);
+    }};
+}
+use crosses_alike;
+
+/// A value as it crosses, credentials and all.
+fn json<T: serde::Serialize>(value: &T) -> String {
+    serde_json::to_string(value).unwrap_or_default()
 }
 
 /// A transport that hands every call to the dispatcher of the capability its path names.
@@ -146,11 +182,14 @@ impl Http for Served {
         let capability = segments.nth(1).unwrap_or_default();
         let body = request.body.as_deref().unwrap_or_default().as_bytes();
         let served = match capability {
-            "download.torrent" => torrent::dispatch(&Client, operation, body).await,
-            "download.usenet" => usenet::dispatch(&Client, operation, body).await,
-            "library.curate" => curate::dispatch(&*self.upstream, operation, body).await,
-            "indexer.search" => search::dispatch(&*self.upstream, operation, body).await,
-            "subtitles.fetch" => fetch::dispatch(&*self.upstream, operation, body).await,
+            torrent::CAPABILITY => torrent::dispatch(&Client, operation, body).await,
+            usenet::CAPABILITY => usenet::dispatch(&Client, operation, body).await,
+            curate::CAPABILITY => curate::dispatch(&*self.upstream, operation, body).await,
+            search::CAPABILITY => search::dispatch(&*self.upstream, operation, body).await,
+            fetch::CAPABILITY => fetch::dispatch(&*self.upstream, operation, body).await,
+            intake::CAPABILITY => intake::dispatch(&*self.upstream, operation, body).await,
+            source::CAPABILITY => source::dispatch(&*self.upstream, operation, body).await,
+            serve::CAPABILITY => serve::dispatch(&*self.upstream, operation, body).await,
             _ => Err(wire::Refusal::unknown_operation(operation)),
         };
         Ok(match served {
@@ -268,12 +307,15 @@ fn every_operation_has_a_path_of_its_own_and_a_schema_each_way() {
         .collect();
     assert_eq!(
         names,
-        vec![
-            "download.usenet",
-            "download.torrent",
-            "library.curate",
-            "indexer.search",
-            "subtitles.fetch"
+        [
+            usenet::CAPABILITY,
+            torrent::CAPABILITY,
+            curate::CAPABILITY,
+            search::CAPABILITY,
+            fetch::CAPABILITY,
+            intake::CAPABILITY,
+            source::CAPABILITY,
+            serve::CAPABILITY,
         ]
     );
 }

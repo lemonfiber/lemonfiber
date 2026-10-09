@@ -18,7 +18,9 @@ use lemonfiber_sidecar::decline::{File, Key};
 
 use super::Ctx;
 use crate::app::invite::declining;
-use crate::jellyfin::{Jellyfin, DECLINE_APP};
+use crate::app_keys::DECLINE_APP;
+use crate::jellyfin::Jellyfin;
+use crate::ports::service::AppKeys as _;
 use crate::seed::{State, Wiring};
 
 /// What the report calls this connection.

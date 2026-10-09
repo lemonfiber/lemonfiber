@@ -7,7 +7,9 @@
 
 use std::path::{Path, PathBuf};
 
-use lemonfiber_sidecar::gate::File;
+use lemonfiber_sidecar::gate::{File, Kind};
+
+use crate::ports::media;
 
 /// The request gate's id in the stack manifest.
 pub(crate) const SERVICE: &str = "request-gate";
@@ -23,6 +25,24 @@ pub(crate) fn service(
 /// root the stack's config volumes are mounted from.
 pub(crate) fn path(project: &Path, file: File) -> PathBuf {
     project.join("config").join(SERVICE).join(file.name())
+}
+
+/// The kind of video the curator a route reaches fetches, or `None` for the media
+/// server's route.
+pub(crate) const fn fetching(route: Kind) -> Option<media::Kind> {
+    match route {
+        Kind::Sonarr => Some(media::Kind::Tv),
+        Kind::Radarr => Some(media::Kind::Movies),
+        Kind::Jellyfin => None,
+    }
+}
+
+/// The route kind for a curator fetching `kind`.
+pub(crate) const fn route_for(kind: media::Kind) -> Kind {
+    match kind {
+        media::Kind::Tv => Kind::Sonarr,
+        media::Kind::Movies => Kind::Radarr,
+    }
 }
 
 #[cfg(test)]

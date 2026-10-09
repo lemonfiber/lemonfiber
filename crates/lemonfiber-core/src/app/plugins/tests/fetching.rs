@@ -561,11 +561,16 @@ impl Runner for Slow {
 
 /// Listing what is installed asks the sources a few at a time rather than one after
 /// another, and answers for each in the record's order.
-#[tokio::test(start_paused = true)]
+#[tokio::test]
 async fn sources_are_asked_a_few_at_a_time_and_answered_in_order() {
     let ctx = ctx("listed-at-once");
     let at = source("listed-at-once", MANIFEST);
     let one = report(installing(&ctx, &at).await).and_then(|done| done.installed.first().cloned());
+    assert!(
+        one.is_some(),
+        "the plugin the listing is built from installs"
+    );
+    tokio::time::pause();
     let installed: Vec<crate::plugin::Installed> = (0..6)
         .filter_map(|n| {
             one.clone().map(|one| crate::plugin::Installed {

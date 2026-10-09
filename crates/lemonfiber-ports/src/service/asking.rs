@@ -25,7 +25,10 @@ use super::Failure;
 /// Two numbers and no more: how many, and over how long. Expressed in the terms a
 /// household says them in rather than in an internal counter — "five a week" is the
 /// sentence, and both halves of it are here.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Quota {
     /// How many requests the period allows.
     pub requests: u32,
@@ -39,7 +42,18 @@ pub struct Quota {
 /// from a limit of nought: nought would be a member who may ask for nothing, and the
 /// service spells "no limit" that way. Read back rather than derived, so what is
 /// reported is the arithmetic that will actually refuse the next request.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Left {
     /// How many the period allows. `None` where nothing limits them.
     pub limit: Option<u32>,
@@ -71,7 +85,18 @@ impl Left {
 }
 
 /// What one member has left, in each of the two kinds the service counts.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Headroom {
     /// Films, counted one to a request.
     pub films: Left,
@@ -86,7 +111,18 @@ pub struct Headroom {
 /// and written as one: a household that auto-approves within a limit is one setting made
 /// of two halves, and writing either alone leaves the other saying something the operator
 /// did not choose.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Asking {
     /// Whether what a member asks for arrives without anybody seeing it first.
     pub approves_own: bool,
@@ -106,7 +142,8 @@ pub struct Asking {
 ///
 /// Written down between runs by whoever holds it, because what is taken while a disk is
 /// full has to survive until there is room again.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct Holding {
     /// What was taken, in the service's own numbering.
     pub taken: u64,

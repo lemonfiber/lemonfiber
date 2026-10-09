@@ -1,6 +1,6 @@
 use super::{
     Application, ApplicationKind, Category, Credential, Diagnose, DownloadClient, Failure,
-    Identity, Protocol, RegisteredApplication, RootFolder,
+    Identity, Protocol, RegisteredApplication, RootFolder, Signed,
 };
 use lemonfiber_error::{Severity, State};
 
@@ -115,4 +115,30 @@ fn the_things_a_service_is_told_about_are_plain_data() {
         base_url: "http://sonarr:8989".to_owned(),
     };
     assert_eq!(registered.clone(), registered);
+}
+
+#[test]
+fn a_secret_never_reaches_a_debug_rendering() {
+    let rendered = [
+        format!("{:?}", Credential::ApiKey("key-secret".to_owned())),
+        format!(
+            "{:?}",
+            Credential::UserPass {
+                username: "admin".to_owned(),
+                password: "password-secret".to_owned(),
+            }
+        ),
+        format!(
+            "{:?}",
+            Signed {
+                id: "id-alex".to_owned(),
+                token: "token-secret".to_owned(),
+            }
+        ),
+    ];
+    assert!(
+        rendered.iter().all(|one| !one.contains("secret")),
+        "{rendered:?}"
+    );
+    assert!(rendered[1].contains("admin") && rendered[2].contains("id-alex"));
 }

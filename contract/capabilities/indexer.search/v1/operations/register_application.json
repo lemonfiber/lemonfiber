@@ -8,14 +8,14 @@
             "$defs": {
               "Application": {
                 "additionalProperties": false,
-                "description": "A media-filing \\*arr, as Prowlarr needs to be told about it so it syncs that\n\\*arr its indexers.",
+                "description": "A media-filing curator, as an indexer manager needs to be told about it so it syncs that\ncurator its indexers.",
                 "properties": {
                   "api_key": {
-                    "description": "The \\*arr's own API key, which is what lets Prowlarr write indexers into\nit.",
+                    "description": "The curator's own API key, which is what lets the indexer manager write indexers into\nit.",
                     "type": "string"
                   },
                   "base_url": {
-                    "description": "The address Prowlarr reaches the \\*arr on, on the stack's network — the\nconnection an existing application is matched by.",
+                    "description": "The address the indexer manager reaches the curator on, on the stack's network — the\nconnection an existing application is matched by.",
                     "type": "string"
                   },
                   "indexer_url": {
@@ -27,7 +27,7 @@
                     "description": "Which application it is, selecting the field schema and sync categories."
                   },
                   "name": {
-                    "description": "The name the operator will see in Prowlarr's own interface.",
+                    "description": "The name the operator will see in the indexer manager's own interface.",
                     "type": "string"
                   }
                 },

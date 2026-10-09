@@ -7,7 +7,7 @@
 
 use super::Ctx;
 use crate::jellyfin::Jellyfin;
-use crate::ports::service::Failure;
+use crate::ports::service::{AppKeys as _, Failure};
 use crate::seed::{State, Wiring};
 
 /// Mint a key filed under `app`, refusing one that is not a single word.

@@ -11,13 +11,7 @@
 
 use serde::{Deserialize, Serialize};
 
-/// The two kinds of video a household files by resolution, and so the two the quality
-/// model speaks to. Music and books have a different axis and are not resolution
-/// presets, so they are not here.
-///
-/// Named for what is filed, never for the service that files it: whatever curates
-/// television is asked about `Tv`. Read as the media type a service declares, and
-/// accepting the old service-named spellings where a record still holds one.
+/// The two kinds of video a household files by resolution.
 #[derive(
     Debug,
     Clone,
@@ -34,12 +28,13 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "kebab-case")]
 pub enum Kind {
     /// Television: series, seasons and episodes.
-    #[serde(alias = "sonarr")]
     Tv,
     /// Film.
-    #[serde(alias = "radarr")]
     Movies,
 }
+
+/// The media type a service declares for music.
+pub const MUSIC: &str = "music";
 
 impl Kind {
     /// Both, television first.

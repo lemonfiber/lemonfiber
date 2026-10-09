@@ -22,9 +22,9 @@ use crate::error::codes::play::{
 use crate::error::{Diagnose as _, Problem, Remedy, State};
 use crate::jellyfin::Jellyfin;
 use crate::model::{GrantReport, PartWayReport, TitleReport, WatchedReport};
-use crate::ports::service::{Household as _, HowFar, Member, Screening as _, Title};
+use crate::ports::service::{Household as _, HowFar, Member, Screening as _};
 
-use door::{located, Door};
+use door::{placed, progressed};
 
 /// How many titles a member's part-way list answers with.
 pub const A_FEW: u32 = 24;
@@ -112,10 +112,7 @@ async fn part_way(ctx: &Ctx, whose: &Whom, most: u32) -> Result<PartWayReport, B
         id: member.id,
         part_way: part_way
             .into_iter()
-            .map(|mut one| {
-                one.held = located(one.held, &door);
-                one
-            })
+            .map(|one| progressed(one, &door))
             .collect(),
         available: true,
         findings: Vec::new(),
@@ -226,17 +223,6 @@ pub(crate) async fn lapsed(ctx: &Ctx) {
     if let Some(server) = jellyfin_reader(ctx, &manifest) {
         grants::ended(ctx, &server).await;
     }
-}
-
-/// A title and every episode in it, located at the door.
-fn placed(mut title: Title, door: &Door) -> Title {
-    title.held = located(title.held, door);
-    for season in &mut title.seasons {
-        for episode in &mut season.episodes {
-            episode.held = located(episode.held.clone(), door);
-        }
-    }
-    title
 }
 
 /// Whether `id` is shaped like an item the media server files: thirty-two hex digits,

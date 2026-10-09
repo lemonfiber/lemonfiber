@@ -7,7 +7,7 @@
           "schema": {
             "$defs": {
               "Kind": {
-                "description": "The two kinds of video a household files by resolution, and so the two the quality\nmodel speaks to. Music and books have a different axis and are not resolution\npresets, so they are not here.\n\nNamed for what is filed, never for the service that files it: whatever curates\ntelevision is asked about `Tv`. Read as the media type a service declares, and\naccepting the old service-named spellings where a record still holds one.",
+                "description": "The two kinds of video a household files by resolution.",
                 "oneOf": [
                   {
                     "const": "tv",
@@ -23,10 +23,10 @@
               },
               "Watched": {
                 "additionalProperties": false,
-                "description": "An \\*arr, as a subtitle finder needs to be told about it.\n\nThe host is a name on the stack's own network rather than an address: the finder\nis a container beside them, so `127.0.0.1` there is the finder itself.",
+                "description": "A curator, as a subtitle finder needs to be told about it.\n\nThe host is a name on the stack's own network rather than an address: the finder\nis a container beside them, so `127.0.0.1` there is the finder itself.",
                 "properties": {
                   "api_key": {
-                    "description": "The \\*arr's own key, which is what lets the finder read what it has.",
+                    "description": "The curator's own key, which is what lets the finder read what it has.",
                     "type": "string"
                   },
                   "host": {

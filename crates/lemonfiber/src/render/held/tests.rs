@@ -1,5 +1,5 @@
+use lemonfiber_core::model::Located;
 use lemonfiber_core::model::{Held, HeldReport, Medium};
-use lemonfiber_core::ports::service::{Holds, Located};
 
 use super::held;
 
@@ -10,7 +10,6 @@ fn one(title: &str, year: Option<u16>, medium: Medium) -> Held {
         year,
         medium,
         at: Located::default(),
-        holds: Holds::default(),
     }
 }
 

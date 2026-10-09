@@ -158,7 +158,7 @@ pub(crate) async fn handoff(ctx: &Ctx, name: String) -> Result<Handoff, Box<Prob
         ));
     };
 
-    report.quick_connect = server.quick_connect().await.unwrap_or(false);
+    report.quick_connect = server.signs_devices_in().await.unwrap_or(false);
     report.steps = steps(&member, &address, report.quick_connect);
     report.clients = clients(&address);
 

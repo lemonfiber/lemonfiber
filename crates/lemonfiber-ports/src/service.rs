@@ -1,9 +1,8 @@
 //! Talking to the services themselves, to wire them to each other.
 //!
 //! One implementation per API *shape*, selected by the manifest's `api.kind` and
-//! never by service name. Four applications share the Servarr shape, which is
-//! what makes one client enough for them — and what lets a fork add a service
-//! that reuses an existing shape with no Rust at all.
+//! never by service name, so a service that reuses an existing shape needs no Rust
+//! at all.
 
 use std::time::Duration;
 
@@ -20,6 +19,7 @@ mod catalogue;
 mod clients;
 mod failure;
 mod fetching;
+mod fronting;
 mod household;
 mod metering;
 mod notices;
@@ -45,6 +45,7 @@ pub use clients::{
 };
 pub use failure::{Failure, ASK_FOR_REPAIRS};
 pub use fetching::{Fetching, Pulling};
+pub use fronting::{AppKeys, Dated, Fronted};
 pub use household::{
     Access, Allowed, Certificate, Household, Invited, Member, NamedLibrary, Playback, Session,
     Signed, Unrated,
@@ -55,9 +56,12 @@ pub use providers::{
     IndexerUse, Indexers, Limits, Recorded, Standing, UsenetAccount, UsenetAccounts,
 };
 pub use quality::{MusicQuality, QualityReleases, ReleaseProbe};
-pub use requests::{HouseholdRequest, MediaServerLink, Requesting, Requests, Telling};
+pub use requests::{
+    HouseholdRequest, IdentitySource, MediaServerLink, MediaStatus, Occasion, RequestStatus,
+    Requesting, Requests, Telling,
+};
 pub use screening::{
-    Episode, Held, Holds, HowFar, Located, Medium, PartWay, Pinned, Screening, Season, Title,
+    EpisodeDetail, Holds, HowFar, Item, ItemDetail, ItemProgress, Medium, Screening, SeasonDetail,
     PLAYER,
 };
 pub use subtitles::{Subtitles, Watched, Watching};
@@ -192,12 +196,9 @@ pub trait Client: Send + Sync {
     async fn quality_profiles(&self) -> Result<Vec<QualityProfile>, Failure>;
 }
 
-/// A media server's first-run setup — Jellyfin, the one service lemonfiber
-/// creates an account on rather than reading a key from.
-///
-/// Jellyfin writes no key to disk and asks for its first account through a setup
-/// wizard, so the credential is one lemonfiber mints and sets here rather than
-/// reads elsewhere.
+/// A media server's first-run setup: a service lemonfiber creates an account on
+/// rather than reading a key from, so the credential is one lemonfiber mints and
+/// sets here.
 #[async_trait]
 pub trait MediaServer: Send + Sync {
     /// Whether the first-run setup is already done — the gate that keeps a

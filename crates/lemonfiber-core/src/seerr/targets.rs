@@ -8,15 +8,16 @@ use serde::Deserialize;
 
 use super::Seerr;
 use crate::ports::http::Method;
+use crate::ports::media::Kind;
 use crate::ports::service::{Endpoint, Failure, FulfilmentTarget, RegisteredTarget};
 
-/// Where the \*arrs that fetch what the household asks for are registered.
-///
-/// Two lists, not one: the request service keeps film and television apart because
-/// they are fetched by different services, and which list a target belongs in is
-/// intrinsic to which \*arr it is.
-const FILM: &str = "/settings/radarr";
-const TELEVISION: &str = "/settings/sonarr";
+/// The list a curator of `kind` is registered in.
+const fn list(kind: Kind) -> &'static str {
+    match kind {
+        Kind::Movies => "/settings/radarr",
+        Kind::Tv => "/settings/sonarr",
+    }
+}
 
 /// How available a film must be before it is fetched.
 ///
@@ -46,7 +47,7 @@ struct TargetResource {
 
 impl TargetResource {
     /// The same target in this product's own words.
-    fn registered(self, television: bool) -> RegisteredTarget {
+    fn registered(self, kind: Kind) -> RegisteredTarget {
         RegisteredTarget {
             id: self.id.to_string(),
             at: Endpoint {
@@ -55,27 +56,23 @@ impl TargetResource {
                 base: self.base_url,
             },
             key: self.api_key,
-            television,
+            kind,
         }
     }
 }
 
 pub(super) async fn fulfilment_targets(seerr: &Seerr) -> Result<Vec<RegisteredTarget>, Failure> {
     let mut held = Vec::new();
-    for (path, television) in [(FILM, false), (TELEVISION, true)] {
+    for kind in [Kind::Movies, Kind::Tv] {
         let response = seerr
             .endpoint
-            .send(&seerr.request(Method::Get, path, None))
+            .send(&seerr.request(Method::Get, list(kind), None))
             .await?;
         let listed: Vec<TargetResource> = seerr.endpoint.decode(
             &response,
             "the request service's fulfilment targets could not be read",
         )?;
-        held.extend(
-            listed
-                .into_iter()
-                .map(|target| target.registered(television)),
-        );
+        held.extend(listed.into_iter().map(|target| target.registered(kind)));
     }
     Ok(held)
 }
@@ -88,7 +85,7 @@ pub(super) async fn add_fulfilment_target(
     // own: television is filed in folders per season, and a film has a point before
     // which there is nothing to fetch. Sending the wrong one is not a field ignored
     // — the service refuses the registration for the one that is missing.
-    let differs = if target.television {
+    let differs = if target.kind == Kind::Tv {
         // Seasons in folders of their own, because that is how the media server
         // reads a series and how anybody browsing one expects to find it.
         ("enableSeasonFolders", serde_json::json!(true))
@@ -119,7 +116,7 @@ pub(super) async fn add_fulfilment_target(
     .collect();
 
     let body = serde_json::Value::Object(fields).to_string();
-    let path = if target.television { TELEVISION } else { FILM };
+    let path = list(target.kind);
     let written = seerr
         .endpoint
         .send(&seerr.request(Method::Post, path, Some(body)))
@@ -133,7 +130,7 @@ pub(super) async fn move_fulfilment_target(
     at: &Endpoint,
     key: &str,
 ) -> Result<(), Failure> {
-    let path = if held.television { TELEVISION } else { FILM };
+    let path = list(held.kind);
     let response = seerr
         .endpoint
         .send(&seerr.request(Method::Get, path, None))
@@ -173,11 +170,11 @@ pub(super) async fn move_fulfilment_target(
 
 pub(super) async fn test_fulfilment_target(
     seerr: &Seerr,
-    television: bool,
+    kind: Kind,
     at: &Endpoint,
     key: &str,
 ) -> Result<(), Failure> {
-    let path = if television { TELEVISION } else { FILM };
+    let path = list(kind);
     let body = serde_json::json!({
         "hostname": at.host,
         "port": at.port,

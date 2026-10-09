@@ -7,10 +7,9 @@
 
 use super::targets::jellyfin_reader;
 use super::{Ctx, Outcome};
-
 use crate::error::{Diagnose, Problem};
-use crate::model::PlayingReport;
-use crate::ports::service::{Failure, Household as _, Member, Playback};
+use crate::model::{Playback, PlayingReport};
+use crate::ports::service::{Failure, Household as _, Member, Playback as Session, Screening as _};
 
 /// Read what is playing now, for one member where `member` names them, or for
 /// everybody.
@@ -67,7 +66,7 @@ pub(crate) async fn asked(ctx: &Ctx, member: Option<&str>) -> Result<Outcome, Bo
 }
 
 /// What the server answered, said as a report about whoever it was asked for.
-fn answered(answered: Result<Vec<Playback>, Failure>, member: String) -> PlayingReport {
+fn answered(answered: Result<Vec<Session>, Failure>, member: String) -> PlayingReport {
     let Ok(sessions) = answered else {
         return PlayingReport {
             member,
@@ -81,7 +80,7 @@ fn answered(answered: Result<Vec<Playback>, Failure>, member: String) -> Playing
     };
     PlayingReport {
         member,
-        sessions,
+        sessions: sessions.into_iter().map(Playback::from).collect(),
         available: true,
         findings: Vec::new(),
     }

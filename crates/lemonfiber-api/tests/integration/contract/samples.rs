@@ -452,7 +452,7 @@ fn a_pairing() -> lemonfiber_core::companion::Pairing {
 /// every field a title, a season and an episode carry.
 fn a_title() -> lemonfiber_core::model::TitleReport {
     use lemonfiber_core::model::{Episode, Held, Medium, Season, Title, TitleReport};
-    use lemonfiber_core::ports::service::{Holds, Located, Pinned};
+    use lemonfiber_core::model::{Located, Pinned};
     let located = |id: &str, medium: Medium| Held {
         id: id.to_owned(),
         title: "The Wire".to_owned(),
@@ -471,7 +471,6 @@ fn a_title() -> lemonfiber_core::model::TitleReport {
             }),
             unlocated: None,
         },
-        holds: Holds::default(),
     };
     TitleReport {
         member: "ana".to_owned(),

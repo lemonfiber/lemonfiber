@@ -58,7 +58,6 @@ macro_rules! contract {
 
                     /// What the operation is asked with.
                     #[derive(
-                        Clone,
                         ::serde::Serialize,
                         ::serde::Deserialize,
                         ::schemars::JsonSchema,

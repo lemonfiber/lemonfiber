@@ -3,8 +3,7 @@
 //! Each says where it is served at the guarded front door, because at a terminal that is
 //! what an operator checks: whether a title a member cannot play is unlocated, and why.
 
-use lemonfiber_core::model::{GrantReport, PartWayReport, TitleReport, WatchedReport};
-use lemonfiber_core::ports::service::Located;
+use lemonfiber_core::model::{GrantReport, Located, PartWayReport, TitleReport, WatchedReport};
 
 use super::held::titled;
 use super::Lines;

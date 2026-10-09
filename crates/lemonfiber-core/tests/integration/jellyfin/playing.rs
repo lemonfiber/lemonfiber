@@ -1,9 +1,8 @@
 //! What the media server is playing now.
 
 use super::{reader, SIGNED_IN};
-use lemonfiber_core::ports::service::{Medium, Playback};
+use lemonfiber_core::ports::service::{Medium, Playback, Screening as _};
 use lemonfiber_fixtures::http::{Answer, Fake};
-use lemonfiber_ports::service::Household;
 
 /// Three sessions: ana watching an episode, bo paused on a film, and a device of
 /// ana's signed in and playing nothing.

@@ -3,7 +3,7 @@
 use super::*;
 
 /// The name the decline service's key is filed under.
-const APP: &str = crate::jellyfin::DECLINE_APP;
+const APP: &str = crate::app_keys::DECLINE_APP;
 
 /// A stack with the media server, the request service and, where `declining`, the
 /// decline service.

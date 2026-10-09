@@ -14,7 +14,7 @@ fn a_film_with_both_pictures_holds_both_and_plays() {
         "ImageTags":{"Primary":"p"},"BackdropImageTags":["b"],"IsFolder":false}]}"#,
     )
     .into_iter()
-    .map(ItemResource::held)
+    .map(ItemResource::item)
     .next();
     let held = held.map(|held| (held.medium, held.holds, held.year));
     assert_eq!(
@@ -41,7 +41,7 @@ fn a_series_plays_nothing_itself_and_an_episode_is_named_one() {
     .into_iter()
     .map(|item| {
         let series = item.is_a_series();
-        let held = item.held();
+        let held = item.item();
         (held.medium, held.holds.plays, held.holds.poster, series)
     })
     .collect();

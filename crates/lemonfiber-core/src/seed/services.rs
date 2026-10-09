@@ -4,130 +4,21 @@
 //! and the media server made the identity source for requests — each a one-off shape
 //! rather than a variation on wiring a client.
 
-use super::drift::{reconcile, Observed};
 use super::{
-    observe_or_skip, observe_or_untold, same_base_url, unreached, unread, wire_one, AppSync,
-    Application, Journal, MediaServer, Naming, Qbittorrent, Random, Requests, State, Wiring, ADMIN,
+    observe_or_skip, observe_or_untold, same_base_url, unreached, wire_one, AppSync, Application,
+    Journal, MediaServer, Naming, Qbittorrent, Random, Requests, State, Wiring, ADMIN,
 };
-use crate::baseline::Record;
+use crate::ports::media::Kind;
 use crate::ports::service::{
-    Endpoint, FulfilmentTarget, RegisteredApplication, RegisteredTarget, Telling,
+    Credential, Endpoint, FulfilmentTarget, IdentitySource, Protocol, RegisteredApplication,
+    RegisteredTarget,
 };
 use crate::secret;
-use crate::seerr::OCCASIONS;
 
-/// The field lemonfiber records what it set the household's telling to under.
-pub(crate) const TELLING: &str = "notifications.household";
+mod telling;
 
-/// What lemonfiber would have the request service tell the household.
-#[must_use]
-pub(crate) const fn wanted_telling() -> Telling {
-    Telling {
-        enabled: true,
-        occasions: OCCASIONS,
-    }
-}
-
-/// A telling written down, so the three-way comparison has one shape to read.
-///
-/// The occasions are a set and the baseline holds strings, so the set is written out
-/// rather than the number alone — a record that said only `222` would be a number
-/// nobody reading the file could place.
-#[must_use]
-pub(crate) fn said(telling: Telling) -> String {
-    let sending = if telling.enabled { "on" } else { "off" };
-    format!("{sending}:{}", telling.occasions)
-}
-
-/// Make sure the request service will tell the household what became of what they
-/// asked for, and say which way it was left.
-///
-/// **Its own step**, rather than part of pointing the service at the media server:
-/// that one stops at a service already initialised, which is every install after the
-/// first — exactly the ones this would otherwise never reach.
-///
-/// Its own connection in the report too, named for what it does rather than for the
-/// agent it does it through: an operator reading the pass wants to know whether the
-/// people in the house will hear back, not which of the service's notifiers carries
-/// it. Hands back what the service holds as well as the state, because a value the
-/// operator set before lemonfiber ever ran is theirs to adopt and the caller needs it
-/// to write the baseline down.
-pub async fn wire_household_telling(
-    seerr: &dyn Requests,
-    recorded: Option<&Record>,
-    rehearsing: bool,
-) -> (Wiring, Telling) {
-    let (state, held) = tell_the_household(seerr, recorded, rehearsing).await;
-    (
-        Wiring::settled("What the household is told".to_owned(), state),
-        held,
-    )
-}
-
-/// What lemonfiber sees for the telling, read from the three values.
-///
-/// Shared with the diagnosis that reads the same field without writing it, so the
-/// two cannot come to different opinions about whose value is on the service — the
-/// division `observe_client` makes for a download client, for the same reason.
-///
-/// A setting is always *there*, so there is no absent value the way an unregistered
-/// download client is absent. The nearest thing is the service's untouched default
-/// with nothing recorded against it: nobody has set this, lemonfiber included.
-/// Without that, a service nobody has configured reads as the operator's own
-/// pre-existing choice, and a diagnosis would tell them they had switched off
-/// something they had never been offered. An operator who turned it off *after*
-/// lemonfiber turned it on has a baseline, so that still reads as their edit.
-#[must_use]
-pub(crate) fn observed_telling(recorded: Option<&Record>, held: Telling) -> Observed {
-    if recorded.is_none() && held == Telling::default() {
-        Observed::Absent
-    } else {
-        reconcile(recorded, Some(said(held).as_str()), &said(wanted_telling()))
-    }
-}
-
-/// The comparison and the write, apart from the reporting shape around them.
-pub(crate) async fn tell_the_household(
-    seerr: &dyn Requests,
-    recorded: Option<&Record>,
-    rehearsing: bool,
-) -> (State, Telling) {
-    let held = match seerr.telling().await {
-        Ok(held) => held,
-        Err(failure) => return (unread(&failure, rehearsing), Telling::default()),
-    };
-    let want = wanted_telling();
-    let holding = said(held);
-    let observed = observed_telling(recorded, held);
-
-    let state = match observed {
-        // `Unavailable` cannot arrive here — it is what a pass says about a service
-        // that would not answer, and one that would not answer returned above with
-        // its own words. Grouped the way the wiring check groups it, rather than
-        // given an arm that nothing can reach.
-        Observed::Absent | Observed::Unavailable if rehearsing => State::WouldWire {
-            yours: Some(holding.clone()),
-            ours: Some(said(want)),
-        },
-        Observed::Absent | Observed::Unavailable => match seerr.tell(&want).await {
-            Ok(()) => State::Wired,
-            Err(failure) => unreached(&failure),
-        },
-        Observed::Present => State::AlreadyWired,
-        // Theirs. Said, and no more than said — somebody who turned this off turned it
-        // off, and a household that stopped being told is a thing to report rather
-        // than a thing to correct.
-        Observed::Drifted => State::Drifted,
-        Observed::Stale => State::Stale,
-        Observed::Conflicted => State::Conflicted {
-            yours: Some(holding),
-            ours: said(want),
-        },
-        Observed::Adopted => State::Adopted,
-        Observed::Unmanaged => State::Unmanaged,
-    };
-    (state, held)
-}
+pub use telling::wire_household_telling;
+pub(crate) use telling::{observed_telling, said, wanted_telling, TELLING};
 
 /// Hand the request service the \*arrs that fulfil what the household asks for.
 ///
@@ -166,11 +57,11 @@ pub async fn wire_fulfilment_targets(
 
     let mut wirings = Vec::new();
     for target in wanted {
-        let here = held_at(&existing, &target.at, target.television);
+        let here = held_at(&existing, &target.at, target.kind);
         let before = target
             .moved_from
             .as_ref()
-            .and_then(|from| held_at(&existing, from, target.television));
+            .and_then(|from| held_at(&existing, from, target.kind));
         let state = match here.or(before) {
             Some(held) if held.at == target.at && held.key == target.key => State::AlreadyWired,
             Some(held) => tested(seerr, target, moved(seerr, held, target, rehearsing).await).await,
@@ -178,7 +69,7 @@ pub async fn wire_fulfilment_targets(
                 let added = wire_one(
                     seerr.add_fulfilment_target(target),
                     seerr.fulfilment_targets(),
-                    |rows| held_at(rows, &target.at, target.television).map(|have| have.id.clone()),
+                    |rows| held_at(rows, &target.at, target.kind).map(|have| have.id.clone()),
                     Naming {
                         service: "seerr",
                         resource: "fulfilment target",
@@ -207,7 +98,7 @@ async fn tested(seerr: &dyn Requests, target: &FulfilmentTarget, written: State)
         return written;
     }
     match seerr
-        .test_fulfilment_target(target.television, &target.at, &target.key)
+        .test_fulfilment_target(target.kind, &target.at, &target.key)
         .await
     {
         Ok(()) => State::Wired,
@@ -241,7 +132,7 @@ async fn moved(
     }
 }
 
-/// The one the request service holds at `endpoint` in the list `television` names,
+/// The one the request service holds at `endpoint` in the list for `kind`,
 /// if it holds one.
 ///
 /// By where it is reached — never by name, so an operator who renamed it is not
@@ -249,10 +140,10 @@ async fn moved(
 fn held_at<'a>(
     held: &'a [RegisteredTarget],
     endpoint: &Endpoint,
-    television: bool,
+    kind: Kind,
 ) -> Option<&'a RegisteredTarget> {
     held.iter()
-        .find(|have| have.at == *endpoint && have.television == television)
+        .find(|have| have.at == *endpoint && have.kind == kind)
 }
 
 /// Where a target is reached, as the report says it: the request gate by name, and
@@ -494,16 +385,26 @@ pub async fn wire_jellyfin_admin(
     }
 }
 
-/// The second half: Seerr signed in through Jellyfin at `server_url`, which on a fresh
-/// Seerr also creates its owner. An already-initialised Seerr is never re-pointed,
-/// since that would cost the household its existing sign-ins.
+/// The second half: the request service signed in through the media server at
+/// `server_url`, spoken to in `protocol`, as the administrator with `password`, which on
+/// a fresh request service also creates its owner. An already-initialised one is never
+/// re-pointed, since that would cost the household its existing sign-ins.
 pub async fn wire_seerr_identity(
     seerr: &dyn Requests,
+    protocol: Protocol,
     password: &str,
     server_url: &str,
     rehearsing: bool,
 ) -> Wiring {
-    let state = configure_seerr(seerr, password, server_url, rehearsing).await;
+    let source = IdentitySource {
+        at: server_url.to_owned(),
+        protocol,
+        credential: Credential::UserPass {
+            username: ADMIN.to_owned(),
+            password: password.to_owned(),
+        },
+    };
+    let state = configure_seerr(seerr, &source, rehearsing).await;
     Wiring::settled(IDENTITY.to_owned(), state)
 }
 
@@ -511,12 +412,7 @@ pub async fn wire_seerr_identity(
 /// left untouched, whether lemonfiber initialised it on an earlier run or the
 /// household set it up with accounts of its own. A fresh Seerr is signed in and
 /// then read back: it must report itself initialised, or the write did not land.
-async fn configure_seerr(
-    seerr: &dyn Requests,
-    password: &str,
-    server_url: &str,
-    rehearsing: bool,
-) -> State {
+async fn configure_seerr(seerr: &dyn Requests, source: &IdentitySource, rehearsing: bool) -> State {
     let initialized = match seerr.initialized().await {
         Ok(done) => done,
         Err(failure) => return unreached(&failure),
@@ -530,10 +426,10 @@ async fn configure_seerr(
     if rehearsing {
         return State::WouldWire {
             yours: None,
-            ours: Some(server_url.to_owned()),
+            ours: Some(source.at.clone()),
         };
     }
-    if let Err(failure) = seerr.configure_identity(ADMIN, password, server_url).await {
+    if let Err(failure) = seerr.configure_identity(source).await {
         return unreached(&failure);
     }
     match seerr.initialized().await {

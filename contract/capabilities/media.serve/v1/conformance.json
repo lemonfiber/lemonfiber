@@ -1,0 +1,188 @@
+{
+  "capability": "media.serve",
+  "cases": [
+    {
+      "case": "refuses-without-the-key",
+      "expect": {
+        "status": [
+          401
+        ]
+      },
+      "keyed": false,
+      "live": true,
+      "operation": "signed_in"
+    },
+    {
+      "case": "signed_in-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "signed_in"
+    },
+    {
+      "case": "title-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "title"
+    },
+    {
+      "case": "part_way-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "part_way"
+    },
+    {
+      "case": "progressed-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "progressed"
+    },
+    {
+      "case": "sign_out-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "sign_out"
+    },
+    {
+      "case": "holdings-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "holdings"
+    },
+    {
+      "case": "playing-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "playing"
+    },
+    {
+      "case": "has_item-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "has_item"
+    },
+    {
+      "case": "rescan-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "rescan"
+    },
+    {
+      "case": "known_proxies-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "known_proxies"
+    },
+    {
+      "case": "trust_only-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "trust_only"
+    },
+    {
+      "case": "allowed_origins-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "allowed_origins"
+    },
+    {
+      "case": "allow_only-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "allow_only"
+    },
+    {
+      "case": "restart-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "restart"
+    },
+    {
+      "case": "filed_as-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "filed_as"
+    },
+    {
+      "case": "dated-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "dated"
+    },
+    {
+      "case": "mint-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "mint"
+    },
+    {
+      "case": "answers_to-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "answers_to"
+    },
+    {
+      "case": "revoke-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "revoke"
+    }
+  ],
+  "major": 1
+}

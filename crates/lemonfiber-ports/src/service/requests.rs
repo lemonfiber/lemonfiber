@@ -2,20 +2,24 @@
 //!
 //! Apart from [`Asking`](super::Asking) because that port answers about one person and
 //! one request — what they may ask for, what they have left, what becomes of one thing
-//! they asked for. This is the service itself: where it authenticates from, which \*arrs
+//! they asked for. This is the service itself: where it authenticates from, which curators
 //! it hands requests on to, who it knows about, and what it says to all of them at once.
+
+use std::collections::BTreeSet;
 
 use async_trait::async_trait;
 
-use super::{Endpoint, Failure, FulfilmentTarget, RegisteredTarget};
+use super::{Credential, Endpoint, Failure, FulfilmentTarget, Protocol, RegisteredTarget};
+use crate::media::Kind;
 
 /// One thing a household member asked for, as the request service records it.
 ///
-/// The two statuses are carried as the service's own numbers rather than folded here:
-/// what became of the request and what became of the media it asked for are separate
-/// facts, and turning the pair into one word a member reads is a decision for the household
-/// model above this, not for the code that reads them off the wire.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// What became of the request and what became of the media it asked for are two
+/// statuses; the household model turns the pair into the one word a member reads.
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct HouseholdRequest {
     /// The number the request service files this request under, which is how one is
     /// named to it again when somebody rules on it.
@@ -34,9 +38,9 @@ pub struct HouseholdRequest {
     /// Which service files the media — television or film — or `None` where the
     /// request service names a media type this build does not know.
     pub kind: Option<crate::media::Kind>,
-    /// The id the \*arr filing this media knows it by, where the request service has
+    /// The id the curator filing this media knows it by, where the request service has
     /// handed it over yet. Nothing for a request still awaiting approval, which no
-    /// \*arr has been told about — so the item cannot be named from the library, and
+    /// curator has been told about — so the item cannot be named from the library, and
     /// is not claimed to be.
     pub item: Option<i64>,
     /// When the media it asked for arrived on the media server, as the request service
@@ -45,10 +49,64 @@ pub struct HouseholdRequest {
     /// The identifier the media server holds that media under, as the request service
     /// records it, or nothing until it is there.
     pub shelf_id: Option<String>,
-    /// What became of the request, as the service numbers them.
-    pub request_status: u8,
-    /// What became of the media it asked for, as the service numbers them.
-    pub media_status: u8,
+    /// What became of the request, or `None` where the service reports a status this
+    /// contract does not name.
+    pub request_status: Option<RequestStatus>,
+    /// What became of the media it asked for, or `None` likewise.
+    pub media_status: Option<MediaStatus>,
+}
+
+/// What became of one request itself.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
+pub enum RequestStatus {
+    /// Nobody has approved or refused it yet.
+    Pending,
+    /// Approved: the services were asked for it.
+    Approved,
+    /// Turned down.
+    Declined,
+    /// The attempt to fetch it failed.
+    Failed,
+    /// Finished with: where the media stands is the answer now.
+    Completed,
+}
+
+/// What became of the media one request asked for.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
+pub enum MediaStatus {
+    /// Nothing is known about it yet.
+    Unknown,
+    /// Known and waiting.
+    Pending,
+    /// Being fetched.
+    Processing,
+    /// Some of it is here.
+    PartlyAvailable,
+    /// All of it is here.
+    Available,
+    /// It was here and has been removed.
+    Deleted,
+}
+
+/// The identity source a request service signs the household in through: where it is,
+/// the protocol it is spoken to in, and the credential that administers it.
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub struct IdentitySource {
+    /// Where the request service reaches it.
+    pub at: String,
+    /// The protocol it is spoken to in.
+    pub protocol: Protocol,
+    /// The credential that administers it.
+    pub credential: Credential,
 }
 
 /// What one member may ask for on the request service.
@@ -56,7 +114,10 @@ pub struct HouseholdRequest {
 /// Only the half that bears on what a household chose. Everything else about the
 /// account — what they are called, what they may watch — is the media server's to say,
 /// and a second copy here would be a copy able to disagree with it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Requesting {
     /// The identifier this service tells them apart by.
     pub id: String,
@@ -67,9 +128,9 @@ pub struct Requesting {
     pub approves_own: bool,
 }
 
-/// A request manager's identity setup and the household's own requests — Seerr,
-/// configured to authenticate its household against the media server rather than
-/// against accounts of its own.
+/// A request service's identity setup and the household's own requests, configured
+/// to authenticate its household against the identity source rather than against
+/// accounts of its own.
 #[async_trait]
 pub trait Requests: Send + Sync {
     /// Whether it has already been initialised — the gate that never re-points a
@@ -80,19 +141,15 @@ pub trait Requests: Send + Sync {
     /// Returns [`Failure`] when it is unreachable or refuses.
     async fn initialized(&self) -> Result<bool, Failure>;
 
-    /// Point authentication at the media server reached at `server_url`, signing
-    /// in as `username` with `password` — which on the first call also creates the
-    /// owner from that account.
+    /// Sign the household in through `source`, as the account its credential names, and
+    /// finish setting up — which on the first call also creates the owner from that
+    /// account.
     ///
     /// # Errors
     ///
-    /// Returns [`Failure`] when it is unreachable or refuses.
-    async fn configure_identity(
-        &self,
-        username: &str,
-        password: &str,
-        server_url: &str,
-    ) -> Result<(), Failure>;
+    /// Returns [`Failure`] when it is unreachable or refuses, and
+    /// [`Failure::Unsupported`] for a protocol it does not sign in through.
+    async fn configure_identity(&self, source: &IdentitySource) -> Result<(), Failure>;
 
     /// Whether the service answers to the key this client carries, as its owner.
     ///
@@ -197,14 +254,14 @@ pub trait Requests: Send + Sync {
     /// Returns [`Failure`] when it is unreachable or refuses.
     async fn tell(&self, telling: &Telling) -> Result<(), Failure>;
 
-    /// The \*arrs it already hands requests to, by the endpoint each reaches.
+    /// The curators it already hands requests to, by the endpoint each reaches.
     ///
     /// # Errors
     ///
     /// Returns [`Failure`] when it is unreachable or refuses.
     async fn fulfilment_targets(&self) -> Result<Vec<RegisteredTarget>, Failure>;
 
-    /// Hand it an \*arr to fulfil requests through.
+    /// Hand it a curator to fulfil requests through.
     ///
     /// # Errors
     ///
@@ -224,15 +281,15 @@ pub trait Requests: Send + Sync {
         key: &str,
     ) -> Result<(), Failure>;
 
-    /// Ask it to reach the \*arr at `at` presenting `key`, in the list `television`
-    /// names, the way its own settings test does, from wherever it runs.
+    /// Ask it to reach the curator of `kind` at `at` presenting `key`, the way its own
+    /// settings test does, from wherever it runs.
     ///
     /// # Errors
     ///
-    /// Returns [`Failure`] when it is unreachable, or could not reach the \*arr.
+    /// Returns [`Failure`] when it is unreachable, or could not reach the curator.
     async fn test_fulfilment_target(
         &self,
-        television: bool,
+        kind: Kind,
         at: &Endpoint,
         key: &str,
     ) -> Result<(), Failure>;
@@ -256,7 +313,10 @@ pub trait Requests: Send + Sync {
 }
 
 /// Where the request service reaches the media server, and the key it presents there.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct MediaServerLink {
     /// Where.
     pub at: Endpoint,
@@ -265,15 +325,57 @@ pub struct MediaServerLink {
 }
 
 /// Whether the request service reaches the household, and about what.
-///
-/// The occasions are a set, carried as the bit field the service keeps them in. It
-/// is a number here rather than a list of named events because that is the shape the
-/// service reads and writes, and translating it twice — once out, once back — would
-/// be two places for the set to lose a member.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Telling {
     /// Whether it will send anything at all.
     pub enabled: bool,
     /// Which occasions it sends on.
-    pub occasions: u32,
+    pub occasions: BTreeSet<Occasion>,
+    /// Whether it also sends on occasions this contract does not name.
+    pub others: bool,
+}
+
+/// One occasion the request service tells the household about.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
+pub enum Occasion {
+    /// A request was received and waits on somebody.
+    Received,
+    /// A request was approved.
+    Approved,
+    /// What was asked for arrived.
+    Arrived,
+    /// What was asked for could not be got.
+    Failed,
+    /// A request was turned down.
+    Declined,
+    /// A request was approved by the household's own policy, with nobody asked.
+    ApprovedByPolicy,
+}
+
+impl Occasion {
+    /// Every occasion.
+    pub const ALL: [Self; 6] = [
+        Self::Received,
+        Self::Approved,
+        Self::Arrived,
+        Self::Failed,
+        Self::Declined,
+        Self::ApprovedByPolicy,
+    ];
 }

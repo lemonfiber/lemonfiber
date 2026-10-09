@@ -1,0 +1,135 @@
+{
+  "post": {
+    "operationId": "reachable",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "request": {
+                "description": "The port's `request`.",
+                "format": "int64",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "request"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$defs": {
+                "Address": {
+                  "description": "Somewhere one member already receives what the request service sends them.\n\nCarries the credential that reaches them, so it is never printed: [`Debug`] names the\nservice and stops there. A line recording a delivery that included the token would be\nthe leak the delivery itself is careful not to be.",
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "description": "Pushover, by the two halves the member gave: whose devices this reaches, and the\napplication it arrives under.\n\nBoth are the member's own. The request service falls back to no application of the\nhousehold's for a per-person message either, and one sent under the household's\nwould arrive from somewhere the member never agreed to hear from.",
+                      "properties": {
+                        "pushover": {
+                          "properties": {
+                            "application": {
+                              "description": "The application it arrives under.",
+                              "type": "string"
+                            },
+                            "sound": {
+                              "description": "The sound they chose, where they chose one.",
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "user": {
+                              "description": "The key naming whose devices this reaches.",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "user",
+                            "application"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "pushover"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "description": "Pushbullet, by the token that is both the address and the authority to write to it.",
+                      "properties": {
+                        "pushbullet": {
+                          "properties": {
+                            "token": {
+                              "description": "The token the member gave.",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "token"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "pushbullet"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "items": {
+                "$ref": "#/$defs/Address"
+              },
+              "title": "Array_of_Address",
+              "type": "array"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ]
+  }
+}

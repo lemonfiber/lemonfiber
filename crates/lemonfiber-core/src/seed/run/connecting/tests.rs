@@ -79,7 +79,6 @@ fn every_download_ask_the_shipped_stack_makes_comes_to_a_client() {
         })
         .collect();
     assert_eq!(made.len(), 6, "two asks from each of three *arrs: {made:?}");
-    // Each shipped download client is named after the API it is spoken to in.
     assert!(made.iter().all(|(id, connection)| {
         *connection == Some(Connection::DownloadClient(Protocol(id.clone())))
     }));
@@ -137,12 +136,12 @@ fn every_curation_ask_the_shipped_stack_makes_is_connected_or_said() {
             (
                 "seerr".to_owned(),
                 "sonarr".to_owned(),
-                Some(Connection::Fulfilment { television: true })
+                Some(Connection::Fulfilment { kind: Kind::Tv })
             ),
             (
                 "seerr".to_owned(),
                 "radarr".to_owned(),
-                Some(Connection::Fulfilment { television: false })
+                Some(Connection::Fulfilment { kind: Kind::Movies })
             ),
             (
                 "bazarr".to_owned(),

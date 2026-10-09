@@ -90,7 +90,7 @@ async fn ran(check: &TellingCheck) -> Vec<Finding> {
     };
 
     vec![finding(verdict(
-        observed_telling(check.recorded.as_ref(), held),
+        observed_telling(check.recorded.as_ref(), &held),
         held.enabled,
     ))]
 }

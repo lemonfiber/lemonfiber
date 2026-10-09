@@ -3,11 +3,10 @@
 //! provisioning adapter is built on; only the reads a trace needs live here, kept apart
 //! from the writes that wire the stack together so the two concerns grow separately.
 
-use super::Shape as _;
 use async_trait::async_trait;
 use serde::Deserialize;
 
-use super::Servarr;
+use super::{Servarr, Shape as _};
 use crate::ports::http::Method;
 use crate::ports::service::{
     Failure, FoundItem, ItemPart, Pipeline, QueueItem, StuckItem, TraceEvent,

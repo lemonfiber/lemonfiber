@@ -362,3 +362,13 @@ fn parses_the_stack_this_binary_embeds() {
     });
     assert_eq!(counted, Some((12, 11, 23)));
 }
+
+#[test]
+fn each_adapter_is_named_as_the_manifest_writes_it() {
+    for kind in ApiKind::ALL {
+        assert_eq!(
+            serde_json::to_value(kind).ok(),
+            Some(serde_json::Value::from(kind.name())),
+        );
+    }
+}

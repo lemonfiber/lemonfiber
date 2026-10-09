@@ -16,8 +16,8 @@ use lemonfiber_sidecar::decline::{Lapses, Refusals};
 use super::{Category, Check, Finding, Verdict};
 use crate::error::codes::decline::UNEXPLAINED;
 use crate::error::{Problem, Remedy};
-use crate::jellyfin::Dated;
 use crate::ports::filesystem::{Beneath, FileSystem};
+use crate::ports::service::{AppKeys as _, Dated};
 
 /// The name this check and anything answering it share.
 const CHECK: &str = "services.decline-key";
@@ -48,7 +48,7 @@ pub trait KeyDates: Send + Sync {
 #[async_trait]
 impl KeyDates for crate::jellyfin::Jellyfin {
     async fn decline_keys(&self) -> Result<Vec<Dated>, ()> {
-        self.dated(crate::jellyfin::DECLINE_APP)
+        self.dated(crate::app_keys::DECLINE_APP)
             .await
             .map_err(|_| ())
     }

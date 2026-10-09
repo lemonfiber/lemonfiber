@@ -9,7 +9,7 @@
 
 use async_trait::async_trait;
 
-use super::Failure;
+use super::{Failure, Playback};
 
 /// The client every session a grant opens is signed in under.
 ///
@@ -44,14 +44,14 @@ pub trait Screening: Send + Sync {
     /// # Errors
     ///
     /// Returns [`Failure`] when the server is unreachable or refuses.
-    async fn title(&self, member: Option<&str>, id: &str) -> Result<Option<Title>, Failure>;
+    async fn title(&self, member: Option<&str>, id: &str) -> Result<Option<ItemDetail>, Failure>;
 
     /// What this member was part-way through, most recent first, `most` of them.
     ///
     /// # Errors
     ///
     /// Returns [`Failure`] when the server is unreachable or refuses.
-    async fn part_way(&self, member: &str, most: u32) -> Result<Vec<PartWay>, Failure>;
+    async fn part_way(&self, member: &str, most: u32) -> Result<Vec<ItemProgress>, Failure>;
 
     /// Record how far through one title this member is, as their own progress.
     ///
@@ -66,81 +66,115 @@ pub trait Screening: Send + Sync {
     ///
     /// Returns [`Failure`] when the server is unreachable or refuses.
     async fn sign_out(&self, device: &str) -> Result<(), Failure>;
+
+    /// What this member may watch, as the media server answers it for them.
+    ///
+    /// **Asked for that member, never filtered for them.** The server holds the age
+    /// limit, the library access and the blocked kinds, and answering about one
+    /// account is a thing it already does — so what comes back is what they may see
+    /// because the server said so, whoever's credential carried the question. A read
+    /// taken about the household and narrowed here would be a second copy of every one
+    /// of those rules, able to disagree with the first on the day either moved.
+    ///
+    /// Sorted and bounded by the server rather than here: a household library is
+    /// larger than a screen, and deciding which part of it to ask for is the caller's
+    /// errand rather than this one's.
+    ///
+    /// `None` names no member and reads what an account with every library and no age
+    /// limit holds, which is what an invitation that chose nothing grants. It is asked
+    /// about no account, so it carries nothing of anybody's.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the server is unreachable or refuses.
+    async fn holdings(&self, member: Option<&str>, most: u32) -> Result<Vec<Item>, Failure>;
+
+    /// What the media server is playing now: one entry a session playing something,
+    /// for one account where `member` names its identifier, or for every account.
+    ///
+    /// Asked of the server each time rather than kept, because what is playing is the
+    /// fact most likely to have changed since anybody last asked. A session signed in
+    /// and playing nothing is not listed: it is a device, not somebody watching.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the server is unreachable or refuses.
+    async fn playing(&self, member: Option<&str>) -> Result<Vec<Playback>, Failure>;
 }
 
-/// What one title is, as a member's own account reads it.
-///
-/// What a person deciding whether to watch it wants, and nothing about how it is
-/// stored: no file, no container, no bitrate.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
-pub struct Title {
-    /// The title as the shelf lists it, with where it is served.
-    #[serde(flatten)]
-    pub held: Held,
+/// One title, as a member's own account reads it on the server.
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub struct ItemDetail {
+    /// The item.
+    pub item: Item,
     /// What it is about, where the server holds a description.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub overview: Option<String>,
     /// How long it runs, in whole minutes, where the server knows.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub minutes: Option<u32>,
     /// The genres the server files it under.
     pub genres: Vec<String>,
     /// The certificate it carries where the operator lives, where it carries one.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub certificate: Option<String>,
     /// When it came out, as a calendar date, where the server knows.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub released: Option<String>,
     /// A series' seasons, each with its episodes, in order. Empty for anything else.
-    pub seasons: Vec<Season>,
+    pub seasons: Vec<SeasonDetail>,
 }
 
-/// One season of a series, with its episodes.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
-pub struct Season {
+/// One season of a series, with its episodes, as the server holds it.
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub struct SeasonDetail {
     /// What the server tells it apart by.
     pub id: String,
     /// What it is called.
     pub name: String,
-    /// Its number in the series, where it has one. Specials often have none.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Its number in the series, where it has one.
     pub number: Option<u32>,
-    /// Its episodes, in order, each with where it is served.
-    pub episodes: Vec<Episode>,
+    /// Its episodes, in order.
+    pub episodes: Vec<EpisodeDetail>,
 }
 
-/// One episode, with where it is served.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
-pub struct Episode {
-    /// The episode as the shelf would list it, with where it is served.
-    #[serde(flatten)]
-    pub held: Held,
+/// One episode, as the server holds it.
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub struct EpisodeDetail {
+    /// The item.
+    pub item: Item,
     /// Its number in the season, where it has one.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub number: Option<u32>,
     /// What happens in it, where the server holds a description.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub overview: Option<String>,
     /// How long it runs, in whole minutes, where the server knows.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub minutes: Option<u32>,
 }
 
-/// Something a member was part-way through, and how far.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
-pub struct PartWay {
-    /// The title or episode, with where it is served.
-    #[serde(flatten)]
-    pub held: Held,
+/// Something a member was part-way through, and how far, as the server holds it.
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub struct ItemProgress {
+    /// The item.
+    pub item: Item,
     /// How far in they got, in whole seconds.
     pub position: u64,
     /// How long it runs, in whole seconds, where the server knows.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub length: Option<u64>,
 }
 
 /// How far through a title a member is, as a player reports it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct HowFar {
     /// How far in, in whole seconds.
     pub position: u64,
@@ -148,38 +182,37 @@ pub struct HowFar {
     pub ended: bool,
 }
 
-/// One thing the household holds, as a member is shown it.
-///
-/// What a person recognises and nothing else. There is no file path, no container,
-/// no bitrate and no library id: a member deciding what to watch is not choosing a
-/// transcode, and a surface handed those would have to decide not to draw them.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
-pub struct Held {
-    /// The identifier the server tells it apart by, which is what asking to play one
-    /// of them names.
+/// One thing the household holds, as the server holds it.
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub struct Item {
+    /// The identifier the server tells it apart by.
     pub id: String,
     /// What it is called, in the words the server holds it under.
     pub title: String,
-    /// The year it came out, where the server knows one. Absent rather than guessed:
-    /// two films share a title far more often than they share a title and a year.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// The year it came out, where the server knows one.
     pub year: Option<u16>,
     /// Which of the kinds this product deals in it is.
     pub medium: Medium,
-    /// Where it is served at the guarded front door, or why it is not.
-    #[serde(flatten)]
-    pub at: Located,
-    /// What the server holds for it, which is what decides which locations it gets.
-    #[serde(skip)]
-    #[schemars(skip)]
+    /// What the server holds for it.
     pub holds: Holds,
 }
 
 /// What the media server holds for one item: its pictures, and whether it streams.
-///
-/// Read by the adapter and turned into locations by the core, which alone knows where
-/// the front door is.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Holds {
     /// Whether it has a poster.
     pub poster: bool,
@@ -187,36 +220,6 @@ pub struct Holds {
     pub backdrop: bool,
     /// Whether it is something that plays, rather than something that holds what plays.
     pub plays: bool,
-}
-
-/// Where one item is served at the guarded front door, or why it is not.
-///
-/// Every location is built by the core from the household address the stack publishes
-/// for the media server, so a client never puts one together.
-#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
-pub struct Located {
-    /// Where its poster is served, where it has one.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub poster: Option<String>,
-    /// Where its backdrop is served, where it has one.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub backdrop: Option<String>,
-    /// Where it streams from, where it plays.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub stream_from: Option<String>,
-    /// The certificate the door presents, which a client pins, beside any location.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub door: Option<Pinned>,
-    /// Why no location is stated, where none is.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub unlocated: Option<String>,
-}
-
-/// The certificate a guarded door presents, as a client pins it.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
-pub struct Pinned {
-    /// SHA-256 over the certificate's DER encoding, lower-case hex.
-    pub fingerprint: String,
 }
 
 /// The kinds of thing a household holds.
@@ -231,7 +234,9 @@ pub struct Pinned {
 /// `uninstall::Sort` — and one word meaning two things in one vocabulary is how a
 /// reader comes to trust the wrong one. The contract flattens every type name into one
 /// namespace, so a clash there is a clash for anything reading it by name.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, schemars::JsonSchema, serde::Deserialize,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum Medium {
     /// One film.

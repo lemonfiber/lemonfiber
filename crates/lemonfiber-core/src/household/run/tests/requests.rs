@@ -1,6 +1,7 @@
 //! Who asked for what, named by the library that holds it.
 
 use super::*;
+use crate::ports::service::{MediaStatus, RequestStatus};
 
 /// The assembly, given the two tables these cases turn on and nothing for the two
 /// they do not.
@@ -41,9 +42,24 @@ fn requests_are_grouped_by_who_asked_in_name_order() {
     let report = assembled(
         vec![account("Sam", true), account("Alex", true)],
         vec![
-            request("Sam", Some(Kind::Movies), Some(7), (2, 5)),
-            request("Alex", Some(Kind::Tv), Some(11), (2, 4)),
-            request("Alex", Some(Kind::Movies), None, (1, 1)),
+            request(
+                "Sam",
+                Some(Kind::Movies),
+                Some(7),
+                (RequestStatus::Approved, MediaStatus::Available),
+            ),
+            request(
+                "Alex",
+                Some(Kind::Tv),
+                Some(11),
+                (RequestStatus::Approved, MediaStatus::PartlyAvailable),
+            ),
+            request(
+                "Alex",
+                Some(Kind::Movies),
+                None,
+                (RequestStatus::Pending, MediaStatus::Unknown),
+            ),
         ],
         &unnamed(),
         &titles(),
@@ -73,7 +89,12 @@ fn requests_are_grouped_by_who_asked_in_name_order() {
 fn somebody_who_has_asked_for_nothing_is_still_in_the_household() {
     let report = assembled(
         vec![account("Alex", true), account("Sam", true)],
-        vec![request("Alex", Some(Kind::Tv), Some(11), (2, 4))],
+        vec![request(
+            "Alex",
+            Some(Kind::Tv),
+            Some(11),
+            (RequestStatus::Approved, MediaStatus::PartlyAvailable),
+        )],
         &unnamed(),
         &titles(),
         None,
@@ -157,7 +178,12 @@ fn access_names_the_libraries_it_can_and_keeps_the_ones_it_cannot() {
 fn a_request_from_somebody_with_no_account_is_said_rather_than_dropped() {
     let report = assembled(
         vec![account("Alex", true)],
-        vec![request("Gone", Some(Kind::Movies), Some(7), (2, 5))],
+        vec![request(
+            "Gone",
+            Some(Kind::Movies),
+            Some(7),
+            (RequestStatus::Approved, MediaStatus::Available),
+        )],
         &unnamed(),
         &titles(),
         None,
@@ -180,7 +206,12 @@ fn a_request_from_somebody_with_no_account_is_said_rather_than_dropped() {
 fn narrowing_does_not_turn_everybody_else_into_a_missing_account() {
     let report = assembled(
         vec![account("Alex", true), account("Sam", true)],
-        vec![request("Sam", Some(Kind::Movies), Some(7), (2, 5))],
+        vec![request(
+            "Sam",
+            Some(Kind::Movies),
+            Some(7),
+            (RequestStatus::Approved, MediaStatus::Available),
+        )],
         &unnamed(),
         &titles(),
         Some("alex"),
@@ -203,7 +234,12 @@ fn narrowing_does_not_turn_everybody_else_into_a_missing_account() {
 fn a_member_is_found_by_the_id_a_session_carries() {
     let report = assembled(
         vec![account("Alex", true), account("Sam", true)],
-        vec![request("Alex", Some(Kind::Movies), Some(7), (2, 5))],
+        vec![request(
+            "Alex",
+            Some(Kind::Movies),
+            Some(7),
+            (RequestStatus::Approved, MediaStatus::Available),
+        )],
         &unnamed(),
         &titles(),
         Some("id-alex"),
@@ -230,7 +266,12 @@ fn a_member_is_found_by_the_id_a_session_carries() {
 fn a_typed_name_still_finds_the_member_it_partly_spells() {
     let report = assembled(
         vec![account("Alex", true), account("Sam", true)],
-        vec![request("Alex", Some(Kind::Movies), Some(7), (2, 5))],
+        vec![request(
+            "Alex",
+            Some(Kind::Movies),
+            Some(7),
+            (RequestStatus::Approved, MediaStatus::Available),
+        )],
         &unnamed(),
         &titles(),
         Some("ale"),
@@ -249,7 +290,12 @@ fn a_typed_name_still_finds_the_member_it_partly_spells() {
 fn a_request_is_named_by_the_library_the_service_handed_it_to() {
     let report = assembled(
         vec![account("Alex", true)],
-        vec![request("Alex", Some(Kind::Tv), Some(11), (2, 4))],
+        vec![request(
+            "Alex",
+            Some(Kind::Tv),
+            Some(11),
+            (RequestStatus::Approved, MediaStatus::PartlyAvailable),
+        )],
         &unnamed(),
         &titles(),
         None,
@@ -271,7 +317,12 @@ fn a_request_no_service_holds_yet_is_named_by_what_it_is() {
     // invented. What it is still reads, so the line is not blank.
     let report = assembled(
         vec![account("Sam", true)],
-        vec![request("Sam", Some(Kind::Movies), None, (1, 1))],
+        vec![request(
+            "Sam",
+            Some(Kind::Movies),
+            None,
+            (RequestStatus::Pending, MediaStatus::Unknown),
+        )],
         &unnamed(),
         &titles(),
         None,
@@ -294,19 +345,40 @@ fn an_item_the_library_does_not_hold_is_left_unnamed() {
     // and nothing is guessed from it.
     assert_eq!(
         titled(
-            &request("Alex", Some(Kind::Tv), Some(999), (2, 5)),
+            &request(
+                "Alex",
+                Some(Kind::Tv),
+                Some(999),
+                (RequestStatus::Approved, MediaStatus::Available)
+            ),
             &titles()
         ),
         None
     );
     // Nor is a film's id looked up against the television library.
     assert_eq!(
-        titled(&request("Alex", Some(Kind::Tv), Some(7), (2, 5)), &titles()),
+        titled(
+            &request(
+                "Alex",
+                Some(Kind::Tv),
+                Some(7),
+                (RequestStatus::Approved, MediaStatus::Available)
+            ),
+            &titles()
+        ),
         None
     );
     // A request whose kind this build does not know is never joined at all.
     assert_eq!(
-        titled(&request("Alex", None, Some(11), (2, 5)), &titles()),
+        titled(
+            &request(
+                "Alex",
+                None,
+                Some(11),
+                (RequestStatus::Approved, MediaStatus::Available)
+            ),
+            &titles()
+        ),
         None
     );
 }
@@ -314,8 +386,18 @@ fn an_item_the_library_does_not_hold_is_left_unnamed() {
 #[test]
 fn narrowing_to_one_member_is_forgiving_about_how_the_name_is_typed() {
     let requests = vec![
-        request("Alex", Some(Kind::Tv), Some(11), (2, 4)),
-        request("Sam", Some(Kind::Movies), Some(7), (2, 5)),
+        request(
+            "Alex",
+            Some(Kind::Tv),
+            Some(11),
+            (RequestStatus::Approved, MediaStatus::PartlyAvailable),
+        ),
+        request(
+            "Sam",
+            Some(Kind::Movies),
+            Some(7),
+            (RequestStatus::Approved, MediaStatus::Available),
+        ),
     ];
     let report = assembled(
         vec![account("Alex", true), account("Sam", true)],
@@ -363,7 +445,12 @@ async fn the_household_view_reads_the_requests_and_names_them_from_the_library()
 fn a_request_is_filed_by_the_id_it_carries_and_not_the_name_it_shows() {
     let renamed = HouseholdRequest {
         member_id: Some("ID-SAM".to_owned()),
-        ..request("Alex", Some(Kind::Movies), Some(7), (2, 5))
+        ..request(
+            "Alex",
+            Some(Kind::Movies),
+            Some(7),
+            (RequestStatus::Approved, MediaStatus::Available),
+        )
     };
     let whole = assembled(
         vec![account("Alex", true), account("Sam", true)],
@@ -388,7 +475,12 @@ fn a_request_is_filed_by_the_id_it_carries_and_not_the_name_it_shows() {
 fn a_member_narrowed_by_id_is_not_handed_a_request_that_only_wears_their_name() {
     let renamed = HouseholdRequest {
         member_id: Some("id-sam".to_owned()),
-        ..request("Alex", Some(Kind::Movies), Some(7), (2, 5))
+        ..request(
+            "Alex",
+            Some(Kind::Movies),
+            Some(7),
+            (RequestStatus::Approved, MediaStatus::Available),
+        )
     };
     let theirs = assembled(
         vec![account("Alex", true), account("Sam", true)],
@@ -431,7 +523,12 @@ fn an_id_names_one_account_even_where_another_name_contains_it() {
 fn a_narrowed_read_names_nobody_else() {
     let report = assembled(
         vec![account("Alex", true)],
-        vec![request("Gone", Some(Kind::Movies), Some(7), (2, 5))],
+        vec![request(
+            "Gone",
+            Some(Kind::Movies),
+            Some(7),
+            (RequestStatus::Approved, MediaStatus::Available),
+        )],
         &unnamed(),
         &titles(),
         Some("id-alex"),
@@ -455,10 +552,25 @@ fn a_request_carries_its_year_its_arrival_and_its_shelf_id_where_each_is_known()
     let arrived = HouseholdRequest {
         arrived: Some("2026-10-01T20:00:00.000Z".to_owned()),
         shelf_id: Some("f00d".to_owned()),
-        ..request("Alex", Some(Kind::Tv), Some(11), (2, 5))
+        ..request(
+            "Alex",
+            Some(Kind::Tv),
+            Some(11),
+            (RequestStatus::Approved, MediaStatus::Available),
+        )
     };
-    let waiting = request("Alex", Some(Kind::Movies), Some(7), (2, 3));
-    let unhanded = request("Alex", Some(Kind::Movies), None, (1, 1));
+    let waiting = request(
+        "Alex",
+        Some(Kind::Movies),
+        Some(7),
+        (RequestStatus::Approved, MediaStatus::Processing),
+    );
+    let unhanded = request(
+        "Alex",
+        Some(Kind::Movies),
+        None,
+        (RequestStatus::Pending, MediaStatus::Unknown),
+    );
     let report = assembled(
         vec![account("Alex", true)],
         vec![arrived, waiting, unhanded],

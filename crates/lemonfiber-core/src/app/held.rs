@@ -21,7 +21,8 @@ use super::{Ctx, Whom};
 
 use crate::error::{Diagnose, Problem};
 use crate::model::HeldReport;
-use crate::ports::service::{Failure, Held, Household as _, Member};
+use crate::ports::service::{Failure, Household as _, Item, Member, Screening as _};
+use crate::screening::door::{located, Door};
 
 /// Read what one member holds, or what the household's defaults would.
 ///
@@ -50,8 +51,8 @@ pub(crate) async fn held(ctx: &Ctx, whose: &Whom, most: u32) -> Result<HeldRepor
             server.holdings(None, most).await,
             String::new(),
             String::new(),
-        )
-        .located(&door));
+            &door,
+        ));
     };
 
     let Ok(accounts) = server.household().await else {
@@ -74,14 +75,19 @@ pub(crate) async fn held(ctx: &Ctx, whose: &Whom, most: u32) -> Result<HeldRepor
         server.holdings(Some(&account.id), most).await,
         account.name.clone(),
         account.id.clone(),
-    )
-    .located(&door))
+        &door,
+    ))
 }
 
 /// What the server answered about one shelf, said as a report about whoever it is.
 ///
 /// `member` and `id` are empty for the household's defaults, which are nobody's.
-fn shelved(answered: Result<Vec<Held>, Failure>, member: String, id: String) -> HeldReport {
+fn shelved(
+    answered: Result<Vec<Item>, Failure>,
+    member: String,
+    id: String,
+    door: &Door,
+) -> HeldReport {
     let Ok(holdings) = answered else {
         return HeldReport {
             member,
@@ -98,7 +104,10 @@ fn shelved(answered: Result<Vec<Held>, Failure>, member: String, id: String) -> 
         rehearsed: false,
         member,
         id,
-        holdings,
+        holdings: holdings
+            .into_iter()
+            .map(|item| located(item, door))
+            .collect(),
         available: true,
         findings: Vec::new(),
     }

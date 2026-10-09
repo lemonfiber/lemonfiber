@@ -1,6 +1,7 @@
 use super::{became_of, held, still_owed, written, Said};
 use crate::asking::Reasons;
 use crate::ports::service::HouseholdRequest;
+use crate::ports::service::{MediaStatus, RequestStatus};
 use crate::telling::Told;
 use crate::test_support::a_context;
 
@@ -18,8 +19,8 @@ fn asked(id: i64) -> HouseholdRequest {
         member_id: None,
         kind: Some(crate::recyclarr::Kind::Movies),
         item: None,
-        request_status: 1,
-        media_status: 2,
+        request_status: Some(RequestStatus::Pending),
+        media_status: Some(MediaStatus::Pending),
     }
 }
 

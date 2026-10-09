@@ -5,7 +5,7 @@
 
 use super::item_type;
 use crate::ports::media::Kind;
-use crate::ports::service::{Held, Holds, Located, Medium};
+use crate::ports::service::{Holds, Item, Medium};
 
 /// One item as the media server describes it.
 #[derive(serde::Deserialize)]
@@ -44,9 +44,9 @@ pub(super) struct ItemsResource {
 }
 
 impl ItemResource {
-    /// The same item in this product's own words, located nowhere yet.
-    pub(super) fn held(self) -> Held {
-        Held {
+    /// The same item in this product's own words.
+    pub(super) fn item(self) -> Item {
+        Item {
             holds: Holds {
                 poster: self.images.primary.is_some(),
                 backdrop: !self.backdrops.is_empty(),
@@ -56,7 +56,6 @@ impl ItemResource {
             title: self.name,
             year: self.year,
             medium: medium(&self.medium),
-            at: Located::default(),
         }
     }
 

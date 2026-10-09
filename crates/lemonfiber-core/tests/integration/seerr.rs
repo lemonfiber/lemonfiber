@@ -11,8 +11,10 @@ use lemonfiber_fixtures::http::{Answer, Fake};
 use std::sync::Arc;
 
 use lemonfiber_core::ports::http::{Http, Method};
+use lemonfiber_core::ports::media::Kind;
 use lemonfiber_core::ports::service::{
-    Endpoint, Failure, FulfilmentTarget, QualityProfile, Requests,
+    Credential, Endpoint, Failure, FulfilmentTarget, IdentitySource, MediaStatus, Protocol,
+    QualityProfile, RequestStatus, Requests,
 };
 use lemonfiber_core::seerr::Seerr;
 
@@ -29,19 +31,61 @@ fn password() -> String {
     ["se", "cret"].concat()
 }
 
+/// The media server at `at`, spoken to as Jellyfin and administered by name and password.
+fn jellyfin_at(at: &str) -> IdentitySource {
+    IdentitySource {
+        at: at.to_owned(),
+        protocol: Protocol("jellyfin".to_owned()),
+        credential: Credential::UserPass {
+            username: "admin".to_owned(),
+            password: password(),
+        },
+    }
+}
+
+/// One request as these tests read it back: who, whether its kind was read, the item, and
+/// its two statuses.
+type Read<'a> = (
+    &'a str,
+    bool,
+    Option<i64>,
+    Option<RequestStatus>,
+    Option<MediaStatus>,
+);
+
 /// Configure identity through the fake, for the common arguments.
 async fn configure(fake: &Arc<Fake>) -> Result<(), Failure> {
     seerr(fake)
-        .configure_identity("admin", &password(), "http://jellyfin:8096")
+        .configure_identity(&jellyfin_at("http://jellyfin:8096"))
         .await
+}
+
+/// A source spoken to in another protocol, or administered by a key, is refused as one
+/// the service is not set up with here, and nothing is sent.
+#[tokio::test]
+async fn an_identity_source_it_does_not_sign_in_through_is_unsupported_and_unsent() {
+    let other = IdentitySource {
+        protocol: Protocol("plex".to_owned()),
+        ..jellyfin_at("http://plex:32400")
+    };
+    let keyed = IdentitySource {
+        credential: Credential::ApiKey(password()),
+        ..jellyfin_at("http://jellyfin:8096")
+    };
+    for source in [other, keyed] {
+        let fake = Fake::always(Answer::reply(200, ""));
+        assert!(matches!(
+            seerr(&fake).configure_identity(&source).await,
+            Err(Failure::Unsupported { .. })
+        ));
+        assert!(fake.requests().is_empty());
+    }
 }
 
 /// Sign in against `address`, and hand back the body that went out.
 async fn body_for(address: &str) -> String {
     let fake = Fake::in_turn(vec![Answer::reply(200, ""), Answer::reply(204, "")]);
-    let _ = seerr(&fake)
-        .configure_identity("admin", &password(), address)
-        .await;
+    let _ = seerr(&fake).configure_identity(&jellyfin_at(address)).await;
     fake.requests()
         .first()
         .and_then(|request| request.body.clone())
@@ -131,7 +175,8 @@ async fn the_client_that_sets_it_up_carries_no_key() {
 }
 
 /// An \*arr as the request service is told about it.
-fn target(television: bool) -> FulfilmentTarget {
+fn target(kind: Kind) -> FulfilmentTarget {
+    let television = kind == Kind::Tv;
     FulfilmentTarget {
         name: if television { "Sonarr" } else { "Radarr" }.to_owned(),
         at: Endpoint {
@@ -141,7 +186,7 @@ fn target(television: bool) -> FulfilmentTarget {
         },
         moved_from: None,
         key: ["ke", "y"].concat(),
-        television,
+        kind,
         profile: QualityProfile {
             id: 1,
             name: "HD".to_owned(),
@@ -151,11 +196,9 @@ fn target(television: bool) -> FulfilmentTarget {
 }
 
 /// Register `target` through the fake, and hand back the body that went out.
-async fn registration(television: bool) -> String {
+async fn registration(kind: Kind) -> String {
     let fake = Fake::in_turn(vec![Answer::reply(200, "")]);
-    let _ = seerr(&fake)
-        .add_fulfilment_target(&target(television))
-        .await;
+    let _ = seerr(&fake).add_fulfilment_target(&target(kind)).await;
     fake.requests()
         .first()
         .and_then(|request| request.body.clone())
@@ -170,7 +213,7 @@ async fn registration(television: bool) -> String {
 /// registers only half a stack.
 #[tokio::test]
 async fn each_kind_of_target_carries_the_field_its_own_list_requires() {
-    let television = registration(true).await;
+    let television = registration(Kind::Tv).await;
     assert!(
         television.contains(r#""enableSeasonFolders":true"#),
         "{television}"
@@ -180,7 +223,7 @@ async fn each_kind_of_target_carries_the_field_its_own_list_requires() {
         "television carried a film's field: {television}"
     );
 
-    let film = registration(false).await;
+    let film = registration(Kind::Movies).await;
     assert!(
         film.contains(r#""minimumAvailability":"released""#),
         "{film}"
@@ -194,8 +237,8 @@ async fn each_kind_of_target_carries_the_field_its_own_list_requires() {
 /// Everything both lists require is sent, whichever list it is.
 #[tokio::test]
 async fn a_registration_carries_everything_the_service_requires_of_it() {
-    for television in [true, false] {
-        let body = registration(television).await;
+    for kind in Kind::ALL {
+        let body = registration(kind).await;
         for required in [
             "name",
             "hostname",
@@ -225,7 +268,7 @@ async fn an_address_that_cannot_be_taken_apart_is_refused_before_it_is_sent() {
     for nonsense in ["jellyfin:8096", "ftp://jellyfin:8096", "http://"] {
         let fake = Fake::in_turn(vec![Answer::reply(200, ""), Answer::reply(204, "")]);
         let outcome = seerr(&fake)
-            .configure_identity("admin", &password(), nonsense)
+            .configure_identity(&jellyfin_at(nonsense))
             .await;
 
         assert!(
@@ -479,7 +522,7 @@ async fn the_households_requests_are_read_with_who_asked_and_what_became_of_each
     }"#;
     let fake = Fake::in_turn(vec![Answer::reply(200, page)]);
     let requests = seerr(&fake).requests().await.unwrap_or_default();
-    let read: Vec<(&str, bool, Option<i64>, u8, u8)> = requests
+    let read: Vec<Read<'_>> = requests
         .iter()
         .map(|request| {
             (
@@ -491,14 +534,32 @@ async fn the_households_requests_are_read_with_who_asked_and_what_became_of_each
             )
         })
         .collect();
-    // The two statuses are carried as the service's own numbers; a request no service
-    // holds yet names no item, which is what leaves it with no title to find.
+    // A request no service holds yet names no item, which is what leaves it with no
+    // title to find.
     assert_eq!(
         read,
         vec![
-            ("Alex", true, Some(11), 2, 4),
-            ("Sam", true, None, 1, 1),
-            ("Alex", true, Some(7), 5, 5),
+            (
+                "Alex",
+                true,
+                Some(11),
+                Some(RequestStatus::Approved),
+                Some(MediaStatus::PartlyAvailable)
+            ),
+            (
+                "Sam",
+                true,
+                None,
+                Some(RequestStatus::Pending),
+                Some(MediaStatus::Unknown)
+            ),
+            (
+                "Alex",
+                true,
+                Some(7),
+                Some(RequestStatus::Completed),
+                Some(MediaStatus::Available)
+            ),
         ]
     );
     // Read newest first, so a household with more than the horizon keeps the requests

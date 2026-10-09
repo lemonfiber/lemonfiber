@@ -87,8 +87,14 @@ pub(super) async fn seed_jellyfin_identity(
         Ok(password) => {
             let seerr_client =
                 crate::seerr::Seerr::new(ctx.seams.http.clone(), &seerr_base, "seerr");
-            crate::seed::wire_seerr_identity(&seerr_client, &password, &server_url, ctx.dry_run)
-                .await
+            crate::seed::wire_seerr_identity(
+                &seerr_client,
+                server.protocol(),
+                &password,
+                &server_url,
+                ctx.dry_run,
+            )
+            .await
         }
         Err(state) => crate::seed::Wiring::settled(crate::seed::IDENTITY.to_owned(), state),
     };
@@ -127,7 +133,7 @@ pub(super) async fn seed_jellyfin_identity(
         ctx.dry_run,
     )
     .await;
-    remember(&mut records, &told.state, held, &ctx.stamp());
+    remember(&mut records, &told.state, &held, &ctx.stamp());
 
     (
         [Some(wiring), linked, changed, Some(told)]
@@ -197,14 +203,14 @@ const SEERR: &str = "seerr";
 fn remember(
     records: &mut crate::baseline::Baseline,
     state: &crate::seed::State,
-    held: crate::ports::service::Telling,
+    held: &crate::ports::service::Telling,
     at: &str,
 ) {
     match state {
         crate::seed::State::Wired | crate::seed::State::AlreadyWired => records.record(
             SEERR,
             crate::seed::TELLING,
-            &crate::seed::said(crate::seed::wanted_telling()),
+            &crate::seed::said(&crate::seed::wanted_telling()),
             at,
         ),
         crate::seed::State::Unmanaged => {

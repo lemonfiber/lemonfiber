@@ -3,16 +3,18 @@ use super::{
     UNREADABLE,
 };
 use crate::certificate::Unkept;
-use crate::ports::service::{Held, Holds, Located, Medium};
+use crate::model::Located;
+use crate::ports::service::{Holds, Item, Medium};
 use lemonfiber_fixtures::scratch::Scratch;
 
-fn held(medium: Medium, holds: Holds) -> Held {
-    Held {
-        id: "f1".to_owned(),
+const ID: &str = "0123456789abcdef0123456789abcdef";
+
+fn held(medium: Medium, holds: Holds) -> Item {
+    Item {
+        id: ID.to_owned(),
         title: "Heat".to_owned(),
         year: None,
         medium,
-        at: Located::default(),
         holds,
     }
 }
@@ -35,14 +37,14 @@ fn a_film_with_both_pictures_is_located_whole_and_pinned() {
     let at = located(held(Medium::Film, EVERYTHING), &the_door()).at;
     assert_eq!(
         at.poster.as_deref(),
-        Some("https://house.local:8920/Items/f1/Images/Primary")
+        Some("https://house.local:8920/Items/0123456789abcdef0123456789abcdef/Images/Primary")
     );
     assert_eq!(
         at.backdrop.as_deref(),
-        Some("https://house.local:8920/Items/f1/Images/Backdrop")
+        Some("https://house.local:8920/Items/0123456789abcdef0123456789abcdef/Images/Backdrop")
     );
     assert!(at.stream_from.as_deref().is_some_and(|stream| stream
-        .starts_with("https://house.local:8920/Videos/f1/master.m3u8?MediaSourceId=f1&")));
+        .starts_with("https://house.local:8920/Videos/0123456789abcdef0123456789abcdef/master.m3u8?MediaSourceId=0123456789abcdef0123456789abcdef&")));
     assert_eq!(
         at.door.map(|door| door.fingerprint).as_deref(),
         Some("ab12")
@@ -178,4 +180,26 @@ async fn with_no_stack_directory_the_door_is_unknown_and_says_why() {
         super::standing(&ctx).await,
         Door::Unknown(super::NO_STACK.to_owned())
     );
+}
+
+#[test]
+fn an_item_named_by_anything_but_an_item_id_is_not_located() {
+    for id in [
+        "f1",
+        "../System/Info",
+        "0123456789abcdef0123456789abcdef&x=1",
+    ] {
+        let at = located(
+            Item {
+                id: id.to_owned(),
+                ..held(Medium::Film, EVERYTHING)
+            },
+            &the_door(),
+        )
+        .at;
+        assert_eq!(at.poster, None, "{id}");
+        assert_eq!(at.stream_from, None, "{id}");
+        assert_eq!(at.door, None, "{id}");
+        assert!(at.unlocated.is_some(), "{id}");
+    }
 }

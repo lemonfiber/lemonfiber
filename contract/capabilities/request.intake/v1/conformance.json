@@ -1,0 +1,260 @@
+{
+  "capability": "request.intake",
+  "cases": [
+    {
+      "case": "refuses-without-the-key",
+      "expect": {
+        "status": [
+          401
+        ]
+      },
+      "keyed": false,
+      "live": true,
+      "operation": "initialized"
+    },
+    {
+      "case": "initialized-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "initialized"
+    },
+    {
+      "case": "configure_identity-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "configure_identity"
+    },
+    {
+      "case": "answers-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "answers"
+    },
+    {
+      "case": "requests-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "requests"
+    },
+    {
+      "case": "link_members-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "link_members"
+    },
+    {
+      "case": "member_for-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "member_for"
+    },
+    {
+      "case": "requesting-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "requesting"
+    },
+    {
+      "case": "approval_first-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "approval_first"
+    },
+    {
+      "case": "remove_member-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "remove_member"
+    },
+    {
+      "case": "telling-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "telling"
+    },
+    {
+      "case": "tell-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "tell"
+    },
+    {
+      "case": "fulfilment_targets-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "fulfilment_targets"
+    },
+    {
+      "case": "add_fulfilment_target-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "add_fulfilment_target"
+    },
+    {
+      "case": "move_fulfilment_target-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "move_fulfilment_target"
+    },
+    {
+      "case": "test_fulfilment_target-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "test_fulfilment_target"
+    },
+    {
+      "case": "media_server_link-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "media_server_link"
+    },
+    {
+      "case": "link_media_server-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "link_media_server"
+    },
+    {
+      "case": "asking-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "asking"
+    },
+    {
+      "case": "set_asking-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "set_asking"
+    },
+    {
+      "case": "left-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "left"
+    },
+    {
+      "case": "set_quota-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "set_quota"
+    },
+    {
+      "case": "approves_own-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "approves_own"
+    },
+    {
+      "case": "decide-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "decide"
+    },
+    {
+      "case": "hold_requests-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "hold_requests"
+    },
+    {
+      "case": "release_requests-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "release_requests"
+    },
+    {
+      "case": "reachable-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "reachable"
+    },
+    {
+      "case": "set_notices-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "set_notices"
+    }
+  ],
+  "major": 1
+}

@@ -1,3 +1,4 @@
+use crate::ports::service::{MediaStatus, RequestStatus};
 use std::sync::Arc;
 
 use lemonfiber_fixtures::http::{Answer, Fake as Transport};
@@ -52,7 +53,7 @@ fn request(
     member: &str,
     kind: Option<Kind>,
     item: Option<i64>,
-    statuses: (u8, u8),
+    statuses: (RequestStatus, MediaStatus),
 ) -> HouseholdRequest {
     HouseholdRequest {
         arrived: None,
@@ -63,8 +64,8 @@ fn request(
         member_id: None,
         kind,
         item,
-        request_status: statuses.0,
-        media_status: statuses.1,
+        request_status: Some(statuses.0),
+        media_status: Some(statuses.1),
     }
 }
 

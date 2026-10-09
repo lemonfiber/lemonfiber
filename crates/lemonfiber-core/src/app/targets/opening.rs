@@ -297,7 +297,7 @@ pub(crate) async fn revoke_jellyfin_key(
         crate::config::JELLYFIN_ADMIN_USER,
         password,
     );
-    client.revoke_our_key().await.ok()
+    crate::app_keys::revoke_ours(&client).await.ok()
 }
 
 /// The request service's own key, read from the settings file it writes.

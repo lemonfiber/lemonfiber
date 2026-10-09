@@ -1,4 +1,4 @@
-use super::{said, tell_the_household, wanted_telling, TELLING};
+use super::telling::{said, tell_the_household, wanted_telling, TELLING};
 use crate::baseline::Baseline;
 use crate::seed::drift::{intent, Intent, Observed};
 use crate::seed::State;
@@ -52,11 +52,11 @@ fn written_to(http: &Fake) -> bool {
 async fn a_service_holding_what_was_wanted_is_left_exactly_as_it_is() {
     let held = format!(
         r#"{{"enabled":true,"types":{}}}"#,
-        wanted_telling().occasions
+        crate::seerr::bits(&wanted_telling().occasions)
     );
     let (seerr, http) = service(vec![Answer::reply(200, held)]);
 
-    let state = against(&seerr, &recorded(&said(wanted_telling()), false)).await;
+    let state = against(&seerr, &recorded(&said(&wanted_telling()), false)).await;
 
     assert_eq!(state, State::AlreadyWired);
     assert!(!written_to(&http), "a correct value was written again");
@@ -82,7 +82,7 @@ async fn both_sides_moved_is_put_to_the_operator_rather_than_settled() {
 
     assert!(
         matches!(&state, State::Conflicted { yours, ours }
-            if yours.as_deref() == Some("on:8") && ours == &said(wanted_telling())),
+            if yours.as_deref() == Some("on:8") && ours == &said(&wanted_telling())),
         "{state:?}"
     );
     assert!(!written_to(&http), "a conflict was resolved by writing");
@@ -165,7 +165,7 @@ async fn a_rehearsed_telling_says_what_is_set_now_and_sets_nothing() {
         state,
         State::WouldWire {
             yours: Some("off:0".to_owned()),
-            ours: Some(said(wanted_telling())),
+            ours: Some(said(&wanted_telling())),
         }
     );
     assert!(
@@ -199,4 +199,26 @@ fn every_state_here_is_the_one_the_shared_policy_asks_for() {
              no longer agrees"
         );
     }
+}
+
+#[test]
+fn each_occasion_is_recorded_under_its_own_code() {
+    use crate::ports::service::{Occasion, Telling};
+    let one = |occasion| Telling {
+        enabled: true,
+        occasions: [occasion].into(),
+        others: false,
+    };
+    let codes: Vec<String> = Occasion::ALL
+        .into_iter()
+        .map(|occasion| said(&one(occasion)))
+        .collect();
+    assert_eq!(codes, ["on:2", "on:4", "on:8", "on:16", "on:64", "on:128"]);
+    assert_eq!(said(&wanted_telling()), "on:222");
+    let with_others = Telling {
+        others: true,
+        ..wanted_telling()
+    };
+    assert_eq!(said(&with_others), "on:222+");
+    assert_eq!(said(&Telling::default()), "off:0");
 }

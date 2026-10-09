@@ -1,4 +1,4 @@
-//! Reading the fragments a "where is my show?" trace is assembled from — one \*arr's view
+//! Reading the fragments a "where is my show?" trace is assembled from — one curator's view
 //! of an item's journey, and the media server's word on whether it is finally playable.
 //! The D9 additions to the service port, kept apart from the provisioning surface.
 
@@ -101,7 +101,7 @@ pub struct StuckItem {
     pub stage: crate::service::stage::Stage,
 }
 
-/// Reading one \*arr's fragment of an item's journey — the service that monitors the
+/// Reading one curator's fragment of an item's journey — the service that monitors the
 /// item and records its history is the spine a trace is built along; the other services
 /// fill in around it.
 #[async_trait]
@@ -176,10 +176,10 @@ pub trait Pipeline: Send + Sync {
 }
 
 /// Reading a media server's library to answer the last question a trace has left — is
-/// the item finally visible and playable? Jellyfin, the one service lemonfiber holds the
-/// household's own admin credential for, so it can ask on the household's behalf.
+/// the item finally visible and playable? Asked with the administrator credential
+/// lemonfiber holds for the media server, on the household's behalf.
 ///
-/// A title is the only join across to the media server — it shares no id with the \*arr
+/// A title is the only join across to the media server — it shares no id with the curator
 /// that traced the item this far — so a match here is a fuzzy one, and the trace marks
 /// the availability it yields uncertain rather than claim a title-guess as fact.
 #[async_trait]

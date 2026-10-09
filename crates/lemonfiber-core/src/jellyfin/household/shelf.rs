@@ -7,7 +7,7 @@
 
 use super::{item_type, Jellyfin, Kind, Method};
 use crate::jellyfin::item::{ItemResource, ItemsResource};
-use crate::ports::service::{Failure, Held};
+use crate::ports::service::{Failure, Item};
 
 /// What this member may watch, as the server answers it for them.
 ///
@@ -28,7 +28,7 @@ pub(super) async fn holdings(
     jellyfin: &Jellyfin,
     member: Option<&str>,
     most: u32,
-) -> Result<Vec<Held>, Failure> {
+) -> Result<Vec<Item>, Failure> {
     let response = jellyfin
         .as_admin(Method::Get, &asked(member, most), None)
         .await?;
@@ -36,7 +36,7 @@ pub(super) async fn holdings(
         .endpoint
         .decode(&response, "what the household holds could not be read")?;
 
-    Ok(held.items.into_iter().map(ItemResource::held).collect())
+    Ok(held.items.into_iter().map(ItemResource::item).collect())
 }
 
 /// The path a shelf is asked at, for one member or for nobody in particular.

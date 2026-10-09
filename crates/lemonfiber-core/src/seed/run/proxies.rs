@@ -12,7 +12,7 @@ use std::time::Duration;
 use super::Ctx;
 use crate::app::targets::MediaServer;
 use crate::jellyfin::Jellyfin;
-use crate::ports::service::Failure;
+use crate::ports::service::{Failure, Fronted as _};
 use crate::seed::{State, Wiring};
 
 /// What the report calls this connection.

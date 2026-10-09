@@ -12,6 +12,7 @@
 //! instance's identity would cost the household its existing sign-ins — and, where
 //! it is not, signs in through Jellyfin to point Seerr's authentication at it.
 
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -29,10 +30,13 @@ use members::{approves_own, MemberResource, LINK_MEMBERS, MEMBERS, NOT_FOUND};
 use records::{RequestPage, RequestRecord, REQUEST_PAGE};
 
 use crate::endpoint::Endpoint;
+use lemonfiber_manifest::ApiKind;
+
 use crate::ports::http::{Http, Method, Request};
+use crate::ports::media::Kind;
 use crate::ports::service::{
-    Failure, FulfilmentTarget, HouseholdRequest, MediaServerLink, RegisteredTarget, Requesting,
-    Requests, Telling,
+    Credential, Failure, FulfilmentTarget, HouseholdRequest, IdentitySource, MediaServerLink,
+    Occasion, RegisteredTarget, Requesting, Requests, Telling,
 };
 use crate::schemes::{PLAIN, SECURE};
 
@@ -113,26 +117,43 @@ fn taken_apart(server_url: &str) -> Option<Reached<'_>> {
     })
 }
 
-/// The occasions the household is told about, as Seerr numbers them.
+/// The occasions the household is told about, each as the bit Seerr keeps it under in
+/// the field it holds the set in.
 ///
-/// A request was received, a decision was made either way, it arrived, or it could
-/// not be got. Each is one bit of the field Seerr keeps the set in, named here rather
-/// than written as one number so what is being asked for can be read.
-///
-/// **The one easy to leave out is `AUTO_APPROVED`.** A household whose policy
-/// approves automatically never has a *pending* request, so a set built from
-/// `PENDING` alone tells that household nothing at the moment they asked — which is
-/// exactly the household that most expects the loop to close by itself.
-const RECEIVED: u32 = 2;
-const DECIDED_YES: u32 = 4;
-const ARRIVED: u32 = 8;
-const COULD_NOT: u32 = 16;
-const DECIDED_NO: u32 = 64;
-const APPROVED_BY_POLICY: u32 = 128;
+/// **The one easy to leave out is approval by policy.** A household whose policy
+/// approves automatically never has a *pending* request, so a set built from receipt
+/// alone tells that household nothing at the moment they asked — which is exactly the
+/// household that most expects the loop to close by itself.
+const OCCASION_BITS: [(Occasion, u32); 6] = [
+    (Occasion::Received, 2),
+    (Occasion::Approved, 4),
+    (Occasion::Arrived, 8),
+    (Occasion::Failed, 16),
+    (Occasion::Declined, 64),
+    (Occasion::ApprovedByPolicy, 128),
+];
 
-/// Everything the household is told about, taken together.
-pub const OCCASIONS: u32 =
-    RECEIVED | DECIDED_YES | ARRIVED | COULD_NOT | DECIDED_NO | APPROVED_BY_POLICY;
+/// What a bit field tells the household about.
+fn telling(enabled: bool, bits: u32) -> Telling {
+    let named = OCCASION_BITS.iter().fold(0, |field, (_, bit)| field | bit);
+    Telling {
+        enabled,
+        occasions: OCCASION_BITS
+            .iter()
+            .filter(|(_, bit)| bits & bit != 0)
+            .map(|&(occasion, _)| occasion)
+            .collect(),
+        others: bits & !named != 0,
+    }
+}
+
+/// The bit field a set of occasions is kept as.
+pub(crate) fn bits(occasions: &BTreeSet<Occasion>) -> u32 {
+    OCCASION_BITS
+        .iter()
+        .filter(|(occasion, _)| occasions.contains(occasion))
+        .fold(0, |field, (_, bit)| field | bit)
+}
 
 /// Where the one agent that needs no account of its own is configured.
 ///
@@ -270,23 +291,8 @@ impl Requests for Seerr {
         self.endpoint.expect_success(&response)
     }
 
-    async fn configure_identity(
-        &self,
-        username: &str,
-        password: &str,
-        server_url: &str,
-    ) -> Result<(), Failure> {
-        // Signing in creates the owner and sets the media server, but it does not finish
-        // setup — Seerr still reports itself uninitialised until told to.
-        self.signed_in_naming(username, password, server_url)
-            .await?;
-
-        // Finishing setup is the step that marks Seerr initialised.
-        let finished = self
-            .endpoint
-            .send(&self.request(Method::Post, "/settings/initialize", None))
-            .await?;
-        self.endpoint.expect_success(&finished)
+    async fn configure_identity(&self, source: &IdentitySource) -> Result<(), Failure> {
+        configure_identity(self, source).await
     }
 
     async fn requests(&self) -> Result<Vec<HouseholdRequest>, Failure> {
@@ -312,11 +318,11 @@ impl Requests for Seerr {
 
     async fn test_fulfilment_target(
         &self,
-        television: bool,
+        kind: Kind,
         at: &crate::ports::service::Endpoint,
         key: &str,
     ) -> Result<(), Failure> {
-        targets::test_fulfilment_target(self, television, at, key).await
+        targets::test_fulfilment_target(self, kind, at, key).await
     }
 
     async fn media_server_link(&self) -> Result<MediaServerLink, Failure> {
@@ -367,16 +373,13 @@ impl Requests for Seerr {
         let held: WebPush = self
             .endpoint
             .decode(&response, "what the household is told could not be read")?;
-        Ok(Telling {
-            enabled: held.enabled,
-            occasions: held.types,
-        })
+        Ok(telling(held.enabled, held.types))
     }
 
     async fn tell(&self, telling: &Telling) -> Result<(), Failure> {
         let body = serde_json::json!({
             "enabled": telling.enabled,
-            "types": telling.occasions,
+            "types": bits(&telling.occasions),
         })
         .to_string();
         let written = self
@@ -385,6 +388,30 @@ impl Requests for Seerr {
             .await?;
         self.endpoint.expect_success(&written)
     }
+}
+
+/// Sign the household in through `source`, and finish setting up.
+async fn configure_identity(seerr: &Seerr, source: &IdentitySource) -> Result<(), Failure> {
+    if source.protocol.0 != ApiKind::Jellyfin.name() {
+        return Err(seerr.endpoint.unsupported(&format!(
+            "it signs a household in through no identity source spoken to as `{}`",
+            source.protocol.0
+        )));
+    }
+    let Credential::UserPass { username, password } = &source.credential else {
+        return Err(seerr
+            .endpoint
+            .unsupported("it signs a household in by an administrator's name and password"));
+    };
+    seerr
+        .signed_in_naming(username, password, &source.at)
+        .await?;
+
+    let finished = seerr
+        .endpoint
+        .send(&seerr.request(Method::Post, "/settings/initialize", None))
+        .await?;
+    seerr.endpoint.expect_success(&finished)
 }
 
 async fn requests(seerr: &Seerr) -> Result<Vec<HouseholdRequest>, Failure> {
@@ -466,3 +493,6 @@ async fn requesting(seerr: &Seerr, media_server_id: &str) -> Result<Option<Reque
         approves_own: approves_own(held.permissions),
     }))
 }
+
+#[cfg(test)]
+mod tests;

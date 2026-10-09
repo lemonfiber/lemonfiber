@@ -23,16 +23,13 @@ use crate::audio::Format;
 use crate::config::{store, JELLYFIN_MODE_KEY};
 use crate::error::{Diagnose, Problem};
 use crate::model::{Disposition, MusicChoice, PresetChoice, QualityReport};
+use crate::ports::media::MUSIC;
 use crate::quality::{Preset, Selection};
 use crate::transcoding::{warn_before_confirming, Playback, Warning};
 use crate::wizard::Library;
 
 /// The scope a global choice is reported under, as opposed to a media type's name.
 const EVERYTHING: &str = "everything";
-
-/// The scope the music format is reported under — its own axis, not a resolution
-/// media type.
-const MUSIC: &str = "music";
 
 /// Show or change the quality preset.
 ///

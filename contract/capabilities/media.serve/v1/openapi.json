@@ -1,0 +1,146 @@
+{
+  "components": {
+    "responses": {
+      "Refused": {
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Refusal"
+            }
+          }
+        },
+        "description": "A refusal the contract declares."
+      }
+    },
+    "schemas": {
+      "Refusal": {
+        "$defs": {
+          "Kind": {
+            "description": "Why an adapter refused a call, as the contract declares it.",
+            "oneOf": [
+              {
+                "const": "unavailable",
+                "description": "The upstream did not answer.",
+                "type": "string"
+              },
+              {
+                "const": "unauthorised",
+                "description": "The upstream refused the credential the adapter holds for it.",
+                "type": "string"
+              },
+              {
+                "const": "refused",
+                "description": "The upstream answered in a way the adapter did not expect.",
+                "type": "string"
+              },
+              {
+                "const": "unsupported",
+                "description": "The upstream speaks a release the adapter does not support.",
+                "type": "string"
+              },
+              {
+                "const": "unknown-operation",
+                "description": "The operation is not one this adapter serves.",
+                "type": "string"
+              },
+              {
+                "const": "not-asked",
+                "description": "What was asked did not read as the operation's request.",
+                "type": "string"
+              }
+            ]
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A refusal, as a problem document.",
+        "properties": {
+          "detail": {
+            "description": "What the adapter said, for a person reading a log. Never decided on.",
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/$defs/Kind",
+            "description": "Which refusal it is."
+          }
+        },
+        "required": [
+          "type",
+          "detail"
+        ],
+        "title": "Refusal",
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "key": {
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "title": "media.serve contract",
+    "version": "1"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/lemonfiber/media.serve/v1/allow_only": {
+      "$ref": "operations/allow_only.json"
+    },
+    "/lemonfiber/media.serve/v1/allowed_origins": {
+      "$ref": "operations/allowed_origins.json"
+    },
+    "/lemonfiber/media.serve/v1/answers_to": {
+      "$ref": "operations/answers_to.json"
+    },
+    "/lemonfiber/media.serve/v1/dated": {
+      "$ref": "operations/dated.json"
+    },
+    "/lemonfiber/media.serve/v1/filed_as": {
+      "$ref": "operations/filed_as.json"
+    },
+    "/lemonfiber/media.serve/v1/has_item": {
+      "$ref": "operations/has_item.json"
+    },
+    "/lemonfiber/media.serve/v1/holdings": {
+      "$ref": "operations/holdings.json"
+    },
+    "/lemonfiber/media.serve/v1/known_proxies": {
+      "$ref": "operations/known_proxies.json"
+    },
+    "/lemonfiber/media.serve/v1/mint": {
+      "$ref": "operations/mint.json"
+    },
+    "/lemonfiber/media.serve/v1/part_way": {
+      "$ref": "operations/part_way.json"
+    },
+    "/lemonfiber/media.serve/v1/playing": {
+      "$ref": "operations/playing.json"
+    },
+    "/lemonfiber/media.serve/v1/progressed": {
+      "$ref": "operations/progressed.json"
+    },
+    "/lemonfiber/media.serve/v1/rescan": {
+      "$ref": "operations/rescan.json"
+    },
+    "/lemonfiber/media.serve/v1/restart": {
+      "$ref": "operations/restart.json"
+    },
+    "/lemonfiber/media.serve/v1/revoke": {
+      "$ref": "operations/revoke.json"
+    },
+    "/lemonfiber/media.serve/v1/sign_out": {
+      "$ref": "operations/sign_out.json"
+    },
+    "/lemonfiber/media.serve/v1/signed_in": {
+      "$ref": "operations/signed_in.json"
+    },
+    "/lemonfiber/media.serve/v1/title": {
+      "$ref": "operations/title.json"
+    },
+    "/lemonfiber/media.serve/v1/trust_only": {
+      "$ref": "operations/trust_only.json"
+    }
+  }
+}

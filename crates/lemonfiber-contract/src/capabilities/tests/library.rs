@@ -2,8 +2,6 @@
 //! against the same curator through the contract, which must answer alike and be told
 //! alike: a failure is named after the service the core called, as the core names it.
 
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use lemonfiber_ports::media::{Format, Kind};
 use lemonfiber_ports::service::{
@@ -14,7 +12,7 @@ use lemonfiber_ports::service::{
 };
 use lemonfiber_ports::Client;
 
-use super::{contracted, curate, Served, Upstream, SERVICE};
+use super::{crosses_alike, curate, json, Upstream, SERVICE};
 
 #[async_trait]
 impl Client for Upstream {
@@ -25,7 +23,7 @@ impl Client for Upstream {
         })
     }
     async fn register_download_client(&self, client: &DownloadClient) -> Result<(), Failure> {
-        self.tell(format!("register {client:?}"));
+        self.tell(format!("register {}", json(client)));
         Ok(())
     }
     async fn update_download_client(
@@ -33,7 +31,7 @@ impl Client for Upstream {
         id: &str,
         client: &DownloadClient,
     ) -> Result<(), Failure> {
-        self.tell(format!("update {id} {client:?}"));
+        self.tell(format!("update {id} {}", json(client)));
         Ok(())
     }
     async fn set_client_field(
@@ -210,7 +208,7 @@ where
         name: "fetcher".to_owned(),
         host: "fetcher".to_owned(),
         port: 6789,
-        protocol: Protocol("usenet".to_owned()),
+        protocol: Protocol("sabnzbd".to_owned()),
         credential: Credential::UserPass {
             username: "u".to_owned(),
             password: "p".to_owned(),
@@ -282,12 +280,27 @@ where
 
 #[tokio::test]
 async fn a_curator_answers_and_is_told_through_its_contract_as_it_is_in_process() {
-    let in_process = Upstream::default();
-    let local = script(&in_process).await;
-    let served = Served::default();
-    let reached = Arc::clone(&served.upstream);
-    let crossed = script(&curate::Adapter(contracted(served))).await;
-    assert_eq!(crossed, local);
-    assert_eq!(reached.told(), in_process.told());
-    assert_eq!(in_process.told().len(), 17);
+    crosses_alike!(
+        script,
+        curate::Adapter,
+        [
+            "register",
+            "update",
+            "set",
+            "set",
+            "folder",
+            "upgrades",
+            "hardlinks",
+            "carry",
+            "add",
+            "format",
+            "library",
+            "find",
+            "history",
+            "queued",
+            "parts",
+            "parts",
+            "stuck"
+        ]
+    );
 }

@@ -305,9 +305,6 @@ fn set_field(fields: &mut Vec<serde_json::Value>, field: &str, value: Option<&st
 }
 
 /// Register a download client, in the protocol it is reached in.
-///
-/// Beside the impl rather than inside it because it decides, and nothing inside an
-/// `#[async_trait]` body is attributed to a line in the coverage report.
 async fn register_download_client(
     servarr: &Servarr,
     client: &DownloadClient,
@@ -328,7 +325,7 @@ struct Filed {
     /// The settings schema its fields are read against.
     settings: &'static str,
     /// The word the app groups download clients by.
-    protocol: &'static str,
+    grouped_as: &'static str,
 }
 
 /// Every kind of download client a Servarr app files.
@@ -337,13 +334,13 @@ const FILED: [Filed; 2] = [
         spoken: ApiKind::Sabnzbd,
         implementation: "Sabnzbd",
         settings: "SabnzbdSettings",
-        protocol: "usenet",
+        grouped_as: "usenet",
     },
     Filed {
         spoken: ApiKind::Qbittorrent,
         implementation: "QBittorrent",
         settings: "QBittorrentSettings",
-        protocol: "torrent",
+        grouped_as: "torrent",
     },
 ];
 
@@ -381,7 +378,7 @@ fn download_client_body(
 
     let mut document = serde_json::json!({
         "enable": true,
-        "protocol": filed.protocol,
+        "protocol": filed.grouped_as,
         "name": client.name,
         "implementation": filed.implementation,
         "configContract": filed.settings,

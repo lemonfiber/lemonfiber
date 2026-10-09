@@ -1,0 +1,91 @@
+{
+  "post": {
+    "operationId": "release_requests",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$defs": {
+              "Holding": {
+                "additionalProperties": false,
+                "description": "What taking one member's asking away came to, kept only so it can be given back.\n\n**Opaque on purpose.** A request service tells several kinds of \"may ask\" apart — a\nplain one, one for each kind of thing, one for the higher quality — and this product\nhas no vocabulary for that set. Naming them here would be a second reading of somebody\nelse's permission model, able to disagree with the one that actually refuses a\nrequest; carrying the service's own answer back out unread cannot. So a member who\ncould only ask for one kind of thing is given that back rather than a plain grant this\nside decided was equivalent.\n\nWritten down between runs by whoever holds it, because what is taken while a disk is\nfull has to survive until there is room again.",
+                "properties": {
+                  "taken": {
+                    "description": "What was taken, in the service's own numbering.",
+                    "format": "uint64",
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "taken"
+                ],
+                "type": "object"
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "holding": {
+                "$ref": "#/$defs/Holding",
+                "description": "The port's `holding`."
+              },
+              "id": {
+                "description": "The port's `id`.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "holding"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "title": "null",
+              "type": "null"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ]
+  }
+}

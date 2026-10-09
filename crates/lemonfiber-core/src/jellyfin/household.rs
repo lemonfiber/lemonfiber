@@ -21,7 +21,7 @@ use super::{item_type, Jellyfin};
 use crate::ports::http::Method;
 use crate::ports::media::Kind;
 use crate::ports::service::{
-    Access, Allowed, Certificate, Failure, Held, Invited, Medium, Member, NamedLibrary, Playback,
+    Access, Allowed, Certificate, Failure, Invited, Item, Medium, Member, NamedLibrary, Playback,
     Session, Signed, Unrated,
 };
 
@@ -335,7 +335,7 @@ impl crate::ports::service::Household for Jellyfin {
             .collect())
     }
 
-    async fn quick_connect(&self) -> Result<bool, Failure> {
+    async fn signs_devices_in(&self) -> Result<bool, Failure> {
         let response = self
             .as_admin(Method::Get, "/QuickConnect/Enabled", None)
             .await?;
@@ -343,14 +343,6 @@ impl crate::ports::service::Household for Jellyfin {
             &response,
             "the media server would not say whether it signs devices in by code",
         )
-    }
-
-    async fn holdings(&self, member: Option<&str>, most: u32) -> Result<Vec<Held>, Failure> {
-        shelf::holdings(self, member, most).await
-    }
-
-    async fn playing(&self, member: Option<&str>) -> Result<Vec<Playback>, Failure> {
-        playing::playing(self, member).await
     }
 
     async fn libraries(&self) -> Result<Vec<NamedLibrary>, Failure> {
@@ -490,4 +482,21 @@ struct SignedIn {
 struct SignedInUser {
     #[serde(rename = "Id", default)]
     id: String,
+}
+
+/// What `member` may watch, at most `most` of it, as the server answers it for them.
+pub(super) async fn holdings(
+    jellyfin: &Jellyfin,
+    member: Option<&str>,
+    most: u32,
+) -> Result<Vec<Item>, Failure> {
+    shelf::holdings(jellyfin, member, most).await
+}
+
+/// What the server is playing now, for `member` or for everybody.
+pub(super) async fn now_playing(
+    jellyfin: &Jellyfin,
+    member: Option<&str>,
+) -> Result<Vec<Playback>, Failure> {
+    playing::playing(jellyfin, member).await
 }

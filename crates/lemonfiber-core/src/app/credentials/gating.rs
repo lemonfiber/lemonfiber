@@ -21,8 +21,9 @@ use super::rotating::{said, unproven, would_rotate};
 use crate::app::gating;
 use crate::app::targets::MediaServer;
 use crate::app::Ctx;
+use crate::app_keys::GATE_APP;
 use crate::credential::{fingerprint, Held, Origin, Propagation, Reach, Rotation, State};
-use crate::jellyfin::GATE_APP;
+use crate::ports::service::AppKeys as _;
 
 /// What the key is recorded as: where it lives inside the stack's configuration.
 pub(super) const SETTING: &str = "request-gate/upstreams.json#jellyfin";
