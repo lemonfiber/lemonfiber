@@ -189,15 +189,31 @@ fn fillers_beside(
     installed: &[crate::plugin::Installed],
     project: &std::path::Path,
 ) -> crate::wiring::Fillers {
+    fillers_trusting(
+        services,
+        installed,
+        project,
+        crate::plugin::first_party::EMBEDDED,
+    )
+}
+
+/// The same, with `trusted` as the plugins that are first-party.
+fn fillers_trusting(
+    services: Vec<lemonfiber_manifest::Service>,
+    installed: &[crate::plugin::Installed],
+    project: &std::path::Path,
+    trusted: &[crate::plugin::first_party::FirstParty],
+) -> crate::wiring::Fillers {
     crate::test_support::stack()
         .manifest()
         .map(|mut manifest| {
             manifest.services = services;
-            crate::wiring::Fillers::of(
+            crate::wiring::Fillers::trusting(
                 &manifest,
                 installed,
                 &crate::wiring::Chosen::default(),
                 Some(project),
+                trusted,
             )
         })
         .unwrap_or_default()

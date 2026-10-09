@@ -379,8 +379,8 @@ fn a_plugin_asker_is_connected_to_nothing() {
     assert_eq!(said.len(), made.len(), "{said:?}");
     assert!(said.contains(
         &"Sonarr fills library.curate, which prowlarr the stand-in asks for, and prowlarr the \
-          stand-in is a plugin's service, which lemonfiber never hands another service's \
-          credential"
+          stand-in is a third-party plugin's service, which lemonfiber never hands another \
+          service's credential"
             .to_owned()
     ));
 }

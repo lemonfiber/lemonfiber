@@ -94,7 +94,7 @@ async fn app_sync_never_registers_a_plugin_curator() {
         matches!(said.as_slice(), [wiring]
             if wiring.connection == "kept the stand-in into prowlarr the app"
                 && matches!(&wiring.state, crate::seed::State::Unmatched { reason }
-                    if reason.contains("is a plugin's service"))),
+                    if reason.contains("is a third-party plugin's service"))),
         "{said:?}"
     );
 }

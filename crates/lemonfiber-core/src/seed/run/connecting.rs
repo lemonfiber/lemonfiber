@@ -14,6 +14,7 @@
 //! here fills what was asked for, and an operator reading a report that left it out
 //! could not tell a filler nothing reaches from one lemonfiber forgot.
 
+use lemonfiber_contract::capabilities::subtitles::fetch;
 use lemonfiber_manifest::ApiKind;
 
 use crate::ports::media::Kind;
@@ -46,6 +47,27 @@ pub(super) const MUSIC: &str = ApplicationKind::Music.media_type();
 /// An ask for anything else is connected where it always was, by the pass that wires
 /// it, and is not reported here as reached by nothing.
 const ANSWERED: [&str; 4] = [USENET, TORRENT, CURATES, SEARCHES];
+
+/// Every contract an asker is paired by, as capability and major.
+const CONTRACTED: [(&str, u32); 1] = [(fetch::CAPABILITY, fetch::MAJOR)];
+
+/// An asker, as the table pairs it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Asking {
+    /// A service this build holds an adapter for, of this kind.
+    Bundled(ApiKind),
+    /// A service speaking this capability's contract.
+    Over(&'static str),
+}
+
+/// The asker as the table pairs it: by a contract it speaks before the adapter it names.
+fn asking(asker: &Filler) -> Option<Asking> {
+    CONTRACTED
+        .iter()
+        .find(|(capability, major)| asker.contracted(capability, *major))
+        .map(|(capability, _)| Asking::Over(capability))
+        .or_else(|| asker.adapter.as_ref().map(|api| Asking::Bundled(api.kind)))
+}
 
 /// What one asker and one filler come to.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -129,34 +151,40 @@ pub(super) struct Pairing<'a> {
     pub(super) made: Result<(Connection, &'a Address, Cleared<'a>), Unmade>,
 }
 
-/// The connection the table holds for an asker speaking `asker`, asking for
-/// `capability`, of a filler speaking `filler`.
+/// The connection the table holds for `asker`, asking for `capability`, of a filler
+/// speaking `filler`.
 ///
 /// A curator comes to whatever its media makes it in the asker, through the same
 /// mapping each asker's own pass uses.
 fn connection(
-    asker: ApiKind,
+    asker: Asking,
     capability: &str,
     filler: ApiKind,
     media: &[String],
 ) -> Result<Connection, Unmade> {
     match (asker, capability, filler) {
-        (ApiKind::Servarr, USENET, ApiKind::Sabnzbd)
-        | (ApiKind::Servarr, TORRENT, ApiKind::Qbittorrent) => Ok(Connection::DownloadClient(
-            Protocol(filler.name().to_owned()),
-        )),
-        (ApiKind::Servarr, CURATES, ApiKind::Servarr) => {
+        (Asking::Bundled(ApiKind::Servarr), USENET, ApiKind::Sabnzbd)
+        | (Asking::Bundled(ApiKind::Servarr), TORRENT, ApiKind::Qbittorrent) => Ok(
+            Connection::DownloadClient(Protocol(filler.name().to_owned())),
+        ),
+        (Asking::Bundled(ApiKind::Servarr), CURATES, ApiKind::Servarr) => {
             super::applications::application_kind(media)
                 .map(Connection::Application)
                 .ok_or(Unmade::Files)
         }
-        (ApiKind::Seerr, CURATES, ApiKind::Servarr) => Kind::of_declared(media)
+        (Asking::Bundled(ApiKind::Seerr), CURATES, ApiKind::Servarr) => Kind::of_declared(media)
             .map(|kind| Connection::Fulfilment { kind })
             .ok_or(Unmade::Files),
-        (ApiKind::Bazarr, CURATES, ApiKind::Servarr) => Kind::of_declared(media)
+        (
+            Asking::Bundled(ApiKind::Bazarr) | Asking::Over(fetch::CAPABILITY),
+            CURATES,
+            ApiKind::Servarr,
+        ) => Kind::of_declared(media)
             .map(Connection::Subtitles)
             .ok_or(Unmade::Files),
-        (ApiKind::Bindery, SEARCHES, ApiKind::Servarr) => Ok(Connection::Aggregator),
+        (Asking::Bundled(ApiKind::Bindery), SEARCHES, ApiKind::Servarr) => {
+            Ok(Connection::Aggregator)
+        }
         _ => Err(Unmade::Unpaired),
     }
 }
@@ -200,7 +228,7 @@ fn made<'a>(
     }
     let speaks = filler.adapter.as_ref().ok_or(Unmade::NoAdapter)?.kind;
     let at = filler.address.as_ref().ok_or(Unmade::NoPort)?;
-    let asks = asker.adapter.as_ref().ok_or(Unmade::Unpaired)?.kind;
+    let asks = asking(asker).ok_or(Unmade::Unpaired)?;
     let made = connection(asks, &ask.capability, speaks, &filler.media_types)?;
     if made.hands_over_the_askers_key() && !crate::wiring::crosses(asker.holder(), filler.holder())
     {
@@ -263,13 +291,13 @@ fn reason(pairing: &Pairing<'_>, why: Unmade) -> String {
             pairing.filler.media_types.join(" and ")
         ),
         Unmade::Withheld => format!(
-            "{fills} and is a plugin's service; {asker} hands every service it registers its \
-             own API key, which opens every indexer it holds, so lemonfiber does not register a \
-             plugin's service in it"
+            "{fills} and is a third-party plugin's service; {asker} hands every service it \
+             registers its own API key, which opens every indexer it holds, so lemonfiber does \
+             not register a third-party plugin's service in it"
         ),
         Unmade::Asked => format!(
-            "{fills} and {asker} is a plugin's service, which lemonfiber never hands another \
-             service's credential"
+            "{fills} and {asker} is a third-party plugin's service, which lemonfiber never \
+             hands another service's credential"
         ),
     }
 }

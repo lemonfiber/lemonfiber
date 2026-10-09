@@ -44,7 +44,7 @@ pub(crate) fn unsupported_here(
 }
 
 pub(crate) use downloads::*;
-pub(crate) use filled::{identity, media, serving, Media};
+pub(crate) use filled::{identity, media, serving, spoken, Media, Spoken};
 pub(crate) use layout::*;
 pub(crate) use media::*;
 pub(crate) use opening::*;
