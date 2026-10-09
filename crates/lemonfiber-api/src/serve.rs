@@ -43,7 +43,7 @@ pub fn admitted(known: bool, headers: &HeaderMap, at: &Binding) -> Result<(), Re
 }
 
 /// What an envelope is served as.
-pub(crate) const JSON: &str = "application/json";
+pub(crate) use lemonfiber_core::ports::http::JSON;
 
 /// What a stream a client holds open is served as.
 pub(crate) const STREAM: &str = "text/event-stream";

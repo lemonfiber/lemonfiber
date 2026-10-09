@@ -1,0 +1,134 @@
+{
+  "post": {
+    "operationId": "transfers",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$defs": {
+                "Download": {
+                  "additionalProperties": false,
+                  "description": "One active download a client is working, normalised to what the dashboard\nshows — the point at which each client's own idea of progress becomes the\nsame three figures.\n\nThe protocol is not carried here: it is intrinsic to which client answered —\na torrent from qBittorrent, a Usenet download from `SABnzbd` — so the gatherer\nsets it from the target it asked rather than trusting each client to name it.",
+                  "properties": {
+                    "eta": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/Duration"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The time left, or `None` where the client gives none because it is stalled\nor cannot estimate one."
+                    },
+                    "name": {
+                      "description": "What is being downloaded.",
+                      "type": "string"
+                    },
+                    "progress": {
+                      "description": "How far along, from zero to a hundred.",
+                      "format": "uint8",
+                      "maximum": 255,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "remaining": {
+                      "description": "The bytes still to be written to disk for this download, or `None` where the\nclient reports no figure — kept apart from a reported zero, which is a\ndownload already complete rather than one whose size is unknown. Summed\nacross a stack's clients, this is the committed content the free-space\nprojection weighs against what the volume has left.",
+                      "format": "uint64",
+                      "minimum": 0,
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "speed": {
+                      "description": "The current speed in bytes per second, or `None` where the client reported\nnone — kept apart from a reported zero, which is a download that is stalled\nrather than one whose speed is unknown.",
+                      "format": "uint64",
+                      "minimum": 0,
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "progress"
+                  ],
+                  "type": "object"
+                },
+                "Duration": {
+                  "properties": {
+                    "nanos": {
+                      "format": "uint32",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "secs": {
+                      "format": "uint64",
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "secs",
+                    "nanos"
+                  ],
+                  "type": "object"
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "items": {
+                "$ref": "#/$defs/Download"
+              },
+              "title": "Array_of_Download",
+              "type": "array"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ]
+  }
+}

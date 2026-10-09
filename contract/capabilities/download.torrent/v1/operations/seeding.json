@@ -1,0 +1,92 @@
+{
+  "post": {
+    "operationId": "seeding",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$defs": {
+                "Seeded": {
+                  "additionalProperties": false,
+                  "description": "One completed download the client is still holding.\n\nThe three things a decision about reclaiming it turns on and nothing else: what\nit is called, so it can be matched to what is on disk and to what a service is\nwaiting for; what it occupies; and what standing removing it would cost. A\nclient with no notion of ratio — Usenet has none to have — has nothing to\nanswer here, which is why this is a port of its own rather than another method\nevery download client would have to pretend to implement.",
+                  "properties": {
+                    "bytes": {
+                      "description": "What it occupies, as the client reports its size.",
+                      "format": "uint64",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "name": {
+                      "description": "What the client calls it, which is what both sides call it.",
+                      "type": "string"
+                    },
+                    "ratio": {
+                      "description": "What it has uploaded against what it downloaded, in hundredths.\n\nWhole hundredths rather than a fraction, because what is done with this is\nshown to a person and compared for equality between two runs, and a\nfraction cannot be compared for equality. No decision made on a ratio is\nfiner than a hundredth.",
+                      "format": "uint32",
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "bytes",
+                    "ratio"
+                  ],
+                  "type": "object"
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "items": {
+                "$ref": "#/$defs/Seeded"
+              },
+              "title": "Array_of_Seeded",
+              "type": "array"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ]
+  }
+}

@@ -120,6 +120,12 @@ fmt:
 contract:
     cargo run --quiet --example contract -p lemonfiber-api
 
+# Rewrite the capability contracts under `contract/capabilities/`: an OpenAPI document and
+# a conformance list per capability and major, and their index, all generated from the
+# declarations in `lemonfiber-contract`.
+capability-contracts:
+    cargo run --quiet --example contracts -p lemonfiber-contract
+
 # Rewrite the stable surface the contract is held to between releases: the
 # `contract/web-api-surface/` directory, an index beside one file per type.
 #

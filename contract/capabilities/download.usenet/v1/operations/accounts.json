@@ -1,0 +1,206 @@
+{
+  "post": {
+    "operationId": "accounts",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$defs": {
+                "Date": {
+                  "format": "date",
+                  "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+                  "type": "string"
+                },
+                "Recorded": {
+                  "additionalProperties": false,
+                  "description": "An allowance recorded against an account, and the point it counts from.\n\nThe two travel together because neither means anything alone: a client measures\neverything an account has ever pulled, so a block bought halfway through its life\nis only readable against what had already gone when it was recorded.",
+                  "properties": {
+                    "cap": {
+                      "description": "The allowance itself, in bytes.",
+                      "format": "uint64",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "from": {
+                      "description": "What the client had already pulled from the account when it was recorded.",
+                      "format": "uint64",
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "cap",
+                    "from"
+                  ],
+                  "type": "object"
+                },
+                "Standing": {
+                  "additionalProperties": false,
+                  "description": "What the client's last exchange with an account showed.\n\nIts records say what an account has pulled; this says what happened when the client\nlast actually spoke to it, which no total can show — a hundred gigabytes pulled last\nweek is no evidence the account answers this morning. So the two are kept apart, and\nonly this half is a reply from the provider.",
+                  "properties": {
+                    "configured": {
+                      "description": "How many connections the client is set to open to it.",
+                      "format": "uint64",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "ready": {
+                      "description": "Connections the client has open and ready to it.\n\nThe one proof of a working account there is: a connection is ready only once the\nprovider has taken the credential on it, which no record of past bytes can show.",
+                      "format": "uint64",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "serving": {
+                      "description": "Whether the client still has it in rotation.\n\nThe difference between an account nobody is downloading through and one that has\nstopped answering, which no other figure here can tell apart: an idle client holds\nno connections to a perfectly good account. A client drops an account it cannot\nuse and picks it up again itself once it works, so being out of rotation is the\nclient's own current verdict rather than a memory of an old failure.",
+                      "type": "boolean"
+                    },
+                    "trouble": {
+                      "description": "The last trouble the client recorded against it, in the words it recorded.\n\nKept verbatim, the provider's own message and all: what those words amount to is\na judgment, and a mapping is not where judgments belong.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ready",
+                    "configured",
+                    "serving"
+                  ],
+                  "type": "object"
+                },
+                "UsenetAccount": {
+                  "additionalProperties": false,
+                  "description": "One Usenet account as its download client holds it.",
+                  "properties": {
+                    "daily": {
+                      "description": "What it pulled on each day the client still holds a figure for.\n\nPer day rather than a client's own week or month total, because those reset on\nthe calendar: read on a Monday morning, \"this week\" is an hour of downloading\nand projecting a block account from it would promise years it does not have.",
+                      "items": {
+                        "maxItems": 2,
+                        "minItems": 2,
+                        "prefixItems": [
+                          {
+                            "$ref": "#/$defs/Date"
+                          },
+                          {
+                            "format": "uint64",
+                            "minimum": 0,
+                            "type": "integer"
+                          }
+                        ],
+                        "type": "array"
+                      },
+                      "type": "array"
+                    },
+                    "downloaded": {
+                      "description": "Everything the client has ever pulled from it.",
+                      "format": "uint64",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "enabled": {
+                      "description": "Whether the client is using it at all — a disabled account downloads nothing,\nso nothing about its capacity is a fault.",
+                      "type": "boolean"
+                    },
+                    "expires_on": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/Date"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The day the subscription behind it ends, where the operator recorded one."
+                    },
+                    "name": {
+                      "description": "What the operator calls it.",
+                      "type": "string"
+                    },
+                    "quota": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/Recorded"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The allowance recorded against it, where the operator recorded one."
+                    },
+                    "standing": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/Standing"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "What the client's last exchange with it showed, where it has one to report. An\naccount the client is not set to use has none: nothing has been asked of it."
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "enabled",
+                    "downloaded",
+                    "daily"
+                  ],
+                  "type": "object"
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "items": {
+                "$ref": "#/$defs/UsenetAccount"
+              },
+              "title": "Array_of_UsenetAccount",
+              "type": "array"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ]
+  }
+}

@@ -1,0 +1,114 @@
+{
+  "capabilities": [
+    {
+      "capability": "download.usenet",
+      "conformance": "download.usenet/v1/conformance.json",
+      "files": [
+        {
+          "path": "download.usenet/v1/openapi.json",
+          "sha256": "62c10343b46b32a944b6168ef85512c9de58c877109c0155962b8afb16ff2c40"
+        },
+        {
+          "path": "download.usenet/v1/operations/transfers.json",
+          "sha256": "44e260a71946f803ec9eac42aea5c55910988c426b8e27975188fb94492f78ff"
+        },
+        {
+          "path": "download.usenet/v1/operations/pulling.json",
+          "sha256": "c1f71a19538494cd4bdb5c4bd39cf3f5f819756a448db39645ef20dd75429fd8"
+        },
+        {
+          "path": "download.usenet/v1/operations/stop.json",
+          "sha256": "19f8e62d8e15d1eab43630b47b45033425ee864b7436071cfb2b5f5f780e6c5b"
+        },
+        {
+          "path": "download.usenet/v1/operations/resume.json",
+          "sha256": "9485a433eb3646272501f652dc8c8ae3984d249b20555dd560da5dac43c9d34f"
+        },
+        {
+          "path": "download.usenet/v1/operations/throttled.json",
+          "sha256": "49fde6c11d76708ec9dd97939ea2a2d186428be130b5145cc11b61315de6e25b"
+        },
+        {
+          "path": "download.usenet/v1/operations/restrain.json",
+          "sha256": "a919ee26f7cbf34935fc977ac3f1160bb866f40449ccc110fe2a1dd22ea4f680"
+        },
+        {
+          "path": "download.usenet/v1/operations/moving.json",
+          "sha256": "8d8a111be6acced2e4915e9313a26a32dd26b3d0fddcd0d4441aed8c4637e1fd"
+        },
+        {
+          "path": "download.usenet/v1/operations/moved.json",
+          "sha256": "729ebcf38a7cf5612d9c22e773a767f0f7ec0d272e92d162697d8fea17300917"
+        },
+        {
+          "path": "download.usenet/v1/operations/accounts.json",
+          "sha256": "b4c726454e78ffad189ad05b55c1cda9613811ee26117c55638430d48da7a5f1"
+        },
+        {
+          "path": "download.usenet/v1/conformance.json",
+          "sha256": "b75ceae763d007f0104283937810b76a1bc5d2ad10316c0c3abcab6d6d6d01be"
+        }
+      ],
+      "majors": [
+        1
+      ],
+      "openapi": "download.usenet/v1/openapi.json",
+      "operations": 9
+    },
+    {
+      "capability": "download.torrent",
+      "conformance": "download.torrent/v1/conformance.json",
+      "files": [
+        {
+          "path": "download.torrent/v1/openapi.json",
+          "sha256": "ba7ed6e6dc4cadddc94ced13e6047ca4964de1d55d1024c3b09fb9e21e8e170a"
+        },
+        {
+          "path": "download.torrent/v1/operations/transfers.json",
+          "sha256": "44e260a71946f803ec9eac42aea5c55910988c426b8e27975188fb94492f78ff"
+        },
+        {
+          "path": "download.torrent/v1/operations/pulling.json",
+          "sha256": "c1f71a19538494cd4bdb5c4bd39cf3f5f819756a448db39645ef20dd75429fd8"
+        },
+        {
+          "path": "download.torrent/v1/operations/stop.json",
+          "sha256": "19f8e62d8e15d1eab43630b47b45033425ee864b7436071cfb2b5f5f780e6c5b"
+        },
+        {
+          "path": "download.torrent/v1/operations/resume.json",
+          "sha256": "9485a433eb3646272501f652dc8c8ae3984d249b20555dd560da5dac43c9d34f"
+        },
+        {
+          "path": "download.torrent/v1/operations/throttled.json",
+          "sha256": "49fde6c11d76708ec9dd97939ea2a2d186428be130b5145cc11b61315de6e25b"
+        },
+        {
+          "path": "download.torrent/v1/operations/restrain.json",
+          "sha256": "a919ee26f7cbf34935fc977ac3f1160bb866f40449ccc110fe2a1dd22ea4f680"
+        },
+        {
+          "path": "download.torrent/v1/operations/moving.json",
+          "sha256": "8d8a111be6acced2e4915e9313a26a32dd26b3d0fddcd0d4441aed8c4637e1fd"
+        },
+        {
+          "path": "download.torrent/v1/operations/moved.json",
+          "sha256": "729ebcf38a7cf5612d9c22e773a767f0f7ec0d272e92d162697d8fea17300917"
+        },
+        {
+          "path": "download.torrent/v1/operations/seeding.json",
+          "sha256": "0897ae0d3dc07081d4b0a3f3cae26beb8668653d683e2d8c956f7426431b2170"
+        },
+        {
+          "path": "download.torrent/v1/conformance.json",
+          "sha256": "07141ab5f748ef48019ed02fd4f66b302e7f988621c18cbcf498eb0804c1ac4a"
+        }
+      ],
+      "majors": [
+        1
+      ],
+      "openapi": "download.torrent/v1/openapi.json",
+      "operations": 9
+    }
+  ]
+}

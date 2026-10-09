@@ -17,6 +17,42 @@ pub struct Date {
     pub day: u8,
 }
 
+/// Written as `YYYY-MM-DD`, the one shape [`Date::parse`] reads.
+impl std::fmt::Display for Date {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:04}-{:02}-{:02}", self.year, self.month, self.day)
+    }
+}
+
+/// Crosses as the same `YYYY-MM-DD` string it is written as.
+impl serde::Serialize for Date {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_str(self)
+    }
+}
+
+/// Read only in the one shape it is written in.
+impl<'de> serde::Deserialize<'de> for Date {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let text = <std::borrow::Cow<'de, str>>::deserialize(deserializer)?;
+        Self::parse(&text).ok_or_else(|| serde::de::Error::custom("not a YYYY-MM-DD date"))
+    }
+}
+
+impl schemars::JsonSchema for Date {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "Date".into()
+    }
+
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({
+            "type": "string",
+            "format": "date",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        })
+    }
+}
+
 impl Date {
     /// Read a `YYYY-MM-DD` date, rejecting anything else.
     ///

@@ -1,0 +1,71 @@
+{
+  "post": {
+    "operationId": "resume",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "description": "Whether a download client is fetching at all.",
+              "oneOf": [
+                {
+                  "const": "fetching",
+                  "description": "It is fetching, or would start on the next thing handed to it.",
+                  "type": "string"
+                },
+                {
+                  "const": "stopped",
+                  "description": "Nothing is moving and nothing new would start.",
+                  "type": "string"
+                }
+              ],
+              "title": "Pulling"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ]
+  }
+}

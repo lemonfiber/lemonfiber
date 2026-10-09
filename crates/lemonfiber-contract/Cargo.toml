@@ -1,0 +1,28 @@
+[package]
+name = "lemonfiber-contract"
+description = "What the core asks of whatever fills a capability, and how an adapter answers."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+authors.workspace = true
+license-file = "../../LICENSE"
+# Not published: the plugin repositories pin it by commit until packages are, and the
+# release ships one binary.
+publish = false
+
+[dependencies]
+lemonfiber-ports = { workspace = true }
+async-trait = { workspace = true }
+ring = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["time"] }
+
+[dev-dependencies]
+lemonfiber-fixtures = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt"] }
+
+[lints]
+workspace = true

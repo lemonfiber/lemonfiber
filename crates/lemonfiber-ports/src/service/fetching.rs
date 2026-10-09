@@ -23,7 +23,10 @@ use async_trait::async_trait;
 use super::Failure;
 
 /// Whether a download client is fetching at all.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
 pub enum Pulling {
     /// It is fetching, or would start on the next thing handed to it.
     Fetching,
