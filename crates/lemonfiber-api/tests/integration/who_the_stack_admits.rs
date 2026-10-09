@@ -11,12 +11,6 @@ use crate::door;
 use door::*;
 use lemonfiber_fixtures::http::Answer as Reply;
 
-/// What the media server answers a name and password it recognises with.
-const SIGNED_IN: &str = r#"{"AccessToken":"a-session","User":{"Id":"a7f3"}}"#;
-
-/// What it answers when asked whether that member's account still stands.
-const STANDING: &str = r#"{"Id":"a7f3","HasPassword":true}"#;
-
 /// A media server that recognises the member, and says their account stands.
 fn recognising() -> Arc<Fake> {
     Fake::by_path(vec![

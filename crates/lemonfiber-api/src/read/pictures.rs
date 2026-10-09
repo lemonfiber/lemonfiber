@@ -10,7 +10,7 @@ use axum::http::{header, HeaderValue, StatusCode};
 use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
-use lemonfiber_core::app::{Command, Viewing};
+use lemonfiber_core::app::{Command, Viewing, Whom};
 use lemonfiber_core::ports::service::Picture;
 use lemonfiber_core::screening::{picture, spoke, Pictured};
 
@@ -51,23 +51,9 @@ async fn pictured(
         Picture::Poster => POSTER,
         Picture::Backdrop => BACKDROP,
     };
-    let given = match wanted(read, query.as_deref()) {
-        Ok(given) => given,
-        Err(problem) => return went_wrong(&problem),
-    };
-    let asked = Wanted {
-        title: Some(id),
-        ..given
-    };
-    let command = match named(TITLE, asked) {
-        Ok(command) => command,
-        Err(why) => return why.answered(),
-    };
-    let granted = may(&caller, Door::Reading, command).granted();
-    let Ok(Command::Viewing(Viewing::Title { member, id })) = granted else {
-        return granted
-            .err()
-            .map_or_else(|| Refusal::NoSuchRead.answered(), |refused| *refused);
+    let (member, id) = match asked_for(&caller, read, id, query.as_deref()) {
+        Ok(asked) => asked,
+        Err(refused) => return *refused,
     };
     if let Some(asker) = caller.member() {
         spoke(&serving.ctx, asker);
@@ -75,6 +61,33 @@ async fn pictured(
     match picture(&serving.ctx, &member, &id, which).await {
         Ok(pictured) => shown(pictured),
         Err(problem) => went_wrong(&problem),
+    }
+}
+
+/// Whose shelf and which title a picture read asks for, ruled on as the title read is,
+/// or what the caller is answered with instead.
+fn asked_for(
+    caller: &Caller,
+    read: &str,
+    id: String,
+    query: Option<&str>,
+) -> Result<(Whom, String), Box<Response>> {
+    let given = wanted(read, query).map_err(|problem| Box::new(went_wrong(&problem)))?;
+    let asked = Wanted {
+        title: Some(id),
+        ..given
+    };
+    let command = named(TITLE, asked).map_err(|why| Box::new(why.answered()))?;
+    titled(may(caller, Door::Reading, command).granted())
+}
+
+/// Whose shelf and which title a granted title read names, or what the caller is
+/// answered with where the ruling granted no title read.
+fn titled(granted: Result<Command, Box<Response>>) -> Result<(Whom, String), Box<Response>> {
+    match granted {
+        Ok(Command::Viewing(Viewing::Title { member, id })) => Ok((member, id)),
+        Ok(_) => Err(Box::new(Refusal::NoSuchRead.answered())),
+        Err(refused) => Err(refused),
     }
 }
 

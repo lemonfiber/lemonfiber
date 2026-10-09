@@ -740,3 +740,27 @@ async fn a_picture_the_server_will_not_answer_is_unanswered_and_a_bad_id_is_neve
     );
     assert!(transport.requests().is_empty());
 }
+
+#[tokio::test]
+async fn the_households_defaults_are_shown_a_picture_without_naming_a_member() {
+    let transport = server(vec![
+        ("/Images/", Answer::served(200, "image/png", "the-poster")),
+        ("/Items/", Answer::reply(200, ON_THE_SHELF)),
+    ]);
+    let ctx = ctx_over(Arc::clone(&transport), "picture-defaults");
+    let shown = picture(&ctx, &Whom::Defaults, FILM, Picture::Poster).await;
+    assert_eq!(
+        shown.ok(),
+        Some(Pictured {
+            media_type: "image/png",
+            bytes: b"the-poster".to_vec(),
+        })
+    );
+    assert_eq!(
+        asked(&transport),
+        vec![
+            (Method::Get, format!("/Items/{FILM}")),
+            (Method::Get, format!("/Items/{FILM}/Images/Primary")),
+        ]
+    );
+}

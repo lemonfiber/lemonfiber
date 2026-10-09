@@ -534,6 +534,16 @@ pub(crate) fn door_with(
     (router, token, admitting)
 }
 
+/// What the stack's media server answers a name and password it recognises with.
+pub(crate) const SIGNED_IN: &str = r#"{"AccessToken":"a-session","User":{"Id":"a7f3"}}"#;
+
+/// What it answers when asked whether that member's account still stands.
+pub(crate) const STANDING: &str = r#"{"Id":"a7f3","HasPassword":true}"#;
+
+/// The household it holds: Ana, and nobody else.
+pub(crate) const HOUSEHOLD: &str = r#"[{"Id":"a7f3","Name":"ana","HasPassword":true,
+    "Policy":{"IsAdministrator":false,"EnableAllFolders":true}}]"#;
+
 /// The world a stack runs in: the repository's stack, whose media server answers
 /// through `transport`, with an env file of the test's own.
 pub(crate) fn a_stack(named: &str, transport: Arc<Fake>) -> Ctx {
