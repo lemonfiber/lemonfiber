@@ -16,12 +16,12 @@
 //! invitation that chose nothing grants, read about no account, so the operator can see
 //! the member's side without reading any member's.
 
-use super::targets::jellyfin_reader;
+use super::targets::media;
 use super::{Ctx, Whom};
 
 use crate::error::{Diagnose, Problem};
 use crate::model::HeldReport;
-use crate::ports::service::{Failure, Household as _, Item, Member, Screening as _};
+use crate::ports::service::{Failure, Item, Member};
 use crate::screening::door::{located, Door};
 
 /// Read what one member holds, or what the household's defaults would.
@@ -37,7 +37,7 @@ pub(crate) async fn held(ctx: &Ctx, whose: &Whom, most: u32) -> Result<HeldRepor
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
 
-    let Some(server) = jellyfin_reader(ctx, &manifest) else {
+    let Some(server) = media(ctx, &manifest).await else {
         return Ok(unread(
             whose,
             "there is no media server to ask what the household holds, or no recorded \
@@ -48,14 +48,14 @@ pub(crate) async fn held(ctx: &Ctx, whose: &Whom, most: u32) -> Result<HeldRepor
     let door = crate::screening::door::standing(ctx).await;
     let Whom::Named(member) = whose else {
         return Ok(shelved(
-            server.holdings(None, most).await,
+            server.serve.holdings(None, most).await,
             String::new(),
             String::new(),
             &door,
         ));
     };
 
-    let Ok(accounts) = server.household().await else {
+    let Ok(accounts) = server.identity.household().await else {
         return Ok(unread(
             whose,
             "the media server would not say who holds an account, so who this shelf \
@@ -72,7 +72,7 @@ pub(crate) async fn held(ctx: &Ctx, whose: &Whom, most: u32) -> Result<HeldRepor
     };
 
     Ok(shelved(
-        server.holdings(Some(&account.id), most).await,
+        server.serve.holdings(Some(&account.id), most).await,
         account.name.clone(),
         account.id.clone(),
         &door,

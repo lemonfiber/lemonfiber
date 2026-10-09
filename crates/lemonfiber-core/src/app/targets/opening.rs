@@ -19,25 +19,6 @@ use super::downloads::{download_targets, DownloadKind};
 use super::layout::{project_directory, read_owned, service_config_dir};
 use super::servarr::{servarr_targets, target_for};
 
-/// The household's media server as a reading client, for the last stage of a trace —
-/// whether the item is finally in the library — and every read of who the household is.
-/// Present only where something fills the identity source and lemonfiber recorded the
-/// administrator's password it minted for that server: the read signs in with the
-/// household's own credential, so without it there is nothing to sign in as.
-///
-/// A trace treats its absence as one more thing it cannot tell rather than a fault, so
-/// either gap simply leaves the availability question unanswered.
-pub(crate) fn jellyfin_reader(
-    ctx: &Ctx,
-    manifest: &lemonfiber_manifest::Manifest,
-) -> Option<Jellyfin> {
-    Some(
-        super::media::hosted(ctx, manifest)?
-            .administered(ctx)?
-            .remembering(std::sync::Arc::clone(&ctx.sessions)),
-    )
-}
-
 /// The stack's own Jellyfin as a reading client signed in as its administrator: the
 /// server the decline service acts on, which it names rather than asking for whatever
 /// serves identity. Nothing where the stack has none or lemonfiber holds no password

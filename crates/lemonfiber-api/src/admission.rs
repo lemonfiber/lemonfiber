@@ -108,9 +108,10 @@ pub struct Admitting {
 /// Asked on every sign-in and every member's call rather than once at start, the
 /// way the operator's credential is read: a stack seeded while this surface was
 /// already serving has a household from that moment on.
+#[async_trait::async_trait]
 pub trait HouseholdAtHand: Send + Sync {
     /// The household as it stands now, or nothing where there is none to ask.
-    fn now(&self) -> Option<Arc<dyn Household>>;
+    async fn now(&self) -> Option<Arc<dyn Household>>;
 
     /// Whether the household vouches for whoever holds this account now, having just
     /// proved its password.
@@ -125,8 +126,9 @@ pub trait HouseholdAtHand: Send + Sync {
 /// One household, the same at every asking.
 ///
 /// It keeps no record of what it offered, so it vouches for everybody it signs in.
+#[async_trait::async_trait]
 impl HouseholdAtHand for Arc<dyn Household> {
-    fn now(&self) -> Option<Arc<dyn Household>> {
+    async fn now(&self) -> Option<Arc<dyn Household>> {
         Some(Arc::clone(self))
     }
 
@@ -136,9 +138,10 @@ impl HouseholdAtHand for Arc<dyn Household> {
 }
 
 /// The household of the stack this surface serves, opened from it at each asking.
+#[async_trait::async_trait]
 impl HouseholdAtHand for Ctx {
-    fn now(&self) -> Option<Arc<dyn Household>> {
-        lemonfiber_core::app::members::household(self)
+    async fn now(&self) -> Option<Arc<dyn Household>> {
+        lemonfiber_core::app::members::household(self).await
     }
 
     fn vouches_for(&self, id: &str) -> bool {
@@ -329,7 +332,7 @@ impl Admitting {
 /// Opening one reads the stack's manifest and its recorded password from disk, and the
 /// worker that answers requests is no place to wait on a disk.
 async fn opened(at: Arc<dyn HouseholdAtHand>) -> Option<Arc<dyn Household>> {
-    tokio::task::spawn_blocking(move || at.now())
+    tokio::task::spawn_blocking(move || tokio::runtime::Handle::current().block_on(at.now()))
         .await
         .ok()
         .flatten()

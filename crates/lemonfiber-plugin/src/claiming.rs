@@ -102,7 +102,8 @@ fn core(name: &str, at: &str, removed: &[Removed], found: &mut Vec<Violation>) {
 ///
 /// `provides` says what a service can do and `[[claim]]` shows it, so neither half
 /// stands alone: a core name nothing demonstrates asserts, and a claim for a name no
-/// service declares demonstrates something nobody said.
+/// service declares demonstrates something nobody said. A capability its service speaks
+/// the contract of is demonstrated by that contract instead.
 fn demonstrated(manifest: &Manifest, found: &mut Vec<Violation>) {
     let mut declared: BTreeMap<&str, &str> = BTreeMap::new();
     for service in &manifest.services {
@@ -165,7 +166,10 @@ fn demonstrated(manifest: &Manifest, found: &mut Vec<Violation>) {
         }
     }
 
-    for (name, service) in declared.iter().filter(|(name, _)| !claimed.contains(*name)) {
+    let undemonstrated = declared
+        .iter()
+        .filter(|(name, service)| !claimed.contains(*name) && !spoken(manifest, service, name));
+    for (name, service) in undemonstrated {
         found.push(Violation {
             location: format!("service {service}.provides"),
             message: format!(
@@ -174,6 +178,20 @@ fn demonstrated(manifest: &Manifest, found: &mut Vec<Violation>) {
             ),
         });
     }
+}
+
+/// Whether `service` speaks `capability`'s contract, which is what demonstrates it.
+fn spoken(manifest: &Manifest, service: &str, capability: &str) -> bool {
+    manifest
+        .services
+        .iter()
+        .filter(|one| one.id == service)
+        .flat_map(|one| &one.speaks)
+        .any(|named| {
+            named
+                .split_once('@')
+                .is_some_and(|(spoken, _)| spoken == capability)
+        })
 }
 
 /// The probes a claim binds, against the ones its capability declares.

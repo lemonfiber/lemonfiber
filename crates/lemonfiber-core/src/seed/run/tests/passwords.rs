@@ -33,6 +33,7 @@ fn torrent_client() -> crate::wiring::Filler {
         confined_to: None,
         media_types: Vec::new(),
         provides: Vec::new(),
+        contracts: Vec::new(),
         majors: Vec::new(),
     }
 }

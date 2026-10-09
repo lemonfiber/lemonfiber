@@ -286,6 +286,30 @@ fn a_core_name_with_no_claim_block_is_refused_as_an_assertion() {
 }
 
 #[test]
+fn a_core_name_its_service_speaks_the_contract_of_is_demonstrated_by_the_contract() {
+    let (before, rest) = CLAIMANT.split_once("[[claim]]").unwrap_or_default();
+    let (_, after) = rest.split_once("[requires]").unwrap_or_default();
+    let unclaimed = format!("{before}[requires]{after}");
+    let speaking = unclaimed.replace(
+        "criticality = \"enhancing\"\n",
+        "criticality = \"enhancing\"\nspeaks      = [\"media.serve@1\"]\n",
+    );
+    assert!(
+        !says(&against(&speaking), &["demonstrated, not asserted"]),
+        "got: {:?}",
+        against(&speaking)
+    );
+    let otherwise = unclaimed.replace(
+        "criticality = \"enhancing\"\n",
+        "criticality = \"enhancing\"\nspeaks      = [\"identity.source@1\"]\n",
+    );
+    assert!(says(
+        &against(&otherwise),
+        &["media.serve", "demonstrated, not asserted"]
+    ));
+}
+
+#[test]
 fn a_claim_for_a_capability_no_service_declares_names_both_halves() {
     let said = changed("\"media.serve\", \"komga:opds\"", "\"komga:opds\"");
     assert!(

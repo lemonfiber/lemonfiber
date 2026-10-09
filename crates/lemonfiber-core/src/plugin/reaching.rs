@@ -8,12 +8,14 @@
 use std::path::Path;
 use std::sync::Arc;
 
+use lemonfiber_contract::adapter::KEY_FILE;
 use lemonfiber_contract::Contracted;
 
 use super::container::LOOPBACK;
 use super::{key_file, Placed};
 use crate::app::Ctx;
 use crate::ports::filesystem::Beneath;
+use crate::wiring::Filler;
 
 /// The adapter `placed` is, asked over its contracts, or why it cannot be reached.
 ///
@@ -26,11 +28,43 @@ pub(crate) async fn reached(
     stack: &Path,
     placed: &Placed,
 ) -> Result<Contracted, String> {
-    let service = &placed.service;
-    let listens = placed
-        .listens
-        .ok_or_else(|| format!("{service} says no port it speaks its contracts on"))?;
-    let key = keyed(ctx, &key_file(stack, service), service)?;
+    asked(
+        ctx,
+        &placed.service,
+        placed.listens,
+        &key_file(stack, &placed.service),
+    )
+    .await
+}
+
+/// The service filling a capability, asked over the contracts it speaks, or why it
+/// cannot be reached.
+///
+/// # Errors
+///
+/// As [`reached`], and where the stack has not been written to this machine, so there
+/// is no key beside the service to read.
+pub(crate) async fn filling(ctx: &Ctx, filler: &Filler) -> Result<Contracted, String> {
+    let service = &filler.id;
+    let key = filler
+        .confined_to
+        .as_ref()
+        .map(|configuration| configuration.join(KEY_FILE))
+        .ok_or_else(|| format!("{service} has no configuration on this machine to hold its key"))?;
+    let listens = filler.address.as_ref().map(|address| address.port);
+    asked(ctx, service, listens, &key).await
+}
+
+/// `service`, listening on `listens` with its key at `key`, asked over its contracts.
+async fn asked(
+    ctx: &Ctx,
+    service: &str,
+    listens: Option<u16>,
+    key: &Path,
+) -> Result<Contracted, String> {
+    let listens =
+        listens.ok_or_else(|| format!("{service} says no port it speaks its contracts on"))?;
+    let key = keyed(ctx, key, service)?;
     let port = published(ctx, service, listens).await?;
     Ok(Contracted::new(
         Arc::clone(&ctx.seams.http),

@@ -18,7 +18,7 @@ use crate::invitation::{
     closed, lapsed_unseen, offered, run_out, Offers, Spent, HOURS_OF_RECORD, HOURS_TO_CLAIM, RECORD,
 };
 use crate::model::MemberStanding;
-use crate::ports::service::{Access, Household as _, Member};
+use crate::ports::service::{Access, Member};
 
 /// Where the invitations of a household stand, by the account's id.
 pub(super) struct Invitations {
@@ -35,7 +35,7 @@ pub(super) struct Invitations {
 /// Where the invitations among these accounts stand, with what has run out taken back.
 pub(super) async fn invitations(
     ctx: &Ctx,
-    server: &crate::jellyfin::Jellyfin,
+    server: &dyn crate::ports::service::Household,
     accounts: &[Member],
     findings: &mut Vec<String>,
 ) -> Invitations {
@@ -102,7 +102,7 @@ fn listed_as_removed(accounts: &[Member], removed: BTreeMap<String, String>) -> 
 /// is not what anybody found.
 async fn expired(
     ctx: &Ctx,
-    server: &crate::jellyfin::Jellyfin,
+    server: &dyn crate::ports::service::Household,
     accounts: &[Member],
     findings: &mut Vec<String>,
 ) -> Spent {
@@ -132,7 +132,7 @@ async fn expired(
 /// rehearsal takes back nothing.
 async fn taken_back(
     ctx: &Ctx,
-    server: &crate::jellyfin::Jellyfin,
+    server: &dyn crate::ports::service::Household,
     spent: &Spent,
     declined: &BTreeSet<String>,
     findings: &mut Vec<String>,
@@ -200,7 +200,7 @@ fn close_taken_up(ctx: &Ctx, accounts: &[Member], removed: &BTreeMap<String, Str
 /// A rehearsal switches nothing off: the account is still reported as declined.
 async fn declined(
     ctx: &Ctx,
-    server: &crate::jellyfin::Jellyfin,
+    server: &dyn crate::ports::service::Household,
     accounts: &[Member],
     findings: &mut Vec<String>,
 ) -> BTreeSet<String> {

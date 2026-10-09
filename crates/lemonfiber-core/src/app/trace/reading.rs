@@ -11,8 +11,7 @@ use crate::doctor::providers::ProvidersCheck;
 use crate::doctor::{Check, Finding, Verdict};
 use crate::model::TraceReport;
 use crate::ports::service::{
-    Indexers, ItemPart, Library, QualityReleases, QueueItem, ReleaseProbe, TraceEvent,
-    UsenetAccounts,
+    Indexers, ItemPart, QualityReleases, QueueItem, ReleaseProbe, TraceEvent, UsenetAccounts,
 };
 use crate::recyclarr::Kind;
 use crate::servarr::Servarr;
@@ -135,11 +134,11 @@ pub(crate) fn beside(reason: String, said: &[String]) -> String {
 /// or it will not answer — unknown, which the trace reads as "cannot tell" rather than
 /// inferring an availability it has not confirmed.
 pub(crate) async fn library_presence(
-    jellyfin: Option<&crate::jellyfin::Jellyfin>,
+    library: Option<&dyn crate::ports::service::Library>,
     kind: Kind,
     title: &str,
 ) -> Option<Presence> {
-    match jellyfin?.has_item(kind, title).await {
+    match library?.has_item(kind, title).await {
         Ok(true) => Some(Presence::Present),
         Ok(false) => Some(Presence::Absent),
         Err(_) => None,

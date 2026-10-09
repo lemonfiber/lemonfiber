@@ -295,7 +295,7 @@ async fn the_command_answers_with_the_reading() {
 async fn a_plugin_standing_in_for_the_media_server_is_the_one_asked() {
     let mut placed = crate::test_support::a_placed(
         "emby",
-        &["identity.source"],
+        &["identity.source", "media.serve"],
         Some(lemonfiber_manifest::Api {
             kind: lemonfiber_manifest::ApiKind::Jellyfin,
             key_source: lemonfiber_manifest::KeySource::Generated,

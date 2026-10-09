@@ -30,7 +30,7 @@ use reading::{
     account_explainable, asking, beside, library_presence, providers, troubles, Fragments, Reads,
 };
 
-use super::targets::{jellyfin_reader, open_servarrs};
+use super::targets::{open_servarrs, serving};
 use super::Ctx;
 use crate::error::{Diagnose, Problem};
 use crate::model::{StuckEntry, StuckReport, TraceReport};
@@ -58,7 +58,7 @@ pub(crate) async fn trace(
         .map_err(|err| Box::new(err.problem()))?;
     // The media server is resolved once, ahead of the match: the last stage of a trace is
     // the same read whichever \*arr the item turns up in.
-    let jellyfin = jellyfin_reader(ctx, &manifest);
+    let served = serving(ctx, &manifest).await;
 
     for arr in open_servarrs(ctx, &manifest.services).await {
         let (kind, service) = (arr.kind, arr.service);
@@ -91,7 +91,14 @@ pub(crate) async fn trace(
             queue: queue_read,
             parts: parts_read,
         };
-        let library = library_presence(jellyfin.as_ref(), kind, &item.title).await;
+        let library = library_presence(
+            served
+                .as_deref()
+                .map(|library| library as &dyn crate::ports::service::Library),
+            kind,
+            &item.title,
+        )
+        .await;
         let mut report = assemble(
             &arr.name,
             &item.title,

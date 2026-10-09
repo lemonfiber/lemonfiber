@@ -16,7 +16,7 @@
 
 use crate::app::Ctx;
 use crate::model::{HouseholdRemoval, Revoked};
-use crate::ports::service::{Household as _, Member, Requests as _};
+use crate::ports::service::{Member, Requests as _};
 
 /// Remove somebody from the household, or — until `confirm` — say what that would cost.
 ///
@@ -41,7 +41,7 @@ pub(crate) async fn remove(
         .stack
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(crate::error::Diagnose::problem(&err)))?;
-    let Some(server) = super::targets::jellyfin_reader(ctx, &manifest) else {
+    let Some(server) = super::targets::identity(ctx, &manifest).await else {
         return Err(Box::new(no_media_server()));
     };
     let Ok(household) = server.household().await else {

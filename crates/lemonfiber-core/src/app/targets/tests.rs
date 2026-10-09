@@ -182,6 +182,7 @@ fn keyed_in(file: &str, within: Option<&str>) -> crate::wiring::Filler {
         confined_to: within.map(std::path::PathBuf::from),
         media_types: Vec::new(),
         provides: Vec::new(),
+        contracts: Vec::new(),
         majors: Vec::new(),
     }
 }

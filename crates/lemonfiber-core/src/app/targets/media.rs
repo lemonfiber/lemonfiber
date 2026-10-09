@@ -23,7 +23,7 @@ use super::secrets::{record_secret, recorded_secret};
 
 /// What the request service asks the stack for: a service that answers, for the services
 /// that ask, whether a person is who they say they are.
-pub(crate) const IDENTITY: &str = "identity.source";
+pub(crate) const IDENTITY: &str = lemonfiber_contract::capabilities::identity::source::CAPABILITY;
 
 /// The service filling the identity source, as everything that reaches it needs it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -65,15 +65,7 @@ impl MediaServer {
     /// nothing to sign in to rather than something to guess at.
     #[must_use]
     pub(crate) fn of(fillers: &Fillers) -> Option<Self> {
-        let (filler, asker) = match fillers.asks().iter().find(|ask| ask.capability == IDENTITY) {
-            Some(ask) => {
-                let [filler] = ask.fillers.as_slice() else {
-                    return None;
-                };
-                (filler, fillers.service(&ask.by))
-            }
-            None => (serving_unasked(fillers)?, None),
-        };
+        let (filler, asker) = settled(fillers)?;
         let adapter = ApiKind::Jellyfin;
         if !filler.speaks(adapter) {
             return None;
@@ -169,6 +161,22 @@ impl MediaServer {
     }
 }
 
+/// The service filling the identity source, with the service asking for it where one
+/// does: the one the ask settled on, or where nothing asks, the one service here serving
+/// identity. Nothing where the ask is contested, or where nothing asks and more than one
+/// service serves it.
+pub(crate) fn settled(fillers: &Fillers) -> Option<(&Filler, Option<&Filler>)> {
+    match fillers.asks().iter().find(|ask| ask.capability == IDENTITY) {
+        Some(ask) => {
+            let [filler] = ask.fillers.as_slice() else {
+                return None;
+            };
+            Some((filler, fillers.service(&ask.by)))
+        }
+        None => Some((serving_unasked(fillers)?, None)),
+    }
+}
+
 /// The one service here serving identity, where nothing asks for one: nothing where none
 /// does, or where more than one does and nothing settles which.
 fn serving_unasked(fillers: &Fillers) -> Option<&Filler> {
@@ -183,8 +191,15 @@ fn serving_unasked(fillers: &Fillers) -> Option<&Filler> {
 /// installed plugin's, with the stack written where the settings say.
 #[must_use]
 pub(crate) fn hosted(ctx: &Ctx, manifest: &Manifest) -> Option<MediaServer> {
+    MediaServer::of(&fillers_here(ctx, manifest))
+}
+
+/// The stack's services and every installed plugin's, with the stack written where the
+/// settings say.
+#[must_use]
+pub(crate) fn fillers_here(ctx: &Ctx, manifest: &Manifest) -> Fillers {
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-    MediaServer::of(&host_fillers(ctx, manifest, project.as_deref()))
+    host_fillers(ctx, manifest, project.as_deref())
 }
 
 #[cfg(test)]

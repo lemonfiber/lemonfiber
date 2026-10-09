@@ -18,6 +18,7 @@ digest      = "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f111612
 tag         = "1.0.0"
 criticality = "optional"
 listens     = 8080
+provides    = ["media.serve"]
 speaks      = ["media.serve@1"]
 
 [[proof]]
