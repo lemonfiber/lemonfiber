@@ -127,8 +127,9 @@ struct Counted {
     household: Arc<dyn Household>,
 }
 
+#[async_trait::async_trait]
 impl HouseholdAtHand for Counted {
-    fn now(&self) -> Option<Arc<dyn Household>> {
+    async fn now(&self) -> Option<Arc<dyn Household>> {
         self.opened.fetch_add(1, Ordering::SeqCst);
         self.there
             .load(Ordering::SeqCst)
@@ -152,8 +153,8 @@ async fn an_opened_household_is_used_for_a_while_and_none_is_never_kept() {
     );
     let opened = || counted.opened.load(Ordering::SeqCst);
 
-    assert!(remembered.now().is_none());
-    assert!(remembered.now().is_none());
+    assert!(remembered.now().await.is_none());
+    assert!(remembered.now().await.is_none());
     assert_eq!(
         opened(),
         2,
@@ -161,12 +162,12 @@ async fn an_opened_household_is_used_for_a_while_and_none_is_never_kept() {
     );
 
     counted.there.store(true, Ordering::SeqCst);
-    assert!(remembered.now().is_some());
-    assert!(remembered.now().is_some());
+    assert!(remembered.now().await.is_some());
+    assert!(remembered.now().await.is_some());
     assert_eq!(opened(), 3, "an opened household was opened again at once");
 
     tokio::time::advance(lemonfiber_api::admission::remembered::KEPT_FOR).await;
-    assert!(remembered.now().is_some());
+    assert!(remembered.now().await.is_some());
     assert_eq!(opened(), 4, "a household kept past its time was used");
 
     assert!(remembered.vouches_for("a7f3"));

@@ -21,7 +21,7 @@
 //! refuse.
 
 use crate::app::Allowance;
-use crate::ports::service::{Allowed, Household as _, NamedLibrary, Unrated};
+use crate::ports::service::{Allowed, NamedLibrary, Unrated};
 
 /// What the person being invited is to be allowed, or nothing where nothing was chosen.
 ///
@@ -31,7 +31,7 @@ use crate::ports::service::{Allowed, Household as _, NamedLibrary, Unrated};
 /// account somebody is being offered again back to open — undoing whatever the
 /// household had narrowed it to, and undoing it silently.
 pub(crate) async fn allowing(
-    server: &crate::jellyfin::Jellyfin,
+    server: &dyn crate::ports::service::Household,
     allowance: &Allowance,
 ) -> Result<Option<Allowed>, Box<crate::error::Problem>> {
     if allowance.libraries.is_empty() && allowance.age_limit.is_none() {
@@ -70,7 +70,7 @@ const fn unrated(allowance: &Allowance) -> Unrated {
 /// `Films` typed as `films` is the same library, and refusing it would be refusing
 /// somebody for their shift key.
 async fn chosen(
-    server: &crate::jellyfin::Jellyfin,
+    server: &dyn crate::ports::service::Household,
     named: &[String],
 ) -> Result<Option<Vec<String>>, Box<crate::error::Problem>> {
     if named.is_empty() {

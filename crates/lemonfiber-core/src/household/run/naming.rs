@@ -14,7 +14,7 @@ use crate::app::Ctx;
 use crate::asking::Reasons;
 use crate::model::{MemberAccess, Restriction};
 use crate::ports::media::Kind;
-use crate::ports::service::{Access, Certificate, Household as _, HouseholdRequest, Pipeline};
+use crate::ports::service::{Access, Certificate, HouseholdRequest, Pipeline};
 use crate::quality::Selection;
 
 use super::allowance;
@@ -28,7 +28,7 @@ use super::allowance;
 /// age limit named from this program's own mapping rather than from the certificates this
 /// household already recognises — so each says so rather than quietly reading as absent.
 pub(super) async fn named_by_the_server(
-    server: &crate::jellyfin::Jellyfin,
+    server: &dyn crate::ports::service::Household,
     findings: &mut Vec<String>,
 ) -> (BTreeMap<String, String>, Vec<Certificate>) {
     let libraries = if let Ok(held) = server.libraries().await {

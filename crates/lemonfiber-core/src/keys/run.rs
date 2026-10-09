@@ -295,7 +295,9 @@ async fn resolved(ctx: &Ctx, wanted: Wanted) -> Result<Scope, Box<Problem>> {
         Wanted::Act => return Ok(Scope::Act),
         Wanted::Member(account) => account,
     };
-    let household = crate::app::members::household(ctx).ok_or_else(|| Box::new(unasked()))?;
+    let household = crate::app::members::household(ctx)
+        .await
+        .ok_or_else(|| Box::new(unasked()))?;
     let members = household
         .household()
         .await
@@ -345,7 +347,7 @@ async fn listed(ctx: &Ctx, kept: &Kept, revoked: Option<String>) -> Listing {
 
 /// The ids of everybody the household holds now, or nothing where it could not be asked.
 async fn standing(ctx: &Ctx) -> Option<BTreeSet<String>> {
-    let household = crate::app::members::household(ctx)?;
+    let household = crate::app::members::household(ctx).await?;
     let members = household.household().await.ok()?;
     Some(members.into_iter().map(|member| member.id).collect())
 }

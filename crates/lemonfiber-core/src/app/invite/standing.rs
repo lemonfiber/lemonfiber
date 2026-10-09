@@ -9,7 +9,7 @@
 use crate::app::Ctx;
 use crate::invitation::{offered, run_out, Offers, Spent, HOURS_OF_RECORD, HOURS_TO_CLAIM, RECORD};
 use crate::model::InvitationStanding;
-use crate::ports::service::{Household as _, Member};
+use crate::ports::service::Member;
 
 /// What was found where the invitation was going.
 pub(crate) fn standing_of(already: Option<&Member>) -> InvitationStanding {
@@ -78,7 +78,7 @@ pub(crate) struct Held {
 /// the second — the whole of what `--dry-run` promises is that the second does not
 /// happen, and a sweep that removed accounts on the way to saying what it would do
 /// would be the flag doing the damage it exists to prevent.
-pub(crate) async fn held(ctx: &Ctx, server: &crate::jellyfin::Jellyfin) -> Held {
+pub(crate) async fn held(ctx: &Ctx, server: &dyn crate::ports::service::Household) -> Held {
     let cutoff = ctx.hours_ago(HOURS_TO_CLAIM);
     let since = ctx.hours_ago(HOURS_OF_RECORD);
     let offers: Offers = crate::app::record::beside(ctx, RECORD);
@@ -117,7 +117,10 @@ pub(crate) struct Taken {
 ///
 /// A server that refuses one is not reported as having given it back: the operator
 /// reads this list as what is gone.
-pub(crate) async fn take_back(server: &crate::jellyfin::Jellyfin, spent: &Spent) -> Taken {
+pub(crate) async fn take_back(
+    server: &dyn crate::ports::service::Household,
+    spent: &Spent,
+) -> Taken {
     let mut taken = Taken {
         withdrawn: Vec::new(),
         suspended: Vec::new(),

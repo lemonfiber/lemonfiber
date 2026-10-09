@@ -71,6 +71,8 @@ pub struct Filler {
     pub media_types: Vec<String>,
     /// Every capability it says it provides.
     pub provides: Vec<String>,
+    /// Every contract it is asked over, each `capability@major`.
+    pub contracts: Vec<String>,
     /// The majors of its image that run here: the first number of the tag it is pinned
     /// by, or nothing where the tag does not open with one.
     pub majors: Vec<u32>,
@@ -95,6 +97,13 @@ impl Filler {
             confined_to: self.confined_to.clone(),
             kind: crate::ports::media::Kind::of_declared(&self.media_types),
         })
+    }
+
+    /// Whether it is asked over `capability`'s contract at `major`.
+    #[must_use]
+    pub fn contracted(&self, capability: &str, major: u32) -> bool {
+        self.contracts
+            .contains(&lemonfiber_contract::spoken(capability, major))
     }
 
     /// Whether lemonfiber speaks to it through this adapter.
@@ -291,6 +300,7 @@ fn bundled(service: &Service, services: &[Service], project: Option<&Path>) -> F
             .map(|project| crate::app::targets::service_config_dir(project, &service.id)),
         media_types: service.media_types.clone(),
         provides: service.provides.clone(),
+        contracts: Vec::new(),
         majors: service.majors(),
     }
 }
@@ -318,6 +328,7 @@ fn brought(plugin: &str, placed: &Placed, project: Option<&Path>) -> Filler {
             .and_then(|project| crate::app::targets::plugin_config_dir(project, placed)),
         media_types: placed.media_types.clone(),
         provides: placed.provides.clone(),
+        contracts: placed.speaks.clone(),
         majors: lemonfiber_manifest::majors(&placed.tag),
     }
 }

@@ -17,7 +17,7 @@ fn ctx(library: &'static str, history: &'static str, queue: &'static str) -> Ctx
 }
 
 /// A context that can reach its Jellyfin: the admin password is recorded under the
-/// env file, so the trace's `jellyfin_reader` resolves a reading client. Tagged so
+/// env file, so the trace asks the media server as its administrator. Tagged so
 /// each test keeps its own env file rather than racing on a shared one.
 fn ctx_with_jellyfin(fake: &Fake, tag: &str) -> Ctx {
     let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("trace-{tag}")).kept();

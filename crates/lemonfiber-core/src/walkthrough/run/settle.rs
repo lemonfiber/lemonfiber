@@ -11,10 +11,9 @@
 
 use super::choose::Chosen;
 use super::walk::Walk;
-use crate::app::targets::{data_root, jellyfin_reader, seerr_reader};
+use crate::app::targets::{data_root, seerr_reader, serving};
 use crate::app::Ctx;
 use crate::model::WalkthroughReport;
-use crate::ports::service::Library;
 use crate::storage::Linked;
 use crate::walkthrough::{Line, Link, Reason, Shape, Step};
 
@@ -28,7 +27,7 @@ pub(super) async fn settle(
     let link = linked(walk.ctx).await;
     walk.say(Line::saying(Step::Importing, note(link)));
 
-    let Some(jellyfin) = jellyfin_reader(walk.ctx, manifest) else {
+    let Some(server) = serving(walk.ctx, manifest).await else {
         // Imported, with nothing running to play it from. Complete through the import and
         // said plainly, because "it worked and you cannot watch it" is not a failure of
         // the pipeline — it is a form that does not include a media server.
@@ -42,9 +41,9 @@ pub(super) async fn settle(
     walk.say(Line::at(Step::Scanning));
     // A scan that will not run is not fatal: the library will find it on its own schedule,
     // and the check below is what decides whether the operator is told it is there.
-    let _ = jellyfin.rescan().await;
+    let _ = server.rescan().await;
 
-    let visible = jellyfin
+    let visible = server
         .has_item(chosen.kind(), &chosen.entry.title)
         .await
         .unwrap_or(false);

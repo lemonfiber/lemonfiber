@@ -38,6 +38,14 @@ impl Remembered {
             held: Mutex::new(None),
         }
     }
+
+    /// The household kept, where it is still to be used at `asked`.
+    fn kept(&self, asked: Instant) -> Option<Arc<dyn Household>> {
+        let held = self.held.lock().unwrap_or_else(PoisonError::into_inner);
+        held.as_ref()
+            .filter(|(until, _)| asked < *until)
+            .map(|(_, household)| Arc::clone(household))
+    }
 }
 
 /// The household kept, or opened again where it has gone stale or there was none.
@@ -45,17 +53,15 @@ impl Remembered {
 /// Nothing is kept where nothing could be opened, so a stack with no household yet is
 /// asked again at the next sign-in rather than answered *none* for the length of the
 /// keeping.
+#[async_trait::async_trait]
 impl HouseholdAtHand for Remembered {
-    fn now(&self) -> Option<Arc<dyn Household>> {
+    async fn now(&self) -> Option<Arc<dyn Household>> {
         let asked = Instant::now();
-        let mut held = self.held.lock().unwrap_or_else(PoisonError::into_inner);
-        if let Some((until, household)) = held.as_ref() {
-            if asked < *until {
-                return Some(Arc::clone(household));
-            }
+        if let Some(kept) = self.kept(asked) {
+            return Some(kept);
         }
-        let opened = self.asked.now();
-        *held = opened
+        let opened = self.asked.now().await;
+        *self.held.lock().unwrap_or_else(PoisonError::into_inner) = opened
             .as_ref()
             .map(|household| (asked + KEPT_FOR, Arc::clone(household)));
         opened

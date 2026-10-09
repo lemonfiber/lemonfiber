@@ -19,8 +19,9 @@
 //! trait implementations go through `#[async_trait]`, which gives every reference in a
 //! signature its own lifetime and can only see a reference written as a type.
 //!
-//! It expands to a module holding, per operation, the request it crosses as; an `Adapter`
-//! that implements every listed trait by asking an adapter; `dispatch`, which serves a
+//! It expands to a module holding, per operation, the request it crosses as; `Fills`, every
+//! listed trait at once; an `Adapter` that implements every listed trait by asking an
+//! adapter; `dispatch`, which serves a
 //! call to anything implementing those traits; and `capability()`, the descriptor the
 //! published documents are generated from.
 
@@ -74,6 +75,11 @@ macro_rules! contract {
                     }
                 }
             )*)*
+
+            /// Whatever fills this capability: every port its contract carries.
+            pub trait Fills: Send + Sync $( + $Trait )* {}
+
+            impl<T> Fills for T where T: Send + Sync $( + $Trait )* {}
 
             /// An adapter that fills this capability, asked over its contract.
             #[derive(Debug, Clone)]

@@ -37,7 +37,7 @@ fn ctx_with(tag: &str, admin_password: Option<&str>) -> (Ctx, Arc<Transport>) {
 async fn a_stack_with_a_media_server_and_its_password_recorded_has_a_household_to_ask() {
     let (context, transport) = ctx_with("held", Some(&a_password()));
 
-    let Some(held) = household(&context) else {
+    let Some(held) = household(&context).await else {
         unreachable!("a stack with a media server and its password recorded has a household")
     };
     let signed = held.whoever("ana", &a_password(), "a-device").await;
@@ -53,22 +53,22 @@ async fn a_stack_with_a_media_server_and_its_password_recorded_has_a_household_t
 }
 
 /// Before the stack is seeded there is no admin password, and so no household.
-#[test]
-fn a_stack_with_no_admin_password_recorded_has_no_household() {
+#[tokio::test]
+async fn a_stack_with_no_admin_password_recorded_has_no_household() {
     let (context, _) = ctx_with("unseeded", None);
 
-    assert!(household(&context).is_none());
+    assert!(household(&context).await.is_none());
 }
 
-#[test]
-fn a_stack_whose_manifest_cannot_be_read_has_no_household() {
+#[tokio::test]
+async fn a_stack_whose_manifest_cannot_be_read_has_no_household() {
     let (context, _) = ctx_with("unread", Some(&a_password()));
     let context = Ctx {
         stack: nowhere(),
         ..context
     };
 
-    assert!(household(&context).is_none());
+    assert!(household(&context).await.is_none());
 }
 
 /// A context whose record holds one offer for account `a7f3`, running out `lapses_in`

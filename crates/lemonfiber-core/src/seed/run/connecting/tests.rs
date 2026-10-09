@@ -405,6 +405,7 @@ fn a_service(
         confined_to: None,
         media_types: vec!["tv".to_owned()],
         provides: Vec::new(),
+        contracts: Vec::new(),
         majors: Vec::new(),
     }
 }

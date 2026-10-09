@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use super::targets::jellyfin_reader;
 use super::{record, Ctx};
 use crate::invitation::{lapsed_unseen, Offers, RECORD};
 use crate::ports::service::Household;
@@ -19,11 +18,10 @@ use crate::ports::service::Household;
 /// Nothing where the stack's manifest cannot be read, where it runs no media server,
 /// or where no admin password is recorded for it yet. Each of those is a stack with
 /// no household to ask, and a member is refused rather than admitted on it.
-#[must_use]
-pub fn household(ctx: &Ctx) -> Option<Arc<dyn Household>> {
+pub async fn household(ctx: &Ctx) -> Option<Arc<dyn Household>> {
     let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
-    let server = jellyfin_reader(ctx, &manifest)?;
-    Some(Arc::new(server))
+    let identity: Arc<dyn Household> = super::targets::identity(ctx, &manifest).await?;
+    Some(identity)
 }
 
 /// Whether the household vouches for whoever holds this account now.

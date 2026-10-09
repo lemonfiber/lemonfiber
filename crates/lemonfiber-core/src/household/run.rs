@@ -20,7 +20,7 @@ mod standing;
 
 use std::collections::BTreeMap;
 
-use crate::app::targets::{jellyfin_reader, seerr_reader};
+use crate::app::targets::{identity, seerr_reader};
 use crate::app::{Ctx, Hostable, Whom};
 use naming::{library_titles, named_access, named_by_the_server, titled, Naming};
 
@@ -28,7 +28,7 @@ use crate::asking::Policy;
 use crate::error::{Diagnose, Problem};
 use crate::household::State;
 use crate::model::{HouseholdMember, HouseholdReport, MemberRequest, Restriction};
-use crate::ports::service::{Household as _, HouseholdRequest, Member, Requests};
+use crate::ports::service::{HouseholdRequest, Member, Requests};
 use crate::quality::Selection;
 use crate::recyclarr::Kind;
 
@@ -73,7 +73,7 @@ async fn everybody(ctx: &Ctx, member: Option<&str>) -> Result<HouseholdReport, B
     // the *requests* instead makes a list of requesters wearing the name of a list of
     // members: somebody with an account who has never asked for anything does not
     // appear at all, and neither does an invitation nobody has taken up.
-    let Some(server) = jellyfin_reader(ctx, &manifest) else {
+    let Some(server) = identity(ctx, &manifest).await else {
         return Ok(unavailable(
             "there is no media server to ask who is in the household, or no recorded \
              password to sign in with — so who is here cannot be read",
@@ -88,7 +88,7 @@ async fn everybody(ctx: &Ctx, member: Option<&str>) -> Result<HouseholdReport, B
     };
 
     let mut findings = Vec::new();
-    let (libraries, certificates) = named_by_the_server(&server, &mut findings).await;
+    let (libraries, certificates) = named_by_the_server(server.as_ref(), &mut findings).await;
 
     // What is said about invitations names other people's accounts, so it is said only
     // to whoever reads the whole household.
@@ -97,7 +97,7 @@ async fn everybody(ctx: &Ctx, member: Option<&str>) -> Result<HouseholdReport, B
         expired,
         declined,
         removed,
-    } = standing::invitations(ctx, &server, &accounts, &mut about_invitations).await;
+    } = standing::invitations(ctx, server.as_ref(), &accounts, &mut about_invitations).await;
     if member.is_none() {
         findings.append(&mut about_invitations);
     }
