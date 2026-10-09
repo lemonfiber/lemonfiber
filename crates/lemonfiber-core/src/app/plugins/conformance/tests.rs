@@ -1,6 +1,7 @@
 use lemonfiber_fixtures::scratch::Scratch;
 
 use super::{cleared, fills, held, witness};
+use crate::app::plugins::tests::unrewritable;
 use crate::app::Ctx;
 use crate::config::paths::NONCONFORMING;
 use crate::test_support::a_context;
@@ -45,7 +46,7 @@ fn an_answer_outside_the_contract_keeps_the_plugin_from_filling_that_capability_
 
 #[test]
 fn clearing_a_plugin_takes_its_answers_and_leaves_the_others() {
-    let (ctx, dir) = keeping("cleared");
+    let (ctx, _dir) = keeping("cleared");
     witness(&ctx, "plex", "media.serve").nonconforming("playing", "why");
     witness(&ctx, "emby", "identity.source").nonconforming("household", "why");
 
@@ -56,7 +57,6 @@ fn clearing_a_plugin_takes_its_answers_and_leaves_the_others() {
 
     assert!(cleared(&ctx, "emby").is_ok());
     assert!(held(&ctx).is_ok_and(|kept| kept.is_empty()));
-    assert!(!dir.join(NONCONFORMING).exists());
 }
 
 #[test]
@@ -85,7 +85,26 @@ fn with_nowhere_to_keep_a_record_nothing_is_kept_and_everything_fills() {
     assert!(fills(&ctx, "plex", "media.serve"));
 
     let (unwritable, dir) = keeping("unwritable");
-    let _ = std::fs::create_dir_all(dir.join(format!("{NONCONFORMING}.new")));
+    assert!(unrewritable(&dir.join(NONCONFORMING)));
     witness(&unwritable, "plex", "media.serve").nonconforming("playing", "why");
     assert!(held(&unwritable).is_ok_and(|kept| kept.is_empty()));
+}
+
+#[test]
+fn a_record_kept_that_cannot_be_written_is_not_cleared() {
+    let (ctx, dir) = keeping("uncleared");
+    witness(&ctx, "plex", "media.serve").nonconforming("playing", "why");
+    assert!(unrewritable(&dir.join(NONCONFORMING)));
+
+    assert!(cleared(&ctx, "plex").is_err());
+    assert!(!fills(&ctx, "plex", "media.serve"));
+}
+
+#[test]
+fn a_record_the_disk_will_not_read_fills_nothing() {
+    let (ctx, dir) = keeping("unopenable");
+    assert!(std::fs::create_dir_all(dir.join(NONCONFORMING)).is_ok());
+
+    assert!(held(&ctx).is_err());
+    assert!(!fills(&ctx, "plex", "media.serve"));
 }

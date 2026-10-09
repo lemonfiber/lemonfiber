@@ -237,7 +237,7 @@ fn record_of(ctx: &Ctx) -> PathBuf {
 /// A record is written under a staging name beside it and moved into place, so a
 /// directory holding something under that name is what no write gets past — on every
 /// platform, and without changing whether the record itself can be read.
-fn unrewritable(record: &Path) -> bool {
+pub(super) fn unrewritable(record: &Path) -> bool {
     std::fs::create_dir_all(staging_of(record).join("held")).is_ok()
 }
 

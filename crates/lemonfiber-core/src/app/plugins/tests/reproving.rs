@@ -116,3 +116,36 @@ async fn proving_what_is_not_installed_or_a_moved_offer_is_refused() {
         crate::error::codes::plugin::PLUGIN_OFFER_MOVED.to_string()
     );
 }
+
+#[tokio::test]
+async fn proving_with_an_unreadable_record_or_no_stack_is_refused() {
+    let held = kept_against("reprove-stackless", r#"["media.serve@1"]"#).await;
+    let mut stackless = held.clone();
+    stackless.settings.stack_dir = None;
+    assert_eq!(
+        refusal(
+            answered(
+                &stackless,
+                proving_again("komga", super::super::Consent::default())
+            )
+            .await
+        ),
+        crate::error::codes::plugin::NOWHERE.to_string()
+    );
+    assert!(!conformance::fills(&held, "komga", "media.serve"));
+
+    let _ = std::fs::write(
+        record_of(&held).with_file_name(crate::config::paths::NONCONFORMING),
+        "not a record",
+    );
+    assert_eq!(
+        refusal(
+            plugins(
+                &held,
+                &proving_again("komga", super::super::Consent::default())
+            )
+            .await
+        ),
+        crate::error::codes::plugin::UNRECORDED.to_string()
+    );
+}

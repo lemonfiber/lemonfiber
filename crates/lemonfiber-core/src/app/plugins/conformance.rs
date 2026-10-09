@@ -53,7 +53,7 @@ pub(crate) fn cleared(ctx: &Ctx, plugin: &str) -> Result<(), Box<Problem>> {
         return Ok(());
     }
     held.retain(|one| one.plugin != plugin);
-    written(ctx, &held)
+    super::super::record::keep(kept_at(ctx).as_deref(), &held)
 }
 
 /// Who is told when `plugin`'s adapter answers `capability` outside its contract.
@@ -99,24 +99,7 @@ fn kept(ctx: &Ctx, answered: Nonconforming) -> Result<(), Box<Problem>> {
             && one.operation == answered.operation)
     });
     held.push(answered);
-    written(ctx, &held)
-}
-
-/// Write the record whole, so a reader finds the one before or the one after, and take
-/// it away where it holds nothing.
-fn written(ctx: &Ctx, held: &[Nonconforming]) -> Result<(), Box<Problem>> {
-    let Some(at) = kept_at(ctx) else {
-        return Ok(());
-    };
-    let unwritten = |why: String| Box::new(super::unrecorded(&at, &why));
-    if held.is_empty() {
-        return std::fs::remove_file(&at).map_err(|why| unwritten(why.to_string()));
-    }
-    let text = serde_json::to_string_pretty(held).map_err(|why| unwritten(why.to_string()))?;
-    let staged = at.with_extension("json.new");
-    std::fs::write(&staged, text)
-        .and_then(|()| std::fs::rename(&staged, &at))
-        .map_err(|why| unwritten(why.to_string()))
+    super::super::record::keep(kept_at(ctx).as_deref(), &held)
 }
 
 /// Where the record is kept: beside the install record.
