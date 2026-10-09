@@ -55,14 +55,6 @@ impl Kind {
         }
     }
 
-    /// The kind a declared media type names, or `None` for one filed by some other axis.
-    #[must_use]
-    pub fn for_media_type(media_type: &str) -> Option<Self> {
-        Self::ALL
-            .into_iter()
-            .find(|kind| kind.media_type() == media_type)
-    }
-
     /// The kind of video a service files, read from the media types it declares, or
     /// `None` for a service that files no video.
     ///
