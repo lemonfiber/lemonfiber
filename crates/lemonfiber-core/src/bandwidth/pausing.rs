@@ -84,6 +84,10 @@ pub struct Pauses {
     /// Whether this was a rehearsal: what each client is doing now, with nothing asked
     /// of any of them.
     pub rehearsed: bool,
+    /// The offer this answers: every client and what it said it was doing before it was
+    /// asked anything, named so that a request carrying it back acts on those clients
+    /// in those states or is refused.
+    pub offer: String,
 }
 
 impl Pauses {

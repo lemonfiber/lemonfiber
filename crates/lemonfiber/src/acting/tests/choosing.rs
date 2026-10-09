@@ -19,6 +19,7 @@ fn an_action_takes_a_key_a_choice_and_an_answer_before_it_reaches_a_command() {
         Wanted::Carry(Command::Restart {
             forms: vec!["full".to_owned()],
             services: Vec::new(),
+            offer: None,
         })
     );
 }
@@ -44,6 +45,7 @@ fn moving_over_the_list_and_typing_at_it_take_nothing() {
         Wanted::Carry(Command::Restart {
             forms: vec!["full".to_owned()],
             services: Vec::new(),
+            offer: None,
         })
     );
 }
@@ -100,6 +102,7 @@ fn marking_several_forms_acts_on_every_one_of_them() {
         Wanted::Carry(Command::Restart {
             forms: vec!["full".to_owned(), "lean".to_owned()],
             services: Vec::new(),
+            offer: None,
         })
     );
 }
@@ -123,6 +126,7 @@ fn taking_every_mark_off_again_leaves_the_row_under_the_cursor() {
         Wanted::Carry(Command::Restart {
             forms: vec!["full".to_owned()],
             services: Vec::new(),
+            offer: None,
         })
     );
 }
@@ -206,6 +210,7 @@ fn what_was_selected_is_what_is_acted_on() {
         Wanted::Carry(Command::Restart {
             forms: vec!["lean".to_owned()],
             services: Vec::new(),
+            offer: None,
         })
     );
 }

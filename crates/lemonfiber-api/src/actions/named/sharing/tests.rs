@@ -16,11 +16,17 @@ fn a_pause_and_a_resume_name_every_download_client_at_once() {
     use lemonfiber_core::bandwidth::Pausing;
     assert_eq!(
         asked_for("downloads-pause", Arguments::default()),
-        Command::Downloads(Pausing::Pause)
+        Command::Downloads {
+            asked: Pausing::Pause,
+            offer: None,
+        }
     );
     assert_eq!(
         asked_for("downloads-resume", Arguments::default()),
-        Command::Downloads(Pausing::Resume)
+        Command::Downloads {
+            asked: Pausing::Resume,
+            offer: None,
+        }
     );
 }
 

@@ -76,6 +76,7 @@ fn a_restart_names_the_services_it_restarts_inside_the_form_it_was_given() {
         Wanted::Carry(Command::Restart {
             forms: vec!["full".to_owned()],
             services: vec!["sonarr".to_owned()],
+            offer: None,
         })
     );
 }

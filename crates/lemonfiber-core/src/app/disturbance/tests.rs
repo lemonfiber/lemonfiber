@@ -31,6 +31,7 @@ fn every_verb_that_starts_something_is_bounded_the_same_way() {
         Command::Restart {
             forms: Vec::new(),
             services: Vec::new(),
+            offer: None,
         },
         Command::Switch { forms: Vec::new() },
     ];
@@ -250,6 +251,7 @@ fn the_payload_and_the_command_agree_on_every_length() {
             Command::Restart {
                 forms: forms(),
                 services: services(),
+                offer: None,
             },
             payload.restarting,
         ),

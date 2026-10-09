@@ -18,6 +18,8 @@ mod grounded;
 pub(crate) mod halted;
 mod inflight;
 mod lock;
+mod offered;
+pub(crate) use offered::answering;
 mod preview;
 pub(crate) use preview::preview;
 mod remote;
@@ -288,6 +290,7 @@ async fn readied(
         forwarding: None,
         switched: None,
         held: None,
+        offer: None,
     };
     Ok((manifest, command, report))
 }
@@ -302,17 +305,7 @@ pub(crate) async fn lifecycle(
     forms: &[String],
     action: &Action,
 ) -> Result<LifecycleReport, Box<Problem>> {
-    // Claimed around the whole operation, and given back whether it worked or not —
-    // an early return between the two would leave the stack claimed by a run that has
-    // already finished, which is the one way this can be worse than no lock at all.
-    //
-    // The claim is recorded under the Compose verb rather than under the command the
-    // surface was given, because that is the word the next run to ask is shown and it
-    // has to mean something to somebody who did not type it.
-    let claim = lock::claimed(ctx, action.name()).await?;
-    let outcome = worked(ctx, forms, action).await;
-    lock::released(claim).await;
-    outcome
+    answering(ctx, forms, action, None).await
 }
 
 /// The operation itself, with the stack already claimed for it.
@@ -320,8 +313,10 @@ async fn worked(
     ctx: &Ctx,
     forms: &[String],
     action: &Action,
+    offer: Option<&str>,
 ) -> Result<LifecycleReport, Box<Problem>> {
     let (manifest, command, mut report) = readied(ctx, forms, action).await?;
+    offered::answered(action, &mut report, offer)?;
 
     // A rehearsal stops here deliberately: it has already done everything except
     // the one irreversible step, so what it reports is what would run rather

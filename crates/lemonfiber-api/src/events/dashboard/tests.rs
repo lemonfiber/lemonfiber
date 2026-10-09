@@ -4,7 +4,7 @@ use lemonfiber_core::alert::{Alert, Moment};
 use lemonfiber_core::error::Severity;
 use lemonfiber_core::model::kind;
 
-use super::{alerted, Dashboard};
+use super::{alerted, playing, Dashboard};
 
 /// One alert about `check`, at its `recurrence`, going `moment`'s way.
 fn an_alert(check: &str, recurrence: u32, moment: Moment) -> Alert {
@@ -110,4 +110,27 @@ async fn an_alert_with_no_identity_is_never_said_as_happening() {
         ..an_alert("sonarr", 1, Moment::Onset)
     };
     assert!(alerted(&dashboard, &[unnamed]).await.is_empty());
+}
+
+/// What is playing is said to a listener that has just arrived, and is not read again
+/// before its pace comes round.
+#[tokio::test]
+async fn what_is_playing_is_said_on_arrival_and_at_its_pace() {
+    let dashboard = a_dashboard();
+    let first = playing(&dashboard, true).await;
+    assert_eq!(first.map(|said| said.kind()), Some(kind::PLAYING));
+    assert_eq!(playing(&dashboard, false).await, None);
+    assert!(
+        playing(&dashboard, true).await.is_some(),
+        "a new listener is told again"
+    );
+}
+
+/// Read again at its pace and unchanged, it is not said again.
+#[tokio::test]
+async fn what_is_playing_unchanged_is_not_said_again() {
+    let dashboard = a_dashboard();
+    let _ = playing(&dashboard, true).await;
+    dashboard.playing.lock().await.0 = None;
+    assert_eq!(playing(&dashboard, false).await, None);
 }

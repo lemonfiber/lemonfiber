@@ -56,7 +56,7 @@ use lemonfiber_core::app::plugins::REFUSALS;
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::dashboard::Snapshot;
 use lemonfiber_core::error::codes::declared;
-use lemonfiber_core::error::Problem;
+use lemonfiber_core::error::{Code, Problem};
 use lemonfiber_core::model::{
     kind::{self, Kind},
     Envelope, SetupReport, API_VERSION,
@@ -139,6 +139,11 @@ pub struct Callable {
     /// Whether calling it again with the same arguments leaves the stack as calling it
     /// once did, so a client can tell a person whether repeating it is safe.
     pub idempotent: bool,
+    /// The code a call carrying back, as `offer`, an offer its rehearsal answered is
+    /// refused with where what it would act on has moved; absent where its rehearsal
+    /// answers no offer.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub moved: Option<&'static str>,
 }
 
 /// One refusal as the contract lists it.
@@ -264,6 +269,7 @@ fn key_callable() -> Vec<Callable> {
             disturbs: by.disturbs,
             rehearsal: rehearsable(by.action),
             idempotent: by.idempotent,
+            moved: by.moved.map(Code::as_str),
         })
         .collect()
 }

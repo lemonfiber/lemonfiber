@@ -131,6 +131,7 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Prob
         forwarding: None,
         switched: Some(switched),
         held: None,
+        offer: None,
     };
 
     if ctx.dry_run {

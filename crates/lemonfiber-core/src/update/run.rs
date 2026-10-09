@@ -29,10 +29,11 @@ use crate::model::StackEdit;
 use crate::plural::s;
 use crate::update::{self, Applied, Change, State as Standing};
 
+use crate::agreement::over;
 use crate::app::engine::{in_flight, Interrupted};
 use crate::app::{Ctx, Waiting};
 use crate::error::codes::update::{
-    CAPTURE_LEFT_IT_DOWN, NOT_CHECKED, NO_SUCH_SERVICE, STILL_TRANSFERRING,
+    CAPTURE_LEFT_IT_DOWN, NOT_CHECKED, NO_SUCH_SERVICE, STILL_TRANSFERRING, UPDATE_MOVED,
 };
 
 /// What was asked of an update.
@@ -44,6 +45,9 @@ pub struct Asked {
     pub confirm: bool,
     /// Whether anything still downloading is let finish first.
     pub wait: Waiting,
+    /// The offer a rehearsal answered, where the update carries one back: refused where
+    /// the steps it would take are no longer those. None acts as without one.
+    pub offer: Option<String>,
 }
 
 /// What updating the stack would change, or what a run of it came to.
@@ -89,6 +93,10 @@ pub struct Report {
     /// Said in a field of its own so that a rehearsal is never told from the real run by
     /// its wording alone.
     pub rehearsed: bool,
+    /// The offer this answers: every step, from the release each service stands on to
+    /// the one it would move to, named so that an update carrying it back takes those
+    /// steps or is refused.
+    pub offer: String,
 }
 
 /// What the release carrying this build changed, as every update report says it.
@@ -115,6 +123,7 @@ impl Report {
             applied: Vec::new(),
             halted: None,
             changelog: brought(),
+            offer: String::new(),
         }
     }
 }
@@ -143,12 +152,49 @@ pub(crate) async fn update(ctx: &Ctx, asked: Asked) -> Result<Report, Box<Proble
         .await
         .map_err(|_| Box::new(not_checked()))?;
     let changes = update::changes(&moving, &images, &ctx.settings.project);
-
-    if asked.confirm {
-        return staging::apply(ctx, &manifest, changes, asked.wait).await;
+    let offer = offered(&changes);
+    if let Some(answered) = asked.offer.as_deref().filter(|answered| *answered != offer) {
+        return Err(Box::new(moved(answered, &offer)));
     }
-    let active = waiting(ctx, &changes).await;
-    Ok(Report::proposed(changes, active, false))
+
+    let mut report = if asked.confirm {
+        staging::apply(ctx, &manifest, changes, asked.wait).await?
+    } else {
+        let active = waiting(ctx, &changes).await;
+        Report::proposed(changes, active, false)
+    };
+    report.offer = offer;
+    Ok(report)
+}
+
+/// The offer an update answers: each step, by the service it moves and the releases
+/// it moves between.
+fn offered(changes: &[Change]) -> String {
+    let words: Vec<&str> = changes
+        .iter()
+        .flat_map(|change| {
+            [
+                change.service.as_str(),
+                change.current.as_str(),
+                change.target.as_str(),
+            ]
+        })
+        .collect();
+    over(&words)
+}
+
+/// An update answering an offer that is not the one standing now.
+fn moved(answered: &str, standing: &str) -> Problem {
+    Problem::new(
+        UPDATE_MOVED,
+        "That agreement was given for a different update",
+        format!(
+            "It answered {answered}, and the update now names {standing}: a release arrived \
+             or was withdrawn since it was rehearsed. Nothing was updated."
+        ),
+        Remedy::new("Rehearse the update again, and answer the offer it gives now"),
+    )
+    .in_state(State::Guided)
 }
 
 /// The services this run is about: the one named, or every one the stack declares.

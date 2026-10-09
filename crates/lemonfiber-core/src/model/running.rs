@@ -71,6 +71,11 @@ pub struct LifecycleReport {
     /// leave the reason somewhere a reader finds later.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub held: Option<String>,
+    /// The offer a restart answers: the services it would restart, named so that a
+    /// restart carrying it back is carried out against those services or refused.
+    /// Absent for every other action.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub offer: Option<String>,
 }
 
 /// What narrowing the active set moved.

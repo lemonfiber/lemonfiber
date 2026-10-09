@@ -63,6 +63,7 @@ fn running() -> Vec<Outcome> {
             forwarding: None,
             switched: None,
             held: None,
+            offer: None,
         }),
         Outcome::Config(ConfigReport {
             settings: Vec::new(),
@@ -420,6 +421,7 @@ fn every_client_paused() -> lemonfiber_core::bandwidth::Pauses {
         ],
         caution: Some("This month's cap is spent.".to_owned()),
         rehearsed: false,
+        offer: String::new(),
     }
 }
 

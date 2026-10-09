@@ -285,6 +285,10 @@ pub enum UpdateCommand {
         /// Let anything still downloading finish before the services are stopped.
         #[arg(long)]
         wait: bool,
+        /// The offer being answered, as the rehearsal printed it. An update carrying one
+        /// is refused where the steps it would take are no longer those.
+        #[arg(long, value_name = "NAME")]
+        offer: Option<String>,
     },
     /// Say where this copy of lemonfiber stands, and what moving it would come to.
     ///

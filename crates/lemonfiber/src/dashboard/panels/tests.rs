@@ -277,6 +277,7 @@ fn a_volume_that_could_not_be_read_never_reads_as_a_full_one() {
     let unread = said(&storage(
         &Panel::Ready(Storage {
             free: Reading::Unknown,
+            config_free: Reading::Unknown,
             exhaustion: None,
             hardlink: Hardlink::Unknown,
         }),
@@ -289,6 +290,7 @@ fn a_volume_that_could_not_be_read_never_reads_as_a_full_one() {
     let empty = said(&storage(
         &Panel::Ready(Storage {
             free: Reading::Known(0),
+            config_free: Reading::Known(0),
             exhaustion: None,
             hardlink: Hardlink::Linking,
         }),
@@ -304,6 +306,7 @@ fn copying_imports_are_stated_as_what_they_cost() {
     let copying = said(&storage(
         &Panel::Ready(Storage {
             free: Reading::Known(1_000_000_000),
+            config_free: Reading::Known(1_000_000_000),
             exhaustion: Some(std::time::Duration::from_secs(7200)),
             hardlink: Hardlink::Copying,
         }),
@@ -555,6 +558,7 @@ fn a_free_space_reading_that_went_stale_is_shown_and_marked() {
     let stale = said(&storage(
         &Panel::Ready(Storage {
             free: Reading::Stale(2_000_000_000),
+            config_free: Reading::Stale(2_000_000_000),
             exhaustion: None,
             hardlink: Hardlink::Unknown,
         }),

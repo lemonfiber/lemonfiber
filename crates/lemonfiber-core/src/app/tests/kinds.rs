@@ -120,6 +120,7 @@ async fn a_dispatched_update_serialises_under_its_own_kind() {
             service: None,
             confirm: false,
             wait: Waiting::Never,
+            offer: None,
         }),
         &ctx,
     )

@@ -231,6 +231,7 @@ fn naming_a_service_reaches_whatever_command_that_action_forks_to() {
         Some(Command::Restart {
             forms: vec!["full".to_owned()],
             services: vec!["sonarr".to_owned()],
+            offer: None,
         })
     );
 }

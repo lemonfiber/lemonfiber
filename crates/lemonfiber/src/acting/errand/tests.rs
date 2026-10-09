@@ -259,6 +259,7 @@ fn an_update(coming: &[&str]) -> Outcome {
         applied: Vec::new(),
         halted: None,
         changelog: lemonfiber_core::changelog::Notes::unread(),
+        offer: String::new(),
     })
 }
 

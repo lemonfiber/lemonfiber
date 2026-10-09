@@ -18,6 +18,7 @@ fn report(asked: Pausing, clients: Vec<Paused>, rehearsed: bool) -> Pauses {
         clients,
         caution: None,
         rehearsed,
+        offer: String::new(),
     }
 }
 

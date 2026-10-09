@@ -130,15 +130,24 @@ async fn lifecycle(ctx: &Ctx, forms: &[String], action: Action) -> Result<Outcom
         .map(Outcome::Lifecycle)
 }
 
-/// Restart what the forms hold, or the services named within them.
+/// Restart what the forms hold, or the services named within them, answering the offer
+/// its rehearsal made where the restart carries one back.
 ///
-/// Beside the table because its row, spelled out, is longer than one line.
-async fn restarted(
-    ctx: &Ctx,
-    forms: &[String],
-    services: Vec<String>,
-) -> Result<Outcome, Box<Problem>> {
-    lifecycle(ctx, forms, Action::Restart(services)).await
+/// Beside the table because its row, spelled out, is longer than one line. Handed the
+/// command whole for the same reason; anything but a restart is answered as one that
+/// names nothing to restart.
+async fn restarted(ctx: &Ctx, restart: Command) -> Result<Outcome, Box<Problem>> {
+    let Command::Restart {
+        forms,
+        services,
+        offer,
+    } = restart
+    else {
+        return lifecycle(ctx, &[], Action::Restart(Vec::new())).await;
+    };
+    engine::answering(ctx, &forms, &Action::Restart(services), offer.as_deref())
+        .await
+        .map(Outcome::Lifecycle)
 }
 
 /// Upgrade existing content to the chosen preset, or state what that would cost.
@@ -429,7 +438,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Down(Teardown { forms, wait }) => down(ctx, &forms, wait).await,
         Command::Halt { forms, services } => lifecycle(ctx, &forms, Action::Stop(services)).await,
         Command::Switch { forms } => engine::switch(ctx, &forms).await.map(Outcome::Lifecycle),
-        Command::Restart { forms, services } => restarted(ctx, &forms, services).await,
+        restart @ Command::Restart { .. } => restarted(ctx, restart).await,
         Command::Pull { forms } => lifecycle(ctx, &forms, Action::Pull(Vec::new())).await,
         Command::ConfigGet { key } => configuring::get(ctx, Some(&key)).await.map(Outcome::Config),
         Command::ConfigSet(change) => configuring::set(ctx, change).await.map(Outcome::Config),
@@ -513,7 +522,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         // And the same shape over the line rather than the disk: asked nothing it
         // reads, asked for a limit it declares one and tells every client.
         Command::Bandwidth(asked) => bandwidth::shared(ctx, &asked).await,
-        Command::Downloads(asked) => bandwidth::pausing::paused(ctx, asked).await,
+        Command::Downloads { asked, offer } => bandwidth::pausing::paused(ctx, asked, offer).await,
         Command::Keys(asked) => crate::keys::run::asked(ctx, asked).await,
         Command::Watch { forms } => watching(ctx, &forms).await,
         // Said onto whatever the surface is listening with, which is how a walk is

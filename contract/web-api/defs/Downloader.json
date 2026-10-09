@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One download client, and whether it is paused.",
+  "type": "object",
+  "properties": {
+    "client": {
+      "description": "The client, by the name the stack knows it under.",
+      "type": "string"
+    },
+    "state": {
+      "description": "Whether it is paused, as the client reads it back.",
+      "$ref": "DownloaderState.json"
+    }
+  },
+  "required": [
+    "client",
+    "state"
+  ]
+}

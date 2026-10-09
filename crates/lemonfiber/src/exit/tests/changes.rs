@@ -111,6 +111,7 @@ fn only_an_update_that_stopped_part_way_is_a_failure() {
             applied: Vec::new(),
             halted: None,
             changelog: lemonfiber_core::changelog::Notes::unread(),
+            offer: String::new(),
         })))
     };
 
@@ -144,6 +145,7 @@ fn an_update_that_worked_and_left_the_stack_down_is_not_a_success() {
         applied: Vec::new(),
         halted: Some("the stack would not start again — lemonfiber up".to_owned()),
         changelog: lemonfiber_core::changelog::Notes::unread(),
+        offer: String::new(),
     })));
 
     assert_eq!(left_down, shown(std::process::ExitCode::from(FAILURE)));
@@ -608,6 +610,7 @@ fn a_pause_a_client_did_not_take_is_not_reported_as_a_pause() {
             }],
             caution: None,
             rehearsed,
+            offer: String::new(),
         })
     };
     let succeeded = std::process::ExitCode::SUCCESS;

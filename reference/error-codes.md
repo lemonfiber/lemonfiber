@@ -232,6 +232,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `LIFE-7` | `ELSEWHERE_UNDERNEATH` | error | 1 | 500 | 0.17.0 | Raised when a path the stack mounts is not at the same path on the machine under the container lemonfiber runs in. |
 | `LIFE-8` | `NO_ENGINE_IN_HERE` | error | 1 | 500 | 0.17.0 | Raised when lemonfiber runs in a container that cannot reach the engine. |
 | `LIFE-9` | `NOT_ON_THIS_ENGINE` | error | 1 | 500 | 0.17.0 | Raised when the engine lemonfiber reaches from a container does not know that container. |
+| `LIFE-10` | `RESTART_MOVED` | warning | 1 | 400 | 0.18.0 | Raised where a restart names an offer that is not the one a fresh look at the stack builds. |
 
 ## `MIGRATE` — taking over a setup already here
 
@@ -343,6 +344,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `RATE-3` | `UNREADABLE` | error | 1 | 400 | 0.12.0 | Raised when what was asked for could not be read as a limit, a window or a cap. |
 | `RATE-4` | `NOTHING_TO_LIMIT` | error | 1 | 400 | 0.12.0 | Raised when there is no download client to limit. |
 | `RATE-5` | `NOTHING_TO_PAUSE` | error | 1 | 400 | 0.17.0 | Raised when there is no download client to pause or resume. |
+| `RATE-6` | `PAUSING_MOVED` | warning | 1 | 400 | 0.18.0 | Raised where pausing or resuming the download clients names an offer that is not the one a fresh look at them builds. |
 
 ## `READ` — asking the web surface a question
 
@@ -526,6 +528,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `UPDATE-2` | `NO_SUCH_SERVICE` | error | 1 | 500 | 0.14.0 | Raised when the service an update was narrowed to is not one the stack declares. |
 | `UPDATE-3` | `STILL_TRANSFERRING` | warning | 1 | 500 | 0.14.0 | Raised when transfers are still in flight and the run was not asked to wait. |
 | `UPDATE-4` | `CAPTURE_LEFT_IT_DOWN` | error | 1 | 500 | 0.14.0 | Raised when the stack came down for the capture and the capture would not write. |
+| `UPDATE-5` | `UPDATE_MOVED` | warning | 1 | 400 | 0.18.0 | Raised where an update names an offer that is not the one a fresh look at the releases builds. |
 
 ## `VPN` — traffic leaving the tunnel
 

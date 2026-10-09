@@ -190,10 +190,12 @@ fn a_whole_snapshot_serialises_with_each_panel_filled_or_marked() {
             eta: eta(5_000_000, 1_048_576),
         }]),
         queue: Panel::unavailable("sonarr did not answer"),
+        downloaders: Panel::Ready(Vec::new()),
         stuck: Vec::new(),
         alerts: Vec::new(),
         storage: Panel::Ready(Storage {
             free: Reading::Known(42_000_000_000),
+            config_free: Reading::Known(42_000_000_000),
             exhaustion: None,
             hardlink: Hardlink::Linking,
         }),

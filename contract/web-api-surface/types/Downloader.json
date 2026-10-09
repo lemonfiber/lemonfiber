@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "client": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "state": {
+      "type": [
+        "ref:DownloaderState"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

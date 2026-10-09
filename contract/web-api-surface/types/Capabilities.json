@@ -5,6 +5,18 @@
         "object{ref:CapabilityState}"
       ],
       "required": true
+    },
+    "scope": {
+      "type": [
+        "ref:CredentialScope"
+      ],
+      "required": true
+    },
+    "stack": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
     }
   },
   "variants": []

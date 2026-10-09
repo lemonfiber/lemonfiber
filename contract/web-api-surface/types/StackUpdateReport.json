@@ -42,6 +42,12 @@
       ],
       "required": true
     },
+    "offer": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
     "rehearsed": {
       "type": [
         "boolean"

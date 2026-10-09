@@ -228,6 +228,7 @@ async fn restarting_names_the_services_and_nothing_else() {
     let command = Command::Restart {
         forms: vec!["library".to_owned()],
         services: vec!["jellyfin".to_owned()],
+        offer: None,
     };
     let produced = report(dispatch(command, &ctx).await);
 

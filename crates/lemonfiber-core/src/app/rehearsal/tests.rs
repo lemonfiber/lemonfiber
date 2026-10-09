@@ -327,6 +327,7 @@ fn always_reported() -> Vec<Command> {
         Command::Restart {
             forms: Vec::new(),
             services: Vec::new(),
+            offer: None,
         },
         Command::Pull { forms: Vec::new() },
         Command::ConfigSet(Setting::to("DATA_ROOT", "/srv/library").agreed(true)),
@@ -377,7 +378,10 @@ fn always_reported() -> Vec<Command> {
             down: Some("20".to_owned()),
             ..BandwidthAsked::default()
         }),
-        Command::Downloads(crate::bandwidth::pausing::Pausing::Pause),
+        Command::Downloads {
+            asked: crate::bandwidth::pausing::Pausing::Pause,
+            offer: None,
+        },
         Command::Uninstall(Removing {
             tier: crate::uninstall::Tier::Configuration,
             confirm: true,
@@ -444,6 +448,7 @@ fn answering_twice() -> Vec<Command> {
             service: None,
             confirm: true,
             wait: Waiting::Never,
+            offer: None,
         }),
         Command::Restore(Restoring {
             archive: crate::app::restore::Kept::Named("anything".to_owned()),
@@ -519,6 +524,7 @@ fn a_rehearsal_carries_the_confirmable_commands_without_their_yes() {
             service: None,
             confirm: true,
             wait: Waiting::Never,
+            offer: None,
         }),
         Command::Restore(Restoring {
             archive: restore::Kept::Named("anything".to_owned()),

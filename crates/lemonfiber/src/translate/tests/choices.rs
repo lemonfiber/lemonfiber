@@ -1,6 +1,7 @@
 //! Quality, configuration, bundles and downloads, as commands.
 
 use super::*;
+use lemonfiber::cli::RawRestart;
 use lemonfiber_core::app::{Gathering, Tracing};
 use lemonfiber_core::app::{Inviting, LettingGo};
 
@@ -8,17 +9,27 @@ use lemonfiber_core::app::{Inviting, LettingGo};
 #[test]
 fn a_restart_carries_the_one_form_and_only_the_services_named() {
     assert_eq!(
-        restarting("media".to_owned(), vec!["sonarr".to_owned()]),
+        restarting(RawRestart {
+            form: "media".to_owned(),
+            services: vec!["sonarr".to_owned()],
+            offer: Some("1a2b3c4d".to_owned()),
+        }),
         Command::Restart {
             forms: vec!["media".to_owned()],
             services: vec!["sonarr".to_owned()],
+            offer: Some("1a2b3c4d".to_owned()),
         }
     );
     assert_eq!(
-        restarting("media".to_owned(), Vec::new()),
+        restarting(RawRestart {
+            form: "media".to_owned(),
+            services: Vec::new(),
+            offer: None,
+        }),
         Command::Restart {
             forms: vec!["media".to_owned()],
             services: Vec::new(),
+            offer: None,
         }
     );
 }

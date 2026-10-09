@@ -42,6 +42,7 @@ pub(super) fn an_update() -> lemonfiber_core::update::run::Report {
             diff: "-yours\n+ours".to_owned(),
         }],
         halted: Some("sonarr did not come back".to_owned()),
+        offer: String::new(),
     }
 }
 

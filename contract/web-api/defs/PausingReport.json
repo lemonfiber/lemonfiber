@@ -21,6 +21,10 @@
         "$ref": "PausedClient.json"
       }
     },
+    "offer": {
+      "description": "The offer this answers: every client and what it said it was doing before it was\nasked anything, named so that a request carrying it back acts on those clients\nin those states or is refused.",
+      "type": "string"
+    },
     "rehearsed": {
       "description": "Whether this was a rehearsal: what each client is doing now, with nothing asked\nof any of them.",
       "type": "boolean"
@@ -29,6 +33,7 @@
   "required": [
     "asked",
     "clients",
-    "rehearsed"
+    "rehearsed",
+    "offer"
   ]
 }

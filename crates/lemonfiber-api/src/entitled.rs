@@ -119,7 +119,7 @@ pub const fn callable_by_a_key(command: &Command) -> bool {
         Command::Restart { .. }
             | Command::Doctor(Diagnosing { accept: None, .. })
             | Command::Update(_)
-            | Command::Downloads(_)
+            | Command::Downloads { .. }
     )
 }
 

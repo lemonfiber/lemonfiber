@@ -47,3 +47,16 @@ pub struct RawDown {
     #[arg(long, conflicts_with = "wait")]
     pub yes: bool,
 }
+
+/// What to restart, as the command line spells it.
+#[derive(Debug, Args)]
+pub struct RawRestart {
+    /// The form holding them.
+    pub form: String,
+    /// The services to restart; none restarts the whole form.
+    pub services: Vec<String>,
+    /// The offer being answered, as the rehearsal printed it. A restart carrying one is
+    /// refused where the services it would restart are no longer those.
+    #[arg(long, value_name = "NAME")]
+    pub offer: Option<String>,
+}

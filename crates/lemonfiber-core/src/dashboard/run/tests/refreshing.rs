@@ -43,21 +43,32 @@ fn the_hardlink_status_reflects_the_empirical_probe() {
 #[test]
 fn storage_projects_exhaustion_from_the_download_rate() {
     // 3600 bytes free, draining at 60 B/s, is a minute until full.
-    let storage = super::super::storage(Reading::Known(3600), Hardlink::Linking, 60);
+    let storage = super::super::storage(
+        Reading::Known(3600),
+        Reading::Unknown,
+        Hardlink::Linking,
+        60,
+    );
     assert_eq!(storage.exhaustion, Some(Duration::from_secs(60)));
 }
 
 #[test]
 fn storage_projects_no_exhaustion_when_nothing_is_draining() {
     // A rate of zero divides to no estimate rather than an infinite one.
-    let storage = super::super::storage(Reading::Known(3600), Hardlink::Linking, 0);
+    let storage =
+        super::super::storage(Reading::Known(3600), Reading::Unknown, Hardlink::Linking, 0);
     assert!(storage.exhaustion.is_none());
 }
 
 /// A stale figure is the last thing the volume said, not what it holds now.
 #[test]
 fn storage_projects_nothing_from_a_volume_it_could_not_read_now() {
-    let storage = super::super::storage(Reading::Stale(3600), Hardlink::Linking, 60);
+    let storage = super::super::storage(
+        Reading::Stale(3600),
+        Reading::Unknown,
+        Hardlink::Linking,
+        60,
+    );
     assert!(storage.exhaustion.is_none());
 }
 
@@ -103,6 +114,7 @@ fn a_download_carries_its_last_speed_across_a_refresh_that_did_not_report_one() 
         vpn: None,
         transfers: Panel::Ready(vec![a_transfer(Reading::Known(4096))]),
         queue: Panel::Ready(Vec::new()),
+        downloaders: Panel::Ready(Vec::new()),
         stuck: Vec::new(),
         alerts: Vec::new(),
         storage: Panel::unavailable("not read here"),
@@ -237,4 +249,70 @@ async fn a_rehearsal_never_probes_the_data_root() {
     assert_eq!(hardlink(&rehearsed), Some(Hardlink::Unknown));
     assert!(made.is_empty(), "a rehearsal made {made:?}");
     assert_eq!(hardlink(&probed), Some(Hardlink::Linking));
+}
+
+/// The configuration volume is its own reading, and the projection of when the data
+/// volume fills reads only the data volume.
+#[test]
+fn storage_carries_the_configuration_volume_beside_the_data_volume() {
+    let storage = super::super::storage(
+        Reading::Known(3600),
+        Reading::Known(7),
+        Hardlink::Linking,
+        60,
+    );
+    assert_eq!(storage.config_free, Reading::Known(7));
+    assert_eq!(storage.exhaustion, Some(Duration::from_secs(60)));
+}
+
+/// Each client says whether it is paused, a client that could not be asked is unknown
+/// rather than fetching, and a panel that could not be filled says why.
+#[test]
+fn each_download_client_says_whether_it_is_paused_or_that_it_could_not_be_asked() {
+    use crate::bandwidth::pausing::Paused;
+    use crate::bandwidth::Pulling;
+    use crate::dashboard::{Downloader, Fetching};
+
+    let said = |client: &str, was: Option<Pulling>| Paused {
+        client: client.to_owned(),
+        was,
+        now: None,
+        unreached: None,
+    };
+    let panel = super::super::downloaders(Some(Ok(vec![
+        said("sabnzbd", Some(Pulling::Stopped)),
+        said("qbittorrent", Some(Pulling::Fetching)),
+        said("nzbget", None),
+    ])));
+    assert_eq!(
+        panel,
+        Panel::Ready(vec![
+            Downloader {
+                client: "sabnzbd".to_owned(),
+                state: Fetching::Paused,
+            },
+            Downloader {
+                client: "qbittorrent".to_owned(),
+                state: Fetching::Fetching,
+            },
+            Downloader {
+                client: "nzbget".to_owned(),
+                state: Fetching::Unknown,
+            },
+        ])
+    );
+    assert!(matches!(
+        super::super::downloaders(None),
+        Panel::Unavailable { reason } if reason.contains("the download clients")
+    ));
+    let refused = crate::error::Problem::new(
+        crate::error::Code::new("TEST-1"),
+        "the stack could not be read",
+        "nothing is known",
+        crate::error::Remedy::new("read it again"),
+    );
+    assert!(matches!(
+        super::super::downloaders(Some(Err(Box::new(refused)))),
+        Panel::Unavailable { reason } if reason == "the stack could not be read"
+    ));
 }

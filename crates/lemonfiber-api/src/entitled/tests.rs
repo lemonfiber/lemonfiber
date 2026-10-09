@@ -194,6 +194,7 @@ fn a_restart() -> Command {
     Command::Restart {
         forms: vec!["tv".to_owned()],
         services: Vec::new(),
+        offer: None,
     }
 }
 
@@ -228,7 +229,10 @@ fn an_act_key_calls_exactly_what_a_key_may_call() {
         may(&acting, Door::Acting, a_restart()),
         Permitted::This(a_restart())
     );
-    let downloads = Command::Downloads(lemonfiber_core::bandwidth::Pausing::Pause);
+    let downloads = Command::Downloads {
+        asked: lemonfiber_core::bandwidth::Pausing::Pause,
+        offer: None,
+    };
     assert_eq!(
         may(&acting, Door::Acting, downloads.clone()),
         Permitted::This(downloads)

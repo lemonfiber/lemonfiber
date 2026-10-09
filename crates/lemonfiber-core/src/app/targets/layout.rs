@@ -144,6 +144,12 @@ fn plain(path: &Path) -> bool {
 /// one per service and named for it.
 const CONFIG_DIR: &str = "config";
 
+/// The directory on this machine the stack's services keep their configuration and
+/// databases beneath, one directory each.
+pub(crate) fn services_config_dir(project: &Path) -> PathBuf {
+    project.join(CONFIG_DIR)
+}
+
 /// A file kept beside the environment file — the one durable location the context
 /// carries, so every record lemonfiber persists (the drift baseline, the materialised
 /// checksums, the recorded quality choice) is placed the same way rather than each

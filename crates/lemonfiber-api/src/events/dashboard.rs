@@ -33,7 +33,11 @@ use lemonfiber_core::model::{kind, Envelope};
 use lemonfiber_core::news::{Newest, News};
 use tokio::sync::Mutex;
 
+use lemonfiber_core::app::{dispatch, Command};
+use tokio::time::Instant;
+
 use super::live::Gathers;
+use super::theirs::{due, playing_unread, PLAYING_EVERY};
 use super::wire::{Nature, Rendered};
 
 /// The dashboard's gather, as the stream's source.
@@ -49,6 +53,8 @@ pub struct Dashboard {
     /// Every alert the dashboard carried at the last gather, by what names it and which
     /// way it went, or nothing before the first gather of this run.
     alerted: Mutex<Option<BTreeSet<(String, Moment)>>>,
+    /// When what is playing was last read, and what was last said of it.
+    playing: Mutex<(Option<Instant>, Option<String>)>,
 }
 
 impl Dashboard {
@@ -61,6 +67,7 @@ impl Dashboard {
             record: Record::carried(),
             told: Mutex::new(None),
             alerted: Mutex::new(None),
+            playing: Mutex::new((None, None)),
         }
     }
 }
@@ -84,6 +91,7 @@ async fn gathered(dashboard: &Dashboard, joined: bool) -> Vec<Rendered> {
             .collect();
     said.extend(newly(dashboard, snapshot, joined).await);
     said.extend(alerted(dashboard, &snapshot.alerts).await);
+    said.extend(playing(dashboard, joined).await);
     *last = Some(gathered);
     said
 }
@@ -118,6 +126,26 @@ async fn alerted(dashboard: &Dashboard, alerts: &[Alert]) -> Vec<Rendered> {
     });
     *alerted = Some(carried);
     said
+}
+
+/// Every session playing, as the read answers the operator, read at a member stream's
+/// pace and said to a listener that has just arrived and to everyone when it changed.
+///
+/// On the operator's stream as on a member's, so a program reading the stack's state
+/// off the stream has no second thing to poll.
+async fn playing(dashboard: &Dashboard, joined: bool) -> Option<Rendered> {
+    let mut heard = dashboard.playing.lock().await;
+    let now = Instant::now();
+    if !joined && !due(heard.0, PLAYING_EVERY, now) {
+        return None;
+    }
+    heard.0 = Some(now);
+    let outcome = dispatch(Command::Playing { member: None }, &dashboard.ctx)
+        .await
+        .unwrap_or_else(|_| playing_unread());
+    let rendered = Rendered::of(Nature::State, &outcome.envelope())?;
+    let previous = heard.1.replace(rendered.said().to_owned());
+    (joined || previous.as_deref() != Some(rendered.said())).then_some(rendered)
 }
 
 /// The newest of each kind, where it is owed: to a listener that has just arrived,

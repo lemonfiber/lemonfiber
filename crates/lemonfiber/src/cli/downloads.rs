@@ -8,6 +8,10 @@ pub struct RawDownloads {
     /// Which of the two to do.
     #[command(subcommand)]
     pub action: DownloadsCommand,
+    /// The offer being answered, as the rehearsal printed it. Carrying one, no client is
+    /// told anything where the clients, or what each said it was doing, have moved.
+    #[arg(long, value_name = "NAME", global = true)]
+    pub offer: Option<String>,
 }
 
 /// The two things to do to every download client at once.

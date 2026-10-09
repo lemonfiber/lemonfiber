@@ -114,6 +114,11 @@
     "status": 400,
     "description": "Raised when an agreement names a reading of this machine that is not the one standing now."
   },
+  "LIFE-10": {
+    "name": "RESTART_MOVED",
+    "status": 400,
+    "description": "Raised where a restart names an offer that is not the one a fresh look at the stack builds."
+  },
   "MIGRATE-1": {
     "name": "OFFER_MOVED",
     "status": 400,
@@ -304,6 +309,11 @@
     "status": 500,
     "description": "The plugin's own service would not start, so nothing about it could be proved."
   },
+  "RATE-6": {
+    "name": "PAUSING_MOVED",
+    "status": 400,
+    "description": "Raised where pausing or resuming the download clients names an offer that is not the one a fresh look at them builds."
+  },
   "READ-1": {
     "name": "UNWANTED",
     "status": 400,
@@ -463,6 +473,11 @@
     "name": "STACK_NEEDS_NEWER",
     "status": 500,
     "description": "Raised when a stack names a newer lemonfiber than the one running."
+  },
+  "UPDATE-5": {
+    "name": "UPDATE_MOVED",
+    "status": 400,
+    "description": "Raised where an update names an offer that is not the one a fresh look at the releases builds."
   },
   "WIRE-1": {
     "name": "NO_SUCH_FILLER",
