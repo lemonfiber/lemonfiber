@@ -67,7 +67,7 @@ pub(super) fn spoken(service: &Service, found: &mut Vec<Violation>) {
 
 /// The capability `named` is the contract of, where the service does not provide it.
 fn unprovided<'a>(service: &Service, named: &'a str) -> Option<&'a str> {
-    let (capability, _) = named.split_once('@')?;
+    let capability = lemonfiber_contract::capability_of(named)?;
     (!service
         .provides
         .iter()
@@ -79,7 +79,7 @@ fn unprovided<'a>(service: &Service, named: &'a str) -> Option<&'a str> {
 fn contracted(named: &str) -> bool {
     lemonfiber_contract::capabilities::all()
         .iter()
-        .any(|capability| format!("{}@{}", capability.name, capability.major) == named)
+        .any(|capability| lemonfiber_contract::spoken(capability.name, capability.major) == named)
 }
 
 #[cfg(test)]

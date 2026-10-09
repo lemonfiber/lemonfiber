@@ -33,6 +33,18 @@ pub fn path(capability: &str, major: u32, operation: &str) -> String {
     format!("/lemonfiber/{capability}/v{major}/{operation}")
 }
 
+/// A contract as a service names it: `capability@major`.
+#[must_use]
+pub fn spoken(capability: &str, major: u32) -> String {
+    format!("{capability}@{major}")
+}
+
+/// The capability a contract named `capability@major` is of.
+#[must_use]
+pub fn capability_of(spoken: &str) -> Option<&str> {
+    spoken.split_once('@').map(|(capability, _)| capability)
+}
+
 /// One operation of one capability's contract: what it is called, and the shapes of what
 /// is asked and what is answered.
 #[derive(Debug, Clone)]

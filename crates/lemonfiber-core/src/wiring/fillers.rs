@@ -102,7 +102,8 @@ impl Filler {
     /// Whether it is asked over `capability`'s contract at `major`.
     #[must_use]
     pub fn contracted(&self, capability: &str, major: u32) -> bool {
-        self.contracts.contains(&format!("{capability}@{major}"))
+        self.contracts
+            .contains(&lemonfiber_contract::spoken(capability, major))
     }
 
     /// Whether lemonfiber speaks to it through this adapter.

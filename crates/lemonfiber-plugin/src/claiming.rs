@@ -187,11 +187,7 @@ fn spoken(manifest: &Manifest, service: &str, capability: &str) -> bool {
         .iter()
         .filter(|one| one.id == service)
         .flat_map(|one| &one.speaks)
-        .any(|named| {
-            named
-                .split_once('@')
-                .is_some_and(|(spoken, _)| spoken == capability)
-        })
+        .any(|named| lemonfiber_contract::capability_of(named) == Some(capability))
 }
 
 /// The probes a claim binds, against the ones its capability declares.
