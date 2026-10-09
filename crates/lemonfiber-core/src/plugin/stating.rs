@@ -142,8 +142,27 @@ pub fn proofs(manifest: &Manifest) -> Vec<Proving> {
             why: proof.why.clone(),
             came_to: None,
         })
+        .chain(
+            manifest
+                .services
+                .iter()
+                .filter(|service| !service.speaks.is_empty())
+                .map(|service| Proving {
+                    proof: format!("{}{SPEAKS}", service.id),
+                    establishes: "It answers the contracts it says it speaks".to_owned(),
+                    of: Some(service.id.clone()),
+                    asks: format!("GET {}", lemonfiber_contract::adapter::about_path()),
+                    why: "lemonfiber asks it over those contracts, so what it says it speaks \
+                          has to be what it answers"
+                        .to_owned(),
+                    came_to: None,
+                }),
+        )
         .collect()
 }
+
+/// What the proof that an adapter speaks what it declares is named after its service.
+pub const SPEAKS: &str = "-speaks";
 
 /// Every bundled thing the plugin declares it will change.
 ///

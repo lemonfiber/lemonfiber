@@ -207,3 +207,30 @@ async fn an_answer_is_read_up_to_the_bound_its_operation_declares() {
     assert_eq!(read.ok().map(|answer| answer.len()), Some(LARGEST));
     assert_eq!(told.count(), 0);
 }
+
+#[tokio::test]
+async fn an_adapter_is_asked_what_it_is_by_a_keyed_get() {
+    let about = r#"{"speaks":["media.serve@1"],"upstream":"a media server","releases":[]}"#;
+    let (fake, client, told) = adapter(Answer::reply(200, about));
+    let said = client.about().await;
+    assert_eq!(
+        said.ok().map(|about| about.speaks),
+        Some(vec!["media.serve@1".to_owned()])
+    );
+    let request = fake.request();
+    assert_eq!(
+        request
+            .as_ref()
+            .map(|request| (request.method, request.url.as_str())),
+        Some((
+            Method::Get,
+            "http://adapter:8080/lemonfiber/adapter/v1/about"
+        ))
+    );
+    assert_eq!(request.and_then(|request| request.body), None);
+    assert_eq!(told.count(), 0);
+
+    let (_, client, told) = adapter(Answer::reply(200, r#"{"speaks":[]}"#));
+    assert!(matches!(client.about().await, Err(Failure::Refused { .. })));
+    assert_eq!(told.count(), 1);
+}

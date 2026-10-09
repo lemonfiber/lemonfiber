@@ -189,6 +189,7 @@ fn observations_carry_the_service_they_describe() {
         published: vec![Published {
             address: std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST),
             port: 8989,
+            private: 8989,
         }],
         project: "lemonfiber".to_owned(),
         service: "sonarr".to_owned(),

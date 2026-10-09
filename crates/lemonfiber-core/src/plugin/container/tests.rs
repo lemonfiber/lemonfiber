@@ -197,6 +197,29 @@ fn a_service_with_no_listener_publishes_nothing() {
     assert!(entry.contains("volumes:"), "got: {entry}");
 }
 
+/// The port a service speaks its contracts on is published on this machine's loopback
+/// alone, at whatever host port the engine gives it; one that speaks nothing publishes
+/// the port it listens on no further than the stack's network.
+#[test]
+fn the_port_an_adapter_speaks_on_is_published_on_loopback_at_a_port_the_engine_picks() {
+    let adapter = document(Placed {
+        reached: None,
+        listens: Some(8080),
+        speaks: vec!["media.serve@1".to_owned()],
+        ..placed()
+    });
+    assert!(
+        adapter.contains(&format!("{OPERATOR}::8080")),
+        "got: {adapter}"
+    );
+    let silent = document(Placed {
+        reached: None,
+        listens: Some(8080),
+        ..placed()
+    });
+    assert!(!silent.contains("ports:"), "got: {silent}");
+}
+
 /// The library is mounted for a service that said it handles media, and no other.
 #[test]
 fn the_library_is_mounted_only_where_the_manifest_said_it_is_wanted() {

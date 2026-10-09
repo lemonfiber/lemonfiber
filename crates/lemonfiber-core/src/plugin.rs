@@ -45,6 +45,7 @@ mod source;
 // than inside either: the record says what was decided and the container says what
 // follows from it, and this says where both of those land on the machine.
 mod placing;
+pub(crate) mod reaching;
 // What an install says it will do, before any of it is done. Beside the placing for
 // the same reason the placing is beside the record: one module turns a decision into
 // paths, and this turns it into the account an operator agrees to.

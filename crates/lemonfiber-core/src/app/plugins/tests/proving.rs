@@ -3,7 +3,9 @@
 use super::*;
 
 /// What the proofs on a report came to, in the order they were declared.
-fn verdicts(outcome: Result<Installs, Box<crate::error::Problem>>) -> Vec<Option<Verdict>> {
+pub(super) fn verdicts(
+    outcome: Result<Installs, Box<crate::error::Problem>>,
+) -> Vec<Option<Verdict>> {
     report(outcome)
         .and_then(|one| one.install)
         .map(|one| one.proofs.into_iter().map(|proof| proof.came_to).collect())

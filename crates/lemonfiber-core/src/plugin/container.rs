@@ -237,6 +237,12 @@ fn entry(plugin: &str, placed: &Placed) -> Entry {
             format!("{}:{port}:{port}", published(reached))
         })
         .into_iter()
+        .chain(
+            placed
+                .listens
+                .filter(|_| !placed.speaks.is_empty())
+                .map(|listens| format!("{OPERATOR}::{listens}")),
+        )
         .collect();
     let mut volumes = Vec::new();
     if placed.takes_data {

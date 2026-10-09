@@ -129,6 +129,7 @@ impl Reporting {
                     Some(Published {
                         address: address.parse().ok()?,
                         port: *port,
+                        private: *port,
                     })
                 })
                 .collect();

@@ -295,7 +295,14 @@ async fn on(ctx: &Ctx, coming: &Coming<'_>, install: &mut Install) -> Came {
     if let Some(why) = proving::up(ctx, coming.would, coming.stack).await {
         return Came::Stopped(why);
     }
-    proving::asked(ctx, coming.manifest, coming.would, &mut install.proofs).await;
+    proving::asked(
+        ctx,
+        coming.manifest,
+        coming.would,
+        coming.stack,
+        &mut install.proofs,
+    )
+    .await;
     install.against = Some(proving::AGAINST);
     if !proving::held(&install.proofs) {
         return Came::NotHeld;

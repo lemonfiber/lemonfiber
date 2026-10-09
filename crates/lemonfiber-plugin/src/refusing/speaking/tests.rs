@@ -38,6 +38,15 @@ fn a_contract_this_build_does_not_speak_is_refused_by_name() {
 }
 
 #[test]
+fn an_adapter_publishing_the_port_it_speaks_on_is_refused() {
+    let said = said(&speaking(r#"["media.serve@1"]"#, "listens     = 25600\n"));
+    assert!(
+        names(&said, &["service komga.port", "loopback alone"]),
+        "{said:?}"
+    );
+}
+
+#[test]
 fn a_contract_named_twice_is_refused() {
     let said = said(&speaking(
         r#"["media.serve@1", "media.serve@1"]"#,
