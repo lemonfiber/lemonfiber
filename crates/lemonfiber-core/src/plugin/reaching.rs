@@ -10,12 +10,10 @@ use std::sync::Arc;
 
 use lemonfiber_contract::Contracted;
 
+use super::container::LOOPBACK;
 use super::{key_file, Placed};
 use crate::app::Ctx;
 use crate::ports::filesystem::Beneath;
-
-/// The host every adapter is reached on.
-const LOOPBACK: &str = "127.0.0.1";
 
 /// The adapter `placed` is, asked over its contracts, or why it cannot be reached.
 ///

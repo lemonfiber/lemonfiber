@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use lemonfiber_plugin::Manifest;
 
 use super::super::installed::{Installed, Placed, Reached};
-use super::{published, written, CONFIGURATION, HOUSEHOLD, LIBRARY, OPERATOR, PROFILE};
+use super::{published, written, CONFIGURATION, HOUSEHOLD, LIBRARY, LOOPBACK, PROFILE};
 
 /// The template the generated entries extend, as the stack ships it.
 ///
@@ -176,7 +176,7 @@ fn each_tier_is_published_on_the_interface_the_tier_decides() {
         ..placed()
     });
     assert!(
-        operator.contains(&format!("{OPERATOR}:25600:25600")),
+        operator.contains(&format!("{LOOPBACK}:25600:25600")),
         "got: {operator}"
     );
     assert!(!operator.contains(HOUSEHOLD), "got: {operator}");
@@ -209,7 +209,7 @@ fn the_port_an_adapter_speaks_on_is_published_on_loopback_at_a_port_the_engine_p
         ..placed()
     });
     assert!(
-        adapter.contains(&format!("{OPERATOR}::8080")),
+        adapter.contains(&format!("{LOOPBACK}::8080")),
         "got: {adapter}"
     );
     let silent = document(Placed {
@@ -540,7 +540,7 @@ fn each_tier_renders_to_its_own_interface() {
             port: 1,
             group: None
         }),
-        OPERATOR
+        LOOPBACK
     );
     assert_eq!(
         published(&Reached::Household {
@@ -550,7 +550,7 @@ fn each_tier_renders_to_its_own_interface() {
         }),
         HOUSEHOLD
     );
-    assert_ne!(OPERATOR, HOUSEHOLD);
+    assert_ne!(LOOPBACK, HOUSEHOLD);
 }
 
 /// A value holds its place in the document whatever it carries.
