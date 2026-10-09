@@ -20,30 +20,15 @@
 # starts where the last left off.
 name: fuzz
 on:
+  # Every pull request, so `smoke` reports on each and can be required. Whether
+  # it has anything to fuzz is `what changed`'s answer, not a path filter's: a
+  # filtered workflow never reports on a pull request outside its paths, and a
+  # required context that never reports holds the branch.
   pull_request:
-    paths: &fuzzed
-      - "crates/lemonfiber/**"
-      - "crates/lemonfiber-adapters/**"
-      - "crates/lemonfiber-api/**"
-      - "crates/lemonfiber-core/**"
-      - "crates/lemonfiber-error/**"
-      - "crates/lemonfiber-manifest/**"
-      - "crates/lemonfiber-plugin/**"
-      - "crates/lemonfiber-ports/**"
-      - "fuzz/**"
-      - ".github/workflows/fuzz.yml"
-      # Everything these targets are built from, not only the crate they exercise.
-      # The compiler is not the one the repository pins, and the parser they drive is
-      # mostly somebody else's code — so a toolchain pin or a `toml` bump is a change
-      # to whether these build and to what they are testing. `fuzz/Cargo.lock` needs
-      # no entry; `fuzz/**` has it.
-      - "rust-toolchain.toml"
-      - "Cargo.lock"
-  # The same paths, so main's build is saved whenever a change could have made
-  # the one a pull request restores stale.
+  # Main's build is saved whenever a change could have made the one a pull
+  # request restores stale, which `what changed` answers the same way.
   push:
     branches: [main]
-    paths: *fuzzed
   schedule:
     - cron: "0 4 * * 0"
   workflow_dispatch:
@@ -59,12 +44,64 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Whether this change reaches what the targets are built from: the crates they
+  # exercise, the harness, the compiler pin and the lockfile. The compiler is not
+  # the one the repository pins, and the parser they drive is mostly somebody
+  # else's code, so a toolchain pin or a `toml` bump is a change to whether these
+  # build and to what they are testing. `fuzz/Cargo.lock` is under `fuzz/`. A
+  # change with no base to compare against fuzzes, and so does a failure here.
+  scope:
+    name: what changed
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      fuzzed: ${{ steps.diff.outputs.fuzzed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          filter: blob:none
+      - id: diff
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BASE}" ] || ! git cat-file -e "${BASE}^{commit}" 2>/dev/null; then
+            echo "fuzzed=true" >> "$GITHUB_OUTPUT"
+            echo "No commit to compare against, so the smoke runs."
+            exit 0
+          fi
+          changed="$(git diff --no-renames --name-only "${BASE}" HEAD)"
+          fuzzed=false
+          while IFS= read -r path; do
+            case "${path}" in
+            crates/lemonfiber/* | crates/lemonfiber-adapters/* | crates/lemonfiber-api/* \
+              | crates/lemonfiber-core/* | crates/lemonfiber-error/* | crates/lemonfiber-manifest/* \
+              | crates/lemonfiber-plugin/* | crates/lemonfiber-ports/* | fuzz/* \
+              | .github/workflows/fuzz.yml | rust-toolchain.toml | Cargo.lock)
+              fuzzed=true
+              ;;
+            esac
+          done <<< "${changed}"
+          echo "fuzzed=${fuzzed}" >> "$GITHUB_OUTPUT"
+          if [ "${fuzzed}" = false ]; then
+            echo "Nothing the targets are built from changed, so the smoke does not run."
+          fi
+
   # The pull request's run and main's. One job rather than one per target:
   # every target is built from the same dependencies, so building them together
   # compiles those once, and the runs that follow need a core each rather than a
   # runner each.
   smoke:
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    needs: scope
+    if: >-
+      !cancelled()
+      && (github.event_name == 'pull_request' || github.event_name == 'push')
+      && (needs.scope.result != 'success' || needs.scope.outputs.fuzzed == 'true')
     runs-on: ubuntu-latest
     permissions:
       contents: read
