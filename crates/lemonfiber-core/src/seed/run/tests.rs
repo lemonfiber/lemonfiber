@@ -219,6 +219,47 @@ fn fillers_trusting(
         .unwrap_or_default()
 }
 
+/// The digest a contracted plugin was installed from.
+const CONTRACTED_MANIFEST: &str = "contracted-manifest";
+
+/// A plugin whose service `service` provides `capability` and speaks its first major on
+/// 8080.
+fn contracted(plugin: &str, service: &str, capability: &str) -> crate::plugin::Installed {
+    let mut placed = crate::test_support::a_placed(service, &[capability], None, Some(8080));
+    placed.speaks = vec![format!("{capability}@1")];
+    let mut installed = crate::test_support::an_installed(plugin, vec![placed]);
+    installed.manifest = CONTRACTED_MANIFEST.to_owned();
+    installed
+}
+
+/// `plugin`, installed from its contracted manifest, as first-party.
+const fn first_party(plugin: &'static str) -> [crate::plugin::first_party::FirstParty; 1] {
+    [crate::plugin::first_party::FirstParty {
+        plugin,
+        manifest: CONTRACTED_MANIFEST,
+    }]
+}
+
+/// A context reaching `service` on loopback 8080, holding its key in `project` where
+/// `keyed`, with every Servarr key on file.
+fn contracted_ctx(project: &std::path::Path, service: &str, keyed: bool, http: Arc<Fake>) -> Ctx {
+    if keyed {
+        let at = crate::plugin::key_file(project, service);
+        let _ = std::fs::create_dir_all(at.parent().unwrap_or(&at));
+        let _ = std::fs::write(&at, "contracted-key");
+    }
+    let engine = Reporting::holding(&[service], Lifecycle::Running, Health::Healthy)
+        .publishing(&[(service, "127.0.0.1", 8080)]);
+    a_context()
+        .engine(Arc::new(engine))
+        .build()
+        .with_http(http)
+        .with_filesystem(Arc::new(SeedFs::keyed(
+            Some("<Config><ApiKey>the-key</ApiKey></Config>"),
+            None,
+        )))
+}
+
 /// The stack's `services` beside a plugin's curator, `kept`, filing `media` and keeping
 /// its key in a file beneath the directory its container owns.
 fn beside_a_stand_in(

@@ -14,6 +14,7 @@
 //! here fills what was asked for, and an operator reading a report that left it out
 //! could not tell a filler nothing reaches from one lemonfiber forgot.
 
+use lemonfiber_contract::capabilities::indexer::search;
 use lemonfiber_contract::capabilities::subtitles::fetch;
 use lemonfiber_manifest::ApiKind;
 
@@ -49,7 +50,10 @@ pub(super) const MUSIC: &str = ApplicationKind::Music.media_type();
 const ANSWERED: [&str; 4] = [USENET, TORRENT, CURATES, SEARCHES];
 
 /// Every contract an asker is paired by, as capability and major.
-const CONTRACTED: [(&str, u32); 1] = [(fetch::CAPABILITY, fetch::MAJOR)];
+const CONTRACTED: [(&str, u32); 2] = [
+    (fetch::CAPABILITY, fetch::MAJOR),
+    (search::CAPABILITY, search::MAJOR),
+];
 
 /// An asker, as the table pairs it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -167,11 +171,13 @@ fn connection(
         | (Asking::Bundled(ApiKind::Servarr), TORRENT, ApiKind::Qbittorrent) => Ok(
             Connection::DownloadClient(Protocol(filler.name().to_owned())),
         ),
-        (Asking::Bundled(ApiKind::Servarr), CURATES, ApiKind::Servarr) => {
-            super::applications::application_kind(media)
-                .map(Connection::Application)
-                .ok_or(Unmade::Files)
-        }
+        (
+            Asking::Bundled(ApiKind::Servarr) | Asking::Over(search::CAPABILITY),
+            CURATES,
+            ApiKind::Servarr,
+        ) => super::applications::application_kind(media)
+            .map(Connection::Application)
+            .ok_or(Unmade::Files),
         (Asking::Bundled(ApiKind::Seerr), CURATES, ApiKind::Servarr) => Kind::of_declared(media)
             .map(|kind| Connection::Fulfilment { kind })
             .ok_or(Unmade::Files),

@@ -95,54 +95,19 @@ async fn a_plugin_finder_is_never_handed_a_curators_key() {
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
 
-/// The digest the contracted finder's plugin was installed from.
-const SUBBER: &str = "subber-manifest";
-
-/// A plugin `subber` whose service stands in for the stack's finder, speaking
-/// `subtitles.fetch@1` on 8080, beside both curators.
+/// A plugin `subber` whose service stands in for the stack's finder over
+/// `subtitles.fetch`, beside both curators.
 fn contracted_finder(
     project: &std::path::Path,
     trusted: &[crate::plugin::first_party::FirstParty],
 ) -> crate::wiring::Fillers {
-    let mut finder =
-        crate::test_support::a_placed("bazarr", &["subtitles.fetch"], None, Some(8080));
-    finder.speaks = vec!["subtitles.fetch@1".to_owned()];
-    let mut subber = crate::test_support::an_installed("subber", vec![finder]);
-    subber.manifest = SUBBER.to_owned();
     fillers_trusting(
         vec![arr("sonarr", 8989, "tv"), arr("radarr", 7878, "movies")],
-        &[subber],
+        &[contracted("subber", "bazarr", "subtitles.fetch")],
         project,
         trusted,
     )
 }
-
-/// A context reaching the contracted finder on loopback, holding its key where `keyed`,
-/// with the curators' keys on file.
-fn contracted_ctx(project: &std::path::Path, keyed: bool, http: Arc<Fake>) -> Ctx {
-    if keyed {
-        let at = crate::plugin::key_file(project, "bazarr");
-        let _ = std::fs::create_dir_all(at.parent().unwrap_or(&at));
-        let _ = std::fs::write(&at, "subber-key");
-    }
-    let engine = Reporting::holding(&["bazarr"], Lifecycle::Running, Health::Healthy)
-        .publishing(&[("bazarr", "127.0.0.1", 8080)]);
-    a_context()
-        .engine(Arc::new(engine))
-        .build()
-        .with_http(http)
-        .with_filesystem(Arc::new(SeedFs::keyed(
-            Some("<Config><ApiKey>the-key</ApiKey></Config>"),
-            None,
-        )))
-}
-
-/// The plugin trusted as first-party.
-const TRUSTED: [crate::plugin::first_party::FirstParty; 1] =
-    [crate::plugin::first_party::FirstParty {
-        plugin: "subber",
-        manifest: SUBBER,
-    }];
 
 #[tokio::test]
 async fn a_first_party_finder_speaking_the_contract_is_told_each_curator_over_it() {
@@ -160,8 +125,8 @@ async fn a_first_party_finder_speaking_the_contract_is_told_each_curator_over_it
             Answer::reply(204, ""),
         ),
     ]);
-    let ctx = contracted_ctx(&project, true, http.clone());
-    let fillers = contracted_finder(&project, &TRUSTED);
+    let ctx = contracted_ctx(&project, "bazarr", true, http.clone());
+    let fillers = contracted_finder(&project, &first_party("subber"));
 
     let wirings = super::super::subtitles::seed_subtitles(&ctx, &fillers).await;
     let rewatched = super::super::subtitles::rewatch(&ctx, &fillers, "sonarr").await;
@@ -194,12 +159,12 @@ async fn a_contracted_finder_untrusted_or_unreachable_is_asked_nothing_and_never
 ) {
     for (tag, trusted, keyed) in [
         ("untrusted", &[][..], true),
-        ("unkeyed", &TRUSTED[..], false),
+        ("unkeyed", &first_party("subber")[..], false),
     ] {
         let project =
             lemonfiber_fixtures::scratch::Scratch::new(&format!("subtitles-contracted-{tag}"));
         let http = Fake::always(Answer::reply(200, WATCHING_NOTHING));
-        let ctx = contracted_ctx(&project, keyed, http.clone());
+        let ctx = contracted_ctx(&project, "bazarr", keyed, http.clone());
         let fillers = contracted_finder(&project, trusted);
 
         let wirings = super::super::subtitles::seed_subtitles(&ctx, &fillers).await;
