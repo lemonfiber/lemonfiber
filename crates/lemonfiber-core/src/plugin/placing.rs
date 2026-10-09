@@ -69,6 +69,8 @@ pub enum Lands {
     Directory,
     /// A file written whole, holding this.
     Document(String),
+    /// The key lemonfiber asks the plugin's adapter with, minted as it is written.
+    Key,
     /// A region inside a file the stack already has, holding this.
     Region {
         /// The file beneath the stack directory, as the record of what lemonfiber
@@ -98,6 +100,14 @@ impl Write {
         }
     }
 
+    /// The key file an adapter service is asked under.
+    const fn key(path: PathBuf) -> Self {
+        Self {
+            path,
+            lands: Lands::Key,
+        }
+    }
+
     /// A region the install writes into one of the stack's own files.
     fn region(stack: &Path, key: &str, owner: String, body: String) -> Self {
         Self {
@@ -124,6 +134,13 @@ impl Write {
 #[must_use]
 pub fn overlay(stack: &Path, plugin: &str) -> PathBuf {
     stack.join(OVERLAYS).join(format!("{plugin}.yml"))
+}
+
+/// Where the key lemonfiber asks a plugin's adapter service with is kept: in that
+/// service's own configuration directory, where its container reads it.
+#[must_use]
+pub fn key_file(stack: &Path, service: &str) -> PathBuf {
+    configuration(stack, service).join(lemonfiber_contract::adapter::KEY_FILE)
 }
 
 /// Where one of a plugin's services keeps its own configuration.
@@ -183,6 +200,13 @@ pub fn writes(installed: &Installed, stack: &Path) -> Vec<Write> {
         .iter()
         .map(|placed| Write::directory(configuration(stack, &placed.service)))
         .collect();
+    planned.extend(
+        installed
+            .services
+            .iter()
+            .filter(|placed| !placed.speaks.is_empty())
+            .map(|placed| Write::key(key_file(stack, &placed.service))),
+    );
     planned.push(Write::file(
         overlay(stack, &installed.plugin),
         super::container::written(installed),

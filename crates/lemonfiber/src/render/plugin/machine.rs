@@ -132,6 +132,7 @@ fn changes(made: &[Changing], recorded: bool) -> Lines {
             match one.puts {
                 Puts::Directory => "a directory ",
                 Puts::Document => "a document  ",
+                Puts::Key => "a key       ",
                 Puts::Region => "a region in ",
             },
             one.path

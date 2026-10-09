@@ -8,6 +8,7 @@ rust-version.workspace = true
 repository.workspace = true
 
 [dependencies]
+lemonfiber-contract = { workspace = true }
 # The bundled stack's manifest as one text, for the vocabulary its services publish.
 lemonfiber-bundled = { workspace = true }
 lemonfiber-error = { workspace = true }

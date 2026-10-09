@@ -75,6 +75,10 @@ pub(crate) fn carry_out(
                 made_whole(ctx, plugin, stamp, &journal, &write.path, Some(content))?;
                 continue;
             }
+            crate::plugin::Lands::Key => {
+                keyed(ctx, plugin, stamp, &journal, &write.path)?;
+                continue;
+            }
         };
         // Journalled first, as every write is, holding what goes between the markers so
         // the reversal can tell its own region from one somebody has edited since. A
@@ -136,6 +140,26 @@ fn made_whole(
             .map_err(|failure| Box::new(unwritable(path, &failure.to_string()))),
     }
 }
+
+/// Mint the key an adapter service is asked with and write it where its container reads
+/// it, keeping one already there so a reinstall does not cut off what holds it.
+fn keyed(
+    ctx: &Ctx,
+    plugin: &str,
+    stamp: &str,
+    journal: &Path,
+    path: &Path,
+) -> Result<(), Box<Problem>> {
+    if path.is_file() {
+        return Ok(());
+    }
+    let key = crate::keys::Secret::mint(ctx.seams.random.as_ref())
+        .ok_or_else(|| Box::new(unwritable(path, UNMINTED)))?;
+    made_whole(ctx, plugin, stamp, journal, path, Some(key.as_str()))
+}
+
+/// Why an adapter's key could not be written.
+const UNMINTED: &str = "this machine would not supply the random bytes a key is made from";
 
 /// The journal entry for a region an install wrote into one of the stack's files.
 fn bounded(plugin: &str, path: &Path, key: &str, owner: &str, body: &str, stamp: &str) -> Change {
@@ -344,7 +368,9 @@ pub(crate) fn landing(ctx: &Ctx, planned: Vec<crate::plugin::Write>) -> Vec<crat
             crate::plugin::Lands::Region { key, .. } => {
                 write.path.is_file() && !crate::unmanaged::covers(&ctx.settings.unmanaged, key)
             }
-            crate::plugin::Lands::Directory | crate::plugin::Lands::Document(_) => true,
+            crate::plugin::Lands::Directory
+            | crate::plugin::Lands::Document(_)
+            | crate::plugin::Lands::Key => true,
         })
         .collect()
 }

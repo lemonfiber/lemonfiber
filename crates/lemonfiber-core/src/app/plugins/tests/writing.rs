@@ -391,3 +391,27 @@ fn a_write_whose_record_cannot_be_written_is_not_made() {
         "the region was written with no record of it"
     );
 }
+
+/// An adapter's key is minted where its container reads it, kept when the install runs
+/// again so what holds it is not cut off, and never written from nothing.
+#[test]
+fn an_adapters_key_is_minted_once_kept_after_and_never_made_up() {
+    use crate::plugin::{Lands, Write};
+
+    let mut ctx = ctx("adapter-key");
+    let path = crate::plugin::key_file(&stack_of(&ctx), "plex-adapter");
+    let key = vec![Write {
+        path: path.clone(),
+        lands: Lands::Key,
+    }];
+    assert!(super::super::writing::carry_out(&ctx, "plex", "1", &key).is_ok());
+    let minted = std::fs::read_to_string(&path).unwrap_or_default();
+    assert!(minted.len() > 32, "{minted}");
+    assert!(super::super::writing::carry_out(&ctx, "plex", "2", &key).is_ok());
+    assert_eq!(std::fs::read_to_string(&path).ok(), Some(minted));
+
+    assert!(std::fs::remove_file(&path).is_ok());
+    ctx.seams.random = std::sync::Arc::new(lemonfiber_fixtures::ports::Chance::exactly(None));
+    assert!(super::super::writing::carry_out(&ctx, "plex", "3", &key).is_err());
+    assert!(!path.exists());
+}

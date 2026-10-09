@@ -34,6 +34,9 @@ pub enum Puts {
     Directory,
     /// A document written, which is the container lemonfiber derives for the plugin.
     Document,
+    /// The key lemonfiber asks one of the plugin's adapters with, minted as it is
+    /// written and never shown.
+    Key,
     /// A region written into one of the stack's own files, marked out as the plugin's:
     /// its route through the proxy, or its entry on the dashboard.
     Region,
@@ -112,6 +115,7 @@ pub fn changes(planned: &[Write]) -> Vec<Changing> {
             puts: match write.lands {
                 Lands::Directory => Puts::Directory,
                 Lands::Document(_) => Puts::Document,
+                Lands::Key => Puts::Key,
                 Lands::Region { .. } => Puts::Region,
             },
         })

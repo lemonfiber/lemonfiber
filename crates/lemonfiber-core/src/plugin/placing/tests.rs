@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use super::{configuration, documents, overlay, writes, Lands, Write};
+use super::{configuration, documents, key_file, overlay, writes, Lands, Write};
 use crate::plugin::installed::{Installed, Placed, Reached};
 
 /// The stack directory these are written beneath.
@@ -30,6 +30,7 @@ fn placed(service: &str) -> Placed {
         listens: None,
         media_types: Vec::new(),
         networks: Vec::new(),
+        speaks: Vec::new(),
     }
 }
 
@@ -90,7 +91,7 @@ fn a_service_keeps_its_configuration_where_the_bundled_ones_keep_theirs() {
 fn document(planned: &[Write]) -> Option<String> {
     planned.iter().find_map(|one| match &one.lands {
         Lands::Document(content) => Some(content.clone()),
-        Lands::Directory | Lands::Region { .. } => None,
+        Lands::Directory | Lands::Key | Lands::Region { .. } => None,
     })
 }
 
@@ -100,7 +101,7 @@ fn regions(planned: &[Write]) -> Vec<(String, String)> {
         .iter()
         .filter_map(|one| match &one.lands {
             Lands::Region { key, owner, .. } => Some((key.clone(), owner.clone())),
-            Lands::Directory | Lands::Document(_) => None,
+            Lands::Directory | Lands::Document(_) | Lands::Key => None,
         })
         .collect()
 }
@@ -271,4 +272,33 @@ fn a_document_no_plugin_is_registered_for_is_not_layered() {
     let layered = documents(&["komga".to_owned()], stack());
     assert!(!layered.contains(&overlay(stack(), "dropped-in-by-hand")));
     assert_eq!(layered.len(), 1);
+}
+
+/// An adapter service is given its key after the directories and before the document
+/// that starts it, and a service that speaks nothing is given none.
+#[test]
+fn an_adapter_service_is_keyed_before_the_document_that_starts_it() {
+    let mut plugin = installed("plex", &["plex", "plex-adapter"]);
+    if let Some(adapter) = plugin.services.get_mut(1) {
+        adapter.speaks = vec!["media.serve@1".to_owned()];
+    }
+    let planned = writes(&plugin, stack());
+    let at = |lands: fn(&Lands) -> bool| planned.iter().position(|one| lands(&one.lands));
+    let key = planned
+        .iter()
+        .filter(|one| one.lands == Lands::Key)
+        .map(|one| one.path.clone())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        key,
+        [PathBuf::from(
+            "/opt/lemonfiber/stack/config/plex-adapter/lemonfiber.key"
+        )]
+    );
+    assert_eq!(
+        key_file(stack(), "plex-adapter"),
+        key.first().cloned().unwrap_or_default()
+    );
+    assert!(at(|one| *one == Lands::Directory) < at(|one| *one == Lands::Key));
+    assert!(at(|one| *one == Lands::Key) < at(|one| matches!(one, Lands::Document(_))));
 }

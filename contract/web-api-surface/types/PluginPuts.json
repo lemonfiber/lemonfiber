@@ -3,6 +3,7 @@
   "variants": [
     "\"directory\"",
     "\"document\"",
+    "\"key\"",
     "\"region\""
   ]
 }

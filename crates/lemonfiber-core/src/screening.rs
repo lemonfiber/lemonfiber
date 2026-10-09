@@ -17,7 +17,7 @@ use crate::app::targets::jellyfin_reader;
 use crate::app::{Ctx, Outcome, Viewing, Whom};
 use crate::error::codes::play::{
     NOBODY_NAMED, NOTHING_TO_PLAY_FROM, NOT_AN_ITEM, NOT_A_DEVICE, NOT_IN_THE_HOUSEHOLD,
-    NOT_ON_THEIR_SHELF, NO_SUCH_PICTURE, SIGNS_NO_DEVICE_IN, UNANSWERED,
+    NOT_ON_THEIR_SHELF, NO_SUCH_PICTURE, SERVER_SILENT, SIGNS_NO_DEVICE_IN,
 };
 use crate::error::{Code, Diagnose as _, Problem, Remedy, State};
 use crate::jellyfin::Jellyfin;
@@ -34,7 +34,7 @@ pub const REFUSALS: [Code; 9] = [
     NOT_ON_THEIR_SHELF,
     NOT_A_DEVICE,
     NOTHING_TO_PLAY_FROM,
-    UNANSWERED,
+    SERVER_SILENT,
     NOBODY_NAMED,
     NOT_IN_THE_HOUSEHOLD,
     SIGNS_NO_DEVICE_IN,
@@ -399,7 +399,7 @@ fn nobody() -> Box<Problem> {
 
 /// The refusal for a server that did not answer.
 fn unanswered() -> Box<Problem> {
-    refused(UNANSWERED, "The media server did not answer")
+    refused(SERVER_SILENT, "The media server did not answer")
 }
 
 #[cfg(test)]

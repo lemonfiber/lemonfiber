@@ -145,7 +145,7 @@
     "description": "Said where there is no media server to play from, or it was never set up."
   },
   "PLAY-5": {
-    "name": "UNANSWERED",
+    "name": "SERVER_SILENT",
     "status": 502,
     "description": "Said where the media server would not answer for a member."
   },

@@ -36,7 +36,7 @@ codes! {
         remedy: "Add a media server to the stack and run `lemonfiber setup`.",
     }
     /// Said where the media server would not answer for a member.
-    UNANSWERED = "PLAY-5" {
+    SERVER_SILENT = "PLAY-5" {
         severity: Error,
         status: 502,
         since: "0.18.0",

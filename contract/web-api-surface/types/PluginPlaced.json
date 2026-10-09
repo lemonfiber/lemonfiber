@@ -72,6 +72,12 @@
       ],
       "required": true
     },
+    "speaks": {
+      "type": [
+        "array[string]"
+      ],
+      "required": false
+    },
     "tag": {
       "type": [
         "string"

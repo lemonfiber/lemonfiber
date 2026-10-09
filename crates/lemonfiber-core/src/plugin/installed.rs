@@ -191,6 +191,10 @@ pub struct Placed {
     /// and staying on the default network.
     #[serde(default)]
     pub networks: Vec<String>,
+    /// Each capability contract it answers as an adapter, as `capability@major`; none in
+    /// a record written before this was kept.
+    #[serde(default)]
+    pub speaks: Vec<String>,
 }
 
 impl Placed {
@@ -216,6 +220,7 @@ impl Placed {
             listens: service.listens,
             media_types: service.media_types.clone(),
             networks: Vec::new(),
+            speaks: service.speaks.clone(),
         }
     }
 
