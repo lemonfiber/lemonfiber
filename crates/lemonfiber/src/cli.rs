@@ -55,7 +55,7 @@ pub use whom::RawWhom;
 // Re-exported so that `cli::Request` still names it: where the subcommands are
 // written down is this file's business, and moving them would otherwise be a change
 // at every call site that matches on one.
-pub use request::Request;
+pub use request::{RawShelf, Request};
 pub use wiring::WiringCommand;
 
 /// Set up and run your media stack.

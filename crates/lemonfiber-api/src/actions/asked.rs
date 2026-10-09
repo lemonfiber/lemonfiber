@@ -16,10 +16,11 @@ mod unwanted;
 
 pub use takers::{
     TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_APPROVED, TAKES_ARCHIVE, TAKES_BUNDLING,
-    TAKES_CAPABILITY, TAKES_CHECK, TAKES_CONSENT, TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS,
-    TAKES_ITEM, TAKES_KEPT, TAKES_NAME, TAKES_NARROWING, TAKES_PLUGIN, TAKES_POLICY, TAKES_PRESET,
-    TAKES_REASON, TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING,
-    TAKES_SHARING, TAKES_SOURCE, TAKES_TERM, TAKES_TIER, TAKES_WAITING,
+    TAKES_CAPABILITY, TAKES_CHECK, TAKES_CONSENT, TAKES_DEVICE, TAKES_DISRUPTION, TAKES_DOWNLOAD,
+    TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_NAME, TAKES_NARROWING, TAKES_PLUGIN, TAKES_POLICY,
+    TAKES_PRESET, TAKES_PROGRESS, TAKES_REASON, TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE,
+    TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING, TAKES_SOURCE, TAKES_TERM, TAKES_TIER,
+    TAKES_WAITING,
 };
 pub(crate) use unwanted::{unwanted, TAKEN};
 
@@ -171,6 +172,17 @@ pub struct Arguments {
     pub exceeded: Option<String>,
     /// How many minutes to lift the limits for, and no longer.
     pub unrestricted_for: Option<u64>,
+    /// The id a player keeps for the device it plays on, which a grant opens a session
+    /// for.
+    pub device: Option<String>,
+    /// The title or episode a player's progress is about, by the identifier the shelf
+    /// lists it under.
+    pub id: Option<String>,
+    /// How far into it the member is, in whole seconds.
+    pub position: Option<u64>,
+    /// Whether the member finished it. Absent says nothing about finishing, which is
+    /// a position like any other.
+    pub ended: Option<bool>,
     /// Whether to say what the action would do and do none of it.
     ///
     /// The command line's `--dry-run`, taken by every action. It is carried on the
@@ -236,6 +248,9 @@ impl Arguments {
             source: Some("komga".to_owned()),
             approved: vec!["api_key@komga".to_owned()],
             inputs: vec!["claim=1234".to_owned()],
+            device: Some("a-phone-0123".to_owned()),
+            id: Some("0123456789abcdef0123456789abcdef".to_owned()),
+            position: Some(1),
             ..Self::default()
         }
     }

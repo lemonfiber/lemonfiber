@@ -52,8 +52,21 @@ fn declared() -> Vec<Service> {
 fn administrative(services: &[Service]) -> Vec<&Service> {
     services
         .iter()
-        .filter(|service| service.bind != Some(Bind::Lan))
+        .filter(|service| service.bind != Some(Bind::Lan) && !behind_the_door(services, service))
         .collect()
+}
+
+/// Whether a service is kept to this machine only because the guarded front door stands
+/// in front of it: the media server, which the household reaches at the door under its
+/// own name, and which is no way to change the stack.
+fn behind_the_door(services: &[Service], service: &Service) -> bool {
+    let door = services.iter().any(|one| {
+        one.id == lemonfiber_core::screening::door::SERVICE && one.bind == Some(Bind::Lan)
+    });
+    door && service
+        .api
+        .as_ref()
+        .is_some_and(|api| api.kind == lemonfiber_manifest::ApiKind::Jellyfin)
 }
 
 /// The answer, over a stack whose household services are up, on a machine that says

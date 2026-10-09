@@ -253,6 +253,10 @@ fn the_first_of_them() -> Vec<Outcome> {
             findings: Vec::new(),
         }),
         Outcome::Playing(PlayingReport::default()),
+        Outcome::Title(lemonfiber_core::model::TitleReport::default()),
+        Outcome::PartWay(lemonfiber_core::model::PartWayReport::default()),
+        Outcome::Granted(lemonfiber_core::model::GrantReport::default()),
+        Outcome::Watched(lemonfiber_core::model::WatchedReport::default()),
         Outcome::Stuck(StuckReport {
             items: Vec::new(),
             incomplete: false,

@@ -5,11 +5,11 @@
 //! same question differently the first time one of them was updated.
 pub(crate) use lemonfiber_api::actions::{
     named, Arguments, Refused, TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_APPROVED,
-    TAKES_ARCHIVE, TAKES_BUNDLING, TAKES_CAPABILITY, TAKES_CHECK, TAKES_CONSENT, TAKES_DISRUPTION,
-    TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_NAME, TAKES_NARROWING, TAKES_PLUGIN,
-    TAKES_POLICY, TAKES_PRESET, TAKES_REASON, TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE,
-    TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING, TAKES_SOURCE, TAKES_TERM, TAKES_TIER,
-    TAKES_WAITING,
+    TAKES_ARCHIVE, TAKES_BUNDLING, TAKES_CAPABILITY, TAKES_CHECK, TAKES_CONSENT, TAKES_DEVICE,
+    TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_NAME,
+    TAKES_NARROWING, TAKES_PLUGIN, TAKES_POLICY, TAKES_PRESET, TAKES_PROGRESS, TAKES_REASON,
+    TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING,
+    TAKES_SOURCE, TAKES_TERM, TAKES_TIER, TAKES_WAITING,
 };
 pub(crate) use lemonfiber_core::app::Command;
 pub(crate) use std::collections::BTreeSet;
@@ -134,11 +134,25 @@ pub(crate) fn exactly_what(action: &str) -> Arguments {
         cap: takes(TAKES_SHARING).then(|| MONTHLY.to_owned()),
         exceeded: takes(TAKES_SHARING).then(|| AT_THE_CAP.to_owned()),
         unrestricted_for: takes(TAKES_SHARING).then_some(MINUTES),
+        device: takes(TAKES_DEVICE).then(|| DEVICE.to_owned()),
+        id: takes(TAKES_PROGRESS).then(|| TITLE.to_owned()),
+        position: takes(TAKES_PROGRESS).then_some(POSITION),
+        // Left as the plainer of the two answers; the sweep gives the other.
+        ended: None,
         // Never handed here: a rehearsal is carried on the run rather than on the
         // command, so it changes no command these sweeps could compare.
         dry_run: false.into(),
     }
 }
+
+/// The id a player keeps for the device a grant opens a session for.
+pub(crate) const DEVICE: &str = "a-phone-2468";
+
+/// A title a player reports progress on.
+pub(crate) const TITLE: &str = "0123456789abcdef0123456789abcdef";
+
+/// How far into it, in seconds.
+pub(crate) const POSITION: u64 = 1234;
 
 /// A capability a choice of filler is about.
 pub(crate) const CAPABILITY: &str = "indexer.search";

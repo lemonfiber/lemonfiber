@@ -21,10 +21,9 @@
 
 use lemonfiber_core::app::restore::Kept;
 use lemonfiber_core::app::support::Destination;
-use lemonfiber_core::app::Restarting;
 use lemonfiber_core::app::{
-    Command, Diagnosing, Gathering, Hostable, Keeping, LettingGo, Removing, Restoring, Setting,
-    Teardown, Waiting, HOSTABLE,
+    Command, Diagnosing, Gathering, Hostable, Keeping, LettingGo, Removing, Restarting, Restoring,
+    Setting, Teardown, Waiting, HOSTABLE,
 };
 use lemonfiber_core::bundle::run::{Wanted, LINES};
 use lemonfiber_core::companion::Asked as Paired;
@@ -39,6 +38,7 @@ mod extending;
 mod household;
 mod migrating;
 mod sharing;
+mod viewing;
 
 use super::asked::{unwanted, Arguments, Disturbing};
 use super::reading::{consent, diagnosing, following, listing, widening};
@@ -85,6 +85,8 @@ pub const OFFERED: &[&str] = &[
     "household-approve",
     "household-decline",
     "household-handoff",
+    "grant",
+    "watched",
     "support",
     "restore",
     "watch",
@@ -273,11 +275,9 @@ pub fn named(action: &str, given: Arguments) -> Result<Command, Refused> {
 /// with nothing in the way — which is how an argument an action reads and the table
 /// refuses it is found, rather than by somebody asking for it over the web.
 pub(crate) fn carried(action: &str, given: Arguments) -> Result<Command, Refused> {
-    // Everything addressed to somebody who lives here goes next door before this
-    // takes the carrier apart: an account offered, a password taken off, an account
-    // taken away, what the household may ask for, and one thing it already asked for.
-    // Each of them has to say what it lacks before it can name a command, which is
-    // longer than a row — and none of the fields they use is one this table reads.
+    // Everything addressed to somebody who lives here goes next door before this takes
+    // the carrier apart: each has to say what it lacks before it can name a command,
+    // which is longer than a row, and none of the fields they use is one this reads.
     if household::about_the_household(action) {
         return household::asked_for(action, given);
     }

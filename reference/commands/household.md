@@ -22,6 +22,8 @@ Commands:
   decline   Turn one waiting request down, saying why
   expiring  Close the requests nobody has ruled on, once they have waited too long
   handoff   Hand somebody's phone or television the way onto the stack, and see whether it arrived
+  grant     Open a session on somebody's own account for one of their devices
+  watched   Record how far somebody got through a title, as their own progress
   help      Print this message or the help of the given subcommand(s)
 
 Options:
@@ -248,4 +250,86 @@ Options:
 
   -h, --help
           Print help (see a summary with '-h')
+```
+
+## `lemonfiber household grant`
+
+```text
+Open a session on somebody's own account for one of their devices.
+
+What the device then plays is under their own limits, and nobody learns their password. The token it plays with is answered once, under `--json` alone, and nothing keeps it. The grant lasts thirty days from the last time their client spoke to lemonfiber.
+
+Usage: lemonfiber household grant [OPTIONS] <NAME> <DEVICE>
+
+Arguments:
+  <NAME>
+          Who the device plays as, named the way they sign in
+
+  <DEVICE>
+          The id the player keeps for the device: eight to sixty-four letters, digits and dashes
+
+Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber household watched`
+
+```text
+Record how far somebody got through a title, as their own progress
+
+Usage: lemonfiber household watched [OPTIONS] --at <AT> <NAME> <ID>
+
+Arguments:
+  <NAME>
+          Whose progress, named the way they sign in
+
+  <ID>
+          The title or episode, by the id the shelf lists it under
+
+Options:
+      --at <AT>
+          How far in, in whole seconds
+
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --ended
+          Record it as finished
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
+  -h, --help
+          Print help
 ```

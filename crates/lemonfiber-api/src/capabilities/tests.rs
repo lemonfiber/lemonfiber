@@ -77,7 +77,18 @@ fn a_member_is_offered_what_the_core_gives_a_member() {
         .filter(|(_, standing)| **standing == Standing::Available)
         .map(|(path, _)| path.as_str())
         .collect();
-    assert_eq!(available, ["/api/held", "/api/playing", "/api/requests"]);
+    assert_eq!(
+        available,
+        [
+            "/api/actions/grant",
+            "/api/actions/watched",
+            "/api/held",
+            "/api/held/{id}",
+            "/api/playing",
+            "/api/requests",
+            "/api/watching",
+        ]
+    );
     assert_eq!(
         declared.capabilities.get("/api/actions/pull"),
         Some(&Standing::Unpermitted),

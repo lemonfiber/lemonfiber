@@ -21,8 +21,9 @@ use lemonfiber_fixtures::ports::Following;
 use lemonfiber_fixtures::support::Reporting;
 
 /// Everything the `library` form declares.
-const LIBRARY: [&str; 7] = [
+const LIBRARY: [&str; 8] = [
     "jellyfin",
+    "door",
     "seerr",
     "request-gate",
     "decline",
@@ -110,7 +111,7 @@ async fn the_first_line_arrives_seconds_in_rather_than_minutes_in() {
     assert_eq!(
         said.first().map(String::as_str),
         Some(
-            "Still starting: audiobookshelf, calibre-web-automated, decline, jellyfin, \
+            "Still starting: audiobookshelf, calibre-web-automated, decline, door, jellyfin, \
              navidrome, request-gate, seerr — 5 seconds so far, of 180."
         )
     );

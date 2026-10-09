@@ -50,6 +50,25 @@ pub(crate) fn exit_code(problem: &Problem) -> u8 {
     leaves(problem.code).exit()
 }
 
+/// A restore that put something back succeeded; one that only listed what it would put
+/// back is waiting on an agreement.
+fn restored(report: &lemonfiber_core::app::restore::Restoration) -> ExitCode {
+    if report.done.is_some() {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::from(VALIDATION)
+    }
+}
+
+/// A walk that met a problem failed; any other end of one is the walk done.
+fn walked(report: &lemonfiber_core::model::WalkthroughReport) -> ExitCode {
+    if report.state.is_a_problem() {
+        ExitCode::from(FAILURE)
+    } else {
+        ExitCode::SUCCESS
+    }
+}
+
 /// Most answers are simply produced, so their success is that they arrived. A
 /// diagnosis is different: a script runs it precisely to learn whether the stack
 /// is healthy, so a broken or undetermined result must exit non-zero — reporting
@@ -146,13 +165,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // A restore that overwrote nothing listed what it would overwrite and
         // stopped — like an unconfirmed reset, it is waiting on the operator's
         // say-so, so a script sees a non-zero result rather than a false success.
-        Outcome::Restore(report) => {
-            if report.done.is_some() {
-                ExitCode::SUCCESS
-            } else {
-                ExitCode::from(VALIDATION)
-            }
-        }
+        Outcome::Restore(report) => restored(report),
         Outcome::Update(report) => moving(report),
         Outcome::Lifecycle(report) => lifecycle(report),
         Outcome::Wizard(report) => setting_up(report),
@@ -172,13 +185,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
                 ExitCode::SUCCESS
             }
         },
-        Outcome::Walkthrough(report) => {
-            if report.state.is_a_problem() {
-                ExitCode::from(FAILURE)
-            } else {
-                ExitCode::SUCCESS
-            }
-        }
+        Outcome::Walkthrough(report) => walked(report),
         // A trace, a stuck-item listing, the household's requests or where the
         // household begins is a query — it answers where things are; asking is never a
         // failure, whatever the answer. A stack with no front door has been asked and
@@ -205,6 +212,12 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::Held(_)
         // Who is watching arrived, or that the media server would not say did.
         | Outcome::Playing(_)
+        // A title, what was part-way through, a grant and a player's progress each
+        // arrived; what could not be done already came back as a problem.
+        | Outcome::Title(_)
+        | Outcome::PartWay(_)
+        | Outcome::Granted(_)
+        | Outcome::Watched(_)
         // What is hosted is a reading, and an install or a removal that could not be
         // carried out already comes back as a problem — so a report here is one that
         // arrived, whatever it says stands.

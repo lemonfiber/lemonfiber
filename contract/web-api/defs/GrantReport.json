@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A grant to play on a member's own account, the token the device plays with, and how\nlong it lasts.",
+  "type": "object",
+  "properties": {
+    "granted": {
+      "description": "Whether a session was opened for the device. A rehearsal opens none.",
+      "type": "boolean"
+    },
+    "lasts_until": {
+      "description": "The last day the grant holds unless the member's client speaks to the core\nbefore then, as `YYYY-MM-DD`.",
+      "type": "string"
+    },
+    "member": {
+      "description": "The member the device now plays as, by the name they are known by.",
+      "type": "string"
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.",
+      "type": "boolean"
+    },
+    "token": {
+      "description": "The token the device presents at the guarded front door, as\n`Authorization: Bearer <token>`. Answered once, here, and kept by nothing in the\ncore; absent where nothing was granted.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "member",
+    "granted",
+    "lasts_until",
+    "rehearsed"
+  ]
+}

@@ -56,8 +56,9 @@ const SETTING: &str = "LAN_BIND";
 /// what it is for. The list is the decision; this is where it is reviewable.
 const HOUSEHOLD: &[(&str, &str)] = &[
     (
-        "jellyfin",
-        "a television plays the library, and a television is not the host",
+        "door",
+        "a television plays the library, and a television is not the host — through the \
+         guard that asks the media server about every byte, which is published in its place",
     ),
     (
         "seerr",

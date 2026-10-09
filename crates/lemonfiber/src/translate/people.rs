@@ -2,14 +2,14 @@
 //! is read, and what they may ask for.
 
 use lemonfiber_core::app::{
-    Allowance, Answer, Arranged, Chosen, Command, Decision, Inviting, Whom,
+    Allowance, Answer, Arranged, Chosen, Command, Decision, Inviting, Viewing, Whom,
 };
 use lemonfiber_core::asking::Policy;
-use lemonfiber_core::ports::service::{Quota, Unrated};
+use lemonfiber_core::ports::service::{HowFar, Quota, Unrated};
 
 use crate::exit::USAGE;
 use crate::say::complain;
-use lemonfiber::cli::{HouseholdCommand, RawAllowance, RawUnrated, RawWhom};
+use lemonfiber::cli::{HouseholdCommand, RawAllowance, RawShelf, RawUnrated, RawWhom};
 
 /// The command line spells what somebody may watch as three flags and the core carries
 /// them as one choice, because they are one decision taken at one moment. Only the
@@ -54,7 +54,12 @@ fn narrowed(whom: RawWhom) -> Option<Whom> {
 /// number of nought or more than one read answers with is refused rather than rounded:
 /// somebody who asked for a thousand and was shown five hundred has been told that is
 /// the shelf.
-pub(crate) fn held(whom: RawWhom, most: Option<u32>) -> Result<Command, u8> {
+pub(crate) fn held(whom: RawWhom, asked: RawShelf) -> Result<Command, u8> {
+    let RawShelf {
+        most,
+        title,
+        part_way,
+    } = asked;
     let Some(member) = narrowed(whom) else {
         complain!(
             "error: name whose shelf with `--member`, or ask for the household's defaults \
@@ -65,6 +70,13 @@ pub(crate) fn held(whom: RawWhom, most: Option<u32>) -> Result<Command, u8> {
     // Taken from the served read rather than restated, so a terminal and a browser
     // looking at one household cannot come to see two different shelves. A number
     // written down twice is a number that drifts the first time one of them moves.
+    if let Some(id) = title {
+        return Ok(Command::Viewing(Viewing::Title { member, id }));
+    }
+    if part_way {
+        let most = most.unwrap_or(lemonfiber_core::screening::A_FEW);
+        return Ok(Command::Viewing(Viewing::PartWay { member, most }));
+    }
     let most = most.unwrap_or(lemonfiber_api::read::table::A_SHELF);
     if most == 0 || most > lemonfiber_api::read::table::MOST_AT_ONCE {
         complain!(
@@ -116,6 +128,23 @@ pub(crate) fn household(whom: RawWhom, action: Option<HouseholdCommand>) -> Resu
             Ok(Command::Expiring(arranging(after, never)))
         }
         HouseholdCommand::Handoff { name } => Ok(Command::Handoff { name }),
+        HouseholdCommand::Grant { name, device } => Ok(Command::Viewing(Viewing::Grant {
+            member: name,
+            device,
+        })),
+        HouseholdCommand::Watched {
+            name,
+            id,
+            at,
+            ended,
+        } => Ok(Command::Viewing(Viewing::Watched {
+            member: name,
+            id,
+            how_far: HowFar {
+                position: at,
+                ended,
+            },
+        })),
     }
 }
 

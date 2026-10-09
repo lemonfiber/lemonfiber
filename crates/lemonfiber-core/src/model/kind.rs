@@ -97,6 +97,14 @@ kinds! {
     HELD = "held",
     /// What the media server is playing now, for everybody or for one member.
     PLAYING = "playing",
+    /// One title, as a member may see it, with where it is served.
+    TITLE = "title",
+    /// What a member was part-way through, and how far.
+    PART_WAY = "part-way",
+    /// A device granted to play on a member's own account.
+    GRANT = "grant",
+    /// How far a member got, as the media server now holds it.
+    WATCHED = "watched",
     /// Where handing somebody's device the way onto the stack stands.
     HANDOFF = "handoff",
     /// What copying an operator's own records across came to.

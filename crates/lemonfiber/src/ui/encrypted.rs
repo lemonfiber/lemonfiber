@@ -14,7 +14,8 @@ use std::sync::Arc;
 
 use lemonfiber_api::guard::Binding;
 use lemonfiber_core::app::Ctx;
-use lemonfiber_core::companion::{answers_to, certificate};
+use lemonfiber_core::certificate;
+use lemonfiber_core::companion::answers_to;
 use lemonfiber_core::error::codes::serve::{NO_CERTIFICATE, UNSETTLED_PORT};
 use lemonfiber_core::error::{Problem, Remedy};
 use lemonfiber_core::PRODUCT;

@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "id": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "member": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "title": {
+      "type": [
+        "anyOf(null,ref:Title)"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

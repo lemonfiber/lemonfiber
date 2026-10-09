@@ -1,0 +1,95 @@
+{
+  "fields": {
+    "backdrop": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "certificate": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "door": {
+      "type": [
+        "anyOf(null,ref:Pinned)"
+      ],
+      "required": false
+    },
+    "genres": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "id": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "medium": {
+      "type": [
+        "ref:Medium"
+      ],
+      "required": true
+    },
+    "minutes": {
+      "type": [
+        "integer|null/uint32"
+      ],
+      "required": false
+    },
+    "overview": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "poster": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "released": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "seasons": {
+      "type": [
+        "array[ref:Season]"
+      ],
+      "required": true
+    },
+    "stream_from": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "title": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "unlocated": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "year": {
+      "type": [
+        "integer|null/uint16"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

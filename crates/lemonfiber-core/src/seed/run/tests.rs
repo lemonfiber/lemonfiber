@@ -445,6 +445,7 @@ mod guarding;
 mod identity;
 mod linking;
 mod passwords;
+mod proxies;
 mod publishing;
 mod replacing;
 mod requests;

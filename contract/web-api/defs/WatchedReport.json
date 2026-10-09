@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A player's report of how far a member got, as the media server now holds it.",
+  "type": "object",
+  "properties": {
+    "ended": {
+      "description": "Whether it was recorded as finished.",
+      "type": "boolean"
+    },
+    "id": {
+      "description": "The title or episode, by the identifier the shelf lists it under.",
+      "type": "string"
+    },
+    "position": {
+      "description": "How far in, in whole seconds, as recorded.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "position",
+    "ended",
+    "rehearsed"
+  ]
+}

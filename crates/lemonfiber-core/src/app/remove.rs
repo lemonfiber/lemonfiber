@@ -70,6 +70,7 @@ pub(crate) async fn remove(
     if server.withdraw(&member.id).await.is_err() {
         return Err(Box::new(would_not_remove(&member.name)));
     }
+    crate::screening::grants::forgotten(ctx, &member.id);
     let revoked =
         also_from_the_request_service(asking.as_ref(), &cost.held, &mut cost.findings).await;
 

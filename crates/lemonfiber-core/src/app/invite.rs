@@ -446,7 +446,10 @@ async fn reaching(ctx: &Ctx, name: &str) -> Result<Reaching, Box<crate::error::P
         let Some(server) = media.administered(ctx) else {
             return Err(Box::new(no_credential()));
         };
-        (server, media.port)
+        (
+            server,
+            crate::screening::door::household_port(&manifest, media.port),
+        )
     };
     let Some(reachable) = household_address(ctx, port).await else {
         return Err(Box::new(nowhere_to_send()));

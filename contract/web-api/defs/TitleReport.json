@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One title, as the member it was asked for may see it.",
+  "type": "object",
+  "properties": {
+    "id": {
+      "description": "The identifier the media server files them under.",
+      "type": "string"
+    },
+    "member": {
+      "description": "The member this was asked for, by the name they are known by.",
+      "type": "string"
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.",
+      "type": "boolean"
+    },
+    "title": {
+      "description": "The title, with where it and each of its episodes is served.",
+      "anyOf": [
+        {
+          "$ref": "Title.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "member",
+    "id",
+    "rehearsed"
+  ]
+}

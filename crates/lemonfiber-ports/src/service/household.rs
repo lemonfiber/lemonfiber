@@ -10,7 +10,7 @@
 
 use async_trait::async_trait;
 
-use super::Failure;
+use super::{Failure, Held, Medium};
 
 /// Who a sign-in proved somebody to be, and the access the server granted for it.
 ///
@@ -316,49 +316,6 @@ pub struct NamedLibrary {
     pub id: String,
     /// What the operator called it.
     pub name: String,
-}
-
-/// One thing the household holds, as a member is shown it.
-///
-/// What a person recognises and nothing else. There is no file path, no container,
-/// no bitrate and no library id: a member deciding what to watch is not choosing a
-/// transcode, and a surface handed those would have to decide not to draw them.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
-pub struct Held {
-    /// The identifier the server tells it apart by, which is what asking to play one
-    /// of them names.
-    pub id: String,
-    /// What it is called, in the words the server holds it under.
-    pub title: String,
-    /// The year it came out, where the server knows one. Absent rather than guessed:
-    /// two films share a title far more often than they share a title and a year.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub year: Option<u16>,
-    /// Which of the kinds this product deals in it is.
-    pub medium: Medium,
-}
-
-/// The kinds of thing a household holds.
-///
-/// Named rather than passed through as the server's own word, because a surface
-/// drawing "Series" against one server and "tvshow" against another would be
-/// rendering a detail of which server this household runs.
-///
-/// `Medium` rather than `Kind`, `Holding` or `Sort`: this product already calls the two
-/// request services a [`crate::media::Kind`], a request's suspension a
-/// [`crate::service::asking::Holding`], and what one line of a manifest is a
-/// `uninstall::Sort` — and one word meaning two things in one vocabulary is how a
-/// reader comes to trust the wrong one. The contract flattens every type name into one
-/// namespace, so a clash there is a clash for anything reading it by name.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum Medium {
-    /// One film.
-    Film,
-    /// A television series, rather than one episode of one.
-    Series,
-    /// Something the server holds that is neither, and is not hidden for that.
-    Other,
 }
 
 /// One certificate the media server's own rating table names.

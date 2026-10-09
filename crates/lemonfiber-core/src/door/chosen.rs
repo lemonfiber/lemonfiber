@@ -143,6 +143,9 @@ fn offered<'a, 'b>(
     else {
         return Err(UNDECLARED.to_owned());
     };
+    // A media server kept to this machine behind the guarded front door is met at the
+    // door, under its own name, so naming it names the door it is reached through.
+    let candidate = guarded(candidates, candidate).unwrap_or(candidate);
     let Some(facing) = candidate.facing else {
         return Err(WITHHELD.to_owned());
     };
@@ -150,6 +153,22 @@ fn offered<'a, 'b>(
         return Ok((facing, candidate));
     }
     Err(facing.because().to_owned())
+}
+
+/// The door a service kept to this machine is reached through, where one stands in front
+/// of it: published itself, and met under that service's name.
+fn guarded<'a, 'b>(
+    candidates: &'b [Candidate<'a>],
+    kept: &Candidate<'a>,
+) -> Option<&'b Candidate<'a>> {
+    if kept.facing.is_some() {
+        return None;
+    }
+    candidates.iter().find(|candidate| {
+        candidate.id == crate::screening::door::SERVICE
+            && candidate.facing.is_some()
+            && candidate.name == kept.name
+    })
 }
 
 #[cfg(test)]

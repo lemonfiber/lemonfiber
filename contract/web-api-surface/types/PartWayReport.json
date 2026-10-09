@@ -1,0 +1,41 @@
+{
+  "fields": {
+    "available": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "findings": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "id": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "member": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "part_way": {
+      "type": [
+        "array[ref:PartWay]"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

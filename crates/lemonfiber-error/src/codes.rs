@@ -124,6 +124,7 @@ families! {
     life => "LIFE": "starting and stopping",
     migrate => "MIGRATE": "taking over a setup already here",
     pair => "PAIR": "pairing a phone with the stack",
+    play => "PLAY": "playing what the household holds",
     plugin => "PLUGIN": "installing and running plugins",
     proc => "PROC": "the program underneath",
     provider => "PROVIDER": "accounts and indexers",

@@ -1,5 +1,17 @@
 {
   "fields": {
+    "backdrop": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "door": {
+      "type": [
+        "anyOf(null,ref:Pinned)"
+      ],
+      "required": false
+    },
     "id": {
       "type": [
         "string"
@@ -12,11 +24,29 @@
       ],
       "required": true
     },
+    "poster": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "stream_from": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "title": {
       "type": [
         "string"
       ],
       "required": true
+    },
+    "unlocated": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
     },
     "year": {
       "type": [

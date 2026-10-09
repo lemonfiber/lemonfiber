@@ -464,7 +464,7 @@ async fn the_door_the_operator_named_is_the_one_that_is_given() {
     };
     let household = a_context()
         .engine(std::sync::Arc::new(Reporting::holding(
-            &["seerr", "jellyfin"],
+            &["seerr", "jellyfin", "door"],
             Lifecycle::Running,
             Health::Healthy,
         )))
@@ -479,7 +479,7 @@ async fn the_door_the_operator_named_is_the_one_that_is_given() {
     );
     assert_eq!(
         report.as_ref().map(|report| report.chosen.clone()),
-        Some(Chosen::Named("jellyfin".to_owned()))
+        Some(Chosen::Named("door".to_owned()))
     );
     assert_eq!(
         report.as_ref().map(|report| report.standing),

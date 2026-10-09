@@ -32,7 +32,8 @@ mod asked;
 mod naming;
 
 use naming::{
-    diagnosing, following, household, moving, narrowed, removing, setting, shelf, watching,
+    diagnosing, following, household, moving, narrowed, part_way, removing, setting, shelf, titled,
+    watching,
 };
 pub(crate) use naming::{THE_STACK, THIS_BINARY};
 
@@ -93,6 +94,16 @@ pub const HELD: &str = "/api/held";
 /// What the media server is playing now: every session for the operator, and a
 /// member's own for a member.
 pub const PLAYING: &str = "/api/playing";
+
+/// What one title on a member's shelf is, with where it and each of its episodes is
+/// served at the guarded front door.
+///
+/// Served at its own route, because the title is named in the path rather than in the
+/// query; held to every rule the other reads are.
+pub const TITLE: &str = "/api/held/{id}";
+
+/// What a member was part-way through, and how far, most recent first.
+pub const WATCHING: &str = "/api/watching";
 
 /// What this machine keeps running when no terminal is open.
 pub const HOSTING: &str = "/api/hosting";
@@ -263,6 +274,8 @@ pub const OFFERED: &[&str] = &[
     STORAGE,
     REQUESTS,
     HELD,
+    TITLE,
+    WATCHING,
     PLAYING,
     HOSTING,
     FRONT_DOOR,
@@ -289,6 +302,9 @@ pub const OFFERED: &[&str] = &[
     PLUGINS,
     WIRING,
 ];
+
+/// An item's identifier, standing for whichever title a request names.
+const AN_ITEM: &str = "0123456789abcdef0123456789abcdef";
 
 /// What a read was given, mirroring the flags its command takes.
 ///
@@ -323,6 +339,8 @@ pub struct Wanted {
     pub what: Option<String>,
     /// How many holdings a shelf answers with.
     pub most: Option<String>,
+    /// The title a read is about, as its path names it.
+    pub title: Option<String>,
 }
 
 impl Wanted {
@@ -337,6 +355,7 @@ impl Wanted {
         Self {
             member: Some("someone".to_owned()),
             term: Some("Sintel".to_owned()),
+            title: Some(AN_ITEM.to_owned()),
             what: Some(THE_STACK.to_owned()),
             ..Self::default()
         }
@@ -376,6 +395,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, Refusal> {
         to,
         what,
         most,
+        title,
     } = given;
     match read {
         VERSION => Ok(Command::Version),
@@ -391,6 +411,8 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, Refusal> {
         REQUESTS => household(member, defaults.as_deref()),
         HELD => shelf(member, defaults.as_deref(), most),
         PLAYING => watching(member),
+        TITLE => titled(member, defaults.as_deref(), title),
+        WATCHING => part_way(member, most),
         // Nothing asked of it, because what is hosted is a property of the machine
         // rather than of the caller: the two words that change it are actions, at the
         // other door, and a parameter here would let one surface be told a different

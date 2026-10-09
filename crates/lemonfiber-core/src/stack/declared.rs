@@ -193,5 +193,20 @@ fn resolve(value: &str, variable: &dyn Fn(&str) -> Option<String>) -> String {
         .unwrap_or_default()
 }
 
+/// The fixed address one service is given on one network, as a Compose file declares
+/// it, or nothing where the file gives it none.
+#[must_use]
+pub fn fixed_address(text: &str, service: &str, network: &str) -> Option<String> {
+    let document: Value = serde_yaml_ng::from_str(text).ok()?;
+    document
+        .get("services")?
+        .get(service)?
+        .get("networks")?
+        .get(network)?
+        .get("ipv4_address")?
+        .as_str()
+        .map(str::to_owned)
+}
+
 #[cfg(test)]
 mod tests;

@@ -21,6 +21,7 @@ mod clients;
 mod connecting;
 // Jellyfin's cross-origin allow-list, held to the front door's origin on every pass.
 mod cors;
+mod proxies;
 // The decline service's own media-server key, minted for it alone.
 mod decline;
 mod fulfilment;
@@ -511,6 +512,11 @@ async fn seed_media_server(
         seed_jellyfin_identity(ctx, services, baseline, server, admin, project).await;
     baseline.merge(&identity_records);
     wirings.extend(identity_wirings);
+
+    // Which address the media server believes about the client: the door's alone. Last,
+    // because a change to it is read only when the server starts again, and everything
+    // above talks to the server.
+    wirings.extend(proxies::seed_proxies(ctx, project, server).await);
     wirings
 }
 

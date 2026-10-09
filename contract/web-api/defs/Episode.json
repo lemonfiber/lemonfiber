@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One episode, with where it is served.",
+  "type": "object",
+  "properties": {
+    "backdrop": {
+      "description": "Where its backdrop is served, where it has one.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "door": {
+      "description": "The certificate the door presents, which a client pins, beside any location.",
+      "anyOf": [
+        {
+          "$ref": "Pinned.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "id": {
+      "description": "The identifier the server tells it apart by, which is what asking to play one\nof them names.",
+      "type": "string"
+    },
+    "medium": {
+      "description": "Which of the kinds this product deals in it is.",
+      "$ref": "Medium.json"
+    },
+    "minutes": {
+      "description": "How long it runs, in whole minutes, where the server knows.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "minimum": 0
+    },
+    "number": {
+      "description": "Its number in the season, where it has one.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "minimum": 0
+    },
+    "overview": {
+      "description": "What happens in it, where the server holds a description.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "poster": {
+      "description": "Where its poster is served, where it has one.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "stream_from": {
+      "description": "Where it streams from, where it plays.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "title": {
+      "description": "What it is called, in the words the server holds it under.",
+      "type": "string"
+    },
+    "unlocated": {
+      "description": "Why no location is stated, where none is.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "year": {
+      "description": "The year it came out, where the server knows one. Absent rather than guessed:\ntwo films share a title far more often than they share a title and a year.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0
+    }
+  },
+  "required": [
+    "id",
+    "title",
+    "medium"
+  ]
+}

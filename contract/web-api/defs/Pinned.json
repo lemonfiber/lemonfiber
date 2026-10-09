@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The certificate a guarded door presents, as a client pins it.",
+  "type": "object",
+  "properties": {
+    "fingerprint": {
+      "description": "SHA-256 over the certificate's DER encoding, lower-case hex.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "fingerprint"
+  ]
+}

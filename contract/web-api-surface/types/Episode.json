@@ -1,0 +1,77 @@
+{
+  "fields": {
+    "backdrop": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "door": {
+      "type": [
+        "anyOf(null,ref:Pinned)"
+      ],
+      "required": false
+    },
+    "id": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "medium": {
+      "type": [
+        "ref:Medium"
+      ],
+      "required": true
+    },
+    "minutes": {
+      "type": [
+        "integer|null/uint32"
+      ],
+      "required": false
+    },
+    "number": {
+      "type": [
+        "integer|null/uint32"
+      ],
+      "required": false
+    },
+    "overview": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "poster": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "stream_from": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "title": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "unlocated": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "year": {
+      "type": [
+        "integer|null/uint16"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

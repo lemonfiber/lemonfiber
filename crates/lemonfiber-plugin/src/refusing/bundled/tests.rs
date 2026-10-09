@@ -24,7 +24,7 @@ fn the_register_holds_the_stack_this_build_ships() {
         named("jellyfin").is_some(),
         "the stack ships a media server"
     );
-    assert_eq!(named("jellyfin").and_then(|held| held.port), Some(8096));
+    assert_eq!(named("jellyfin").and_then(|held| held.port), Some(8095));
 }
 
 /// A description this build cannot read holds nothing, and holds it visibly.
@@ -62,10 +62,7 @@ fn nothing_the_stack_does_not_ship_is_reserved() {
 /// A port the stack publishes is found by the service that publishes it.
 #[test]
 fn a_port_the_stack_publishes_names_the_service_holding_it() {
-    assert_eq!(
-        publishing(8096).map(|held| held.id.as_str()),
-        Some("jellyfin")
-    );
+    assert_eq!(publishing(8096).map(|held| held.id.as_str()), Some("door"));
 }
 
 /// The reader takes a label from a stanza and nothing from anything else.

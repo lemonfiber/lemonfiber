@@ -38,10 +38,11 @@ pub(super) fn held(report: &HeldReport) -> Lines {
 }
 
 /// One thing, as somebody would say it.
-fn titled(holding: &Held) -> String {
+pub(super) fn titled(holding: &Held) -> String {
     let medium = match holding.medium {
         Medium::Film => "film",
         Medium::Series => "series",
+        Medium::Episode => "episode",
         // Said rather than left blank. A line with no kind on it reads as an oversight
         // in this program, where what it is is the media server using a word this build
         // has not been taught.

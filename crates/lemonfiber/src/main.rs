@@ -310,7 +310,7 @@ async fn main() -> ExitCode {
         // answered from a table compiled into the binary rather than from a stack.
         Request::Explain { word } => return explaining(&ctx, &word, cli.json, cli.dry_run).await,
         Request::Household { whom, action } => taken!(household(whom, action)),
-        Request::Held { whom, most } => taken!(translate::held(whom, most)),
+        Request::Held { whom, shelf } => taken!(translate::held(whom, shelf)),
         Request::Playing { member } => Command::Playing { member },
         Request::History => Command::History,
         Request::Undo { at } => Command::Undo { run: Some(at) },

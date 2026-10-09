@@ -1,0 +1,13 @@
+# One row per requirement this repository has worked on; read by spec's
+# status_check.py and the release gate.
+
+requirement = [
+  { id = "D11-R1", state = "done", evidence = ["crates/lemonfiber-core/src/screening.rs", "crates/lemonfiber-core/src/screening/grants.rs", "crates/lemonfiber-core/src/jellyfin/screening.rs", "crates/lemonfiber-api/src/actions/named/viewing.rs", "crates/lemonfiber-api/src/entitled.rs", "crates/lemonfiber-core/src/screening/tests.rs"] },
+  { id = "D11-R2", state = "done", evidence = ["crates/lemonfiber-core/src/seed/run/proxies.rs", "crates/lemonfiber-core/src/jellyfin/proxies.rs", "crates/lemonfiber-core/src/screening/door.rs", "crates/lemonfiber-core/src/door.rs", "crates/lemonfiber-core/src/seed/run/tests/proxies.rs"] },
+  { id = "D11-R3", state = "done", evidence = ["crates/lemonfiber-core/src/screening/door.rs", "crates/lemonfiber-core/src/app/held.rs", "crates/lemonfiber-ports/src/service/screening.rs", "crates/lemonfiber-core/src/screening/door/tests.rs"] },
+  { id = "D11-R4", state = "done", evidence = ["crates/lemonfiber-core/src/screening.rs", "crates/lemonfiber-core/src/jellyfin/screening.rs", "crates/lemonfiber-api/src/read.rs", "crates/lemonfiber-core/tests/integration/jellyfin/screening.rs"] },
+  { id = "D11-R5", state = "done", evidence = ["crates/lemonfiber-core/src/screening.rs", "crates/lemonfiber-core/src/jellyfin/screening.rs", "crates/lemonfiber-api/src/read/table.rs", "crates/lemonfiber-core/tests/integration/jellyfin/screening.rs"] },
+  { id = "D11-R6", state = "done", evidence = ["crates/lemonfiber-core/src/screening/door.rs", "crates/lemonfiber-ports/src/service/screening.rs", "crates/lemonfiber-core/src/screening/door/tests.rs"] },
+  { id = "D11-R7", state = "done", evidence = ["crates/lemonfiber-core/src/certificate.rs", "crates/lemonfiber-core/src/screening/door.rs", "crates/lemonfiber-core/src/app/engine.rs", "crates/lemonfiber-core/src/screening/door/tests.rs"] },
+  { id = "D11-R8", state = "done", evidence = ["crates/lemonfiber-core/src/screening.rs", "crates/lemonfiber-core/src/jellyfin/screening.rs", "crates/lemonfiber-api/src/actions/named/viewing.rs", "crates/lemonfiber-core/tests/integration/jellyfin/screening.rs"] },
+]

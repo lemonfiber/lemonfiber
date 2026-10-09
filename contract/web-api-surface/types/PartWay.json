@@ -1,0 +1,71 @@
+{
+  "fields": {
+    "backdrop": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "door": {
+      "type": [
+        "anyOf(null,ref:Pinned)"
+      ],
+      "required": false
+    },
+    "id": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "length": {
+      "type": [
+        "integer|null/uint64"
+      ],
+      "required": false
+    },
+    "medium": {
+      "type": [
+        "ref:Medium"
+      ],
+      "required": true
+    },
+    "position": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "poster": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "stream_from": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "title": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "unlocated": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "year": {
+      "type": [
+        "integer|null/uint16"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

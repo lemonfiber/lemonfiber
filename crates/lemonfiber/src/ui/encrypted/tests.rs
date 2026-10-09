@@ -1,7 +1,8 @@
 use axum::http::{header, HeaderMap, HeaderValue};
 use lemonfiber_api::admission::here;
 use lemonfiber_core::app::Ctx;
-use lemonfiber_core::companion::{certificate, paired, served};
+use lemonfiber_core::certificate;
+use lemonfiber_core::companion::{paired, served};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::error::codes::serve::{NO_CERTIFICATE, UNSETTLED_PORT};
 use lemonfiber_core::platform::Environment;

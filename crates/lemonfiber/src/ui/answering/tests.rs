@@ -307,7 +307,7 @@ mod encrypted {
             _stapled: &[u8],
             _now: UnixTime,
         ) -> Result<ServerCertVerified, rustls::Error> {
-            if lemonfiber_core::companion::certificate::fingerprint(presented) == self.0 {
+            if lemonfiber_core::certificate::fingerprint(presented) == self.0 {
                 Ok(ServerCertVerified::assertion())
             } else {
                 Err(rustls::Error::General(

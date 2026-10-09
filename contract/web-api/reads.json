@@ -102,6 +102,40 @@
     "file": false
   },
   {
+    "path": "/api/held/{id}",
+    "parameters": [
+      {
+        "name": "member",
+        "repeatable": false
+      },
+      {
+        "name": "defaults",
+        "repeatable": false
+      }
+    ],
+    "kinds": [
+      "title"
+    ],
+    "file": false
+  },
+  {
+    "path": "/api/watching",
+    "parameters": [
+      {
+        "name": "member",
+        "repeatable": false
+      },
+      {
+        "name": "most",
+        "repeatable": false
+      }
+    ],
+    "kinds": [
+      "part-way"
+    ],
+    "file": false
+  },
+  {
     "path": "/api/playing",
     "parameters": [
       {

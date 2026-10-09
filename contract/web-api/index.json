@@ -12,6 +12,7 @@
     "downloads-pause": "actions/downloads-pause.json",
     "downloads-resume": "actions/downloads-resume.json",
     "forget": "actions/forget.json",
+    "grant": "actions/grant.json",
     "hosting-install": "actions/hosting-install.json",
     "hosting-remove": "actions/hosting-remove.json",
     "household-allow": "actions/household-allow.json",
@@ -48,6 +49,7 @@
     "update": "actions/update.json",
     "walkthrough": "actions/walkthrough.json",
     "watch": "actions/watch.json",
+    "watched": "actions/watched.json",
     "wiring-fill": "actions/wiring-fill.json"
   },
   "bodies": {
@@ -79,6 +81,7 @@
     "forms": "kinds/forms.json",
     "front-door": "kinds/front-door.json",
     "glossary": "kinds/glossary.json",
+    "grant": "kinds/grant.json",
     "handoff": "kinds/handoff.json",
     "held": "kinds/held.json",
     "history": "kinds/history.json",
@@ -97,6 +100,7 @@
     "news-items": "kinds/news-items.json",
     "outbound": "kinds/outbound.json",
     "pairing": "kinds/pairing.json",
+    "part-way": "kinds/part-way.json",
     "pausing": "kinds/pausing.json",
     "playing": "kinds/playing.json",
     "plugins": "kinds/plugins.json",
@@ -120,6 +124,7 @@
     "stored": "kinds/stored.json",
     "stuck": "kinds/stuck.json",
     "substitution": "kinds/substitution.json",
+    "title": "kinds/title.json",
     "trace": "kinds/trace.json",
     "undo": "kinds/undo.json",
     "uninstall": "kinds/uninstall.json",
@@ -128,6 +133,7 @@
     "version": "kinds/version.json",
     "walkthrough": "kinds/walkthrough.json",
     "watch": "kinds/watch.json",
+    "watched": "kinds/watched.json",
     "wiring": "kinds/wiring.json",
     "wizard": "kinds/wizard.json",
     "word": "kinds/word.json"

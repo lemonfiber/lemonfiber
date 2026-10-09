@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What one member was part-way through, most recent first.",
+  "type": "object",
+  "properties": {
+    "available": {
+      "description": "Whether it could be read at all. An empty list and an unread one are different\nanswers, and what could not be read is said in `findings`.",
+      "type": "boolean"
+    },
+    "findings": {
+      "description": "What is worth saying about this read, in the words its reader would use.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "id": {
+      "description": "The identifier the media server files them under.",
+      "type": "string"
+    },
+    "member": {
+      "description": "The member this was asked for, by the name they are known by.",
+      "type": "string"
+    },
+    "part_way": {
+      "description": "Each title or episode, how far in, and where it is served.",
+      "type": "array",
+      "items": {
+        "$ref": "PartWay.json"
+      }
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "member",
+    "id",
+    "part_way",
+    "available",
+    "findings",
+    "rehearsed"
+  ]
+}

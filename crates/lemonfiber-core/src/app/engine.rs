@@ -386,6 +386,7 @@ async fn worked(
 /// the connection that needs the key reports its own absence rather than this stopping
 /// the services from running at all.
 pub(crate) fn mint_adopted_secrets(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) {
+    crate::screening::door::made_before_start(ctx, manifest);
     let declares_bindery = manifest.services.iter().any(|service| {
         service
             .api
