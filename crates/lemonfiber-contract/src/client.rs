@@ -11,7 +11,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use lemonfiber_ports::http::{Http, Method, Request};
+use lemonfiber_ports::http::{Http, Method, Request, Response};
 use lemonfiber_ports::service::Failure;
 
 use crate::wire::{self, Refusal};
@@ -107,7 +107,27 @@ impl Contracted {
         A: serde::Serialize + Sync,
         R: serde::de::DeserializeOwned,
     {
-        let body = serde_json::to_string(asked).map_err(|why| self.refused(&why.to_string()))?;
+        let response = self
+            .exchange(capability, major, operation, serde_json::to_string(asked))
+            .await?;
+        let answer = self.answer(operation, &response)?;
+        serde_json::from_str(answer)
+            .map_err(|why| self.outside(operation, &format!("the answer did not read: {why}")))
+    }
+
+    /// Send what was asked, written, and wait for the adapter's response.
+    ///
+    /// Everything a call decides before decoding is decided here and in [`Self::answer`],
+    /// outside the generic [`Self::call`], so it is compiled and tested once rather than
+    /// once per operation.
+    async fn exchange(
+        &self,
+        capability: &str,
+        major: u32,
+        operation: &str,
+        written: serde_json::Result<String>,
+    ) -> Result<Response, Failure> {
+        let body = written.map_err(|why| self.refused(&why.to_string()))?;
         let request = Request {
             method: Method::Post,
             url: format!(
@@ -129,26 +149,18 @@ impl Contracted {
                 service: self.service.clone(),
             });
         };
-        self.read(operation, &response)
+        Ok(response)
     }
 
-    /// What one response answers, if it is an answer the contract declares.
-    fn read<R: serde::de::DeserializeOwned>(
-        &self,
-        operation: &str,
-        response: &lemonfiber_ports::http::Response,
-    ) -> Result<R, Failure> {
+    /// The JSON one response answers with, if it is an answer the contract declares.
+    fn answer<'r>(&self, operation: &str, response: &'r Response) -> Result<&'r str, Failure> {
         if response.body.len() > LARGEST {
             return Err(self.outside(operation, "the answer is larger than the contract allows"));
         }
-        let decoded = |body: &str| {
-            serde_json::from_str(body)
-                .map_err(|why| self.outside(operation, &format!("the answer did not read: {why}")))
-        };
         match response.status {
-            200 => decoded(&response.body),
+            200 => Ok(&response.body),
             // Only an answer with nothing to say may be empty, and it reads as nothing.
-            204 if response.body.is_empty() => decoded("null"),
+            204 if response.body.is_empty() => Ok("null"),
             401 => Err(Failure::Unauthorised {
                 service: self.service.clone(),
             }),
@@ -182,7 +194,7 @@ impl Contracted {
 }
 
 /// Whether a response declares itself a problem document.
-fn is_problem(response: &lemonfiber_ports::http::Response) -> bool {
+fn is_problem(response: &Response) -> bool {
     response
         .header("content-type")
         .is_some_and(|kind| kind.starts_with(wire::PROBLEM))

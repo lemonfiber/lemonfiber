@@ -147,3 +147,17 @@ async fn an_unwitnessed_client_still_refuses_an_answer_outside_the_contract() {
         Err(Failure::Refused { .. })
     ));
 }
+
+#[tokio::test]
+async fn a_request_that_cannot_be_written_is_refused_and_never_sent() {
+    let (fake, client, _) = adapter(Answer::reply(200, "7"));
+    // JSON keys are strings, so a map keyed by pairs has no JSON to be written as.
+    let unwritable = std::collections::BTreeMap::from([((1_u8, 2_u8), 3_u8)]);
+    assert!(matches!(
+        client
+            .call::<_, u32>("download.torrent", 1, "moved", &unwritable)
+            .await,
+        Err(Failure::Refused { .. })
+    ));
+    assert!(fake.request().is_none());
+}
