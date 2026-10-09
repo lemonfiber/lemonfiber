@@ -1,3 +1,4 @@
+use crate::servarr::Shape as _;
 use std::collections::BTreeSet;
 
 use super::{guidance, rewrite, Kind};
@@ -71,40 +72,40 @@ fn each_service_names_its_own_cutoff_unmet_upgrade_command() {
 #[test]
 fn each_service_names_its_own_search_and_history_endpoints() {
     // Television is searched and traced by episode; film by movie.
-    assert_eq!(Kind::Sonarr.release_id_param(), "episodeId");
-    assert_eq!(Kind::Radarr.release_id_param(), "movieId");
-    assert_eq!(Kind::Sonarr.library_endpoint(), "series");
-    assert_eq!(Kind::Radarr.library_endpoint(), "movie");
-    assert_eq!(Kind::Sonarr.history_filter(), "seriesIds");
-    assert_eq!(Kind::Radarr.history_filter(), "movieIds");
+    assert_eq!(Kind::Tv.release_id_param(), "episodeId");
+    assert_eq!(Kind::Movies.release_id_param(), "movieId");
+    assert_eq!(Kind::Tv.library_endpoint(), "series");
+    assert_eq!(Kind::Movies.library_endpoint(), "movie");
+    assert_eq!(Kind::Tv.history_filter(), "seriesIds");
+    assert_eq!(Kind::Movies.history_filter(), "movieIds");
     // Only television files its items in parts; a film is the whole item.
-    assert_eq!(Kind::Sonarr.parts_endpoint(), Some("episode"));
-    assert_eq!(Kind::Radarr.parts_endpoint(), None);
-    assert_eq!(Kind::Sonarr.reference_field(), "tvdbId");
-    assert_eq!(Kind::Radarr.reference_field(), "tmdbId");
-    assert_eq!(Kind::Sonarr.search_option(), "searchForMissingEpisodes");
-    assert_eq!(Kind::Radarr.search_option(), "searchForMovie");
-    assert_eq!(Kind::Sonarr.parts_filter(), "seriesId");
-    assert_eq!(Kind::Radarr.parts_filter(), "movieId");
+    assert_eq!(Kind::Tv.parts_endpoint(), Some("episode"));
+    assert_eq!(Kind::Movies.parts_endpoint(), None);
+    assert_eq!(Kind::Tv.reference_field(), "tvdbId");
+    assert_eq!(Kind::Movies.reference_field(), "tmdbId");
+    assert_eq!(Kind::Tv.search_option(), "searchForMissingEpisodes");
+    assert_eq!(Kind::Movies.search_option(), "searchForMovie");
+    assert_eq!(Kind::Tv.parts_filter(), "seriesId");
+    assert_eq!(Kind::Movies.parts_filter(), "movieId");
     // The words a household uses, not the services' own.
-    assert_eq!(Kind::Sonarr.noun(), "series");
-    assert_eq!(Kind::Radarr.noun(), "film");
+    assert_eq!(Kind::Tv.noun(), "series");
+    assert_eq!(Kind::Movies.noun(), "film");
 }
 
 #[test]
 fn the_three_1080p_presets_collapse_for_television() {
     assert_eq!(
-        guidance(Kind::Sonarr, Preset::SpaceSaving),
-        guidance(Kind::Sonarr, Preset::Balanced)
+        guidance(Kind::Tv, Preset::SpaceSaving),
+        guidance(Kind::Tv, Preset::Balanced)
     );
     assert_eq!(
-        guidance(Kind::Sonarr, Preset::Balanced),
-        guidance(Kind::Sonarr, Preset::HighQuality)
+        guidance(Kind::Tv, Preset::Balanced),
+        guidance(Kind::Tv, Preset::HighQuality)
     );
     // Only 4K stands apart for television.
     assert_ne!(
-        guidance(Kind::Sonarr, Preset::HighQuality),
-        guidance(Kind::Sonarr, Preset::Maximum)
+        guidance(Kind::Tv, Preset::HighQuality),
+        guidance(Kind::Tv, Preset::Maximum)
     );
 }
 
@@ -116,8 +117,8 @@ fn film_keeps_all_four_presets_distinct() {
         (Preset::HighQuality, Preset::Maximum),
     ] {
         assert_ne!(
-            guidance(Kind::Radarr, first),
-            guidance(Kind::Radarr, second),
+            guidance(Kind::Movies, first),
+            guidance(Kind::Movies, second),
             "{first:?} and {second:?} should differ for film",
         );
     }

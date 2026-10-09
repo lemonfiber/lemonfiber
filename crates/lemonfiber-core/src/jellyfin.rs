@@ -205,7 +205,7 @@ struct SignedIn {
 /// movie for film — the value its `IncludeItemTypes` filter narrows the library by.
 const fn item_type(kind: Kind) -> &'static str {
     match kind {
-        Kind::Sonarr => "Series",
-        Kind::Radarr => "Movie",
+        Kind::Tv => "Series",
+        Kind::Movies => "Movie",
     }
 }

@@ -62,7 +62,7 @@ impl ItemResource {
 
     /// Whether the server files it as a series.
     pub(super) fn is_a_series(&self) -> bool {
-        self.medium == item_type(Kind::Sonarr)
+        self.medium == item_type(Kind::Tv)
     }
 }
 
@@ -74,9 +74,9 @@ const EPISODE: &str = "Episode";
 /// Read through [`item_type`] rather than against words of its own, so the filter a
 /// query asks for and the answer it reads back cannot drift apart.
 fn medium(word: &str) -> Medium {
-    if word == item_type(Kind::Radarr) {
+    if word == item_type(Kind::Movies) {
         Medium::Film
-    } else if word == item_type(Kind::Sonarr) {
+    } else if word == item_type(Kind::Tv) {
         Medium::Series
     } else if word == EPISODE {
         Medium::Episode

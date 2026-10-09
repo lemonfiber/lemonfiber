@@ -102,7 +102,7 @@ impl ReleasesCheck {
                 ),
             };
         };
-        match service.probe_releases(kind.release_id_param()).await {
+        match service.probe_releases(kind).await {
             // The search could not run: nothing was learned about releases, only that
             // the service or its indexers could not be reached — the indexer-failure
             // case, kept as its own thing rather than dressed as a preset problem.
@@ -145,7 +145,7 @@ async fn ran(check: &ReleasesCheck) -> Vec<Finding> {
     let resolution: Vec<(&Target, Kind)> = check
         .targets
         .iter()
-        .filter_map(|target| Kind::for_section(&target.id).map(|kind| (target, kind)))
+        .filter_map(|target| target.kind.map(|kind| (target, kind)))
         .collect();
 
     if resolution.is_empty() {

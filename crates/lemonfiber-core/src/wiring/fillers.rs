@@ -93,6 +93,7 @@ impl Filler {
             config: self.key_file.clone()?,
             version: api.version?,
             confined_to: self.confined_to.clone(),
+            kind: crate::ports::media::Kind::of_declared(&self.media_types),
         })
     }
 

@@ -39,8 +39,8 @@ pub use asking::{Approving, Asking, Headroom, Holding, Left, Quota};
 pub use carrying::{Carried, Carrying, Record};
 pub use catalogue::{AddPlan, Added, Catalogue, CatalogueEntry};
 pub use clients::{
-    Category, ClientKind, ClientProbe, Credential, Download, DownloadClient, Endpoint,
-    FulfilmentTarget, QualityProfile, Queue, QueueDepth, Queued, Queues, RegisteredClient,
+    Category, ClientProbe, Credential, Download, DownloadClient, Endpoint, FulfilmentTarget,
+    Protocol, QualityProfile, Queue, QueueDepth, Queued, Queues, RegisteredClient,
     RegisteredFolder, RegisteredTarget, RootFolder, Seeded, Seeding, Transfers,
 };
 pub use failure::{Failure, ASK_FOR_REPAIRS};
@@ -60,12 +60,15 @@ pub use screening::{
     Episode, Held, Holds, HowFar, Located, Medium, PartWay, Pinned, Screening, Season, Title,
     PLAYER,
 };
-pub use subtitles::{Subtitled, Subtitles, Watched, Watching};
+pub use subtitles::{Subtitles, Watched, Watching};
 pub use throttling::{Hours, Rates, Throttled, Throttling, Wanted, Window};
 pub use trace::{FoundItem, ItemPart, Library, Pipeline, QueueItem, StuckItem, TraceEvent};
 
 /// Who a service says it is, once it answers.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Identity {
     /// The service's own name for itself.
     pub name: String,
@@ -214,19 +217,20 @@ pub trait MediaServer: Send + Sync {
     async fn create_admin(&self, name: &str, password: &str) -> Result<(), Failure>;
 }
 
-/// Asking a Servarr-shape service to run one of its background commands — the
-/// operator-triggered maintenance a stack sometimes needs, such as re-searching
-/// existing content for a better release when the quality bar is raised.
+/// Asking a curator to start the operator-triggered maintenance a stack sometimes
+/// needs, such as re-searching existing content for a better release when the
+/// quality bar is raised.
 #[async_trait]
 pub trait Maintenance: Send + Sync {
-    /// Ask the service to run the named command. Returns once the service has
-    /// accepted it; the work itself then runs in the background there, so this is
-    /// the request to start it, not a wait for it to finish.
+    /// Ask the curator to re-search what it already holds of `kind` for a release
+    /// that meets its current quality bar. Returns once it has accepted the request;
+    /// the work then runs in the background there, so this is the request to start
+    /// it, not a wait for it to finish.
     ///
     /// # Errors
     ///
-    /// Returns [`Failure`] when the service is unreachable or refuses the command.
-    async fn run_command(&self, name: &str) -> Result<(), Failure>;
+    /// Returns [`Failure`] when the curator is unreachable or refuses.
+    async fn search_upgrades(&self, kind: crate::media::Kind) -> Result<(), Failure>;
 }
 
 /// Telling a service how to move files from the download directory into the

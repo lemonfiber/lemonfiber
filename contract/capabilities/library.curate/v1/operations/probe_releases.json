@@ -1,0 +1,107 @@
+{
+  "post": {
+    "operationId": "probe_releases",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$defs": {
+              "Kind": {
+                "description": "The two kinds of video a household files by resolution, and so the two the quality\nmodel speaks to. Music and books have a different axis and are not resolution\npresets, so they are not here.\n\nNamed for what is filed, never for the service that files it: whatever curates\ntelevision is asked about `Tv`. Read as the media type a service declares, and\naccepting the old service-named spellings where a record still holds one.",
+                "oneOf": [
+                  {
+                    "const": "tv",
+                    "description": "Television: series, seasons and episodes.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "movies",
+                    "description": "Film.",
+                    "type": "string"
+                  }
+                ]
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "kind": {
+                "$ref": "#/$defs/Kind",
+                "description": "The port's `kind`."
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "description": "What a search for the operator's wanted content found, read against the quality\nprofile in force — the basis for telling \"the preset yields no matching releases\"\napart from \"the indexer failed\" (which surfaces as a [`Failure`], not a probe).",
+              "oneOf": [
+                {
+                  "const": "nothing-wanted",
+                  "description": "Nothing is wanted, so there was nothing to search for — the preset cannot be\njudged against releases yet.",
+                  "type": "string"
+                },
+                {
+                  "const": "matching",
+                  "description": "The search ran and returned releases the profile would grab — the preset is\nmet by what is available.",
+                  "type": "string"
+                },
+                {
+                  "const": "none-match",
+                  "description": "The search returned releases, but the profile wants none of them — they exist\nbut do not meet the chosen quality, so the preset conflicts with what is out\nthere.",
+                  "type": "string"
+                },
+                {
+                  "const": "none-found",
+                  "description": "The search ran cleanly and returned nothing at all — few or none are available,\nas distinct from the indexer having failed to answer.",
+                  "type": "string"
+                }
+              ],
+              "title": "ReleaseProbe"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ]
+  }
+}

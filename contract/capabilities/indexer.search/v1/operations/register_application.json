@@ -1,0 +1,124 @@
+{
+  "post": {
+    "operationId": "register_application",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$defs": {
+              "Application": {
+                "additionalProperties": false,
+                "description": "A media-filing \\*arr, as Prowlarr needs to be told about it so it syncs that\n\\*arr its indexers.",
+                "properties": {
+                  "api_key": {
+                    "description": "The \\*arr's own API key, which is what lets Prowlarr write indexers into\nit.",
+                    "type": "string"
+                  },
+                  "base_url": {
+                    "description": "The address Prowlarr reaches the \\*arr on, on the stack's network — the\nconnection an existing application is matched by.",
+                    "type": "string"
+                  },
+                  "indexer_url": {
+                    "description": "The address the application reaches the indexer back on, on the stack's network.",
+                    "type": "string"
+                  },
+                  "kind": {
+                    "$ref": "#/$defs/ApplicationKind",
+                    "description": "Which application it is, selecting the field schema and sync categories."
+                  },
+                  "name": {
+                    "description": "The name the operator will see in Prowlarr's own interface.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "kind",
+                  "indexer_url",
+                  "base_url",
+                  "api_key"
+                ],
+                "type": "object"
+              },
+              "ApplicationKind": {
+                "description": "What an application the indexer searches for files, selecting how the indexer\nfiles the application and which release categories it syncs to it.",
+                "oneOf": [
+                  {
+                    "const": "tv",
+                    "description": "Television.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "movies",
+                    "description": "Film.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "music",
+                    "description": "Music.",
+                    "type": "string"
+                  }
+                ]
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "application": {
+                "$ref": "#/$defs/Application",
+                "description": "The port's `application`."
+              }
+            },
+            "required": [
+              "application"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "title": "null",
+              "type": "null"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ]
+  }
+}

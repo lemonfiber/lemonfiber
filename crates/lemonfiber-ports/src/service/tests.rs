@@ -1,6 +1,6 @@
 use super::{
-    Application, ApplicationKind, Category, ClientKind, Credential, Diagnose, DownloadClient,
-    Failure, Identity, RegisteredApplication, RootFolder,
+    Application, ApplicationKind, Category, Credential, Diagnose, DownloadClient, Failure,
+    Identity, Protocol, RegisteredApplication, RootFolder,
 };
 use lemonfiber_error::{Severity, State};
 
@@ -86,7 +86,7 @@ fn the_things_a_service_is_told_about_are_plain_data() {
         name: "SABnzbd".to_owned(),
         host: "sabnzbd".to_owned(),
         port: 8080,
-        kind: ClientKind::Sabnzbd,
+        protocol: Protocol("sabnzbd".to_owned()),
         credential: Credential::ApiKey("the-key".to_owned()),
         category: Category {
             field: "tvCategory".to_owned(),
@@ -103,12 +103,12 @@ fn the_things_a_service_is_told_about_are_plain_data() {
 
     let application = Application {
         name: "Sonarr".to_owned(),
-        kind: ApplicationKind::Sonarr,
-        prowlarr_url: "http://prowlarr:9696".to_owned(),
+        kind: ApplicationKind::Tv,
+        indexer_url: "http://prowlarr:9696".to_owned(),
         base_url: "http://sonarr:8989".to_owned(),
         api_key: "the-key".to_owned(),
     };
-    assert_eq!(application.clone().kind, ApplicationKind::Sonarr);
+    assert_eq!(application.clone().kind, ApplicationKind::Tv);
 
     let registered = RegisteredApplication {
         id: "3".to_owned(),

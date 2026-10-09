@@ -1,0 +1,260 @@
+{
+  "capability": "library.curate",
+  "cases": [
+    {
+      "case": "refuses-without-the-key",
+      "expect": {
+        "status": [
+          401
+        ]
+      },
+      "keyed": false,
+      "live": true,
+      "operation": "identity"
+    },
+    {
+      "case": "identity-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "identity"
+    },
+    {
+      "case": "register_download_client-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "register_download_client"
+    },
+    {
+      "case": "update_download_client-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "update_download_client"
+    },
+    {
+      "case": "set_client_field-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "set_client_field"
+    },
+    {
+      "case": "test_download_clients-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "test_download_clients"
+    },
+    {
+      "case": "register_root_folder-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "register_root_folder"
+    },
+    {
+      "case": "root_folders-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "root_folders"
+    },
+    {
+      "case": "download_clients-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "download_clients"
+    },
+    {
+      "case": "quality_profiles-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "quality_profiles"
+    },
+    {
+      "case": "search_upgrades-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "search_upgrades"
+    },
+    {
+      "case": "hardlinks-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "hardlinks"
+    },
+    {
+      "case": "set_hardlinks-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "set_hardlinks"
+    },
+    {
+      "case": "records-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "records"
+    },
+    {
+      "case": "carry-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "carry"
+    },
+    {
+      "case": "lookup-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "lookup"
+    },
+    {
+      "case": "add_plan-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "add_plan"
+    },
+    {
+      "case": "add-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "add"
+    },
+    {
+      "case": "indexer_count-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "indexer_count"
+    },
+    {
+      "case": "queue-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "queue"
+    },
+    {
+      "case": "probe_releases-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "probe_releases"
+    },
+    {
+      "case": "apply_music_format-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "apply_music_format"
+    },
+    {
+      "case": "library-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "library"
+    },
+    {
+      "case": "find_items-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "find_items"
+    },
+    {
+      "case": "item_history-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "item_history"
+    },
+    {
+      "case": "item_queue-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "item_queue"
+    },
+    {
+      "case": "item_parts-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "item_parts"
+    },
+    {
+      "case": "stuck_items-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "stuck_items"
+    }
+  ],
+  "major": 1
+}

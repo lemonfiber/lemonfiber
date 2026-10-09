@@ -16,7 +16,8 @@
 
 use lemonfiber_manifest::ApiKind;
 
-use crate::ports::service::{ApplicationKind, ClientKind, Subtitled};
+use crate::ports::media::Kind;
+use crate::ports::service::{ApplicationKind, Protocol};
 use crate::seed::{State, Wiring};
 use crate::wiring::{Address, Ask, Filler, Fillers};
 
@@ -34,11 +35,11 @@ const CURATES: &str = "library.curate";
 const SEARCHES: &str = "indexer.search";
 
 /// Television, as the stack manifest names the media a curator files.
-pub(super) const TELEVISION: &str = "tv";
+pub(super) const TELEVISION: &str = Kind::Tv.media_type();
 /// Film, likewise.
-pub(super) const FILM: &str = "movies";
+pub(super) const FILM: &str = Kind::Movies.media_type();
 /// Music, likewise.
-pub(super) const MUSIC: &str = "music";
+pub(super) const MUSIC: &str = ApplicationKind::Music.media_type();
 
 /// Every capability an ask is answered for here.
 ///
@@ -47,10 +48,10 @@ pub(super) const MUSIC: &str = "music";
 const ANSWERED: [&str; 4] = [USENET, TORRENT, CURATES, SEARCHES];
 
 /// What one asker and one filler come to.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum Connection {
     /// The filler, registered in the asker as a download client of this kind.
-    DownloadClient(ClientKind),
+    DownloadClient(Protocol),
     /// The filler, registered in the indexer as an application of this kind, so the
     /// indexer pushes it what it searches.
     Application(ApplicationKind),
@@ -61,7 +62,7 @@ pub(super) enum Connection {
         television: bool,
     },
     /// The filler, watched by the subtitle finder as this kind.
-    Subtitles(Subtitled),
+    Subtitles(Kind),
     /// The filler, told to the asker as an aggregator it pulls indexers from, with the
     /// filler's own key to read it with.
     Aggregator,
@@ -73,7 +74,7 @@ impl Connection {
     /// The indexer gives every application it syncs its own API key, and that key opens
     /// every indexer it holds. Every other connection hands the asker the filler's
     /// credential, which is the filler's to give.
-    const fn hands_over_the_askers_key(self) -> bool {
+    const fn hands_over_the_askers_key(&self) -> bool {
         matches!(self, Self::Application(_))
     }
 }
@@ -140,21 +141,22 @@ fn connection(
     media: &[String],
 ) -> Result<Connection, Unmade> {
     match (asker, capability, filler) {
-        (ApiKind::Servarr, USENET, ApiKind::Sabnzbd) => {
-            Ok(Connection::DownloadClient(ClientKind::Sabnzbd))
-        }
-        (ApiKind::Servarr, TORRENT, ApiKind::Qbittorrent) => {
-            Ok(Connection::DownloadClient(ClientKind::Qbittorrent))
+        (ApiKind::Servarr, USENET, ApiKind::Sabnzbd)
+        | (ApiKind::Servarr, TORRENT, ApiKind::Qbittorrent) => {
+            Ok(Connection::DownloadClient(Protocol(filler.name())))
         }
         (ApiKind::Servarr, CURATES, ApiKind::Servarr) => {
             super::applications::application_kind(media)
                 .map(Connection::Application)
                 .ok_or(Unmade::Files)
         }
-        (ApiKind::Seerr, CURATES, ApiKind::Servarr) => super::fulfilment::fetches(media)
-            .map(|television| Connection::Fulfilment { television })
+        // Lidarr and Bindery file media the request service does not deal in at all.
+        (ApiKind::Seerr, CURATES, ApiKind::Servarr) => Kind::of_declared(media)
+            .map(|kind| Connection::Fulfilment {
+                television: kind == Kind::Tv,
+            })
             .ok_or(Unmade::Files),
-        (ApiKind::Bazarr, CURATES, ApiKind::Servarr) => super::subtitles::subtitled(media)
+        (ApiKind::Bazarr, CURATES, ApiKind::Servarr) => Kind::of_declared(media)
             .map(Connection::Subtitles)
             .ok_or(Unmade::Files),
         (ApiKind::Bindery, SEARCHES, ApiKind::Servarr) => Ok(Connection::Aggregator),
@@ -219,7 +221,7 @@ pub(super) fn unmatched(fillers: &Fillers) -> Vec<Wiring> {
         .iter()
         .filter(|pairing| !from_its_end(fillers, pairing))
         .filter_map(|pairing| {
-            let why = pairing.made.err()?;
+            let why = *pairing.made.as_ref().err()?;
             Some(Wiring::settled(
                 format!("{} into {}", pairing.filler.name, pairing.asker.name),
                 State::Unmatched {

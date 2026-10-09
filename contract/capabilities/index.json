@@ -109,6 +109,207 @@
       ],
       "openapi": "download.torrent/v1/openapi.json",
       "operations": 9
+    },
+    {
+      "capability": "library.curate",
+      "conformance": "library.curate/v1/conformance.json",
+      "files": [
+        {
+          "path": "library.curate/v1/openapi.json",
+          "sha256": "6ed9452bc7d29b7d61c073e9563e5afe1bf91db4537e69c6e878d4e4b32609bd"
+        },
+        {
+          "path": "library.curate/v1/operations/identity.json",
+          "sha256": "f8db2bc235419365fe3208b33988481433c4e6e9d0a06e2de8229139e43f8346"
+        },
+        {
+          "path": "library.curate/v1/operations/register_download_client.json",
+          "sha256": "70073c5fddcf0c3e7ab8c4b8f90606a0c65035a6691e719ecacd4cde814161ea"
+        },
+        {
+          "path": "library.curate/v1/operations/update_download_client.json",
+          "sha256": "125ac0d42f19e08a331f5565f22d10e7b81ca34431d47b0ea38e0131e6e4637f"
+        },
+        {
+          "path": "library.curate/v1/operations/set_client_field.json",
+          "sha256": "a99dab24b9fea5bc1801818cb19e56a6c110cfc05b5884d7198fdc74b3fe7ddf"
+        },
+        {
+          "path": "library.curate/v1/operations/test_download_clients.json",
+          "sha256": "666f16fe6caafef6296e6408b093918485a0757a471e10c1d78e89974e8097c3"
+        },
+        {
+          "path": "library.curate/v1/operations/register_root_folder.json",
+          "sha256": "580863bae088cae9054d5ea1880f486fd5d9e0e4eabfa7d5a3f4ffb2e67e3a6a"
+        },
+        {
+          "path": "library.curate/v1/operations/root_folders.json",
+          "sha256": "fac64760fe7cb8409536b6a0929d63ff206af15805257468beefad1321990c7c"
+        },
+        {
+          "path": "library.curate/v1/operations/download_clients.json",
+          "sha256": "be17c689db16ab325bddad884384c2a24ec9f814185b8bf92a6db8fe76629483"
+        },
+        {
+          "path": "library.curate/v1/operations/quality_profiles.json",
+          "sha256": "dc3ecdbe51650b582c7009a137114c3b7db234f4b8374defae8468c196025c81"
+        },
+        {
+          "path": "library.curate/v1/operations/search_upgrades.json",
+          "sha256": "1cbd7e6b006f8ca344b023164e084fcaa83dec9261a2c9d0b079a35b1f9318fb"
+        },
+        {
+          "path": "library.curate/v1/operations/hardlinks.json",
+          "sha256": "96d60a30d2ccaa0d4b5a8474a6ad715009f13054ae3d50e25761d30df1cfecef"
+        },
+        {
+          "path": "library.curate/v1/operations/set_hardlinks.json",
+          "sha256": "c328b4a8e2eec342fc4e8a1f521dd6a6036943185120906f7034fe1184aaaf5b"
+        },
+        {
+          "path": "library.curate/v1/operations/records.json",
+          "sha256": "712adfac0f5815f2cdfcba8967d0f4bfd19556fdac67291ee58b11610fe78bbb"
+        },
+        {
+          "path": "library.curate/v1/operations/carry.json",
+          "sha256": "f39ed4deacdc65a24efe1203672467772feed1338015c8ad1225c748db329a32"
+        },
+        {
+          "path": "library.curate/v1/operations/lookup.json",
+          "sha256": "1f341dec1bf50fe4838be80fc971de9612cdc22e14a9980af0acfa7ff9c72f87"
+        },
+        {
+          "path": "library.curate/v1/operations/add_plan.json",
+          "sha256": "d8e8372851f400df28bc2b676e12f28467c226b309ca6783a01ea2adfcd46f9d"
+        },
+        {
+          "path": "library.curate/v1/operations/add.json",
+          "sha256": "5c6f9c2884d036f95778a8f56c04735e76fda16f43a1ae49625081b1eeaeb63c"
+        },
+        {
+          "path": "library.curate/v1/operations/indexer_count.json",
+          "sha256": "2deee0028b6a935196065749b8ea9d84bbd8586bb7f435f239dcfe08049172db"
+        },
+        {
+          "path": "library.curate/v1/operations/queue.json",
+          "sha256": "4e5bc2e95470755f79092c862d71c54d1b2cacfbb0c2ec3b4e3042f9014e53ad"
+        },
+        {
+          "path": "library.curate/v1/operations/probe_releases.json",
+          "sha256": "b56252525d8e409507c36042178d72fa7e2e8488c600205dadface4741637486"
+        },
+        {
+          "path": "library.curate/v1/operations/apply_music_format.json",
+          "sha256": "678edced4d6b8fbdbfcc0724efb9f1d7486ac8e15c75226e9a247923a10416e1"
+        },
+        {
+          "path": "library.curate/v1/operations/library.json",
+          "sha256": "6d147adaf4632000a8b6aae529a8dc7ec34769481fa5005cf80f55c2efb084c3"
+        },
+        {
+          "path": "library.curate/v1/operations/find_items.json",
+          "sha256": "bbb4bc964c5e008c4432bad5140a96b87b61226b1ebfe3a75785db9086185814"
+        },
+        {
+          "path": "library.curate/v1/operations/item_history.json",
+          "sha256": "e5bdf9b5bbc7a19f0959f25534062739d13d181cd2492246c7ffd46c708e8c8c"
+        },
+        {
+          "path": "library.curate/v1/operations/item_queue.json",
+          "sha256": "256d0ffc410544017937fda4b4e2d303a7ba82cec144a70fbd8e60a3ca3334e4"
+        },
+        {
+          "path": "library.curate/v1/operations/item_parts.json",
+          "sha256": "cd4ebbf438e4954d9943f44228e36a3f482ae9a2881e7e9899f80893b21e252e"
+        },
+        {
+          "path": "library.curate/v1/operations/stuck_items.json",
+          "sha256": "d1ac7046945884a87d5467cf978626ab4d446f1cc5a1ca99d0b235a9e6f8bee8"
+        },
+        {
+          "path": "library.curate/v1/conformance.json",
+          "sha256": "521e3af92aa5abe13f6a5b61111c0df2ac44900a213e55c74b11e6d9ad7448f7"
+        }
+      ],
+      "majors": [
+        1
+      ],
+      "openapi": "library.curate/v1/openapi.json",
+      "operations": 27
+    },
+    {
+      "capability": "indexer.search",
+      "conformance": "indexer.search/v1/conformance.json",
+      "files": [
+        {
+          "path": "indexer.search/v1/openapi.json",
+          "sha256": "df8cf68d8b72c83d977dfcdce036c0254c52c328be905892825096ea3f4f0493"
+        },
+        {
+          "path": "indexer.search/v1/operations/register_application.json",
+          "sha256": "1f967d1086061969c25806e2769ae81724ac43ffe2175b59891a34a68f31e963"
+        },
+        {
+          "path": "indexer.search/v1/operations/applications.json",
+          "sha256": "fae797e6d0b79932c8ab39369cffc98a4d500a53a7cbad6292d74026048df596"
+        },
+        {
+          "path": "indexer.search/v1/operations/test_application.json",
+          "sha256": "4880db775631798919eaf2afac5705bcf3992672bbcced6dbed7a76821a52fd8"
+        },
+        {
+          "path": "indexer.search/v1/operations/rekey_application.json",
+          "sha256": "32d44c7d6965335b55c81b2892ae8e500608d25ef11b5835fa1553ccf428d752"
+        },
+        {
+          "path": "indexer.search/v1/operations/indexers.json",
+          "sha256": "f3be43642727dbd84d75e2d9f09bb4d3d9ddd83f2734620cb4b3aa31840cc0be"
+        },
+        {
+          "path": "indexer.search/v1/operations/aggregators.json",
+          "sha256": "16afd84888f6062aefa4291e33c2d5e4506d87aad8a7114d57a041d4e4386f8f"
+        },
+        {
+          "path": "indexer.search/v1/operations/add_aggregator.json",
+          "sha256": "ec5149f2411c0c020dbc2e3afa6d308a4c4655b321c1955dd53300a046bdd831"
+        },
+        {
+          "path": "indexer.search/v1/conformance.json",
+          "sha256": "b8bd55170e824bcbbf27ecf700584f1853d16bc2fc60428f7de908a6580f6492"
+        }
+      ],
+      "majors": [
+        1
+      ],
+      "openapi": "indexer.search/v1/openapi.json",
+      "operations": 7
+    },
+    {
+      "capability": "subtitles.fetch",
+      "conformance": "subtitles.fetch/v1/conformance.json",
+      "files": [
+        {
+          "path": "subtitles.fetch/v1/openapi.json",
+          "sha256": "be5659876c4b9072fc01e107c80bf45f0ee1c5551533d4801052657545f7d9a1"
+        },
+        {
+          "path": "subtitles.fetch/v1/operations/watching.json",
+          "sha256": "65a0c0b5870b9533499e3bdeb13cb9303dd09164186844270d8ef82014acc821"
+        },
+        {
+          "path": "subtitles.fetch/v1/operations/watch.json",
+          "sha256": "16df78f92aadd7a7909d50381ed39108dfbe48b6c20da1c8049e7f9c21758ad7"
+        },
+        {
+          "path": "subtitles.fetch/v1/conformance.json",
+          "sha256": "bc35c9759e7ec3c89546b5322354cc25bb682b446fe152445ca1c24239f3f4d8"
+        }
+      ],
+      "majors": [
+        1
+      ],
+      "openapi": "subtitles.fetch/v1/openapi.json",
+      "operations": 2
     }
   ]
 }

@@ -1,0 +1,88 @@
+{
+  "post": {
+    "operationId": "aggregators",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$defs": {
+                "KnownAggregator": {
+                  "additionalProperties": false,
+                  "description": "An aggregator the service already holds.\n\nRead back so one already known is left alone rather than added twice, and so a\nregistration can be confirmed by reading it. **Whether it holds a key is part of\nthis**: the service accepts a registration whose key it did not understand and\nanswers success, so an entry without one is the failure this reads for.",
+                  "properties": {
+                    "id": {
+                      "description": "The identifier the service gave it.",
+                      "type": "string"
+                    },
+                    "keyed": {
+                      "description": "Whether it holds a key for it. The key itself is not read back — a credential\nis not something to carry around to decide whether to write one.",
+                      "type": "boolean"
+                    },
+                    "url": {
+                      "description": "Where it says the aggregator is.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "url",
+                    "keyed"
+                  ],
+                  "type": "object"
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "items": {
+                "$ref": "#/$defs/KnownAggregator"
+              },
+              "title": "Array_of_KnownAggregator",
+              "type": "array"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ]
+  }
+}

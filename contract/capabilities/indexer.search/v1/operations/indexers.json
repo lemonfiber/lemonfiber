@@ -1,0 +1,251 @@
+{
+  "post": {
+    "operationId": "indexers",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$defs": {
+              "SystemTime": {
+                "properties": {
+                  "nanos_since_epoch": {
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "secs_since_epoch": {
+                    "format": "uint64",
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "secs_since_epoch",
+                  "nanos_since_epoch"
+                ],
+                "type": "object"
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "now": {
+                "$ref": "#/$defs/SystemTime",
+                "description": "The port's `now`."
+              }
+            },
+            "required": [
+              "now"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$defs": {
+                "Duration": {
+                  "properties": {
+                    "nanos": {
+                      "format": "uint32",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "secs": {
+                      "format": "uint64",
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "secs",
+                    "nanos"
+                  ],
+                  "type": "object"
+                },
+                "IndexerUse": {
+                  "additionalProperties": false,
+                  "description": "One indexer as the aggregator that queries it has it.\n\nCounts and, where the operator recorded them, the caps those counts are judged\nagainst. What the aggregator always knows is how many times it asked, how many of\nthose failed, and whether it has since given up on the indexer; what it knows only\nsometimes is what the subscription behind it allows.",
+                  "properties": {
+                    "enabled": {
+                      "description": "Whether the aggregator is querying it at all.",
+                      "type": "boolean"
+                    },
+                    "failed_grabs": {
+                      "description": "How many of those it did not hand over.",
+                      "format": "uint64",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "failed_queries": {
+                      "description": "How many of those searches it did not answer.",
+                      "format": "uint64",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "grabbed_from": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/SystemTime"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "When the oldest grab still inside the window was made — the same, for the other\nallowance, which runs out on its own schedule."
+                    },
+                    "grabs": {
+                      "description": "Releases taken from it in that window.",
+                      "format": "uint64",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "limits": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/Limits"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "What it allows and over how long, where the operator recorded either."
+                    },
+                    "name": {
+                      "description": "What the operator calls it.",
+                      "type": "string"
+                    },
+                    "queries": {
+                      "description": "Searches made in the window asked for.",
+                      "format": "uint64",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "rested_until": {
+                      "description": "When the aggregator will try it again, in its own words, where it has taken it\nout of rotation after repeated failures.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "searched_from": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/SystemTime"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "When the oldest search still inside the window was made.\n\nA reset falls out of this and nothing else: a rolling window frees up the moment\nits oldest call ages out of it. A total has no times in it, so a count alone can\nsay an allowance is spent and never say when it comes back."
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "enabled",
+                    "queries",
+                    "failed_queries",
+                    "grabs",
+                    "failed_grabs"
+                  ],
+                  "type": "object"
+                },
+                "Limits": {
+                  "additionalProperties": false,
+                  "description": "What an indexer allows, as the aggregator was told it.\n\nAn indexer publishes its allowance almost nowhere — the caps in its capabilities\ndocument are results per query, not calls per day — so the figure that exists is the\none the operator typed into the aggregator after reading their own subscription. That\nmakes it exactly the shape a Usenet block takes: the allowance is recorded in the\nclient, the use is measured by the client, and asking either costs the provider\nnothing.\n\nThe window travels with the caps because a cap means nothing without one, and because\nthe aggregator counts against a *rolling* window: a count taken from midnight would\nreport headroom that is not there every morning, which is the same calendar trap the\ndownload client's weekly totals set.",
+                  "properties": {
+                    "grabs": {
+                      "description": "Grabs allowed in the window, where the operator recorded a cap.",
+                      "format": "uint64",
+                      "minimum": 0,
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "queries": {
+                      "description": "Searches allowed in the window, where the operator recorded a cap.",
+                      "format": "uint64",
+                      "minimum": 0,
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "window": {
+                      "$ref": "#/$defs/Duration",
+                      "description": "How far back the window reaches from now."
+                    }
+                  },
+                  "required": [
+                    "window"
+                  ],
+                  "type": "object"
+                },
+                "SystemTime": {
+                  "properties": {
+                    "nanos_since_epoch": {
+                      "format": "uint32",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "secs_since_epoch": {
+                      "format": "uint64",
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "secs_since_epoch",
+                    "nanos_since_epoch"
+                  ],
+                  "type": "object"
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "items": {
+                "$ref": "#/$defs/IndexerUse"
+              },
+              "title": "Array_of_IndexerUse",
+              "type": "array"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ]
+  }
+}

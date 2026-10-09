@@ -102,8 +102,8 @@ impl RequestRecord {
             member: self.requested_by.display_name,
             member_id: self.requested_by.jellyfin_user_id,
             kind: match self.media_type.as_str() {
-                "tv" => Some(Kind::Sonarr),
-                "movie" => Some(Kind::Radarr),
+                "tv" => Some(Kind::Tv),
+                "movie" => Some(Kind::Movies),
                 _ => None,
             },
             item: self.media.external_service_id,

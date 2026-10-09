@@ -1,6 +1,6 @@
 //! What kind of thing lemonfiber is handling — the words the boundary needs to name it.
 //!
-//! Which \*arr an item belongs to, and how good an operator wants their music. Both are
+//! Which kind of video an item is, and how good an operator wants their music. Both are
 //! choices made well above this, and both have to cross the boundary: a port that could not
 //! say which service it is asking about, or what quality to apply, would push the naming
 //! into every caller.
@@ -11,141 +11,71 @@
 
 use serde::{Deserialize, Serialize};
 
-/// The two services whose quality an operator chooses by resolution, and so the
-/// two the quality model speaks to. Music and books have a different axis and
-/// are not resolution presets, so they are not here.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+/// The two kinds of video a household files by resolution, and so the two the quality
+/// model speaks to. Music and books have a different axis and are not resolution
+/// presets, so they are not here.
+///
+/// Named for what is filed, never for the service that files it: whatever curates
+/// television is asked about `Tv`. Read as the media type a service declares, and
+/// accepting the old service-named spellings where a record still holds one.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum Kind {
-    /// Sonarr — television.
-    Sonarr,
-    /// Radarr — film.
-    Radarr,
+    /// Television: series, seasons and episodes.
+    #[serde(alias = "sonarr")]
+    Tv,
+    /// Film.
+    #[serde(alias = "radarr")]
+    Movies,
 }
 
 impl Kind {
-    /// Both services, in the order `recyclarr.yml` lists them.
-    pub const ALL: [Self; 2] = [Self::Sonarr, Self::Radarr];
+    /// Both, television first.
+    pub const ALL: [Self; 2] = [Self::Tv, Self::Movies];
 
-    /// The top-level `recyclarr.yml` section this service is configured under.
-    #[must_use]
-    pub const fn section(self) -> &'static str {
-        match self {
-            Self::Sonarr => "sonarr",
-            Self::Radarr => "radarr",
-        }
-    }
-
-    /// The media type in a [`Selection`] this service draws its preset from, so a
-    /// per-type choice — Maximum for film, Balanced for television — reaches the
-    /// right service.
+    /// The media type a service declares for this kind, and a [`Selection`] draws its
+    /// preset by, so a per-type choice reaches the right curator.
     #[must_use]
     pub const fn media_type(self) -> &'static str {
         match self {
-            Self::Sonarr => "tv",
-            Self::Radarr => "movies",
+            Self::Tv => "tv",
+            Self::Movies => "movies",
         }
     }
 
-    /// The service whose section a top-level `recyclarr.yml` key names — also the
-    /// service a compose id such as `sonarr` names, since the two share the word —
-    /// or `None` for any other key, so an operator's own additions are left alone.
+    /// The kind of video a service files, read from the media types it declares, or
+    /// `None` for a service that files no video.
+    ///
+    /// Television before film whatever order they are declared in: a service filing
+    /// both is filed as one, and which one has to be the same every run.
     #[must_use]
-    pub fn for_section(key: &str) -> Option<Self> {
-        Self::ALL.into_iter().find(|kind| kind.section() == key)
+    pub fn of_declared(media_types: &[String]) -> Option<Self> {
+        Self::ALL.into_iter().find(|kind| {
+            media_types
+                .iter()
+                .any(|media| media.as_str() == kind.media_type())
+        })
     }
 
-    /// The Servarr command that re-searches existing content for a better release
-    /// meeting the current quality profile — the "upgrade what is already here"
-    /// action. Named per service, verified against each app's command set.
-    #[must_use]
-    pub const fn upgrade_command(self) -> &'static str {
-        match self {
-            Self::Sonarr => "CutoffUnmetEpisodeSearch",
-            Self::Radarr => "CutoffUnmetMoviesSearch",
-        }
-    }
-
-    /// The query parameter naming what a manual release search is for — an episode for
-    /// television, a movie for film. A wanted item's own id fills it, so a search asks
-    /// the indexers for exactly what the operator is missing.
-    #[must_use]
-    pub const fn release_id_param(self) -> &'static str {
-        match self {
-            Self::Sonarr => "episodeId",
-            Self::Radarr => "movieId",
-        }
-    }
-
-    /// The API path segment listing the service's library — the series it tracks, or the
-    /// films — searched by a human term to find an item to trace.
-    #[must_use]
-    pub const fn library_endpoint(self) -> &'static str {
-        match self {
-            Self::Sonarr => "series",
-            Self::Radarr => "movie",
-        }
-    }
-
-    /// The history query parameter that filters events to one library item, so a trace
-    /// reads only what happened to the item asked about.
-    #[must_use]
-    pub const fn history_filter(self) -> &'static str {
-        match self {
-            Self::Sonarr => "seriesIds",
-            Self::Radarr => "movieIds",
-        }
-    }
-
-    /// The plain word for what this service files, as a household would say it — the
-    /// noun a request is named by where its title could not be found.
+    /// The plain word for what is filed, as a household would say it — the noun a
+    /// request is named by where its title could not be found.
     #[must_use]
     pub const fn noun(self) -> &'static str {
         match self {
-            Self::Sonarr => "series",
-            Self::Radarr => "film",
-        }
-    }
-
-    /// The API path segment listing the parts a library item is made of — the episodes of
-    /// a series — or `None` for a service whose items have no parts. A film is the whole
-    /// item, so there is nothing to aggregate and nothing to ask for.
-    #[must_use]
-    pub const fn parts_endpoint(self) -> Option<&'static str> {
-        match self {
-            Self::Sonarr => Some("episode"),
-            Self::Radarr => None,
-        }
-    }
-
-    /// The external catalogue this service files by — the identifier an add is made
-    /// with. The two services use different catalogues, and a field one does not know is
-    /// a field it refuses the whole request over.
-    #[must_use]
-    pub const fn reference_field(self) -> &'static str {
-        match self {
-            Self::Sonarr => "tvdbId",
-            Self::Radarr => "tmdbId",
-        }
-    }
-
-    /// The add option that tells the service to go and look for what it has just taken
-    /// on, rather than filing it and waiting for its next scheduled sweep — which is the
-    /// difference between a walkthrough and a bookmark.
-    #[must_use]
-    pub const fn search_option(self) -> &'static str {
-        match self {
-            Self::Sonarr => "searchForMissingEpisodes",
-            Self::Radarr => "searchForMovie",
-        }
-    }
-
-    /// The query parameter that narrows the parts listing to one library item.
-    #[must_use]
-    pub const fn parts_filter(self) -> &'static str {
-        match self {
-            Self::Sonarr => "seriesId",
-            Self::Radarr => "movieId",
+            Self::Tv => "series",
+            Self::Movies => "film",
         }
     }
 }
@@ -153,7 +83,7 @@ impl Kind {
 /// How good the operator wants their music to sound, and how much disk they will
 /// spend on it — chosen as a format preference, since music has no resolution to
 /// choose.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Format {
     /// Small lossy files that sound great on phones, earbuds, and in the car:
@@ -244,3 +174,6 @@ impl Format {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

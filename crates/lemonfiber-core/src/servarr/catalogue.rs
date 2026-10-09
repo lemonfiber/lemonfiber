@@ -5,6 +5,7 @@
 //! where would you file it and to what standard, take it on and go and look, and — asked
 //! first of all — have you got anything to look *with*.
 
+use super::Shape as _;
 use async_trait::async_trait;
 use serde::Deserialize;
 
@@ -113,8 +114,8 @@ impl LookupResult {
             title: self.title,
             year: self.year,
             reference: match kind {
-                Kind::Sonarr => self.tvdb_id,
-                Kind::Radarr => self.tmdb_id,
+                Kind::Tv => self.tvdb_id,
+                Kind::Movies => self.tmdb_id,
             }
             .unwrap_or_default(),
             held_as: (self.id != 0).then_some(self.id),
@@ -189,8 +190,8 @@ async fn add(
     // afterwards. Reaching inside a literal object carries a branch for the object
     // not being one, which cannot happen and so can never be shown working.
     let only = match kind {
-        Kind::Sonarr => ("seasonFolder", serde_json::json!(true)),
-        Kind::Radarr => ("minimumAvailability", serde_json::json!("released")),
+        Kind::Tv => ("seasonFolder", serde_json::json!(true)),
+        Kind::Movies => ("minimumAvailability", serde_json::json!("released")),
     };
     let fields: serde_json::Map<String, serde_json::Value> = [
         ("title", serde_json::json!(entry.title)),

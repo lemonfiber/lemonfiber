@@ -8,7 +8,7 @@
 use async_trait::async_trait;
 use lemonfiber_core::journal::Journal;
 use lemonfiber_core::ports::service::{
-    Category, Client, ClientKind, ClientProbe, Credential, DownloadClient, Failure, Identity,
+    Category, Client, ClientProbe, Credential, DownloadClient, Failure, Identity, Protocol,
     RegisteredClient, RegisteredFolder, RootFolder,
 };
 use lemonfiber_core::seed::{wire_root_folders, Placing, State};
@@ -369,7 +369,7 @@ pub fn client_with_category(name: &str, host: &str, port: u16, category: &str) -
         name: name.to_owned(),
         host: host.to_owned(),
         port,
-        kind: ClientKind::Sabnzbd,
+        protocol: Protocol("sabnzbd".to_owned()),
         credential: Credential::ApiKey("sab-key".to_owned()),
         category: Category {
             field: "tvCategory".to_owned(),

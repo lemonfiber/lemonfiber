@@ -5,39 +5,21 @@
 //! releases happen not to have any.
 
 use super::Failure;
+use crate::media::Kind;
 use async_trait::async_trait;
-
-/// Which \*arr a subtitle finder is being pointed at.
-///
-/// Only the two that file what carries subtitles. Music and books have none to find,
-/// so there is no variant for them rather than a variant that is never used.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Subtitled {
-    /// Sonarr — television.
-    Sonarr,
-    /// Radarr — film.
-    Radarr,
-}
-
-impl Subtitled {
-    /// The name the subtitle finder files this \*arr's settings under.
-    #[must_use]
-    pub const fn section(self) -> &'static str {
-        match self {
-            Self::Sonarr => "sonarr",
-            Self::Radarr => "radarr",
-        }
-    }
-}
 
 /// An \*arr, as a subtitle finder needs to be told about it.
 ///
 /// The host is a name on the stack's own network rather than an address: the finder
 /// is a container beside them, so `127.0.0.1` there is the finder itself.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Watched {
-    /// Which \*arr it is, selecting the settings it is filed under.
-    pub which: Subtitled,
+    /// What it files, selecting the settings it is filed under. Only video carries
+    /// subtitles, so only a kind of video is ever watched.
+    pub which: Kind,
     /// The host the finder reaches it on.
     pub host: String,
     /// The port it listens on.
@@ -53,7 +35,10 @@ pub struct Watched {
 ///
 /// **The base path is not part of this**, deliberately: it is normalised on the way
 /// in — `/` is stored as empty — so comparing it reports a difference nobody made.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Watching {
     /// Whether the finder is set to use this \*arr at all. Off is the default, and
     /// an address written with this left off is an address nothing reads.
@@ -79,7 +64,7 @@ pub trait Subtitles: Send + Sync {
     /// # Errors
     ///
     /// Returns [`Failure`] when it is unreachable or refuses.
-    async fn watching(&self, which: Subtitled) -> Result<Watching, Failure>;
+    async fn watching(&self, which: Kind) -> Result<Watching, Failure>;
 
     /// Point the finder at an \*arr, and switch it on.
     ///

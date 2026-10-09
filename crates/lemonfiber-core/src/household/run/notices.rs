@@ -80,8 +80,8 @@ const RETURNS: &str = "Room returns one at a time, as your old requests age out"
 fn costs(quality: &Selection) -> String {
     format!(
         "A film {}, a season {} — before you ask",
-        super::allowance::for_kind(Kind::Radarr, quality).reading(),
-        super::allowance::for_kind(Kind::Sonarr, quality).reading(),
+        super::allowance::for_kind(Kind::Movies, quality).reading(),
+        super::allowance::for_kind(Kind::Tv, quality).reading(),
     )
 }
 

@@ -44,7 +44,7 @@ pub(crate) async fn upgrade(ctx: &Ctx, confirm: bool) -> Result<UpgradeReport, B
 
     let mut media = Vec::new();
     for target in servarr_targets(&manifest.services, project.as_deref()) {
-        let Some(kind) = Kind::for_section(&target.id) else {
+        let Some(kind) = target.kind else {
             continue;
         };
         let preset = selection.for_type(kind.media_type());
@@ -78,7 +78,7 @@ async fn trigger(ctx: &Ctx, kind: Kind, target: &Target) -> Triggered {
         .await
     {
         None => Triggered::NotStarted,
-        Some(service) => match service.run_command(kind.upgrade_command()).await {
+        Some(service) => match service.search_upgrades(kind).await {
             Ok(()) => Triggered::Started,
             Err(failure) => Triggered::Failed {
                 detail: failure.to_string(),

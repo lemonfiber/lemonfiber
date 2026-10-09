@@ -3,7 +3,7 @@
 use super::{sabnzbd, sonarr};
 use lemonfiber_core::ports::http::Method;
 use lemonfiber_core::ports::service::{
-    Category, ClientKind, Credential, DownloadClient, Failure, RootFolder,
+    Category, Credential, DownloadClient, Failure, Protocol, RootFolder,
 };
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_ports::Client;
@@ -32,7 +32,7 @@ fn qbit() -> DownloadClient {
         name: "qBittorrent".to_owned(),
         host: "qbittorrent".to_owned(),
         port: 8081,
-        kind: ClientKind::Qbittorrent,
+        protocol: Protocol("qbittorrent".to_owned()),
         credential: Credential::UserPass {
             username: "admin".to_owned(),
             password: "web-pass".to_owned(),
@@ -314,4 +314,22 @@ async fn a_rejected_download_client_registration_is_refused() {
         sonarr(&fake).register_download_client(&sabnzbd()).await,
         Err(Failure::Refused { .. })
     ));
+}
+
+#[tokio::test]
+async fn a_download_client_in_a_protocol_the_service_does_not_file_is_unsupported_and_unsent() {
+    let fake = Fake::always(Answer::reply(201, ""));
+    let unfiled = DownloadClient {
+        protocol: Protocol("nzbget".to_owned()),
+        ..sabnzbd()
+    };
+    assert!(matches!(
+        sonarr(&fake).register_download_client(&unfiled).await,
+        Err(Failure::Unsupported { .. })
+    ));
+    assert!(matches!(
+        sonarr(&fake).update_download_client("7", &unfiled).await,
+        Err(Failure::Unsupported { .. })
+    ));
+    assert!(fake.request().is_none());
 }

@@ -14,7 +14,7 @@ async fn a_present_title_signs_in_then_finds_it_in_the_library() {
     ]);
     // The term matches the library title the same case-insensitive way the *arr found it.
     assert_eq!(
-        reader(&fake).has_item(Kind::Sonarr, "expanse").await.ok(),
+        reader(&fake).has_item(Kind::Tv, "expanse").await.ok(),
         Some(true)
     );
 
@@ -49,7 +49,7 @@ async fn a_library_without_the_title_reads_as_absent() {
         Answer::reply(200, r#"{"Items":[{"Name":"Some Other Show"}]}"#),
     ]);
     assert_eq!(
-        reader(&fake).has_item(Kind::Sonarr, "expanse").await.ok(),
+        reader(&fake).has_item(Kind::Tv, "expanse").await.ok(),
         Some(false)
     );
 }
@@ -61,7 +61,7 @@ async fn a_film_read_asks_the_library_for_movies() {
         Answer::reply(200, r#"{"Items":[{"Name":"Dune"}]}"#),
     ]);
     assert_eq!(
-        reader(&fake).has_item(Kind::Radarr, "dune").await.ok(),
+        reader(&fake).has_item(Kind::Movies, "dune").await.ok(),
         Some(true)
     );
     assert!(fake
@@ -74,7 +74,7 @@ async fn a_film_read_asks_the_library_for_movies() {
 async fn a_refused_sign_in_fails_before_any_library_read() {
     let fake = Fake::in_turn(vec![Answer::reply(401, "")]);
     assert!(matches!(
-        reader(&fake).has_item(Kind::Sonarr, "expanse").await,
+        reader(&fake).has_item(Kind::Tv, "expanse").await,
         Err(Failure::Unauthorised { .. })
     ));
     // The library was never read: without a token there is nothing to read it with.
@@ -88,7 +88,7 @@ async fn an_unreadable_library_is_refused() {
         Answer::reply(200, "not json"),
     ]);
     assert!(matches!(
-        reader(&fake).has_item(Kind::Sonarr, "expanse").await,
+        reader(&fake).has_item(Kind::Tv, "expanse").await,
         Err(Failure::Refused { .. })
     ));
 }
@@ -97,7 +97,7 @@ async fn an_unreadable_library_is_refused() {
 async fn an_unreachable_media_server_is_unavailable_for_a_library_read() {
     let fake = Fake::silent();
     assert!(matches!(
-        reader(&fake).has_item(Kind::Sonarr, "expanse").await,
+        reader(&fake).has_item(Kind::Tv, "expanse").await,
         Err(Failure::Unavailable { .. })
     ));
 }

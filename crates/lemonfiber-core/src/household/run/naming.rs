@@ -13,6 +13,7 @@ use crate::app::targets::open_servarrs;
 use crate::app::Ctx;
 use crate::asking::Reasons;
 use crate::model::{MemberAccess, Restriction};
+use crate::ports::media::Kind;
 use crate::ports::service::{Access, Certificate, Household as _, HouseholdRequest, Pipeline};
 use crate::quality::Selection;
 
@@ -63,7 +64,7 @@ pub(super) struct Naming<'a> {
     /// Library identifier to the name the operator gave it.
     pub(super) libraries: &'a BTreeMap<String, String>,
     /// The title each \*arr knows its items by, and the year it says each came out.
-    pub(super) titles: &'a BTreeMap<(&'static str, i64), Titled>,
+    pub(super) titles: &'a BTreeMap<(Kind, i64), Titled>,
     /// The media server's own certificates, in the operator's country.
     pub(super) certificates: &'a [Certificate],
     /// Whether each member's requests arrive unseen, how much of their period is
@@ -110,7 +111,7 @@ pub(super) struct Naming<'a> {
 pub(super) async fn library_titles(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
-) -> (BTreeMap<(&'static str, i64), Titled>, bool) {
+) -> (BTreeMap<(Kind, i64), Titled>, bool) {
     let mut titles = BTreeMap::new();
     let mut named = true;
     for arr in open_servarrs(ctx, services).await {
@@ -120,7 +121,7 @@ pub(super) async fn library_titles(
                     title: item.title,
                     year: item.year,
                 };
-                ((arr.kind.section(), item.id), item_named)
+                ((arr.kind, item.id), item_named)
             })),
             Err(_) => named = false,
         }
@@ -176,9 +177,9 @@ pub(super) struct Titled {
 /// invented.
 pub(super) fn titled<'a>(
     request: &HouseholdRequest,
-    titles: &'a BTreeMap<(&'static str, i64), Titled>,
+    titles: &'a BTreeMap<(Kind, i64), Titled>,
 ) -> Option<&'a Titled> {
     let kind = request.kind?;
     let item = request.item?;
-    titles.get(&(kind.section(), item))
+    titles.get(&(kind, item))
 }

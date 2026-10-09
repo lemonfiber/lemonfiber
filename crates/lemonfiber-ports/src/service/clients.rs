@@ -6,19 +6,24 @@
 use super::{Duration, Failure};
 use async_trait::async_trait;
 
-/// Which download client an entry is, selecting the field schema the Servarr app
-/// files it under — see the download-client contract in the spec.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ClientKind {
-    /// `SABnzbd` — a Usenet client.
-    Sabnzbd,
-    /// `qBittorrent` — a torrent client.
-    Qbittorrent,
-}
+/// The protocol a download client is reached in: the name of the API a curator speaks
+/// to it, as the download client declares it.
+///
+/// Open rather than a list, because which protocols a curator speaks is the curator's to
+/// know: one it does not speak is its refusal to give, and a new download client
+/// needs no change here to be offered to every curator that speaks its protocol.
+#[derive(
+    Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(transparent)]
+pub struct Protocol(pub String);
 
 /// How a download client proves itself, which differs by client — a single API
 /// key for one, a username and its password for the other.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
 pub enum Credential {
     /// A single API key.
     ApiKey(String),
@@ -37,7 +42,10 @@ pub enum Credential {
 /// The field is not shared across applications — Sonarr names it `tvCategory`,
 /// Radarr `movieCategory`, Lidarr `musicCategory` — so it travels with the client
 /// rather than being assumed by the writer.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Category {
     /// The field the target application names its category.
     pub field: String,
@@ -46,7 +54,10 @@ pub struct Category {
 }
 
 /// A download client, as one service needs to be told about another.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct DownloadClient {
     /// The name the operator will see in the service's own interface.
     pub name: String,
@@ -54,8 +65,8 @@ pub struct DownloadClient {
     pub host: String,
     /// The port it listens on.
     pub port: u16,
-    /// Which client it is, selecting the field schema.
-    pub kind: ClientKind,
+    /// The protocol it is reached in.
+    pub protocol: Protocol,
     /// How the service authenticates to it.
     pub credential: Credential,
     /// The category the requesting application files its downloads under.
@@ -68,7 +79,10 @@ pub struct DownloadClient {
 /// matched by the endpoint it reaches, the host and port, rather than by its
 /// label, so a differently-named but equivalent client is not duplicated — and so
 /// a later undo names exactly the one created.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct RegisteredClient {
     /// The identifier the service assigned.
     pub id: String,
@@ -85,7 +99,10 @@ pub struct RegisteredClient {
 /// How a download client the service holds answered its reachability test —
 /// the service's own verdict on whether the client it connects to is working,
 /// keyed by the id the service assigned it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct ClientProbe {
     /// The id of the client tested, matching a [`RegisteredClient::id`].
     pub id: String,
@@ -103,7 +120,10 @@ pub struct ClientProbe {
 /// Both halves are carried because the request service wants both: the identifier
 /// it will send, and the name it will show. Reading the name back rather than
 /// assuming it means an operator who renamed a profile still sees their own word.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct QualityProfile {
     /// The identifier the service assigned.
     pub id: u32,
@@ -169,7 +189,10 @@ pub struct RegisteredTarget {
 }
 
 /// Where a service should file the media it imports.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct RootFolder {
     /// The path inside the container.
     pub path: String,
@@ -181,7 +204,10 @@ pub struct RootFolder {
 ///
 /// Read back so an absent connection can be told from one already made — matched
 /// by path, not by any label — and so a later undo names exactly the one created.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct RegisteredFolder {
     /// The identifier the service assigned.
     pub id: String,
@@ -303,7 +329,10 @@ pub trait Queues: Send + Sync {
 }
 
 /// A service's queue as one read of it found it.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Queue {
     /// How many items the service says it has, whatever fitted on the page.
     pub total: usize,
@@ -329,7 +358,10 @@ impl Queue {
 /// Deliberately close to what the API returns: interpreting it is
 /// the queue model's, and a port that decided what counted as stuck would put
 /// the judgement in the one place a test cannot reach it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Queued {
     /// What the service calls it — the name the download client also knows it by,
     /// which is what correlates the two sides.

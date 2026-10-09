@@ -168,7 +168,7 @@ fn application_body(application: &Application) -> String {
         "implementation": implementation,
         "configContract": config_contract,
         "fields": [
-            { "name": "prowlarrUrl", "value": application.prowlarr_url },
+            { "name": "prowlarrUrl", "value": application.indexer_url },
             { "name": "baseUrl", "value": application.base_url },
             { "name": "apiKey", "value": application.api_key },
             { "name": "syncCategories", "value": categories },
@@ -184,17 +184,17 @@ fn application_body(application: &Application) -> String {
 /// syncs nothing, so they are part of a working connection rather than a default.
 fn schema(kind: ApplicationKind) -> (&'static str, &'static str, &'static [u32]) {
     match kind {
-        ApplicationKind::Sonarr => (
+        ApplicationKind::Tv => (
             "Sonarr",
             "SonarrSettings",
             &[5000, 5010, 5020, 5030, 5040, 5045, 5050],
         ),
-        ApplicationKind::Radarr => (
+        ApplicationKind::Movies => (
             "Radarr",
             "RadarrSettings",
             &[2000, 2010, 2020, 2030, 2040, 2045, 2050, 2060, 2070, 2080],
         ),
-        ApplicationKind::Lidarr => (
+        ApplicationKind::Music => (
             "Lidarr",
             "LidarrSettings",
             &[3000, 3010, 3020, 3030, 3040, 3050, 3060],

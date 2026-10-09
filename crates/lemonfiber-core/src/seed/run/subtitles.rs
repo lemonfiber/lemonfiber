@@ -10,33 +10,19 @@
 //! that is not running is skipped and completed on a later pass rather than holding
 //! up the other.
 
-use super::connecting::{pairings, Cleared, Connection, FILM, TELEVISION};
+use super::connecting::{pairings, Cleared, Connection};
 use super::Ctx;
 use crate::ports::filesystem::Beneath;
-use crate::ports::service::{Subtitled, Subtitles as _, Watched};
+use crate::ports::media::Kind;
+use crate::ports::service::{Subtitles as _, Watched};
 use crate::wiring::{Address, Filler, Fillers};
-
-/// Which \*arr this is to the subtitle finder, or nothing where it files media that
-/// carries no subtitles.
-///
-/// Music and books are not an omission: there is nothing to subtitle, so the finder
-/// has no setting for them at all.
-pub(super) fn subtitled(media_types: &[String]) -> Option<Subtitled> {
-    if media_types.iter().any(|kind| kind == TELEVISION) {
-        return Some(Subtitled::Sonarr);
-    }
-    if media_types.iter().any(|kind| kind == FILM) {
-        return Some(Subtitled::Radarr);
-    }
-    None
-}
 
 /// One subtitle finder, and every curator it is told about with where it reaches each.
 struct Watching<'a> {
     /// The finder that asks.
     asker: Cleared<'a>,
     /// Each curator, as the finder files it, and where it reaches it.
-    curators: Vec<(&'a Filler, Subtitled, &'a Address)>,
+    curators: Vec<(&'a Filler, Kind, &'a Address)>,
 }
 
 /// Every subtitle finder and the curators lemonfiber tells it about.
@@ -215,6 +201,3 @@ fn unreached(failure: &crate::ports::service::Failure) -> crate::seed::State {
         detail: failure.to_string(),
     }
 }
-
-#[cfg(test)]
-mod tests;

@@ -15,7 +15,10 @@ use super::Failure;
 /// Four, because four are what an operator would miss: where things are found, and the
 /// three libraries the *arrs keep. Each is a path under the same API and behaves the
 /// same way, which is why one port serves all of them.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
 pub enum Record {
     /// Where releases are searched for.
     Indexer,
@@ -58,7 +61,10 @@ impl Record {
 /// a record copied with its ids intact would point at whatever happened to be third on
 /// the other machine — which is the quiet way an import ruins a library rather than
 /// failing to copy it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct Carried {
     /// What it is called, which is how a copy already here is recognised.
     pub name: String,

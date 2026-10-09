@@ -1,0 +1,178 @@
+{
+  "post": {
+    "operationId": "item_queue",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$defs": {
+              "Kind": {
+                "description": "The two kinds of video a household files by resolution, and so the two the quality\nmodel speaks to. Music and books have a different axis and are not resolution\npresets, so they are not here.\n\nNamed for what is filed, never for the service that files it: whatever curates\ntelevision is asked about `Tv`. Read as the media type a service declares, and\naccepting the old service-named spellings where a record still holds one.",
+                "oneOf": [
+                  {
+                    "const": "tv",
+                    "description": "Television: series, seasons and episodes.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "movies",
+                    "description": "Film.",
+                    "type": "string"
+                  }
+                ]
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "id": {
+                "description": "The port's `id`.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "kind": {
+                "$ref": "#/$defs/Kind",
+                "description": "The port's `kind`."
+              }
+            },
+            "required": [
+              "kind",
+              "id"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$defs": {
+                "QueueItem": {
+                  "additionalProperties": false,
+                  "description": "One record the download queue holds for an item: the stage it is at, and whether it is\nstuck — queued but not progressing, the C7 signal.\n\nA series holds one record per episode, so this is per-record rather than collapsed to\nthe item: an episode downloading now and one grabbed and lost look identical once\nflattened, and telling those apart is the whole value of a trace.",
+                  "properties": {
+                    "part": {
+                      "description": "The part of the item this record is for — an episode — where the service names\none. A film's queue record names no part; the record is for the whole item.",
+                      "format": "int64",
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "stage": {
+                      "$ref": "#/$defs/Stage",
+                      "description": "The furthest stage the queue shows this record at."
+                    },
+                    "stuck": {
+                      "description": "Whether it is stuck — a warning or error tracked-download status.",
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "stage",
+                    "stuck"
+                  ],
+                  "type": "object"
+                },
+                "Stage": {
+                  "description": "A stage in an item's journey, ordered from \"nobody asked for it\" to \"playable\". The\ndeclaration order is the pipeline order, so one stage compares less than a later one.",
+                  "oneOf": [
+                    {
+                      "const": "not-monitored",
+                      "description": "Nobody has asked for it — no \\*arr is monitoring it.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "monitored",
+                      "description": "Monitored, waiting to be searched for.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "searching",
+                      "description": "A search is running.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "found",
+                      "description": "Releases were found by an indexer.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "grabbed",
+                      "description": "A release was sent to the download client.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "downloading",
+                      "description": "The download is in progress.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "downloaded",
+                      "description": "The download finished.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "importing",
+                      "description": "The \\*arr is importing it to the library.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "imported",
+                      "description": "It was imported to the library on disk.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "available",
+                      "description": "It is visible and playable in the media server.",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "items": {
+                "$ref": "#/$defs/QueueItem"
+              },
+              "title": "Array_of_QueueItem",
+              "type": "array"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ]
+  }
+}

@@ -69,17 +69,14 @@ fn request(
 }
 
 /// A title map holding one series and one film.
-fn titles() -> BTreeMap<(&'static str, i64), Titled> {
+fn titles() -> BTreeMap<(Kind, i64), Titled> {
     let named = |title: &str, year: Option<u16>| Titled {
         title: title.to_owned(),
         year,
     };
     let mut titles = BTreeMap::new();
-    titles.insert(
-        (Kind::Sonarr.section(), 11),
-        named("The Expanse", Some(2015)),
-    );
-    titles.insert((Kind::Radarr.section(), 7), named("Dune", None));
+    titles.insert((Kind::Tv, 11), named("The Expanse", Some(2015)));
+    titles.insert((Kind::Movies, 7), named("Dune", None));
     titles
 }
 

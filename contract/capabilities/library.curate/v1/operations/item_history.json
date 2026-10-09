@@ -1,0 +1,148 @@
+{
+  "post": {
+    "operationId": "item_history",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$defs": {
+              "Kind": {
+                "description": "The two kinds of video a household files by resolution, and so the two the quality\nmodel speaks to. Music and books have a different axis and are not resolution\npresets, so they are not here.\n\nNamed for what is filed, never for the service that files it: whatever curates\ntelevision is asked about `Tv`. Read as the media type a service declares, and\naccepting the old service-named spellings where a record still holds one.",
+                "oneOf": [
+                  {
+                    "const": "tv",
+                    "description": "Television: series, seasons and episodes.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "movies",
+                    "description": "Film.",
+                    "type": "string"
+                  }
+                ]
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "id": {
+                "description": "The port's `id`.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "kind": {
+                "$ref": "#/$defs/Kind",
+                "description": "The port's `kind`."
+              }
+            },
+            "required": [
+              "kind",
+              "id"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$defs": {
+                "TraceEvent": {
+                  "additionalProperties": false,
+                  "description": "One notable event in an item's history: what happened and when. The forward-moving\noutcomes — a grab, an import — mark how far the item got; the rest — a failed\ndownload, a removal — are the history of what has been tried, shown even though they\nadvance no stage.",
+                  "properties": {
+                    "at": {
+                      "description": "When it happened, as the service reported it.",
+                      "type": "string"
+                    },
+                    "outcome": {
+                      "$ref": "#/$defs/TraceOutcome",
+                      "description": "What happened."
+                    },
+                    "part": {
+                      "description": "The part of the item it happened to — an episode — where the service files its\nhistory that way. A film's history names no part.",
+                      "format": "int64",
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "outcome",
+                    "at"
+                  ],
+                  "type": "object"
+                },
+                "TraceOutcome": {
+                  "description": "A notable thing that happened to an item, as an \\*arr's history records it. Where the\nfurthest stage answers \"how far did it get?\", the sequence of outcomes answers \"what\nhas been tried?\" — a release grabbed more than once, a download that failed and was\ntried again, a file imported and later removed. Repeated failed grabs are a pattern\nworth seeing, not something a single furthest-stage reading can show.",
+                  "oneOf": [
+                    {
+                      "const": "grabbed",
+                      "description": "A release was sent to the download client.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "download-failed",
+                      "description": "The download client failed the release it was handed.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "imported",
+                      "description": "The item was imported to the library on disk.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "removed",
+                      "description": "The item's file was removed.",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "items": {
+                "$ref": "#/$defs/TraceEvent"
+              },
+              "title": "Array_of_TraceEvent",
+              "type": "array"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ]
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "post": {
+    "operationId": "register_root_folder",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$defs": {
+              "RootFolder": {
+                "additionalProperties": false,
+                "description": "Where a service should file the media it imports.",
+                "properties": {
+                  "media_type": {
+                    "description": "Which media type it holds.",
+                    "type": "string"
+                  },
+                  "path": {
+                    "description": "The path inside the container.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path",
+                  "media_type"
+                ],
+                "type": "object"
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "folder": {
+                "$ref": "#/$defs/RootFolder",
+                "description": "The port's `folder`."
+              }
+            },
+            "required": [
+              "folder"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "title": "null",
+              "type": "null"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ]
+  }
+}

@@ -16,15 +16,15 @@ fn the_application_kind_follows_from_the_media() {
     use crate::ports::service::ApplicationKind;
     assert_eq!(
         application_kind(&["tv".to_owned()]),
-        Some(ApplicationKind::Sonarr)
+        Some(ApplicationKind::Tv)
     );
     assert_eq!(
         application_kind(&["movies".to_owned()]),
-        Some(ApplicationKind::Radarr)
+        Some(ApplicationKind::Movies)
     );
     assert_eq!(
         application_kind(&["music".to_owned()]),
-        Some(ApplicationKind::Lidarr)
+        Some(ApplicationKind::Music)
     );
     // Bindery files books but is not one of Prowlarr's applications.
     assert!(application_kind(&["books".to_owned()]).is_none());

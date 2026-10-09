@@ -233,6 +233,7 @@ fn theirs(container: &Container, ours: &Target) -> Option<Target> {
         config,
         version: ours.version,
         confined_to: None,
+        kind: ours.kind,
     })
 }
 
