@@ -29,7 +29,7 @@
       "type": "string"
     },
     "fronts": {
-      "description": "The service of the same plugin it stands in front of, as an adapter; none in a\nrecord written before this was kept.",
+      "description": "The service of the same plugin it stands in front of, as an adapter.",
       "type": [
         "string",
         "null"
@@ -52,7 +52,7 @@
       "minimum": 0
     },
     "media_types": {
-      "description": "The media it files, in the stack manifest's vocabulary, which decides what it\ncomes to in each service that asks for what it provides.\n\nDefaulted for a record written before this was kept, which reads as filing\nnothing named.",
+      "description": "The media it files, in the stack manifest's vocabulary, which decides what it\ncomes to in each service that asks for what it provides; none in an older record.",
       "type": "array",
       "default": [],
       "items": {
@@ -60,7 +60,7 @@
       }
     },
     "name": {
-      "description": "What it is called, for a reader, which is what its dashboard entry is listed as.\n\nDefaulted for a record written before this was kept, which lists it by its id\nrather than leaving it off the panel.",
+      "description": "What it is called, for a reader, which is what its dashboard entry is listed as;\na record written before this was kept lists it by its id.",
       "type": "string",
       "default": ""
     },
@@ -96,7 +96,7 @@
       "type": "string"
     },
     "speaks": {
-      "description": "Each capability contract it answers as an adapter, as `capability@major`; none in\na record written before this was kept.",
+      "description": "Each capability contract it answers as an adapter, as `capability@major`.",
       "type": "array",
       "default": [],
       "items": {
