@@ -185,3 +185,19 @@ fn an_offer_names_every_step_it_was_made_over() {
     assert_ne!(offer, super::offered(&[step("4.0.3")]));
     assert_ne!(offer, super::offered(&[]));
 }
+
+/// A confirmed update with nothing to move is answered as confirmed, and moves nothing.
+#[tokio::test]
+async fn a_confirmed_update_with_nothing_to_move_moves_nothing() {
+    let ctx = nothing_pulled();
+    let confirmed = update(
+        &ctx,
+        Asked {
+            confirm: true,
+            ..asking()
+        },
+    )
+    .await
+    .map(|report| (report.confirmed, report.changes.len(), report.applied.len()));
+    assert_eq!(confirmed.ok(), Some((true, 0, 0)));
+}
