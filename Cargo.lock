@@ -1360,6 +1360,7 @@ dependencies = [
  "lemonfiber-ports",
  "libc",
  "reqwest",
+ "rustix",
  "rustls",
  "rustls-pki-types",
  "serde_json",

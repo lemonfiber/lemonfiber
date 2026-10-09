@@ -371,6 +371,19 @@ pub trait FileSystem: Storage + Send + Sync {
         read_beneath(self, path, within).await
     }
 
+    /// Make the directory `path`, and every one missing above it, beneath `within`:
+    /// never through a link, and never outside `within`.
+    ///
+    /// The default makes nothing and answers whether the directory is already there,
+    /// for the fakes; the implementation that touches a real filesystem overrides it.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`Fault`] where the directory is not there once this returns.
+    async fn make_beneath(&self, path: &Path, _within: &Path) -> Result<(), Fault> {
+        self.canonicalize(path).await.map(drop)
+    }
+
     /// Record a small file lemonfiber keeps for itself, creating the directory
     /// for it where needed.
     ///

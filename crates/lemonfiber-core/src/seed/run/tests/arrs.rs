@@ -37,6 +37,39 @@ async fn seed_wires_each_arrs_root_folders() {
     assert!(all_wired, "a folder already present is left wired");
 }
 
+/// Each root folder an \*arr lacks has its directory made under the recorded data
+/// root before it is registered, and one whose directory cannot be made is failed
+/// naming the host path rather than handed to the \*arr.
+#[tokio::test]
+async fn seed_makes_each_root_folders_directory_under_the_data_root_first() {
+    const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+    let env = config_scratch("roots-made");
+    let _ = store::write(&env, "DATA_ROOT=/srv/data\n");
+    let ctx = a_context()
+        .settings(Settings {
+            env_file: Some(env.to_path_buf()),
+            ..Settings::default()
+        })
+        .build()
+        .with_filesystem(Arc::new(
+            SeedFs::keyed(Some(KEYED), None).missing(vec!["/srv/data/media/"]),
+        ))
+        .with_http(seeding_with(vec![(
+            "/rootfolder",
+            Answer::reply(200, "[]"),
+        )]));
+
+    let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
+    let folders = root_folder_wirings(&report);
+    assert_eq!(folders.len(), 3);
+    for wiring in folders {
+        assert!(
+            matches!(&wiring.state, State::Failed { detail } if detail.contains("/srv/data/media/")),
+            "{wiring:?}"
+        );
+    }
+}
+
 #[tokio::test]
 async fn seed_skips_arr_root_folders_when_the_key_is_not_readable() {
     // No configuration to read a key from, so the arrs have not finished

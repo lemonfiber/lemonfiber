@@ -461,3 +461,79 @@ async fn a_record_is_never_written_through_a_link_at_its_name() {
     let mode = std::fs::metadata(&theirs).map(|meta| meta.permissions().mode() & 0o777);
     assert_eq!(mode.ok(), Some(0o644));
 }
+
+/// Every missing directory down to the one asked for is made, and asking again is no
+/// fault.
+#[tokio::test]
+async fn a_missing_directory_is_made_with_every_one_above_it() {
+    let dir = scratch();
+    let owned = dir.join("owned");
+    let _ = std::fs::create_dir_all(&owned);
+    let wanted = owned.join("media").join("tv");
+
+    assert!(Disk.make_beneath(&wanted, &owned).await.is_ok());
+    assert!(Disk.make_beneath(&wanted, &owned).await.is_ok());
+    assert!(wanted.is_dir());
+}
+
+/// A link at the leaf or on the way is refused, and nothing is made where it leads.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_directory_is_never_made_through_a_link() {
+    let dir = scratch();
+    let owned = dir.join("owned");
+    let _ = std::fs::create_dir_all(owned.join("media"));
+    let elsewhere = dir.join("elsewhere");
+    let _ = std::fs::create_dir_all(&elsewhere);
+    let _ = std::os::unix::fs::symlink(&elsewhere, owned.join("media").join("tv"));
+    let _ = std::os::unix::fs::symlink(&elsewhere, owned.join("books"));
+
+    for through in [
+        owned.join("media").join("tv"),
+        owned.join("media").join("tv").join("Season 01"),
+        owned.join("books").join("audio"),
+    ] {
+        let refused = Disk.make_beneath(&through, &owned).await;
+        assert!(refused.is_err(), "{through:?}");
+    }
+    assert!(std::fs::read_dir(&elsewhere).is_ok_and(|mut held| held.next().is_none()));
+}
+
+/// A file on the way, a path outside the tree and a step back up out of it are each
+/// refused.
+#[tokio::test]
+async fn a_directory_is_made_only_where_the_tree_leads() {
+    let dir = scratch();
+    let owned = dir.join("owned");
+    let _ = std::fs::create_dir_all(&owned);
+    let _ = std::fs::write(owned.join("kept.yml"), "theirs");
+
+    for refused in [
+        owned.join("kept.yml").join("tv"),
+        dir.join("beside"),
+        owned.join("..").join("beside"),
+    ] {
+        assert!(
+            Disk.make_beneath(&refused, &owned).await.is_err(),
+            "{refused:?}"
+        );
+    }
+    assert!(!dir.join("beside").exists());
+}
+
+/// A directory the platform will not make is a fault in its own words.
+#[tokio::test]
+async fn a_directory_that_cannot_be_made_is_said_in_the_platforms_words() {
+    let dir = scratch();
+    let owned = dir.join("owned");
+    let _ = std::fs::create_dir_all(&owned);
+    let gone = owned.join("gone");
+
+    let refused = Disk.make_beneath(&gone.join("tv"), &gone).await;
+    let long = Disk
+        .make_beneath(&owned.join("n".repeat(1024)), &owned)
+        .await;
+
+    assert!(refused.is_err_and(|fault| fault.message.contains("was not made")));
+    assert!(long.is_err_and(|fault| fault.message.contains("was not made")));
+}

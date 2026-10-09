@@ -11,7 +11,7 @@ use lemonfiber_core::ports::service::{
     Category, Client, ClientProbe, Credential, DownloadClient, Failure, Identity, Protocol,
     RegisteredClient, RegisteredFolder, RootFolder,
 };
-use lemonfiber_core::seed::{wire_root_folders, Placing, State};
+use lemonfiber_core::seed::{wire_root_folders, Backing, Placing, State};
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
@@ -301,6 +301,7 @@ pub async fn seed_contested(
         Placing {
             contested,
             root: "/data",
+            backing: None,
         },
         &mut journal,
         "t",
@@ -314,23 +315,7 @@ pub async fn seed_contested(
 /// Drive the folder wiring as a rehearsal: the same pass over the same service, with
 /// the registering left out.
 pub async fn would_wire(service: &FakeService, wanted: &[RootFolder]) -> Vec<State> {
-    let mut journal = Journal::new();
-    wire_root_folders(
-        service,
-        "sonarr",
-        wanted,
-        Placing {
-            contested: &BTreeMap::new(),
-            root: "/data",
-        },
-        &mut journal,
-        "t",
-        true,
-    )
-    .await
-    .into_iter()
-    .map(|wiring| wiring.state)
-    .collect()
+    wire_with(service, wanted, None, true).await
 }
 
 /// Drive the folder wiring against a borrowed service, so one fake can be carried
@@ -338,6 +323,17 @@ pub async fn would_wire(service: &FakeService, wanted: &[RootFolder]) -> Vec<Sta
 /// service between one run and the next. A fresh journal each pass, as production
 /// keeps none across passes.
 pub async fn wire_on(service: &FakeService, wanted: &[RootFolder]) -> Vec<State> {
+    wire_with(service, wanted, None, false).await
+}
+
+/// Drive the uncontested folder wiring against a borrowed service, making each
+/// folder's directory where `backing` says the data root is.
+pub async fn wire_with(
+    service: &FakeService,
+    wanted: &[RootFolder],
+    backing: Option<Backing<'_>>,
+    rehearsing: bool,
+) -> Vec<State> {
     let mut journal = Journal::new();
     wire_root_folders(
         service,
@@ -346,10 +342,11 @@ pub async fn wire_on(service: &FakeService, wanted: &[RootFolder]) -> Vec<State>
         Placing {
             contested: &BTreeMap::new(),
             root: "/data",
+            backing,
         },
         &mut journal,
         "t",
-        false,
+        rehearsing,
     )
     .await
     .into_iter()

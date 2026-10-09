@@ -73,17 +73,32 @@ fn blocked(survey: &MigrationReport) -> Option<BesideReport> {
         if !survey.beside.is_empty() {
             return None;
         }
+        if !survey
+            .standing
+            .iter()
+            .any(crate::migration::standing::runs_ours)
+        {
+            return Some(refused(
+                "nothing here runs a service lemonfiber runs, so there is no setup to stand \
+                 beside",
+            ));
+        }
         "no service lemonfiber runs has anywhere else to listen, so there is no way to \
          stand beside what is here"
     } else {
         "what is on this machine could not be read, and standing beside a setup that \
          could not be looked at would be guessing which ports are free"
     };
-    Some(BesideReport {
+    Some(refused(why))
+}
+
+/// Standing beside, refused for `why`.
+fn refused(why: &str) -> BesideReport {
+    BesideReport {
         stance: Stance::Blocked,
         refusal: Some(why.to_owned()),
         ..BesideReport::default()
-    })
+    }
 }
 
 /// The Compose file that says where each service listens instead.

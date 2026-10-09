@@ -54,7 +54,7 @@ pub use scan::{residual, Residual};
 #[derive(
     Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, serde::Deserialize, schemars::JsonSchema,
 )]
-#[serde(from = "bool")]
+#[serde(from = "bool", into = "bool")]
 pub enum Filenames {
     /// Replaced by their marks.
     #[default]
@@ -70,6 +70,12 @@ impl From<bool> for Filenames {
         } else {
             Self::Replaced
         }
+    }
+}
+
+impl From<Filenames> for bool {
+    fn from(filenames: Filenames) -> Self {
+        filenames == Filenames::Shown
     }
 }
 

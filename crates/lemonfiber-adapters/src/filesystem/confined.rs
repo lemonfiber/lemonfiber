@@ -1,4 +1,5 @@
-//! Reading and writing a file somebody else's container can write.
+//! Reading and writing a file, and making a directory, somebody else's container can
+//! write.
 //!
 //! The container owns the directory, so it can put a link where a file is expected, link
 //! a directory on the way to one, or leave a pipe there. A plain open follows the first
@@ -13,7 +14,7 @@
 //! await; the asynchronous read runs the same function on a thread that may block.
 
 use std::io::{Read as _, Write as _};
-use std::path::Path;
+use std::path::{Component, Path};
 
 use lemonfiber_ports::filesystem::{Beneath, Confined, Fault, READ_LIMIT};
 
@@ -78,6 +79,77 @@ pub(super) fn overwrite(path: &Path, within: &Path, contents: &[u8]) -> Result<(
         return Err(Fault::escaped(path, within));
     }
     landed(file.set_len(0).and_then(|()| (&file).write_all(contents)))
+}
+
+/// Make `path` and every directory missing above it, one at a time from `within` down,
+/// each made and then opened through the handle of the one above it and never through
+/// a link, so a link put on the way between two steps is refused rather than followed.
+#[cfg(unix)]
+pub(super) fn make(path: &Path, within: &Path) -> Result<(), Fault> {
+    use rustix::fs::{mkdirat, openat, Mode, OFlags, CWD};
+    let opening = OFlags::DIRECTORY | OFlags::RDONLY | OFlags::CLOEXEC;
+    let unmade = |error: rustix::io::Errno| {
+        Fault::new(format!(
+            "{} was not made beneath {}: {error}",
+            path.display(),
+            within.display()
+        ))
+    };
+    let mut here = openat(CWD, within, opening, Mode::empty()).map_err(unmade)?;
+    for name in steps(path, within)? {
+        match mkdirat(&here, name, Mode::RWXU | Mode::RWXG | Mode::RWXO) {
+            Ok(()) | Err(rustix::io::Errno::EXIST) => {}
+            Err(error) => return Err(unmade(error)),
+        }
+        here = openat(&here, name, opening | OFlags::NOFOLLOW, Mode::empty()).map_err(unmade)?;
+    }
+    Ok(())
+}
+
+/// Make `path` and every directory missing above it, one at a time from `within` down.
+/// Windows has no flag that refuses a link on the way, so each step that is already
+/// there is looked at first and refused where it is not a directory of its own.
+#[cfg(windows)]
+pub(super) fn make(path: &Path, within: &Path) -> Result<(), Fault> {
+    let mut here = within.to_path_buf();
+    for name in steps(path, within)? {
+        here.push(name);
+        match std::fs::symlink_metadata(&here) {
+            Ok(found) if found.is_dir() => {}
+            Ok(_) => {
+                return Err(Fault::new(format!(
+                    "{} is a link or a file, and lemonfiber makes its own directory there \
+                     rather than following one",
+                    here.display()
+                )))
+            }
+            Err(_) => std::fs::create_dir(&here).map_err(|error| Fault::new(error.to_string()))?,
+        }
+    }
+    Ok(())
+}
+
+/// The names `path` is made of below `within`, refused where it is not beneath it or
+/// steps back up out of it.
+fn steps<'a>(path: &'a Path, within: &Path) -> Result<Vec<&'a std::ffi::OsStr>, Fault> {
+    let rest = path
+        .strip_prefix(within)
+        .map_err(|_| outside(path, within))?;
+    rest.components()
+        .map(|part| match part {
+            Component::Normal(name) => Ok(name),
+            _ => Err(outside(path, within)),
+        })
+        .collect()
+}
+
+/// The refusal of a directory that does not lie beneath the one it is made in.
+fn outside(path: &Path, within: &Path) -> Fault {
+    Fault::new(format!(
+        "{} does not lie beneath {}, and lemonfiber makes its own directories only there",
+        path.display(),
+        within.display()
+    ))
 }
 
 /// What emptying and writing the checked file came to, a failure in the platform's own

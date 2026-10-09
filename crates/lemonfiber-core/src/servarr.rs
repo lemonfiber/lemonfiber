@@ -344,6 +344,10 @@ const FILED: [Filed; 2] = [
     },
 ];
 
+/// The priority a download client is filed at: the highest of the 1 to 50 a Servarr app
+/// takes, and the one its own form starts from.
+const PRIORITY: u8 = 1;
+
 /// The registration a Servarr app takes for `client`, or the refusal for a protocol it
 /// does not speak.
 fn download_client_body(
@@ -382,6 +386,7 @@ fn download_client_body(
         "name": client.name,
         "implementation": filed.implementation,
         "configContract": filed.settings,
+        "priority": PRIORITY,
         "fields": fields,
     });
     // An update names the client the service already assigned, so the same document

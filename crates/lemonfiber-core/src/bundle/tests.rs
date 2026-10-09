@@ -60,6 +60,17 @@ fn terms(revealed: &[&str], filenames: Filenames) -> Terms {
     }
 }
 
+#[test]
+fn the_terms_carry_filenames_as_the_flag_they_were_read_from() {
+    for (filenames, flag) in [(Filenames::Replaced, false), (Filenames::Shown, true)] {
+        let said = serde_json::to_value(terms(&[], filenames)).ok();
+        let said = said.as_ref().and_then(|terms| terms.get("filenames"));
+        assert_eq!(said, Some(&serde_json::Value::Bool(flag)));
+        let read = serde_json::from_value::<Filenames>(serde_json::Value::Bool(flag)).ok();
+        assert_eq!(read, Some(filenames));
+    }
+}
+
 /// The case the whole free-text rule exists for. An address is worth sharing and the
 /// key riding in its query is not, and in a log line they arrive as one word with no
 /// field name in front of them for an allow-list to recognise.

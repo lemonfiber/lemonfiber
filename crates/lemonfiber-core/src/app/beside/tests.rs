@@ -1,5 +1,5 @@
 use super::{blocked, layered};
-use crate::model::{MigrationReport, MovedReport};
+use crate::model::{MigrationReport, MovedReport, OccupantReport, StandingReport};
 
 fn moved(service: &str, from: u16, to: u16) -> MovedReport {
     MovedReport {
@@ -44,11 +44,33 @@ fn a_survey_that_could_not_look_stops_it() {
     assert!(said.contains("could not be read"), "{said}");
 }
 
+/// Nothing of ours standing here is nothing to stand beside.
+#[test]
+fn no_setup_to_stand_beside_stops_it() {
+    let looked = MigrationReport {
+        read: true,
+        ..MigrationReport::default()
+    };
+    let said = blocked(&looked)
+        .and_then(|read| read.refusal)
+        .unwrap_or_default();
+    assert!(said.contains("no setup to stand beside"), "{said}");
+}
+
 /// Nowhere left to listen is a refusal rather than an empty file.
 #[test]
 fn nowhere_left_to_listen_stops_it() {
     let looked = MigrationReport {
         read: true,
+        standing: vec![StandingReport {
+            project: "media".to_owned(),
+            services: vec![OccupantReport {
+                service: "sonarr".to_owned(),
+                running: true,
+                ports: vec![8989],
+                adoptable: true,
+            }],
+        }],
         ..MigrationReport::default()
     };
     let said = blocked(&looked)

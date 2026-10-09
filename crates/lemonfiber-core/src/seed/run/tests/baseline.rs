@@ -84,6 +84,27 @@ async fn a_root_folder_not_wired_is_not_warned_even_where_the_path_is_missing() 
 }
 
 #[tokio::test]
+async fn a_wired_root_folder_outside_the_data_root_has_no_host_directory_to_check() {
+    let filesystem = SeedFs::keyed(None, None).missing(vec!["elsewhere"]);
+    let wanted = [RootFolder {
+        path: "/elsewhere/tv".to_owned(),
+        media_type: "tv".to_owned(),
+    }];
+    let mut wirings = vec![Wiring::settled(
+        "tv root folder in Sonarr".to_owned(),
+        State::Wired,
+    )];
+    escalate_broken_roots(
+        &filesystem,
+        Some(std::path::Path::new("/srv/media")),
+        &wanted,
+        &mut wirings,
+    )
+    .await;
+    assert!(broken(&wirings).is_none());
+}
+
+#[tokio::test]
 async fn a_reset_previews_then_reverts_a_drifted_connection() {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let dir = lemonfiber_fixtures::scratch::Scratch::named("reset-conn");
