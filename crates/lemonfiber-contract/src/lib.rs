@@ -16,8 +16,12 @@
 pub mod adapter;
 pub mod capabilities;
 pub mod client;
+pub mod conformance;
 mod declare;
 pub mod documents;
+
+use std::future::Future;
+use std::pin::Pin;
 
 use declare::contract;
 pub mod wire;
@@ -45,6 +49,15 @@ pub fn capability_of(spoken: &str) -> Option<&str> {
     spoken.split_once('@').map(|(capability, _)| capability)
 }
 
+/// An answer read as one operation's, by a client asked it: what the core makes of it.
+type Reading = for<'c> fn(
+    &'c Contracted,
+    &'static str,
+    u32,
+    &'static str,
+    usize,
+) -> Pin<Box<dyn Future<Output = Result<(), Failure>> + Send + 'c>>;
+
 /// One operation of one capability's contract: what it is called, and the shapes of what
 /// is asked and what is answered.
 #[derive(Debug, Clone)]
@@ -61,16 +74,18 @@ pub struct Operation {
     pub answered: schemars::Schema,
     /// The most its answer may carry, in bytes.
     pub largest: usize,
+    /// How its answer is read.
+    reads: Reading,
 }
 
 impl Operation {
     /// The operation `name` of `capability`'s major, asked as `A` and answered as `R`.
     #[must_use]
-    pub fn new<A: schemars::JsonSchema, R: schemars::JsonSchema>(
-        capability: &'static str,
-        major: u32,
-        name: &'static str,
-    ) -> Self {
+    pub fn new<A, R>(capability: &'static str, major: u32, name: &'static str) -> Self
+    where
+        A: schemars::JsonSchema,
+        R: schemars::JsonSchema + serde::de::DeserializeOwned + Send + 'static,
+    {
         Self {
             capability,
             major,
@@ -78,7 +93,18 @@ impl Operation {
             asked: schemars::schema_for!(A),
             answered: schemars::schema_for!(R),
             largest: client::LARGEST,
+            reads: read_as::<R>,
         }
+    }
+
+    /// What `client` answers this operation comes to, read as the core reads it: the
+    /// answer's status, size and shape held to the contract.
+    ///
+    /// # Errors
+    ///
+    /// As [`Contracted::call`].
+    pub async fn judged(&self, client: &Contracted) -> Result<(), Failure> {
+        (self.reads)(client, self.capability, self.major, self.name, self.largest).await
     }
 
     /// The same operation, its answer bounded at `largest` bytes.
@@ -93,6 +119,22 @@ impl Operation {
     pub fn path(&self) -> String {
         path(self.capability, self.major, self.name)
     }
+}
+
+/// Ask `client` one operation and read its answer as `R`, keeping nothing of it.
+fn read_as<'c, R: serde::de::DeserializeOwned + Send + 'static>(
+    client: &'c Contracted,
+    capability: &'static str,
+    major: u32,
+    name: &'static str,
+    largest: usize,
+) -> Pin<Box<dyn Future<Output = Result<(), Failure>> + Send + 'c>> {
+    Box::pin(async move {
+        client
+            .call::<(), R>(capability, major, name, largest, &())
+            .await
+            .map(drop)
+    })
 }
 
 /// One capability's contract: its name, its major and its operations.

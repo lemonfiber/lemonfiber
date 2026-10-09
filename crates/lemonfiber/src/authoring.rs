@@ -74,10 +74,10 @@ impl Answered {
     }
 }
 
-/// Answer one of the five things a plugin author asks this binary.
+/// Answer one of the six things a plugin author asks this binary.
 ///
 /// The schema is always the document, because it is a thing an editor reads rather
-/// than a listing a person does. The other four have a form for each.
+/// than a listing a person does. The other five have a form for each.
 pub(crate) async fn published(read: &Authoring, json: bool, asking: &dyn Registry) -> Answered {
     match read {
         Authoring::Schema => document_of(lemonfiber_core::plugin::schema().as_deref()),
@@ -89,6 +89,7 @@ pub(crate) async fn published(read: &Authoring, json: bool, asking: &dyn Registr
         )),
         Authoring::Capabilities => capabilities(json),
         Authoring::Claims { path } => claims(path, json),
+        Authoring::Conform { path } => conform(path, json).await,
         Authoring::Provenance { path, keys } => vouched_for(path, keys, json, asking).await,
     }
 }
@@ -140,6 +141,24 @@ fn claims(path: &Path, json: bool) -> Answered {
     };
     render::plugin::claimed(&read, json).map_or_else(unrenderable, |lines| {
         if read.installable {
+            Answered::shown(lines)
+        } else {
+            Answered::refused(lines)
+        }
+    })
+}
+
+/// What one plugin's conformance recordings come to against the contracts it speaks.
+///
+/// A plugin that would not fill what it speaks exits non-zero, which is what an
+/// author's CI and the catalogue's are asking.
+async fn conform(path: &Path, json: bool) -> Answered {
+    let read = match lemonfiber_core::plugin::conformed(path).await {
+        Ok(read) => read,
+        Err(unreadable) => return Answered::faulted(unreadable.to_string()),
+    };
+    render::plugin::conformed(&read, json).map_or_else(unrenderable, |lines| {
+        if read.conforms {
             Answered::shown(lines)
         } else {
             Answered::refused(lines)

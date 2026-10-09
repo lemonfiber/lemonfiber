@@ -255,7 +255,7 @@ pub fn read_digested(path: &Path) -> Result<(Manifest, String), Unreadable> {
 /// The one answer to *where a plugin's manifest is*, because the two reads above
 /// would otherwise each carry their own and be free to disagree about whether a
 /// directory or the file inside it was meant.
-fn sourced(path: &Path) -> Result<(PathBuf, Manifest), Unreadable> {
+pub(super) fn sourced(path: &Path) -> Result<(PathBuf, Manifest), Unreadable> {
     let (root, at) = source(path);
     if !at.is_file() {
         return Err(Unreadable::NoManifest(root));

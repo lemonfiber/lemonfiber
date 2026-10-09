@@ -20,6 +20,7 @@ criticality = "optional"
 listens     = 8080
 provides    = ["media.serve"]
 speaks      = ["media.serve@1"]
+fronts      = "komga"
 
 [[proof]]
 service = "komga""#,
@@ -37,10 +38,38 @@ async fn adapted(
     installing(&ctx, &source(name, &speaking())).await
 }
 
+/// The digest the speaking manifest pins the service its adapter fronts by.
+const UPSTREAM: &str = "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945";
+
+/// Where the speaking adapter's live case asks without the key.
+const UNKEYED: &str = "/lemonfiber/media.serve/v1/signed_in";
+
+/// An adapter's account of itself: speaking `speaks`, with one release at `digest`.
+fn about(speaks: &str, digest: &str) -> String {
+    format!(
+        r#"{{"speaks":{speaks},"upstream":"Komga","releases":[{{"version":"1.11.0","digest":"{digest}"}}]}}"#
+    )
+}
+
 /// A context the speaking manifest installs into, its adapter published as `published`
 /// and saying it speaks `speaks`.
 pub(super) fn adapting(name: &str, published: &[(&str, &str, u16)], speaks: &str) -> Ctx {
-    let about = format!(r#"{{"speaks":{speaks},"upstream":"Komga","releases":[]}}"#);
+    answering_as(
+        name,
+        published,
+        &about(speaks, UPSTREAM),
+        lemonfiber_fixtures::http::Answer::reply(401, ""),
+    )
+}
+
+/// As [`adapting`], the adapter giving `told` as its account and answering `unkeyed`
+/// to a call without the key.
+fn answering_as(
+    name: &str,
+    published: &[(&str, &str, u16)],
+    told: &str,
+    unkeyed: lemonfiber_fixtures::http::Answer,
+) -> Ctx {
     let http = Fake::by_path(vec![
         (
             "/api/v1/libraries",
@@ -48,8 +77,9 @@ pub(super) fn adapting(name: &str, published: &[(&str, &str, u16)], speaks: &str
         ),
         (
             "/lemonfiber/adapter/v1/about",
-            lemonfiber_fixtures::http::Answer::reply(200, about),
+            lemonfiber_fixtures::http::Answer::reply(200, told),
         ),
+        (UNKEYED, unkeyed),
     ]);
     let mut ctx = proving(name, Arc::new(Recording::answering(Ok(spoke("")))), http);
     ctx.seams.engine = Arc::new(
@@ -106,7 +136,7 @@ async fn an_adapter_that_speaks_otherwise_or_cannot_be_reached_is_not_installed(
 
 #[tokio::test]
 async fn an_adapter_that_has_not_answered_yet_is_asked_again() {
-    let about = r#"{"speaks":["media.serve@1"],"upstream":"Komga","releases":[]}"#;
+    let told = about(r#"["media.serve@1"]"#, UPSTREAM);
     let http = Fake::by_path_in_turn(vec![
         (
             "/api/v1/libraries",
@@ -116,8 +146,12 @@ async fn an_adapter_that_has_not_answered_yet_is_asked_again() {
             "/lemonfiber/adapter/v1/about",
             vec![
                 lemonfiber_fixtures::http::Answer::Silent,
-                lemonfiber_fixtures::http::Answer::reply(200, about),
+                lemonfiber_fixtures::http::Answer::reply(200, told),
             ],
+        ),
+        (
+            UNKEYED,
+            vec![lemonfiber_fixtures::http::Answer::reply(401, "")],
         ),
     ]);
     let mut ctx = proving(
@@ -138,4 +172,51 @@ async fn an_adapter_that_has_not_answered_yet_is_asked_again() {
             .collect::<Vec<_>>(),
         ["passed", "passed"]
     );
+}
+
+#[tokio::test]
+async fn an_adapter_not_recorded_at_its_upstream_or_answering_without_the_key_is_not_installed() {
+    for (name, told, unkeyed, fault) in [
+        (
+            "adapter-elsewhere",
+            about(r#"["media.serve@1"]"#, "sha256:0000"),
+            lemonfiber_fixtures::http::Answer::reply(401, ""),
+            "lists no release recorded at",
+        ),
+        (
+            "adapter-open",
+            about(r#"["media.serve@1"]"#, UPSTREAM),
+            lemonfiber_fixtures::http::Answer::reply(200, ""),
+            "refuses-without-the-key answered 200",
+        ),
+        (
+            "adapter-gone-quiet",
+            about(r#"["media.serve@1"]"#, UPSTREAM),
+            lemonfiber_fixtures::http::Answer::Silent,
+            "refuses-without-the-key: ",
+        ),
+    ] {
+        let ctx = answering_as(
+            name,
+            &[("komga-adapter", "127.0.0.1", 8080)],
+            &told,
+            unkeyed,
+        );
+        let outcome = installing(&ctx, &source(name, &speaking())).await;
+        let said = verdicts(outcome);
+        assert_eq!(
+            said.iter()
+                .map(|verdict| came_to(verdict.as_ref()))
+                .collect::<Vec<_>>(),
+            ["passed", "failed"],
+            "{name}"
+        );
+        assert!(
+            said.last().is_some_and(|verdict| matches!(
+                verdict,
+                Some(Verdict::Failed { faults }) if faults.iter().any(|one| one.contains(fault))
+            )),
+            "{name}: {said:?}"
+        );
+    }
 }

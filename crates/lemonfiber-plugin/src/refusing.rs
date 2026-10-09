@@ -180,7 +180,7 @@ fn running(manifest: &Manifest, found: &mut Vec<Violation>) {
         pinned(service, found);
         placed(service, found);
         adapting::adapted(service, found);
-        speaking::spoken(service, found);
+        speaking::spoken(service, &manifest.services, found);
     }
 }
 

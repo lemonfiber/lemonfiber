@@ -31,6 +31,7 @@ fn placed(service: &str) -> Placed {
         media_types: Vec::new(),
         networks: Vec::new(),
         speaks: Vec::new(),
+        fronts: None,
     }
 }
 

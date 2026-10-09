@@ -152,6 +152,36 @@ async fn a_plugin_nothing_refuses_is_read_and_the_run_ends_well() {
     assert!(said(&answered).contains("kavita"), "{}", said(&answered));
 }
 
+/// A plugin whose adapters speak nothing conforms with nothing to judge, and one the
+/// manifest rules refuse is shown and still fails.
+#[tokio::test]
+async fn conforming_ends_on_whether_the_plugin_would_fill_what_it_speaks() {
+    let whole = read(
+        Authoring::Conform {
+            path: source("conform-whole", WHOLE),
+        },
+        false,
+    )
+    .await;
+    assert_eq!(whole.code, 0, "{:?}", whole.fault);
+    assert!(
+        said(&whole).contains("nothing to judge"),
+        "{}",
+        said(&whole)
+    );
+
+    let refused = read(
+        Authoring::Conform {
+            path: source("conform-unpinned", &unpinned()),
+        },
+        false,
+    )
+    .await;
+    assert_eq!(refused.code, FAILURE);
+    assert!(refused.fault.is_none(), "{:?}", refused.fault);
+    assert!(said(&refused).contains("Refused"), "{}", said(&refused));
+}
+
 /// A refused manifest is shown and still fails.
 ///
 /// The author's CI is asking whether this would be installed, and the whole of
@@ -171,6 +201,7 @@ async fn a_plugin_that_would_not_install_says_why_and_still_fails() {
 async fn a_path_holding_no_manifest_is_a_fault_rather_than_a_verdict() {
     for asked in [
         Authoring::Claims { path: nowhere() },
+        Authoring::Conform { path: nowhere() },
         Authoring::Provenance {
             path: nowhere(),
             keys: Vec::new(),

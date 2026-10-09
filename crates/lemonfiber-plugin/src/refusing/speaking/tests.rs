@@ -1,11 +1,80 @@
 use crate::refusing::tests::{names, said, INSTALLABLE};
 
-/// The fixture's service, speaking `speaks` and saying `rest`.
+/// The upstream the fixture's service stands in front of when it speaks.
+const UPSTREAM: &str = r#"[[service]]
+id          = "komga-server"
+name        = "Komga server"
+image       = "docker.io/gotson/komga"
+digest      = "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+tag         = "1.11.0"
+criticality = "important"
+
+"#;
+
+/// The fixture's service, speaking `speaks` in front of an upstream of its own and
+/// saying `rest`.
 fn speaking(speaks: &str, rest: &str) -> String {
-    INSTALLABLE.replace(
+    INSTALLABLE
+        .replace(
+            "config_path = \"/config\"\n",
+            &format!(
+                "config_path = \"/config\"\nspeaks      = {speaks}\nfronts      = \"komga-server\"\n{rest}"
+            ),
+        )
+        .replace("[[claim]]\n", &format!("{UPSTREAM}[[claim]]\n"))
+        .replace("[[wiring]]\n", "[[wiring]]\nservice         = \"komga\"\n")
+        .replace(
+            "id      = \"komga.serves\"\n",
+            "id      = \"komga.serves\"\nservice = \"komga\"\n",
+        )
+}
+
+#[test]
+fn an_adapter_names_one_other_service_of_its_plugin_that_speaks_nothing_as_its_upstream() {
+    let fronting = |fronts: &str| {
+        said(
+            &speaking(r#"["media.serve@1"]"#, "listens     = 8080\n")
+                .replace("fronts      = \"komga-server\"\n", fronts),
+        )
+    };
+    for (fronts, says) in [
+        ("", "an adapter has to name"),
+        ("fronts      = \"komga\"\n", "names the adapter itself"),
+        (
+            "fronts      = \"kavita\"\n",
+            "kavita, which this plugin does not declare",
+        ),
+    ] {
+        let said = fronting(fronts);
+        assert!(
+            names(&said, &["service komga.fronts", says]),
+            "{fronts}: {said:?}"
+        );
+    }
+    let both = speaking(r#"["media.serve@1"]"#, "listens     = 8080\n").replace(
+        "criticality = \"important\"\n\n[[claim]]",
+        "criticality = \"important\"\nspeaks      = [\"media.serve@1\"]\nlistens     = 8081\nfronts      = \"komga\"\nprovides    = [\"komga:other\"]\n\n[[claim]]",
+    );
+    assert!(
+        names(
+            &said(&both),
+            &["service komga.fronts", "speaks a contract itself"]
+        ),
+        "{:?}",
+        said(&both)
+    );
+    let stray = INSTALLABLE.replace(
         "config_path = \"/config\"\n",
-        &format!("config_path = \"/config\"\nspeaks      = {speaks}\n{rest}"),
-    )
+        "config_path = \"/config\"\nfronts      = \"komga-server\"\n",
+    );
+    assert!(
+        names(
+            &said(&stray),
+            &["service komga.fronts", "only a service that speaks"]
+        ),
+        "{:?}",
+        said(&stray)
+    );
 }
 
 #[test]

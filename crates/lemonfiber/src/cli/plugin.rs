@@ -240,6 +240,17 @@ pub enum Authoring {
         /// The plugin's source: its directory, or the `plugin.toml` inside it.
         path: PathBuf,
     },
+    /// Judge a plugin's conformance recordings against the contracts its adapters speak.
+    ///
+    /// Each case of each contract has one recording beside the manifest, at
+    /// `conformance/<capability>@<major>/<case>.json`, taken against the service the
+    /// adapter `fronts` at the digest the manifest pins it by. A recorded answer is read
+    /// as lemonfiber reads a running adapter's. A refusal, or a case a recording fails or
+    /// cannot prove, exits non-zero. Nothing is installed and nothing is asked.
+    Conform {
+        /// The plugin's source: its directory, or the `plugin.toml` inside it.
+        path: PathBuf,
+    },
     /// Ask each image's registry whether anybody has said it is theirs.
     ///
     /// The one read here that reaches the network, and the only one: it asks the

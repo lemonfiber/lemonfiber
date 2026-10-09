@@ -234,3 +234,34 @@ async fn an_adapter_is_asked_what_it_is_by_a_keyed_get() {
     assert!(matches!(client.about().await, Err(Failure::Refused { .. })));
     assert_eq!(told.count(), 1);
 }
+
+#[tokio::test]
+async fn a_call_without_the_key_carries_none_and_answers_its_status() {
+    let (fake, client, told) = adapter(Answer::reply(401, ""));
+    let serve = crate::capabilities::media::serve::capability();
+    let first = serve.operations.first();
+    let status = match first {
+        Some(operation) => client.unkeyed(operation).await.ok(),
+        None => None,
+    };
+    assert_eq!(status, Some(401));
+    let request = fake.request();
+    assert!(request.as_ref().is_some_and(|request| !request
+        .headers
+        .iter()
+        .any(|(name, _)| name == "Authorization")));
+    assert_eq!(
+        request.and_then(|request| request.body).as_deref(),
+        Some("{}")
+    );
+    assert_eq!(told.count(), 0);
+
+    let silent = Contracted::new(Fake::silent(), "http://adapter:8080", "plex-adapter", "k3y");
+    match first {
+        Some(operation) => assert!(matches!(
+            silent.unkeyed(operation).await,
+            Err(Failure::Unavailable { .. })
+        )),
+        None => unreachable!("media.serve carries operations"),
+    }
+}
