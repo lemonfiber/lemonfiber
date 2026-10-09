@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What asking an installed plugin's adapters again came to.",
+  "type": "object",
+  "properties": {
+    "asked": {
+      "description": "Whether its adapters were asked, rather than only said to be.",
+      "type": "boolean"
+    },
+    "cleared": {
+      "description": "Whether every answer kept against the plugin was cleared, which a proof that did\nnot hold never does.",
+      "type": "boolean"
+    },
+    "kept": {
+      "description": "Every answer kept against the plugin when it was proved, which a pass clears.",
+      "type": "array",
+      "items": {
+        "$ref": "PluginNonconforming.json"
+      }
+    },
+    "plugin": {
+      "description": "The plugin proved.",
+      "type": "string"
+    },
+    "proofs": {
+      "description": "Each proof asked, or that would be asked, with what it came to.",
+      "type": "array",
+      "items": {
+        "$ref": "PluginProving.json"
+      }
+    }
+  },
+  "required": [
+    "plugin",
+    "proofs",
+    "kept",
+    "asked",
+    "cleared"
+  ]
+}

@@ -185,8 +185,15 @@ fn each_act_carries_what_its_command_takes() {
         ..Arguments::default()
     };
     assert_eq!(
-        named("plugin-remove", remove),
+        named("plugin-remove", remove.clone()),
         Ok(Command::Plugins(Asked::Remove {
+            plugin: "kavita".to_owned(),
+            consent: consent(offer, &[]),
+        }))
+    );
+    assert_eq!(
+        named("plugin-prove", remove),
+        Ok(Command::Plugins(Asked::Prove {
             plugin: "kavita".to_owned(),
             consent: consent(offer, &[]),
         }))
@@ -247,6 +254,7 @@ fn an_act_missing_its_subject_is_refused_by_name() {
         "source",
     );
     missing("plugin-remove", Arguments::default(), "plugin");
+    missing("plugin-prove", Arguments::default(), "plugin");
 }
 
 /// A bare `confirm` is no yes to any of the three, an approval is no part of a removal,

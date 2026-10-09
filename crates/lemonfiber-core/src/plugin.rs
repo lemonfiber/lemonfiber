@@ -92,11 +92,11 @@ pub use recipes::{approval, approvals, Adapter, Named, Owner, Pair, Recipe, Step
 pub use recorded::{Answer, Asked, Recording};
 pub use register::{Already, Register, Unreadable as Unrecorded};
 pub use reports::{
-    Fetchable, Install, Installs, Nonconforming, Removal, Restored, Sourced, Substituted, Unfilled,
-    Update,
+    Fetchable, Install, Installs, Nonconforming, Removal, Reproof, Restored, Sourced, Substituted,
+    Unfilled, Update,
 };
 pub use source::{unspoken, Source, SPOKEN};
-pub use stating::{changes, overrides, proofs, Changing, Overriding, Proving, Puts};
+pub use stating::{changes, overrides, proofs, speaking, Changing, Overriding, Proving, Puts};
 pub use verified::{against, Changed, Verification};
 
 // Re-exported so a surface rendering one of these reads it through the module that

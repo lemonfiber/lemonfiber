@@ -128,6 +128,19 @@ pub enum PluginCommand {
         #[arg(long, value_name = "NAME")]
         offer: Option<String>,
     },
+    /// Ask an installed plugin's adapters again whether they speak what they declare.
+    ///
+    /// Every answer an adapter gave outside its contract is kept against the plugin,
+    /// and the plugin fills none of that capability until a proof it passes clears it.
+    /// Named on its own it says what it would ask and what a pass would clear, asks
+    /// nothing, and prints a name for that offer; answering with that name is the yes.
+    Prove {
+        /// The plugin's id, as `lemonfiber plugin installed` lists it.
+        plugin: String,
+        /// The offer being answered, as the run that made it printed it.
+        #[arg(long, value_name = "NAME")]
+        offer: Option<String>,
+    },
     /// Replace an installed plugin with another version of it, as one operation.
     ///
     /// The source of the new version is any an install takes, and has to hold the

@@ -415,6 +415,7 @@ async fn restored(ctx: &Ctx, was: &Installed, stack: &Path, stamp: &str) -> Rest
 fn answering(installed: Vec<Installed>, update: Update, offer: String) -> Installs {
     Installs {
         nonconforming: Vec::new(),
+        proof: None,
         agreement: Some(offer),
         rehearsed: false,
         installed,

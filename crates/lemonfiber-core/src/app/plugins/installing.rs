@@ -192,6 +192,7 @@ pub(super) async fn install(
 
     Ok(Installs {
         nonconforming: Vec::new(),
+        proof: None,
         rehearsed: false,
         removal: None,
         installed: standing.installed().to_vec(),

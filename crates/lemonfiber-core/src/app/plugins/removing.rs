@@ -211,6 +211,7 @@ fn answering(
 ) -> crate::plugin::Installs {
     crate::plugin::Installs {
         nonconforming: Vec::new(),
+        proof: None,
         agreement: Some(offer),
         rehearsed: false,
         installed,

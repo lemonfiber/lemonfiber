@@ -24,6 +24,12 @@
       ],
       "required": false
     },
+    "proof": {
+      "type": [
+        "anyOf(null,ref:PluginReproof)"
+      ],
+      "required": false
+    },
     "rehearsed": {
       "type": [
         "boolean"

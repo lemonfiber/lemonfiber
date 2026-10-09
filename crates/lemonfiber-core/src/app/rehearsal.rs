@@ -221,7 +221,6 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Outbound => reads("outbound"),
         Command::Provenance => reads("provenance"),
         Command::Stored => reads("stored"),
-        Command::Plugins(plugins::Asked::Installed) => reads("plugin installed"),
         Command::Archives => reads("archives"),
         Command::Migrate(MigrateAction::Survey) => reads("migrate"),
         Command::Credentials(Asking::Read | Asking::Reveal { .. }) => reads("credentials"),
@@ -280,29 +279,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Restart(_) => reports("restart", LIFECYCLE).disturbing(Situation::Restarting),
         Command::Pull { .. } => reports("pull", LIFECYCLE),
         Command::ConfigSet(_) => reports("config set", &[kind::CONFIG]),
-        // Everything it changes is settled before anything is touched: the manifest
-        // is read, what the install decides is settled, and where every one of its
-        // writes lands is derived without a disk under it. A rehearsal does all of
-        // that, states it, and stops short of carrying it out — so what it reports is
-        // what the real run reports rather than a summary of it.
-        Command::Plugins(plugins::Asked::Install { .. }) => reports("plugin install", PLUGINS),
-        // The same, read backwards. What a removal puts back is judged before a byte of
-        // it is touched — the rollback layer's own judgement, which is the whole of
-        // what can be known without acting — and what it would leave with nothing
-        // filling it is a fact about the record rather than about a machine mid-run.
-        // Taking a plugin off stops its containers through the same engine stop, held to
-        // the same grace.
-        Command::Plugins(plugins::Asked::Remove { .. }) => {
-            reports("plugin remove", PLUGINS).disturbing(Situation::Stopping)
-        }
-        // Both of those at once, as the one account the update is. What goes back is the
-        // rollback layer's judgement and what comes on is the install's settled writes
-        // and declared proofs, and neither needs anything touched to be known.
-        // The version installed comes off and another comes on in its place, held to the
-        // same settle wait a switch is.
-        Command::Plugins(plugins::Asked::Update { .. }) => {
-            reports("plugin update", PLUGINS).disturbing(Situation::Switching)
-        }
+        Command::Plugins(asked) => plugin(asked),
         Command::Wiring(Linking::Fill(_)) => reports("wiring fill", &[kind::SUBSTITUTION]),
         Command::Quality(_) => reports("quality", &[kind::QUALITY]),
         Command::Alerts(_) => reports("alerts", &[kind::ALERTS]),
@@ -406,5 +383,36 @@ mod withheld;
 
 pub use refusing::{not_taught_yet, verdict};
 pub use withheld::carried;
+/// What a run of a plugin command reads, writes and disturbs.
+const fn plugin(asked: &plugins::Asked) -> Asked {
+    match asked {
+        plugins::Asked::Installed => reads("plugin installed"),
+        // Everything it changes is settled before anything is touched: the manifest
+        // is read, what the install decides is settled, and where every one of its
+        // writes lands is derived without a disk under it. A rehearsal does all of
+        // that, states it, and stops short of carrying it out — so what it reports is
+        // what the real run reports rather than a summary of it.
+        plugins::Asked::Install { .. } => reports("plugin install", PLUGINS),
+        // The same, read backwards. What a removal puts back is judged before a byte of
+        // it is touched — the rollback layer's own judgement, which is the whole of
+        // what can be known without acting — and what it would leave with nothing
+        // filling it is a fact about the record rather than about a machine mid-run.
+        // Taking a plugin off stops its containers through the same engine stop, held to
+        // the same grace.
+        plugins::Asked::Remove { .. } => {
+            reports("plugin remove", PLUGINS).disturbing(Situation::Stopping)
+        }
+        // Both of those at once, as the one account the update is. What goes back is the
+        // rollback layer's judgement and what comes on is the install's settled writes
+        // and declared proofs, and neither needs anything touched to be known.
+        // The version installed comes off and another comes on in its place, held to the
+        // same settle wait a switch is.
+        plugins::Asked::Update { .. } => {
+            reports("plugin update", PLUGINS).disturbing(Situation::Switching)
+        }
+        plugins::Asked::Prove { .. } => reports("plugin prove", PLUGINS),
+    }
+}
+
 #[cfg(test)]
 mod tests;

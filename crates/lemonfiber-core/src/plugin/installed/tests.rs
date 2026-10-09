@@ -424,6 +424,7 @@ fn what_is_recorded_for_one_plugin_is_answerable_by_name() {
 fn the_report_says_what_is_installed_and_what_this_run_did() {
     let read = Installs {
         nonconforming: Vec::new(),
+        proof: None,
         rehearsed: false,
         agreement: None,
         installed: whole().into_iter().collect(),
@@ -435,6 +436,7 @@ fn the_report_says_what_is_installed_and_what_this_run_did() {
     };
     let done = Installs {
         nonconforming: Vec::new(),
+        proof: None,
         rehearsed: false,
         agreement: None,
         removal: None,

@@ -24,6 +24,7 @@ use super::super::Lines;
 
 mod answering;
 mod listed;
+mod reproved;
 mod updated;
 
 /// What is installed on this machine, and what installing one came to.
@@ -78,6 +79,17 @@ pub(crate) fn installs(report: &Installs) -> Lines {
         if !one.removed {
             lines.extend(answering::unanswered(
                 "remove",
+                report.agreement.as_deref(),
+                &[],
+                report.rehearsed,
+            ));
+        }
+        lines.spaced(shelf(report.installed.len()));
+    } else if let Some(one) = &report.proof {
+        lines.extend(reproved::proved(one));
+        if !one.asked {
+            lines.extend(answering::unanswered(
+                "prove",
                 report.agreement.as_deref(),
                 &[],
                 report.rehearsed,
@@ -147,7 +159,7 @@ fn changes(made: &[Changing], recorded: bool) -> Lines {
 /// verdict.** It is one fact about the run and repeating it per proof would be four
 /// sentences where one is true — and leaving it out would let a verdict reached
 /// against a recording read as one the service gave.
-fn proving(proofs: &[Proving], against: Option<Evidence>, recorded: bool) -> Lines {
+pub(super) fn proving(proofs: &[Proving], against: Option<Evidence>, recorded: bool) -> Lines {
     let mut lines = Lines::default();
     if proofs.is_empty() {
         lines.spaced("    It declares no proof, so nothing about it was established.");

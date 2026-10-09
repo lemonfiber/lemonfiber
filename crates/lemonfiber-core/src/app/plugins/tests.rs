@@ -295,6 +295,7 @@ pub(super) async fn answered(
             source,
             consent,
         },
+        Asked::Prove { plugin, .. } => Asked::Prove { plugin, consent },
         Asked::Installed => Asked::Installed,
     };
     plugins(ctx, &yes).await
@@ -530,6 +531,7 @@ mod installing;
 mod proving;
 mod reaching;
 mod removing;
+mod reproving;
 mod speaking;
 mod updating;
 mod writing;
