@@ -1,0 +1,25 @@
+# A pull request cannot change what this repository's checks run on its own
+# say (Q-R83). `pull_request_target` runs this file as the base branch holds
+# it, so a pull request cannot rewrite it; the reusable checks nothing of the
+# pull request out and reads its trees through the API. A change under
+# `.github/workflows/` or `.github/actions/` other than spec's pins moving
+# forward fails it, and is merged by a maintainer by choice.
+#
+# The verdict is a check on the head commit the event names, so every new head
+# gets its own run. Under `pull_request_target` `github.ref` is the base branch
+# every pull request shares, so the group is keyed on the pull request's number:
+# a push cancels the run for the head it replaced, and nothing else (Q-R75).
+name: pin-only
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+permissions: {}
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  pin-only:
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: lemonfiber/spec/.github/workflows/pin-only.yml@4562180c9f974bf03aa9be34610f83bb6eb06029 # v1.0.61

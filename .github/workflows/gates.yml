@@ -1,0 +1,29 @@
+# The shared checks, as steps of one job, and what they post on the pull
+# request (Q-R82). Branch protection requires `gates / gates`; `gates / report`
+# labels, comments and closes, and judges nothing.
+#
+# `edited` is listed because the squash merge writes the pull request's title
+# and body to `main`, so `squash-message` reads them again when they change
+# (GOV-R62). `report` needs `pull-requests: write` to comment and close, and
+# `issues: write` to label; `gates` itself holds no write permission.
+name: gates
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+permissions:
+  contents: read
+# A pull request pushed again cancels the run on its old head, which nobody
+# will read and which holds runners the org shares (Q-R75). Every other event
+# is grouped by its own run, so it is never cancelled and never cancels.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
+jobs:
+  gates:
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    uses: lemonfiber/spec/.github/workflows/gates.yml@4562180c9f974bf03aa9be34610f83bb6eb06029 # v1.0.61
+    with:
+      checks: spec-check hygiene workflow-pins security dco attribution commitlint squash-message explain labeler goals refs
