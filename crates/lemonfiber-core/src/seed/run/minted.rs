@@ -1,4 +1,4 @@
-//! The Jellyfin keys lemonfiber mints for the services it builds, each filed under the
+//! The media server keys lemonfiber mints for the services it builds, each filed under the
 //! name of the service that holds it.
 //!
 //! What every such key has in common is here: minting one that is a single word,
@@ -6,15 +6,14 @@
 //! is handed over is the service's own step.
 
 use super::Ctx;
-use crate::jellyfin::Jellyfin;
-use crate::ports::service::{AppKeys as _, Failure};
+use crate::ports::service::{AppKeys, Failure};
 use crate::seed::{State, Wiring};
 
 /// Mint a key filed under `app`, refusing one that is not a single word.
 ///
 /// A key that is not one word is revoked again at once, so nothing is left on the
 /// server that nothing could hold.
-pub(super) async fn mint(client: &Jellyfin, app: &str) -> Result<String, State> {
+pub(super) async fn mint(client: &dyn AppKeys, app: &str) -> Result<String, State> {
     let key = client
         .mint(app)
         .await
@@ -24,13 +23,14 @@ pub(super) async fn mint(client: &Jellyfin, app: &str) -> Result<String, State> 
     }
     let _ = client.revoke(&key).await;
     Err(State::Failed {
-        detail: "Jellyfin minted a key that is not one word, so it was revoked again".to_owned(),
+        detail: "the media server minted a key that is not one word, so it was revoked again"
+            .to_owned(),
     })
 }
 
 /// Revoke every key in `keys`, stopping at the first the server refuses.
 pub(super) async fn revoked<'a>(
-    client: &Jellyfin,
+    client: &dyn AppKeys,
     keys: impl IntoIterator<Item = &'a String>,
 ) -> Result<(), Failure> {
     for key in keys {
@@ -41,7 +41,7 @@ pub(super) async fn revoked<'a>(
 
 /// What revoking `keys` comes to, as a state: wired, or the failure that stopped it.
 pub(super) async fn revoking<'a>(
-    client: &Jellyfin,
+    client: &dyn AppKeys,
     keys: impl IntoIterator<Item = &'a String>,
 ) -> State {
     match revoked(client, keys).await {
@@ -63,7 +63,7 @@ pub(super) fn count(app: &str, keys: usize) -> String {
 /// every one, reported as `connection`. Nothing where none is filed.
 pub(super) async fn retired(
     ctx: &Ctx,
-    client: &Jellyfin,
+    client: &dyn AppKeys,
     app: &str,
     connection: &str,
     filed: &[String],

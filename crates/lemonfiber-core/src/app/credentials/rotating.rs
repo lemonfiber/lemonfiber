@@ -299,6 +299,11 @@ pub(crate) enum Replacing {
     Unkept(String),
 }
 
+/// What is said where the media server is spoken to over its contracts, which change no
+/// administrator's password.
+const OVER_ITS_CONTRACTS: &str = "this media server is spoken to over its contracts, which \
+                                  change no administrator's password";
+
 /// What is said where lemonfiber holds no administrator password for the media server.
 const NO_ADMINISTRATOR_HELD: &str = "lemonfiber holds no administrator password for this media \
                                      server, so there is nothing to change; run `lemonfiber seed`";
@@ -317,6 +322,9 @@ pub(crate) async fn replace_jellyfin_password(
     let Some(current) = server.recorded_password(ctx) else {
         return Err(Replacing::Unproven(NO_ADMINISTRATOR_HELD.to_owned()));
     };
+    let Some(client) = server.signed_in(ctx, current) else {
+        return Err(Replacing::Unproven(OVER_ITS_CONTRACTS.to_owned()));
+    };
     // Below what can be told without acting, and above the mint: a password generated to
     // describe a rotation is a secret that exists because somebody asked a question.
     if rehearsing {
@@ -333,7 +341,6 @@ pub(crate) async fn replace_jellyfin_password(
     if let Err(failure) = record_secret(ctx, &pending(setting), &replacement) {
         return Err(Replacing::Unproven(unrecorded(&failure)));
     }
-    let client = server.signed_in(ctx, current);
     match client.replace_password(&replacement).await {
         Ok(()) => promoted(ctx, setting, &replacement)
             .map(|()| Replaced::Done)

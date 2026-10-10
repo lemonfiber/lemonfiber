@@ -22,9 +22,13 @@ use super::tokens::{through_the_gate, Kept};
 use super::Ctx;
 use crate::baseline::Baseline;
 use crate::credential::{Reach, Settled};
-use crate::jellyfin::{Jellyfin, SEERR_APP};
+use std::sync::Arc;
+
+use lemonfiber_contract::capabilities::media::serve;
+
+use crate::jellyfin::SEERR_APP;
 use crate::ports::media::Kind;
-use crate::ports::service::{AppKeys as _, RegisteredTarget, Requests};
+use crate::ports::service::{RegisteredTarget, Requests};
 use crate::seed::{State, Wiring};
 use crate::wiring::{Filler, Fillers};
 
@@ -88,7 +92,7 @@ pub(super) async fn seed_taken_back(
     let project = gated(services, project)?;
     let (filler, base) = bundled(fillers)?;
     let owed = baseline.named(&filler.id, HELD_KEY);
-    let jellyfin = jellyfin_admin(ctx, fillers);
+    let jellyfin = media_server_admin(ctx, fillers).await;
     let minted = match &jellyfin {
         Some((client, ..)) => client.filed_as(SEERR_APP).await.unwrap_or_default(),
         None => Vec::new(),
@@ -244,10 +248,13 @@ fn gated<'a>(services: &[Service], project: Option<&'a Path>) -> Option<&'a Path
 }
 
 /// The media server as its administrator, with the route the gate reaches it on and what
-/// it is called, where lemonfiber holds the administrator's password.
-fn jellyfin_admin(ctx: &Ctx, fillers: &Fillers) -> Option<(Jellyfin, String, String)> {
+/// it is called, where it can be asked as one.
+async fn media_server_admin(
+    ctx: &Ctx,
+    fillers: &Fillers,
+) -> Option<(Arc<dyn serve::Fills>, String, String)> {
     let server = crate::app::targets::MediaServer::of(fillers)?;
-    let client = server.administered(ctx)?;
+    let client = server.administering(ctx).await?;
     Some((client, server.id().to_owned(), server.name().to_owned()))
 }
 

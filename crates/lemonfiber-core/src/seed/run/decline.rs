@@ -21,8 +21,7 @@ use super::Ctx;
 use crate::app::invite::declining;
 use crate::app::targets::MediaServer;
 use crate::app_keys::DECLINE_APP;
-use crate::jellyfin::Jellyfin;
-use crate::ports::service::AppKeys as _;
+use crate::ports::service::AppKeys;
 use crate::seed::{State, Wiring};
 
 /// What the report calls this connection, for the media server `server`.
@@ -44,7 +43,7 @@ pub(super) async fn seed_decline_key(
     // it set up. A rehearsal before the first run finds none recorded, because the
     // identity step mints it, and so finds no key on the server either — where the
     // server the decline service acts on is the one the identity step sets up.
-    let Some(client) = server.administered(ctx) else {
+    let Some(client) = server.administering(ctx).await else {
         let minting = MediaServer::of(fillers)
             .is_some_and(|identity| identity.id() == server.id() && identity.would_mint(ctx));
         return (declining && minting).then(|| would_mint(server));
@@ -55,7 +54,7 @@ pub(super) async fn seed_decline_key(
     if !declining {
         return super::minted::retired(
             ctx,
-            &client,
+            client.as_ref(),
             DECLINE_APP,
             &connection(server),
             &filed.ok()?,
@@ -85,16 +84,16 @@ pub(super) async fn seed_decline_key(
     .and_then(|text| Key::read(&text).ok())
     .filter(|key| filed.iter().any(|one| one == key.reveal()));
     let state = match held {
-        Some(key) => kept(ctx, &client, &filed, key.reveal()).await,
+        Some(key) => kept(ctx, client.as_ref(), &filed, key.reveal()).await,
         None if ctx.dry_run => return Some(would_mint(server)),
-        None => minted(&client, &filed, &path).await,
+        None => minted(client.as_ref(), &filed, &path).await,
     };
     Some(settled(server, state))
 }
 
 /// The key the file holds is one the media server holds: revoke whatever else is filed
 /// beside it.
-async fn kept(ctx: &Ctx, client: &Jellyfin, filed: &[String], key: &str) -> State {
+async fn kept(ctx: &Ctx, client: &dyn AppKeys, filed: &[String], key: &str) -> State {
     let others: Vec<&String> = filed.iter().filter(|one| *one != key).collect();
     if others.is_empty() {
         return State::AlreadyWired;
@@ -112,7 +111,7 @@ async fn kept(ctx: &Ctx, client: &Jellyfin, filed: &[String], key: &str) -> Stat
 ///
 /// A key that could not be written is revoked again at once: one nothing holds is not
 /// left on the server for the next run to find.
-async fn minted(client: &Jellyfin, filed: &[String], path: &Path) -> State {
+async fn minted(client: &dyn AppKeys, filed: &[String], path: &Path) -> State {
     let key = match super::minted::mint(client, DECLINE_APP).await {
         Ok(key) => key,
         Err(state) => return state,

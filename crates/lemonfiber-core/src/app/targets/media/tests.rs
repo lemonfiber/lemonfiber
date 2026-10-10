@@ -176,3 +176,90 @@ fn a_stack_asking_for_no_identity_still_has_its_media_server() {
     let contested = shipped(&[a_plugin_server()], &Chosen::default(), unasked);
     assert_eq!(MediaServer::of(&contested), None);
 }
+
+/// A plugin bringing a contracted media server: an adapter speaking `identity.source`
+/// and `media.serve` in front of an upstream of its own, naming its native API where
+/// `native` is given.
+fn a_contracted_server(native: Option<&str>) -> Installed {
+    let mut adapter = a_placed(
+        "plex-adapter",
+        &["identity.source", "media.serve"],
+        None,
+        Some(8080),
+    );
+    adapter.speaks = vec!["identity.source@1".to_owned(), "media.serve@1".to_owned()];
+    adapter.fronts = Some("plex".to_owned());
+    let mut upstream = a_placed("plex", &[], None, Some(32400));
+    upstream.native = native.map(str::to_owned);
+    an_installed("plex", vec![adapter, upstream])
+}
+
+/// A contracted media server is spoken to over its contracts alone, and another service
+/// signs the household in through the upstream its adapter fronts, in the API that
+/// upstream names; the request gate, which speaks only this build's adapter's API,
+/// answers no route for it.
+#[test]
+fn a_contracted_server_is_reached_over_its_contracts_and_paired_at_its_upstream() {
+    let chosen = Chosen::read(Some("identity.source=plex-adapter"));
+    let fillers = shipped(&[a_contracted_server(Some("plex"))], &chosen, |_| ());
+    let server = MediaServer::of(&fillers);
+
+    assert_eq!(server.as_ref().map(MediaServer::id), Some("plex-adapter"));
+    assert_eq!(
+        server.as_ref().map(|one| one.reach),
+        Some(super::Reach::Over)
+    );
+    assert_eq!(
+        server.as_ref().and_then(|one| one.pairing.clone()),
+        Some(super::Pairing {
+            protocol: crate::ports::service::Protocol("plex".to_owned()),
+            at: Address {
+                host: "plex".to_owned(),
+                port: 32400
+            },
+        })
+    );
+    assert_eq!(server.as_ref().and_then(MediaServer::gate_kind), None);
+    assert!(server.as_ref().is_some_and(|one| one
+        .signed_in(&crate::test_support::a_context().build(), "x")
+        .is_none()));
+}
+
+/// An upstream that names no native API leaves the contracted server unpaired: there is
+/// no API to tell another service to sign the household in through.
+#[test]
+fn a_contracted_server_whose_upstream_names_no_api_is_unpaired() {
+    let chosen = Chosen::read(Some("identity.source=plex-adapter"));
+    let fillers = shipped(&[a_contracted_server(None)], &chosen, |_| ());
+    let server = MediaServer::of(&fillers);
+
+    assert_eq!(
+        server.as_ref().map(|one| one.reach),
+        Some(super::Reach::Over)
+    );
+    assert_eq!(server.as_ref().and_then(|one| one.pairing.clone()), None);
+}
+
+/// The stack's own server is reached through this build's adapter, paired at its own
+/// address in that adapter's API, and the gate answers a route for it.
+#[test]
+fn the_stacks_server_is_reached_through_the_adapter_and_paired_at_itself() {
+    let fillers = shipped(&[], &Chosen::default(), |_| ());
+    let server = MediaServer::of(&fillers);
+
+    assert_eq!(
+        server.as_ref().map(|one| one.reach),
+        Some(super::Reach::Bundled(ApiKind::Jellyfin))
+    );
+    assert_eq!(
+        server
+            .as_ref()
+            .and_then(|one| one.pairing.as_ref())
+            .map(|pairing| (pairing.protocol.0.as_str(), pairing.at.url())),
+        Some(("jellyfin", "http://jellyfin:8096".to_owned()))
+    );
+    assert_eq!(
+        server.as_ref().and_then(MediaServer::gate_kind),
+        Some(lemonfiber_sidecar::gate::Kind::Jellyfin)
+    );
+}

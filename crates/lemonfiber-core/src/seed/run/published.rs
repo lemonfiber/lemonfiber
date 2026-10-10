@@ -192,8 +192,12 @@ async fn retired(ctx: &Ctx, services: &[Service], fillers: &crate::wiring::Fille
         return;
     };
     let server = crate::app::targets::MediaServer::of(fillers);
-    let revoked = match server.as_ref().and_then(|server| server.administered(ctx)) {
-        Some(client) => crate::app_keys::revoke_ours(&client).await.ok(),
+    let client = match &server {
+        Some(server) => server.administering(ctx).await,
+        None => None,
+    };
+    let revoked = match client {
+        Some(client) => crate::app_keys::revoke_ours(client.as_ref()).await.ok(),
         None => None,
     };
     let media_server = server

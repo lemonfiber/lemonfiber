@@ -234,6 +234,11 @@ pub struct Service {
     /// against. Required where `speaks` is.
     #[serde(default)]
     pub fronts: Option<String>,
+    /// The API this service answers the stack's other services in, by the name those
+    /// services know it by: declared on the upstream an adapter of the same plugin fronts,
+    /// where other services reach that upstream directly rather than through the adapter.
+    #[serde(default)]
+    pub native: Option<String>,
     /// The one privileged shape lemonfiber writes for this service, where it is the
     /// upstream an adapter of the same plugin fronts and that adapter speaks
     /// `network.egress-guard`.

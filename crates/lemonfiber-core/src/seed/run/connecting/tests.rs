@@ -408,6 +408,8 @@ fn a_service(
         contracts: Vec::new(),
         first_party: false,
         majors: Vec::new(),
+        fronts: None,
+        native: None,
     }
 }
 

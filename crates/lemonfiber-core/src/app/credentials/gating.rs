@@ -23,7 +23,6 @@ use crate::app::targets::MediaServer;
 use crate::app::Ctx;
 use crate::app_keys::GATE_APP;
 use crate::credential::{fingerprint, Held, Origin, Propagation, Reach, Rotation, State};
-use crate::ports::service::AppKeys as _;
 
 /// What the key is recorded as: where it lives inside the stack's configuration.
 pub(super) const SETTING: &str = "request-gate/upstreams.json#jellyfin";
@@ -88,7 +87,10 @@ pub(super) async fn value(ctx: &Ctx, held: &Held) -> Option<String> {
 
 /// Replace the key, keeping a working one at every moment.
 pub(super) async fn rotate(ctx: &Ctx, held: &Held, fillers: &crate::wiring::Fillers) -> Rotation {
-    let Some(client) = MediaServer::of(fillers).and_then(|server| server.administered(ctx)) else {
+    let Some(server) = MediaServer::of(fillers) else {
+        return unproven(held, NO_ADMINISTRATOR);
+    };
+    let Some(client) = server.administering(ctx).await else {
         return unproven(held, NO_ADMINISTRATOR);
     };
     if ctx.dry_run {

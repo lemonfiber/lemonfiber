@@ -10,8 +10,7 @@ use std::path::Path;
 
 use super::Ctx;
 use crate::app::targets::MediaServer;
-use crate::jellyfin::Jellyfin;
-use crate::ports::service::{Failure, Fronted as _};
+use crate::ports::service::{Failure, Fronted};
 use crate::seed::{State, Wiring};
 
 /// What the report calls this connection.
@@ -31,7 +30,7 @@ pub(super) async fn seed_proxies(
 ) -> Option<Wiring> {
     let server = server?;
     let door = crate::screening::door::upstream(project?)?;
-    let Some(password) = server.recorded_password(ctx) else {
+    let Some(client) = server.administering(ctx).await else {
         return ctx.dry_run.then(|| {
             Wiring::settled(
                 connection(server),
@@ -42,7 +41,6 @@ pub(super) async fn seed_proxies(
             )
         });
     };
-    let client = server.signed_in(ctx, password);
     let state = match client.known_proxies().await {
         Err(failure) => crate::seed::unreached(&failure),
         Ok(held) if held == [door.as_str()] => State::AlreadyWired,
@@ -50,7 +48,7 @@ pub(super) async fn seed_proxies(
             yours: Some(held.join(", ")),
             ours: Some(door),
         },
-        Ok(_) => match trusted(&client, &door).await {
+        Ok(_) => match trusted(client.as_ref(), &door).await {
             Ok(()) => State::Wired,
             Err(failure) => crate::seed::unreached(&failure),
         },
@@ -61,10 +59,11 @@ pub(super) async fn seed_proxies(
 /// Trust `door` alone, start the server again so it reads what was written, and wait
 /// until it answers again — every pass after this one talks to it, and a server that is
 /// still starting would read as one that refuses.
-async fn trusted(client: &Jellyfin, door: &str) -> Result<(), Failure> {
+async fn trusted(client: &dyn Fronted, door: &str) -> Result<(), Failure> {
     client.trust_only(door).await?;
     client.restart().await?;
     crate::patience::RESTART
-        .until(|| client.accepts(), Result::is_ok)
+        .until(|| client.known_proxies(), Result::is_ok)
         .await
+        .map(|_| ())
 }

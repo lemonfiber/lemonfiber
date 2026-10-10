@@ -33,6 +33,7 @@ pub mod carried;
 mod colliding;
 mod evidence;
 mod failing;
+mod fronting;
 mod naming;
 mod reaching;
 mod recipes;
@@ -185,6 +186,7 @@ fn running(manifest: &Manifest, found: &mut Vec<Violation>) {
         adapting::adapted(service, found);
         speaking::spoken(service, &manifest.services, found);
         shaping::shaped(service, &manifest.services, found);
+        fronting::native(service, &manifest.services, found);
     }
 }
 

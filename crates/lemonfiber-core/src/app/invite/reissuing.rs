@@ -12,7 +12,6 @@
 use crate::app::Ctx;
 use crate::invitation::HOURS_TO_CLAIM;
 use crate::model::{Invitation, InvitationStanding, Linked};
-use crate::ports::service::Household as _;
 
 use super::standing::Held;
 use super::{reaching, Reaching};
@@ -46,6 +45,7 @@ pub(crate) async fn reissue(
         reachable,
         manifest,
     } = reaching(ctx, &name).await?;
+    let server = server.as_ref();
 
     let Ok(household) = server.household().await else {
         return Err(Box::new(unreadable()));
@@ -84,7 +84,7 @@ pub(crate) async fn reissue(
     // by wrong guesses, or switched off when its last window closed, is one its person
     // cannot sign in to until this is written — and switched on first, it would open to
     // the old password for as long as the reset took.
-    super::offering::guarded(&server, &member, None, false).await?;
+    super::offering::guarded(server, &member, None, false).await?;
     // A new decline address with the new offer: the old token went with the old record,
     // so a refusal of it no longer reads as this account's standing.
     let decline = super::declining::issued(ctx, &manifest.services, &held.household, &member).await;

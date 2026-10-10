@@ -33,10 +33,12 @@ pub(crate) mod standing;
 
 pub(crate) use reissuing::reissue;
 
+use lemonfiber_contract::capabilities::identity::source;
+
 use crate::app::{Allowance, Ctx};
 use crate::invitation::{Spent, HOURS_TO_CLAIM};
 use crate::model::{Applied, Invitation, InvitationStanding, Linked};
-use crate::ports::service::{Allowed, Household as _, Member};
+use crate::ports::service::{Allowed, Member};
 
 use allowing::{allowing, would_not_allow};
 use refusals::{
@@ -76,8 +78,9 @@ pub(crate) async fn offer(
         reachable,
         manifest,
     } = reaching(ctx, &name).await?;
+    let server = server.as_ref();
 
-    let held = held(ctx, &server).await;
+    let held = held(ctx, server).await;
     let already = already_here(&held, &name).cloned();
     // Refused before anything else, a rehearsal included. This is the account the program
     // signs in as, and an offer would write a household member's limits on it.
@@ -97,7 +100,7 @@ pub(crate) async fn offer(
     // wrong is a refusal the operator is owed instead of an account, not after one —
     // and a rehearsal that skipped the check would say an invitation would be made
     // that the real run then refuses.
-    let allowed = allowing(&server, &allowance).await?;
+    let allowed = allowing(server, &allowance).await?;
 
     // A rehearsal makes no account and takes none back. Both halves of this command
     // change the household, and the one that removes accounts is the half nobody
@@ -123,21 +126,21 @@ pub(crate) async fn offer(
             // Said in full on a rehearsal, because every part of it is known without
             // writing anything: the certificates are a read, and what would be written
             // has already been decided.
-            applied: applied(&server, &allowance, allowed.as_ref(), Linked::NotTried).await,
+            applied: applied(server, &allowance, allowed.as_ref(), Linked::NotTried).await,
         });
     }
 
-    let taken = take_back(&server, &sweeping).await;
+    let taken = take_back(server, &sweeping).await;
 
     // The account comes back from whichever this is about, so the operator is told
     // the name somebody signs in as rather than the one they typed — those differ by
     // case whenever an account was already here.
     let member = match already {
         Some(member) => {
-            again(ctx, &server, &held, &member, renewing, allowed.as_ref()).await?;
+            again(ctx, server, &held, &member, renewing, allowed.as_ref()).await?;
             member
         }
-        None => made(ctx, &server, &held, &name, allowed.as_ref()).await?,
+        None => made(ctx, server, &held, &name, allowed.as_ref()).await?,
     };
 
     // The account being narrowed is named only where something was written on it: an
@@ -154,7 +157,7 @@ pub(crate) async fn offer(
     let narrowed = allowed.as_ref().map(|_| member.id.as_str());
     let Told { linked, requesting } =
         told(ctx, &manifest, &to_link(&held, &member), narrowed).await;
-    let applied = applied(&server, &allowance, allowed.as_ref(), requesting).await;
+    let applied = applied(server, &allowance, allowed.as_ref(), requesting).await;
 
     Ok(Invitation {
         name: member.name,
@@ -210,7 +213,7 @@ fn standing_after(already: Option<&Member>, renewing: bool) -> InvitationStandin
 /// and is still theirs; what a failure leaves is the account as it stood.
 async fn again(
     ctx: &Ctx,
-    server: &crate::jellyfin::Jellyfin,
+    server: &dyn source::Fills,
     held: &Held,
     member: &Member,
     renewing: bool,
@@ -244,7 +247,7 @@ async fn again(
 /// account the household holds.
 async fn made(
     ctx: &Ctx,
-    server: &crate::jellyfin::Jellyfin,
+    server: &dyn source::Fills,
     held: &Held,
     name: &str,
     allowed: Option<&Allowed>,
@@ -269,7 +272,7 @@ async fn made(
 /// Where the media server will not take it back either, the refusal says which account
 /// was left and what it is, because that is now the operator's to remove.
 async fn undone(
-    server: &crate::jellyfin::Jellyfin,
+    server: &dyn source::Fills,
     member: &Member,
     refusal: crate::error::Problem,
 ) -> crate::error::Problem {
@@ -321,7 +324,7 @@ async fn holding(access: &crate::app::targets::HouseholdAccess, member: &str) ->
 /// and not the limit: the words for the number still read, and what stands in for the
 /// names says it stood in.
 async fn applied(
-    server: &crate::jellyfin::Jellyfin,
+    server: &dyn source::Fills,
     allowance: &Allowance,
     allowed: Option<&crate::ports::service::Allowed>,
     requesting: Linked,
@@ -423,8 +426,8 @@ async fn told(
 /// What both halves of this errand need before either can act: a way to reach the media
 /// server, and the address a person reaches it at.
 struct Reaching {
-    /// The media server, signed in as this program.
-    server: crate::jellyfin::Jellyfin,
+    /// The media server, asked as its administrator.
+    server: std::sync::Arc<dyn source::Fills>,
     /// Where a *person* opens it.
     reachable: crate::door::Address,
     /// The stack, whose request service and media server are found in it — boxed,
@@ -450,7 +453,7 @@ async fn reaching(ctx: &Ctx, name: &str) -> Result<Reaching, Box<crate::error::P
         let Some(media) = super::targets::hosted(ctx, &manifest) else {
             return Err(Box::new(no_media_server()));
         };
-        let Some(server) = media.administered(ctx) else {
+        let Some(server) = media.identifying(ctx).await else {
             return Err(Box::new(no_credential()));
         };
         (

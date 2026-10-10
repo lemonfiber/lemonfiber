@@ -28,7 +28,7 @@ use serde::{Deserialize, Serialize};
 use crate::app::Ctx;
 use crate::error::{Problem, Remedy};
 use crate::model::{HandedClient, HandedSession, Handoff, HandoffRemedy, HandoffState};
-use crate::ports::service::{Household as _, Member};
+use crate::ports::service::Member;
 
 /// What the record is called, beside the environment file.
 ///
@@ -107,7 +107,7 @@ pub(crate) async fn handoff(ctx: &Ctx, name: String) -> Result<Handoff, Box<Prob
         let Some(media) = super::targets::hosted(ctx, &manifest) else {
             return Err(Box::new(no_media_server()));
         };
-        let Some(server) = media.administered(ctx) else {
+        let Some(server) = media.identifying(ctx).await else {
             return Err(Box::new(not_set_up()));
         };
         (

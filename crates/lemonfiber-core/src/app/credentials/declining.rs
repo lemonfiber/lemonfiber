@@ -22,8 +22,7 @@ use crate::app::invite::declining;
 use crate::app::Ctx;
 use crate::app_keys::DECLINE_APP;
 use crate::credential::{fingerprint, Held, Origin, Propagation, Reach, Rotation, State};
-use crate::jellyfin::Jellyfin;
-use crate::ports::service::AppKeys as _;
+use crate::ports::service::AppKeys;
 
 /// What the key is recorded as: where it lives inside the stack's configuration.
 pub(super) const SETTING: &str = "decline/jellyfin.key";
@@ -100,9 +99,10 @@ pub(super) async fn rotate(
     services: &[Service],
     fillers: &crate::wiring::Fillers,
 ) -> Rotation {
-    let Some(client) =
-        crate::app::targets::declined_server(fillers).and_then(|server| server.administered(ctx))
-    else {
+    let Some(server) = crate::app::targets::declined_server(fillers) else {
+        return unproven(held, NO_ADMINISTRATOR);
+    };
+    let Some(client) = server.administering(ctx).await else {
         return unproven(held, NO_ADMINISTRATOR);
     };
     let health = declining::service(services)
@@ -127,7 +127,7 @@ pub(super) async fn rotate(
         return unproven(held, UNWRITTEN);
     };
     if client.answers_to(&minted).await.is_err() {
-        put_back(ctx, &client, &path, old.as_ref(), &minted).await;
+        put_back(ctx, client.as_ref(), &path, old.as_ref(), &minted).await;
         return unproven(held, UNTAKEN);
     }
     let holds = match health {
@@ -135,7 +135,7 @@ pub(super) async fn rotate(
         None => false,
     };
     if !holds {
-        put_back(ctx, &client, &path, old.as_ref(), &minted).await;
+        put_back(ctx, client.as_ref(), &path, old.as_ref(), &minted).await;
         return unproven(held, UNHELD);
     }
     for other in client
@@ -159,7 +159,7 @@ pub(super) async fn rotate(
 
 /// Revoke `minted` and put `old` back where the service reads it, or leave nothing there
 /// where there was nothing before.
-async fn put_back(ctx: &Ctx, client: &Jellyfin, path: &Path, old: Option<&Key>, minted: &str) {
+async fn put_back(ctx: &Ctx, client: &dyn AppKeys, path: &Path, old: Option<&Key>, minted: &str) {
     match old {
         Some(old) => {
             let _ = crate::config::store::write(path, &old.written());
