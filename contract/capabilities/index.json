@@ -61,7 +61,7 @@
       "files": [
         {
           "path": "download.torrent/v1/openapi.json",
-          "sha256": "ba7ed6e6dc4cadddc94ced13e6047ca4964de1d55d1024c3b09fb9e21e8e170a"
+          "sha256": "275ffc940dacb3200b083221fa8c0f0dbf85276f2ed9c6e6f2dc993d70216896"
         },
         {
           "path": "download.torrent/v1/operations/transfers.json",
@@ -100,15 +100,19 @@
           "sha256": "85b17513241ba25ce3c200f9cc7a598fb317a5456759d022e1932c16a6af32c7"
         },
         {
+          "path": "download.torrent/v1/operations/stop_seeding.json",
+          "sha256": "5f3d42d8db6a8d0bb50e4e6e0f27d7442515dc7d37e4ab22caafb18502ed2dc7"
+        },
+        {
           "path": "download.torrent/v1/conformance.json",
-          "sha256": "07141ab5f748ef48019ed02fd4f66b302e7f988621c18cbcf498eb0804c1ac4a"
+          "sha256": "7130ca7ae303196450e416cd63556e9220d579be1c83822a10481baa7cb9596a"
         }
       ],
       "majors": [
         1
       ],
       "openapi": "download.torrent/v1/openapi.json",
-      "operations": 9
+      "operations": 10
     },
     {
       "capability": "library.curate",

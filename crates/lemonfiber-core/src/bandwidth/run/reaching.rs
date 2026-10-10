@@ -10,14 +10,12 @@
 //! the unconfirmed run and the applying one produce the same shape of answer and
 //! there is no second rendering to fall out of step with the first.
 
-use crate::app::targets::{DownloadKind, DownloadTarget};
+use crate::app::targets::{DownloadTarget, Downloading};
 use crate::app::Ctx;
 use crate::bandwidth::{Answer, Held, Holding, Period, Pulling};
 use crate::ports::service::{
     Failure, Fetching, Hours, Metering, Moved, Rates, Throttled, Throttling, Wanted,
 };
-use crate::qbittorrent::Qbittorrent;
-use crate::sabnzbd::Sabnzbd;
 
 /// What a run is to do about one client's fetching.
 ///
@@ -36,47 +34,35 @@ pub(super) enum Fetch {
 }
 
 /// A download client this command can reach.
-///
-/// Boxed on both arms because the two clients are very different sizes and an
-/// enum as large as its largest arm would be carried around at that size for
-/// every one of them.
-pub(super) enum Client {
-    /// The torrent client, which uploads and keeps a schedule of its own.
-    Torrent(Box<Qbittorrent>),
-    /// The Usenet client, which does neither.
-    Usenet(Box<Sabnzbd>),
+pub(super) struct Client {
+    /// The id it runs under, which is what the report names it by.
+    pub(super) service: String,
+    /// The client, as the protocol it moves.
+    pub(super) client: Downloading,
 }
 
 impl Client {
-    /// The name the stack knows it under, which is what the report names it by.
-    pub(super) fn name(&self) -> &'static str {
-        match self {
-            Self::Torrent(_) => crate::qbittorrent::SERVICE,
-            Self::Usenet(_) => crate::sabnzbd::SERVICE,
-        }
-    }
-
     /// The limits on it.
     fn throttling(&self) -> &dyn Throttling {
-        match self {
-            Self::Torrent(client) => client.as_ref(),
-            Self::Usenet(client) => client.as_ref(),
+        match &self.client {
+            Downloading::Torrent(client) => client.as_ref(),
+            Downloading::Usenet(client) => client.as_ref(),
         }
     }
 
     /// What it has moved.
     fn metering(&self) -> &dyn Metering {
-        match self {
-            Self::Torrent(client) => client.as_ref(),
-            Self::Usenet(client) => client.as_ref(),
+        match &self.client {
+            Downloading::Torrent(client) => client.as_ref(),
+            Downloading::Usenet(client) => client.as_ref(),
         }
     }
 
     /// Whether it is fetching at all.
     pub(super) fn fetching(&self) -> &dyn Fetching {
-        match self {
-            Self::Torrent(client) => client.as_ref(),
-            Self::Usenet(client) => client.as_ref(),
+        match &self.client {
+            Downloading::Torrent(client) => client.as_ref(),
+            Downloading::Usenet(client) => client.as_ref(),
         }
     }
 
@@ -96,17 +82,11 @@ pub(super) fn opened(ctx: &Ctx, targets: &[DownloadTarget]) -> Vec<Client> {
     targets.iter().map(|target| open(ctx, target)).collect()
 }
 
-/// One download client, opened with the credential it answers to.
+/// One download client, opened as the protocol it moves.
 pub(super) fn open(ctx: &Ctx, target: &DownloadTarget) -> Client {
-    match &target.kind {
-        DownloadKind::Qbittorrent { password } => Client::Torrent(Box::new(
-            Qbittorrent::authenticated(ctx.seams.http.clone(), &target.base, password.clone()),
-        )),
-        DownloadKind::Sabnzbd { key } => Client::Usenet(Box::new(Sabnzbd::new(
-            ctx.seams.http.clone(),
-            &target.base,
-            key.clone(),
-        ))),
+    Client {
+        service: target.service.clone(),
+        client: target.client(ctx),
     }
 }
 
@@ -131,7 +111,7 @@ pub(super) async fn holding(
         None => None,
     };
     Holding {
-        client: client.name().to_owned(),
+        client: client.service.clone(),
         answer: match answered {
             Ok(held) => {
                 let moving = client.throttling().moving().await.unwrap_or_default();

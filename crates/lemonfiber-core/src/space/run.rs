@@ -13,9 +13,11 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
+use lemonfiber_contract::capabilities::download::torrent;
+
 use crate::error::codes::space::ANOTHER_OFFER;
 use crate::error::{Diagnose, Problem, Remedy, State};
-use crate::ports::service::{Queued, Queues, Seeded, Seeding};
+use crate::ports::service::{Queued, Queues, Seeded};
 use crate::space::{
     reckon, Counting, Left, Level, Measured, Reckoning, Reclaimed, Role, Stalled, Survey, Tally,
     Volume, HALTED, NOWHERE_TO_MEASURE, WALK_REFUSED,
@@ -180,7 +182,7 @@ pub(crate) struct Gathered {
     pub(crate) measured: Measured,
     /// The torrent client the completed downloads came from, where the stack has one
     /// this run can authenticate to.
-    pub(crate) holder: Option<crate::qbittorrent::Qbittorrent>,
+    pub(crate) holder: Option<Box<dyn torrent::Fills>>,
 }
 
 /// Read everything one reckoning is made of.
@@ -192,7 +194,7 @@ pub(crate) async fn measure(ctx: &Ctx) -> Result<Gathered, Box<Problem>> {
     // files of those downloads and of nothing else in particular.
     let fillers = host_fillers(ctx, &watched.stack, project);
     let holder = torrent_client(ctx, &download_targets(ctx, &fillers).await);
-    let held = holding(holder.as_ref()).await;
+    let held = holding(holder.as_deref()).await;
 
     let mut data = Survey::beneath(
         &watched.root,
@@ -260,7 +262,7 @@ fn now(ctx: &Ctx) -> u64 {
 /// Only a torrent client has an answer — Usenet has no seeding to have — so a
 /// stack with no torrent client, or one lemonfiber cannot authenticate to, holds
 /// nothing rather than failing the reading.
-async fn holding(holder: Option<&crate::qbittorrent::Qbittorrent>) -> Vec<Seeded> {
+async fn holding(holder: Option<&dyn torrent::Fills>) -> Vec<Seeded> {
     match holder {
         Some(client) => client.seeding().await.unwrap_or_default(),
         None => Vec::new(),

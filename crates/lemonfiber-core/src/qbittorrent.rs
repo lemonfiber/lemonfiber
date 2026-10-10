@@ -278,7 +278,7 @@ impl Qbittorrent {
     /// Returns [`Failure`] where qBittorrent cannot be reached, rejects the password,
     /// is holding nothing of that name or more than one of it, refuses the removal,
     /// or is still holding it afterwards.
-    pub(crate) async fn stop_seeding(&self, name: &str) -> Result<(), Failure> {
+    async fn let_go(&self, name: &str) -> Result<(), Failure> {
         let holding = self.completed().await?;
         let named: Vec<&CompletedInfo> = holding
             .iter()
@@ -367,6 +367,10 @@ struct CompletedInfo {
 impl Seeding for Qbittorrent {
     async fn seeding(&self) -> Result<Vec<Seeded>, Failure> {
         seeding(self).await
+    }
+
+    async fn stop_seeding(&self, name: &str) -> Result<(), Failure> {
+        self.let_go(name).await
     }
 }
 

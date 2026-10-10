@@ -106,6 +106,9 @@
     "/lemonfiber/download.torrent/v1/stop": {
       "$ref": "operations/stop.json"
     },
+    "/lemonfiber/download.torrent/v1/stop_seeding": {
+      "$ref": "operations/stop_seeding.json"
+    },
     "/lemonfiber/download.torrent/v1/throttled": {
       "$ref": "operations/throttled.json"
     },

@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use lemonfiber_fixtures::http::{Answer, Fake};
+use lemonfiber_fixtures::scratch::Scratch;
 use lemonfiber_fixtures::walking::Walking;
 
 use super::stop_seeding;
@@ -12,9 +13,13 @@ use crate::error::codes::space::NOT_HELD;
 use crate::error::codes::space::STILL_HELD;
 use crate::ports::filesystem::{FsKind, Identity, StorageFacts};
 use crate::ports::occupancy::Occupant;
+use crate::ports::service::Seeded;
 use crate::space::letting::agreement;
 use crate::space::{Candidate, Standing, RATIO_CONSEQUENCE};
-use crate::test_support::{a_context, a_password, env_at, SeedFs};
+use crate::test_support::{
+    a_context, a_password, contracted, contracted_context, env_at, env_without_password, json,
+    SeedFs, CONTRACTED_KEY,
+};
 
 /// The download every case here names, and what it is called on both sides.
 const HELD: &str = "Imported";
@@ -222,4 +227,76 @@ async fn a_client_that_will_not_let_it_go_is_reported_rather_than_called_done() 
     );
     let refused = stop_seeding(&ctx, HELD.to_owned(), Some(standing())).await;
     assert!(refused.is_err_and(|problem| problem.code == STILL_HELD));
+}
+
+#[tokio::test]
+async fn a_torrent_client_speaking_its_contract_is_told_over_it_to_let_go() {
+    static EMBEDDED: include_dir::Dir<'_> =
+        include_dir::include_dir!("$CARGO_MANIFEST_DIR/../../assets/media-stack");
+    let project = Scratch::new("letting-contracted");
+    let mut register = crate::plugin::Register::empty();
+    assert!(register
+        .record(contracted("seeding", "fetcher", "download.torrent"))
+        .is_ok());
+    let held = Seeded {
+        name: HELD.to_owned(),
+        bytes: 8_000,
+        ratio: 175,
+    };
+    let asking = Fake::by_path(vec![
+        ("download.torrent/v1/transfers", Answer::reply(200, "[]")),
+        (
+            "download.torrent/v1/seeding",
+            Answer::reply(200, json(&vec![held])),
+        ),
+        (
+            "download.torrent/v1/stop_seeding",
+            Answer::reply(200, "null"),
+        ),
+    ]);
+    let ctx = contracted_context(&project, "fetcher", true)
+        .over(crate::stack::Source::Embedded(&EMBEDDED))
+        .settings(Settings {
+            data_root: Some(PathBuf::from("/srv/media")),
+            env_file: Some(env_without_password("letting-contracted")),
+            stack_dir: Some(project.to_path_buf()),
+            ..Settings::default()
+        })
+        .build()
+        .with_http(asking.clone())
+        .with_filesystem(Arc::new(SeedFs::keyed(None, None).with_facts(facts())))
+        .with_occupancy(Walking::holding(a_tree()));
+    let kept = crate::app::plugins::kept_at(&ctx).unwrap_or_default();
+    assert!(std::fs::write(&kept, register.to_json().unwrap_or_default()).is_ok());
+
+    let offer = stop_seeding(&ctx, HELD.to_owned(), None).await;
+    assert!(offer.is_ok_and(|offer| offer.gone.is_none() && offer.agreement == standing()));
+    assert!(!asking.asked_for("stop_seeding"));
+
+    let taken = stop_seeding(&ctx, HELD.to_owned(), Some(standing())).await;
+    assert!(taken.is_ok_and(|taken| taken
+        .gone
+        .is_some_and(|gone| !gone.rehearsed && gone.name == HELD)));
+    let told: Vec<_> = asking
+        .requests()
+        .into_iter()
+        .filter(|asked| asked.url.ends_with("/stop_seeding"))
+        .map(|asked| {
+            let key = asked
+                .headers
+                .into_iter()
+                .find(|(name, _)| name == "Authorization")
+                .map(|(_, value)| value);
+            (asked.url, asked.body, key)
+        })
+        .collect();
+    assert_eq!(
+        told,
+        vec![(
+            "http://127.0.0.1:8080/lemonfiber/download.torrent/v1/stop_seeding".to_owned(),
+            Some(json(&serde_json::json!({ "name": HELD }))),
+            Some(format!("Bearer {CONTRACTED_KEY}")),
+        )]
+    );
+    assert!(!asking.asked_for("/api/v2/"));
 }

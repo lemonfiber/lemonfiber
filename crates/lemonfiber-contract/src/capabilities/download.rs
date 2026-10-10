@@ -74,6 +74,8 @@ crate::contract! {
         impl Seeding {
             /// What it is still seeding.
             fn seeding() -> Vec<Seeded>;
+            /// Let one completed download go, with its files.
+            fn stop_seeding(str name: &str) -> ();
         }
     }
 }

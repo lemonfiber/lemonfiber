@@ -18,7 +18,7 @@ use crate::doctor::storage::StorageCheck;
 use crate::doctor::vpn::{budget_for, VpnCheck};
 use crate::doctor::wiring::WiringCheck;
 use crate::doctor::{Category, Check, CHECK_BUDGET, FILESYSTEM_BUDGET};
-use crate::ports::service::{Indexers, UsenetAccounts};
+use crate::ports::service::Indexers;
 
 use super::Stack;
 
@@ -182,9 +182,7 @@ async fn provider_accounts(
 ) -> ProvidersCheck {
     let services = &manifest.services;
     ProvidersCheck::new(
-        crate::app::targets::usenet_client(ctx, &host_fillers(ctx, manifest, project))
-            .await
-            .map(|client| Arc::new(client) as Arc<dyn UsenetAccounts>),
+        crate::app::targets::usenet_client(ctx, &host_fillers(ctx, manifest, project)).await,
         crate::app::targets::indexer_aggregator(ctx, services, project)
             .await
             .map(|aggregator| Arc::new(aggregator) as Arc<dyn Indexers>),

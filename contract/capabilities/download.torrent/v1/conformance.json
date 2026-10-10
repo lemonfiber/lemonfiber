@@ -92,6 +92,15 @@
       "keyed": true,
       "live": false,
       "operation": "seeding"
+    },
+    {
+      "case": "stop_seeding-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "stop_seeding"
     }
   ],
   "major": 1

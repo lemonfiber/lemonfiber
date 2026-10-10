@@ -7,15 +7,17 @@
 use crate::app::Ctx;
 use crate::doctor::credentials::Target;
 use crate::jellyfin::Jellyfin;
+use crate::ports::service::UsenetAccounts;
 use crate::prowlarr::Prowlarr;
-use crate::sabnzbd::Sabnzbd;
 use crate::seerr::Seerr;
 use crate::servarr::Servarr;
+use crate::wiring::Fillers;
 use std::path::Path;
+use std::sync::Arc;
 
 use crate::recyclarr::Kind;
 
-use super::downloads::{download_targets, DownloadKind};
+use super::downloads::download_targets;
 use super::layout::{project_directory, read_owned, service_config_dir};
 use super::servarr::{servarr_targets, target_for};
 
@@ -38,7 +40,7 @@ pub(crate) fn declined_reader(
             crate::config::JELLYFIN_ADMIN_USER,
             password,
         )
-        .remembering(std::sync::Arc::clone(&ctx.sessions)),
+        .remembering(Arc::clone(&ctx.sessions)),
     )
 }
 
@@ -206,16 +208,12 @@ pub(crate) fn service_addr(
 /// Nothing where there is no Usenet client, or where the client has not written its key
 /// yet — a service still starting holds nothing to report, the same skip every read here
 /// makes.
-pub(crate) async fn usenet_client(ctx: &Ctx, fillers: &crate::wiring::Fillers) -> Option<Sabnzbd> {
-    download_targets(ctx, fillers)
+pub(crate) async fn usenet_client(ctx: &Ctx, fillers: &Fillers) -> Option<Arc<dyn UsenetAccounts>> {
+    let client: Box<dyn UsenetAccounts> = download_targets(ctx, fillers)
         .await
-        .into_iter()
-        .find_map(|target| match target.kind {
-            DownloadKind::Sabnzbd { key } => {
-                Some(Sabnzbd::new(ctx.seams.http.clone(), target.base, key))
-            }
-            DownloadKind::Qbittorrent { .. } => None,
-        })
+        .iter()
+        .find_map(|target| target.usenet(ctx))?;
+    Some(Arc::from(client))
 }
 
 /// The Servarr-shape service that files no media of its own — the indexer aggregator,

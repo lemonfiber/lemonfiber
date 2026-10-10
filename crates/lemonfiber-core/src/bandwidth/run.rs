@@ -290,7 +290,7 @@ async fn counting(ctx: &Ctx, clients: &[reaching::Client], declared: &Declared) 
         let Some(moved) = client.moved(&month).await else {
             incomplete.push(format!(
                 "{} would not say what it has moved, so none of it is in this figure.",
-                client.name()
+                client.service
             ));
             continue;
         };
@@ -301,7 +301,7 @@ async fn counting(ctx: &Ctx, clients: &[reaching::Client], declared: &Declared) 
             incomplete.push(format!(
                 "{} counts only what it has moved since it last started, so this is \
                  short by whatever it moved before that.",
-                client.name()
+                client.service
             ));
         }
     }
