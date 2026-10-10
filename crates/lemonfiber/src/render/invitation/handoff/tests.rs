@@ -245,7 +245,7 @@ fn a_remedy_is_said_as_the_command_that_takes_it() {
 }
 
 /// A client opened at the address by a link of its own has that link offered as a code
-/// of its own, labelled with the client and the device (`G1-R15`); one opened at the
+/// of its own, labelled with the client and the device; one opened at the
 /// address itself is not drawn twice.
 #[test]
 fn a_clients_own_link_is_offered_as_a_code_of_its_own() {

@@ -111,7 +111,7 @@ fn an_invitation_still_standing_is_handed_over_again() {
 }
 
 /// Somebody already in the house is told so, and asked to claim nothing. The address
-/// they sign in at is still offered as a code beside its text (`G1-R15`).
+/// they sign in at is still offered as a code beside its text.
 #[test]
 fn somebody_already_in_the_house_is_asked_to_claim_nothing() {
     let said = invitation(&joined()).text();
@@ -125,7 +125,7 @@ fn somebody_already_in_the_house_is_asked_to_claim_nothing() {
 }
 
 /// The join link is said after the address, and each address is offered as a code of
-/// its own, labelled, the join link's first (`N21-R11`, `G1-R15`).
+/// its own, labelled, the join link's first.
 #[test]
 fn each_address_is_offered_as_a_labelled_code_the_join_link_first() {
     let said = invitation(&Invitation {

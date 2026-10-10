@@ -122,9 +122,9 @@ const NAMED: &[(&str, Reach, &str)] = &[
 /// is the other half of the question: nothing carries it anywhere.
 const MINTING: &[(&str, &str)] = &[
     (
-        "crates/lemonfiber-api/src/admission.rs",
-        "the device name one household member's sign-in is given at the media server. Drawn \
-         fresh for every sign-in, held in memory with nothing but that sign-in's session, sent \
+        "crates/lemonfiber-api/src/admission/claiming.rs",
+        "the device name one household member's sign-in, or claim, is given at the media \
+         server. Drawn fresh for every sign-in, held in memory with nothing but that sign-in's session, sent \
          only to the media server on this machine, and never written down or reused — so it \
          names one sign-in and nothing about the installation, and a second sign-in carries \
          another",
