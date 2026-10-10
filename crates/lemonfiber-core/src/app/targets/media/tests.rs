@@ -273,7 +273,20 @@ fn a_contracted_server_fronting_another_plugins_service_is_unpaired() {
         |_| (),
     );
 
-    assert_eq!(MediaServer::of(&fillers).and_then(|one| one.pairing), None);
+    let server = MediaServer::of(&fillers);
+
+    assert_eq!(
+        fillers
+            .service(MEDIA_UPSTREAM)
+            .map(|one| (one.brought_by(), one.native.as_deref())),
+        Some((Some("other"), Some("upstream")))
+    );
+    assert_eq!(server.as_ref().map(MediaServer::id), Some(MEDIA_ADAPTER));
+    assert_eq!(
+        server.as_ref().map(|one| one.reach),
+        Some(super::Reach::Over)
+    );
+    assert_eq!(server.and_then(|one| one.pairing), None);
 }
 
 /// A contracted media server that cannot be asked over its contracts is asked nothing
