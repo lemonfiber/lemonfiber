@@ -5,6 +5,7 @@
 //! contract's path, `about` and `ready`, and every one of them only under the plugin's
 //! key, which the core wrote to the adapter's configuration directory before it started.
 
+use std::collections::BTreeMap;
 use std::future::Future;
 use std::path::Path;
 use std::pin::Pin;
@@ -16,7 +17,7 @@ use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::Response;
 use axum::routing::{get, post};
 use axum::Router;
-use lemonfiber_contract::adapter::{about_path, ready_path, About, KEY_FILE};
+use lemonfiber_contract::adapter::{about_path, ready_path, About, KEY_FILE, UPSTREAM_FILE};
 use lemonfiber_contract::wire::{JSON, PROBLEM};
 use lemonfiber_contract::{Refusal, Served};
 use tokio::net::TcpListener;
@@ -80,6 +81,22 @@ impl Kit {
 /// The error reading it, where the core wrote none.
 pub fn key_in(configuration: &Path) -> std::io::Result<String> {
     std::fs::read_to_string(configuration.join(KEY_FILE)).map(|key| key.trim().to_owned())
+}
+
+/// The upstream's credential, as the core last wrote it to the adapter's configuration
+/// directory: each of its parts by name.
+///
+/// Read again on each call, because the core rewrites it when it rotates or moves that
+/// credential and the adapter never does.
+///
+/// # Errors
+///
+/// The error reading it, where the core wrote none, or [`std::io::ErrorKind::InvalidData`]
+/// where what is there is not a JSON object of strings.
+pub fn upstream_in(configuration: &Path) -> std::io::Result<BTreeMap<String, String>> {
+    let written = std::fs::read(configuration.join(UPSTREAM_FILE))?;
+    serde_json::from_slice(&written)
+        .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))
 }
 
 /// Answer the core at `address` until the process ends.

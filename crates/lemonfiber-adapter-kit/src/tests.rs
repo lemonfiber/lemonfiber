@@ -3,13 +3,13 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use axum::body::{to_bytes, Body};
 use axum::http::{Request, StatusCode};
-use lemonfiber_contract::adapter::{About, Release, KEY_FILE};
+use lemonfiber_contract::adapter::{About, Release, KEY_FILE, UPSTREAM_FILE};
 use lemonfiber_contract::capabilities::subtitles::fetch;
 use lemonfiber_ports::media::Kind;
 use lemonfiber_ports::service::{Failure, Subtitles, Watched, Watching};
 use tower::ServiceExt as _;
 
-use super::{key_in, serve, serving, Kit};
+use super::{key_in, serve, serving, upstream_in, Kit};
 
 const KEY: &str = "the-plugins-key";
 
@@ -160,6 +160,32 @@ fn the_key_is_read_from_where_the_core_wrote_it() {
     assert_eq!(key_in(&dir).ok().as_deref(), Some(KEY));
     let _ = std::fs::remove_dir_all(&dir);
     assert!(key_in(&dir).is_err());
+}
+
+#[test]
+fn the_upstreams_credential_is_read_afresh_from_where_the_core_wrote_it() {
+    let dir = std::env::temp_dir().join(format!("adapter-kit-upstream-{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&dir);
+    assert!(upstream_in(&dir).is_err());
+    let _ = std::fs::write(
+        dir.join(UPSTREAM_FILE),
+        r#"{"username":"lemonfiber","password":"first"}"#,
+    );
+    let first = upstream_in(&dir).unwrap_or_default();
+    assert_eq!(
+        first.get("username").map(String::as_str),
+        Some("lemonfiber")
+    );
+    assert_eq!(first.get("password").map(String::as_str), Some("first"));
+    let _ = std::fs::write(dir.join(UPSTREAM_FILE), r#"{"password":"rotated"}"#);
+    let rotated = upstream_in(&dir).unwrap_or_default();
+    assert_eq!(rotated.get("password").map(String::as_str), Some("rotated"));
+    let _ = std::fs::write(dir.join(UPSTREAM_FILE), r#"{"password":7}"#);
+    assert_eq!(
+        upstream_in(&dir).err().map(|err| err.kind()),
+        Some(std::io::ErrorKind::InvalidData)
+    );
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 #[tokio::test]
