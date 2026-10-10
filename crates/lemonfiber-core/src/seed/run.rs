@@ -14,9 +14,9 @@ use crate::ports::docker::LogQuery;
 
 mod aggregators;
 mod applications;
-mod arrs;
 mod baseline;
 mod clients;
+mod curating;
 // What one service asking for what another fills comes to, by what each speaks.
 mod connecting;
 // Jellyfin's cross-origin allow-list, held to the front door's origin on every pass.
@@ -30,6 +30,7 @@ mod gate;
 // The Jellyfin keys minted for the services lemonfiber builds.
 mod claiming;
 mod guarding;
+mod keys;
 mod minted;
 mod published;
 pub(crate) use published::published_as;
@@ -44,15 +45,15 @@ pub(crate) mod identity;
 mod reset;
 
 use applications::{seed_applications, skipped};
-use arrs::{seed_arr, wanted_clients, ArrSeeding};
 use baseline::{escalate_broken_roots, wanted_roots, DATA_ROOT, SCHEMA_VERSION_FIELD};
-// Reached by reconfiguration as well as by seeding: what the \*arrs that file media
+use curating::{seed_curator, wanted_clients, CuratorSeeding};
+// Reached by reconfiguration as well as by seeding: what the curators that file media
 // are, and the record of what lemonfiber last wrote. One answer to each, rather than a
 // second reader beside this one that could disagree with it.
 pub(crate) use applications::resync_application;
-pub(crate) use arrs::servarr_arrs;
 pub(crate) use baseline::{load_baseline, save_baseline, Loaded};
 use clients::{category_for, held, seed_passwords, Held};
+pub(crate) use curating::curators;
 pub(crate) use gate::reroute;
 pub(crate) use guarding::exposure;
 use identity::seed_request_identity;
@@ -75,9 +76,9 @@ pub(crate) use subtitles::rewatch;
 ///
 /// - whether the torrent password lemonfiber recorded is still the one in force, which
 ///   is answered by signing in;
-/// - what the household is told, and which \*arrs the request service hands a request
+/// - what the household is told, and which curators the request service hands a request
 ///   to — both read as the owner, and the owner's session is a sign-in;
-/// - whether a drifted download client still reaches anything, which the \*arr answers
+/// - whether a drifted download client still reaches anything, which the curator answers
 ///   only by being asked to test it. The drift is reported; what is left out is the
 ///   claim that it broke something.
 ///
@@ -94,15 +95,16 @@ pub(crate) use subtitles::rewatch;
 /// say, and one that surveyed separately would be a second opinion about what
 /// lemonfiber intends — and the one nobody runs is the one that goes wrong.
 ///
-/// One connection is unlike the rest: qBittorrent's web UI password, the
+/// One connection is unlike the rest: the torrent client's web UI password, the
 /// credential lemonfiber mints rather than reads — its temporary password is
 /// read from the container's log, replaced with a generated one, and the
 /// generated one recorded where the forwarded-port push reads it. The rest of
-/// the graph reads a credential and writes a connection: each media-filing
-/// \*arr's root folders, and its download clients (`SABnzbd` and qBittorrent).
-/// Prowlarr's app sync registers each of those \*arrs back into Prowlarr, so it
-/// pushes them indexers. It then makes Jellyfin the identity source for Seerr, so
-/// the household signs in once. Bindery wiring lands next.
+/// the graph reads a credential and writes a connection: each curator's root
+/// folders and its download clients, each curator registered into the indexer so
+/// it pushes them indexers, the aggregator a book curator pulls from, the media
+/// server as the request service's identity so the household signs in once, the
+/// curators the request service hands requests to, and those the subtitle finder
+/// watches.
 pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, Box<Problem>> {
     let mut manifest = ctx
         .stack
@@ -128,7 +130,7 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
 
     // Each torrent client's password, the one credential lemonfiber mints. A later run
     // mints nothing — the password in force is the one already set — so the value
-    // recorded on the run that minted it stands in. Without that an \*arr that came up
+    // recorded on the run that minted it stands in. Without that a curator that came up
     // after the first seed would never learn about the client, since its password
     // cannot be read back from the client itself.
     let (minted, passwords) = seed_passwords(ctx, &fillers).await;
@@ -136,20 +138,20 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     let held = held(ctx, &fillers, &passwords).await;
     wirings.extend(clients::refused(&fillers, &held));
 
-    // Root folders and download clients for each \*arr that files media, and the
+    // Root folders and download clients for each curator, and the
     // pairs that come to no connection at all, said rather than left out.
     wirings.extend(connecting::unmatched(&fillers));
-    // The host data root, read once, so each \*arr's root folders can be checked
+    // The host data root, read once, so each curator's root folders can be checked
     // against the filesystem they file into and a folder pointing nowhere raised as a
     // warning.
     let data_root = crate::app::targets::data_root(ctx);
-    let arrs = servarr_arrs(&manifest.services, project.as_deref());
-    // A root folder one \*arr wants and another does too is contested: two \*arrs
+    let curating = curators(&fillers);
+    // A root folder one curator wants and another does too is contested: two curators
     // on one folder would each rewrite the other's files, so it is refused rather
-    // than wired. Detected across every \*arr up front, before any is wired.
-    let root_claims: Vec<(&str, Vec<crate::ports::service::RootFolder>)> = arrs
+    // than wired. Detected across every curator up front, before any is wired.
+    let root_claims: Vec<(&str, Vec<crate::ports::service::RootFolder>)> = curating
         .iter()
-        .map(|arr| (arr.target.name.as_str(), wanted_roots(&arr.media_types)))
+        .map(|curator| (curator.name(), wanted_roots(curator.media_types())))
         .collect();
     let contested = crate::seed::contested_roots(
         root_claims
@@ -169,12 +171,12 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // proceeds and re-forms it while an ordinary seed leaves the lost record untouched
     // rather than silently replacing it.
     let (mut baseline, lost) = load_baseline(ctx).starting();
-    // Each \*arr's wiring is independent of the others, so the \*arrs are seeded at
-    // once rather than in series: a pass's time then tracks the slowest \*arr, not
+    // Each curator's wiring is independent of the others, so the curators are seeded at
+    // once rather than in series: a pass's time then tracks the slowest curator, not
     // their sum. Each records what it wrote into its own baseline, read against the
     // loaded snapshot; the records are folded back into one below, and since a
-    // field key carries the service, no two \*arrs collide.
-    let seeding = ArrSeeding {
+    // field key carries the service, no two curators collide.
+    let seeding = CuratorSeeding {
         contested: &contested,
         fillers: &fillers,
         held: &held,
@@ -182,10 +184,14 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
         expected: &baseline,
         adopt,
     };
-    let seeded =
-        futures_util::future::join_all(arrs.iter().map(|arr| seed_arr(ctx, arr, &seeding))).await;
-    for (arr_wirings, records) in seeded {
-        wirings.extend(arr_wirings);
+    let seeded = futures_util::future::join_all(
+        curating
+            .iter()
+            .map(|curator| seed_curator(ctx, *curator, &seeding)),
+    )
+    .await;
+    for (curator_wirings, records) in seeded {
+        wirings.extend(curator_wirings);
         baseline.merge(&records);
     }
 
@@ -194,7 +200,7 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // it is among the pairs reported above as reached by nothing.
     wirings.extend(seed_applications(ctx, &fillers).await);
 
-    // The book *arr, which the aggregator cannot register itself into: it keeps its own
+    // The book curator, which the aggregator cannot register itself into: it keeps its own
     // list of aggregators and pulls from them, so it is told where one is instead.
     wirings.extend(aggregators::seed_aggregators(ctx, &fillers).await);
 
@@ -210,7 +216,7 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
         .await,
     );
 
-    // The *arrs the request service hands a request to, and the credentials it held
+    // The curators the request service hands a request to, and the credentials it held
     // before the gate taken back.
     wirings.extend(
         seed_requests(
@@ -236,7 +242,7 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // accounts it holds to anything that can reach it.
     wirings.extend(guarding::guarded(ctx, &fillers, &mut baseline).await);
 
-    // The subtitle finder, told which \*arrs to watch. Until it is, it has nothing
+    // The subtitle finder, told which curators to watch. Until it is, it has nothing
     // to look at, and a household gets subtitles for nothing — which looks exactly
     // like releases that happen to have none.
     wirings.extend(subtitles::seed_subtitles(ctx, &fillers).await);
@@ -364,7 +370,7 @@ pub(crate) fn managed_telling(
 }
 
 /// The download-client wirings lemonfiber manages, as a caller that only reads them needs
-/// them: each \*arr, the clients lemonfiber would write there, and what it last recorded
+/// them: each curator, the clients lemonfiber would write there, and what it last recorded
 /// for each.
 ///
 /// Here rather than where it is used, so the read-only half of drift and the writing half
@@ -385,24 +391,25 @@ pub(crate) async fn managed_wirings(
         return Vec::new();
     };
     let (fillers, held) = reading(ctx, manifest, installed, project).await;
-    servarr_arrs(&manifest.services, project)
-        .into_iter()
-        .map(|arr| {
-            let clients = wanted_clients(&arr, &fillers, &held)
-                .into_iter()
-                .map(|want| crate::doctor::wiring::Wired {
-                    recorded: baseline
-                        .entry(&arr.target.name, &crate::seed::client_field(&want))
-                        .cloned(),
-                    want,
-                })
-                .collect();
-            crate::doctor::wiring::Managed {
-                target: arr.target,
-                clients,
-            }
-        })
-        .collect()
+    let mut managed = Vec::new();
+    for curator in curators(&fillers) {
+        let clients = wanted_clients(curator, &fillers, &held)
+            .into_iter()
+            .map(|want| crate::doctor::wiring::Wired {
+                recorded: baseline
+                    .entry(curator.name(), &crate::seed::client_field(&want))
+                    .cloned(),
+                want,
+            })
+            .collect();
+        managed.push(crate::doctor::wiring::Managed {
+            id: curator.id().to_owned(),
+            name: curator.name().to_owned(),
+            reach: curator.reach(ctx).await,
+            clients,
+        });
+    }
+    managed
 }
 
 /// Who fills each ask and the credential each download client answers to, as a pass
@@ -440,11 +447,11 @@ async fn read_temporary_password(ctx: &Ctx, service: &str) -> Option<String> {
     crate::qbittorrent::temporary_password(&log)
 }
 
-/// The \*arrs the request service hands a request to. Without this the household can
+/// The curators the request service hands a request to. Without this the household can
 /// ask and nothing downstream ever hears, and with it the request surface offers only
 /// what the stack can actually deliver.
 ///
-/// Which \*arr keys the request service holds is noted first, because the move to the
+/// Which curators' keys the request service holds is noted first, because the move to the
 /// gate is what hides it; once it reaches everything through the gate, those keys and
 /// the Jellyfin key it minted itself are taken back.
 async fn seed_requests(

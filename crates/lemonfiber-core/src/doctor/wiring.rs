@@ -1,7 +1,7 @@
 //! Whether each download client still sits where lemonfiber wired it.
 //!
 //! The one place an operator and lemonfiber write to the same field. lemonfiber tells each
-//! \*arr which category to file its downloads under; the operator can open the same page
+//! curator which category to file its downloads under; the operator can open the same page
 //! and change it. Both are legitimate, and the difference between them is not visible in
 //! the value — only in what lemonfiber last recorded for it.
 //!
@@ -19,14 +19,14 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use super::credentials::Target;
+use super::credentials::Reach;
 use super::{Category, Check, Finding, Mend, Verdict};
 use crate::baseline::Record;
 use crate::error::codes::wiring::DRIFTED;
 use crate::error::{Problem, Remedy};
 use crate::ports::filesystem::FileSystem;
 use crate::ports::http::Http;
-use crate::ports::service::{Client as _, DownloadClient, RegisteredClient};
+use crate::ports::service::{Client, DownloadClient, RegisteredClient};
 use crate::seed::{observe_client, same_endpoint, Observed};
 
 mod mender;
@@ -34,18 +34,22 @@ mod mender;
 pub(crate) use mender::WiringMender;
 
 /// The stem every wiring finding is named from. The service and the client follow it, so
-/// two clients drifting in one \*arr are two findings to answer rather than one.
+/// two clients drifting in one curator are two findings to answer rather than one.
 const CHECK: &str = "config.download-client";
 
-/// The download-client wiring of one \*arr: how to reach it, and the clients lemonfiber
+/// The download-client wiring of one curator: how to reach it, and the clients lemonfiber
 /// manages there.
 ///
 /// Held rather than read at assembly, so the check opens the service and reads what it
 /// holds at the moment it runs. A check that captured the value when it was built would
 /// compare a repair's work against the very reading the repair changed.
 pub struct Managed {
-    /// The \*arr, and how to authenticate to it.
-    pub target: Target,
+    /// The curator's id.
+    pub id: String,
+    /// The curator's name.
+    pub name: String,
+    /// How it is asked, or nothing where it speaks its contract and cannot be asked over it.
+    pub reach: Option<Reach>,
     /// The clients lemonfiber wired into it, with what it last recorded for each.
     pub clients: Vec<Wired>,
 }
@@ -63,7 +67,7 @@ impl Wired {
     /// The name this wiring's finding and its repair share.
     ///
     /// Carries the service and the client, so a repair offered for one drift is not
-    /// answered by another \*arr's.
+    /// answered by another curator's.
     #[must_use]
     pub fn check(&self, service: &str) -> String {
         format!("{CHECK}:{service}:{}", self.want.name.to_lowercase())
@@ -85,17 +89,19 @@ pub(crate) struct Reading {
 impl Reading {
     /// The clients a service holds, or nothing where it could not be asked.
     ///
-    /// Nothing covers both "the key is not written yet" and "the service would not
-    /// answer". Neither is a drift, and neither is a pass; the caller reports both as
+    /// Nothing covers "it cannot be asked", "the key is not written yet" and "the service
+    /// would not answer". None is a drift, and none is a pass; the caller reports each as
     /// unverified.
     pub(crate) async fn held(&self, managed: &Managed) -> Option<Vec<RegisteredClient>> {
         self.open(managed).await?.download_clients().await.ok()
     }
 
-    /// The service itself, authenticated, or nothing where its key cannot be read yet.
-    pub(crate) async fn open(&self, managed: &Managed) -> Option<crate::servarr::Servarr> {
+    /// The curator as a client, or nothing where it cannot be asked or its key is not
+    /// written yet.
+    pub(crate) async fn open(&self, managed: &Managed) -> Option<Box<dyn Client>> {
         managed
-            .target
+            .reach
+            .as_ref()?
             .open(&self.http, self.filesystem.as_ref())
             .await
     }
@@ -128,7 +134,7 @@ impl WiringCheck {
         }
     }
 
-    /// What one \*arr's managed clients look like now.
+    /// What one curator's managed clients look like now.
     ///
     /// The service is opened and asked once, however many clients lemonfiber manages
     /// there: they are all rows of the same answer, and asking per client would be the
@@ -147,17 +153,17 @@ impl WiringCheck {
         // an edit was actually found — a check that ran the service's own test on every
         // healthy run would be spending it to learn nothing.
         let broken = match (&service, held.as_deref()) {
-            (Some(service), Some(held)) => broken_clients(managed, held, service).await,
+            (Some(service), Some(held)) => broken_clients(managed, held, service.as_ref()).await,
             _ => Vec::new(),
         };
         managed
             .clients
             .iter()
             .map(|wired| {
-                let name = wired.check(&managed.target.id);
+                let name = wired.check(&managed.id);
                 let title = format!(
                     "{} files {} downloads where lemonfiber wired it",
-                    managed.target.name, wired.want.name
+                    managed.name, wired.want.name
                 );
                 Finding::in_category(
                     Category::Config,
@@ -168,7 +174,7 @@ impl WiringCheck {
                 // The service whose wiring this is about — so a drifted setting on a
                 // service that is itself in trouble reads as one problem, and a failure
                 // here is quoted with what that service said for itself.
-                .about(&managed.target.id)
+                .about(&managed.id)
             })
             .collect()
     }
@@ -205,7 +211,7 @@ async fn ran(check: &WiringCheck) -> Vec<Finding> {
 async fn broken_clients(
     managed: &Managed,
     held: &[RegisteredClient],
-    service: &crate::servarr::Servarr,
+    service: &dyn Client,
 ) -> Vec<String> {
     let edited: Vec<&Wired> = managed
         .clients
@@ -270,7 +276,7 @@ fn verdict(
 ) -> Verdict {
     let Some(held) = held else {
         return Verdict::Unverified {
-            reason: format!("{} could not be asked what it holds", managed.target.name),
+            reason: format!("{} could not be asked what it holds", managed.name),
             remedy: Remedy::new("Check the service is up and has finished starting")
                 .with_detail("lemonfiber status"),
         };
@@ -283,10 +289,7 @@ fn verdict(
         // that would not answer, and a service that will not answer this one has already
         // been reported unverified above.
         Observed::Absent | Observed::Unavailable => Verdict::Skipped {
-            reason: format!(
-                "{} is not wired into {} yet",
-                wired.want.name, managed.target.name
-            ),
+            reason: format!("{} is not wired into {} yet", wired.want.name, managed.name),
         },
         Observed::Present => Verdict::Pass {
             note: Some(format!(
@@ -295,10 +298,7 @@ fn verdict(
             )),
         },
         Observed::Adopted | Observed::Unmanaged => Verdict::Pass {
-            note: Some(format!(
-                "filing where you set it, in {}",
-                managed.target.name
-            )),
+            note: Some(format!("filing where you set it, in {}", managed.name)),
         },
         Observed::Stale => Verdict::Warn(stale(managed, wired)),
         // The operator's own edit. Said, and no more than said — until the service tells
@@ -325,7 +325,7 @@ fn stale(managed: &Managed, wired: &Wired) -> Problem {
         DRIFTED,
         format!(
             "{} files {} downloads under a category lemonfiber has since moved on from",
-            managed.target.name, wired.want.name
+            managed.name, wired.want.name
         ),
         "New downloads land under the old category, so anything filed since is somewhere \
          the rest of the stack no longer looks",
@@ -344,7 +344,7 @@ fn unreachable(managed: &Managed, wired: &Wired) -> Problem {
         DRIFTED,
         format!(
             "{} cannot reach {}, which you moved off lemonfiber's category",
-            managed.target.name, wired.want.name
+            managed.name, wired.want.name
         ),
         "Nothing downloads through a client the service cannot reach, so the queue fills \
          and never empties",

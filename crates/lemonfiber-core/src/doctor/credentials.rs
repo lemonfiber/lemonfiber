@@ -31,6 +31,30 @@ use crate::ports::http::Http;
 use crate::ports::service::{Client, Failure};
 use crate::servarr::{api_key, Servarr};
 
+/// How a curator is asked.
+pub enum Reach {
+    /// Over `library.curate`.
+    Over(lemonfiber_contract::Contracted),
+    /// As the bundled curator.
+    Bundled(Target),
+}
+
+impl Reach {
+    /// The curator as a client, or nothing where its key cannot be read yet.
+    pub(crate) async fn open(
+        &self,
+        http: &Arc<dyn Http>,
+        fs: &dyn FileSystem,
+    ) -> Option<Box<dyn Client>> {
+        match self {
+            Self::Over(adapter) => Some(Box::new(
+                lemonfiber_contract::capabilities::library::curate::Adapter(adapter.clone()),
+            )),
+            Self::Bundled(target) => Some(Box::new(target.open(http, fs).await?)),
+        }
+    }
+}
+
 /// One service whose credential is to be proven.
 ///
 /// The address the host reaches it on and the host path to the file it wrote its

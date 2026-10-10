@@ -15,14 +15,13 @@ use async_trait::async_trait;
 use crate::doctor::{Finding, Mend, Verdict};
 use crate::error::Diagnose as _;
 use crate::journal::{Change, Kind};
-use crate::ports::service::Client as _;
 use crate::repair::{may_write, Attempt, Repair, Writing, OPERATION};
 
 use crate::seed::CLIENT;
 
 use super::{holding, Managed, Reading, Wired};
 
-/// Bringing one \*arr's download client back to the category lemonfiber files under.
+/// Bringing one curator's download client back to the category lemonfiber files under.
 ///
 /// Holds the same wirings the check does, and reads them the same way: the service is
 /// asked afresh when the repair runs, because a category can move between looking and
@@ -53,7 +52,7 @@ impl WiringMender {
             managed
                 .clients
                 .iter()
-                .find(|wired| wired.check(&managed.target.id) == repair.check)
+                .find(|wired| wired.check(&managed.id) == repair.check)
                 .map(|wired| (managed, wired))
         })
     }
@@ -66,15 +65,15 @@ impl Mend for WiringMender {
             .iter()
             .flat_map(|managed| {
                 managed.clients.iter().map(move |wired| Repair {
-                    check: wired.check(&managed.target.id),
+                    check: wired.check(&managed.id),
                     does: format!(
                         "Put {}'s {} back on the category lemonfiber files under",
-                        managed.target.name, wired.want.name
+                        managed.name, wired.want.name
                     ),
                     effects: vec![format!(
                         "Downloads already filed under the old category stay where they are, \
                          so {} may need a rescan to find them",
-                        managed.target.name
+                        managed.name
                     )],
                     // The change is journalled, so `lemonfiber doctor --undo` can put the
                     // category back exactly as it was.
@@ -91,12 +90,12 @@ impl Mend for WiringMender {
     }
 
     fn writes_to(&self, repair: &Repair) -> Vec<String> {
-        // The \*arr, by the id the stack declares it under. What is written is a
+        // The curator, by the id it is declared under. What is written is a
         // download client's category *inside* that service, so the service is the thing
         // an operator would have declared theirs — nothing here has a name of its own
         // that a declaration could reach.
         self.named(repair)
-            .map(|(managed, _)| vec![managed.target.id.clone()])
+            .map(|(managed, _)| vec![managed.id.clone()])
             .unwrap_or_default()
     }
 
@@ -144,8 +143,8 @@ async fn mended(mender: &WiringMender, repair: &Repair) -> Attempt {
     let Some(client) = mender.reading.open(managed).await else {
         return Attempt::Stopped {
             leaving: format!(
-                "{} could not be authenticated to, so it was left as it was",
-                managed.target.name
+                "{} could not be asked, so it was left as it was",
+                managed.name
             ),
         };
     };
@@ -156,7 +155,7 @@ async fn mended(mender: &WiringMender, repair: &Repair) -> Attempt {
         return Attempt::Stopped {
             leaving: format!(
                 "{} would not say what it holds, so nothing was written",
-                managed.target.name
+                managed.name
             ),
         };
     };
@@ -164,7 +163,7 @@ async fn mended(mender: &WiringMender, repair: &Repair) -> Attempt {
         return Attempt::Stopped {
             leaving: format!(
                 "{} no longer holds {}, so there was nothing to put back",
-                managed.target.name, wired.want.name
+                managed.name, wired.want.name
             ),
         };
     };
@@ -180,7 +179,7 @@ async fn mended(mender: &WiringMender, repair: &Repair) -> Attempt {
         Ok(()) => Attempt::recorded(vec![Change {
             at: mender.stamp.clone(),
             operation: OPERATION.to_owned(),
-            target: managed.target.id.clone(),
+            target: managed.id.clone(),
             kind: Kind::Configured {
                 resource: CLIENT.to_owned(),
                 id: have.id.clone(),
@@ -192,7 +191,7 @@ async fn mended(mender: &WiringMender, repair: &Repair) -> Attempt {
         Err(failure) => Attempt::Stopped {
             leaving: format!(
                 "{} would not take the category, and kept the one it had — {}",
-                managed.target.name,
+                managed.name,
                 failure.problem().summary
             ),
         },

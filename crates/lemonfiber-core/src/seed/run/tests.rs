@@ -2,9 +2,9 @@ use crate::ports::filesystem::Storage;
 use std::sync::Arc;
 
 use super::applications::application_kind;
-use super::arrs::servarr_arrs;
 use super::baseline::escalate_broken_roots;
 use super::clients::{category_for, Held};
+use super::curating::curators;
 use super::{withheld, withheld_brought};
 use crate::app::targets::{project_directory, recorded_secret, servarr_targets};
 use crate::app::{dispatch, Command, Ctx, Outcome};
@@ -492,10 +492,10 @@ fn nothing_declared_leaves_every_service_in_the_pass() {
 
 mod aggregators;
 mod applications;
-mod arrs;
 mod baseline;
 mod claiming;
 mod cors;
+mod curating;
 mod decline;
 mod gate;
 mod guarding;
