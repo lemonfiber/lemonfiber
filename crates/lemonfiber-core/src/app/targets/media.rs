@@ -8,7 +8,6 @@
 //! setting named for that server, so the stack's is never read for, or sent to, a
 //! plugin's server, and a plugin's is never taken for the stack's.
 
-use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use lemonfiber_contract::adapter::{UPSTREAM_FILE, UPSTREAM_PASSWORD, UPSTREAM_USERNAME};
@@ -205,12 +204,11 @@ impl MediaServer {
                 self.name()
             )
         })?;
-        let credential = BTreeMap::from([
-            (UPSTREAM_USERNAME, crate::config::MEDIA_SERVER_ADMIN_USER),
-            (UPSTREAM_PASSWORD, password),
-        ]);
-        let written = serde_json::to_string(&credential).map_err(|err| err.to_string())?;
-        crate::config::store::write(&configuration.join(UPSTREAM_FILE), &written)
+        let credential = serde_json::json!({
+            UPSTREAM_USERNAME: crate::config::MEDIA_SERVER_ADMIN_USER,
+            UPSTREAM_PASSWORD: password,
+        });
+        crate::config::store::write(&configuration.join(UPSTREAM_FILE), &credential.to_string())
             .map_err(|failure| failure.to_string())
     }
 

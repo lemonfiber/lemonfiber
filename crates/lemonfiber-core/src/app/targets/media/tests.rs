@@ -322,7 +322,8 @@ async fn a_contracted_server_unanswered_over_its_contracts_is_asked_nothing() {
 
 /// Recording a contracted server's administrator's password also writes it where the
 /// server's adapter reads its upstream's credential, readable by the operator alone; the
-/// stack's own server is handed nothing beside its setting.
+/// stack's own server is handed nothing beside its setting, and a credential that cannot
+/// be written is refused.
 #[test]
 fn a_contracted_servers_password_is_handed_to_its_adapter_and_the_stacks_is_not() {
     use std::os::unix::fs::PermissionsExt as _;
@@ -359,6 +360,15 @@ fn a_contracted_servers_password_is_handed_to_its_adapter_and_the_stacks_is_not(
         &Chosen::read(Some("identity.source=media-adapter")),
         |_| (),
     ));
+    let _ = std::fs::write(scratch.join("blocked"), "");
+    let blocked = place(
+        MediaServer::of(&shipped(
+            &[a_contracted_media_server(Some("upstream"))],
+            &Chosen::read(Some("identity.source=media-adapter")),
+            |_| (),
+        )),
+        "blocked/adapter",
+    );
 
     let handed = contracted
         .as_ref()
@@ -367,6 +377,9 @@ fn a_contracted_servers_password_is_handed_to_its_adapter_and_the_stacks_is_not(
         .as_ref()
         .map(|server| server.record_password(&ctx, &password));
     let nowhere = unplaced
+        .as_ref()
+        .map(|server| server.record_password(&ctx, &password));
+    let unwritten = blocked
         .as_ref()
         .map(|server| server.record_password(&ctx, &password));
     let upstream = scratch
@@ -397,4 +410,5 @@ fn a_contracted_servers_password_is_handed_to_its_adapter_and_the_stacks_is_not(
     assert_eq!(kept, Some(Ok(())));
     assert!(!stacks_written);
     assert!(nowhere.is_some_and(|recorded| recorded.is_err()));
+    assert!(unwritten.is_some_and(|recorded| recorded.is_err()));
 }
