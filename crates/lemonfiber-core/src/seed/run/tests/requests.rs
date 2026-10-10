@@ -401,3 +401,47 @@ async fn a_contracted_request_service_untrusted_or_unreachable_is_handed_nothing
         );
     }
 }
+
+#[tokio::test]
+async fn a_first_party_plugin_naming_the_bundled_request_adapter_is_never_asked_with_the_stacks_key(
+) {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("requests-bundled-plugin");
+    let stand_in = crate::test_support::a_placed("seerr", &[], Some(seerr_api()), Some(5055));
+    let mut asking = crate::test_support::an_installed("asking", vec![stand_in]);
+    asking.manifest = "asking-manifest".to_owned();
+    let trusted = [crate::plugin::first_party::FirstParty {
+        plugin: "asking",
+        manifest: "asking-manifest",
+    }];
+    let fillers = fillers_trusting(
+        vec![arr("sonarr", 8989, "tv")],
+        &[asking],
+        &project,
+        &trusted,
+    );
+    let http = Fake::by_path_in_turn(a_curator());
+    let ctx = contracted_ctx(&project, "seerr", true, http.clone());
+
+    let wirings = super::super::seed_fulfilment_targets(
+        &ctx,
+        &[arr("sonarr", 8989, "tv")],
+        &fillers,
+        Some(&project),
+    )
+    .await;
+
+    assert!(
+        wirings
+            .iter()
+            .all(|wiring| !matches!(wiring.state, crate::seed::State::Wired)),
+        "{wirings:?}"
+    );
+    assert!(
+        !http
+            .requests()
+            .iter()
+            .any(|one| one.url.contains("/api/v1/")),
+        "{:?}",
+        http.requests()
+    );
+}

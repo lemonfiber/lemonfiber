@@ -36,6 +36,8 @@ pub(super) struct Fulfils<'a> {
     pub(super) at: &'a Address,
     /// The kind of video it fetches.
     pub(super) kind: Kind,
+    /// The request service the gate cleared it for.
+    pub(super) asker: Cleared<'a>,
 }
 
 /// Every curator the request service asks for and lemonfiber hands it, as the stack's
@@ -45,10 +47,11 @@ pub(super) fn fulfilling(fillers: &Fillers) -> Vec<Fulfils<'_>> {
     pairings(fillers)
         .into_iter()
         .filter_map(|pairing| match pairing.made {
-            Ok((Connection::Fulfilment { kind }, at, _)) => Some(Fulfils {
+            Ok((Connection::Fulfilment { kind }, at, asker)) => Some(Fulfils {
                 filler: pairing.filler,
                 at,
                 kind,
+                asker,
             }),
             _ => None,
         })
@@ -67,10 +70,13 @@ pub(super) fn fulfilling(fillers: &Fillers) -> Vec<Fulfils<'_>> {
 /// or folder to name, is left out rather than registered half-configured — a target the
 /// request service holds but cannot fetch through is worse than one it does not hold,
 /// because the request is accepted either way and only the second is visibly missing.
-async fn wanted_targets(ctx: &Ctx, fillers: &Fillers) -> (Vec<FulfilmentTarget>, Vec<Wiring>) {
+async fn wanted_targets(
+    ctx: &Ctx,
+    curators: &[Fulfils<'_>],
+) -> (Vec<FulfilmentTarget>, Vec<Wiring>) {
     let mut wanted = Vec::new();
     let mut refused = Vec::new();
-    for fulfils in fulfilling(fillers) {
+    for fulfils in curators {
         let filler = fulfils.filler;
         let key = match super::arrs::servarr_key(ctx, filler).await {
             Beneath::Read(key) => key,
@@ -151,10 +157,40 @@ pub(super) async fn seed_fulfilment_targets(
     fillers: &Fillers,
     project: Option<&Path>,
 ) -> Vec<Wiring> {
-    let Some(requester) = requester(ctx, services, fillers).await else {
+    let mut wirings = Vec::new();
+    for (asker, curators) in by_asker(fulfilling(fillers)) {
+        wirings.extend(handed(ctx, services, asker, &curators, project).await);
+    }
+    wirings
+}
+
+/// Every curator, grouped under the request service the gate cleared it for.
+fn by_asker(curators: Vec<Fulfils<'_>>) -> Vec<(Cleared<'_>, Vec<Fulfils<'_>>)> {
+    let mut found: Vec<(Cleared<'_>, Vec<Fulfils<'_>>)> = Vec::new();
+    for fulfils in curators {
+        match found
+            .iter_mut()
+            .find(|(asker, _)| asker.id == fulfils.asker.id)
+        {
+            Some((_, held)) => held.push(fulfils),
+            None => found.push((fulfils.asker, vec![fulfils])),
+        }
+    }
+    found
+}
+
+/// Hand one request service the curators the gate cleared for it.
+async fn handed(
+    ctx: &Ctx,
+    services: &[Service],
+    asker: Cleared<'_>,
+    curators: &[Fulfils<'_>],
+    project: Option<&Path>,
+) -> Vec<Wiring> {
+    let Some(requester) = requester(ctx, &asker).await else {
         return Vec::new();
     };
-    let (wanted, refused) = wanted_targets(ctx, fillers).await;
+    let (wanted, refused) = wanted_targets(ctx, curators).await;
     if wanted.is_empty() {
         return refused;
     }
@@ -181,28 +217,19 @@ enum Requester {
     Bundled(String),
 }
 
-/// The request service the curators are handed to: over `request.intake` where the
-/// service asking for them speaks it, otherwise the stack's bundled one. Nothing where
-/// it speaks the contract and cannot be asked over it, or where there is none.
-async fn requester(ctx: &Ctx, services: &[Service], fillers: &Fillers) -> Option<Requester> {
-    if let Some(asker) = asker(fillers) {
-        match spoken(ctx, &asker, intake::CAPABILITY, intake::MAJOR).await {
-            Spoken::Over(adapter) => return Some(Requester::Over(adapter)),
-            Spoken::Unanswered => return None,
-            Spoken::Not => {}
-        }
+/// How `asker` is asked: over `request.intake` where it speaks it, otherwise as the
+/// bundled request service where it is the stack's own, at the port it publishes.
+/// Nothing where it speaks the contract and cannot be asked over it, or is a plugin's
+/// service speaking none, which the stack's own key is never handed to.
+async fn requester(ctx: &Ctx, asker: &Cleared<'_>) -> Option<Requester> {
+    match spoken(ctx, asker, intake::CAPABILITY, intake::MAJOR).await {
+        Spoken::Over(adapter) => Some(Requester::Over(adapter)),
+        Spoken::Unanswered => None,
+        Spoken::Not => (asker.holder() == crate::wiring::Holder::Stack)
+            .then_some(asker.published)
+            .flatten()
+            .map(|port| Requester::Bundled(crate::app::targets::loopback(port))),
     }
-    super::identity::seerr_service(services).map(Requester::Bundled)
-}
-
-/// The service asking for the curators requests are handed to, as the gate cleared it.
-fn asker(fillers: &Fillers) -> Option<Cleared<'_>> {
-    pairings(fillers)
-        .into_iter()
-        .find_map(|pairing| match pairing.made {
-            Ok((Connection::Fulfilment { .. }, _, asker)) => Some(asker),
-            _ => None,
-        })
 }
 
 /// Hand the request service `wanted` as they are.
