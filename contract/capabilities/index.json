@@ -321,7 +321,7 @@
       "files": [
         {
           "path": "request.intake/v1/openapi.json",
-          "sha256": "745b36c51428c8a4a0d82f1a05d3ccfdb68df48189242080dafd3ae200e4c4cf"
+          "sha256": "f53ecc5329bd4c325e151c3820510f104f1d5a05f240adea073ee4b6fcdcb7bb"
         },
         {
           "path": "request.intake/v1/operations/initialized.json",
@@ -432,15 +432,27 @@
           "sha256": "3d15b88107276ffd66b4251fdc94b33f2bf4f5254f3353a67894da79f7190382"
         },
         {
+          "path": "request.intake/v1/operations/search.json",
+          "sha256": "24da2929b079cd26a7dfd145e1ce65616eaa402212684dc68d11a4757ee632fc"
+        },
+        {
+          "path": "request.intake/v1/operations/detail.json",
+          "sha256": "3c57ab430af9bb34b74591a8b061c7d1bbc7ec2433ea7664f22df04db94720cc"
+        },
+        {
+          "path": "request.intake/v1/operations/ask.json",
+          "sha256": "da43618fa348db51c3c43e527bda5bde5a3b8104d8561d1ce2ea1ce62256fe90"
+        },
+        {
           "path": "request.intake/v1/conformance.json",
-          "sha256": "82efe093eaddf24fdf02d0c331846a052f3ced9e615eb556264cd25927989836"
+          "sha256": "655f4c5c1401b363509a21e38145d5b0db27f18a0ac26a306b7f5d4144569545"
         }
       ],
       "majors": [
         1
       ],
       "openapi": "request.intake/v1/openapi.json",
-      "operations": 27
+      "operations": 30
     },
     {
       "capability": "identity.source",

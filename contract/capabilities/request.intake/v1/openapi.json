@@ -97,6 +97,9 @@
     "/lemonfiber/request.intake/v1/approves_own": {
       "$ref": "operations/approves_own.json"
     },
+    "/lemonfiber/request.intake/v1/ask": {
+      "$ref": "operations/ask.json"
+    },
     "/lemonfiber/request.intake/v1/asking": {
       "$ref": "operations/asking.json"
     },
@@ -105,6 +108,9 @@
     },
     "/lemonfiber/request.intake/v1/decide": {
       "$ref": "operations/decide.json"
+    },
+    "/lemonfiber/request.intake/v1/detail": {
+      "$ref": "operations/detail.json"
     },
     "/lemonfiber/request.intake/v1/fulfilment_targets": {
       "$ref": "operations/fulfilment_targets.json"
@@ -147,6 +153,9 @@
     },
     "/lemonfiber/request.intake/v1/requests": {
       "$ref": "operations/requests.json"
+    },
+    "/lemonfiber/request.intake/v1/search": {
+      "$ref": "operations/search.json"
     },
     "/lemonfiber/request.intake/v1/set_asking": {
       "$ref": "operations/set_asking.json"

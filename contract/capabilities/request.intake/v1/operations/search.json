@@ -1,0 +1,222 @@
+{
+  "post": {
+    "operationId": "search",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$defs": {
+              "Kind": {
+                "description": "The two kinds of video a household files by resolution.",
+                "oneOf": [
+                  {
+                    "const": "tv",
+                    "description": "Television: series, seasons and episodes.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "movies",
+                    "description": "Film.",
+                    "type": "string"
+                  }
+                ]
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "kinds": {
+                "description": "The port's `kinds`.",
+                "items": {
+                  "$ref": "#/$defs/Kind"
+                },
+                "type": "array"
+              },
+              "page": {
+                "description": "The port's `page`.",
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "term": {
+                "description": "The port's `term`.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "term",
+              "kinds",
+              "page"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$defs": {
+                "Found": {
+                  "additionalProperties": false,
+                  "description": "One title a search found.",
+                  "properties": {
+                    "id": {
+                      "description": "The id the request service knows the title by, which names it to every other call.",
+                      "type": "string"
+                    },
+                    "kind": {
+                      "$ref": "#/$defs/Kind",
+                      "description": "Whether it is a series or a film."
+                    },
+                    "poster": {
+                      "description": "Where its poster is published, as the service gives it, or nothing.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "status": {
+                      "$ref": "#/$defs/MediaStatus",
+                      "description": "Where it stands in the house: here, partly here, on its way or unknown."
+                    },
+                    "title": {
+                      "description": "What it is called.",
+                      "type": "string"
+                    },
+                    "year": {
+                      "description": "The year it came out, where the service knows one.",
+                      "format": "uint16",
+                      "maximum": 65535,
+                      "minimum": 0,
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "title",
+                    "status"
+                  ],
+                  "type": "object"
+                },
+                "Kind": {
+                  "description": "The two kinds of video a household files by resolution.",
+                  "oneOf": [
+                    {
+                      "const": "tv",
+                      "description": "Television: series, seasons and episodes.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "movies",
+                      "description": "Film.",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "MediaStatus": {
+                  "description": "What became of the media one request asked for.",
+                  "oneOf": [
+                    {
+                      "const": "unknown",
+                      "description": "Nothing is known about it yet.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "pending",
+                      "description": "Known and waiting.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "processing",
+                      "description": "Being fetched.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "partly-available",
+                      "description": "Some of it is here.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "available",
+                      "description": "All of it is here.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "deleted",
+                      "description": "It was here and has been removed.",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "additionalProperties": false,
+              "description": "One page of what a search found.",
+              "properties": {
+                "next": {
+                  "description": "The page after this one, or nothing where this is the last.",
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "titles": {
+                  "description": "The titles on this page, in the service's order.",
+                  "items": {
+                    "$ref": "#/$defs/Found"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "titles"
+              ],
+              "title": "Page",
+              "type": "object"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ],
+    "x-lemonfiber-largest": 1048576
+  }
+}
