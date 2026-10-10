@@ -215,6 +215,31 @@ pub(crate) const CONTRACTED_PORT: u16 = 8080;
 /// The key a contracted plugin's service holds in a context built for it.
 pub(crate) const CONTRACTED_KEY: &str = "contracted-key";
 
+/// The adapter [`a_contracted_media_server`] brings.
+pub(crate) const MEDIA_ADAPTER: &str = "media-adapter";
+
+/// The upstream [`MEDIA_ADAPTER`] fronts.
+pub(crate) const MEDIA_UPSTREAM: &str = "media-upstream";
+
+/// A plugin bringing a contracted media server: [`MEDIA_ADAPTER`], speaking
+/// `identity.source` and `media.serve` on [`CONTRACTED_PORT`] in front of
+/// [`MEDIA_UPSTREAM`], which names `native` as the API it answers in where one is given.
+pub(crate) fn a_contracted_media_server(native: Option<&str>) -> crate::plugin::Installed {
+    let mut adapter = a_placed(
+        MEDIA_ADAPTER,
+        &["identity.source", "media.serve"],
+        None,
+        Some(CONTRACTED_PORT),
+    );
+    adapter.speaks = vec!["identity.source@1".to_owned(), "media.serve@1".to_owned()];
+    adapter.fronts = Some(MEDIA_UPSTREAM.to_owned());
+    let mut upstream = a_placed(MEDIA_UPSTREAM, &[], None, Some(9000));
+    upstream.native = native.map(str::to_owned);
+    let mut installed = an_installed("contracted", vec![adapter, upstream]);
+    installed.manifest = CONTRACTED_MANIFEST.to_owned();
+    installed
+}
+
 /// A plugin whose service `service` provides `capability` and speaks its first major on
 /// [`CONTRACTED_PORT`].
 pub(crate) fn contracted(

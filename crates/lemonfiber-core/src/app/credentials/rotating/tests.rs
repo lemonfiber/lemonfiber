@@ -214,3 +214,48 @@ async fn the_stacks_administrator_password_is_not_rotated_against_a_plugins_serv
     );
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
+
+/// A contracted media server's administrator's password is never changed: it is spoken
+/// to over its contracts, which change none, so it is asked nothing even where a password
+/// is recorded for it.
+#[tokio::test]
+async fn a_contracted_servers_administrator_password_is_not_replaced() {
+    let installed = [crate::test_support::a_contracted_media_server(Some(
+        "upstream",
+    ))];
+    let chosen = crate::wiring::Chosen::read(Some("identity.source=media-adapter"));
+    let fillers = crate::test_support::stack()
+        .manifest()
+        .map(|manifest| crate::wiring::Fillers::of(&manifest, &installed, &chosen, None))
+        .unwrap_or_default();
+    let http = lemonfiber_fixtures::http::Fake::always(lemonfiber_fixtures::http::Answer::reply(
+        200, "{}",
+    ));
+    let env = crate::test_support::env_without_password("rotate-contracted-server");
+    let ctx = crate::test_support::a_context()
+        .settings(config::Settings {
+            env_file: Some(env.clone()),
+            ..config::Settings::default()
+        })
+        .build()
+        .with_http(http.clone());
+    let server = crate::app::targets::MediaServer::of(&fillers);
+
+    let recorded = server
+        .as_ref()
+        .map(|one| one.record_password(&ctx, &format!("{}{}", "7777ffff", "8888aaaa9999")));
+    let refused = match server.as_ref() {
+        Some(server) => super::replace_jellyfin_password(&ctx, server, false)
+            .await
+            .err(),
+        None => None,
+    };
+    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+
+    assert_eq!(recorded, Some(Ok(())));
+    assert!(matches!(
+        &refused,
+        Some(super::Replacing::Unproven(detail)) if detail == super::OVER_ITS_CONTRACTS
+    ));
+    assert!(http.requests().is_empty(), "{:?}", http.requests());
+}
