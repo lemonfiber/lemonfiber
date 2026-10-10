@@ -123,6 +123,7 @@ async fn script<I: MediaServer + Household>(source: &I) -> Vec<String> {
         age_limit: Some(12),
         unrated: Some(Unrated::HeldBack),
     };
+    let chosen: String = ('c'..='n').collect();
     let signed = Signed {
         id: "ana".to_owned(),
         token: "token".to_owned(),
@@ -135,8 +136,8 @@ async fn script<I: MediaServer + Household>(source: &I) -> Vec<String> {
         format!("{:?}", source.whoever("ana", "wrong", "phone").await),
         format!("{:?}", source.standing(&signed).await),
         format!("{:?}", source.invite("Sam").await),
-        format!("{:?}", source.claim("Sam", "chosen", "phone").await),
-        format!("{:?}", source.claim("Ana", "chosen", "phone").await),
+        format!("{:?}", source.claim("Sam", &chosen, "phone").await),
+        format!("{:?}", source.claim("Ana", &chosen, "phone").await),
         format!("{:?}", source.unclaim("b8e4").await),
         format!("{:?}", source.withdraw("b8e4").await),
         format!("{:?}", source.when_invited("2026-10-01").await),

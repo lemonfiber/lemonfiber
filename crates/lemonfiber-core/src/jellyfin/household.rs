@@ -473,10 +473,11 @@ async fn claim(
     password: &str,
     device: &str,
 ) -> Result<bool, Failure> {
-    let Some(signed) = whoever(jellyfin, name, "", device).await? else {
+    let unclaimed = String::new();
+    let Some(signed) = whoever(jellyfin, name, &unclaimed, device).await? else {
         return Ok(false);
     };
-    let body = serde_json::json!({ "CurrentPw": "", "NewPw": password }).to_string();
+    let body = serde_json::json!({ "CurrentPw": unclaimed, "NewPw": password }).to_string();
     let changing = super::carried(
         &jellyfin.request(
             Method::Post,

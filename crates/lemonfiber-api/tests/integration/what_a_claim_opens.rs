@@ -73,6 +73,12 @@ async fn claimed(router: axum::Router, password: &str, claim: &str) -> door::Ans
     .await
 }
 
+/// A password one character shorter than the least the core takes, built rather than
+/// written.
+fn too_short() -> String {
+    ('a'..='z').take(credential::LEAST - 1).collect()
+}
+
 /// Whether the media server was asked to set a password.
 fn set_a_password(transport: &Fake) -> bool {
     transport
@@ -146,7 +152,7 @@ async fn a_short_password_is_refused_before_the_media_server_is_asked() {
     let ctx = offered("claim-short", transport.clone());
     let (router, _) = door_over(&ctx);
 
-    let answer = claimed(router, "short", CLAIM).await;
+    let answer = claimed(router, &too_short(), CLAIM).await;
 
     assert_eq!(answer.status, StatusCode::BAD_REQUEST, "{}", answer.body);
     assert_eq!(the_code(&answer.body), "ADMIT-14");
