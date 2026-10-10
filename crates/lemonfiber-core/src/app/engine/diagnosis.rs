@@ -24,7 +24,6 @@ use crate::doctor::guides::GuidesCheck;
 use crate::doctor::headroom::HeadroomCheck;
 use crate::doctor::indexer::IndexerCheck;
 use crate::doctor::releases::ReleasesCheck;
-use crate::doctor::telling::TellingCheck;
 use crate::doctor::{examine, Check, Finding, Narrowing, Verdict};
 use crate::error::{Diagnose, Problem, Remedy};
 use crate::model::DoctorReport;
@@ -241,17 +240,6 @@ fn decline_key(
     DeclineKeyCheck::new(ctx.seams.filesystem.clone(), decline)
 }
 
-/// Whether the people in the house will hear back about what they asked for.
-///
-/// The read-only half of the seeding step that switches it on, so a household that
-/// quietly stopped being notified is reported rather than discovered by somebody
-/// coming to complain. Built here rather than inline because the assembly it joins
-/// is already at the length a reader can hold.
-fn household_telling(ctx: &Ctx, services: &[lemonfiber_manifest::Service]) -> TellingCheck {
-    let (requests, recorded) = crate::seed::run::managed_telling(ctx, services);
-    TellingCheck::new(requests, recorded)
-}
-
 /// Whether the stack's Usenet indexer aggregator keeps its configuration to itself, asked
 /// of the one the stack ships where this machine can reach it.
 fn guarded(ctx: &Ctx, services: &[lemonfiber_manifest::Service]) -> GuardedCheck {
@@ -398,7 +386,7 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
             .map(crate::doctor::permissions::guarded)
             .unwrap_or_default(),
     );
-    let telling = household_telling(ctx, &manifest.services);
+    let telling = deferring::telling(ctx, manifest);
     let guarded = guarded(ctx, &manifest.services);
     let gate = gate_record(ctx, &manifest.services, project.as_deref());
     let decline = decline_key(ctx, &manifest.services, project.as_deref());

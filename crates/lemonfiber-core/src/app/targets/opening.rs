@@ -91,31 +91,6 @@ pub(crate) async fn open_servarrs(
     open
 }
 
-/// The request service, carrying its own key, which it answers as its owner.
-///
-/// **Its own key, never the media server's administrator password.** That password
-/// passes through the request service once, on the sign-in that sets it up, and every
-/// read and write after that carries the key the service wrote for itself. A key is a
-/// header on each request rather than a session left open on somebody else's service,
-/// so a pass that only says what it would do reads with it too.
-///
-/// **Takes the address rather than finding it**, so it always hands a client back and
-/// the caller keeps the one place that decides there is nobody to talk to. A service
-/// that has not written its key yet still gets a client: whatever is about to use it
-/// reports the refusal in its own words, and handing back nothing would leave the
-/// operator with no line at all about work that was attempted and failed.
-pub(crate) async fn seerr_as_owner(
-    ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
-    base: String,
-) -> Seerr {
-    let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-    match seerr_key(ctx, services, project.as_deref()).await {
-        Some(key) => Seerr::keyed(ctx.seams.http.clone(), base, "seerr", key),
-        None => Seerr::new(ctx.seams.http.clone(), base, "seerr"),
-    }
-}
-
 /// What reading the household's requests needs: the request service, asked as its
 /// owner, whose reads see every member's requests.
 pub(crate) struct HouseholdAccess {
@@ -139,21 +114,79 @@ pub(crate) async fn household_requests(
 }
 
 /// Whatever among `fillers` fills `request.intake`, asked over the contract where it
-/// speaks it, and otherwise as the stack's own request service through
-/// [`owned_requests`].
+/// speaks it, and otherwise as the stack's own request service holding the key it wrote
+/// for itself.
 ///
 /// Nothing where nothing here fills it, where it speaks the contract and cannot be
 /// asked over it — never then asked any other way — or where it speaks none and is not
-/// the stack's own request service holding the key it wrote for itself.
+/// the stack's own request service holding its key.
 pub(crate) async fn requests_from(ctx: &Ctx, fillers: &Fillers) -> Option<HouseholdAccess> {
-    let (filler, _) = fillers.filling(intake::CAPABILITY)?;
-    let requests: Arc<dyn intake::Fills> =
-        match spoken(ctx, filler, intake::CAPABILITY, intake::MAJOR).await {
-            Spoken::Over(adapter) => Arc::new(intake::Adapter(adapter)),
-            Spoken::Unanswered => return None,
-            Spoken::Not => Arc::new(owned_requests(ctx, filler).await?),
-        };
+    let requests = asked(ctx, request_service(fillers)?, Unkeyed::Skipped).await?;
     Some(HouseholdAccess { requests })
+}
+
+/// The service filling `request.intake` among `fillers`, as the ask for it settles or as
+/// the one service providing it.
+pub(crate) fn request_service(fillers: &Fillers) -> Option<&Filler> {
+    fillers
+        .filling(intake::CAPABILITY)
+        .map(|(filler, _)| filler)
+}
+
+/// The request service `filler` is, asked as its owner: over `request.intake` where it
+/// speaks it, otherwise the stack's own request service holding the key it wrote for
+/// itself, or holding none where it has not written one yet, so whatever uses it reports
+/// the refusal in its own words. Nothing where it speaks the contract and cannot be asked
+/// over it, or where [`bundled_requests`] refuses it.
+pub(crate) async fn requests_as_owner(
+    ctx: &Ctx,
+    filler: &Filler,
+) -> Option<Arc<dyn intake::Fills>> {
+    asked(ctx, filler, Unkeyed::Asked).await
+}
+
+/// Whether the stack's own request service is asked before it has written its key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Unkeyed {
+    /// Asked holding no key, so it answers with its own refusal.
+    Asked,
+    /// Not asked at all.
+    Skipped,
+}
+
+/// The request service `filler` is: over `request.intake` where it speaks it, nothing
+/// where it speaks it and cannot be asked over it, and otherwise the stack's own request
+/// service where [`bundled_requests`] lets it be, holding the key it wrote for itself or,
+/// where `unkeyed` asks it, none.
+async fn asked(ctx: &Ctx, filler: &Filler, unkeyed: Unkeyed) -> Option<Arc<dyn intake::Fills>> {
+    match spoken(ctx, filler, intake::CAPABILITY, intake::MAJOR).await {
+        Spoken::Over(adapter) => Some(Arc::new(intake::Adapter(adapter))),
+        Spoken::Unanswered => None,
+        Spoken::Not => {
+            let base = bundled_requests(filler)?;
+            let key = requests_key(ctx, filler).await;
+            if key.is_none() && unkeyed == Unkeyed::Skipped {
+                return None;
+            }
+            Some(Arc::new(holding(ctx, filler, base, key)))
+        }
+    }
+}
+
+/// The stack's own request service `filler`, reached at `base`, as its owner: holding
+/// the key it wrote for itself, or none before it has written one.
+pub(crate) async fn owned_requests(ctx: &Ctx, filler: &Filler, base: String) -> Seerr {
+    holding(ctx, filler, base, requests_key(ctx, filler).await)
+}
+
+/// The stack's own request service `filler`, reached at `base`, holding `key` where it
+/// has written one.
+fn holding(ctx: &Ctx, filler: &Filler, base: String, key: Option<String>) -> Seerr {
+    let http = ctx.seams.http.clone();
+    match key {
+        Some(key) => Seerr::keyed(http, base, &filler.id, key),
+        None => Seerr::new(http, base, &filler.id),
+    }
 }
 
 /// Where the host reaches `filler` as the stack's own request service: nothing where it
@@ -169,16 +202,8 @@ pub(crate) fn bundled_requests(filler: &Filler) -> Option<String> {
 
 /// The key the stack's own request service `filler` wrote for itself, read from the
 /// settings beneath its own directory; nothing before it has written one.
-pub(crate) async fn requests_key(ctx: &Ctx, filler: &Filler) -> Option<String> {
+async fn requests_key(ctx: &Ctx, filler: &Filler) -> Option<String> {
     crate::seerr::api_key(&credential_file(ctx, filler).await.text()?)
-}
-
-/// The stack's own request service `filler` is, carrying the key it wrote for itself;
-/// nothing where [`bundled_requests`] refuses it or it has not written its key yet.
-async fn owned_requests(ctx: &Ctx, filler: &Filler) -> Option<Seerr> {
-    let base = bundled_requests(filler)?;
-    let key = requests_key(ctx, filler).await?;
-    Some(Seerr::keyed(ctx.seams.http.clone(), base, &filler.id, key))
 }
 
 /// Where the host reaches a service, and the id it runs under.

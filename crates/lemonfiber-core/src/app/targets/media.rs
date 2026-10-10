@@ -103,15 +103,11 @@ impl MediaServer {
         self.filler.brought_by()
     }
 
-    /// Where the host reaches the request service that asks for it, where it is the
-    /// request service this build speaks to and publishes a port.
+    /// Whether a rehearsal stands where the identity step mints this server's
+    /// administrator's password: a request service the password may reach asks for it.
     #[must_use]
-    pub(crate) fn requests(&self) -> Option<String> {
-        self.asked_by
-            .as_ref()
-            .filter(|asker| asker.speaks(ApiKind::Seerr))
-            .and_then(|asker| asker.published)
-            .map(loopback)
+    pub(crate) fn would_mint(&self, ctx: &Ctx) -> bool {
+        ctx.dry_run && self.asked_by.is_some()
     }
 
     /// The administrator's password lemonfiber recorded for this server.

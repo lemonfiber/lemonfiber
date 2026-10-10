@@ -24,7 +24,6 @@ use crate::app::gating;
 use crate::app::Ctx;
 use crate::credential::{fingerprint, Held, Origin, Propagation, Reach, Rotation, State};
 use crate::ports::service::{MediaServerLink, RegisteredTarget, Requests};
-use crate::seed::run::identity;
 use crate::seed::run::tokens::{through_the_gate, Kept, Presented};
 
 /// What each token is recorded as, before the route it is accepted on.
@@ -49,9 +48,6 @@ const ROTATING: &str = "a real run would mint a new token, hand the gate its has
 /// What a landed replacement says.
 const LANDED: &str = "the request service took the new token, and the gate accepts it alone";
 
-/// Why there is nothing to mint with.
-const NO_RANDOMNESS: &str = "no randomness was available to generate a token";
-
 /// Whether `held` is one of the gate's tokens.
 pub(super) fn is_token(held: &Held) -> bool {
     held.setting.starts_with(SETTING)
@@ -68,10 +64,15 @@ struct Route {
 }
 
 /// A token's line in the inventory, for each route the gate answers.
-pub(super) async fn held(ctx: &Ctx, services: &[Service], project: Option<&Path>) -> Vec<Held> {
-    let (Some(project), Some(base)) = (
+pub(super) async fn held(
+    ctx: &Ctx,
+    services: &[Service],
+    fillers: &crate::wiring::Fillers,
+    project: Option<&Path>,
+) -> Vec<Held> {
+    let (Some(project), Some(filler)) = (
         project.filter(|_| gating::service(services).is_some()),
-        identity::seerr_service(services),
+        crate::app::targets::request_service(fillers),
     ) else {
         return Vec::new();
     };
@@ -79,9 +80,11 @@ pub(super) async fn held(ctx: &Ctx, services: &[Service], project: Option<&Path>
     if routes.is_empty() {
         return Vec::new();
     }
-    let seerr = crate::app::targets::seerr_as_owner(ctx, services, base).await;
-    let targets = seerr.fulfilment_targets().await.ok();
-    let link = seerr.media_server_link().await.ok();
+    let Some(requests) = crate::app::targets::requests_as_owner(ctx, filler).await else {
+        return Vec::new();
+    };
+    let targets = requests.fulfilment_targets().await.ok();
+    let link = requests.media_server_link().await.ok();
     let kept = Kept::read(ctx, project).await;
     routes
         .iter()
@@ -148,10 +151,12 @@ pub(super) async fn rotate(
     ctx: &Ctx,
     held: &Held,
     services: &[Service],
+    fillers: &crate::wiring::Fillers,
     project: Option<&Path>,
 ) -> Rotation {
     let id = held.setting.trim_start_matches(SETTING);
-    let (Some(project), Some(base)) = (project, identity::seerr_service(services)) else {
+    let (Some(project), Some(filler)) = (project, crate::app::targets::request_service(fillers))
+    else {
         return unproven(held, &not_handed(&held.name));
     };
     let Some(route) = routes(ctx, services, project)
@@ -161,13 +166,18 @@ pub(super) async fn rotate(
     else {
         return unproven(held, &not_handed(&held.name));
     };
+    if !handable(fillers, filler, &route) {
+        return unproven(held, &withheld(&route, filler));
+    }
     if ctx.dry_run {
         return would_rotate(held, ROTATING);
     }
     let Some(token) = crate::secret::generate(ctx.seams.random.as_ref()) else {
-        return unproven(held, NO_RANDOMNESS);
+        return unproven(held, crate::secret::NO_RANDOMNESS_FOR_TOKEN);
     };
-    let seerr = crate::app::targets::seerr_as_owner(ctx, services, base).await;
+    let Some(requests) = crate::app::targets::requests_as_owner(ctx, filler).await else {
+        return unproven(held, &not_handed(&held.name));
+    };
     let kept = Kept::read(ctx, project).await;
     let presented = [Presented {
         route: route.id.clone(),
@@ -178,8 +188,8 @@ pub(super) async fn rotate(
         Err(reason) => return unproven(held, &kept.unwritten(&reason)),
     };
     let proven = match gating::fetching(route.kind) {
-        None => relinked(&seerr, &route, &token).await,
-        Some(kind) => retargeted(&seerr, &route, &token, kind).await,
+        None => relinked(requests.as_ref(), &route, &token).await,
+        Some(kind) => retargeted(requests.as_ref(), &route, &token, kind).await,
     };
     if let Err(detail) = proven {
         let _ = kept.restore();
@@ -201,41 +211,71 @@ pub(super) async fn rotate(
 /// Give the request service's target at `route` the new token and have it prove it,
 /// putting the old one back where the proof fails.
 async fn retargeted(
-    seerr: &dyn Requests,
+    requests: &dyn Requests,
     route: &Route,
     token: &str,
     kind: media::Kind,
 ) -> Result<(), String> {
     let at = through_the_gate(&route.id);
-    let targets = seerr
+    let targets = requests
         .fulfilment_targets()
         .await
         .map_err(|failure| said(&failure))?;
     let Some(held) = targeted(&targets, route, kind) else {
         return Err(not_handed(&name(route)));
     };
-    seerr
+    requests
         .move_fulfilment_target(held, &at, token)
         .await
         .map_err(|failure| said(&failure))?;
-    if seerr.test_fulfilment_target(kind, &at, token).await.is_ok() {
+    if requests
+        .test_fulfilment_target(kind, &at, token)
+        .await
+        .is_ok()
+    {
         return Ok(());
     }
     let moved = RegisteredTarget {
         key: token.to_owned(),
         ..held.clone()
     };
-    let _ = seerr.move_fulfilment_target(&moved, &at, &held.key).await;
+    let _ = requests
+        .move_fulfilment_target(&moved, &at, &held.key)
+        .await;
     Err(unreached(route))
 }
 
 /// Give the request service's media-server connection the new token, which it proves
 /// through the gate before it keeps it.
-async fn relinked(seerr: &dyn Requests, route: &Route, token: &str) -> Result<(), String> {
-    seerr
+async fn relinked(requests: &dyn Requests, route: &Route, token: &str) -> Result<(), String> {
+    requests
         .link_media_server(&through_the_gate(&route.id), token)
         .await
         .map_err(|_| unreached(route))
+}
+
+/// Whether the token for `route` may be handed to the request service `filler`: the
+/// service behind the route is one the trust gate lets a credential cross from to it.
+fn handable(
+    fillers: &crate::wiring::Fillers,
+    filler: &crate::wiring::Filler,
+    route: &Route,
+) -> bool {
+    fillers
+        .service(&route.id)
+        .is_some_and(|upstream| crate::wiring::crosses(upstream.holder(), filler.holder()))
+}
+
+/// What is said where the token for `route` may not be handed to the request service
+/// `filler`.
+fn withheld(route: &Route, filler: &crate::wiring::Filler) -> String {
+    format!(
+        "{} is not handed to {}: lemonfiber does not hand that plugin's service a credential \
+         that opens {}.",
+        name(route),
+        filler.name,
+        route.name
+    )
 }
 
 /// What is said where the token a line names is not handed over yet.
@@ -264,7 +304,8 @@ fn targeted<'a>(
         .find(|target| target.at == at && target.kind == kind)
 }
 
-/// The token the request service presents to Jellyfin, where it reaches it at `route`.
+/// The token the request service presents to the media server, where it reaches it at
+/// `route`.
 fn linked(link: &MediaServerLink, route: &Route) -> Option<String> {
     (link.at == through_the_gate(&route.id)).then(|| link.key.clone())
 }

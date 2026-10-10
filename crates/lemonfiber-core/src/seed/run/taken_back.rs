@@ -1,16 +1,17 @@
 //! Taking back the credentials the request service held before the request gate.
 //!
-//! A stack that ran Seerr without the gate handed it each fulfilling \*arr's own key,
-//! and Seerr minted itself a Jellyfin key on the sign-in that set it up. Moving Seerr to
-//! the gate stops it using either, but its settings file and every backup taken since
-//! still hold them. So once Seerr reaches everything through the gate, each \*arr key it
-//! held is replaced through the same reset a rotation makes, and Seerr's own Jellyfin
-//! key is revoked.
+//! A stack whose bundled request service ran without the gate handed it each fulfilling
+//! curator's own key, and the request service minted itself a media server key on the
+//! sign-in that set it up. Moving it to the gate stops it using either, but its settings
+//! file and every backup taken since still hold them. So once it reaches everything
+//! through the gate, each curator key it held is replaced through the same reset a
+//! rotation makes, and its own media server key is revoked.
 //!
-//! **What is owed is remembered across runs.** Which \*arr keys Seerr held can only be
-//! seen before its targets move, and the move and the reset may land in different
-//! runs, so each one owed is kept in the baseline until its reset lands. Seerr's own
-//! Jellyfin key needs no memory: it is filed under Seerr's name until it is revoked.
+//! **What is owed is remembered across runs.** Which curator keys it held can only be
+//! seen before its targets move, and the move and the reset may land in different runs,
+//! so each one owed is kept in the baseline, under the request service's id, until its
+//! reset lands. Its own media server key needs no memory: it is filed under its name
+//! until it is revoked.
 
 use std::path::Path;
 
@@ -25,13 +26,17 @@ use crate::jellyfin::{Jellyfin, SEERR_APP};
 use crate::ports::media::Kind;
 use crate::ports::service::{AppKeys as _, RegisteredTarget, Requests};
 use crate::seed::{State, Wiring};
-use crate::wiring::Fillers;
+use crate::wiring::{Filler, Fillers};
+
+/// The stack's own request service among `fillers`, the one that ran before the gate,
+/// which a plugin's never did, and where the host reaches it.
+fn bundled(fillers: &Fillers) -> Option<(&Filler, String)> {
+    let filler = crate::app::targets::request_service(fillers)?;
+    Some((filler, crate::app::targets::bundled_requests(filler)?))
+}
 
 /// What the report calls this connection.
 const CONNECTION: &str = "The credentials the request service held";
-
-/// The service the owed work is recorded under in the baseline.
-const SEERR: &str = "seerr";
 
 /// The field prefix of an owed \*arr key, followed by the \*arr's id.
 const HELD_KEY: &str = "held-key:";
@@ -49,11 +54,11 @@ pub(super) async fn note_held(
     project: Option<&Path>,
     baseline: &mut Baseline,
 ) {
-    let Some(base) = gated(services, project).and(super::identity::seerr_service(services)) else {
+    let Some((filler, base)) = gated(services, project).and(bundled(fillers)) else {
         return;
     };
-    let seerr = crate::app::targets::seerr_as_owner(ctx, services, base).await;
-    let Ok(held) = seerr.fulfilment_targets().await else {
+    let requests = crate::app::targets::owned_requests(ctx, filler, base).await;
+    let Ok(held) = requests.fulfilment_targets().await else {
         return;
     };
     for fulfils in fulfilling(fillers) {
@@ -62,7 +67,7 @@ pub(super) async fn note_held(
             .any(|one| one.at.host == fulfils.at.host && one.at.port == fulfils.at.port)
         {
             baseline.record(
-                SEERR,
+                &filler.id,
                 &format!("{HELD_KEY}{}", fulfils.filler.id),
                 OWED,
                 &ctx.stamp(),
@@ -71,7 +76,7 @@ pub(super) async fn note_held(
     }
 }
 
-/// Replace every \*arr key the request service held and revoke its own Jellyfin key,
+/// Replace every \*arr key the request service held and revoke its own media server key,
 /// once it reaches everything through the gate. Nothing where nothing is owed.
 pub(super) async fn seed_taken_back(
     ctx: &Ctx,
@@ -81,8 +86,8 @@ pub(super) async fn seed_taken_back(
     baseline: &mut Baseline,
 ) -> Option<Wiring> {
     let project = gated(services, project)?;
-    let base = super::identity::seerr_service(services)?;
-    let owed = baseline.named(SEERR, HELD_KEY);
+    let (filler, base) = bundled(fillers)?;
+    let owed = baseline.named(&filler.id, HELD_KEY);
     let jellyfin = jellyfin_admin(ctx, fillers);
     let minted = match &jellyfin {
         Some((client, ..)) => client.filed_as(SEERR_APP).await.unwrap_or_default(),
@@ -98,31 +103,40 @@ pub(super) async fn seed_taken_back(
             ours: Some("none".to_owned()),
         }));
     }
-    let seerr = crate::app::targets::seerr_as_owner(ctx, services, base).await;
-    let route = jellyfin.as_ref().map(|(_, route, _)| route.as_str());
-    let direct = match still_direct(ctx, &seerr, fillers, project, route).await {
+    let requests = crate::app::targets::owned_requests(ctx, filler, base).await;
+    let server = jellyfin
+        .as_ref()
+        .map(|(_, route, name)| (route.as_str(), name.as_str()));
+    let direct = match still_direct(ctx, &requests, fillers, project, server).await {
         Ok(direct) => direct,
         Err(failure) => return Some(settled(crate::seed::unreached(&failure))),
     };
     if !direct.is_empty() {
         return Some(settled(State::Skipped {
             reason: format!(
-                "Seerr still reaches {} without the gate, so nothing it held is replaced yet. \
-                 A later run replaces them once Seerr reaches everything through the gate.",
-                direct.join(", ")
+                "{name} still reaches {} without the gate, so nothing it held is replaced yet. \
+                 A later run replaces them once {name} reaches everything through the gate.",
+                direct.join(", "),
+                name = filler.name,
             ),
         }));
     }
     let mut unsettled = Vec::new();
-    for arr in owed {
-        unsettled.extend(replaced(ctx, services, fillers, project, &arr, baseline).await);
+    for curator in owed {
+        unsettled.extend(
+            replaced(
+                ctx, services, fillers, project, &filler.id, &curator, baseline,
+            )
+            .await,
+        );
     }
     if let Some((client, _, server)) = &jellyfin {
         for key in &minted {
             if let Err(failure) = client.revoke(key).await {
                 unsettled.push(format!(
-                    "Seerr's own {server} key could not be revoked: {failure}. It still opens \
-                     {server}; the next run revokes it."
+                    "{}'s own {server} key could not be revoked: {failure}. It still opens \
+                     {server}; the next run revokes it.",
+                    filler.name
                 ));
             }
         }
@@ -136,26 +150,26 @@ pub(super) async fn seed_taken_back(
     }))
 }
 
-/// Replace the key of the \*arr `arr`, forgetting it as owed once the reset lands, and
-/// say whatever did not land.
+/// Replace the key of the curator `curator`, owed by the request service `owed_by`,
+/// forgetting it as owed once the reset lands, and say whatever did not land.
 async fn replaced(
     ctx: &Ctx,
     services: &[Service],
     fillers: &Fillers,
     project: &Path,
-    arr: &str,
+    owed_by: &str,
+    curator: &str,
     baseline: &mut Baseline,
 ) -> Vec<String> {
-    let field = format!("{HELD_KEY}{arr}");
-    // An \*arr that is no longer on this machine holds no key anybody can use.
-    let Some(target) = fillers.service(arr).and_then(crate::wiring::Filler::target) else {
-        baseline.forget(SEERR, &field);
+    let field = format!("{HELD_KEY}{curator}");
+    let Some(target) = fillers.service(curator).and_then(Filler::target) else {
+        baseline.forget(owed_by, &field);
         return Vec::new();
     };
     let rotation =
         crate::app::credentials::reset_arr(ctx, services, fillers, Some(project), target).await;
     if matches!(rotation.settled, Settled::Replaced { .. }) {
-        baseline.forget(SEERR, &field);
+        baseline.forget(owed_by, &field);
         return rotation
             .consumers
             .iter()
@@ -174,29 +188,30 @@ async fn replaced(
     )]
 }
 
-/// What the request service still reaches without the gate, by name: the media server
-/// where its link is not at the gate's route under a token the gate accepts, and each
+/// What the request service still reaches without the gate, by name: the media server,
+/// reached at the gate on the route and called the name in `server`, where its link is
+/// not at that route under a token the gate accepts, and each
 /// fulfilling \*arr whose target is not at the gate or does not pass the request
 /// service's own test.
 async fn still_direct(
     ctx: &Ctx,
-    seerr: &dyn Requests,
+    requests: &dyn Requests,
     fillers: &Fillers,
     project: &Path,
-    route: Option<&str>,
+    server: Option<(&str, &str)>,
 ) -> Result<Vec<String>, crate::ports::service::Failure> {
     let kept = Kept::read(ctx, project).await;
     let mut direct = Vec::new();
-    if let Some(route) = route {
-        let link = seerr.media_server_link().await?;
+    if let Some((route, name)) = server {
+        let link = requests.media_server_link().await?;
         if link.at != through_the_gate(route) || !kept.accepts(route, &link.key) {
-            direct.push("Jellyfin".to_owned());
+            direct.push(name.to_owned());
         }
     }
-    let held = seerr.fulfilment_targets().await?;
+    let held = requests.fulfilment_targets().await?;
     for fulfils in fulfilling(fillers) {
         let host = &fulfils.at.host;
-        if !gated_target(seerr, &held, &kept, host, fulfils.kind).await {
+        if !gated_target(requests, &held, &kept, host, fulfils.kind).await {
             direct.push(fulfils.filler.name.clone());
         }
     }
@@ -206,7 +221,7 @@ async fn still_direct(
 /// Whether the request service holds the \*arr reached at `host` at the gate, under a
 /// token the gate accepts, and passes its own test of it there.
 async fn gated_target(
-    seerr: &dyn Requests,
+    requests: &dyn Requests,
     held: &[RegisteredTarget],
     kept: &Kept,
     host: &str,
@@ -217,7 +232,7 @@ async fn gated_target(
         return false;
     };
     kept.accepts(host, &one.key)
-        && seerr
+        && requests
             .test_fulfilment_target(kind, &one.at, &one.key)
             .await
             .is_ok()

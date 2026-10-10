@@ -19,6 +19,13 @@ use crate::ports::random::Random;
 /// password, and a round number of bytes so the rendering has no remainder.
 pub(crate) const SECRET_BYTES: usize = 24;
 
+/// What is said where no randomness was available to generate a token.
+pub(crate) const NO_RANDOMNESS_FOR_TOKEN: &str = "no randomness was available to generate a token";
+
+/// What is said where no randomness was available to generate a password.
+pub(crate) const NO_RANDOMNESS_FOR_PASSWORD: &str =
+    "no randomness was available to generate a password";
+
 /// Generate a secret from the given source of randomness, or `None` where the
 /// randomness could not be obtained — never a weaker fallback, because a
 /// guessable password on the client the forwarded port authenticates to is the

@@ -14,13 +14,10 @@
 
 use std::path::Path;
 
-use lemonfiber_contract::capabilities::request::intake;
-use lemonfiber_contract::Contracted;
 use lemonfiber_manifest::Service;
 
 use super::connecting::{pairings, Cleared, Connection};
 use super::Ctx;
-use crate::app::targets::{spoken, Spoken};
 use crate::ports::filesystem::Beneath;
 use crate::ports::media::Kind;
 use crate::ports::service::{Client as _, Endpoint, FulfilmentTarget, QualityProfile, Requests};
@@ -187,17 +184,13 @@ async fn handed(
     curators: &[Fulfils<'_>],
     project: Option<&Path>,
 ) -> Vec<Wiring> {
-    let Some(requester) = requester(ctx, &asker).await else {
+    let Some(requests) = crate::app::targets::requests_as_owner(ctx, &asker).await else {
         return Vec::new();
     };
     let (wanted, refused) = wanted_targets(ctx, curators).await;
     if wanted.is_empty() {
         return refused;
     }
-    let requests: Box<dyn Requests> = match requester {
-        Requester::Over(adapter) => Box::new(intake::Adapter(adapter)),
-        Requester::Bundled(base) => Box::new(owned(ctx, &asker, base).await),
-    };
     let requests = requests.as_ref();
     let mut wirings = match project.filter(|_| crate::app::gating::service(services).is_some()) {
         Some(project) => through_the_gate(ctx, requests, wanted, project).await,
@@ -205,36 +198,6 @@ async fn handed(
     };
     wirings.extend(refused);
     wirings
-}
-
-/// How the request service is asked.
-enum Requester {
-    /// Over `request.intake`.
-    Over(Contracted),
-    /// As the stack's own request service, where the host reaches it.
-    Bundled(String),
-}
-
-/// How `asker` is asked: over `request.intake` where it speaks it, otherwise as the
-/// stack's own request service where [`crate::app::targets::bundled_requests`] lets it
-/// be. Nothing where it speaks the contract and cannot be asked over it, or is a
-/// plugin's service speaking none, which the stack's own key is never handed to.
-async fn requester(ctx: &Ctx, asker: &Cleared<'_>) -> Option<Requester> {
-    match spoken(ctx, asker, intake::CAPABILITY, intake::MAJOR).await {
-        Spoken::Over(adapter) => Some(Requester::Over(adapter)),
-        Spoken::Unanswered => None,
-        Spoken::Not => crate::app::targets::bundled_requests(asker).map(Requester::Bundled),
-    }
-}
-
-/// The stack's own request service `asker` as its owner, at `base`: carrying the key it
-/// wrote for itself, or none before it has written one.
-async fn owned(ctx: &Ctx, asker: &Cleared<'_>, base: String) -> crate::seerr::Seerr {
-    let http = ctx.seams.http.clone();
-    match crate::app::targets::requests_key(ctx, asker).await {
-        Some(key) => crate::seerr::Seerr::keyed(http, base, &asker.id, key),
-        None => crate::seerr::Seerr::new(http, base, &asker.id),
-    }
 }
 
 /// Hand the request service `wanted` as they are.

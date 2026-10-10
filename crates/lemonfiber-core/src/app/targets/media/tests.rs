@@ -64,8 +64,8 @@ fn the_stacks_media_server_is_the_one_its_request_service_asks_for() {
         Some(crate::config::JELLYFIN_ADMIN_PASSWORD_KEY)
     );
     assert_eq!(
-        server.as_ref().and_then(MediaServer::requests),
-        Some("http://127.0.0.1:5055".to_owned())
+        server.as_ref().and_then(crate::test_support::asker),
+        Some("seerr")
     );
     assert_eq!(server.as_ref().and_then(MediaServer::brought_by), None);
 }
@@ -154,7 +154,7 @@ fn a_plugin_under_the_request_services_id_is_never_the_one_asking() {
     let server = MediaServer::of(&fillers);
 
     assert_eq!(server.as_ref().map(MediaServer::id), Some("jellyfin"));
-    assert_eq!(server.as_ref().and_then(MediaServer::requests), None);
+    assert_eq!(server.as_ref().and_then(crate::test_support::asker), None);
 }
 
 /// A stack nothing on which asks for an identity still has its media server, the one
@@ -171,7 +171,7 @@ fn a_stack_asking_for_no_identity_still_has_its_media_server() {
     let server = MediaServer::of(&fillers);
 
     assert_eq!(server.as_ref().map(MediaServer::id), Some("jellyfin"));
-    assert_eq!(server.as_ref().and_then(MediaServer::requests), None);
+    assert_eq!(server.as_ref().and_then(crate::test_support::asker), None);
 
     let contested = shipped(&[a_plugin_server()], &Chosen::default(), unasked);
     assert_eq!(MediaServer::of(&contested), None);

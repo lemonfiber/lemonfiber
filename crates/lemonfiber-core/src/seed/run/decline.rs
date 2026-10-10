@@ -18,6 +18,7 @@ use lemonfiber_sidecar::decline::{File, Key};
 
 use super::Ctx;
 use crate::app::invite::declining;
+use crate::app::targets::MediaServer;
 use crate::app_keys::DECLINE_APP;
 use crate::jellyfin::Jellyfin;
 use crate::ports::service::AppKeys as _;
@@ -31,6 +32,7 @@ const CONNECTION: &str = "The decline service's own Jellyfin key";
 pub(super) async fn seed_decline_key(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
+    server: Option<&MediaServer>,
     project: Option<&Path>,
 ) -> Option<Wiring> {
     let jellyfin = super::identity::jellyfin_service(services)?;
@@ -39,7 +41,9 @@ pub(super) async fn seed_decline_key(
     // it set up. A rehearsal before the first run finds none recorded, because the
     // identity step mints it, and so finds no key on the server either.
     let Some(password) = super::identity::recorded_jellyfin_password(ctx) else {
-        let minting = ctx.dry_run && super::identity::seerr_service(services).is_some();
+        let minting = server.is_some_and(|server| {
+            server.setting == crate::config::JELLYFIN_ADMIN_PASSWORD_KEY && server.would_mint(ctx)
+        });
         return (declining && minting).then(would_mint);
     };
     let client = Jellyfin::authenticated(

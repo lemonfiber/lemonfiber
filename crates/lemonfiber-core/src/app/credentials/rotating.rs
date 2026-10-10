@@ -82,7 +82,7 @@ pub(crate) async fn rotate(
             super::gating::rotate(ctx, held, fillers).await
         }
         Origin::Lemonfiber if super::tokening::is_token(held) => {
-            super::tokening::rotate(ctx, held, services, project).await
+            super::tokening::rotate(ctx, held, services, fillers, project).await
         }
         Origin::Service => match super::resetting::resettable(held, services, project) {
             Some(target) => {

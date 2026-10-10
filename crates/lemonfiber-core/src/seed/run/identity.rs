@@ -13,21 +13,21 @@ use crate::app::credentials::Replacing;
 use crate::app::targets::MediaServer;
 
 /// The media server's administrator, as the first half of the identity left it: the
-/// password to go on with, or the state the identity rests in without one, and where the
-/// host reaches the request service that asked for it.
+/// password to go on with, or the state the identity rests in without one, and the
+/// request service that asked for it.
 pub(super) struct Admin {
     /// The password, or the state the identity rests in without one.
     administered: Result<String, crate::seed::State>,
-    /// Where the host reaches the request service that asks for the server.
-    requests: String,
+    /// The request service that asks for the server, as the gate cleared it.
+    requests: crate::wiring::Filler,
 }
 
 /// The first half of making whatever fills the identity source the one the request
 /// service signs in against: the media server's administrator, minted where its first-run
 /// setup has not run.
 ///
-/// Nothing where nothing fills the identity source, or where the service asking is not a
-/// request service this build speaks to: without both there is nothing to wire. The admin
+/// Nothing where nothing fills the identity source, or where nothing the trust gate lets
+/// the administrator's password reach asks for it: without both there is nothing to wire. The admin
 /// password is the one credential minted rather than read — recorded under the server's
 /// own setting on the run that mints it, before the setup is given it, and read back on a
 /// later run. Recorded here, before the second half, so the steps between the two can
@@ -37,7 +37,7 @@ pub(super) async fn seed_media_server_admin(
     server: Option<&MediaServer>,
 ) -> Option<Admin> {
     let server = server?;
-    let requests = server.requests()?;
+    let requests = server.asked_by.clone()?;
     let client = server.client(ctx);
     let recorded = server.recorded_password(ctx);
     let keep = |password: &str| server.record_password(ctx, password);
@@ -87,11 +87,13 @@ pub(super) async fn seed_request_identity(
         None => server.network.url(),
     };
 
+    let Some(client) = crate::app::targets::requests_as_owner(ctx, &requests).await else {
+        return (Vec::new(), records);
+    };
     let wiring = match administered {
         Ok(password) => {
-            let client = crate::seerr::Seerr::new(ctx.seams.http.clone(), &requests, "seerr");
             crate::seed::wire_request_identity(
-                &client,
+                client.as_ref(),
                 server.protocol(),
                 &password,
                 &server_url,
@@ -105,15 +107,18 @@ pub(super) async fn seed_request_identity(
     // What the household is told and where the request service reaches the media server
     // are read and written with the request service's own key, which the setup above
     // is what writes, so the client is opened only now.
-    let owner = crate::app::targets::seerr_as_owner(ctx, services, requests.clone()).await;
+    let owner = crate::app::targets::requests_as_owner(ctx, &requests)
+        .await
+        .unwrap_or(client);
 
     let linked = match (gate, &wiring.state) {
         (Some(_), crate::seed::State::WouldWire { .. }) => {
-            Some(super::linking::would_link(server.id()))
+            Some(super::linking::would_link(&requests, server))
         }
-        (Some(project), crate::seed::State::Wired | crate::seed::State::AlreadyWired) => {
-            Some(super::linking::seed_media_server_link(ctx, &owner, server.id(), project).await)
-        }
+        (Some(project), crate::seed::State::Wired | crate::seed::State::AlreadyWired) => Some(
+            super::linking::seed_media_server_link(ctx, owner.as_ref(), &requests, server, project)
+                .await,
+        ),
         _ => None,
     };
 
@@ -131,12 +136,12 @@ pub(super) async fn seed_request_identity(
     // the identity above was wired this run: the identity step stops at a service
     // already initialised, and that is every install after the first.
     let (told, held) = crate::seed::wire_household_telling(
-        &owner,
-        expected.entry(SEERR, crate::seed::TELLING),
+        owner.as_ref(),
+        expected.entry(&requests.id, crate::seed::TELLING),
         ctx.dry_run,
     )
     .await;
-    remember(&mut records, &told.state, &held, &ctx.stamp());
+    remember(&mut records, &requests.id, &told.state, &held, &ctx.stamp());
 
     (
         [Some(wiring), linked, changed, Some(told)]
@@ -194,9 +199,6 @@ fn rotated_by(server: &MediaServer) -> String {
     }
 }
 
-/// The service the household's telling is recorded under.
-const SEERR: &str = "seerr";
-
 /// Write down what this pass leaves the telling at.
 ///
 /// lemonfiber's own value where it wrote or confirmed one, and the operator's where
@@ -205,29 +207,23 @@ const SEERR: &str = "seerr";
 /// which is what keeps a preserved edit preserved on the next run too.
 fn remember(
     records: &mut crate::baseline::Baseline,
+    service: &str,
     state: &crate::seed::State,
     held: &crate::ports::service::Telling,
     at: &str,
 ) {
     match state {
         crate::seed::State::Wired | crate::seed::State::AlreadyWired => records.record(
-            SEERR,
+            service,
             crate::seed::TELLING,
             &crate::seed::said(&crate::seed::wanted_telling()),
             at,
         ),
         crate::seed::State::Unmanaged => {
-            records.adopt(SEERR, crate::seed::TELLING, &crate::seed::said(held), at);
+            records.adopt(service, crate::seed::TELLING, &crate::seed::said(held), at);
         }
         _ => {}
     }
-}
-
-/// Where the host reaches Seerr's API, if the stack has it — resolved the way every
-/// service lemonfiber speaks to is.
-pub(crate) fn seerr_service(services: &[lemonfiber_manifest::Service]) -> Option<String> {
-    crate::app::targets::service_addr(services, lemonfiber_manifest::ApiKind::Seerr)
-        .map(|addr| addr.loopback)
 }
 
 /// Jellyfin's addresses, if the stack has it. Jellyfin's kind carries no key source of

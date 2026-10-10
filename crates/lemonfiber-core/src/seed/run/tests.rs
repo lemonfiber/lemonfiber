@@ -296,7 +296,15 @@ fn seerr_api() -> lemonfiber_manifest::Api {
 }
 
 fn seerr_svc() -> lemonfiber_manifest::Service {
-    manifest_service("seerr", Some(seerr_api()), Some(5055))
+    requesting(manifest_service("seerr", Some(seerr_api()), Some(5055)))
+}
+
+/// `service` as the stack's request service: called what the stack calls it and filling
+/// `request.intake`.
+fn requesting(mut service: lemonfiber_manifest::Service) -> lemonfiber_manifest::Service {
+    "Seerr".clone_into(&mut service.name);
+    service.provides = vec!["request.intake".to_owned()];
+    service
 }
 
 fn jellyfin_api() -> lemonfiber_manifest::Api {
@@ -384,7 +392,7 @@ fn household_changing(completed: bool, signed_in: bool, admitted: u16, changed: 
 
 /// The request service, declaring the settings file it writes its key to.
 fn seerr_with_settings() -> lemonfiber_manifest::Service {
-    manifest_service(
+    requesting(manifest_service(
         "seerr",
         Some(lemonfiber_manifest::Api {
             kind: lemonfiber_manifest::ApiKind::Seerr,
@@ -393,7 +401,7 @@ fn seerr_with_settings() -> lemonfiber_manifest::Service {
             version: None,
         }),
         Some(5055),
-    )
+    ))
 }
 
 /// The book \*arr, as a manifest service whose key lemonfiber mints for it.
