@@ -18,10 +18,11 @@
 //! list [`super::placing::writes`] derives, so what an install would say can be put in
 //! front of a test without a stack directory under it.
 
-use lemonfiber_plugin::Manifest;
+use lemonfiber_plugin::{Manifest, Shape};
 use serde::Serialize;
 
 use super::claimed::Verdict;
+use super::installed::Installed;
 use super::placing::{Lands, Write};
 
 /// What an install puts at one path.
@@ -99,6 +100,58 @@ pub struct Overriding {
     pub setting: String,
     /// What changing it is for.
     pub why: String,
+}
+
+/// One service taking a privileged shape, as the reading states it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "PluginTaking")]
+pub struct Taking {
+    /// The service taking it.
+    pub service: String,
+    /// The shape it takes.
+    pub shape: Shape,
+    /// The kernel capabilities it is given.
+    pub grants: Vec<String>,
+    /// The devices it is given.
+    pub devices: Vec<String>,
+    /// What approving it is written as, apart from the offer.
+    pub approval: String,
+}
+
+/// Every service of the plugin taking a privileged shape, in the order the record
+/// keeps them.
+#[must_use]
+pub fn taking(installed: &Installed) -> Vec<Taking> {
+    installed
+        .services
+        .iter()
+        .filter_map(|placed| {
+            placed.shape.map(|shape| Taking {
+                service: placed.service.clone(),
+                shape,
+                grants: shape
+                    .grants()
+                    .iter()
+                    .map(|&grant| grant.to_owned())
+                    .collect(),
+                devices: shape
+                    .devices()
+                    .iter()
+                    .map(|&device| device.to_owned())
+                    .collect(),
+                approval: shape.approval(&placed.service),
+            })
+        })
+        .collect()
+}
+
+/// What the reading lists as approved one by one: each value the recipes would carry
+/// elsewhere, and each service taking a privileged shape.
+#[must_use]
+pub fn asked<'a>(would: &'a Installed, taking: &'a [Taking]) -> Vec<&'a str> {
+    let mut asked = super::approvals(&would.recipes);
+    asked.extend(taking.iter().map(|one| one.approval.as_str()));
+    asked
 }
 
 /// Every change installing this plugin makes, in the order it makes them.

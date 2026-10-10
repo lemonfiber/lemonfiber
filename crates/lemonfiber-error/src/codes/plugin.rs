@@ -262,17 +262,18 @@ codes! {
             message names what moved.",
         remedy: "Read it again, and answer the name it prints.",
     }
-    /// Raised when a value a recipe would carry to a destination was not approved as
-    /// itself, or an approval names a pair the recipe does not carry.
+    /// Raised when a value a recipe would carry to a destination, or the egress guard's
+    /// shape a service would take, was not approved as itself, or an approval names
+    /// something the reading does not list.
     UNAPPROVED = "PLUGIN-26" {
         severity: Error,
         status: 400,
         since: "0.17.0",
-        meaning: "A value a recipe would send to another host was not approved as itself, or an \
-            approval names a value and destination the reading does not list. Each value a \
-            recipe carries elsewhere is agreed to on its own, apart from the plugin, so nothing \
-            was changed.",
-        remedy: "Approve each value the reading lists, by name, with `--approve`, and nothing \
+        meaning: "A value a recipe would send to another host, or the egress guard's shape a \
+            service would take, was not approved as itself, or an approval names something the \
+            reading does not list. Each is agreed to on its own, apart from the plugin, so \
+            nothing was changed.",
+        remedy: "Approve each one the reading lists, by name, with `--approve`, and nothing \
             else.",
     }
     /// Raised when the source an update names holds a different plugin from the one

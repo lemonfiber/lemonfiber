@@ -192,6 +192,9 @@ pub struct Placed {
     /// The service of the same plugin it stands in front of, as an adapter.
     #[serde(default)]
     pub fronts: Option<String>,
+    /// The privileged shape lemonfiber writes for it, where it took one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shape: Option<lemonfiber_plugin::Shape>,
 }
 
 impl Placed {
@@ -219,6 +222,7 @@ impl Placed {
             networks: Vec::new(),
             speaks: service.speaks.clone(),
             fronts: service.fronts.clone(),
+            shape: service.shape,
         }
     }
 

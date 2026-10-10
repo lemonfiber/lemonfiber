@@ -283,7 +283,7 @@ A plugin's name — a bare word such as `komga` — is resolved through the cata
 
 Installing over an installation is refused naming it: that is an update, which puts one set of changes back before it applies another.
 
-Named on its own it settles everything the real run settles, says the same account of it, writes nothing, and prints a name for that offer; answering with that name is the yes. The source is read again first, and an answer given for a different reading is refused, naming what moved. Every value a recipe would send to another host is listed, and each is approved as itself with `--approve`. `--dry-run` answers an offer the same way and writes nothing either.
+Named on its own it settles everything the real run settles, says the same account of it, writes nothing, and prints a name for that offer; answering with that name is the yes. The source is read again first, and an answer given for a different reading is refused, naming what moved. Every value a recipe would send to another host, and the egress guard's shape a service would take, is listed, and each is approved as itself with `--approve`. `--dry-run` answers an offer the same way and writes nothing either.
 
 Usage: lemonfiber plugin install [OPTIONS] <SOURCE>
 
@@ -299,7 +299,7 @@ Options:
           The offer being answered, as the run that made it printed it
 
       --approve <VALUE@DESTINATION>
-          A value a recipe would send elsewhere, approved as itself, as the reading lists it. Once for each
+          A value a recipe would send elsewhere, or the egress guard's shape a service would take, approved as itself, as the reading lists it. Once for each
 
       --dry-run
           Say what would happen, and change nothing
@@ -452,7 +452,7 @@ The source of the new version is any an install takes, and has to hold the plugi
 
 The machine is on one version or the other at every moment, never between them. The record of what is installed is written last, once the new version has held; where it does not hold, it goes back and the version it replaced is put back on from its record, and the report says which version the machine is on.
 
-Named on its own it says what would go back, what the new version would write and prove, what would stop meanwhile and what a recipe of the new version would send where, touches nothing, and prints a name for that offer; answering with that name, and approving each value with `--approve`, is the yes.
+Named on its own it says what would go back, what the new version would write and prove, what would stop meanwhile and what a recipe of the new version would send where and what shape it would take, touches nothing, and prints a name for that offer; answering with that name, and approving each with `--approve`, is the yes.
 
 Usage: lemonfiber plugin update [OPTIONS] <PLUGIN> <SOURCE>
 
@@ -471,7 +471,7 @@ Options:
           The offer being answered, as the run that made it printed it
 
       --approve <VALUE@DESTINATION>
-          A value a recipe would send elsewhere, approved as itself, as the reading lists it. Once for each
+          A value a recipe would send elsewhere, or the egress guard's shape a service would take, approved as itself, as the reading lists it. Once for each
 
       --dry-run
           Say what would happen, and change nothing

@@ -122,6 +122,7 @@ pub(crate) fn a_placed(
         networks: Vec::new(),
         speaks: Vec::new(),
         fronts: None,
+        shape: None,
     }
 }
 

@@ -453,6 +453,7 @@ fn the_report_says_what_is_installed_and_what_this_run_did() {
                 reversed: None,
                 contests: Vec::new(),
                 recipes_ran: Vec::new(),
+                taking: Vec::new(),
             })
         }),
         update: None,
@@ -544,4 +545,35 @@ type Alter = fn(&mut Installed);
 /// Every service of a record, changed the same way.
 fn each(one: &mut Installed, change: impl Fn(&mut Placed)) {
     one.services.iter_mut().for_each(change);
+}
+
+#[test]
+fn the_shape_a_service_took_is_kept_and_a_record_without_one_reads_as_none() {
+    let shaped = installed(|manifest| {
+        set(manifest, |service| {
+            service.shape = Some(lemonfiber_plugin::Shape::EgressGuard);
+        });
+    });
+    let kept = shaped
+        .as_ref()
+        .and_then(|one| serde_json::to_string(one).ok())
+        .unwrap_or_default();
+    assert!(kept.contains(r#""shape":"egress-guard""#), "got: {kept}");
+    let read = Register::parse(&format!(r#"{{"installed": [{kept}]}}"#));
+    assert_eq!(
+        read.ok()
+            .and_then(|register| register.installed().first().cloned())
+            .and_then(|one| one.services.first().and_then(|placed| placed.shape)),
+        Some(lemonfiber_plugin::Shape::EgressGuard)
+    );
+
+    let plain = whole()
+        .as_ref()
+        .and_then(|one| serde_json::to_string(one).ok())
+        .unwrap_or_default();
+    assert!(!plain.contains(r#""shape""#), "got: {plain}");
+    assert_eq!(
+        placed(whole().as_ref(), "komga").and_then(|one| one.shape),
+        None
+    );
 }

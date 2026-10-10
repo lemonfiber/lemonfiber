@@ -99,7 +99,10 @@ pub use reports::{
     Unfilled, Update,
 };
 pub use source::{unspoken, Source, SPOKEN};
-pub use stating::{changes, overrides, proofs, speaking, Changing, Overriding, Proving, Puts};
+pub use stating::{
+    asked, changes, overrides, proofs, speaking, taking, Changing, Overriding, Proving, Puts,
+    Taking,
+};
 pub use verified::{against, Changed, Verification};
 
 // Re-exported so a surface rendering one of these reads it through the module that
@@ -116,7 +119,7 @@ pub use lemonfiber_plugin::vocabulary::{
     Capability, Constraint, Credential, Declared, Probe, Published as Capabilities, Removed,
     Requirement, Unpublishable,
 };
-pub use lemonfiber_plugin::Violation;
+pub use lemonfiber_plugin::{Shape, Violation};
 
 /// The stack this build pins, which is what says who declares each capability.
 const STACK: &str = lemonfiber_bundled::STACK;

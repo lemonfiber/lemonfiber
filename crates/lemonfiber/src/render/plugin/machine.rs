@@ -16,8 +16,8 @@ use lemonfiber_core::app::putting_back::Reversal;
 use lemonfiber_core::doctor::Verdict as Checked;
 use lemonfiber_core::journal::{Action, Undo};
 use lemonfiber_core::plugin::{
-    approvals, Changing, Evidence, Installed, Installs, Overriding, Proving, Puts, Reached,
-    Removal, Unfilled, Verdict, Verification,
+    asked, Changing, Evidence, Installed, Installs, Overriding, Proving, Puts, Reached, Removal,
+    Unfilled, Verdict, Verification,
 };
 
 use super::super::Lines;
@@ -61,6 +61,7 @@ pub(crate) fn installs(report: &Installs) -> Lines {
         // an install that went back changed none of it — the same as a rehearsal.
         lines.extend(overriding(&install.overrides, install.recorded));
         lines.extend(answering::recipes(&install.would.recipes));
+        lines.extend(answering::taking(&install.taking, acted));
         lines.extend(container(&install.would));
         if let Some(put_back) = &install.reversed {
             lines.extend(reversal(put_back));
@@ -69,7 +70,7 @@ pub(crate) fn installs(report: &Installs) -> Lines {
             lines.extend(answering::unanswered(
                 "install",
                 report.agreement.as_deref(),
-                &approvals(&install.would.recipes),
+                &asked(&install.would, &install.taking),
                 report.rehearsed,
             ));
         }
@@ -103,7 +104,7 @@ pub(crate) fn installs(report: &Installs) -> Lines {
             lines.extend(answering::unanswered(
                 "update",
                 report.agreement.as_deref(),
-                &approvals(&one.install.would.recipes),
+                &asked(&one.install.would, &one.install.taking),
                 report.rehearsed,
             ));
         }

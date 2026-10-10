@@ -64,7 +64,7 @@ requirement = [
   { id = "ARCH-R84", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/claimed.rs", "crates/lemonfiber-core/src/plugin/container.rs"] },
   { id = "ARCH-R85", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/claimed.rs", "crates/lemonfiber-core/src/plugin/container.rs"] },
   { id = "ARCH-R86", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/claimed.rs", "crates/lemonfiber-core/src/plugin/container.rs"] },
-  { id = "ARCH-R87", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/claimed.rs", "crates/lemonfiber-core/src/plugin/container.rs"] },
+  { id = "ARCH-R87", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/claimed.rs", "crates/lemonfiber-core/src/plugin/container.rs", "crates/lemonfiber-plugin/src/refusing/shaping.rs", "crates/lemonfiber-plugin/src/refusing/shaping/tests.rs"] },
   { id = "ARCH-R88", state = "done", evidence = ["crates/lemonfiber-plugin/src/schema.rs", "crates/lemonfiber-core/src/plugin/container.rs"] },
   { id = "ARCH-R89", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/claimed.rs", "crates/lemonfiber-core/src/plugin/container.rs"] },
   { id = "ARCH-R90", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/claimed.rs", "crates/lemonfiber-core/src/plugin/container.rs"] },

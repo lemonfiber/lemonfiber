@@ -257,7 +257,7 @@
   "PLUGIN-26": {
     "name": "UNAPPROVED",
     "status": 400,
-    "description": "Raised when a value a recipe would carry to a destination was not approved as itself, or an approval names a pair the recipe does not carry."
+    "description": "Raised when a value a recipe would carry to a destination, or the egress guard's shape a service would take, was not approved as itself, or an approval names something the reading does not list."
   },
   "PLUGIN-27": {
     "name": "ANOTHER_PLUGIN",

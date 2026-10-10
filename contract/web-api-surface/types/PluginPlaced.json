@@ -78,6 +78,12 @@
       ],
       "required": true
     },
+    "shape": {
+      "type": [
+        "anyOf(null,ref:PluginShape)"
+      ],
+      "required": false
+    },
     "speaks": {
       "type": [
         "array[string]"

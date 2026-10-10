@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
-use lemonfiber_plugin::Manifest;
+use lemonfiber_plugin::{Manifest, Shape};
 
 use super::super::installed::{Installed, Placed, Reached};
 use super::{published, written, CONFIGURATION, HOUSEHOLD, LIBRARY, LOOPBACK, PROFILE};
@@ -67,6 +67,7 @@ fn placed() -> Placed {
         networks: Vec::new(),
         speaks: Vec::new(),
         fronts: None,
+        shape: None,
     }
 }
 
@@ -410,6 +411,61 @@ fn shapes() -> Vec<String> {
             ..placed()
         }),
     ]
+}
+
+/// What an entry is, as a YAML reader reads it back.
+fn read(document: &str) -> serde_yaml_ng::Value {
+    serde_yaml_ng::from_str(document).unwrap_or_default()
+}
+
+#[test]
+fn the_egress_guard_shape_adds_its_grant_and_its_device_and_nothing_else() {
+    let plain = document(placed());
+    let shaped = document(Placed {
+        shape: Some(Shape::EgressGuard),
+        ..placed()
+    });
+    assert_eq!(
+        list(&shaped, "komga", "cap_add"),
+        [
+            "CHOWN",
+            "DAC_OVERRIDE",
+            "FOWNER",
+            "SETGID",
+            "SETUID",
+            "KILL",
+            "NET_ADMIN"
+        ],
+        "{shaped}"
+    );
+    assert_eq!(
+        list(&shaped, "komga", "devices"),
+        ["/dev/net/tun:/dev/net/tun"],
+        "{shaped}"
+    );
+    assert!(
+        !plain.contains("devices") && !plain.contains("NET_ADMIN"),
+        "{plain}"
+    );
+
+    let mut taken = read(&shaped);
+    let entry = taken
+        .get_mut("services")
+        .and_then(|services| services.get_mut("komga"))
+        .and_then(serde_yaml_ng::Value::as_mapping_mut);
+    let removed = entry.map(|entry| {
+        let devices = entry.remove("devices");
+        let granted = entry
+            .get_mut("cap_add")
+            .and_then(serde_yaml_ng::Value::as_sequence_mut)
+            .and_then(Vec::pop);
+        (devices.is_some(), granted)
+    });
+    assert_eq!(
+        removed,
+        Some((true, Some(serde_yaml_ng::Value::from("NET_ADMIN"))))
+    );
+    assert_eq!(taken, read(&plain), "nothing else differs: {shaped}");
 }
 
 /// Nothing outside the permitted set is ever written.

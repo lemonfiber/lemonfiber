@@ -80,15 +80,9 @@ pub(crate) async fn update(
         crate::plugin::writes(&would, stack),
     ));
     let offer = super::offering::updating(&read.digest, &was, &would, &changes, &contests);
-    let acting = super::offering::acting(
-        ctx,
-        consent,
-        &would.plugin,
-        &offer,
-        &super::offering::UPDATING,
-        &crate::plugin::approvals(&would.recipes),
-    )?;
-    let mut account = started(&was, &would, &read.manifest, changes, contests);
+    let (acting, taking) =
+        super::offering::answered(ctx, consent, &would, &offer, &super::offering::UPDATING)?;
+    let mut account = started(&was, &would, &read.manifest, changes, contests, taking);
     let at = crate::plugin::owner(&was.plugin);
     let whose = |change: &crate::journal::Change| crate::plugin::owns(&was.plugin, change);
 
@@ -226,6 +220,7 @@ fn started(
     manifest: &lemonfiber_plugin::Manifest,
     changes: Vec<crate::plugin::Changing>,
     contests: Vec<crate::wiring::Contest>,
+    taking: Vec<crate::plugin::Taking>,
 ) -> Update {
     Update {
         plugin: was.plugin.clone(),
@@ -244,6 +239,7 @@ fn started(
             overrides: crate::plugin::overrides(manifest),
             reversed: None,
             recipes_ran: Vec::new(),
+            taking,
         },
         stopped: None,
         restored: None,

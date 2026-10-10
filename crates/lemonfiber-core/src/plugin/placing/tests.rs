@@ -32,6 +32,7 @@ fn placed(service: &str) -> Placed {
         networks: Vec::new(),
         speaks: Vec::new(),
         fronts: None,
+        shape: None,
     }
 }
 
