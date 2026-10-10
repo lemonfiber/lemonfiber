@@ -92,11 +92,31 @@ pub fn key_in(configuration: &Path) -> std::io::Result<String> {
 /// # Errors
 ///
 /// The error reading it, where the core wrote none, or [`std::io::ErrorKind::InvalidData`]
-/// where what is there is not a JSON object of strings.
+/// where what is there is larger than [`UPSTREAM_MOST`] or is not a JSON object of
+/// strings. Neither error carries anything read from the file.
 pub fn upstream_in(configuration: &Path) -> std::io::Result<BTreeMap<String, String>> {
-    let written = std::fs::read(configuration.join(UPSTREAM_FILE))?;
-    serde_json::from_slice(&written)
-        .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))
+    use std::io::Read as _;
+    let file = std::fs::File::open(configuration.join(UPSTREAM_FILE))?;
+    let mut written = Vec::new();
+    file.take(UPSTREAM_MOST + 1).read_to_end(&mut written)?;
+    if written.len() as u64 > UPSTREAM_MOST {
+        return Err(unreadable(UNREAD_TOO_LARGE));
+    }
+    serde_json::from_slice(&written).map_err(|_| unreadable(UNREAD_NOT_STRINGS))
+}
+
+/// The most an upstream's credential may hold, in bytes.
+pub const UPSTREAM_MOST: u64 = 64 * 1024;
+
+/// Said where the upstream's credential is larger than [`UPSTREAM_MOST`].
+const UNREAD_TOO_LARGE: &str = "the upstream's credential is larger than an adapter reads";
+
+/// Said where the upstream's credential is not a JSON object of strings.
+const UNREAD_NOT_STRINGS: &str = "the upstream's credential is not a JSON object of strings";
+
+/// An upstream's credential refused for `why`, carrying nothing read from it.
+fn unreadable(why: &'static str) -> std::io::Error {
+    std::io::Error::new(std::io::ErrorKind::InvalidData, why)
 }
 
 /// Answer the core at `address` until the process ends.

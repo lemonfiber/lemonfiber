@@ -8,8 +8,10 @@
 //! setting named for that server, so the stack's is never read for, or sent to, a
 //! plugin's server, and a plugin's is never taken for the stack's.
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use lemonfiber_contract::adapter::{UPSTREAM_FILE, UPSTREAM_PASSWORD, UPSTREAM_USERNAME};
 use lemonfiber_contract::capabilities::identity::source;
 use lemonfiber_contract::capabilities::media::serve;
 use lemonfiber_manifest::{ApiKind, Manifest};
@@ -187,7 +189,29 @@ impl MediaServer {
     ///
     /// Why the record would not take it, in words.
     pub(crate) fn record_password(&self, ctx: &Ctx, password: &str) -> Result<(), String> {
-        record_secret(ctx, &self.setting, password).map_err(|failure| failure.to_string())
+        record_secret(ctx, &self.setting, password).map_err(|failure| failure.to_string())?;
+        match self.reach {
+            Reach::Over => self.hand_upstream(password),
+            Reach::Bundled(_) => Ok(()),
+        }
+    }
+
+    /// The administrator's credential written where the server's adapter reads its
+    /// upstream's, beside its key and readable by the operator alone.
+    fn hand_upstream(&self, password: &str) -> Result<(), String> {
+        let configuration = self.filler.confined_to.as_deref().ok_or_else(|| {
+            format!(
+                "{} has no configuration on this machine to hold its upstream's credential",
+                self.name()
+            )
+        })?;
+        let credential = BTreeMap::from([
+            (UPSTREAM_USERNAME, crate::config::JELLYFIN_ADMIN_USER),
+            (UPSTREAM_PASSWORD, password),
+        ]);
+        let written = serde_json::to_string(&credential).map_err(|err| err.to_string())?;
+        crate::config::store::write(&configuration.join(UPSTREAM_FILE), &written)
+            .map_err(|failure| failure.to_string())
     }
 
     /// The server as its first run is driven: over `identity.source` where it speaks it,

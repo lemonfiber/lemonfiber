@@ -319,3 +319,82 @@ async fn a_contracted_server_unanswered_over_its_contracts_is_asked_nothing() {
     }
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
+
+/// Recording a contracted server's administrator's password also writes it where the
+/// server's adapter reads its upstream's credential, readable by the operator alone; the
+/// stack's own server is handed nothing beside its setting.
+#[test]
+fn a_contracted_servers_password_is_handed_to_its_adapter_and_the_stacks_is_not() {
+    use std::os::unix::fs::PermissionsExt as _;
+
+    let env = crate::test_support::env_without_password("hand-upstream");
+    let scratch = env.parent().unwrap_or(std::path::Path::new(".")).to_owned();
+    let ctx = crate::test_support::a_context()
+        .settings(crate::config::Settings {
+            env_file: Some(env),
+            ..crate::config::Settings::default()
+        })
+        .build();
+    let password = crate::test_support::a_password();
+    let place = |server: Option<MediaServer>, dir: &str| {
+        server.map(|mut server| {
+            server.filler.confined_to = Some(scratch.join(dir));
+            server
+        })
+    };
+    let contracted = place(
+        MediaServer::of(&shipped(
+            &[a_contracted_media_server(Some("upstream"))],
+            &Chosen::read(Some("identity.source=media-adapter")),
+            |_| (),
+        )),
+        "contracted",
+    );
+    let stacks = place(
+        MediaServer::of(&shipped(&[], &Chosen::default(), |_| ())),
+        "stacks",
+    );
+    let unplaced = MediaServer::of(&shipped(
+        &[a_contracted_media_server(Some("upstream"))],
+        &Chosen::read(Some("identity.source=media-adapter")),
+        |_| (),
+    ));
+
+    let handed = contracted
+        .as_ref()
+        .map(|server| server.record_password(&ctx, &password));
+    let kept = stacks
+        .as_ref()
+        .map(|server| server.record_password(&ctx, &password));
+    let nowhere = unplaced
+        .as_ref()
+        .map(|server| server.record_password(&ctx, &password));
+    let upstream = scratch
+        .join("contracted")
+        .join(lemonfiber_contract::adapter::UPSTREAM_FILE);
+    let written: std::collections::BTreeMap<String, String> = std::fs::read(&upstream)
+        .ok()
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .unwrap_or_default();
+    let mode = std::fs::metadata(&upstream).map(|meta| meta.permissions().mode() & 0o777);
+    let stacks_written = scratch.join("stacks").exists();
+    let _ = std::fs::remove_dir_all(&scratch);
+
+    assert_eq!(handed, Some(Ok(())));
+    assert_eq!(
+        written
+            .get(lemonfiber_contract::adapter::UPSTREAM_USERNAME)
+            .map(String::as_str),
+        Some(crate::config::JELLYFIN_ADMIN_USER)
+    );
+    assert_eq!(
+        written
+            .get(lemonfiber_contract::adapter::UPSTREAM_PASSWORD)
+            .map(String::as_str),
+        Some(password.as_str())
+    );
+    assert_eq!(mode.ok(), Some(0o600));
+    assert_eq!(kept, Some(Ok(())));
+    assert!(!stacks_written);
+    assert!(nowhere.is_some_and(|recorded| recorded.is_err()));
+}

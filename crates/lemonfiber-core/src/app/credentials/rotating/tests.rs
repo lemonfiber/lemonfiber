@@ -239,7 +239,14 @@ async fn a_contracted_servers_administrator_password_is_not_replaced() {
         })
         .build()
         .with_http(http.clone());
-    let server = crate::app::targets::MediaServer::of(&fillers);
+    let configuration = env
+        .parent()
+        .unwrap_or(std::path::Path::new("."))
+        .join("adapter");
+    let server = crate::app::targets::MediaServer::of(&fillers).map(|mut server| {
+        server.filler.confined_to = Some(configuration.clone());
+        server
+    });
 
     let unheld = match server.as_ref() {
         Some(server) => super::replace_admin_password(&ctx, server, false)
