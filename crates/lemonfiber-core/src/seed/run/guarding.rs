@@ -16,8 +16,6 @@
 //! turns it back on. One whose password lemonfiber does not hold, or that refuses the
 //! one it does, is never turned off or given another administrator to get back in.
 
-use std::time::Duration;
-
 use lemonfiber_manifest::ApiKind;
 
 use super::Ctx;
@@ -30,13 +28,6 @@ pub(super) const FIELD: &str = "authentication";
 
 /// What the baseline records the authentication as.
 const BASIC: &str = "basic";
-
-/// How many times the guarded read is asked again while the service restarts.
-const READS: u32 = 40;
-
-/// How long between them: the service takes a few seconds to restart, and up to two
-/// minutes on a slow machine.
-const BETWEEN_READS: Duration = Duration::from_secs(3);
 
 /// The aggregator, as this pass reaches it.
 struct Aggregator {
@@ -261,13 +252,14 @@ async fn turned_on(ctx: &Ctx, aggregator: &Aggregator) -> State {
 async fn proven(aggregator: &Aggregator, password: &str, before: &[String]) -> State {
     let client = &aggregator.client;
     let mut refused = false;
-    for read in 0..READS {
+    let patience = crate::patience::RESTART;
+    for read in 0..patience.asks {
         if matches!(client.exposed().await, Ok(false)) {
             refused = true;
             break;
         }
-        if read + 1 < READS {
-            tokio::time::sleep(BETWEEN_READS).await;
+        if read + 1 < patience.asks {
+            tokio::time::sleep(patience.between).await;
         }
     }
     if !refused {

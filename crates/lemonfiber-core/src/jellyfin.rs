@@ -28,6 +28,7 @@ mod screening;
 mod serving;
 mod sessions;
 mod setup;
+mod upkeep;
 
 pub use keys::SEERR_APP;
 pub(crate) use screening::pictured_at;

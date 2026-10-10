@@ -124,6 +124,9 @@
     "/lemonfiber/media.serve/v1/progressed": {
       "$ref": "operations/progressed.json"
     },
+    "/lemonfiber/media.serve/v1/refresh": {
+      "$ref": "operations/refresh.json"
+    },
     "/lemonfiber/media.serve/v1/rescan": {
       "$ref": "operations/rescan.json"
     },
@@ -132,6 +135,9 @@
     },
     "/lemonfiber/media.serve/v1/revoke": {
       "$ref": "operations/revoke.json"
+    },
+    "/lemonfiber/media.serve/v1/series_held": {
+      "$ref": "operations/series_held.json"
     },
     "/lemonfiber/media.serve/v1/sign_out": {
       "$ref": "operations/sign_out.json"

@@ -18,4 +18,5 @@ requirement = [
   { id = "C1-R14", state = "done", evidence = ["crates/lemonfiber-core/src/doctor.rs", "crates/lemonfiber-core/src/doctor/headroom.rs", "crates/lemonfiber-core/src/doctor/storage.rs"] },
   { id = "C1-R16", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/examining.rs", "crates/lemonfiber-core/src/doctor/vpn/pair.rs", "crates/lemonfiber-core/src/bundle/run.rs"] },
   { id = "C1-R17", state = "done", evidence = ["crates/lemonfiber-core/src/app/conditions.rs"] },
+  { id = "C1-R18", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/seasons.rs", "crates/lemonfiber-core/src/app/engine/diagnosis/deferring.rs", "crates/lemonfiber-contract/src/capabilities/media.rs"] },
 ]

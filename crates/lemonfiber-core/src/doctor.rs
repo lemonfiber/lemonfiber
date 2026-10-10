@@ -35,6 +35,7 @@ pub mod narrowing;
 pub mod permissions;
 pub mod providers;
 pub mod releases;
+pub mod seasons;
 pub mod storage;
 pub mod telling;
 pub mod vpn;

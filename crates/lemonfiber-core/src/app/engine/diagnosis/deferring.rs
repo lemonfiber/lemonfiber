@@ -13,6 +13,7 @@ use crate::app::targets::{committed_bytes, host_fillers};
 use crate::app::Ctx;
 use crate::doctor::deferred::Deferred;
 use crate::doctor::providers::ProvidersCheck;
+use crate::doctor::seasons::SeasonsCheck;
 use crate::doctor::storage::StorageCheck;
 use crate::doctor::vpn::{budget_for, VpnCheck};
 use crate::doctor::wiring::WiringCheck;
@@ -117,6 +118,19 @@ pub(super) fn wired(ctx: &Ctx, stack: &Stack, project: Option<&Path>) -> Deferre
                 wirings,
                 ctx.stamp(),
             )) as Box<dyn Check>
+        }
+    })
+}
+
+/// Whether every series the media server holds opens onto its seasons, built when it runs.
+pub(super) fn seasons(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> Deferred {
+    let (ctx, manifest) = (ctx.clone(), manifest.clone());
+    Deferred::new(Category::Services, CHECK_BUDGET, move || {
+        let (ctx, manifest) = (ctx.clone(), manifest.clone());
+        async move {
+            let service = crate::app::targets::served_by(&ctx, &manifest);
+            let served = crate::app::targets::serving(&ctx, &manifest).await;
+            Box::new(SeasonsCheck::new(service, served)) as Box<dyn Check>
         }
     })
 }

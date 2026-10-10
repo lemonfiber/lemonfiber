@@ -527,7 +527,7 @@
       "files": [
         {
           "path": "media.serve/v1/openapi.json",
-          "sha256": "9a35c331e469a4f7a24ea9ebd9882c5017d5ebe00c91ca5ed5ccf26ce6385291"
+          "sha256": "3efa6acbbcd178172d02eb3311be48c5df179bcc870033a472be06ef2ec7311a"
         },
         {
           "path": "media.serve/v1/operations/signed_in.json",
@@ -568,6 +568,14 @@
         {
           "path": "media.serve/v1/operations/rescan.json",
           "sha256": "7cf7cc9ad84056d1e7b8d54b33c565fea3aa5488535b76ae3e8ca1df18410294"
+        },
+        {
+          "path": "media.serve/v1/operations/series_held.json",
+          "sha256": "8573a8590e8f7d36b3664985868f7fc70473182e70cae40fe47d2ffc56dac197"
+        },
+        {
+          "path": "media.serve/v1/operations/refresh.json",
+          "sha256": "14de02715c267cc827bab81ffe10cda9fb7b3ae6347747d1c9881c72ccea23be"
         },
         {
           "path": "media.serve/v1/operations/known_proxies.json",
@@ -611,14 +619,14 @@
         },
         {
           "path": "media.serve/v1/conformance.json",
-          "sha256": "f2a2718927446af26dac4ddc185c25159f1faf54d846e31bc0741a91255b9e30"
+          "sha256": "7c01ab81a4addb989fe3294710014fdb8b4ad6a59c45d8f5ec6e7e7298b00f2f"
         }
       ],
       "majors": [
         1
       ],
       "openapi": "media.serve/v1/openapi.json",
-      "operations": 20
+      "operations": 22
     }
   ]
 }
