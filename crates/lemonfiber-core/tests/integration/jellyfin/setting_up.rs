@@ -1,6 +1,6 @@
 //! The media server's own setup and administrator.
 
-use super::jellyfin;
+use super::media_server;
 use lemonfiber_core::ports::http::Method;
 use lemonfiber_core::ports::service::Failure;
 use lemonfiber_fixtures::http::{Answer, Fake};
@@ -13,7 +13,10 @@ async fn a_completed_wizard_is_reported() {
         200,
         r#"{"StartupWizardCompleted":true}"#,
     )]);
-    assert_eq!(jellyfin(&fake).startup_completed().await.ok(), Some(true));
+    assert_eq!(
+        media_server(&fake).startup_completed().await.ok(),
+        Some(true)
+    );
     assert!(fake
         .requests()
         .first()
@@ -26,18 +29,24 @@ async fn an_incomplete_or_unstated_wizard_reads_as_not_done() {
         200,
         r#"{"StartupWizardCompleted":false}"#,
     )]);
-    assert_eq!(jellyfin(&fake).startup_completed().await.ok(), Some(false));
+    assert_eq!(
+        media_server(&fake).startup_completed().await.ok(),
+        Some(false)
+    );
     // A response that omits the field is a server too fresh to have set it: not
     // done, the same as false.
     let bare = Fake::in_turn(vec![Answer::reply(200, "{}")]);
-    assert_eq!(jellyfin(&bare).startup_completed().await.ok(), Some(false));
+    assert_eq!(
+        media_server(&bare).startup_completed().await.ok(),
+        Some(false)
+    );
 }
 
 #[tokio::test]
 async fn an_unreadable_public_info_is_refused() {
     let fake = Fake::in_turn(vec![Answer::reply(200, "not json")]);
     assert!(matches!(
-        jellyfin(&fake).startup_completed().await,
+        media_server(&fake).startup_completed().await,
         Err(Failure::Refused { .. })
     ));
 }
@@ -46,16 +55,16 @@ async fn an_unreadable_public_info_is_refused() {
 async fn a_refused_public_info_carries_the_status() {
     let fake = Fake::in_turn(vec![Answer::reply(503, "")]);
     assert!(matches!(
-        jellyfin(&fake).startup_completed().await,
+        media_server(&fake).startup_completed().await,
         Err(Failure::Refused { .. })
     ));
 }
 
 #[tokio::test]
-async fn an_unreachable_jellyfin_is_unavailable() {
+async fn an_unreachable_media_server_is_unavailable() {
     let fake = Fake::silent();
     assert!(matches!(
-        jellyfin(&fake).startup_completed().await,
+        media_server(&fake).startup_completed().await,
         Err(Failure::Unavailable { .. })
     ));
 }
@@ -75,7 +84,7 @@ async fn the_account_is_read_into_being_before_it_is_written() {
         Answer::reply(204, ""),
         Answer::reply(204, ""),
     ]);
-    assert!(jellyfin(&fake)
+    assert!(media_server(&fake)
         .create_admin("admin", &password)
         .await
         .is_ok());
@@ -127,7 +136,7 @@ async fn a_rejected_admin_creation_is_refused_and_setup_is_not_finished() {
         Answer::reply(400, "user already exists"),
     ]);
     assert!(matches!(
-        jellyfin(&fake).create_admin("admin", &password).await,
+        media_server(&fake).create_admin("admin", &password).await,
         Err(Failure::Refused { .. })
     ));
     // The read and the failed write; completion was never reached.
@@ -143,17 +152,17 @@ async fn a_rejected_completion_is_refused() {
         Answer::reply(500, "boom"),
     ]);
     assert!(matches!(
-        jellyfin(&fake).create_admin("admin", &password).await,
+        media_server(&fake).create_admin("admin", &password).await,
         Err(Failure::Refused { .. })
     ));
 }
 
 #[tokio::test]
-async fn creating_the_admin_on_an_unreachable_jellyfin_is_unavailable() {
+async fn creating_the_admin_on_an_unreachable_media_server_is_unavailable() {
     let password = a_word();
     let fake = Fake::silent();
     assert!(matches!(
-        jellyfin(&fake).create_admin("admin", &password).await,
+        media_server(&fake).create_admin("admin", &password).await,
         Err(Failure::Unavailable { .. })
     ));
 }

@@ -99,8 +99,8 @@ fn a_household_waiting_on_nothing_says_so() {
 
 /// A panel that could not be filled says why, as every other panel does.
 ///
-/// Distinct from the case below: this is the reading failing before Seerr is
-/// reached at all — an unreadable stack — where that one is Seerr reached and
+/// Distinct from the case below: this is the reading failing before the request service is
+/// reached at all — an unreadable stack — where that one is the request service reached and
 /// not answering. Both leave an empty list and they are not the same thing.
 #[test]
 fn a_household_panel_that_could_not_be_filled_says_why() {

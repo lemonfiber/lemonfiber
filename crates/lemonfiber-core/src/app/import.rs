@@ -2,7 +2,7 @@
 //!
 //! The mode that leaves both stacks standing. lemonfiber runs its own services and takes
 //! across what the operator built by hand: where releases are searched for, and the
-//! three libraries the *arrs follow.
+//! three libraries the curators follow.
 //!
 //! Nothing of theirs is written to, stopped, or removed — theirs is only ever read. What
 //! is written is written to lemonfiber's own services, and only where they do not

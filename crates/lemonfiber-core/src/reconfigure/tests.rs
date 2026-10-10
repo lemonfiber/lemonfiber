@@ -27,7 +27,7 @@ fn every_decision_says_what_changing_it_affects() {
     }
 }
 
-/// The sharpest one in the product: moving the data without re-pointing the *arrs
+/// The sharpest one in the product: moving the data without re-pointing the curators
 /// leaves a library that points at nothing, and that has to be said beforehand.
 #[test]
 fn moving_the_data_location_is_consequential_and_says_why() {

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "How much of the stack a backup covers.\n\nWhole-stack is the common case, but restoring one service is often what is\nactually wanted — one \\*arr's configuration mangled while the rest is fine —\nso the scope is recorded in the archive and honoured on the way back.",
+  "description": "How much of the stack a backup covers.\n\nWhole-stack is the common case, but restoring one service is often what is\nactually wanted — one curator's configuration mangled while the rest is fine —\nso the scope is recorded in the archive and honoured on the way back.",
   "oneOf": [
     {
       "description": "Every service's configuration, plus lemonfiber's own and the stack.",

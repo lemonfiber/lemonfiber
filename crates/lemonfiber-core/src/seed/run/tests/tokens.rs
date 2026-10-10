@@ -1,4 +1,4 @@
-//! The request gate's tokens: the request service reaches each \*arr through the gate,
+//! The request gate's tokens: the request service reaches each curator through the gate,
 //! under a token the gate accepts as a hash and lemonfiber keeps no copy of.
 
 use lemonfiber_sidecar::gate::{Accepted, File, Tokens, PORT};
@@ -11,17 +11,17 @@ fn minted() -> String {
     crate::secret::render(&[0xab; crate::secret::SECRET_BYTES])
 }
 
-/// A stack with Sonarr and the request service and, where `gating`, the request gate.
+/// A stack with a curator and the request service and, where `gating`, the request gate.
 fn stack(gating: bool) -> Vec<lemonfiber_manifest::Service> {
-    let mut services = vec![curator("sonarr", 8989, "tv"), seerr_svc()];
+    let mut services = vec![curator("sonarr", 8989, "tv"), requests_svc()];
     if gating {
         services.push(manifest_service("request-gate", None, Some(PORT)));
     }
     services
 }
 
-/// A stack directory where Sonarr has written its key and, where `accepted` names
-/// some, the gate accepts those tokens on Sonarr's route.
+/// A stack directory where the curator has written its key and, where `accepted` names
+/// some, the gate accepts those tokens on the curator's route.
 fn project(name: &str, accepted: &[&str]) -> std::path::PathBuf {
     let at = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
     let _ = std::fs::remove_dir_all(&at);
@@ -35,7 +35,7 @@ fn project(name: &str, accepted: &[&str]) -> std::path::PathBuf {
     at
 }
 
-/// The gate accepting `tokens` on Sonarr's route.
+/// The gate accepting `tokens` on the curator's route.
 fn accepting(tokens: &[&str]) -> Tokens {
     Tokens::of(vec![Accepted {
         route: "sonarr".to_owned(),
@@ -55,7 +55,7 @@ fn accepted(project: &std::path::Path) -> Option<Tokens> {
         .and_then(|text| Tokens::read(&text).ok())
 }
 
-/// Sonarr as the request service lists it: at `host` and `port` under `base`, with
+/// The curator as the request service lists it: at `host` and `port` under `base`, with
 /// `key`.
 fn listed(host: &str, port: u16, base: &str, key: &str) -> String {
     serde_json::json!([{
@@ -70,13 +70,13 @@ fn listed(host: &str, port: u16, base: &str, key: &str) -> String {
     .to_string()
 }
 
-/// Sonarr held at the gate with `key`.
+/// The curator held at the gate with `key`.
 fn at_the_gate(key: &str) -> String {
     listed("request-gate", PORT, "/sonarr", key)
 }
 
-/// A stack whose Sonarr answers with a profile and a folder, and whose request service
-/// lists each of `held` in turn for Sonarr, answering a registration with `added` and
+/// A stack whose curator answers with a profile and a folder, and whose request service
+/// lists each of `held` in turn for the curator, answering a registration with `added` and
 /// a move with `moved`.
 fn serving(held: &[&str], added: u16, moved: u16) -> Arc<Fake> {
     Fake::by_route_in_turn(vec![
@@ -153,10 +153,10 @@ fn states(wirings: &[Wiring]) -> Vec<State> {
     wirings.iter().map(|wiring| wiring.state.clone()).collect()
 }
 
-/// A stack with the gate hands the request service Sonarr at the gate, under a token
+/// A stack with the gate hands the request service the curator at the gate, under a token
 /// minted for its route, and the gate that token's hash alone.
 #[tokio::test]
-async fn an_arr_is_handed_over_at_the_gate_under_a_new_token() {
+async fn a_curator_is_handed_over_at_the_gate_under_a_new_token() {
     let at = project("tokens-fresh", &[]);
     let http = serving(&["[]", "[]", &at_the_gate(&minted())], 201, 200);
 
@@ -205,10 +205,10 @@ async fn a_token_the_gate_refuses_is_replaced() {
     assert_eq!(accepted(&at), Some(accepting(&[&minted()])));
 }
 
-/// Sonarr held at its own address is moved to the gate in place, keeping everything
+/// The curator held at its own address is moved to the gate in place, keeping everything
 /// the operator chose about it.
 #[tokio::test]
-async fn an_arr_held_at_its_own_address_is_moved_to_the_gate() {
+async fn a_curator_held_at_its_own_address_is_moved_to_the_gate() {
     let at = project("tokens-moved", &[]);
     let http = serving(&[&listed("sonarr", 8989, "", "sonarr-own-key")], 201, 200);
 
@@ -229,10 +229,10 @@ async fn an_arr_held_at_its_own_address_is_moved_to_the_gate() {
         .any(|asked| asked.method == Method::Post && asked.url.ends_with("/settings/sonarr")));
 }
 
-/// A stack that no longer runs the gate moves Sonarr back to its own address, with
+/// A stack that no longer runs the gate moves the curator back to its own address, with
 /// its own key.
 #[tokio::test]
-async fn removing_the_gate_moves_an_arr_back() {
+async fn removing_the_gate_moves_a_curator_back() {
     let at = project("tokens-ungated", &[]);
     let http = serving(&[&at_the_gate("held")], 201, 200);
 
@@ -248,7 +248,7 @@ async fn removing_the_gate_moves_an_arr_back() {
     );
 }
 
-/// A rehearsal says where Sonarr would move, and writes nothing to either side.
+/// A rehearsal says where the curator would move, and writes nothing to either side.
 #[tokio::test]
 async fn a_rehearsal_says_where_and_writes_nothing() {
     for (name, held, expected) in [

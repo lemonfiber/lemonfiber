@@ -9,7 +9,7 @@ fn answering(body: &'static str) -> Arc<Fake> {
     Fake::always(Answer::reply(200, body))
 }
 
-/// A Servarr config carrying a usable key, and one carrying none.
+/// A curator config carrying a usable key, and one carrying none.
 const CONFIG_WITH_KEY: &str = "<Config><ApiKey>a1b2c3d4e5</ApiKey></Config>";
 
 const CONFIG_NO_KEY: &str = "<Config><Port>8989</Port></Config>";
@@ -185,7 +185,7 @@ async fn an_engine_that_will_not_answer_leaves_the_door_panel_saying_why() {
 }
 
 /// A context configured with a fake filesystem and transport, over the stack
-/// this repo carries so its \*arr services resolve as queue targets.
+/// this repo carries so its curator services resolve as queue targets.
 fn ctx_with(fs: SeedFs, http: Arc<Fake>) -> Ctx {
     ctx(Reporting::holding(
         &LIBRARY,
@@ -197,7 +197,7 @@ fn ctx_with(fs: SeedFs, http: Arc<Fake>) -> Ctx {
 }
 
 #[tokio::test]
-async fn the_queue_panel_fills_with_each_arrs_depth_and_stuck_count() {
+async fn the_queue_panel_fills_with_each_curators_depth_and_stuck_count() {
     let ctx = ctx_with(
         SeedFs::keyed(Some(CONFIG_WITH_KEY), None),
         answering(QUEUE_JSON),
@@ -306,8 +306,8 @@ async fn an_unreadable_volume_reports_free_space_unknown_not_zero() {
 }
 
 /// A context configured to read download clients: the library stack running, a
-/// fake filesystem for `SABnzbd`'s key, the given transport, and — where set — an
-/// env file holding qBittorrent's recorded password.
+/// fake filesystem for the Usenet client's key, the given transport, and — where set — an
+/// env file holding the torrent client's recorded password.
 fn ctx_downloads(fs: SeedFs, http: Arc<dyn Http>, env_file: Option<PathBuf>) -> Ctx {
     let settings = Settings {
         protocols: Protocols::both(),
@@ -366,7 +366,7 @@ async fn the_transfers_panel_fills_from_each_download_client() {
 
 #[tokio::test]
 async fn a_client_not_yet_seeded_is_left_out_not_a_failure() {
-    // No recorded qBittorrent password and no SABnzbd key on disk: both are
+    // No recorded torrent client password and no Usenet client key on disk: both are
     // still finishing first start, so each is skipped and the panel is
     // ready-but-empty rather than failed.
     let http: Arc<dyn Http> = Fake::scripted(Vec::new());
@@ -377,8 +377,8 @@ async fn a_client_not_yet_seeded_is_left_out_not_a_failure() {
 
 #[tokio::test]
 async fn a_client_whose_key_is_not_on_disk_yet_is_left_out() {
-    // SABnzbd has written a config but not its key; qBittorrent has no recorded
-    // password. Neither can be read, so neither appears.
+    // The Usenet client has written a config but not its key; the torrent client has no
+    // recorded password. Neither can be read, so neither appears.
     let http: Arc<dyn Http> = Fake::scripted(Vec::new());
     let ctx = ctx_downloads(SeedFs::keyed(None, Some(SAB_NO_KEY_INI)), http, None);
     let snapshot = gather(&ctx, None).await;
@@ -387,7 +387,7 @@ async fn a_client_whose_key_is_not_on_disk_yet_is_left_out() {
 
 #[tokio::test]
 async fn a_download_client_that_will_not_answer_is_left_out() {
-    // The password is recorded, but qBittorrent's login goes unanswered, so it
+    // The password is recorded, but the torrent client's login goes unanswered, so it
     // is dropped from the panel rather than failing it.
     let http: Arc<dyn Http> = Fake::scripted(Vec::new());
     let ctx = ctx_downloads(

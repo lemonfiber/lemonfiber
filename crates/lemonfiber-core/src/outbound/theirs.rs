@@ -1,10 +1,10 @@
 //! The requests the stack's own services make, attributed to them.
 //!
-//! An indexer query is Prowlarr asking an indexer. A poster is Radarr asking a
-//! metadata provider. A peer connection is qBittorrent being a torrent client.
-//! Counting any of those as lemonfiber's would overstate what this product does —
-//! and leaving them out would understate what running the stack does, which is the
-//! thing an operator is actually deciding about.
+//! An indexer query is the indexer aggregator asking an indexer. A poster is a curator
+//! asking a metadata provider. A peer connection is the torrent client being a torrent
+//! client. Counting any of those as lemonfiber's would overstate what this product does —
+//! and leaving them out would understate what running the stack does, which is the thing an
+//! operator is actually deciding about.
 //!
 //! **The stack is what says so.** A service declares where it reaches and what it
 //! asks for in its own manifest entry, and that is what the inventory carries. So

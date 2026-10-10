@@ -1,21 +1,21 @@
 //! There is one way into the request service, and it is the account somebody
 //! already has.
 //!
-//! A household member signs in to Seerr with their Jellyfin account — the same
-//! credentials that let them watch — because this program points Seerr's identity at
-//! the media server rather than letting it keep accounts of its own. That is what
-//! makes a second registration unnecessary: not a setting that forbids one, but
-//! there being nothing else to sign in through.
+//! A household member signs in to the request service with their media server account — the
+//! same credentials that let them watch — because this program points the request service's
+//! identity at the media server rather than letting it keep accounts of its own. That is
+//! what makes a second registration unnecessary: not a setting that forbids one, but there
+//! being nothing else to sign in through.
 //!
 //! Held by reading the endpoints this program asks for. That is a sweep of source
 //! text, which is the wrong instrument when the claim is about behaviour and the
 //! text merely describes it — here the claim *is* which endpoints are asked for, so
 //! the strings are the subject rather than a description of it.
 //!
-//! What this does not claim: that Seerr's own local sign-in is switched off. Nothing
-//! here touches that setting, and nothing asks for it — what is required is that no
-//! separate registration be *required*, and an identity source somebody already has
-//! an account with satisfies that whatever else the service permits.
+//! What this does not claim: that the request service's own local sign-in is switched off.
+//! Nothing here touches that setting, and nothing asks for it — what is required is that no
+//! separate registration be *required*, and an identity source somebody already has an
+//! account with satisfies that whatever else the service permits.
 
 use std::collections::BTreeSet;
 use std::fs;

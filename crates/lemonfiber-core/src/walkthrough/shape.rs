@@ -1,10 +1,10 @@
 //! Which walkthrough a stack deserves, and whether to offer one at all.
 //!
-//! Not every stack can fetch something. One configured for neither usenet nor torrents is
-//! a media server over media the household already owns, and offering to acquire
-//! something would be the product misunderstanding its own operator. That stack still has
-//! a first-content question worth answering — *can Jellyfin see my files?* — so it gets a
-//! walkthrough of its own rather than none.
+//! Not every stack can fetch something. One configured for neither usenet nor torrents is a
+//! media server over media the household already owns, and offering to acquire something
+//! would be the product misunderstanding its own operator. That stack still has a
+//! first-content question worth answering — *can the media server see my files?* — so it
+//! gets a walkthrough of its own rather than none.
 //!
 //! And a stack with no indexer configured cannot search. Offering a walk that must stop
 //! at the first step teaches the operator that the product does not know what it is doing;

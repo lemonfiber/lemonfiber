@@ -129,7 +129,7 @@ pub(crate) async fn settled(ctx: &Ctx) {
 /// identity source, under that server's own setting.
 fn minted(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> Vec<Minted> {
     let torrent = service_addr(&manifest.services, ApiKind::Qbittorrent).map(|addr| Minted {
-        setting: config::QBITTORRENT_PASSWORD_KEY.to_owned(),
+        setting: config::TORRENT_PASSWORD_KEY.to_owned(),
         kind: ApiKind::Qbittorrent,
         loopback: addr.loopback,
         id: addr.id,
@@ -155,7 +155,7 @@ async fn taken(ctx: &Ctx, minted: &Minted, password: &str) -> Option<bool> {
             ctx.seams.http.clone(),
             &minted.loopback,
             &minted.id,
-            config::JELLYFIN_ADMIN_USER,
+            config::MEDIA_SERVER_ADMIN_USER,
             password,
         )
         .accepts()

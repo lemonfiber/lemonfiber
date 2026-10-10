@@ -1,6 +1,6 @@
 //! What moving the data location does to the library paths already in place.
 //!
-//! The sharpest change in the product. Every \*arr holds absolute paths to its root
+//! The sharpest change in the product. Every curator holds absolute paths to its root
 //! folders, and those paths are inside its container: they name the mount, not the
 //! host directory under it. Moving the data location moves what the mount resolves
 //! to, so a path like `/data/media/tv` goes on being spelled the same and starts
@@ -8,7 +8,7 @@
 //! be worked out before the write rather than discovered after it.
 //!
 //! Two ways a path fails to survive the move. It can sit inside the mount and
-//! resolve to a host directory that is not there, which leaves the \*arr importing
+//! resolve to a host directory that is not there, which leaves the curator importing
 //! into a void. Or it can sit *outside* the mount altogether — a folder the operator
 //! or an adopted stack pointed somewhere of its own — in which case moving the data
 //! location cannot re-point it at all, and no write here would.
@@ -103,7 +103,7 @@ pub fn moving(existing: &[Existing], to: &Path) -> Vec<LibraryPath> {
 ///
 /// `None` where every path carries, which is the move that may simply be made.
 /// A path that would not carry is not a judgement call an operator can take on:
-/// there is no version of this where the \*arrs point at absent paths and the
+/// there is no version of this where the curators point at absent paths and the
 /// operator is better off, so the sentence names what breaks rather than offering
 /// to break it.
 #[must_use]

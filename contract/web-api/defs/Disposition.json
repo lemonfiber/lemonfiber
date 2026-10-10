@@ -23,7 +23,7 @@
       "const": "held"
     },
     {
-      "description": "The recorded preset was re-asserted over the Recyclarr config, overwriting\na hand-edit where an ordinary run would have preserved it.",
+      "description": "The recorded preset was re-asserted over the quality sync config, overwriting\na hand-edit where an ordinary run would have preserved it.",
       "type": "string",
       "const": "reapplied"
     },

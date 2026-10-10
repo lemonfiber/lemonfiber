@@ -1,4 +1,4 @@
-//! One item's journey through a \*arr: its library, its history and its queue.
+//! One item's journey through a curator: its library, its history and its queue.
 //!
 //! The reads a trace needs, kept apart from the writes that wire the stack —
 //! the same split the adapter itself makes.
@@ -11,8 +11,8 @@ use lemonfiber_core::servarr::Servarr;
 use lemonfiber_core::trace::{Outcome, Stage};
 use lemonfiber_fixtures::http::{Answer, Fake};
 
-/// A Sonarr client over the given fake — the v3 the media *arrs answer at.
-fn sonarr(fake: &Arc<Fake>) -> Servarr {
+/// A Sonarr client over the given fake — the v3 the media curators answer at.
+fn curator(fake: &Arc<Fake>) -> Servarr {
     let http: Arc<dyn Http> = fake.clone();
     Servarr::new(http, "http://sonarr:8989", "the-key", "sonarr", 3)
 }
@@ -20,7 +20,7 @@ fn sonarr(fake: &Arc<Fake>) -> Servarr {
 // ---- Pipeline (item trace fragment) ----
 
 /// A Sonarr client (v3) over the given router.
-fn sonarr_routed(router: &Arc<Fake>) -> Servarr {
+fn curator_routed(router: &Arc<Fake>) -> Servarr {
     let http: Arc<dyn Http> = router.clone();
     Servarr::new(http, "http://sonarr:8989", "the-key", "sonarr", 3)
 }
@@ -38,7 +38,7 @@ async fn find_items_matches_the_library_by_human_title() {
         ),
     )]);
     // Case-insensitive substring of the title, never an internal id.
-    let found = sonarr_routed(&router)
+    let found = curator_routed(&router)
         .find_items(Kind::Tv, "expanse")
         .await
         .unwrap_or_default();
@@ -60,11 +60,11 @@ async fn find_items_reads_the_library_for_the_service_kind() {
             r#"[{"id":7,"title":"Dune","monitored":true}]"#.to_owned(),
         ),
     )]);
-    let radarr = {
+    let movie_curator = {
         let http: Arc<dyn Http> = router.clone();
         Servarr::new(http, "http://radarr:7878", "the-key", "radarr", 3)
     };
-    let found = radarr
+    let found = movie_curator
         .find_items(Kind::Movies, "dune")
         .await
         .unwrap_or_default();
@@ -92,7 +92,7 @@ async fn item_history_keeps_the_notable_events_and_drops_the_rest() {
             .to_owned(),
         ),
     )]);
-    let events = sonarr_routed(&router)
+    let events = curator_routed(&router)
         .item_history(Kind::Tv, 1)
         .await
         .unwrap_or_default();
@@ -133,7 +133,7 @@ async fn an_unreadable_library_is_a_failure() {
         "/series",
         Answer::reply(200, "not json".to_owned()),
     )]);
-    assert!(sonarr_routed(&router)
+    assert!(curator_routed(&router)
         .find_items(Kind::Tv, "x")
         .await
         .is_err());
@@ -146,7 +146,7 @@ async fn an_unreadable_history_is_a_failure() {
         "/history",
         Answer::reply(200, "not json".to_owned()),
     )]);
-    assert!(sonarr_routed(&router)
+    assert!(curator_routed(&router)
         .item_history(Kind::Tv, 1)
         .await
         .is_err());
@@ -158,7 +158,7 @@ async fn item_queue_reads_a_downloading_item_by_series() {
             {"seriesId":1,"episodeId":42,"trackedDownloadState":"downloading","trackedDownloadStatus":"ok"}
         ]}"#
         .to_owned()))]);
-    let queue = sonarr_routed(&router)
+    let queue = curator_routed(&router)
         .item_queue(Kind::Tv, 1)
         .await
         .unwrap_or_default();
@@ -189,11 +189,14 @@ async fn item_queue_reads_a_film_by_movie_and_flags_stuck() {
             .to_owned(),
         ),
     )]);
-    let radarr = {
+    let movie_curator = {
         let http: Arc<dyn Http> = router.clone();
         Servarr::new(http, "http://radarr:7878", "the-key", "radarr", 3)
     };
-    let queue = radarr.item_queue(Kind::Movies, 7).await.unwrap_or_default();
+    let queue = movie_curator
+        .item_queue(Kind::Movies, 7)
+        .await
+        .unwrap_or_default();
     // A film's record names no part — the record is for the whole item.
     assert_eq!(
         queue,
@@ -226,7 +229,7 @@ async fn item_queue_walks_past_the_first_page_to_find_the_item() {
         (Method::Get, "/queue?page=1", Answer::reply(200, page_one)),
         (Method::Get, "/queue?page=2", Answer::reply(200, page_two)),
     ]);
-    let queue = sonarr_routed(&router)
+    let queue = curator_routed(&router)
         .item_queue(Kind::Tv, 1)
         .await
         .unwrap_or_default();
@@ -254,7 +257,7 @@ async fn item_queue_holding_nothing_for_the_item_is_empty() {
             r#"{"records":[{"seriesId":99,"trackedDownloadState":"downloading"}]}"#.to_owned(),
         ),
     )]);
-    let queue = sonarr_routed(&router)
+    let queue = curator_routed(&router)
         .item_queue(Kind::Tv, 1)
         .await
         .unwrap_or_default();
@@ -269,7 +272,7 @@ async fn item_parts_reads_the_episodes_of_a_series() {
             {"id":13,"seasonNumber":0,"episodeNumber":1,"title":"A Special"}
         ]"#
         .to_owned()))]);
-    let parts = sonarr_routed(&router)
+    let parts = curator_routed(&router)
         .item_parts(Kind::Tv, 1, None)
         .await
         .unwrap_or_default();
@@ -310,7 +313,7 @@ async fn item_parts_narrows_to_one_season_at_the_service() {
         "/episode",
         Answer::reply(200, "[]".to_owned()),
     )]);
-    let parts = sonarr_routed(&router)
+    let parts = curator_routed(&router)
         .item_parts(Kind::Tv, 1, Some(2))
         .await
         .unwrap_or_default();
@@ -327,11 +330,11 @@ async fn a_film_has_no_parts_and_is_never_asked_for_them() {
     // A film is the whole item. Asking a service that files nothing per part would be a
     // request with no answer, so none is made.
     let router = Fake::by_route(Vec::new());
-    let radarr = {
+    let movie_curator = {
         let http: Arc<dyn Http> = router.clone();
         Servarr::new(http, "http://radarr:7878", "the-key", "radarr", 3)
     };
-    let parts = radarr
+    let parts = movie_curator
         .item_parts(Kind::Movies, 7, None)
         .await
         .unwrap_or_default();
@@ -346,7 +349,7 @@ async fn unreadable_episodes_are_a_failure() {
         "/episode",
         Answer::reply(200, "not json".to_owned()),
     )]);
-    assert!(sonarr_routed(&router)
+    assert!(curator_routed(&router)
         .item_parts(Kind::Tv, 1, None)
         .await
         .is_err());
@@ -364,7 +367,7 @@ async fn stuck_items_names_each_stuck_show_once() {
             {"trackedDownloadStatus":"warning","trackedDownloadState":"downloading"}
         ]}"#
         .to_owned()))]);
-    let items = sonarr_routed(&router)
+    let items = curator_routed(&router)
         .stuck_items(Kind::Tv)
         .await
         .unwrap_or_default();
@@ -387,11 +390,14 @@ async fn stuck_items_names_each_stuck_show_once() {
 async fn stuck_items_names_a_stuck_film_by_its_movie() {
     let router = Fake::by_route(vec![(Method::Get, "/queue", Answer::reply(200, r#"{"records":[{"trackedDownloadStatus":"error","trackedDownloadState":"downloading","movie":{"title":"Dune"}}]}"#
             .to_owned()))]);
-    let radarr = {
+    let movie_curator = {
         let http: Arc<dyn Http> = router.clone();
         Servarr::new(http, "http://radarr:7878", "the-key", "radarr", 3)
     };
-    let items = radarr.stuck_items(Kind::Movies).await.unwrap_or_default();
+    let items = movie_curator
+        .stuck_items(Kind::Movies)
+        .await
+        .unwrap_or_default();
     assert_eq!(items.first().map(|item| item.title.as_str()), Some("Dune"));
     assert!(router
         .requests()
@@ -406,7 +412,7 @@ async fn an_unreadable_queue_is_a_failure() {
         "/queue",
         Answer::reply(200, "not json".to_owned()),
     )]);
-    assert!(sonarr_routed(&router)
+    assert!(curator_routed(&router)
         .item_queue(Kind::Tv, 1)
         .await
         .is_err());
@@ -415,7 +421,7 @@ async fn an_unreadable_queue_is_a_failure() {
 #[tokio::test]
 async fn whether_the_service_hardlinks_is_read_from_its_own_settings() {
     let fake = Fake::always(Answer::reply(200, r#"{"id":1,"copyUsingHardlinks":true}"#));
-    assert_eq!(sonarr(&fake).hardlinks().await.ok(), Some(true));
+    assert_eq!(curator(&fake).hardlinks().await.ok(), Some(true));
 }
 
 #[tokio::test]
@@ -426,7 +432,7 @@ async fn telling_it_to_copy_keeps_every_other_setting_it_had() {
         200,
         r#"{"id":3,"copyUsingHardlinks":true,"importExtraFiles":true,"recycleBin":"/data/bin"}"#,
     ));
-    assert!(sonarr(&fake).set_hardlinks(false).await.is_ok());
+    assert!(curator(&fake).set_hardlinks(false).await.is_ok());
 
     let sent = fake
         .request()
@@ -445,7 +451,7 @@ async fn telling_it_to_copy_keeps_every_other_setting_it_had() {
 #[tokio::test]
 async fn settings_that_are_not_an_object_are_refused_rather_than_guessed() {
     let fake = Fake::always(Answer::reply(200, "[]"));
-    assert!(sonarr(&fake).set_hardlinks(false).await.is_err());
+    assert!(curator(&fake).set_hardlinks(false).await.is_err());
 }
 
 #[tokio::test]
@@ -478,7 +484,7 @@ async fn an_item_fetched_over_and_over_carries_the_count_the_history_shows() {
             ),
         ),
     ]);
-    let read = sonarr_routed(&router)
+    let read = curator_routed(&router)
         .queue()
         .await
         .ok()
@@ -514,7 +520,7 @@ async fn an_item_grabbed_again_after_it_imported_is_not_counted_as_a_loop() {
             ),
         ),
     ]);
-    let read = sonarr_routed(&router)
+    let read = curator_routed(&router)
         .queue()
         .await
         .ok()
@@ -543,7 +549,7 @@ async fn a_history_that_cannot_be_read_still_answers_with_the_queue() {
             Answer::reply(200, "not json at all".to_owned()),
         ),
     ]);
-    let read = sonarr_routed(&router)
+    let read = curator_routed(&router)
         .queue()
         .await
         .ok()
@@ -572,7 +578,7 @@ async fn a_history_the_service_refuses_still_answers_with_the_queue() {
             Answer::reply(500, "nope".to_owned()),
         ),
     ]);
-    let read = sonarr_routed(&router)
+    let read = curator_routed(&router)
         .queue()
         .await
         .ok()
@@ -594,7 +600,7 @@ async fn the_library_says_the_year_each_item_came_out_and_no_year_where_it_knows
                 .to_owned(),
         ),
     )]);
-    let years: Vec<Option<u16>> = sonarr_routed(&router)
+    let years: Vec<Option<u16>> = curator_routed(&router)
         .library(Kind::Tv)
         .await
         .unwrap_or_default()

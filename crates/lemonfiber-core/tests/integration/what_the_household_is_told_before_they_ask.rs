@@ -18,7 +18,7 @@ use lemonfiber_core::ports::service::Noticing;
 use lemonfiber_core::seerr::Seerr;
 use lemonfiber_fixtures::http::{Answer, Fake};
 
-fn seerr(fake: &Arc<Fake>) -> Seerr {
+fn request_service(fake: &Arc<Fake>) -> Seerr {
     let http: Arc<dyn Http> = fake.clone();
     Seerr::new(http, "http://127.0.0.1:5055", "seerr")
 }
@@ -92,7 +92,7 @@ fn sent_to(fake: &Arc<Fake>, method: Method, fragment: &str) -> Vec<Request> {
 async fn saying_again_what_is_already_said_writes_nothing() {
     let fake = hanging(ROWS, ROWS);
 
-    let hung = seerr(&fake)
+    let hung = request_service(&fake)
         .set_notices(&[
             "a film costs this much".to_owned(),
             "the disk is full".to_owned(),
@@ -116,7 +116,7 @@ async fn saying_again_what_is_already_said_writes_nothing() {
 async fn the_same_notices_in_another_order_are_written() {
     let fake = hanging(ROWS, AFTER);
 
-    let hung = seerr(&fake)
+    let hung = request_service(&fake)
         .set_notices(&[
             "the disk is full".to_owned(),
             "a film costs this much".to_owned(),
@@ -136,7 +136,7 @@ async fn the_same_notices_in_another_order_are_written() {
 async fn hanging_a_notice_leaves_every_other_row_as_it_was() {
     let fake = hanging(ROWS, AFTER);
 
-    let hung = seerr(&fake)
+    let hung = request_service(&fake)
         .set_notices(&["something new".to_owned()])
         .await;
 
@@ -224,7 +224,7 @@ async fn hanging_a_notice_leaves_every_other_row_as_it_was() {
 async fn a_house_with_nothing_to_say_takes_its_notices_down() {
     let fake = hanging(ROWS, UNTOUCHED);
 
-    let hung = seerr(&fake).set_notices(&[]).await;
+    let hung = request_service(&fake).set_notices(&[]).await;
 
     assert!(hung.is_ok());
     assert_eq!(
@@ -244,7 +244,7 @@ async fn a_service_that_will_not_answer_is_a_failure() {
     let fake = Fake::silent();
 
     assert!(
-        seerr(&fake)
+        request_service(&fake)
             .set_notices(&["anything".to_owned()])
             .await
             .is_err(),
@@ -262,7 +262,7 @@ async fn an_unreadable_answer_is_a_failure() {
     )]);
 
     assert!(
-        seerr(&fake)
+        request_service(&fake)
             .set_notices(&["anything".to_owned()])
             .await
             .is_err(),
@@ -308,7 +308,7 @@ async fn a_refusal_at_any_write_is_a_refusal() {
         ]);
 
         assert!(
-            seerr(&fake)
+            request_service(&fake)
                 .set_notices(&["something new".to_owned()])
                 .await
                 .is_err(),
@@ -344,7 +344,7 @@ async fn a_page_that_will_not_be_read_back_is_a_failure() {
     ]);
 
     assert!(
-        seerr(&fake)
+        request_service(&fake)
             .set_notices(&["something new".to_owned()])
             .await
             .is_err(),

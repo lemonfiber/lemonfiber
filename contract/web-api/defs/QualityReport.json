@@ -11,7 +11,7 @@
       }
     },
     "customised": {
-      "description": "Whether the Recyclarr config has been hand-edited since lemonfiber wrote it —\nthe `customised` state, in which the preset is no longer authoritative until\nit is deliberately re-asserted. For a reapply, whether an edit was overwritten.",
+      "description": "Whether the quality sync config has been hand-edited since lemonfiber wrote it —\nthe `customised` state, in which the preset is no longer authoritative until\nit is deliberately re-asserted. For a reapply, whether an edit was overwritten.",
       "type": "boolean"
     },
     "disposition": {

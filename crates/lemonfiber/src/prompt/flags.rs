@@ -36,8 +36,8 @@ pub(super) fn parse_protocols(value: &str) -> Result<Protocols, String> {
 /// Read `--library` into a library choice, or name what was expected.
 pub(super) fn parse_library(value: &str) -> Result<Library, String> {
     match value.to_lowercase().as_str() {
-        "docker" => Ok(Library::JellyfinDocker),
-        "native" => Ok(Library::JellyfinNative),
+        "docker" => Ok(Library::Docker),
+        "native" => Ok(Library::Native),
         "none" => Ok(Library::None),
         other => Err(format!(
             "--library must be docker, native or none, not `{other}`"
@@ -267,7 +267,7 @@ impl Prompt for Flags {
         self.flags.service_user
     }
     fn library(&self) -> Library {
-        self.flags.library.unwrap_or(Library::JellyfinDocker)
+        self.flags.library.unwrap_or(Library::Docker)
     }
     fn vpn(&self) -> bool {
         // A non-interactive run states it with a flag; absent, it is taken as no,

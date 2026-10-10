@@ -1,9 +1,9 @@
 //! Nobody in the house needs an account here, and this holds it to the types.
 //!
-//! Somebody who lives here signs into Jellyfin to watch and into Seerr to ask for
-//! something, and both authenticate against the one Jellyfin account they were
-//! given. This program is not in that path. It has one credential of its own — the
-//! operator's, for the web surface — and no way to hold a second.
+//! Somebody who lives here signs into the media server to watch and into the request
+//! service to ask for something, and both authenticate against the one media server account
+//! they were given. This program is not in that path. It has one credential of its own —
+//! the operator's, for the web surface — and no way to hold a second.
 //!
 //! That is true today by there being nothing to make it false, which is the kind of
 //! truth that lasts until somebody adds a login. What makes it structural rather

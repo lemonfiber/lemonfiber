@@ -567,7 +567,7 @@ pub(crate) fn seeded(ctx: &Ctx) {
     };
     let Ok(()) = lemonfiber_core::config::store::set(
         env,
-        lemonfiber_core::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+        lemonfiber_core::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         &a_password(),
     ) else {
         unreachable!("a scratch directory can be written")

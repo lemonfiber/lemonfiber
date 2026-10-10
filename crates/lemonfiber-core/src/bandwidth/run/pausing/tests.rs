@@ -7,7 +7,7 @@ use crate::bandwidth::{Declared, Pausing, Pulling};
 use crate::config::Settings;
 use crate::test_support::{a_context, a_password, env_at};
 
-/// What qBittorrent says about whether it would start the next thing it is handed.
+/// What the torrent client says about whether it would start the next thing it is handed.
 const ADDS_STOPPED: &str = r#"{"add_stopped_enabled":true}"#;
 
 /// The same, where it would start it.

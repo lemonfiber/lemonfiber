@@ -4,9 +4,9 @@ use super::*;
 
 #[tokio::test]
 async fn a_wired_root_folder_the_host_cannot_back_is_a_warning() {
-    // The *arr files into `/data/media/tv`, but the host directory it resolves to
+    // The curator files into `/data/media/tv`, but the host directory it resolves to
     // is not there — the operator repointed the data root, or the media directory
-    // was never made. The *arr imports into a void, so the folder is raised to a
+    // was never made. The curator imports into a void, so the folder is raised to a
     // warning naming the missing path.
     let filesystem = SeedFs::keyed(None, None).missing(vec!["media/tv"]);
     let wanted = [root("tv")];
@@ -63,8 +63,8 @@ async fn a_root_folder_check_without_a_data_root_escalates_nothing() {
 
 #[tokio::test]
 async fn a_root_folder_not_wired_is_not_warned_even_where_the_path_is_missing() {
-    // A skipped folder is not one the *arr files into, so a missing path there is
-    // not yet a break — only the folders the *arr actually holds are checked.
+    // A skipped folder is not one the curator files into, so a missing path there is
+    // not yet a break — only the folders the curator actually holds are checked.
     let filesystem = SeedFs::keyed(None, None).missing(vec!["media/tv"]);
     let wanted = [root("tv")];
     let mut wirings = vec![Wiring::settled(
@@ -111,7 +111,7 @@ async fn a_reset_previews_then_reverts_a_drifted_connection() {
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
     let env = dir.join(".env");
-    // A recorded qBittorrent password makes a qBittorrent download client wanted; a
+    // A recorded torrent client password makes a torrent download client wanted; a
     // baseline recording lemonfiber's category for it, against the categoryless client
     // the service now reports, reads as the operator's drift to revert.
     let _ = std::fs::write(&env, "QBITTORRENT_PASSWORD=pw\n");
@@ -149,10 +149,10 @@ async fn a_reset_previews_then_reverts_a_drifted_connection() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// The Servarr routing, but answering `system/status` with a set version and
+/// The curator routing, but answering `system/status` with a set version and
 /// holding each download client under a drifted category — so a schema change
 /// (version bumped, every client moved) can be driven end to end.
-/// A seed run whose \*arrs report the given major version, and hold a second
+/// A seed run whose curators report the given major version, and hold a second
 /// download client the ordinary routes do not.
 ///
 /// Three routes over the ordinary table rather than a transport of its own: the
@@ -187,7 +187,7 @@ fn clients_answering(clients: Answer) -> Arc<Fake> {
 }
 
 /// A context seeding the real stack over the given transport, with a
-/// qBittorrent password recorded and the given baseline written beside it.
+/// torrent client password recorded and the given baseline written beside it.
 fn schema_ctx(dir: &std::path::Path, baseline: &str, http: Arc<Fake>) -> Ctx {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let _ = std::fs::create_dir_all(dir);
@@ -204,8 +204,8 @@ fn schema_ctx(dir: &std::path::Path, baseline: &str, http: Arc<Fake>) -> Ctx {
         .with_http(http)
 }
 
-/// The state of the `qBittorrent into Sonarr` wiring in a seed report.
-fn qbittorrent_into_sonarr(report: &crate::seed::Report) -> Option<&crate::seed::State> {
+/// The state of the torrent client's wiring into the curator in a seed report.
+fn torrent_into_curator(report: &crate::seed::Report) -> Option<&crate::seed::State> {
     report
         .wirings
         .iter()
@@ -215,7 +215,7 @@ fn qbittorrent_into_sonarr(report: &crate::seed::Report) -> Option<&crate::seed:
 
 #[tokio::test]
 async fn a_schema_change_re_baselines_rather_than_reporting_mass_drift() {
-    // Sonarr moved from version 4 to 5, and its one managed download client now
+    // The curator moved from version 4 to 5, and its one managed download client now
     // reads a different category — every managed value moved at once. That is the
     // upgrade renaming fields, not the operator editing each, so the current shape
     // is adopted as the new baseline and the wiring reads adopted, not drifted.
@@ -226,7 +226,7 @@ async fn a_schema_change_re_baselines_rather_than_reporting_mass_drift() {
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     assert_eq!(
-        qbittorrent_into_sonarr(&report),
+        torrent_into_curator(&report),
         Some(&crate::seed::State::Adopted),
         "a schema change adopts the current shape rather than reporting drift"
     );
@@ -241,7 +241,7 @@ async fn a_schema_change_re_baselines_rather_than_reporting_mass_drift() {
 
 #[tokio::test]
 async fn a_version_change_with_only_some_drift_is_left_as_the_operators_edits() {
-    // The version changed, but Sonarr never recorded this client — so it reads as
+    // The version changed, but the curator never recorded this client — so it reads as
     // the operator's own, unmanaged, not as drift. Not every managed value moved,
     // so it is not a schema change: it is left as it is rather than re-baselined.
     let dir = lemonfiber_fixtures::scratch::Scratch::named("schema-partial").kept();
@@ -251,7 +251,7 @@ async fn a_version_change_with_only_some_drift_is_left_as_the_operators_edits() 
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     assert_eq!(
-        qbittorrent_into_sonarr(&report),
+        torrent_into_curator(&report),
         Some(&crate::seed::State::Unmanaged),
         "a version change alone does not re-baseline a value that did not wholesale-drift"
     );
@@ -260,7 +260,7 @@ async fn a_version_change_with_only_some_drift_is_left_as_the_operators_edits() 
 
 #[tokio::test]
 async fn an_unchanged_version_leaves_a_drift_as_the_drift_it_is() {
-    // Sonarr is on the version lemonfiber last recorded, so nothing upgraded — the
+    // The curator is on the version lemonfiber last recorded, so nothing upgraded — the
     // client that differs is the operator's edit, reported as drift and preserved,
     // not re-baselined.
     let dir = lemonfiber_fixtures::scratch::Scratch::named("schema-same");
@@ -270,7 +270,7 @@ async fn an_unchanged_version_leaves_a_drift_as_the_drift_it_is() {
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     assert_eq!(
-        qbittorrent_into_sonarr(&report),
+        torrent_into_curator(&report),
         Some(&crate::seed::State::Drifted),
         "an unchanged version leaves a drift as drift"
     );
@@ -281,7 +281,7 @@ async fn an_unchanged_version_leaves_a_drift_as_the_drift_it_is() {
 /// nothing to fail the read — with every other call answered plainly. For the
 /// reset-connection edge cases, where what the service holds decides the preview.
 /// A context for the reset-connection edge cases: the real stack, a recorded
-/// qBittorrent password so a client is wanted, keys per `filesystem`, over `http`.
+/// torrent client password so a client is wanted, keys per `filesystem`, over `http`.
 fn reset_ctx(
     dir: &std::path::Path,
     filesystem: Arc<SeedFs>,
@@ -327,8 +327,8 @@ async fn a_reset_over_an_unreadable_register_puts_back_nothing() {
 }
 
 #[tokio::test]
-async fn a_reset_skips_an_arr_that_has_not_written_its_key() {
-    // A client is wanted, but the \*arr's key is not readable — it has not finished
+async fn a_reset_skips_a_curator_that_has_not_written_its_key() {
+    // A client is wanted, but the curator's key is not readable — it has not finished
     // starting — so there is nothing to open and it is passed over rather than reset.
     let dir = lemonfiber_fixtures::scratch::Scratch::named("reset-noopen");
     let _ = std::fs::remove_dir_all(&dir);

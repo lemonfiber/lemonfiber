@@ -54,7 +54,7 @@ fn a_curator_the_request_gate_reaches_joins_the_gates_network() {
 /// A media server the operator chose for the identity the request service asks for
 /// joins the networks the request gate reaches the stack's on, and not the one the
 /// stack's media server shares with the decline service alone: the decline service
-/// reaches Jellyfin by name, never whatever serves identity, so a stand-in is never
+/// reaches the media server by name, never whatever serves identity, so a stand-in is never
 /// reached over that network and is given no route to the decline service.
 #[test]
 fn a_chosen_media_server_joins_the_gates_network_and_not_the_decline_services() {

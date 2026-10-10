@@ -10,7 +10,7 @@ use crate::trace::{Confidence, Coverage, Outcome, Part, Presence, Stage};
 use super::explaining::{stall_reason, trace_findings};
 use super::reading::Fragments;
 
-/// Build the trace from what one \*arr knows and what the media server confirms: the
+/// Build the trace from what one curator knows and what the media server confirms: the
 /// stages its history records, what its queue is doing now, whether it is finally in the
 /// library, the furthest reached, and — where a record proves it — why it stopped.
 pub(crate) fn assemble(
@@ -26,7 +26,7 @@ pub(crate) fn assemble(
         library,
         reads,
     } = fragments;
-    // Presence in the media server only means something for availability once an \*arr is
+    // Presence in the media server only means something for availability once a curator is
     // monitoring the item; for one nobody asked for, "not monitored" is the whole answer,
     // and a library match is not availability but a disagreement — surfaced below as a
     // finding, never folded into how far the item got.
@@ -57,7 +57,7 @@ pub(crate) fn assemble(
     let mut reached = advancing;
     reached.extend(queue_stage);
     // The library is the last word on how far an item got: confirmed present, it is
-    // available whatever the \*arr's own record stops at.
+    // available whatever the curator's own record stops at.
     let present = library == Some(Presence::Present);
     if present {
         reached.push(Stage::Available);
@@ -102,7 +102,7 @@ pub(crate) fn assemble(
         }
     }
     // The media server's confirmation is the final stage — a present fact, so untimed, and
-    // always past what a \*arr's history and queue can show.
+    // always past what a curator's history and queue can show.
     if present {
         stages.push(TraceStage {
             stage: Stage::Available,

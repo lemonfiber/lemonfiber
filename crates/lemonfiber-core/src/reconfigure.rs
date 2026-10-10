@@ -7,7 +7,7 @@
 //!
 //! So every answer setup writes is listed here with what changing it costs and what
 //! changing it affects. The cost is the part that has to arrive *before* the write:
-//! moving the data location without re-pointing the *arrs leaves a library that points
+//! moving the data location without re-pointing the curators leaves a library that points
 //! at nothing, and an operator told that afterwards has already lost the thing the
 //! telling was for.
 //!
@@ -26,7 +26,7 @@
 //! a proposal against it, and the surfaces that write settings consult both.
 
 use crate::config::{
-    DATA_ROOT_KEY, FRONT_DOOR_KEY, INDEXER_APIKEY_KEY, INDEXER_URL_KEY, JELLYFIN_MODE_KEY,
+    DATA_ROOT_KEY, FRONT_DOOR_KEY, INDEXER_APIKEY_KEY, INDEXER_URL_KEY, MEDIA_SERVER_MODE_KEY,
     PGID_KEY, PROVIDER_HOST_KEY, PROVIDER_PASS_KEY, PROVIDER_PORT_KEY, PROVIDER_TLS_KEY,
     PROVIDER_USER_KEY, PUID_KEY, TORRENT_KEY, USENET_KEY, VPN_PROVIDER_KEY,
 };
@@ -81,12 +81,12 @@ pub(crate) const DECISIONS: [Decision; 15] = [
     Decision {
         key: DATA_ROOT_KEY,
         cost: Cost::Consequential,
-        affects: "where every download and every library file lives. Each *arr holds absolute paths to its root folders, so moving this without re-pointing them leaves a library that points at nothing",
+        affects: "where every download and every library file lives. Each curator holds absolute paths to its root folders, so moving this without re-pointing them leaves a library that points at nothing",
     },
     Decision {
-        key: JELLYFIN_MODE_KEY,
+        key: MEDIA_SERVER_MODE_KEY,
         cost: Cost::Consequential,
-        affects: "whether Jellyfin runs as a container or natively. Its configuration and its library paths differ between the two and have to be carried across",
+        affects: "whether the media server runs as a container or natively. Its configuration and its library paths differ between the two and have to be carried across",
     },
     Decision {
         key: USENET_KEY,

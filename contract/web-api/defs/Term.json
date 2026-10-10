@@ -4,7 +4,7 @@
   "type": "object",
   "properties": {
     "also_called": {
-      "description": "What other services in this stack call the same thing.\n\nSonarr and `SABnzbd` do not agree on words, and an operator moving between\ntheir screens should not have to work out that two of them are one.",
+      "description": "What other services in this stack call the same thing.\n\nA curator and a Usenet client do not agree on words, and an operator moving between\ntheir screens should not have to work out that two of them are one.",
       "type": "array",
       "items": {
         "type": "string"

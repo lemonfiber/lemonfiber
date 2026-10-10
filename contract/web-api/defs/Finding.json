@@ -44,7 +44,7 @@
       ]
     },
     "service_name": {
-      "description": "What the stack calls that service in front of an operator.\n\nCarried beside the id rather than left for a surface to derive, because the id is\na key and not a name: capitalising `qbittorrent` does not arrive at qBittorrent,\nand the stack has already written the name down. Absent where the finding is about\nno service, and where the stack declares no service by that id — an id standing in\nfor a name would put the key back in front of the operator.\n\nSet after the run, like [`Self::caused_by`], from the same manifest that says\nwhich service depends on which.",
+      "description": "What the stack calls that service in front of an operator.\n\nCarried beside the id rather than left for a surface to derive, because the id is\na key and not a name: capitalising `qbittorrent` does not arrive at `qBittorrent`,\nand the stack has already written the name down. Absent where the finding is about\nno service, and where the stack declares no service by that id — an id standing in\nfor a name would put the key back in front of the operator.\n\nSet after the run, like [`Self::caused_by`], from the same manifest that says\nwhich service depends on which.",
       "type": [
         "string",
         "null"

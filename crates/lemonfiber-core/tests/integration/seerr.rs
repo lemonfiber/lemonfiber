@@ -18,7 +18,7 @@ use lemonfiber_core::ports::service::{
 };
 use lemonfiber_core::seerr::Seerr;
 
-fn seerr(fake: &Arc<Fake>) -> Seerr {
+fn request_service(fake: &Arc<Fake>) -> Seerr {
     let http: Arc<dyn Http> = fake.clone();
     Seerr::new(http, "http://127.0.0.1:5055", "seerr")
 }
@@ -32,7 +32,7 @@ fn password() -> String {
 }
 
 /// The media server at `at`, spoken to as Jellyfin and administered by name and password.
-fn jellyfin_at(at: &str) -> IdentitySource {
+fn media_server_at(at: &str) -> IdentitySource {
     IdentitySource {
         at: at.to_owned(),
         protocol: Protocol("jellyfin".to_owned()),
@@ -55,8 +55,8 @@ type Read<'a> = (
 
 /// Configure identity through the fake, for the common arguments.
 async fn configure(fake: &Arc<Fake>) -> Result<(), Failure> {
-    seerr(fake)
-        .configure_identity(&jellyfin_at("http://jellyfin:8096"))
+    request_service(fake)
+        .configure_identity(&media_server_at("http://jellyfin:8096"))
         .await
 }
 
@@ -66,16 +66,16 @@ async fn configure(fake: &Arc<Fake>) -> Result<(), Failure> {
 async fn an_identity_source_it_does_not_sign_in_through_is_unsupported_and_unsent() {
     let other = IdentitySource {
         protocol: Protocol("plex".to_owned()),
-        ..jellyfin_at("http://plex:32400")
+        ..media_server_at("http://plex:32400")
     };
     let keyed = IdentitySource {
         credential: Credential::ApiKey(password()),
-        ..jellyfin_at("http://jellyfin:8096")
+        ..media_server_at("http://jellyfin:8096")
     };
     for source in [other, keyed] {
         let fake = Fake::always(Answer::reply(200, ""));
         assert!(matches!(
-            seerr(&fake).configure_identity(&source).await,
+            request_service(&fake).configure_identity(&source).await,
             Err(Failure::Unsupported { .. })
         ));
         assert!(fake.requests().is_empty());
@@ -85,7 +85,9 @@ async fn an_identity_source_it_does_not_sign_in_through_is_unsupported_and_unsen
 /// Sign in against `address`, and hand back the body that went out.
 async fn body_for(address: &str) -> String {
     let fake = Fake::in_turn(vec![Answer::reply(200, ""), Answer::reply(204, "")]);
-    let _ = seerr(&fake).configure_identity(&jellyfin_at(address)).await;
+    let _ = request_service(&fake)
+        .configure_identity(&media_server_at(address))
+        .await;
     fake.requests()
         .first()
         .and_then(|request| request.body.clone())
@@ -99,7 +101,7 @@ async fn body_for(address: &str) -> String {
 /// the flag rather than staying in the host, a port of its own, and a base path where
 /// the service is served under one.
 #[tokio::test]
-async fn an_address_reaches_seerr_in_the_pieces_it_assembles_one_from() {
+async fn an_address_reaches_the_request_service_in_the_pieces_it_assembles_one_from() {
     let plain = body_for("http://jellyfin:8096").await;
     assert!(plain.contains(r#""hostname":"jellyfin""#), "{plain}");
     assert!(plain.contains(r#""port":8096"#), "{plain}");
@@ -166,7 +168,7 @@ async fn a_key_the_service_refuses_is_a_failure() {
 async fn the_client_that_sets_it_up_carries_no_key() {
     let fake = Fake::in_turn(vec![Answer::reply(200, r#"{"initialized":false}"#)]);
 
-    let _ = seerr(&fake).initialized().await;
+    let _ = request_service(&fake).initialized().await;
 
     assert!(fake
         .requests()
@@ -174,7 +176,7 @@ async fn the_client_that_sets_it_up_carries_no_key() {
         .is_some_and(|request| !request.headers.iter().any(|(name, _)| name == "X-Api-Key")));
 }
 
-/// An \*arr as the request service is told about it.
+/// A curator as the request service is told about it.
 fn target(kind: Kind) -> FulfilmentTarget {
     let television = kind == Kind::Tv;
     FulfilmentTarget {
@@ -198,7 +200,9 @@ fn target(kind: Kind) -> FulfilmentTarget {
 /// Register `target` through the fake, and hand back the body that went out.
 async fn registration(kind: Kind) -> String {
     let fake = Fake::in_turn(vec![Answer::reply(200, "")]);
-    let _ = seerr(&fake).add_fulfilment_target(&target(kind)).await;
+    let _ = request_service(&fake)
+        .add_fulfilment_target(&target(kind))
+        .await;
     fake.requests()
         .first()
         .and_then(|request| request.body.clone())
@@ -267,8 +271,8 @@ async fn a_registration_carries_everything_the_service_requires_of_it() {
 async fn an_address_that_cannot_be_taken_apart_is_refused_before_it_is_sent() {
     for nonsense in ["jellyfin:8096", "ftp://jellyfin:8096", "http://"] {
         let fake = Fake::in_turn(vec![Answer::reply(200, ""), Answer::reply(204, "")]);
-        let outcome = seerr(&fake)
-            .configure_identity(&jellyfin_at(nonsense))
+        let outcome = request_service(&fake)
+            .configure_identity(&media_server_at(nonsense))
             .await;
 
         assert!(
@@ -287,7 +291,7 @@ async fn an_address_that_cannot_be_taken_apart_is_refused_before_it_is_sent() {
 #[tokio::test]
 async fn the_members_are_named_to_the_service_that_imports_them() {
     let fake = Fake::always(Answer::reply(201, "{}"));
-    let told = seerr(&fake)
+    let told = request_service(&fake)
         .link_members(&["a1".to_owned(), "b2".to_owned()])
         .await;
 
@@ -312,7 +316,7 @@ async fn the_members_are_named_to_the_service_that_imports_them() {
 #[tokio::test]
 async fn naming_nobody_sends_nothing() {
     let fake = Fake::always(Answer::reply(500, ""));
-    let told = seerr(&fake).link_members(&[]).await;
+    let told = request_service(&fake).link_members(&[]).await;
 
     assert!(
         told.is_ok(),
@@ -329,14 +333,17 @@ async fn naming_nobody_sends_nothing() {
 #[tokio::test]
 async fn a_refused_import_is_reported() {
     let fake = Fake::always(Answer::reply(403, ""));
-    assert!(seerr(&fake).link_members(&["a1".to_owned()]).await.is_err());
+    assert!(request_service(&fake)
+        .link_members(&["a1".to_owned()])
+        .await
+        .is_err());
 }
 
 /// The account is looked up by the *media server's* identifier, which is the one held.
 #[tokio::test]
 async fn the_account_is_found_by_the_media_servers_own_identifier() {
     let fake = Fake::always(Answer::reply(200, r#"{"id":7,"jellyfinUsername":"ana"}"#));
-    let found = seerr(&fake)
+    let found = request_service(&fake)
         .member_for("c7e31fb2cfa544d6b6ab9d99821d7424")
         .await;
 
@@ -358,7 +365,7 @@ async fn the_account_is_found_by_the_media_servers_own_identifier() {
 #[tokio::test]
 async fn an_account_this_service_never_made_is_nothing_rather_than_a_failure() {
     let fake = Fake::always(Answer::reply(404, r#"{"message":"User not found."}"#));
-    let found = seerr(&fake)
+    let found = request_service(&fake)
         .member_for("c7e31fb2cfa544d6b6ab9d99821d7424")
         .await;
 
@@ -372,7 +379,7 @@ async fn an_account_this_service_never_made_is_nothing_rather_than_a_failure() {
 #[tokio::test]
 async fn a_refused_lookup_is_not_read_as_nobody_being_there() {
     let fake = Fake::always(Answer::reply(403, ""));
-    assert!(seerr(&fake)
+    assert!(request_service(&fake)
         .member_for("c7e31fb2cfa544d6b6ab9d99821d7424")
         .await
         .is_err());
@@ -382,7 +389,7 @@ async fn a_refused_lookup_is_not_read_as_nobody_being_there() {
 #[tokio::test]
 async fn the_account_is_removed_where_the_service_keeps_them() {
     let fake = Fake::always(Answer::reply(200, "{}"));
-    assert!(seerr(&fake).remove_member("7").await.is_ok());
+    assert!(request_service(&fake).remove_member("7").await.is_ok());
 
     let asked = fake.request();
     assert!(
@@ -398,13 +405,13 @@ async fn the_account_is_removed_where_the_service_keeps_them() {
 #[tokio::test]
 async fn a_refused_removal_is_reported() {
     let fake = Fake::always(Answer::reply(405, ""));
-    assert!(seerr(&fake).remove_member("1").await.is_err());
+    assert!(request_service(&fake).remove_member("1").await.is_err());
 }
 
 #[tokio::test]
-async fn an_initialised_seerr_is_reported() {
+async fn an_initialised_request_service_is_reported() {
     let fake = Fake::in_turn(vec![Answer::reply(200, r#"{"initialized":true}"#)]);
-    assert_eq!(seerr(&fake).initialized().await.ok(), Some(true));
+    assert_eq!(request_service(&fake).initialized().await.ok(), Some(true));
     assert!(fake
         .requests()
         .first()
@@ -412,34 +419,34 @@ async fn an_initialised_seerr_is_reported() {
 }
 
 #[tokio::test]
-async fn an_uninitialised_or_unstated_seerr_reads_as_not_done() {
+async fn an_uninitialised_or_unstated_request_service_reads_as_not_done() {
     let fake = Fake::in_turn(vec![Answer::reply(200, r#"{"initialized":false}"#)]);
-    assert_eq!(seerr(&fake).initialized().await.ok(), Some(false));
+    assert_eq!(request_service(&fake).initialized().await.ok(), Some(false));
     // A response that omits the field is a Seerr too fresh to have set it.
     let bare = Fake::in_turn(vec![Answer::reply(200, "{}")]);
-    assert_eq!(seerr(&bare).initialized().await.ok(), Some(false));
+    assert_eq!(request_service(&bare).initialized().await.ok(), Some(false));
 }
 
 #[tokio::test]
 async fn an_unreadable_public_settings_is_refused() {
     let fake = Fake::in_turn(vec![Answer::reply(200, "not json")]);
     assert!(matches!(
-        seerr(&fake).initialized().await,
+        request_service(&fake).initialized().await,
         Err(Failure::Refused { .. })
     ));
 }
 
 #[tokio::test]
-async fn an_unreachable_seerr_is_unavailable_on_the_read() {
+async fn an_unreachable_request_service_is_unavailable_on_the_read() {
     let fake = Fake::silent();
     assert!(matches!(
-        seerr(&fake).initialized().await,
+        request_service(&fake).initialized().await,
         Err(Failure::Unavailable { .. })
     ));
 }
 
 #[tokio::test]
-async fn configuring_identity_signs_in_through_jellyfin_then_finishes_setup() {
+async fn configuring_identity_signs_in_through_the_media_server_then_finishes_setup() {
     let fake = Fake::in_turn(vec![Answer::reply(200, ""), Answer::reply(204, "")]);
     assert!(configure(&fake).await.is_ok());
 
@@ -499,7 +506,7 @@ async fn a_rejected_finish_is_refused() {
 }
 
 #[tokio::test]
-async fn an_unreachable_seerr_is_unavailable_on_the_sign_in() {
+async fn an_unreachable_request_service_is_unavailable_on_the_sign_in() {
     let fake = Fake::silent();
     assert!(matches!(
         configure(&fake).await,
@@ -521,7 +528,7 @@ async fn the_households_requests_are_read_with_who_asked_and_what_became_of_each
         ]
     }"#;
     let fake = Fake::in_turn(vec![Answer::reply(200, page)]);
-    let requests = seerr(&fake).requests().await.unwrap_or_default();
+    let requests = request_service(&fake).requests().await.unwrap_or_default();
     let read: Vec<Read<'_>> = requests
         .iter()
         .map(|request| {
@@ -576,7 +583,7 @@ async fn a_media_type_this_build_does_not_know_names_no_service() {
         {"status":2,"type":"music","media":{"status":3},"requestedBy":{"displayName":"Sam"}}
     ]}"#;
     let fake = Fake::in_turn(vec![Answer::reply(200, page)]);
-    let requests = seerr(&fake).requests().await.unwrap_or_default();
+    let requests = request_service(&fake).requests().await.unwrap_or_default();
     // Reported as a request whose kind is unknown rather than guessed into one of the
     // two this build files.
     assert_eq!(requests.first().map(|request| request.kind), Some(None));
@@ -601,7 +608,7 @@ async fn the_requests_walk_past_the_first_page() {
         Answer::reply(200, page_one),
         Answer::reply(200, page_two),
     ]);
-    let requests = seerr(&fake).requests().await.unwrap_or_default();
+    let requests = request_service(&fake).requests().await.unwrap_or_default();
     assert_eq!(requests.len(), 101);
     assert!(fake
         .requests()
@@ -612,7 +619,7 @@ async fn the_requests_walk_past_the_first_page() {
 #[tokio::test]
 async fn an_unreadable_request_record_is_a_failure() {
     let fake = Fake::in_turn(vec![Answer::reply(200, "not json")]);
-    assert!(seerr(&fake).requests().await.is_err());
+    assert!(request_service(&fake).requests().await.is_err());
 }
 
 /// The request service's key is read from the settings file it writes.
@@ -649,7 +656,7 @@ async fn the_media_server_link_is_read_from_its_settings() {
         r#"{"name":"Jellyfin","ip":"request-gate","port":5057,"urlBase":"/jellyfin","apiKey":"the-token"}"#,
     )]);
 
-    let link = seerr(&fake).media_server_link().await;
+    let link = request_service(&fake).media_server_link().await;
 
     assert_eq!(
         link.ok(),
@@ -663,9 +670,12 @@ async fn the_media_server_link_is_read_from_its_settings() {
         })
     );
     let unreadable = Fake::in_turn(vec![Answer::reply(200, "not settings")]);
-    assert!(seerr(&unreadable).media_server_link().await.is_err());
+    assert!(request_service(&unreadable)
+        .media_server_link()
+        .await
+        .is_err());
     let silent = Fake::in_turn(vec![Answer::Silent]);
-    assert!(seerr(&silent).media_server_link().await.is_err());
+    assert!(request_service(&silent).media_server_link().await.is_err());
 }
 
 /// A new link sends where and with what, and nothing else, and a refusal is said.
@@ -678,7 +688,9 @@ async fn a_new_media_server_link_sends_where_and_with_what() {
     };
     let fake = Fake::in_turn(vec![Answer::reply(200, "")]);
 
-    let linked = seerr(&fake).link_media_server(&at, "the-token").await;
+    let linked = request_service(&fake)
+        .link_media_server(&at, "the-token")
+        .await;
 
     assert!(linked.is_ok(), "{linked:?}");
     let sent = fake
@@ -696,7 +708,7 @@ async fn a_new_media_server_link_sends_where_and_with_what() {
     );
     for answer in [Answer::reply(400, ""), Answer::Silent] {
         let refusing = Fake::in_turn(vec![answer]);
-        assert!(seerr(&refusing)
+        assert!(request_service(&refusing)
             .link_media_server(&at, "the-token")
             .await
             .is_err());
@@ -716,7 +728,7 @@ async fn a_request_whose_title_is_on_the_media_server_says_when_it_arrived_and_w
         ]
     }"#;
     let fake = Fake::in_turn(vec![Answer::reply(200, page)]);
-    let requests = seerr(&fake).requests().await.unwrap_or_default();
+    let requests = request_service(&fake).requests().await.unwrap_or_default();
     let read: Vec<(Option<&str>, Option<&str>)> = requests
         .iter()
         .map(|request| (request.arrived.as_deref(), request.shelf_id.as_deref()))

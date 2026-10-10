@@ -50,7 +50,7 @@ pub enum Settled {
     /// Its own outcome rather than one of the refusals above, because it is not a
     /// refusal: nothing went wrong, and what an operator is being told is what would
     /// happen if they ran it again meaning it. Carrying its own three fields rather
-    /// than one sentence, because "it would rotate the qBittorrent password" is not a
+    /// than one sentence, because "it would rotate the torrent client's password" is not a
     /// report — where the value lives is what would be written over, and what is owed
     /// afterwards is the half nobody finds out about until a consumer stops working.
     ///

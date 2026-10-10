@@ -88,15 +88,15 @@ pub(super) const SCHEMA_VERSION_FIELD: &str = "schema:version";
 
 /// Raise each wired root folder the host cannot back to a warning.
 ///
-/// A root folder the \*arr files into must resolve to a directory on the host, where
+/// A root folder the curator files into must resolve to a directory on the host, where
 /// the container's `/data` mount is rooted. One that resolves to nothing — the
 /// operator repointed the data root, or the media directory was never created — is a
-/// root folder pointing where nothing exists: the \*arr imports into a void. That
+/// root folder pointing where nothing exists: the curator imports into a void. That
 /// breaks the stack, so the folder's wiring is raised from information to a warning
 /// naming the missing path and how to fix it.
 ///
-/// Only folders the \*arr actually holds are checked — the wired and the
-/// already-wired. A skipped or refused folder is not one the \*arr files into, so a
+/// Only folders the curator actually holds are checked — the wired and the
+/// already-wired. A skipped or refused folder is not one the curator files into, so a
 /// missing path there is not yet a break. Nothing is checked where no data root is
 /// known, since without it the host path cannot be resolved to confirm or deny.
 pub(super) async fn escalate_broken_roots(
@@ -140,7 +140,7 @@ pub(super) async fn escalate_broken_roots(
 /// change out from under.
 pub(super) use crate::reconfigure::relocating::MOUNT as DATA_ROOT;
 
-/// The root folders an \*arr wants, one per media type it manages, each under the
+/// The root folders a curator wants, one per media type it manages, each under the
 /// media directory of the mounted data root. Shared by the seed pass and the
 /// up-front contested-path check, so both reason about the same set.
 pub(super) fn wanted_roots(media_types: &[String]) -> Vec<crate::ports::service::RootFolder> {

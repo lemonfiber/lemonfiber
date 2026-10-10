@@ -52,7 +52,7 @@ fn service(
     }
 }
 
-/// Jellyfin, and the decline service where `declining`.
+/// The media server, and the decline service where `declining`.
 fn stack(declining: bool) -> Vec<lemonfiber_manifest::Service> {
     let mut media_server = service(
         "jellyfin",
@@ -89,7 +89,7 @@ fn scene(name: &str, administered: bool, key: Option<&str>, http: Arc<Fake>) -> 
     if administered {
         let _ = store::set(
             &env,
-            crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+            crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
             &lemonfiber_fixtures::support::a_password(),
         );
     }
@@ -124,9 +124,9 @@ fn fingerprint(key: &str) -> String {
         .unwrap_or_default()
 }
 
-/// Jellyfin and the decline service: Jellyfin lists each of `lists` in turn, answers a
-/// mint with `minted`, a revocation with `revoked` and a key's proof with `proved`, and
-/// the service says it holds `holding`.
+/// The media server and the decline service: the media server lists each of `lists` in
+/// turn, answers a mint with `minted`, a revocation with `revoked` and a key's proof with
+/// `proved`, and the service says it holds `holding`.
 fn serving(lists: &[&[&str]], minted: u16, revoked: u16, proved: u16, holding: &str) -> Arc<Fake> {
     let listed = |keys: &[&str]| {
         let items: Vec<serde_json::Value> = keys

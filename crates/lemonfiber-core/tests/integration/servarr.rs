@@ -18,14 +18,14 @@ use lemonfiber_core::servarr::Servarr;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_ports::service::Catalogue;
 
-/// A Sonarr client over the given fake — the v3 the media *arrs answer at.
-fn sonarr(fake: &Arc<Fake>) -> Servarr {
+/// A Sonarr client over the given fake — the v3 the media curators answer at.
+fn curator(fake: &Arc<Fake>) -> Servarr {
     let http: Arc<dyn Http> = fake.clone();
     Servarr::new(http, "http://sonarr:8989", "the-key", "sonarr", 3)
 }
 
 /// A `SABnzbd` download client: a Usenet client authenticated by an API key.
-fn sabnzbd() -> DownloadClient {
+fn usenet_client() -> DownloadClient {
     DownloadClient {
         name: "SABnzbd".to_owned(),
         host: "sabnzbd".to_owned(),
@@ -42,7 +42,7 @@ fn sabnzbd() -> DownloadClient {
 // ---- Lidarr music-quality apply ----
 
 /// A Lidarr client over the given router — the v1 Lidarr answers at.
-fn lidarr(router: &Arc<Fake>) -> Servarr {
+fn music_curator(router: &Arc<Fake>) -> Servarr {
     let http: Arc<dyn Http> = router.clone();
     Servarr::new(http, "http://lidarr:8686", "the-key", "lidarr", 1)
 }
@@ -64,7 +64,7 @@ const PROFILES: &str = r#"[
     ]}
 ]"#;
 
-/// A \*arr of the given kind over the fake, at the endpoint that kind answers on.
+/// A curator of the given kind over the fake, at the endpoint that kind answers on.
 fn of_kind(fake: &Arc<Fake>, kind: Kind) -> Servarr {
     let http: Arc<dyn Http> = fake.clone();
     match kind {

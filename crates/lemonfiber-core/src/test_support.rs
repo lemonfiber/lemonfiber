@@ -61,7 +61,7 @@ pub(crate) fn env_without_password(name: &str) -> std::path::PathBuf {
     recorded(name, None)
 }
 
-/// A private env file recording qBittorrent's password, at a scratch path unique to
+/// A private env file recording the torrent client's password, at a scratch path unique to
 /// the test so concurrent tests do not share one.
 ///
 /// Here rather than beside any one test because more than one needs a client that can
@@ -84,7 +84,7 @@ fn recorded(name: &str, password: Option<&str>) -> std::path::PathBuf {
     assert!(
         crate::config::store::set(
             &path,
-            crate::config::QBITTORRENT_PASSWORD_KEY,
+            crate::config::TORRENT_PASSWORD_KEY,
             password.unwrap_or_default(),
         )
         .is_ok(),
@@ -168,7 +168,7 @@ pub(crate) fn beside_contracted_requests(
     ctx.settings.env_file = Some(dir.join(".env"));
     let _ = crate::app::targets::record_secret(
         &ctx,
-        crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         &a_password(),
     );
     let mut placed = a_placed(CONTRACTED_REQUESTS, &["request.intake"], None, Some(8080));

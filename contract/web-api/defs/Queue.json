@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "One `*arr`'s queue, and how much of it is stuck.",
+  "description": "One curator's queue, and how much of it is stuck.",
   "type": "object",
   "properties": {
     "depth": {

@@ -440,7 +440,7 @@ fn back(said: &mut Vec<String>, typed: &mut String) {
 /// stop answering keys while it did.
 ///
 /// A question narrowed by picking is carried the same way and for the same reason —
-/// the list of what is stuck is read off the \*arrs — so what comes back is a
+/// the list of what is stuck is read off the curators — so what comes back is a
 /// listing to choose from rather than an answer to read. Which of the two it is is
 /// decided where the answer arrives, in [`super::narrowing`].
 fn put(stage: &mut Stage, question: &'static Question, said: Vec<String>) -> Wanted {

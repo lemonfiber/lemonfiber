@@ -14,11 +14,11 @@ use crate::recyclarr::Kind;
 use crate::test_support::{a_context, a_password, nowhere, SeedFs};
 use crate::trace::{Coverage, Outcome, Presence, Stage};
 
-/// A Servarr config that opens a target, carrying a readable key.
+/// A curator config that opens a target, carrying a readable key.
 const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
 
 /// A download client configuration carrying the key it generated for itself.
-const SAB_INI: &str = "[misc]\napi_key = sabkey123\n";
+const USENET_INI: &str = "[misc]\napi_key = sabkey123\n";
 
 /// An empty queue, as the shape a service returns with nothing downloading.
 const EMPTY_QUEUE: &str = r#"{"records":[]}"#;
@@ -28,30 +28,30 @@ const EMPTY_QUEUE: &str = r#"{"records":[]}"#;
 const NO_EPISODES: &str = "[]";
 
 /// A transport that answers each service's reads by the shape of the URL, so a trace's
-/// calls need no exact ordering: the \*arr library, history and queue, and Jellyfin's
-/// sign-in and library.
+/// calls need no exact ordering: the curator library, history and queue, and the media
+/// server's sign-in and library.
 struct Fake {
     library: &'static str,
     history: &'static str,
     queue: &'static str,
     episodes: &'static str,
     sign_in: &'static str,
-    jellyfin_library: &'static str,
+    media_server_library: &'static str,
     wanted: &'static str,
     releases: &'static str,
 }
 
 impl Fake {
-    /// A transport with no media server configured to answer — the \*arr-only reads
+    /// A transport with no media server configured to answer — the curator-only reads
     /// the trace made before it could see the library.
-    fn arr(library: &'static str, history: &'static str, queue: &'static str) -> Self {
+    fn curator(library: &'static str, history: &'static str, queue: &'static str) -> Self {
         Self {
             library,
             history,
             queue,
             episodes: NO_EPISODES,
             sign_in: "",
-            jellyfin_library: "",
+            media_server_library: "",
             wanted: "",
             releases: "",
         }
@@ -63,7 +63,7 @@ impl Fake {
         Self {
             wanted,
             releases,
-            ..Self::arr(library, r#"{"records":[]}"#, EMPTY_QUEUE)
+            ..Self::curator(library, r#"{"records":[]}"#, EMPTY_QUEUE)
         }
     }
 
@@ -71,7 +71,7 @@ impl Fake {
     fn with_episodes(library: &'static str, queue: &'static str, episodes: &'static str) -> Self {
         Self {
             episodes,
-            ..Self::arr(library, "{}", queue)
+            ..Self::curator(library, "{}", queue)
         }
     }
 }
@@ -81,7 +81,7 @@ impl Fake {
     fn transport(&self) -> Arc<Transport> {
         Transport::by_path(vec![
             ("/AuthenticateByName", Answer::reply(200, self.sign_in)),
-            ("/Items", Answer::reply(200, self.jellyfin_library)),
+            ("/Items", Answer::reply(200, self.media_server_library)),
             ("/history", Answer::reply(200, self.history)),
             ("/queue", Answer::reply(200, self.queue)),
             ("/episode", Answer::reply(200, self.episodes)),
@@ -121,7 +121,7 @@ fn queued(stage: Stage, stuck: bool) -> Vec<QueueItem> {
     }]
 }
 
-/// A context over the real stack, a filesystem that opens the \*arrs, and a transport
+/// A context over the real stack, a filesystem that opens the curators, and a transport
 /// answering the given reads.
 fn ctx_with(fake: &Fake) -> Ctx {
     a_context()

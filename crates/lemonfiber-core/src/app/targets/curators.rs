@@ -1,4 +1,4 @@
-//! The Servarr-shape services whose credential can be proven, and the ones that
+//! The curator-shape services whose credential can be proven, and the ones that
 //! declared the shape and cannot be reached through it.
 //!
 //! Only a service that speaks the shape, publishes a port and names the file it writes
@@ -19,16 +19,16 @@ use crate::model::UnsupportedReport;
 
 use super::layout::config_path;
 
-/// The Servarr-shape services whose credential can be proven, and where to read
+/// The curator-shape services whose credential can be proven, and where to read
 /// each one's key and reach it.
 ///
-/// Only a service that speaks the Servarr shape, publishes a port to reach it on
+/// Only a service that speaks the curator shape, publishes a port to reach it on
 /// and names the config file it writes its key to can be proven; anything else is
 /// left out rather than reported as a fault. The host path to that file follows
 /// the stack's bind-mount convention — a service's `/config` is `config/<id>`
 /// under the project root — so the key the service wrote is read from where
 /// Compose mounted it.
-pub(crate) fn servarr_targets(
+pub(crate) fn curator_targets(
     services: &[lemonfiber_manifest::Service],
     project: Option<&Path>,
 ) -> Vec<Target> {
@@ -41,7 +41,7 @@ pub(crate) fn servarr_targets(
         .collect()
 }
 
-/// The one Servarr-shape service with this id, or nothing where the stack has none — the
+/// The one curator-shape service with this id, or nothing where the stack has none — the
 /// lookup a reversal makes, which knows the name of the service it has to reach and
 /// nothing else about it.
 pub(crate) fn target_named(
@@ -49,7 +49,7 @@ pub(crate) fn target_named(
     project: Option<&Path>,
     id: &str,
 ) -> Option<Target> {
-    servarr_targets(services, project)
+    curator_targets(services, project)
         .into_iter()
         .find(|target| target.id == id)
 }
@@ -62,8 +62,8 @@ pub(crate) fn target_for(service: &lemonfiber_manifest::Service, project: &Path)
     }
     let port = service.port?;
     let config = config_path(project, service, api.path.as_deref())?;
-    // The Servarr shape spans two API versions, so the manifest carries it. A
-    // servarr service that names none cannot be reached at a known path, so it is
+    // The curator shape spans two API versions, so the manifest carries it. A
+    // curator that names none cannot be reached at a known path, so it is
     // no target rather than one guessed at the wrong version.
     let version = api.version?;
     Some(Target {
@@ -77,7 +77,7 @@ pub(crate) fn target_for(service: &lemonfiber_manifest::Service, project: &Path)
     })
 }
 
-/// Every service that declares the Servarr shape and cannot be reached through it,
+/// Every service that declares the curator shape and cannot be reached through it,
 /// each with what its declaration is missing.
 ///
 /// Nothing where the stack has not been written to disk: the config file half of the
@@ -114,7 +114,7 @@ fn unreachable_for(
     })
 }
 
-/// What a Servarr-shape declaration is missing, or nothing where it is complete.
+/// What a curator-shape declaration is missing, or nothing where it is complete.
 ///
 /// In the order a reader would fix them, and one at a time: three sentences about one
 /// service is a list nobody finishes, and the first of them is enough to act on.

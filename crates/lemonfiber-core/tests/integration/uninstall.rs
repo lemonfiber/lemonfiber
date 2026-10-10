@@ -30,7 +30,7 @@ use lemonfiber_fixtures::support::{spoke, Recording, Reporting, Scripted, SeedFs
 use lemonfiber_fixtures::walking::Walking;
 
 /// One image this stack declares, named once so a case does not spell the digest twice.
-const SONARR: &str =
+const CURATOR_IMAGE: &str =
     "lscr.io/linuxserver/sonarr@sha256:f247545d23ba8b233d6604575347e48a623fe6ad75dda02348bf81917f3b5c06";
 
 /// Somewhere for the backup a destructive tier takes before anything goes.
@@ -262,7 +262,7 @@ async fn a_confirmed_removal_of_the_containers_hands_the_image_to_the_engine() {
     let runner = Arc::new(Recording::answering(Ok(spoke(""))));
     let ctx =
         running(&heard, Arc::clone(&runner) as Arc<dyn Runner>).with_images(Pulled::holding(vec![
-            Pulled::image(SONARR, 400, &["lemonfiber"]),
+            Pulled::image(CURATOR_IMAGE, 400, &["lemonfiber"]),
         ]));
     let asked = Removing::surveying(Tier::Services).confirmed(true);
 
@@ -276,11 +276,11 @@ async fn a_confirmed_removal_of_the_containers_hands_the_image_to_the_engine() {
         Ok(_) | Err(_) => Vec::new(),
     };
 
-    assert!(gone.iter().any(|name| name == SONARR), "{gone:?}");
+    assert!(gone.iter().any(|name| name == CURATOR_IMAGE), "{gone:?}");
     let about_the_image: Vec<Vec<String>> = runner
         .seen()
         .into_iter()
-        .filter(|argv| argv.iter().any(|word| word == SONARR))
+        .filter(|argv| argv.iter().any(|word| word == CURATOR_IMAGE))
         .collect();
     assert_eq!(
         about_the_image,
@@ -288,7 +288,7 @@ async fn a_confirmed_removal_of_the_containers_hands_the_image_to_the_engine() {
             "docker".to_owned(),
             "image".to_owned(),
             "rm".to_owned(),
-            SONARR.to_owned(),
+            CURATOR_IMAGE.to_owned(),
         ]]
     );
 }

@@ -38,7 +38,9 @@ impl Next {
         match self {
             Self::MoreContent => "lemonfiber walkthrough",
             Self::Household => "lemonfiber household",
-            Self::ClientApps => "Install a Jellyfin client and point it at this machine",
+            Self::ClientApps => {
+                "Install the media server's client app and point it at this machine"
+            }
         }
     }
 

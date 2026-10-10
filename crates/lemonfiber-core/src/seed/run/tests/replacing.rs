@@ -165,7 +165,7 @@ fn replacing_a_bundled_service_changes_nothing_that_asks() {
     }
     // Every kind of ask a pass answers was tried: both download clients, the curators
     // the indexer, the request service and the subtitle finder each reach, and the book
-    // *arr's indexer.
+    // curator's indexer.
     assert_eq!(
         swapped_for,
         [
@@ -248,7 +248,7 @@ fn replacing_the_media_server_leaves_the_decline_service_on_its_own_server() {
     assert_eq!(declined.as_ref().map(MediaServer::id), Some("jellyfin"));
     assert_eq!(
         declined.as_ref().map(|one| one.setting.as_str()),
-        Some(crate::config::JELLYFIN_ADMIN_PASSWORD_KEY)
+        Some(crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY)
     );
     assert_eq!(declined.as_ref().and_then(crate::test_support::asker), None);
 }

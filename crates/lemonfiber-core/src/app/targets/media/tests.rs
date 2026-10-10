@@ -63,7 +63,7 @@ fn the_stacks_media_server_is_the_one_its_request_service_asks_for() {
     );
     assert_eq!(
         server.as_ref().map(|one| one.setting.as_str()),
-        Some(crate::config::JELLYFIN_ADMIN_PASSWORD_KEY)
+        Some(crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY)
     );
     assert_eq!(
         server.as_ref().and_then(crate::test_support::asker),

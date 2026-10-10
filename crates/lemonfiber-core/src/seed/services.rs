@@ -20,12 +20,12 @@ mod telling;
 pub use telling::wire_household_telling;
 pub(crate) use telling::{observed_telling, said, wanted_telling, TELLING};
 
-/// Hand the request service the \*arrs that fulfil what the household asks for.
+/// Hand the request service the curators that fulfil what the household asks for.
 ///
-/// Until it is told, the request service knows of no \*arr: a request is accepted
+/// Until it is told, the request service knows of no curator: a request is accepted
 /// and no downloader ever hears about it. It does not discover them.
 ///
-/// Only the \*arrs actually in the stack are offered, and that is the half worth
+/// Only the curators actually in the stack are offered, and that is the half worth
 /// stating — the request service offers what its targets can deliver, so television
 /// is not offered where no curator files it. A curator that is absent is simply
 /// never handed over.
@@ -99,7 +99,7 @@ pub async fn wire_fulfilment_targets(
 }
 
 /// `written`, where it is a target just wired, held to the request service's own test
-/// of it: a target is wired only once the service has reached the \*arr with it.
+/// of it: a target is wired only once the service has reached the curator with it.
 async fn tested(requests: &dyn Requests, target: &FulfilmentTarget, written: State) -> State {
     if written != State::Wired {
         return written;
@@ -176,7 +176,7 @@ pub(crate) fn as_request_target(name: &str) -> String {
 /// the ones it already has, and record each write as a change.
 ///
 /// The same shape as [`wire_root_folders`], matched by the address the indexer
-/// reaches an \*arr on rather than by a label, so an application an operator
+/// reaches a curator on rather than by a label, so an application an operator
 /// renamed is recognised as the same connection and not registered a second time.
 /// An application already present is left exactly as it is and never rewritten,
 /// which is what preserves an operator's own change to its sync settings.
@@ -237,7 +237,7 @@ pub async fn wire_applications(
 ///
 /// The indexer shows a stored key only masked, so the only way to tell a key the curator
 /// has since replaced is the indexer's own test, which runs with the key it stores. One
-/// that fails is given the \*arr's current key, in place and nothing else, and tested
+/// that fails is given the curator's current key, in place and nothing else, and tested
 /// again. A rehearsal asks nothing: the test is a `POST`, which a rehearsal does not
 /// send.
 async fn current_key(
@@ -276,7 +276,7 @@ fn unkept(why: &str) -> State {
     State::Failed { detail }
 }
 
-/// Replace qBittorrent's temporary web UI password with a generated one, recorded
+/// Replace the torrent client's temporary web UI password with a generated one, recorded
 /// through `keep` before the client is given it, and hand the generated value back for
 /// the connections that sign in with it next.
 ///
@@ -288,7 +288,7 @@ fn unkept(why: &str) -> State {
 /// authenticating again; only a confirmed change is wired and handed back. One that
 /// was recorded and then not taken is replaced by the next run, which finds the
 /// recorded password refused and starts again from the temporary one.
-pub async fn wire_qbittorrent_password(
+pub async fn wire_torrent_password(
     client: &Qbittorrent,
     random: &dyn Random,
     temporary: &str,

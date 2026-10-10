@@ -110,7 +110,7 @@ fn halfway(paths: &Paths) -> Wizard {
         Answer::Credentials(None),
         Answer::Provider(None),
         Answer::ServiceUser(Some((1000, 1000))),
-        Answer::Library(Library::JellyfinDocker),
+        Answer::Library(Library::Docker),
         Answer::Household(true),
         Answer::Notifications(Appetite::default_appetite()),
         Answer::Autostart(false),

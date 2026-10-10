@@ -5,7 +5,7 @@
 
 use super::Answers;
 use crate::config::{
-    Protocols, DATA_ROOT_KEY, INDEXER_APIKEY_KEY, INDEXER_URL_KEY, JELLYFIN_MODE_KEY, PGID_KEY,
+    Protocols, DATA_ROOT_KEY, INDEXER_APIKEY_KEY, INDEXER_URL_KEY, MEDIA_SERVER_MODE_KEY, PGID_KEY,
     PROVIDER_HOST_KEY, PROVIDER_PASS_KEY, PROVIDER_PORT_KEY, PROVIDER_TLS_KEY, PROVIDER_USER_KEY,
     PUID_KEY, TORRENT_KEY, USENET_KEY,
 };
@@ -46,7 +46,7 @@ pub enum Step {
     Provider,
     /// The user and group the containers run as. Asked only where it is visible.
     ServiceUser,
-    /// Whether to run Jellyfin, and if so how.
+    /// Whether to run the media server, and if so how.
     Library,
     /// Whether others in the home will use it.
     Household,
@@ -171,7 +171,7 @@ impl Step {
                 PROVIDER_TLS_KEY,
             ],
             Self::ServiceUser => &[PUID_KEY, PGID_KEY],
-            Self::Library => &[JELLYFIN_MODE_KEY],
+            Self::Library => &[MEDIA_SERVER_MODE_KEY],
             _ => &[],
         }
     }

@@ -23,19 +23,19 @@ fn key() -> String {
     ["the", "-key"].concat()
 }
 
-fn bazarr(fake: &Arc<Fake>) -> Bazarr {
+fn subtitle_finder(fake: &Arc<Fake>) -> Bazarr {
     let http: Arc<dyn Http> = fake.clone();
     Bazarr::new(http, "http://127.0.0.1:6767", "bazarr", key())
 }
 
-/// Settings as the service reports them, holding one \*arr and not the other.
-const HOLDING_SONARR: &str = r#"{
+/// Settings as the service reports them, holding one curator and not the other.
+const HOLDING_CURATOR: &str = r#"{
     "general": { "use_sonarr": true, "use_radarr": false },
     "sonarr": { "ip": "sonarr", "port": 8989, "apikey": "set", "base_url": "" },
     "radarr": { "ip": "127.0.0.1", "port": 7878, "apikey": "", "base_url": "/" }
 }"#;
 
-/// An \*arr as the finder is told about it.
+/// A curator as the finder is told about it.
 fn watched(which: Kind) -> Watched {
     let (host, port) = match which {
         Kind::Tv => ("sonarr", 8989),
@@ -49,14 +49,14 @@ fn watched(which: Kind) -> Watched {
     }
 }
 
-/// What is already set is read back, per \*arr and not in aggregate.
+/// What is already set is read back, per curator and not in aggregate.
 ///
 /// The two are wired independently, so a reading that answered for both together
 /// would report one as done because the other was.
 #[tokio::test]
-async fn what_the_finder_holds_is_read_for_one_arr_at_a_time() {
-    let fake = Fake::always(Answer::reply(200, HOLDING_SONARR));
-    let finder = bazarr(&fake);
+async fn what_the_finder_holds_is_read_for_one_curator_at_a_time() {
+    let fake = Fake::always(Answer::reply(200, HOLDING_CURATOR));
+    let finder = subtitle_finder(&fake);
 
     let television = finder.watching(Kind::Tv).await.ok();
     assert!(
@@ -78,8 +78,8 @@ async fn what_the_finder_holds_is_read_for_one_arr_at_a_time() {
 /// The key travels in the header the service asks for it in.
 #[tokio::test]
 async fn the_key_is_presented_where_the_service_looks_for_it() {
-    let fake = Fake::always(Answer::reply(200, HOLDING_SONARR));
-    let _ = bazarr(&fake).watching(Kind::Tv).await;
+    let fake = Fake::always(Answer::reply(200, HOLDING_CURATOR));
+    let _ = subtitle_finder(&fake).watching(Kind::Tv).await;
 
     let sent = fake.requests();
     let carried = sent
@@ -102,9 +102,9 @@ async fn the_key_is_presented_where_the_service_looks_for_it() {
 /// configuration file's own paths flattened, so a field spelt otherwise is a
 /// setting quietly not set.
 #[tokio::test]
-async fn pointing_it_at_an_arr_sets_the_address_and_the_switch_at_once() {
+async fn pointing_it_at_a_curator_sets_the_address_and_the_switch_at_once() {
     let fake = Fake::always(Answer::reply(204, ""));
-    let told = bazarr(&fake).watch(&watched(Kind::Tv)).await;
+    let told = subtitle_finder(&fake).watch(&watched(Kind::Tv)).await;
     assert!(told.is_ok(), "{told:?}");
 
     let sent = fake.requests();
@@ -131,11 +131,11 @@ async fn pointing_it_at_an_arr_sets_the_address_and_the_switch_at_once() {
     );
 }
 
-/// Each \*arr is written under its own name, so wiring one does not claim the other.
+/// Each curator is written under its own name, so wiring one does not claim the other.
 #[tokio::test]
-async fn each_arr_is_written_under_the_name_the_service_files_it_by() {
+async fn each_curator_is_written_under_the_name_the_service_files_it_by() {
     let fake = Fake::always(Answer::reply(204, ""));
-    let _ = bazarr(&fake).watch(&watched(Kind::Movies)).await;
+    let _ = subtitle_finder(&fake).watch(&watched(Kind::Movies)).await;
 
     let sent = fake.requests();
     let body = sent
@@ -160,26 +160,26 @@ async fn each_arr_is_written_under_the_name_the_service_files_it_by() {
 async fn a_service_that_will_not_take_it_is_reported() {
     let refused = Fake::always(Answer::reply(401, ""));
     assert!(matches!(
-        bazarr(&refused).watch(&watched(Kind::Tv)).await,
+        subtitle_finder(&refused).watch(&watched(Kind::Tv)).await,
         Err(Failure::Unauthorised { .. })
     ));
 
     let silent = Fake::silent();
     assert!(matches!(
-        bazarr(&silent).watching(Kind::Tv).await,
+        subtitle_finder(&silent).watching(Kind::Tv).await,
         Err(Failure::Unavailable { .. })
     ));
 }
 
 /// The finder's own key is the one under `auth`, not the first one in the file.
 ///
-/// Its configuration holds an `apikey` under `auth` and another under each \*arr it
+/// Its configuration holds an `apikey` under `auth` and another under each curator it
 /// has been pointed at, so a scan for the name meets whichever section comes first.
 /// The file the service writes is alphabetical, so `auth` leads both of those and
 /// that scan is right by accident rather than by anything the format promises. This
 /// fixture keeps that order; the next test reverses it.
 #[test]
-fn the_key_read_is_the_finders_own_and_not_an_arrs() {
+fn the_key_read_is_the_finders_own_and_not_a_curators() {
     const WRITTEN: &str = "\
 auth:
   apikey: the-finders-own

@@ -26,7 +26,7 @@ const FIRST_PARTY: [FirstParty; 1] = [FirstParty {
 }];
 
 /// The request service's own adapter, reading its key from the settings it writes.
-fn seerr_api() -> Api {
+fn requests_api() -> Api {
     Api {
         kind: ApiKind::Seerr,
         key_source: KeySource::ConfigJson,
@@ -82,7 +82,7 @@ fn reaching(tag: &str, keyed: bool) -> (Scratch, Ctx, Arc<Fake>) {
         .build()
         .with_http(fake.clone())
         .with_filesystem(Arc::new(
-            SeedFs::keyed(None, None).with_seerr(SEERR_SETTINGS),
+            SeedFs::keyed(None, None).with_requests(SEERR_SETTINGS),
         ));
     ctx.settings.env_file = Some(project.join(".env"));
     (project, ctx, fake)
@@ -135,7 +135,11 @@ async fn a_contracted_request_service_that_cannot_be_asked_is_asked_nothing() {
     ] {
         let (project, ctx, fake) = reaching(tag, keyed);
         let fillers = beside(
-            &[bringing(CONTRACTED_REQUESTS, &[speaks], Some(seerr_api()))],
+            &[bringing(
+                CONTRACTED_REQUESTS,
+                &[speaks],
+                Some(requests_api()),
+            )],
             false,
             &project,
         );
@@ -157,7 +161,7 @@ async fn a_contracted_request_service_that_cannot_be_asked_is_asked_nothing() {
 async fn a_plugin_speaking_no_contract_is_never_asked_as_the_bundled_request_service() {
     let (project, ctx, fake) = reaching("impostor", true);
     let fillers = beside(
-        &[bringing("seerr", &[], Some(seerr_api()))],
+        &[bringing("seerr", &[], Some(requests_api()))],
         false,
         &project,
     );

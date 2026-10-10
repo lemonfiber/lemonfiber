@@ -161,12 +161,12 @@ pub(crate) const VPN_PROVIDER_KEY: &str = "VPN_PROVIDER";
 /// and the port-forward check reads that as "does not apply" rather than a fault.
 pub(crate) const VPN_PORT_FORWARDING_KEY: &str = "VPN_PORT_FORWARDING";
 
-/// The setting selecting how Jellyfin is served: in a container or on the host.
+/// The setting selecting how the media server is served: in a container or on the host.
 ///
 /// A single switch is the whole of the difference between the two modes — the
 /// compose stack drops one service and the URLs change, nothing more. Absent
 /// where the operator runs no media server at all.
-pub(crate) const JELLYFIN_MODE_KEY: &str = "JELLYFIN_MODE";
+pub(crate) const MEDIA_SERVER_MODE_KEY: &str = "JELLYFIN_MODE";
 
 /// The address the household's own links are pointed at.
 ///
@@ -224,71 +224,70 @@ pub(crate) const PROVIDER_TLS_KEY: &str = "USENET_TLS";
 /// operator chose to proceed with unverified.
 pub(crate) const PROVIDER_VALIDATED_KEY: &str = "USENET_VALIDATED";
 
-/// The environment key holding qBittorrent's web UI password.
+/// The environment key holding the torrent client's web UI password.
 ///
 /// Seeding generates this password and records it here, because the
-/// forwarded-port push authenticates to qBittorrent with it — the one credential
+/// forwarded-port push authenticates to the torrent client with it — the one credential
 /// lemonfiber mints and writes rather than reads from a service.
-pub const QBITTORRENT_PASSWORD_KEY: &str = "QBITTORRENT_PASSWORD";
+pub const TORRENT_PASSWORD_KEY: &str = "QBITTORRENT_PASSWORD";
 
-/// The environment key holding the Jellyfin administrator password.
+/// The environment key holding the media server's administrator password.
 ///
-/// Jellyfin generates no key on disk and asks for an account to be created, so
-/// seeding mints this password, sets it by driving Jellyfin's own first-run
-/// setup, and records it here — the same shape as qBittorrent's, and the
-/// credential the Seerr identity wiring reads back. The account name is
-/// [`JELLYFIN_ADMIN_USER`].
-pub const JELLYFIN_ADMIN_PASSWORD_KEY: &str = "JELLYFIN_ADMIN_PASSWORD";
+/// The bundled media server generates no key on disk and asks for an account to be created,
+/// so seeding mints this password, sets it by driving its own first-run setup, and records
+/// it here — the same shape as the torrent client's, and the credential the request
+/// service's identity wiring reads back. The account name is [`MEDIA_SERVER_ADMIN_USER`].
+pub const MEDIA_SERVER_ADMIN_PASSWORD_KEY: &str = "JELLYFIN_ADMIN_PASSWORD";
 
 /// The environment key holding the listening server's first-account password.
 ///
-/// The same shape as Jellyfin's and for the same reason: the service starts with no
+/// The same shape as the media server's and for the same reason: the service starts with no
 /// account and writes no key, so lemonfiber mints this, creates the account with it,
 /// and keeps it. The account is made so that nobody else on the network can claim the
 /// server first; no token of it is recorded.
-pub(crate) const AUDIOBOOKSHELF_PASSWORD_KEY: &str = "AUDIOBOOKSHELF_PASSWORD";
+pub(crate) const LISTENING_SERVER_PASSWORD_KEY: &str = "AUDIOBOOKSHELF_PASSWORD";
 
 /// The environment key holding the Usenet indexer aggregator's administrator password.
 ///
 /// The aggregator starts with no authentication, so there is nothing to read: lemonfiber
 /// mints this, turns authentication on with it, and keeps it, so that the indexer
 /// accounts the aggregator holds are not read by anything that can reach it.
-pub(crate) const NZBHYDRA2_ADMIN_PASSWORD_KEY: &str = "NZBHYDRA2_ADMIN_PASSWORD";
+pub(crate) const USENET_AGGREGATOR_ADMIN_PASSWORD_KEY: &str = "NZBHYDRA2_ADMIN_PASSWORD";
 
 /// The name of the administrator lemonfiber gives the Usenet indexer aggregator.
-pub(crate) const NZBHYDRA2_ADMIN_USER: &str = "admin";
+pub(crate) const USENET_AGGREGATOR_ADMIN_USER: &str = "admin";
 
-/// The environment key holding the book \*arr's API key.
+/// The environment key holding the book curator's API key.
 ///
 /// The one credential in the stack that lemonfiber mints and the *service* adopts,
 /// rather than one it mints and keeps: given this in its environment the service takes
 /// it verbatim instead of generating its own, which is what lets both sides know it
 /// without reading the database it would otherwise keep it in.
-pub(crate) const BINDERY_API_KEY: &str = "BINDERY_API_KEY";
+pub(crate) const BOOK_CURATOR_API_KEY: &str = "BINDERY_API_KEY";
 
 /// The name of the listening server's first account.
-pub(crate) const AUDIOBOOKSHELF_USER: &str = "admin";
+pub(crate) const LISTENING_SERVER_USER: &str = "admin";
 
-/// The name of the Jellyfin administrator account lemonfiber creates at setup — the
+/// The name of the media server's administrator account lemonfiber creates at setup — the
 /// household's own account, one source of truth for the name so the first-run driver
-/// creates it, the Seerr identity wiring signs in with it, and a trace's library read
-/// authenticates as it, all under the same name.
-pub(crate) const JELLYFIN_ADMIN_USER: &str = "admin";
+/// creates it, the request service's identity wiring signs in with it, and a trace's
+/// library read authenticates as it, all under the same name.
+pub(crate) const MEDIA_SERVER_ADMIN_USER: &str = "admin";
 
-/// The account name qBittorrent's web UI is reached under.
+/// The account name the torrent client's web UI is reached under.
 ///
 /// One source of truth for the name, so the client that logs in, the download-client
-/// registration that hands it to an \*arr, and the tunnel's forwarded-port push all
-/// present the same one. Separate from Jellyfin's although both spell it `admin`: they are two
-/// services, and either may change without the other.
-pub(crate) const QBITTORRENT_USER: &str = "admin";
+/// registration that hands it to a curator, and the tunnel's forwarded-port push all
+/// present the same one. Separate from the media server's although both spell it `admin`:
+/// they are two services, and either may change without the other.
+pub(crate) const TORRENT_USER: &str = "admin";
 
 /// What a torrent client's web UI password setting ends in, after the service it is
 /// for.
 ///
 /// Per service, because the password is the one a particular client was set to, and a
 /// second client standing in for the first is a second password. The bundled client's
-/// comes out as [`QBITTORRENT_PASSWORD_KEY`], which is where the tunnel's forwarded-port
+/// comes out as [`TORRENT_PASSWORD_KEY`], which is where the tunnel's forwarded-port
 /// push reads it.
 pub(crate) const PASSWORD_SUFFIX: &str = "_PASSWORD";
 
@@ -306,7 +305,7 @@ pub(crate) const API_KEY_SUFFIX: &str = "_API_KEY";
 /// What the setting holding the password lemonfiber minted for a media server's
 /// administrator ends in.
 ///
-/// The bundled media server's comes out as [`JELLYFIN_ADMIN_PASSWORD_KEY`], and a
+/// The bundled media server's comes out as [`MEDIA_SERVER_ADMIN_PASSWORD_KEY`], and a
 /// plugin's standing in for it as one in the plugin's own namespace, so the stack's
 /// administrator password is never read for, or sent to, a plugin's server.
 pub(crate) const ADMIN_PASSWORD_SUFFIX: &str = "_ADMIN_PASSWORD";
@@ -405,7 +404,7 @@ pub const SETTINGS: &[&str] = &[
     PGID_KEY,
     VPN_PROVIDER_KEY,
     VPN_PORT_FORWARDING_KEY,
-    JELLYFIN_MODE_KEY,
+    MEDIA_SERVER_MODE_KEY,
     INDEXER_URL_KEY,
     INDEXER_APIKEY_KEY,
     INDEXER_VALIDATED_KEY,
@@ -415,11 +414,11 @@ pub const SETTINGS: &[&str] = &[
     PROVIDER_PASS_KEY,
     PROVIDER_TLS_KEY,
     PROVIDER_VALIDATED_KEY,
-    QBITTORRENT_PASSWORD_KEY,
-    JELLYFIN_ADMIN_PASSWORD_KEY,
-    AUDIOBOOKSHELF_PASSWORD_KEY,
-    NZBHYDRA2_ADMIN_PASSWORD_KEY,
-    BINDERY_API_KEY,
+    TORRENT_PASSWORD_KEY,
+    MEDIA_SERVER_ADMIN_PASSWORD_KEY,
+    LISTENING_SERVER_PASSWORD_KEY,
+    USENET_AGGREGATOR_ADMIN_PASSWORD_KEY,
+    BOOK_CURATOR_API_KEY,
     FRONT_DOOR_KEY,
     FILLS_KEY,
     FILLS_WHY_KEY,

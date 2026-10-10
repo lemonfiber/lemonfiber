@@ -2,7 +2,7 @@
 
 use super::{asked, ctx, env_at, silent, the_service_key, the_torrent_password, SERVICE_CONFIG};
 use lemonfiber_core::app::{dispatch, Asking, Command};
-use lemonfiber_core::config::{Settings, QBITTORRENT_PASSWORD_KEY};
+use lemonfiber_core::config::{Settings, TORRENT_PASSWORD_KEY};
 use lemonfiber_core::credential::{fingerprint, State};
 use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::support::Reporting;
@@ -89,7 +89,7 @@ async fn no_recorded_value_appears_anywhere_in_the_answer() {
     let env = env_at(
         "secrecy",
         &[
-            (QBITTORRENT_PASSWORD_KEY, &password),
+            (TORRENT_PASSWORD_KEY, &password),
             ("INDEXER_APIKEY", &indexer),
         ],
     );
@@ -143,17 +143,17 @@ async fn a_service_key_that_no_longer_matches_the_published_copy_is_reported_as_
     let ctx = ctx(env, Files::anywhere(SERVICE_CONFIG), silent());
 
     let inventory = asked(&ctx, Asking::Read).await;
-    let sonarr = inventory
+    let curator = inventory
         .held
         .iter()
         .find(|one| one.name == "Sonarr API key");
 
     assert!(
-        sonarr.is_some(),
-        "the stack carries Sonarr, so its key is listed"
+        curator.is_some(),
+        "the stack carries a curator, so its key is listed"
     );
-    assert_eq!(sonarr.map(|one| one.state), Some(State::Invalid));
-    let said = sonarr
+    assert_eq!(curator.map(|one| one.state), Some(State::Invalid));
+    let said = curator
         .and_then(|one| one.advisory.clone())
         .unwrap_or_default();
     assert!(said.contains("regenerated"), "{said}");

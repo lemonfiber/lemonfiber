@@ -320,7 +320,7 @@ async fn what_a_client_has_moved_is_nothing_where_it_would_not_say() {
     }
 }
 
-/// `SABnzbd`'s queue, holding at a quarter of a megabyte and pulling under it.
+/// The Usenet client's queue, holding at a quarter of a megabyte and pulling under it.
 const QUEUED: &str = r#"{"queue":{"speedlimit_abs":"262144","kbpersec":"128.0"}}"#;
 
 /// Its account statistics, kept by the day rather than as a running total.

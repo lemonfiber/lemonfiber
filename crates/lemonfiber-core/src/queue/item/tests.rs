@@ -19,7 +19,7 @@ fn downloading(progress: u8) -> Item {
 
 #[test]
 fn a_finished_download_nothing_took_is_the_failure_nobody_owns() {
-    // To the client it is a completed download; to the *arr it is nothing at
+    // To the client it is a completed download; to the curator it is nothing at
     // all. Neither reports a problem, because neither has one.
     assert!(downloading(100).is_completed_not_imported());
     assert!(!downloading(94).is_completed_not_imported());

@@ -128,7 +128,7 @@ async fn a_stack_that_cannot_be_read_changes_nothing() {
     );
 }
 
-/// An environment file recording a qBittorrent password, at a scratch path
+/// An environment file recording a torrent client password, at a scratch path
 /// unique to the test so concurrent tests do not share one.
 fn env_at(name: &str) -> std::path::PathBuf {
     let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("fwd-{name}")).kept();
@@ -137,7 +137,7 @@ fn env_at(name: &str) -> std::path::PathBuf {
     assert!(
         crate::config::store::set(
             &path,
-            crate::config::QBITTORRENT_PASSWORD_KEY,
+            crate::config::TORRENT_PASSWORD_KEY,
             &crate::test_support::a_password(),
         )
         .is_ok(),
@@ -147,7 +147,7 @@ fn env_at(name: &str) -> std::path::PathBuf {
 }
 
 /// A context that can authenticate to a torrent client answering `replies`.
-/// What qBittorrent answers a read with before any login, which is how a fresh
+/// What the torrent client answers a read with before any login, which is how a fresh
 /// client's first read goes.
 const SIGNED_OUT: (u16, &str) = (403, "Forbidden");
 

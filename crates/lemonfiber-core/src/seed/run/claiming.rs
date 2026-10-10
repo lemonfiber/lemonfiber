@@ -29,7 +29,7 @@ pub(super) async fn claimed(ctx: &Ctx, services: &[Service]) -> Option<Wiring> {
     let client =
         crate::audiobookshelf::Audiobookshelf::new(ctx.seams.http.clone(), addr.loopback, &addr.id);
     let recorded =
-        crate::app::targets::recorded_secret(ctx, crate::config::AUDIOBOOKSHELF_PASSWORD_KEY);
+        crate::app::targets::recorded_secret(ctx, crate::config::LISTENING_SERVER_PASSWORD_KEY);
     let state = match client.has_account().await {
         Err(failure) => crate::seed::unreached(&failure),
         Ok(true) if recorded.is_some() => State::AlreadyWired,
@@ -50,9 +50,11 @@ async fn made(ctx: &Ctx, client: &crate::audiobookshelf::Audiobookshelf) -> Stat
             detail: crate::secret::NO_RANDOMNESS_FOR_PASSWORD.to_owned(),
         };
     };
-    if let Err(failure) =
-        crate::app::targets::record_secret(ctx, crate::config::AUDIOBOOKSHELF_PASSWORD_KEY, &fresh)
-    {
+    if let Err(failure) = crate::app::targets::record_secret(
+        ctx,
+        crate::config::LISTENING_SERVER_PASSWORD_KEY,
+        &fresh,
+    ) {
         return State::Failed {
             detail: format!(
                 "the password lemonfiber generated could not be recorded, so it was not set: \
@@ -61,14 +63,14 @@ async fn made(ctx: &Ctx, client: &crate::audiobookshelf::Audiobookshelf) -> Stat
         };
     }
     match client
-        .create_account(crate::config::AUDIOBOOKSHELF_USER, &fresh)
+        .create_account(crate::config::LISTENING_SERVER_USER, &fresh)
         .await
     {
         Ok(()) => State::Wired,
         Err(failure) => {
             if let Some(env) = ctx.settings.env_file.as_deref() {
                 let _ =
-                    crate::config::store::unset(env, crate::config::AUDIOBOOKSHELF_PASSWORD_KEY);
+                    crate::config::store::unset(env, crate::config::LISTENING_SERVER_PASSWORD_KEY);
             }
             crate::seed::unreached(&failure)
         }
@@ -83,7 +85,7 @@ fn taken(name: &str) -> State {
              holds the server. If that was not you, someone else on your network claimed it: \
              reset {name}'s configuration and run `lemonfiber seed` to claim it again. If it \
              was you, record its password with `lemonfiber config set {setting} <password>`.",
-            setting = crate::config::AUDIOBOOKSHELF_PASSWORD_KEY,
+            setting = crate::config::LISTENING_SERVER_PASSWORD_KEY,
         ),
     }
 }

@@ -221,9 +221,9 @@ pub fn same_endpoint(have: &RegisteredClient, want: &DownloadClient) -> bool {
     have.host == want.host && have.port == want.port
 }
 
-/// Whether two application addresses reach the same \*arr.
+/// Whether two application addresses reach the same curator.
 ///
-/// A trailing separator is ignored, as it is for a folder path: Prowlarr may
+/// A trailing separator is ignored, as it is for a folder path: the indexer aggregator may
 /// store the canonical form of the address it was given, and the wanted address
 /// and its stored form must be recognised as one so a write is not made every run.
 pub(super) fn same_base_url(a: &str, b: &str) -> bool {
@@ -242,7 +242,7 @@ pub(super) fn same_path(a: &str, b: &str) -> bool {
 }
 
 /// A root-folder path in the form paths are compared in — the trailing separator
-/// dropped, as [`same_path`] drops it — so one folder wanted by two \*arrs keys to
+/// dropped, as [`same_path`] drops it — so one folder wanted by two curators keys to
 /// a single entry however each spells it.
 pub(super) fn canonical_root(path: &str) -> String {
     path.trim_end_matches('/').to_owned()

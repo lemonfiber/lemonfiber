@@ -1,7 +1,7 @@
 //! Who answers each of the stack's asks, in the terms something reaching it needs.
 //!
 //! The settlement above says *which* service fills an ask. Everything that then acts
-//! on the answer — telling an \*arr about a download client, publishing a key, reading
+//! on the answer — telling a curator about a download client, publishing a key, reading
 //! what a filler holds — needs more than the name: where the filler answers beside the
 //! others, which of lemonfiber's adapters it speaks, and where its credential is kept.
 //! This is the one place that is worked out, for the stack's services and every
@@ -85,7 +85,7 @@ pub struct Filler {
 }
 
 impl Filler {
-    /// The service as one of the Servarr shape this machine can open: where it reaches
+    /// The service as one of the curator shape this machine can open: where it reaches
     /// it, the file its key is in and the version of the shape it speaks, or nothing
     /// where it speaks another, publishes no port or names no file.
     #[must_use]

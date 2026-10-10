@@ -204,10 +204,10 @@ pub(super) fn alerts(alerts: &[Alert], room: usize) -> Vec<Line<'static>> {
 
 /// The stuck panel: what in the pipeline has stopped, and for how long.
 ///
-/// Read across the download clients and the \*arrs together, because the failure
+/// Read across the download clients and the curators together, because the failure
 /// that matters most is invisible inside either: an item that downloaded and was
 /// never imported is a finished download to the client and nothing at all to the
-/// \*arr.
+/// curator.
 pub(super) fn stuck(stuck: &[Stuck], room: usize) -> Vec<Line<'static>> {
     if stuck.is_empty() {
         return vec![Line::styled("nothing is stuck", quiet())];

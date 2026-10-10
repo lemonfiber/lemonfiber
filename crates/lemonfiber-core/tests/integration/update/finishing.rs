@@ -1,10 +1,10 @@
 //! What a finished run records, and what it waits for first.
 
-use super::{asking, behind, recording, reported, Coming, Kept, Machine, SONARR};
+use super::{asking, behind, recording, reported, Coming, Kept, Machine, CURATOR_VERSIONS};
 use lemonfiber_core::app::{dispatch, Ctx, Waiting};
 use lemonfiber_core::archive::{Archiving, Vault};
 use lemonfiber_core::config::paths::Paths;
-use lemonfiber_core::config::{store, Protocols, Settings, QBITTORRENT_PASSWORD_KEY};
+use lemonfiber_core::config::{store, Protocols, Settings, TORRENT_PASSWORD_KEY};
 use lemonfiber_core::ports::docker::Engine;
 use lemonfiber_core::ports::http::Http;
 use lemonfiber_core::ports::process::Runner;
@@ -38,8 +38,8 @@ async fn a_confirmed_run_records_what_it_moved_and_where_the_capture_went() {
         r#""operation":"update""#.to_owned(),
         r#""target":"sonarr""#.to_owned(),
         r#""action":"pinned""#.to_owned(),
-        format!(r#""previous":"{}""#, SONARR.0),
-        format!(r#""current":"{}""#, SONARR.1),
+        format!(r#""previous":"{}""#, CURATOR_VERSIONS.0),
+        format!(r#""current":"{}""#, CURATOR_VERSIONS.1),
     ] {
         assert!(written.contains(&held), "{held} is missing from {written}");
     }
@@ -51,14 +51,14 @@ async fn a_confirmed_run_records_what_it_moved_and_where_the_capture_went() {
     );
 }
 
-/// A private environment file recording qBittorrent's password, at a scratch path
+/// A private environment file recording the torrent client's password, at a scratch path
 /// unique to this case so concurrent tests do not share one.
 fn env_at(name: &str) -> PathBuf {
     let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("update-{name}")).kept();
     let _ = std::fs::remove_dir_all(&dir);
     let path = dir.join(".env");
     assert!(
-        store::set(&path, QBITTORRENT_PASSWORD_KEY, &a_password()).is_ok(),
+        store::set(&path, TORRENT_PASSWORD_KEY, &a_password()).is_ok(),
         "the scratch environment file is written"
     );
     path
@@ -82,7 +82,7 @@ fn transferring(
             ..Settings::default()
         })
         .build()
-        .with_images(Pulled::holding(behind(&[("sonarr", SONARR.0)])))
+        .with_images(Pulled::holding(behind(&[("sonarr", CURATOR_VERSIONS.0)])))
         .with_http(http)
         .with_archives(Archiving {
             paths: Paths::rooted(Path::new("/cfg"), Path::new("/data")),
@@ -91,7 +91,7 @@ fn transferring(
         .with_patience(Duration::ZERO)
 }
 
-/// A qBittorrent still working on something, answering the same way every time.
+/// A torrent client still working on something, answering the same way every time.
 fn still_coming_down() -> Arc<Fake> {
     Fake::by_path_in_turn(vec![
         ("/auth/login", vec![Answer::reply(200, "Ok.")]),

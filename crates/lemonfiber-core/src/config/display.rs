@@ -150,7 +150,7 @@ pub const SHOWN: &[(&str, &str)] = &[
          whose effect is that lemonfiber stops doing something",
     ),
     (
-        super::JELLYFIN_MODE_KEY,
+        super::MEDIA_SERVER_MODE_KEY,
         "whether the media server runs in a container or on the host machine",
     ),
     (

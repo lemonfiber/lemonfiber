@@ -3,8 +3,8 @@
 //! The deepest quality preset asks for 4K HDR, which a media server must
 //! transcode for any device that cannot direct-play it. Whether that transcode
 //! is smooth or pins every CPU core is a property of the platform and how
-//! Jellyfin runs, not of the preset — and the operator cannot see it from the
-//! choice itself. lemonfiber can: it knows the environment and whether Jellyfin
+//! the media server runs, not of the preset — and the operator cannot see it from the
+//! choice itself. lemonfiber can: it knows the environment and whether the media server
 //! runs in its container or on the host, so it states the consequence for
 //! household playback before the choice is confirmed rather than after the
 //! complaints.
@@ -32,9 +32,9 @@ pub enum Playback {
 }
 
 impl Playback {
-    /// What this environment and Jellyfin mode amount to: Linux reaches the
+    /// What this environment and media server mode amount to: Linux reaches the
     /// encoder from inside the container; macOS and Windows reach it only when
-    /// Jellyfin runs natively; without a media server there is nothing to reach.
+    /// the media server runs natively; without a media server there is nothing to reach.
     ///
     /// This is the one place transcoding bridges the platform and the operator's
     /// media-server choice; everything downstream takes the [`Playback`] it
@@ -51,11 +51,9 @@ impl Playback {
     pub const fn of(environment: Environment, library: Library) -> Self {
         match library {
             Library::None => Self::NoServer,
-            Library::JellyfinNative => Self::HardwareTranscoding,
-            Library::JellyfinDocker if environment.can_transcode_in_docker() => {
-                Self::HardwareTranscoding
-            }
-            Library::JellyfinDocker => Self::SoftwareOnly,
+            Library::Native => Self::HardwareTranscoding,
+            Library::Docker if environment.can_transcode_in_docker() => Self::HardwareTranscoding,
+            Library::Docker => Self::SoftwareOnly,
         }
     }
 }

@@ -38,10 +38,10 @@ pub const EVERY: &[Reach] = &[
 /// The repository the community quality guides are synced from, probed for
 /// reachability rather than read.
 ///
-/// A hand-maintained literal — Recyclarr does not publish where it syncs from in a
-/// form anything here could read — so it must be changed by hand if the upstream
-/// moves, or both the probe and the list below name a source unrelated to what
-/// actually syncs.
+/// A hand-maintained literal — the quality sync tool does not publish where it syncs from
+/// in a form anything here could read — so it must be changed by hand if the upstream
+/// moves, or both the probe and the list below name a source unrelated to what actually
+/// syncs.
 pub const GUIDE_SOURCE: &str = "https://github.com/TRaSH-Guides/Guides";
 
 /// Where a member who is reached on Pushover is reached.
@@ -183,9 +183,9 @@ pub fn purpose(reach: Reach) -> &'static str {
             "Fetch the service images this stack runs, and the newer ones when it is updated."
         }
         Reach::Guides => {
-            "Confirm the source Recyclarr syncs the community quality profiles from can be \
-             reached, so a sync that would bring nothing back is noticed rather than mistaken \
-             for a preset that has no effect."
+            "Confirm the source the quality sync tool syncs the community quality profiles from \
+             can be reached, so a sync that would bring nothing back is noticed rather than \
+             mistaken for a preset that has no effect."
         }
         Reach::Echo => {
             "Read the public address the download client's traffic comes out of, so it can be \
@@ -303,8 +303,8 @@ pub fn cost(reach: Reach) -> &'static str {
         }
         Reach::Guides => {
             "The diagnosis stops confirming the quality-guide source is reachable and reports \
-             that it did not look. Recyclarr goes on syncing to its own schedule and the \
-             profiles already in place are unaffected."
+             that it did not look. The quality sync tool goes on syncing to its own schedule and \
+             the profiles already in place are unaffected."
         }
         Reach::Echo => {
             "Leak detection stops. A tunnel that has quietly fallen back to this machine's own \

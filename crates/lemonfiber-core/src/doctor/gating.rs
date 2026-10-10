@@ -163,7 +163,7 @@ fn refusals(refused: &[&Entry]) -> Problem {
             refused.len(),
             listed(refused)
         ),
-        "Something reaching the request service asked Sonarr, Radarr or Jellyfin for more \
+        "Something reaching the request service asked a curator or the media server for more \
          than requests need, and the gate stopped it",
         Remedy::new(
             "The request service made calls it has no use for. If nobody changed its \

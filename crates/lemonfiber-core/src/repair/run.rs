@@ -259,7 +259,7 @@ async fn permitted(ctx: &Ctx, mender: &dyn crate::doctor::Mend, repair: &Repair)
 /// Two reversals, in order: the changes that live inside a service go back through that
 /// service, and what is left — settings, directories — goes back on the host. In that
 /// order because the service is the part that can be unreachable, and an operator whose
-/// Sonarr is down should still get their environment file back.
+/// curator is down should still get their environment file back.
 ///
 /// # Errors
 ///

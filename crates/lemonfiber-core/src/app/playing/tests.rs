@@ -7,7 +7,7 @@ use crate::app::Outcome;
 use crate::ports::service::{Access, Medium, Member};
 use crate::test_support::{a_context, a_password, SeedFs};
 
-/// A Servarr config carrying a readable key, so the stack resolves its targets.
+/// A curator config carrying a readable key, so the stack resolves its targets.
 const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
 
 /// Ada watching an episode and Bram paused on a film, in the server's own words.
@@ -65,7 +65,7 @@ fn ctx_over(transport: Arc<Transport>, tag: &str, signs_in: bool) -> Ctx {
     if signs_in {
         let _ = crate::app::targets::record_secret(
             &context,
-            crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+            crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
             &a_password(),
         );
     }

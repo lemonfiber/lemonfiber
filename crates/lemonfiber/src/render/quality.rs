@@ -27,7 +27,7 @@ pub(super) fn quality(report: &QualityReport) -> Lines {
             lines.spaced("Saved. This affects future acquisitions only — nothing already downloaded changes.");
             if report.customised {
                 lines.put(format!(
-                    "Your Recyclarr config is customised, so this preset will not apply on its \
+                    "Your quality sync config is customised, so this preset will not apply on its \
                      own. Run `{PRODUCT} quality reapply` to let it overwrite your edits."
                 ));
             }
@@ -40,33 +40,39 @@ pub(super) fn quality(report: &QualityReport) -> Lines {
         Disposition::Held => {
             lines.spaced(
                 "Not saved: this machine would have to transcode this in software, which will not \
-                 play well. Re-run with --confirm to choose it anyway, or run Jellyfin natively.",
+                 play well. Re-run with --confirm to choose it anyway, or run the media server \
+                 natively.",
             );
         }
         // Re-asserting the preset over the config: say whether it overwrote an edit.
         Disposition::Reapplied => {
             if report.customised {
-                lines.spaced("Reapplied the preset, overwriting your customised Recyclarr config.");
+                lines.spaced(
+                    "Reapplied the preset, overwriting your customised quality sync config.",
+                );
             } else {
-                lines.spaced("Reapplied the preset. The Recyclarr config was already in step.");
+                lines.spaced("Reapplied the preset. The quality sync config was already in step.");
             }
         }
         // A rehearsed reapply: preview whether it would overwrite an edit.
         Disposition::WouldReapply => {
             if report.customised {
                 lines.spaced(
-                    "Would reapply the preset, overwriting your customised Recyclarr config.",
+                    "Would reapply the preset, overwriting your customised quality sync config.",
                 );
             } else {
-                lines.spaced("Would reapply the preset. The Recyclarr config is already in step.");
+                lines.spaced(
+                    "Would reapply the preset. The quality sync config is already in step.",
+                );
             }
         }
         // A plain show reports the state; a customised config is worth naming.
         Disposition::Shown => {
             if report.customised {
                 lines.spaced(format!(
-                    "Your Recyclarr config is customised — the preset is no longer authoritative. \
-                     Run `{PRODUCT} quality reapply` to re-assert it over your edits."
+                    "Your quality sync config is customised — the preset is no longer \
+                     authoritative. Run `{PRODUCT} quality reapply` to re-assert it over your \
+                     edits."
                 ));
             }
         }

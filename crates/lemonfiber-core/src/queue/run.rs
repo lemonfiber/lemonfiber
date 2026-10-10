@@ -1,6 +1,6 @@
 //! Watching the pipeline across the services that each see half of it.
 //!
-//! The \*arrs know what they are waiting for; the download clients know what they
+//! The curators know what they are waiting for; the download clients know what they
 //! are fetching. Neither knows what the other is doing, which is why the failure
 //! that matters most — downloaded successfully, never imported — is invisible to
 //! both and has to be assembled here.
@@ -159,7 +159,7 @@ pub fn watch(
 
 /// What can honestly be said about one item, or nothing.
 ///
-/// A finished download no \*arr is waiting for is either an orphan or a torrent
+/// A finished download no curator is waiting for is either an orphan or a torrent
 /// seeding after a successful import, and from here those are identical: the
 /// queue holds what is in progress, so an imported item has left it. Telling them
 /// apart needs the service's history, which nothing reads yet.

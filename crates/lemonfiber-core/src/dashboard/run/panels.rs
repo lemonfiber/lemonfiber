@@ -21,7 +21,7 @@ use crate::queue::run::Answered;
 use crate::storage::{test_link, Linked};
 
 use crate::app::targets::{
-    download_targets, host_fillers, protocol_of, read_transfers, servarr_targets,
+    curator_targets, download_targets, host_fillers, protocol_of, read_transfers,
 };
 
 /// What the household has asked for, for the panel beside the door.
@@ -187,13 +187,12 @@ pub(super) fn download_rate(transfers: &Panel<Vec<Transfer>>) -> u64 {
 
 /// The active downloads across the stack's download clients.
 ///
-/// Resolves the download clients to host-side targets, then reads each on its own
-/// shape — qBittorrent authenticated with the recorded password, `SABnzbd` with the
-/// key it wrote to disk. A client not yet seeded (no password, or no key on disk)
-/// or one that will not answer is left out rather than failing the panel; only a
-/// stack that cannot be read at all leaves the whole panel unavailable, since then
-/// there is nothing to ask. The protocol is set from which client answered, not
-/// trusted from the answer.
+/// Resolves the download clients to host-side targets, then reads each on its own shape —
+/// the torrent client authenticated with the recorded password, the Usenet client with the
+/// key it wrote to disk. A client not yet seeded (no password, or no key on disk) or one
+/// that will not answer is left out rather than failing the panel; only a stack that cannot
+/// be read at all leaves the whole panel unavailable, since then there is nothing to ask.
+/// The protocol is set from which client answered, not trusted from the answer.
 pub(super) async fn transfers(
     ctx: &Ctx,
     manifest: Result<&Manifest, &String>,
@@ -277,9 +276,9 @@ pub(super) async fn vpn(ctx: &Ctx, manifest: Result<&Manifest, &String>) -> Opti
     }
 }
 
-/// Each media-filing \*arr's queue depth and stuck count.
+/// Each media-filing curator's queue depth and stuck count.
 ///
-/// Resolves the Servarr-shape services the same way the credentials check does —
+/// Resolves the curator-shape services the same way the credentials check does —
 /// the stack's own bind-mount convention — then reads each one's key from disk and
 /// asks it for its queue. A service still starting (no key written yet) or one
 /// that will not answer is left out of the panel rather than failing it; only a
@@ -294,10 +293,10 @@ pub(super) async fn queues(
         Ok(manifest) => manifest,
         Err(reason) => return (Panel::unavailable(reason.clone()), Vec::new()),
     };
-    let targets = servarr_targets(&manifest.services, project);
+    let targets = curator_targets(&manifest.services, project);
 
     // Opened and read at once rather than one service after another: each is two
-    // round trips, and five \*arrs in series is ten waits where the slowest one would
+    // round trips, and five curators in series is ten waits where the slowest one would
     // do. `join_all` keeps the order, so the panel and the answers below read the
     // same as when they were gathered one at a time.
     let read = futures_util::future::join_all(targets.iter().map(|target| async move {

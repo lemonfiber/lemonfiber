@@ -62,7 +62,7 @@ async fn indexer(ctx: &Ctx, asker: &Cleared<'_>) -> Asked {
     let Some(published) = asker.published else {
         return Asked::Nobody;
     };
-    let Beneath::Read(key) = super::keys::servarr_key(ctx, asker).await else {
+    let Beneath::Read(key) = super::keys::curator_key(ctx, asker).await else {
         return Asked::Unkeyed;
     };
     Asked::By(Box::new(crate::prowlarr::Prowlarr::new(
@@ -119,7 +119,7 @@ async fn sync(ctx: &Ctx, syncing: &Syncing<'_>, only: Option<&str>) -> Vec<crate
     for (curator, kind, reached) in curators {
         // A curator the gate let the indexer's key reach, read from its own file: one not
         // written yet, or in a file it may not be read from, is passed over this run.
-        let Beneath::Read(key) = super::keys::servarr_key(ctx, curator).await else {
+        let Beneath::Read(key) = super::keys::curator_key(ctx, curator).await else {
             passed.push(skipped(synced(&curator.name, &asker.name), &curator.name));
             continue;
         };
@@ -149,8 +149,8 @@ async fn sync(ctx: &Ctx, syncing: &Syncing<'_>, only: Option<&str>) -> Vec<crate
     wirings
 }
 
-/// Hold each indexer's application for the curator `arr` to the key it answers to now:
-/// what replacing that curator's key owes the indexer.
+/// Hold each indexer's application for the curator `curator_id` to the key it answers to
+/// now: what replacing that curator's key owes the indexer.
 ///
 /// Answers with the indexer's name and how the application came out, for each indexer
 /// that registers it — none where nothing does. One where either key is not written yet
@@ -158,11 +158,11 @@ async fn sync(ctx: &Ctx, syncing: &Syncing<'_>, only: Option<&str>) -> Vec<crate
 pub(crate) async fn resync_application(
     ctx: &Ctx,
     fillers: &Fillers,
-    arr: &str,
+    curator_id: &str,
 ) -> Vec<(String, crate::seed::State)> {
     let mut found = Vec::new();
     for syncing in syncing(fillers) {
-        for wiring in sync(ctx, &syncing, Some(arr)).await {
+        for wiring in sync(ctx, &syncing, Some(curator_id)).await {
             if !matches!(wiring.state, crate::seed::State::Skipped { .. }) {
                 found.push((syncing.asker.name.clone(), wiring.state));
             }
@@ -171,7 +171,7 @@ pub(crate) async fn resync_application(
     found
 }
 
-/// The application kind for an \*arr's media, read from the first media type it
+/// The application kind for a curator's media, read from the first media type it
 /// declares, or nothing where that is not one an indexer's app sync covers — the same
 /// by-media mapping the download clients' categories use, so the two stay in step.
 pub(super) fn application_kind(

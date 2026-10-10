@@ -312,7 +312,7 @@ fn what_travels_is_why_and_never_the_decline_itself() {
     }
 }
 
-/// A Servarr config that opens a target, carrying a readable key.
+/// A curator config that opens a target, carrying a readable key.
 const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
 
 /// The one request the household is waiting on, asked for long enough ago that any
@@ -376,13 +376,13 @@ fn listing(name: &str, closes: u16, lists: u16) -> (Ctx, Arc<Transport>) {
         .build()
         .with_filesystem(Arc::new(
             SeedFs::keyed(Some(KEYED), None)
-                .with_seerr(lemonfiber_fixtures::support::SEERR_SETTINGS),
+                .with_requests(lemonfiber_fixtures::support::SEERR_SETTINGS),
         ))
         .with_http(held);
     ctx.settings.env_file = Some(env_at(name, &a_password()));
     let _ = crate::app::targets::record_secret(
         &ctx,
-        crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         &a_password(),
     );
     (ctx, transport)

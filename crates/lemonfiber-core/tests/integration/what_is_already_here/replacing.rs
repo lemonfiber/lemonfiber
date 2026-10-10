@@ -18,7 +18,7 @@ use lemonfiber_fixtures::pulled::Pulled;
 use lemonfiber_fixtures::support::{refused, spoke, Recording, Reporting};
 use std::sync::Arc;
 
-/// Somebody else's sonarr, standing here, with every command run recorded.
+/// Somebody else's curator, standing here, with every command run recorded.
 fn theirs(runner: &Arc<Recording>) -> Ctx {
     let images = Pulled::holding(vec![Pulled::image(
         "lscr.io/linuxserver/sonarr:4.0.15",
