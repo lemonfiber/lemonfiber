@@ -27,6 +27,7 @@ mod providers;
 mod quality;
 mod requests;
 mod screening;
+mod searching;
 pub mod stage;
 mod subtitles;
 mod throttling;
@@ -65,6 +66,7 @@ pub use screening::{
     EpisodeDetail, Holds, HowFar, Image, Item, ItemDetail, ItemProgress, Medium, Picture,
     Screening, SeasonDetail, PICTURE_MOST, PLAYER,
 };
+pub use searching::{Asked, Detail, Found, Page, Searching, Season, Wish};
 pub use subtitles::{Subtitles, Watched, Watching};
 pub use throttling::{Hours, Rates, Throttled, Throttling, Wanted, Window};
 pub use trace::{FoundItem, ItemPart, Library, Pipeline, QueueItem, StuckItem, TraceEvent};

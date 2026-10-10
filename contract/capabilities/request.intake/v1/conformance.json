@@ -254,6 +254,33 @@
       "keyed": true,
       "live": false,
       "operation": "set_notices"
+    },
+    {
+      "case": "search-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "search"
+    },
+    {
+      "case": "detail-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "detail"
+    },
+    {
+      "case": "ask-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "ask"
     }
   ],
   "major": 1

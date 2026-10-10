@@ -6,6 +6,7 @@
 //! it is written once; each client builds its own requests and holds one of these
 //! to send them.
 
+use std::fmt::Write as _;
 use std::sync::Arc;
 
 use crate::ports::http::{Fetched, Http, Method, Request, Response};
@@ -50,6 +51,19 @@ pub(crate) fn form_encoded(fields: &[(&str, &str)]) -> String {
         form.append_pair(name, value);
     }
     form.finish()
+}
+
+/// `value` as a query carries it: every byte outside the unreserved set
+/// written as `%XX`, a space included, so no reader takes a `+` for one.
+pub(crate) fn query_encoded(value: &str) -> String {
+    value.bytes().fold(String::new(), |mut out, byte| {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~') {
+            out.push(char::from(byte));
+        } else {
+            let _ = write!(out, "%{byte:02X}");
+        }
+        out
+    })
 }
 
 /// A service reached over the HTTP port: where it is, and what to call it when

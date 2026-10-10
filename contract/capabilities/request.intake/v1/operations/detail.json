@@ -1,0 +1,197 @@
+{
+  "post": {
+    "operationId": "detail",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$defs": {
+              "Kind": {
+                "description": "The two kinds of video a household files by resolution.",
+                "oneOf": [
+                  {
+                    "const": "tv",
+                    "description": "Television: series, seasons and episodes.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "movies",
+                    "description": "Film.",
+                    "type": "string"
+                  }
+                ]
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "id": {
+                "description": "The port's `id`.",
+                "type": "string"
+              },
+              "kind": {
+                "$ref": "#/$defs/Kind",
+                "description": "The port's `kind`."
+              },
+              "region": {
+                "description": "The port's `region`.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "id",
+              "region"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$defs": {
+                "Detail": {
+                  "additionalProperties": false,
+                  "description": "What one title is, beyond what a search says of it.",
+                  "properties": {
+                    "certification": {
+                      "description": "Its certification in the region asked for, or nothing where it has none there.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "overview": {
+                      "description": "What it is about, in the service's words, where it has any.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "released": {
+                      "description": "Whether it has come out yet.",
+                      "type": "boolean"
+                    },
+                    "seasons": {
+                      "description": "Each season of a series, and none for a film.",
+                      "items": {
+                        "$ref": "#/$defs/Season"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "released",
+                    "seasons"
+                  ],
+                  "type": "object"
+                },
+                "MediaStatus": {
+                  "description": "What became of the media one request asked for.",
+                  "oneOf": [
+                    {
+                      "const": "unknown",
+                      "description": "Nothing is known about it yet.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "pending",
+                      "description": "Known and waiting.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "processing",
+                      "description": "Being fetched.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "partly-available",
+                      "description": "Some of it is here.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "available",
+                      "description": "All of it is here.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "deleted",
+                      "description": "It was here and has been removed.",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "Season": {
+                  "additionalProperties": false,
+                  "description": "One season of a series, and where it stands in the house.",
+                  "properties": {
+                    "number": {
+                      "description": "Its number.",
+                      "format": "uint32",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "status": {
+                      "$ref": "#/$defs/MediaStatus",
+                      "description": "Where it stands in the house."
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Detail"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Nullable_Detail"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ],
+    "x-lemonfiber-largest": 1048576
+  }
+}

@@ -9,6 +9,7 @@ use lemonfiber_ports::service::{
     Noticing, Occasion, Protocol, QualityProfile, Quota, RegisteredTarget, RequestStatus,
     Requesting, Requests, Telling,
 };
+use lemonfiber_ports::service::{Asked, Detail, Found, Page, Searching, Season, Wish};
 
 use super::{contracted, crosses_alike, intake, json, Served, Upstream, SERVICE};
 
@@ -187,8 +188,47 @@ impl Noticing for Upstream {
     }
 }
 
+#[async_trait]
+impl Searching for Upstream {
+    async fn search(&self, term: &str, kinds: &[Kind], page: u32) -> Result<Page, Failure> {
+        Ok(Page {
+            titles: vec![Found {
+                id: "603".to_owned(),
+                kind: kinds.first().copied().unwrap_or(Kind::Movies),
+                title: format!("found by {term}"),
+                year: Some(1999),
+                status: MediaStatus::Unknown,
+                poster: Some("https://posters.example/603.jpg".to_owned()),
+            }],
+            next: Some(page + 1),
+        })
+    }
+
+    async fn detail(&self, kind: Kind, id: &str, region: &str) -> Result<Option<Detail>, Failure> {
+        Ok((id == "603").then(|| Detail {
+            overview: Some(format!("a {kind:?} rated in {region}")),
+            certification: Some("12".to_owned()),
+            released: true,
+            seasons: vec![Season {
+                number: 1,
+                status: MediaStatus::Available,
+            }],
+        }))
+    }
+
+    async fn ask(&self, member: &str, wish: &Wish) -> Result<Asked, Failure> {
+        self.tell(format!("ask {member} {wish:?}"));
+        Ok(Asked {
+            request: 12,
+            waiting: true,
+        })
+    }
+}
+
 /// Every operation of the capability, once, each answer written down.
-async fn script<R: Requests + Approving + Addressing + Noticing>(service: &R) -> Vec<String> {
+async fn script<R: Requests + Approving + Addressing + Noticing + Searching>(
+    service: &R,
+) -> Vec<String> {
     let source = IdentitySource {
         at: "http://server:8096".to_owned(),
         protocol: Protocol("jellyfin".to_owned()),
@@ -230,7 +270,7 @@ async fn script<R: Requests + Approving + Addressing + Noticing>(service: &R) ->
     };
     let members = ["a7f3".to_owned(), "b8e4".to_owned()];
     let notices = ["the disk is nearly full".to_owned()];
-    vec![
+    let mut written = vec![
         format!("{:?}", service.initialized().await),
         format!("{:?}", service.configure_identity(&source).await),
         format!("{:?}", service.answers().await),
@@ -278,6 +318,31 @@ async fn script<R: Requests + Approving + Addressing + Noticing>(service: &R) ->
         ),
         format!("{:?}", service.reachable(11).await),
         format!("{:?}", service.set_notices(&notices).await),
+    ];
+    written.extend(searched(service).await);
+    written
+}
+
+/// The search, a title's detail, one the service does not know, and an ask, each
+/// answer written down.
+async fn searched<R: Searching>(service: &R) -> Vec<String> {
+    vec![
+        format!("{:?}", service.search("matrix", &[Kind::Movies], 1).await),
+        format!("{:?}", service.detail(Kind::Movies, "603", "NL").await),
+        format!("{:?}", service.detail(Kind::Movies, "1", "NL").await),
+        format!(
+            "{:?}",
+            service
+                .ask(
+                    "4",
+                    &Wish {
+                        id: "603".to_owned(),
+                        kind: Kind::Tv,
+                        seasons: vec![1, 2],
+                    }
+                )
+                .await
+        ),
     ]
 }
 
@@ -288,7 +353,7 @@ async fn a_request_service_answers_and_is_told_through_its_contract_as_it_is_in_
         intake::Adapter,
         [
             "identity", "link", "approval", "remove", "tell", "add", "move", "test", "relink",
-            "asking", "quota", "quota", "approves", "decide", "release", "notices"
+            "asking", "quota", "quota", "approves", "decide", "release", "notices", "ask"
         ]
     );
 }
