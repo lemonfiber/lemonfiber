@@ -8,14 +8,15 @@
 //! file a request for any member by naming them.
 
 use async_trait::async_trait;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-use super::records::media_status;
-use super::Seerr;
+use super::records::{kind_of, media_status, media_type, request_status};
+use super::{Seerr, NOT_FOUND};
+use crate::endpoint::query_encoded;
 use crate::ports::http::Method;
 use crate::ports::media::Kind;
 use crate::ports::service::{
-    Asked, Detail, Failure, Found, MediaStatus, Page, Searching, Season, Wish,
+    Asked, Detail, Failure, Found, MediaStatus, Page, RequestStatus, Searching, Season, Wish,
 };
 
 /// Where every published poster is served from, at the width a phone shows it.
@@ -30,9 +31,6 @@ const UNRELEASED_SERIES: [&str; 3] = ["Planned", "In Production", "Pilot"];
 /// The number a series files its specials under.
 const SPECIALS: u32 = 0;
 
-/// The status a request is filed under while it waits for somebody to approve it.
-const PENDING: u8 = 1;
-
 /// One page of a search, as the service answers it.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -42,13 +40,13 @@ struct SearchPage {
     #[serde(default)]
     total_pages: u32,
     #[serde(default)]
-    results: Vec<Result>,
+    results: Vec<Hit>,
 }
 
 /// One thing a search found: a film, a series or a person.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct Result {
+struct Hit {
     id: i64,
     media_type: String,
     #[serde(default)]
@@ -148,6 +146,18 @@ struct SeasonNumber {
     season_number: u32,
 }
 
+/// A request to file: the title, the member it is filed for, and for a series the seasons
+/// of it, every one where none are named.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Filing {
+    media_type: &'static str,
+    media_id: u64,
+    user_id: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    seasons: Option<serde_json::Value>,
+}
+
 /// A filed request: its number and where it stands.
 #[derive(Deserialize)]
 struct Filed {
@@ -156,21 +166,9 @@ struct Filed {
     status: u8,
 }
 
-/// The service's word for `kind`.
-const fn media_type(kind: Kind) -> &'static str {
-    match kind {
-        Kind::Tv => "tv",
-        Kind::Movies => "movie",
-    }
-}
-
-/// The kind the service's word names, or nothing for a person or anything else.
-fn kind_of(word: &str) -> Option<Kind> {
-    match word {
-        "tv" => Some(Kind::Tv),
-        "movie" => Some(Kind::Movies),
-        _ => None,
-    }
+/// The number the service names a title or a member by, or nothing for any other text.
+fn number(id: &str) -> Option<u64> {
+    id.parse().ok()
 }
 
 /// The year a date opens with.
@@ -184,7 +182,7 @@ fn standing(info: Option<&MediaInfo>) -> MediaStatus {
         .unwrap_or(MediaStatus::Unknown)
 }
 
-impl Result {
+impl Hit {
     /// The title this is, where it is a film or a series of one of `kinds`.
     fn found(self, kinds: &[Kind]) -> Option<Found> {
         let kind = kind_of(&self.media_type).filter(|kind| kinds.contains(kind))?;
@@ -207,7 +205,7 @@ impl Full {
                 releases
                     .results
                     .into_iter()
-                    .find(|one| one.iso_3166_1 == region)?
+                    .find(|one| one.iso_3166_1.eq_ignore_ascii_case(region))?
                     .release_dates
                     .into_iter()
                     .map(|date| date.certification)
@@ -217,7 +215,7 @@ impl Full {
                 ratings
                     .results
                     .into_iter()
-                    .find(|one| one.iso_3166_1 == region)
+                    .find(|one| one.iso_3166_1.eq_ignore_ascii_case(region))
                     .map(|one| one.rating)
                     .filter(|rating| !rating.is_empty())
             }),
@@ -253,16 +251,8 @@ impl Full {
 
 #[async_trait]
 impl Searching for Seerr {
-    async fn search(
-        &self,
-        term: &str,
-        kinds: &[Kind],
-        page: u32,
-    ) -> std::result::Result<Page, Failure> {
-        let path = format!(
-            "/search?query={}&page={page}",
-            crate::endpoint::query_encoded(term)
-        );
+    async fn search(&self, term: &str, kinds: &[Kind], page: u32) -> Result<Page, Failure> {
+        let path = format!("/search?query={}&page={page}", query_encoded(term));
         let response = self
             .endpoint
             .send(&self.request(Method::Get, &path, None))
@@ -280,22 +270,16 @@ impl Searching for Seerr {
         })
     }
 
-    async fn detail(
-        &self,
-        kind: Kind,
-        id: &str,
-        region: &str,
-    ) -> std::result::Result<Option<Detail>, Failure> {
-        let path = format!(
-            "/{}/{}",
-            media_type(kind),
-            crate::endpoint::query_encoded(id)
-        );
+    async fn detail(&self, kind: Kind, id: &str, region: &str) -> Result<Option<Detail>, Failure> {
+        let Some(id) = number(id) else {
+            return Ok(None);
+        };
+        let path = format!("/{}/{id}", media_type(kind));
         let response = self
             .endpoint
             .send(&self.request(Method::Get, &path, None))
             .await?;
-        if response.status == 404 {
+        if response.status == NOT_FOUND {
             return Ok(None);
         }
         let full: Full = self
@@ -304,39 +288,35 @@ impl Searching for Seerr {
         Ok(Some(full.detail(kind, region)))
     }
 
-    async fn ask(&self, member: &str, wish: &Wish) -> std::result::Result<Asked, Failure> {
-        let (Ok(media), Ok(user)) = (wish.id.parse::<i64>(), member.parse::<i64>()) else {
+    async fn ask(&self, member: &str, wish: &Wish) -> Result<Asked, Failure> {
+        let (Some(media), Some(user)) = (number(&wish.id), number(member)) else {
             return Err(self
                 .endpoint
                 .refused("the title or the member is not one the service names"));
         };
-        let body = match wish.kind {
-            Kind::Movies => serde_json::json!({
-                "mediaType": media_type(wish.kind),
-                "mediaId": media,
-                "userId": user,
-            }),
-            Kind::Tv => serde_json::json!({
-                "mediaType": media_type(wish.kind),
-                "mediaId": media,
-                "userId": user,
-                "seasons": if wish.seasons.is_empty() {
+        let filing = Filing {
+            media_type: media_type(wish.kind),
+            media_id: media,
+            user_id: user,
+            seasons: (wish.kind == Kind::Tv).then(|| {
+                if wish.seasons.is_empty() {
                     serde_json::json!("all")
                 } else {
                     serde_json::json!(wish.seasons)
-                },
+                }
             }),
         };
+        let body = serde_json::to_string(&filing).unwrap_or_default();
         let response = self
             .endpoint
-            .send(&self.request(Method::Post, "/request", Some(body.to_string())))
+            .send(&self.request(Method::Post, "/request", Some(body)))
             .await?;
         let filed: Filed = self
             .endpoint
             .decode(&response, "the request could not be filed")?;
         Ok(Asked {
             request: filed.id,
-            waiting: filed.status == PENDING,
+            waiting: request_status(filed.status) == Some(RequestStatus::Pending),
         })
     }
 }

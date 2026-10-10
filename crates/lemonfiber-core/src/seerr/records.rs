@@ -101,11 +101,7 @@ impl RequestRecord {
             made: self.created_at,
             member: self.requested_by.display_name,
             member_id: self.requested_by.jellyfin_user_id,
-            kind: match self.media_type.as_str() {
-                "tv" => Some(Kind::Tv),
-                "movie" => Some(Kind::Movies),
-                _ => None,
-            },
+            kind: kind_of(&self.media_type),
             item: self.media.external_service_id,
             arrived: self.media.media_added_at,
             shelf_id: self.media.jellyfin_media_id,
@@ -113,6 +109,19 @@ impl RequestRecord {
             media_status: media_status(self.media.status),
         }
     }
+}
+
+/// The service's word for `kind`.
+pub(super) const fn media_type(kind: Kind) -> &'static str {
+    match kind {
+        Kind::Tv => "tv",
+        Kind::Movies => "movie",
+    }
+}
+
+/// The kind the service's word names, or nothing for a person or anything else.
+pub(super) fn kind_of(word: &str) -> Option<Kind> {
+    Kind::ALL.into_iter().find(|kind| media_type(*kind) == word)
 }
 
 /// What became of a request, from the number the service files it under, or `None` for

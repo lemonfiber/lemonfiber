@@ -105,7 +105,7 @@ async fn a_series_is_rated_by_region_and_never_offers_its_specials() {
     let http = Fake::by_path(vec![("/api/v1/tv/1399", Answer::reply(200, series))]);
 
     let detail = service(&http)
-        .detail(Kind::Tv, "1399", "US")
+        .detail(Kind::Tv, "1399", "us")
         .await
         .ok()
         .flatten()
@@ -148,6 +148,17 @@ async fn a_title_the_service_does_not_know_is_nothing() {
     let detail = service(&http).detail(Kind::Movies, "1", "NL").await;
 
     assert_eq!(detail.ok(), Some(None));
+}
+
+#[tokio::test]
+async fn an_id_that_is_not_the_services_number_is_nothing_and_nothing_is_asked() {
+    let http = Fake::by_path(vec![("/api/v1/", Answer::reply(200, "{}"))]);
+    let seerr = service(&http);
+
+    for id in ["..", "603/../../settings", "-603", ""] {
+        assert_eq!(seerr.detail(Kind::Movies, id, "NL").await.ok(), Some(None));
+    }
+    assert!(http.requests().is_empty());
 }
 
 #[tokio::test]
@@ -200,7 +211,7 @@ async fn an_ask_is_filed_for_the_member_with_every_season_or_the_ones_named() {
 }
 
 #[tokio::test]
-async fn a_film_is_asked_for_without_seasons_and_an_unnamed_member_is_refused_unasked() {
+async fn a_film_is_asked_for_without_seasons_and_an_unnamed_member_or_title_is_refused_unasked() {
     let http = Fake::by_route(vec![(
         Method::Post,
         "/api/v1/request",
@@ -214,6 +225,12 @@ async fn a_film_is_asked_for_without_seasons_and_an_unnamed_member_is_refused_un
     };
 
     assert!(seerr.ask("somebody", &film).await.is_err());
+    assert!(seerr.ask("-4", &film).await.is_err());
+    let unnamed = Wish {
+        id: "603&userId=1".to_owned(),
+        ..film.clone()
+    };
+    assert!(seerr.ask("4", &unnamed).await.is_err());
     assert!(http.requests().is_empty());
 
     let asked = seerr.ask("4", &film).await;
