@@ -661,3 +661,28 @@ async fn the_household_telling_is_read_over_the_contract_against_its_own_record(
         vec![format!("{CONTRACTED_REQUESTS_AT}telling")]
     );
 }
+
+/// A stack nothing on which fills `request.intake` has no telling to ask about, and no
+/// record to hold it to, whatever an earlier run recorded.
+#[tokio::test]
+async fn without_a_request_service_there_is_no_telling_to_ask_about() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("telling-unfilled");
+    let env = config_scratch("telling-unfilled");
+    let http = Fake::always(Answer::reply(200, "{}"));
+    let ctx = contracted_identity_ctx(&project, &env, true, http.clone());
+    let mut baseline = crate::baseline::Baseline::new();
+    baseline.record(
+        "seerr",
+        crate::seed::TELLING,
+        &crate::seed::said(&crate::seed::wanted_telling()),
+        "2026-08-28T00:00:00Z",
+    );
+    super::super::save_baseline(&ctx, &baseline);
+
+    let (requests, recorded) =
+        super::super::managed_telling(&ctx, &fillers_at(vec![jellyfin_svc()], &project)).await;
+
+    assert!(requests.is_none());
+    assert!(recorded.is_none());
+    assert!(http.requests().is_empty());
+}

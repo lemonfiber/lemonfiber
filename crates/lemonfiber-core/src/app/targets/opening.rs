@@ -164,14 +164,28 @@ async fn asked(ctx: &Ctx, filler: &Filler, unkeyed: Unkeyed) -> Option<Arc<dyn i
         Spoken::Unanswered => None,
         Spoken::Not => {
             let base = bundled_requests(filler)?;
-            let http = ctx.seams.http.clone();
-            let requests = match (requests_key(ctx, filler).await, unkeyed) {
-                (Some(key), _) => Seerr::keyed(http, base, &filler.id, key),
-                (None, Unkeyed::Asked) => Seerr::new(http, base, &filler.id),
-                (None, Unkeyed::Skipped) => return None,
-            };
-            Some(Arc::new(requests))
+            let key = requests_key(ctx, filler).await;
+            if key.is_none() && unkeyed == Unkeyed::Skipped {
+                return None;
+            }
+            Some(Arc::new(holding(ctx, filler, base, key)))
         }
+    }
+}
+
+/// The stack's own request service `filler`, reached at `base`, as its owner: holding
+/// the key it wrote for itself, or none before it has written one.
+pub(crate) async fn owned_requests(ctx: &Ctx, filler: &Filler, base: String) -> Seerr {
+    holding(ctx, filler, base, requests_key(ctx, filler).await)
+}
+
+/// The stack's own request service `filler`, reached at `base`, holding `key` where it
+/// has written one.
+fn holding(ctx: &Ctx, filler: &Filler, base: String, key: Option<String>) -> Seerr {
+    let http = ctx.seams.http.clone();
+    match key {
+        Some(key) => Seerr::keyed(http, base, &filler.id, key),
+        None => Seerr::new(http, base, &filler.id),
     }
 }
 

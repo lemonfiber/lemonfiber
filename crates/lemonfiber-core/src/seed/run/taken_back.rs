@@ -26,13 +26,13 @@ use crate::jellyfin::{Jellyfin, SEERR_APP};
 use crate::ports::media::Kind;
 use crate::ports::service::{AppKeys as _, RegisteredTarget, Requests};
 use crate::seed::{State, Wiring};
-use crate::wiring::Fillers;
+use crate::wiring::{Filler, Fillers};
 
-/// The stack's own request service among `fillers`: the one that ran before the gate,
-/// which a plugin's never did.
-fn bundled(fillers: &Fillers) -> Option<&crate::wiring::Filler> {
-    crate::app::targets::request_service(fillers)
-        .filter(|filler| crate::app::targets::bundled_requests(filler).is_some())
+/// The stack's own request service among `fillers`, the one that ran before the gate,
+/// which a plugin's never did, and where the host reaches it.
+fn bundled(fillers: &Fillers) -> Option<(&Filler, String)> {
+    let filler = crate::app::targets::request_service(fillers)?;
+    Some((filler, crate::app::targets::bundled_requests(filler)?))
 }
 
 /// What the report calls this connection.
@@ -54,12 +54,10 @@ pub(super) async fn note_held(
     project: Option<&Path>,
     baseline: &mut Baseline,
 ) {
-    let Some(filler) = gated(services, project).and(bundled(fillers)) else {
+    let Some((filler, base)) = gated(services, project).and(bundled(fillers)) else {
         return;
     };
-    let Some(requests) = crate::app::targets::requests_as_owner(ctx, filler).await else {
-        return;
-    };
+    let requests = crate::app::targets::owned_requests(ctx, filler, base).await;
     let Ok(held) = requests.fulfilment_targets().await else {
         return;
     };
@@ -88,7 +86,7 @@ pub(super) async fn seed_taken_back(
     baseline: &mut Baseline,
 ) -> Option<Wiring> {
     let project = gated(services, project)?;
-    let filler = bundled(fillers)?;
+    let (filler, base) = bundled(fillers)?;
     let owed = baseline.named(&filler.id, HELD_KEY);
     let jellyfin = jellyfin_admin(ctx, fillers);
     let minted = match &jellyfin {
@@ -105,11 +103,11 @@ pub(super) async fn seed_taken_back(
             ours: Some("none".to_owned()),
         }));
     }
-    let requests = crate::app::targets::requests_as_owner(ctx, filler).await?;
+    let requests = crate::app::targets::owned_requests(ctx, filler, base).await;
     let server = jellyfin
         .as_ref()
         .map(|(_, route, name)| (route.as_str(), name.as_str()));
-    let direct = match still_direct(ctx, requests.as_ref(), fillers, project, server).await {
+    let direct = match still_direct(ctx, &requests, fillers, project, server).await {
         Ok(direct) => direct,
         Err(failure) => return Some(settled(crate::seed::unreached(&failure))),
     };
@@ -164,10 +162,7 @@ async fn replaced(
     baseline: &mut Baseline,
 ) -> Vec<String> {
     let field = format!("{HELD_KEY}{curator}");
-    let Some(target) = fillers
-        .service(curator)
-        .and_then(crate::wiring::Filler::target)
-    else {
+    let Some(target) = fillers.service(curator).and_then(Filler::target) else {
         baseline.forget(owed_by, &field);
         return Vec::new();
     };
