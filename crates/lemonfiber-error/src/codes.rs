@@ -121,6 +121,7 @@ families! {
     invite => "INVITE": "offering somebody an account",
     kept => "KEPT": "what lemonfiber keeps here",
     key => "KEY": "keys another program reaches the stack with",
+    library => "LIBRARY": "what the media server holds",
     life => "LIFE": "starting and stopping",
     migrate => "MIGRATE": "taking over a setup already here",
     pair => "PAIR": "pairing a phone with the stack",

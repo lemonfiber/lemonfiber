@@ -49,6 +49,21 @@ pub(crate) async fn serving(ctx: &Ctx, manifest: &Manifest) -> Option<Arc<dyn se
     served(ctx, &fillers_here(ctx, manifest)).await
 }
 
+/// The service filling `media.serve`, where one does.
+pub(crate) fn served_by(ctx: &Ctx, manifest: &Manifest) -> Option<String> {
+    provider(&fillers_here(ctx, manifest), serve::CAPABILITY).map(|filler| filler.id.clone())
+}
+
+/// The media server, where it provides `capability`.
+fn provider<'f>(fillers: &'f Fillers, capability: &str) -> Option<&'f Filler> {
+    let (filler, _) = settled(fillers)?;
+    filler
+        .provides
+        .iter()
+        .any(|provided| provided == capability)
+        .then_some(filler)
+}
+
 async fn identified(ctx: &Ctx, fillers: &Fillers) -> Option<Arc<dyn source::Fills>> {
     Some(
         match reached(ctx, fillers, source::CAPABILITY, source::MAJOR).await? {
@@ -112,14 +127,7 @@ enum Reached {
 /// and a recorded password for. Every answer outside the contract is kept against the
 /// plugin.
 async fn reached(ctx: &Ctx, fillers: &Fillers, capability: &str, major: u32) -> Option<Reached> {
-    let (filler, _) = settled(fillers)?;
-    if !filler
-        .provides
-        .iter()
-        .any(|provided| provided == capability)
-    {
-        return None;
-    }
+    let filler = provider(fillers, capability)?;
     match spoken(ctx, filler, capability, major).await {
         Spoken::Over(adapter) => return Some(Reached::Contracted(adapter)),
         Spoken::Unanswered => return None,

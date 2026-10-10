@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use lemonfiber_ports::media::Kind;
 use lemonfiber_ports::service::{
     AppKeys, Dated, EpisodeDetail, Failure, Fronted, Holds, HowFar, Image, Item, ItemDetail,
-    ItemProgress, Library, Medium, Picture, Playback, Screening, SeasonDetail,
+    ItemProgress, Library, Medium, Picture, Playback, Screening, SeasonDetail, SeriesHeld, Upkeep,
 };
 
 use super::{crosses_alike, serve, Upstream};
@@ -109,6 +109,24 @@ impl Library for Upstream {
 }
 
 #[async_trait]
+impl Upkeep for Upstream {
+    async fn series_held(&self, most: u32) -> Result<Vec<SeriesHeld>, Failure> {
+        Ok((0..most)
+            .map(|n| SeriesHeld {
+                id: format!("s{n}"),
+                title: "The Expanse".to_owned(),
+                seasons: n,
+                episodes: 12,
+            })
+            .collect())
+    }
+    async fn refresh(&self, id: &str) -> Result<(), Failure> {
+        self.tell(format!("refresh {id}"));
+        Ok(())
+    }
+}
+
+#[async_trait]
 impl Fronted for Upstream {
     async fn known_proxies(&self) -> Result<Vec<String>, Failure> {
         Ok(vec!["10.0.0.2".to_owned()])
@@ -155,7 +173,7 @@ impl AppKeys for Upstream {
 }
 
 /// Every operation of the capability, once, each answer written down.
-async fn script<M: Screening + Library + Fronted + AppKeys>(server: &M) -> Vec<String> {
+async fn script<M: Screening + Library + Upkeep + Fronted + AppKeys>(server: &M) -> Vec<String> {
     let how_far = HowFar {
         position: 600,
         ended: false,
@@ -177,6 +195,8 @@ async fn script<M: Screening + Library + Fronted + AppKeys>(server: &M) -> Vec<S
         format!("{:?}", server.playing(None).await),
         format!("{:?}", server.has_item(Kind::Movies, "sintel").await),
         format!("{:?}", server.rescan().await),
+        format!("{:?}", server.series_held(2).await),
+        format!("{:?}", server.refresh("s0").await),
         format!("{:?}", server.known_proxies().await),
         format!("{:?}", server.trust_only("10.0.0.2").await),
         format!("{:?}", server.allowed_origins().await),
@@ -199,6 +219,7 @@ async fn a_media_server_answers_and_is_told_through_its_contract_as_it_is_in_pro
             "progressed",
             "sign",
             "rescan",
+            "refresh",
             "trust",
             "allow",
             "restart",

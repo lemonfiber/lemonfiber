@@ -375,6 +375,7 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
     );
     let providers = deferring::providing(ctx, manifest, project.as_deref());
     let wiring = deferring::wired(ctx, stack, project.as_deref());
+    let seasons = deferring::seasons(ctx, manifest);
     // Where the stack is actually listening, asked of the container engine rather
     // than read out of the files that asked for it: a mapping edited by hand and
     // applied, or an image whose defaults changed under an upgrade, is a service
@@ -426,6 +427,7 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
         Box::new(headroom),
         Box::new(releases),
         Box::new(wiring),
+        Box::new(seasons),
         Box::new(telling),
         Box::new(guarded),
         Box::new(gate),

@@ -31,6 +31,7 @@ pub mod stage;
 mod subtitles;
 mod throttling;
 mod trace;
+mod upkeep;
 
 pub use addressing::{Address, Addressing};
 pub use aggregators::{Aggregator, Aggregators, KnownAggregator};
@@ -67,6 +68,7 @@ pub use screening::{
 pub use subtitles::{Subtitles, Watched, Watching};
 pub use throttling::{Hours, Rates, Throttled, Throttling, Wanted, Window};
 pub use trace::{FoundItem, ItemPart, Library, Pipeline, QueueItem, StuckItem, TraceEvent};
+pub use upkeep::{SeriesHeld, Upkeep, SERIES_MOST};
 
 /// Who a service says it is, once it answers.
 #[derive(

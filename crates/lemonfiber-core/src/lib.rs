@@ -98,6 +98,7 @@ pub mod nzbhydra2;
 pub mod origin;
 pub mod outbound;
 pub mod outward;
+pub(crate) mod patience;
 pub mod platform;
 pub use crate::error::plural;
 pub mod network;

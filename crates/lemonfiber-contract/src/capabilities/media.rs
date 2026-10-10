@@ -4,17 +4,24 @@
 //! What the house holds and what one member may watch; what is playing; one title, what
 //! is part-way and how far it got; a title's pictures; opening and closing a device's own
 //! session; whether
-//! the library holds something yet; and standing behind the front door, with the keys it
-//! holds for the stack's own services.
+//! the library holds something yet; how each series it holds is filed, and reading one
+//! item afresh; and standing behind the front door, with the keys it holds for the
+//! stack's own services.
 
 use lemonfiber_ports::media::Kind;
 use lemonfiber_ports::service::{
     AppKeys, Dated, Fronted, HowFar, Image, Item, ItemDetail, ItemProgress, Library, Picture,
-    Playback, Screening, PICTURE_MOST,
+    Playback, Screening, SeriesHeld, Upkeep, PICTURE_MOST, SERIES_MOST,
 };
 
 /// The most a picture's answer carries: its bytes written as base64, and room for the rest.
 const PICTURE_ANSWER: usize = PICTURE_MOST.div_ceil(3) * 4 + 1024;
+
+/// The most one series' line in an answer carries.
+const SERIES_LINE: usize = 512;
+
+/// The most an answer of every series carries.
+const SERIES_ANSWER: usize = SERIES_MOST as usize * SERIES_LINE;
 
 crate::contract! {
     /// `media.serve`: a media server.
@@ -42,6 +49,12 @@ crate::contract! {
             fn has_item(value kind: Kind, str term: &str) -> bool;
             /// Look over the library again.
             fn rescan() -> ();
+        }
+        impl Upkeep {
+            /// Every series it holds, with how many seasons and episodes each is filed with.
+            fn series_held(value most: u32) -> Vec<SeriesHeld> where largest = SERIES_ANSWER;
+            /// Read one item, and everything filed under it, afresh.
+            fn refresh(str id: &str) -> ();
         }
         impl Fronted {
             /// The addresses trusted to name the client.

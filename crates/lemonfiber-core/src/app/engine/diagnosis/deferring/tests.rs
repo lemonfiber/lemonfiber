@@ -1,6 +1,6 @@
 //! Each deferred check declares the family and budget of the check it builds.
 
-use super::{providing, stored, tunnel, wired, Stack};
+use super::{providing, seasons, stored, tunnel, wired, Stack};
 use crate::doctor::deferred::Deferred;
 use crate::doctor::Check;
 use crate::test_support::a_context;
@@ -39,6 +39,7 @@ async fn each_declares_the_family_and_budget_of_the_check_it_builds() {
             tunnel(&ctx, manifest, None, true),
             providing(&ctx, manifest, None),
             wired(&ctx, stack, None),
+            seasons(&ctx, manifest),
         ] {
             assert!(
                 declared_what_it_built(&deferred).await,

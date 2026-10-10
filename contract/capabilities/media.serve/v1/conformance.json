@@ -103,6 +103,24 @@
       "operation": "rescan"
     },
     {
+      "case": "series_held-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "series_held"
+    },
+    {
+      "case": "refresh-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "refresh"
+    },
+    {
       "case": "known_proxies-answers",
       "expect": {
         "conforms": true

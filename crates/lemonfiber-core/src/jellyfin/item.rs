@@ -66,7 +66,7 @@ impl ItemResource {
 }
 
 /// The word the server files an episode under.
-const EPISODE: &str = "Episode";
+pub(super) const EPISODE: &str = "Episode";
 
 /// Which of the kinds a held item is, from the word the server uses for it.
 ///

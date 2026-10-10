@@ -7,7 +7,6 @@
 //! changes it starts the server again.
 
 use std::path::Path;
-use std::time::Duration;
 
 use super::Ctx;
 use crate::app::targets::MediaServer;
@@ -59,26 +58,13 @@ pub(super) async fn seed_proxies(
     Some(Wiring::settled(connection(server), state))
 }
 
-/// How many times the server is asked again while it starts.
-const READS: u32 = 40;
-
-/// How long between them: the server takes a few seconds to start, and up to two minutes
-/// on a slow machine.
-const BETWEEN_READS: Duration = Duration::from_secs(3);
-
 /// Trust `door` alone, start the server again so it reads what was written, and wait
 /// until it answers again — every pass after this one talks to it, and a server that is
 /// still starting would read as one that refuses.
 async fn trusted(client: &Jellyfin, door: &str) -> Result<(), Failure> {
     client.trust_only(door).await?;
     client.restart().await?;
-    let mut read = 0;
-    loop {
-        tokio::time::sleep(BETWEEN_READS).await;
-        read += 1;
-        let answered = client.accepts().await;
-        if answered.is_ok() || read >= READS {
-            return answered;
-        }
-    }
+    crate::patience::RESTART
+        .until(|| client.accepts(), Result::is_ok)
+        .await
 }

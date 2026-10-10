@@ -219,6 +219,12 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `KEY-10` | `NO_SUCH_KEY` | error | 1 | 404 | 0.17.0 | Raised when no active key holds the name a revoke gave. |
 | `KEY-11` | `MEMBERS_MAY_NOT_MINT` | warning | 1 | 409 | 0.17.0 | Raised when a household member asks to mint a key and the operator has not allowed members to. |
 
+## `LIBRARY` — what the media server holds
+
+| Code | Name | Severity | Exit | Status | Since | Summary |
+| ---- | ---- | -------- | ---- | ------ | ----- | ------- |
+| `LIBRARY-1` | `UNSEASONED` | warning | 1 | 500 | 0.18.0 | Raised where the media server holds a series' episodes and answers no seasons for it. |
+
 ## `LIFE` — starting and stopping
 
 | Code | Name | Severity | Exit | Status | Since | Summary |
