@@ -1,7 +1,7 @@
 //! The household's limits and approval, read and written.
 
 use super::common::household::answering;
-use super::{seerr, MEMBER};
+use super::{request_service, MEMBER};
 use lemonfiber_core::app::{dispatch, Chosen, Command};
 use lemonfiber_core::asking::Policy;
 use lemonfiber_core::ports::http::{Method, Request};
@@ -44,7 +44,7 @@ async fn the_two_settings_that_decide_a_policy_are_read_as_a_pair() {
         Answer::reply(200, SETTINGS),
     )]);
 
-    let held = seerr(&fake).asking().await;
+    let held = request_service(&fake).asking().await;
 
     assert_eq!(
         held.ok(),
@@ -70,7 +70,7 @@ async fn a_household_with_no_limit_on_either_half_has_no_limit() {
         ),
     )]);
 
-    let held = seerr(&fake).asking().await;
+    let held = request_service(&fake).asking().await;
 
     assert_eq!(
         held.ok(),
@@ -101,7 +101,7 @@ async fn the_household_write_names_the_two_settings_and_nothing_else() {
         ),
     ]);
 
-    let written = seerr(&fake)
+    let written = request_service(&fake)
         .set_asking(&Asking {
             approves_own: true,
             quota: Some(Quota {
@@ -141,7 +141,7 @@ async fn lifting_the_household_limit_writes_nought_rather_than_nothing() {
         ),
     ]);
 
-    let written = seerr(&fake)
+    let written = request_service(&fake)
         .set_asking(&Asking {
             approves_own: true,
             quota: None,
@@ -169,7 +169,7 @@ async fn taking_the_household_approval_off_writes_the_permissions_without_it() {
         ),
     ]);
 
-    let written = seerr(&fake)
+    let written = request_service(&fake)
         .set_asking(&Asking {
             approves_own: false,
             quota: Some(Quota {
@@ -195,7 +195,10 @@ async fn what_a_member_has_left_is_read_with_nought_as_no_limit() {
         Answer::reply(200, COUNTS),
     )]);
 
-    let held = seerr(&fake).left(MEMBER).await.unwrap_or_default();
+    let held = request_service(&fake)
+        .left(MEMBER)
+        .await
+        .unwrap_or_default();
 
     assert_eq!(held.films.limit, Some(5));
     assert_eq!(held.films.used, 4);
@@ -224,7 +227,7 @@ async fn setting_one_members_limit_carries_the_rest_of_them_back() {
         ),
     ]);
 
-    let written = seerr(&fake)
+    let written = request_service(&fake)
         .set_quota(
             MEMBER,
             Some(Quota {
@@ -260,7 +263,7 @@ async fn taking_a_members_own_limit_away_writes_nought() {
         ),
     ]);
 
-    let written = seerr(&fake).set_quota(MEMBER, None).await;
+    let written = request_service(&fake).set_quota(MEMBER, None).await;
 
     assert!(written.is_ok(), "{written:?}");
     let body = last_body_to(&fake, "settings/main");
@@ -284,7 +287,7 @@ async fn granting_the_approval_makes_nobody_an_administrator() {
         ),
     ]);
 
-    let written = seerr(&fake).approves_own(MEMBER, true).await;
+    let written = request_service(&fake).approves_own(MEMBER, true).await;
 
     assert!(written.is_ok(), "{written:?}");
     let body = last_body_to(&fake, "settings/permissions");
@@ -308,7 +311,7 @@ async fn taking_the_approval_off_leaves_the_rest_of_the_account_alone() {
         ),
     ]);
 
-    let written = seerr(&fake).approves_own(MEMBER, false).await;
+    let written = request_service(&fake).approves_own(MEMBER, false).await;
 
     assert!(written.is_ok(), "{written:?}");
     let body = last_body_to(&fake, "settings/permissions");
@@ -334,7 +337,7 @@ async fn a_settings_document_missing_a_half_is_still_no_limit() {
             Answer::reply(200, held),
         )]);
 
-        let read = seerr(&fake).asking().await;
+        let read = request_service(&fake).asking().await;
 
         assert_eq!(
             read.ok(),

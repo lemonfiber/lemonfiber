@@ -6,7 +6,7 @@ fn partly_landed() -> Rotation {
         "qBittorrent web UI password",
         "signed in with the replacement",
         vec![
-            Propagation::updated("qBittorrent's own web UI"),
+            Propagation::updated("the torrent client's own web UI"),
             Propagation::pending("the forwarded-port push", "lemonfiber restart torrent"),
             Propagation::failed("Sonarr's download client", "Sonarr did not answer"),
         ],

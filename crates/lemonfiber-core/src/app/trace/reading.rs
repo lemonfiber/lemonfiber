@@ -1,6 +1,6 @@
 //! What each service holds about one item.
 //!
-//! The fragments a trace correlates: what the \*arr records, what the media server can
+//! The fragments a trace correlates: what the curator records, what the media server can
 //! play, and — where the trail goes cold at an absence — what the accounts underneath have
 //! left. Reading only; nothing here decides what the fragments mean.
 
@@ -34,7 +34,7 @@ pub(crate) enum Searched {
     Unsettled,
 }
 
-/// Ask one \*arr's indexers what they carry for the content this stack is missing, read
+/// Ask one curator's indexers what they carry for the content this stack is missing, read
 /// against the quality profile in force.
 ///
 /// The one read a trace makes that costs something outside this machine: it spends a
@@ -63,7 +63,7 @@ pub(crate) async fn asking(service: &Servarr, kind: Kind) -> Searched {
 ///
 /// Only two stages it could: nothing found, and nothing taken. An indexer with its
 /// allowance spent answers every search with an empty list, and an account that is
-/// refusing or empty takes nothing it is handed — and both leave a \*arr holding an
+/// refusing or empty takes nothing it is handed — and both leave a curator holding an
 /// absence it cannot explain, which is exactly what those two stalls are.
 ///
 /// Deliberately not the stage where releases were found and none was good enough: that is

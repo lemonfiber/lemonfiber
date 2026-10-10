@@ -30,7 +30,7 @@ fn a_machine(named: &str, household: Option<&'static str>) -> (Ctx, Arc<Heard>) 
         Some(users) => {
             let _ = crate::config::store::set(
                 &env,
-                crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+                crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
                 "minted-earlier",
             );
             Fake::by_path(vec![

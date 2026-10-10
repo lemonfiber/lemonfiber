@@ -7,7 +7,7 @@
 //! error channel through which a dead source could terminate the render loop.
 //!
 //! This gatherer fills every read-only panel: the services and their health, the
-//! storage volume (free space, hardlink status, projected exhaustion), each \*arr's
+//! storage volume (free space, hardlink status, projected exhaustion), each curator's
 //! queue, each download client's active transfers, and the VPN tunnel's state. The
 //! panels are read at once rather than one after another, each within a bound of
 //! its own, and the slow ones at the pace [`crate::dashboard::pace`] sets.
@@ -53,7 +53,7 @@ pub struct Gathered {
     readings: Readings,
     /// What this machine called itself when it was last asked.
     named: Option<String>,
-    /// What each \*arr's queue held when it was last read.
+    /// What each curator's queue held when it was last read.
     answers: Vec<(String, Answered)>,
 }
 

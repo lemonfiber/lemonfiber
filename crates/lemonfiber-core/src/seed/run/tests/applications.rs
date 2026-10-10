@@ -1,8 +1,8 @@
-//! Registering each *arr with the indexer manager.
+//! Registering each curator with the indexer manager.
 
 use super::*;
 
-/// The wirings whose connection registers an \*arr into Prowlarr's app sync.
+/// The wirings whose connection registers a curator into the indexer aggregator's app sync.
 fn application_wirings(report: &crate::seed::Report) -> Vec<&crate::seed::Wiring> {
     report
         .wirings
@@ -26,16 +26,16 @@ fn the_application_kind_follows_from_the_media() {
         application_kind(&["music".to_owned()]),
         Some(ApplicationKind::Music)
     );
-    // Bindery files books but is not one of Prowlarr's applications.
+    // The book curator files books but is not one of the aggregator's applications.
     assert!(application_kind(&["books".to_owned()]).is_none());
     // A service that files no media is not an application at all.
     assert!(application_kind(&[]).is_none());
 }
 
 #[tokio::test]
-async fn app_sync_does_nothing_where_the_stack_has_no_prowlarr() {
+async fn app_sync_does_nothing_where_the_stack_has_no_indexer_aggregator() {
     let ctx = seed_ctx(None, true, Vec::new(), None, None);
-    // Only a media-filing arr, so nothing asks for it at all.
+    // Only a media-filing curator, so nothing asks for it at all.
     let wirings =
         super::super::seed_applications(&ctx, &fillers_of(vec![curator("sonarr", 8989, "tv")]))
             .await;
@@ -46,15 +46,15 @@ async fn app_sync_does_nothing_where_the_stack_has_no_prowlarr() {
 /// back, has nothing registered into it and says nothing.
 #[tokio::test]
 async fn app_sync_passes_over_an_indexer_nothing_can_reach() {
-    const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+    const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let http = seeding();
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
         .with_http(http.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), None)));
-    let mut unpublished = prowlarr();
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG), None)));
+    let mut unpublished = aggregator_svc();
     unpublished.port = None;
     unpublished.listens = Some(9696);
-    let mut unlistening = prowlarr();
+    let mut unlistening = aggregator_svc();
     unlistening.listens = None;
 
     for indexer in [unpublished, unlistening] {
@@ -75,12 +75,15 @@ async fn app_sync_passes_over_an_indexer_nothing_can_reach() {
 /// registered as ever.
 #[tokio::test]
 async fn app_sync_never_registers_a_plugin_curator() {
-    const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+    const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let http = seeding();
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
         .with_http(http.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), None)));
-    let fillers = beside_a_stand_in(vec![prowlarr(), curator("sonarr", 8989, "tv")], "movies");
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG), None)));
+    let fillers = beside_a_stand_in(
+        vec![aggregator_svc(), curator("sonarr", 8989, "tv")],
+        "movies",
+    );
 
     let wirings = super::super::seed_applications(&ctx, &fillers).await;
     let said: Vec<crate::seed::Wiring> = super::super::connecting::unmatched(&fillers)
@@ -111,12 +114,12 @@ async fn app_sync_never_registers_a_plugin_curator() {
 /// key: nothing is asked of it or of any curator, and a replaced key owes it nothing.
 #[tokio::test]
 async fn app_sync_never_hands_a_plugin_indexer_a_curators_key() {
-    const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+    const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let http = seeding();
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
         .with_http(http.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), None)));
-    let fillers = asked_by_a_plugin(&prowlarr(), vec![curator("sonarr", 8989, "tv")]);
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG), None)));
+    let fillers = asked_by_a_plugin(&aggregator_svc(), vec![curator("sonarr", 8989, "tv")]);
 
     let wirings = super::super::seed_applications(&ctx, &fillers).await;
     let resynced = super::super::resync_application(&ctx, &fillers, "sonarr").await;
@@ -130,11 +133,11 @@ async fn app_sync_never_hands_a_plugin_indexer_a_curators_key() {
 /// one, and nothing for a curator no indexer registers.
 #[tokio::test]
 async fn a_replaced_key_resyncs_each_indexer_that_registers_the_curator() {
-    const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+    const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
         .with_http(seeding())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), None)));
-    let fillers = fillers_of(vec![prowlarr(), curator("sonarr", 8989, "tv")]);
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG), None)));
+    let fillers = fillers_of(vec![aggregator_svc(), curator("sonarr", 8989, "tv")]);
 
     let resynced = super::super::resync_application(&ctx, &fillers, "sonarr").await;
     let nobody = super::super::resync_application(&ctx, &fillers, "radarr").await;
@@ -155,7 +158,7 @@ async fn a_replaced_key_resyncs_each_indexer_that_registers_the_curator() {
 async fn a_replaced_key_owes_an_indexer_with_no_key_yet_nothing() {
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
         .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
-    let fillers = fillers_of(vec![prowlarr(), curator("sonarr", 8989, "tv")]);
+    let fillers = fillers_of(vec![aggregator_svc(), curator("sonarr", 8989, "tv")]);
 
     let resynced = super::super::resync_application(&ctx, &fillers, "sonarr").await;
 
@@ -166,12 +169,15 @@ async fn a_replaced_key_owes_an_indexer_with_no_key_yet_nothing() {
 /// there, so there is no application to hold to the new key.
 #[tokio::test]
 async fn a_replaced_key_owes_the_indexer_nothing_for_a_plugin_curator() {
-    const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+    const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let http = seeding();
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
         .with_http(http.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), None)));
-    let fillers = beside_a_stand_in(vec![prowlarr(), curator("sonarr", 8989, "tv")], "movies");
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG), None)));
+    let fillers = beside_a_stand_in(
+        vec![aggregator_svc(), curator("sonarr", 8989, "tv")],
+        "movies",
+    );
 
     let resynced = super::super::resync_application(&ctx, &fillers, "kept").await;
 
@@ -180,16 +186,17 @@ async fn a_replaced_key_owes_the_indexer_nothing_for_a_plugin_curator() {
 }
 
 #[tokio::test]
-async fn app_sync_skips_every_arr_until_prowlarr_has_written_its_key() {
-    let services = fillers_of(vec![prowlarr(), curator("sonarr", 8989, "tv")]);
-    // Prowlarr's key is not readable yet, so it is still starting: every
+async fn app_sync_skips_every_curator_until_the_aggregator_has_written_its_key() {
+    let services = fillers_of(vec![aggregator_svc(), curator("sonarr", 8989, "tv")]);
+    // The aggregator's key is not readable yet, so it is still starting: every
     // application is skipped for a re-run rather than failed.
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
         .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
     let wirings = super::super::seed_applications(&ctx, &services).await;
     assert_eq!(wirings.len(), 1);
     assert!(wirings.iter().all(is_skipped));
-    // The key that is missing is Prowlarr's, so it is Prowlarr the report names.
+    // The key that is missing is the aggregator's, so it is the aggregator the report
+    // names.
     assert!(
         wirings.iter().all(|wiring| matches!(&wiring.state,
             crate::seed::State::Skipped { reason } if reason.starts_with("prowlarr the app has"))),
@@ -198,15 +205,16 @@ async fn app_sync_skips_every_arr_until_prowlarr_has_written_its_key() {
 }
 
 #[tokio::test]
-async fn app_sync_skips_only_the_arr_that_has_not_written_its_key() {
-    const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    let services = fillers_of(vec![prowlarr(), curator("sonarr", 8989, "tv")]);
-    // Prowlarr's key is readable but Sonarr's is not — Sonarr came up after
-    // Prowlarr — so Sonarr's application waits while Prowlarr itself proceeds.
+async fn app_sync_skips_only_the_curator_that_has_not_written_its_key() {
+    const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+    let services = fillers_of(vec![aggregator_svc(), curator("sonarr", 8989, "tv")]);
+    // The aggregator's key is readable but the curator's is not — the curator came up after
+    // the aggregator — so the curator's application waits while the aggregator itself
+    // proceeds.
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
         .with_http(seeding())
         .with_filesystem(Arc::new(
-            SeedFs::keyed(Some(SERVARR), None).only_for_prowlarr(),
+            SeedFs::keyed(Some(CURATOR_CONFIG), None).only_for_aggregator(),
         ));
     let wirings = super::super::seed_applications(&ctx, &services).await;
     assert_eq!(wirings.len(), 1);
@@ -214,14 +222,14 @@ async fn app_sync_skips_only_the_arr_that_has_not_written_its_key() {
 }
 
 #[tokio::test]
-async fn app_sync_registers_an_arr_whose_keys_are_all_readable() {
-    const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    let services = fillers_of(vec![prowlarr(), curator("sonarr", 8989, "tv")]);
-    // The seeding routes report Sonarr already registered — its baseUrl is in the
+async fn app_sync_registers_a_curator_whose_keys_are_all_readable() {
+    const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+    let services = fillers_of(vec![aggregator_svc(), curator("sonarr", 8989, "tv")]);
+    // The seeding routes report the curator already registered — its baseUrl is in the
     // application list — so the connection reads back as already wired.
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
         .with_http(seeding())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), None)));
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG), None)));
     let wirings = super::super::seed_applications(&ctx, &services).await;
     assert_eq!(wirings.len(), 1);
     assert_eq!(
@@ -230,15 +238,15 @@ async fn app_sync_registers_an_arr_whose_keys_are_all_readable() {
     );
 }
 
-/// A Prowlarr transport that starts with no applications, captures the POST
+/// An indexer aggregator transport that starts with no applications, captures the POST
 /// that registers one, and reports it on the next read — so the orchestrator's
 /// write path runs end to end rather than short-circuiting to already-wired.
-/// Prowlarr holding no applications until one is written, then holding it.
+/// The aggregator holding no applications until one is written, then holding it.
 ///
 /// The registration is a write followed by a read that has to see it, so the read
-/// answers an empty list and then the list with Sonarr in it. What was posted is
+/// answers an empty list and then the list with the curator in it. What was posted is
 /// read off the transport's own record rather than a captured copy.
-fn registering_prowlarr() -> Arc<Fake> {
+fn registering_aggregator() -> Arc<Fake> {
     Fake::by_route_in_turn(vec![
         (Method::Post, "", vec![Answer::reply(201, "")]),
         (
@@ -256,15 +264,15 @@ fn registering_prowlarr() -> Arc<Fake> {
 }
 
 #[tokio::test]
-async fn app_sync_registers_an_absent_arr_and_reads_it_back() {
-    const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    let services = fillers_of(vec![prowlarr(), curator("sonarr", 8989, "tv")]);
-    // Prowlarr holds no applications, so Sonarr is genuinely written and then
+async fn app_sync_registers_an_absent_curator_and_reads_it_back() {
+    const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+    let services = fillers_of(vec![aggregator_svc(), curator("sonarr", 8989, "tv")]);
+    // The aggregator holds no applications, so the curator is genuinely written and then
     // read back — the write path a pre-populated list would hide.
-    let http = registering_prowlarr();
+    let http = registering_aggregator();
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
         .with_http(http.clone())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), None)));
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(CURATOR_CONFIG), None)));
 
     let wirings = super::super::seed_applications(&ctx, &services).await;
     assert_eq!(wirings.len(), 1);
@@ -274,8 +282,8 @@ async fn app_sync_registers_an_absent_arr_and_reads_it_back() {
         "an absent application is written and confirmed by read-back"
     );
 
-    // The orchestrator built the registration for the right *arr, reaching it
-    // and Prowlarr on the stack network, and posted it to Prowlarr's v1 API.
+    // The orchestrator built the registration for the right curator, reaching it
+    // and the aggregator on the stack network, and posted it to the aggregator's v1 API.
     let posted = http
         .requests()
         .into_iter()
@@ -296,14 +304,17 @@ async fn app_sync_registers_an_absent_arr_and_reads_it_back() {
 }
 
 #[tokio::test]
-async fn seed_registers_each_arr_into_prowlarr() {
-    // The whole command against the real manifest: Prowlarr and the three
-    // media-filing arrs, each already registered by the seeding routes.
-    const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    const SABNZBD: &str = "[misc]\napi_key = the-sab-key\n";
+async fn seed_registers_each_curator_into_the_indexer_aggregator() {
+    // The whole command against the real manifest: the indexer aggregator and the three
+    // media-filing curators, each already registered by the seeding routes.
+    const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+    const USENET_CONFIG: &str = "[misc]\napi_key = the-sab-key\n";
     let ctx = seed_ctx(Some(TEMP_LOG), true, Vec::new(), Some(vec![0x11; 24]), None)
         .with_http(seeding())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), Some(SABNZBD))));
+        .with_filesystem(Arc::new(SeedFs::keyed(
+            Some(CURATOR_CONFIG),
+            Some(USENET_CONFIG),
+        )));
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     let applications = application_wirings(&report);

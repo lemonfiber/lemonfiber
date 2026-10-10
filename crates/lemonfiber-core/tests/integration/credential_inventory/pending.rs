@@ -3,13 +3,13 @@
 
 use super::{ctx, env_at, recorded, the_torrent_password};
 use lemonfiber_core::app::{dispatch, Command};
-use lemonfiber_core::config::{JELLYFIN_ADMIN_PASSWORD_KEY, QBITTORRENT_PASSWORD_KEY};
+use lemonfiber_core::config::{MEDIA_SERVER_ADMIN_PASSWORD_KEY, TORRENT_PASSWORD_KEY};
 use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use std::sync::Arc;
 
 /// The name a torrent client's replacement is kept under.
-const QBITTORRENT_PENDING: &str = "QBITTORRENT_PASSWORD_PENDING";
+const TORRENT_PENDING: &str = "QBITTORRENT_PASSWORD_PENDING";
 
 /// The replacement the earlier run left pending, built as the others are.
 fn the_replacement() -> String {
@@ -28,8 +28,8 @@ fn both(name: &str) -> std::path::PathBuf {
     env_at(
         name,
         &[
-            (QBITTORRENT_PASSWORD_KEY, &the_torrent_password()),
-            (QBITTORRENT_PENDING, &the_replacement()),
+            (TORRENT_PASSWORD_KEY, &the_torrent_password()),
+            (TORRENT_PENDING, &the_replacement()),
         ],
     )
 }
@@ -45,10 +45,10 @@ async fn a_replacement_the_service_took_is_moved_into_place() {
     )]);
     any_command(&env, http, false).await;
     assert_eq!(
-        recorded(&env, QBITTORRENT_PASSWORD_KEY),
+        recorded(&env, TORRENT_PASSWORD_KEY),
         Some(the_replacement())
     );
-    assert_eq!(recorded(&env, QBITTORRENT_PENDING), None);
+    assert_eq!(recorded(&env, TORRENT_PENDING), None);
 }
 
 /// The client still takes the password in force, so the replacement goes.
@@ -58,10 +58,10 @@ async fn a_replacement_the_service_never_took_is_taken_away() {
     let http = Fake::by_path(vec![("/auth/login", Answer::reply(200, "Ok."))]);
     any_command(&env, http, false).await;
     assert_eq!(
-        recorded(&env, QBITTORRENT_PASSWORD_KEY),
+        recorded(&env, TORRENT_PASSWORD_KEY),
         Some(the_torrent_password())
     );
-    assert_eq!(recorded(&env, QBITTORRENT_PENDING), None);
+    assert_eq!(recorded(&env, TORRENT_PENDING), None);
 }
 
 /// Where the client takes neither, will not answer, or the run only says what it would
@@ -84,12 +84,12 @@ async fn an_unsettled_question_leaves_both_where_they_are() {
         let env = both(name);
         any_command(&env, http, rehearsing).await;
         assert_eq!(
-            recorded(&env, QBITTORRENT_PASSWORD_KEY),
+            recorded(&env, TORRENT_PASSWORD_KEY),
             Some(the_torrent_password()),
             "{name}"
         );
         assert_eq!(
-            recorded(&env, QBITTORRENT_PENDING),
+            recorded(&env, TORRENT_PENDING),
             Some(the_replacement()),
             "{name}"
         );
@@ -103,7 +103,7 @@ async fn the_administrators_replacement_is_settled_through_a_sign_in() {
     let env = env_at(
         "pending-administrator",
         &[
-            (JELLYFIN_ADMIN_PASSWORD_KEY, &the_torrent_password()),
+            (MEDIA_SERVER_ADMIN_PASSWORD_KEY, &the_torrent_password()),
             ("JELLYFIN_ADMIN_PASSWORD_PENDING", &the_replacement()),
         ],
     );
@@ -114,7 +114,7 @@ async fn the_administrators_replacement_is_settled_through_a_sign_in() {
     )]);
     any_command(&env, http, false).await;
     assert_eq!(
-        recorded(&env, JELLYFIN_ADMIN_PASSWORD_KEY),
+        recorded(&env, MEDIA_SERVER_ADMIN_PASSWORD_KEY),
         Some(the_replacement())
     );
     assert_eq!(recorded(&env, "JELLYFIN_ADMIN_PASSWORD_PENDING"), None);
@@ -126,7 +126,7 @@ async fn the_administrators_replacement_is_settled_through_a_sign_in() {
 async fn nothing_pending_asks_no_service_anything() {
     let env = env_at(
         "pending-none",
-        &[(QBITTORRENT_PASSWORD_KEY, &the_torrent_password())],
+        &[(TORRENT_PASSWORD_KEY, &the_torrent_password())],
     );
     let http = Fake::by_path(vec![("/auth/login", Answer::reply(200, "Ok."))]);
     any_command(&env, http.clone(), false).await;
@@ -153,8 +153,8 @@ async fn a_stack_that_cannot_be_read_leaves_both_for_later() {
 
     assert!(http.requests().is_empty(), "{:?}", http.requests());
     assert_eq!(
-        recorded(&env, QBITTORRENT_PASSWORD_KEY),
+        recorded(&env, TORRENT_PASSWORD_KEY),
         Some(the_torrent_password())
     );
-    assert_eq!(recorded(&env, QBITTORRENT_PENDING), Some(the_replacement()));
+    assert_eq!(recorded(&env, TORRENT_PENDING), Some(the_replacement()));
 }

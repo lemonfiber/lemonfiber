@@ -26,13 +26,16 @@ async fn identity_beside(
 }
 
 #[tokio::test]
-async fn identity_does_nothing_without_both_jellyfin_and_seerr() {
+async fn identity_does_nothing_without_both_the_media_server_and_the_request_service() {
     let ctx = seed_ctx(None, true, Vec::new(), None, None);
-    // Seerr present but no Jellyfin, and the other way round: either alone is
-    // nothing to wire.
+    // The request service present but no media server, and the other way round: either
+    // alone is nothing to wire.
     let base = crate::baseline::Baseline::new();
-    assert!(identity(&ctx, &[seerr_svc()], &base).await.0.is_empty());
-    assert!(identity(&ctx, &[jellyfin_svc()], &base).await.0.is_empty());
+    assert!(identity(&ctx, &[requests_svc()], &base).await.0.is_empty());
+    assert!(identity(&ctx, &[media_server_svc()], &base)
+        .await
+        .0
+        .is_empty());
 }
 
 /// **The stack's administrator's password is never sent to a plugin.** A plugin's
@@ -47,7 +50,7 @@ async fn a_plugin_under_the_request_services_id_is_never_sent_the_administrators
     }
     let _ = store::set(
         &env,
-        crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         "the-stacks-administrator",
     );
     let http = household(true, false);
@@ -58,14 +61,14 @@ async fn a_plugin_under_the_request_services_id_is_never_sent_the_administrators
         vec![crate::test_support::a_placed(
             "seerr",
             &["request.intake"],
-            Some(seerr_api()),
+            Some(requests_api()),
             Some(5999),
         )],
     );
 
     let (wirings, _) = identity_beside(
         &ctx,
-        &[jellyfin_svc()],
+        &[media_server_svc()],
         &[impostor],
         &crate::baseline::Baseline::new(),
     )
@@ -94,11 +97,11 @@ async fn identity_leaves_an_already_set_up_household_alone() {
     if let Some(parent) = env.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    // Jellyfin's password was recorded on an earlier run, and both services are
+    // The media server's password was recorded on an earlier run, and both services are
     // already set up: nothing is minted and nothing re-pointed.
     let _ = store::set(
         &env,
-        crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         "minted-earlier",
     );
     let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.to_path_buf()))
@@ -106,7 +109,7 @@ async fn identity_leaves_an_already_set_up_household_alone() {
 
     let (wirings, _records) = identity(
         &ctx,
-        &[jellyfin_svc(), seerr_svc()],
+        &[media_server_svc(), requests_svc()],
         &crate::baseline::Baseline::new(),
     )
     .await;
@@ -136,7 +139,7 @@ async fn identity_mints_records_and_wires_a_fresh_household() {
 
     let (wirings, records) = identity(
         &ctx,
-        &[jellyfin_svc(), seerr_svc()],
+        &[media_server_svc(), requests_svc()],
         &crate::baseline::Baseline::new(),
     )
     .await;
@@ -189,7 +192,7 @@ async fn a_fresh_household_with_nowhere_to_record_its_password_is_given_none() {
 
     let (wirings, _) = identity(
         &ctx,
-        &[jellyfin_svc(), seerr_svc()],
+        &[media_server_svc(), requests_svc()],
         &crate::baseline::Baseline::new(),
     )
     .await;
@@ -207,10 +210,10 @@ async fn a_fresh_household_with_nowhere_to_record_its_password_is_given_none() {
     );
 }
 
-/// A password change Jellyfin refuses after the request service's setup is said, with
-/// what it leaves open and how to close it, and the minted password stays recorded.
+/// A password change the media server refuses after the request service's setup is said,
+/// with what it leaves open and how to close it, and the minted password stays recorded.
 #[tokio::test]
-async fn a_password_change_jellyfin_refuses_after_setup_is_said() {
+async fn a_password_change_the_media_server_refuses_after_setup_is_said() {
     for (tag, admitted, changed) in [("unchanged", 200, 500), ("unadmitted", 401, 204)] {
         a_password_change_refused_after_setup_is_said(tag, admitted, changed).await;
     }
@@ -233,7 +236,7 @@ async fn a_password_change_refused_after_setup_is_said(tag: &str, admitted: u16,
 
     let (wirings, _) = identity(
         &ctx,
-        &[jellyfin_svc(), seerr_svc()],
+        &[media_server_svc(), requests_svc()],
         &crate::baseline::Baseline::new(),
     )
     .await;
@@ -277,7 +280,7 @@ async fn a_plugins_server_refusing_its_changed_password_points_at_the_server() {
     let mut placed = crate::test_support::a_placed(
         "emby",
         &["identity.source"],
-        Some(jellyfin_api()),
+        Some(media_server_api()),
         Some(8920),
     );
     placed.tag = "10.10.7".to_owned();
@@ -285,7 +288,7 @@ async fn a_plugins_server_refusing_its_changed_password_points_at_the_server() {
 
     let (wirings, _) = identity_beside(
         &ctx,
-        &[seerr_svc()],
+        &[requests_svc()],
         &[server],
         &crate::baseline::Baseline::new(),
     )
@@ -331,7 +334,7 @@ async fn a_telling_set_before_lemonfiber_ran_is_adopted_as_the_baseline() {
     }
     let _ = store::set(
         &env,
-        crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         "minted-earlier",
     );
     let ctx =
@@ -339,7 +342,7 @@ async fn a_telling_set_before_lemonfiber_ran_is_adopted_as_the_baseline() {
 
     let (wirings, records) = identity(
         &ctx,
-        &[jellyfin_svc(), seerr_svc()],
+        &[media_server_svc(), requests_svc()],
         &crate::baseline::Baseline::new(),
     )
     .await;
@@ -385,7 +388,7 @@ async fn a_telling_the_operator_switched_off_is_reported_rather_than_overruled()
     }
     let _ = store::set(
         &env,
-        crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         "minted-earlier",
     );
     let ctx =
@@ -400,7 +403,7 @@ async fn a_telling_the_operator_switched_off_is_reported_rather_than_overruled()
         "2026-08-28T00:00:00Z",
     );
 
-    let (wirings, records) = identity(&ctx, &[jellyfin_svc(), seerr_svc()], &baseline).await;
+    let (wirings, records) = identity(&ctx, &[media_server_svc(), requests_svc()], &baseline).await;
 
     assert_eq!(
         wirings.get(1).map(|wiring| &wiring.state),
@@ -440,7 +443,7 @@ fn beside_contracted_requests(
     crate::test_support::stack()
         .manifest()
         .map(|mut manifest| {
-            manifest.services = vec![jellyfin_svc()];
+            manifest.services = vec![media_server_svc()];
             manifest
                 .wirings
                 .retain(|wiring| wiring.asks.as_deref() != Some(crate::app::targets::IDENTITY));
@@ -469,7 +472,7 @@ fn contracted_identity_ctx(
     }
     let _ = store::set(
         env,
-        crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         ADMINISTRATOR,
     );
     let mut ctx = contracted_ctx(project, CONTRACTED_REQUESTS, keyed, http)
@@ -490,7 +493,7 @@ async fn identity_over(
     let admin = super::super::identity::seed_media_server_admin(ctx, server.as_ref()).await;
     super::super::seed_request_identity(
         ctx,
-        &[jellyfin_svc()],
+        &[media_server_svc()],
         &crate::baseline::Baseline::new(),
         server.as_ref(),
         admin,
@@ -680,7 +683,7 @@ async fn without_a_request_service_there_is_no_telling_to_ask_about() {
     super::super::save_baseline(&ctx, &baseline);
 
     let (requests, recorded) =
-        super::super::managed_telling(&ctx, &fillers_at(vec![jellyfin_svc()], &project)).await;
+        super::super::managed_telling(&ctx, &fillers_at(vec![media_server_svc()], &project)).await;
 
     assert!(requests.is_none());
     assert!(recorded.is_none());
@@ -697,7 +700,7 @@ async fn a_contracted_server_whose_upstream_names_no_api_is_paired_with_nothing(
 
     let (wirings, _) = identity_beside(
         &ctx,
-        &[seerr_svc()],
+        &[requests_svc()],
         &[crate::test_support::a_contracted_media_server(None)],
         &crate::baseline::Baseline::new(),
     )
@@ -726,7 +729,7 @@ async fn a_contracted_server_unanswered_over_its_contract_is_not_set_up() {
 
     let (wirings, _) = identity_beside(
         &ctx,
-        &[seerr_svc()],
+        &[requests_svc()],
         &[crate::test_support::a_contracted_media_server(Some(
             "upstream",
         ))],

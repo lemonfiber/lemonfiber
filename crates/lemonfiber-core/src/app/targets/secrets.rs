@@ -10,8 +10,8 @@ use crate::config::store;
 /// A secret lemonfiber minted and recorded in the environment file, read back by
 /// its key, or nothing where none is recorded yet — an unreadable or absent file
 /// reads the same as an empty value. The one reader for every credential lemonfiber
-/// mints and records rather than reads from a service (qBittorrent's password,
-/// Jellyfin's admin password), so the read-back stays identical across them.
+/// mints and records rather than reads from a service (the torrent client's password,
+/// the media server's admin password), so the read-back stays identical across them.
 pub(crate) fn recorded_secret(ctx: &Ctx, key: &str) -> Option<String> {
     let path = ctx.settings.env_file.as_deref()?;
     let file = store::read(path).unwrap_or_default();

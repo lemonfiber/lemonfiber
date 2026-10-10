@@ -13,7 +13,7 @@ use std::sync::Arc;
 use lemonfiber_core::jellyfin::Jellyfin;
 use lemonfiber_core::ports::http::Http;
 
-fn jellyfin(fake: &Arc<Fake>) -> Jellyfin {
+fn media_server(fake: &Arc<Fake>) -> Jellyfin {
     let http: Arc<dyn Http> = fake.clone();
     Jellyfin::new(http, "http://127.0.0.1:8096", "jellyfin")
 }

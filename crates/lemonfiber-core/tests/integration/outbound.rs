@@ -209,14 +209,17 @@ async fn what_the_services_reach_is_attributed_to_them_and_covers_all_of_them() 
     let report = listed(Settings::default()).await;
 
     assert!(report.theirs.len() > 10, "{:?}", report.theirs.len());
-    let Some(prowlarr) = report
+    let Some(aggregator) = report
         .theirs
         .iter()
         .find(|entry| entry.service == "prowlarr")
     else {
         unreachable!("the stack runs an indexer manager")
     };
-    assert!(prowlarr.destination.contains("indexers"), "{prowlarr:?}");
+    assert!(
+        aggregator.destination.contains("indexers"),
+        "{aggregator:?}"
+    );
     let quiet: Vec<&str> = report
         .theirs
         .iter()

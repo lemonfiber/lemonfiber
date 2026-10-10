@@ -1,6 +1,6 @@
 //! The plumbing every service client shares over the HTTP port.
 //!
-//! Servarr and qBittorrent speak different APIs, but they reach them the same
+//! Curators and torrent clients speak different APIs, but they reach them the same
 //! way: a base address, a name to blame a failure on, and one reading of what a
 //! transport error or a non-success status means. That common part lives here so
 //! it is written once; each client builds its own requests and holds one of these
@@ -12,8 +12,8 @@ use crate::ports::http::{Fetched, Http, Method, Request, Response};
 use crate::ports::service::Failure;
 use crate::text::fitted;
 
-/// The header a Servarr-shape service authenticates with — Sonarr, Radarr,
-/// Lidarr and Prowlarr all read the key from it, and the setup validator sends
+/// The header a curator-shape service authenticates with — every curator
+/// and the indexer aggregator read the key from it, and the setup validator sends
 /// it the same way, so its name is written once.
 pub(crate) const API_KEY_HEADER: &str = "X-Api-Key";
 
@@ -99,9 +99,9 @@ impl Endpoint {
         }
     }
 
-    /// A JSON request that also carries a Servarr-shape API key in its header — the shape
-    /// every keyed service builds from (Sonarr, Radarr, Lidarr, Prowlarr), differing only
-    /// in the path prefix the caller supplies for its API version.
+    /// A JSON request that also carries a curator-shape API key in its header — the shape
+    /// every keyed service builds from (the curators and the indexer aggregator), differing
+    /// only in the path prefix the caller supplies for its API version.
     pub(crate) fn keyed_request(
         &self,
         method: Method,

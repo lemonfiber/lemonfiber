@@ -9,12 +9,12 @@
 //! and never with a password set on a service that nothing recorded.
 //!
 //! Two credentials can genuinely be replaced from here and the rest cannot, and the
-//! difference is not arbitrary. lemonfiber can replace what it minted and set itself
-//! — qBittorrent's web UI password — and it can hand out afresh what a service minted
-//! for itself, which is the repair for a service that regenerated its key underneath
-//! a stack still handing out the old one. It cannot invent a Usenet password: a value
-//! this product made up would be one the provider has never heard of, so what is owed
-//! there is a sentence saying where a replacement comes from.
+//! difference is not arbitrary. lemonfiber can replace what it minted and set itself — the
+//! torrent client's web UI password — and it can hand out afresh what a service minted for
+//! itself, which is the repair for a service that regenerated its key underneath a stack
+//! still handing out the old one. It cannot invent a Usenet password: a value this product
+//! made up would be one the provider has never heard of, so what is owed there is a
+//! sentence saying where a replacement comes from.
 
 use std::path::Path;
 
@@ -35,15 +35,15 @@ const MINTING: &str = "a real run would generate a new web UI password, record i
      nothing was set.";
 
 /// What a rehearsal says about replacing the media server's administrator password.
-const ADMINISTERING: &str = "a real run would generate a new administrator password, record \
-     it beside the one in force, set it on Jellyfin, sign in with it to prove Jellyfin took \
-     it, and only then put it in place of the old one. Nothing was generated here, and nothing \
-     was set.";
+const ADMINISTERING: &str = "a real run would generate a new administrator password, record it \
+     beside the one in force, set it on the media server, sign in with it to prove the server \
+     took it, and only then put it in place of the old one. Nothing was generated here, and \
+     nothing was set.";
 
 /// What a rotation the torrent client refused at its first sign-in left behind.
-const REFUSED_BY_THE_CLIENT: &str = "qBittorrent refused the password lemonfiber holds, so \
-     there was nothing to change it with. Nothing was written; the recorded password is the \
-     one it was before.";
+const REFUSED_BY_THE_CLIENT: &str = "the torrent client refused the password lemonfiber holds, so \
+     there was nothing to change it with. Nothing was written; the recorded password is the one \
+     it was before.";
 
 /// What a rehearsal says about handing a service's own key back out.
 const REPUBLISHING: &str = "a real run would read the key the service wrote for itself, \
@@ -90,10 +90,10 @@ pub(crate) async fn rotate(
             }
             None => republished(ctx, held, services, project).await,
         },
-        Origin::Lemonfiber if held.setting == config::QBITTORRENT_PASSWORD_KEY => {
+        Origin::Lemonfiber if held.setting == config::TORRENT_PASSWORD_KEY => {
             replaced(ctx, held, services).await
         }
-        Origin::Lemonfiber if held.setting == config::JELLYFIN_ADMIN_PASSWORD_KEY => {
+        Origin::Lemonfiber if held.setting == config::MEDIA_SERVER_ADMIN_PASSWORD_KEY => {
             administrator(ctx, held, fillers).await
         }
         // A credential whose replacement comes from somewhere else writes nothing on
@@ -148,15 +148,15 @@ fn elsewhere(setting: &str) -> String {
             "your Usenet provider's own account page",
             "lemonfiber setup",
         ),
-        config::AUDIOBOOKSHELF_PASSWORD_KEY => (
-            "Audiobookshelf's own account settings",
+        config::LISTENING_SERVER_PASSWORD_KEY => (
+            "the listening server's own account settings",
             "lemonfiber config set AUDIOBOOKSHELF_PASSWORD",
         ),
-        config::NZBHYDRA2_ADMIN_PASSWORD_KEY => (
-            "NZBHydra2's own authentication settings",
+        config::USENET_AGGREGATOR_ADMIN_PASSWORD_KEY => (
+            "the Usenet indexer aggregator's own authentication settings",
             "lemonfiber config set NZBHYDRA2_ADMIN_PASSWORD",
         ),
-        config::BINDERY_API_KEY => (
+        config::BOOK_CURATOR_API_KEY => (
             "this setting itself — the book service adopts whatever it is given",
             "lemonfiber config set BINDERY_API_KEY",
         ),
@@ -170,7 +170,7 @@ fn elsewhere(setting: &str) -> String {
     )
 }
 
-/// Replace qBittorrent's web UI password with a freshly minted one.
+/// Replace the torrent client's web UI password with a freshly minted one.
 ///
 /// The client sets the replacement and then signs in with it, so a set the service
 /// accepted but did not apply is caught rather than called done. The replacement is
@@ -215,7 +215,7 @@ async fn replaced(ctx: &Ctx, held: &Held, services: &[Service]) -> Rotation {
         Ok(()) => match promoted(ctx, &held.setting, &replacement) {
             Ok(()) => Rotation::landed(
                 &held.name,
-                "qBittorrent took the replacement and signed in with it",
+                "the torrent client took the replacement and signed in with it",
                 reached(&held.setting),
             ),
             Err(detail) => Rotation::stopped(&held.name, Settled::ReplacedUnproven { detail }),
@@ -258,20 +258,25 @@ async fn administrator(ctx: &Ctx, held: &Held, fillers: &crate::wiring::Fillers)
     else {
         return unproven(held, NO_ADMINISTRATOR_HELD);
     };
-    match replace_jellyfin_password(ctx, &server, ctx.dry_run).await {
+    match replace_admin_password(ctx, &server, ctx.dry_run).await {
         Ok(Replaced::Rehearsed) => would_rotate(held, ADMINISTERING),
         Ok(Replaced::Done) => Rotation::landed(
             &held.name,
-            "Jellyfin took the new password and signed in with it",
+            &format!(
+                "{} took the new password and signed in with it",
+                server.name()
+            ),
             reached(&held.setting),
         ),
         Err(Replacing::Refused) => Rotation::stopped(
             &held.name,
             Settled::Refused {
-                detail: "Jellyfin refused the password lemonfiber holds, so there was nothing to \
-                         change it with. Nothing was written; the recorded password is the one \
-                         it was before."
-                    .to_owned(),
+                detail: format!(
+                    "{} refused the password lemonfiber holds, so there was nothing to change \
+                     it with. Nothing was written; the recorded password is the one it was \
+                     before.",
+                    server.name()
+                ),
             },
         ),
         Err(Replacing::Unproven(detail)) => unproven(held, &detail),
@@ -291,11 +296,12 @@ pub(crate) enum Replaced {
 
 /// Why the media server's administrator password was not replaced.
 pub(crate) enum Replacing {
-    /// Jellyfin refused the password lemonfiber holds.
+    /// The media server refused the password lemonfiber holds.
     Refused,
     /// Nothing usable answered, or there was nothing to replace with; why, in words.
     Unproven(String),
-    /// Jellyfin took the replacement and it could not be moved into place; why, in words.
+    /// The media server took the replacement and it could not be moved into place; why, in
+    /// words.
     Unkept(String),
 }
 
@@ -314,7 +320,7 @@ const NO_ADMINISTRATOR_HELD: &str = "lemonfiber holds no administrator password 
 ///
 /// Kept under the server's own setting throughout, so a plugin's server is given a
 /// replacement for its own password and the stack's is never touched for it.
-pub(crate) async fn replace_jellyfin_password(
+pub(crate) async fn replace_admin_password(
     ctx: &Ctx,
     server: &MediaServer,
     rehearsing: bool,
@@ -375,7 +381,7 @@ async fn republished(
         .find(|target| published_as(&target.id) == held.setting)
     else {
         // Every service that writes its own key is on the inventory, and only the
-        // Servarr-shaped ones can be asked to identify themselves with it. For the
+        // curator-shaped ones can be asked to identify themselves with it. For the
         // rest there is nothing here to prove a key against, and handing one out
         // unproven is what seeding already does.
         return Rotation::stopped(

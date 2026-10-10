@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "What upgrading existing content did, or — unconfirmed — would do.\n\nUpgrading re-acquires the existing library at the chosen quality, which is a\nlarge, bandwidth-expensive operation, so it is a separate explicit action whose\ncost is stated before it runs and which does nothing until confirmed. Each *arr\nre-searches against its own current cutoff, so the report speaks per media type\nrather than asserting one preset across the library.",
+  "description": "What upgrading existing content did, or — unconfirmed — would do.\n\nUpgrading re-acquires the existing library at the chosen quality, which is a\nlarge, bandwidth-expensive operation, so it is a separate explicit action whose\ncost is stated before it runs and which does nothing until confirmed. Each curator\nre-searches against its own current cutoff, so the report speaks per media type\nrather than asserting one preset across the library.",
   "type": "object",
   "properties": {
     "confirmed": {

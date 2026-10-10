@@ -21,7 +21,7 @@ async fn a_service_still_starting_costs_names_without_being_called_a_failed_read
         "starting",
     );
     context = context.with_filesystem(Arc::new(
-        SeedFs::keyed(None, None).with_seerr(lemonfiber_fixtures::support::SEERR_SETTINGS),
+        SeedFs::keyed(None, None).with_requests(lemonfiber_fixtures::support::SEERR_SETTINGS),
     ));
     let report = household(&context, None).await.unwrap_or_default();
     assert!(report.available);

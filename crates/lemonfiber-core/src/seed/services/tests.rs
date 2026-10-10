@@ -27,16 +27,16 @@ fn recorded(value: &str, adopted: bool) -> Baseline {
     baseline
 }
 
-async fn against(seerr: &Seerr, baseline: &Baseline) -> State {
-    tell_the_household(seerr, baseline.entry("seerr", TELLING), false)
+async fn against(request_service: &Seerr, baseline: &Baseline) -> State {
+    tell_the_household(request_service, baseline.entry("seerr", TELLING), false)
         .await
         .0
 }
 
 /// The same comparison over the same service, asked what the pass would do rather
 /// than asked to do it.
-async fn would(seerr: &Seerr, baseline: &Baseline) -> State {
-    tell_the_household(seerr, baseline.entry("seerr", TELLING), true)
+async fn would(request_service: &Seerr, baseline: &Baseline) -> State {
+    tell_the_household(request_service, baseline.entry("seerr", TELLING), true)
         .await
         .0
 }
@@ -54,9 +54,9 @@ async fn a_service_holding_what_was_wanted_is_left_exactly_as_it_is() {
         r#"{{"enabled":true,"types":{}}}"#,
         crate::seerr::bits(&wanted_telling().occasions)
     );
-    let (seerr, http) = service(vec![Answer::reply(200, held)]);
+    let (request_service, http) = service(vec![Answer::reply(200, held)]);
 
-    let state = against(&seerr, &recorded(&said(&wanted_telling()), false)).await;
+    let state = against(&request_service, &recorded(&said(&wanted_telling()), false)).await;
 
     assert_eq!(state, State::AlreadyWired);
     assert!(!written_to(&http), "a correct value was written again");
@@ -65,9 +65,9 @@ async fn a_service_holding_what_was_wanted_is_left_exactly_as_it_is() {
 #[tokio::test]
 async fn lemonfibers_own_value_behind_its_intent_is_reported_rather_than_rewritten() {
     // The baseline and the service agree; it is lemonfiber that has moved on.
-    let (seerr, http) = service(vec![Answer::reply(200, SOME)]);
+    let (request_service, http) = service(vec![Answer::reply(200, SOME)]);
 
-    let state = against(&seerr, &recorded("on:8", false)).await;
+    let state = against(&request_service, &recorded("on:8", false)).await;
 
     assert_eq!(state, State::Stale);
     assert!(!written_to(&http), "a value nobody edited was overwritten");
@@ -76,9 +76,9 @@ async fn lemonfibers_own_value_behind_its_intent_is_reported_rather_than_rewritt
 #[tokio::test]
 async fn both_sides_moved_is_put_to_the_operator_rather_than_settled() {
     // The baseline matches neither what the service holds nor what is wanted.
-    let (seerr, http) = service(vec![Answer::reply(200, SOME)]);
+    let (request_service, http) = service(vec![Answer::reply(200, SOME)]);
 
-    let state = against(&seerr, &recorded("on:2", false)).await;
+    let state = against(&request_service, &recorded("on:2", false)).await;
 
     assert!(
         matches!(&state, State::Conflicted { yours, ours }
@@ -90,9 +90,9 @@ async fn both_sides_moved_is_put_to_the_operator_rather_than_settled() {
 
 #[tokio::test]
 async fn a_value_the_operator_had_adopted_stays_theirs() {
-    let (seerr, http) = service(vec![Answer::reply(200, SOME)]);
+    let (request_service, http) = service(vec![Answer::reply(200, SOME)]);
 
-    let state = against(&seerr, &recorded("on:8", true)).await;
+    let state = against(&request_service, &recorded("on:8", true)).await;
 
     assert_eq!(state, State::Adopted);
     assert!(!written_to(&http));
@@ -101,9 +101,9 @@ async fn a_value_the_operator_had_adopted_stays_theirs() {
 #[tokio::test]
 async fn a_value_set_before_lemonfiber_ever_ran_is_taken_on_rather_than_flagged() {
     // Something is set, and lemonfiber never wrote it: theirs, pre-existing.
-    let (seerr, http) = service(vec![Answer::reply(200, SOME)]);
+    let (request_service, http) = service(vec![Answer::reply(200, SOME)]);
 
-    let state = against(&seerr, &Baseline::new()).await;
+    let state = against(&request_service, &Baseline::new()).await;
 
     assert_eq!(state, State::Unmanaged);
     assert!(!written_to(&http), "a pre-existing value was overwritten");
@@ -111,9 +111,9 @@ async fn a_value_set_before_lemonfiber_ever_ran_is_taken_on_rather_than_flagged(
 
 #[tokio::test]
 async fn a_service_that_will_not_answer_is_reported_rather_than_guessed_at() {
-    let (seerr, http) = service(vec![Answer::Silent]);
+    let (request_service, http) = service(vec![Answer::Silent]);
 
-    let state = against(&seerr, &Baseline::new()).await;
+    let state = against(&request_service, &Baseline::new()).await;
 
     assert!(matches!(state, State::Skipped { .. }), "{state:?}");
     assert!(
@@ -129,12 +129,12 @@ async fn a_service_that_will_not_answer_is_reported_rather_than_guessed_at() {
 /// believing the loop closes.
 #[tokio::test]
 async fn a_write_the_service_refuses_is_reported_in_its_own_words() {
-    let (seerr, _) = service(vec![
+    let (request_service, _) = service(vec![
         Answer::reply(200, r#"{"enabled":false,"types":0}"#),
         Answer::reply(500, "no"),
     ]);
 
-    let state = against(&seerr, &Baseline::new()).await;
+    let state = against(&request_service, &Baseline::new()).await;
 
     assert!(
         matches!(state, State::Failed { .. } | State::Skipped { .. }),
@@ -157,9 +157,10 @@ async fn a_rehearsed_telling_says_what_is_set_now_and_sets_nothing() {
     // A service nobody has configured, with nothing recorded against it — the one
     // case that is a connection to make rather than somebody's own choice to leave
     // alone, and so the only one with anything to report in the other tense.
-    let (seerr, http) = service(vec![Answer::reply(200, r#"{"enabled":false,"types":0}"#)]);
+    let (request_service, http) =
+        service(vec![Answer::reply(200, r#"{"enabled":false,"types":0}"#)]);
 
-    let state = would(&seerr, &Baseline::new()).await;
+    let state = would(&request_service, &Baseline::new()).await;
 
     assert_eq!(
         state,

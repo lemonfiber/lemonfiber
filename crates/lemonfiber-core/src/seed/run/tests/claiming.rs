@@ -1,12 +1,12 @@
 //! Claiming the listening server's first account, and saying who holds it.
 
-use super::publishing::audiobookshelf_svc;
+use super::publishing::listening_server_svc;
 use super::*;
 
 /// What claiming came to, against this server's answers and this settings file.
 async fn claiming(http: Arc<Fake>, env: Option<std::path::PathBuf>) -> Option<Wiring> {
     let ctx = seed_ctx(None, true, Vec::new(), Some(vec![9; 32]), env).with_http(http);
-    super::super::claiming::claimed(&ctx, &[audiobookshelf_svc()]).await
+    super::super::claiming::claimed(&ctx, &[listening_server_svc()]).await
 }
 
 /// Whether the server was asked to make an account.
@@ -125,7 +125,7 @@ async fn an_account_lemonfiber_made_earlier_is_already_wired() {
     let env = recorded_admin("listening-ours");
     let _ = store::set(
         &env,
-        crate::config::AUDIOBOOKSHELF_PASSWORD_KEY,
+        crate::config::LISTENING_SERVER_PASSWORD_KEY,
         "minted-earlier",
     );
     let http = Fake::by_path(vec![("/status", Answer::reply(200, r#"{"isInit":true}"#))]);
@@ -146,7 +146,7 @@ async fn nothing_is_claimed_without_a_listening_server_or_on_a_rehearsal() {
     assert!(super::super::claiming::claimed(&ctx, &[]).await.is_none());
     let rehearsing = ctx.rehearsing();
     assert!(
-        super::super::claiming::claimed(&rehearsing, &[audiobookshelf_svc()])
+        super::super::claiming::claimed(&rehearsing, &[listening_server_svc()])
             .await
             .is_none()
     );

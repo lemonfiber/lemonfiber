@@ -137,7 +137,7 @@ pub(super) async fn put_back(
 /// opens it and a read presenting nothing is refused, refused where there is no password
 /// recorded or it is refused, and not guarded where anybody is still answered.
 async fn held(ctx: &Ctx, aggregator: &Aggregator) -> State {
-    let setting = crate::config::NZBHYDRA2_ADMIN_PASSWORD_KEY;
+    let setting = crate::config::USENET_AGGREGATOR_ADMIN_PASSWORD_KEY;
     let Some(password) = crate::app::targets::recorded_secret(ctx, setting) else {
         return State::Refused {
             reason: format!(
@@ -202,7 +202,7 @@ async fn turned_on(ctx: &Ctx, aggregator: &Aggregator) -> State {
             ),
         };
     };
-    let setting = crate::config::NZBHYDRA2_ADMIN_PASSWORD_KEY;
+    let setting = crate::config::USENET_AGGREGATOR_ADMIN_PASSWORD_KEY;
     let Some(password) = crate::secret::generate(ctx.seams.random.as_ref()) else {
         return State::Failed {
             detail: crate::secret::NO_RANDOMNESS_FOR_PASSWORD.to_owned(),
@@ -305,7 +305,7 @@ async fn proven(aggregator: &Aggregator, password: &str, before: &[String]) -> S
 /// The administrator lemonfiber names, holding `password`.
 fn admin(password: &str) -> Credential<'_> {
     Credential {
-        username: crate::config::NZBHYDRA2_ADMIN_USER,
+        username: crate::config::USENET_AGGREGATOR_ADMIN_USER,
         password,
     }
 }

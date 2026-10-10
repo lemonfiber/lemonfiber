@@ -7,11 +7,11 @@ use crate::quality::Preset;
 use crate::test_support::{a_context, nowhere, SeedFs};
 use lemonfiber_fixtures::http::Fake;
 
-/// The Servarr config file `SeedFs` hands back for any \*arr, carrying a readable
+/// The curator config file `SeedFs` hands back for any curator, carrying a readable
 /// key so a target opens.
 const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
 
-/// A context over the real stack (which names Sonarr and Radarr), the given
+/// A context over the real stack (which names a TV and a movie curator), the given
 /// filesystem, and HTTP that answers the upgrade POSTs from `replies`.
 fn ctx(fs: Arc<SeedFs>, replies: Vec<(u16, &'static str)>) -> Ctx {
     a_context()
@@ -49,8 +49,8 @@ async fn unconfirmed_states_the_cost_per_media_and_triggers_nothing() {
 }
 
 #[tokio::test]
-async fn a_confirmed_upgrade_starts_a_research_on_each_resolution_arr() {
-    // Both media *arrs accept the command; music and index services are left out.
+async fn a_confirmed_upgrade_starts_a_research_on_each_resolution_curator() {
+    // Both media curators accept the command; music and index services are left out.
     let report = upgrade(
         &ctx(
             Arc::new(SeedFs::keyed(Some(KEYED), None)),
@@ -61,7 +61,11 @@ async fn a_confirmed_upgrade_starts_a_research_on_each_resolution_arr() {
     .await
     .unwrap_or_default();
     assert!(report.confirmed);
-    assert_eq!(report.media.len(), 2, "only Sonarr and Radarr are asked");
+    assert_eq!(
+        report.media.len(),
+        2,
+        "only the TV and movie curators are asked"
+    );
     assert!(outcomes(&report)
         .iter()
         .all(|outcome| matches!(outcome, Some(Triggered::Started))));
@@ -95,7 +99,7 @@ async fn a_per_type_choice_states_each_types_own_preset() {
 }
 
 #[tokio::test]
-async fn an_arr_not_yet_started_is_reported_not_started() {
+async fn a_curator_not_yet_started_is_reported_not_started() {
     // No key on disk: the service has not finished starting, so it is not a fault.
     let report = upgrade(&ctx(Arc::new(SeedFs::keyed(None, None)), vec![]), true)
         .await
@@ -107,7 +111,7 @@ async fn an_arr_not_yet_started_is_reported_not_started() {
 }
 
 #[tokio::test]
-async fn an_arr_that_refuses_the_command_is_reported_failed() {
+async fn a_curator_that_refuses_the_command_is_reported_failed() {
     let report = upgrade(
         &ctx(
             Arc::new(SeedFs::keyed(Some(KEYED), None)),

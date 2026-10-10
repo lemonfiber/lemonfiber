@@ -96,7 +96,7 @@ fn what_removing_a_seeding_torrent_costs_is_said_in_what_it_does() {
 
 #[test]
 fn a_download_a_service_is_still_waiting_for_is_never_called_waste() {
-    // One name and an *arr still queued for it is an import that has not
+    // One name and a curator still queued for it is an import that has not
     // happened yet, not one that never will.
     let awaited = BTreeSet::from(["A.Show.S01E01".to_owned()]);
     let found = candidates(

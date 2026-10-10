@@ -281,7 +281,7 @@ async fn a_download_the_operator_already_answered_for_is_left_alone() {
     );
 }
 
-/// A Servarr-shape service's own configuration, with the key it wrote.
+/// A curator-shape service's own configuration, with the key it wrote.
 const KEYED: &str = "<Config><ApiKey>a1b2c3d4e5</ApiKey></Config>";
 
 /// A queue holding one item the service has stopped making progress on.

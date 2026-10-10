@@ -280,7 +280,7 @@ fn nothing_is_published_beyond_loopback_without_a_declared_reason() {
 /// above reads what the Compose files publish, so a service the manifest declares
 /// and no file publishes at all would pass it in silence. This starts from the
 /// declaration and goes looking, by host port rather than by service name —
-/// qBittorrent has no network namespace of its own and its port is published by
+/// the torrent client has no network namespace of its own and its port is published by
 /// the tunnel it borrows one from.
 #[test]
 fn every_service_the_stack_calls_admin_is_published_on_loopback() {

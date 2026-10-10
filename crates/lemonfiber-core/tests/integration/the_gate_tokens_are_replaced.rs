@@ -14,7 +14,7 @@ use lemonfiber_ports::docker::{Health, Lifecycle};
 use lemonfiber_sidecar::gate::{Accepted, Credential, Kind, Tokens, Upstream, Upstreams};
 use lemonfiber_sidecar::TokenHash;
 
-/// The gate accepting `tokens` on Sonarr's route.
+/// The gate accepting `tokens` on the curator's route.
 fn accepting(tokens: &[&str]) -> String {
     Tokens::of(vec![Accepted {
         route: "sonarr".to_owned(),

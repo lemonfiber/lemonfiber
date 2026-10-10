@@ -21,7 +21,7 @@ pub enum QualityAction {
         /// transcode in software, which is otherwise held rather than recorded.
         confirm: bool,
     },
-    /// Re-assert the recorded preset over a hand-edited Recyclarr config — the
+    /// Re-assert the recorded preset over a hand-edited quality sync config — the
     /// explicit consent to let the preset win where a run would preserve the edit.
     Reapply,
 }

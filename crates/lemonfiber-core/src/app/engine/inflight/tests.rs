@@ -17,8 +17,8 @@ fn named(forms: &[&str]) -> Vec<String> {
     forms.iter().map(|form| (*form).to_owned()).collect()
 }
 
-/// A context that can reach both download clients: `SABnzbd`'s key on a fake
-/// filesystem, qBittorrent's password in a scratch env file, and both protocols
+/// A context that can reach both download clients: the Usenet client's key on a fake
+/// filesystem, the torrent client's password in a scratch env file, and both protocols
 /// in play so a plan holds both.
 fn reaching(http: Arc<dyn Http>, env_file: Option<PathBuf>) -> Ctx {
     let settings = Settings {

@@ -63,12 +63,12 @@ async fn every_service_the_stack_declares_says_what_it_is_under_and_where_it_is_
 async fn the_pin_is_an_exact_version_and_the_image_it_belongs_to() {
     let report = listed().await;
 
-    let sonarr = report
+    let curator = report
         .services
         .iter()
         .find(|service| service.id == "sonarr")
         .cloned();
-    let said = sonarr.map(|service| {
+    let said = curator.map(|service| {
         (
             service.image.contains('/'),
             service.pinned.is_empty(),

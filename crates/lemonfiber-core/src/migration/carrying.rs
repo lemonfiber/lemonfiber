@@ -1,6 +1,6 @@
 //! What taking an existing stack over would come to, and what nothing carries across.
 //!
-//! An \*arr migrates its database forward on first start, and the binary that did so is
+//! A curator migrates its database forward on first start, and the binary that did so is
 //! the oldest that can open it afterwards. So the version standing on an existing
 //! project decides what adopting it means, and a later version already here is a door
 //! lemonfiber cannot walk back through.
@@ -29,7 +29,7 @@ const NEVER_CARRIED: [(&str, &str); 4] = [
          hold accounts with",
     ),
     (
-        "scripts hooked into an *arr's events",
+        "scripts hooked into a curator's events",
         "a connect script runs a program on your machine, and carrying one across would run \
          somebody's program somewhere it was never pointed at",
     ),

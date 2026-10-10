@@ -43,7 +43,7 @@ fn a_flag_run_answers_from_what_it_was_given() {
     );
     assert!(prompt.usenet_provider().is_some());
     assert_eq!(prompt.service_user(), Some((1000, 1000)));
-    assert!(matches!(prompt.library(), Library::JellyfinDocker));
+    assert!(matches!(prompt.library(), Library::Docker));
     assert!(prompt.household());
     assert!(prompt.autostart());
     // Consent given up front is what stands in for a person confirming.
@@ -89,7 +89,7 @@ fn a_flag_run_without_consent_keeps_nothing_it_could_not_prove() {
     assert_eq!(prompt.service_user(), None);
     assert!(!prompt.household());
     assert!(!prompt.autostart());
-    assert!(matches!(prompt.library(), Library::JellyfinDocker));
+    assert!(matches!(prompt.library(), Library::Docker));
     assert_eq!(
         prompt.protocols(),
         Protocols {
@@ -102,8 +102,8 @@ fn a_flag_run_without_consent_keeps_nothing_it_could_not_prove() {
 #[test]
 fn each_library_choice_can_be_named_on_the_command_line() {
     for (given, expected) in [
-        ("docker", Library::JellyfinDocker),
-        ("native", Library::JellyfinNative),
+        ("docker", Library::Docker),
+        ("native", Library::Native),
         ("NONE", Library::None),
     ] {
         let flags = SetupFlags::parse(RawSetup {

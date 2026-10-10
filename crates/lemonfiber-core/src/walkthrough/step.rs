@@ -38,7 +38,7 @@ pub enum Step {
     Grabbing,
     /// The download is running.
     Downloading,
-    /// The \*arr is moving the finished download into the library.
+    /// The curator is moving the finished download into the library.
     Importing,
     /// The media server is being told to look at what arrived.
     Scanning,

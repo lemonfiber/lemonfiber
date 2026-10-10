@@ -2,7 +2,7 @@
 //!
 //! Refusing outright would be this product deciding it knows better than the person
 //! whose secrets these are, which it does not: an operator moving a service to
-//! another machine, or signing in to qBittorrent's web UI by hand, has an ordinary
+//! another machine, or signing in to the torrent client's web UI by hand, has an ordinary
 //! reason to need a value lemonfiber minted on their behalf and never showed them.
 //!
 //! What is owed instead is that it never happens by accident. Asking prints the

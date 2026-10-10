@@ -1,15 +1,15 @@
-//! The key a service of the Servarr shape wrote for itself, and what a connection comes
+//! The key a service of the curator shape wrote for itself, and what a connection comes
 //! to where the file holding it was refused.
 
 use super::{Ctx, Path};
 use crate::ports::filesystem::Beneath;
 
-/// The API key a service of the Servarr shape wrote for itself, read from the file
+/// The API key a service of the curator shape wrote for itself, read from the file
 /// its own declaration names — beneath its own directory where a plugin brought it.
 ///
 /// [`Beneath::Read`] holds the key itself; a file holding none is as absent as one not
 /// written, and a file refused stays refused, so the caller can say so.
-pub(super) async fn servarr_key(ctx: &Ctx, filler: &crate::wiring::Filler) -> Beneath {
+pub(super) async fn curator_key(ctx: &Ctx, filler: &crate::wiring::Filler) -> Beneath {
     match crate::app::targets::credential_file(ctx, filler).await {
         Beneath::Read(text) => {
             crate::servarr::api_key(&text).map_or(Beneath::Absent, Beneath::Read)
@@ -34,9 +34,9 @@ pub(super) fn refusal(filler: &crate::wiring::Filler) -> crate::seed::State {
     }
 }
 
-/// A Servarr application's API key, read from the configuration file it wrote it
+/// A curator's API key, read from the configuration file it wrote it
 /// to, or nothing where it has not written one yet.
-pub(super) async fn read_servarr_key(ctx: &Ctx, config: &Path) -> Option<String> {
+pub(super) async fn read_curator_key(ctx: &Ctx, config: &Path) -> Option<String> {
     let within = crate::within::directory_of(config);
     let text =
         crate::app::targets::read_owned(ctx.seams.filesystem.as_ref(), config, within).await?;

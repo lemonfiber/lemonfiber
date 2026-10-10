@@ -217,7 +217,7 @@ fn asking_about_a_word_gives_the_longer_form_and_the_other_names() {
         said.contains("Search engines that find"),
         "the sentence: {said}"
     );
-    assert!(said.contains("Prowlarr"), "and the longer form: {said}");
+    assert!(said.contains("aggregator"), "and the longer form: {said}");
     assert!(
         said.contains("Other services call this: search provider."),
         "{said}"

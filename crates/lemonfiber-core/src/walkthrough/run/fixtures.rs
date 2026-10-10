@@ -1,7 +1,7 @@
 //! What the walkthrough's tests build their stacks out of.
 //!
 //! One transport answering every service the walk touches, because the walk touches all
-//! of them in one run: a \*arr's catalogue, its root folders and profiles, the add, the
+//! of them in one run: a curator's catalogue, its root folders and profiles, the add, the
 //! release probe, the history and the queue, and a media server's sign-in, library and
 //! rescan. Splitting that across a fake each would mean a test setting up six things to
 //! say one.
@@ -15,7 +15,7 @@ use crate::test_support::{a_context, a_password, Reporting, SeedFs};
 use crate::walkthrough::{Line, Narrator};
 use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
-/// A Servarr configuration that opens a target, carrying a readable key.
+/// A curator configuration that opens a target, carrying a readable key.
 const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
 
 /// What each of the walk's requests is answered with. Every field is the raw body the
@@ -40,9 +40,9 @@ pub(super) struct Fake {
     pub history: &'static str,
     /// The item's queue.
     pub queue: &'static str,
-    /// Jellyfin's sign-in.
+    /// The media server's sign-in.
     pub sign_in: &'static str,
-    /// Jellyfin's library.
+    /// The media server's library.
     pub library: &'static str,
     /// What the download client says it is moving.
     pub transfers: &'static str,
@@ -81,10 +81,10 @@ pub(super) const NOTHING_MOVING: &str = r#"{"queue":{"kbpersec":"0","slots":[]}}
 /// A download client carrying the item, half done at fourteen megabytes a second.
 pub(super) const CARRYING_IT: &str = r#"{"queue":{"kbpersec":"13672","slots":[{"filename":"Sintel.2010.1080p","percentage":"50","status":"Downloading","timeleft":"0:02:00","mbleft":"1050"}]}}"#;
 
-/// The `SABnzbd` configuration that opens a download-client target, carrying a key.
-pub(super) const SAB_KEYED: &str = "[misc]\napi_key = the-key\n";
+/// The Usenet client's configuration that opens a download-client target, carrying a key.
+pub(super) const USENET_KEYED: &str = "[misc]\napi_key = the-key\n";
 
-/// A Jellyfin sign-in that hands back a token, and a library holding the item.
+/// A media server sign-in that hands back a token, and a library holding the item.
 pub(super) const SIGNED_IN: &str = r#"{"AccessToken":"token"}"#;
 pub(super) const HAS_ITEM: &str = r#"{"Items":[{"Name":"Sintel"}]}"#;
 pub(super) const NO_ITEMS: &str = r#"{"Items":[]}"#;
@@ -182,14 +182,14 @@ impl Narrator for Listening {
     }
 }
 
-/// A stack over the real manifest, a filesystem that opens the \*arrs, and a transport
+/// A stack over the real manifest, a filesystem that opens the curators, and a transport
 /// answering as `fake` says — with no media server credential, so the library stage is
 /// simply unreachable.
 pub(super) fn ctx_with(fake: &Fake) -> Ctx {
     a_context()
         .settings(over_usenet())
         .build()
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), Some(SAB_KEYED))))
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), Some(USENET_KEYED))))
         .with_http(fake.transport())
         // No waiting: every test would otherwise sit through the real poll, and what the wait
         // does at its bound is exactly what the tests are about.
@@ -214,7 +214,7 @@ pub(super) fn ctx_watching(fake: &Fake) -> Ctx {
     ctx.settings.env_file = Some(dir.join(".env"));
     let _ = crate::app::targets::record_secret(
         &ctx,
-        crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         &a_password(),
     );
     ctx

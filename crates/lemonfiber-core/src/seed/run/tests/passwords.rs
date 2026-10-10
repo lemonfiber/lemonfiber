@@ -59,7 +59,7 @@ fn a_non_seed_outcome_carries_no_seed_report() {
 }
 
 #[tokio::test]
-async fn seed_replaces_and_records_the_qbittorrent_password() {
+async fn seed_replaces_and_records_the_torrent_client_password() {
     let env = config_scratch("seed-records");
     if let Some(parent) = env.parent() {
         let _ = std::fs::create_dir_all(parent);
@@ -240,7 +240,7 @@ async fn seed_reports_a_failed_password_change_and_records_nothing() {
 }
 
 #[tokio::test]
-async fn seed_skips_qbittorrent_when_no_password_is_announced() {
+async fn seed_skips_the_torrent_client_when_no_password_is_announced() {
     let ctx = seed_ctx(None, true, Vec::new(), Some(vec![0x11; 24]), None);
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     assert!(
@@ -259,7 +259,7 @@ async fn seed_skips_qbittorrent_when_no_password_is_announced() {
 }
 
 #[tokio::test]
-async fn seed_skips_qbittorrent_when_its_log_cannot_be_read() {
+async fn seed_skips_the_torrent_client_when_its_log_cannot_be_read() {
     let ctx = seed_ctx(None, false, Vec::new(), Some(vec![0x11; 24]), None);
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     assert!(
@@ -285,11 +285,7 @@ async fn seed_skips_qbittorrent_when_its_log_cannot_be_read() {
 async fn a_password_already_set_is_reported_rather_than_set_again() {
     const ANNOUNCED: &str = "A temporary password is provided for this session: spent";
     let path = config_scratch("qbt-already-set");
-    let _ = store::set(
-        &path,
-        crate::config::QBITTORRENT_PASSWORD_KEY,
-        "minted-earlier",
-    );
+    let _ = store::set(&path, crate::config::TORRENT_PASSWORD_KEY, "minted-earlier");
     let http = Fake::always(Answer::reply(200, "Ok."));
     let ctx = seed_ctx(
         Some(ANNOUNCED),
@@ -300,11 +296,11 @@ async fn a_password_already_set_is_reported_rather_than_set_again() {
     )
     .with_http(http.clone());
 
-    let (wiring, recorded) = super::super::clients::seed_qbittorrent_password(
+    let (wiring, recorded) = super::super::clients::seed_torrent_password(
         &ctx,
         &torrent_client(),
         "http://127.0.0.1:8081",
-        crate::config::QBITTORRENT_PASSWORD_KEY,
+        crate::config::TORRENT_PASSWORD_KEY,
     )
     .await;
 
@@ -332,7 +328,7 @@ async fn a_recorded_password_the_client_refuses_falls_through_to_the_temporary()
     let path = config_scratch("qbt-stale-record");
     let _ = store::set(
         &path,
-        crate::config::QBITTORRENT_PASSWORD_KEY,
+        crate::config::TORRENT_PASSWORD_KEY,
         "from-a-container-that-is-gone",
     );
     // Log in, refused; log in with the temporary, taken; set; confirm.
@@ -356,11 +352,11 @@ async fn a_recorded_password_the_client_refuses_falls_through_to_the_temporary()
     )
     .with_http(http.clone());
 
-    let (wiring, recorded) = super::super::clients::seed_qbittorrent_password(
+    let (wiring, recorded) = super::super::clients::seed_torrent_password(
         &ctx,
         &torrent_client(),
         "http://127.0.0.1:8081",
-        crate::config::QBITTORRENT_PASSWORD_KEY,
+        crate::config::TORRENT_PASSWORD_KEY,
     )
     .await;
 
@@ -387,11 +383,7 @@ async fn a_recorded_password_the_client_refuses_falls_through_to_the_temporary()
 #[tokio::test]
 async fn a_rehearsed_pass_will_not_sign_in_to_test_the_password_it_recorded() {
     let path = config_scratch("qbt-rehearsed");
-    let _ = store::set(
-        &path,
-        crate::config::QBITTORRENT_PASSWORD_KEY,
-        "minted-earlier",
-    );
+    let _ = store::set(&path, crate::config::TORRENT_PASSWORD_KEY, "minted-earlier");
     let http = Fake::always(Answer::reply(200, "Ok."));
     let ctx = seed_ctx(
         Some(TEMP_LOG),
@@ -403,11 +395,11 @@ async fn a_rehearsed_pass_will_not_sign_in_to_test_the_password_it_recorded() {
     .with_http(http.clone())
     .rehearsing();
 
-    let (wiring, recorded) = super::super::clients::seed_qbittorrent_password(
+    let (wiring, recorded) = super::super::clients::seed_torrent_password(
         &ctx,
         &torrent_client(),
         "http://127.0.0.1:8081",
-        crate::config::QBITTORRENT_PASSWORD_KEY,
+        crate::config::TORRENT_PASSWORD_KEY,
     )
     .await;
 
@@ -432,30 +424,29 @@ async fn a_rehearsed_pass_will_not_sign_in_to_test_the_password_it_recorded() {
 }
 
 #[tokio::test]
-async fn a_later_seed_offers_qbittorrent_from_its_recorded_password() {
+async fn a_later_seed_offers_the_torrent_client_from_its_recorded_password() {
     // The temporary password is gone, so nothing is minted this run; the
-    // password recorded earlier stands in and qBittorrent is offered anyway.
-    const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    const SABNZBD: &str = "[misc]\napi_key = the-sab-key\n";
+    // password recorded earlier stands in and the torrent client is offered anyway.
+    const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+    const USENET_CONFIG: &str = "[misc]\napi_key = the-sab-key\n";
     let path = config_scratch("qbt-later-seed");
-    let _ = store::set(
-        &path,
-        crate::config::QBITTORRENT_PASSWORD_KEY,
-        "minted-earlier",
-    );
+    let _ = store::set(&path, crate::config::TORRENT_PASSWORD_KEY, "minted-earlier");
     let ctx = seed_ctx(None, true, Vec::new(), None, Some(path.to_path_buf()))
         .with_http(seeding())
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), Some(SABNZBD))));
+        .with_filesystem(Arc::new(SeedFs::keyed(
+            Some(CURATOR_CONFIG),
+            Some(USENET_CONFIG),
+        )));
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     let clients = download_client_wirings(&report);
     assert_eq!(clients.len(), 6, "both clients into each of three arrs");
-    let qbittorrent = clients
+    let torrent = clients
         .iter()
         .filter(|wiring| wiring.connection.starts_with("qBittorrent into "))
         .count();
     assert_eq!(
-        qbittorrent, 3,
+        torrent, 3,
         "qBittorrent is offered to every arr on a later run"
     );
 }

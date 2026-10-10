@@ -12,7 +12,8 @@ async fn a_present_title_signs_in_then_finds_it_in_the_library() {
         Answer::reply(200, SIGNED_IN),
         Answer::reply(200, r#"{"Items":[{"Name":"The Expanse"}]}"#),
     ]);
-    // The term matches the library title the same case-insensitive way the *arr found it.
+    // The term matches the library title the same case-insensitive way the curator found
+    // it.
     assert_eq!(
         reader(&fake).has_item(Kind::Tv, "expanse").await.ok(),
         Some(true)

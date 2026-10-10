@@ -502,9 +502,9 @@ async fn a_check_that_cannot_mend_anything_offers_no_mender() {
 /// A download client on a fake transport, answering the sign-in and the two port reads.
 ///
 /// The second preferences answer is what the client says after the write: `set_listen_port`
-/// reads back rather than trusting the write, because qBittorrent accepts a port it then
-/// declines to use — so a fake that answered the old port twice would be a client that
-/// refused the move, which is a different test.
+/// reads back rather than trusting the write, because the bundled torrent client accepts a
+/// port it then declines to use — so a fake that answered the old port twice would be a
+/// client that refused the move, which is a different test.
 fn client_on(first: &str, after: &str, takes_the_write: bool) -> Qbittorrent {
     let written = if takes_the_write {
         Answer::reply(200, "")

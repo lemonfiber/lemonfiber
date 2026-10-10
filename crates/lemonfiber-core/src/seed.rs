@@ -60,7 +60,7 @@ pub(crate) use services::{
 };
 pub use services::{
     wire_applications, wire_fulfilment_targets, wire_household_telling, wire_media_server_admin,
-    wire_qbittorrent_password, wire_request_identity, Keep, IDENTITY,
+    wire_request_identity, wire_torrent_password, Keep, IDENTITY,
 };
 
 use std::collections::BTreeMap;
@@ -79,9 +79,9 @@ use crate::qbittorrent::Qbittorrent;
 pub const OPERATION: &str = "seed";
 
 /// The administrator account name lemonfiber creates on the media server and
-/// signs Seerr in with — one source of truth, so a trace's later library read
+/// signs the request service in with — one source of truth, so a trace's later library read
 /// authenticates under the same name it was created with.
-const ADMIN: &str = crate::config::JELLYFIN_ADMIN_USER;
+const ADMIN: &str = crate::config::MEDIA_SERVER_ADMIN_USER;
 
 /// Register one connection, confirm it landed by reading the list back, and
 /// record it as a change — the shared body of wiring a folder, a download client,

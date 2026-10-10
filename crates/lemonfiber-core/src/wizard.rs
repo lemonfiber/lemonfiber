@@ -18,7 +18,7 @@ use std::path::PathBuf;
 use crate::config::env::EnvFile;
 use crate::config::{
     Protocols, DATA_ROOT_KEY, INDEXER_APIKEY_KEY, INDEXER_URL_KEY, INDEXER_VALIDATED_KEY,
-    JELLYFIN_MODE_KEY, PGID_KEY, PROVIDER_HOST_KEY, PROVIDER_PASS_KEY, PROVIDER_PORT_KEY,
+    MEDIA_SERVER_MODE_KEY, PGID_KEY, PROVIDER_HOST_KEY, PROVIDER_PASS_KEY, PROVIDER_PORT_KEY,
     PROVIDER_TLS_KEY, PROVIDER_USER_KEY, PROVIDER_VALIDATED_KEY, PUID_KEY, TORRENT_KEY, USENET_KEY,
 };
 use crate::journal::{Change, Journal, Kind, Undo};
@@ -74,14 +74,14 @@ impl Wizard {
     /// Drop any restored answer this environment would refuse, and re-home a
     /// cursor left on a step it does not present.
     ///
-    /// A value the machine has changed out from under — native Jellyfin now on
+    /// A value the machine has changed out from under — a native media server now on
     /// Linux, a container user now on a platform that maps ownership away — is
     /// cleared rather than silently kept, because `Answers` is the set that will
     /// be written and a stale one would be applied. The cleared question then
     /// reappears as unanswered, to be asked afresh where it now applies.
     fn reconcile(&mut self) {
-        if self.progress.answers.library == Some(Library::JellyfinNative)
-            && !self.environment.offers_native_jellyfin()
+        if self.progress.answers.library == Some(Library::Native)
+            && !self.environment.offers_native_media_server()
         {
             self.progress.answers.library = None;
         }
@@ -140,7 +140,7 @@ impl Wizard {
     /// # Errors
     ///
     /// Returns [`Rejected`] where the value is not meaningful on this platform —
-    /// native Jellyfin where it buys nothing, or a container user where ownership
+    /// a native media server where it buys nothing, or a container user where ownership
     /// is mapped away.
     pub fn answer(&mut self, answer: Answer) -> Result<(), Rejected> {
         match answer {
@@ -165,10 +165,8 @@ impl Wizard {
                 }
                 self.progress.answers.service_user = Some(user);
             }
-            Answer::Library(Library::JellyfinNative)
-                if !self.environment.offers_native_jellyfin() =>
-            {
-                return Err(Rejected::NativeJellyfinUnavailable);
+            Answer::Library(Library::Native) if !self.environment.offers_native_media_server() => {
+                return Err(Rejected::NativeMediaServerUnavailable);
             }
             Answer::Library(library) => self.progress.answers.library = Some(library),
             Answer::Household(shared) => self.progress.answers.household = Some(shared),
@@ -345,7 +343,7 @@ impl Wizard {
             settings.push((PGID_KEY.to_owned(), gid.to_string()));
         }
         if let Some(mode) = answers.library.and_then(Library::mode) {
-            settings.push((JELLYFIN_MODE_KEY.to_owned(), mode.to_owned()));
+            settings.push((MEDIA_SERVER_MODE_KEY.to_owned(), mode.to_owned()));
         }
         Plan { settings }
     }

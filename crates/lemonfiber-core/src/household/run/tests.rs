@@ -14,7 +14,7 @@ use crate::test_support::{a_context, a_password, SeedFs};
 use std::collections::BTreeMap;
 use std::time::SystemTime;
 
-/// A Servarr config that opens a target, carrying a readable key.
+/// A curator config that opens a target, carrying a readable key.
 const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
 
 /// A request service that answered nothing, which is what these cases are about.
@@ -82,7 +82,7 @@ fn titles() -> BTreeMap<(Kind, i64), Titled> {
 }
 
 /// A transport answering the media server's accounts, the request service's check of
-/// its own key and its reads, and the \*arr libraries, by the shape of the URL.
+/// its own key and its reads, and the curator libraries, by the shape of the URL.
 struct Fake {
     accounts: &'static str,
     folders: &'static str,
@@ -212,8 +212,8 @@ fn ctx_over(transport: Arc<Transport>, tag: &str, no_room: bool) -> Ctx {
     let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("household-{tag}")).kept();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
-    let disk =
-        SeedFs::keyed(Some(KEYED), None).with_seerr(lemonfiber_fixtures::support::SEERR_SETTINGS);
+    let disk = SeedFs::keyed(Some(KEYED), None)
+        .with_requests(lemonfiber_fixtures::support::SEERR_SETTINGS);
     let mut context = a_context()
         .build()
         .with_filesystem(Arc::new(if no_room {
@@ -230,7 +230,7 @@ fn ctx_over(transport: Arc<Transport>, tag: &str, no_room: bool) -> Ctx {
     }
     let _ = crate::app::targets::record_secret(
         &context,
-        crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         &a_password(),
     );
     context

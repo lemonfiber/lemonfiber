@@ -1,13 +1,13 @@
 //! Everything that leaves this machine, why, and what stops if you refuse it.
 //!
-//! Two lists, and keeping them apart is most of the point. lemonfiber makes nine
-//! requests on its own account and they are enumerated here in full; the services
-//! in the stack make a great many more, and those are **theirs** — an indexer
-//! query is Prowlarr asking an indexer, a poster is Radarr asking a metadata
-//! provider, and a peer connection is qBittorrent doing what a torrent client is.
-//! Counting those as lemonfiber's would overstate what this product does; leaving
-//! them out entirely would understate what running the stack does. So they are
-//! listed, and listed as somebody else's.
+//! Two lists, and keeping them apart is most of the point. lemonfiber makes nine requests
+//! on its own account and they are enumerated here in full; the services in the stack make
+//! a great many more, and those are **theirs** — an indexer query is the indexer aggregator
+//! asking an indexer, a poster is a curator asking a metadata provider, and a peer
+//! connection is the torrent client doing what a torrent client is. Counting those as
+//! lemonfiber's would overstate what this product does; leaving them out entirely would
+//! understate what running the stack does. So they are listed, and listed as somebody
+//! else's.
 //!
 //! What makes this a surface rather than a comment is that an operator can read it.
 //! A promise about network behaviour kept in a document is a promise; one an

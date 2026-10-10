@@ -1,4 +1,4 @@
-//! Wiring download clients into a \\*arr, against a fake service.
+//! Wiring download clients into a curator, against a fake service.
 //!
 //! The same driver as the root folders, with the difference that is the whole
 //! point of it: a client is matched by the endpoint it reaches, not by its label,

@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use include_dir::{include_dir, Dir};
 
-use super::{materialise, pending_reverts, reapply_recyclarr, recyclarr_customised, reset_stack};
+use super::{materialise, pending_reverts, quality_sync_customised, reapply_preset, reset_stack};
 use crate::quality::{Preset, Selection};
 use crate::stack::{Failure, Source};
 
@@ -22,7 +22,7 @@ fn read(path: &Path) -> String {
     std::fs::read_to_string(path).unwrap_or_default()
 }
 
-/// The default choice, which rewrites the shipped Recyclarr config to itself —
+/// The default choice, which rewrites the shipped quality sync config to itself —
 /// the selection the file-writing tests use, since it changes nothing.
 fn balanced() -> Selection {
     Selection::everywhere(Preset::Balanced)
@@ -357,7 +357,7 @@ fn without_a_record_path_the_stack_is_still_written() {
 }
 
 #[test]
-fn a_chosen_preset_is_carried_into_the_recyclarr_config() {
+fn a_chosen_preset_is_carried_into_the_quality_sync_config() {
     let (into, record) = scratch("recyclarr-maximum");
     let maximum = Selection::everywhere(Preset::Maximum);
 
@@ -381,7 +381,7 @@ fn a_chosen_preset_is_carried_into_the_recyclarr_config() {
 }
 
 #[test]
-fn the_default_choice_leaves_the_shipped_recyclarr_config_untouched() {
+fn the_default_choice_leaves_the_shipped_quality_sync_config_untouched() {
     let (into, record) = scratch("recyclarr-default");
     let (_, edits) = materialise(
         &DISK,
@@ -400,9 +400,9 @@ fn the_default_choice_leaves_the_shipped_recyclarr_config_untouched() {
 }
 
 #[test]
-fn no_selection_writes_the_rest_but_skips_the_recyclarr_config() {
+fn no_selection_writes_the_rest_but_skips_the_quality_sync_config() {
     // A teardown/restart/rehearsal carries no choice: the stack is still
-    // written, but the Recyclarr config is left alone rather than written back
+    // written, but the quality sync config is left alone rather than written back
     // to the shipped default.
     let (into, record) = scratch("recyclarr-none");
     let (_, edits) = materialise(
@@ -418,7 +418,7 @@ fn no_selection_writes_the_rest_but_skips_the_recyclarr_config() {
     assert!(read(&into.join("compose.yaml")).contains("image: sonarr"));
     assert!(
         !into.join("config/recyclarr/recyclarr.yml").exists(),
-        "the Recyclarr config is left untouched, not written",
+        "the quality sync config is left untouched, not written",
     );
 }
 
@@ -434,8 +434,8 @@ fn no_selection_does_not_revert_an_applied_preset() {
         Some(&Selection::everywhere(Preset::Maximum)),
         &[],
     );
-    let recyclarr = into.join("config/recyclarr/recyclarr.yml");
-    assert!(read(&recyclarr).contains("sonarr-web-2160p.yml"));
+    let quality_sync = into.join("config/recyclarr/recyclarr.yml");
+    assert!(read(&quality_sync).contains("sonarr-web-2160p.yml"));
 
     // A later command carrying no choice leaves the applied preset exactly as it
     // is — not written back to the shipped default.
@@ -448,7 +448,7 @@ fn no_selection_does_not_revert_an_applied_preset() {
         &[],
     );
     assert!(
-        read(&recyclarr).contains("sonarr-web-2160p.yml"),
+        read(&quality_sync).contains("sonarr-web-2160p.yml"),
         "the applied preset is not reverted",
     );
 }
@@ -457,7 +457,7 @@ fn no_selection_does_not_revert_an_applied_preset() {
 fn a_config_is_customised_only_once_it_differs_from_the_record() {
     let (into, record) = scratch("customised");
     // Nothing written yet: nothing to be customised against.
-    assert!(!recyclarr_customised(&DISK, Some(&into), Some(&record)));
+    assert!(!quality_sync_customised(&DISK, Some(&into), Some(&record)));
 
     // Applied and untouched: lemonfiber's own, not customised.
     let _ = materialise(
@@ -468,17 +468,17 @@ fn a_config_is_customised_only_once_it_differs_from_the_record() {
         Some(&balanced()),
         &[],
     );
-    assert!(!recyclarr_customised(&DISK, Some(&into), Some(&record)));
+    assert!(!quality_sync_customised(&DISK, Some(&into), Some(&record)));
 
     // The operator tunes it by hand: now it is customised.
-    let recyclarr = into.join("config/recyclarr/recyclarr.yml");
-    let _ = std::fs::write(&recyclarr, "# mine\n");
-    assert!(recyclarr_customised(&DISK, Some(&into), Some(&record)));
+    let quality_sync = into.join("config/recyclarr/recyclarr.yml");
+    let _ = std::fs::write(&quality_sync, "# mine\n");
+    assert!(quality_sync_customised(&DISK, Some(&into), Some(&record)));
 
     // Deleted while the record persists: nothing on disk to be customised, so a
     // reapply would simply write it again.
-    let _ = std::fs::remove_file(&recyclarr);
-    assert!(!recyclarr_customised(&DISK, Some(&into), Some(&record)));
+    let _ = std::fs::remove_file(&quality_sync);
+    assert!(!quality_sync_customised(&DISK, Some(&into), Some(&record)));
 }
 
 #[test]
@@ -493,13 +493,13 @@ fn reapply_overwrites_a_customised_config_and_records_it() {
         Some(&maximum),
         &[],
     );
-    let recyclarr = into.join("config/recyclarr/recyclarr.yml");
+    let quality_sync = into.join("config/recyclarr/recyclarr.yml");
     // The operator hand-edits it.
-    let _ = std::fs::write(&recyclarr, "# mine\n");
-    assert!(recyclarr_customised(&DISK, Some(&into), Some(&record)));
+    let _ = std::fs::write(&quality_sync, "# mine\n");
+    assert!(quality_sync_customised(&DISK, Some(&into), Some(&record)));
 
     // Reapply re-asserts the recorded preset over the edit.
-    let overwritten = reapply_recyclarr(
+    let overwritten = reapply_preset(
         &DISK,
         Source::Embedded(&STACKLET),
         Some(&into),
@@ -521,13 +521,13 @@ fn reapply_overwrites_a_customised_config_and_records_it() {
         edit.is_some_and(|edit| edit.diff.contains('+')),
         "{overwritten:?}"
     );
-    assert!(read(&recyclarr).contains("sonarr-web-2160p.yml"));
+    assert!(read(&quality_sync).contains("sonarr-web-2160p.yml"));
     // Recorded as lemonfiber's own again: no longer customised.
-    assert!(!recyclarr_customised(&DISK, Some(&into), Some(&record)));
+    assert!(!quality_sync_customised(&DISK, Some(&into), Some(&record)));
 }
 
 /// The diff of a replaced config reaches a terminal, its scrollback and any bug
-/// report pasted out of it, and a Recyclarr config carries a key per instance.
+/// report pasted out of it, and a quality sync config carries a key per instance.
 #[test]
 fn a_credential_in_the_config_a_reapply_replaces_is_named_and_never_printed() {
     let (into, record) = scratch("reapply-secret");
@@ -540,11 +540,11 @@ fn a_credential_in_the_config_a_reapply_replaces_is_named_and_never_printed() {
         Some(&maximum),
         &[],
     );
-    let recyclarr = into.join("config/recyclarr/recyclarr.yml");
+    let quality_sync = into.join("config/recyclarr/recyclarr.yml");
     let key = ["a", "recyclarr", "key"].join("-");
-    let _ = std::fs::write(&recyclarr, format!("    api_key: {key}\n"));
+    let _ = std::fs::write(&quality_sync, format!("    api_key: {key}\n"));
 
-    let overwritten = reapply_recyclarr(
+    let overwritten = reapply_preset(
         &DISK,
         Source::Embedded(&STACKLET),
         Some(&into),
@@ -576,7 +576,7 @@ fn a_reapply_over_a_config_already_in_lemonfibers_own_hand_replaces_nothing() {
         &[],
     );
 
-    let overwritten = reapply_recyclarr(
+    let overwritten = reapply_preset(
         &DISK,
         Source::Embedded(&STACKLET),
         Some(&into),
@@ -604,10 +604,10 @@ fn a_rehearsed_reapply_writes_nothing() {
         Some(&maximum),
         &[],
     );
-    let recyclarr = into.join("config/recyclarr/recyclarr.yml");
-    let _ = std::fs::write(&recyclarr, "# mine\n");
+    let quality_sync = into.join("config/recyclarr/recyclarr.yml");
+    let _ = std::fs::write(&quality_sync, "# mine\n");
 
-    let overwritten = reapply_recyclarr(
+    let overwritten = reapply_preset(
         &DISK,
         Source::Embedded(&STACKLET),
         Some(&into),
@@ -626,7 +626,7 @@ fn a_rehearsed_reapply_writes_nothing() {
         "the rehearsal shows what it would replace"
     );
     // The edit is still on disk: a rehearsal changed nothing.
-    assert_eq!(read(&recyclarr), "# mine\n");
+    assert_eq!(read(&quality_sync), "# mine\n");
 }
 
 /// A declaration is a name and the reason somebody gave for writing it down.
@@ -723,10 +723,10 @@ fn a_reapply_leaves_a_quality_config_declared_unmanaged_exactly_as_it_is() {
         Some(&maximum),
         &[],
     );
-    let recyclarr = into.join("config/recyclarr/recyclarr.yml");
-    let _ = std::fs::write(&recyclarr, "# mine\n");
+    let quality_sync = into.join("config/recyclarr/recyclarr.yml");
+    let _ = std::fs::write(&quality_sync, "# mine\n");
 
-    let overwritten = reapply_recyclarr(
+    let overwritten = reapply_preset(
         &DISK,
         Source::Embedded(&STACKLET),
         Some(&into),
@@ -738,13 +738,17 @@ fn a_reapply_leaves_a_quality_config_declared_unmanaged_exactly_as_it_is() {
     .unwrap_or_default();
 
     assert!(overwritten.is_none(), "{overwritten:?}");
-    assert_eq!(read(&recyclarr), "# mine\n", "the config was overwritten");
+    assert_eq!(
+        read(&quality_sync),
+        "# mine\n",
+        "the config was overwritten"
+    );
 }
 
 #[test]
 fn reapply_leaves_an_external_stack_alone() {
     let (into, record) = scratch("reapply-external");
-    let overwritten = reapply_recyclarr(
+    let overwritten = reapply_preset(
         &DISK,
         Source::External(Path::new("/some/operator/stack")),
         Some(&into),
@@ -772,9 +776,9 @@ fn a_link_planted_where_a_stack_file_goes_is_neither_read_nor_written() {
     let operator = into.with_file_name("authorized_keys");
     assert!(std::fs::create_dir_all(into.parent().unwrap_or(&into)).is_ok());
     assert!(std::fs::write(&operator, "ssh-ed25519 theirs\n").is_ok());
-    let recyclarr = into.join("config").join("recyclarr");
-    let _ = std::fs::create_dir_all(&recyclarr);
-    let _ = std::os::unix::fs::symlink(&operator, recyclarr.join("recyclarr.yml"));
+    let quality_sync = into.join("config").join("recyclarr");
+    let _ = std::fs::create_dir_all(&quality_sync);
+    let _ = std::os::unix::fs::symlink(&operator, quality_sync.join("recyclarr.yml"));
 
     let refused = materialise(
         &DISK,

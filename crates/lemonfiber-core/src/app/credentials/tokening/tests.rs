@@ -88,15 +88,15 @@ fn fillers_beside(
     )
 }
 
-/// Jellyfin, the request service, Sonarr and, where `gating`, the request gate.
+/// The media server, the request service, a curator and, where `gating`, the request gate.
 fn stack(gating: bool) -> Vec<lemonfiber_manifest::Service> {
-    let mut jellyfin = service(
+    let mut media_server = service(
         "jellyfin",
         "Jellyfin",
         Some(lemonfiber_manifest::ApiKind::Jellyfin),
         8096,
     );
-    jellyfin.provides = vec!["media.serve".to_owned(), "identity.source".to_owned()];
+    media_server.provides = vec!["media.serve".to_owned(), "identity.source".to_owned()];
     let mut requests = service(
         "seerr",
         "Seerr",
@@ -104,14 +104,18 @@ fn stack(gating: bool) -> Vec<lemonfiber_manifest::Service> {
         5055,
     );
     requests.provides = vec!["request.intake".to_owned()];
-    let mut services = vec![jellyfin, requests, service("sonarr", "Sonarr", None, 8989)];
+    let mut services = vec![
+        media_server,
+        requests,
+        service("sonarr", "Sonarr", None, 8989),
+    ];
     if gating {
         services.push(service("request-gate", "Request gate", None, PORT));
     }
     services
 }
 
-/// The gate's routes: Sonarr's and Jellyfin's.
+/// The gate's routes: the curator's and the media server's.
 fn routes() -> Upstreams {
     Upstreams::of(vec![
         Upstream {
@@ -131,17 +135,18 @@ fn routes() -> Upstreams {
     ])
 }
 
-/// The gate accepting `sonarr` on Sonarr's route and `jellyfin` on Jellyfin's.
-fn accepting(sonarr: &[&str], jellyfin: &[&str]) -> Tokens {
+/// The gate accepting `curator` on the curator's route and `media_server` on the media
+/// server's.
+fn accepting(curator: &[&str], media_server: &[&str]) -> Tokens {
     let hashed = |tokens: &[&str]| tokens.iter().map(|token| TokenHash::of(token)).collect();
     Tokens::of(vec![
         Accepted {
             route: "sonarr".to_owned(),
-            tokens: hashed(sonarr),
+            tokens: hashed(curator),
         },
         Accepted {
             route: "jellyfin".to_owned(),
-            tokens: hashed(jellyfin),
+            tokens: hashed(media_server),
         },
     ])
 }
@@ -186,16 +191,22 @@ fn accepted(project: &Path) -> Option<Tokens> {
         .and_then(|text| Tokens::read(&text).ok())
 }
 
-/// The request service: Sonarr held at the gate with `sonarr`, Jellyfin linked at the
-/// gate with `jellyfin`; answering a move with `moved`, its own test with each of
-/// `tested` in turn, and a new link with `linked`.
-fn serving(sonarr: &str, jellyfin: &str, moved: u16, tested: &[u16], linked: u16) -> Arc<Fake> {
+/// The request service: the curator held at the gate with `curator`, the media server
+/// linked at the gate with `media_server`; answering a move with `moved`, its own test with
+/// each of `tested` in turn, and a new link with `linked`.
+fn serving(
+    curator: &str,
+    media_server: &str,
+    moved: u16,
+    tested: &[u16],
+    linked: u16,
+) -> Arc<Fake> {
     let target = serde_json::json!([{
-        "id": 1, "hostname": "request-gate", "port": PORT, "baseUrl": "/sonarr", "apiKey": sonarr,
+        "id": 1, "hostname": "request-gate", "port": PORT, "baseUrl": "/sonarr", "apiKey": curator,
     }])
     .to_string();
     let link = serde_json::json!({
-        "ip": "request-gate", "port": PORT, "urlBase": "/jellyfin", "apiKey": jellyfin,
+        "ip": "request-gate", "port": PORT, "urlBase": "/jellyfin", "apiKey": media_server,
     })
     .to_string();
     Fake::by_route_in_turn(vec![
@@ -261,8 +272,8 @@ fn unproven(settled: &Settled) -> Option<&str> {
     }
 }
 
-const SONARR: &str = "Request gate token for Sonarr";
-const JELLYFIN: &str = "Request gate token for Jellyfin";
+const CURATOR_LINE: &str = "Request gate token for Sonarr";
+const MEDIA_SERVER_LINE: &str = "Request gate token for Jellyfin";
 
 #[tokio::test]
 async fn each_route_has_a_line_read_from_the_request_service() {
@@ -277,20 +288,20 @@ async fn each_route_has_a_line_read_from_the_request_service() {
 
     let lines = held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at)).await;
 
-    let sonarr = named(&lines, SONARR);
-    assert_eq!(sonarr.state, State::Active);
+    let curator = named(&lines, CURATOR_LINE);
+    assert_eq!(curator.state, State::Active);
     assert_eq!(
-        sonarr.fingerprint,
+        curator.fingerprint,
         Some(crate::credential::fingerprint("held"))
     );
-    assert_eq!(sonarr.location, "held only by the request service");
+    assert_eq!(curator.location, "held only by the request service");
     assert_eq!(
-        sonarr.consumers,
+        curator.consumers,
         vec!["the request service, which reaches Sonarr through the gate".to_owned()]
     );
-    let jellyfin = named(&lines, JELLYFIN);
-    assert_eq!(jellyfin.state, State::Invalid);
-    assert!(jellyfin
+    let media_server = named(&lines, MEDIA_SERVER_LINE);
+    assert_eq!(media_server.state, State::Invalid);
+    assert!(media_server
         .advisory
         .is_some_and(|said| said.starts_with("the gate does not accept the token")));
 }
@@ -319,7 +330,7 @@ async fn a_token_not_handed_over_or_unread_says_so() {
     ]);
     let (ctx, at) = scene("tokens-unheld", true, &accepting(&[], &[]), http, true);
     let lines = held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at)).await;
-    for name in [SONARR, JELLYFIN] {
+    for name in [CURATOR_LINE, MEDIA_SERVER_LINE] {
         let line = named(&lines, name);
         assert_eq!(line.state, State::Absent, "{name}");
         assert!(line
@@ -330,8 +341,8 @@ async fn a_token_not_handed_over_or_unread_says_so() {
     let silent = Fake::by_route_in_turn(vec![(Method::Get, "", vec![Answer::Silent])]);
     let (ctx, at) = scene("tokens-unread", true, &accepting(&[], &[]), silent, true);
     let lines = held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at)).await;
-    assert_eq!(named(&lines, SONARR).state, State::Stale);
-    assert_eq!(named(&lines, JELLYFIN).state, State::Stale);
+    assert_eq!(named(&lines, CURATOR_LINE).state, State::Stale);
+    assert_eq!(named(&lines, MEDIA_SERVER_LINE).state, State::Stale);
 }
 
 #[tokio::test]
@@ -373,7 +384,7 @@ async fn a_token_is_never_printed() {
     );
     let line = named(
         &held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at)).await,
-        SONARR,
+        CURATOR_LINE,
     );
 
     let shown = super::super::revealing::reveal(&ctx, &line, true).await;
@@ -392,15 +403,15 @@ async fn a_route_for_a_service_the_stack_no_longer_names_is_called_by_its_route(
         http,
         true,
     );
-    let without_sonarr: Vec<_> = stack(true)
+    let without_curator: Vec<_> = stack(true)
         .into_iter()
         .filter(|service| service.id != "sonarr")
         .collect();
 
     let lines = held(
         &ctx,
-        &without_sonarr,
-        &fillers_from(without_sonarr.clone(), Some(&at)),
+        &without_curator,
+        &fillers_from(without_curator.clone(), Some(&at)),
         Some(&at),
     )
     .await;

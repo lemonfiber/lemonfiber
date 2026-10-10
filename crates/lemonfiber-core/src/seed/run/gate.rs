@@ -1,11 +1,11 @@
 //! The request gate's routes: each upstream it answers for, and what it presents there.
 //!
 //! The gate holds the credentials the request service would otherwise hold: each
-//! fulfilling \*arr's own key, read from where the \*arr wrote it, and a key minted for
+//! fulfilling curator's own key, read from where the curator wrote it, and a key minted for
 //! the gate alone in the media server, whichever service fills the identity source, and
 //! filed under its name. They are handed over in one
 //! owner-only file in the gate's configuration directory, never its environment, and
-//! written again whenever what they should hold has moved — an \*arr that regenerated
+//! written again whenever what they should hold has moved — a curator that regenerated
 //! its key reaches the gate on the next pass.
 //!
 //! **The file is what holds the media server's key.** A key filed under the gate's name that
@@ -59,7 +59,7 @@ async fn curators_alone(
         return Some(settled(no_project()));
     };
     let (path, current) = routes_file(ctx, project).await;
-    let wanted = Upstreams::of(arr_routes(ctx, fillers).await);
+    let wanted = Upstreams::of(curator_routes(ctx, fillers).await);
     let state = if current.as_ref() == Some(&wanted) {
         State::AlreadyWired
     } else if ctx.dry_run {
@@ -118,7 +118,7 @@ async fn with_the_media_server(
         return Some(settled(no_project()));
     };
     let (path, current) = routes_file(ctx, project).await;
-    let routes = arr_routes(ctx, fillers).await;
+    let routes = curator_routes(ctx, fillers).await;
     let held = current
         .as_ref()
         .and_then(|upstreams| upstreams.route(server.id()))
@@ -176,22 +176,22 @@ fn no_project() -> State {
     }
 }
 
-/// Write the gate's routes again after the \*arr `arr` replaced its key, so its route
-/// presents the new one: what replacing that key owes the gate.
+/// Write the gate's routes again after the curator `curator_id` replaced its key, so its
+/// route presents the new one: what replacing that key owes the gate.
 ///
 /// Nothing where the stack runs no gate or the request service does not fulfil
-/// through `arr`.
+/// through `curator_id`.
 pub(crate) async fn reroute(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
     fillers: &crate::wiring::Fillers,
     project: Option<&Path>,
-    arr: &str,
+    curator_id: &str,
 ) -> Option<State> {
     gating::service(services)?;
     let routed = super::fulfilling(fillers)
         .iter()
-        .any(|fulfils| fulfils.filler.id == arr);
+        .any(|fulfils| fulfils.filler.id == curator_id);
     routed.then_some(())?;
     // Boxed, because it is carried across the routes being written.
     let server = crate::app::targets::MediaServer::of(fillers).map(Box::new);
@@ -240,13 +240,13 @@ async fn kept(
     minted::revoking(client, others).await
 }
 
-/// A route for each \*arr the request service fulfils through, with the key it wrote for
-/// itself. An \*arr that has written none yet has no route until it has.
-async fn arr_routes(ctx: &Ctx, fillers: &crate::wiring::Fillers) -> Vec<Upstream> {
+/// A route for each curator the request service fulfils through, with the key it wrote for
+/// itself. A curator that has written none yet has no route until it has.
+async fn curator_routes(ctx: &Ctx, fillers: &crate::wiring::Fillers) -> Vec<Upstream> {
     let mut routes = Vec::new();
     for fulfils in super::fulfilling(fillers) {
         let crate::ports::filesystem::Beneath::Read(key) =
-            super::keys::servarr_key(ctx, fulfils.filler).await
+            super::keys::curator_key(ctx, fulfils.filler).await
         else {
             continue;
         };

@@ -40,13 +40,13 @@ fn bundled(fillers: &Fillers) -> Option<(&Filler, String)> {
 /// What the report calls this connection.
 const CONNECTION: &str = "The credentials the request service held";
 
-/// The field prefix of an owed \*arr key, followed by the \*arr's id.
+/// The field prefix of an owed curator key, followed by the curator's id.
 const HELD_KEY: &str = "held-key:";
 
 /// What an owed field holds. Its presence is the record; the value says what it is.
 const OWED: &str = "owed";
 
-/// Note every fulfilling \*arr whose own key the request service holds now, before its
+/// Note every fulfilling curator whose own key the request service holds now, before its
 /// target moves to the gate. Nothing where the stack runs no gate or no request service,
 /// or where the request service will not say what it holds.
 pub(super) async fn note_held(
@@ -78,7 +78,7 @@ pub(super) async fn note_held(
     }
 }
 
-/// Replace every \*arr key the request service held and revoke its own media server key,
+/// Replace every curator key the request service held and revoke its own media server key,
 /// once it reaches everything through the gate. Nothing where nothing is owed.
 pub(super) async fn seed_taken_back(
     ctx: &Ctx,
@@ -169,7 +169,7 @@ async fn replaced(
         return Vec::new();
     };
     let rotation =
-        crate::app::credentials::reset_arr(ctx, services, fillers, Some(project), target).await;
+        crate::app::credentials::reset_curator(ctx, services, fillers, Some(project), target).await;
     if matches!(rotation.settled, Settled::Replaced { .. }) {
         baseline.forget(owed_by, &field);
         return rotation
@@ -193,7 +193,7 @@ async fn replaced(
 /// What the request service still reaches without the gate, by name: the media server,
 /// reached at the gate on the route and called the name in `server`, where its link is
 /// not at that route under a token the gate accepts, and each
-/// fulfilling \*arr whose target is not at the gate or does not pass the request
+/// fulfilling curator whose target is not at the gate or does not pass the request
 /// service's own test.
 async fn still_direct(
     ctx: &Ctx,
@@ -220,7 +220,7 @@ async fn still_direct(
     Ok(direct)
 }
 
-/// Whether the request service holds the \*arr reached at `host` at the gate, under a
+/// Whether the request service holds the curator reached at `host` at the gate, under a
 /// token the gate accepts, and passes its own test of it there.
 async fn gated_target(
     requests: &dyn Requests,

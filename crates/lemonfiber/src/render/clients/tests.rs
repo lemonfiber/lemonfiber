@@ -14,7 +14,7 @@ use lemonfiber_core::wizard::Library;
 fn what_playback_will_struggle_with_is_said_before_any_device() {
     let strained = warn_before_confirming(
         Preset::Maximum,
-        Playback::of(Environment::MacOs, Library::JellyfinDocker),
+        Playback::of(Environment::MacOs, Library::Docker),
     );
     assert!(strained.is_some(), "the fixture must warrant a caution");
     let drawn = guidance(&lemonfiber_core::clients::guidance(strained)).text();

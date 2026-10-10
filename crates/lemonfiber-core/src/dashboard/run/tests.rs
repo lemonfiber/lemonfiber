@@ -68,7 +68,7 @@ const fn filled(
 
 // ── VPN panel ─────────────────────────────────────────────────
 
-/// A healthy tunnel scripted onto the gluetun/qBittorrent pair the stack
+/// A healthy tunnel scripted onto the tunnel and torrent client pair the stack
 /// declares: matching egress, a country, and a forwarded port.
 fn healthy_tunnel() -> Tunnel {
     Tunnel {

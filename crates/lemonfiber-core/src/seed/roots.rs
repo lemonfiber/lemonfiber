@@ -1,7 +1,7 @@
 //! Where each service files what it downloads.
 //!
 //! A root folder is the one piece of seeding two services can genuinely contest — the
-//! same path claimed by two *arrs is an operator decision, not something to resolve on
+//! same path claimed by two curators is an operator decision, not something to resolve on
 //! their behalf.
 
 use std::path::{Path, PathBuf};
@@ -13,7 +13,7 @@ use super::{
 use crate::ports::filesystem::FileSystem;
 
 /// What a wanted root folder is judged against before it may be written: the paths
-/// another \*arr also claims, and the data tree lemonfiber mounts. And where that tree
+/// another curator also claims, and the data tree lemonfiber mounts. And where that tree
 /// is on the host, so the folder's directory is made before the service is asked to
 /// file into it.
 ///
@@ -23,8 +23,8 @@ use crate::ports::filesystem::FileSystem;
 /// which is why a pass that only says what it would do reports them exactly as a real
 /// run does.
 pub struct Placing<'a> {
-    /// Root-folder paths more than one \*arr wants, from [`contested_roots`]. A folder
-    /// named here is refused rather than written: two \*arrs on one root folder would
+    /// Root-folder paths more than one curator wants, from [`contested_roots`]. A folder
+    /// named here is refused rather than written: two curators on one root folder would
     /// each manage the other's files.
     pub contested: &'a BTreeMap<String, Vec<String>>,
     /// The host data root every root folder must sit within. A folder outside it is
@@ -55,8 +55,8 @@ pub struct Backing<'a> {
 /// read back before it is called wired, because a write is not done until the
 /// service reports it, and only then is it recorded.
 ///
-/// A folder another \*arr also wants — named in [`Placing::contested`] — is refused
-/// rather than written, because two \*arrs on one root folder would each manage the
+/// A folder another curator also wants — named in [`Placing::contested`] — is refused
+/// rather than written, because two curators on one root folder would each manage the
 /// other's files. A folder outside [`Placing::root`], the data tree lemonfiber
 /// mounts, is refused too: the service would file where
 /// its downloads are neither hardlinked to nor visible to the rest of the stack.
@@ -130,10 +130,10 @@ pub async fn wire_root_folders(
     wirings
 }
 
-/// Root-folder paths more than one \*arr wants, each mapped to the \*arrs that
-/// want it, named and sorted. Two \*arrs pointed at one root folder would each
+/// Root-folder paths more than one curator wants, each mapped to the curators that
+/// want it, named and sorted. Two curators pointed at one root folder would each
 /// manage the other's files, so a shared folder is refused rather than wired; a
-/// path only one \*arr wants is left out, since there is nothing to refuse.
+/// path only one curator wants is left out, since there is nothing to refuse.
 #[must_use]
 pub fn contested_roots<'a>(
     claims: impl IntoIterator<Item = (&'a str, &'a [RootFolder])>,
@@ -154,9 +154,9 @@ pub fn contested_roots<'a>(
     by_path
 }
 
-/// Why a wanted folder is refused: the other \*arrs that also claim its path,
-/// named, or `None` where the path is this \*arr's alone. Called only for a
-/// folder this \*arr wants, so where the path is contested this \*arr is one of
+/// Why a wanted folder is refused: the other curators that also claim its path,
+/// named, or `None` where the path is this curator's alone. Called only for a
+/// folder this curator wants, so where the path is contested this curator is one of
 /// its claimants and at least one other remains to name.
 pub(super) fn contest_reason(
     service: &str,
@@ -170,7 +170,7 @@ pub(super) fn contest_reason(
         .filter(|name| *name != service)
         .collect();
     Some(format!(
-        "{} is also the root folder for {}; two *arrs on one root folder would each manage the other's files",
+        "{} is also the root folder for {}; two curators on one root folder would each manage the other's files",
         folder.path,
         others.join(" and ")
     ))

@@ -339,21 +339,21 @@ impl SeedFs {
 
     /// The same, answering the subtitle finder's configuration path with `config`.
     #[must_use]
-    pub fn with_bazarr(mut self, config: &'static str) -> Self {
+    pub fn with_subtitle_finder(mut self, config: &'static str) -> Self {
         self.bazarr = Some(config);
         self
     }
 
     /// The same, answering the request service's settings path with `settings`.
     #[must_use]
-    pub fn with_seerr(mut self, settings: &'static str) -> Self {
+    pub fn with_requests(mut self, settings: &'static str) -> Self {
         self.seerr = Some(settings);
         self
     }
 
     /// The same, but withholding the Servarr key from every path but Prowlarr's.
     #[must_use]
-    pub fn only_for_prowlarr(mut self) -> Self {
+    pub fn only_for_aggregator(mut self) -> Self {
         self.only_prowlarr = true;
         self
     }

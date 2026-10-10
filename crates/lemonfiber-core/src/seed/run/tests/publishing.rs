@@ -1,14 +1,14 @@
-//! Handing each service's key and the *arrs to the services that read them.
+//! Handing each service's key and the curators to the services that read them.
 
 use super::*;
 
-/// The request service is handed the \*arrs, read from the \*arrs themselves.
+/// The request service is handed the curators, read from the curators themselves.
 ///
 /// Everything the request service needs to fetch through one — where it is, what
-/// to authenticate with, which profile and which folder — comes off the \*arr
+/// to authenticate with, which profile and which folder — comes off the curator
 /// rather than being assumed here.
 #[tokio::test]
-async fn the_arrs_in_the_stack_are_handed_to_the_request_service() {
+async fn the_curators_in_the_stack_are_handed_to_the_request_service() {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let http = Fake::by_path_in_turn(vec![
         (
@@ -35,8 +35,8 @@ async fn the_arrs_in_the_stack_are_handed_to_the_request_service() {
 
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
-        &[curator("sonarr", 8989, "tv"), seerr_svc()],
-        &fillers_of(vec![curator("sonarr", 8989, "tv"), seerr_svc()]),
+        &[curator("sonarr", 8989, "tv"), requests_svc()],
+        &fillers_of(vec![curator("sonarr", 8989, "tv"), requests_svc()]),
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
     )
     .await;
@@ -111,7 +111,7 @@ async fn each_services_key_is_published_where_the_stack_reads_it() {
 }
 
 /// The listening server, whose key is one lemonfiber makes an account for.
-pub(super) fn audiobookshelf_svc() -> lemonfiber_manifest::Service {
+pub(super) fn listening_server_svc() -> lemonfiber_manifest::Service {
     manifest_service(
         "audiobookshelf",
         Some(lemonfiber_manifest::Api {
@@ -128,11 +128,11 @@ pub(super) fn audiobookshelf_svc() -> lemonfiber_manifest::Service {
 fn every_keyed_service() -> Vec<lemonfiber_manifest::Service> {
     vec![
         curator("sonarr", 8989, "tv"),
-        prowlarr(),
-        bazarr_svc(),
-        seerr_with_settings(),
-        jellyfin_svc(),
-        audiobookshelf_svc(),
+        aggregator_svc(),
+        subtitle_finder_svc(),
+        requests_with_settings(),
+        media_server_svc(),
+        listening_server_svc(),
         manifest_service(
             "qbittorrent",
             Some(lemonfiber_manifest::Api {
@@ -146,12 +146,12 @@ fn every_keyed_service() -> Vec<lemonfiber_manifest::Service> {
     ]
 }
 
-/// Every key a service wrote down is published, even where no \*arr list holds it.
+/// Every key a service wrote down is published, even where no curator list holds it.
 ///
-/// The media-filing \*arrs are the right set for root folders and download clients and
-/// the wrong one here: Prowlarr manages no media and so declares no media types, and
-/// the subtitle finder is not Servarr-shaped at all, and both have a key. qBittorrent
-/// is reached by name and password rather than by key, and half a credential
+/// The media-filing curators are the right set for root folders and download clients and
+/// the wrong one here: the indexer aggregator manages no media and so declares no media
+/// types, and the subtitle finder is not curator-shaped at all, and both have a key. The
+/// torrent client is reached by name and password rather than by key, and half a credential
 /// authenticates as badly as none.
 ///
 /// **What nothing reads is retired on the way.** The media server's key
@@ -166,12 +166,12 @@ async fn every_service_with_a_key_is_published_not_only_the_ones_that_file_media
     // for the dashboard is in the file, to be retired.
     let _ = store::set(
         &env,
-        crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         "minted-earlier",
     );
     let _ = store::set(
         &env,
-        crate::config::AUDIOBOOKSHELF_PASSWORD_KEY,
+        crate::config::LISTENING_SERVER_PASSWORD_KEY,
         "minted-earlier",
     );
     let _ = store::set(&env, "JELLYFIN_API_KEY", "jellyfin-key");
@@ -194,8 +194,8 @@ async fn every_service_with_a_key_is_published_not_only_the_ones_that_file_media
         .with_http(http.clone())
         .with_filesystem(Arc::new(
             SeedFs::keyed(Some(KEYED), None)
-                .with_bazarr(FINDER_CONFIG)
-                .with_seerr(r#"{"main":{"apiKey":"request-key"}}"#),
+                .with_subtitle_finder(FINDER_CONFIG)
+                .with_requests(r#"{"main":{"apiKey":"request-key"}}"#),
         ));
 
     let services = every_keyed_service();
@@ -209,7 +209,7 @@ async fn every_service_with_a_key_is_published_not_only_the_ones_that_file_media
         &Held::from(std::collections::BTreeMap::from([(
             "qbittorrent".to_owned(),
             Credential::UserPass {
-                username: crate::config::QBITTORRENT_USER.to_owned(),
+                username: crate::config::TORRENT_USER.to_owned(),
                 password: "minted-earlier".to_owned(),
             },
         )])),
@@ -259,7 +259,7 @@ async fn a_key_that_would_not_be_revoked_is_not_forgotten() {
     let env = recorded_admin("unrevoked");
     let _ = store::set(
         &env,
-        crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         "minted-earlier",
     );
     let _ = store::set(&env, "JELLYFIN_API_KEY", "jellyfin-key");
@@ -276,8 +276,8 @@ async fn a_key_that_would_not_be_revoked_is_not_forgotten() {
 
     let _ = super::super::published::publish_keys(
         &ctx,
-        &[jellyfin_svc()],
-        &super::fillers_of(vec![jellyfin_svc()]),
+        &[media_server_svc()],
+        &super::fillers_of(vec![media_server_svc()]),
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
         &Held::default(),
     )
@@ -344,8 +344,8 @@ async fn a_rehearsed_publish_names_the_settings_and_none_of_the_keys() {
 
     let wiring = super::super::published::publish_keys(
         &ctx,
-        &[curator("sonarr", 8989, "tv"), audiobookshelf_svc()],
-        &super::fillers_of(vec![curator("sonarr", 8989, "tv"), audiobookshelf_svc()]),
+        &[curator("sonarr", 8989, "tv"), listening_server_svc()],
+        &super::fillers_of(vec![curator("sonarr", 8989, "tv"), listening_server_svc()]),
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
         &Held::default(),
     )
@@ -382,9 +382,9 @@ async fn a_rehearsed_publish_names_the_settings_and_none_of_the_keys() {
 async fn a_service_whose_entry_names_no_file_publishes_no_key() {
     let env = recorded_admin("no-file-named");
     let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone())).with_filesystem(Arc::new(
-        SeedFs::keyed(None, None).with_seerr(r#"{"main":{"apiKey":"unreachable"}}"#),
+        SeedFs::keyed(None, None).with_requests(r#"{"main":{"apiKey":"unreachable"}}"#),
     ));
-    let mut pathless = seerr_with_settings();
+    let mut pathless = requests_with_settings();
     pathless.api = Some(lemonfiber_manifest::Api {
         kind: lemonfiber_manifest::ApiKind::Seerr,
         key_source: lemonfiber_manifest::KeySource::ApiSettings,

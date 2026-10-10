@@ -80,7 +80,7 @@ impl State {
     /// stopped itself. A crash-looping service does have something to stop, and
     /// is the case that most wants stopping. `HostManaged` has something running
     /// too, but it is the operating system's and not lemonfiber's — which is the
-    /// whole of what leaving a native Jellyfin alone comes to.
+    /// whole of what leaving a native media server alone comes to.
     #[must_use]
     pub(crate) const fn stoppable(self) -> bool {
         !matches!(

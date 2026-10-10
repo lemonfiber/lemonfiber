@@ -5,14 +5,14 @@
 //! domain knowledge to do by hand. But the operator's actual question is small:
 //! *how good should this look, and how much disk am I willing to spend?*
 //!
-//! This module is that question as four presets, each stating in plain terms what
-//! it means and what it costs — an approximate size per hour and whether a typical
-//! client will have to transcode it, because that is what the choice actually buys.
-//! Carrying a preset out is a separate concern: the presets are a friendly surface
-//! over the community-maintained profiles ([TRaSH](https://trash-guides.info) via
-//! Recyclarr), so the hard part stays maintained upstream and this only translates
-//! the question. Nothing here reaches a service or a disk; it is the pure model the
-//! surface and the Recyclarr writer are built on.
+//! This module is that question as four presets, each stating in plain terms what it means
+//! and what it costs — an approximate size per hour and whether a typical client will have
+//! to transcode it, because that is what the choice actually buys. Carrying a preset out is
+//! a separate concern: the presets are a friendly surface over the community-maintained
+//! profiles ([TRaSH](https://trash-guides.info) via the quality sync tool), so the hard
+//! part stays maintained upstream and this only translates the question. Nothing here
+//! reaches a service or a disk; it is the pure model the surface and the quality sync
+//! writer are built on.
 
 pub(crate) mod run;
 

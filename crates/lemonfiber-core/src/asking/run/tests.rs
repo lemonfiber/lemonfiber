@@ -15,7 +15,7 @@ const FIVE_A_WEEK: Quota = Quota {
     days: 7,
 };
 
-/// A Servarr config that opens a target, carrying a readable key.
+/// A curator config that opens a target, carrying a readable key.
 const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
 
 /// The two accounts the media server holds — one ordinary, one nobody by that
@@ -137,13 +137,13 @@ fn answering(tag: &str, broken: Vec<(Option<Method>, &'static str, Answer)>) -> 
         .build()
         .with_filesystem(Arc::new(
             SeedFs::keyed(Some(KEYED), None)
-                .with_seerr(lemonfiber_fixtures::support::SEERR_SETTINGS),
+                .with_requests(lemonfiber_fixtures::support::SEERR_SETTINGS),
         ))
         .with_http(transport);
     context.settings.env_file = Some(dir.join(".env"));
     let _ = crate::app::targets::record_secret(
         &context,
-        crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         &a_password(),
     );
     context

@@ -18,14 +18,14 @@ use crate::ports::filesystem::Confined;
 use crate::quality::Selection;
 use crate::stack::{Failure, Source};
 
-/// The stack file the quality choice is carried into: Recyclarr's config, whose
+/// The stack file the quality choice is carried into: the quality sync tool's config, whose
 /// `include:` template lists a preset rewrites.
 ///
 /// Matched against a file's key, which is its embedded path — baked with forward
 /// slashes on every platform by the stack embedding, the same separator the
 /// materialised record keys already use. It would need revisiting only if the
 /// stack ever came from a real filesystem walk on a back-slash OS.
-const RECYCLARR_CONFIG: &str = "config/recyclarr/recyclarr.yml";
+const QUALITY_SYNC_CONFIG: &str = "config/recyclarr/recyclarr.yml";
 
 /// Write the stack under `into`, preserving any file the operator has edited, and
 /// return where it lives and which files were left as they set them.
@@ -37,10 +37,10 @@ const RECYCLARR_CONFIG: &str = "config/recyclarr/recyclarr.yml";
 /// record of what was written is updated for the next run.
 ///
 /// When a `selection` is given, it is carried into the stack as it is written: the
-/// Recyclarr config's template lists are rewritten to the chosen preset, so what
+/// quality sync config's template lists are rewritten to the chosen preset, so what
 /// lemonfiber materialises already reflects the choice. The default selection
 /// rewrites the shipped config to itself, so an unconfigured stack is untouched.
-/// With no selection — a teardown, a restart, a rehearsal — the Recyclarr config
+/// With no selection — a teardown, a restart, a rehearsal — the quality sync config
 /// is left exactly as it is on disk rather than being written back to the shipped
 /// default, so an already-applied preset is never reverted by a command that has
 /// no business changing it.
@@ -206,9 +206,9 @@ fn write_stack(
         }
         let content = match selection {
             Some(selection) => carrying_the_choice(&key, content, selection),
-            // No choice to carry, and the Recyclarr config left as it is rather than
+            // No choice to carry, and the quality sync config left as it is rather than
             // written back to the shipped default — which would revert a preset.
-            None if key == RECYCLARR_CONFIG => continue,
+            None if key == QUALITY_SYNC_CONFIG => continue,
             None => Cow::Borrowed(content),
         };
         let target = into.join(&relative);
@@ -289,12 +289,12 @@ fn carrying_regions<'a>(content: Cow<'a, [u8]>, on_disk: Option<&[u8]>) -> Cow<'
 }
 
 /// The content lemonfiber intends for a stack file, given the quality choice: the
-/// Recyclarr config with its template lists rewritten to the preset, every other
+/// quality sync config with its template lists rewritten to the preset, every other
 /// file exactly as it ships. The rewrite is what makes the choice take effect on
 /// the next stack write, and the default selection returns the shipped config
 /// unchanged, so a stack no one has chosen a preset for is materialised as before.
 fn carrying_the_choice<'a>(key: &str, content: &'a [u8], selection: &Selection) -> Cow<'a, [u8]> {
-    if key == RECYCLARR_CONFIG {
+    if key == QUALITY_SYNC_CONFIG {
         let rewritten = crate::recyclarr::rewrite(&String::from_utf8_lossy(content), selection);
         Cow::Owned(rewritten.into_bytes())
     } else {
@@ -302,14 +302,14 @@ fn carrying_the_choice<'a>(key: &str, content: &'a [u8], selection: &Selection) 
     }
 }
 
-/// Whether the materialised Recyclarr config has been hand-edited since lemonfiber
+/// Whether the materialised quality sync config has been hand-edited since lemonfiber
 /// last wrote it — the `customised` state, in which a preset is no longer
 /// authoritative because the operator has tuned the config by hand.
 ///
 /// False where there is nothing to judge against: no record of what lemonfiber
 /// wrote, or no config on disk. It is the same comparison [`decide`] makes — on-disk
 /// against the record — read without writing anything.
-pub(crate) fn recyclarr_customised(
+pub(crate) fn quality_sync_customised(
     confined: &dyn Confined,
     into: Option<&Path>,
     record_path: Option<&Path>,
@@ -317,11 +317,11 @@ pub(crate) fn recyclarr_customised(
     let Some(into) = into else {
         return false;
     };
-    let Some(recorded) = load(record_path).checksum(RECYCLARR_CONFIG) else {
+    let Some(recorded) = load(record_path).checksum(QUALITY_SYNC_CONFIG) else {
         return false;
     };
-    let within = held_beneath(into, Path::new(RECYCLARR_CONFIG));
-    on_disk(confined, &into.join(RECYCLARR_CONFIG), &within)
+    let within = held_beneath(into, Path::new(QUALITY_SYNC_CONFIG));
+    on_disk(confined, &into.join(QUALITY_SYNC_CONFIG), &within)
         .is_some_and(|bytes| checksum(&bytes) != recorded)
 }
 
@@ -335,7 +335,7 @@ fn on_disk(confined: &dyn Confined, target: &Path, within: &Path) -> Option<Vec<
         .map(String::into_bytes)
 }
 
-/// Re-assert the recorded preset over the Recyclarr config, overwriting a hand-edit
+/// Re-assert the recorded preset over the quality sync config, overwriting a hand-edit
 /// where an ordinary run would have preserved it — the operator's explicit consent
 /// to let the preset win. Records the new content so it is recognised as lemonfiber's
 /// own again.
@@ -354,7 +354,7 @@ fn on_disk(confined: &dyn Confined, target: &Path, within: &Path) -> Option<Vec<
 /// # Errors
 ///
 /// Returns [`Failure`] when there is nowhere to write, or the config cannot be written.
-pub(crate) fn reapply_recyclarr(
+pub(crate) fn reapply_preset(
     confined: &dyn Confined,
     source: Source,
     into: Option<&Path>,
@@ -366,11 +366,11 @@ pub(crate) fn reapply_recyclarr(
     // The one command whose whole purpose is to overwrite an operator's edit, held by
     // the one declaration whose whole purpose is to stop that. Answered as "nothing was
     // replaced", which is true: the config is theirs and stays exactly as it is.
-    if crate::unmanaged::covers(unmanaged, RECYCLARR_CONFIG) {
+    if crate::unmanaged::covers(unmanaged, QUALITY_SYNC_CONFIG) {
         return Ok(None);
     }
-    let Some(shipped) = shipped_recyclarr(source) else {
-        // External, or a stack with no Recyclarr config: nothing lemonfiber manages.
+    let Some(shipped) = shipped_quality_sync(source) else {
+        // External, or a stack with no quality sync config: nothing lemonfiber manages.
         // This is also the guard that keeps an external stack safe — `into` is the
         // built-in stack directory, not where an external stack lives, so writing
         // there would be wrong. An external source has no embedded files, so it
@@ -380,37 +380,37 @@ pub(crate) fn reapply_recyclarr(
     let Some(into) = into else {
         return Err(Failure::NowhereToWrite);
     };
-    let target = into.join(RECYCLARR_CONFIG);
-    let within = held_beneath(into, Path::new(RECYCLARR_CONFIG));
+    let target = into.join(QUALITY_SYNC_CONFIG);
+    let within = held_beneath(into, Path::new(QUALITY_SYNC_CONFIG));
     let desired = crate::recyclarr::rewrite(&String::from_utf8_lossy(shipped), selection);
 
-    // Read before the write, and read once. The same comparison `recyclarr_customised`
+    // Read before the write, and read once. The same comparison `quality_sync_customised`
     // makes — a record of what lemonfiber wrote, and a file on disk that no longer
     // matches it — but holding the content rather than the verdict, because what is
     // about to be overwritten cannot be read back afterwards.
-    let recorded = load(record_path).checksum(RECYCLARR_CONFIG);
+    let recorded = load(record_path).checksum(QUALITY_SYNC_CONFIG);
     let theirs = on_disk(confined, &target, &within)
         .filter(|bytes| recorded.is_some_and(|was| was != checksum(bytes)));
 
     if !rehearse {
         write(confined, (&target, &within), desired.as_bytes())?;
         let mut record = load(record_path);
-        record.record(RECYCLARR_CONFIG, checksum(desired.as_bytes()));
+        record.record(QUALITY_SYNC_CONFIG, checksum(desired.as_bytes()));
         save(record_path, &record);
     }
     Ok(theirs.map(|yours| StackEdit {
-        path: RECYCLARR_CONFIG.to_owned(),
+        path: QUALITY_SYNC_CONFIG.to_owned(),
         diff: diff(&String::from_utf8_lossy(&yours), &desired),
     }))
 }
 
-/// The Recyclarr config this stack ships, or `None` for a stack that has none — an
+/// The quality sync config this stack ships, or `None` for a stack that has none — an
 /// external stack lemonfiber does not write, or one without the file.
-fn shipped_recyclarr(source: Source) -> Option<&'static [u8]> {
+fn shipped_quality_sync(source: Source) -> Option<&'static [u8]> {
     source
         .files()
         .into_iter()
-        .find(|(relative, _)| relative.to_string_lossy() == RECYCLARR_CONFIG)
+        .find(|(relative, _)| relative.to_string_lossy() == QUALITY_SYNC_CONFIG)
         .map(|(_, content)| content)
 }
 

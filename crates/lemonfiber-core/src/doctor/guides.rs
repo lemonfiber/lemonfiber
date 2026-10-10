@@ -1,6 +1,6 @@
 //! Proving the quality guide source can be reached, so a stale sync is noticed.
 //!
-//! Recyclarr keeps quality profiles current by syncing community guides from an
+//! The quality sync tool keeps quality profiles current by syncing community guides from an
 //! upstream source on a schedule. When that source cannot be reached the sync
 //! brings nothing, but the profiles already in place stay exactly as they are —
 //! nothing falls back to unconfigured. This check reports when that currency
@@ -9,7 +9,7 @@
 //!
 //! It probes the source's reachability from here, which only ever establishes one
 //! thing honestly: that a clean answer came back now. That is a proxy — not proof
-//! — for whether Recyclarr's own scheduled sync reached it (a different host, a
+//! — for whether the sync tool's own scheduled sync reached it (a different host, a
 //! git fetch rather than this page, a different moment). So the check makes exactly
 //! two claims: reachable (a pass), or could-not-confirm (unverified). It never
 //! asserts the stack is degraded from a probe that cannot see the sync itself —

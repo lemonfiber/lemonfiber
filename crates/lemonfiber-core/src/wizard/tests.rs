@@ -18,7 +18,7 @@ fn on_native_linux() -> Wizard {
 }
 
 /// A wizard on a platform where the container user is not asked (macOS maps
-/// ownership away) but native Jellyfin is offered.
+/// ownership away) but a native media server is offered.
 fn on_macos() -> Wizard {
     Wizard::new(Environment::MacOs)
 }
@@ -38,7 +38,7 @@ fn answer_all(wizard: &mut Wizard) {
         .answer(Answer::ServiceUser(Some((1000, 1001))))
         .unwrap_or(());
     wizard
-        .answer(Answer::Library(Library::JellyfinDocker))
+        .answer(Answer::Library(Library::Docker))
         .unwrap_or(());
     wizard.answer(Answer::Household(true)).unwrap_or(());
     wizard

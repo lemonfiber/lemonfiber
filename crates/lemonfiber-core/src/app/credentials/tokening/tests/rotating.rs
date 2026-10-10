@@ -15,7 +15,7 @@ async fn a_third_party_request_service_is_never_handed_a_token() {
     );
     let line = named(
         &held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at)).await,
-        SONARR,
+        CURATOR_LINE,
     );
     let without_requests: Vec<_> = stack(true)
         .into_iter()
@@ -48,7 +48,7 @@ async fn a_third_party_request_service_is_never_handed_a_token() {
     assert_eq!(http.requests().len(), asked_before);
 }
 
-/// A stack directory whose gate accepts `held` on Sonarr's route, and a context over
+/// A stack directory whose gate accepts `held` on the curator's route, and a context over
 /// `http` reaching a first-party plugin's request service speaking `request.intake` in
 /// place of the stack's own, holding its key where `keyed`; with the stack's services and
 /// what its asks come to.
@@ -98,10 +98,10 @@ fn beside_contracted_requests(
     (ctx, at, services, fillers)
 }
 
-/// Sonarr's token's line, as the inventory reads it.
-fn sonarr_line() -> Held {
+/// The curator's token's line, as the inventory reads it.
+fn curator_line() -> Held {
     Held {
-        name: SONARR.to_owned(),
+        name: CURATOR_LINE.to_owned(),
         setting: "request-gate/tokens.json#sonarr".to_owned(),
         consumers: Vec::new(),
         location: String::new(),
@@ -133,7 +133,7 @@ async fn a_first_party_request_service_is_handed_a_token_over_the_contract() {
     let (ctx, at, services, fillers) =
         beside_contracted_requests("tokens-first-party", true, &http);
 
-    let rotation = rotate(&ctx, &sonarr_line(), &services, &fillers, Some(&at)).await;
+    let rotation = rotate(&ctx, &curator_line(), &services, &fillers, Some(&at)).await;
 
     assert!(
         matches!(rotation.settled, Settled::Replaced { .. }),
@@ -168,7 +168,7 @@ async fn a_request_service_that_cannot_be_asked_over_the_contract_is_handed_noth
     let (ctx, at, services, fillers) = beside_contracted_requests("tokens-unasked", false, &http);
 
     let lines = held(&ctx, &services, &fillers, Some(&at)).await;
-    let rotation = rotate(&ctx, &sonarr_line(), &services, &fillers, Some(&at)).await;
+    let rotation = rotate(&ctx, &curator_line(), &services, &fillers, Some(&at)).await;
 
     assert!(lines.is_empty(), "{lines:?}");
     assert!(
@@ -180,7 +180,7 @@ async fn a_request_service_that_cannot_be_asked_over_the_contract_is_handed_noth
 }
 
 #[tokio::test]
-async fn an_arr_token_is_replaced_once_the_request_service_proves_it() {
+async fn a_curator_token_is_replaced_once_the_request_service_proves_it() {
     let http = serving("held", "linked", 200, &[200], 200);
     let (ctx, at) = scene(
         "tokens-rotate-arr",
@@ -191,7 +191,7 @@ async fn an_arr_token_is_replaced_once_the_request_service_proves_it() {
     );
     let line = named(
         &held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at)).await,
-        SONARR,
+        CURATOR_LINE,
     );
 
     let rotation = crate::app::credentials::rotating::rotate(
@@ -223,7 +223,7 @@ async fn an_arr_token_is_replaced_once_the_request_service_proves_it() {
 }
 
 #[tokio::test]
-async fn an_arr_token_the_request_service_cannot_prove_is_taken_back() {
+async fn a_curator_token_the_request_service_cannot_prove_is_taken_back() {
     let http = serving("held", "linked", 200, &[500], 200);
     let (ctx, at) = scene(
         "tokens-rotate-unproven",
@@ -234,7 +234,7 @@ async fn an_arr_token_the_request_service_cannot_prove_is_taken_back() {
     );
     let line = named(
         &held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at)).await,
-        SONARR,
+        CURATOR_LINE,
     );
 
     let rotation = rotate(
@@ -267,7 +267,7 @@ async fn an_arr_token_the_request_service_cannot_prove_is_taken_back() {
 }
 
 #[tokio::test]
-async fn the_jellyfin_token_is_replaced_once_the_request_service_keeps_it() {
+async fn the_media_server_token_is_replaced_once_the_request_service_keeps_it() {
     let http = serving("held", "linked", 200, &[200], 200);
     let (ctx, at) = scene(
         "tokens-rotate-jellyfin",
@@ -278,7 +278,7 @@ async fn the_jellyfin_token_is_replaced_once_the_request_service_keeps_it() {
     );
     let line = named(
         &held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at)).await,
-        JELLYFIN,
+        MEDIA_SERVER_LINE,
     );
 
     let rotation = rotate(
@@ -328,7 +328,7 @@ async fn a_rotation_that_cannot_start_changes_nothing() {
     );
     let line = named(
         &held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at)).await,
-        SONARR,
+        CURATOR_LINE,
     );
 
     let unrandom = rotate(
@@ -411,7 +411,7 @@ async fn a_rotation_the_service_or_the_file_stops_is_unproven() {
         };
         let (ctx, at) = scene(name, true, &accepting(&["held"], &[]), http, true);
         let line = Held {
-            name: SONARR.to_owned(),
+            name: CURATOR_LINE.to_owned(),
             setting: "request-gate/tokens.json#sonarr".to_owned(),
             consumers: Vec::new(),
             location: String::new(),
@@ -470,7 +470,7 @@ async fn an_old_token_the_gate_cannot_be_told_to_drop_is_said() {
     ]));
     let line = named(
         &held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at)).await,
-        SONARR,
+        CURATOR_LINE,
     );
 
     let rotation = rotate(
@@ -504,7 +504,7 @@ async fn a_request_service_that_stops_answering_mid_rotation_changes_nothing() {
         true,
     );
     let line = Held {
-        name: SONARR.to_owned(),
+        name: CURATOR_LINE.to_owned(),
         setting: "request-gate/tokens.json#sonarr".to_owned(),
         consumers: Vec::new(),
         location: String::new(),

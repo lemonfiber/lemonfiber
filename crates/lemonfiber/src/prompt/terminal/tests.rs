@@ -294,16 +294,10 @@ fn a_provider_takes_the_standard_port_and_tls_unless_told_otherwise() {
 
 #[test]
 fn the_library_choice_offers_the_native_option_only_where_it_applies() {
-    assert!(matches!(
-        answered(&["1"]).library(),
-        Library::JellyfinDocker
-    ));
+    assert!(matches!(answered(&["1"]).library(), Library::Docker));
     assert!(matches!(answered(&["3"]).library(), Library::None));
     // macOS offers a native media server, so choosing it is possible.
-    assert!(matches!(
-        answered(&["2"]).library(),
-        Library::JellyfinNative
-    ));
+    assert!(matches!(answered(&["2"]).library(), Library::Native));
     // Where it is not offered, the same answer falls back rather than taking a
     // choice this platform never showed.
     let linux = Terminal::answered_by(
@@ -311,7 +305,7 @@ fn the_library_choice_offers_the_native_option_only_where_it_applies() {
         PathBuf::from("/srv/media"),
         Box::new(Script::of(&["2"])),
     );
-    assert!(matches!(linux.library(), Library::JellyfinDocker));
+    assert!(matches!(linux.library(), Library::Docker));
 }
 
 #[test]

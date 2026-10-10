@@ -56,8 +56,8 @@ pub const EVERY: &[Beside] = &[
         what: "a media server you installed natively",
         why: "Running the media server outside a container is something you chose and set \
               up yourself, so nothing here knows what it was told or what it wrote.",
-        by_hand: jellyfin_by_hand,
-        at: jellyfin_at,
+        by_hand: media_server_by_hand,
+        at: media_server_at,
     },
     Beside {
         what: "a tunnel client such as Tailscale",
@@ -104,7 +104,7 @@ const fn docker_at(environment: Environment) -> Option<&'static str> {
 }
 
 /// How a natively-installed media server comes off, per platform.
-const fn jellyfin_by_hand(environment: Environment) -> &'static str {
+const fn media_server_by_hand(environment: Environment) -> &'static str {
     match environment {
         Environment::MacOs => {
             "Quit Jellyfin, drag it from Applications to the Bin, and remove \
@@ -123,7 +123,7 @@ const fn jellyfin_by_hand(environment: Environment) -> &'static str {
 }
 
 /// Where a natively-installed media server sits, per platform.
-const fn jellyfin_at(environment: Environment) -> Option<&'static str> {
+const fn media_server_at(environment: Environment) -> Option<&'static str> {
     match environment {
         Environment::MacOs => Some("/Applications/Jellyfin.app"),
         Environment::LinuxNative | Environment::LinuxDesktop => Some("/var/lib/jellyfin"),

@@ -24,7 +24,7 @@ use crate::space::{
 };
 
 use crate::app::targets::{
-    committed_bytes, download_targets, host_fillers, project_directory, servarr_targets,
+    committed_bytes, curator_targets, download_targets, host_fillers, project_directory,
     torrent_client,
 };
 use crate::app::Ctx;
@@ -280,7 +280,7 @@ async fn queued(
     services: &[lemonfiber_manifest::Service],
     project: Option<&Path>,
 ) -> (BTreeSet<String>, Vec<Stalled>) {
-    let targets = servarr_targets(services, project);
+    let targets = curator_targets(services, project);
     let read = futures_util::future::join_all(targets.iter().map(|target| async move {
         let service = target
             .open(&ctx.seams.http, ctx.seams.filesystem.as_ref())

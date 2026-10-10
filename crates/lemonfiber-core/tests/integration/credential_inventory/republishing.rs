@@ -6,8 +6,8 @@ use lemonfiber_core::app::Asking;
 use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::http::{Answer, Fake};
 
-/// A Servarr status body, as a healthy service answers `system/status` with.
-const PROWLARR_STATUS: &str = r#"{"instanceName":"Prowlarr","version":"1.32.2.4987"}"#;
+/// The aggregator's status body, as a healthy service answers `system/status` with.
+const AGGREGATOR_STATUS: &str = r#"{"instanceName":"Prowlarr","version":"1.32.2.4987"}"#;
 
 /// A service that answers to the key it holds has that key handed out again — the
 /// repair for one that regenerated it underneath a stack still serving the old copy.
@@ -17,7 +17,7 @@ async fn a_service_that_answers_to_its_own_key_has_it_handed_out_again() {
     let env = env_at("republish", &[("PROWLARR_API_KEY", &stale)]);
     let http = Fake::by_path(vec![(
         "/system/status",
-        Answer::reply(200, PROWLARR_STATUS),
+        Answer::reply(200, AGGREGATOR_STATUS),
     )]);
     let ctx = ctx(env.clone(), Files::anywhere(SERVICE_CONFIG), http);
 
@@ -142,7 +142,7 @@ async fn a_rehearsed_republish_reads_no_key_and_asks_the_service_nothing() {
     let env = env_at("rehearsed-republish", &[("PROWLARR_API_KEY", &stale)]);
     let http = Fake::by_path(vec![(
         "/system/status",
-        Answer::reply(200, PROWLARR_STATUS),
+        Answer::reply(200, AGGREGATOR_STATUS),
     )]);
     let ctx = ctx(env.clone(), Files::anywhere(SERVICE_CONFIG), http.clone()).rehearsing();
 
@@ -175,7 +175,7 @@ async fn a_key_that_cannot_be_published_is_not_called_handed_out() {
     sealed(&env);
     let http = Fake::by_path(vec![(
         "/system/status",
-        Answer::reply(200, PROWLARR_STATUS),
+        Answer::reply(200, AGGREGATOR_STATUS),
     )]);
     let ctx = ctx(env.clone(), Files::anywhere(SERVICE_CONFIG), http);
 

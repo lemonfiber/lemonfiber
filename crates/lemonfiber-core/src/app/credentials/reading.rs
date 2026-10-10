@@ -116,7 +116,7 @@ fn declared(plugin: &Installed) -> Vec<Held> {
 
 /// The reader that takes one service's own key out of the file it wrote it into.
 ///
-/// Four shapes and one question. A Servarr-shape service keeps its key in XML, the
+/// Four shapes and one question. A curator-shape service keeps its key in XML, the
 /// subtitle finder in YAML, the request service in JSON and the Usenet client in an
 /// INI — and every one of them is a file under the service's own configuration
 /// directory, named by the manifest, so the shape decides only which reader opens it.

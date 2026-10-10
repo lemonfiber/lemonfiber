@@ -26,7 +26,7 @@ fn values() -> BTreeMap<String, String> {
 }
 
 /// A recipe whose pairs carry every value of [`values`] to each destination these tests
-/// call, and whose `key` is the credential lemonfiber holds for sonarr.
+/// call, and whose `key` is the credential lemonfiber holds for `sonarr`.
 fn paired() -> Recipe {
     let pairs: String = ["komga", "plex.tv", "sonarr", "radarr"]
         .iter()

@@ -1,4 +1,4 @@
-//! The request gate's own Jellyfin key is listed, printed on a confirmed ask, and
+//! The request gate's own media server key is listed, printed on a confirmed ask, and
 //! replaced in the order that keeps a working key at every moment, all through the
 //! dispatcher.
 
@@ -15,7 +15,7 @@ use lemonfiber_fixtures::support::Reporting;
 use lemonfiber_ports::docker::{Health, Lifecycle};
 use lemonfiber_sidecar::gate::{Credential, Kind, Upstream, Upstreams};
 
-/// The gate's routes, with Jellyfin's presenting `key`.
+/// The gate's routes, with the media server's presenting `key`.
 fn routes(key: &str) -> String {
     Upstreams::of(vec![Upstream {
         route: "jellyfin".to_owned(),

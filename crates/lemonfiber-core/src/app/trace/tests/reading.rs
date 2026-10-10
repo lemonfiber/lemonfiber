@@ -2,7 +2,7 @@
 
 use super::*;
 
-/// A Jellyfin sign-in that hands back an access token, and a library that has the
+/// A media server sign-in that hands back an access token, and a library that has the
 /// traced item — the pair a media server answers when the item is finally available.
 const SIGNED_IN: &str = r#"{"AccessToken":"token"}"#;
 
@@ -11,34 +11,34 @@ const HAS_ITEM: &str = r#"{"Items":[{"Name":"The Expanse"}]}"#;
 const NO_ITEM: &str = r#"{"Items":[]}"#;
 
 /// A context whose media server the trace cannot ask — no admin password is recorded,
-/// so the library stage is simply left unanswered, as on the \*arr-only slices.
+/// so the library stage is simply left unanswered, as on the curator-only slices.
 fn ctx(library: &'static str, history: &'static str, queue: &'static str) -> Ctx {
-    ctx_with(&Fake::arr(library, history, queue))
+    ctx_with(&Fake::curator(library, history, queue))
 }
 
-/// A context that can reach its Jellyfin: the admin password is recorded under the
+/// A context that can reach its media server: the admin password is recorded under the
 /// env file, so the trace asks the media server as its administrator. Tagged so
 /// each test keeps its own env file rather than racing on a shared one.
-fn ctx_with_jellyfin(fake: &Fake, tag: &str) -> Ctx {
+fn ctx_with_media_server(fake: &Fake, tag: &str) -> Ctx {
     let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("trace-{tag}")).kept();
     let _ = std::fs::create_dir_all(&dir);
     let mut context = ctx_with(fake);
     context.settings.env_file = Some(dir.join(".env"));
     let _ = crate::app::targets::record_secret(
         &context,
-        crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         &a_password(),
     );
     context
 }
 
-/// A Jellyfin reading client over a transport, for the library-presence reads.
-fn jellyfin(fake: &Fake) -> Jellyfin {
+/// A media server reading client over a transport, for the library-presence reads.
+fn media_server(fake: &Fake) -> Jellyfin {
     Jellyfin::authenticated(
         fake.transport(),
         "http://127.0.0.1:8096",
         "jellyfin",
-        crate::config::JELLYFIN_ADMIN_USER,
+        crate::config::MEDIA_SERVER_ADMIN_USER,
         a_password(),
     )
 }
@@ -105,15 +105,15 @@ async fn tracing_passes_over_a_service_whose_library_cannot_be_read() {
 #[tokio::test]
 async fn tracing_a_matched_item_present_in_the_library_reports_available() {
     // Imported in history, and the media server confirms it is in the library: the
-    // trace runs all the way to available, on the Jellyfin stage, marked uncertain.
-    let context = ctx_with_jellyfin(
+    // trace runs all the way to available, on the media server stage, marked uncertain.
+    let context = ctx_with_media_server(
         &Fake {
             library: r#"[{"id":1,"title":"The Expanse","monitored":true}]"#,
             history: r#"{"records":[{"eventType":"downloadFolderImported","date":"2026-01-01T00:00:00Z"}]}"#,
             queue: EMPTY_QUEUE,
             episodes: NO_EPISODES,
             sign_in: SIGNED_IN,
-            jellyfin_library: HAS_ITEM,
+            media_server_library: HAS_ITEM,
             wanted: "",
             releases: "",
         },
@@ -135,13 +135,13 @@ async fn a_media_server_with_nothing_reads_as_absent() {
     // The sign-in is accepted and the library answers, holding nothing: a confirmed
     // absence, not an unknown.
     let presence = library_presence(
-        Some(&jellyfin(&Fake {
+        Some(&media_server(&Fake {
             library: "",
             history: "",
             queue: "",
             episodes: NO_EPISODES,
             sign_in: SIGNED_IN,
-            jellyfin_library: NO_ITEM,
+            media_server_library: NO_ITEM,
             wanted: "",
             releases: "",
         })),
@@ -157,7 +157,7 @@ async fn a_media_server_that_will_not_answer_leaves_presence_unknown() {
     // The sign-in comes back as something that is not a session: the read failed, so
     // presence is unknown — never inferred as absent.
     let presence = library_presence(
-        Some(&jellyfin(&Fake::arr("", "", ""))),
+        Some(&media_server(&Fake::curator("", "", ""))),
         Kind::Movies,
         "The Expanse",
     )
@@ -176,9 +176,10 @@ const STUCK_QUEUE: &str = r#"{"records":[{"trackedDownloadStatus":"warning","tra
 
 #[tokio::test]
 async fn stuck_lists_each_stuck_item_tagged_with_its_service() {
-    // Sonarr's queue holds a stuck series; Radarr's holds nothing it can name (a series
-    // record, no movie title) and Lidarr is not a traceable kind — so the one stuck
-    // item is listed, tagged with the service holding it, and the list is complete.
+    // The TV curator's queue holds a stuck series; the movie curator's holds nothing it can
+    // name (a series record, no movie title) and the music curator is not a traceable kind
+    // — so the one stuck item is listed, tagged with the service holding it, and the list
+    // is complete.
     let report = super::super::stuck(&ctx("", "", STUCK_QUEUE))
         .await
         .unwrap_or_default();
@@ -191,7 +192,7 @@ async fn stuck_lists_each_stuck_item_tagged_with_its_service() {
 
 #[tokio::test]
 async fn stuck_marks_the_list_incomplete_where_a_queue_cannot_be_read() {
-    // An \*arr whose queue will not decode is reported as leaving the list possibly
+    // A curator whose queue will not decode is reported as leaving the list possibly
     // short, rather than read as nothing stuck.
     let report = super::super::stuck(&ctx("", "", "not json"))
         .await
@@ -201,13 +202,13 @@ async fn stuck_marks_the_list_incomplete_where_a_queue_cannot_be_read() {
 }
 
 #[tokio::test]
-async fn stuck_over_arrs_that_have_not_started_finds_nothing() {
-    // No key is readable, so no \*arr opens: nothing was asked, so the list is empty
+async fn stuck_over_curators_that_have_not_started_finds_nothing() {
+    // No key is readable, so no curator opens: nothing was asked, so the list is empty
     // and complete rather than incomplete.
     let context = a_context()
         .build()
         .with_filesystem(Arc::new(SeedFs::keyed(None, None)))
-        .with_http(Fake::arr("", "", EMPTY_QUEUE).transport());
+        .with_http(Fake::curator("", "", EMPTY_QUEUE).transport());
     let report = super::super::stuck(&context).await.unwrap_or_default();
     assert!(report.items.is_empty());
     assert!(!report.incomplete);

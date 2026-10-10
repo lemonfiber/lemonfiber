@@ -112,7 +112,7 @@ impl Lines {
     ///
     /// Made plain on the way in, because most of what is shown here came from
     /// somewhere else — a release name from an indexer, a failure message from a
-    /// \*arr — and a terminal reads a control character in the middle of one as an
+    /// curator — and a terminal reads a control character in the middle of one as an
     /// instruction. One place rather than at each caller: a line that skipped it
     /// would be the one carrying the name somebody chose.
     pub(crate) fn put(&mut self, line: impl Into<String>) {

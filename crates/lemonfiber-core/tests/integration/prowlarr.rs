@@ -26,12 +26,12 @@ fn now() -> SystemTime {
 }
 
 /// A Prowlarr client over the given fake.
-fn prowlarr(fake: &Arc<Fake>) -> Prowlarr {
+fn aggregator(fake: &Arc<Fake>) -> Prowlarr {
     let http: Arc<dyn Http> = fake.clone();
     Prowlarr::new(http, "http://127.0.0.1:9696", "prowlarr-key", "prowlarr")
 }
 
-/// A wanted application of the given kind, reaching the given \*arr.
+/// A wanted application of the given kind, reaching the given curator.
 fn application(name: &str, kind: ApplicationKind, base_url: &str) -> Application {
     Application {
         name: name.to_owned(),
@@ -45,11 +45,11 @@ fn application(name: &str, kind: ApplicationKind, base_url: &str) -> Application
 #[tokio::test]
 async fn an_application_is_posted_to_its_v1_endpoint_with_the_key() {
     let fake = Fake::always(Answer::reply(201, ""));
-    let sonarr = application("Sonarr", ApplicationKind::Tv, "http://sonarr:8989");
-    assert!(prowlarr(&fake).register_application(&sonarr).await.is_ok());
+    let tv = application("Sonarr", ApplicationKind::Tv, "http://sonarr:8989");
+    assert!(aggregator(&fake).register_application(&tv).await.is_ok());
 
     let sent = fake.request();
-    // Prowlarr's API is a major behind the media *arrs': v1, not v3.
+    // Prowlarr's API is a major behind the media curators': v1, not v3.
     assert!(sent
         .as_ref()
         .is_some_and(|request| request.url.ends_with("/api/v1/applications")));
@@ -66,10 +66,10 @@ async fn an_application_is_posted_to_its_v1_endpoint_with_the_key() {
 }
 
 #[tokio::test]
-async fn a_sonarr_application_carries_its_schema_and_television_categories() {
+async fn a_television_curator_application_carries_its_schema_and_television_categories() {
     let fake = Fake::always(Answer::reply(201, ""));
-    let sonarr = application("Sonarr", ApplicationKind::Tv, "http://sonarr:8989");
-    assert!(prowlarr(&fake).register_application(&sonarr).await.is_ok());
+    let tv = application("Sonarr", ApplicationKind::Tv, "http://sonarr:8989");
+    assert!(aggregator(&fake).register_application(&tv).await.is_ok());
 
     let body = fake
         .request()
@@ -101,10 +101,13 @@ async fn a_sonarr_application_carries_its_schema_and_television_categories() {
 }
 
 #[tokio::test]
-async fn a_radarr_application_carries_its_schema_and_movie_categories() {
+async fn a_movie_curator_application_carries_its_schema_and_movie_categories() {
     let fake = Fake::always(Answer::reply(201, ""));
-    let radarr = application("Radarr", ApplicationKind::Movies, "http://radarr:7878");
-    assert!(prowlarr(&fake).register_application(&radarr).await.is_ok());
+    let movies = application("Radarr", ApplicationKind::Movies, "http://radarr:7878");
+    assert!(aggregator(&fake)
+        .register_application(&movies)
+        .await
+        .is_ok());
 
     let body = fake
         .request()
@@ -123,10 +126,10 @@ async fn a_radarr_application_carries_its_schema_and_movie_categories() {
 }
 
 #[tokio::test]
-async fn a_lidarr_application_carries_its_schema_and_music_categories() {
+async fn a_music_curator_application_carries_its_schema_and_music_categories() {
     let fake = Fake::always(Answer::reply(201, ""));
-    let lidarr = application("Lidarr", ApplicationKind::Music, "http://lidarr:8686");
-    assert!(prowlarr(&fake).register_application(&lidarr).await.is_ok());
+    let music = application("Lidarr", ApplicationKind::Music, "http://lidarr:8686");
+    assert!(aggregator(&fake).register_application(&music).await.is_ok());
 
     let body = fake
         .request()
@@ -147,9 +150,9 @@ async fn a_lidarr_application_carries_its_schema_and_music_categories() {
 #[tokio::test]
 async fn a_rejected_application_registration_is_refused() {
     let fake = Fake::always(Answer::reply(400, "unknown implementation"));
-    let sonarr = application("Sonarr", ApplicationKind::Tv, "http://sonarr:8989");
+    let tv = application("Sonarr", ApplicationKind::Tv, "http://sonarr:8989");
     assert!(matches!(
-        prowlarr(&fake).register_application(&sonarr).await,
+        aggregator(&fake).register_application(&tv).await,
         Err(Failure::Refused { .. })
     ));
 }
@@ -157,9 +160,9 @@ async fn a_rejected_application_registration_is_refused() {
 #[tokio::test]
 async fn a_registration_with_no_answer_is_unavailable() {
     let fake = Fake::always(Answer::Silent);
-    let sonarr = application("Sonarr", ApplicationKind::Tv, "http://sonarr:8989");
+    let tv = application("Sonarr", ApplicationKind::Tv, "http://sonarr:8989");
     assert!(matches!(
-        prowlarr(&fake).register_application(&sonarr).await,
+        aggregator(&fake).register_application(&tv).await,
         Err(Failure::Unavailable { .. })
     ));
 }
@@ -172,7 +175,7 @@ async fn the_applications_are_read_back_by_their_base_url() {
         200,
         r#"[{"id":3,"name":"Sonarr","fields":[{"name":"baseUrl","value":"http://sonarr:8989"},{"name":"apiKey","value":"x"}]}]"#,
     ));
-    let applications = prowlarr(&fake).applications().await;
+    let applications = aggregator(&fake).applications().await;
     assert_eq!(
         applications.ok(),
         Some(vec![RegisteredApplication {
@@ -193,7 +196,7 @@ async fn an_application_that_names_no_base_url_is_left_out_rather_than_guessed()
         200,
         r#"[{"id":3,"fields":[{"name":"baseUrl","value":"http://sonarr:8989"}]},{"id":4,"fields":[{"name":"apiKey","value":"x"}]}]"#,
     ));
-    let applications = prowlarr(&fake)
+    let applications = aggregator(&fake)
         .applications()
         .await
         .ok()
@@ -212,7 +215,7 @@ async fn an_application_that_names_no_base_url_is_left_out_rather_than_guessed()
 async fn an_unreadable_application_list_is_refused() {
     let fake = Fake::always(Answer::reply(200, "not an array"));
     assert!(matches!(
-        prowlarr(&fake).applications().await,
+        aggregator(&fake).applications().await,
         Err(Failure::Refused { .. })
     ));
 }
@@ -221,7 +224,7 @@ async fn an_unreadable_application_list_is_refused() {
 async fn an_application_listing_that_is_refused_is_unauthorised() {
     let fake = Fake::always(Answer::reply(401, ""));
     assert!(matches!(
-        prowlarr(&fake).applications().await,
+        aggregator(&fake).applications().await,
         Err(Failure::Unauthorised { .. })
     ));
 }
@@ -230,7 +233,7 @@ async fn an_application_listing_that_is_refused_is_unauthorised() {
 async fn an_application_listing_with_no_answer_is_unavailable() {
     let fake = Fake::always(Answer::Silent);
     assert!(matches!(
-        prowlarr(&fake).applications().await,
+        aggregator(&fake).applications().await,
         Err(Failure::Unavailable { .. })
     ));
 }
@@ -261,7 +264,7 @@ async fn indexer_use_is_read_from_the_aggregator_rather_than_from_the_indexers()
         Answer::reply(200, STANDINGS),
         Answer::reply(200, COUNTS),
     ]);
-    let indexers = prowlarr(&fake).indexers(now()).await.unwrap_or_default();
+    let indexers = aggregator(&fake).indexers(now()).await.unwrap_or_default();
 
     assert_eq!(
         indexers,
@@ -351,7 +354,7 @@ async fn a_recorded_cap_is_read_with_the_window_and_the_calls_it_is_counted_over
         Answer::reply(200, HOURLY_COUNTS),
         Answer::reply(200, HISTORY),
     ]);
-    let indexers = prowlarr(&fake).indexers(now()).await.unwrap_or_default();
+    let indexers = aggregator(&fake).indexers(now()).await.unwrap_or_default();
 
     assert_eq!(
         indexers.first().map(|indexer| indexer.limits),
@@ -391,7 +394,7 @@ async fn indexers_that_cannot_be_read_are_a_failure_rather_than_an_empty_list() 
     ] {
         let fake = Fake::in_turn(answers);
         assert!(matches!(
-            prowlarr(&fake).indexers(now()).await,
+            aggregator(&fake).indexers(now()).await,
             Err(Failure::Refused { .. })
         ));
     }
@@ -409,7 +412,7 @@ fn held() -> RegisteredApplication {
 }
 
 #[tokio::test]
-async fn an_application_is_tested_as_prowlarr_holds_it_with_its_key_masked() {
+async fn an_application_is_tested_as_the_aggregator_holds_it_with_its_key_masked() {
     let fake = Fake::by_rules(vec![
         (
             Some(Method::Post),
@@ -419,7 +422,7 @@ async fn an_application_is_tested_as_prowlarr_holds_it_with_its_key_masked() {
         (None, "/applications", Answer::reply(200, HELD)),
     ]);
 
-    assert!(prowlarr(&fake).test_application(&held()).await.is_ok());
+    assert!(aggregator(&fake).test_application(&held()).await.is_ok());
     let sent = fake.request();
     assert!(sent
         .as_ref()
@@ -440,7 +443,7 @@ async fn an_application_whose_stored_key_fails_its_test_is_refused() {
         (None, "/applications", Answer::reply(200, HELD)),
     ]);
 
-    assert!(prowlarr(&fake).test_application(&held()).await.is_err());
+    assert!(aggregator(&fake).test_application(&held()).await.is_err());
 }
 
 #[tokio::test]
@@ -454,7 +457,7 @@ async fn an_application_is_rekeyed_in_place_with_only_its_key_changed() {
         (None, "/applications", Answer::reply(200, HELD)),
     ]);
 
-    assert!(prowlarr(&fake)
+    assert!(aggregator(&fake)
         .rekey_application(&held(), "the-new-key")
         .await
         .is_ok());
@@ -471,10 +474,10 @@ async fn an_application_is_rekeyed_in_place_with_only_its_key_changed() {
 }
 
 #[tokio::test]
-async fn an_application_prowlarr_no_longer_lists_is_refused_by_name() {
+async fn an_application_the_aggregator_no_longer_lists_is_refused_by_name() {
     let fake = Fake::always(Answer::reply(200, "[]"));
 
-    let refused = prowlarr(&fake)
+    let refused = aggregator(&fake)
         .rekey_application(&held(), "the-new-key")
         .await;
     assert!(

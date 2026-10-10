@@ -24,17 +24,17 @@ use crate::ports::service::{ApplicationKind, Protocol};
 use crate::seed::{State, Wiring};
 use crate::wiring::{Address, Ask, Filler, Fillers};
 
-/// Usenet downloading, which a media-filing \*arr asks for.
+/// Usenet downloading, which a media-filing curator asks for.
 const USENET: &str = "download.usenet";
 
-/// Torrent downloading, which a media-filing \*arr asks for.
+/// Torrent downloading, which a media-filing curator asks for.
 const TORRENT: &str = "download.torrent";
 
 /// Curating a library, which the indexer, the request service and the subtitle finder
 /// each ask of every service that does it.
 const CURATES: &str = "library.curate";
 
-/// Searching across indexers, which the book \*arr asks of the service it pulls from.
+/// Searching across indexers, which the book curator asks of the service it pulls from.
 const SEARCHES: &str = "indexer.search";
 
 /// Television, as the stack manifest names the media a curator files.

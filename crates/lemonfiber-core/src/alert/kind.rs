@@ -1,7 +1,7 @@
 //! Which events exist, and which of them are lemonfiber's to raise.
 //!
-//! The division of labour is the whole point. Seerr already tells a household
-//! member their request was approved and that it has arrived; the \*arrs have their
+//! The division of labour is the whole point. The request service already tells a household
+//! member their request was approved and that it has arrived; the curators have their
 //! own connection systems. lemonfiber's unique contribution is the conditions
 //! **nothing else observes** — a VPN leak, hardlinks quietly degrading to copies,
 //! an item downloaded but never imported, a disk that will fill before the queue
@@ -22,10 +22,10 @@ const THEIRS: [&str; 3] = ["request", "household", "watchlist"];
 
 /// Whether this kind of event is lemonfiber's to raise at all.
 ///
-/// False for everything in a service's own domain — the request lifecycle Seerr
-/// owns end to end, and anything addressed to a household member rather than to
-/// the operator. lemonfiber does not chase a household member who has no
-/// notification target either; that is Seerr's to handle.
+/// False for everything in a service's own domain — the request lifecycle the request
+/// service owns end to end, and anything addressed to a household member rather than to the
+/// operator. lemonfiber does not chase a household member who has no notification target
+/// either; that is the request service's to handle.
 #[must_use]
 pub fn is_ours(kind: &str) -> bool {
     let domain = kind.split('.').next().unwrap_or(kind);

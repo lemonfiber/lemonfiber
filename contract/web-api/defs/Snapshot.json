@@ -39,7 +39,7 @@
       "$ref": "PanelStorage.json"
     },
     "stuck": {
-      "description": "What in the pipeline has stopped, worst first — assessed across the\ndownload clients and the \\*arrs together, because the failure that matters\nmost is invisible inside either.",
+      "description": "What in the pipeline has stopped, worst first — assessed across the\ndownload clients and the curators together, because the failure that matters\nmost is invisible inside either.",
       "type": "array",
       "items": {
         "$ref": "Stuck.json"

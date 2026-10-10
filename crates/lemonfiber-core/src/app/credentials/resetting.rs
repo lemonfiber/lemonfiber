@@ -1,17 +1,17 @@
-//! Replacing a media \*arr's own API key, and handing the new one to everything that
+//! Replacing a media curator's own API key, and handing the new one to everything that
 //! reads it.
 //!
-//! The one rotation that cannot prove before it replaces. The \*arr makes the new key
+//! The one rotation that cannot prove before it replaces. The curator makes the new key
 //! itself and drops the old one in the same moment, so the order kept everywhere else
 //! — set, prove, then record — becomes ask, read the new key back, prove it, then hand
 //! it out. A refused ask leaves the old key in force; a new key that will not answer
 //! is said as exactly that, with the command that finishes the job once it does.
 //!
-//! What reads the key is reached in the same run rather than left to the next seeding:
-//! Prowlarr's application, the subtitle finder and the request gate's route each hold
-//! a copy, and a copy left behind is one that stops working the moment the reset lands.
-//! Prowlarr's indexer aggregator keeps the republishing rotation: it files no media,
-//! and every \*arr reads its key, which is a different list of consumers.
+//! What reads the key is reached in the same run rather than left to the next seeding: The
+//! indexer aggregator's application, the subtitle finder and the request gate's route each
+//! hold a copy, and a copy left behind is one that stops working the moment the reset
+//! lands. The indexer aggregator keeps the republishing rotation: it files no media, and
+//! every curator reads its key, which is a different list of consumers.
 
 use std::path::Path;
 use std::time::Duration;
@@ -27,13 +27,13 @@ use crate::ports::service::Client as _;
 use crate::seed::run::published_as;
 use crate::seed::State;
 
-/// What a rehearsal says about replacing an \*arr's own key.
+/// What a rehearsal says about replacing a curator's own key.
 const RESETTING: &str = "a real run would ask the service to replace its own key, read the \
      new one it writes, prove the service answers to it, and only then hand it to everything \
      that reads it. Nothing was replaced and nothing was handed out.";
 
 /// How many times the configuration file is read for the new key before the reset is
-/// said not to have written one. The pinned \*arrs write it before they answer.
+/// said not to have written one. The pinned curators write it before they answer.
 const READS: u32 = 10;
 
 /// What a copy says that ended neither holding the new key nor failing in words of
@@ -43,7 +43,7 @@ const UNTAKEN: &str = "it did not take the new key; `lemonfiber seed` says why";
 /// The pause between those reads.
 const BETWEEN_READS: Duration = Duration::from_millis(500);
 
-/// The media \*arr whose key `held` is, where it is one: a Servarr-shaped service that
+/// The media curator whose key `held` is, where it is one: a curator-shaped service that
 /// files media. Nothing for every other service key, including the aggregator's.
 pub(super) fn resettable(
     held: &Held,
@@ -57,7 +57,7 @@ pub(super) fn resettable(
         .find(|target| published_as(&target.id) == held.setting)
 }
 
-/// Ask the \*arr to replace its key, prove the new one, and hand it to every copy.
+/// Ask the curator to replace its key, prove the new one, and hand it to every copy.
 pub(super) async fn rotate(
     ctx: &Ctx,
     held: &Held,
@@ -84,9 +84,9 @@ pub(super) async fn rotate(
     .await
 }
 
-/// Replace the key of the \*arr `target` is, on a run that means it: what taking a key
+/// Replace the key of the curator `target` is, on a run that means it: what taking a key
 /// back from a service that held it is, as well as what a rotation asked for is.
-pub(crate) async fn reset_arr(
+pub(crate) async fn reset_curator(
     ctx: &Ctx,
     services: &[Service],
     fillers: &crate::wiring::Fillers,
@@ -182,10 +182,11 @@ async fn written_after(
     None
 }
 
-/// Every other service holding a copy of the \*arr's key, each given the new one.
+/// Every other service holding a copy of the curator's key, each given the new one.
 ///
-/// Only the copies this stack has: no Prowlarr, no subtitle finder, or no gate in front
-/// of the request service is a consumer that is not there rather than one left behind.
+/// Only the copies this stack has: no indexer aggregator, no subtitle finder, or no gate in
+/// front of the request service is a consumer that is not there rather than one left
+/// behind.
 async fn copies(
     ctx: &Ctx,
     services: &[Service],
@@ -193,17 +194,18 @@ async fn copies(
     project: Option<&Path>,
     target: &Target,
 ) -> Vec<Propagation> {
-    let arr = target.name.as_str();
+    let curator = target.name.as_str();
     let mut copies = Vec::new();
-    for (prowlarr, state) in crate::seed::run::resync_application(ctx, fillers, &target.id).await {
+    for (aggregator, state) in crate::seed::run::resync_application(ctx, fillers, &target.id).await
+    {
         copies.push(copy(
-            format!("{prowlarr}, which supplies {arr} with indexers"),
+            format!("{aggregator}, which supplies {curator} with indexers"),
             state,
         ));
     }
-    for (bazarr, state) in crate::seed::run::rewatch(ctx, fillers, &target.id).await {
+    for (finder, state) in crate::seed::run::rewatch(ctx, fillers, &target.id).await {
         copies.push(copy(
-            format!("{bazarr}, which finds subtitles for {arr}"),
+            format!("{finder}, which finds subtitles for {curator}"),
             state,
         ));
     }
@@ -211,7 +213,7 @@ async fn copies(
         crate::seed::run::reroute(ctx, services, fillers, project, &target.id).await
     {
         copies.push(copy(
-            format!("the request gate, which reaches {arr} for the request service"),
+            format!("the request gate, which reaches {curator} for the request service"),
             state,
         ));
     }

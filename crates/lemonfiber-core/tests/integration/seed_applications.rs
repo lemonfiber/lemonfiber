@@ -1,6 +1,6 @@
-//! Registering each \\*arr as an application in Prowlarr.
+//! Registering each curator as an application in the indexer aggregator.
 //!
-//! The same shape again, matched by the base URL Prowlarr reaches the service on.
+//! The same shape again, matched by the base URL the aggregator reaches the service on.
 
 use common::service::*;
 use std::sync::Mutex;
@@ -13,15 +13,15 @@ use lemonfiber_core::ports::service::{
 };
 use lemonfiber_core::seed::{wire_applications, State};
 
-// ---- Prowlarr applications: the same driver, matched by base URL not label. ----
+// ---- Aggregator applications: the same driver, matched by base URL not label. ----
 
-/// A Prowlarr that answers the app-sync driver from a script.
-struct FakeProwlarr {
+/// An indexer aggregator that answers the app-sync driver from a script.
+struct FakeAggregator {
     mode: Mode,
     applications: Mutex<Vec<RegisteredApplication>>,
     reads: Mutex<u32>,
     next_id: Mutex<u32>,
-    /// Whether the key it stores is one the *arr no longer answers to.
+    /// Whether the key it stores is one the curator no longer answers to.
     stale: Mutex<bool>,
     /// Whether a new key it is given still fails its test.
     stays_stale: bool,
@@ -31,7 +31,7 @@ struct FakeProwlarr {
     refuses_rekey: bool,
 }
 
-impl FakeProwlarr {
+impl FakeAggregator {
     fn with(mode: Mode, applications: Vec<RegisteredApplication>) -> Self {
         Self {
             mode,
@@ -45,7 +45,7 @@ impl FakeProwlarr {
         }
     }
 
-    /// The same, holding a key the *arr has since replaced; where `stays_stale`, the
+    /// The same, holding a key the curator has since replaced; where `stays_stale`, the
     /// key it is given fails too.
     fn stale(applications: Vec<RegisteredApplication>, stays_stale: bool) -> Self {
         Self {
@@ -57,7 +57,7 @@ impl FakeProwlarr {
 }
 
 #[async_trait]
-impl AppSync for FakeProwlarr {
+impl AppSync for FakeAggregator {
     async fn register_application(&self, application: &Application) -> Result<(), Failure> {
         match self.mode {
             Mode::Down => Err(down("prowlarr")),
@@ -72,7 +72,7 @@ impl AppSync for FakeProwlarr {
                 {
                     applications.push(RegisteredApplication {
                         id: id.to_string(),
-                        // Prowlarr stores the canonical address, dropping a
+                        // The aggregator stores the canonical address, dropping a
                         // trailing slash — as its `fields` read back.
                         base_url: application.base_url.trim_end_matches('/').to_owned(),
                     });
@@ -148,9 +148,13 @@ fn app(base_url: &str) -> Application {
 
 /// Run the app-sync driver for the wanted applications, returning their states
 /// and the number of changes journalled.
-async fn seed_applications(prowlarr: FakeProwlarr, wanted: &[Application]) -> (Vec<State>, usize) {
+async fn seed_applications(
+    aggregator: FakeAggregator,
+    wanted: &[Application],
+) -> (Vec<State>, usize) {
     let mut journal = Journal::new();
-    let wirings = wire_applications(&prowlarr, "prowlarr", wanted, &mut journal, "t", false).await;
+    let wirings =
+        wire_applications(&aggregator, "prowlarr", wanted, &mut journal, "t", false).await;
     let states = wirings.into_iter().map(|wiring| wiring.state).collect();
     (states, journal.changes().len())
 }
@@ -158,7 +162,7 @@ async fn seed_applications(prowlarr: FakeProwlarr, wanted: &[Application]) -> (V
 #[tokio::test]
 async fn an_absent_application_is_registered_read_back_and_recorded() {
     let (states, recorded) = seed_applications(
-        FakeProwlarr::with(Mode::Normal, Vec::new()),
+        FakeAggregator::with(Mode::Normal, Vec::new()),
         &[app("http://sonarr:8989")],
     )
     .await;
@@ -168,8 +172,8 @@ async fn an_absent_application_is_registered_read_back_and_recorded() {
 
 #[tokio::test]
 async fn an_application_at_the_same_base_url_is_left_untouched_despite_a_different_name() {
-    // Identity is the address Prowlarr reaches, not the label: the operator
-    // renamed the application, but it points at the same *arr, so it is left
+    // Identity is the address the aggregator reaches, not the label: the operator
+    // renamed the application, but it points at the same curator, so it is left
     // alone rather than registered a second time.
     let existing = vec![RegisteredApplication {
         id: "1".to_owned(),
@@ -178,7 +182,7 @@ async fn an_application_at_the_same_base_url_is_left_untouched_despite_a_differe
     let mut renamed = app("http://sonarr:8989");
     renamed.name = "Sonarr — my own name".to_owned();
     let (states, recorded) =
-        seed_applications(FakeProwlarr::with(Mode::Normal, existing), &[renamed]).await;
+        seed_applications(FakeAggregator::with(Mode::Normal, existing), &[renamed]).await;
     assert_eq!(states, vec![State::AlreadyWired]);
     assert_eq!(
         recorded, 0,
@@ -188,7 +192,7 @@ async fn an_application_at_the_same_base_url_is_left_untouched_despite_a_differe
 
 #[tokio::test]
 async fn a_present_application_is_matched_despite_a_trailing_slash() {
-    // Idempotent across the same normalization: Prowlarr holds the canonical
+    // Idempotent across the same normalization: the aggregator holds the canonical
     // address, and a wanted one that differs only by a trailing slash is left
     // alone, not re-registered.
     let existing = vec![RegisteredApplication {
@@ -196,7 +200,7 @@ async fn a_present_application_is_matched_despite_a_trailing_slash() {
         base_url: "http://sonarr:8989".to_owned(),
     }];
     let (states, recorded) = seed_applications(
-        FakeProwlarr::with(Mode::Normal, existing),
+        FakeAggregator::with(Mode::Normal, existing),
         &[app("http://sonarr:8989/")],
     )
     .await;
@@ -205,9 +209,9 @@ async fn a_present_application_is_matched_despite_a_trailing_slash() {
 }
 
 #[tokio::test]
-async fn an_unavailable_prowlarr_skips_every_application() {
+async fn an_unavailable_aggregator_skips_every_application() {
     let (states, recorded) = seed_applications(
-        FakeProwlarr::with(Mode::Down, Vec::new()),
+        FakeAggregator::with(Mode::Down, Vec::new()),
         &[app("http://sonarr:8989"), app("http://radarr:7878")],
     )
     .await;
@@ -225,9 +229,9 @@ async fn an_unavailable_prowlarr_skips_every_application() {
 }
 
 #[tokio::test]
-async fn a_prowlarr_that_refuses_the_application_listing_fails() {
+async fn an_aggregator_that_refuses_the_application_listing_fails() {
     let (states, _) = seed_applications(
-        FakeProwlarr::with(Mode::RefusesList, Vec::new()),
+        FakeAggregator::with(Mode::RefusesList, Vec::new()),
         &[app("http://sonarr:8989")],
     )
     .await;
@@ -238,9 +242,9 @@ async fn a_prowlarr_that_refuses_the_application_listing_fails() {
 }
 
 #[tokio::test]
-async fn a_rejected_application_registration_fails_with_prowlarrs_own_words() {
+async fn a_rejected_application_registration_fails_with_the_aggregators_own_words() {
     let (states, recorded) = seed_applications(
-        FakeProwlarr::with(Mode::RejectsRegister, Vec::new()),
+        FakeAggregator::with(Mode::RejectsRegister, Vec::new()),
         &[app("http://sonarr:8989")],
     )
     .await;
@@ -259,7 +263,7 @@ async fn a_rejected_application_registration_fails_with_prowlarrs_own_words() {
 async fn an_application_write_that_does_not_appear_when_read_back_is_a_failure() {
     // Accepted but not reported back, so it did not land — not done, not recorded.
     let (states, recorded) = seed_applications(
-        FakeProwlarr::with(Mode::Swallows, Vec::new()),
+        FakeAggregator::with(Mode::Swallows, Vec::new()),
         &[app("http://sonarr:8989")],
     )
     .await;
@@ -271,11 +275,11 @@ async fn an_application_write_that_does_not_appear_when_read_back_is_a_failure()
 }
 
 #[tokio::test]
-async fn a_prowlarr_that_stops_answering_after_the_write_is_skipped() {
+async fn an_aggregator_that_stops_answering_after_the_write_is_skipped() {
     // The write went out but could not be confirmed, so it is left for a later
     // run to reconcile rather than declared wired.
     let (states, recorded) = seed_applications(
-        FakeProwlarr::with(Mode::DropsAfterRegister, Vec::new()),
+        FakeAggregator::with(Mode::DropsAfterRegister, Vec::new()),
         &[app("http://sonarr:8989")],
     )
     .await;
@@ -286,32 +290,35 @@ async fn a_prowlarr_that_stops_answering_after_the_write_is_skipped() {
     assert_eq!(recorded, 0, "an unconfirmed write is not recorded as done");
 }
 
-/// Run the same driver as a rehearsal: the same pass over the same Prowlarr, with the
+/// Run the same driver as a rehearsal: the same pass over the same aggregator, with the
 /// registering left out. The journal is handed back for the half that matters most —
 /// a rehearsal that recorded a change would leave the next `undo` offering to reverse
 /// something nobody made.
-async fn would_register(prowlarr: &FakeProwlarr, wanted: &[Application]) -> (Vec<State>, usize) {
+async fn would_register(
+    aggregator: &FakeAggregator,
+    wanted: &[Application],
+) -> (Vec<State>, usize) {
     let mut journal = Journal::new();
-    let wirings = wire_applications(prowlarr, "prowlarr", wanted, &mut journal, "t", true).await;
+    let wirings = wire_applications(aggregator, "prowlarr", wanted, &mut journal, "t", true).await;
     (
         wirings.into_iter().map(|wiring| wiring.state).collect(),
         journal.changes().len(),
     )
 }
 
-/// A rehearsal names the address it would register the \*arr at, and registers none.
+/// A rehearsal names the address it would register the curator at, and registers none.
 ///
 /// The address is what identity is decided by here, so it is also the whole of what an
 /// operator can check: a report saying only that an application would be added leaves
-/// them unable to tell a correct pass from one about to point Prowlarr at a container
-/// that is not there. Read back off Prowlarr afterwards rather than believed from the
+/// them unable to tell a correct pass from one about to point the aggregator at a container
+/// that is not there. Read back off the aggregator afterwards rather than believed from the
 /// state, because reporting `WouldWire` while still writing would look right in the
 /// first assertion and be the defect this flag exists to prevent.
 #[tokio::test]
 async fn a_rehearsed_pass_names_the_address_it_would_register_and_registers_none() {
-    let prowlarr = FakeProwlarr::with(Mode::Normal, Vec::new());
+    let aggregator = FakeAggregator::with(Mode::Normal, Vec::new());
 
-    let (states, recorded) = would_register(&prowlarr, &[app("http://sonarr:8989")]).await;
+    let (states, recorded) = would_register(&aggregator, &[app("http://sonarr:8989")]).await;
 
     assert_eq!(
         states,
@@ -321,11 +328,11 @@ async fn a_rehearsed_pass_names_the_address_it_would_register_and_registers_none
         }]
     );
     assert_eq!(recorded, 0, "a rehearsal journalled a change nobody made");
-    let held = prowlarr.applications().await.unwrap_or_default();
+    let held = aggregator.applications().await.unwrap_or_default();
     assert!(held.is_empty(), "the application was registered: {held:?}");
 }
 
-/// An application whose stored key the *arr no longer answers to is given the
+/// An application whose stored key the curator no longer answers to is given the
 /// current one, in place, and tested again.
 #[tokio::test]
 async fn an_application_on_a_replaced_key_is_given_the_current_one() {
@@ -333,11 +340,11 @@ async fn an_application_on_a_replaced_key_is_given_the_current_one() {
         id: "1".to_owned(),
         base_url: "http://sonarr:8989".to_owned(),
     }];
-    let prowlarr = FakeProwlarr::stale(existing.clone(), false);
+    let aggregator = FakeAggregator::stale(existing.clone(), false);
     let mut journal = Journal::new();
 
     let wirings = wire_applications(
-        &prowlarr,
+        &aggregator,
         "prowlarr",
         &[app("http://sonarr:8989")],
         &mut journal,
@@ -351,7 +358,7 @@ async fn an_application_on_a_replaced_key_is_given_the_current_one() {
         vec![State::Wired]
     );
     assert_eq!(
-        prowlarr
+        aggregator
             .rekeyed
             .lock()
             .map(|keys| keys.clone())
@@ -359,9 +366,9 @@ async fn an_application_on_a_replaced_key_is_given_the_current_one() {
         vec!["arr-key".to_owned()]
     );
 
-    let refusing = FakeProwlarr {
+    let refusing = FakeAggregator {
         refuses_rekey: true,
-        ..FakeProwlarr::stale(existing.clone(), false)
+        ..FakeAggregator::stale(existing.clone(), false)
     };
     let (states, _) = seed_applications(refusing, &[app("http://sonarr:8989")]).await;
     assert!(
@@ -369,7 +376,7 @@ async fn an_application_on_a_replaced_key_is_given_the_current_one() {
         "{states:?}"
     );
 
-    let still = FakeProwlarr::stale(existing, true);
+    let still = FakeAggregator::stale(existing, true);
     let (states, _) = seed_applications(still, &[app("http://sonarr:8989")]).await;
     assert!(
         matches!(states.as_slice(), [State::Failed { detail }] if detail.contains("cannot connect")),
@@ -377,18 +384,18 @@ async fn an_application_on_a_replaced_key_is_given_the_current_one() {
     );
 }
 
-/// A rehearsal does not test an application Prowlarr holds: the test is a `POST`.
+/// A rehearsal does not test an application the aggregator holds: the test is a `POST`.
 #[tokio::test]
 async fn a_rehearsal_tests_nothing() {
     let existing = vec![RegisteredApplication {
         id: "1".to_owned(),
         base_url: "http://sonarr:8989".to_owned(),
     }];
-    let prowlarr = FakeProwlarr::stale(existing, false);
+    let aggregator = FakeAggregator::stale(existing, false);
     let mut journal = Journal::new();
 
     let wirings = wire_applications(
-        &prowlarr,
+        &aggregator,
         "prowlarr",
         &[app("http://sonarr:8989")],
         &mut journal,
@@ -401,5 +408,5 @@ async fn a_rehearsal_tests_nothing() {
         wirings.into_iter().map(|one| one.state).collect::<Vec<_>>(),
         vec![State::AlreadyWired]
     );
-    assert!(prowlarr.rekeyed.lock().is_ok_and(|keys| keys.is_empty()));
+    assert!(aggregator.rekeyed.lock().is_ok_and(|keys| keys.is_empty()));
 }

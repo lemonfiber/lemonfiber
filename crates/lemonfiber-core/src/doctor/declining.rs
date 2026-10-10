@@ -106,15 +106,17 @@ async fn ran(files: &dyn FileSystem, decline: Option<&Decline>) -> Verdict {
             reason: "there is no media server to ask, or no recorded password to sign in with, \
                      so when the decline service's key was last used cannot be read"
                 .to_owned(),
-            remedy: Remedy::new("Check Jellyfin is running").with_detail("lemonfiber status"),
+            remedy: Remedy::new("Check the media server is running")
+                .with_detail("lemonfiber status"),
         };
     };
     let Ok(dated) = keys.decline_keys().await else {
         return Verdict::Unverified {
-            reason: "Jellyfin's key list could not be read, so when the decline service's key \
-                     was last used is not known"
+            reason: "the media server's key list could not be read, so when the decline \
+                     service's key was last used is not known"
                 .to_owned(),
-            remedy: Remedy::new("Check Jellyfin is running").with_detail("lemonfiber status"),
+            remedy: Remedy::new("Check the media server is running")
+                .with_detail("lemonfiber status"),
         };
     };
     let Ok(recorded) = latest_recorded(files, decline).await else {
@@ -137,8 +139,8 @@ async fn ran(files: &dyn FileSystem, decline: Option<&Decline>) -> Verdict {
             }
         })
         .unwrap_or_else(|| Verdict::Unverified {
-            reason: "Jellyfin holds no key filed under the decline service's name, so the key \
-                     the service holds is not one whose use can be read"
+            reason: "the media server holds no key filed under the decline service's name, so \
+                     the key the service holds is not one whose use can be read"
                 .to_owned(),
             remedy: Remedy::new("Seed again so the decline service is given a key")
                 .with_detail("lemonfiber seed"),
@@ -204,10 +206,10 @@ fn judged(dated: &Dated, recorded: Option<u64>) -> Verdict {
     let Some(used) = seconds(written) else {
         return Verdict::Unverified {
             reason: format!(
-                "Jellyfin dates the decline service's key's last use as {written:?}, which is \
-                 no moment this build reads, so the use cannot be accounted for"
+                "the media server dates the decline service's key's last use as {written:?}, \
+                 which is no moment this build reads, so the use cannot be accounted for"
             ),
-            remedy: Remedy::new("Check which Jellyfin version the stack runs")
+            remedy: Remedy::new("Check which media server version the stack runs")
                 .with_detail("lemonfiber status"),
         };
     };

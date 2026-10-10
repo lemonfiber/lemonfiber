@@ -4,7 +4,7 @@
 //! whether its credential is ever read, so a kind the manifest allows and nothing
 //! here answers is a service whose key is never published — which reads downstream
 //! as a service with nothing to say. And the request service refuses every call
-//! until it has an owner, so registering the \*arrs into it before that step
+//! until it has an owner, so registering the curators into it before that step
 //! reports two failures and then fixes them further down the same run.
 //!
 //! Both are pinned against the source of the seeding run rather than against a
@@ -101,7 +101,7 @@ fn every_api_a_service_can_declare_is_acted_on() {
 /// The request service is given an owner before anything is registered into it.
 ///
 /// It refuses every call until it has one, and the step that gives it one is the
-/// identity wiring. Registering the \*arrs into it first is not merely early — the
+/// identity wiring. Registering the curators into it first is not merely early — the
 /// service answers "refused the credential", which a seed run reports as two failed
 /// connections. It then, further down the same run, sets up the service that had just
 /// refused it, so a fresh stack reported a fault it had already fixed by the time
@@ -130,11 +130,11 @@ fn the_request_service_is_set_up_before_anything_is_registered_into_it() {
         shipped.find("seed_media_server("),
         shipped.find("seed_fulfilment_targets("),
     ) else {
-        unreachable!("seeding sets up the request service and registers the *arrs into it");
+        unreachable!("seeding sets up the request service and registers the curators into it");
     };
     assert!(
         identity < targets,
-        "the *arrs are registered into the request service before it is given an \
+        "the curators are registered into the request service before it is given an \
          owner, so a fresh stack reports two failures and then fixes them in the \
          same run"
     );

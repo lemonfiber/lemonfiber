@@ -1,4 +1,4 @@
-use super::{catalogue, Consumer, Entry, Needed, Origin, CATALOGUE, QBITTORRENT};
+use super::{catalogue, Consumer, Entry, Needed, Origin, CATALOGUE, TORRENT_CLIENT};
 use crate::config::Protocols;
 use crate::credential::Reach;
 
@@ -21,16 +21,20 @@ fn no_two_entries_are_recorded_under_the_same_setting() {
     assert_eq!(settings.len(), held, "{settings:?}");
 }
 
-/// The consumer this list exists for: a rotation reaching qBittorrent alone leaves
+/// The consumer this list exists for: a rotation reaching the torrent client alone leaves
 /// the tunnel unable to apply the port it was granted.
 #[test]
 fn the_torrent_password_names_the_port_push_as_well_as_the_client() {
-    let consumers: Vec<&str> = QBITTORRENT.consumers.iter().map(|one| one.name).collect();
+    let consumers: Vec<&str> = TORRENT_CLIENT
+        .consumers
+        .iter()
+        .map(|one| one.name)
+        .collect();
     let consumers = consumers.join("; ");
 
     assert!(consumers.contains("forwarded-port push"), "{consumers}");
     assert!(consumers.contains("web UI"), "{consumers}");
-    assert!(QBITTORRENT.consumers.len() >= 3, "{consumers}");
+    assert!(TORRENT_CLIENT.consumers.len() >= 3, "{consumers}");
 }
 
 #[test]

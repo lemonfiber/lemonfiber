@@ -19,7 +19,7 @@
 /// How much of the stack a backup covers.
 ///
 /// Whole-stack is the common case, but restoring one service is often what is
-/// actually wanted — one \*arr's configuration mangled while the rest is fine —
+/// actually wanted — one curator's configuration mangled while the rest is fine —
 /// so the scope is recorded in the archive and honoured on the way back.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(tag = "scope", rename_all = "snake_case")]
@@ -110,11 +110,11 @@ pub struct Item {
 /// by path beneath the directory its configuration is kept in — left out of every
 /// capture.
 ///
-/// A cache, a scratch area and a log are no part of what breaks, and they are the bulk
-/// of a configuration directory: Jellyfin's cache alone grows to tens of gigabytes. A
-/// capture holding them takes as long as copying them, and an update takes one with
-/// the whole stack down, so their size would be the stack's downtime. The cover art
-/// the \*arrs keep is fetched again on their next refresh.
+/// A cache, a scratch area and a log are no part of what breaks, and they are the bulk of a
+/// configuration directory: the bundled media server's cache alone grows to tens of
+/// gigabytes. A capture holding them takes as long as copying them, and an update takes one
+/// with the whole stack down, so their size would be the stack's downtime. The cover art
+/// the curators keep is fetched again on their next refresh.
 pub const REBUILT: &[(&str, &str)] = &[
     ("audiobookshelf", "metadata/cache"),
     ("audiobookshelf", "metadata/logs"),

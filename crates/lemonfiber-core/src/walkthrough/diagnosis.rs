@@ -90,7 +90,7 @@ impl Reason {
     #[must_use]
     pub const fn remedy(self) -> &'static str {
         match self {
-            Self::NoIndexers => "Add an indexer in Prowlarr, then run `lemonfiber walkthrough`",
+            Self::NoIndexers => "Add an indexer to the indexer aggregator, then run `lemonfiber walkthrough`",
             Self::IndexersFailed => "Run `lemonfiber doctor` — it tests each indexer and says which",
             Self::NothingMatched => "Try something else, or check the indexer covers this category",
             Self::NoneMetThePreset => {

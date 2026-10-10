@@ -8,7 +8,7 @@
 //!
 //! **Its key is one lemonfiber mints.** The service generates its own on first start
 //! and keeps it in a database rather than a file, so there would be nothing to read;
-//! given `BINDERY_API_KEY` in its environment it adopts that value verbatim instead,
+//! given `BOOK_CURATOR_API_KEY` in its environment it adopts that value verbatim instead,
 //! which is the same arrangement qBittorrent's password has.
 //!
 //! **The body is camel-cased**, and a field under any other spelling is dropped

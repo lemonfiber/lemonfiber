@@ -9,7 +9,7 @@
 use std::collections::BTreeMap;
 use std::time::SystemTime;
 
-use crate::app::targets::open_servarrs;
+use crate::app::targets::open_curators;
 use crate::app::Ctx;
 use crate::asking::Reasons;
 use crate::model::{MemberAccess, Restriction};
@@ -63,7 +63,7 @@ pub(super) async fn named_by_the_server(
 pub(super) struct Naming<'a> {
     /// Library identifier to the name the operator gave it.
     pub(super) libraries: &'a BTreeMap<String, String>,
-    /// The title each \*arr knows its items by, and the year it says each came out.
+    /// The title each curator knows its items by, and the year it says each came out.
     pub(super) titles: &'a BTreeMap<(Kind, i64), Titled>,
     /// The media server's own certificates, in the operator's country.
     pub(super) certificates: &'a [Certificate],
@@ -102,7 +102,7 @@ pub(super) struct Naming<'a> {
     pub(super) declined: &'a std::collections::BTreeSet<String>,
 }
 
-/// The title each \*arr knows its items by, keyed by the service and the id the request
+/// The title each curator knows its items by, keyed by the service and the id the request
 /// service hands over — the exact-id join a request is named through, and the second
 /// value saying whether every library actually answered.
 ///
@@ -114,14 +114,14 @@ pub(super) async fn library_titles(
 ) -> (BTreeMap<(Kind, i64), Titled>, bool) {
     let mut titles = BTreeMap::new();
     let mut named = true;
-    for arr in open_servarrs(ctx, services).await {
-        match arr.service.library(arr.kind).await {
+    for curator in open_curators(ctx, services).await {
+        match curator.service.library(curator.kind).await {
             Ok(items) => titles.extend(items.into_iter().map(|item| {
                 let item_named = Titled {
                     title: item.title,
                     year: item.year,
                 };
-                ((arr.kind, item.id), item_named)
+                ((curator.kind, item.id), item_named)
             })),
             Err(_) => named = false,
         }
@@ -162,16 +162,16 @@ pub(super) fn named_access(
     said
 }
 
-/// What one \*arr calls an item, and the year it says the item came out.
+/// What one curator calls an item, and the year it says the item came out.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct Titled {
     /// The title, as a person would name it.
     pub(super) title: String,
-    /// The year it came out, where the \*arr knows one.
+    /// The year it came out, where the curator knows one.
     pub(super) year: Option<u16>,
 }
 
-/// What a request is called and when it came out, where the \*arr filing it has been told
+/// What a request is called and when it came out, where the curator filing it has been told
 /// about it and its library could be read. Nothing otherwise — a request still awaiting
 /// approval has been handed to no service, so there is no title to find and none is
 /// invented.

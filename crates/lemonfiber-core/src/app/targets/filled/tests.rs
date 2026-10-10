@@ -131,7 +131,7 @@ fn bundled(tag: &str, password: Option<&str>) -> Ctx {
     if let Some(password) = password {
         let _ = crate::app::targets::record_secret(
             &ctx,
-            crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+            crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
             password,
         );
     }

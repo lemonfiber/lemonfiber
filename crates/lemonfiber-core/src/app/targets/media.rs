@@ -234,7 +234,7 @@ impl MediaServer {
             ctx.seams.http.clone(),
             &self.loopback,
             self.id(),
-            crate::config::JELLYFIN_ADMIN_USER,
+            crate::config::MEDIA_SERVER_ADMIN_USER,
             password,
         ))
     }

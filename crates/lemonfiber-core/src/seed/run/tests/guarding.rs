@@ -72,7 +72,12 @@ fn settings_file(name: &str, password: Option<&str>) -> std::path::PathBuf {
     let _ = std::fs::create_dir_all(&dir);
     let env = dir.join(".env");
     if let Some(password) = password {
-        assert!(store::set(&env, crate::config::NZBHYDRA2_ADMIN_PASSWORD_KEY, password).is_ok());
+        assert!(store::set(
+            &env,
+            crate::config::USENET_AGGREGATOR_ADMIN_PASSWORD_KEY,
+            password
+        )
+        .is_ok());
     }
     env
 }
@@ -96,7 +101,7 @@ async fn guarded(ctx: &Ctx, baseline: &mut Baseline) -> Option<Wiring> {
 /// The password the settings file holds for the aggregator.
 fn held(env: &std::path::Path) -> Option<String> {
     store::read(env).ok().and_then(|file| {
-        file.get(crate::config::NZBHYDRA2_ADMIN_PASSWORD_KEY)
+        file.get(crate::config::USENET_AGGREGATOR_ADMIN_PASSWORD_KEY)
             .map(str::to_owned)
     })
 }

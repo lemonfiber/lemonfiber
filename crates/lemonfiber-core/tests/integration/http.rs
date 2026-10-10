@@ -434,9 +434,9 @@ async fn a_cookie_set_by_one_service_is_never_sent_to_another() {
     indexer.stop().await;
 }
 
-/// And the half that has to keep working: qBittorrent authenticates by a cookie set
-/// at login and expected on the calls after it, so the origin that set one gets it
-/// back. A store that leaked nothing and remembered nothing would be no store.
+/// And the half that has to keep working: the bundled torrent client authenticates by a
+/// cookie set at login and expected on the calls after it, so the origin that set one gets
+/// it back. A store that leaked nothing and remembered nothing would be no store.
 #[tokio::test]
 async fn a_cookie_comes_back_to_the_service_that_set_it() {
     let client = Web::new();

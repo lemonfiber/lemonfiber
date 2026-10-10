@@ -163,7 +163,7 @@ async fn a_failure_is_quoted_with_the_lines_about_the_item_first() {
     );
 }
 
-/// A stopped walkthrough quotes the \*arr's own output, and a \*arr that fails while
+/// A stopped walkthrough quotes the curator's own output, and a curator that fails while
 /// authenticating quotes the credential it failed with.
 ///
 /// These lines are printed under "What sonarr was saying" and served as a stopped

@@ -6,7 +6,7 @@ use crate::queue::{Fetching, Importing, Item, Stall, Thresholds};
 /// Long enough that every threshold here has been passed.
 const AGES: Duration = Duration::from_secs(30 * 24 * 60 * 60);
 
-/// An item part-way through a download, an *arr waiting for it.
+/// An item part-way through a download, a curator waiting for it.
 fn downloading(name: &str, progress: u8, moving: bool) -> Item {
     Item {
         fetching: Some(Fetching { progress, moving }),

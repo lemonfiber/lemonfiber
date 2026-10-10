@@ -20,7 +20,7 @@ use std::path::PathBuf;
 
 use crate::app::{Ctx, QualityAction};
 use crate::audio::Format;
-use crate::config::{store, JELLYFIN_MODE_KEY};
+use crate::config::{store, MEDIA_SERVER_MODE_KEY};
 use crate::error::{Diagnose, Problem};
 use crate::model::{Disposition, MusicChoice, PresetChoice, QualityReport};
 use crate::ports::media::MUSIC;
@@ -40,7 +40,7 @@ const EVERYTHING: &str = "everything";
 /// software, which is held rather than recorded until it is agreed to, and which is
 /// no cost at all on a host that transcodes in hardware. So an unconfirmed run here
 /// is the write, not an account of one. A reapply re-asserts the recorded preset
-/// over a Recyclarr config the operator hand-edited, the explicit consent an
+/// over a quality sync config the operator hand-edited, the explicit consent an
 /// ordinary run withholds.
 pub(crate) fn quality(ctx: &Ctx, action: QualityAction) -> Result<QualityReport, Box<Problem>> {
     let mut selection = load_selection(ctx)?;
@@ -51,7 +51,7 @@ pub(crate) fn quality(ctx: &Ctx, action: QualityAction) -> Result<QualityReport,
     let (disposition, customised, overwritten) = match action {
         QualityAction::Show => (
             Disposition::Shown,
-            crate::app::materialise::recyclarr_customised(
+            crate::app::materialise::quality_sync_customised(
                 ctx.seams.confined.as_ref(),
                 into,
                 record.as_deref(),
@@ -81,7 +81,7 @@ pub(crate) fn quality(ctx: &Ctx, action: QualityAction) -> Result<QualityReport,
             };
             (
                 disposition,
-                crate::app::materialise::recyclarr_customised(
+                crate::app::materialise::quality_sync_customised(
                     ctx.seams.confined.as_ref(),
                     into,
                     record.as_deref(),
@@ -90,7 +90,7 @@ pub(crate) fn quality(ctx: &Ctx, action: QualityAction) -> Result<QualityReport,
             )
         }
         QualityAction::Reapply => {
-            let overwritten = crate::app::materialise::reapply_recyclarr(
+            let overwritten = crate::app::materialise::reapply_preset(
                 ctx.seams.confined.as_ref(),
                 ctx.stack,
                 into,
@@ -204,12 +204,12 @@ fn quality_path(ctx: &Ctx) -> Option<PathBuf> {
 }
 
 /// What the media server this stack runs can do with content a client must
-/// transcode — read from the platform and the recorded Jellyfin mode.
+/// transcode — read from the platform and the recorded media server mode.
 fn playback(ctx: &Ctx) -> Playback {
     Playback::of(ctx.environment, current_library(ctx))
 }
 
-/// The Jellyfin mode on record, or [`Library::None`] where none is — an absent
+/// The media server mode on record, or [`Library::None`] where none is — an absent
 /// file, an absent key, or a value that is neither mode all mean no server this
 /// warning need speak for.
 fn current_library(ctx: &Ctx) -> Library {
@@ -217,7 +217,7 @@ fn current_library(ctx: &Ctx) -> Library {
         .env_file
         .as_deref()
         .and_then(|path| store::read(path).ok())
-        .and_then(|file| file.get(JELLYFIN_MODE_KEY).and_then(Library::from_mode))
+        .and_then(|file| file.get(MEDIA_SERVER_MODE_KEY).and_then(Library::from_mode))
         .unwrap_or(Library::None)
 }
 

@@ -22,10 +22,10 @@ use crate::wiring::Filler;
 /// The category an application files under, named as that application names its
 /// category field, for the media type it manages.
 ///
-/// The field is fixed per application — Sonarr names it `tvCategory`, Radarr
-/// `movieCategory`, Lidarr `musicCategory` — so the mapping is by the media type
-/// that identifies the application. A media type lemonfiber does not recognise has
-/// no known field, so it names none rather than guessing.
+/// The field is fixed per application — the TV curator names it `tvCategory`, the movie
+/// curator `movieCategory`, the music curator `musicCategory` — so the mapping is by the
+/// media type that identifies the application. A media type lemonfiber does not recognise
+/// has no known field, so it names none rather than guessing.
 pub(super) fn category_for(media: &str) -> Option<crate::ports::service::Category> {
     let field = match media {
         TELEVISION => "tvCategory",
@@ -146,7 +146,7 @@ pub(super) async fn held(ctx: &Ctx, fillers: &Fillers, minted: &BTreeMap<Holder,
             held.keys.insert(
                 Holder::of(filler),
                 Credential::UserPass {
-                    username: crate::config::QBITTORRENT_USER.to_owned(),
+                    username: crate::config::TORRENT_USER.to_owned(),
                     password,
                 },
             );
@@ -156,7 +156,7 @@ pub(super) async fn held(ctx: &Ctx, fillers: &Fillers, minted: &BTreeMap<Holder,
 }
 
 /// Every download client whose credential file was refused, said on the connection it
-/// would have made into each \*arr that asks for it.
+/// would have made into each curator that asks for it.
 pub(super) fn refused(fillers: &Fillers, held: &Held) -> Vec<Wiring> {
     pairings(fillers)
         .iter()
@@ -204,7 +204,7 @@ pub(super) async fn seed_passwords(
             continue;
         };
         let base = crate::app::targets::loopback(port);
-        let (wiring, generated) = seed_qbittorrent_password(ctx, filler, &base, &setting).await;
+        let (wiring, generated) = seed_torrent_password(ctx, filler, &base, &setting).await;
         wirings.push(wiring);
         if let Some(password) = generated {
             minted.insert(Holder::of(filler), password);
@@ -221,7 +221,7 @@ pub(super) async fn seed_passwords(
 /// authenticate with, so the connection is skipped for a re-run once the container
 /// has announced one. A generated password is recorded in the environment under
 /// `setting`, the client's own, before the client is given it.
-pub(super) async fn seed_qbittorrent_password(
+pub(super) async fn seed_torrent_password(
     ctx: &Ctx,
     filler: &Filler,
     base: &str,
@@ -278,7 +278,7 @@ pub(super) async fn seed_qbittorrent_password(
         crate::app::targets::record_secret(ctx, setting, password)
             .map_err(|failure| failure.to_string())
     };
-    crate::seed::wire_qbittorrent_password(
+    crate::seed::wire_torrent_password(
         &client,
         ctx.seams.random.as_ref(),
         &temporary,

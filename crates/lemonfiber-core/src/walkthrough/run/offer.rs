@@ -5,31 +5,31 @@
 //! a walk that must stop at its first step is the product demonstrating that it does not
 //! know what it is doing, on the operator's very first minute with it.
 
-use crate::app::targets::OpenArr;
+use crate::app::targets::OpenCurator;
 use crate::app::Ctx;
 use crate::ports::service::Catalogue;
 use crate::walkthrough::Why;
 
 /// What this stack should be offered.
-pub(super) async fn offered(ctx: &Ctx, arrs: &[OpenArr]) -> Why {
+pub(super) async fn offered(ctx: &Ctx, curators: &[OpenCurator]) -> Why {
     let protocols = ctx.settings.protocols;
     Why::of(
         protocols.usenet || protocols.torrent,
-        has_indexers(arrs).await,
+        has_indexers(curators).await,
     )
 }
 
 /// Whether anything is configured to search with.
 ///
 /// Any one service having an indexer is enough: they are wired to a shared indexer
-/// manager, so a stack where one \*arr answers and another has not finished starting has
+/// manager, so a stack where one curator answers and another has not finished starting has
 /// indexers — reading the silent one as zero would withdraw an offer the stack can honour.
 ///
 /// A service that cannot be asked contributes nothing rather than a zero, for the same
 /// reason: it is the difference between "there are none" and "I could not tell".
-async fn has_indexers(arrs: &[OpenArr]) -> bool {
-    for arr in arrs {
-        if arr.service.indexer_count().await.unwrap_or(0) > 0 {
+async fn has_indexers(curators: &[OpenCurator]) -> bool {
+    for curator in curators {
+        if curator.service.indexer_count().await.unwrap_or(0) > 0 {
             return true;
         }
     }

@@ -4,7 +4,7 @@
   "type": "object",
   "properties": {
     "service": {
-      "description": "The \\*arr whose queue is holding it.",
+      "description": "The curator whose queue is holding it.",
       "type": "string"
     },
     "stage": {
