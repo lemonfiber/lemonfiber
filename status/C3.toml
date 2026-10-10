@@ -17,5 +17,5 @@ requirement = [
   { id = "C3-R13", state = "done", evidence = ["crates/lemonfiber-core/src/repair.rs"] },
   { id = "C3-R14", state = "done", evidence = ["crates/lemonfiber-core/src/repair.rs"] },
   { id = "C3-R15", state = "done", evidence = ["crates/lemonfiber-core/src/repair.rs"] },
-  { id = "C3-R16", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/seasons.rs", "crates/lemonfiber-core/src/patience.rs", "crates/lemonfiber-core/src/jellyfin/upkeep.rs"] },
+  { id = "C3-R16", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/seasons.rs", "crates/lemonfiber-core/src/patience.rs", "crates/lemonfiber-core/src/jellyfin/upkeep.rs", "crates/lemonfiber/src/repair.rs"] },
 ]

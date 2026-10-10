@@ -6,7 +6,7 @@ use lemonfiber_core::stack::Source;
 use crate::exit::{repairing, shown, success};
 use crate::prompt::Answers;
 
-use super::{run, Asking, Confirm as _, Ctx, Mending, Paths};
+use super::{repaired, run, Asking, Confirm as _, Consent, Ctx, Mending, Paths};
 use lemonfiber::cli::Fixing;
 
 /// Where a test's records live, in a scratch directory of its own — named, because a
@@ -318,6 +318,53 @@ async fn a_repair_with_nobody_there_is_told_which_flags_rather_than_asked() {
         probe.0.load(std::sync::atomic::Ordering::Relaxed),
         "being asked is what it records"
     );
+}
+
+/// A rehearsal is the offer: it needs nobody at a terminal and puts no question.
+#[tokio::test]
+async fn a_rehearsal_asks_nobody_and_needs_no_terminal() {
+    let mut rehearsing = ctx();
+    rehearsing.dry_run = true;
+    let nobody = Nobody::default();
+    let code = run(
+        &rehearsing,
+        paths("rehearsed-unattended"),
+        Mending {
+            fixing: Fixing {
+                fix: true,
+                yes: false,
+                disruptive: false,
+            },
+            undo: false,
+        },
+        &nobody,
+        false,
+    )
+    .await;
+
+    assert_eq!(shown(code), success());
+    assert!(!nobody.0.load(std::sync::atomic::Ordering::Relaxed));
+}
+
+/// A rehearsal told to go ahead carries nothing out, and its report says it was one.
+#[tokio::test]
+async fn a_rehearsal_told_to_go_ahead_carries_nothing_out() {
+    let mut rehearsing = ctx();
+    rehearsing.dry_run = true;
+
+    let outcome = repaired(
+        &rehearsing,
+        Some(Consent::Standing),
+        false,
+        &Nobody::default(),
+    )
+    .await;
+
+    let Ok(lemonfiber_core::app::Outcome::Repair(report)) = outcome else {
+        unreachable!("a rehearsal answers with the repair report: {outcome:?}");
+    };
+    assert!(report.rehearsed);
+    assert!(!report.acted);
 }
 
 async fn asked_for(yes: bool, json: bool) -> String {

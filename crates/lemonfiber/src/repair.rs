@@ -10,8 +10,9 @@
 
 use std::process::ExitCode;
 
-use lemonfiber_core::app::{Ctx, Outcome};
-use lemonfiber_core::repair::run::{mend, putting_right, retracting, Confirm, Consent};
+use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
+use lemonfiber_core::error::Problem;
+use lemonfiber_core::repair::run::{mend, retracting, Confirm, Consent};
 use lemonfiber_core::repair::{Repair, Stance};
 
 use lemonfiber_core::config::paths::Paths;
@@ -33,22 +34,10 @@ pub(crate) async fn run(
     if asked.undo {
         return undone(ctx, &paths, json).await;
     }
-    // Nobody is there to answer a prompt in machine-readable mode, and a script that wanted
-    // repairs carried out says so with --yes. So one that did not gets the offer and no
-    // action, which is what report-only is for.
-    //
-    // A run with nowhere to read an answer from is refused rather than asked. The offer
-    // reaches a terminal nobody is at, and the read that follows it blocks on input that
-    // never comes — once per repair, invisibly, with the run appearing to hang.
-    //
-    // Two of the three consents are settled before the run begins and are data, so
-    // they go in through the entry a browser goes in through. Nothing here decides
-    // what each one comes to.
-    let consent = match (asked.fixing.yes, json, answers.present()) {
+    let reporting = json || ctx.dry_run;
+    let consent = match (asked.fixing.yes, reporting, answers.present()) {
         (true, _, _) => Some(Consent::Standing),
         (false, true, _) => Some(Consent::Offer),
-        // The third is a question put mid-run and answered by whoever is at the
-        // terminal, which is the one shape no request can carry.
         (false, false, true) => None,
         (false, false, false) => {
             complain!(
@@ -61,13 +50,34 @@ pub(crate) async fn run(
         }
     };
 
-    let repaired = match &consent {
-        Some(consent) => putting_right(ctx, consent, asked.fixing.disruptive).await,
-        None => mend(ctx, Stance::Ask, asked.fixing.disruptive, &Asking(answers)).await,
-    };
-    match repaired {
-        Ok(report) => answered(&Outcome::Repair(report), json),
+    match repaired(ctx, consent, asked.fixing.disruptive, answers).await {
+        Ok(outcome) => answered(&outcome, json),
         Err(problem) => crate::complain(&problem),
+    }
+}
+
+/// What a forward repair run comes to: a consent settled in advance is dispatched, and an
+/// unsettled one is asked at the terminal.
+async fn repaired(
+    ctx: &Ctx,
+    consent: Option<Consent>,
+    disruptive: bool,
+    answers: &(dyn Answers + Sync),
+) -> Result<Outcome, Box<Problem>> {
+    match consent {
+        Some(consent) => {
+            dispatch(
+                Command::Repair {
+                    consent,
+                    disruptive,
+                },
+                ctx,
+            )
+            .await
+        }
+        None => mend(ctx, Stance::Ask, disruptive, &Asking(answers))
+            .await
+            .map(Outcome::Repair),
     }
 }
 
