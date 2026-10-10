@@ -448,7 +448,7 @@
       "files": [
         {
           "path": "identity.source/v1/openapi.json",
-          "sha256": "7e2fb11592508e10f72ea96d6622d923f141ecb87999c262fdf0fc6fa09dbb2f"
+          "sha256": "b686dfa3e5d755c5dd2587b8331f758af85d1c4a6fb7be4d518782b1f86b20b0"
         },
         {
           "path": "identity.source/v1/operations/startup_completed.json",
@@ -473,6 +473,10 @@
         {
           "path": "identity.source/v1/operations/invite.json",
           "sha256": "781c87fb5f1b732a10dcacb14f9e6638db7dccf01ef5d5b6f281990dd3f2150a"
+        },
+        {
+          "path": "identity.source/v1/operations/claim.json",
+          "sha256": "e3825d3a8b4855f235d8e7bd7016b5d13fd62e31e7946d1c2cd13d40cdfd09a1"
         },
         {
           "path": "identity.source/v1/operations/unclaim.json",
@@ -516,14 +520,14 @@
         },
         {
           "path": "identity.source/v1/conformance.json",
-          "sha256": "6703b2850f0e85b49d3a902a7395f692a67315b15bcd8c1ac88955bc3c52c0c1"
+          "sha256": "cb1cda31028b3b6828cd79a159871c382144e57d5e1d3c7700f0607cb04b5011"
         }
       ],
       "majors": [
         1
       ],
       "openapi": "identity.source/v1/openapi.json",
-      "operations": 16
+      "operations": 17
     },
     {
       "capability": "media.serve",

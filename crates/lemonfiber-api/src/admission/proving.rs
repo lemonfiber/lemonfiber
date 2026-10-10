@@ -65,6 +65,7 @@ impl Admitting {
         let given = Given {
             name: Some(name),
             password: password.to_owned(),
+            claim: None,
         };
         let proved = match self.whoever(&given, &ticket, random).await {
             Some((Opened::Member(signed), door)) if signed.id == id => Some(door),

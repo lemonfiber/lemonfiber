@@ -67,6 +67,15 @@
       "operation": "invite"
     },
     {
+      "case": "claim-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "claim"
+    },
+    {
       "case": "unclaim-answers",
       "expect": {
         "conforms": true

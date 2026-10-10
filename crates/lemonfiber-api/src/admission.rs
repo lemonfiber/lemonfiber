@@ -31,12 +31,14 @@
 
 pub mod admitted;
 pub mod attempts;
+mod claiming;
 pub mod keyed;
 pub mod keyring;
 mod proving;
 pub mod remembered;
 pub mod sessions;
 
+use claiming::signed_in;
 use sessions::Opened;
 
 use std::net::{IpAddr, SocketAddr};
@@ -121,6 +123,16 @@ pub trait HouseholdAtHand: Send + Sync {
     /// taken up in time is what this program recorded offering, not anything the server
     /// keeps.
     fn vouches_for(&self, id: &str) -> bool;
+
+    /// Whether `token` claims the invitation standing on account `id` now. A household
+    /// that keeps no record of what it offered offers no claim.
+    async fn offers_claim(&self, _id: &str, _token: &str) -> bool {
+        false
+    }
+
+    /// Spend the claim on account `id`'s invitation, where there is a record to spend it
+    /// from.
+    fn claim_spent(&self, _id: &str) {}
 }
 
 /// One household, the same at every asking.
@@ -146,6 +158,14 @@ impl HouseholdAtHand for Ctx {
 
     fn vouches_for(&self, id: &str) -> bool {
         lemonfiber_core::app::members::vouched_for(self, id)
+    }
+
+    async fn offers_claim(&self, id: &str, token: &str) -> bool {
+        lemonfiber_core::app::members::offers_claim(self, id, token).await
+    }
+
+    fn claim_spent(&self, id: &str) {
+        lemonfiber_core::app::members::claim_spent(self, id);
     }
 }
 
@@ -232,26 +252,9 @@ impl Admitting {
         }
         let at = Arc::clone(self.household.as_ref()?);
         let household = opened(Arc::clone(&at)).await?;
-
-        // A name for this sign-in at the server, fresh each time: the server keeps one
-        // sign-in per account and device, so a second under one name would end the
-        // first, and a member signed in from two browsers would lose one of them.
-        let device = random
-            .bytes(DEVICE_BYTES)?
-            .iter()
-            .fold(String::new(), |mut named, byte| {
-                use std::fmt::Write as _;
-                let _ = write!(named, "{byte:02x}");
-                named
-            });
-        let signed = household
-            .whoever(name, &given.password, &device)
+        signed_in(at, household.as_ref(), name, &given.password, random)
             .await
-            .ok()
-            .flatten()?;
-        vouched(at, &signed.id)
-            .await
-            .then_some((Opened::Member(signed), door))
+            .map(|opened| (opened, door))
     }
 
     /// Who the secret a request carried proves it to be, or nothing.
@@ -336,15 +339,6 @@ async fn opened(at: Arc<dyn HouseholdAtHand>) -> Option<Arc<dyn Household>> {
         .await
         .ok()
         .flatten()
-}
-
-/// Whether the household `at` holds vouches for whoever holds this account, asked on a
-/// thread made for blocking: it reads what was offered from disk, and may write it back.
-async fn vouched(at: Arc<dyn HouseholdAtHand>, id: &str) -> bool {
-    let id = id.to_owned();
-    tokio::task::spawn_blocking(move || at.vouches_for(&id))
-        .await
-        .unwrap_or(false)
 }
 
 /// What the guard learned when somebody knocked.
@@ -437,8 +431,11 @@ struct Given {
     /// with the machine's own password, which is nobody's name.
     #[serde(default)]
     name: Option<String>,
-    /// What was typed.
+    /// What was typed: at a claim, the password they chose.
     password: String,
+    /// The claim token an invitation's join link carries, where this is a claim.
+    #[serde(default)]
+    claim: Option<String>,
 }
 
 /// The body signing in takes, with the route it is sent to, described from the type
@@ -473,6 +470,9 @@ async fn opening(
     let Ok(Json(given)) = given else {
         return Refusal::NotAPassword.answered();
     };
+    if given.claim.is_some() && given.password.chars().count() < credential::LEAST {
+        return Refusal::ShortChoice.answered();
+    }
     let now = serving.ctx.seams.clock.now();
     let ticket = match serving
         .admitting
@@ -483,12 +483,23 @@ async fn opening(
         Ok(ticket) => ticket,
         Err(left) => return waiting(left.as_secs().max(1)),
     };
-    let Some((who, door)) = serving
-        .admitting
-        .whoever(&given, &ticket, serving.ctx.seams.random.as_ref())
-        .await
-    else {
-        return Refusal::NotThePassword.answered();
+    let random = serving.ctx.seams.random.as_ref();
+    let admitted = match given.claim.as_deref() {
+        Some(token) => {
+            serving
+                .admitting
+                .claimed(&given, token, &ticket, random)
+                .await
+        }
+        None => serving
+            .admitting
+            .whoever(&given, &ticket, random)
+            .await
+            .ok_or(Refusal::NotThePassword),
+    };
+    let (who, door) = match admitted {
+        Ok(admitted) => admitted,
+        Err(refusal) => return refusal.answered(),
     };
     serving.admitting.attempts.right(&ticket, door, now).await;
     let opened = serving

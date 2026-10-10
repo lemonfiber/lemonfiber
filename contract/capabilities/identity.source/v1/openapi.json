@@ -88,6 +88,9 @@
     "/lemonfiber/identity.source/v1/allow": {
       "$ref": "operations/allow.json"
     },
+    "/lemonfiber/identity.source/v1/claim": {
+      "$ref": "operations/claim.json"
+    },
     "/lemonfiber/identity.source/v1/claimable": {
       "$ref": "operations/claimable.json"
     },

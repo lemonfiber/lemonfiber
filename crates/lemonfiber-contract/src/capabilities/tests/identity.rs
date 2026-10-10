@@ -58,6 +58,10 @@ impl Household for Upstream {
             ..Member::default()
         })
     }
+    async fn claim(&self, name: &str, password: &str, device: &str) -> Result<bool, Failure> {
+        self.tell(format!("claim {name} {} {device}", password.len()));
+        Ok(name == "Sam")
+    }
     async fn unclaim(&self, id: &str) -> Result<(), Failure> {
         self.tell(format!("unclaim {id}"));
         Ok(())
@@ -119,6 +123,7 @@ async fn script<I: MediaServer + Household>(source: &I) -> Vec<String> {
         age_limit: Some(12),
         unrated: Some(Unrated::HeldBack),
     };
+    let chosen: String = ('c'..='n').collect();
     let signed = Signed {
         id: "ana".to_owned(),
         token: "token".to_owned(),
@@ -131,6 +136,8 @@ async fn script<I: MediaServer + Household>(source: &I) -> Vec<String> {
         format!("{:?}", source.whoever("ana", "wrong", "phone").await),
         format!("{:?}", source.standing(&signed).await),
         format!("{:?}", source.invite("Sam").await),
+        format!("{:?}", source.claim("Sam", &chosen, "phone").await),
+        format!("{:?}", source.claim("Ana", &chosen, "phone").await),
         format!("{:?}", source.unclaim("b8e4").await),
         format!("{:?}", source.withdraw("b8e4").await),
         format!("{:?}", source.when_invited("2026-10-01").await),
@@ -151,6 +158,8 @@ async fn an_identity_source_answers_and_is_told_through_its_contract_as_it_is_in
         source::Adapter,
         [
             "admin",
+            "claim",
+            "claim",
             "unclaim",
             "withdraw",
             "allow",

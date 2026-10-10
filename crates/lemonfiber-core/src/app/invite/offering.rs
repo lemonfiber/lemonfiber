@@ -23,6 +23,7 @@ pub(super) fn recorded_now(ctx: &Ctx, held: &Held, member: &Member) -> bool {
         offered: ctx.hours_ago(0),
         lapses: ctx.hours_ago(-HOURS_TO_CLAIM),
         decline: None,
+        claim: None,
     };
     let offers = recorded(held.offers.clone(), &held.household, &member.id, offer);
     crate::app::record::keep(

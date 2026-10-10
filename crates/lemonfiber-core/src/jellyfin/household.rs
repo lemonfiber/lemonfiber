@@ -251,6 +251,10 @@ impl crate::ports::service::Household for Jellyfin {
         Ok(made.member())
     }
 
+    async fn claim(&self, name: &str, password: &str, device: &str) -> Result<bool, Failure> {
+        claim(self, name, password, device).await
+    }
+
     async fn unclaim(&self, id: &str) -> Result<(), Failure> {
         // A flag rather than a password: the same endpoint takes `CurrentPw`/`NewPw`
         // when somebody changes their own, and naming neither is what makes this a
@@ -459,6 +463,37 @@ async fn whoever(
         token: signed.token,
     })
     .filter(|signed| !signed.id.is_empty() && !signed.token.is_empty()))
+}
+
+/// Set the first password on an unclaimed account, signed in as it with the empty
+/// password it holds, and sign that sign-in out again.
+async fn claim(
+    jellyfin: &Jellyfin,
+    name: &str,
+    password: &str,
+    device: &str,
+) -> Result<bool, Failure> {
+    let unclaimed = String::new();
+    let Some(signed) = whoever(jellyfin, name, &unclaimed, device).await? else {
+        return Ok(false);
+    };
+    let body = serde_json::json!({ "CurrentPw": unclaimed, "NewPw": password }).to_string();
+    let changing = super::carried(
+        &jellyfin.request(
+            Method::Post,
+            &format!("/Users/{}/Password", signed.id),
+            Some(body),
+        ),
+        &signed.token,
+    );
+    let response = jellyfin.endpoint.send(&changing).await?;
+    jellyfin.endpoint.expect_success(&response)?;
+    let leaving = super::carried(
+        &jellyfin.request(Method::Post, "/Sessions/Logout", None),
+        &signed.token,
+    );
+    let _ = jellyfin.endpoint.send(&leaving).await;
+    Ok(true)
 }
 
 /// The statuses a media server refuses a name and password with.

@@ -646,3 +646,77 @@ async fn an_offer_on_a_stack_running_the_decline_service_carries_its_decline_add
         "{made:?}"
     );
 }
+
+/// An offer on a machine served encrypted on the network carries the join link the
+/// companion opens, and keeps only the hash of the claim token it carries.
+#[tokio::test]
+async fn an_offer_on_a_machine_served_encrypted_carries_a_join_link() {
+    let env = recorded_admin("offers-joinable");
+    let companion =
+        lemonfiber_fixtures::scratch::Scratch::named("offers-joinable-companion").kept();
+    let _ = crate::certificate::kept_or_made(&companion);
+    let _ = crate::companion::served::record(
+        &companion,
+        crate::companion::served::Served {
+            port: 8443,
+            encrypted: true,
+            network: true,
+        },
+    );
+    let http = Fake::by_path_in_turn(vec![
+        (
+            "/Users/AuthenticateByName",
+            vec![Answer::reply(200, r#"{"AccessToken":"token"}"#); 3],
+        ),
+        (
+            "/System/ActivityLog",
+            vec![Answer::reply(200, r#"{"Items":[]}"#)],
+        ),
+        (
+            "/Users/New",
+            vec![Answer::reply(
+                200,
+                r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
+            )],
+        ),
+        ("/Users", vec![Answer::reply(200, "[]")]),
+    ]);
+    let ctx = a_context()
+        .settings(Settings {
+            env_file: Some(env.clone()),
+            companion: Some(companion.clone()),
+            household_host: Some("192.168.1.20".to_owned()),
+            ..Settings::default()
+        })
+        .build()
+        .with_http(http);
+
+    let made = dispatch(
+        Command::Invite(Inviting {
+            name: "ana".to_owned(),
+            allowance: Allowance::default(),
+            confirm: true,
+        }),
+        &ctx,
+    )
+    .await;
+    let record =
+        std::fs::read_to_string(env.with_file_name("invitations.json")).unwrap_or_default();
+    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    let _ = std::fs::remove_dir_all(companion);
+
+    let join = invited(&made)
+        .and_then(|report| report.join.clone())
+        .unwrap_or_default();
+    let claim = join.rsplit("&claim=").next().unwrap_or_default();
+    assert!(
+        join.starts_with("lemonfiber://join?address=https%3A%2F%2F192.168.1.20%3A8443&")
+            && join.contains("&name=ana&claim="),
+        "{made:?}"
+    );
+    assert!(
+        !claim.is_empty() && !record.contains(claim) && record.contains("\"claim\""),
+        "the record kept the token rather than its hash: {record}"
+    );
+    assert!(invited(&made).is_some_and(|report| report.unjoinable.is_none()));
+}

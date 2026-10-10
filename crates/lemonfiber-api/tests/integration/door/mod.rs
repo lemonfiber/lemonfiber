@@ -476,6 +476,9 @@ impl Household for AHousehold {
     async fn invite(&self, _: &str) -> Result<Member, Failure> {
         unreachable!("the door asks this household who somebody is and nothing else")
     }
+    async fn claim(&self, _: &str, _: &str, _: &str) -> Result<bool, Failure> {
+        unreachable!("this household keeps no record of an offer, so nothing is claimed")
+    }
     async fn unclaim(&self, _: &str) -> Result<(), Failure> {
         unreachable!("the door asks this household who somebody is and nothing else")
     }

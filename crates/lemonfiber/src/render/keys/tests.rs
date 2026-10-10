@@ -48,6 +48,7 @@ fn a_minted_key_is_shown_once_with_what_a_client_elsewhere_needs() {
     );
     assert!(said.contains(report.secret.as_str()), "{said}");
     assert!(said.contains("not shown again"), "{said}");
+    assert!(said.contains("The same secret, for a camera:"), "{said}");
     assert!(said.contains("address  https://192.168.1.9:8443"), "{said}");
     assert!(
         said.contains(&format!("pin      {}", "ab".repeat(32))),

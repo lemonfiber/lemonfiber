@@ -146,4 +146,7 @@ requirement = [
   { id = "ARCH-R175", state = "done", evidence = ["crates/lemonfiber-error/src/codes.rs", "crates/lemonfiber/src/codes.rs", "crates/lemonfiber/src/codes/tests.rs", "contract/codes.json", "reference/error-codes.md"] },
   { id = "ARCH-R178", state = "done", evidence = ["crates/lemonfiber-api/src/events/dashboard.rs", "crates/lemonfiber-api/src/events/dashboard/tests.rs"] },
   { id = "ARCH-R179", state = "done", evidence = ["crates/lemonfiber-api/src/capabilities.rs", "crates/lemonfiber-api/src/capabilities/tests.rs"] },
+  { id = "ARCH-R218", state = "done", evidence = ["crates/lemonfiber-core/src/model/invitation.rs", "contract/web-api/defs/Invitation.json", "crates/lemonfiber-core/src/app/invite/joining.rs"] },
+  { id = "ARCH-R219", state = "done", evidence = ["crates/lemonfiber-api/src/admission.rs", "crates/lemonfiber-api/src/refusal.rs", "crates/lemonfiber-error/src/codes/admit.rs", "contract/web-api/bodies/session.json", "crates/lemonfiber-api/tests/integration/what_a_claim_opens.rs"] },
+  { id = "ARCH-R220", state = "done", evidence = ["crates/lemonfiber-core/src/model/invitation.rs", "crates/lemonfiber/src/render/qr.rs"] },
 ]

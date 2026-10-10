@@ -30,6 +30,12 @@
       ],
       "required": true
     },
+    "join": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "linked": {
       "type": [
         "ref:Linked"
@@ -59,6 +65,12 @@
         "array[string]"
       ],
       "required": true
+    },
+    "unjoinable": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
     },
     "withdrawn": {
       "type": [

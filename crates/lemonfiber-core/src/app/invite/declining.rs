@@ -18,7 +18,8 @@ use crate::ports::service::Member;
 /// The decline service's id in the stack manifest.
 pub(crate) const SERVICE: &str = "decline";
 
-/// How many random bytes back a decline token: 128 bits, held only as a hash.
+/// How many random bytes back an offer's decline or claim token: 128 bits, held only as
+/// a hash.
 const TOKEN_BYTES: usize = 16;
 
 /// The decline service, where the stack runs one.
@@ -28,7 +29,7 @@ pub(crate) fn service(
     services.iter().find(|service| service.id == SERVICE)
 }
 
-/// A new decline token, or none where the randomness could not be had.
+/// A new token for one offer, or none where the randomness could not be had.
 pub(super) fn minted(ctx: &Ctx) -> Option<String> {
     ctx.seams
         .random
@@ -190,7 +191,7 @@ pub(super) async fn issued(
 }
 
 /// The seconds since the Unix epoch a recorded moment names.
-fn seconds(moment: &str) -> Option<u64> {
+pub(super) fn seconds(moment: &str) -> Option<u64> {
     let at: jiff::Timestamp = moment.parse().ok()?;
     u64::try_from(at.as_second()).ok()
 }

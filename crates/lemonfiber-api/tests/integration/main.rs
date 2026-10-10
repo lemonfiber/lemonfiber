@@ -10,6 +10,7 @@ mod idle;
 mod nothing_is_carried_through;
 mod reading;
 mod what_a_choice_of_filler_means;
+mod what_a_claim_opens;
 mod what_a_client_is_told_it_may_do;
 mod what_a_disturbing_diagnosis_means;
 mod what_a_follow_says;

@@ -118,6 +118,17 @@ pub trait Household: Send + Sync {
     /// Returns [`Failure`] when the server is unreachable or refuses.
     async fn invite(&self, name: &str) -> Result<Member, Failure>;
 
+    /// Set the first password on an account nobody has claimed, signed in as that account
+    /// with the empty password it holds, and never as the administrator.
+    ///
+    /// `Ok(false)` where that sign-in is refused: the account has a password already, or
+    /// is switched off. `device` names the sign-in, as for [`Household::whoever`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the server is unreachable or refuses the password.
+    async fn claim(&self, name: &str, password: &str, device: &str) -> Result<bool, Failure>;
+
     /// Put the account back to having no password on it.
     ///
     /// **This is what a reset is here**: not a new password chosen for somebody, but the

@@ -61,6 +61,10 @@ pub(crate) struct Offer {
     /// nowhere, so a copy of this record declines nobody.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) decline: Option<lemonfiber_sidecar::decline::TokenHash>,
+    /// The hash of the claim token its join link carries. The token went out on the
+    /// invitation and is kept nowhere, so a copy of this record claims nothing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) claim: Option<lemonfiber_sidecar::TokenHash>,
 }
 
 /// An account nobody has claimed, with when it was offered where that is known.

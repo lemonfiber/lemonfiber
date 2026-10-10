@@ -186,11 +186,12 @@ fn a_caution_about_the_address_is_said_beside_it() {
 #[test]
 fn an_address_too_long_to_draw_still_gets_the_words() {
     let far_too_long = format!("http://{}", "h".repeat(8000));
-    let said = handoff(&Handoff {
-        address: Some(far_too_long.clone()),
-        ..issued()
-    })
-    .text();
+    let mut too_long = issued();
+    too_long.address = Some(far_too_long.clone());
+    for client in &mut too_long.clients {
+        client.code.clone_from(&far_too_long);
+    }
+    let said = handoff(&too_long).text();
 
     assert!(
         said.contains(&far_too_long),
@@ -241,4 +242,29 @@ fn a_remedy_is_said_as_the_command_that_takes_it() {
     );
     let none = said(HandoffState::Connected, None);
     assert!(!none.contains('`'), "{none}");
+}
+
+/// A client opened at the address by a link of its own has that link offered as a code
+/// of its own, labelled with the client and the device; one opened at the
+/// address itself is not drawn twice.
+#[test]
+fn a_clients_own_link_is_offered_as_a_code_of_its_own() {
+    let mut linked = issued();
+    linked.clients.push(HandedClient {
+        device: "iPhone or iPad".to_owned(),
+        client: "Swiftfin".to_owned(),
+        open_source: true,
+        code: format!("swiftfin://server?url={ADDRESS}"),
+        deep_link: true,
+    });
+    let said = handoff(&linked).text();
+
+    assert!(
+        said.contains("To open Swiftfin on iPhone or iPad at it, this:"),
+        "{said}"
+    );
+    assert!(
+        !said.contains("To open the official Jellyfin app"),
+        "a client opened at the address was drawn twice: {said}"
+    );
 }

@@ -24,6 +24,7 @@ fn offer(offered: &str) -> Offer {
         offered: offered.to_owned(),
         lapses: String::new(),
         decline: None,
+        claim: None,
     }
 }
 

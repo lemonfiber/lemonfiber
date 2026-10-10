@@ -14,6 +14,16 @@
     "status": 403,
     "description": "Raised when a key asked for something its scope does not reach."
   },
+  "ADMIT-13": {
+    "name": "NOT_OPEN",
+    "status": 401,
+    "description": "Raised when a claim names an invitation that is not open."
+  },
+  "ADMIT-14": {
+    "name": "SHORT_CHOICE",
+    "status": 400,
+    "description": "Raised when the password chosen at a claim is shorter than the least this takes."
+  },
   "ADMIT-4": {
     "name": "NOT_ADMITTED",
     "status": 403,

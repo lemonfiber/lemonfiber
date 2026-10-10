@@ -62,12 +62,15 @@ fn a_refusal_raised_as_a_problem_answers_at_its_status() {
 }
 
 #[test]
-fn only_the_password_door_answers_unauthorized() {
+fn only_the_door_answers_unauthorized() {
     let unauthorized: Vec<Refusal> = Refusal::EVERY
         .into_iter()
         .filter(|refusal| refusal.status() == StatusCode::UNAUTHORIZED)
         .collect();
-    assert_eq!(unauthorized, vec![Refusal::NotThePassword]);
+    assert_eq!(
+        unauthorized,
+        vec![Refusal::NotThePassword, Refusal::NotOpen]
+    );
 }
 
 #[test]

@@ -22,7 +22,7 @@ impl Refusal {
                 "Nobody was identified, so nothing was answered. The account has not been \
                  removed and the session has not ended."
             }
-            Self::NotThePassword => "Nothing was opened, and no session was begun.",
+            Self::NotThePassword | Self::NotOpen | Self::ShortChoice => self.at_the_door(),
             Self::KeyInTheClear => {
                 "The key crossed a network unencrypted, so it was not looked at and nothing \
                  was answered. Anything between that machine and this one may have read it."
@@ -127,6 +127,21 @@ impl Refusal {
                 "The action was not carried out, and nothing was changed. Carrying out \
                  a different request from the one asked for would be worse than none."
             }
+        }
+    }
+
+    /// What a refusal at the door means: a password that opened nothing, or a claim.
+    const fn at_the_door(self) -> &'static str {
+        match self {
+            Self::NotOpen => {
+                "Nothing was set, and no session was begun. The same is said whether the \
+                 invitation was claimed already, ran out, was declined or was never one."
+            }
+            Self::ShortChoice => {
+                "Nothing was set. The invitation still stands and can be claimed with a \
+                 longer password."
+            }
+            _ => "Nothing was opened, and no session was begun.",
         }
     }
 }

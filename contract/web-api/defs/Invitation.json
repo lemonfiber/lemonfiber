@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "One invitation, as it was just made.\n\nCarries what the operator has to pass on and nothing else — a name to sign in\nwith, one address, and how long it stands. The address is the media server's,\nbecause setting a first password happens there.",
+  "description": "One invitation, as it was just made.\n\nCarries what the operator has to pass on and nothing else: a name to sign in with,\nthe address to sign in at, the link the app opens, the address that declines it, and\nhow long it stands. The address is the media server's, where a first password is set\nin a browser; the link sets it through the core instead.",
   "type": "object",
   "properties": {
     "address": {
@@ -37,6 +37,13 @@
       "type": "integer",
       "format": "int64"
     },
+    "join": {
+      "description": "The link the companion app opens this invitation at, `lemonfiber://join` with the\naddress, certificate fingerprint and identifier pairing names, the name to sign in\nas, when it lapses in seconds since the Unix epoch, and a claim token where there is\nan account to claim. Absent on a rehearsal, and where `unjoinable` says why.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "linked": {
       "description": "Whether the request service knows about the household yet.\n\nSeparate from `standing`, which is about the media-server account alone. The\ntwo can disagree — an account made while the request service was unreachable\nis `Made` and `NotYet` — and that disagreement is the state this reports.",
       "$ref": "Linked.json"
@@ -59,6 +66,13 @@
       "items": {
         "type": "string"
       }
+    },
+    "unjoinable": {
+      "description": "Why there is no join link, in words every surface can show. Absent where there is\none, and on a rehearsal.",
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "withdrawn": {
       "description": "Invitations nobody claimed in time, removed on the way past.\n\nReported rather than done quietly: an operator who invited somebody last\nweek and hears nothing would otherwise have no way to learn the account is\ngone. On a rehearsal these are the ones that *would* be removed.",

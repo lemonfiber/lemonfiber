@@ -30,6 +30,8 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `ADMIT-10` | `NOT_A_PASSWORD` | error | 1 | 400 | 0.17.0 | Raised when what was offered at the door is not a password. |
 | `ADMIT-11` | `KEY_IN_THE_CLEAR` | error | 1 | 403 | 0.17.0 | Raised when a key arrived from another machine over a connection its pin does not verify. |
 | `ADMIT-12` | `NOT_FOR_A_KEY` | warning | 1 | 403 | 0.17.0 | Raised when a key asked for something its scope does not reach. |
+| `ADMIT-13` | `NOT_OPEN` | error | 1 | 401 | 0.18.0 | Raised when a claim names an invitation that is not open. |
+| `ADMIT-14` | `SHORT_CHOICE` | error | 1 | 400 | 0.18.0 | Raised when the password chosen at a claim is shorter than the least this takes. |
 
 ## `ASK` — putting a request to the web surface
 

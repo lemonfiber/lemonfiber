@@ -105,9 +105,10 @@ pub struct Applied {
 
 /// One invitation, as it was just made.
 ///
-/// Carries what the operator has to pass on and nothing else — a name to sign in
-/// with, one address, and how long it stands. The address is the media server's,
-/// because setting a first password happens there.
+/// Carries what the operator has to pass on and nothing else: a name to sign in with,
+/// the address to sign in at, the link the app opens, the address that declines it, and
+/// how long it stands. The address is the media server's, where a first password is set
+/// in a browser; the link sets it through the core instead.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub struct Invitation {
@@ -128,6 +129,14 @@ pub struct Invitation {
     /// declining anything. Absent on a rehearsal, for somebody already in the household,
     /// and where the stack runs no decline service.
     pub decline: Option<String>,
+    /// The link the companion app opens this invitation at, `lemonfiber://join` with the
+    /// address, certificate fingerprint and identifier pairing names, the name to sign in
+    /// as, when it lapses in seconds since the Unix epoch, and a claim token where there is
+    /// an account to claim. Absent on a rehearsal, and where `unjoinable` says why.
+    pub join: Option<String>,
+    /// Why there is no join link, in words every surface can show. Absent where there is
+    /// one, and on a rehearsal.
+    pub unjoinable: Option<String>,
     /// What is worth knowing about the address itself, where anything is.
     ///
     /// An address that is a number is one a router can hand elsewhere, so a bookmark
