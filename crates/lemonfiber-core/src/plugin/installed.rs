@@ -21,12 +21,6 @@
 //! make the record disagree with the container. The same goes for the label a service
 //! answers on. Which dashboard group a tier belongs to is the stack's answer rather
 //! than the format's, so nothing declared is kept as nothing declared.
-//!
-//! **A plugin is several services.** One is what this generation of the format
-//! admits, and the record is shaped for what the contract describes rather than for
-//! what the reader currently allows — a record built around a single service would
-//! have to be migrated by the change that admits the second, and a migration of a
-//! record nobody can regenerate is the expensive kind.
 
 use lemonfiber_plugin::{Bind, Manifest, Service};
 use serde::{Deserialize, Serialize};
