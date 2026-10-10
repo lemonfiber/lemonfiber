@@ -417,3 +417,48 @@ fn a_plugins_service_holds_as_first_party_only_where_the_build_trusts_it() {
     unnamed.origin = Origin::Operator;
     assert_eq!(unnamed.holder(), super::Holder::Nobody);
 }
+
+/// The id of what fills `capability` and of what asks for it, where one service fills it.
+fn filled_by(fillers: &Fillers, capability: &str) -> Option<(String, Option<String>)> {
+    fillers
+        .filling(capability)
+        .map(|(filler, asker)| (filler.id.clone(), asker.map(|one| one.id.clone())))
+}
+
+/// A capability the stack asks for is filled by what the ask settled on, with the
+/// service that asked; one the ask leaves contested is filled by nothing.
+#[test]
+fn a_capability_asked_for_is_filled_as_the_ask_settled() {
+    let fillers = shipped(&[], &Chosen::default(), |_| ());
+    assert_eq!(
+        filled_by(&fillers, "identity.source"),
+        Some(("jellyfin".to_owned(), Some("seerr".to_owned())))
+    );
+
+    let rival = an_installed(
+        "emby",
+        vec![a_placed("emby", &["identity.source"], None, Some(8920))],
+    );
+    let contested = shipped(&[rival], &Chosen::default(), |_| ());
+    assert_eq!(filled_by(&contested, "identity.source"), None);
+}
+
+/// A capability nothing asks for is filled by the one service providing it, with
+/// nobody asking; by nothing where none provides it, or two do and nothing settles
+/// which.
+#[test]
+fn a_capability_nothing_asks_for_is_filled_by_its_one_provider() {
+    let fillers = shipped(&[], &Chosen::default(), |_| ());
+    assert_eq!(
+        filled_by(&fillers, "request.intake"),
+        Some(("seerr".to_owned(), None))
+    );
+    assert_eq!(filled_by(&fillers, "nothing.provides"), None);
+
+    let second = an_installed(
+        "intake",
+        vec![a_placed("requests", &["request.intake"], None, Some(8080))],
+    );
+    let two = shipped(&[second], &Chosen::default(), |_| ());
+    assert_eq!(filled_by(&two, "request.intake"), None);
+}

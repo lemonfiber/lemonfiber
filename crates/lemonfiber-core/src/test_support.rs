@@ -126,6 +126,59 @@ pub(crate) fn a_placed(
     }
 }
 
+/// The service a plugin brings in place of the stack's own request service.
+pub(crate) const CONTRACTED_REQUESTS: &str = "requests";
+
+/// Where the host reaches [`CONTRACTED_REQUESTS`].
+pub(crate) const CONTRACTED_REQUESTS_AT: &str =
+    "http://127.0.0.1:8080/lemonfiber/request.intake/v1/";
+
+/// A context over the shipped stack without its own request service, beside a plugin
+/// whose [`CONTRACTED_REQUESTS`] fills `request.intake` and speaks its first major on
+/// loopback 8080, holding its key where `keyed`, with the media server's administrator's
+/// password recorded and every call answered by `http`.
+pub(crate) fn beside_contracted_requests(
+    tag: &str,
+    keyed: bool,
+    http: std::sync::Arc<lemonfiber_fixtures::http::Fake>,
+) -> crate::app::Ctx {
+    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("contracted-{tag}")).kept();
+    let _ = std::fs::remove_dir_all(&dir);
+    lemonfiber_fixtures::stack::manifest_without(&dir, "seerr");
+    if keyed {
+        let at = crate::plugin::key_file(&dir, CONTRACTED_REQUESTS);
+        let _ = std::fs::create_dir_all(at.parent().unwrap_or(&at));
+        let _ = std::fs::write(&at, "contracted-key");
+    }
+    let engine = Reporting::holding(
+        &[CONTRACTED_REQUESTS],
+        crate::ports::docker::Lifecycle::Running,
+        crate::ports::docker::Health::Healthy,
+    )
+    .publishing(&[(CONTRACTED_REQUESTS, "127.0.0.1", 8080)]);
+    let mut ctx = a_context()
+        .over(crate::stack::Source::External(Box::leak(
+            dir.clone().into_boxed_path(),
+        )))
+        .engine(std::sync::Arc::new(engine))
+        .build()
+        .with_http(http);
+    ctx.settings.env_file = Some(dir.join(".env"));
+    let _ = crate::app::targets::record_secret(
+        &ctx,
+        crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+        &a_password(),
+    );
+    let mut placed = a_placed(CONTRACTED_REQUESTS, &["request.intake"], None, Some(8080));
+    placed.speaks = vec!["request.intake@1".to_owned()];
+    let mut register = crate::plugin::Register::empty();
+    let _ = register.record(an_installed("intake", vec![placed]));
+    if let Some(kept) = crate::app::plugins::kept_at(&ctx) {
+        let _ = std::fs::write(kept, register.to_json().unwrap_or_default());
+    }
+    ctx
+}
+
 /// An installed plugin holding these services.
 pub(crate) fn an_installed(
     plugin: &str,

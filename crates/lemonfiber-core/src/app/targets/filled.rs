@@ -18,7 +18,7 @@ use crate::app::Ctx;
 use crate::jellyfin::Jellyfin;
 use crate::wiring::{Filler, Fillers};
 
-use super::media::{fillers_here, settled, MediaServer};
+use super::media::{fillers_here, MediaServer, IDENTITY};
 
 /// The media server's two capabilities, each as the service filling it answers.
 #[derive(Clone)]
@@ -56,7 +56,7 @@ pub(crate) fn served_by(ctx: &Ctx, manifest: &Manifest) -> Option<String> {
 
 /// The media server, where it provides `capability`.
 fn provider<'f>(fillers: &'f Fillers, capability: &str) -> Option<&'f Filler> {
-    let (filler, _) = settled(fillers)?;
+    let (filler, _) = fillers.filling(IDENTITY)?;
     filler
         .provides
         .iter()

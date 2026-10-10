@@ -386,7 +386,7 @@ async fn told(
     members: &[String],
     narrowed: Option<&str>,
 ) -> Told {
-    let Some(access) = crate::app::targets::seerr_reader(ctx, manifest).await else {
+    let Some(access) = crate::app::targets::household_requests(ctx, manifest).await else {
         return Told {
             linked: Linked::NotTried,
             requesting: Linked::NotTried,

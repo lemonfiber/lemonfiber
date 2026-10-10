@@ -20,7 +20,7 @@ mod standing;
 
 use std::collections::BTreeMap;
 
-use crate::app::targets::{identity, seerr_reader};
+use crate::app::targets::{household_requests, identity};
 use crate::app::{Ctx, Hostable, Whom};
 use naming::{library_titles, named_access, named_by_the_server, titled, Naming};
 
@@ -263,10 +263,10 @@ pub(crate) async fn reaching(
     ctx: &Ctx,
     manifest: &lemonfiber_manifest::Manifest,
 ) -> Result<crate::app::targets::HouseholdAccess, String> {
-    let Some(access) = seerr_reader(ctx, manifest).await else {
+    let Some(access) = household_requests(ctx, manifest).await else {
         return Err(
-            "there is no request service to ask, or it has not written its own key yet, \
-             so what the household has asked for is not shown"
+            "there is no request service to ask, or it cannot be asked yet, so what the \
+             household has asked for is not shown"
                 .to_owned(),
         );
     };

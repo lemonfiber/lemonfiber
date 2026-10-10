@@ -236,6 +236,26 @@ impl Fillers {
         self.services.iter()
     }
 
+    /// The one service filling `capability`, with the service asking for it where one
+    /// does: the one the ask settled on, or where nothing asks, the one service here
+    /// providing it. Nothing where the ask is contested, or where nothing asks and other
+    /// than exactly one service provides it.
+    #[must_use]
+    pub fn filling(&self, capability: &str) -> Option<(&Filler, Option<&Filler>)> {
+        if let Some(ask) = self.asks.iter().find(|ask| ask.capability == capability) {
+            let [filler] = ask.fillers.as_slice() else {
+                return None;
+            };
+            return Some((filler, self.service(&ask.by)));
+        }
+        let mut providing = self
+            .services
+            .iter()
+            .filter(|one| one.provides.iter().any(|provided| provided == capability));
+        let one = providing.next()?;
+        providing.next().is_none().then_some((one, None))
+    }
+
     /// Every service lemonfiber speaks to through this adapter, the stack's first.
     pub fn speaking(&self, kind: ApiKind) -> impl Iterator<Item = &Filler> {
         self.services.iter().filter(move |one| one.speaks(kind))

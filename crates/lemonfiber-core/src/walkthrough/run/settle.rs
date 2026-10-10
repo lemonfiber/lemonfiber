@@ -11,7 +11,7 @@
 
 use super::choose::Chosen;
 use super::walk::Walk;
-use crate::app::targets::{data_root, seerr_reader, serving};
+use crate::app::targets::{data_root, household_requests, serving};
 use crate::app::Ctx;
 use crate::model::WalkthroughReport;
 use crate::storage::Linked;
@@ -56,7 +56,7 @@ pub(super) async fn settle(
     }
 
     walk.say(Line::saying(Step::Available, chosen.named.clone()));
-    let household = seerr_reader(walk.ctx, manifest).await.is_some();
+    let household = household_requests(walk.ctx, manifest).await.is_some();
     walk.finished(Shape::Pipeline, &chosen.named, link, household)
 }
 

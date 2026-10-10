@@ -187,7 +187,7 @@ fn unnamed() -> BTreeMap<String, String> {
 }
 
 /// A context whose request service can be reached: the media-server password is
-/// recorded, so `seerr_reader` resolves a client. Tagged so each test keeps its own
+/// recorded, so `household_requests` resolves a client. Tagged so each test keeps its own
 /// env file rather than racing on a shared one.
 fn ctx_with(fake: &Fake, tag: &str) -> Ctx {
     ctx_over(fake.transport(), tag, false)
@@ -236,6 +236,7 @@ fn ctx_over(transport: Arc<Transport>, tag: &str, no_room: bool) -> Ctx {
     context
 }
 
+mod contracted;
 mod defaults;
 mod limits;
 mod quota;

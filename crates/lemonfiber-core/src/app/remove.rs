@@ -60,7 +60,7 @@ pub(crate) async fn remove(
         return Err(Box::new(runs_the_server(&member.name)));
     }
 
-    let asking = super::targets::seerr_reader(ctx, &manifest).await;
+    let asking = super::targets::household_requests(ctx, &manifest).await;
     let mut cost = what_it_costs(asking.as_ref(), &member).await;
 
     if !confirm {

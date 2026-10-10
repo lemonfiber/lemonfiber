@@ -196,7 +196,7 @@ async fn handed(
     }
     let requests: Box<dyn Requests> = match requester {
         Requester::Over(adapter) => Box::new(intake::Adapter(adapter)),
-        Requester::Bundled(port) => Box::new(owned(ctx, &asker, port).await),
+        Requester::Bundled(base) => Box::new(owned(ctx, &asker, base).await),
     };
     let requests = requests.as_ref();
     let mut wirings = match project.filter(|_| crate::app::gating::service(services).is_some()) {
@@ -211,35 +211,27 @@ async fn handed(
 enum Requester {
     /// Over `request.intake`.
     Over(Contracted),
-    /// As the bundled request service, at the port it publishes.
-    Bundled(u16),
+    /// As the stack's own request service, where the host reaches it.
+    Bundled(String),
 }
 
 /// How `asker` is asked: over `request.intake` where it speaks it, otherwise as the
-/// bundled request service where it is the stack's own, at the port it publishes.
-/// Nothing where it speaks the contract and cannot be asked over it, or is a plugin's
-/// service speaking none, which the stack's own key is never handed to.
+/// stack's own request service where [`crate::app::targets::bundled_requests`] lets it
+/// be. Nothing where it speaks the contract and cannot be asked over it, or is a
+/// plugin's service speaking none, which the stack's own key is never handed to.
 async fn requester(ctx: &Ctx, asker: &Cleared<'_>) -> Option<Requester> {
     match spoken(ctx, asker, intake::CAPABILITY, intake::MAJOR).await {
         Spoken::Over(adapter) => Some(Requester::Over(adapter)),
         Spoken::Unanswered => None,
-        Spoken::Not => (asker.holder() == crate::wiring::Holder::Stack)
-            .then_some(asker.published)
-            .flatten()
-            .map(Requester::Bundled),
+        Spoken::Not => crate::app::targets::bundled_requests(asker).map(Requester::Bundled),
     }
 }
 
-/// The stack's own request service `asker` as its owner, at `port`: carrying the key it
-/// wrote for itself, read from its own file, or none before it has written one.
-async fn owned(ctx: &Ctx, asker: &Cleared<'_>, port: u16) -> crate::seerr::Seerr {
-    let base = crate::app::targets::loopback(port);
+/// The stack's own request service `asker` as its owner, at `base`: carrying the key it
+/// wrote for itself, or none before it has written one.
+async fn owned(ctx: &Ctx, asker: &Cleared<'_>, base: String) -> crate::seerr::Seerr {
     let http = ctx.seams.http.clone();
-    match crate::app::targets::credential_file(ctx, asker)
-        .await
-        .text()
-        .and_then(|settings| crate::seerr::api_key(&settings))
-    {
+    match crate::app::targets::requests_key(ctx, asker).await {
         Some(key) => crate::seerr::Seerr::keyed(http, base, &asker.id, key),
         None => crate::seerr::Seerr::new(http, base, &asker.id),
     }
