@@ -3,7 +3,7 @@
 //!
 //! The service itself (who it signs in through, which curators it hands requests to,
 //! who it knows and what it tells them); what one member may ask for and what becomes
-//! of one request; where the person who made a request already hears from it; and the
+//! of one request; where the person who made a request already hears from it; the
 //! notices everybody reads before they ask; and the titles beyond the house a member may
 //! find and ask for.
 
