@@ -395,7 +395,7 @@ async fn without_a_media_server_the_curators_are_still_routed() {
     );
     let services = vec![
         seerr_svc(),
-        arr("sonarr", 8989, "tv"),
+        curator("sonarr", 8989, "tv"),
         manifest_service("request-gate", None, Some(lemonfiber_sidecar::gate::PORT)),
     ];
 

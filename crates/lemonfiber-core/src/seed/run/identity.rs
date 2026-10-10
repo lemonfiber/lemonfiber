@@ -176,7 +176,6 @@ fn changed(server: &MediaServer) -> String {
     )
 }
 
-/// Change the administrator's password, and say how that went.
 /// What is said where the media server names no API the request service could sign the
 /// household in through: an adapter whose upstream declares none.
 fn unpaired(server: &MediaServer) -> crate::seed::Wiring {
@@ -193,6 +192,7 @@ fn unpaired(server: &MediaServer) -> crate::seed::Wiring {
     )
 }
 
+/// Change the administrator's password, and say how that went.
 async fn changed_after_setup(ctx: &Ctx, server: &MediaServer) -> crate::seed::Wiring {
     let failed = match crate::app::credentials::replace_jellyfin_password(ctx, server, false).await
     {

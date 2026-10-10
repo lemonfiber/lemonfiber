@@ -182,16 +182,16 @@ fn a_stack_asking_for_no_identity_still_has_its_media_server() {
 /// `native` is given.
 fn a_contracted_server(native: Option<&str>) -> Installed {
     let mut adapter = a_placed(
-        "plex-adapter",
+        "media-adapter",
         &["identity.source", "media.serve"],
         None,
         Some(8080),
     );
     adapter.speaks = vec!["identity.source@1".to_owned(), "media.serve@1".to_owned()];
-    adapter.fronts = Some("plex".to_owned());
-    let mut upstream = a_placed("plex", &[], None, Some(32400));
+    adapter.fronts = Some("media-upstream".to_owned());
+    let mut upstream = a_placed("media-upstream", &[], None, Some(9000));
     upstream.native = native.map(str::to_owned);
-    an_installed("plex", vec![adapter, upstream])
+    an_installed("contracted", vec![adapter, upstream])
 }
 
 /// A contracted media server is spoken to over its contracts alone, and another service
@@ -200,11 +200,11 @@ fn a_contracted_server(native: Option<&str>) -> Installed {
 /// answers no route for it.
 #[test]
 fn a_contracted_server_is_reached_over_its_contracts_and_paired_at_its_upstream() {
-    let chosen = Chosen::read(Some("identity.source=plex-adapter"));
-    let fillers = shipped(&[a_contracted_server(Some("plex"))], &chosen, |_| ());
+    let chosen = Chosen::read(Some("identity.source=media-adapter"));
+    let fillers = shipped(&[a_contracted_server(Some("upstream"))], &chosen, |_| ());
     let server = MediaServer::of(&fillers);
 
-    assert_eq!(server.as_ref().map(MediaServer::id), Some("plex-adapter"));
+    assert_eq!(server.as_ref().map(MediaServer::id), Some("media-adapter"));
     assert_eq!(
         server.as_ref().map(|one| one.reach),
         Some(super::Reach::Over)
@@ -212,10 +212,10 @@ fn a_contracted_server_is_reached_over_its_contracts_and_paired_at_its_upstream(
     assert_eq!(
         server.as_ref().and_then(|one| one.pairing.clone()),
         Some(super::Pairing {
-            protocol: crate::ports::service::Protocol("plex".to_owned()),
+            protocol: crate::ports::service::Protocol("upstream".to_owned()),
             at: Address {
-                host: "plex".to_owned(),
-                port: 32400
+                host: "media-upstream".to_owned(),
+                port: 9000
             },
         })
     );
@@ -229,7 +229,7 @@ fn a_contracted_server_is_reached_over_its_contracts_and_paired_at_its_upstream(
 /// no API to tell another service to sign the household in through.
 #[test]
 fn a_contracted_server_whose_upstream_names_no_api_is_unpaired() {
-    let chosen = Chosen::read(Some("identity.source=plex-adapter"));
+    let chosen = Chosen::read(Some("identity.source=media-adapter"));
     let fillers = shipped(&[a_contracted_server(None)], &chosen, |_| ());
     let server = MediaServer::of(&fillers);
 
@@ -268,11 +268,13 @@ fn the_stacks_server_is_reached_through_the_adapter_and_paired_at_itself() {
 /// nowhere: the administrator's password is never pointed at another's service.
 #[test]
 fn a_contracted_server_fronting_another_plugins_service_is_unpaired() {
-    let mut installed = a_contracted_server(Some("plex"));
-    installed.services.retain(|placed| placed.service != "plex");
-    let mut stranger = a_placed("plex", &[], None, Some(32400));
-    stranger.native = Some("plex".to_owned());
-    let chosen = Chosen::read(Some("identity.source=plex-adapter"));
+    let mut installed = a_contracted_server(Some("upstream"));
+    installed
+        .services
+        .retain(|placed| placed.service != "media-upstream");
+    let mut stranger = a_placed("media-upstream", &[], None, Some(9000));
+    stranger.native = Some("upstream".to_owned());
+    let chosen = Chosen::read(Some("identity.source=media-adapter"));
     let fillers = shipped(
         &[installed, an_installed("other", vec![stranger])],
         &chosen,

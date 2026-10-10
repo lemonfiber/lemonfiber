@@ -14,7 +14,9 @@
 //! until it is revoked.
 
 use std::path::Path;
+use std::sync::Arc;
 
+use lemonfiber_contract::capabilities::media::serve;
 use lemonfiber_manifest::Service;
 
 use super::fulfilment::fulfilling;
@@ -22,10 +24,6 @@ use super::tokens::{through_the_gate, Kept};
 use super::Ctx;
 use crate::baseline::Baseline;
 use crate::credential::{Reach, Settled};
-use std::sync::Arc;
-
-use lemonfiber_contract::capabilities::media::serve;
-
 use crate::jellyfin::SEERR_APP;
 use crate::ports::media::Kind;
 use crate::ports::service::{RegisteredTarget, Requests};
@@ -92,8 +90,8 @@ pub(super) async fn seed_taken_back(
     let project = gated(services, project)?;
     let (filler, base) = bundled(fillers)?;
     let owed = baseline.named(&filler.id, HELD_KEY);
-    let jellyfin = media_server_admin(ctx, fillers).await;
-    let minted = match &jellyfin {
+    let media_server = media_server_admin(ctx, fillers).await;
+    let minted = match &media_server {
         Some((client, ..)) => client.filed_as(SEERR_APP).await.unwrap_or_default(),
         None => Vec::new(),
     };
@@ -108,7 +106,7 @@ pub(super) async fn seed_taken_back(
         }));
     }
     let requests = crate::app::targets::owned_requests(ctx, filler, base).await;
-    let server = jellyfin
+    let server = media_server
         .as_ref()
         .map(|(_, route, name)| (route.as_str(), name.as_str()));
     let direct = match still_direct(ctx, &requests, fillers, project, server).await {
@@ -134,7 +132,7 @@ pub(super) async fn seed_taken_back(
             .await,
         );
     }
-    if let Some((client, _, server)) = &jellyfin {
+    if let Some((client, _, server)) = &media_server {
         for key in &minted {
             if let Err(failure) = client.revoke(key).await {
                 unsettled.push(format!(

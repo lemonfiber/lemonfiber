@@ -27,7 +27,7 @@ use crate::seed::{State, Wiring};
 /// What the report calls this connection.
 const CONNECTION: &str = "The request gate's routes";
 
-/// Hold the gate to a route for each fulfilling \*arr and, where it speaks the media
+/// Hold the gate to a route for each fulfilling curator and, where it speaks the media
 /// server's API, one for the media server under a key of its own — or, where the stack no
 /// longer runs the gate, to no key at all.
 pub(super) async fn seed_gate_routes(
@@ -42,13 +42,13 @@ pub(super) async fn seed_gate_routes(
         Some((server, kind)) => {
             with_the_media_server(ctx, services, fillers, server, kind, project).await
         }
-        None => arrs_alone(ctx, services, fillers, project).await,
+        None => curators_alone(ctx, services, fillers, project).await,
     }
 }
 
 /// The gate's routes where it answers for no media server: one for each fulfilling
-/// \*arr, and no key minted for it anywhere.
-async fn arrs_alone(
+/// curator, and no key minted for it anywhere.
+async fn curators_alone(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
     fillers: &crate::wiring::Fillers,
