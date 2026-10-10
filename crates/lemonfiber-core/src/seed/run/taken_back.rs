@@ -176,7 +176,8 @@ async fn replaced(
 
 /// What the request service still reaches without the gate, by name: the media server
 /// where its link is not at the gate's route under a token the gate accepts, and each
-/// fulfilling \*arr whose target is not at the gate or does not pass Seerr's own test.
+/// fulfilling \*arr whose target is not at the gate or does not pass the request
+/// service's own test.
 async fn still_direct(
     ctx: &Ctx,
     seerr: &dyn Requests,

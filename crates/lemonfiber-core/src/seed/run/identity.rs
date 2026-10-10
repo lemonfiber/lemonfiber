@@ -27,11 +27,15 @@ pub(super) struct Admin {
 /// setup has not run.
 ///
 /// Nothing where nothing fills the identity source, or where the service asking is not a
-/// request service this build speaks to: without both there is nothing to wire. The admin password is the one credential minted
-/// rather than read — recorded under the server's own setting on the run that mints it,
-/// before the setup is given it, and read back on a later run. Recorded here, before the
-/// second half, so the steps between the two can sign in with it.
-pub(super) async fn seed_jellyfin_admin(ctx: &Ctx, server: Option<&MediaServer>) -> Option<Admin> {
+/// request service this build speaks to: without both there is nothing to wire. The admin
+/// password is the one credential minted rather than read — recorded under the server's
+/// own setting on the run that mints it, before the setup is given it, and read back on a
+/// later run. Recorded here, before the second half, so the steps between the two can
+/// sign in with it.
+pub(super) async fn seed_media_server_admin(
+    ctx: &Ctx,
+    server: Option<&MediaServer>,
+) -> Option<Admin> {
     let server = server?;
     let requests = server.requests()?;
     let client = server.client(ctx);
@@ -55,7 +59,7 @@ pub(super) async fn seed_jellyfin_admin(ctx: &Ctx, server: Option<&MediaServer>)
 /// request gate's route to it where the stack runs the gate, and at the server's own
 /// address on the stack's network where it does not — then, through the gate, handed the
 /// token it reaches the server with after that.
-pub(super) async fn seed_jellyfin_identity(
+pub(super) async fn seed_request_identity(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
     expected: &crate::baseline::Baseline,
@@ -68,7 +72,7 @@ pub(super) async fn seed_jellyfin_identity(
         Some(server),
         Some(Admin {
             administered,
-            requests: seerr_base,
+            requests,
         }),
     ) = (server, admin)
     else {
@@ -85,10 +89,9 @@ pub(super) async fn seed_jellyfin_identity(
 
     let wiring = match administered {
         Ok(password) => {
-            let seerr_client =
-                crate::seerr::Seerr::new(ctx.seams.http.clone(), &seerr_base, "seerr");
+            let client = crate::seerr::Seerr::new(ctx.seams.http.clone(), &requests, "seerr");
             crate::seed::wire_request_identity(
-                &seerr_client,
+                &client,
                 server.protocol(),
                 &password,
                 &server_url,
@@ -102,7 +105,7 @@ pub(super) async fn seed_jellyfin_identity(
     // What the household is told and where the request service reaches the media server
     // are read and written with the request service's own key, which the setup above
     // is what writes, so the client is opened only now.
-    let owner = crate::app::targets::seerr_as_owner(ctx, services, seerr_base.clone()).await;
+    let owner = crate::app::targets::seerr_as_owner(ctx, services, requests.clone()).await;
 
     let linked = match (gate, &wiring.state) {
         (Some(_), crate::seed::State::WouldWire { .. }) => {
