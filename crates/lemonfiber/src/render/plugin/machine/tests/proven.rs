@@ -435,6 +435,22 @@ fn an_install_says_what_its_services_would_ask_for_and_one_asking_nothing_is_sil
     .text();
     assert!(done.contains("What it asks for:"), "{done}");
     assert!(done.contains("reaching nothing"), "{done}");
+
+    let named = super::super::asking(
+        &[lemonfiber_core::wiring::Wired {
+            reaches: lemonfiber_core::wiring::Reaches::ByName {
+                service: "sonarr".to_owned(),
+                why: String::new(),
+            },
+            ..asked(lemonfiber_core::wiring::Settled::Outright, &[])
+        }],
+        false,
+    )
+    .text();
+    assert!(
+        named.contains("subfinder is wired to sonarr by name"),
+        "{named}"
+    );
 }
 
 /// Proving `komga` again, asked or only read, with one answer kept against it.

@@ -393,20 +393,24 @@ pub(super) fn asking(asks: &[lemonfiber_core::wiring::Wired], recorded: bool) ->
         if recorded { "asks" } else { "would ask" }
     ));
     for link in asks {
-        if let lemonfiber_core::wiring::Reaches::Asked {
-            capability,
-            services,
-            settled,
-            origins,
-        } = &link.reaches
-        {
-            lines.put(format!(
-                "      {} asks for {capability}, reaching {}",
-                link.by,
-                super::super::wiring::reached(services, origins)
-            ));
-            for said in super::super::wiring::settling(settled) {
-                lines.put(format!("        {said}"));
+        match &link.reaches {
+            lemonfiber_core::wiring::Reaches::Asked {
+                capability,
+                services,
+                settled,
+                origins,
+            } => {
+                lines.put(format!(
+                    "      {} asks for {capability}, reaching {}",
+                    link.by,
+                    super::super::wiring::reached(services, origins)
+                ));
+                for said in super::super::wiring::settling(settled) {
+                    lines.put(format!("        {said}"));
+                }
+            }
+            lemonfiber_core::wiring::Reaches::ByName { service, .. } => {
+                lines.put(format!("      {} is wired to {service} by name", link.by));
             }
         }
     }
