@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use lemonfiber_plugin::{Manifest, Shape};
 
 use super::super::installed::{Installed, Placed, Reached};
-use super::{published, written, CONFIGURATION, HOUSEHOLD, LIBRARY, LOOPBACK, PROFILE};
+use super::{published, written, CONFIGURATION, HOUSEHOLD, LIBRARY, LOOPBACK, OPERATOR, PROFILE};
 
 /// The template the generated entries extend, as the stack ships it.
 ///
@@ -223,6 +223,31 @@ fn the_port_an_adapter_speaks_on_is_published_on_loopback_at_a_port_the_engine_p
         ..placed()
     });
     assert!(!silent.contains("ports:"), "got: {silent}");
+}
+
+/// A service that speaks a contract runs as the operator, so it can read the key written
+/// readable by that uid alone; one that speaks none is written with no user at all.
+#[test]
+fn an_adapter_runs_as_the_operator_and_nothing_else_is_given_a_user() {
+    let adapter = document(Placed {
+        speaks: vec!["media.serve@1".to_owned()],
+        listens: Some(8080),
+        ..placed()
+    });
+    let user = read(&adapter)
+        .get("services")
+        .and_then(|services| services.get("komga"))
+        .and_then(|entry| entry.get("user"))
+        .and_then(serde_yaml_ng::Value::as_str)
+        .map(str::to_owned);
+    assert_eq!(user.as_deref(), Some(OPERATOR), "got: {adapter}");
+    let mut carried = keys(&adapter);
+    assert!(carried.remove("user"), "got: {adapter}");
+    let permitted: BTreeSet<String> = KEYS.iter().map(|&key| key.to_owned()).collect();
+    assert!(carried.is_subset(&permitted), "got: {adapter}");
+    for stranger in shapes() {
+        assert!(!keys(&stranger).contains("user"), "got: {stranger}");
+    }
 }
 
 /// The library is mounted for a service that said it handles media, and no other.

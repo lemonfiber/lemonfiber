@@ -46,9 +46,13 @@
 //! any of it but `shape`, which names the egress guard's shape rather than spelling it:
 //! this adds `NET_ADMIN` and `/dev/net/tun` for it, and nothing else. What is not set
 //! is set nowhere for a reason: a memory ceiling that fits a media server transcoding
-//! is no ceiling for a sidecar, a read-only root breaks every image that writes outside
-//! its configuration directory, and a user would break every image that drops to one
-//! itself.
+//! is no ceiling for a sidecar, and a read-only root breaks every image that writes
+//! outside its configuration directory.
+//!
+//! **A user is written for an adapter and for nothing else.** A service that speaks a
+//! contract is built for lemonfiber's, and reads a key written readable by the
+//! operator's uid alone, so it runs as that uid (`F14-R27`). Any other service is a
+//! stranger's image, and a user would break every one that drops to its own.
 
 use serde::Serialize;
 
@@ -87,6 +91,9 @@ const CONFIGURATION: &str = "./config";
 
 /// The library, mounted exactly as every bundled service mounts it.
 const LIBRARY: &str = "${DATA_ROOT:-./data}:/data";
+
+/// Who an adapter runs as: the operator, spelled as the stack's own images are.
+const OPERATOR: &str = "${PUID:-1000}:${PGID:-1000}";
 
 /// The interface a household port is published on.
 ///
@@ -177,8 +184,8 @@ impl Serialize for Services<'_> {
 /// One service's entry, and the whole of what one can carry.
 ///
 /// A key is a field here, so a key a plugin may not have — a mount of its own, a
-/// network mode, a user, an entrypoint, a command, an environment — is one there is no
-/// field for. The fields that bound what it may do, the devices included, hold only
+/// network mode, an entrypoint, a command, an environment — is one there is no field
+/// for. The fields that bound what it may do, the devices included, hold only
 /// this build's values.
 #[derive(Serialize)]
 struct Entry {
@@ -188,6 +195,9 @@ struct Entry {
     image: String,
     /// The plugin's own profile.
     profiles: Vec<String>,
+    /// The operator, where it speaks a contract.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    user: Option<&'static str>,
     /// Where it is published, where it listens.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     ports: Vec<String>,
@@ -229,9 +239,9 @@ struct Extends {
 ///
 /// Every value the plugin supplied is written as a literal: Compose substitutes
 /// `${…}` from the stack's environment file in any value, quoted or not, and `$$` is
-/// how a Compose file says a dollar that is only a dollar. The two variables this
-/// build writes itself — the interface and the library — are the only substitutions
-/// an entry carries.
+/// how a Compose file says a dollar that is only a dollar. The variables this
+/// build writes itself — the interface, the library and an adapter's user — are the
+/// only substitutions an entry carries.
 fn entry(plugin: &str, placed: &Placed) -> Entry {
     let (file, service) = TEMPLATE;
     let ports = placed
@@ -262,6 +272,7 @@ fn entry(plugin: &str, placed: &Placed) -> Entry {
         extends: Extends { file, service },
         image: format!("{}@{}", literal(&placed.image), literal(&placed.digest)),
         profiles: vec![profile(plugin)],
+        user: (!placed.speaks.is_empty()).then_some(OPERATOR),
         ports,
         volumes,
         networks: placed.networks.iter().map(|name| literal(name)).collect(),
