@@ -4,8 +4,6 @@
 //! material names, the name to sign in as, when it lapses, and a claim token. The token
 //! goes out once, in the link, and this program keeps only its hash on the offer.
 
-use std::fmt::Write as _;
-
 use lemonfiber_sidecar::TokenHash;
 
 use crate::app::Ctx;
@@ -93,22 +91,9 @@ fn written(material: &Material, expires: u64, name: &str, claim: Option<&str>) -
     }
     let query: Vec<String> = said
         .into_iter()
-        .map(|(key, value)| format!("{key}={}", encoded(value)))
+        .map(|(key, value)| format!("{key}={}", crate::endpoint::query_encoded(value)))
         .collect();
     format!("{JOIN}?{}", query.join("&"))
-}
-
-/// `value` with every byte outside the unreserved set written as `%XX`, a space included,
-/// so no reader takes a `+` for one.
-fn encoded(value: &str) -> String {
-    value.bytes().fold(String::new(), |mut out, byte| {
-        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~') {
-            out.push(char::from(byte));
-        } else {
-            let _ = write!(out, "%{byte:02X}");
-        }
-        out
-    })
 }
 
 /// Why there is no join link, from what refused the pairing material it is built on.

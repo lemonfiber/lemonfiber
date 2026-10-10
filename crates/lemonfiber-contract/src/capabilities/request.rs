@@ -4,13 +4,14 @@
 //! The service itself (who it signs in through, which curators it hands requests to,
 //! who it knows and what it tells them); what one member may ask for and what becomes
 //! of one request; where the person who made a request already hears from it; and the
-//! notices everybody reads before they ask.
+//! notices everybody reads before they ask; and the titles beyond the house a member may
+//! find and ask for.
 
 use lemonfiber_ports::media::Kind;
 use lemonfiber_ports::service::{
-    Address, Addressing, Approving, Asking, Endpoint, FulfilmentTarget, Headroom, Holding,
-    HouseholdRequest, IdentitySource, MediaServerLink, Noticing, Quota, RegisteredTarget,
-    Requesting, Requests, Telling,
+    Address, Addressing, Approving, Asked, Asking, Detail, Endpoint, FulfilmentTarget, Headroom,
+    Holding, HouseholdRequest, IdentitySource, MediaServerLink, Noticing, Page, Quota,
+    RegisteredTarget, Requesting, Requests, Searching, Telling, Wish,
 };
 
 crate::contract! {
@@ -85,6 +86,14 @@ crate::contract! {
         impl Noticing {
             /// Show exactly these notices, in this order.
             fn set_notices(slice notices: &[String] as String) -> ();
+        }
+        impl Searching {
+            /// One page of the titles of these kinds a term finds.
+            fn search(str term: &str, slice kinds: &[Kind] as Kind, value page: u32) -> Page;
+            /// What one title is, with its certification in a region.
+            fn detail(value kind: Kind, str id: &str, str region: &str) -> Option<Detail>;
+            /// Ask for a title on behalf of one member.
+            fn ask(str member: &str, refer wish: &Wish as Wish) -> Asked;
         }
     }
 }

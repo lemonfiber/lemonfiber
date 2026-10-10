@@ -150,24 +150,10 @@ fn substituted(text: &str, values: &BTreeMap<String, String>, encoding: bool) ->
         .map(|piece| match piece {
             Piece::Written(written) => written.to_owned(),
             Piece::Named(name) => match values.get(name.trim()) {
-                Some(value) if encoding => encoded(value),
+                Some(value) if encoding => crate::endpoint::query_encoded(value),
                 Some(value) => value.clone(),
                 None => format!("{OPENS}{name}{CLOSES}"),
             },
-        })
-        .collect()
-}
-
-/// A value as a query carries it: every byte but the unreserved ones percent-encoded.
-fn encoded(value: &str) -> String {
-    value
-        .bytes()
-        .map(|byte| {
-            if byte.is_ascii_alphanumeric() || b"-._~".contains(&byte) {
-                char::from(byte).to_string()
-            } else {
-                format!("%{byte:02X}")
-            }
         })
         .collect()
 }

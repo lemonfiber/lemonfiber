@@ -24,6 +24,7 @@ mod linking;
 mod members;
 mod notices;
 mod records;
+mod searching;
 mod targets;
 
 use members::{approves_own, MemberResource, LINK_MEMBERS, MEMBERS, NOT_FOUND};
