@@ -326,26 +326,6 @@ pub(crate) async fn indexer_aggregator(
     ))
 }
 
-/// Revoke the media server key filed under lemonfiber's name, where it can.
-///
-/// Answers whether one was revoked. Nothing where lemonfiber does not hold the admin
-/// password: a server somebody else set up is one this cannot sign in to.
-pub(crate) async fn revoke_jellyfin_key(
-    ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
-) -> Option<bool> {
-    let addr = service_addr(services, ApiKind::Jellyfin)?;
-    let password = crate::seed::run::identity::recorded_jellyfin_password(ctx)?;
-    let client = crate::jellyfin::Jellyfin::authenticated(
-        ctx.seams.http.clone(),
-        addr.loopback,
-        &addr.id,
-        crate::config::JELLYFIN_ADMIN_USER,
-        password,
-    );
-    crate::app_keys::revoke_ours(&client).await.ok()
-}
-
 /// The request service's own key, read from the settings file it writes.
 ///
 /// Published with the rest of the stack's keys, and the key lemonfiber itself reads and

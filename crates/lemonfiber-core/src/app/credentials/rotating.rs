@@ -76,7 +76,7 @@ pub(crate) async fn rotate(
     }
     match held.origin {
         Origin::Lemonfiber if held.setting == super::declining::SETTING => {
-            super::declining::rotate(ctx, held, services).await
+            super::declining::rotate(ctx, held, services, fillers).await
         }
         Origin::Lemonfiber if held.setting == super::gating::SETTING => {
             super::gating::rotate(ctx, held, fillers).await

@@ -234,7 +234,9 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // configured that way and by no other means — the quality sync and the archive
     // extractor — so without this they run with nothing, and the quality sync refuses
     // its whole configuration over a single undefined name.
-    wirings.push(published::publish_keys(ctx, &manifest.services, project.as_deref(), &held).await);
+    wirings.push(
+        published::publish_keys(ctx, &manifest.services, &fillers, project.as_deref(), &held).await,
+    );
 
     // The listening server's first account, which is anybody's until somebody makes it.
     wirings.extend(claiming::claimed(ctx, &manifest.services).await);

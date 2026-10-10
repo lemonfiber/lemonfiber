@@ -52,6 +52,7 @@ pub(crate) fn published_as(id: &str) -> String {
 pub(super) async fn publish_keys(
     ctx: &Ctx,
     services: &[Service],
+    fillers: &crate::wiring::Fillers,
     project: Option<&std::path::Path>,
     held: &Held,
 ) -> crate::seed::Wiring {
@@ -63,7 +64,7 @@ pub(super) async fn publish_keys(
         return would_publish(published, held);
     }
 
-    retired(ctx, services).await;
+    retired(ctx, services, fillers).await;
     published.extend(from_the_clients(held));
 
     let state = if published.is_empty() {
@@ -186,20 +187,25 @@ async fn written_down(
 /// there — so a revocation that failed leaves the value where the next run can still
 /// find which key it was. The listening server's token cannot be revoked on its own;
 /// forgetting it is what leaves nothing on this machine holding it.
-async fn retired(ctx: &Ctx, services: &[Service]) {
+async fn retired(ctx: &Ctx, services: &[Service], fillers: &crate::wiring::Fillers) {
     let Some(env) = ctx.settings.env_file.as_deref() else {
         return;
     };
-    let revoked = crate::app::targets::revoke_jellyfin_key(ctx, services).await;
-    let media_server =
-        with_api(services, lemonfiber_manifest::ApiKind::Jellyfin).filter(|_| revoked.is_some());
-    let listening = with_api(services, lemonfiber_manifest::ApiKind::Audiobookshelf);
+    let server = crate::app::targets::MediaServer::of(fillers);
+    let revoked = match server.as_ref().and_then(|server| server.administered(ctx)) {
+        Some(client) => crate::app_keys::revoke_ours(&client).await.ok(),
+        None => None,
+    };
+    let media_server = server
+        .filter(|_| revoked.is_some())
+        .map(|server| published_as(server.id()));
+    let listening = with_api(services, lemonfiber_manifest::ApiKind::Audiobookshelf)
+        .map(|service| published_as(&service.id));
     // Only what is there: the file is rewritten by every removal, and a setting that
     // was never published is not a reason to touch it.
     for setting in media_server
         .into_iter()
         .chain(listening)
-        .map(|service| published_as(&service.id))
         .filter(|setting| crate::app::targets::recorded_secret(ctx, setting).is_some())
     {
         let _ = crate::config::store::unset(env, &setting);

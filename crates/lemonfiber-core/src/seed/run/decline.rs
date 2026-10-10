@@ -1,9 +1,11 @@
-//! The decline service's own Jellyfin key: minted for it alone, and handed over in a file.
+//! The decline service's own media server key: minted for it alone, and handed over in a
+//! file.
 //!
-//! The service switches off an invitation the invitee refuses, which on Jellyfin is an
-//! administrator's act on every supported line — and no credential narrower than an API
-//! key, which administers the whole server, can do it. So the key is the service's and
-//! nothing else's: filed under its own name, so Jellyfin's key list says what holds it,
+//! The service switches off an invitation the invitee refuses, which on the media server
+//! is an administrator's act on every supported line — and no credential narrower than an
+//! API key, which administers the whole server, can do it. So the key is the service's
+//! and nothing else's: filed under its own name, so the server's key list says what holds
+//! it,
 //! and written owner-only into the service's configuration directory rather than its
 //! environment, which `docker compose config` and `docker inspect` print.
 //!
@@ -24,49 +26,53 @@ use crate::jellyfin::Jellyfin;
 use crate::ports::service::AppKeys as _;
 use crate::seed::{State, Wiring};
 
-/// What the report calls this connection.
-const CONNECTION: &str = "The decline service's own Jellyfin key";
+/// What the report calls this connection, for the media server `server`.
+fn connection(server: &MediaServer) -> String {
+    format!("The decline service's own {} key", server.name())
+}
 
-/// Hold the decline service to one key of its own, where the stack has Jellyfin — or,
-/// where the stack no longer runs the service, to none.
+/// Hold the decline service to one key of its own, where the stack has a media server —
+/// or, where the stack no longer runs the service, to none.
 pub(super) async fn seed_decline_key(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
     server: Option<&MediaServer>,
     project: Option<&Path>,
 ) -> Option<Wiring> {
-    let jellyfin = super::identity::jellyfin_service(services)?;
+    let server = server?;
     let declining = declining::service(services).is_some();
     // Minted with the administrator's session, which lemonfiber holds only on a server
     // it set up. A rehearsal before the first run finds none recorded, because the
     // identity step mints it, and so finds no key on the server either.
-    let Some(password) = super::identity::recorded_jellyfin_password(ctx) else {
-        let minting = server.is_some_and(|server| {
-            server.setting == crate::config::JELLYFIN_ADMIN_PASSWORD_KEY && server.would_mint(ctx)
-        });
-        return (declining && minting).then(would_mint);
+    let Some(client) = server.administered(ctx) else {
+        let minting = server.would_mint(ctx);
+        return (declining && minting).then(|| would_mint(server));
     };
-    let client = Jellyfin::authenticated(
-        ctx.seams.http.clone(),
-        &jellyfin.loopback,
-        "jellyfin",
-        crate::config::JELLYFIN_ADMIN_USER,
-        password,
-    );
     let filed = client.filed_as(DECLINE_APP).await;
     // A stack that does not run the service asked for nothing here: a key list that
     // could not be read is left for the next run to retire from, not reported.
     if !declining {
-        return super::minted::retired(ctx, &client, DECLINE_APP, CONNECTION, &filed.ok()?).await;
+        return super::minted::retired(
+            ctx,
+            &client,
+            DECLINE_APP,
+            &connection(server),
+            &filed.ok()?,
+        )
+        .await;
     }
     let filed = match filed {
         Ok(filed) => filed,
-        Err(failure) => return Some(settled(crate::seed::unreached(&failure))),
+        Err(failure) => return Some(settled(server, crate::seed::unreached(&failure))),
     };
     let Some(project) = project else {
-        return Some(settled(State::Skipped {
-            reason: "there is no stack directory to hand the decline service its key in".to_owned(),
-        }));
+        return Some(settled(
+            server,
+            State::Skipped {
+                reason: "there is no stack directory to hand the decline service its key in"
+                    .to_owned(),
+            },
+        ));
     };
     let path = declining::path(project, File::Key);
     let held = crate::app::targets::read_owned(
@@ -79,13 +85,13 @@ pub(super) async fn seed_decline_key(
     .filter(|key| filed.iter().any(|one| one == key.reveal()));
     let state = match held {
         Some(key) => kept(ctx, &client, &filed, key.reveal()).await,
-        None if ctx.dry_run => return Some(would_mint()),
+        None if ctx.dry_run => return Some(would_mint(server)),
         None => minted(&client, &filed, &path).await,
     };
-    Some(settled(state))
+    Some(settled(server, state))
 }
 
-/// The key the file holds is one Jellyfin holds: revoke whatever else is filed beside it.
+/// The key the file holds is one the media server holds: revoke whatever else is filed beside it.
 async fn kept(ctx: &Ctx, client: &Jellyfin, filed: &[String], key: &str) -> State {
     let others: Vec<&String> = filed.iter().filter(|one| *one != key).collect();
     if others.is_empty() {
@@ -125,11 +131,14 @@ async fn minted(client: &Jellyfin, filed: &[String], path: &Path) -> State {
 
 /// What a rehearsal says where a real run would mint the key: nothing of the value,
 /// which would not exist yet.
-fn would_mint() -> Wiring {
-    settled(State::WouldWire {
-        yours: None,
-        ours: None,
-    })
+fn would_mint(server: &MediaServer) -> Wiring {
+    settled(
+        server,
+        State::WouldWire {
+            yours: None,
+            ours: None,
+        },
+    )
 }
 
 /// How many keys are filed under the service's name, said as a reader would.
@@ -137,7 +146,7 @@ fn count(keys: usize) -> String {
     super::minted::count(DECLINE_APP, keys)
 }
 
-/// This connection, resting in `state`.
-fn settled(state: State) -> Wiring {
-    Wiring::settled(CONNECTION.to_owned(), state)
+/// This connection to `server`, resting in `state`.
+fn settled(server: &MediaServer, state: State) -> Wiring {
+    Wiring::settled(connection(server), state)
 }

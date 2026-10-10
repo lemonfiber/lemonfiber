@@ -54,15 +54,28 @@ fn service(
 
 /// Jellyfin, and the decline service where `declining`.
 fn stack(declining: bool) -> Vec<lemonfiber_manifest::Service> {
-    let mut services = vec![service(
+    let mut jellyfin = service(
         "jellyfin",
         Some(lemonfiber_manifest::ApiKind::Jellyfin),
         8096,
-    )];
+    );
+    jellyfin.provides = vec!["identity.source".to_owned()];
+    jellyfin.listens = Some(8096);
+    let mut services = vec![jellyfin];
     if declining {
         services.push(service("decline", None, 5056));
     }
     services
+}
+
+/// The shipped stack's fillers with `services` as its services.
+fn fillers(services: &[lemonfiber_manifest::Service]) -> crate::wiring::Fillers {
+    crate::test_support::stack_fillers(
+        services.to_vec(),
+        &[],
+        None,
+        crate::plugin::first_party::EMBEDDED,
+    )
 }
 
 /// A stack directory holding `key` where it holds one, and a context with the media
@@ -264,7 +277,7 @@ async fn a_rotation_lands_only_once_jellyfin_takes_the_key_and_the_service_holds
         &ctx,
         &listed,
         &stack(true),
-        &crate::wiring::Fillers::default(),
+        &fillers(&stack(true)),
         Some(&at),
     )
     .await;
@@ -297,11 +310,10 @@ async fn a_new_key_jellyfin_refuses_is_revoked_and_the_old_one_put_back() {
     let (ctx, at) = scene("decline-rotate-untaken", true, Some("old"), http.clone());
     let listed = listed(&ctx, &at).await;
 
-    let rotation = rotate(&ctx, &listed, &stack(true)).await;
+    let rotation = rotate(&ctx, &listed, &stack(true), &fillers(&stack(true))).await;
 
-    assert!(
-        unproven(&rotation.settled).is_some_and(|said| said.starts_with("Jellyfin did not take"))
-    );
+    assert!(unproven(&rotation.settled)
+        .is_some_and(|said| said.starts_with("The media server did not take")));
     assert_eq!(on_disk(&at).as_deref(), Some("old"));
     assert_eq!(revoked(&http), vec!["fresh".to_owned()]);
 }
@@ -312,7 +324,7 @@ async fn a_new_key_the_service_does_not_hold_is_revoked_and_nothing_left_where_t
     let (ctx, at) = scene("decline-rotate-unheld", true, None, http.clone());
     let listed = listed(&ctx, &at).await;
 
-    let rotation = rotate(&ctx, &listed, &stack(true)).await;
+    let rotation = rotate(&ctx, &listed, &stack(true), &fillers(&stack(true))).await;
 
     assert!(unproven(&rotation.settled)
         .is_some_and(|said| said.starts_with("the decline service did not")));
@@ -332,7 +344,7 @@ async fn a_service_with_no_port_to_ask_is_one_that_does_not_hold_the_key() {
         }
     }
 
-    let rotation = rotate(&ctx, &listed, &services).await;
+    let rotation = rotate(&ctx, &listed, &services, &fillers(&services)).await;
 
     assert!(unproven(&rotation.settled)
         .is_some_and(|said| said.starts_with("the decline service did not")));
@@ -349,7 +361,7 @@ async fn a_new_key_that_cannot_be_written_is_revoked_again() {
     let _ = std::fs::write(at.join("config").join("decline"), "");
     listed.location = key_file(&at).display().to_string();
 
-    let rotation = rotate(&ctx, &listed, &stack(true)).await;
+    let rotation = rotate(&ctx, &listed, &stack(true), &fillers(&stack(true))).await;
 
     assert!(
         unproven(&rotation.settled).is_some_and(|said| said.starts_with("the new key could not"))
@@ -363,7 +375,7 @@ async fn a_mint_jellyfin_refuses_changes_nothing() {
     let (ctx, at) = scene("decline-rotate-unminted", true, Some("old"), http.clone());
     let listed = listed(&ctx, &at).await;
 
-    let rotation = rotate(&ctx, &listed, &stack(true)).await;
+    let rotation = rotate(&ctx, &listed, &stack(true), &fillers(&stack(true))).await;
 
     assert!(unproven(&rotation.settled).is_some(), "{rotation:?}");
     assert_eq!(on_disk(&at).as_deref(), Some("old"));
@@ -381,12 +393,12 @@ async fn without_an_administrator_or_on_a_rehearsal_nothing_is_minted() {
     );
     let listed = listed(&ctx, &at).await;
 
-    let unadministered = rotate(&ctx, &listed, &stack(true)).await;
+    let unadministered = rotate(&ctx, &listed, &stack(true), &fillers(&stack(true))).await;
     assert!(unproven(&unadministered.settled).is_some_and(|said| said.contains("no administrator")));
 
     let (mut rehearsing, _) = scene("decline-rotate-rehearsed", true, Some("old"), http.clone());
     rehearsing.dry_run = true;
-    let rehearsed = rotate(&rehearsing, &listed, &stack(true)).await;
+    let rehearsed = rotate(&rehearsing, &listed, &stack(true), &fillers(&stack(true))).await;
     assert!(
         matches!(rehearsed.settled, Settled::Rehearsed { .. }),
         "{rehearsed:?}"

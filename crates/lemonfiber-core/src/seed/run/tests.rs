@@ -206,19 +206,7 @@ fn fillers_trusting(
     project: &std::path::Path,
     trusted: &[crate::plugin::first_party::FirstParty],
 ) -> crate::wiring::Fillers {
-    crate::test_support::stack()
-        .manifest()
-        .map(|mut manifest| {
-            manifest.services = services;
-            crate::wiring::Fillers::trusting(
-                &manifest,
-                installed,
-                &crate::wiring::Chosen::default(),
-                Some(project),
-                trusted,
-            )
-        })
-        .unwrap_or_default()
+    crate::test_support::stack_fillers(services, installed, Some(project), trusted)
 }
 
 /// A context reaching `service` on loopback 8080, holding its key in `project` where
