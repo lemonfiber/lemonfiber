@@ -402,7 +402,7 @@ fn a_client_that_would_not_answer_says_so_in_its_own_words() {
 
 /// A client asked over the contract of `protocol`, answering every limit and metering
 /// question with figures of its own, uploading where `uploads`.
-fn contracted(protocol: Protocol, uploads: bool) -> (DownloadTarget, Arc<Fake>) {
+fn speaking_its_contract(protocol: Protocol, uploads: bool) -> (DownloadTarget, Arc<Fake>) {
     let held = json(&Throttled {
         rates: wanted().active,
         uploads,
@@ -443,7 +443,7 @@ async fn a_client_speaking_its_protocols_contract_is_limited_and_metered_over_it
         (Protocol::Torrent, "download.torrent", true),
         (Protocol::Usenet, "download.usenet", false),
     ] {
-        let (target, http) = contracted(protocol, uploads);
+        let (target, http) = speaking_its_contract(protocol, uploads);
         let clients = opened(&ctx, &[target]);
         assert_eq!(clients.len(), 1, "the contracted client opened");
         for client in &clients {
