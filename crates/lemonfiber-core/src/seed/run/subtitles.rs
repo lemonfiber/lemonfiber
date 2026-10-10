@@ -89,14 +89,14 @@ pub(super) async fn seed_subtitles(ctx: &Ctx, fillers: &Fillers) -> Vec<crate::s
         };
         for (curator, which, at) in &watching.curators {
             let connection = for_subtitles(&curator.name);
-            let api_key = match super::arrs::servarr_key(ctx, curator).await {
+            let api_key = match super::curating::servarr_key(ctx, curator).await {
                 Beneath::Read(key) => key,
                 Beneath::Absent => {
                     wirings.push(super::skipped(connection, &curator.name));
                     continue;
                 }
                 Beneath::Escaped => {
-                    wirings.push(super::arrs::refused(connection, curator));
+                    wirings.push(super::curating::refused(connection, curator));
                     continue;
                 }
             };
@@ -139,11 +139,14 @@ pub(crate) async fn rewatch(
         let Some(finder) = finder(ctx, watching.asker).await else {
             continue;
         };
-        let api_key = match super::arrs::servarr_key(ctx, curator).await {
+        let api_key = match super::curating::servarr_key(ctx, curator).await {
             Beneath::Read(key) => key,
             Beneath::Absent => continue,
             Beneath::Escaped => {
-                found.push((watching.asker.name.clone(), super::arrs::refusal(curator)));
+                found.push((
+                    watching.asker.name.clone(),
+                    super::curating::refusal(curator),
+                ));
                 continue;
             }
         };

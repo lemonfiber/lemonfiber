@@ -1,6 +1,6 @@
 //! Reading where the services actually file, before the data location moves.
 //!
-//! The \*arrs are the only things that know: each holds its own root folders, and
+//! The \*curating are the only things that know: each holds its own root folders, and
 //! what they hold is not what lemonfiber would write today — an adopted stack, a
 //! folder added by hand, or one left behind by an earlier location all live here
 //! and all survive a move differently. So they are asked rather than assumed.
@@ -55,37 +55,32 @@ const fn nothing() -> Library {
     }
 }
 
-/// The root folders every \*arr that could be opened holds, with whether the host
+/// The root folders every \*curator that could be opened holds, with whether the host
 /// directory each would land on after the move is there.
 ///
-/// `None` where not one \*arr could be asked — which is a different answer from
+/// `None` where not one \*curator could be asked — which is a different answer from
 /// none of them holding anything, and the only one that must never be read as an
-/// empty library. A single \*arr answering is enough to make this a read: the
+/// empty library. A single \*curator answering is enough to make this a read: the
 /// others are still starting, and a later run completes them.
 async fn held(ctx: &Ctx, to: &Path) -> Option<Vec<Existing>> {
     let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
-    let project =
-        super::super::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-    let arrs = super::super::seed::servarr_arrs(&manifest.services, project.as_deref());
+    let fillers = super::super::targets::fillers_here(ctx, &manifest);
+    let curating = super::super::seed::curators(&fillers);
 
     let mut found = Vec::new();
     let mut answered = false;
-    for arr in &arrs {
-        let Some(client) = arr
-            .target
-            .open(&ctx.seams.http, ctx.seams.filesystem.as_ref())
-            .await
-        else {
+    for curator in &curating {
+        let Some(client) = curator.client(ctx).await else {
             continue;
         };
-        let Ok(folders) = crate::ports::service::Client::root_folders(&client).await else {
+        let Ok(folders) = crate::ports::service::Client::root_folders(client.as_ref()).await else {
             continue;
         };
         answered = true;
         for folder in folders {
             let present = resolves(ctx, to, &folder.path).await;
             found.push(Existing {
-                service: arr.target.name.clone(),
+                service: curator.name().to_owned(),
                 path: folder.path,
                 present,
             });

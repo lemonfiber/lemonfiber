@@ -4,12 +4,11 @@
 //! them before it is confirmed and reverts nothing it did not show.
 
 use super::{
-    load_baseline, project_directory, reading, save_baseline, servarr_arrs, wanted_clients, Ctx,
-    Loaded,
+    curators, load_baseline, project_directory, reading, save_baseline, wanted_clients, Ctx, Loaded,
 };
 
 /// Revert every drifted service connection to lemonfiber's own — or, unconfirmed, report
-/// which would be. The connection side of a full reset: for each \*arr, a download-client
+/// which would be. The connection side of a full reset: for each \*curator, a download-client
 /// category the operator changed is written back through the update op (on confirm) or
 /// only listed (on preview). Read-only until confirmed, so a preview changes nothing.
 pub(crate) async fn reset_connections(ctx: &Ctx, confirm: bool) -> Vec<crate::seed::Wiring> {
@@ -23,7 +22,7 @@ pub(crate) async fn reset_connections(ctx: &Ctx, confirm: bool) -> Vec<crate::se
     };
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     let (fillers, held) = reading(ctx, &manifest, register.installed(), project.as_deref()).await;
-    let arrs = servarr_arrs(&manifest.services, project.as_deref());
+    let curating = curators(&fillers);
     let baseline = match load_baseline(ctx) {
         Loaded::Formed(baseline) => baseline,
         Loaded::Fresh | Loaded::Lost => crate::baseline::Baseline::new(),
@@ -32,22 +31,18 @@ pub(crate) async fn reset_connections(ctx: &Ctx, confirm: bool) -> Vec<crate::se
     let at = ctx.stamp();
 
     let mut wirings = Vec::new();
-    for arr in &arrs {
-        let wanted = wanted_clients(arr, &fillers, &held);
+    for curator in &curating {
+        let wanted = wanted_clients(*curator, &fillers, &held);
         if wanted.is_empty() {
             continue;
         }
-        let Some(client) = arr
-            .target
-            .open(&ctx.seams.http, ctx.seams.filesystem.as_ref())
-            .await
-        else {
+        let Some(client) = curator.client(ctx).await else {
             continue;
         };
         wirings.extend(
             reset_arr_connections(
-                &client,
-                &arr.target.name,
+                client.as_ref(),
+                curator.name(),
                 &wanted,
                 confirm,
                 &baseline,
@@ -66,7 +61,7 @@ pub(crate) async fn reset_connections(ctx: &Ctx, confirm: bool) -> Vec<crate::se
     wirings
 }
 
-/// One \*arr's side of a connection reset: on confirm, revert each drifted
+/// One \*curator's side of a connection reset: on confirm, revert each drifted
 /// download-client category in place and report only the reverts that landed; on a
 /// preview, read the clients and report which categories would be reverted, writing
 /// nothing.

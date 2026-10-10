@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use lemonfiber_core::baseline::{Origin, Record};
-use lemonfiber_core::doctor::credentials::Target;
+use lemonfiber_core::doctor::credentials::{Reach, Target};
 use lemonfiber_core::doctor::wiring::{Managed, Wired, WiringCheck};
 use lemonfiber_core::doctor::{Category, Check, Finding, Verdict};
 use lemonfiber_core::error::codes::wiring::DRIFTED;
@@ -74,8 +74,11 @@ fn recorded(value: &str, origin: Origin) -> Record {
 
 /// The wiring lemonfiber manages, with whatever it recorded for it.
 fn managed(recorded: Option<Record>) -> Managed {
+    let target = sonarr();
     Managed {
-        target: sonarr(),
+        id: target.id.clone(),
+        name: target.name.clone(),
+        reach: Some(Reach::Bundled(target)),
         clients: vec![Wired {
             want: want(),
             recorded,

@@ -78,11 +78,11 @@ async fn wanted_targets(
     let mut refused = Vec::new();
     for fulfils in curators {
         let filler = fulfils.filler;
-        let key = match super::arrs::servarr_key(ctx, filler).await {
+        let key = match super::curating::servarr_key(ctx, filler).await {
             Beneath::Read(key) => key,
             Beneath::Absent => continue,
             Beneath::Escaped => {
-                refused.push(super::arrs::refused(
+                refused.push(super::curating::refused(
                     crate::seed::as_request_target(&filler.name),
                     filler,
                 ));

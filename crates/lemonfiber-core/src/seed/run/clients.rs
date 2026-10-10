@@ -163,7 +163,7 @@ pub(super) fn refused(fillers: &Fillers, held: &Held) -> Vec<Wiring> {
         .filter(|pairing| matches!(pairing.made, Ok((Connection::DownloadClient(_), _, _))))
         .filter(|pairing| held.refused.contains(&Holder::of(pairing.filler)))
         .map(|pairing| {
-            super::arrs::refused(
+            super::curating::refused(
                 format!("{} into {}", pairing.filler.name, pairing.asker.name),
                 pairing.filler,
             )

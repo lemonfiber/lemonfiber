@@ -84,8 +84,14 @@ async fn seed_skips_arr_root_folders_when_the_key_is_not_readable() {
 }
 
 #[test]
-fn no_project_directory_means_no_arrs_to_wire() {
-    assert!(servarr_arrs(&[], None).is_empty());
+fn no_project_directory_means_no_curators_to_wire() {
+    let fillers = crate::test_support::stack()
+        .manifest()
+        .map(|manifest| {
+            crate::wiring::Fillers::of(&manifest, &[], &crate::wiring::Chosen::default(), None)
+        })
+        .unwrap_or_default();
+    assert!(curators(&fillers).is_empty());
 }
 
 #[tokio::test]
@@ -147,16 +153,20 @@ fn told(
 ) -> Vec<Vec<crate::ports::service::DownloadClient>> {
     crate::test_support::stack()
         .manifest()
-        .map(|manifest| {
+        .map(|mut manifest| {
+            for service in manifest
+                .services
+                .iter_mut()
+                .filter(|one| one.id == "sonarr")
+            {
+                service.media_types = vec![media.to_owned()];
+            }
             let fillers =
                 crate::wiring::Fillers::of(&manifest, installed, chosen, Some(stack_root()));
-            servarr_arrs(&manifest.services, Some(stack_root()))
-                .into_iter()
-                .filter(|arr| arr.target.id == "sonarr")
-                .map(|mut arr| {
-                    arr.media_types = vec![media.to_owned()];
-                    super::super::arrs::wanted_clients(&arr, &fillers, held)
-                })
+            curators(&fillers)
+                .iter()
+                .filter(|arr| arr.id() == "sonarr")
+                .map(|arr| super::super::curating::wanted_clients(*arr, &fillers, held))
                 .collect()
         })
         .unwrap_or_default()
@@ -451,4 +461,73 @@ async fn seed_skips_download_clients_when_the_arr_key_is_not_readable() {
     let clients = download_client_wirings(&report);
     assert_eq!(clients.len(), 6);
     assert!(clients.iter().all(|wiring| is_skipped(wiring)));
+}
+
+/// A plugin `curating` whose service `shows` files television over `library.curate`,
+/// beside the stack's own curators.
+fn contracted_curator(
+    project: &std::path::Path,
+    media: &[&str],
+) -> (crate::plugin::Installed, crate::wiring::Fillers) {
+    let mut installed = contracted("curating", "shows", "library.curate");
+    for placed in &mut installed.services {
+        placed.media_types = media.iter().map(|one| (*one).to_owned()).collect();
+    }
+    let fillers = fillers_trusting(
+        vec![arr("sonarr", 8989, "tv")],
+        std::slice::from_ref(&installed),
+        project,
+        &first_party("curating"),
+    );
+    (installed, fillers)
+}
+
+#[tokio::test]
+async fn a_curator_speaking_the_contract_is_asked_over_it_and_never_as_the_bundled_one() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("curators-contracted");
+    let (_, fillers) = contracted_curator(&project, &["tv"]);
+    let http = Fake::always(Answer::reply(200, "[]"));
+    let ctx = contracted_ctx(&project, "shows", true, http.clone());
+
+    let listed: Vec<&str> = curators(&fillers).iter().map(|one| one.id()).collect();
+    assert!(
+        listed.contains(&"shows") && listed.contains(&"sonarr"),
+        "{listed:?}"
+    );
+    let Some(shows) = curators(&fillers)
+        .into_iter()
+        .find(|one| one.id() == "shows")
+    else {
+        unreachable!("the contracted curator is listed");
+    };
+    let folders = match shows.client(&ctx).await {
+        Some(client) => client.root_folders().await.ok(),
+        None => None,
+    };
+    assert_eq!(folders.map(|held| held.len()), Some(0));
+    assert_eq!(
+        http.request().map(|asked| asked.url),
+        Some("http://127.0.0.1:8080/lemonfiber/library.curate/v1/root_folders".to_owned())
+    );
+
+    let unkeyed = lemonfiber_fixtures::scratch::Scratch::new("curators-contracted-unkeyed");
+    let (_, fillers) = contracted_curator(&unkeyed, &["tv"]);
+    let http = Fake::always(Answer::reply(200, "[]"));
+    let ctx = contracted_ctx(&unkeyed, "shows", false, http.clone());
+    let shows = curators(&fillers)
+        .into_iter()
+        .find(|one| one.id() == "shows");
+    let reached = match shows {
+        Some(shows) => shows.client(&ctx).await.is_some(),
+        None => true,
+    };
+    assert!(!reached);
+    assert!(http.request().is_none());
+}
+
+#[test]
+fn a_contracted_service_filing_no_media_is_no_curator() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("curators-contracted-no-media");
+    let (_, fillers) = contracted_curator(&project, &[]);
+    assert!(curators(&fillers).iter().all(|one| one.id() != "shows"));
 }

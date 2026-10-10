@@ -1,57 +1,83 @@
 //! Seeding one media service.
 //!
-//! Everything a single \*arr needs pointed at it, and the order it has to happen in.
+//! Everything a single \*curator needs pointed at it, and the order it has to happen in.
+
+use lemonfiber_contract::capabilities::library::curate;
 
 use super::clients::Held;
 use super::connecting::{pairings, Connection};
 use super::{
-    category_for, escalate_broken_roots, skipped, target_for, wanted_roots, Ctx, Path, DATA_ROOT,
+    category_for, escalate_broken_roots, skipped, wanted_roots, Ctx, Path, DATA_ROOT,
     SCHEMA_VERSION_FIELD,
 };
+use crate::app::targets::{spoken, Spoken};
+use crate::doctor::credentials::Reach;
 use crate::ports::filesystem::Beneath;
 use crate::ports::service::{Client, DownloadClient};
-use crate::wiring::Fillers;
+use crate::wiring::{Filler, Fillers};
 
-/// A Servarr application that files media: its identity and address (as the
-/// credential check resolves them) and the media types it manages, which give
-/// the root folders it needs.
-pub(crate) struct Arr {
-    pub(crate) target: crate::doctor::credentials::Target,
-    pub(crate) media_types: Vec<String>,
+/// A service that files media, as the core asks it.
+#[derive(Clone, Copy)]
+pub(crate) struct Curator<'a>(&'a Filler);
+
+impl<'a> Curator<'a> {
+    /// Its id.
+    pub(crate) const fn id(self) -> &'a str {
+        self.0.id.as_str()
+    }
+
+    /// Its name.
+    pub(crate) const fn name(self) -> &'a str {
+        self.0.name.as_str()
+    }
+
+    /// The media it files.
+    pub(crate) const fn media_types(self) -> &'a [String] {
+        self.0.media_types.as_slice()
+    }
+
+    /// How the curator is asked: over `library.curate` where it speaks the contract,
+    /// otherwise as the bundled curator. Nothing where it speaks the contract and cannot
+    /// be asked over it.
+    pub(crate) async fn reach(self, ctx: &Ctx) -> Option<Reach> {
+        match spoken(ctx, self.0, curate::CAPABILITY, curate::MAJOR).await {
+            Spoken::Over(adapter) => Some(Reach::Over(adapter)),
+            Spoken::Unanswered => None,
+            Spoken::Not => self.0.target().map(Reach::Bundled),
+        }
+    }
+
+    /// The curator as a client, or nothing where it cannot be asked or its key is not
+    /// written yet.
+    pub(crate) async fn client(self, ctx: &Ctx) -> Option<Box<dyn Client>> {
+        self.reach(ctx)
+            .await?
+            .open(&ctx.seams.http, ctx.seams.filesystem.as_ref())
+            .await
+    }
 }
 
-/// The Servarr applications that file media — Sonarr, Radarr, Lidarr — resolved
-/// with their media types. Prowlarr shares the shape but manages no media, so it
-/// declares no media types and is left out.
-pub(crate) fn servarr_arrs(
-    services: &[lemonfiber_manifest::Service],
-    project: Option<&Path>,
-) -> Vec<Arr> {
-    let Some(project) = project else {
-        return Vec::new();
-    };
-    services
-        .iter()
-        .filter_map(|service| {
-            let target = target_for(service, project)?;
-            if service.media_types.is_empty() {
-                return None;
-            }
-            Some(Arr {
-                target,
-                media_types: service.media_types.clone(),
-            })
+/// Every service that files media and that this machine can ask: over `library.curate`,
+/// or as the bundled curator.
+pub(crate) fn curators(fillers: &Fillers) -> Vec<Curator<'_>> {
+    fillers
+        .services()
+        .filter(|filler| {
+            !filler.media_types.is_empty()
+                && (filler.contracted(curate::CAPABILITY, curate::MAJOR)
+                    || filler.target().is_some())
         })
+        .map(Curator)
         .collect()
 }
 
-/// The inputs a seed pass reads once and hands to every \*arr it seeds: the
-/// cross-\*arr contested-root map, who fills each ask and the credential each
+/// The inputs a seed pass reads once and hands to every \*curator it seeds: the
+/// cross-\*curator contested-root map, who fills each ask and the credential each
 /// download client answers to, the host data root each root folder is checked
-/// against, the loaded baseline to compare with, and whether this is an adopt pass. Grouped so seeding one \*arr takes the pass and the
-/// \*arr rather than a long list that only `arr` varies across.
-pub(super) struct ArrSeeding<'a> {
-    /// Root-folder paths more than one \*arr wants — refused rather than wired.
+/// against, the loaded baseline to compare with, and whether this is an adopt pass. Grouped so seeding one \*curator takes the pass and the
+/// \*curator rather than a long list that only `curator` varies across.
+pub(super) struct CuratorSeeding<'a> {
+    /// Root-folder paths more than one \*curator wants — refused rather than wired.
     pub(super) contested: &'a std::collections::BTreeMap<String, Vec<String>>,
     /// Who fills each of the stack's asks, and where each is reached.
     pub(super) fillers: &'a Fillers,
@@ -69,39 +95,35 @@ pub(super) struct ArrSeeding<'a> {
 /// `/data/media`, and its download clients beside them. The application's key is
 /// read from its configuration; without it — the application has not finished
 /// starting — both are skipped for a re-run rather than failed.
-pub(super) async fn seed_arr(
+pub(super) async fn seed_curator(
     ctx: &Ctx,
-    arr: &Arr,
-    seeding: &ArrSeeding<'_>,
+    curator: &Curator<'_>,
+    seeding: &CuratorSeeding<'_>,
 ) -> (Vec<crate::seed::Wiring>, crate::baseline::Baseline) {
-    let wanted = wanted_roots(&arr.media_types);
-    let clients = wanted_clients(arr, seeding.fillers, seeding.held);
-    // What this \*arr writes is recorded in its own baseline, against the loaded
-    // snapshot, so several \*arrs can be seeded at once without sharing one; the
+    let wanted = wanted_roots(curator.media_types());
+    let clients = wanted_clients(*curator, seeding.fillers, seeding.held);
+    // What this \*curator writes is recorded in its own baseline, against the loaded
+    // snapshot, so several \*curating can be seeded at once without sharing one; the
     // caller folds them back into one afterwards.
     let mut records = crate::baseline::Baseline::new();
 
     // The service's key is read once, opening the client for both its root folders
     // and its download clients rather than once each. Without it the service has not
     // finished starting, so both are skipped for a re-run and nothing is recorded.
-    let Some(client) = arr
-        .target
-        .open(&ctx.seams.http, ctx.seams.filesystem.as_ref())
-        .await
-    else {
+    let Some(client) = curator.client(ctx).await else {
         let mut wirings: Vec<_> = wanted
             .iter()
             .map(|folder| {
                 skipped(
-                    format!("{} root folder in {}", folder.media_type, arr.target.name),
-                    &arr.target.name,
+                    format!("{} root folder in {}", folder.media_type, curator.name()),
+                    curator.name(),
                 )
             })
             .collect();
         wirings.extend(clients.iter().map(|client| {
             skipped(
-                format!("{} into {}", client.name, arr.target.name),
-                &arr.target.name,
+                format!("{} into {}", client.name, curator.name()),
+                curator.name(),
             )
         }));
         return (wirings, records);
@@ -130,7 +152,7 @@ pub(super) async fn seed_arr(
         &live_version,
         seeding
             .expected
-            .expected(&arr.target.name, SCHEMA_VERSION_FIELD),
+            .expected(curator.name(), SCHEMA_VERSION_FIELD),
     ) {
         (Some(live), Some(recorded)) => live != recorded,
         _ => false,
@@ -138,15 +160,15 @@ pub(super) async fn seed_arr(
     let re_baseline = version_changed
         && !clients.is_empty()
         && client.download_clients().await.is_ok_and(|existing| {
-            crate::seed::wholesale_drift(&existing, &clients, seeding.expected, &arr.target.name)
+            crate::seed::wholesale_drift(&existing, &clients, seeding.expected, curator.name())
         });
     if let Some(live) = &live_version {
-        records.record(&arr.target.name, SCHEMA_VERSION_FIELD, live, &at);
+        records.record(curator.name(), SCHEMA_VERSION_FIELD, live, &at);
     }
 
     let mut wirings = crate::seed::wire_root_folders(
-        &client,
-        &arr.target.name,
+        client.as_ref(),
+        curator.name(),
         &wanted,
         crate::seed::Placing {
             contested: seeding.contested,
@@ -163,7 +185,7 @@ pub(super) async fn seed_arr(
     .await;
     // Before the download clients are appended, `wirings` holds exactly one entry per
     // wanted root folder in order, so each is escalated against the folder it reports
-    // on: one the \*arr files into that resolves to nothing on the host is a root
+    // on: one the \*curator files into that resolves to nothing on the host is a root
     // folder pointing where nothing exists — a drift that breaks the stack.
     escalate_broken_roots(
         ctx.seams.filesystem.as_ref(),
@@ -175,8 +197,8 @@ pub(super) async fn seed_arr(
     if !clients.is_empty() {
         wirings.extend(
             crate::seed::wire_download_clients(
-                &client,
-                &arr.target.name,
+                client.as_ref(),
+                curator.name(),
                 &clients,
                 &mut journal,
                 &mut crate::seed::Baselines {
@@ -194,16 +216,20 @@ pub(super) async fn seed_arr(
     (wirings, records)
 }
 
-/// The download clients an \*arr is told about: each service filling one of its asks
+/// The download clients an \*curator is told about: each service filling one of its asks
 /// that lemonfiber connects to it as a download client, at the address that service
-/// declares, under the category the \*arr's first media type files as.
+/// declares, under the category the \*curator's first media type files as.
 ///
 /// None where it manages no category. A filler whose credential is not in hand yet is
 /// left out rather than told about with nothing to prove itself with, and a later run
-/// that finds the credential tells the \*arr then.
-pub(super) fn wanted_clients(arr: &Arr, fillers: &Fillers, held: &Held) -> Vec<DownloadClient> {
-    let Some(category) = arr
-        .media_types
+/// that finds the credential tells the \*curator then.
+pub(super) fn wanted_clients(
+    curator: Curator<'_>,
+    fillers: &Fillers,
+    held: &Held,
+) -> Vec<DownloadClient> {
+    let Some(category) = curator
+        .media_types()
         .first()
         .and_then(|media| category_for(media))
     else {
@@ -211,7 +237,7 @@ pub(super) fn wanted_clients(arr: &Arr, fillers: &Fillers, held: &Held) -> Vec<D
     };
     let mut wanted = Vec::new();
     for pairing in pairings(fillers) {
-        if pairing.ask.by != arr.target.id {
+        if pairing.ask.by != curator.id() {
             continue;
         }
         let Ok((Connection::DownloadClient(protocol), at, _)) = &pairing.made else {
