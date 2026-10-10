@@ -136,6 +136,7 @@ pub(super) fn what_is_wired() -> WiringReport {
         wired: vec![
             Wired {
                 by: "seerr".to_owned(),
+                origin: lemonfiber_core::origin::Origin::Bundled,
                 reaches: Reaches::Asked {
                     capability: "identity.source".to_owned(),
                     services: vec!["jellyfin".to_owned()],
@@ -149,9 +150,26 @@ pub(super) fn what_is_wired() -> WiringReport {
             },
             Wired {
                 by: "qbittorrent".to_owned(),
+                origin: lemonfiber_core::origin::Origin::Bundled,
                 reaches: Reaches::ByName {
                     service: "gluetun".to_owned(),
                     why: "It has no network namespace of its own".to_owned(),
+                },
+            },
+            Wired {
+                by: "subfinder".to_owned(),
+                origin: lemonfiber_core::origin::Origin::Plugin {
+                    named: "subfinder".to_owned(),
+                },
+                reaches: Reaches::Asked {
+                    capability: "library.curate".to_owned(),
+                    services: vec!["sonarr".to_owned()],
+                    settled: Settled::Each,
+                    origins: std::iter::once((
+                        "sonarr".to_owned(),
+                        lemonfiber_core::origin::Origin::Bundled,
+                    ))
+                    .collect(),
                 },
             },
         ],
@@ -220,6 +238,7 @@ pub(super) fn what_is_installed() -> lemonfiber_core::plugin::Installs {
             speaks: Vec::new(),
             fronts: None,
             shape: None,
+            asks: Vec::new(),
         }],
         provides: Vec::new(),
         contributions: Vec::new(),
@@ -270,6 +289,7 @@ pub(super) fn what_is_installed() -> lemonfiber_core::plugin::Installs {
             would: one,
             recorded: true,
             reversed: None,
+            asks: Vec::new(),
             contests: Vec::new(),
             recipes_ran: Vec::new(),
             taking: Vec::new(),

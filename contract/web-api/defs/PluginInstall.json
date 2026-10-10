@@ -14,6 +14,13 @@
         }
       ]
     },
+    "asks": {
+      "description": "Every ask its services would make, each with what it would reach and how that\nwould be settled.",
+      "type": "array",
+      "items": {
+        "$ref": "Wired.json"
+      }
+    },
     "changes": {
       "description": "Every change it makes to the machine, in the order it makes them.",
       "type": "array",
@@ -93,6 +100,7 @@
     "changes",
     "proofs",
     "contests",
+    "asks",
     "overrides",
     "recipes_ran",
     "taking"

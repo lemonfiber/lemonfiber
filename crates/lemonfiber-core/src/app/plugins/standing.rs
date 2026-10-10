@@ -32,21 +32,30 @@ pub(crate) fn substituted(
         .collect()
 }
 
-/// Every ask of the stack's that installing this would leave contested.
+/// What installing a plugin would do to the wiring: the asks it would leave contested
+/// and the asks its own services would make.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct Standing {
+    /// Every ask that installing it would leave contested and that is not contested now.
+    pub(crate) contests: Vec<crate::wiring::Contest>,
+    /// Every ask its services would make, as each would then stand.
+    pub(crate) asks: Vec<crate::wiring::Wired>,
+}
+
+/// What installing `would` beside `held` would do to the wiring.
 ///
 /// Read against the stack as it stands and the plugins already installed, so the answer
 /// is about this machine: an ask a plugin installed earlier has already contested is
 /// not this install's doing, and is not laid at its door.
-pub(crate) fn contested(
+pub(crate) fn standing(
     ctx: &Ctx,
     manifest: &lemonfiber_manifest::Manifest,
     held: &Register,
     would: &Installed,
-) -> Vec<crate::wiring::Contest> {
-    crate::wiring::contested_by(
-        manifest,
-        held.installed(),
-        would,
-        &super::super::targets::chosen_fillers(ctx),
-    )
+) -> Standing {
+    let chosen = super::super::targets::chosen_fillers(ctx);
+    Standing {
+        contests: crate::wiring::contested_by(manifest, held.installed(), would, &chosen),
+        asks: crate::wiring::asked_by(manifest, held.installed(), would, &chosen),
+    }
 }

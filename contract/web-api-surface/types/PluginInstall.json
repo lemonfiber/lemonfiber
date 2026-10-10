@@ -6,6 +6,12 @@
       ],
       "required": false
     },
+    "asks": {
+      "type": [
+        "array[ref:Wired]"
+      ],
+      "required": true
+    },
     "changes": {
       "type": [
         "array[ref:PluginChange]"

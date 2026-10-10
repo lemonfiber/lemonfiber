@@ -497,9 +497,10 @@ fn a_plugins_service_declares_exactly_the_fields_the_contract_permits() {
 ///
 /// The stack manifest declares a link between two of its services, and a link
 /// that names a service rather than asking for a capability is the exception an
-/// operator makes deliberately. A plugin has no field for either: it declares
-/// what its own service can do and is reached by whatever already asks, and the
-/// route and the dashboard entry are written for it from its tier.
+/// operator makes deliberately. A plugin has no field naming a link's far end: it declares
+/// what its own service can do and is reached by whatever already asks, it asks by
+/// capability alone, and the route and the dashboard entry are written for it from
+/// its tier.
 ///
 /// Asked of the generated schema rather than of the types, because the document
 /// an author writes against is the one that has to have no such field — and
@@ -516,7 +517,6 @@ fn the_format_has_no_field_by_which_a_plugin_could_wire_to_a_named_service() {
         "by",
         "by_name",
         "depends_on",
-        "each",
         "filled_by",
         "fills",
         "reaches",
@@ -542,7 +542,7 @@ fn the_format_has_no_field_by_which_a_plugin_could_wire_to_a_named_service() {
 /// Held to the whole set rather than to a floor, so that a block added without the
 /// feature saying so fails here — and so does one quietly removed.
 #[test]
-fn a_manifest_is_the_ten_kinds_of_declaration_and_no_other() {
+fn a_manifest_is_the_eleven_kinds_of_declaration_and_no_other() {
     let published = published();
     let blocks: BTreeSet<&str> = published
         .as_value()
@@ -558,6 +558,7 @@ fn a_manifest_is_the_ten_kinds_of_declaration_and_no_other() {
             "service",
             "claim",
             "wiring",
+            "ask",
             "proof",
             "contribution",
             "recipe",

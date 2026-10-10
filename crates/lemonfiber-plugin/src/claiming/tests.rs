@@ -143,13 +143,13 @@ fn a_capability_a_later_generation_removed_is_told_when_it_went() {
         removed_in: 4,
     };
     let mut found = Vec::new();
-    super::core("media.stream", "service s", &[gone], &mut found);
+    super::core("media.stream", "service s.provides", &[gone], &mut found);
     let said = found.first().map(ToString::to_string).unwrap_or_default();
     assert!(said.contains("media.stream"), "names it: {said}");
     assert!(said.contains("generation 4"), "and when it went: {said}");
 
     let mut unknown = Vec::new();
-    super::core("media.stream", "service s", &[], &mut unknown);
+    super::core("media.stream", "service s.provides", &[], &mut unknown);
     let never = unknown.first().map(ToString::to_string).unwrap_or_default();
     assert!(
         never.contains("names no capability") && !never.contains("generation"),

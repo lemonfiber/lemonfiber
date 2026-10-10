@@ -119,6 +119,55 @@ fn config_path(record: Option<&Installed>, service: &str) -> Option<String> {
     placed(record, service).map(|one| one.config_path)
 }
 
+#[test]
+fn each_ask_is_kept_on_the_service_that_makes_it() {
+    let record = installed(|manifest| {
+        manifest.asking = vec![
+            lemonfiber_plugin::Ask {
+                service: Some("komga-sidecar".to_owned()),
+                capability: "library.curate".to_owned(),
+                each: true,
+            },
+            lemonfiber_plugin::Ask {
+                service: Some("komga".to_owned()),
+                capability: "download.usenet".to_owned(),
+                each: false,
+            },
+        ];
+    });
+    let asks = |service| placed(record.as_ref(), service).map(|one| one.asks);
+    assert_eq!(
+        asks("komga-sidecar"),
+        Some(vec![super::Asking {
+            capability: "library.curate".to_owned(),
+            each: true,
+        }])
+    );
+    assert_eq!(
+        asks("komga"),
+        Some(vec![super::Asking {
+            capability: "download.usenet".to_owned(),
+            each: false,
+        }])
+    );
+}
+
+#[test]
+fn a_service_asking_nothing_records_no_asks_and_reads_back_from_a_record_without_them() {
+    let record = whole();
+    let written = record
+        .as_ref()
+        .and_then(|one| one.services.first())
+        .and_then(|placed| serde_json::to_string(placed).ok())
+        .unwrap_or_default();
+    assert!(
+        !written.is_empty() && !written.contains("asks"),
+        "{written}"
+    );
+    let read: Option<Placed> = serde_json::from_str(&written).ok();
+    assert_eq!(read.map(|one| one.asks), Some(Vec::new()));
+}
+
 /// The adapter a service names and the port it answers on are what the record keeps,
 /// so whatever later asks for what it fills can be told about it.
 #[test]
@@ -451,6 +500,7 @@ fn the_report_says_what_is_installed_and_what_this_run_did() {
                 verified: None,
                 overrides: Vec::new(),
                 reversed: None,
+                asks: Vec::new(),
                 contests: Vec::new(),
                 recipes_ran: Vec::new(),
                 taking: Vec::new(),

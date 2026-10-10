@@ -21,11 +21,11 @@
 //! reached over it and is given no route to what is on it.
 //!
 //! **Settled rather than declared.** A plugin's service stands in for a stack service
-//! only through an ask it is settled to fill: the one the operator chose it for, or one
-//! every claimant answers. A plugin claiming what the stack's own service still answers
-//! replaces nothing, and joining that service's networks would give it reach the stack
-//! never granted it. Choosing a filler is what changes this, so a choice rewrites the
-//! documents of the plugins whose networks it moves.
+//! only through one of the stack's own asks it is settled to fill: the one the operator
+//! chose it for, or one every claimant answers. A plugin claiming what the stack's own
+//! service still answers replaces nothing, and joining that service's networks would
+//! give it reach the stack never granted it. Choosing a filler is what changes this, so
+//! a choice rewrites the documents of the plugins whose networks it moves.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -71,7 +71,10 @@ impl Joins {
         // carries cannot be told apart from the stack's own: it is taken as the stack's,
         // and no plugin's service is settled by a name it shares.
         let mut fills: BTreeMap<(String, String), BTreeSet<String>> = BTreeMap::new();
-        for wired in settled {
+        for wired in settled
+            .iter()
+            .filter(|wired| wired.origin == crate::origin::Origin::Bundled)
+        {
             let crate::wiring::Reaches::Asked {
                 capability,
                 services,

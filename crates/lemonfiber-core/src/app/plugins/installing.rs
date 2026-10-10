@@ -98,9 +98,9 @@ pub(super) async fn install(
         .ok_or_else(|| Box::new(nowhere_to_write(&would.plugin)))?;
     super::occupied::unoccupied(ctx, &would, held.installed(), stack)?;
     let planned = writing::landing(ctx, crate::plugin::writes(&would, stack));
-    let contests = standing::contested(ctx, &stack_manifest, &held, &would);
+    let wiring = standing::standing(ctx, &stack_manifest, &held, &would);
     let changes = crate::plugin::changes(&planned);
-    let offer = offering::installing(&read.digest, &would, &changes, &contests);
+    let offer = offering::installing(&read.digest, &would, &changes, &wiring);
     let (acting, taking) = offering::answered(ctx, consent, &would, &offer, &offering::INSTALLING)?;
 
     let mut stated = crate::plugin::proofs(&read.manifest);
@@ -196,7 +196,8 @@ pub(super) async fn install(
             proofs: stated,
             against,
             verified: checked,
-            contests,
+            contests: wiring.contests,
+            asks: wiring.asks,
             overrides: crate::plugin::overrides(&read.manifest),
             reversed: put_back,
             recipes_ran,

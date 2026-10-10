@@ -333,6 +333,7 @@ fn an_install_that_would_contest_an_ask_says_so_and_one_that_would_not_is_silent
         agreement: None,
         installed: Vec::new(),
         install: Some(Box::new(Install {
+            asks: Vec::new(),
             contests: vec![lemonfiber_core::wiring::Contest {
                 by: "seerr".to_owned(),
                 capability: "identity.source".to_owned(),
@@ -366,6 +367,90 @@ fn an_install_that_would_contest_an_ask_says_so_and_one_that_would_not_is_silent
     )
     .text();
     assert!(done.contains("What is now contested"), "{done}");
+}
+
+/// One ask a plugin's service makes, settled as given and reaching `services`.
+fn asked(
+    settled: lemonfiber_core::wiring::Settled,
+    services: &[&str],
+) -> lemonfiber_core::wiring::Wired {
+    lemonfiber_core::wiring::Wired {
+        by: "subfinder".to_owned(),
+        origin: lemonfiber_core::origin::Origin::Plugin {
+            named: "komga".to_owned(),
+        },
+        reaches: lemonfiber_core::wiring::Reaches::Asked {
+            capability: "library.curate".to_owned(),
+            services: services.iter().map(|one| (*one).to_owned()).collect(),
+            settled,
+            origins: services
+                .iter()
+                .map(|one| ((*one).to_owned(), lemonfiber_core::origin::Origin::Bundled))
+                .collect(),
+        },
+    }
+}
+
+#[test]
+fn an_install_says_what_its_services_would_ask_for_and_one_asking_nothing_is_silent() {
+    let one = recorded("komga", None);
+    let reading = |asks| {
+        installs(&Installs {
+            nonconforming: Vec::new(),
+            proof: None,
+            rehearsed: false,
+            agreement: None,
+            installed: Vec::new(),
+            install: Some(Box::new(Install {
+                asks,
+                ..install(one.clone(), false)
+            })),
+            removal: None,
+            update: None,
+            substituted: Vec::new(),
+            sources: Vec::new(),
+        })
+        .text()
+    };
+    let quiet = reading(Vec::new());
+    assert!(!quiet.contains("would ask"), "{quiet}");
+
+    let said = reading(vec![asked(
+        lemonfiber_core::wiring::Settled::Each,
+        &["sonarr", "radarr"],
+    )]);
+    assert!(said.contains("What it would ask for:"), "{said}");
+    assert!(
+        said.contains(
+            "subfinder asks for library.curate, reaching sonarr (bundled), radarr (bundled)"
+        ),
+        "{said}"
+    );
+    assert!(said.contains("every service that fills it"), "{said}");
+
+    let done = super::super::asking(
+        &[asked(lemonfiber_core::wiring::Settled::Unfilled, &[])],
+        true,
+    )
+    .text();
+    assert!(done.contains("What it asks for:"), "{done}");
+    assert!(done.contains("reaching nothing"), "{done}");
+
+    let named = super::super::asking(
+        &[lemonfiber_core::wiring::Wired {
+            reaches: lemonfiber_core::wiring::Reaches::ByName {
+                service: "sonarr".to_owned(),
+                why: String::new(),
+            },
+            ..asked(lemonfiber_core::wiring::Settled::Outright, &[])
+        }],
+        false,
+    )
+    .text();
+    assert!(
+        named.contains("subfinder is wired to sonarr by name"),
+        "{named}"
+    );
 }
 
 /// Proving `komga` again, asked or only read, with one answer kept against it.

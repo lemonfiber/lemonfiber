@@ -26,6 +26,9 @@ mod answering;
 mod listed;
 mod reproved;
 mod updated;
+mod wired;
+
+use wired::{asking, contesting};
 
 /// What is installed on this machine, and what installing one came to.
 ///
@@ -53,6 +56,7 @@ pub(crate) fn installs(report: &Installs) -> Lines {
         lines.put(format!("    from {}", listed::origin(&install.would)));
         lines.extend(services(&install.would));
         lines.extend(contesting(&install.contests, install.recorded));
+        lines.extend(asking(&install.asks, install.recorded));
         lines.extend(changes(&install.changes, acted));
         lines.extend(proving(&install.proofs, install.against, acted));
         lines.extend(verified(install.verified.as_ref()));
@@ -353,31 +357,6 @@ fn removal(one: &Removal) -> Lines {
     ));
     lines.extend(leaves(&one.leaves, one.removed));
     lines.extend(reversal(&one.went_back));
-    lines
-}
-
-/// Every ask of the stack's the install leaves contested, and what to do about it.
-///
-/// Nothing at all where it contests nothing, which is the common case and needs no
-/// line: this is a warning, and a warning printed on every install stops being read.
-pub(super) fn contesting(contests: &[lemonfiber_core::wiring::Contest], recorded: bool) -> Lines {
-    let mut lines = Lines::default();
-    if contests.is_empty() {
-        return lines;
-    }
-    lines.spaced(format!(
-        "    What {} contested, and reaches nothing until you choose:",
-        if recorded { "is now" } else { "it would leave" }
-    ));
-    for one in contests {
-        lines.put(format!(
-            "      {} asks for {} — claimed by {}",
-            one.by,
-            one.capability,
-            one.claimants.join(", ")
-        ));
-    }
-    lines.put("      Choose which fills it with `lemonfiber wiring fill`.");
     lines
 }
 

@@ -37,7 +37,7 @@ mod settling;
 pub use chosen::{Chosen, REASON_MOST};
 pub use fillers::{crosses, Address, Ask, Filler, Fillers, Holder};
 use settling::claimants;
-pub use settling::{contested_by, filled, settle, unfilled};
+pub use settling::{asked_by, contested_by, filled, settle, unfilled};
 
 /// Every code the wiring, or the record of what is installed, is refused with where
 /// something it is read from cannot be read.
@@ -148,6 +148,8 @@ pub enum Reaches {
 pub struct Wired {
     /// The service the link runs from — what asked.
     pub by: String,
+    /// Where the service that asked came from: this build's stack, or a named plugin.
+    pub origin: crate::origin::Origin,
     /// What it reaches.
     pub reaches: Reaches,
 }

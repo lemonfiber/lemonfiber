@@ -73,16 +73,16 @@ pub(crate) async fn update(
         .ok_or_else(|| Box::new(nowhere_to_write(&would.plugin)))?;
     let mut without = held.clone();
     without.forget(&was.plugin);
-    let contests = super::standing::contested(ctx, &stack_manifest, &without, &would);
+    let wiring = super::standing::standing(ctx, &stack_manifest, &without, &would);
     unheld(ctx, &would, without.installed(), stack)?;
     let changes = crate::plugin::changes(&super::writing::landing(
         ctx,
         crate::plugin::writes(&would, stack),
     ));
-    let offer = super::offering::updating(&read.digest, &was, &would, &changes, &contests);
+    let offer = super::offering::updating(&read.digest, &was, &would, &changes, &wiring);
     let (acting, taking) =
         super::offering::answered(ctx, consent, &would, &offer, &super::offering::UPDATING)?;
-    let mut account = started(&was, &would, &read.manifest, changes, contests, taking);
+    let mut account = started(&was, &would, &read.manifest, changes, wiring, taking);
     let at = crate::plugin::owner(&was.plugin);
     let whose = |change: &crate::journal::Change| crate::plugin::owns(&was.plugin, change);
 
@@ -219,7 +219,7 @@ fn started(
     would: &Installed,
     manifest: &lemonfiber_plugin::Manifest,
     changes: Vec<crate::plugin::Changing>,
-    contests: Vec<crate::wiring::Contest>,
+    wiring: super::standing::Standing,
     taking: Vec<crate::plugin::Taking>,
 ) -> Update {
     Update {
@@ -235,7 +235,8 @@ fn started(
             proofs: crate::plugin::proofs(manifest),
             against: None,
             verified: None,
-            contests,
+            contests: wiring.contests,
+            asks: wiring.asks,
             overrides: crate::plugin::overrides(manifest),
             reversed: None,
             recipes_ran: Vec::new(),

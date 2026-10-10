@@ -6,6 +6,12 @@
       ],
       "required": true
     },
+    "origin": {
+      "type": [
+        "ref:ValueOrigin"
+      ],
+      "required": true
+    },
     "reaches": {
       "type": [
         "ref:Reaches"

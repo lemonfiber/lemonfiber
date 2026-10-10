@@ -57,6 +57,9 @@ pub struct Install {
     /// other, so installing it leaves the ask refused until somebody chooses — which is
     /// a change to what the stack does, and stated with the rest before it happens.
     pub contests: Vec<crate::wiring::Contest>,
+    /// Every ask its services would make, each with what it would reach and how that
+    /// would be settled.
+    pub asks: Vec<crate::wiring::Wired>,
     /// Every bundled thing the plugin declares it will change.
     ///
     /// The full extent rather than a sample of it: a manifest may change a bundled

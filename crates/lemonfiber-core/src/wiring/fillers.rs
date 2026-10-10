@@ -146,18 +146,18 @@ pub struct Ask {
     pub fillers: Vec<Filler>,
 }
 
-/// Every service on this machine, and every ask the stack makes of them.
+/// Every service on this machine, and every ask the stack and its plugins make of them.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Fillers {
     /// The stack's services in declaration order, then each plugin's.
     services: Vec<Filler>,
-    /// Each of the stack's asks, in the order the stack declares them.
+    /// Each ask, the stack's in the order it declares them and then each plugin's.
     asks: Vec<Ask>,
 }
 
 impl Fillers {
-    /// Every ask the stack declares answered against everything installed, and every
-    /// service resolved to where it answers.
+    /// Every ask the stack and its plugins make, answered against everything installed,
+    /// and every service resolved to where it answers.
     ///
     /// `project` is where the stack was written to disk, which is what a credential file
     /// is found beneath; without one every service still has its address and its adapter
@@ -219,7 +219,7 @@ impl Fillers {
         Self { services, asks }
     }
 
-    /// Every ask the stack declares, in the order it declares them.
+    /// Every ask, the stack's in the order it declares them and then each plugin's.
     #[must_use]
     pub fn asks(&self) -> &[Ask] {
         &self.asks

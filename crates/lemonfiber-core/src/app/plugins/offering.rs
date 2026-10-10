@@ -16,27 +16,29 @@ use serde::Serialize;
 
 use std::collections::BTreeMap;
 
+use super::standing::Standing;
 use crate::error::codes::plugin::{PLUGIN_OFFER_MOVED, UNAPPROVED};
 use crate::error::{Problem, Remedy, State};
 use crate::plugin::{Changing, Installed, Taking};
-use crate::wiring::Contest;
 
 use super::super::Ctx;
 
 /// The parts an install's offer is named over, as a refusal names them.
-pub(super) const INSTALLING: [&str; 4] = [
+pub(super) const INSTALLING: [&str; 5] = [
     "the plugin",
     "what it would write",
     "what it would leave contested",
+    "what it would ask for",
     "what it would send where",
 ];
 
 /// The parts an update's offer is named over, as a refusal names them.
-pub(super) const UPDATING: [&str; 6] = [
+pub(super) const UPDATING: [&str; 7] = [
     "the plugin",
     "the version it replaces",
     "what it would write",
     "what it would leave contested",
+    "what it would ask for",
     "what it would stop",
     "what it would send where",
 ];
@@ -112,19 +114,20 @@ impl std::fmt::Debug for Inputs {
 }
 
 /// What an install is offered as: the plugin, what it would write, what it would leave
-/// contested, and what it would send where. `read` is the SHA-256 of the manifest's
-/// bytes as they were read.
+/// contested, what it would ask for, and what it would send where. `read` is the SHA-256
+/// of the manifest's bytes as they were read.
 pub(super) fn installing(
     read: &str,
     would: &Installed,
     changes: &[Changing],
-    contests: &[Contest],
+    standing: &Standing,
 ) -> String {
     let sent = crate::plugin::approvals(&would.recipes).join("\n");
     crate::agreement::joined(&[
         the_plugin(read, would),
         crate::agreement::over(&[&json(changes)]),
-        crate::agreement::over(&[&json(contests)]),
+        crate::agreement::over(&[&json(&standing.contests)]),
+        crate::agreement::over(&[&json(&standing.asks)]),
         crate::agreement::over(&[&sent]),
     ])
 }
@@ -136,7 +139,7 @@ pub(super) fn updating(
     was: &Installed,
     would: &Installed,
     changes: &[Changing],
-    contests: &[Contest],
+    standing: &Standing,
 ) -> String {
     let stops = stopping(was).join("\n");
     let sent = crate::plugin::approvals(&would.recipes).join("\n");
@@ -144,7 +147,8 @@ pub(super) fn updating(
         the_plugin(read, would),
         crate::agreement::over(&[&json(was)]),
         crate::agreement::over(&[&json(changes)]),
-        crate::agreement::over(&[&json(contests)]),
+        crate::agreement::over(&[&json(&standing.contests)]),
+        crate::agreement::over(&[&json(&standing.asks)]),
         crate::agreement::over(&[&stops]),
         crate::agreement::over(&[&sent]),
     ])

@@ -6,6 +6,12 @@
       ],
       "required": false
     },
+    "asks": {
+      "type": [
+        "array[ref:PluginAsking]"
+      ],
+      "required": false
+    },
     "config_path": {
       "type": [
         "string"

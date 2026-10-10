@@ -15,6 +15,13 @@
       ],
       "default": null
     },
+    "asks": {
+      "description": "Every capability it asks for.",
+      "type": "array",
+      "items": {
+        "$ref": "PluginAsking.json"
+      }
+    },
     "config_path": {
       "description": "Where inside the container its one configuration directory is mounted.\n\nResolved rather than optional. The record answers where the directory is, and\na run that re-derived the fallback would answer for a container it did not\nwrite the day that fallback moved.",
       "type": "string"

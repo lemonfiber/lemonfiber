@@ -54,7 +54,12 @@ fn claimed_by(service: &Service, plugin: &str, found: &mut Vec<Violation>) {
     let at = format!("service {}", service.id);
     for name in &service.provides {
         if vocabulary::is_core_name(name) {
-            core(name, &at, vocabulary::removed(), found);
+            core(
+                name,
+                &format!("{at}.provides"),
+                vocabulary::removed(),
+                found,
+            );
         } else if !namespaced_with(name, plugin) {
             found.push(Violation {
                 location: format!("{at}.provides"),
@@ -73,16 +78,16 @@ fn claimed_by(service: &Service, plugin: &str, found: &mut Vec<Violation>) {
 /// A name a published generation carried and this one does not is told which
 /// generation it went in. That is a different fact from a name that never existed and
 /// the only one of the two an author can act on, so the two refusals are not merged.
-fn core(name: &str, at: &str, removed: &[Removed], found: &mut Vec<Violation>) {
+pub(crate) fn core(name: &str, location: &str, removed: &[Removed], found: &mut Vec<Violation>) {
     if vocabulary::carried().iter().any(|held| held.name == name) {
         return;
     }
-    let location = format!("{at}.provides");
+    let location = location.to_owned();
     if let Some(gone) = removed.iter().find(|one| one.name == name) {
         found.push(Violation {
             location,
             message: format!(
-                "{name} was removed in capability vocabulary generation {}, so this claims a name \
+                "{name} was removed in capability vocabulary generation {}, so this names a capability \
                  this build no longer carries",
                 gone.removed_in
             ),

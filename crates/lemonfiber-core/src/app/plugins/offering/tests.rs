@@ -1,8 +1,8 @@
-use super::{acting, Consent, INSTALLING};
+use super::{acting, Consent, Standing, INSTALLING, UPDATING};
 
-/// An offer of four parts, as an install names one.
+/// An offer of five parts, as an install names one.
 fn standing() -> String {
-    crate::agreement::parted(&[&["plugin"], &["writes"], &["contests"], &["a@b"]])
+    crate::agreement::parted(&[&["plugin"], &["writes"], &["contests"], &["asks"], &["a@b"]])
 }
 
 /// What the run is refused with, by code.
@@ -53,6 +53,7 @@ fn an_offer_that_moved_is_refused_naming_only_the_part_that_did() {
             &["plugin"],
             &["other writes"],
             &["contests"],
+            &["asks"],
             &["a@b"],
         ])),
         approved: vec!["a@b".to_owned()],
@@ -159,9 +160,42 @@ fn a_stray_approval_is_repeated_with_nothing_a_terminal_obeys() {
 #[test]
 fn the_plugin_is_sealed_over_the_bytes_that_were_read() {
     let would = crate::test_support::an_installed("komga", Vec::new());
-    let offer = super::installing("aaaa", &would, &[], &[]);
+    let offer = super::installing("aaaa", &would, &[], &Standing::default());
     let plugin = offer.split('-').next().unwrap_or_default();
     assert_eq!(plugin.len(), 32, "{offer}");
-    let other = super::installing("bbbb", &would, &[], &[]);
+    let other = super::installing("bbbb", &would, &[], &Standing::default());
     assert_ne!(other.split('-').next(), Some(plugin));
+}
+
+#[test]
+fn an_install_or_update_whose_asks_moved_is_refused_naming_that_part_alone() {
+    let would = crate::test_support::an_installed("komga", Vec::new());
+    let was = Standing::default();
+    let asking = Standing {
+        asks: vec![crate::wiring::Wired {
+            by: "komga".to_owned(),
+            origin: crate::origin::Origin::Plugin {
+                named: "komga".to_owned(),
+            },
+            reaches: crate::wiring::Reaches::Asked {
+                capability: "library.curate".to_owned(),
+                services: Vec::new(),
+                settled: crate::wiring::Settled::Unfilled,
+                origins: std::collections::BTreeMap::new(),
+            },
+        }],
+        ..Standing::default()
+    };
+    let before = super::installing("aaaa", &would, &[], &was);
+    let after = super::installing("aaaa", &would, &[], &asking);
+    assert_eq!(
+        crate::agreement::differs(&before, &after, &INSTALLING),
+        vec!["what it would ask for"]
+    );
+    let before = super::updating("aaaa", &would, &would, &[], &was);
+    let after = super::updating("aaaa", &would, &would, &[], &asking);
+    assert_eq!(
+        crate::agreement::differs(&before, &after, &UPDATING),
+        vec!["what it would ask for"]
+    );
 }

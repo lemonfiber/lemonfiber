@@ -51,6 +51,9 @@ pub struct Manifest {
     /// How the stack's own proxy and dashboard reach its services. One each, at most.
     #[serde(default, rename = "wiring")]
     pub wirings: Vec<Wiring>,
+    /// The capabilities its services ask for.
+    #[serde(default, rename = "ask")]
+    pub asking: Vec<Ask>,
     /// What must hold before it is installed.
     #[serde(default, rename = "proof")]
     pub proofs: Vec<Proof>,
@@ -336,6 +339,21 @@ pub struct Wiring {
     /// the stack uses for its tier.
     #[serde(default)]
     pub dashboard_group: Option<String>,
+}
+
+/// One capability a plugin's service asks for.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(rename = "PluginAsk")]
+pub struct Ask {
+    /// The plugin's own service that asks; optional where the plugin declares one.
+    #[serde(default)]
+    pub service: Option<String>,
+    /// The core capability asked for.
+    pub capability: String,
+    /// Whether every service that fills it is reached rather than one.
+    #[serde(default)]
+    pub each: bool,
 }
 
 /// Where one service's own entry goes, once the manifest's defaults are taken.

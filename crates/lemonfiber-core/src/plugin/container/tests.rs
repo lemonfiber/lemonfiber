@@ -68,6 +68,7 @@ fn placed() -> Placed {
         speaks: Vec::new(),
         fronts: None,
         shape: None,
+        asks: Vec::new(),
     }
 }
 
@@ -423,6 +424,7 @@ fn the_egress_guard_shape_adds_its_grant_and_its_device_and_nothing_else() {
     let plain = document(placed());
     let shaped = document(Placed {
         shape: Some(Shape::EgressGuard),
+        asks: Vec::new(),
         ..placed()
     });
     assert_eq!(
