@@ -105,8 +105,15 @@ impl Seeding for Client {
         }])
     }
 
-    async fn stop_seeding(&self, _name: &str) -> Result<(), Failure> {
-        Ok(())
+    async fn stop_seeding(&self, name: &str) -> Result<(), Failure> {
+        if name == "a film" {
+            Ok(())
+        } else {
+            Err(Failure::Refused {
+                service: "upstream".to_owned(),
+                detail: format!("nothing called {name} is held"),
+            })
+        }
     }
 }
 
@@ -248,6 +255,11 @@ async fn a_torrent_client_answers_through_its_contract_as_it_answers_in_process(
         Some(7)
     );
     assert_eq!(asked.seeding().await.ok(), Client.seeding().await.ok());
+    assert_eq!(asked.stop_seeding("a film").await.ok(), Some(()));
+    assert!(matches!(
+        asked.stop_seeding("another film").await,
+        Err(Failure::Refused { detail, .. }) if detail.contains("another film")
+    ));
 }
 
 #[tokio::test]
