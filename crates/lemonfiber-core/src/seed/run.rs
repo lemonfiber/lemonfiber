@@ -36,7 +36,8 @@ mod published;
 pub(crate) use published::published_as;
 mod subtitles;
 mod taken_back;
-// Seerr's Jellyfin connection, held at the request gate's Jellyfin route.
+// The request service's connection to the media server, held at the request gate's route
+// to it.
 mod linking;
 // The request gate's tokens, one per route, held raw by the request service alone.
 pub(crate) mod tokens;
@@ -502,7 +503,7 @@ async fn seed_media_server(
     wirings.extend(cors::seed_cors(ctx, services, server).await);
 
     // The decline service's key, minted in the server the decline service names.
-    wirings.extend(decline::seed_decline_key(ctx, services, project).await);
+    wirings.extend(decline::seed_decline_key(ctx, services, server, project).await);
 
     // The request gate's routes, with the same session.
     wirings.extend(gate::seed_gate_routes(ctx, services, fillers, server, project).await);

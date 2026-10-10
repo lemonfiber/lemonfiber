@@ -433,6 +433,100 @@ async fn a_third_party_request_service_is_never_handed_a_token() {
     assert_eq!(http.requests().len(), asked_before);
 }
 
+/// **A first-party request service speaking `request.intake` is handed the new token over
+/// it**, which the trust gate lets the stack's curator's token cross to, and the stack's
+/// own request service's API is never asked.
+#[tokio::test]
+async fn a_first_party_request_service_is_handed_a_token_over_the_contract() {
+    let target = serde_json::json!([{
+        "id": "1",
+        "at": { "host": crate::app::gating::SERVICE, "port": PORT, "base": "/sonarr" },
+        "key": "held",
+        "kind": "tv",
+    }])
+    .to_string();
+    let http = Fake::by_path_in_turn(vec![
+        ("/v1/fulfilment_targets", vec![Answer::reply(200, target)]),
+        ("/v1/move_fulfilment_target", vec![Answer::reply(204, "")]),
+        ("/v1/test_fulfilment_target", vec![Answer::reply(204, "")]),
+    ]);
+    let (_, at) = scene(
+        "tokens-first-party",
+        true,
+        &accepting(&["held"], &[]),
+        http.clone(),
+        true,
+    );
+    let ctx = crate::test_support::contracted_context(
+        &at,
+        crate::test_support::CONTRACTED_REQUESTS,
+        true,
+    )
+    .settings(Settings::default())
+    .build()
+    .with_http(http.clone())
+    .with_random(Arc::new(lemonfiber_fixtures::support::FixedRandom(Some(
+        vec![0xab; crate::secret::SECRET_BYTES],
+    ))));
+    let without_requests: Vec<_> = stack(true)
+        .into_iter()
+        .filter(|service| service.id != "seerr")
+        .collect();
+    let fillers = crate::test_support::stack()
+        .manifest()
+        .map(|mut manifest| {
+            manifest.services = without_requests.clone();
+            crate::wiring::Fillers::trusting(
+                &manifest,
+                &[crate::test_support::contracted(
+                    "intake",
+                    crate::test_support::CONTRACTED_REQUESTS,
+                    "request.intake",
+                )],
+                &crate::wiring::Chosen::default(),
+                Some(&at),
+                &crate::test_support::first_party("intake"),
+            )
+        })
+        .unwrap_or_default();
+    let line = Held {
+        name: SONARR.to_owned(),
+        setting: "request-gate/tokens.json#sonarr".to_owned(),
+        consumers: Vec::new(),
+        location: String::new(),
+        origin: crate::credential::Origin::Lemonfiber,
+        from: crate::origin::Origin::Bundled,
+        state: State::Active,
+        fingerprint: None,
+        advisory: None,
+    };
+
+    let rotation = rotate(&ctx, &line, &without_requests, &fillers, Some(&at)).await;
+
+    assert!(
+        matches!(rotation.settled, Settled::Replaced { .. }),
+        "{rotation:?}"
+    );
+    assert_eq!(accepted(&at), Some(accepting(&[&minted()], &[])));
+    let asked = http.requests();
+    assert!(
+        asked.iter().any(|one| one.url
+            == format!(
+                "{}test_fulfilment_target",
+                crate::test_support::CONTRACTED_REQUESTS_AT
+            )
+            && one
+                .body
+                .as_deref()
+                .is_some_and(|body| body.contains(&minted()))),
+        "{asked:?}"
+    );
+    assert!(
+        !asked.iter().any(|one| one.url.contains("/api/v1/")),
+        "{asked:?}"
+    );
+}
+
 #[tokio::test]
 async fn an_arr_token_is_replaced_once_the_request_service_proves_it() {
     let http = serving("held", "linked", 200, &[200], 200);

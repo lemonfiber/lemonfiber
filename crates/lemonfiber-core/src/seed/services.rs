@@ -317,7 +317,7 @@ pub async fn wire_qbittorrent_password(
             Wiring::settled(
                 connection,
                 State::Failed {
-                    detail: "no randomness was available to generate a password".to_owned(),
+                    detail: crate::secret::NO_RANDOMNESS_FOR_PASSWORD.to_owned(),
                 },
             ),
             None,
@@ -384,7 +384,7 @@ pub async fn wire_media_server_admin(
     }
     let Some(password) = secret::generate(random) else {
         return Err(State::Failed {
-            detail: "no randomness was available to generate a password".to_owned(),
+            detail: crate::secret::NO_RANDOMNESS_FOR_PASSWORD.to_owned(),
         });
     };
     keep(&password).map_err(|why| unkept(&why))?;

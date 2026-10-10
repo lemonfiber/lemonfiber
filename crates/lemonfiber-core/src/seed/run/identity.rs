@@ -13,8 +13,8 @@ use crate::app::credentials::Replacing;
 use crate::app::targets::MediaServer;
 
 /// The media server's administrator, as the first half of the identity left it: the
-/// password to go on with, or the state the identity rests in without one, and where the
-/// host reaches the request service that asked for it.
+/// password to go on with, or the state the identity rests in without one, and the
+/// request service that asked for it.
 pub(super) struct Admin {
     /// The password, or the state the identity rests in without one.
     administered: Result<String, crate::seed::State>,
@@ -26,8 +26,8 @@ pub(super) struct Admin {
 /// service signs in against: the media server's administrator, minted where its first-run
 /// setup has not run.
 ///
-/// Nothing where nothing fills the identity source, or where the service asking is not a
-/// request service this build speaks to: without both there is nothing to wire. The admin
+/// Nothing where nothing fills the identity source, or where nothing the trust gate lets
+/// the administrator's password reach asks for it: without both there is nothing to wire. The admin
 /// password is the one credential minted rather than read — recorded under the server's
 /// own setting on the run that mints it, before the setup is given it, and read back on a
 /// later run. Recorded here, before the second half, so the steps between the two can
@@ -113,10 +113,11 @@ pub(super) async fn seed_request_identity(
 
     let linked = match (gate, &wiring.state) {
         (Some(_), crate::seed::State::WouldWire { .. }) => {
-            Some(super::linking::would_link(server.id()))
+            Some(super::linking::would_link(&requests, server))
         }
         (Some(project), crate::seed::State::Wired | crate::seed::State::AlreadyWired) => Some(
-            super::linking::seed_media_server_link(ctx, owner.as_ref(), server.id(), project).await,
+            super::linking::seed_media_server_link(ctx, owner.as_ref(), &requests, server, project)
+                .await,
         ),
         _ => None,
     };
@@ -223,13 +224,6 @@ fn remember(
         }
         _ => {}
     }
-}
-
-/// Where the host reaches Seerr's API, if the stack has it — resolved the way every
-/// service lemonfiber speaks to is.
-pub(crate) fn seerr_service(services: &[lemonfiber_manifest::Service]) -> Option<String> {
-    crate::app::targets::service_addr(services, lemonfiber_manifest::ApiKind::Seerr)
-        .map(|addr| addr.loopback)
 }
 
 /// Jellyfin's addresses, if the stack has it. Jellyfin's kind carries no key source of

@@ -72,7 +72,7 @@ impl Kept {
                 refused.push(Wiring::settled(
                     crate::seed::described_target(&target),
                     State::Failed {
-                        detail: "no randomness was available to generate a token".to_owned(),
+                        detail: crate::secret::NO_RANDOMNESS_FOR_TOKEN.to_owned(),
                     },
                 ));
                 continue;

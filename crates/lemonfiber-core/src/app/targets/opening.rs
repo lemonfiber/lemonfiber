@@ -114,20 +114,14 @@ pub(crate) async fn household_requests(
 }
 
 /// Whatever among `fillers` fills `request.intake`, asked over the contract where it
-/// speaks it, and otherwise as the stack's own request service through
-/// [`owned_requests`].
+/// speaks it, and otherwise as the stack's own request service holding the key it wrote
+/// for itself.
 ///
 /// Nothing where nothing here fills it, where it speaks the contract and cannot be
 /// asked over it — never then asked any other way — or where it speaks none and is not
-/// the stack's own request service holding the key it wrote for itself.
+/// the stack's own request service holding its key.
 pub(crate) async fn requests_from(ctx: &Ctx, fillers: &Fillers) -> Option<HouseholdAccess> {
-    let (filler, _) = fillers.filling(intake::CAPABILITY)?;
-    let requests: Arc<dyn intake::Fills> =
-        match spoken(ctx, filler, intake::CAPABILITY, intake::MAJOR).await {
-            Spoken::Over(adapter) => Arc::new(intake::Adapter(adapter)),
-            Spoken::Unanswered => return None,
-            Spoken::Not => Arc::new(owned_requests(ctx, filler).await?),
-        };
+    let requests = asked(ctx, request_service(fillers)?, Unkeyed::Skipped).await?;
     Some(HouseholdAccess { requests })
 }
 
@@ -148,16 +142,36 @@ pub(crate) async fn requests_as_owner(
     ctx: &Ctx,
     filler: &Filler,
 ) -> Option<Arc<dyn intake::Fills>> {
+    asked(ctx, filler, Unkeyed::Asked).await
+}
+
+/// Whether the stack's own request service is asked before it has written its key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Unkeyed {
+    /// Asked holding no key, so it answers with its own refusal.
+    Asked,
+    /// Not asked at all.
+    Skipped,
+}
+
+/// The request service `filler` is: over `request.intake` where it speaks it, nothing
+/// where it speaks it and cannot be asked over it, and otherwise the stack's own request
+/// service where [`bundled_requests`] lets it be, holding the key it wrote for itself or,
+/// where `unkeyed` asks it, none.
+async fn asked(ctx: &Ctx, filler: &Filler, unkeyed: Unkeyed) -> Option<Arc<dyn intake::Fills>> {
     match spoken(ctx, filler, intake::CAPABILITY, intake::MAJOR).await {
         Spoken::Over(adapter) => Some(Arc::new(intake::Adapter(adapter))),
         Spoken::Unanswered => None,
-        Spoken::Not => match owned_requests(ctx, filler).await {
-            Some(owned) => Some(Arc::new(owned)),
-            None => bundled_requests(filler).map(|base| {
-                Arc::new(Seerr::new(ctx.seams.http.clone(), base, &filler.id))
-                    as Arc<dyn intake::Fills>
-            }),
-        },
+        Spoken::Not => {
+            let base = bundled_requests(filler)?;
+            let http = ctx.seams.http.clone();
+            let requests = match (requests_key(ctx, filler).await, unkeyed) {
+                (Some(key), _) => Seerr::keyed(http, base, &filler.id, key),
+                (None, Unkeyed::Asked) => Seerr::new(http, base, &filler.id),
+                (None, Unkeyed::Skipped) => return None,
+            };
+            Some(Arc::new(requests))
+        }
     }
 }
 
@@ -174,16 +188,8 @@ pub(crate) fn bundled_requests(filler: &Filler) -> Option<String> {
 
 /// The key the stack's own request service `filler` wrote for itself, read from the
 /// settings beneath its own directory; nothing before it has written one.
-pub(crate) async fn requests_key(ctx: &Ctx, filler: &Filler) -> Option<String> {
+async fn requests_key(ctx: &Ctx, filler: &Filler) -> Option<String> {
     crate::seerr::api_key(&credential_file(ctx, filler).await.text()?)
-}
-
-/// The stack's own request service `filler` is, carrying the key it wrote for itself;
-/// nothing where [`bundled_requests`] refuses it or it has not written its key yet.
-async fn owned_requests(ctx: &Ctx, filler: &Filler) -> Option<Seerr> {
-    let base = bundled_requests(filler)?;
-    let key = requests_key(ctx, filler).await?;
-    Some(Seerr::keyed(ctx.seams.http.clone(), base, &filler.id, key))
 }
 
 /// Where the host reaches a service, and the id it runs under.

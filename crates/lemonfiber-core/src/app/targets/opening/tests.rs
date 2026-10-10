@@ -5,7 +5,7 @@ use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::scratch::Scratch;
 use lemonfiber_manifest::{Api, ApiKind, KeySource, Manifest};
 
-use super::requests_from;
+use super::{request_service, requests_as_owner, requests_from};
 use crate::app::Ctx;
 use crate::plugin::first_party::FirstParty;
 use crate::plugin::Installed;
@@ -141,6 +141,11 @@ async fn a_contracted_request_service_that_cannot_be_asked_is_asked_nothing() {
         );
 
         assert!(requests_from(&ctx, &fillers).await.is_none(), "{tag}");
+        let owned = match request_service(&fillers) {
+            Some(filler) => requests_as_owner(&ctx, filler).await.is_some(),
+            None => true,
+        };
+        assert!(!owned, "{tag}");
         assert!(fake.requests().is_empty(), "{tag}: {:?}", asked(&fake));
     }
 }
@@ -184,4 +189,27 @@ async fn the_stacks_own_request_service_is_asked_with_its_own_key() {
 
     let unwritten = ctx.with_filesystem(Arc::new(SeedFs::keyed(None, None)));
     assert!(requests_from(&unwritten, &fillers).await.is_none());
+}
+
+/// The stack's own request service is asked as its owner before it has written its
+/// key, holding none, so whatever uses it reports the refusal in its own words.
+#[tokio::test]
+async fn the_stacks_own_request_service_is_asked_as_its_owner_before_it_writes_its_key() {
+    let (project, ctx, fake) = reaching("bundled-unkeyed", false);
+    let unwritten = ctx.with_filesystem(Arc::new(SeedFs::keyed(None, None)));
+    let fillers = beside(&[], true, &project);
+
+    let answered = match request_service(&fillers) {
+        Some(filler) => match requests_as_owner(&unwritten, filler).await {
+            Some(requests) => requests.answers().await.is_ok(),
+            None => false,
+        },
+        None => false,
+    };
+
+    assert!(answered, "{:?}", asked(&fake));
+    assert_eq!(
+        asked(&fake),
+        vec![("http://127.0.0.1:5055/api/v1/auth/me".to_owned(), None)]
+    );
 }

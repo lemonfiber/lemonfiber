@@ -259,6 +259,11 @@ pub(crate) fn contracted_context(
     a_context().engine(std::sync::Arc::new(engine))
 }
 
+/// The id of the request service `server` is handed to, where one is.
+pub(crate) fn asker(server: &crate::app::targets::MediaServer) -> Option<&str> {
+    server.asked_by.as_ref().map(|asker| asker.id.as_str())
+}
+
 /// A value as a contract carries it.
 pub(crate) fn json<T: serde::Serialize>(value: &T) -> String {
     serde_json::to_string(value).unwrap_or_default()

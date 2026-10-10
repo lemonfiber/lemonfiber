@@ -200,7 +200,7 @@ fn replacing_the_media_server_changes_nothing_that_signs_in_to_it() {
     let now = after.as_ref().and_then(MediaServer::of);
 
     assert!(
-        was.as_ref().and_then(MediaServer::requests).is_some(),
+        was.as_ref().and_then(crate::test_support::asker).is_some(),
         "the shipped stack's request service asks its media server"
     );
     assert_eq!(now.as_ref().map(MediaServer::id), Some(STAND_IN));
@@ -209,8 +209,8 @@ fn replacing_the_media_server_changes_nothing_that_signs_in_to_it() {
         Some(format!("http://{STAND_IN}:{ITS_PORT}"))
     );
     assert_eq!(
-        now.as_ref().and_then(MediaServer::requests),
-        was.as_ref().and_then(MediaServer::requests)
+        now.as_ref().and_then(crate::test_support::asker),
+        was.as_ref().and_then(crate::test_support::asker)
     );
     assert_eq!(now.as_ref().and_then(MediaServer::brought_by), Some(PLUGIN));
     assert_eq!(

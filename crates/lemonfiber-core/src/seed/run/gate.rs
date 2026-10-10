@@ -42,7 +42,7 @@ pub(super) async fn seed_gate_routes(
     // Minted with the administrator's session, which lemonfiber holds only on a server
     // it set up; a rehearsal before the first run finds none recorded yet.
     let Some(password) = server.recorded_password(ctx) else {
-        let minting = ctx.dry_run && server.requests().is_some();
+        let minting = server.would_mint(ctx);
         return (gating && minting).then(|| {
             settled(State::WouldWire {
                 yours: None,

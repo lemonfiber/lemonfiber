@@ -48,9 +48,6 @@ const ROTATING: &str = "a real run would mint a new token, hand the gate its has
 /// What a landed replacement says.
 const LANDED: &str = "the request service took the new token, and the gate accepts it alone";
 
-/// Why there is nothing to mint with.
-const NO_RANDOMNESS: &str = "no randomness was available to generate a token";
-
 /// Whether `held` is one of the gate's tokens.
 pub(super) fn is_token(held: &Held) -> bool {
     held.setting.starts_with(SETTING)
@@ -176,7 +173,7 @@ pub(super) async fn rotate(
         return would_rotate(held, ROTATING);
     }
     let Some(token) = crate::secret::generate(ctx.seams.random.as_ref()) else {
-        return unproven(held, NO_RANDOMNESS);
+        return unproven(held, crate::secret::NO_RANDOMNESS_FOR_TOKEN);
     };
     let Some(requests) = crate::app::targets::requests_as_owner(ctx, filler).await else {
         return unproven(held, &not_handed(&held.name));
@@ -307,7 +304,8 @@ fn targeted<'a>(
         .find(|target| target.at == at && target.kind == kind)
 }
 
-/// The token the request service presents to Jellyfin, where it reaches it at `route`.
+/// The token the request service presents to the media server, where it reaches it at
+/// `route`.
 fn linked(link: &MediaServerLink, route: &Route) -> Option<String> {
     (link.at == through_the_gate(&route.id)).then(|| link.key.clone())
 }

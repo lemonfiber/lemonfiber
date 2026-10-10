@@ -335,6 +335,56 @@ async fn a_request_service_that_will_not_say_what_it_holds_owes_nothing_yet() {
     assert!(noted.is_empty());
 }
 
+/// **Only the stack's own request service ran before the gate.** A first-party plugin's
+/// request service speaking `request.intake` in its place owes nothing, is asked nothing,
+/// and nothing recorded under its id is taken back.
+#[tokio::test]
+async fn a_plugins_request_service_owes_nothing_and_is_asked_nothing() {
+    let http = household(&sonarr_direct(), 200, &keys(true), 204, 201);
+    let (ctx, project) = taking("plugin", &http, false);
+    let services: Vec<_> = gated()
+        .into_iter()
+        .filter(|service| service.id != "seerr")
+        .collect();
+    let fillers = fillers_trusting(
+        services.clone(),
+        &[contracted(
+            "intake",
+            crate::test_support::CONTRACTED_REQUESTS,
+            "request.intake",
+        )],
+        &project,
+        &first_party("intake"),
+    );
+    let mut noted = Baseline::new();
+    super::super::taken_back::note_held(&ctx, &services, &fillers, Some(&project), &mut noted)
+        .await;
+    let mut owing = Baseline::new();
+    owing.record(
+        crate::test_support::CONTRACTED_REQUESTS,
+        OWED_SONARR,
+        "owed",
+        "1",
+    );
+
+    let wiring = super::super::taken_back::seed_taken_back(
+        &ctx,
+        &services,
+        &fillers,
+        Some(&project),
+        &mut owing,
+    )
+    .await;
+
+    assert!(noted.is_empty());
+    assert!(wiring.is_none(), "{wiring:?}");
+    assert_eq!(
+        owing.expected(crate::test_support::CONTRACTED_REQUESTS, OWED_SONARR),
+        Some("owed")
+    );
+    assert!(http.requests().is_empty(), "{:?}", http.requests());
+}
+
 #[tokio::test]
 async fn nothing_owed_and_nothing_minted_is_not_a_connection() {
     let http = household(&sonarr_gated(), 200, &keys(false), 204, 201);

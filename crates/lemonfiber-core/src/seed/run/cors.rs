@@ -37,7 +37,7 @@ pub(super) async fn seed_cors(
     // either, because the identity step mints it, so where that step would it says what
     // the run would write.
     let recorded = server.recorded_password(ctx);
-    let minting = ctx.dry_run && server.requests().is_some();
+    let minting = server.would_mint(ctx);
     if recorded.is_none() && !minting {
         return None;
     }

@@ -28,11 +28,11 @@ use crate::ports::service::{AppKeys as _, RegisteredTarget, Requests};
 use crate::seed::{State, Wiring};
 use crate::wiring::Fillers;
 
-/// The bundled request service among `fillers`: the one that ran before the gate, which a
-/// request service speaking its contract never did.
-fn bundled_requests(fillers: &Fillers) -> Option<&crate::wiring::Filler> {
+/// The stack's own request service among `fillers`: the one that ran before the gate,
+/// which a plugin's never did.
+fn bundled(fillers: &Fillers) -> Option<&crate::wiring::Filler> {
     crate::app::targets::request_service(fillers)
-        .filter(|filler| filler.speaks(lemonfiber_manifest::ApiKind::Seerr))
+        .filter(|filler| crate::app::targets::bundled_requests(filler).is_some())
 }
 
 /// What the report calls this connection.
@@ -54,7 +54,7 @@ pub(super) async fn note_held(
     project: Option<&Path>,
     baseline: &mut Baseline,
 ) {
-    let Some(filler) = gated(services, project).and(bundled_requests(fillers)) else {
+    let Some(filler) = gated(services, project).and(bundled(fillers)) else {
         return;
     };
     let Some(requests) = crate::app::targets::requests_as_owner(ctx, filler).await else {
@@ -88,7 +88,7 @@ pub(super) async fn seed_taken_back(
     baseline: &mut Baseline,
 ) -> Option<Wiring> {
     let project = gated(services, project)?;
-    let filler = bundled_requests(fillers)?;
+    let filler = bundled(fillers)?;
     let owed = baseline.named(&filler.id, HELD_KEY);
     let jellyfin = jellyfin_admin(ctx, fillers);
     let minted = match &jellyfin {

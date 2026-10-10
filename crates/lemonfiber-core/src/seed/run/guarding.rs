@@ -205,7 +205,7 @@ async fn turned_on(ctx: &Ctx, aggregator: &Aggregator) -> State {
     let setting = crate::config::NZBHYDRA2_ADMIN_PASSWORD_KEY;
     let Some(password) = crate::secret::generate(ctx.seams.random.as_ref()) else {
         return State::Failed {
-            detail: "no randomness was available to generate a password".to_owned(),
+            detail: crate::secret::NO_RANDOMNESS_FOR_PASSWORD.to_owned(),
         };
     };
     if let Err(failure) = crate::app::targets::record_secret(ctx, setting, &password) {

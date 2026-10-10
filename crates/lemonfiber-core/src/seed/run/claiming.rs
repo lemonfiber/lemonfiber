@@ -47,7 +47,7 @@ pub(super) async fn claimed(ctx: &Ctx, services: &[Service]) -> Option<Wiring> {
 async fn made(ctx: &Ctx, client: &crate::audiobookshelf::Audiobookshelf) -> State {
     let Some(fresh) = crate::secret::generate(ctx.seams.random.as_ref()) else {
         return State::Failed {
-            detail: "no randomness was available to generate a password".to_owned(),
+            detail: crate::secret::NO_RANDOMNESS_FOR_PASSWORD.to_owned(),
         };
     };
     if let Err(failure) =
