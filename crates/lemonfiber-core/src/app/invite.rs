@@ -25,6 +25,7 @@
 
 mod allowing;
 pub(crate) mod declining;
+pub(crate) mod joining;
 mod offering;
 mod refusals;
 mod reissuing;
@@ -110,6 +111,8 @@ pub(crate) async fn offer(
             address: reachable.url,
             // A rehearsal mints no token, so there is no address yet that would decline.
             decline: None,
+            join: None,
+            unjoinable: None,
             caution: reachable.caution,
             hours: HOURS_TO_CLAIM,
             withdrawn: names(&sweeping.withdrawn),
@@ -146,6 +149,8 @@ pub(crate) async fn offer(
         declining::issued(ctx, &manifest.services, &held.household, &member).await
     };
 
+    let joining = joining::joining(ctx, &member, standing).await;
+
     let narrowed = allowed.as_ref().map(|_| member.id.as_str());
     let Told { linked, requesting } =
         told(ctx, &manifest, &to_link(&held, &member), narrowed).await;
@@ -155,6 +160,8 @@ pub(crate) async fn offer(
         name: member.name,
         address: reachable.url,
         decline,
+        join: joining.join,
+        unjoinable: joining.unjoinable,
         caution: reachable.caution,
         hours: HOURS_TO_CLAIM,
         withdrawn: taken.withdrawn,

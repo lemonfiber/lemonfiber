@@ -121,6 +121,16 @@ pub trait HouseholdAtHand: Send + Sync {
     /// taken up in time is what this program recorded offering, not anything the server
     /// keeps.
     fn vouches_for(&self, id: &str) -> bool;
+
+    /// Whether `token` claims the invitation standing on account `id` now. A household
+    /// that keeps no record of what it offered offers no claim.
+    async fn offers_claim(&self, _id: &str, _token: &str) -> bool {
+        false
+    }
+
+    /// Spend the claim on account `id`'s invitation, where there is a record to spend it
+    /// from.
+    fn claim_spent(&self, _id: &str) {}
 }
 
 /// One household, the same at every asking.
@@ -146,6 +156,14 @@ impl HouseholdAtHand for Ctx {
 
     fn vouches_for(&self, id: &str) -> bool {
         lemonfiber_core::app::members::vouched_for(self, id)
+    }
+
+    async fn offers_claim(&self, id: &str, token: &str) -> bool {
+        lemonfiber_core::app::members::offers_claim(self, id, token).await
+    }
+
+    fn claim_spent(&self, id: &str) {
+        lemonfiber_core::app::members::claim_spent(self, id);
     }
 }
 
@@ -232,26 +250,58 @@ impl Admitting {
         }
         let at = Arc::clone(self.household.as_ref()?);
         let household = opened(Arc::clone(&at)).await?;
+        signed_in(at, household.as_ref(), name, &given.password, random)
+            .await
+            .map(|opened| (opened, door))
+    }
 
-        // A name for this sign-in at the server, fresh each time: the server keeps one
-        // sign-in per account and device, so a second under one name would end the
-        // first, and a member signed in from two browsers would lose one of them.
-        let device = random
-            .bytes(DEVICE_BYTES)?
-            .iter()
-            .fold(String::new(), |mut named, byte| {
-                use std::fmt::Write as _;
-                let _ = write!(named, "{byte:02x}");
-                named
-            });
-        let signed = household
-            .whoever(name, &given.password, &device)
+    /// Who claiming an invitation proves somebody to be, once the password they chose is
+    /// set on the account it names; nothing where the invitation is not open.
+    ///
+    /// The account must be unclaimed, switched on and not an administrator, and the token
+    /// must claim its standing offer. The token is spent before the member signs in with
+    /// the password just set, so it claims nothing again whatever that sign-in answers.
+    async fn claimed(
+        &self,
+        given: &Given,
+        token: &str,
+        ticket: &Ticket,
+        random: &dyn Random,
+    ) -> Option<(Opened, Door)> {
+        let door = ticket.member.clone()?;
+        let asked = given.name.as_deref()?.to_lowercase();
+        let at = Arc::clone(self.household.as_ref()?);
+        let household = opened(Arc::clone(&at)).await?;
+        let member = household
+            .household()
             .await
-            .ok()
-            .flatten()?;
-        vouched(at, &signed.id)
+            .ok()?
+            .into_iter()
+            .find(|member| member.name.to_lowercase() == asked)?;
+        if member.claimed || member.access.disabled || member.access.administrator {
+            return None;
+        }
+        if !claimable(Arc::clone(&at), &member.id, token).await {
+            return None;
+        }
+        let device = device(random)?;
+        if !household
+            .claim(&member.name, &given.password, &device)
             .await
-            .then_some((Opened::Member(signed), door))
+            .ok()?
+        {
+            return None;
+        }
+        at.claim_spent(&member.id);
+        signed_in(
+            at,
+            household.as_ref(),
+            &member.name,
+            &given.password,
+            random,
+        )
+        .await
+        .map(|opened| (opened, door))
     }
 
     /// Who the secret a request carried proves it to be, or nothing.
@@ -336,6 +386,53 @@ async fn opened(at: Arc<dyn HouseholdAtHand>) -> Option<Arc<dyn Household>> {
         .await
         .ok()
         .flatten()
+}
+
+/// A name for one sign-in at the server, fresh each time: the server keeps one sign-in per
+/// account and device, so a second under one name would end the first, and a member
+/// signed in from two browsers would lose one of them.
+fn device(random: &dyn Random) -> Option<String> {
+    Some(
+        random
+            .bytes(DEVICE_BYTES)?
+            .iter()
+            .fold(String::new(), |mut named, byte| {
+                use std::fmt::Write as _;
+                let _ = write!(named, "{byte:02x}");
+                named
+            }),
+    )
+}
+
+/// The member a name and a password sign in as at `household`, where the household `at`
+/// holds vouches for them.
+async fn signed_in(
+    at: Arc<dyn HouseholdAtHand>,
+    household: &dyn Household,
+    name: &str,
+    password: &str,
+    random: &dyn Random,
+) -> Option<Opened> {
+    let device = device(random)?;
+    let signed = household
+        .whoever(name, password, &device)
+        .await
+        .ok()
+        .flatten()?;
+    vouched(at, &signed.id)
+        .await
+        .then_some(Opened::Member(signed))
+}
+
+/// Whether `token` claims account `id`'s standing invitation, asked on a thread made for
+/// blocking: it reads what was offered from disk.
+async fn claimable(at: Arc<dyn HouseholdAtHand>, id: &str, token: &str) -> bool {
+    let (id, token) = (id.to_owned(), token.to_owned());
+    tokio::task::spawn_blocking(move || {
+        tokio::runtime::Handle::current().block_on(at.offers_claim(&id, &token))
+    })
+    .await
+    .unwrap_or(false)
 }
 
 /// Whether the household `at` holds vouches for whoever holds this account, asked on a
@@ -437,8 +534,11 @@ struct Given {
     /// with the machine's own password, which is nobody's name.
     #[serde(default)]
     name: Option<String>,
-    /// What was typed.
+    /// What was typed: at a claim, the password they chose.
     password: String,
+    /// The claim token an invitation's join link carries, where this is a claim.
+    #[serde(default)]
+    claim: Option<String>,
 }
 
 /// The body signing in takes, with the route it is sent to, described from the type
@@ -473,6 +573,9 @@ async fn opening(
     let Ok(Json(given)) = given else {
         return Refusal::NotAPassword.answered();
     };
+    if given.claim.is_some() && given.password.chars().count() < credential::LEAST {
+        return Refusal::ShortChoice.answered();
+    }
     let now = serving.ctx.seams.clock.now();
     let ticket = match serving
         .admitting
@@ -483,12 +586,22 @@ async fn opening(
         Ok(ticket) => ticket,
         Err(left) => return waiting(left.as_secs().max(1)),
     };
-    let Some((who, door)) = serving
-        .admitting
-        .whoever(&given, &ticket, serving.ctx.seams.random.as_ref())
-        .await
-    else {
-        return Refusal::NotThePassword.answered();
+    let random = serving.ctx.seams.random.as_ref();
+    let admitted = match given.claim.as_deref() {
+        Some(token) => serving
+            .admitting
+            .claimed(&given, token, &ticket, random)
+            .await
+            .ok_or(Refusal::NotOpen),
+        None => serving
+            .admitting
+            .whoever(&given, &ticket, random)
+            .await
+            .ok_or(Refusal::NotThePassword),
+    };
+    let (who, door) = match admitted {
+        Ok(admitted) => admitted,
+        Err(refusal) => return refusal.answered(),
     };
     serving.admitting.attempts.right(&ticket, door, now).await;
     let opened = serving

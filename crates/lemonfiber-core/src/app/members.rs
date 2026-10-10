@@ -47,5 +47,31 @@ pub fn vouched_for(ctx: &Ctx, id: &str) -> bool {
     true
 }
 
+/// Whether `token` claims the offer standing on account `id` now: its hash is the one the
+/// offer carries, the offer has not lapsed, and it was not declined.
+pub async fn offers_claim(ctx: &Ctx, id: &str, token: &str) -> bool {
+    let offers: Offers = record::beside(ctx, RECORD);
+    let presented = Some(lemonfiber_sidecar::TokenHash::of(token));
+    let carried = offers.get(id).is_some_and(|offer| offer.claim == presented);
+    carried
+        && !lapsed_unseen(&offers, id, &ctx.hours_ago(0))
+        && !super::invite::declining::declined(ctx, &offers)
+            .await
+            .contains(id)
+}
+
+/// Take the claim off the offer standing on account `id`, so its token claims nothing
+/// again.
+pub fn claim_spent(ctx: &Ctx, id: &str) {
+    let mut offers: Offers = record::beside(ctx, RECORD);
+    if offers
+        .get_mut(id)
+        .and_then(|offer| offer.claim.take())
+        .is_some()
+    {
+        record::keep_beside(ctx, RECORD, &offers);
+    }
+}
+
 #[cfg(test)]
 mod tests;

@@ -4,6 +4,14 @@
   "description": "What a caller offers at the door.",
   "type": "object",
   "properties": {
+    "claim": {
+      "description": "The claim token an invitation's join link carries, where this is a claim.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
     "name": {
       "description": "Who they say they are, where they say so. Absent from an operator signing in\nwith the machine's own password, which is nobody's name.",
       "type": [
@@ -13,7 +21,7 @@
       "default": null
     },
     "password": {
-      "description": "What was typed.",
+      "description": "What was typed: at a claim, the password they chose.",
       "type": "string"
     }
   },

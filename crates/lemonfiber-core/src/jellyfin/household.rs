@@ -251,6 +251,29 @@ impl crate::ports::service::Household for Jellyfin {
         Ok(made.member())
     }
 
+    async fn claim(&self, name: &str, password: &str, device: &str) -> Result<bool, Failure> {
+        let Some(signed) = whoever(self, name, "", device).await? else {
+            return Ok(false);
+        };
+        let body = serde_json::json!({ "CurrentPw": "", "NewPw": password }).to_string();
+        let changing = super::carried(
+            &self.request(
+                Method::Post,
+                &format!("/Users/{}/Password", signed.id),
+                Some(body),
+            ),
+            &signed.token,
+        );
+        let response = self.endpoint.send(&changing).await?;
+        self.endpoint.expect_success(&response)?;
+        let leaving = super::carried(
+            &self.request(Method::Post, "/Sessions/Logout", None),
+            &signed.token,
+        );
+        let _ = self.endpoint.send(&leaving).await;
+        Ok(true)
+    }
+
     async fn unclaim(&self, id: &str) -> Result<(), Failure> {
         // A flag rather than a password: the same endpoint takes `CurrentPw`/`NewPw`
         // when somebody changes their own, and naming neither is what makes this a

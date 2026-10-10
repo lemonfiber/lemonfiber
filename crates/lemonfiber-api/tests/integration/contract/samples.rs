@@ -220,6 +220,14 @@ fn serving() -> Vec<Outcome> {
             decline: Some(
                 "http://a-machine.local:5056/decline/9f2c4e8a1b7d3f60a5e2c9b4d7f1a3e8".to_owned(),
             ),
+            join: Some(
+                "lemonfiber://join?address=https%3A%2F%2Fa-machine.local%3A8443&fingerprint=\
+                 3b7c0e1d9a4f2b6c8e5d1a7f3c9b2e4d6a8f0c1e3b5d7f9a2c4e6b8d0f1a3c5e&stack=\
+                 000102030405060708090a0b0c0d0e0f&expires=1791417600&name=ana&claim=\
+                 4c8e2a6f1b9d3e7a5c0f8b2d6e4a1c9f"
+                    .to_owned(),
+            ),
+            unjoinable: None,
             caution: None,
             hours: 48,
             withdrawn: Vec::new(),

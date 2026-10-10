@@ -5,8 +5,8 @@
 //! the devices signed in once one has, and the reason where nothing could be handed
 //! over.
 //!
-//! The code is the address again, for a camera. It signs nobody in, so it is drawn
-//! without a warning about who might see it.
+//! The codes are the address again, and each client's own link to it, for a camera.
+//! They sign nobody in, so they are drawn without a warning about who might see them.
 //!
 //! What to do next arrives as a remedy with no words of its own, and here it is the
 //! command that does it: this surface is a terminal, so that is how it is taken.
@@ -16,7 +16,6 @@ use lemonfiber_core::model::{Handoff, HandoffRemedy, HandoffState};
 use lemonfiber_core::PRODUCT;
 
 use super::super::{qr, Lines};
-use crate::say;
 
 /// What an operator is told about handing one person's device over.
 pub(crate) fn handoff(report: &Handoff) -> Lines {
@@ -91,12 +90,11 @@ fn handing(lines: &mut Lines, report: &Handoff, address: &str) {
     if let Some(caution) = &report.caution {
         lines.put(format!("  {caution}"));
     }
-    if let Some(drawn) = qr::rows(address, say::folding()) {
-        lines.spaced("Point the device's camera, or the app's scanner, at this:");
-        for row in drawn {
-            lines.put(format!("  {row}"));
-        }
-    }
+    qr::labelled(
+        lines,
+        "Point the device's camera, or the app's scanner, at this:",
+        address,
+    );
     lines.spaced("Then:");
     for (number, step) in report.steps.iter().enumerate() {
         lines.put(format!("  {}. {step}", number + 1));
@@ -109,6 +107,20 @@ fn handing(lines: &mut Lines, report: &Handoff, address: &str) {
             " (not open source)"
         };
         lines.put(format!("  {}   {}{closed}", client.device, client.client));
+    }
+    for client in report
+        .clients
+        .iter()
+        .filter(|client| client.code != address)
+    {
+        qr::labelled(
+            lines,
+            &format!(
+                "To open {} on {} at it, this:",
+                client.client, client.device
+            ),
+            &client.code,
+        );
     }
 }
 

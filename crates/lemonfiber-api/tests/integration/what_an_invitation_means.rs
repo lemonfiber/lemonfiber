@@ -138,6 +138,8 @@ fn an_invitation_reaches_a_browser_under_its_own_name() {
         name: "ana".to_owned(),
         address: "http://192.168.1.20:8096".to_owned(),
         decline: None,
+        join: None,
+        unjoinable: None,
         caution: None,
         hours: 48,
         withdrawn: vec!["bo".to_owned()],

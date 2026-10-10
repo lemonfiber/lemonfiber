@@ -385,3 +385,66 @@ async fn a_sign_in_granted_no_access_is_nobody() {
         Ok(None)
     ));
 }
+
+/// A claim signs in as the account with the empty password it holds, sets the one the
+/// person chose with that sign-in's own access, never the administrator's, and leaves.
+#[tokio::test]
+async fn a_claim_sets_the_chosen_password_signed_in_as_the_account() {
+    let fake = Fake::in_turn(vec![
+        Answer::reply(200, SIGNED_IN_AS),
+        Answer::reply(204, ""),
+        Answer::reply(204, ""),
+    ]);
+
+    let claimed = jellyfin(&fake).claim("ana", &hers(), "a-phone").await;
+
+    assert!(matches!(claimed, Ok(true)), "{claimed:?}");
+    let asked = fake.requests();
+    assert_eq!(asked.len(), 3);
+    assert!(asked
+        .first()
+        .and_then(|request| request.body.as_deref())
+        .is_some_and(|body| body.contains(r#""Pw":"""#)));
+    let changing = asked.get(1);
+    assert!(changing.is_some_and(|request| {
+        request.url.ends_with("/Users/a7f3/Password")
+            && request
+                .body
+                .as_deref()
+                .is_some_and(|body| body == format!(r#"{{"CurrentPw":"","NewPw":"{}"}}"#, hers()))
+            && request
+                .headers
+                .iter()
+                .any(|(name, value)| name == "Authorization" && value.contains(r#"Token="token""#))
+    }));
+    assert!(asked
+        .get(2)
+        .is_some_and(|request| request.url.ends_with("/Sessions/Logout")));
+}
+
+/// An account that will not sign in with an empty password is claimed already, or
+/// switched off: nothing is set.
+#[tokio::test]
+async fn an_account_that_will_not_sign_in_empty_is_not_claimed() {
+    let fake = Fake::in_turn(vec![Answer::reply(401, "")]);
+
+    assert!(matches!(
+        jellyfin(&fake).claim("ana", &hers(), "a-phone").await,
+        Ok(false)
+    ));
+    assert_eq!(fake.requests().len(), 1);
+}
+
+/// A password the server will not take is a failure, not an account claimed.
+#[tokio::test]
+async fn a_password_the_server_will_not_take_is_a_failure() {
+    let fake = Fake::in_turn(vec![
+        Answer::reply(200, SIGNED_IN_AS),
+        Answer::reply(400, ""),
+    ]);
+
+    assert!(jellyfin(&fake)
+        .claim("ana", &hers(), "a-phone")
+        .await
+        .is_err());
+}

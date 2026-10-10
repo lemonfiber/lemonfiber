@@ -4,15 +4,14 @@
 //! on. An operator reading only the first two lines has everything they need to
 //! send the message.
 //!
-//! The code beneath it is the same address again, for a camera. Somebody being
-//! invited is usually holding the phone they will watch on, and typing an address
-//! and then a password on a phone keyboard is exactly the friction that makes
-//! people give up before they start.
+//! The codes beneath it are the join link, the same address and the decline address
+//! again, each for a camera. Somebody being invited is usually holding the phone they
+//! will watch on, and typing an address and then a password on a phone keyboard is
+//! exactly the friction that makes people give up before they start.
 
 use lemonfiber_core::model::{Invitation, InvitationStanding, Linked};
 
 use super::{qr, Lines};
-use crate::say;
 
 // Where a device handed that address stands: the same address and the same code,
 // asked about again once somebody has it.
@@ -53,23 +52,36 @@ pub(super) fn invitation(report: &Invitation) -> Lines {
     if let Some(caution) = &report.caution {
         lines.put(format!("  {caution}"));
     }
+    if let Some(join) = &report.join {
+        lines.put("  With the app, they open this instead:".to_owned());
+        lines.put(format!("  {join}"));
+    }
+    if let Some(unjoinable) = &report.unjoinable {
+        lines.put(format!("  {unjoinable}"));
+    }
     if let Some(decline) = &report.decline {
         lines.put("  If they would rather not, they can decline it here:".to_owned());
         lines.put(format!("  {decline}"));
     }
 
-    // Nothing to claim, so nothing to point a camera at. The address stands because
-    // it is still where they sign in, but a code and an instruction about setting a
-    // first password would be telling somebody to do again what they have done.
-    if report.standing == InvitationStanding::Joined {
-        return footer(lines, report);
+    if let Some(join) = &report.join {
+        qr::labelled(
+            &mut lines,
+            "To open it in the app, point their phone's camera at this:",
+            join,
+        );
+    }
+    qr::labelled(
+        &mut lines,
+        "To sign in from a browser, this:",
+        &report.address,
+    );
+    if let Some(decline) = &report.decline {
+        qr::labelled(&mut lines, "To decline it, this:", decline);
     }
 
-    if let Some(drawn) = qr::rows(&report.address, say::folding()) {
-        lines.spaced("Or point their phone's camera at this:");
-        for row in drawn {
-            lines.put(format!("  {row}"));
-        }
+    if report.standing == InvitationStanding::Joined {
+        return footer(lines, report);
     }
 
     lines.spaced(format!(

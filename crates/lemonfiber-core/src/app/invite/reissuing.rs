@@ -88,8 +88,11 @@ pub(crate) async fn reissue(
     // A new decline address with the new offer: the old token went with the old record,
     // so a refusal of it no longer reads as this account's standing.
     let decline = super::declining::issued(ctx, &manifest.services, &held.household, &member).await;
+    let joining = super::joining::joining(ctx, &member, InvitationStanding::Reset).await;
     Ok(Invitation {
         decline,
+        join: joining.join,
+        unjoinable: joining.unjoinable,
         ..renewed(member.name, reachable, false)
     })
 }
@@ -106,6 +109,8 @@ fn renewed(name: String, reachable: crate::door::Address, rehearsed: bool) -> In
         name,
         address: reachable.url,
         decline: None,
+        join: None,
+        unjoinable: None,
         caution: reachable.caution,
         hours: HOURS_TO_CLAIM,
         withdrawn: Vec::new(),

@@ -20,6 +20,7 @@ fn offer(decline: Option<&str>) -> Offer {
         offered: "2026-10-03T10:00:00Z".to_owned(),
         lapses: "2026-10-05T10:00:00Z".to_owned(),
         decline: decline.map(TokenHash::of),
+        claim: None,
     }
 }
 

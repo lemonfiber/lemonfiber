@@ -29,6 +29,8 @@ crate::contract! {
             fn standing(refer signed: &Signed as Signed) -> bool;
             /// Make an account for somebody invited.
             fn invite(str name: &str) -> Member;
+            /// Set the first password on an unclaimed account, signed in as it.
+            fn claim(str name: &str, str password: &str, str device: &str) -> bool;
             /// Take an unclaimed invitation back.
             fn unclaim(str id: &str) -> ();
             /// Withdraw an account.

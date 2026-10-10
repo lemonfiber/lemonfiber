@@ -6,6 +6,8 @@ fn offered(withdrawn: Vec<String>) -> Invitation {
         name: "ana".to_owned(),
         address: "http://192.168.1.20:8096".to_owned(),
         decline: None,
+        join: None,
+        unjoinable: None,
         caution: None,
         hours: 48,
         withdrawn,
@@ -108,10 +110,8 @@ fn an_invitation_still_standing_is_handed_over_again() {
     );
 }
 
-/// Somebody already in the house is told so, and asked for nothing.
-///
-/// A code to scan and an instruction to set a first password are both telling
-/// somebody to do again what they have already done.
+/// Somebody already in the house is told so, and asked to claim nothing. The address
+/// they sign in at is still offered as a code beside its text (`G1-R15`).
 #[test]
 fn somebody_already_in_the_house_is_asked_to_claim_nothing() {
     let said = invitation(&joined()).text();
@@ -121,10 +121,49 @@ fn somebody_already_in_the_house_is_asked_to_claim_nothing() {
         !said.contains("set a password"),
         "somebody already in was told to claim an account: {said}"
     );
+    assert!(said.contains("To sign in from a browser, this:"), "{said}");
+}
+
+/// The join link is said after the address, and each address is offered as a code of
+/// its own, labelled, the join link's first (`N21-R11`, `G1-R15`).
+#[test]
+fn each_address_is_offered_as_a_labelled_code_the_join_link_first() {
+    let said = invitation(&Invitation {
+        join: Some("lemonfiber://join?address=x&name=ana&claim=c".to_owned()),
+        decline: Some("http://192.168.1.20:5056/decline/7f3c".to_owned()),
+        ..offered(Vec::new())
+    })
+    .text();
+
+    let at = |text: &str| said.find(text);
     assert!(
-        !said.contains('\u{2588}'),
-        "a code was drawn for somebody with nothing to claim: {said}"
+        said.contains("  lemonfiber://join?address=x&name=ana&claim=c"),
+        "{said}"
     );
+    let order = [
+        at("To open it in the app, point their phone's camera at this:"),
+        at("To sign in from a browser, this:"),
+        at("To decline it, this:"),
+    ];
+    assert!(order.iter().all(Option::is_some), "{said}");
+    assert!(order.is_sorted(), "{said}");
+}
+
+/// Where there is no join link, why is said with the invitation, and no code for one
+/// is drawn.
+#[test]
+fn why_there_is_no_join_link_is_said_with_the_invitation() {
+    let said = invitation(&Invitation {
+        unjoinable: Some("The app cannot be handed this invitation, because x.".to_owned()),
+        ..offered(Vec::new())
+    })
+    .text();
+
+    assert!(
+        said.contains("  The app cannot be handed this invitation, because x."),
+        "{said}"
+    );
+    assert!(!said.contains("To open it in the app"), "{said}");
 }
 
 /// What the sweep took back is said whatever was found under the name asked for.

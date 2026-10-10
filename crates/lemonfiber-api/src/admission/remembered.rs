@@ -70,4 +70,12 @@ impl HouseholdAtHand for Remembered {
     fn vouches_for(&self, id: &str) -> bool {
         self.asked.vouches_for(id)
     }
+
+    async fn offers_claim(&self, id: &str, token: &str) -> bool {
+        self.asked.offers_claim(id, token).await
+    }
+
+    fn claim_spent(&self, id: &str) {
+        self.asked.claim_spent(id);
+    }
 }

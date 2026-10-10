@@ -5,7 +5,7 @@
 
 use lemonfiber_core::keys::{Listed, Listing, Minted, State};
 
-use super::Lines;
+use super::{qr, Lines};
 
 /// A key minted, with its secret, the address and the pin a client elsewhere needs.
 pub(super) fn minted(report: &Minted) -> Lines {
@@ -18,6 +18,11 @@ pub(super) fn minted(report: &Minted) -> Lines {
     ));
     lines.spaced("Its secret, which is not shown again:");
     lines.put(format!("  {}", report.secret.as_str()));
+    qr::labelled(
+        &mut lines,
+        "The same secret, for a camera:",
+        report.secret.as_str(),
+    );
     lines.spaced(format!(
         "A program sends it in the {} header.",
         lemonfiber_api::guard::TOKEN_HEADER

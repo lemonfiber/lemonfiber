@@ -16,4 +16,5 @@ requirement = [
   { id = "G1-R12", state = "done", evidence = [".github/workflows/sonar.yml", "crates/lemonfiber/src/acting.rs", "crates/lemonfiber/src/acting/words.rs", "crates/lemonfiber/src/dashboard.rs"] },
   { id = "G1-R13", state = "done", evidence = ["crates/lemonfiber/src/prompt.rs"] },
   { id = "G1-R14", state = "done", evidence = ["crates/lemonfiber-api/src/setup.rs"] },
+  { id = "G1-R15", state = "partial", evidence = ["crates/lemonfiber/src/render/qr.rs", "crates/lemonfiber/src/render/invitation.rs", "crates/lemonfiber/src/render/invitation/handoff.rs", "crates/lemonfiber/src/render/keys.rs", "crates/lemonfiber/src/render/companion.rs", "crates/lemonfiber/src/render/door.rs"] },
 ]

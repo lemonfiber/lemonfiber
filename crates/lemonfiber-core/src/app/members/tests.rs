@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
-use super::{household, vouched_for};
+use super::{claim_spent, household, offers_claim, vouched_for};
 use crate::app::Ctx;
 use crate::test_support::{a_context, a_password, nowhere};
 
@@ -81,6 +81,7 @@ fn offered(tag: &str, lapses_in: i64) -> Ctx {
             offered: context.hours_ago(48 - lapses_in),
             lapses: context.hours_ago(-lapses_in),
             decline: None,
+            claim: None,
         },
     )]
     .into_iter()
@@ -123,4 +124,75 @@ fn an_account_never_offered_is_vouched_for() {
 
     assert!(vouched_for(&context, "b9c1"));
     assert!(on_record(&context).contains_key("a7f3"));
+}
+
+/// A context whose record holds an offer on `a7f3` lapsing `lapses_in` hours from now,
+/// claimed by `a-claim` and declined by `a-refusal`, with the decline service's refusals
+/// written under a stack of its own where `refused`.
+fn claimable(tag: &str, lapses_in: i64, refused: bool) -> Ctx {
+    use lemonfiber_sidecar::decline::{File, Refusal, Refusals, TokenHash};
+
+    let context = offered(tag, lapses_in);
+    let mut offers = on_record(&context);
+    if let Some(offer) = offers.get_mut("a7f3") {
+        offer.claim = Some(TokenHash::of("a-claim"));
+        offer.decline = Some(TokenHash::of("a-refusal"));
+    }
+    crate::app::record::keep_beside(&context, crate::invitation::RECORD, &offers);
+    let project =
+        lemonfiber_fixtures::scratch::Scratch::named(&format!("members-{tag}-stack")).kept();
+    if refused {
+        let record = crate::app::invite::declining::path(&project, File::Refusals);
+        let refusals = Refusals::default().with(Refusal {
+            token: TokenHash::of("a-refusal"),
+            account: "a7f3".to_owned(),
+            at: 1,
+        });
+        let _ = std::fs::create_dir_all(record.parent().unwrap_or(project.as_path()));
+        let _ = std::fs::write(&record, refusals.written());
+    }
+    let project: &'static std::path::Path = Box::leak(project.into_boxed_path());
+    Ctx {
+        stack: crate::stack::Source::External(project),
+        ..context
+    }
+}
+
+/// The token its offer carries claims an account's standing invitation, and nothing
+/// else claims it.
+#[tokio::test]
+async fn only_the_token_an_offer_carries_claims_it() {
+    let context = claimable("claim-open", 1, false);
+
+    assert!(offers_claim(&context, "a7f3", "a-claim").await);
+    assert!(!offers_claim(&context, "a7f3", "a-guess").await);
+    assert!(!offers_claim(&context, "b9c1", "a-claim").await);
+}
+
+#[tokio::test]
+async fn a_lapsed_invitation_claims_nothing() {
+    let context = claimable("claim-lapsed", -1, false);
+
+    assert!(!offers_claim(&context, "a7f3", "a-claim").await);
+}
+
+#[tokio::test]
+async fn a_declined_invitation_claims_nothing() {
+    let context = claimable("claim-declined", 1, true);
+
+    assert!(!offers_claim(&context, "a7f3", "a-claim").await);
+}
+
+/// A claim spent is taken off the offer, which stays, so its token claims nothing again.
+#[tokio::test]
+async fn a_spent_claim_claims_nothing_again() {
+    let context = claimable("claim-spent", 1, false);
+
+    claim_spent(&context, "a7f3");
+    claim_spent(&context, "b9c1");
+
+    assert!(!offers_claim(&context, "a7f3", "a-claim").await);
+    assert!(on_record(&context)
+        .get("a7f3")
+        .is_some_and(|offer| offer.claim.is_none() && offer.decline.is_some()));
 }

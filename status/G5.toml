@@ -15,5 +15,5 @@ requirement = [
   { id = "G5-R11", state = "done", evidence = ["crates/lemonfiber-ports/src/network.rs"] },
   { id = "G5-R12", state = "done", evidence = ["crates/lemonfiber-core/src/door/chosen.rs", "crates/lemonfiber-core/src/config/display.rs", "crates/lemonfiber-core/tests/integration/what_the_household_is_handed.rs"] },
   { id = "G5-R13", state = "done", evidence = ["crates/lemonfiber-core/src/door/run.rs", "crates/lemonfiber-core/src/door/run/tests.rs"] },
-  { id = "G5-R14", state = "done", evidence = ["crates/lemonfiber-core/src/app/invite/declining.rs", "crates/lemonfiber-sidecar/", "crates/lemonfiber-core/src/seed/run/decline.rs", "crates/lemonfiber-core/src/app/credentials/declining.rs"] },
+  { id = "G5-R14", state = "done", evidence = ["crates/lemonfiber-core/src/app/invite/declining.rs", "crates/lemonfiber-core/src/app/invite/joining.rs", "crates/lemonfiber-sidecar/", "crates/lemonfiber-core/src/seed/run/decline.rs", "crates/lemonfiber-core/src/app/credentials/declining.rs"] },
 ]

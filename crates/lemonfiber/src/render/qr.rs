@@ -36,6 +36,16 @@ pub(super) fn rows(address: &str, ascii: bool) -> Option<Vec<String>> {
     Some(if ascii { wide(&code) } else { stacked(&code) })
 }
 
+/// `text` drawn as a code under `label`, where it fits in one.
+pub(super) fn labelled(lines: &mut super::Lines, label: &str, text: &str) {
+    if let Some(drawn) = rows(text, crate::say::folding()) {
+        lines.spaced(label);
+        for row in drawn {
+            lines.put(format!("  {row}"));
+        }
+    }
+}
+
 /// Whether the reader should see a dark module here.
 ///
 /// Everything outside the code is light, which is what makes the margin a margin.

@@ -50,6 +50,10 @@ pub enum Refusal {
     KeyInTheClear,
     /// A key asked for something its scope does not reach.
     NotForAKey,
+    /// A claim named an invitation that is not open.
+    NotOpen,
+    /// The password chosen at a claim is too short.
+    ShortChoice,
     /// A read was given a parameter its answer has nowhere to put.
     Unwanted,
     /// A parameter carrying one value was given more than once.
@@ -129,7 +133,7 @@ impl Refusal {
     ///
     /// What the contract lists, so a variant added above and not here is a code no
     /// client can name. A test holds the two together.
-    pub const EVERY: [Self; 41] = [
+    pub const EVERY: [Self; 43] = [
         Self::NotAdmitted,
         Self::Elsewhere,
         Self::NotYours,
@@ -139,6 +143,8 @@ impl Refusal {
         Self::NotAPassword,
         Self::KeyInTheClear,
         Self::NotForAKey,
+        Self::NotOpen,
+        Self::ShortChoice,
         Self::Unwanted,
         Self::Repeated,
         Self::NoSuchRead,
@@ -186,6 +192,8 @@ impl Refusal {
             Self::NotAPassword => admit::NOT_A_PASSWORD,
             Self::KeyInTheClear => admit::KEY_IN_THE_CLEAR,
             Self::NotForAKey => admit::NOT_FOR_A_KEY,
+            Self::NotOpen => admit::NOT_OPEN,
+            Self::ShortChoice => admit::SHORT_CHOICE,
             Self::Unwanted => read::UNWANTED,
             Self::Repeated => read::REPEATED,
             Self::NoSuchRead => read::NO_SUCH_READ,
@@ -261,6 +269,8 @@ impl Refusal {
             Self::NotThePassword => "That is not the password for this machine.",
             Self::TooManyAttempts => "Too many wrong passwords and keys. Try again later.",
             Self::NotAPassword => "The body of this request is not a password.",
+            Self::NotOpen => "This invitation can no longer be claimed.",
+            Self::ShortChoice => "That password is too short to choose.",
             // Said before the key was looked at, so it says nothing about whether the key
             // was right: only that it came the wrong way.
             Self::KeyInTheClear => {
@@ -364,6 +374,11 @@ impl Refusal {
                     .with_detail("Retry-After")
             }
             Self::NotAPassword => Remedy::new("Send the password as the body's `password`"),
+            Self::NotOpen => Remedy::new("Ask whoever invited you for a new invitation"),
+            Self::ShortChoice => Remedy::new(format!(
+                "Choose a password of at least {} characters",
+                lemonfiber_core::admission::LEAST
+            )),
             Self::Unwanted => Remedy::new("Ask again, naming only what this read takes"),
             Self::Repeated => Remedy::new("Ask again, naming it once"),
             Self::NoSuchRead => Remedy::new("Ask for one of the reads the contract names"),

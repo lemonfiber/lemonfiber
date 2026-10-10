@@ -344,6 +344,8 @@ fn the_rest_of_them() -> Vec<Outcome> {
             name: "ana".to_owned(),
             address: "http://a-machine.local:8096".to_owned(),
             decline: None,
+            join: None,
+            unjoinable: None,
             caution: None,
             hours: 48,
             withdrawn: Vec::new(),

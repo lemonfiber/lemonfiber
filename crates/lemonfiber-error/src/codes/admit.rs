@@ -125,4 +125,23 @@ codes! {
         remedy: "Call only what the contract lists as callable by a key, or ask whoever looks \
             after this machine.",
     }
+    /// Raised when a claim names an invitation that is not open.
+    NOT_OPEN = "ADMIT-13" {
+        severity: Error,
+        status: 401,
+        since: "0.18.0",
+        meaning: "This invitation can no longer be claimed, and nothing was set. The same is said \
+            whether it was claimed already, ran out, was declined or was never one, so a guess \
+            learns nothing about which.",
+        remedy: "Ask whoever invited you for a new invitation.",
+    }
+    /// Raised when the password chosen at a claim is shorter than the least this takes.
+    SHORT_CHOICE = "ADMIT-14" {
+        severity: Error,
+        status: 400,
+        since: "0.18.0",
+        meaning: "The password chosen is too short, and nothing was set. The invitation still \
+            stands and can be claimed with a longer one.",
+        remedy: "Choose a password of at least twelve characters.",
+    }
 }
