@@ -16,7 +16,7 @@ use crate::model::InvitationStanding;
 use crate::ports::service::Member;
 
 /// Where the companion opens an invitation.
-pub(crate) const JOIN: &str = "lemonfiber://join";
+const JOIN: &str = "lemonfiber://join";
 
 /// What an invitation says about the app: the link it opens, or why there is none.
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -79,12 +79,7 @@ fn with_claim(mut offers: Offers, member: &str, token: &str) -> Option<(Offers, 
 
 /// The link itself: [`JOIN`] and its parameters, in a fixed order, each percent-encoded.
 #[must_use]
-pub(crate) fn written(
-    material: &Material,
-    expires: u64,
-    name: &str,
-    claim: Option<&str>,
-) -> String {
+fn written(material: &Material, expires: u64, name: &str, claim: Option<&str>) -> String {
     let expires = expires.to_string();
     let mut said = vec![
         ("address", material.address.as_str()),
@@ -134,7 +129,7 @@ fn unjoinable(problem: &Problem) -> Joining {
 
 /// Said where the claim token could not be minted or recorded.
 const UNREADIED: &str = "The app cannot be handed this invitation, because its claim could \
-                         not be written down. It can still be claimed at the address above.";
+                         not be written down. It can still be claimed at the sign-in address.";
 
 #[cfg(test)]
 mod tests;

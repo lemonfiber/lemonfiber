@@ -195,6 +195,8 @@ async fn an_account_the_media_server_will_not_sign_in_empty_is_refused() {
     let _ = fs::remove_dir_all(a_directory("claim-closed"));
 }
 
+/// A media server that cannot be asked is said as that, not as an invitation that is
+/// closed, so nobody is sent to ask for a new one.
 #[tokio::test]
 async fn a_household_that_cannot_be_read_claims_nothing() {
     let transport = Fake::by_path(vec![
@@ -206,9 +208,37 @@ async fn a_household_that_cannot_be_read_claims_nothing() {
 
     let answer = claimed(router, &hers(), CLAIM).await;
 
-    assert_eq!(answer.status, StatusCode::UNAUTHORIZED, "{}", answer.body);
+    assert_eq!(answer.status, StatusCode::FORBIDDEN, "{}", answer.body);
+    assert_eq!(the_code(&answer.body), "ADMIT-7");
     assert!(!set_a_password(&transport));
     let _ = fs::remove_dir_all(a_directory("claim-unread"));
+}
+
+/// A password the media server will not take is said as the media server not
+/// answering, and the claim is kept for another try.
+#[tokio::test]
+async fn a_password_the_media_server_will_not_take_keeps_the_claim() {
+    let transport = Fake::by_path_in_turn(vec![
+        (
+            "/Users/AuthenticateByName",
+            vec![Reply::reply(200, SIGNED_IN)],
+        ),
+        ("/Users/a7f3/Password", vec![Reply::reply(400, "")]),
+        ("/Users", vec![Reply::reply(200, UNCLAIMED)]),
+    ]);
+    let ctx = offered("claim-refused", transport.clone());
+    let (router, _) = door_over(&ctx);
+
+    let answer = claimed(router, &hers(), CLAIM).await;
+
+    assert_eq!(answer.status, StatusCode::FORBIDDEN, "{}", answer.body);
+    assert_eq!(the_code(&answer.body), "ADMIT-7");
+    let Some(env) = ctx.settings.env_file.as_deref() else {
+        unreachable!("a stack built here has an env file")
+    };
+    let record = fs::read_to_string(env.with_file_name("invitations.json")).unwrap_or_default();
+    assert!(record.contains(CLAIM_HASHED), "{record}");
+    let _ = fs::remove_dir_all(a_directory("claim-refused"));
 }
 
 /// A household handed to the door keeps no record of what it offered, so nothing it

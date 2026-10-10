@@ -256,41 +256,48 @@ impl Admitting {
     }
 
     /// Who claiming an invitation proves somebody to be, once the password they chose is
-    /// set on the account it names; nothing where the invitation is not open.
+    /// set on the account it names.
     ///
     /// The account must be unclaimed, switched on and not an administrator, and the token
-    /// must claim its standing offer. The token is spent before the member signs in with
-    /// the password just set, so it claims nothing again whatever that sign-in answers.
+    /// must claim its standing offer; anything else is an invitation that is not open. A
+    /// media server that could not be asked is said as that, not as a closed invitation.
+    /// The token is spent before the member signs in with the password just set, so it
+    /// claims nothing again whatever that sign-in answers.
     async fn claimed(
         &self,
         given: &Given,
         token: &str,
         ticket: &Ticket,
         random: &dyn Random,
-    ) -> Option<(Opened, Door)> {
-        let door = ticket.member.clone()?;
-        let asked = given.name.as_deref()?.to_lowercase();
-        let at = Arc::clone(self.household.as_ref()?);
-        let household = opened(Arc::clone(&at)).await?;
+    ) -> Result<(Opened, Door), Refusal> {
+        let door = ticket.member.clone().ok_or(Refusal::NotOpen)?;
+        let asked = given
+            .name
+            .as_deref()
+            .ok_or(Refusal::NotOpen)?
+            .to_lowercase();
+        let at = Arc::clone(self.household.as_ref().ok_or(Refusal::Unconfirmed)?);
+        let household = opened(Arc::clone(&at)).await.ok_or(Refusal::Unconfirmed)?;
         let member = household
             .household()
             .await
-            .ok()?
+            .map_err(|_| Refusal::Unconfirmed)?
             .into_iter()
-            .find(|member| member.name.to_lowercase() == asked)?;
-        if member.claimed || member.access.disabled || member.access.administrator {
-            return None;
-        }
+            .find(|member| member.name.to_lowercase() == asked)
+            .filter(|member| {
+                !(member.claimed || member.access.disabled || member.access.administrator)
+            })
+            .ok_or(Refusal::NotOpen)?;
         if !claimable(Arc::clone(&at), &member.id, token).await {
-            return None;
+            return Err(Refusal::NotOpen);
         }
-        let device = device(random)?;
-        if !household
+        let device = device(random).ok_or(Refusal::Unconfirmed)?;
+        let set = household
             .claim(&member.name, &given.password, &device)
             .await
-            .ok()?
-        {
-            return None;
+            .map_err(|_| Refusal::Unconfirmed)?;
+        if !set {
+            return Err(Refusal::NotOpen);
         }
         at.claim_spent(&member.id);
         signed_in(
@@ -302,6 +309,7 @@ impl Admitting {
         )
         .await
         .map(|opened| (opened, door))
+        .ok_or(Refusal::Unconfirmed)
     }
 
     /// Who the secret a request carried proves it to be, or nothing.
@@ -588,11 +596,12 @@ async fn opening(
     };
     let random = serving.ctx.seams.random.as_ref();
     let admitted = match given.claim.as_deref() {
-        Some(token) => serving
-            .admitting
-            .claimed(&given, token, &ticket, random)
-            .await
-            .ok_or(Refusal::NotOpen),
+        Some(token) => {
+            serving
+                .admitting
+                .claimed(&given, token, &ticket, random)
+                .await
+        }
         None => serving
             .admitting
             .whoever(&given, &ticket, random)
