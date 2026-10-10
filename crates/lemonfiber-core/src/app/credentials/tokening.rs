@@ -169,6 +169,9 @@ pub(super) async fn rotate(
     else {
         return unproven(held, &not_handed(&held.name));
     };
+    if !handable(fillers, filler, &route) {
+        return unproven(held, &withheld(&route, filler));
+    }
     if ctx.dry_run {
         return would_rotate(held, ROTATING);
     }
@@ -252,6 +255,30 @@ async fn relinked(requests: &dyn Requests, route: &Route, token: &str) -> Result
         .link_media_server(&through_the_gate(&route.id), token)
         .await
         .map_err(|_| unreached(route))
+}
+
+/// Whether the token for `route` may be handed to the request service `filler`: the
+/// service behind the route is one the trust gate lets a credential cross from to it.
+fn handable(
+    fillers: &crate::wiring::Fillers,
+    filler: &crate::wiring::Filler,
+    route: &Route,
+) -> bool {
+    fillers
+        .service(&route.id)
+        .is_some_and(|upstream| crate::wiring::crosses(upstream.holder(), filler.holder()))
+}
+
+/// What is said where the token for `route` may not be handed to the request service
+/// `filler`.
+fn withheld(route: &Route, filler: &crate::wiring::Filler) -> String {
+    format!(
+        "{} is not handed to {}: lemonfiber does not hand that plugin's service a credential \
+         that opens {}.",
+        name(route),
+        filler.name,
+        route.name
+    )
 }
 
 /// What is said where the token a line names is not handed over yet.

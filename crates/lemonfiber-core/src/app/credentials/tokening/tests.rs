@@ -71,11 +71,25 @@ fn fillers_from(
     services: Vec<lemonfiber_manifest::Service>,
     project: Option<&std::path::Path>,
 ) -> crate::wiring::Fillers {
+    fillers_beside(services, &[], project)
+}
+
+/// The same, with `installed` beside the stack.
+fn fillers_beside(
+    services: Vec<lemonfiber_manifest::Service>,
+    installed: &[crate::plugin::Installed],
+    project: Option<&std::path::Path>,
+) -> crate::wiring::Fillers {
     crate::test_support::stack()
         .manifest()
         .map(|mut manifest| {
             manifest.services = services;
-            crate::wiring::Fillers::of(&manifest, &[], &crate::wiring::Chosen::default(), project)
+            crate::wiring::Fillers::of(
+                &manifest,
+                installed,
+                &crate::wiring::Chosen::default(),
+                project,
+            )
         })
         .unwrap_or_default()
 }
@@ -372,6 +386,51 @@ async fn a_token_is_never_printed() {
 
     assert_eq!(shown.value, None);
     assert_eq!(shown.warning, UNPRINTED);
+}
+
+#[tokio::test]
+async fn a_third_party_request_service_is_never_handed_a_token() {
+    let http = serving("held", "linked", 200, &[200], 200);
+    let (ctx, at) = scene(
+        "tokens-third-party",
+        true,
+        &accepting(&["held"], &["linked"]),
+        http.clone(),
+        true,
+    );
+    let line = named(
+        &held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at)).await,
+        SONARR,
+    );
+    let without_requests: Vec<_> = stack(true)
+        .into_iter()
+        .filter(|service| service.id != "seerr")
+        .collect();
+    let asked_before = http.requests().len();
+
+    let rotation = super::super::rotating::rotate(
+        &ctx,
+        &line,
+        &without_requests,
+        &fillers_beside(
+            without_requests.clone(),
+            &[crate::test_support::contracted(
+                "intake",
+                crate::test_support::CONTRACTED_REQUESTS,
+                "request.intake",
+            )],
+            Some(&at),
+        ),
+        Some(&at),
+    )
+    .await;
+
+    assert!(
+        matches!(&rotation.settled, Settled::Unproven { detail } if detail.contains("does not hand")),
+        "{rotation:?}"
+    );
+    assert_eq!(accepted(&at), Some(accepting(&["held"], &["linked"])));
+    assert_eq!(http.requests().len(), asked_before);
 }
 
 #[tokio::test]
