@@ -52,18 +52,18 @@ fn service(
     }
 }
 
-/// Jellyfin, and the request gate where `gating`.
+/// The media server, and the request gate where `gating`.
 fn stack(gating: bool) -> Vec<lemonfiber_manifest::Service> {
-    let mut jellyfin = service(
+    let mut media_server = service(
         "jellyfin",
         Some(lemonfiber_manifest::ApiKind::Jellyfin),
         8096,
     );
-    jellyfin.provides = vec!["identity.source".to_owned()];
-    jellyfin.listens = Some(8096);
-    let mut seerr = service("seerr", Some(lemonfiber_manifest::ApiKind::Seerr), 5055);
-    seerr.listens = Some(5055);
-    let mut services = vec![jellyfin, seerr];
+    media_server.provides = vec!["identity.source".to_owned()];
+    media_server.listens = Some(8096);
+    let mut request_service = service("seerr", Some(lemonfiber_manifest::ApiKind::Seerr), 5055);
+    request_service.listens = Some(5055);
+    let mut services = vec![media_server, request_service];
     if gating {
         services.push(service("request-gate", None, PORT));
     }
@@ -75,7 +75,7 @@ fn filling(services: Vec<lemonfiber_manifest::Service>) -> crate::wiring::Filler
     crate::test_support::stack_fillers(services, &[], None, crate::plugin::first_party::EMBEDDED)
 }
 
-/// The gate's routes: Sonarr's, and Jellyfin's presenting `key`.
+/// The gate's routes: the curator's, and the media server's presenting `key`.
 fn routes(key: &str) -> Upstreams {
     Upstreams::of(vec![
         Upstream {
@@ -95,8 +95,8 @@ fn routes(key: &str) -> Upstreams {
     ])
 }
 
-/// A stack directory whose gate presents `key` to Jellyfin where it holds routes, and
-/// a context with the media server's administrator recorded where `administered`,
+/// A stack directory whose gate presents `key` to the media server where it holds routes,
+/// and a context with the media server's administrator recorded where `administered`,
 /// answering over `http`.
 fn scene(name: &str, administered: bool, key: Option<&str>, http: Arc<Fake>) -> (Ctx, PathBuf) {
     let at = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
@@ -107,7 +107,7 @@ fn scene(name: &str, administered: bool, key: Option<&str>, http: Arc<Fake>) -> 
     if administered {
         let _ = store::set(
             &env,
-            crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+            crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
             &lemonfiber_fixtures::support::a_password(),
         );
     }
@@ -135,8 +135,8 @@ fn on_disk(project: &Path) -> Option<Upstreams> {
         .and_then(|text| Upstreams::read(&text).ok())
 }
 
-/// Jellyfin: it lists each of `lists` in turn under the gate's name, and answers a mint
-/// with `minted`, a revocation with `revoked` and a key's proof with `proved`.
+/// The media server: it lists each of `lists` in turn under the gate's name, and answers a
+/// mint with `minted`, a revocation with `revoked` and a key's proof with `proved`.
 fn serving(lists: &[&[&str]], minted: u16, revoked: u16, proved: u16) -> Arc<Fake> {
     let listed = |keys: &[&str]| {
         let items: Vec<serde_json::Value> = keys
@@ -253,7 +253,7 @@ async fn a_key_not_there_yet_is_absent_and_says_how_to_get_one() {
 }
 
 #[tokio::test]
-async fn without_the_gate_jellyfin_or_a_stack_directory_there_is_no_line() {
+async fn without_the_gate_the_media_server_or_a_stack_directory_there_is_no_line() {
     let (ctx, at) = scene(
         "gate-held-none",
         true,
@@ -307,7 +307,7 @@ async fn a_confirmed_ask_prints_the_key_from_the_routes() {
 }
 
 #[tokio::test]
-async fn a_rotation_lands_only_once_jellyfin_takes_the_key() {
+async fn a_rotation_lands_only_once_the_media_server_takes_the_key() {
     let http = serving(
         &[&["old"], &["old", "fresh"], &["old", "fresh"]],
         204,
@@ -339,7 +339,7 @@ async fn a_rotation_lands_only_once_jellyfin_takes_the_key() {
 }
 
 #[tokio::test]
-async fn a_new_key_jellyfin_refuses_is_revoked_and_the_old_routes_put_back() {
+async fn a_new_key_the_media_server_refuses_is_revoked_and_the_old_routes_put_back() {
     let http = serving(&[&["old"], &["old", "fresh"]], 204, 204, 401);
     let (ctx, at) = scene("gate-rotate-untaken", true, Some("old"), http.clone());
     let listed = listed(&ctx, &at).await;
@@ -391,7 +391,7 @@ async fn a_new_key_that_cannot_be_written_is_revoked_again() {
 }
 
 #[tokio::test]
-async fn a_mint_jellyfin_refuses_or_routes_not_there_change_nothing() {
+async fn a_mint_the_media_server_refuses_or_routes_not_there_change_nothing() {
     let http = serving(&[&["old"]], 500, 204, 200);
     let (ctx, at) = scene("gate-rotate-unminted", true, Some("old"), http.clone());
     let listed = listed(&ctx, &at).await;

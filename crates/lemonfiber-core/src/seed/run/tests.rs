@@ -6,7 +6,7 @@ use super::baseline::escalate_broken_roots;
 use super::clients::{category_for, Held};
 use super::curating::curators;
 use super::{withheld, withheld_brought};
-use crate::app::targets::{project_directory, recorded_secret, servarr_targets};
+use crate::app::targets::{curator_targets, project_directory, recorded_secret};
 use crate::app::{dispatch, Command, Ctx, Outcome};
 use crate::config::{store, Settings};
 use crate::model::VersionReport;
@@ -60,14 +60,14 @@ fn manifest_service(
     }
 }
 
-/// A Servarr-shape API declaration naming the given key file, or none, at the
+/// A curator-shape API declaration naming the given key file, or none, at the
 /// v3 most tests need; the version-specific tests set their own.
-fn servarr_api(path: Option<&str>) -> lemonfiber_manifest::Api {
-    servarr_api_at(path, Some(3))
+fn curator_api(path: Option<&str>) -> lemonfiber_manifest::Api {
+    curator_api_at(path, Some(3))
 }
 
 /// The same, at a given API version — `None` to omit it entirely.
-fn servarr_api_at(path: Option<&str>, version: Option<u32>) -> lemonfiber_manifest::Api {
+fn curator_api_at(path: Option<&str>, version: Option<u32>) -> lemonfiber_manifest::Api {
     lemonfiber_manifest::Api {
         kind: lemonfiber_manifest::ApiKind::Servarr,
         key_source: lemonfiber_manifest::KeySource::ConfigXml,
@@ -89,7 +89,7 @@ fn is_skipped(wiring: &crate::seed::Wiring) -> bool {
     matches!(wiring.state, crate::seed::State::Skipped { .. })
 }
 
-/// A context whose engine says the given qBittorrent log line, answering
+/// A context whose engine says the given torrent client log line, answering
 /// seeding's HTTP from `replies` and its randomness from `bytes`.
 fn seed_ctx(
     log: Option<&str>,
@@ -118,7 +118,7 @@ fn seed_ctx(
         .with_random(Arc::new(FixedRandom(bytes)))
 }
 
-/// The line qBittorrent logs its temporary password on.
+/// The line the torrent client logs its temporary password on.
 const TEMP_LOG: &str = "A temporary password is provided for this session: read-from-log";
 
 fn config_scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
@@ -143,7 +143,7 @@ fn broken(wirings: &[Wiring]) -> Option<String> {
     }
 }
 
-/// The wirings whose connection registers a download client into an arr.
+/// The wirings whose connection registers a download client into a curator.
 fn download_client_wirings(report: &crate::seed::Report) -> Vec<&crate::seed::Wiring> {
     report
         .wirings
@@ -163,7 +163,7 @@ fn download_client_wirings(report: &crate::seed::Report) -> Vec<&crate::seed::Wi
 fn curator(id: &str, port: u16, media: &str) -> lemonfiber_manifest::Service {
     let mut service = manifest_service(
         id,
-        Some(servarr_api(Some("/config/config.xml"))),
+        Some(curator_api(Some("/config/config.xml"))),
         Some(port),
     );
     service.media_types = vec![media.to_owned()];
@@ -210,7 +210,7 @@ fn fillers_trusting(
 }
 
 /// A context reaching `service` on loopback 8080, holding its key in `project` where
-/// `keyed`, with every Servarr key on file.
+/// `keyed`, with every curator key on file.
 fn contracted_ctx(project: &std::path::Path, service: &str, keyed: bool, http: Arc<Fake>) -> Ctx {
     crate::test_support::contracted_context(project, service, keyed)
         .build()
@@ -230,7 +230,7 @@ fn beside_a_stand_in(
     let mut stand_in = crate::test_support::a_placed(
         "kept",
         &["library.curate"],
-        Some(servarr_api(Some("/config/config.xml"))),
+        Some(curator_api(Some("/config/config.xml"))),
         Some(8990),
     );
     stand_in.media_types = vec![media.to_owned()];
@@ -255,26 +255,26 @@ fn asked_by_a_plugin(
     )
 }
 
-/// A filesystem holding every Servarr key, the stand-in's resolving away from beneath
+/// A filesystem holding every curator key, the stand-in's resolving away from beneath
 /// the directory its container owns.
 fn leading_away_from_the_stand_in() -> SeedFs {
     SeedFs::keyed(Some("<Config><ApiKey>the-key</ApiKey></Config>"), None)
         .leading_away(vec!["config/kept/"])
 }
 
-/// Prowlarr as a manifest service: a Servarr shape that files no media.
-fn prowlarr() -> lemonfiber_manifest::Service {
+/// The indexer aggregator as a manifest service: a curator shape that files no media.
+fn aggregator_svc() -> lemonfiber_manifest::Service {
     manifest_service(
         "prowlarr",
-        Some(servarr_api(Some("/config/config.xml"))),
+        Some(curator_api(Some("/config/config.xml"))),
         Some(9696),
     )
 }
 
-// ---- Jellyfin as Seerr's identity: two services and a minted credential. ----
+// ---- The media server as the request service's identity, with a minted credential. ----
 
-/// A Seerr-shape service declaration.
-fn seerr_api() -> lemonfiber_manifest::Api {
+/// A request-service-shape declaration.
+fn requests_api() -> lemonfiber_manifest::Api {
     lemonfiber_manifest::Api {
         kind: lemonfiber_manifest::ApiKind::Seerr,
         key_source: lemonfiber_manifest::KeySource::ApiSettings,
@@ -283,8 +283,8 @@ fn seerr_api() -> lemonfiber_manifest::Api {
     }
 }
 
-fn seerr_svc() -> lemonfiber_manifest::Service {
-    requesting(manifest_service("seerr", Some(seerr_api()), Some(5055)))
+fn requests_svc() -> lemonfiber_manifest::Service {
+    requesting(manifest_service("seerr", Some(requests_api()), Some(5055)))
 }
 
 /// `service` as the stack's request service: called what the stack calls it and filling
@@ -295,7 +295,7 @@ fn requesting(mut service: lemonfiber_manifest::Service) -> lemonfiber_manifest:
     service
 }
 
-fn jellyfin_api() -> lemonfiber_manifest::Api {
+fn media_server_api() -> lemonfiber_manifest::Api {
     lemonfiber_manifest::Api {
         kind: lemonfiber_manifest::ApiKind::Jellyfin,
         key_source: lemonfiber_manifest::KeySource::Generated,
@@ -305,11 +305,11 @@ fn jellyfin_api() -> lemonfiber_manifest::Api {
 }
 
 /// The stack's media server, called what the stack calls it and serving its identity.
-fn jellyfin_svc() -> lemonfiber_manifest::Service {
-    let mut jellyfin = manifest_service("jellyfin", Some(jellyfin_api()), Some(8096));
-    jellyfin.name = "Jellyfin".to_owned();
-    jellyfin.provides = vec!["identity.source".to_owned()];
-    jellyfin
+fn media_server_svc() -> lemonfiber_manifest::Service {
+    let mut media_server = manifest_service("jellyfin", Some(media_server_api()), Some(8096));
+    media_server.name = "Jellyfin".to_owned();
+    media_server.provides = vec!["identity.source".to_owned()];
+    media_server
 }
 
 /// The media server the shipped stack's identity ask settles on among `services`.
@@ -317,22 +317,22 @@ fn served(services: &[lemonfiber_manifest::Service]) -> Option<crate::app::targe
     crate::app::targets::MediaServer::of(&fillers_of(services.to_vec()))
 }
 
-/// A transport standing in for the household pair, routed by path: Jellyfin's
+/// A transport standing in for the household pair, routed by path: the media server's
 /// public info reports whether its wizard has run, its `/Startup/*` calls
-/// succeed, Seerr's sign-in flips it to initialised, and its public settings
+/// succeed, the request service's sign-in flips it to initialised, and its public settings
 /// report that state.
-/// A household that answers Jellyfin's and Seerr's setup reads.
+/// A household that answers the media server's and the request service's setup reads.
 ///
-/// `completed` is what Jellyfin says about its own wizard. `signed_in` is whether
-/// Seerr is already initialised: where it is not, the catch-all answers "no" and then
-/// "yes", which is the read-write-read the identity wiring performs. Scripting the
+/// `completed` is what the media server says about its own wizard. `signed_in` is whether
+/// the request service is already initialised: where it is not, the catch-all answers "no"
+/// and then "yes", which is the read-write-read the identity wiring performs. Scripting the
 /// change in order rather than flipping a flag says which write is meant to cause it.
 fn household(completed: bool, signed_in: bool) -> Arc<Fake> {
     household_changing(completed, signed_in, 200, 204)
 }
 
-/// [`household`], with Jellyfin answering the administrator's sign-in with `admitted`
-/// and the password change with `changed`.
+/// [`household`], with the media server answering the administrator's sign-in with
+/// `admitted` and the password change with `changed`.
 fn household_changing(completed: bool, signed_in: bool, admitted: u16, changed: u16) -> Arc<Fake> {
     let initialised = if signed_in {
         vec![Answer::reply(200, r#"{"initialized":true}"#)]
@@ -350,8 +350,8 @@ fn household_changing(completed: bool, signed_in: bool, admitted: u16, changed: 
                 format!(r#"{{"StartupWizardCompleted":{completed}}}"#),
             )],
         ),
-        // Jellyfin's setup calls and Seerr's sign-in succeed, but neither by
-        // itself finishes Seerr's setup.
+        // The media server's setup calls and the request service's sign-in succeed, but
+        // neither by itself finishes the request service's setup.
         ("/Startup/", vec![Answer::reply(200, "")]),
         // The administrator's sign-in, and the password change made once the request
         // service has been set up.
@@ -379,7 +379,7 @@ fn household_changing(completed: bool, signed_in: bool, admitted: u16, changed: 
 }
 
 /// The request service, declaring the settings file it writes its key to.
-fn seerr_with_settings() -> lemonfiber_manifest::Service {
+fn requests_with_settings() -> lemonfiber_manifest::Service {
     requesting(manifest_service(
         "seerr",
         Some(lemonfiber_manifest::Api {
@@ -392,8 +392,8 @@ fn seerr_with_settings() -> lemonfiber_manifest::Service {
     ))
 }
 
-/// The book \*arr, as a manifest service whose key lemonfiber mints for it.
-fn bindery_svc() -> lemonfiber_manifest::Service {
+/// The book curator, as a manifest service whose key lemonfiber mints for it.
+fn book_curator_svc() -> lemonfiber_manifest::Service {
     manifest_service(
         "bindery",
         Some(lemonfiber_manifest::Api {
@@ -414,14 +414,14 @@ fn recorded_admin(name: &str) -> std::path::PathBuf {
     let env = dir.join(".env");
     let _ = crate::config::store::set(
         &env,
-        crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         "minted-earlier",
     );
     env
 }
 
 /// The subtitle finder as a manifest service: a key in a YAML of its own.
-fn bazarr_svc() -> lemonfiber_manifest::Service {
+fn subtitle_finder_svc() -> lemonfiber_manifest::Service {
     manifest_service(
         "bazarr",
         Some(lemonfiber_manifest::Api {
@@ -435,7 +435,7 @@ fn bazarr_svc() -> lemonfiber_manifest::Service {
 }
 
 /// The finder's configuration as it writes it — its own key under `auth`, and
-/// one under each \*arr it has been pointed at.
+/// one under each curator it has been pointed at.
 const FINDER_CONFIG: &str = "auth:\n  apikey: finder-key\nsonarr:\n  apikey: someone-elses\n";
 
 fn stack_root() -> &'static std::path::Path {

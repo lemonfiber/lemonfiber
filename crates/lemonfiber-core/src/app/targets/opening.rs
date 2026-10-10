@@ -20,10 +20,10 @@ use crate::wiring::{Filler, Fillers, Holder};
 
 use crate::recyclarr::Kind;
 
+use super::curators::{curator_targets, target_for};
 use super::downloads::download_targets;
 use super::filled::{spoken, Spoken};
 use super::layout::{project_directory, read_owned, service_config_dir};
-use super::servarr::{servarr_targets, target_for};
 
 /// The server the decline service acts on: the stack's own service its link by name
 /// reaches, rather than whatever serves identity, where that is one lemonfiber speaks to
@@ -33,9 +33,9 @@ pub(crate) fn declined_server(fillers: &Fillers) -> Option<super::MediaServer> {
     super::MediaServer::at(fillers, filler)
 }
 
-/// One \*arr a read can be made against: the service it files, a client already carrying
+/// One curator a read can be made against: the service it files, a client already carrying
 /// its key, and the name a report calls it by.
-pub(crate) struct OpenArr {
+pub(crate) struct OpenCurator {
     /// The service's display name, as a report names where a fact came from.
     pub name: String,
     /// Which of the two media services it is.
@@ -44,19 +44,19 @@ pub(crate) struct OpenArr {
     pub service: Servarr,
 }
 
-/// Every \*arr whose key could be read, ready to be asked something.
+/// Every curator whose key could be read, ready to be asked something.
 ///
 /// One that has not finished starting has not written its key yet, so it cannot be opened
 /// and is left out. That is deliberately not a failed read: a service still coming up
 /// holds nothing to report, so its absence understates nothing — the convention every
 /// caller here follows, stated once rather than re-derived at each of them.
-pub(crate) async fn open_servarrs(
+pub(crate) async fn open_curators(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
-) -> Vec<OpenArr> {
+) -> Vec<OpenCurator> {
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     let mut open = Vec::new();
-    for target in servarr_targets(services, project.as_deref()) {
+    for target in curator_targets(services, project.as_deref()) {
         let Some(kind) = target.kind else {
             continue;
         };
@@ -66,7 +66,7 @@ pub(crate) async fn open_servarrs(
         else {
             continue;
         };
-        open.push(OpenArr {
+        open.push(OpenCurator {
             name: target.name.clone(),
             kind,
             service,
@@ -267,7 +267,7 @@ pub(crate) async fn usenet_client(ctx: &Ctx, fillers: &Fillers) -> Option<Arc<dy
     Some(Arc::from(client))
 }
 
-/// The Servarr-shape service that files no media of its own — the indexer aggregator,
+/// The curator-shape service that files no media of its own — the indexer aggregator,
 /// which is what makes it the one that knows how the indexers have been behaving.
 ///
 /// Identified by what it does rather than by name, like every other service here, so a
@@ -293,8 +293,8 @@ pub(crate) fn aggregator_target(
 
 /// The indexer aggregator, ready to be asked how its indexers have been behaving.
 ///
-/// Its API is a major behind the media \*arrs', which is why it is its own client
-/// rather than the shared Servarr one — but it writes its key exactly the way they do.
+/// Its API is a major behind the media curators', which is why it is its own client
+/// rather than the shared curator one — but it writes its key exactly the way they do.
 pub(crate) async fn indexer_aggregator(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
@@ -313,9 +313,9 @@ pub(crate) async fn indexer_aggregator(
 /// The request service's own key, read from the settings file it writes.
 ///
 /// Published with the rest of the stack's keys, and the key lemonfiber itself reads and
-/// writes Seerr with. Nothing before Seerr is initialised, since that is the run that
-/// writes one.
-pub(crate) async fn seerr_key(
+/// writes the request service with. Nothing before the request service is initialised,
+/// since that is the run that writes one.
+pub(crate) async fn stack_requests_key(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
     project: Option<&std::path::Path>,
@@ -333,11 +333,11 @@ pub(crate) async fn seerr_key(
 
 /// The subtitle finder's own key, read from the configuration it writes.
 ///
-/// Its own rather than shared with a Servarr read: the file is a YAML holding an
+/// Its own rather than shared with a curator read: the file is a YAML holding an
 /// `apikey` under several sections, so which one is this service's is decided by the
 /// section it sits under. Nothing where the stack has no subtitle finder, or where it
 /// has not written a key yet.
-pub(crate) async fn bazarr_key(
+pub(crate) async fn subtitle_finder_key(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
     project: Option<&std::path::Path>,

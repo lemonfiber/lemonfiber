@@ -7,8 +7,8 @@ fn a_trace_link_names_the_term_the_trace_searches_by() {
     assert!(trace_link("The Expanse").contains("trace 'The Expanse'"));
 }
 
-/// This line is a command an operator copies, and the title in it is an \*arr's or
-/// Overseerr's rather than ours.
+/// This line is a command an operator copies, and the title in it is a curator's or
+/// the request service's rather than ours.
 ///
 /// A title carrying the quote the line was built with closed it early, and everything
 /// after that was read by the shell as further arguments. What follows the quote is

@@ -1,5 +1,5 @@
-//! Seerr pointed at Jellyfin through the request gate, and handed the token it reaches
-//! Jellyfin with after its setup.
+//! The request service pointed at the media server through the request gate, and handed the
+//! token it reaches the media server with after its setup.
 
 use lemonfiber_sidecar::gate::{Accepted, File, Tokens, PORT};
 use lemonfiber_sidecar::TokenHash;
@@ -13,7 +13,7 @@ fn minted() -> String {
 
 /// A stack with the media server, the request service and, where `gating`, the gate.
 fn stack(gating: bool) -> Vec<lemonfiber_manifest::Service> {
-    let mut services = vec![jellyfin_svc(), seerr_svc()];
+    let mut services = vec![media_server_svc(), requests_svc()];
     if gating {
         services.push(manifest_service("request-gate", None, Some(PORT)));
     }
@@ -25,7 +25,7 @@ fn tokens_file(project: &std::path::Path) -> std::path::PathBuf {
     crate::app::gating::path(project, File::Tokens)
 }
 
-/// The gate accepting `tokens` on Jellyfin's route.
+/// The gate accepting `tokens` on the media server's route.
 fn accepting(tokens: &[&str]) -> Tokens {
     Tokens::of(vec![Accepted {
         route: "jellyfin".to_owned(),
@@ -33,7 +33,7 @@ fn accepting(tokens: &[&str]) -> Tokens {
     }])
 }
 
-/// A stack directory where the gate accepts `accepted` on Jellyfin's route.
+/// A stack directory where the gate accepts `accepted` on the media server's route.
 fn project(name: &str, accepted: &[&str]) -> std::path::PathBuf {
     let at = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
     let _ = std::fs::remove_dir_all(&at);
@@ -70,7 +70,7 @@ fn at_the_gate(key: &str) -> String {
     link("request-gate", PORT, "/jellyfin", key)
 }
 
-/// A household whose Jellyfin has been set up, whose request service answers each of
+/// A household whose media server has been set up, whose request service answers each of
 /// `initialised` in turn when asked whether it is set up, lists `linked` as its
 /// media-server settings, and answers a new link with `relinked`.
 fn serving(initialised: &[bool], linked: &str, relinked: u16) -> Arc<Fake> {
@@ -177,7 +177,7 @@ fn state_of(wirings: &[Wiring], name: &str) -> Option<State> {
 /// What the report calls the link.
 const LINK: &str = "Seerr's Jellyfin connection";
 
-/// A fresh request service is set up at the gate's Jellyfin route, then handed a
+/// A fresh request service is set up at the gate's media server route, then handed a
 /// token the gate accepts there, which it proves before it keeps it.
 #[tokio::test]
 async fn a_fresh_request_service_is_set_up_through_the_gate() {
@@ -226,7 +226,7 @@ async fn a_link_both_sides_hold_is_left_alone() {
     assert_eq!(accepted(&at), Some(accepting(&["held"])));
 }
 
-/// A request service set up at Jellyfin's own address is moved to the gate.
+/// A request service set up at the media server's own address is moved to the gate.
 #[tokio::test]
 async fn a_request_service_linked_directly_is_moved_to_the_gate() {
     let at = project("linking-direct", &[]);
@@ -239,7 +239,7 @@ async fn a_request_service_linked_directly_is_moved_to_the_gate() {
 }
 
 /// A stack without the gate has no link to hold, and sets the request service up at
-/// Jellyfin's own address.
+/// the media server's own address.
 #[tokio::test]
 async fn without_the_gate_there_is_no_link() {
     let at = project("linking-ungated", &[]);

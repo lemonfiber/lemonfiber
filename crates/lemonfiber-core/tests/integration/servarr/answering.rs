@@ -1,6 +1,6 @@
 //! Who a service says it is, and how its refusals are read.
 
-use super::sonarr;
+use super::curator;
 use lemonfiber_core::ports::http::Method;
 use lemonfiber_core::ports::media::Kind;
 use lemonfiber_core::ports::service::Failure;
@@ -14,7 +14,7 @@ async fn a_valid_credential_reads_the_service_identity() {
         200,
         r#"{"instanceName":"Sonarr","appName":"Sonarr","version":"4.0.15.2941"}"#,
     ));
-    let identity = sonarr(&fake).identity().await;
+    let identity = curator(&fake).identity().await;
     assert_eq!(
         identity.ok().map(|who| (who.name, who.version)),
         Some(("Sonarr".to_owned(), "4.0.15.2941".to_owned()))
@@ -37,14 +37,14 @@ async fn the_app_name_is_used_when_no_instance_name_is_set() {
         200,
         r#"{"appName":"Radarr","version":"5.0"}"#,
     ));
-    let identity = sonarr(&fake).identity().await;
+    let identity = curator(&fake).identity().await;
     assert_eq!(identity.ok().map(|who| who.name), Some("Radarr".to_owned()));
 }
 
 #[tokio::test]
 async fn an_upgrade_search_is_posted_as_the_command_for_its_kind_and_accepted() {
     let fake = Fake::always(Answer::reply(201, r#"{"name":"CutoffUnmetEpisodeSearch"}"#));
-    let accepted = sonarr(&fake).search_upgrades(Kind::Tv).await;
+    let accepted = curator(&fake).search_upgrades(Kind::Tv).await;
     assert!(accepted.is_ok());
 
     // The command rode a POST to the command route, named in the body.
@@ -61,14 +61,14 @@ async fn an_upgrade_search_is_posted_as_the_command_for_its_kind_and_accepted() 
 #[tokio::test]
 async fn an_upgrade_search_a_service_refuses_is_a_failure() {
     let fake = Fake::always(Answer::reply(500, "boom"));
-    assert!(sonarr(&fake).search_upgrades(Kind::Tv).await.is_err());
+    assert!(curator(&fake).search_upgrades(Kind::Tv).await.is_err());
 }
 
 #[tokio::test]
 async fn a_rejected_key_is_unauthorised() {
     let fake = Fake::always(Answer::reply(401, ""));
     assert!(matches!(
-        sonarr(&fake).identity().await,
+        curator(&fake).identity().await,
         Err(Failure::Unauthorised { .. })
     ));
 }
@@ -77,7 +77,7 @@ async fn a_rejected_key_is_unauthorised() {
 async fn a_service_that_is_not_answering_is_unavailable() {
     let fake = Fake::always(Answer::Silent);
     assert!(matches!(
-        sonarr(&fake).identity().await,
+        curator(&fake).identity().await,
         Err(Failure::Unavailable { .. })
     ));
 }
@@ -86,7 +86,7 @@ async fn a_service_that_is_not_answering_is_unavailable() {
 async fn an_unexpected_status_is_refused_with_the_services_own_words() {
     // The service's own message is carried through, not paraphrased.
     let fake = Fake::always(Answer::reply(500, "database is locked"));
-    let detail = match sonarr(&fake).identity().await {
+    let detail = match curator(&fake).identity().await {
         Err(Failure::Refused { detail, .. }) => Some(detail),
         _ => None,
     };
@@ -99,7 +99,7 @@ async fn an_unexpected_status_is_refused_with_the_services_own_words() {
 #[tokio::test]
 async fn an_unexpected_status_with_no_body_is_refused_with_its_code() {
     let fake = Fake::always(Answer::reply(503, ""));
-    let detail = match sonarr(&fake).identity().await {
+    let detail = match curator(&fake).identity().await {
         Err(Failure::Refused { detail, .. }) => Some(detail),
         _ => None,
     };
@@ -109,7 +109,7 @@ async fn an_unexpected_status_with_no_body_is_refused_with_its_code() {
 #[tokio::test]
 async fn an_unreadable_status_body_is_refused_and_the_detail_names_the_break() {
     let fake = Fake::always(Answer::reply(200, "not json at all"));
-    let detail = match sonarr(&fake).identity().await {
+    let detail = match curator(&fake).identity().await {
         Err(Failure::Refused { detail, .. }) => detail,
         _ => String::new(),
     };
@@ -129,7 +129,7 @@ async fn an_unreadable_status_body_is_refused_and_the_detail_names_the_break() {
 async fn a_status_that_names_neither_itself_nor_its_version_is_refused() {
     let fake = Fake::always(Answer::reply(200, r#"{"version":"4.0"}"#));
     assert!(matches!(
-        sonarr(&fake).identity().await,
+        curator(&fake).identity().await,
         Err(Failure::Refused { .. })
     ));
 }
@@ -141,7 +141,7 @@ async fn a_service_that_does_not_serve_the_api_version_is_unsupported() {
     // unsupported, naming the version, rather than read as a generic refusal so
     // seeding refuses it rather than writing something malformed.
     let fake = Fake::always(Answer::reply(404, ""));
-    let detail = match sonarr(&fake).identity().await {
+    let detail = match curator(&fake).identity().await {
         Err(Failure::Unsupported { detail, .. }) => Some(detail),
         _ => None,
     };
@@ -158,7 +158,7 @@ async fn a_read_against_an_unsupported_api_version_is_unsupported_too() {
     // malformed is ever posted.
     let fake = Fake::always(Answer::reply(404, ""));
     assert!(matches!(
-        sonarr(&fake).root_folders().await,
+        curator(&fake).root_folders().await,
         Err(Failure::Unsupported { .. })
     ));
 }

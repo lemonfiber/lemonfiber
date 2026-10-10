@@ -21,11 +21,11 @@ use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::support::Reporting;
 
-/// `SABnzbd`'s configuration, carrying the key it generated for itself.
-const SAB_INI: &str = "[misc]\napi_key = sabkey123\n";
+/// The Usenet client's configuration, carrying the key it generated for itself.
+const USENET_INI: &str = "[misc]\napi_key = sabkey123\n";
 
 /// The aggregator's configuration, carrying the key it generated for itself.
-const PROWLARR_XML: &str = "<Config><ApiKey>a1b2c3d4e5</ApiKey></Config>";
+const AGGREGATOR_XML: &str = "<Config><ApiKey>a1b2c3d4e5</ApiKey></Config>";
 
 /// One Usenet account with a block recorded against it, and one day of history.
 const SERVERS: &str = r#"{"config":{"servers":[
@@ -74,8 +74,8 @@ async fn the_accounts_behind_a_real_stack_are_read_from_the_services_that_use_th
             Health::None,
         )))
         .filesystem(Files::ending(vec![
-            ("config/sabnzbd/sabnzbd.ini", SAB_INI),
-            ("config/prowlarr/config.xml", PROWLARR_XML),
+            ("config/sabnzbd/sabnzbd.ini", USENET_INI),
+            ("config/prowlarr/config.xml", AGGREGATOR_XML),
         ]))
         .build()
         .with_http(http);
@@ -122,8 +122,8 @@ async fn an_account_refusing_the_login_fails_through_the_whole_diagnosis() {
             Health::None,
         )))
         .filesystem(Files::ending(vec![
-            ("config/sabnzbd/sabnzbd.ini", SAB_INI),
-            ("config/prowlarr/config.xml", PROWLARR_XML),
+            ("config/sabnzbd/sabnzbd.ini", USENET_INI),
+            ("config/prowlarr/config.xml", AGGREGATOR_XML),
         ]))
         .build()
         .with_http(http);

@@ -27,7 +27,7 @@ const GOVERNED: [&str; 2] = [
 /// The media server's administrator's password is read as a method of the server the
 /// lookup resolved, which names the request service it is handed to only where the gate
 /// lets it cross; [`the_media_server_names_its_asker_through_the_gate`] holds that.
-const READERS: [&str; 3] = ["servarr_key(", "usenet_key(", "recorded_password("];
+const READERS: [&str; 3] = ["curator_key(", "usenet_key(", "recorded_password("];
 
 /// Whether `line` calls one of [`READERS`] as a function rather than as a method.
 fn reads(line: &str) -> bool {

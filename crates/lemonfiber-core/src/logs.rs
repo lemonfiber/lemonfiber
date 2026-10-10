@@ -7,7 +7,7 @@
 //!
 //! Where it does not, it passes through unclassified. That is the whole discipline
 //! here: the obvious shortcut is to call everything on standard error an error, and
-//! it would be wrong about most of this stack — the \*arr services, the tunnel and
+//! it would be wrong about most of this stack — the curator services, the tunnel and
 //! the Usenet client all write ordinary progress to stderr. A viewer that paints all
 //! of that red teaches an operator to ignore red, which costs them the one line the
 //! colour existed for. So the stream a line arrived on is not an input here, and a

@@ -9,7 +9,7 @@ use lemonfiber_core::seed::{wire_download_clients, Baselines, Severity, State, W
 #[tokio::test]
 async fn a_client_the_operator_re_filed_is_preserved_as_drift() {
     // lemonfiber last wrote "tv" and still wants "tv", but the operator changed the
-    // category in the *arr itself. That is their edit to keep, not a mistake to
+    // category in the curator itself. That is their edit to keep, not a mistake to
     // revert: against the baseline it reports as drift and is left exactly as it is,
     // nothing re-registered.
     let existing = vec![RegisteredClient {
@@ -51,7 +51,7 @@ async fn a_client_the_operator_re_filed_is_preserved_as_drift() {
     );
 }
 
-/// A qBittorrent client the operator re-filed, so it reads as drift — the setup a
+/// A torrent client the operator re-filed, so it reads as drift — the setup a
 /// severity check reads. Recorded "tv", the service now holds "my-own-tv".
 fn re_filed_client() -> Vec<RegisteredClient> {
     vec![RegisteredClient {
@@ -66,7 +66,7 @@ fn re_filed_client() -> Vec<RegisteredClient> {
 }
 
 /// Wire the wanted clients against a service holding `existing`, with lemonfiber's own
-/// value recorded for the qBittorrent endpoint so a differing one reads as drift, and
+/// value recorded for the torrent client's endpoint so a differing one reads as drift, and
 /// the given test verdicts — `None` to stand in for a service that will not test.
 async fn seed_clients_probed(
     existing: Vec<RegisteredClient>,
@@ -118,8 +118,8 @@ fn breakage(wiring: Option<&Wiring>) -> Option<String> {
     }
 }
 
-/// The single wanted qBittorrent client the drift-severity tests re-file.
-fn one_qbittorrent() -> [DownloadClient; 1] {
+/// The single wanted torrent client the drift-severity tests re-file.
+fn one_torrent_client() -> [DownloadClient; 1] {
     [client("qBittorrent", "qbittorrent", 8080)]
 }
 
@@ -149,7 +149,7 @@ async fn a_drifted_client_the_service_cannot_reach_is_raised_to_a_warning() {
         breakage(wirings.first()).is_some_and(|breakage| breakage.contains("connection refused")),
         "the unreachable drift is a warning naming the service's words"
     );
-    // The freshly-wired SABnzbd client never drifted, so it was never tested.
+    // The freshly-wired Usenet client never drifted, so it was never tested.
     assert_eq!(
         wirings.get(1).map(|wiring| &wiring.state),
         Some(&State::Wired)
@@ -163,7 +163,7 @@ async fn a_drifted_client_the_service_still_reaches_stays_informational() {
     // edit, working — so it is left as the information it is.
     let wirings = seed_clients_probed(
         re_filed_client(),
-        &one_qbittorrent(),
+        &one_torrent_client(),
         Some(vec![probe("1", true, None)]),
     )
     .await;
@@ -180,7 +180,7 @@ async fn an_unreachable_client_the_service_gave_no_words_for_names_a_fallback() 
     // the warning is never blank — a fallback stands in for the missing detail.
     let wirings = seed_clients_probed(
         re_filed_client(),
-        &one_qbittorrent(),
+        &one_torrent_client(),
         Some(vec![probe("1", false, None)]),
     )
     .await;
@@ -194,7 +194,7 @@ async fn an_unreachable_client_the_service_gave_no_words_for_names_a_fallback() 
 async fn a_drift_the_service_will_not_test_stays_the_information_it_is() {
     // A service that will not run the test at all proves nothing broken, so the drift
     // is left as information rather than guessed into a warning.
-    let wirings = seed_clients_probed(re_filed_client(), &one_qbittorrent(), None).await;
+    let wirings = seed_clients_probed(re_filed_client(), &one_torrent_client(), None).await;
     assert_eq!(
         wirings.first().map(|wiring| &wiring.state),
         Some(&State::Drifted)
@@ -208,7 +208,7 @@ async fn a_drift_the_test_does_not_cover_stays_informational() {
     // not a failure, so the drift stays the information it is.
     let wirings = seed_clients_probed(
         re_filed_client(),
-        &one_qbittorrent(),
+        &one_torrent_client(),
         Some(vec![probe("999", false, Some("some other client"))]),
     )
     .await;

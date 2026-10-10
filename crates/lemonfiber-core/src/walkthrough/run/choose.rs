@@ -10,7 +10,7 @@
 //! disk, and — worse — teaches them the product does not check.
 
 use super::walk::Walk;
-use crate::app::targets::OpenArr;
+use crate::app::targets::OpenCurator;
 use crate::ports::service::{Catalogue, CatalogueEntry};
 use crate::recyclarr::Kind;
 use crate::walkthrough::{Line, Reason, Step, Suggestion};
@@ -22,7 +22,7 @@ use crate::walkthrough::{Line, Reason, Step, Suggestion};
 /// be tested either.
 pub(super) struct Chosen<'a> {
     /// The service that will hold it, already open.
-    pub arr: &'a OpenArr,
+    pub curator: &'a OpenCurator,
     /// The catalogue entry to ask for.
     pub entry: CatalogueEntry,
     /// What to call it in every line from here on.
@@ -32,12 +32,12 @@ pub(super) struct Chosen<'a> {
 impl Chosen<'_> {
     /// Which of the two media services handles it.
     pub(super) const fn kind(&self) -> Kind {
-        self.arr.kind
+        self.curator.kind
     }
 
     /// What the service calls itself, for a narration that names where work is happening.
     pub(super) fn service(&self) -> String {
-        self.arr.name.clone()
+        self.curator.name.clone()
     }
 }
 
@@ -53,7 +53,7 @@ pub(super) enum NotChosen {
 /// could handle.
 pub(super) async fn choose<'a>(
     walk: &mut Walk<'_>,
-    arrs: &'a [OpenArr],
+    curators: &'a [OpenCurator],
     term: Option<&str>,
 ) -> Result<Chosen<'a>, NotChosen> {
     // Every service is asked, not only the likely one: the operator typed a title, not a
@@ -62,13 +62,16 @@ pub(super) async fn choose<'a>(
     // its own kind — a stack running only films should not be offered a series.
     let mut refused = false;
     let mut said = false;
-    for arr in arrs {
-        let asked = term.map_or_else(|| Suggestion::safe_for(arr.kind).to_owned(), str::to_owned);
+    for curator in curators {
+        let asked = term.map_or_else(
+            || Suggestion::safe_for(curator.kind).to_owned(),
+            str::to_owned,
+        );
         if !said {
             walk.say(Line::saying(Step::Choosing, asked.clone()));
             said = true;
         }
-        let Ok(found) = arr.service.lookup(arr.kind, &asked).await else {
+        let Ok(found) = curator.service.lookup(curator.kind, &asked).await else {
             refused = true;
             continue;
         };
@@ -79,7 +82,11 @@ pub(super) async fn choose<'a>(
             continue;
         };
         let named = entry.named();
-        return Ok(Chosen { arr, entry, named });
+        return Ok(Chosen {
+            curator,
+            entry,
+            named,
+        });
     }
 
     // A catalogue that would not answer and a catalogue that answered with nothing are

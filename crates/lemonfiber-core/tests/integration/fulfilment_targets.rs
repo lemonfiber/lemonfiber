@@ -1,4 +1,4 @@
-//! Handing the request service the \*arrs that fetch what the household asks for.
+//! Handing the request service the curators that fetch what the household asks for.
 //!
 //! Driven through the real clients over a scripted stack, so these read the requests
 //! this product actually sends rather than a second description of them — and from
@@ -17,8 +17,8 @@ use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_ports::http::Method;
 use std::sync::Arc;
 
-/// Sonarr as the request service should be told about it.
-fn sonarr() -> FulfilmentTarget {
+/// The curator as the request service should be told about it.
+fn curator() -> FulfilmentTarget {
     FulfilmentTarget {
         name: "Sonarr".to_owned(),
         at: Endpoint {
@@ -61,40 +61,52 @@ fn holding(film: &str, television: &str) -> (Seerr, Arc<Fake>) {
     (Seerr::new(http.clone(), "http://seerr:5055", "seerr"), http)
 }
 
-/// Sonarr as the request service reports it once registered.
+/// The curator as the request service reports it once registered.
 fn registered() -> String {
     r#"{"id":1,"hostname":"sonarr","port":8989,"apiKey":"the-key"}"#.to_owned()
 }
 
-async fn wire(seerr: &Seerr, wanted: &[FulfilmentTarget]) -> Vec<State> {
+async fn wire(request_service: &Seerr, wanted: &[FulfilmentTarget]) -> Vec<State> {
     let mut journal = Journal::new();
-    wire_fulfilment_targets(seerr, wanted, &mut journal, "2026-08-28T00:00:00Z", false)
-        .await
-        .into_iter()
-        .map(|wiring| wiring.state)
-        .collect()
+    wire_fulfilment_targets(
+        request_service,
+        wanted,
+        &mut journal,
+        "2026-08-28T00:00:00Z",
+        false,
+    )
+    .await
+    .into_iter()
+    .map(|wiring| wiring.state)
+    .collect()
 }
 
 /// The same pass over the same request service, asked what it would hand over rather
 /// than asked to hand it over.
-async fn would_wire(seerr: &Seerr, wanted: &[FulfilmentTarget]) -> Vec<State> {
+async fn would_wire(request_service: &Seerr, wanted: &[FulfilmentTarget]) -> Vec<State> {
     let mut journal = Journal::new();
-    wire_fulfilment_targets(seerr, wanted, &mut journal, "2026-08-28T00:00:00Z", true)
-        .await
-        .into_iter()
-        .map(|wiring| wiring.state)
-        .collect()
+    wire_fulfilment_targets(
+        request_service,
+        wanted,
+        &mut journal,
+        "2026-08-28T00:00:00Z",
+        true,
+    )
+    .await
+    .into_iter()
+    .map(|wiring| wiring.state)
+    .collect()
 }
 
-/// An \*arr the request service does not know about is handed over.
+/// A curator the request service does not know about is handed over.
 ///
 /// The whole point: until it is told, a request is accepted and no downloader ever
 /// hears about it. What was sent is read off the request rather than taken on trust.
 #[tokio::test]
-async fn an_arr_the_request_service_lacks_is_handed_over() {
-    let (seerr, http) = holding("[]", "[]");
+async fn a_curator_the_request_service_lacks_is_handed_over() {
+    let (request_service, http) = holding("[]", "[]");
 
-    let states = wire(&seerr, &[sonarr()]).await;
+    let states = wire(&request_service, &[curator()]).await;
 
     assert_eq!(states, vec![State::Wired], "{states:?}");
     let sent = http
@@ -105,7 +117,7 @@ async fn an_arr_the_request_service_lacks_is_handed_over() {
         .unwrap_or_default();
     assert!(
         sent.contains("\"hostname\":\"sonarr\"") && sent.contains("\"port\":8989"),
-        "the *arr was not named by the endpoint the request service reaches it on: {sent}"
+        "the curator was not named by the endpoint the request service reaches it on: {sent}"
     );
     assert!(
         sent.contains("\"activeProfileId\":4") && sent.contains("HD-1080p"),
@@ -123,14 +135,14 @@ async fn an_arr_the_request_service_lacks_is_handed_over() {
 /// not handed a second copy of the same service — and never rewritten, so whatever
 /// they changed about it survives a seed.
 #[tokio::test]
-async fn an_arr_already_registered_is_left_untouched_despite_a_different_name() {
+async fn a_curator_already_registered_is_left_untouched_despite_a_different_name() {
     let renamed = format!(
         "[{}]",
         r#"{"id":1,"name":"Renamed","hostname":"sonarr","port":8989,"apiKey":"the-key"}"#
     );
-    let (seerr, http) = holding("[]", &renamed);
+    let (request_service, http) = holding("[]", &renamed);
 
-    let states = wire(&seerr, &[sonarr()]).await;
+    let states = wire(&request_service, &[curator()]).await;
 
     assert_eq!(states, vec![State::AlreadyWired], "{states:?}");
     assert!(
@@ -146,9 +158,9 @@ async fn an_arr_already_registered_is_left_untouched_despite_a_different_name() 
 #[tokio::test]
 async fn a_request_service_that_will_not_answer_is_skipped() {
     let http = Fake::by_path_in_turn(vec![("/settings", vec![Answer::Silent])]);
-    let seerr = Seerr::new(http, "http://seerr:5055", "seerr");
+    let request_service = Seerr::new(http, "http://seerr:5055", "seerr");
 
-    let states = wire(&seerr, &[sonarr()]).await;
+    let states = wire(&request_service, &[curator()]).await;
 
     assert!(
         matches!(states.first(), Some(State::Skipped { .. })),
@@ -156,7 +168,7 @@ async fn a_request_service_that_will_not_answer_is_skipped() {
     );
 }
 
-/// The profiles an \*arr reports, as the request service needs them named.
+/// The profiles a curator reports, as the request service needs them named.
 ///
 /// A profile with no usable id or no name is passed over: the request service must
 /// name both when it hands over a request, and half of one is not an answer.
@@ -168,7 +180,7 @@ async fn only_profiles_that_can_be_named_are_offered() {
         {"id":9,"name":""}
     ]"#;
     let http = Fake::by_path_in_turn(vec![("/qualityprofile", vec![Answer::reply(200, listed)])]);
-    let arr = Servarr::new(
+    let curator = Servarr::new(
         http,
         "http://sonarr:8989",
         "the-key".to_owned(),
@@ -176,7 +188,7 @@ async fn only_profiles_that_can_be_named_are_offered() {
         3,
     );
 
-    let profiles = arr.quality_profiles().await.unwrap_or_default();
+    let profiles = curator.quality_profiles().await.unwrap_or_default();
 
     assert_eq!(
         profiles,
@@ -191,12 +203,15 @@ async fn only_profiles_that_can_be_named_are_offered() {
 /// What the request service already holds, read back by endpoint.
 #[tokio::test]
 async fn the_targets_it_holds_are_read_from_both_lists() {
-    let (seerr, _) = holding(
+    let (request_service, _) = holding(
         r#"[{"id":2,"hostname":"radarr","port":7878}]"#,
         &format!("[{}]", registered()),
     );
 
-    let held = seerr.fulfilment_targets().await.unwrap_or_default();
+    let held = request_service
+        .fulfilment_targets()
+        .await
+        .unwrap_or_default();
 
     assert_eq!(held.len(), 2, "both lists were not read: {held:?}");
     assert!(
@@ -214,9 +229,9 @@ async fn the_targets_it_holds_are_read_from_both_lists() {
 /// household's requests are then fulfilled twice.
 #[tokio::test]
 async fn a_target_list_that_will_not_read_back_is_refused_rather_than_taken_as_empty() {
-    let (seerr, _) = holding("not a list of targets", &format!("[{}]", registered()));
+    let (request_service, _) = holding("not a list of targets", &format!("[{}]", registered()));
 
-    let said = seerr
+    let said = request_service
         .fulfilment_targets()
         .await
         .err()
@@ -229,19 +244,19 @@ async fn a_target_list_that_will_not_read_back_is_refused_rather_than_taken_as_e
     );
 }
 
-/// A rehearsal names the endpoint it would register an \*arr at, and registers none.
+/// A rehearsal names the endpoint it would register a curator at, and registers none.
 ///
 /// The address is the whole of what the operator is deciding about: the request
-/// service reaches an \*arr over the stack's own network, and a report that said only
+/// service reaches a curator over the stack's own network, and a report that said only
 /// "a target would be added" would leave them unable to tell a correct run from one
 /// about to point the service at the wrong container. Asserted together with the
 /// traffic, because a report that reads right while the write still goes out is the
 /// one failure this flag exists to prevent wearing the right words.
 #[tokio::test]
 async fn a_rehearsed_pass_names_the_endpoint_it_would_register_and_registers_none() {
-    let (seerr, http) = holding("[]", "[]");
+    let (request_service, http) = holding("[]", "[]");
 
-    let states = would_wire(&seerr, &[sonarr()]).await;
+    let states = would_wire(&request_service, &[curator()]).await;
 
     assert_eq!(
         states,
@@ -256,7 +271,7 @@ async fn a_rehearsed_pass_names_the_endpoint_it_would_register_and_registers_non
             .requests()
             .iter()
             .any(|asked| asked.method == Method::Post),
-        "a rehearsal handed the *arr over"
+        "a rehearsal handed the curator over"
     );
 }
 
@@ -271,9 +286,9 @@ async fn a_rehearsed_pass_names_the_endpoint_it_would_register_and_registers_non
 #[tokio::test]
 async fn a_rehearsed_read_as_the_owner_says_it_could_not_tell_rather_than_naming_a_fault() {
     let http = Fake::by_path(vec![("/settings", Answer::reply(401, ""))]);
-    let seerr = Seerr::new(http, "http://seerr:5055", "seerr");
+    let request_service = Seerr::new(http, "http://seerr:5055", "seerr");
 
-    let states = would_wire(&seerr, &[sonarr()]).await;
+    let states = would_wire(&request_service, &[curator()]).await;
 
     let said = format!("{states:?}");
     assert!(
@@ -290,7 +305,7 @@ async fn a_rehearsed_read_as_the_owner_says_it_could_not_tell_rather_than_naming
     );
 }
 
-/// Sonarr as the request service should reach it through the gate, held before at its
+/// The curator as the request service should reach it through the gate, held before at its
 /// own address.
 fn gated() -> FulfilmentTarget {
     FulfilmentTarget {
@@ -299,13 +314,13 @@ fn gated() -> FulfilmentTarget {
             port: 5057,
             base: "/sonarr".to_owned(),
         },
-        moved_from: Some(sonarr().at),
+        moved_from: Some(curator().at),
         key: "the-token".to_owned(),
-        ..sonarr()
+        ..curator()
     }
 }
 
-/// A request service listing `listed` for Sonarr on every read, and answering a move
+/// A request service listing `listed` for the curator on every read, and answering a move
 /// with `moved`.
 fn moving(listed: &str, moved: u16) -> (Seerr, Arc<Fake>) {
     moving_tested(listed, moved, 200)
@@ -338,16 +353,16 @@ fn moving_tested(listed: &str, moved: u16, tested: u16) -> (Seerr, Arc<Fake>) {
     (Seerr::new(http.clone(), "http://seerr:5055", "seerr"), http)
 }
 
-/// Sonarr held at its own address, named and profiled by the operator.
+/// The curator held at its own address, named and profiled by the operator.
 const HELD_DIRECTLY: &str = r#"[{"id":1,"name":"Mine","hostname":"sonarr","port":8989,"apiKey":"the-key","activeProfileId":9}]"#;
 
-/// An \*arr held where it was reached before is moved in place: its endpoint and key
+/// A curator held where it was reached before is moved in place: its endpoint and key
 /// change, and everything the operator chose about it stays.
 #[tokio::test]
-async fn an_arr_held_where_it_was_reached_before_is_moved_in_place() {
-    let (seerr, http) = moving(HELD_DIRECTLY, 200);
+async fn a_curator_held_where_it_was_reached_before_is_moved_in_place() {
+    let (request_service, http) = moving(HELD_DIRECTLY, 200);
 
-    let states = wire(&seerr, &[gated()]).await;
+    let states = wire(&request_service, &[gated()]).await;
 
     assert_eq!(states, vec![State::Wired], "{states:?}");
     let sent = http
@@ -368,15 +383,15 @@ async fn an_arr_held_where_it_was_reached_before_is_moved_in_place() {
     }
 }
 
-/// An \*arr held at the right endpoint under another key has its key rewritten.
+/// A curator held at the right endpoint under another key has its key rewritten.
 #[tokio::test]
-async fn an_arr_held_under_another_key_has_it_rewritten() {
-    let (seerr, http) = moving(
+async fn a_curator_held_under_another_key_has_it_rewritten() {
+    let (request_service, http) = moving(
         r#"[{"id":1,"hostname":"sonarr","port":8989,"apiKey":"an-old-key"}]"#,
         200,
     );
 
-    let states = wire(&seerr, &[sonarr()]).await;
+    let states = wire(&request_service, &[curator()]).await;
 
     assert_eq!(states, vec![State::Wired], "{states:?}");
     assert!(http
@@ -389,12 +404,12 @@ async fn an_arr_held_under_another_key_has_it_rewritten() {
                 .is_some_and(|body| body.contains("the-key"))));
 }
 
-/// A rehearsal says where the \*arr would move from and to, and moves nothing.
+/// A rehearsal says where the curator would move from and to, and moves nothing.
 #[tokio::test]
 async fn a_rehearsed_move_says_where_and_moves_nothing() {
-    let (seerr, http) = moving(HELD_DIRECTLY, 200);
+    let (request_service, http) = moving(HELD_DIRECTLY, 200);
 
-    let states = would_wire(&seerr, &[gated()]).await;
+    let states = would_wire(&request_service, &[gated()]).await;
 
     assert_eq!(
         states,
@@ -414,21 +429,21 @@ async fn a_rehearsed_move_says_where_and_moves_nothing() {
 /// reported rather than called done.
 #[tokio::test]
 async fn a_move_that_does_not_land_is_reported() {
-    let (seerr, _) = moving(HELD_DIRECTLY, 500);
-    let states = wire(&seerr, &[gated()]).await;
+    let (request_service, _) = moving(HELD_DIRECTLY, 500);
+    let states = wire(&request_service, &[gated()]).await;
     assert!(
         matches!(states.first(), Some(State::Failed { .. })),
         "{states:?}"
     );
 
-    let (seerr, _) = moving(HELD_DIRECTLY, 200);
+    let (request_service, _) = moving(HELD_DIRECTLY, 200);
     let gone = lemonfiber_core::ports::service::RegisteredTarget {
         id: "7".to_owned(),
-        at: sonarr().at,
+        at: curator().at,
         key: String::new(),
         kind: Kind::Tv,
     };
-    let said = seerr
+    let said = request_service
         .move_fulfilment_target(&gone, &gated().at, "the-token")
         .await
         .err()
@@ -458,7 +473,7 @@ async fn a_film_target_moves_within_the_film_list() {
             vec![Answer::reply(200, "")],
         ),
     ]);
-    let seerr = Seerr::new(http.clone(), "http://seerr:5055", "seerr");
+    let request_service = Seerr::new(http.clone(), "http://seerr:5055", "seerr");
     let held = lemonfiber_core::ports::service::RegisteredTarget {
         id: "1".to_owned(),
         at: Endpoint {
@@ -474,7 +489,7 @@ async fn a_film_target_moves_within_the_film_list() {
         ..gated()
     };
 
-    let moved = seerr
+    let moved = request_service
         .move_fulfilment_target(&held, &film.at, &film.key)
         .await;
 
@@ -491,7 +506,7 @@ async fn a_film_target_moves_within_the_film_list() {
 async fn a_move_or_registration_the_service_does_not_answer_fails() {
     let held = lemonfiber_core::ports::service::RegisteredTarget {
         id: "1".to_owned(),
-        at: sonarr().at,
+        at: curator().at,
         key: "the-key".to_owned(),
         kind: Kind::Tv,
     };
@@ -512,10 +527,10 @@ async fn a_move_or_registration_the_service_does_not_answer_fails() {
             (Method::Get, "/settings/sonarr", vec![listed]),
             (Method::Put, "/settings/sonarr/1", vec![put]),
         ]);
-        let seerr = Seerr::new(http, "http://seerr:5055", "seerr");
+        let request_service = Seerr::new(http, "http://seerr:5055", "seerr");
 
         assert!(
-            seerr
+            request_service
                 .move_fulfilment_target(&held, &gated().at, "the-token")
                 .await
                 .is_err(),
@@ -528,16 +543,19 @@ async fn a_move_or_registration_the_service_does_not_answer_fails() {
         "/settings/sonarr",
         vec![Answer::Silent],
     )]);
-    let seerr = Seerr::new(http, "http://seerr:5055", "seerr");
-    assert!(seerr.add_fulfilment_target(&sonarr()).await.is_err());
+    let request_service = Seerr::new(http, "http://seerr:5055", "seerr");
+    assert!(request_service
+        .add_fulfilment_target(&curator())
+        .await
+        .is_err());
 }
 
 /// A target moved but not reached by the request service's own test is not wired.
 #[tokio::test]
 async fn a_target_the_request_service_cannot_reach_is_not_wired() {
-    let (seerr, http) = moving_tested(HELD_DIRECTLY, 200, 500);
+    let (request_service, http) = moving_tested(HELD_DIRECTLY, 200, 500);
 
-    let states = wire(&seerr, &[gated()]).await;
+    let states = wire(&request_service, &[gated()]).await;
 
     assert!(
         matches!(states.first(), Some(State::Failed { detail }) if detail.starts_with("the request service's own test of the target failed: ")),

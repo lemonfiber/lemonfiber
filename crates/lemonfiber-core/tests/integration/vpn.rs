@@ -473,9 +473,9 @@ async fn both_unreachable_cannot_confirm_safety() {
 async fn a_stopped_vpn_container_is_a_definite_fault() {
     let mut gluetun = Behavior::up("gluetun", None);
     gluetun.running = false;
-    let mut qbit = Behavior::up("qbittorrent", None);
-    qbit.running = false;
-    let findings = check(vec![gluetun, qbit]).run().await;
+    let mut torrent_client = Behavior::up("qbittorrent", None);
+    torrent_client.running = false;
+    let findings = check(vec![gluetun, torrent_client]).run().await;
     assert_eq!(
         problem(&findings, "vpn.tunnel").map(|problem| problem.code),
         Some(VPN_CONTAINER_DOWN)
@@ -505,11 +505,14 @@ async fn a_missing_vpn_container_is_a_definite_fault() {
 
 #[tokio::test]
 async fn a_client_that_cannot_be_asked_is_unverified() {
-    let mut qbit = Behavior::up("qbittorrent", Some("185.65.1.1"));
-    qbit.exec_fails = true;
-    let findings = check(vec![Behavior::up("gluetun", Some("185.65.1.1")), qbit])
-        .run()
-        .await;
+    let mut torrent_client = Behavior::up("qbittorrent", Some("185.65.1.1"));
+    torrent_client.exec_fails = true;
+    let findings = check(vec![
+        Behavior::up("gluetun", Some("185.65.1.1")),
+        torrent_client,
+    ])
+    .run()
+    .await;
     assert!(matches!(
         verdict(&findings, "vpn.egress-match"),
         Some(Verdict::Unverified { .. })

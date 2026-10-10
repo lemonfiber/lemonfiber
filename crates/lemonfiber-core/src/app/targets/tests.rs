@@ -97,7 +97,7 @@ fn a_declaration_this_build_cannot_reach_is_named_in_the_same_list() {
 #[test]
 fn what_this_build_cannot_cover_reads_in_one_order_whichever_source_named_it() {
     let (services, project) = resolving();
-    // Two Servarr declarations with the port taken away — unreachable, and so in
+    // Two curator declarations with the port taken away — unreachable, and so in
     // the list beside the one shape this build defers on purpose.
     let theirs: Vec<lemonfiber_manifest::Service> = services
         .into_iter()

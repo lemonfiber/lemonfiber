@@ -1,6 +1,6 @@
 //! Root folders and download clients written to a service.
 
-use super::{sabnzbd, sonarr};
+use super::{curator, usenet_client};
 use lemonfiber_core::ports::http::Method;
 use lemonfiber_core::ports::service::{
     Category, Credential, DownloadClient, Failure, Protocol, RootFolder,
@@ -15,7 +15,7 @@ async fn a_root_folder_is_posted_to_its_endpoint() {
         path: "/data/media/tv".to_owned(),
         media_type: "tv".to_owned(),
     };
-    assert!(sonarr(&fake).register_root_folder(&folder).await.is_ok());
+    assert!(curator(&fake).register_root_folder(&folder).await.is_ok());
 
     let sent = fake.request();
     assert!(sent
@@ -27,7 +27,7 @@ async fn a_root_folder_is_posted_to_its_endpoint() {
 }
 
 /// A `qBittorrent` download client: a torrent client authenticated by a login.
-fn qbit() -> DownloadClient {
+fn torrent_client() -> DownloadClient {
     DownloadClient {
         name: "qBittorrent".to_owned(),
         host: "qbittorrent".to_owned(),
@@ -45,10 +45,10 @@ fn qbit() -> DownloadClient {
 }
 
 #[tokio::test]
-async fn a_sabnzbd_client_is_posted_as_its_usenet_implementation() {
+async fn a_usenet_client_is_posted_as_its_usenet_implementation() {
     let fake = Fake::always(Answer::reply(201, ""));
-    assert!(sonarr(&fake)
-        .register_download_client(&sabnzbd())
+    assert!(curator(&fake)
+        .register_download_client(&usenet_client())
         .await
         .is_ok());
 
@@ -75,10 +75,10 @@ async fn a_sabnzbd_client_is_posted_as_its_usenet_implementation() {
 }
 
 #[tokio::test]
-async fn a_qbittorrent_client_is_posted_as_its_torrent_implementation() {
+async fn a_torrent_client_is_posted_as_its_torrent_implementation() {
     let fake = Fake::always(Answer::reply(201, ""));
-    assert!(sonarr(&fake)
-        .register_download_client(&qbit())
+    assert!(curator(&fake)
+        .register_download_client(&torrent_client())
         .await
         .is_ok());
 
@@ -108,8 +108,8 @@ async fn a_qbittorrent_client_is_posted_as_its_torrent_implementation() {
 #[tokio::test]
 async fn a_download_client_is_posted_to_its_endpoint() {
     let fake = Fake::always(Answer::reply(201, ""));
-    assert!(sonarr(&fake)
-        .register_download_client(&sabnzbd())
+    assert!(curator(&fake)
+        .register_download_client(&usenet_client())
         .await
         .is_ok());
 
@@ -123,8 +123,8 @@ async fn a_download_client_is_posted_to_its_endpoint() {
 #[tokio::test]
 async fn an_updated_download_client_is_put_to_its_id_carrying_it() {
     let fake = Fake::always(Answer::reply(200, ""));
-    assert!(sonarr(&fake)
-        .update_download_client("7", &sabnzbd())
+    assert!(curator(&fake)
+        .update_download_client("7", &usenet_client())
         .await
         .is_ok());
 
@@ -152,7 +152,7 @@ async fn one_field_is_put_back_leaving_the_rest_of_the_client_alone() {
         Answer::reply(200, String::new()),
     ]);
 
-    assert!(sonarr(&fake)
+    assert!(curator(&fake)
         .set_client_field("7", "tvCategory", Some("tv-sonarr"))
         .await
         .is_ok());
@@ -180,7 +180,7 @@ async fn a_field_put_back_to_nothing_is_taken_out() {
         Answer::reply(200, String::new()),
     ]);
 
-    assert!(sonarr(&fake)
+    assert!(curator(&fake)
         .set_client_field("7", "tvCategory", None)
         .await
         .is_ok());
@@ -202,7 +202,7 @@ async fn a_field_the_client_does_not_carry_is_added() {
         Answer::reply(200, String::new()),
     ]);
 
-    assert!(sonarr(&fake)
+    assert!(curator(&fake)
         .set_client_field("7", "tvCategory", Some("tv-sonarr"))
         .await
         .is_ok());
@@ -221,7 +221,7 @@ async fn a_client_with_no_settings_to_put_back_is_refused() {
     let fake = Fake::always(Answer::reply(200, r#"{"id":7}"#));
 
     assert!(matches!(
-        sonarr(&fake)
+        curator(&fake)
             .set_client_field("7", "tvCategory", None)
             .await,
         Err(Failure::Refused { .. })
@@ -234,7 +234,7 @@ async fn a_client_with_no_settings_to_put_back_is_refused() {
 async fn a_client_that_cannot_be_read_is_not_written_back() {
     let fake = Fake::always(Answer::reply(500, "boom"));
 
-    assert!(sonarr(&fake)
+    assert!(curator(&fake)
         .set_client_field("7", "tvCategory", None)
         .await
         .is_err());
@@ -246,8 +246,8 @@ async fn an_update_with_an_id_the_service_did_not_assign_is_refused() {
     // address — refused rather than a malformed request sent.
     let fake = Fake::always(Answer::reply(200, ""));
     assert!(matches!(
-        sonarr(&fake)
-            .update_download_client("not-a-number", &sabnzbd())
+        curator(&fake)
+            .update_download_client("not-a-number", &usenet_client())
             .await,
         Err(Failure::Refused { .. })
     ));
@@ -257,7 +257,9 @@ async fn an_update_with_an_id_the_service_did_not_assign_is_refused() {
 async fn a_rejected_download_client_update_is_refused() {
     let fake = Fake::always(Answer::reply(400, "cannot update"));
     assert!(matches!(
-        sonarr(&fake).update_download_client("7", &sabnzbd()).await,
+        curator(&fake)
+            .update_download_client("7", &usenet_client())
+            .await,
         Err(Failure::Refused { .. })
     ));
 }
@@ -275,7 +277,7 @@ async fn testing_download_clients_reads_each_services_verdict() {
         {"id":3,"isValid":false,"validationFailures":[]}
     ]"#;
     let fake = Fake::always(Answer::reply(200, body));
-    let probes = sonarr(&fake)
+    let probes = curator(&fake)
         .test_download_clients()
         .await
         .unwrap_or_default();
@@ -306,7 +308,7 @@ async fn a_rejected_root_folder_registration_is_refused() {
         media_type: "tv".to_owned(),
     };
     assert!(matches!(
-        sonarr(&fake).register_root_folder(&folder).await,
+        curator(&fake).register_root_folder(&folder).await,
         Err(Failure::Refused { .. })
     ));
 }
@@ -315,7 +317,9 @@ async fn a_rejected_root_folder_registration_is_refused() {
 async fn a_rejected_download_client_registration_is_refused() {
     let fake = Fake::always(Answer::reply(400, "unknown implementation"));
     assert!(matches!(
-        sonarr(&fake).register_download_client(&sabnzbd()).await,
+        curator(&fake)
+            .register_download_client(&usenet_client())
+            .await,
         Err(Failure::Refused { .. })
     ));
 }
@@ -325,14 +329,14 @@ async fn a_download_client_in_a_protocol_the_service_does_not_file_is_unsupporte
     let fake = Fake::always(Answer::reply(201, ""));
     let unfiled = DownloadClient {
         protocol: Protocol("nzbget".to_owned()),
-        ..sabnzbd()
+        ..usenet_client()
     };
     assert!(matches!(
-        sonarr(&fake).register_download_client(&unfiled).await,
+        curator(&fake).register_download_client(&unfiled).await,
         Err(Failure::Unsupported { .. })
     ));
     assert!(matches!(
-        sonarr(&fake).update_download_client("7", &unfiled).await,
+        curator(&fake).update_download_client("7", &unfiled).await,
         Err(Failure::Unsupported { .. })
     ));
     assert!(fake.request().is_none());

@@ -71,7 +71,7 @@ pub(crate) fn standing_on(images: &[Image], project: &str, image: &str) -> Optio
 /// cannot be listed the way a project can, and it is named from the image beneath it
 /// instead. Narrowed to images lemonfiber runs: a machine has databases and build tools
 /// standing on it that have nothing to do with a media stack, and naming those under a
-/// migration survey would bury the one line that matters — a Jellyfin nobody can adopt
+/// migration survey would bury the one line that matters — a media server nobody can adopt
 /// because there is no project description to adopt it from.
 #[must_use]
 pub(crate) fn outside_compose(images: &[Image], ours: &[Ours]) -> Vec<UnsupportedReport> {

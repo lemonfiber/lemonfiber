@@ -33,7 +33,7 @@ fn paths(root: &Path) -> Paths {
     Paths::rooted(&root.join("config"), &root.join("data"))
 }
 
-/// A Servarr config carrying a readable key, so the target opens.
+/// A curator's config carrying a readable key, so the target opens.
 const CONFIG: &str = "<Config><ApiKey>a1b2c3d4e5</ApiKey></Config>";
 
 /// The client as the service holds it, and its answer to being written back.
@@ -47,7 +47,7 @@ fn answering() -> Arc<Fake> {
     )])
 }
 
-/// A context whose Sonarr opens and answers, so a change inside it can go back.
+/// A context whose curator opens and answers, so a change inside it can go back.
 fn reaching(root: &Path) -> Ctx {
     lemonfiber_testing::a_live_context()
         .filesystem(Files::ending(vec![("config/sonarr/config.xml", CONFIG)]))

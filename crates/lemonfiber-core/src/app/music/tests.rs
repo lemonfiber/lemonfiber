@@ -7,19 +7,19 @@ use crate::model::{Disposition, Triggered};
 use crate::test_support::{a_context, nowhere, SeedFs};
 use lemonfiber_fixtures::http::Fake;
 
-/// The Lidarr config file `SeedFs` hands back, carrying a readable key so the target
-/// opens.
+/// The music curator's config file `SeedFs` hands back, carrying a readable key so the
+/// target opens.
 const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
 
-/// A Lidarr default-shaped quality profile the apply fetches and rewrites.
+/// A music curator's default-shaped quality profile the apply fetches and rewrites.
 const PROFILE: &str = r#"[{"id":1,"upgradeAllowed":false,"cutoff":1006,"items":[
     {"id":1006,"name":"Lossless","allowed":false,"items":[
         {"quality":{"id":6,"name":"FLAC"},"items":[],"allowed":false}
     ]}
 ]}]"#;
 
-/// A context over the real stack (which names Lidarr), the given filesystem, and HTTP
-/// answering from `replies`.
+/// A context over the real stack (which names a music curator), the given filesystem, and
+/// HTTP answering from `replies`.
 fn ctx(fs: Arc<SeedFs>, replies: Vec<(u16, &'static str)>) -> Ctx {
     a_context()
         .build()
@@ -51,7 +51,7 @@ async fn a_rehearsal_records_nothing_and_applies_nothing() {
 
 #[tokio::test]
 async fn a_recorded_choice_is_applied_to_the_music_service() {
-    // The profile GET is answered, then the PUT; Lidarr accepts both.
+    // The profile GET is answered, then the PUT; the music curator accepts both.
     let report = music(
         &recording_ctx(
             Arc::new(SeedFs::keyed(Some(KEYED), None)),

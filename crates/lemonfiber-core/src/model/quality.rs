@@ -57,7 +57,7 @@ pub struct QualityReport {
     /// resolution, so it is reported apart from the resolution presets rather than
     /// forced into their shape.
     pub music: Option<MusicChoice>,
-    /// Whether the Recyclarr config has been hand-edited since lemonfiber wrote it —
+    /// Whether the quality sync config has been hand-edited since lemonfiber wrote it —
     /// the `customised` state, in which the preset is no longer authoritative until
     /// it is deliberately re-asserted. For a reapply, whether an edit was overwritten.
     pub customised: bool,

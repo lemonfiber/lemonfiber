@@ -4,16 +4,16 @@ use lemonfiber_sidecar::gate::{Credential, File, Kind, Upstream, Upstreams};
 
 use super::*;
 
-/// The name the gate's Jellyfin key is filed under.
+/// The name the gate's media server key is filed under.
 const APP: &str = crate::app_keys::GATE_APP;
 
-/// A stack with the media server, the request service, Sonarr, Radarr and Lidarr — which
-/// files music the request service never asks for, so the gate has no route to it — and,
-/// where `gating`, the request gate.
+/// A stack with the media server, the request service and TV, movie and music curators —
+/// the music one files music the request service never asks for, so the gate has no route
+/// to it — and, where `gating`, the request gate.
 fn stack(gating: bool) -> Vec<lemonfiber_manifest::Service> {
     let mut services = vec![
-        jellyfin_svc(),
-        seerr_svc(),
+        media_server_svc(),
+        requests_svc(),
         curator("sonarr", 8989, "tv"),
         curator("radarr", 7878, "movies"),
         curator("lidarr", 8686, "music"),
@@ -28,8 +28,8 @@ fn stack(gating: bool) -> Vec<lemonfiber_manifest::Service> {
     services
 }
 
-/// Jellyfin's key list, holding `keys` under the gate's name and Seerr's own key beside
-/// them.
+/// The media server's key list, holding `keys` under the gate's name and the request
+/// service's own key beside them.
 fn listed(keys: &[&str]) -> String {
     let mut items: Vec<serde_json::Value> = keys
         .iter()
@@ -65,13 +65,13 @@ fn serving(lists: &[&[&str]], minted: u16, revoked: u16) -> Arc<Fake> {
     ])
 }
 
-/// A stack directory where each of `arrs` has written its own key, holding `held` as the
-/// gate's Jellyfin key where it holds one, and a context with the media server's
-/// administrator recorded where `administered` says, answering over `http`.
+/// A stack directory where each of `curators` has written its own key, holding `held` as
+/// the the gate's media server key where it holds one, and a context with the media
+/// server's administrator recorded where `administered` says, answering over `http`.
 fn gate_ctx(
     name: &str,
     administered: bool,
-    arrs: &[(&str, &str)],
+    curators: &[(&str, &str)],
     held: Option<&str>,
     http: Arc<Fake>,
 ) -> (Ctx, std::path::PathBuf) {
@@ -83,16 +83,16 @@ fn gate_ctx(
     if administered {
         let _ = store::set(
             &env,
-            crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+            crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
             &lemonfiber_fixtures::support::a_password(),
         );
     }
-    for (arr, key) in arrs {
-        let config = at.join("config").join(arr).join("config.xml");
+    for (curator, key) in curators {
+        let config = at.join("config").join(curator).join("config.xml");
         let _ = store::write(&config, &format!("<Config><ApiKey>{key}</ApiKey></Config>"));
     }
     if let Some(held) = held {
-        let _ = store::write(&routes_file(&at), &holding(arrs, held).written());
+        let _ = store::write(&routes_file(&at), &holding(curators, held).written());
     }
     let ctx = a_context()
         .environment(crate::platform::Environment::LinuxNative)
@@ -105,21 +105,21 @@ fn gate_ctx(
     (ctx, at)
 }
 
-/// The routes the gate should hold where `arrs` have written their keys and `key` is
-/// its Jellyfin key.
-fn holding(arrs: &[(&str, &str)], key: &str) -> Upstreams {
-    let mut upstreams: Vec<Upstream> = arrs
+/// The routes the gate should hold where `curators` have written their keys and `key` is
+/// its media server key.
+fn holding(curators: &[(&str, &str)], key: &str) -> Upstreams {
+    let mut upstreams: Vec<Upstream> = curators
         .iter()
-        .map(|(arr, credential)| Upstream {
-            route: (*arr).to_owned(),
-            kind: if *arr == "sonarr" {
+        .map(|(curator, credential)| Upstream {
+            route: (*curator).to_owned(),
+            kind: if *curator == "sonarr" {
                 Kind::Sonarr
             } else {
                 Kind::Radarr
             },
             address: format!(
-                "http://{arr}:{}",
-                if *arr == "sonarr" { 8989 } else { 7878 }
+                "http://{curator}:{}",
+                if *curator == "sonarr" { 8989 } else { 7878 }
             ),
             credential: Credential::new(*credential),
             majors: Vec::new(),
@@ -128,16 +128,16 @@ fn holding(arrs: &[(&str, &str)], key: &str) -> Upstreams {
     upstreams.push(Upstream {
         route: "jellyfin".to_owned(),
         kind: Kind::Jellyfin,
-        address: jellyfin_svc_network_url(),
+        address: media_server_svc_network_url(),
         credential: Credential::new(key),
-        majors: jellyfin_svc().majors(),
+        majors: media_server_svc().majors(),
     });
     Upstreams::of(upstreams)
 }
 
-/// Where the gate reaches Jellyfin: at its id on the stack's network, on the port it
-/// says it listens on there.
-fn jellyfin_svc_network_url() -> String {
+/// Where the gate reaches the media server: at its id on the stack's network, on the port
+/// it says it listens on there.
+fn media_server_svc_network_url() -> String {
     "http://jellyfin:8096".to_owned()
 }
 
@@ -179,24 +179,25 @@ async fn seeded(
     (wiring.map(|one| one.state), revoked)
 }
 
-/// Both \*arrs, with the keys they wrote.
-const ARRS: &[(&str, &str)] = &[("sonarr", "sonarrs"), ("radarr", "radarrs")];
+/// Both curators, with the keys they wrote.
+const CURATORS: &[(&str, &str)] = &[("sonarr", "sonarrs"), ("radarr", "radarrs")];
 
-/// Radarr alone: the stack before Sonarr wrote its key.
-const RADARR: &[(&str, &str)] = &[("radarr", "radarrs")];
+/// The movie curator alone: the stack before the TV curator wrote its key.
+const MOVIES_ONLY: &[(&str, &str)] = &[("radarr", "radarrs")];
 
 /// A stack whose gate holds nothing has a key minted for it, and is handed a route for
-/// each \*arr, with the key it wrote, and one for Jellyfin, with the new key.
+/// each curator, with the key it wrote, and one for the media server, with the new key.
 #[tokio::test]
 async fn the_routes_are_written_with_a_key_of_the_gates_own() {
     let http = serving(&[&[], &[], &["fresh"]], 204, 204);
-    let (ctx, at) = gate_ctx("gate-routes-minted", true, ARRS, None, http.clone());
+    let (ctx, at) = gate_ctx("gate-routes-minted", true, CURATORS, None, http.clone());
 
     let (state, revoked) = seeded(&ctx, &http, true, &at).await;
 
     assert_eq!(state, Some(State::Wired));
-    assert_eq!(routes(&at), Some(holding(ARRS, "fresh")));
-    // The test stack pins Jellyfin at tag `1`, so the gate forwards to major 1 alone.
+    assert_eq!(routes(&at), Some(holding(CURATORS, "fresh")));
+    // The test stack pins the media server at tag `1`, so the gate forwards to major 1
+    // alone.
     assert_eq!(
         routes(&at).and_then(|held| held.route("jellyfin").map(|one| one.majors.clone())),
         Some(vec![1])
@@ -205,11 +206,18 @@ async fn the_routes_are_written_with_a_key_of_the_gates_own() {
     assert!(http.asked_for(&format!("/Auth/Keys?App={APP}")));
 }
 
-/// Routes that already say what they should, under a key Jellyfin lists, are left alone.
+/// Routes that already say what they should, under a key the media server lists, are left
+/// alone.
 #[tokio::test]
 async fn routes_that_hold_are_left_alone() {
     let http = serving(&[&["kept"]], 204, 204);
-    let (ctx, at) = gate_ctx("gate-routes-kept", true, ARRS, Some("kept"), http.clone());
+    let (ctx, at) = gate_ctx(
+        "gate-routes-kept",
+        true,
+        CURATORS,
+        Some("kept"),
+        http.clone(),
+    );
 
     let (state, revoked) = seeded(&ctx, &http, true, &at).await;
 
@@ -217,13 +225,19 @@ async fn routes_that_hold_are_left_alone() {
     assert!(revoked.is_empty(), "{revoked:?}");
 }
 
-/// An \*arr that wrote a new key reaches the gate on the next pass, under the same
-/// Jellyfin key, and a key filed under the gate's name that the routes do not hold is
+/// A curator that wrote a new key reaches the gate on the next pass, under the same
+/// media server key, and a key filed under the gate's name that the routes do not hold is
 /// revoked.
 #[tokio::test]
-async fn a_moved_arr_key_is_written_and_strays_revoked() {
+async fn a_moved_curator_key_is_written_and_strays_revoked() {
     let http = serving(&[&["stray", "kept"]], 204, 204);
-    let (ctx, at) = gate_ctx("gate-routes-moved", true, ARRS, Some("kept"), http.clone());
+    let (ctx, at) = gate_ctx(
+        "gate-routes-moved",
+        true,
+        CURATORS,
+        Some("kept"),
+        http.clone(),
+    );
     let moved = [("sonarr", "regenerated"), ("radarr", "radarrs")];
     let _ = store::write(
         &at.join("config/sonarr/config.xml"),
@@ -237,27 +251,27 @@ async fn a_moved_arr_key_is_written_and_strays_revoked() {
     assert_eq!(revoked, vec!["stray".to_owned()]);
 }
 
-/// An \*arr that has written no key yet has no route until it has.
+/// A curator that has written no key yet has no route until it has.
 #[tokio::test]
-async fn an_arr_without_a_key_has_no_route() {
+async fn a_curator_without_a_key_has_no_route() {
     let http = serving(&[&[], &[], &["fresh"]], 204, 204);
-    let (ctx, at) = gate_ctx("gate-routes-keyless", true, RADARR, None, http.clone());
+    let (ctx, at) = gate_ctx("gate-routes-keyless", true, MOVIES_ONLY, None, http.clone());
 
     let (state, _) = seeded(&ctx, &http, true, &at).await;
 
     assert_eq!(state, Some(State::Wired));
-    assert_eq!(routes(&at), Some(holding(RADARR, "fresh")));
+    assert_eq!(routes(&at), Some(holding(MOVIES_ONLY, "fresh")));
 }
 
-/// A key the routes hold that Jellyfin no longer lists is replaced, and what was filed
-/// before the replacement is revoked once the routes are written.
+/// A key the routes hold that the media server no longer lists is replaced, and what was
+/// filed before the replacement is revoked once the routes are written.
 #[tokio::test]
-async fn a_key_jellyfin_dropped_is_replaced() {
+async fn a_key_the_media_server_dropped_is_replaced() {
     let http = serving(&[&["stray"], &["stray"], &["stray", "fresh"]], 204, 204);
     let (ctx, at) = gate_ctx(
         "gate-routes-dropped",
         true,
-        ARRS,
+        CURATORS,
         Some("gone"),
         http.clone(),
     );
@@ -265,7 +279,7 @@ async fn a_key_jellyfin_dropped_is_replaced() {
     let (state, revoked) = seeded(&ctx, &http, true, &at).await;
 
     assert_eq!(state, Some(State::Wired));
-    assert_eq!(routes(&at), Some(holding(ARRS, "fresh")));
+    assert_eq!(routes(&at), Some(holding(CURATORS, "fresh")));
     assert_eq!(revoked, vec!["stray".to_owned()]);
 }
 
@@ -277,7 +291,7 @@ async fn removing_the_gate_revokes_its_key() {
     let (ctx, at) = gate_ctx(
         "gate-routes-retired",
         true,
-        ARRS,
+        CURATORS,
         Some("kept"),
         http.clone(),
     );
@@ -286,7 +300,7 @@ async fn removing_the_gate_revokes_its_key() {
     assert_eq!(revoked, vec!["kept".to_owned()]);
 
     let http = serving(&[&[]], 204, 204);
-    let (ctx, at) = gate_ctx("gate-routes-none", true, ARRS, None, http.clone());
+    let (ctx, at) = gate_ctx("gate-routes-none", true, CURATORS, None, http.clone());
     assert_eq!(seeded(&ctx, &http, false, &at).await.0, None);
 }
 
@@ -328,7 +342,7 @@ async fn a_rehearsal_mints_writes_and_revokes_nothing() {
         ),
     ] {
         let http = serving(&[keys], 204, 204);
-        let written = if moved { RADARR } else { ARRS };
+        let written = if moved { MOVIES_ONLY } else { CURATORS };
         let (mut ctx, at) = gate_ctx(name, true, written, held_now, http.clone());
         if moved {
             let _ = store::write(
@@ -362,7 +376,7 @@ async fn without_an_administrator_only_a_rehearsal_says_anything() {
     let (mut ctx, at) = gate_ctx(
         "gate-routes-unadministered",
         false,
-        ARRS,
+        CURATORS,
         None,
         http.clone(),
     );
@@ -394,7 +408,7 @@ async fn without_a_media_server_the_curators_are_still_routed() {
         http.clone(),
     );
     let services = vec![
-        seerr_svc(),
+        requests_svc(),
         curator("sonarr", 8989, "tv"),
         manifest_service("request-gate", None, Some(lemonfiber_sidecar::gate::PORT)),
     ];
@@ -443,7 +457,7 @@ async fn the_curators_routes_alone_are_rehearsed_held_and_reported() {
         http.clone(),
     );
     let services = vec![
-        seerr_svc(),
+        requests_svc(),
         curator("sonarr", 8989, "tv"),
         manifest_service("request-gate", None, Some(lemonfiber_sidecar::gate::PORT)),
     ];
@@ -499,7 +513,7 @@ async fn the_curators_routes_alone_are_rehearsed_held_and_reported() {
 #[tokio::test]
 async fn without_a_stack_directory_nothing_is_minted() {
     let http = serving(&[&[]], 204, 204);
-    let (ctx, _) = gate_ctx("gate-routes-no-project", true, ARRS, None, http.clone());
+    let (ctx, _) = gate_ctx("gate-routes-no-project", true, CURATORS, None, http.clone());
 
     let wiring = super::super::gate::seed_gate_routes(
         &ctx,
@@ -522,7 +536,8 @@ async fn without_a_stack_directory_nothing_is_minted() {
         .any(|asked| asked.method == Method::Post && asked.url.contains("/Auth/Keys")));
 }
 
-/// Jellyfin refusing the key list, the mint or a revocation is reported, never called done.
+/// The media server refusing the key list, the mint or a revocation is reported, never
+/// called done.
 #[tokio::test]
 async fn a_refusal_is_reported() {
     let unlisted = Fake::by_route(vec![
@@ -533,7 +548,13 @@ async fn a_refusal_is_reported() {
         ),
         (Method::Get, "/Auth/Keys", Answer::reply(500, "")),
     ]);
-    let (ctx, at) = gate_ctx("gate-routes-unlisted", true, ARRS, None, unlisted.clone());
+    let (ctx, at) = gate_ctx(
+        "gate-routes-unlisted",
+        true,
+        CURATORS,
+        None,
+        unlisted.clone(),
+    );
     let (state, _) = seeded(&ctx, &unlisted, true, &at).await;
     assert!(matches!(state, Some(State::Failed { .. })), "{state:?}");
     // Without the gate, an unreadable key list is nothing this stack asked about.
@@ -557,7 +578,7 @@ async fn a_refusal_is_reported() {
         ),
     ] {
         let http = serving(lists, minted, revoked);
-        let (ctx, at) = gate_ctx(name, true, ARRS, held_now, http.clone());
+        let (ctx, at) = gate_ctx(name, true, CURATORS, held_now, http.clone());
 
         let (state, _) = seeded(&ctx, &http, true, &at).await;
 
@@ -573,7 +594,7 @@ async fn a_refusal_is_reported() {
 #[tokio::test]
 async fn a_key_whose_routes_cannot_be_written_is_revoked_again() {
     let http = serving(&[&[], &[], &["fresh"]], 204, 204);
-    let (ctx, at) = gate_ctx("gate-routes-unwritable", true, ARRS, None, http.clone());
+    let (ctx, at) = gate_ctx("gate-routes-unwritable", true, CURATORS, None, http.clone());
     blocked(&at);
 
     let (state, revoked) = seeded(&ctx, &http, true, &at).await;
@@ -599,12 +620,12 @@ async fn routes_that_cannot_be_updated_are_said() {
     let (ctx, at) = gate_ctx(
         "gate-routes-unwritable-kept",
         true,
-        ARRS,
+        CURATORS,
         None,
         http.clone(),
     );
     blocked(&at);
-    let outdated = holding(RADARR, "kept").written();
+    let outdated = holding(MOVIES_ONLY, "kept").written();
     let ctx = ctx.with_filesystem(lemonfiber_fixtures::files::Files::at(vec![
         (
             at.join("config/sonarr/config.xml"),

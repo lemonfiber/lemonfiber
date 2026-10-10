@@ -26,18 +26,18 @@ use lemonfiber_core::repair::{Attempt, Repair, Writing, OPERATION};
 use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::http::{Answer, Fake};
 
-/// A Servarr config carrying a generated key, as one reads from disk.
+/// A curator's config carrying a generated key, as one reads from disk.
 const CONFIG: &str = "<Config><ApiKey>a1b2c3d4e5</ApiKey></Config>";
 
 /// The category lemonfiber files television downloads under.
 const OURS: &str = "tv-sonarr";
 
-/// Where Sonarr writes its key, in the stack's bind-mount convention.
+/// Where the curator writes its key, in the stack's bind-mount convention.
 fn config() -> PathBuf {
     PathBuf::from("/stack/config/sonarr/config.xml")
 }
 
-fn sonarr() -> Target {
+fn curator() -> Target {
     Target {
         id: "sonarr".to_owned(),
         name: "Sonarr".to_owned(),
@@ -49,7 +49,7 @@ fn sonarr() -> Target {
     }
 }
 
-/// The download client lemonfiber wires into Sonarr, filing under its own category.
+/// The download client lemonfiber wires into the curator, filing under its own category.
 fn want() -> DownloadClient {
     DownloadClient {
         name: "SABnzbd".to_owned(),
@@ -75,7 +75,7 @@ fn recorded(value: &str, origin: Origin) -> Record {
 
 /// The wiring lemonfiber manages, with whatever it recorded for it.
 fn managed(recorded: Option<Record>) -> Managed {
-    let target = sonarr();
+    let target = curator();
     Managed {
         id: target.id.clone(),
         name: target.name.clone(),
@@ -424,7 +424,7 @@ async fn a_carried_repair_records_enough_to_be_put_back() {
 
     // Recorded as a change inside the service, not as a setting in lemonfiber's own
     // environment file. Taken for the latter, reversing it would write the field's name
-    // into that file and leave Sonarr exactly as it was — and report it restored.
+    // into that file and leave the curator exactly as it was — and report it restored.
     assert_eq!(
         changes(attempt.as_ref()).and_then(<[Change]>::first),
         Some(&Change {
@@ -608,7 +608,7 @@ async fn a_wiring_still_where_lemonfiber_put_it_is_offered_nothing() {
 /// under — which is the name an operator writes down when they say a service is
 /// theirs to tune.
 ///
-/// The thing being written is a download client's category *inside* Sonarr. It has no
+/// The thing being written is a download client's category *inside* the curator. It has no
 /// name of its own that anybody could have declared, so naming it would be offering
 /// the operator a word their declaration can never match; naming the service is what
 /// makes "sonarr is mine" reach this repair at all. Asked of the mender rather than

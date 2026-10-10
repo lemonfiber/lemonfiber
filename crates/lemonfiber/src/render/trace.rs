@@ -25,7 +25,7 @@ pub(super) fn trace_link(title: &str) -> String {
 /// A title written so a shell hands the whole of it to the trace as one argument.
 ///
 /// This line is not a label, it is a command an operator copies and runs, and the title
-/// in it came from an indexer or an \*arr. In double quotes a title carrying one closes
+/// in it came from an indexer or a curator. In double quotes a title carrying one closes
 /// the quote early, and everything after it is read as further arguments — or, where the
 /// title carries `$` or a backtick, as something to expand.
 ///
@@ -434,7 +434,7 @@ pub(super) fn stuck(report: &StuckReport) -> Lines {
     // A queue that could not be read leaves the list possibly short; saying so keeps it
     // from being read as "nothing else is stuck", the same honesty a trace keeps.
     if report.incomplete {
-        lines.spaced("An *arr's queue could not be read, so this list may be incomplete.");
+        lines.spaced("A curator's queue could not be read, so this list may be incomplete.");
     }
     lines.extend(unreadable(&report.unsupported));
     lines

@@ -1,7 +1,7 @@
 //! Which of two image tags is the later, and how large a step lies between them,
 //! where either can be told at all.
 //!
-//! An \*arr's database is migrated forward by whichever binary opened it last, and an
+//! A curator's database is migrated forward by whichever binary opened it last, and an
 //! older binary cannot open it afterwards. So the tag standing on an existing project
 //! is what decides whether lemonfiber's own pin would be an upgrade, and whether it
 //! would be a downgrade that must be refused rather than attempted.

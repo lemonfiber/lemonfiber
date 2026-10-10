@@ -24,7 +24,7 @@ fn a_monitored_item_with_a_grab_and_import_reaches_imported() {
     );
     assert_eq!(report.stages.last().map(|s| s.stage), Some(Stage::Imported));
     // Imported with the media server unread is not a stall: it may already be
-    // scanned, and the *arr cannot tell — so nothing is claimed.
+    // scanned, and the curator cannot tell — so nothing is claimed.
     assert!(report.stall.is_none());
 }
 

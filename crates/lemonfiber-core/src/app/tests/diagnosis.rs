@@ -252,7 +252,7 @@ async fn what_a_service_said_reaches_a_finding_with_no_credential_in_it() {
 /// parameter in it.
 ///
 /// The shape this product builds its own indexer request in — `t=search` first and
-/// the key last — and the \*arrs log an outbound URL whenever one is refused. What a
+/// the key last — and the curators log an outbound URL whenever one is refused. What a
 /// container writes is the input this field is made of, so a rule that reads a URL
 /// only as far as its first `=` leaves the key in the evidence.
 #[tokio::test]

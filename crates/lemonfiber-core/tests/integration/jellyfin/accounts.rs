@@ -1,6 +1,6 @@
 //! The household's accounts: offered, withdrawn, reset and standing.
 
-use super::{hers, jellyfin, not_hers, reader, HOUSEHOLD, SIGNED_IN, SIGNED_IN_AS};
+use super::{hers, media_server, not_hers, reader, HOUSEHOLD, SIGNED_IN, SIGNED_IN_AS};
 use lemonfiber_core::ports::http::Method;
 use lemonfiber_core::ports::service::{Failure, Signed};
 use lemonfiber_fixtures::http::{Answer, Fake};
@@ -178,7 +178,7 @@ async fn a_pair_the_server_knows_answers_with_the_account_it_proved() {
     let fake = Fake::in_turn(vec![Answer::reply(200, SIGNED_IN_AS)]);
 
     assert_eq!(
-        jellyfin(&fake)
+        media_server(&fake)
             .whoever("ana", &hers(), "this-browser")
             .await
             .ok()
@@ -208,7 +208,7 @@ async fn a_pair_the_server_refuses_is_nobody_rather_than_a_fault() {
     for refused in [401, 403] {
         let fake = Fake::in_turn(vec![Answer::reply(refused, r#"{"error":"no"}"#)]);
 
-        let said = jellyfin(&fake)
+        let said = media_server(&fake)
             .whoever("ana", &not_hers(), "this-browser")
             .await;
         assert!(
@@ -225,7 +225,7 @@ async fn a_server_that_could_not_answer_is_not_a_pair_that_was_wrong() {
     let fake = Fake::in_turn(vec![Answer::reply(500, "upstream is unwell")]);
 
     assert!(
-        jellyfin(&fake)
+        media_server(&fake)
             .whoever("ana", &hers(), "this-browser")
             .await
             .is_err(),
@@ -240,7 +240,7 @@ async fn an_account_with_no_id_is_nobody() {
     let fake = Fake::in_turn(vec![Answer::reply(200, r#"{"AccessToken":"t","User":{}}"#)]);
 
     assert!(matches!(
-        jellyfin(&fake)
+        media_server(&fake)
             .whoever("ana", &hers(), "this-browser")
             .await,
         Ok(None)
@@ -359,7 +359,7 @@ async fn an_account_answered_without_a_policy_is_one_the_server_still_holds() {
 #[tokio::test]
 async fn a_sign_in_is_named_as_the_device_the_caller_chose() {
     let fake = Fake::in_turn(vec![Answer::reply(200, SIGNED_IN_AS)]);
-    let _ = jellyfin(&fake)
+    let _ = media_server(&fake)
         .whoever("ana", &hers(), "this-browser")
         .await;
     let named = fake
@@ -379,7 +379,7 @@ async fn a_sign_in_granted_no_access_is_nobody() {
     let fake = Fake::in_turn(vec![Answer::reply(200, r#"{"User":{"Id":"a7f3"}}"#)]);
 
     assert!(matches!(
-        jellyfin(&fake)
+        media_server(&fake)
             .whoever("ana", &hers(), "this-browser")
             .await,
         Ok(None)
@@ -396,7 +396,7 @@ async fn a_claim_sets_the_chosen_password_signed_in_as_the_account() {
         Answer::reply(204, ""),
     ]);
 
-    let claimed = jellyfin(&fake).claim("ana", &hers(), "a-phone").await;
+    let claimed = media_server(&fake).claim("ana", &hers(), "a-phone").await;
 
     assert!(matches!(claimed, Ok(true)), "{claimed:?}");
     let asked = fake.requests();
@@ -429,7 +429,7 @@ async fn an_account_that_will_not_sign_in_empty_is_not_claimed() {
     let fake = Fake::in_turn(vec![Answer::reply(401, "")]);
 
     assert!(matches!(
-        jellyfin(&fake).claim("ana", &hers(), "a-phone").await,
+        media_server(&fake).claim("ana", &hers(), "a-phone").await,
         Ok(false)
     ));
     assert_eq!(fake.requests().len(), 1);
@@ -443,7 +443,7 @@ async fn a_password_the_server_will_not_take_is_a_failure() {
         Answer::reply(400, ""),
     ]);
 
-    assert!(jellyfin(&fake)
+    assert!(media_server(&fake)
         .claim("ana", &hers(), "a-phone")
         .await
         .is_err());

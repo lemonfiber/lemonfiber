@@ -1,4 +1,4 @@
-//! Jellyfin's cross-origin allow-list, held to the household front door's origin.
+//! The media server's cross-origin allow-list, held to the household front door's origin.
 
 use super::*;
 
@@ -13,7 +13,7 @@ fn published(mut service: lemonfiber_manifest::Service) -> lemonfiber_manifest::
 
 /// A stack with the media server and the request service, both on the household tier.
 fn stack() -> Vec<lemonfiber_manifest::Service> {
-    vec![published(jellyfin_svc()), published(seerr_svc())]
+    vec![published(media_server_svc()), published(requests_svc())]
 }
 
 /// A context whose household is reached at a recorded address, with the media server's
@@ -29,7 +29,7 @@ fn cors_ctx(name: &str, administered: bool, http: Arc<Fake>) -> Ctx {
     if administered {
         let _ = store::set(
             &env,
-            crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+            crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
             &lemonfiber_fixtures::support::a_password(),
         );
     }
@@ -63,7 +63,7 @@ fn serving(first: &'static str, after: &'static str) -> Arc<Fake> {
     ])
 }
 
-/// The allow-list at Jellyfin's default, and once it names the front door alone.
+/// The allow-list at the media server's default, and once it names the front door alone.
 const OPEN: &str = r#"{"CorsHosts":["*"]}"#;
 const CLOSED: &str = r#"{"CorsHosts":["http://192.168.1.20:5055"]}"#;
 
@@ -182,15 +182,15 @@ async fn without_a_credential_or_a_media_server_nothing_is_asked() {
 
     assert!(super::super::cors::seed_cors(
         &rehearsing,
-        &[published(jellyfin_svc())],
-        served(&[published(jellyfin_svc())]).as_ref()
+        &[published(media_server_svc())],
+        served(&[published(media_server_svc())]).as_ref()
     )
     .await
     .is_none());
     assert!(super::super::cors::seed_cors(
         &ctx,
-        &[published(seerr_svc())],
-        served(&[published(seerr_svc())]).as_ref()
+        &[published(requests_svc())],
+        served(&[published(requests_svc())]).as_ref()
     )
     .await
     .is_none());
@@ -262,11 +262,11 @@ async fn a_write_the_media_server_refuses_is_reported() {
 /// leave no origin to name, so nothing is written and the pass warns.
 #[tokio::test]
 async fn a_stack_with_no_door_or_a_door_with_no_port_names_no_origin() {
-    let mut portless = published(seerr_svc());
+    let mut portless = published(requests_svc());
     portless.port = None;
     for (name, services) in [
-        ("cors-no-door", vec![jellyfin_svc(), seerr_svc()]),
-        ("cors-no-port", vec![jellyfin_svc(), portless]),
+        ("cors-no-door", vec![media_server_svc(), requests_svc()]),
+        ("cors-no-port", vec![media_server_svc(), portless]),
     ] {
         let http = serving(OPEN, CLOSED);
         let ctx = cors_ctx(name, true, http.clone());
@@ -316,7 +316,7 @@ async fn a_plugins_door_never_puts_its_origin_on_the_allow_list() {
     )
     .is_ok());
 
-    let services = [published(jellyfin_svc())];
+    let services = [published(media_server_svc())];
     let wiring = super::super::cors::seed_cors(&ctx, &services, served(&services).as_ref()).await;
     let written: Vec<String> = http
         .requests()

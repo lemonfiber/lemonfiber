@@ -20,10 +20,10 @@ const ONE_ACCEPTED: &str = r#"[{"rejections":[]}]"#;
 /// A release search that ran cleanly and came back with nothing at all.
 const NO_RELEASES: &str = "[]";
 
-/// A context whose download client's key is readable as well as the \*arrs', so a
+/// A context whose download client's key is readable as well as the curators', so a
 /// trace that asks the accounts resolves both readers rather than only one.
 fn ctx_with_accounts(fake: &Fake) -> Ctx {
-    ctx_with(fake).with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), Some(SAB_INI))))
+    ctx_with(fake).with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), Some(USENET_INI))))
 }
 
 /// The distinction this whole path exists to draw: releases are out there and the
@@ -158,7 +158,7 @@ async fn a_trace_that_already_has_its_answer_asks_the_indexers_nothing() {
 /// had asked and heard something.
 #[tokio::test]
 async fn a_stall_reads_unchanged_where_the_accounts_cannot_be_read() {
-    let context = ctx_with_accounts(&Fake::arr(
+    let context = ctx_with_accounts(&Fake::curator(
         r#"[{"id":1,"title":"The Expanse","monitored":true}]"#,
         r#"{"records":[]}"#,
         EMPTY_QUEUE,

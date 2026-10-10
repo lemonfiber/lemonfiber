@@ -129,10 +129,10 @@ fn half_an_answer_from_the_stack_is_no_answer_at_all() {
         .into_iter()
         .filter(|one| one.id == "prowlarr")
         .take(1)
-        .map(|mut prowlarr| {
-            prowlarr.reaches = Some("somewhere this binary never heard of".to_owned());
-            prowlarr.asks_for = None;
-            prowlarr
+        .map(|mut aggregator| {
+            aggregator.reaches = Some("somewhere this binary never heard of".to_owned());
+            aggregator.asks_for = None;
+            aggregator
         })
         .collect();
 
@@ -145,7 +145,7 @@ fn half_an_answer_from_the_stack_is_no_answer_at_all() {
     );
 }
 
-/// And prowlarr is still the stack's to describe: the point of the field is that a
+/// And the aggregator is still the stack's to describe: the point of the field is that a
 /// fork can correct what shipped with it, so nothing in this binary answers for a
 /// service the stack describes.
 #[test]
@@ -154,10 +154,10 @@ fn a_service_this_binary_once_described_is_still_the_stacks_to_describe() {
         .into_iter()
         .filter(|service| service.id == "prowlarr")
         .take(1)
-        .map(|mut prowlarr| {
-            prowlarr.reaches = Some("somewhere this binary never heard of".to_owned());
-            prowlarr.asks_for = Some("Something this binary never heard of either.".to_owned());
-            prowlarr
+        .map(|mut aggregator| {
+            aggregator.reaches = Some("somewhere this binary never heard of".to_owned());
+            aggregator.asks_for = Some("Something this binary never heard of either.".to_owned());
+            aggregator
         })
         .collect();
 

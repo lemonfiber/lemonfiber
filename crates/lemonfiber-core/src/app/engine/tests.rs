@@ -135,7 +135,7 @@ fn several_services_are_said_together_in_the_order_the_stack_declares_them() {
         both.as_ref().is_some_and(|said| {
             said.find("jellyfin")
                 .zip(said.find("seerr"))
-                .is_some_and(|(jellyfin, seerr)| jellyfin < seerr)
+                .is_some_and(|(media_server, requests)| media_server < requests)
         }),
         "asked for in one order, reported in the stack's: {both:?}"
     );

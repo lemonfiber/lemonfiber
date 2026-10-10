@@ -13,12 +13,12 @@
       "const": "repeated-import-failure"
     },
     {
-      "description": "Downloaded successfully and never imported. The failure nobody owns: the\nclient considers it finished, the \\*arr never picked it up, and from each\nservice's own perspective there is nothing wrong.",
+      "description": "Downloaded successfully and never imported. The failure nobody owns: the\nclient considers it finished, the curator never picked it up, and from each\nservice's own perspective there is nothing wrong.",
       "type": "string",
       "const": "completed-not-imported"
     },
     {
-      "description": "On disk, and no \\*arr knows about it.",
+      "description": "On disk, and no curator knows about it.",
       "type": "string",
       "const": "orphaned"
     },

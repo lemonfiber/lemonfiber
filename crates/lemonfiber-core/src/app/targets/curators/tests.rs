@@ -1,4 +1,4 @@
-use super::{servarr_targets, unreachable_targets};
+use super::{curator_targets, unreachable_targets};
 use std::path::Path;
 
 /// One service, read back through the manifest parser rather than built as a
@@ -35,7 +35,7 @@ fn service(id: &str, port: Option<u16>, api: &str) -> Vec<lemonfiber_manifest::S
     read
 }
 
-/// A complete Servarr declaration.
+/// A complete curator declaration.
 const WHOLE: &str =
     "\n[service.api]\nkind = \"servarr\"\nkey_source = \"config-xml\"\npath = \"/config/config.xml\"\nversion = 3\n";
 
@@ -56,7 +56,7 @@ fn because(services: &[lemonfiber_manifest::Service]) -> Option<String> {
 #[test]
 fn a_complete_declaration_is_a_target_and_is_not_reported_as_anything_else() {
     let whole = service("theirs", Some(8989), WHOLE);
-    assert_eq!(servarr_targets(&whole, Some(project())).len(), 1);
+    assert_eq!(curator_targets(&whole, Some(project())).len(), 1);
     assert_eq!(because(&whole), None);
 }
 

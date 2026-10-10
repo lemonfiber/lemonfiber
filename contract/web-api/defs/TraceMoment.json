@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "One moment in a traced item's history: what happened and when. Where [`TraceStage`]\nis the linear progress, this is the log an \\*arr kept — the grabs, the failed\ndownloads, the import and any later removal — so a repeated attempt is seen as the\npattern it is rather than flattened to a single furthest stage.",
+  "description": "One moment in a traced item's history: what happened and when. Where [`TraceStage`]\nis the linear progress, this is the log a curator kept — the grabs, the failed\ndownloads, the import and any later removal — so a repeated attempt is seen as the\npattern it is rather than flattened to a single furthest stage.",
   "type": "object",
   "properties": {
     "at": {

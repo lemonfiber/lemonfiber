@@ -158,7 +158,7 @@ async fn an_unrelated_setting_says_nothing_about_seeding() {
 
 #[tokio::test]
 async fn moving_the_data_location_says_what_it_affects_before_anything_moves() {
-    // The sharpest change in the product: every *arr holds absolute paths to its
+    // The sharpest change in the product: every curator holds absolute paths to its
     // root folders, and an operator told this afterwards has already lost the
     // library the telling was for. So the sentence arrives while the old location
     // is still the one on disk.

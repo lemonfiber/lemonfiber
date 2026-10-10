@@ -45,7 +45,7 @@ fn speaking(kind: lemonfiber_manifest::ApiKind) -> lemonfiber_manifest::Api {
     }
 }
 
-/// The reasons the shipped stack's Sonarr is given for each pairing that comes to
+/// The reasons the shipped stack's TV curator is given for each pairing that comes to
 /// nothing.
 fn reasons(fillers: &Fillers) -> Vec<String> {
     unmatched(fillers)
@@ -78,7 +78,11 @@ fn every_download_ask_the_shipped_stack_makes_comes_to_a_client() {
             )
         })
         .collect();
-    assert_eq!(made.len(), 6, "two asks from each of three *arrs: {made:?}");
+    assert_eq!(
+        made.len(),
+        6,
+        "two asks from each of three curators: {made:?}"
+    );
     assert!(made.iter().all(|(id, connection)| {
         *connection == Some(Connection::DownloadClient(Protocol(id.clone())))
     }));
@@ -178,7 +182,7 @@ fn a_curator_filing_media_nothing_hands_the_asker_is_said_naming_it() {
         }
     });
 
-    let seerrs: Vec<String> = unmatched(&fillers)
+    let request_services: Vec<String> = unmatched(&fillers)
         .into_iter()
         .filter(|wiring| wiring.connection.ends_with("into Seerr"))
         .filter_map(|wiring| match wiring.state {
@@ -187,12 +191,12 @@ fn a_curator_filing_media_nothing_hands_the_asker_is_said_naming_it() {
         })
         .collect();
 
-    assert!(seerrs.contains(
+    assert!(request_services.contains(
         &"Radarr fills library.curate, which Seerr asks for, and names no media it files, so \
           lemonfiber cannot say what to hand Seerr"
             .to_owned()
     ));
-    assert!(seerrs.contains(
+    assert!(request_services.contains(
         &"Lidarr fills library.curate, which Seerr asks for, and files music, which lemonfiber \
           does not hand Seerr"
             .to_owned()
@@ -275,12 +279,12 @@ fn an_asker_naming_no_adapter_is_connected_to_nothing() {
         }
     });
 
-    let sonarrs: Vec<Result<Connection, Unmade>> = pairings(&fillers)
+    let curators: Vec<Result<Connection, Unmade>> = pairings(&fillers)
         .iter()
         .filter(|pairing| pairing.ask.by == "sonarr")
         .map(|pairing| pairing.made.clone().map(|(connection, _, _)| connection))
         .collect();
-    assert_eq!(sonarrs, vec![Err(Unmade::Unpaired); 2]);
+    assert_eq!(curators, vec![Err(Unmade::Unpaired); 2]);
 }
 
 /// An asker that is not on this machine is passed over, and an ask answered elsewhere

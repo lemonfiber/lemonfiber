@@ -3,7 +3,7 @@
 
 use super::*;
 
-/// A recipe presenting sonarr's credential to sonarr and capturing what it answers
+/// A recipe presenting `sonarr`'s credential to `sonarr` and capturing what it answers
 /// with, then carrying that to komga: the pairs declare both, as a reading that missed
 /// the trade would have let through.
 const TRADED: &str = r#"

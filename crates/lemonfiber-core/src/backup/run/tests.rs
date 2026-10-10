@@ -183,7 +183,7 @@ async fn retention_keeps_each_scope_on_its_own_count() {
     .await
     .map_err(|problem| *problem);
     // Keep one whole-stack of the two older ones (plus the fresh one), and never
-    // the sonarr archive, which belongs to a different scope's count.
+    // the curator's archive, which belongs to a different scope's count.
     assert_eq!(
         report.map(|report| report.pruned),
         Ok(vec!["lemonfiber-full-2026-07-01.tar.gz".to_owned()])

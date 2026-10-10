@@ -7,29 +7,29 @@ use crate::wizard::Library;
 fn a_docker_media_server_transcodes_in_hardware_only_where_the_platform_can() {
     // Linux reaches the encoder from the container; macOS and Windows do not.
     assert_eq!(
-        Playback::of(Environment::LinuxNative, Library::JellyfinDocker),
+        Playback::of(Environment::LinuxNative, Library::Docker),
         Playback::HardwareTranscoding
     );
     assert_eq!(
-        Playback::of(Environment::LinuxDesktop, Library::JellyfinDocker),
+        Playback::of(Environment::LinuxDesktop, Library::Docker),
         Playback::HardwareTranscoding
     );
     assert_eq!(
-        Playback::of(Environment::MacOs, Library::JellyfinDocker),
+        Playback::of(Environment::MacOs, Library::Docker),
         Playback::SoftwareOnly
     );
     assert_eq!(
-        Playback::of(Environment::Windows, Library::JellyfinDocker),
+        Playback::of(Environment::Windows, Library::Docker),
         Playback::SoftwareOnly
     );
 }
 
 #[test]
-fn native_jellyfin_reaches_the_encoder_wherever_it_runs() {
+fn a_native_media_server_reaches_the_encoder_wherever_it_runs() {
     // Native mode exists to reach the host encoder the Docker VM cannot.
     for environment in [Environment::MacOs, Environment::Windows] {
         assert_eq!(
-            Playback::of(environment, Library::JellyfinNative),
+            Playback::of(environment, Library::Native),
             Playback::HardwareTranscoding
         );
     }
@@ -50,7 +50,7 @@ fn no_media_server_means_there_is_nothing_to_transcode() {
 
 #[test]
 fn maximum_on_a_software_only_host_is_warned_before_confirmation() {
-    let playback = Playback::of(Environment::MacOs, Library::JellyfinDocker);
+    let playback = Playback::of(Environment::MacOs, Library::Docker);
     assert_eq!(
         warn_before_confirming(Preset::Maximum, playback),
         Some(Warning {
@@ -63,8 +63,8 @@ fn maximum_on_a_software_only_host_is_warned_before_confirmation() {
 fn a_host_that_hardware_transcodes_needs_no_warning() {
     // Linux Docker, and native mode on macOS, both reach the encoder.
     for playback in [
-        Playback::of(Environment::LinuxNative, Library::JellyfinDocker),
-        Playback::of(Environment::MacOs, Library::JellyfinNative),
+        Playback::of(Environment::LinuxNative, Library::Docker),
+        Playback::of(Environment::MacOs, Library::Native),
     ] {
         assert!(warn_before_confirming(Preset::Maximum, playback).is_none());
     }
@@ -72,7 +72,7 @@ fn a_host_that_hardware_transcodes_needs_no_warning() {
 
 #[test]
 fn a_preset_that_does_not_force_transcoding_is_never_warned() {
-    let software_only = Playback::of(Environment::MacOs, Library::JellyfinDocker);
+    let software_only = Playback::of(Environment::MacOs, Library::Docker);
     for preset in [Preset::SpaceSaving, Preset::Balanced, Preset::HighQuality] {
         assert!(
             warn_before_confirming(preset, software_only).is_none(),

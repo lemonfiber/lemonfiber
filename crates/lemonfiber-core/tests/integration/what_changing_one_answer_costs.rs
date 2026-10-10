@@ -2,9 +2,9 @@
 //!
 //! The diff beside this — what the setting holds and what it would hold — is settled
 //! without asking anybody. Everything here needs somebody outside lemonfiber to have
-//! been asked: the \*arrs for where they actually file, the download clients for what
+//! been asked: the curators for where they actually file, the download clients for what
 //! is still coming down. So both sides are faked — a filesystem handing back each
-//! \*arr's key, and a transport answering as the services would — and the command is
+//! curator's key, and a transport answering as the services would — and the command is
 //! driven the way a surface drives it.
 //!
 //! From here rather than a `#[cfg(test)]` module, as the wiring and credentials tests
@@ -25,7 +25,7 @@ use lemonfiber_fixtures::http::Fake;
 use lemonfiber_fixtures::support::{seeding_routes, Reporting, SeedFs};
 use lemonfiber_ports::docker::{Health, Lifecycle};
 
-/// A Servarr config carrying a key, as one reads from disk.
+/// A curator's config carrying a key, as one reads from disk.
 const CONFIG: &str = "<Config><ApiKey>a1b2c3d4e5</ApiKey></Config>";
 
 /// The settings these name, spelled once.
@@ -59,7 +59,7 @@ const AGREED: Said = Said {
 };
 
 /// A scratch environment file, holding the data location a move starts from and the
-/// download client's recorded password — without which nothing can ask qBittorrent
+/// download client's recorded password — without which nothing can ask the torrent client
 /// what is still coming down.
 fn env_at(name: &str, from: &Path) -> PathBuf {
     let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("change-{name}")).kept();
@@ -68,7 +68,7 @@ fn env_at(name: &str, from: &Path) -> PathBuf {
     let _ = lemonfiber_core::config::store::set(&env, DATA_ROOT, &from.display().to_string());
     let _ = lemonfiber_core::config::store::set(
         &env,
-        lemonfiber_core::config::QBITTORRENT_PASSWORD_KEY,
+        lemonfiber_core::config::TORRENT_PASSWORD_KEY,
         &["minted", "-earlier"].concat(),
     );
     env
@@ -83,10 +83,10 @@ fn remembering(env: &Path, key: &str, value: &str) {
     let _ = std::fs::write(env.with_file_name("baseline.json"), record);
 }
 
-/// A context over the stack this repository carries, reaching \*arrs that answer.
+/// A context over the stack this repository carries, reaching curators that answer.
 ///
 /// `missing` names path fragments the filesystem will not resolve, which is how a host
-/// directory that is not there is driven: the \*arrs hold `/data/media/<type>` whatever
+/// directory that is not there is driven: the curators hold `/data/media/<type>` whatever
 /// happens, and what decides a move is whether the directory behind each one exists at
 /// the new location.
 fn reaching(env: PathBuf, from: &Path, protocols: Protocols, missing: Vec<&'static str>) -> Ctx {

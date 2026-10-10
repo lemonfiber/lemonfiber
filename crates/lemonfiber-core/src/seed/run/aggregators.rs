@@ -1,6 +1,6 @@
-//! Telling the book \*arr where its indexers come from.
+//! Telling the book curator where its indexers come from.
 //!
-//! Every other \*arr is registered into by the aggregator itself. This one the
+//! Every other curator is registered into by the aggregator itself. This one the
 //! aggregator cannot reach, so the connection is made from the other end: the service
 //! keeps its own list of aggregators and pulls from them, and what has to happen is
 //! that it is told where one is and handed a key to read it with.
@@ -20,17 +20,17 @@ fn connection(asker: &str) -> String {
     format!("Indexers into {asker}")
 }
 
-/// Tell each book \*arr about the aggregator its ask for an indexer settles on, the
+/// Tell each book curator about the aggregator its ask for an indexer settles on, the
 /// stack's or a plugin's.
 ///
-/// Which service that is comes from what the stack says the book \*arr asks for, not
+/// Which service that is comes from what the stack says the book curator asks for, not
 /// from a name written here, and it is reached where it says it listens on the stack's
-/// network with the key it wrote for itself. Only a book \*arr the gate lets the
+/// network with the key it wrote for itself. Only a book curator the gate lets the
 /// aggregator's key reach is told, since it is handed that key: a third-party plugin's
 /// service is handed no credential that is not its own. A pair nothing here connects is
 /// reported by the table, never dropped.
 ///
-/// Nothing for a book \*arr with no key yet — the key is minted on the run that first
+/// Nothing for a book curator with no key yet — the key is minted on the run that first
 /// reaches it, and a service started before that is completed by a later run rather
 /// than failed — or for an aggregator that has not written its own key yet.
 pub(super) async fn seed_aggregators(ctx: &Ctx, fillers: &Fillers) -> Vec<crate::seed::Wiring> {
@@ -43,7 +43,7 @@ pub(super) async fn seed_aggregators(ctx: &Ctx, fillers: &Fillers) -> Vec<crate:
             continue;
         };
         let connection = connection(&asker.name);
-        let key = match super::keys::servarr_key(ctx, pairing.filler).await {
+        let key = match super::keys::curator_key(ctx, pairing.filler).await {
             Beneath::Read(key) => key,
             Beneath::Absent => continue,
             Beneath::Escaped => {
@@ -64,7 +64,7 @@ pub(super) async fn seed_aggregators(ctx: &Ctx, fillers: &Fillers) -> Vec<crate:
     wirings
 }
 
-/// The book \*arr as a client holding the key lemonfiber minted for it, under the setting
+/// The book curator as a client holding the key lemonfiber minted for it, under the setting
 /// kept for it, where it publishes a port and the key is recorded.
 ///
 /// The key is minted where the services are started, before this one has ever run, and

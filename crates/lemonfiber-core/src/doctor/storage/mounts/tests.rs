@@ -11,7 +11,7 @@ fn crowding(service: &str, mounts: &[&str]) -> Crowded {
 }
 
 /// The service whose downloads and library are on opposite sides of a boundary.
-fn sonarr() -> Crowded {
+fn curator() -> Crowded {
     crowding(
         "sonarr",
         &[
@@ -35,7 +35,7 @@ fn said(findings: &[Finding]) -> String {
 fn a_split_data_location_is_reported_rather_than_refused() {
     // The whole point: the stack still runs, and the operator is told what it will
     // cost them.
-    let found = findings(&[sonarr()]);
+    let found = findings(&[curator()]);
     assert!(
         found
             .iter()
@@ -49,7 +49,7 @@ fn what_it_costs_is_named_rather_than_the_rule_it_broke() {
     // "More than one mount beneath the data location" means nothing to most
     // operators. Minutes instead of instants, twice the disk, and nothing left to
     // seed from is what they will actually meet.
-    let words = said(&findings(&[sonarr()]));
+    let words = said(&findings(&[curator()]));
     assert!(words.contains("copy rather than link"), "{words}");
     assert!(words.contains("twice the disk"), "{words}");
     assert!(words.contains("seed"), "{words}");
@@ -59,7 +59,7 @@ fn what_it_costs_is_named_rather_than_the_rule_it_broke() {
 fn the_mounts_it_found_are_shown_rather_than_counted() {
     // A count is not something an operator can act on. The entries are what they
     // will go and edit, so the finding carries them.
-    let words = said(&findings(&[sonarr()]));
+    let words = said(&findings(&[curator()]));
     assert!(
         words.contains("${DATA_ROOT}/downloads:/downloads"),
         "{words}"
@@ -72,7 +72,7 @@ fn the_choice_can_be_answered_by_the_name_the_finding_carries() {
     // The id offered to `--accept` is the id the finding reports under; a second
     // name written into the sentence would be the one that drifts, and the one
     // nobody could answer with.
-    let found = findings(&[sonarr()]);
+    let found = findings(&[curator()]);
     let words = said(&found);
     assert!(words.contains(&format!("--accept {CHECK}")), "{words}");
     assert_eq!(
@@ -86,7 +86,7 @@ fn each_service_is_reported_as_its_own() {
     // A fork can split the mounts for one service and not for another, and each
     // finding is attributed so the report reads as being about that service.
     let found = findings(&[
-        sonarr(),
+        curator(),
         crowding("radarr", &["${DATA_ROOT}/a:/a", "${DATA_ROOT}/b:/b"]),
     ]);
     let about: Vec<Option<String>> = found

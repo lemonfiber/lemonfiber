@@ -29,7 +29,7 @@ use lemonfiber_core::ports::http::{Http, Request, Response, Unreachable};
 use lemonfiber_fixtures::http::Fake;
 use lemonfiber_fixtures::support::Reporting;
 
-/// A Servarr configuration carrying the key that service generated for itself.
+/// A curator's configuration carrying the key that service generated for itself.
 const SERVICE_CONFIG: &str = "<Config><ApiKey>aaaabbbbccccddddeeee</ApiKey></Config>";
 
 /// The key inside [`SERVICE_CONFIG`], so a test can assert it never surfaces.

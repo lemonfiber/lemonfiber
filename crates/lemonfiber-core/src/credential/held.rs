@@ -6,8 +6,8 @@
 //! that ought to be there and is not.
 //!
 //! **The consumer list is the load-bearing column.** Rotation walks it, and anything
-//! left off it is something a rotation strands without saying so. qBittorrent's
-//! password is the case that proves it: the obvious consumer is qBittorrent, but the
+//! left off it is something a rotation strands without saying so. The torrent client's
+//! password is the case that proves it: the obvious consumer is the torrent client, but the
 //! tunnel's forwarded-port push authenticates to the same web UI on every connect and
 //! release, and it reads the password out of the environment at the moment its
 //! container was created. A list naming services rather than consumers would have one
@@ -220,7 +220,7 @@ const USENET: Entry = Entry {
     name: "Usenet provider password",
     setting: config::PROVIDER_PASS_KEY,
     consumers: &[
-        Consumer::at_the_service("SABnzbd, which downloads through the account"),
+        Consumer::at_the_service("the Usenet client, which downloads through the account"),
         Consumer::read_by_lemonfiber(
             "lemonfiber's own provider check, which reads what the account has left",
         ),
@@ -235,7 +235,9 @@ const INDEXER: Entry = Entry {
     name: "Indexer API key",
     setting: config::INDEXER_APIKEY_KEY,
     consumers: &[
-        Consumer::at_the_service("Prowlarr, which searches the indexer on the stack's behalf"),
+        Consumer::at_the_service(
+            "the indexer aggregator, which searches the indexer on the stack's behalf",
+        ),
         Consumer::read_by_lemonfiber(
             "lemonfiber's own indexer check, which proves the indexer still answers",
         ),
@@ -245,12 +247,12 @@ const INDEXER: Entry = Entry {
     proven_by: Some(config::INDEXER_VALIDATED_KEY),
 };
 
-/// qBittorrent's web UI password, and the reason the consumer column exists.
-const QBITTORRENT: Entry = Entry {
+/// The torrent client's web UI password, and the reason the consumer column exists.
+const TORRENT_CLIENT: Entry = Entry {
     name: "qBittorrent web UI password",
-    setting: config::QBITTORRENT_PASSWORD_KEY,
+    setting: config::TORRENT_PASSWORD_KEY,
     consumers: &[
-        Consumer::at_the_service("qBittorrent's own web UI"),
+        Consumer::at_the_service("the torrent client's own web UI"),
         Consumer::from_its_environment(
             "the tunnel's forwarded-port push, which signs in on every connect and release",
             "lemonfiber restart torrent",
@@ -263,11 +265,11 @@ const QBITTORRENT: Entry = Entry {
 };
 
 /// The media server's administrator password.
-const JELLYFIN: Entry = Entry {
+const MEDIA_SERVER: Entry = Entry {
     name: "Jellyfin administrator password",
-    setting: config::JELLYFIN_ADMIN_PASSWORD_KEY,
+    setting: config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
     consumers: &[Consumer::at_the_service(
-        "Jellyfin's own administrator account",
+        "the media server's own administrator account",
     )],
     origin: Origin::Lemonfiber,
     needed: Needed::Always,
@@ -275,11 +277,11 @@ const JELLYFIN: Entry = Entry {
 };
 
 /// The listening server's first-account password.
-const AUDIOBOOKSHELF: Entry = Entry {
+const LISTENING_SERVER: Entry = Entry {
     name: "Audiobookshelf account password",
-    setting: config::AUDIOBOOKSHELF_PASSWORD_KEY,
+    setting: config::LISTENING_SERVER_PASSWORD_KEY,
     consumers: &[Consumer::at_the_service(
-        "Audiobookshelf's own first account",
+        "the listening server's own first account",
     )],
     origin: Origin::Lemonfiber,
     needed: Needed::Always,
@@ -287,11 +289,11 @@ const AUDIOBOOKSHELF: Entry = Entry {
 };
 
 /// The Usenet indexer aggregator's administrator password.
-const NZBHYDRA2: Entry = Entry {
+const USENET_AGGREGATOR: Entry = Entry {
     name: "NZBHydra2 administrator password",
-    setting: config::NZBHYDRA2_ADMIN_PASSWORD_KEY,
+    setting: config::USENET_AGGREGATOR_ADMIN_PASSWORD_KEY,
     consumers: &[Consumer::at_the_service(
-        "NZBHydra2's own administrator account",
+        "the Usenet indexer aggregator's own administrator account",
     )],
     origin: Origin::Lemonfiber,
     needed: Needed::OverUsenet,
@@ -299,9 +301,9 @@ const NZBHYDRA2: Entry = Entry {
 };
 
 /// The book service's API key — minted here and adopted by the service.
-const BINDERY: Entry = Entry {
+const BOOK_CURATOR: Entry = Entry {
     name: "Book library API key",
-    setting: config::BINDERY_API_KEY,
+    setting: config::BOOK_CURATOR_API_KEY,
     consumers: &[Consumer::from_its_environment(
         "the book library service, which takes this key rather than minting its own",
         "lemonfiber restart books",
@@ -319,11 +321,11 @@ pub const CATALOGUE: &[Entry] = &[
     VPN,
     USENET,
     INDEXER,
-    QBITTORRENT,
-    JELLYFIN,
-    AUDIOBOOKSHELF,
-    NZBHYDRA2,
-    BINDERY,
+    TORRENT_CLIENT,
+    MEDIA_SERVER,
+    LISTENING_SERVER,
+    USENET_AGGREGATOR,
+    BOOK_CURATOR,
 ];
 
 /// The credentials this stack needs, given what it runs.

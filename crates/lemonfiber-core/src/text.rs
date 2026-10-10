@@ -1,7 +1,7 @@
 //! Text from somewhere else, made safe to put on a terminal.
 //!
 //! Most of what this product shows an operator did not come from this product. A
-//! release name comes from an indexer, a failure message comes from a \*arr, a
+//! release name comes from an indexer, a failure message comes from a curator, a
 //! container name comes from an image somebody else built. All of it is written
 //! straight to a terminal, and a terminal is not a text box: a control character
 //! in the middle of a release name is an instruction to the emulator.

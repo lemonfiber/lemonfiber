@@ -28,7 +28,7 @@ use crate::doctor::{examine, Check, Finding, Narrowing, Verdict};
 use crate::error::{Diagnose, Problem, Remedy};
 use crate::model::DoctorReport;
 
-use crate::app::targets::{project_directory, servarr_targets};
+use crate::app::targets::{curator_targets, project_directory};
 use crate::app::Ctx;
 
 use crate::error::codes::diag::NO_SUCH_CHECK;
@@ -334,7 +334,7 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
     let credentials = CredentialsCheck::new(
         ctx.seams.http.clone(),
         ctx.seams.filesystem.clone(),
-        servarr_targets(&manifest.services, project.as_deref()),
+        curator_targets(&manifest.services, project.as_deref()),
     );
     let indexer = indexer_still_answers(ctx);
     // Whether the upstream quality guides can be reached, so a sync that would come
@@ -363,7 +363,7 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
     let releases = ReleasesCheck::new(
         ctx.seams.http.clone(),
         ctx.seams.filesystem.clone(),
-        servarr_targets(&manifest.services, project.as_deref()),
+        curator_targets(&manifest.services, project.as_deref()),
         disruptive,
     );
     let providers = deferring::providing(ctx, manifest, project.as_deref());

@@ -125,7 +125,7 @@ pub enum Disposition {
     /// The choice needs transcoding this host cannot do well, so it was held
     /// rather than recorded without explicit confirmation.
     Held,
-    /// The recorded preset was re-asserted over the Recyclarr config, overwriting
+    /// The recorded preset was re-asserted over the quality sync config, overwriting
     /// a hand-edit where an ordinary run would have preserved it.
     Reapplied,
     /// A re-assert that was a rehearsal: it reports whether it would overwrite a

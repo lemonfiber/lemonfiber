@@ -1,6 +1,6 @@
 //! What is read back from a service: folders, clients, keys and queues.
 
-use super::{sonarr, taking_on};
+use super::{curator, taking_on};
 use lemonfiber_core::ports::http::Http;
 use lemonfiber_core::ports::service::{
     Category, Failure, QueueDepth, Queued, RegisteredClient, RegisteredFolder, RootFolder,
@@ -18,7 +18,7 @@ async fn the_root_folders_are_read_back_with_their_ids() {
         200,
         r#"[{"id":1,"path":"/data/media/tv"},{"id":7,"path":"/data/media/movies"}]"#,
     ));
-    let folders = sonarr(&fake).root_folders().await;
+    let folders = curator(&fake).root_folders().await;
     assert_eq!(
         folders.ok(),
         Some(vec![
@@ -38,7 +38,7 @@ async fn the_root_folders_are_read_back_with_their_ids() {
 async fn an_unreadable_folder_list_is_refused() {
     let fake = Fake::always(Answer::reply(200, "not an array"));
     assert!(matches!(
-        sonarr(&fake).root_folders().await,
+        curator(&fake).root_folders().await,
         Err(Failure::Refused { .. })
     ));
 }
@@ -47,7 +47,7 @@ async fn an_unreadable_folder_list_is_refused() {
 async fn a_rejected_folder_listing_is_unauthorised() {
     let fake = Fake::always(Answer::reply(401, ""));
     assert!(matches!(
-        sonarr(&fake).root_folders().await,
+        curator(&fake).root_folders().await,
         Err(Failure::Unauthorised { .. })
     ));
 }
@@ -56,7 +56,7 @@ async fn a_rejected_folder_listing_is_unauthorised() {
 async fn a_folder_listing_with_no_answer_is_unavailable() {
     let fake = Fake::always(Answer::Silent);
     assert!(matches!(
-        sonarr(&fake).root_folders().await,
+        curator(&fake).root_folders().await,
         Err(Failure::Unavailable { .. })
     ));
 }
@@ -69,7 +69,7 @@ async fn the_download_clients_are_read_back_by_their_endpoint() {
         200,
         r#"[{"id":3,"name":"SABnzbd","fields":[{"name":"host","value":"sabnzbd"},{"name":"port","value":8080},{"name":"tvCategory","value":"tv"}]}]"#,
     ));
-    let clients = sonarr(&fake).download_clients().await;
+    let clients = curator(&fake).download_clients().await;
     assert_eq!(
         clients.ok(),
         Some(vec![RegisteredClient {
@@ -97,7 +97,7 @@ async fn a_client_that_names_no_endpoint_is_left_out_rather_than_guessed() {
         200,
         r#"[{"id":3,"fields":[{"name":"host","value":"sabnzbd"},{"name":"port","value":8080}]},{"id":4,"fields":[{"name":"port","value":9090}]}]"#,
     ));
-    let clients = sonarr(&fake)
+    let clients = curator(&fake)
         .download_clients()
         .await
         .ok()
@@ -112,7 +112,7 @@ async fn a_client_that_names_no_endpoint_is_left_out_rather_than_guessed() {
 async fn a_download_client_listing_that_is_refused_is_unauthorised() {
     let fake = Fake::always(Answer::reply(401, ""));
     assert!(matches!(
-        sonarr(&fake).download_clients().await,
+        curator(&fake).download_clients().await,
         Err(Failure::Unauthorised { .. })
     ));
 }
@@ -121,7 +121,7 @@ async fn a_download_client_listing_that_is_refused_is_unauthorised() {
 async fn a_download_client_listing_with_no_answer_is_unavailable() {
     let fake = Fake::always(Answer::Silent);
     assert!(matches!(
-        sonarr(&fake).download_clients().await,
+        curator(&fake).download_clients().await,
         Err(Failure::Unavailable { .. })
     ));
 }
@@ -130,7 +130,7 @@ async fn a_download_client_listing_with_no_answer_is_unavailable() {
 async fn an_unreadable_download_client_list_is_refused() {
     let fake = Fake::always(Answer::reply(200, "not an array"));
     assert!(matches!(
-        sonarr(&fake).download_clients().await,
+        curator(&fake).download_clients().await,
         Err(Failure::Refused { .. })
     ));
 }
@@ -198,21 +198,21 @@ async fn the_api_version_selects_the_path_segment() {
         media_type: "music".to_owned(),
     };
 
-    let lidarr = Fake::always(Answer::reply(201, ""));
-    assert!(versioned(&lidarr, 1)
+    let music_curator = Fake::always(Answer::reply(201, ""));
+    assert!(versioned(&music_curator, 1)
         .register_root_folder(&folder)
         .await
         .is_ok());
-    assert!(lidarr
+    assert!(music_curator
         .request()
         .is_some_and(|request| request.url.ends_with("/api/v1/rootfolder")));
 
-    let sonarr = Fake::always(Answer::reply(201, ""));
-    assert!(versioned(&sonarr, 3)
+    let curator = Fake::always(Answer::reply(201, ""));
+    assert!(versioned(&curator, 3)
         .register_root_folder(&folder)
         .await
         .is_ok());
-    assert!(sonarr
+    assert!(curator
         .request()
         .is_some_and(|request| request.url.ends_with("/api/v3/rootfolder")));
 }
@@ -226,7 +226,7 @@ async fn a_json_post_declares_its_content_type() {
         path: "/data/media/tv".to_owned(),
         media_type: "tv".to_owned(),
     };
-    assert!(sonarr(&fake).register_root_folder(&folder).await.is_ok());
+    assert!(curator(&fake).register_root_folder(&folder).await.is_ok());
     assert!(fake.request().is_some_and(|request| request
         .headers
         .iter()
@@ -237,7 +237,7 @@ async fn a_json_post_declares_its_content_type() {
 async fn a_get_carries_no_content_type() {
     // A read has no body, so it declares no content type.
     let fake = Fake::always(Answer::reply(200, "[]"));
-    let _ = sonarr(&fake).root_folders().await;
+    let _ = curator(&fake).root_folders().await;
     assert!(fake.request().is_some_and(|request| request
         .headers
         .iter()
@@ -255,7 +255,7 @@ async fn a_queue_item_carries_what_the_service_said_went_wrong() {
            "trackedDownloadState":"importPending","downloadId":"ABC123",
            "statusMessages":[{"messages":["Permission denied writing to /data/media"]}]}]}"#,
     ));
-    let read = sonarr(&fake).queue().await.ok().unwrap_or_default();
+    let read = curator(&fake).queue().await.ok().unwrap_or_default();
     let first = read.items.first().cloned().unwrap_or_else(|| Queued {
         title: String::new(),
         status: String::new(),
@@ -283,7 +283,7 @@ async fn a_passkey_the_service_quotes_in_its_message_is_withheld_as_it_is_read()
                "errorMessage":"Tracker https://tracker.example/{passkey}/announce: unregistered torrent"}}]}}"#
         ),
     ));
-    let read = sonarr(&fake).queue().await.ok().unwrap_or_default();
+    let read = curator(&fake).queue().await.ok().unwrap_or_default();
     let message = read.items.first().and_then(|item| item.message.clone());
     assert!(
         message
@@ -302,7 +302,7 @@ async fn a_service_that_offers_only_blank_detail_carries_none_rather_than_empty(
         r#"{"totalRecords":1,"records":[{"title":"Some.Release","trackedDownloadStatus":"warning",
            "errorMessage":"   ","downloadId":""}]}"#,
     ));
-    let read = sonarr(&fake).queue().await.ok().unwrap_or_default();
+    let read = curator(&fake).queue().await.ok().unwrap_or_default();
     let carried: Vec<(Option<String>, Option<String>)> = read
         .items
         .iter()
@@ -317,7 +317,7 @@ async fn the_queue_depth_and_the_stuck_count_are_read() {
         200,
         r#"{"totalRecords":5,"records":[{"trackedDownloadStatus":"ok"},{"trackedDownloadStatus":"warning"},{"trackedDownloadStatus":"Error"}]}"#,
     ));
-    let queue = sonarr(&fake).queue().await;
+    let queue = curator(&fake).queue().await;
     let depth = queue.as_ref().map(QueueDepth::of);
     assert_eq!(depth.ok(), Some(QueueDepth { total: 5, stuck: 2 }));
 
@@ -329,12 +329,12 @@ async fn the_queue_depth_and_the_stuck_count_are_read() {
 async fn a_queue_that_is_not_answered_is_unavailable() {
     let fake = Fake::always(Answer::Silent);
     assert!(matches!(
-        sonarr(&fake).queue().await,
+        curator(&fake).queue().await,
         Err(Failure::Unavailable { .. })
     ));
 }
 
-/// Each \*arr is asked in its own vocabulary, and never in the other's.
+/// Each curator is asked in its own vocabulary, and never in the other's.
 ///
 /// The two services take the same request under different names — a different external
 /// identifier, a different search option, and one extra field each that the other has

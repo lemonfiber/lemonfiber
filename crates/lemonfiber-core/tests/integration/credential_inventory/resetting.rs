@@ -1,4 +1,4 @@
-//! Replacing a media \*arr's own key and handing the new one to every copy.
+//! Replacing a media curator's own key and handing the new one to every copy.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -20,27 +20,27 @@ use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::support::Reporting;
 use lemonfiber_sidecar::gate::{Credential, Kind, Upstream, Upstreams};
 
-/// A Servarr status body, as a healthy service answers `system/status` with.
-const SONARR_STATUS: &str = r#"{"instanceName":"Sonarr","version":"4.0.20.2967"}"#;
+/// A curator's status body, as a healthy service answers `system/status` with.
+const CURATOR_STATUS: &str = r#"{"instanceName":"Sonarr","version":"4.0.20.2967"}"#;
 
-/// Prowlarr's application for Sonarr, its stored key masked.
-const PROWLARR_HOLDS: &str = r#"[{"id":7,"name":"Sonarr","fields":[{"name":"baseUrl","value":"http://sonarr:8989"},{"name":"apiKey","value":"********"}]}]"#;
+/// The aggregator's application for the curator, its stored key masked.
+const AGGREGATOR_HOLDS: &str = r#"[{"id":7,"name":"Sonarr","fields":[{"name":"baseUrl","value":"http://sonarr:8989"},{"name":"apiKey","value":"********"}]}]"#;
 
-/// The key Sonarr writes when it replaces [`the_service_key`], split for the same
+/// The key the curator writes when it replaces [`the_service_key`], split for the same
 /// reason that one is.
 fn the_new_key() -> String {
     format!("{}{}", "9999eeee", "77776666aaaa")
 }
 
-/// Sonarr's configuration once it has replaced its key.
+/// The curator's configuration once it has replaced its key.
 fn replaced_config() -> String {
     format!("<Config><ApiKey>{}</ApiKey></Config>", the_new_key())
 }
 
 /// The subtitle finder's configuration, holding its own key under `auth`.
-const BAZARR_CONFIG: &str = "auth:\n  apikey: bazarrkeybazarrkey\n";
+const SUBTITLE_FINDER_CONFIG: &str = "auth:\n  apikey: bazarrkeybazarrkey\n";
 
-/// A filesystem holding each \*arr's configuration as it was until the transport was
+/// A filesystem holding each curator's configuration as it was until the transport was
 /// asked to reset a key and as the reset left it after, the subtitle finder's
 /// configuration, and whatever `rest` holds everywhere else.
 struct Resetting {
@@ -105,7 +105,7 @@ impl FileSystem for Resetting {
             });
         }
         if name.ends_with("config.yaml") {
-            return Some(BAZARR_CONFIG.to_owned());
+            return Some(SUBTITLE_FINDER_CONFIG.to_owned());
         }
         self.now().read(path).await
     }
@@ -126,7 +126,7 @@ impl Storage for Resetting {
     }
 }
 
-/// Rotate Sonarr's key over this transport and these files.
+/// Rotate the curator's key over this transport and these files.
 async fn rotated(env: PathBuf, files: Arc<dyn FileSystem>, http: Arc<Fake>) -> Inventory {
     asked(
         &ctx(env, files, http),
@@ -137,17 +137,17 @@ async fn rotated(env: PathBuf, files: Arc<dyn FileSystem>, http: Arc<Fake>) -> I
     .await
 }
 
-/// A reset that lands is proven with the new key, recorded, and handed to Prowlarr's
+/// A reset that lands is proven with the new key, recorded, and handed to the aggregator's
 /// copy in the same run.
 #[tokio::test]
-async fn a_reset_key_is_proven_recorded_and_handed_to_prowlarr() {
+async fn a_reset_key_is_proven_recorded_and_handed_to_the_indexer_aggregator() {
     let env = env_at("reset", &[("SONARR_API_KEY", &the_service_key())]);
     let http = Fake::by_route_in_turn(vec![
         (Method::Post, "/command", vec![Answer::reply(201, "{}")]),
         (
             Method::Get,
             "/system/status",
-            vec![Answer::reply(200, SONARR_STATUS)],
+            vec![Answer::reply(200, CURATOR_STATUS)],
         ),
         (
             Method::Post,
@@ -162,7 +162,7 @@ async fn a_reset_key_is_proven_recorded_and_handed_to_prowlarr() {
         (
             Method::Get,
             "/applications",
-            vec![Answer::reply(200, PROWLARR_HOLDS)],
+            vec![Answer::reply(200, AGGREGATOR_HOLDS)],
         ),
     ]);
 
@@ -178,11 +178,11 @@ async fn a_reset_key_is_proven_recorded_and_handed_to_prowlarr() {
         "{rotation:?}"
     );
     assert_eq!(recorded(&env, "SONARR_API_KEY"), Some(the_new_key()));
-    let prowlarr = rotation
+    let aggregator = rotation
         .into_iter()
         .flat_map(|one| one.consumers)
         .find(|one| one.consumer == "Prowlarr, which supplies Sonarr with indexers");
-    assert_eq!(prowlarr.map(|one| one.reach), Some(Reach::Updated));
+    assert_eq!(aggregator.map(|one| one.reach), Some(Reach::Updated));
     let rekeyed = http
         .requests()
         .into_iter()
@@ -286,7 +286,7 @@ async fn a_rehearsed_reset_asks_the_service_nothing() {
     assert_eq!(recorded(&env, "SONARR_API_KEY"), Some(the_service_key()));
 }
 
-/// The gate's routes, with Jellyfin's presenting `key` and no \*arr route yet.
+/// The gate's routes, with the media server's presenting `key` and no curator route yet.
 fn gate_routes(key: &str) -> String {
     Upstreams::of(vec![Upstream {
         route: "jellyfin".to_owned(),
@@ -317,7 +317,7 @@ async fn a_reset_key_reaches_the_subtitle_finder_and_the_gate() {
         (
             Method::Get,
             "/system/status",
-            vec![Answer::reply(200, SONARR_STATUS)],
+            vec![Answer::reply(200, CURATOR_STATUS)],
         ),
         (
             Method::Post,
@@ -416,7 +416,7 @@ async fn a_reset_key_that_cannot_be_recorded_says_what_finishes_the_job() {
         (
             Method::Get,
             "/system/status",
-            Answer::reply(200, SONARR_STATUS),
+            Answer::reply(200, CURATOR_STATUS),
         ),
     ]);
 

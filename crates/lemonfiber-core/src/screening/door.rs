@@ -15,8 +15,8 @@ use crate::ports::service::{Item, ItemDetail, ItemProgress, Medium, Picture};
 
 /// The port the guarded front door serves encrypted on.
 ///
-/// Jellyfin's own port for encrypted service, so a client that knows the media server
-/// knows this one too.
+/// The bundled media server's own port for encrypted service, so a client that knows the
+/// media server knows this one too.
 pub const GUARDED: u16 = 8920;
 
 /// Where the door's certificate and key are kept, beneath the stack directory.

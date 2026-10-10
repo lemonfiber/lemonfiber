@@ -29,7 +29,7 @@ pub(crate) const PANEL_WITHIN: Duration = Duration::from_secs(10);
 /// holds — where every other panel is one or two requests.
 pub(crate) const HOUSEHOLD_WITHIN: Duration = Duration::from_secs(30);
 
-/// How often each \*arr's queue is read afresh.
+/// How often each curator's queue is read afresh.
 pub(crate) const QUEUES_EVERY: Duration = Duration::from_secs(5);
 
 /// How often the data volume's free space is read afresh.
@@ -58,7 +58,7 @@ pub(crate) const VPN_EVERY: Duration = Duration::from_secs(5 * 60);
 /// A panel read at a pace of its own rather than on every refresh.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Paced {
-    /// Each \*arr's queue.
+    /// Each curator's queue.
     Queues,
     /// The data volume's free space.
     FreeSpace,

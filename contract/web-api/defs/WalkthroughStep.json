@@ -23,7 +23,7 @@
       "const": "downloading"
     },
     {
-      "description": "The \\*arr is moving the finished download into the library.",
+      "description": "The curator is moving the finished download into the library.",
       "type": "string",
       "const": "importing"
     },

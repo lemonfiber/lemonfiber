@@ -133,7 +133,7 @@ fn context(name: &str, transport: &Arc<Fake>, facts: StorageFacts) -> Ctx {
     let env = dir.join(".env");
     let _ = lemonfiber_core::config::store::set(
         &env,
-        lemonfiber_core::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+        lemonfiber_core::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         "minted-earlier",
     );
     lemonfiber_testing::a_context()
@@ -144,7 +144,7 @@ fn context(name: &str, transport: &Arc<Fake>, facts: StorageFacts) -> Ctx {
         )))
         .filesystem(Arc::new(
             SeedFs::keyed(None, None)
-                .with_seerr(lemonfiber_fixtures::support::SEERR_SETTINGS)
+                .with_requests(lemonfiber_fixtures::support::SEERR_SETTINGS)
                 .with_facts(facts),
         ))
         .settings(Settings {

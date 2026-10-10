@@ -141,7 +141,7 @@ async fn restoring_one_service_leaves_the_others_untouched() {
     let dest = paths.backups().join("sonarr.tar.gz");
     assert!(tar.write(&dest, &manifest, &plan.items).await.is_ok());
 
-    // Change sonarr since the backup, so a real restore is observable.
+    // Change the curator since the backup, so a real restore is observable.
     write_file(
         &paths.service_config().join("sonarr/config.xml"),
         "<Changed/>",
@@ -656,7 +656,7 @@ async fn an_archive_is_no_more_readable_than_the_settings_it_carries() {
 ///
 /// Declared here rather than measured, because "typical" is a judgement and not a
 /// reading: it is lemonfiber's own configuration plus a service directory for each
-/// of the stack's services, and the weight in those is the \*arr databases — single
+/// of the stack's services, and the weight in those is the curator databases — single
 /// -digit megabytes each for a household library, and tens of megabytes for a large
 /// one. Fifty megabytes is the generous end of that.
 ///

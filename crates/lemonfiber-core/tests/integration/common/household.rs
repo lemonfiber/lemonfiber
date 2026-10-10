@@ -48,7 +48,7 @@ pub fn recorded_admin(name: &str) -> std::path::PathBuf {
     let env = dir.join(".env");
     let _ = lemonfiber_core::config::store::set(
         &env,
-        lemonfiber_core::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+        lemonfiber_core::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         &["minted", "-earlier"].concat(),
     );
     env

@@ -83,7 +83,7 @@ pub trait Prompt {
     /// The user and group the containers run as, asked only where ownership shows;
     /// `None` where the operator declines and the image's own default is kept.
     fn service_user(&self) -> Option<(u32, u32)>;
-    /// Whether to run Jellyfin, and how.
+    /// Whether to run the media server, and how.
     fn library(&self) -> Library;
     /// Whether others in the home will use it.
     fn household(&self) -> bool;

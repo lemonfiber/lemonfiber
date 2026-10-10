@@ -118,7 +118,7 @@ pub enum State {
         detail: String,
     },
     /// Refused by lemonfiber's own policy, carrying the reason a re-run will not
-    /// resolve — such as two \*arrs pointed at one root folder, or a service that
+    /// resolve — such as two curators pointed at one root folder, or a service that
     /// does not serve the API version this build speaks. Either way nothing it
     /// names was written, whether it was refused before the write or the write
     /// itself found nothing to land in.

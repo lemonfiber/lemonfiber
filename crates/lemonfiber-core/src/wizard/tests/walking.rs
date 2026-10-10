@@ -4,7 +4,7 @@ use super::*;
 
 #[test]
 fn a_recorded_mode_round_trips_back_to_the_library_choice() {
-    for library in [Library::JellyfinDocker, Library::JellyfinNative] {
+    for library in [Library::Docker, Library::Native] {
         let mode = library.mode().unwrap_or_default();
         assert_eq!(Library::from_mode(mode), Some(library));
     }
@@ -128,7 +128,7 @@ fn an_answer_is_recorded_against_its_field() {
         .answer(Answer::ServiceUser(Some((1000, 1001))))
         .unwrap_or(());
     wizard
-        .answer(Answer::Library(Library::JellyfinDocker))
+        .answer(Answer::Library(Library::Docker))
         .unwrap_or(());
     wizard.answer(Answer::Household(true)).unwrap_or(());
     wizard
@@ -140,7 +140,7 @@ fn an_answer_is_recorded_against_its_field() {
     assert_eq!(answers.protocols, Some(Protocols::both()));
     assert_eq!(answers.data_location, Some(PathBuf::from("/srv/media")));
     assert_eq!(answers.service_user, Some(Some((1000, 1001))));
-    assert_eq!(answers.library, Some(Library::JellyfinDocker));
+    assert_eq!(answers.library, Some(Library::Docker));
     assert_eq!(answers.household, Some(true));
     assert_eq!(answers.autostart, Some(false));
 }
@@ -158,21 +158,18 @@ fn a_container_user_is_refused_where_ownership_is_mapped_away() {
 }
 
 #[test]
-fn native_jellyfin_is_refused_where_it_buys_nothing() {
+fn a_native_media_server_is_refused_where_it_buys_nothing() {
     let mut linux = on_native_linux();
     assert_eq!(
-        linux.answer(Answer::Library(Library::JellyfinNative)),
-        Err(super::super::Rejected::NativeJellyfinUnavailable)
+        linux.answer(Answer::Library(Library::Native)),
+        Err(super::super::Rejected::NativeMediaServerUnavailable)
     );
     assert_eq!(linux.answers().library, None);
 
     // Where it is offered, it is accepted.
     let mut macos = on_macos();
-    assert_eq!(
-        macos.answer(Answer::Library(Library::JellyfinNative)),
-        Ok(())
-    );
-    assert_eq!(macos.answers().library, Some(Library::JellyfinNative));
+    assert_eq!(macos.answer(Answer::Library(Library::Native)), Ok(()));
+    assert_eq!(macos.answers().library, Some(Library::Native));
 }
 
 #[test]
@@ -249,14 +246,12 @@ fn progress_survives_a_round_trip_so_setup_can_resume() {
 }
 
 #[test]
-fn resuming_where_native_jellyfin_is_no_longer_offered_clears_it() {
+fn resuming_where_a_native_media_server_is_no_longer_offered_clears_it() {
     // Chosen on macOS, resumed on Linux, where the container transcodes and
     // native mode buys nothing: the choice this machine rejects must not be
     // carried into what would be written.
     let mut macos = on_macos();
-    macos
-        .answer(Answer::Library(Library::JellyfinNative))
-        .unwrap_or(());
+    macos.answer(Answer::Library(Library::Native)).unwrap_or(());
     let saved = macos.progress().clone();
 
     let resumed = Wizard::resume(Environment::LinuxNative, saved);
@@ -299,7 +294,7 @@ fn resuming_re_homes_a_cursor_left_on_a_skipped_step() {
 fn the_serialised_step_and_answers_read_as_their_kebab_names() {
     let mut wizard = on_macos();
     wizard
-        .answer(Answer::Library(Library::JellyfinNative))
+        .answer(Answer::Library(Library::Native))
         .unwrap_or(());
     wizard.progress.at = Step::DataLocation;
     let json = serde_json::to_string(wizard.progress()).unwrap_or_default();

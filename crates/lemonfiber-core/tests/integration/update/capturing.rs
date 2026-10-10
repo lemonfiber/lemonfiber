@@ -1,6 +1,6 @@
 //! The capture taken before anything moves.
 
-use super::{asking, behind, came_to, ctx, reported, Coming, Kept, Machine, SONARR};
+use super::{asking, behind, came_to, ctx, reported, Coming, Kept, Machine, CURATOR_VERSIONS};
 use lemonfiber_core::app::{dispatch, Waiting};
 use lemonfiber_core::config::{Reaching, REACH_REGISTRY_KEY};
 use lemonfiber_core::ports::process::Failure as RunFailure;
@@ -10,7 +10,11 @@ use lemonfiber_core::update::{Ending, Reversal, State};
 async fn a_confirmed_run_captures_before_anything_opens_its_state_on_the_new_image() {
     let machine = Machine::coming(Coming::Answering);
     let archive = Kept::writing(true);
-    let context = ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive);
+    let context = ctx(
+        &machine,
+        behind(&[("sonarr", CURATOR_VERSIONS.0)]),
+        &archive,
+    );
 
     let report = reported(dispatch(asking(true, Waiting::Never), &context).await);
 
@@ -50,7 +54,11 @@ async fn a_confirmed_run_captures_before_anything_opens_its_state_on_the_new_ima
 async fn the_images_are_fetched_before_anything_stops() {
     let machine = Machine::coming(Coming::Answering);
     let archive = Kept::writing(true);
-    let context = ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive);
+    let context = ctx(
+        &machine,
+        behind(&[("sonarr", CURATOR_VERSIONS.0)]),
+        &archive,
+    );
 
     let report = reported(dispatch(asking(true, Waiting::Never), &context).await);
 
@@ -82,7 +90,11 @@ async fn a_fetch_that_fails_still_lets_the_run_take_its_steps() {
         reason: "the registry did not answer".to_owned(),
     }));
     let archive = Kept::writing(true);
-    let context = ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive);
+    let context = ctx(
+        &machine,
+        behind(&[("sonarr", CURATOR_VERSIONS.0)]),
+        &archive,
+    );
 
     let report = reported(dispatch(asking(true, Waiting::Never), &context).await);
 
@@ -96,7 +108,11 @@ async fn a_fetch_that_fails_still_lets_the_run_take_its_steps() {
 async fn a_machine_that_fetches_nothing_is_not_fetched_for() {
     let machine = Machine::coming(Coming::Answering);
     let archive = Kept::writing(true);
-    let mut context = ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive);
+    let mut context = ctx(
+        &machine,
+        behind(&[("sonarr", CURATOR_VERSIONS.0)]),
+        &archive,
+    );
     context.settings.reaching = Reaching::without(REACH_REGISTRY_KEY);
 
     let report = reported(dispatch(asking(true, Waiting::Never), &context).await);
@@ -115,7 +131,11 @@ async fn a_machine_that_fetches_nothing_is_not_fetched_for() {
 async fn a_capture_that_will_not_write_stops_the_run_before_anything_moves() {
     let machine = Machine::coming(Coming::Answering);
     let archive = Kept::writing(false);
-    let context = ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive);
+    let context = ctx(
+        &machine,
+        behind(&[("sonarr", CURATOR_VERSIONS.0)]),
+        &archive,
+    );
 
     let refused = dispatch(asking(true, Waiting::Never), &context).await;
 
@@ -134,7 +154,11 @@ async fn a_capture_that_will_not_write_stops_the_run_before_anything_moves() {
 async fn a_capture_that_will_not_write_says_the_stack_was_left_down() {
     let machine = Machine::coming(Coming::Answering);
     let archive = Kept::writing(false);
-    let context = ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive);
+    let context = ctx(
+        &machine,
+        behind(&[("sonarr", CURATOR_VERSIONS.0)]),
+        &archive,
+    );
 
     let refused = dispatch(asking(true, Waiting::Never), &context).await;
 
@@ -178,7 +202,11 @@ async fn a_stack_that_will_not_come_back_does_not_undo_the_update_it_reports() {
             program: "docker".to_owned(),
         }));
     let archive = Kept::writing(true);
-    let context = ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive);
+    let context = ctx(
+        &machine,
+        behind(&[("sonarr", CURATOR_VERSIONS.0)]),
+        &archive,
+    );
 
     let report = reported(dispatch(asking(true, Waiting::Never), &context).await);
 
@@ -218,7 +246,11 @@ async fn a_stack_that_will_not_come_down_is_never_captured_and_never_moved() {
             program: "docker".to_owned(),
         }));
     let archive = Kept::writing(true);
-    let context = ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive);
+    let context = ctx(
+        &machine,
+        behind(&[("sonarr", CURATOR_VERSIONS.0)]),
+        &archive,
+    );
 
     let refused = dispatch(asking(true, Waiting::Never), &context).await;
 

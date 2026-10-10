@@ -48,7 +48,7 @@
       "const": "service-user"
     },
     {
-      "description": "Whether to run Jellyfin, and if so how.",
+      "description": "Whether to run the media server, and if so how.",
       "type": "string",
       "const": "library"
     },

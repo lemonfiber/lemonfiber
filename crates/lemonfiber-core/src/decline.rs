@@ -3,7 +3,7 @@
 //!
 //! The core asks it one thing: which key it holds. A rotation writes a new key where
 //! the service reads it and revokes the old one only once the service says it holds the
-//! new, so a decline is never left with a key Jellyfin no longer takes.
+//! new, so a decline is never left with a key the media server no longer takes.
 
 use std::sync::Arc;
 

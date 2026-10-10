@@ -1,4 +1,4 @@
-//! Wiring root folders into a \\*arr, against a fake service.
+//! Wiring root folders into a curator, against a fake service.
 //!
 //! The first driver, and the one the others are shaped after: observe, write only
 //! what is missing, read it back before calling it wired, and journal the change.
@@ -201,18 +201,18 @@ async fn a_present_folder_is_matched_despite_a_trailing_slash() {
     assert_eq!(recorded, 0);
 }
 
-/// The reason a shared root folder is refused, naming the given other \*arr, in
+/// The reason a shared root folder is refused, naming the given other curator, in
 /// the exact words the driver builds so the assertions read against one source.
 fn shared_root(path: &str, other: &str) -> String {
     format!(
-        "{path} is also the root folder for {other}; two *arrs on one root folder would each manage the other's files"
+        "{path} is also the root folder for {other}; two curators on one root folder would each manage the other's files"
     )
 }
 
 #[tokio::test]
-async fn a_root_folder_another_arr_also_wants_is_refused_not_wired() {
-    // Two *arrs on one root folder would each manage the other's files, so the
-    // shared folder is refused — with the other *arr named — and nothing written.
+async fn a_root_folder_another_curator_also_wants_is_refused_not_wired() {
+    // Two curators on one root folder would each manage the other's files, so the
+    // shared folder is refused — with the other curator named — and nothing written.
     let contested = BTreeMap::from([(
         "/data/media/tv".to_owned(),
         vec!["radarr".to_owned(), "sonarr".to_owned()],
@@ -235,7 +235,7 @@ async fn a_root_folder_another_arr_also_wants_is_refused_not_wired() {
 #[tokio::test]
 async fn a_contested_folder_is_refused_even_where_the_service_already_holds_it() {
     // The clash is the point: a folder already registered is still refused when
-    // another *arr shares it, so the two are never left both managing one root.
+    // another curator shares it, so the two are never left both managing one root.
     let existing = vec![RegisteredFolder {
         id: "1".to_owned(),
         path: "/data/media/tv".to_owned(),
@@ -261,7 +261,7 @@ async fn a_contested_folder_is_refused_even_where_the_service_already_holds_it()
 
 #[tokio::test]
 async fn only_the_contested_folder_is_refused_the_rest_are_wired() {
-    // Refusal is per folder: the shared one is refused, the *arr's own is wired.
+    // Refusal is per folder: the shared one is refused, the curator's own is wired.
     let contested = BTreeMap::from([(
         "/data/media/tv".to_owned(),
         vec!["radarr".to_owned(), "sonarr".to_owned()],
@@ -285,10 +285,13 @@ async fn only_the_contested_folder_is_refused_the_rest_are_wired() {
 }
 
 #[test]
-fn a_root_folder_two_arrs_want_is_contested_naming_both_sorted() {
-    let sonarr = [folder("/data/media/tv")];
-    let radarr = [folder("/data/media/tv")];
-    let contested = contested_roots([("sonarr", sonarr.as_slice()), ("radarr", radarr.as_slice())]);
+fn a_root_folder_two_curators_want_is_contested_naming_both_sorted() {
+    let tv_roots = [folder("/data/media/tv")];
+    let movie_roots = [folder("/data/media/tv")];
+    let contested = contested_roots([
+        ("sonarr", tv_roots.as_slice()),
+        ("radarr", movie_roots.as_slice()),
+    ]);
     assert_eq!(
         contested.get("/data/media/tv").map(Vec::as_slice),
         Some(["radarr".to_owned(), "sonarr".to_owned()].as_slice()),
@@ -297,10 +300,13 @@ fn a_root_folder_two_arrs_want_is_contested_naming_both_sorted() {
 }
 
 #[test]
-fn a_root_folder_only_one_arr_wants_is_not_contested() {
-    let sonarr = [folder("/data/media/tv")];
-    let radarr = [folder("/data/media/movies")];
-    let contested = contested_roots([("sonarr", sonarr.as_slice()), ("radarr", radarr.as_slice())]);
+fn a_root_folder_only_one_curator_wants_is_not_contested() {
+    let tv_roots = [folder("/data/media/tv")];
+    let movie_roots = [folder("/data/media/movies")];
+    let contested = contested_roots([
+        ("sonarr", tv_roots.as_slice()),
+        ("radarr", movie_roots.as_slice()),
+    ]);
     assert!(
         contested.is_empty(),
         "no path is shared, so nothing is contested",
@@ -309,21 +315,24 @@ fn a_root_folder_only_one_arr_wants_is_not_contested() {
 
 #[test]
 fn a_contested_path_is_recognised_across_a_trailing_slash() {
-    // One *arr spells the path with a trailing slash, the other without; they are
+    // One curator spells the path with a trailing slash, the other without; they are
     // the same folder, so the clash is not hidden.
-    let sonarr = [folder("/data/media/tv/")];
-    let radarr = [folder("/data/media/tv")];
-    let contested = contested_roots([("sonarr", sonarr.as_slice()), ("radarr", radarr.as_slice())]);
+    let tv_roots = [folder("/data/media/tv/")];
+    let movie_roots = [folder("/data/media/tv")];
+    let contested = contested_roots([
+        ("sonarr", tv_roots.as_slice()),
+        ("radarr", movie_roots.as_slice()),
+    ]);
     assert_eq!(contested.len(), 1);
     assert!(contested.contains_key("/data/media/tv"));
 }
 
 #[test]
-fn one_arr_listing_a_path_twice_does_not_contest_itself() {
-    // Distinct services, not repeats, make a contest: one *arr naming a path twice
-    // is still one *arr.
-    let sonarr = [folder("/data/media/tv"), folder("/data/media/tv")];
-    let contested = contested_roots([("sonarr", sonarr.as_slice())]);
+fn one_curator_listing_a_path_twice_does_not_contest_itself() {
+    // Distinct services, not repeats, make a contest: one curator naming a path twice
+    // is still one curator.
+    let tv_roots = [folder("/data/media/tv"), folder("/data/media/tv")];
+    let contested = contested_roots([("sonarr", tv_roots.as_slice())]);
     assert!(
         contested.is_empty(),
         "one *arr cannot contest a folder with itself",

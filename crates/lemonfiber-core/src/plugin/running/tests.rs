@@ -10,7 +10,7 @@ use lemonfiber_plugin::Recipe;
 
 use super::{run, Came, Outcome, Reaching, Running};
 
-/// The stack as these runs reach it: Komga is the plugin's own, Sonarr the stack's.
+/// The stack as these runs reach it: Komga is the plugin's own, the curator the stack's.
 fn reaching() -> Reaching {
     Reaching {
         ports: BTreeMap::from([("komga".to_owned(), 25600), ("sonarr".to_owned(), 8989)]),
@@ -34,7 +34,7 @@ fn recipe(steps: &str) -> Recipe {
     })
 }
 
-/// The credential lemonfiber holds for sonarr in these runs.
+/// The credential lemonfiber holds for `sonarr` in these runs.
 const HELD: &str = "5onarr-k3y-0123456789abcdef";
 
 /// The one pair outside the stack these runs approve.

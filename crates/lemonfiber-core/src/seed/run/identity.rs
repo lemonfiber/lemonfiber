@@ -194,8 +194,7 @@ fn unpaired(server: &MediaServer) -> crate::seed::Wiring {
 
 /// Change the administrator's password, and say how that went.
 async fn changed_after_setup(ctx: &Ctx, server: &MediaServer) -> crate::seed::Wiring {
-    let failed = match crate::app::credentials::replace_jellyfin_password(ctx, server, false).await
-    {
+    let failed = match crate::app::credentials::replace_admin_password(ctx, server, false).await {
         Ok(_) => return crate::seed::Wiring::settled(changed(server), crate::seed::State::Wired),
         Err(Replacing::Refused) => {
             format!("{} refused the password lemonfiber holds", server.name())

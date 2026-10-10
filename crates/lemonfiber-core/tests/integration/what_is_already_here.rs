@@ -173,7 +173,7 @@ async fn replacing(ctx: &Ctx, offer: Option<&str>) -> Result<Option<ReplaceRepor
     .await
 }
 
-/// Their sonarr, on a port of its own so the two stacks can be told apart.
+/// Their curator, on a port of its own so the two stacks can be told apart.
 fn both_stacks() -> (Reporting, Arc<Pulled>) {
     let engine = Reporting::holding(&["sonarr"], Lifecycle::Running, Health::Healthy)
         .belonging_to("media")

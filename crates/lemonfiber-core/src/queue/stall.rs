@@ -8,7 +8,7 @@
 //! of the message that would have helped.
 //!
 //! The redownload loop earns its own category for that reason. It looks like
-//! ordinary activity from every angle: the client is downloading, the \*arr is
+//! ordinary activity from every angle: the client is downloading, the curator is
 //! importing, both report success, and it happens again an hour later. Nothing
 //! that watches one service can see it.
 
@@ -30,10 +30,10 @@ pub enum Stall {
     /// resolve itself.
     RepeatedImportFailure,
     /// Downloaded successfully and never imported. The failure nobody owns: the
-    /// client considers it finished, the \*arr never picked it up, and from each
+    /// client considers it finished, the curator never picked it up, and from each
     /// service's own perspective there is nothing wrong.
     CompletedNotImported,
-    /// On disk, and no \*arr knows about it.
+    /// On disk, and no curator knows about it.
     Orphaned,
     /// No progress at all beyond the threshold.
     StalledDownload,
@@ -82,9 +82,9 @@ impl Stall {
                 "a permission, an unparsable name, or an archive nothing extracted"
             }
             Self::CompletedNotImported => {
-                "the file landed somewhere the *arr is not looking, or cannot read"
+                "the file landed somewhere the curator is not looking, or cannot read"
             }
-            Self::Orphaned => "added by hand, or the *arr lost track of it",
+            Self::Orphaned => "added by hand, or the curator lost track of it",
             Self::StalledDownload => "no seeders, or the article is past retention",
             Self::WaitingIndefinitely => "nothing matches, or an indexer stopped answering",
             Self::Slow => "a slow source, or something else using the connection",
@@ -131,19 +131,19 @@ impl Stall {
         let each = match self {
             Self::RedownloadLoop => [
                 "stop the item before it spends more of the allowance, then fix the import",
-                "check the *arr's history for the same item arriving repeatedly",
+                "check the curator's history for the same item arriving repeatedly",
             ],
             Self::RepeatedImportFailure => [
-                "read the *arr's import log for what it refused, and fix that",
+                "read the curator's import log for what it refused, and fix that",
                 "import it by hand once, to see the refusal directly",
             ],
             Self::CompletedNotImported => [
-                "check the download and library paths agree between the client and the *arr",
+                "check the download and library paths agree between the client and the curator",
                 "check the container can read where the file landed",
             ],
             Self::Orphaned => [
                 "remove it if nothing wants it, or add the series or film that does",
-                "check whether an *arr lost track of something it had grabbed",
+                "check whether a curator lost track of something it had grabbed",
             ],
             Self::StalledDownload => [
                 "remove it and grab a different release",

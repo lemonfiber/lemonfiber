@@ -36,19 +36,19 @@ pub(super) enum Landed {
 
 /// Wait for it to land, narrating what moves, for as long as that is reasonable.
 pub(super) async fn watch(walk: &mut Walk<'_>, chosen: &Chosen<'_>, item: &Added) -> Landed {
-    let arr = chosen.arr;
+    let curator = chosen.curator;
     // The operator's patience, which is one thing and already a knob: a run told to wait
     // less waits less here too, and a walkthrough is exactly the kind of run someone
     // scripting would want to bound.
     let deadline = walk.ctx.seams.clock.now() + walk.ctx.patience;
 
     loop {
-        let events = arr
+        let events = curator
             .service
             .item_history(chosen.kind(), item.id)
             .await
             .unwrap_or_default();
-        let queue = arr
+        let queue = curator
             .service
             .item_queue(chosen.kind(), item.id)
             .await
@@ -189,7 +189,7 @@ const fn past_patience(furthest: Step) -> Landed {
 
 /// What the services were saying, for a stop to quote.
 ///
-/// The explanation for a failed import is almost always in the \*arr's own output, and an
+/// The explanation for a failed import is almost always in the curator's own output, and an
 /// operator who has to go and find it has been handed a fault report rather than a
 /// diagnosis. Lines mentioning the item come first; where none does, the most recent are
 /// shown, because something is better than a silent failure.
@@ -214,7 +214,7 @@ pub(super) async fn what_was_said(
 
     let named: Vec<String> = services
         .iter()
-        .filter(|service| matches!(service.api.as_ref().map(|api| api.kind), Some(kind) if is_servarr(kind)))
+        .filter(|service| matches!(service.api.as_ref().map(|api| api.kind), Some(kind) if is_curator(kind)))
         .map(|service| service.id.clone())
         .collect();
     if named.is_empty() {
@@ -251,7 +251,7 @@ pub(super) async fn what_was_said(
 }
 
 /// Whether an API kind is one of the library managers whose output explains an import.
-const fn is_servarr(kind: lemonfiber_manifest::ApiKind) -> bool {
+const fn is_curator(kind: lemonfiber_manifest::ApiKind) -> bool {
     matches!(kind, lemonfiber_manifest::ApiKind::Servarr)
 }
 

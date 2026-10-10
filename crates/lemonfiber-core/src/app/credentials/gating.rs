@@ -1,15 +1,15 @@
-//! The request gate's own Jellyfin key, as the inventory lists it, prints it and
+//! The request gate's own media server key, as the inventory lists it, prints it and
 //! replaces it.
 //!
-//! It is held in one place, the Jellyfin route of the gate's routes file, which the gate
-//! reads on every call. So this line is read from that file, and a replacement is
+//! It is held in one place, the media server route of the gate's routes file, which the
+//! gate reads on every call. So this line is read from that file, and a replacement is
 //! written there.
 //!
-//! **A replacement keeps a working key at every moment.** A new key is minted, written
-//! into the routes and proven against Jellyfin, and only then is the old one revoked.
-//! Where any step fails the new key is revoked and the old routes put back. A revocation
-//! of the old key that Jellyfin refuses leaves it filed under the gate's name and held by
-//! nothing, which the next seed revokes.
+//! **A replacement keeps a working key at every moment.** A new key is minted, written into
+//! the routes and proven against the media server, and only then is the old one revoked.
+//! Where any step fails the new key is revoked and the old routes put back. A revocation of
+//! the old key that the media server refuses leaves it filed under the gate's name and held
+//! by nothing, which the next seed revokes.
 
 use std::path::{Path, PathBuf};
 
@@ -35,16 +35,17 @@ const CONSUMER: &str =
     "the request gate, which reads the media server's libraries and members for the request service";
 
 /// What is said where the key is not there.
-const ABSENT: &str = "Jellyfin request-gate key is not there yet, so the request gate cannot \
-                      read the media server for the request service. Run `lemonfiber seed`.";
+const ABSENT: &str = "The media server's request-gate key is not there yet, so the request \
+                      gate cannot read the media server for the request service. Run \
+                      `lemonfiber seed`.";
 
 /// What a rehearsal says a replacement would take.
-const ROTATING: &str = "a real run would mint a new key on Jellyfin, write it into the request \
-                        gate's routes, prove Jellyfin takes it, and only then revoke the old \
-                        one. Nothing was minted here, and nothing was written.";
+const ROTATING: &str = "a real run would mint a new key on the media server, write it into the \
+                        request gate's routes, prove the media server takes it, and only then \
+                        revoke the old one. Nothing was minted here, and nothing was written.";
 
 /// What a landed replacement says.
-const LANDED: &str = "Jellyfin took the new key, and the request gate's routes hold it";
+const LANDED: &str = "The media server took the new key, and the request gate's routes hold it";
 
 /// Why a new key was revoked before it was ever used.
 const UNWRITTEN: &str =
@@ -139,7 +140,7 @@ pub(super) async fn rotate(ctx: &Ctx, held: &Held, fillers: &crate::wiring::Fill
     )
 }
 
-/// `routes` with the route to Jellyfin presenting `key`, where they have one.
+/// `routes` with the route to the media server presenting `key`, where they have one.
 fn holding(routes: &Upstreams, key: &str) -> Option<Upstreams> {
     let mut upstreams = routes.upstreams.clone();
     let route = upstreams
@@ -149,7 +150,7 @@ fn holding(routes: &Upstreams, key: &str) -> Option<Upstreams> {
     Some(Upstreams::of(upstreams))
 }
 
-/// The key the route to Jellyfin presents, where `routes` have one.
+/// The key the route to the media server presents, where `routes` have one.
 fn key_in(routes: &Upstreams) -> Option<String> {
     routes
         .upstreams

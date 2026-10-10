@@ -129,7 +129,7 @@ fn merging_gathers_each_baselines_records_and_keeps_timestamps() {
         Some("movies"),
         "the other baseline's records are gathered in"
     );
-    // The unchanged sonarr value keeps its original timestamp, not the merged one.
+    // The unchanged `sonarr` value keeps its original timestamp, not the merged one.
     let json = serde_json::to_string(&main).unwrap_or_default();
     assert!(
         json.contains(r#""at":"1""#) && !json.contains(r#""at":"9""#),

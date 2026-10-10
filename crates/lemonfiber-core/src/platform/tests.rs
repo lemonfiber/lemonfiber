@@ -75,18 +75,18 @@ fn puid_pgid_is_asked_only_where_ownership_is_visible() {
 }
 
 #[test]
-fn native_jellyfin_is_offered_only_where_docker_cannot_transcode() {
+fn a_native_media_server_is_offered_only_where_docker_cannot_transcode() {
     // Offered on macOS and Windows, where the Docker VM cannot reach the
     // encoder; never on Linux, where the container can.
-    assert!(Environment::MacOs.offers_native_jellyfin());
-    assert!(Environment::Windows.offers_native_jellyfin());
+    assert!(Environment::MacOs.offers_native_media_server());
+    assert!(Environment::Windows.offers_native_media_server());
     for environment in [
         Environment::LinuxNative,
         Environment::LinuxDesktop,
         Environment::Unsupported,
     ] {
         assert!(
-            !environment.offers_native_jellyfin(),
+            !environment.offers_native_media_server(),
             "{environment:?} either transcodes in Docker or is unsupported"
         );
     }

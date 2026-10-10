@@ -42,7 +42,7 @@ pub(crate) fn ours(service: &str, image: &str, tag: &str, port: Option<u16>) -> 
     }
 }
 
-/// The two \*arrs most of these cases are about.
+/// The two curators most of these cases are about.
 pub(crate) fn running() -> Vec<Ours> {
     vec![
         ours("sonarr", "linuxserver/sonarr", "4.0.1", Some(8989)),
@@ -133,12 +133,12 @@ fn one_call_fills_every_part_of_the_answer() {
 fn a_second_copy_steps_over_the_ports_the_existing_stack_holds() {
     let seen = [container("media", "sonarr", &[8989, 8990])];
     let found = surveyed("lemonfiber", &seen, &[], &running(), &[]);
-    let sonarr = found
+    let curator = found
         .beside
         .iter()
         .find(|moved| moved.service == "sonarr")
         .map(|moved| moved.to);
-    assert_eq!(sonarr, Some(8991), "{:?}", found.beside);
+    assert_eq!(curator, Some(8991), "{:?}", found.beside);
 }
 
 /// Nothing but lemonfiber's own stack on the machine: no port is in the way, and no

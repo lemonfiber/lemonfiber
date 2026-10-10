@@ -1,12 +1,12 @@
-//! Telling the subtitle finder which \*arrs to watch.
+//! Telling the subtitle finder which curators to watch.
 //!
 //! The last of the connections that runs *into* a service rather than out of one:
-//! the finder does not discover the \*arrs, and until it is told it has nothing to
+//! the finder does not discover the curators, and until it is told it has nothing to
 //! look at. A household then gets subtitles for nothing, which is indistinguishable
 //! from releases that happen to have none — the failure this whole feature exists
 //! to prevent, in its quietest form.
 //!
-//! Each \*arr is told about on its own. The service takes a partial write, so one
+//! Each curator is told about on its own. The service takes a partial write, so one
 //! that is not running is skipped and completed on a later pass rather than holding
 //! up the other.
 
@@ -89,7 +89,7 @@ pub(super) async fn seed_subtitles(ctx: &Ctx, fillers: &Fillers) -> Vec<crate::s
         };
         for (curator, which, at) in &watching.curators {
             let connection = for_subtitles(&curator.name);
-            let api_key = match super::keys::servarr_key(ctx, curator).await {
+            let api_key = match super::keys::curator_key(ctx, curator).await {
                 Beneath::Read(key) => key,
                 Beneath::Absent => {
                     wirings.push(super::skipped(connection, &curator.name));
@@ -115,31 +115,31 @@ pub(super) async fn seed_subtitles(ctx: &Ctx, fillers: &Fillers) -> Vec<crate::s
     wirings
 }
 
-/// Point each finder watching the curator `arr` at it with the key it answers to now,
-/// whatever the finder holds: what replacing that curator's key owes it. The finder
+/// Point each finder watching the curator `curator_id` at it with the key it answers to
+/// now, whatever the finder holds: what replacing that curator's key owes it. The finder
 /// shows whether it holds a key and never which, so there is nothing to read first.
 ///
 /// Answers with each finder's name and how the write came out — none where no finder
-/// watches `arr`, and none from one where a key is not written yet, since there is
+/// watches `curator_id`, and none from one where a key is not written yet, since there is
 /// nothing to hold to it until there is.
 pub(crate) async fn rewatch(
     ctx: &Ctx,
     fillers: &Fillers,
-    arr: &str,
+    curator_id: &str,
 ) -> Vec<(String, crate::seed::State)> {
     let mut found = Vec::new();
     for watching in watching(fillers) {
         let Some((curator, which, at)) = watching
             .curators
             .iter()
-            .find(|(curator, _, _)| curator.id == arr)
+            .find(|(curator, _, _)| curator.id == curator_id)
         else {
             continue;
         };
         let Some(finder) = finder(ctx, watching.asker).await else {
             continue;
         };
-        let api_key = match super::keys::servarr_key(ctx, curator).await {
+        let api_key = match super::keys::curator_key(ctx, curator).await {
             Beneath::Read(key) => key,
             Beneath::Absent => continue,
             Beneath::Escaped => {
@@ -162,7 +162,7 @@ pub(crate) async fn rewatch(
     found
 }
 
-/// Point the finder at one \*arr, leaving it alone where it already is.
+/// Point the finder at one curator, leaving it alone where it already is.
 ///
 /// Read first, because the operator may have set this themselves or a previous run
 /// may have done it: writing regardless would be a second write that changes nothing
@@ -180,10 +180,10 @@ async fn watch(
         return crate::seed::State::AlreadyWired;
     }
     // Below the read, for the reason every other gate here is: a finder already
-    // watching this \*arr is left alone on a real run, so a rehearsal of that is the
+    // watching this curator is left alone on a real run, so a rehearsal of that is the
     // run. What is reported is the address a real one would point it at, and what it
     // holds now where it holds anything at all — including whether it holds a key for
-    // it, because a finder pointed at the right \*arr with no key is exactly the case
+    // it, because a finder pointed at the right curator with no key is exactly the case
     // this connection exists to fix, and the two addresses on their own would read as
     // a change to nothing.
     if rehearsing {

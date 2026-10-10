@@ -9,7 +9,7 @@ fn a_stack_that_downloads_and_can_search_gets_the_whole_walk() {
 #[test]
 fn a_stack_that_acquires_nothing_is_asked_a_different_question() {
     // A media server over media the household already owns has a first-content
-    // question — can Jellyfin see my files? — and it is not "shall I fetch one".
+    // question — can the media server see my files? — and it is not "shall I fetch one".
     assert_eq!(Why::of(false, false), Why::Offer(Shape::LibraryOnly));
     assert_eq!(
         Why::of(false, true),

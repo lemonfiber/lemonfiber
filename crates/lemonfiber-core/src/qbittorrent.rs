@@ -105,7 +105,7 @@ impl Qbittorrent {
         let request = self.post(
             "/auth/login",
             &[
-                ("username", crate::config::QBITTORRENT_USER),
+                ("username", crate::config::TORRENT_USER),
                 ("password", password),
             ],
         );
