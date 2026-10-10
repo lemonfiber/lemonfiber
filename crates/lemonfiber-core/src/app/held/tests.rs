@@ -6,7 +6,7 @@ use super::{account as whose, held, unread, Ctx, Whom};
 use crate::ports::service::{Access, Medium, Member};
 use crate::test_support::{a_context, a_password, SeedFs};
 
-/// A Servarr config carrying a readable key, so the stack resolves its targets.
+/// A curator config carrying a readable key, so the stack resolves its targets.
 const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
 
 /// The media server's scripted answers to the two questions this read asks it.
@@ -69,7 +69,7 @@ fn ctx_over(transport: Arc<Transport>, tag: &str) -> Ctx {
     context.settings.env_file = Some(dir.join(".env"));
     let _ = crate::app::targets::record_secret(
         &context,
-        crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         &a_password(),
     );
     context

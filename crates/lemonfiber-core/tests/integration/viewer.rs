@@ -138,8 +138,8 @@ fn a_filter_narrows_the_view_without_discarding_what_it_hides() {
     scrollback.take(line("sonarr", "grabbed an episode"));
     scrollback.take(line("radarr", "grabbed a film"));
 
-    let only_sonarr = Filter::default().from_services(&["sonarr".to_owned()]);
-    assert_eq!(showing(&scrollback, &only_sonarr), ["grabbed an episode"]);
+    let only_curator = Filter::default().from_services(&["sonarr".to_owned()]);
+    assert_eq!(showing(&scrollback, &only_curator), ["grabbed an episode"]);
 
     assert_eq!(
         showing(&scrollback, &Filter::default()),

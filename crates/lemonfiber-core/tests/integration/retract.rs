@@ -25,11 +25,12 @@ use lemonfiber_core::repair::OPERATION;
 use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::http::{Answer, Fake};
 
-/// A Servarr config carrying a readable key, so the target opens.
+/// A curator's config carrying a readable key, so the target opens.
 const CONFIG: &str = "<Config><ApiKey>a1b2c3d4e5</ApiKey></Config>";
 
-/// `SABnzbd`'s own configuration, carrying the key an \*arr is told to reach it with.
-const SABNZBD: &str = "[misc]\napi_key = sabkey123\n";
+/// The Usenet client's own configuration, carrying the key a curator is told to reach it
+/// with.
+const USENET_CONFIG: &str = "[misc]\napi_key = sabkey123\n";
 
 /// Where this test's records live, in a scratch directory of its own.
 fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
@@ -43,11 +44,12 @@ fn paths(root: &Path) -> Paths {
 /// A context over the real stack, answering services from the given transport.
 fn ctx(root: &Path, http: Arc<Fake>) -> Ctx {
     lemonfiber_testing::a_live_context()
-        // SABnzbd's key too: the wirings a diagnosis reads are the clients lemonfiber
-        // would write, and without a credential to write there is no client to compare.
+        // The Usenet client's key too: the wirings a diagnosis reads are the clients
+        // lemonfiber would write, and without a credential to write there is no client to
+        // compare.
         .filesystem(Files::ending(vec![
             ("config/sonarr/config.xml", CONFIG),
-            ("config/sabnzbd/sabnzbd.ini", SABNZBD),
+            ("config/sabnzbd/sabnzbd.ini", USENET_CONFIG),
         ]))
         .settings(Settings {
             env_file: Some(paths(root).env_file()),
@@ -58,7 +60,7 @@ fn ctx(root: &Path, http: Arc<Fake>) -> Ctx {
         .with_http(http)
 }
 
-/// A repair that changed one field inside Sonarr.
+/// A repair that changed one field inside the curator.
 fn configured() -> Change {
     Change {
         at: "2000".to_owned(),
@@ -162,7 +164,7 @@ async fn a_stack_with_a_baseline_has_its_wirings_read() {
     if let Some(dir) = paths.env_file().parent() {
         let _ = std::fs::create_dir_all(dir);
     }
-    // What lemonfiber last wrote into Sonarr, in the shape seeding saves.
+    // What lemonfiber last wrote into the curator, in the shape seeding saves.
     let _ = std::fs::write(
         paths.env_file().with_file_name("baseline.json"),
         r#"{"services":{"Sonarr":{"downloadclient:sabnzbd:8080":{"value":"tv-sonarr","at":"1000","origin":"written"}}}}"#,

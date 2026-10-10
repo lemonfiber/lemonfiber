@@ -7,12 +7,12 @@
 //! and how much disk* — needs a second, format-shaped answer here rather than a
 //! resolution one bent to fit.
 //!
-//! This is that answer as three formats, each stating in plain terms what it means
-//! and what it costs. Carrying it out is a separate concern: unlike the resolution
-//! presets there is no community profile to lean on (Recyclarr configures only
-//! Sonarr and Radarr), so the format maps to Lidarr's own quality profile, applied
-//! through its API. Nothing here reaches a service or a disk; it is the pure model
-//! that surface and the Lidarr writer are built on.
+//! This is that answer as three formats, each stating in plain terms what it means and what
+//! it costs. Carrying it out is a separate concern: unlike the resolution presets there is
+//! no community profile to lean on (the quality sync tool configures only the TV and movie
+//! curators), so the format maps to the music curator's own quality profile, applied
+//! through its API. Nothing here reaches a service or a disk; it is the pure model that
+//! surface and the music curator's writer are built on.
 
 pub use lemonfiber_ports::media::Format;
 

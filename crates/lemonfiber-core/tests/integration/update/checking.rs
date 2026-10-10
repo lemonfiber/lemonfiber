@@ -1,6 +1,6 @@
 //! What an update finds before it moves anything.
 
-use super::{asking, behind, ctx, reported, Coming, Kept, Machine, SONARR};
+use super::{asking, behind, ctx, reported, Coming, Kept, Machine, CURATOR_VERSIONS};
 use lemonfiber_core::app::{dispatch, Waiting};
 use lemonfiber_core::update::State;
 
@@ -8,7 +8,11 @@ use lemonfiber_core::update::State;
 async fn a_bare_run_names_both_versions_and_changes_nothing() {
     let machine = Machine::coming(Coming::Answering);
     let archive = Kept::writing(true);
-    let context = ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive);
+    let context = ctx(
+        &machine,
+        behind(&[("sonarr", CURATOR_VERSIONS.0)]),
+        &archive,
+    );
 
     let report = reported(dispatch(asking(false, Waiting::Never), &context).await);
 
@@ -29,7 +33,7 @@ async fn a_bare_run_names_both_versions_and_changes_nothing() {
             State::UpdatesAvailable,
             false,
             1,
-            Some((SONARR.0.to_owned(), SONARR.1.to_owned()))
+            Some((CURATOR_VERSIONS.0.to_owned(), CURATOR_VERSIONS.1.to_owned()))
         ))
     );
     assert_eq!(archive.written(), 0, "a bare run captured something");

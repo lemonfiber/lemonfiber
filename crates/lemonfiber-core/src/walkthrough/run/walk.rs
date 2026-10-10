@@ -5,7 +5,7 @@
 //! A walkthrough that narrated to the screen and reported something else would be two
 //! accounts of one event, and the operator would have no way to tell which was true.
 
-use crate::app::targets::OpenArr;
+use crate::app::targets::OpenCurator;
 use crate::app::Ctx;
 use crate::model::WalkthroughReport;
 use crate::walkthrough::{
@@ -117,7 +117,11 @@ impl<'a> Walk<'a> {
     ///
     /// Detected rather than acquired again, and the operator is offered something else —
     /// re-fetching what is already on disk would teach them the product does not look.
-    pub(super) fn already_here(&mut self, item: &str, arrs: &[OpenArr]) -> WalkthroughReport {
+    pub(super) fn already_here(
+        &mut self,
+        item: &str,
+        curators: &[OpenCurator],
+    ) -> WalkthroughReport {
         let mut report = self.ending(
             Shape::Pipeline,
             Some(item.to_owned()),
@@ -125,7 +129,8 @@ impl<'a> Walk<'a> {
             None,
         );
         report.already_here = true;
-        let kinds: Vec<crate::recyclarr::Kind> = arrs.iter().map(|arr| arr.kind).collect();
+        let kinds: Vec<crate::recyclarr::Kind> =
+            curators.iter().map(|curator| curator.kind).collect();
         report.suggestions = Suggestion::for_kinds(&kinds)
             .into_iter()
             .filter(|suggestion| !item.contains(suggestion.title))

@@ -40,7 +40,7 @@ pub enum Credential {
         /// The API key the indexer authenticates the query with.
         key: String,
     },
-    /// An existing service to adopt — a Servarr-shape API reached with its key,
+    /// An existing service to adopt — a curator-shape API reached with its key,
     /// asked to read back its own identity.
     Service {
         /// The service's base URL.

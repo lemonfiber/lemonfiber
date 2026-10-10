@@ -13,7 +13,7 @@ Usage: lemonfiber quality [OPTIONS] <COMMAND>
 Commands:
   show     Show the quality choice in force, and what each preset means and costs
   set      Choose a preset — for everything, or for one media type
-  reapply  Re-assert the recorded preset over a Recyclarr config you have hand-edited
+  reapply  Re-assert the recorded preset over a quality sync config you have hand-edited
   upgrade  Upgrade existing content to the chosen quality — re-download what is already here at the higher quality
   help     Print this message or the help of the given subcommand(s)
 
@@ -113,7 +113,7 @@ Options:
 ## `lemonfiber quality reapply`
 
 ```text
-Re-assert the recorded preset over a Recyclarr config you have hand-edited.
+Re-assert the recorded preset over a quality sync config you have hand-edited.
 
 An ordinary run keeps your edits; this is the explicit consent to let the preset win instead.
 

@@ -22,7 +22,7 @@ fn rehearsed(rotation: &Rotation) -> Option<(String, Vec<String>)> {
 
 #[test]
 fn the_torrent_password_reaches_its_own_service_and_leaves_the_rest_pending() {
-    let consumers = reached(config::QBITTORRENT_PASSWORD_KEY);
+    let consumers = reached(config::TORRENT_PASSWORD_KEY);
 
     assert_eq!(consumers.len(), 3, "{consumers:?}");
     assert_eq!(
@@ -62,8 +62,8 @@ fn every_credential_this_cannot_replace_says_where_a_replacement_would_come_from
         .map(|entry| entry.setting)
         .filter(|setting| {
             ![
-                config::QBITTORRENT_PASSWORD_KEY,
-                config::JELLYFIN_ADMIN_PASSWORD_KEY,
+                config::TORRENT_PASSWORD_KEY,
+                config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
             ]
             .contains(setting)
         })
@@ -83,7 +83,7 @@ fn every_credential_this_cannot_replace_says_where_a_replacement_would_come_from
 fn what_a_rehearsed_rotation_reports_is_a_place_and_a_list_of_steps() {
     let held = crate::credential::Held {
         name: "qBittorrent web UI password".to_owned(),
-        setting: config::QBITTORRENT_PASSWORD_KEY.to_owned(),
+        setting: config::TORRENT_PASSWORD_KEY.to_owned(),
         consumers: Vec::new(),
         location: "the environment file".to_owned(),
         origin: crate::credential::Origin::Lemonfiber,
@@ -175,7 +175,7 @@ async fn the_stacks_administrator_password_is_not_rotated_against_a_plugins_serv
         .unwrap_or_default();
     let held = crate::credential::Held {
         name: "Jellyfin administrator password".to_owned(),
-        setting: config::JELLYFIN_ADMIN_PASSWORD_KEY.to_owned(),
+        setting: config::MEDIA_SERVER_ADMIN_PASSWORD_KEY.to_owned(),
         consumers: Vec::new(),
         location: "the settings file".to_owned(),
         origin: crate::credential::Origin::Lemonfiber,
@@ -242,7 +242,7 @@ async fn a_contracted_servers_administrator_password_is_not_replaced() {
     let server = crate::app::targets::MediaServer::of(&fillers);
 
     let unheld = match server.as_ref() {
-        Some(server) => super::replace_jellyfin_password(&ctx, server, false)
+        Some(server) => super::replace_admin_password(&ctx, server, false)
             .await
             .err(),
         None => None,
@@ -251,7 +251,7 @@ async fn a_contracted_servers_administrator_password_is_not_replaced() {
         .as_ref()
         .map(|one| one.record_password(&ctx, &lemonfiber_fixtures::support::a_password()));
     let refused = match server.as_ref() {
-        Some(server) => super::replace_jellyfin_password(&ctx, server, false)
+        Some(server) => super::replace_admin_password(&ctx, server, false)
             .await
             .err(),
         None => None,

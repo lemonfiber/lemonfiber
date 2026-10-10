@@ -1,4 +1,4 @@
-//! The book \*arr's client, driven through the HTTP port against a fake transport.
+//! The book curator's client, driven through the HTTP port against a fake transport.
 //!
 //! The body it takes is camel-cased, and a field under any other spelling is dropped
 //! without complaint — the registration still answers `201`, having stored an entry
@@ -20,7 +20,7 @@ fn key() -> String {
     ["the", "-key"].concat()
 }
 
-fn bindery(fake: &Arc<Fake>) -> Bindery {
+fn book_curator(fake: &Arc<Fake>) -> Bindery {
     let http: Arc<dyn Http> = fake.clone();
     Bindery::new(http, "http://127.0.0.1:8787", "bindery", key())
 }
@@ -38,7 +38,7 @@ fn aggregator() -> Aggregator {
 #[tokio::test]
 async fn the_key_is_presented_where_the_service_looks_for_it() {
     let fake = Fake::always(Answer::reply(200, "[]"));
-    let _ = bindery(&fake).aggregators().await;
+    let _ = book_curator(&fake).aggregators().await;
 
     let carried = fake
         .request()
@@ -60,7 +60,7 @@ async fn the_key_is_presented_where_the_service_looks_for_it() {
 #[tokio::test]
 async fn the_aggregator_is_registered_under_the_names_the_service_reads() {
     let fake = Fake::always(Answer::reply(201, "{}"));
-    let told = bindery(&fake).add_aggregator(&aggregator()).await;
+    let told = book_curator(&fake).add_aggregator(&aggregator()).await;
     assert!(told.is_ok(), "{told:?}");
 
     let body = fake
@@ -93,7 +93,7 @@ async fn an_entry_without_a_key_is_not_read_as_one_that_holds_it() {
         {"id":2,"url":"http://other:9696","apiKey":"set"}
     ]"#;
     let fake = Fake::always(Answer::reply(200, HELD));
-    let held = bindery(&fake).aggregators().await.unwrap_or_default();
+    let held = book_curator(&fake).aggregators().await.unwrap_or_default();
 
     assert_eq!(held.len(), 2, "{held:?}");
     assert!(
@@ -113,13 +113,13 @@ async fn an_entry_without_a_key_is_not_read_as_one_that_holds_it() {
 async fn a_service_that_will_not_take_it_is_reported() {
     let refused = Fake::always(Answer::reply(401, ""));
     assert!(matches!(
-        bindery(&refused).add_aggregator(&aggregator()).await,
+        book_curator(&refused).add_aggregator(&aggregator()).await,
         Err(Failure::Unauthorised { .. })
     ));
 
     let silent = Fake::silent();
     assert!(matches!(
-        bindery(&silent).aggregators().await,
+        book_curator(&silent).aggregators().await,
         Err(Failure::Unavailable { .. })
     ));
 }
@@ -128,14 +128,14 @@ async fn a_service_that_will_not_take_it_is_reported() {
 #[tokio::test]
 async fn a_list_that_cannot_be_read_is_reported() {
     let fake = Fake::always(Answer::reply(200, "not json"));
-    assert!(bindery(&fake).aggregators().await.is_err());
+    assert!(book_curator(&fake).aggregators().await.is_err());
 }
 
 /// The registration is a post, to the collection the service keeps them in.
 #[tokio::test]
 async fn the_registration_goes_to_the_collection_the_service_keeps() {
     let fake = Fake::always(Answer::reply(201, "{}"));
-    let _ = bindery(&fake).add_aggregator(&aggregator()).await;
+    let _ = book_curator(&fake).add_aggregator(&aggregator()).await;
 
     assert!(
         fake.request()

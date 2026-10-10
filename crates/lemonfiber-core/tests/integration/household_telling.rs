@@ -17,7 +17,8 @@ use lemonfiber_core::ports::service::Requests;
 use lemonfiber_core::seerr::Seerr;
 use lemonfiber_fixtures::http::{Answer, Fake};
 
-/// Every occasion, as Seerr keeps the set: the bit field it answers and is written.
+/// Every occasion, as the request service keeps the set: the bit field it answers and is
+/// written.
 const OCCASIONS: u32 = 222;
 
 /// The real client over a scripted request service.
@@ -128,9 +129,10 @@ async fn a_service_nobody_configured_is_set_up_to_tell_the_household() {
             Answer::reply(200, ""),
         ],
     )]);
-    let seerr = Seerr::new(http.clone(), "http://seerr:5055", "seerr");
+    let request_service = Seerr::new(http.clone(), "http://seerr:5055", "seerr");
 
-    let (wiring, _) = lemonfiber_core::seed::wire_household_telling(&seerr, None, false).await;
+    let (wiring, _) =
+        lemonfiber_core::seed::wire_household_telling(&request_service, None, false).await;
 
     assert_eq!(
         wiring.state,

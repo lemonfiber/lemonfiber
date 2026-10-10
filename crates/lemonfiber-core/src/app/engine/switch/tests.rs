@@ -76,7 +76,7 @@ fn a_crash_looping_service_outside_the_new_shape_is_stopped() {
     assert_eq!(moved(&running, &[]).stopped, vec!["sabnzbd".to_owned()]);
 }
 
-/// The operating system owns a native Jellyfin, so a switch neither starts it
+/// The operating system owns a native media server, so a switch neither starts it
 /// nor claims to have.
 #[test]
 fn a_host_managed_service_is_neither_started_nor_stopped() {

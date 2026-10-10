@@ -91,7 +91,7 @@ fn a_landed_rotation_names_every_consumer_and_how_far_it_reached_each() {
             "qBittorrent web UI password",
             "qBittorrent signed in with it",
             vec![
-                Propagation::updated("qBittorrent's own web UI"),
+                Propagation::updated("the torrent client's own web UI"),
                 Propagation::pending("the forwarded-port push", "lemonfiber restart torrent"),
                 Propagation::failed("Sonarr's download client", "Sonarr did not answer"),
             ],
@@ -99,7 +99,10 @@ fn a_landed_rotation_names_every_consumer_and_how_far_it_reached_each() {
     );
 
     assert!(text.contains("was replaced"), "{text}");
-    assert!(text.contains("qBittorrent's own web UI — has it"), "{text}");
+    assert!(
+        text.contains("the torrent client's own web UI — has it"),
+        "{text}"
+    );
     assert!(
         text.contains("still to be given it: run `lemonfiber restart torrent`"),
         "{text}"
@@ -123,7 +126,7 @@ fn a_refused_rotation_says_so_and_lists_no_consumers() {
         Inventory::of(vec![held(State::Active, None)]).after(Rotation::stopped(
             "qBittorrent web UI password",
             Settled::Refused {
-                detail: "qBittorrent refused the password lemonfiber holds".to_owned(),
+                detail: "the torrent client refused the password lemonfiber holds".to_owned(),
             },
         )),
     );

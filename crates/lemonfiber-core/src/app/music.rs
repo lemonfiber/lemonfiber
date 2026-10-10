@@ -2,14 +2,14 @@
 //!
 //! Music has no resolution, so its quality is an [`audio::Format`](crate::audio)
 //! rather than a resolution preset — and no community profile configures it, so the
-//! choice is applied straight to the music service (Lidarr) through its API. Unlike a
+//! choice is applied straight to the music service through its API. Unlike a
 //! resolution preset, which is recorded and picked up when the stack is next written,
 //! this both records the choice and applies it now.
 //!
 //! The choice is recorded first, so it is remembered even when the service cannot be
 //! reached; a rehearsal records nothing and applies nothing.
 
-use super::targets::{project_directory, servarr_targets};
+use super::targets::{curator_targets, project_directory};
 use super::Ctx;
 use crate::audio::Format;
 use crate::error::Problem;
@@ -17,7 +17,7 @@ use crate::model::{Disposition, MusicReport, Triggered};
 use crate::ports::service::MusicQuality;
 
 /// The compose id of the music service the format is applied to.
-const LIDARR: &str = "lidarr";
+const MUSIC_SERVICE_ID: &str = "lidarr";
 
 /// Record the audio format for music and apply it to the music service, reporting what
 /// became of both.
@@ -63,11 +63,11 @@ async fn apply(ctx: &Ctx, format: Format) -> Triggered {
         .ok()
         .map(|manifest| {
             let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-            servarr_targets(&manifest.services, project.as_deref())
+            curator_targets(&manifest.services, project.as_deref())
         })
         .unwrap_or_default()
         .into_iter()
-        .find(|target| target.id == LIDARR);
+        .find(|target| target.id == MUSIC_SERVICE_ID);
     let Some(target) = target else {
         return Triggered::NotStarted;
     };

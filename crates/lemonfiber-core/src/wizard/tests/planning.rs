@@ -271,13 +271,13 @@ fn a_declined_container_user_writes_no_ids() {
 fn the_library_choice_maps_to_its_mode_or_to_nothing() {
     let mut docker = on_native_linux();
     docker
-        .answer(Answer::Library(Library::JellyfinDocker))
+        .answer(Answer::Library(Library::Docker))
         .unwrap_or(());
     assert_eq!(setting(&docker.plan(), "JELLYFIN_MODE"), Some("docker"));
 
     let mut native = on_macos();
     native
-        .answer(Answer::Library(Library::JellyfinNative))
+        .answer(Answer::Library(Library::Native))
         .unwrap_or(());
     assert_eq!(setting(&native.plan(), "JELLYFIN_MODE"), Some("native"));
 

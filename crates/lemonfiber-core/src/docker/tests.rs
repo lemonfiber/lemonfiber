@@ -368,7 +368,7 @@ const MEDIA: [&str; 8] = [
 ///
 /// Inline, because the stack this binary ships has no host-managed service
 /// and the rule still has to be proven. Transcoding on some hardware needs
-/// Jellyfin outside a container, and lemonfiber must not try to start it.
+/// the media server outside a container, and lemonfiber must not try to start it.
 const NATIVE: &str = r#"
 schema_version = 1
 stack_version = "1.0.0"
@@ -545,7 +545,7 @@ fn a_service_the_operating_system_owns_is_not_counted_against_the_form() {
     assert_eq!(
         condition(&services),
         Condition::Active,
-        "a form is not permanently partial because Jellyfin runs natively"
+        "a form is not permanently partial because the media server runs natively"
     );
 
     let host_only: Vec<super::Service> = services

@@ -136,7 +136,7 @@ fn every_device_says_what_to_use_on_it() {
 fn a_preset_this_machine_can_only_transcode_in_software_names_the_transcode() {
     let strained = warn_before_confirming(
         Preset::Maximum,
-        Playback::of(Environment::MacOs, Library::JellyfinDocker),
+        Playback::of(Environment::MacOs, Library::Docker),
     );
     assert!(strained.is_some(), "the fixture must warrant a caution");
 
@@ -171,13 +171,13 @@ fn a_preset_this_machine_can_only_transcode_in_software_names_the_transcode() {
 /// reaches this through a different arm of the decision.
 #[test]
 fn guidance_that_warrants_no_caution_does_not_gain_one() {
-    let software_only = Playback::of(Environment::MacOs, Library::JellyfinDocker);
+    let software_only = Playback::of(Environment::MacOs, Library::Docker);
     let mut asked = 0_usize;
     for (preset, playback) in [
         (Preset::Balanced, software_only),
         (
             Preset::Maximum,
-            Playback::of(Environment::LinuxNative, Library::JellyfinDocker),
+            Playback::of(Environment::LinuxNative, Library::Docker),
         ),
         (
             Preset::Maximum,

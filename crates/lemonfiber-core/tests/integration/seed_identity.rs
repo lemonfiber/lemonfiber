@@ -1,7 +1,7 @@
-//! Pointing Seerr at Jellyfin, with a credential minted for it.
+//! Pointing the request service at the media server, with a credential minted for it.
 //!
 //! Two services and a secret, and the one case that must never be overwritten: a
-//! Seerr the household already set up is left as they left it.
+//! A request service the household already set up is left as they left it.
 
 use common::service::*;
 use std::sync::Mutex;
@@ -13,9 +13,9 @@ use lemonfiber_core::ports::service::{
 };
 use lemonfiber_core::seed::{wire_media_server_admin, wire_request_identity, State};
 
-// ---- Jellyfin as Seerr's identity: two services and a minted credential. ----
+// ---- The media server as the request service's identity, with a minted credential. ----
 
-/// How Jellyfin's setup answers.
+/// How the media server's setup answers.
 enum Startup {
     /// The wizard has already run.
     Completed,
@@ -25,7 +25,7 @@ enum Startup {
     Down,
 }
 
-/// How Jellyfin answers the account creation. A refusal stands for every
+/// How the media server answers the account creation. A refusal stands for every
 /// non-success; the not-answering path is exercised through the startup read.
 enum Create {
     Ok,
@@ -58,7 +58,7 @@ impl MediaServer for FakeMedia {
     }
 }
 
-/// How Seerr answers a read of its initialised state.
+/// How the request service answers a read of its initialised state.
 enum Init {
     /// Not initialised.
     Fresh,
@@ -68,7 +68,7 @@ enum Init {
     Down,
 }
 
-/// How Seerr answers the sign-in. A refusal stands for every non-success; the
+/// How the request service answers the sign-in. A refusal stands for every non-success; the
 /// not-answering path is exercised through the initialised read.
 enum Configure {
     Ok,
@@ -257,17 +257,17 @@ impl Requests for FakeReq {
 /// recorded (present only where one was newly minted).
 async fn identity(
     media: FakeMedia,
-    seerr: FakeReq,
+    request_service: FakeReq,
     random: Option<Vec<u8>>,
     recorded: Option<&str>,
 ) -> (State, Option<String>) {
-    identity_keeping(media, seerr, random, recorded, true).await
+    identity_keeping(media, request_service, random, recorded, true).await
 }
 
 /// The same, against a record that takes what it is given or refuses everything.
 async fn identity_keeping(
     media: FakeMedia,
-    seerr: FakeReq,
+    request_service: FakeReq,
     random: Option<Vec<u8>>,
     recorded: Option<&str>,
     takes: bool,
@@ -286,7 +286,7 @@ async fn identity_keeping(
     let state = match wire_media_server_admin(&media, &random, recorded, false, &keep).await {
         Ok(password) => {
             wire_request_identity(
-                &seerr,
+                &request_service,
                 Protocol("jellyfin".to_owned()),
                 &password,
                 "http://jellyfin:8096",
@@ -303,7 +303,7 @@ async fn identity_keeping(
 /// The same two services, asked what the pass would do rather than asked to do it.
 async fn would_identity(
     media: FakeMedia,
-    seerr: FakeReq,
+    request_service: FakeReq,
     recorded: Option<&str>,
 ) -> (State, Option<String>) {
     // Randomness is available on purpose: what proves nothing was minted is that
@@ -319,7 +319,7 @@ async fn would_identity(
     let state = match wire_media_server_admin(&media, &random, recorded, true, &keep).await {
         Ok(password) => {
             wire_request_identity(
-                &seerr,
+                &request_service,
                 Protocol("jellyfin".to_owned()),
                 &password,
                 "http://jellyfin:8096",
@@ -378,7 +378,7 @@ async fn a_rehearsed_identity_leaves_an_initialised_request_service_as_it_is() {
 }
 
 #[tokio::test]
-async fn a_jellyfin_that_is_not_answering_skips_the_identity() {
+async fn a_media_server_that_is_not_answering_skips_the_identity() {
     let (state, minted) = identity(
         media(Startup::Down, Create::Ok),
         FakeReq::new(Init::Fresh, Init::Done, Configure::Ok),
@@ -455,7 +455,7 @@ async fn a_password_that_cannot_be_recorded_is_never_given_to_the_wizard() {
 }
 
 #[tokio::test]
-async fn a_jellyfin_set_up_outside_lemonfiber_is_skipped() {
+async fn a_media_server_set_up_outside_lemonfiber_is_skipped() {
     // The wizard has run but lemonfiber recorded no password, so the household set
     // it up: its credential is unknown, and the identity cannot be wired.
     let (state, minted) = identity(
@@ -470,9 +470,9 @@ async fn a_jellyfin_set_up_outside_lemonfiber_is_skipped() {
 }
 
 #[tokio::test]
-async fn a_recorded_password_wires_an_already_initialised_seerr() {
-    // Jellyfin was set up by lemonfiber before (password recorded) and Seerr is
-    // already initialised: nothing is minted and nothing re-pointed.
+async fn a_recorded_password_wires_an_already_initialised_request_service() {
+    // The media server was set up by lemonfiber before (password recorded) and the request
+    // service is already initialised: nothing is minted and nothing re-pointed.
     let (state, minted) = identity(
         media(Startup::Completed, Create::Ok),
         FakeReq::new(Init::Done, Init::Done, Configure::Ok),
@@ -485,9 +485,9 @@ async fn a_recorded_password_wires_an_already_initialised_seerr() {
 }
 
 #[tokio::test]
-async fn a_seerr_that_is_not_answering_still_records_the_minted_password() {
-    // Jellyfin's account was created this run, so its password must be recorded
-    // even though Seerr could not then be reached to finish the wiring.
+async fn a_request_service_that_is_not_answering_still_records_the_minted_password() {
+    // The media server's account was created this run, so its password must be recorded
+    // even though the request service could not then be reached to finish the wiring.
     let (state, minted) = identity(
         media(Startup::Fresh, Create::Ok),
         FakeReq::new(Init::Down, Init::Done, Configure::Ok),
@@ -516,8 +516,8 @@ async fn a_rejected_sign_in_fails() {
 
 #[tokio::test]
 async fn a_sign_in_that_does_not_take_is_a_failure() {
-    // Seerr accepted the sign-in but still reports itself uninitialised on the
-    // read-back, so the write did not land.
+    // The request service accepted the sign-in but still reports itself uninitialised on
+    // the read-back, so the write did not land.
     let (state, _) = identity(
         media(Startup::Fresh, Create::Ok),
         FakeReq::new(Init::Fresh, Init::Fresh, Configure::Ok),

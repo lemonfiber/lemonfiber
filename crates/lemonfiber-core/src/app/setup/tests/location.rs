@@ -6,11 +6,11 @@ use super::*;
 async fn an_answer_that_does_not_apply_here_stops_the_run() {
     let dir = scratch("rejected");
     let paths = layout(&dir);
-    // Native Jellyfin buys nothing on native Linux, so a prompt that offers it
+    // A native media server buys nothing on native Linux, so a prompt that offers it
     // anyway is rejected rather than applied.
     let mut wizard = Wizard::new(Environment::LinuxNative);
     let prompt = Scripted {
-        library: Library::JellyfinNative,
+        library: Library::Native,
         ..Scripted::workable(dir.join("data-root"))
     };
 

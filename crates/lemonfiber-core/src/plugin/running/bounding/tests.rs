@@ -6,8 +6,8 @@ use lemonfiber_plugin::Recipe;
 
 use super::Bounds;
 
-/// A recipe holding `key` to sonarr, with pairs carrying `key` to sonarr and `token`
-/// and `other` to sonarr, komga and a host outside.
+/// A recipe holding `key` to `sonarr`, with pairs carrying `key` to `sonarr` and `token`
+/// and `other` to `sonarr`, `komga` and a host outside.
 fn recipe() -> Recipe {
     let pairs: String = ["sonarr", "komga", "metadata.example.org"]
         .iter()
@@ -79,7 +79,8 @@ fn a_capture_is_traded_only_where_its_call_carried_a_credential() {
     ));
 }
 
-/// A recipe whose `lib` goes to sonarr by a released pair, and to radarr by a plain one.
+/// A recipe whose `lib` goes to `sonarr` by a released pair, and to `radarr` by a plain
+/// one.
 fn releasing() -> Recipe {
     toml::from_str(
         "id = \"r\"\ntitle = \"R\"\nwhy = \"Held\"\n[[input]]\nname = \"key\"\n\

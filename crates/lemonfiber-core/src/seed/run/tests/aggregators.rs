@@ -1,15 +1,15 @@
-//! Telling the book *arr where its metadata aggregator is.
+//! Telling the book curator where its metadata aggregator is.
 
 use super::*;
 
-/// The stack's indexer, answering the book \*arr's ask for one.
+/// The stack's indexer, answering the book curator's ask for one.
 fn indexer() -> lemonfiber_manifest::Service {
-    let mut indexer = prowlarr();
+    let mut indexer = aggregator_svc();
     indexer.provides = vec!["indexer.search".to_owned()];
     indexer
 }
 
-/// What the pass tells each book \*arr among `services`, beside `installed`, with the
+/// What the pass tells each book curator among `services`, beside `installed`, with the
 /// operator's choices `chosen`.
 async fn told_among(
     ctx: &Ctx,
@@ -32,17 +32,17 @@ async fn told_among(
     super::super::aggregators::seed_aggregators(ctx, &fillers).await
 }
 
-/// The same, among the stack's indexer and book \*arr alone.
+/// The same, among the stack's indexer and book curator alone.
 async fn told(ctx: &Ctx) -> Vec<Wiring> {
-    told_among(ctx, vec![indexer(), bindery_svc()], &[], "").await
+    told_among(ctx, vec![indexer(), book_curator_svc()], &[], "").await
 }
 
 /// The aggregator is registered, under the names the service reads.
 #[tokio::test]
-async fn the_book_arr_is_told_where_the_aggregator_is() {
+async fn the_book_curator_is_told_where_the_aggregator_is() {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let env = recorded_admin("bindery-told");
-    let _ = store::set(&env, crate::config::BINDERY_API_KEY, "minted-earlier");
+    let _ = store::set(&env, crate::config::BOOK_CURATOR_API_KEY, "minted-earlier");
     let http = Fake::by_path_in_turn(vec![(
         "/api/v1/prowlarr",
         vec![Answer::reply(200, "[]"), Answer::reply(201, "{}")],
@@ -75,7 +75,7 @@ async fn an_aggregator_already_known_is_not_registered_again() {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     const HELD: &str = r#"[{"id":1,"url":"http://prowlarr:9696","apiKey":"set"}]"#;
     let env = recorded_admin("bindery-known");
-    let _ = store::set(&env, crate::config::BINDERY_API_KEY, "minted-earlier");
+    let _ = store::set(&env, crate::config::BOOK_CURATOR_API_KEY, "minted-earlier");
     let http = Fake::by_path(vec![("/api/v1/prowlarr", Answer::reply(200, HELD))]);
     let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
         .with_http(http.clone())
@@ -106,7 +106,7 @@ async fn an_entry_the_service_kept_without_a_key_is_registered_again() {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     const KEYLESS: &str = r#"[{"id":1,"url":"http://prowlarr:9696","apiKey":""}]"#;
     let env = recorded_admin("bindery-keyless");
-    let _ = store::set(&env, crate::config::BINDERY_API_KEY, "minted-earlier");
+    let _ = store::set(&env, crate::config::BOOK_CURATOR_API_KEY, "minted-earlier");
     let http = Fake::by_path_in_turn(vec![(
         "/api/v1/prowlarr",
         vec![Answer::reply(200, KEYLESS), Answer::reply(201, "{}")],
@@ -126,16 +126,16 @@ async fn an_entry_the_service_kept_without_a_key_is_registered_again() {
 }
 
 /// Nothing to do where either end is absent, or the key to reach one is — the book
-/// \*arr's, not minted yet, or the aggregator's, not written yet.
+/// curator's, not minted yet, or the aggregator's, not written yet.
 ///
 /// The aggregator's absence is its own case rather than a repeat of the book
-/// \*arr's: the book \*arr is reached first, so a stack holding one and no
+/// curator's: the book curator is reached first, so a stack holding one and no
 /// aggregator gets as far as having a client and nothing to tell it about.
 #[tokio::test]
-async fn nothing_is_told_where_a_book_arr_a_key_or_an_aggregator_is_missing() {
+async fn nothing_is_told_where_a_book_curator_a_key_or_an_aggregator_is_missing() {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let env = recorded_admin("bindery-absent");
-    let _ = store::set(&env, crate::config::BINDERY_API_KEY, "minted-earlier");
+    let _ = store::set(&env, crate::config::BOOK_CURATOR_API_KEY, "minted-earlier");
     let http = Fake::by_path(vec![("/api/v1/prowlarr", Answer::reply(200, "[]"))]);
     let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
         .with_http(http)
@@ -143,7 +143,7 @@ async fn nothing_is_told_where_a_book_arr_a_key_or_an_aggregator_is_missing() {
 
     assert!(
         told_among(&ctx, vec![indexer()], &[], "").await.is_empty(),
-        "a stack with no book *arr wired something"
+        "a stack with no book curator wired something"
     );
 
     let bare = recorded_admin("bindery-unkeyed");
@@ -151,11 +151,11 @@ async fn nothing_is_told_where_a_book_arr_a_key_or_an_aggregator_is_missing() {
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)));
     assert!(
         told(&unkeyed).await.is_empty(),
-        "a book *arr with no key minted yet wired something"
+        "a book curator with no key minted yet wired something"
     );
 
     assert!(
-        told_among(&ctx, vec![bindery_svc()], &[], "")
+        told_among(&ctx, vec![book_curator_svc()], &[], "")
             .await
             .is_empty(),
         "a stack with no aggregator wired something"
@@ -171,20 +171,20 @@ async fn nothing_is_told_where_a_book_arr_a_key_or_an_aggregator_is_missing() {
     let _ = std::fs::remove_dir_all(bare.parent().unwrap_or(std::path::Path::new("/")));
 }
 
-/// Which service the book \*arr pulls from is the stack's answer rather than a name
+/// Which service the book curator pulls from is the stack's answer rather than a name
 /// written in this crate, so an ask the stack has not settled registers nobody, and
-/// one settled on a service this build tells the book \*arr nothing about is reported
+/// one settled on a service this build tells the book curator nothing about is reported
 /// as reached by nothing rather than registered on a guess.
 #[tokio::test]
 async fn an_indexer_ask_settled_on_nothing_it_can_tell_registers_nobody() {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let env = recorded_admin("bindery-unsettled");
-    let _ = store::set(&env, crate::config::BINDERY_API_KEY, "minted-earlier");
+    let _ = store::set(&env, crate::config::BOOK_CURATOR_API_KEY, "minted-earlier");
     let http = Fake::by_path(vec![("/api/v1/prowlarr", Answer::reply(200, "[]"))]);
     let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
         .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)));
-    // A searcher speaking an adapter nothing here tells the book *arr about.
+    // A searcher speaking an adapter nothing here tells the book curator about.
     let mut aggregator = manifest_service(
         "searcher",
         Some(lemonfiber_manifest::Api {
@@ -197,10 +197,10 @@ async fn an_indexer_ask_settled_on_nothing_it_can_tell_registers_nobody() {
     );
     aggregator.provides = vec!["indexer.search".to_owned()];
 
-    let unprovided = told_among(&ctx, vec![prowlarr(), bindery_svc()], &[], "").await;
+    let unprovided = told_among(&ctx, vec![aggregator_svc(), book_curator_svc()], &[], "").await;
     let unspoken = told_among(
         &ctx,
-        vec![indexer(), aggregator.clone(), bindery_svc()],
+        vec![indexer(), aggregator.clone(), book_curator_svc()],
         &[],
         "indexer.search=searcher",
     )
@@ -208,7 +208,7 @@ async fn an_indexer_ask_settled_on_nothing_it_can_tell_registers_nobody() {
     let reported = crate::test_support::stack()
         .manifest()
         .map(|mut manifest| {
-            manifest.services = vec![indexer(), aggregator, bindery_svc()];
+            manifest.services = vec![indexer(), aggregator, book_curator_svc()];
             super::super::connecting::unmatched(&crate::wiring::Fillers::of(
                 &manifest,
                 &[],
@@ -231,7 +231,7 @@ async fn an_indexer_ask_settled_on_nothing_it_can_tell_registers_nobody() {
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 }
 
-/// A plugin's aggregator chosen in the stack's place is the one the book \*arr is told
+/// A plugin's aggregator chosen in the stack's place is the one the book curator is told
 /// about: at its own id on the port it listens on, with the key it wrote for itself —
 /// and one whose key file leads away from beneath its own directory is refused, naming
 /// it, with nothing told.
@@ -239,13 +239,13 @@ async fn an_indexer_ask_settled_on_nothing_it_can_tell_registers_nobody() {
 async fn a_plugin_aggregator_is_told_on_its_own_terms() {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let env = recorded_admin("bindery-plugin");
-    let _ = store::set(&env, crate::config::BINDERY_API_KEY, "minted-earlier");
+    let _ = store::set(&env, crate::config::BOOK_CURATOR_API_KEY, "minted-earlier");
     let stand_in = crate::test_support::an_installed(
         "kept",
         vec![crate::test_support::a_placed(
             "kept",
             &["indexer.search"],
-            Some(servarr_api(Some("/config/config.xml"))),
+            Some(curator_api(Some("/config/config.xml"))),
             Some(8990),
         )],
     );
@@ -262,7 +262,7 @@ async fn a_plugin_aggregator_is_told_on_its_own_terms() {
             Answer::reply(200, "[]"),
         )]))
         .with_filesystem(Arc::new(leading_away_from_the_stand_in()));
-    let services = vec![indexer(), bindery_svc()];
+    let services = vec![indexer(), book_curator_svc()];
 
     let wirings = told_among(
         &ctx,
@@ -302,25 +302,25 @@ async fn a_plugin_aggregator_is_told_on_its_own_terms() {
 }
 
 /// **A plugin is never told the indexer's key.** A plugin's service standing where the
-/// book \*arr would ask, on a stack whose own book \*arr is gone, is told nothing, and
+/// book curator would ask, on a stack whose own book curator is gone, is told nothing, and
 /// nothing carrying a key is sent anywhere.
 #[tokio::test]
-async fn a_plugin_under_the_book_arrs_id_is_never_told_the_indexers_key() {
+async fn a_plugin_under_the_book_curators_id_is_never_told_the_indexers_key() {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let env = recorded_admin("bindery-impostor");
-    let _ = store::set(&env, crate::config::BINDERY_API_KEY, "minted-earlier");
+    let _ = store::set(&env, crate::config::BOOK_CURATOR_API_KEY, "minted-earlier");
     let http = Fake::by_path(vec![("/api/v1/prowlarr", Answer::reply(200, "[]"))]);
     let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
         .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)));
-    let fillers = asked_by_a_plugin(&bindery_svc(), vec![indexer()]);
+    let fillers = asked_by_a_plugin(&book_curator_svc(), vec![indexer()]);
 
     let wirings = super::super::aggregators::seed_aggregators(&ctx, &fillers).await;
 
     assert!(wirings.is_empty(), "{wirings:?}");
     assert!(
         http.requests().is_empty(),
-        "the plugin under the book *arr's id was asked something: {:?}",
+        "the plugin under the book curator's id was asked something: {:?}",
         http.requests()
     );
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
@@ -328,10 +328,10 @@ async fn a_plugin_under_the_book_arrs_id_is_never_told_the_indexers_key() {
 
 /// A service that will not answer is reported, in its own words.
 #[tokio::test]
-async fn a_book_arr_that_refuses_is_reported() {
+async fn a_book_curator_that_refuses_is_reported() {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let env = recorded_admin("bindery-refuses");
-    let _ = store::set(&env, crate::config::BINDERY_API_KEY, "minted-earlier");
+    let _ = store::set(&env, crate::config::BOOK_CURATOR_API_KEY, "minted-earlier");
     let http = Fake::by_path(vec![("/api/v1/prowlarr", Answer::reply(401, ""))]);
     let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
         .with_http(http)
@@ -354,10 +354,10 @@ async fn a_book_arr_that_refuses_is_reported() {
 /// accept refuses only the registration, and reporting that connection as made
 /// would leave it unmade with nothing anywhere to say so.
 #[tokio::test]
-async fn a_registration_the_book_arr_refuses_is_reported() {
+async fn a_registration_the_book_curator_refuses_is_reported() {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let env = recorded_admin("bindery-refused-write");
-    let _ = store::set(&env, crate::config::BINDERY_API_KEY, "minted-earlier");
+    let _ = store::set(&env, crate::config::BOOK_CURATOR_API_KEY, "minted-earlier");
     let http = Fake::by_path_in_turn(vec![(
         "/api/v1/prowlarr",
         vec![Answer::reply(200, "[]"), Answer::reply(401, "")],
@@ -376,12 +376,12 @@ async fn a_registration_the_book_arr_refuses_is_reported() {
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 }
 
-/// A rehearsal names the aggregator the book \*arr would be told to pull from, and
+/// A rehearsal names the aggregator the book curator would be told to pull from, and
 /// tells it nothing.
 ///
 /// The read and the already-there check are true of a real run too, so what a
 /// rehearsal leaves out is the registration and nothing above it — which is why the
-/// address is there to report: the book \*arr pulls from whatever it is pointed at,
+/// address is there to report: the book curator pulls from whatever it is pointed at,
 /// and an operator checking this is checking that it would be pointed at the
 /// aggregator on the stack's own network rather than at a host address no container
 /// can reach.
@@ -389,7 +389,7 @@ async fn a_registration_the_book_arr_refuses_is_reported() {
 async fn a_rehearsed_pass_names_the_aggregator_it_would_register_and_registers_none() {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let env = recorded_admin("bindery-rehearsed");
-    let _ = store::set(&env, crate::config::BINDERY_API_KEY, "minted-earlier");
+    let _ = store::set(&env, crate::config::BOOK_CURATOR_API_KEY, "minted-earlier");
     let http = Fake::by_path(vec![("/api/v1/prowlarr", Answer::reply(200, "[]"))]);
     let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
         .with_http(http.clone())

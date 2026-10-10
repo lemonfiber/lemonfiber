@@ -1,4 +1,5 @@
-//! The address Jellyfin trusts to name the client, held to the guarded front door's.
+//! The address the media server trusts to name the client, held to the guarded front
+//! door's.
 
 use super::*;
 
@@ -31,7 +32,7 @@ fn proxies_ctx(name: &str, administered: bool, http: Arc<Fake>) -> Ctx {
     if administered {
         let _ = store::set(
             &env,
-            crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+            crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
             &lemonfiber_fixtures::support::a_password(),
         );
     }
@@ -69,7 +70,7 @@ const THE_DOOR: &str = r#"{"KnownProxies":["10.80.96.18"]}"#;
 
 /// The one wiring this pass reports, and whether it asked for a restart.
 async fn seeded(ctx: &Ctx, http: &Fake, project: &std::path::Path) -> (Option<State>, bool) {
-    let stack = vec![jellyfin_svc()];
+    let stack = vec![media_server_svc()];
     let wiring =
         super::super::proxies::seed_proxies(ctx, Some(project), served(&stack).as_ref()).await;
     let restarted = http

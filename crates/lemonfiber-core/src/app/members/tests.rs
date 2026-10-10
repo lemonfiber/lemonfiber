@@ -24,7 +24,7 @@ fn ctx_with(tag: &str, admin_password: Option<&str>) -> (Ctx, Arc<Transport>) {
     if let Some(password) = admin_password {
         let _ = crate::app::targets::record_secret(
             &context,
-            crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+            crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
             password,
         );
     }

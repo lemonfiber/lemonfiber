@@ -1,6 +1,6 @@
 //! Why it stopped, where the record plainly shows it.
 //!
-//! Never over-claiming: an \*arr's own history can show a grab that failed or an import
+//! Never over-claiming: a curator's own history can show a grab that failed or an import
 //! that never came, and those are said. What it cannot see — whether an indexer found
 //! anything, whether the client took it — is left to the services that can.
 
@@ -11,7 +11,7 @@ use crate::trace::{Confidence, Presence, Stage};
 /// Why a wanted item that nothing has been grabbed for has stopped, where nobody asked
 /// for a search.
 ///
-/// Three causes look identical from an \*arr's own record — the indexers carry nothing,
+/// Three causes look identical from a curator's own record — the indexers carry nothing,
 /// the indexers carry only releases the quality in force rejects, and no search has been
 /// made at all — and only a live search tells them apart. So this names none of them and
 /// says which question is unanswered, beside the form of the trace that answers it.
@@ -75,7 +75,7 @@ pub(crate) fn trace_findings(unmanaged_but_present: bool, reads: Reads) -> Vec<S
 /// it stopped. The generic reason a resting stage carries, sharpened by what only the live
 /// reads can settle: a stuck queue names the download client; an import confirmed absent
 /// from the library names the missing scan; downloading and beyond are otherwise either in
-/// progress or beyond what the \*arr alone can judge.
+/// progress or beyond what the curator alone can judge.
 pub(crate) fn stall_reason(
     furthest: Stage,
     queue_stuck: bool,
@@ -99,7 +99,7 @@ pub(crate) fn stall_reason(
         Stage::NotMonitored => furthest.stall().map(str::to_owned),
         // Monitored and nothing since — but a claim about why is a claim about an empty
         // history, so only where the history was actually read, not where it could not be.
-        // What it stopped for is a question no \*arr can answer alone, so what is said is
+        // What it stopped for is a question no curator can answer alone, so what is said is
         // that it is unanswered and what would answer it.
         Stage::Monitored if reads.history => Some(NOT_SEARCHED.to_owned()),
         // Grabbed and not in the queue — a claim about an empty queue, so only where the
@@ -114,7 +114,7 @@ pub(crate) fn stall_reason(
 
 /// What a live search adds to a trace whose item is wanted and has been carried nowhere.
 ///
-/// The one reading no \*arr can reach on its own. Releases every profile rejects and no
+/// The one reading no curator can reach on its own. Releases every profile rejects and no
 /// releases at all leave the same silence in its history, and only a search against the
 /// indexers tells them apart — so where the search says the quality in force wants none
 /// of what is out there, the item did reach `Found`, and the stage, the stages it passed

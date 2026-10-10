@@ -135,7 +135,7 @@ impl Environment {
         matches!(self, Self::LinuxNative)
     }
 
-    /// Whether the setup wizard should offer to run Jellyfin natively rather than
+    /// Whether the setup wizard should offer to run the media server natively rather than
     /// in a container.
     ///
     /// Native mode exists to reach a hardware encoder the Docker VM cannot, so it
@@ -144,7 +144,7 @@ impl Environment {
     /// encoder directly, so native mode buys nothing and must not be offered;
     /// offering it there would trade away deployment uniformity for no gain.
     #[must_use]
-    pub const fn offers_native_jellyfin(self) -> bool {
+    pub const fn offers_native_media_server(self) -> bool {
         !self.can_transcode_in_docker() && !matches!(self, Self::Unsupported)
     }
 
@@ -160,7 +160,7 @@ impl Environment {
     /// Whether the engine resolves `host.docker.internal` without being told to.
     ///
     /// It is a Docker Desktop convenience. Without it, a service reaching a
-    /// host-run Jellyfin fails with nothing in any log explaining why.
+    /// host-run media server fails with nothing in any log explaining why.
     #[must_use]
     pub const fn resolves_host_gateway(self) -> bool {
         !matches!(self, Self::LinuxNative | Self::Unsupported)

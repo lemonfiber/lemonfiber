@@ -1,6 +1,6 @@
 //! What a key a service generated for itself looks like.
 //!
-//! The \*arrs, the Usenet client, the subtitle finder and the request service each write
+//! The curators, the Usenet client, the subtitle finder and the request service each write
 //! the key they made into a file in their own directory, and lemonfiber reads it from
 //! there, publishes it to the stack's other services and presents it in headers and
 //! queries. The file is the container's to write, so what is in it is only taken for a

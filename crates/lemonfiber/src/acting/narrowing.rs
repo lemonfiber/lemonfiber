@@ -2,7 +2,7 @@
 //!
 //! Four of this screen's questions are about one thing rather than about everything,
 //! and two of those four are about a thing that is already on a list. A form has a
-//! name the stack chose and a stuck item has a title an \*arr is holding; asking an
+//! name the stack chose and a stuck item has a title a curator is holding; asking an
 //! operator to type either exactly would be a spelling test with a listing sitting
 //! right there to be read off.
 //!
@@ -150,7 +150,7 @@ fn read(question: &'static Question, given: &[String], outcome: &Outcome) -> Sta
 /// Everything a listing offers: what taking each one names the second read, what it
 /// is called on the row, and what it is in the line beside that.
 ///
-/// The stack's own words for a form and the \*arr's own words for a stuck item. A
+/// The stack's own words for a form and the curator's own words for a stuck item. A
 /// listing paraphrased here would be describing something other than what is running.
 fn listed(outcome: &Outcome) -> Option<Vec<(String, String, String)>> {
     match outcome {

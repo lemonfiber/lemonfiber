@@ -1,6 +1,6 @@
 //! Wiring the stack's services to each other, idempotently.
 //!
-//! One connection lemonfiber mints (qBittorrent's web UI password); the rest it
+//! One connection lemonfiber mints (the torrent client's web UI password); the rest it
 //! reads and writes. The orchestration lives here so [`crate::app::dispatch`] stays a
 //! table of one-line calls rather than carrying the whole graph.
 
@@ -19,7 +19,8 @@ mod clients;
 mod curating;
 // What one service asking for what another fills comes to, by what each speaks.
 mod connecting;
-// Jellyfin's cross-origin allow-list, held to the front door's origin on every pass.
+// The media server's cross-origin allow-list, held to the front door's origin on every
+// pass.
 mod cors;
 mod proxies;
 // The decline service's own media-server key, minted for it alone.
@@ -27,7 +28,7 @@ mod decline;
 mod fulfilment;
 // The request gate's routes, and the key it holds for the media server.
 mod gate;
-// The Jellyfin keys minted for the services lemonfiber builds.
+// The media server keys minted for the services lemonfiber builds.
 mod claiming;
 mod guarding;
 mod keys;
@@ -428,7 +429,7 @@ async fn reading(
     (fillers, held)
 }
 
-/// The temporary password qBittorrent announced in its log, if it has.
+/// The temporary password the torrent client announced in its log, if it has.
 async fn read_temporary_password(ctx: &Ctx, service: &str) -> Option<String> {
     let mut lines = ctx
         .seams
@@ -455,7 +456,7 @@ async fn read_temporary_password(ctx: &Ctx, service: &str) -> Option<String> {
 ///
 /// Which curators' keys the request service holds is noted first, because the move to the
 /// gate is what hides it; once it reaches everything through the gate, those keys and
-/// the Jellyfin key it minted itself are taken back.
+/// the media server key it minted itself are taken back.
 async fn seed_requests(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
@@ -469,7 +470,7 @@ async fn seed_requests(
     wirings
 }
 
-/// How many lines back to read for qBittorrent's start-up announcement. Its
+/// How many lines back to read for the torrent client's start-up announcement. Its
 /// temporary password is printed once, early, so a generous tail finds it well
 /// after start without pulling the whole log.
 const TEMP_PASSWORD_LOG_LINES: u32 = 200;

@@ -154,7 +154,7 @@ impl Prompt for Terminal {
 
     fn prerequisites(&self, map: &PrerequisiteMap) {
         // Nothing required is stated first and plainly — a folder of existing media
-        // reaching a working Jellyfin with no accounts is an end state, not a lesser
+        // reaching a working media server with no accounts is an end state, not a lesser
         // one. Otherwise each thing is named, explained, costed in a band, and given
         // the criteria that decide it — no vendors, since those age and vary.
         if let Some(note) = map.library_only {
@@ -308,17 +308,17 @@ impl Prompt for Terminal {
     }
 
     fn library(&self) -> Library {
-        let native = self.environment.offers_native_jellyfin();
-        say!("\nServe your library with Jellyfin?");
+        let native = self.environment.offers_native_media_server();
+        say!("\nServe your library with a media server?");
         say!("  1) Yes, in a container — works everywhere");
         if native {
             say!("  2) Yes, on the host — reaches a hardware transcoder the container cannot");
         }
         say!("  3) No media server");
         match self.answers.ask("Choose [1]:").as_str() {
-            "2" if native => Library::JellyfinNative,
+            "2" if native => Library::Native,
             "3" => Library::None,
-            _ => Library::JellyfinDocker,
+            _ => Library::Docker,
         }
     }
 

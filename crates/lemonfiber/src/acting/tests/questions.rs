@@ -116,7 +116,7 @@ fn the_line_being_typed_ignores_a_move_and_is_left_on_a_way_out() {
 /// what comes back is offered as a list to take one of rather than as an answer.
 ///
 /// Carried rather than asked for the reason every other question is: reading what
-/// is stuck reaches the \*arrs over the network, and a screen that waited on it
+/// is stuck reaches the curators over the network, and a screen that waited on it
 /// would stop answering keys while it did.
 #[test]
 fn a_question_that_picks_asks_for_its_listing_and_then_offers_it() {

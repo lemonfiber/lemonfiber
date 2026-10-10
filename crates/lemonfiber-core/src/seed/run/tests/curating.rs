@@ -143,8 +143,8 @@ fn both_held() -> Held {
     ]))
 }
 
-/// The clients the shipped stack's Sonarr is told about, with `installed` and `chosen`,
-/// filing under `media` — one list per Sonarr, which the shipped stack has one of.
+/// The clients the shipped stack's TV curator is told about, with `installed` and `chosen`,
+/// filing under `media` — one list per TV curator, which the shipped stack has one of.
 fn told(
     installed: &[crate::plugin::Installed],
     chosen: &crate::wiring::Chosen,
@@ -277,7 +277,7 @@ fn a_filler_nothing_connects_is_not_told_about() {
 /// owns is not read, and each curator that asks for it is told why on that connection.
 #[tokio::test]
 async fn a_plugin_client_whose_key_file_leads_away_is_refused_on_its_connection() {
-    const SABNZBD: &str = "[misc]\napi_key = the-sab-key\n";
+    const USENET_CONFIG: &str = "[misc]\napi_key = the-sab-key\n";
     let stand_in = crate::test_support::a_placed(
         "nzbget",
         &["download.usenet"],
@@ -292,7 +292,7 @@ async fn a_plugin_client_whose_key_file_leads_away_is_refused_on_its_connection(
     let installed = [crate::test_support::an_installed("nzbget", vec![stand_in])];
     let chosen = crate::wiring::Chosen::read(Some("download.usenet=nzbget"));
     let ctx = seed_ctx(None, true, Vec::new(), None, None).with_filesystem(Arc::new(
-        SeedFs::keyed(None, Some(SABNZBD)).leading_away(vec!["config/nzbget/"]),
+        SeedFs::keyed(None, Some(USENET_CONFIG)).leading_away(vec!["config/nzbget/"]),
     ));
     let fillers = crate::test_support::stack()
         .manifest()
@@ -344,40 +344,36 @@ fn a_curator_with_no_category_is_told_about_no_client() {
 fn a_recorded_password_is_read_back_or_read_as_absent() {
     // Nowhere to read from.
     let ctx = seed_ctx(None, true, Vec::new(), None, None);
-    assert!(recorded_secret(&ctx, crate::config::QBITTORRENT_PASSWORD_KEY).is_none());
+    assert!(recorded_secret(&ctx, crate::config::TORRENT_PASSWORD_KEY).is_none());
 
     let path = config_scratch("qbt-readback");
     let ctx = seed_ctx(None, true, Vec::new(), None, Some(path.to_path_buf()));
     // A file that holds no password of ours.
     let _ = store::set(&path, "SOMETHING_ELSE", "x");
     assert!(
-        recorded_secret(&ctx, crate::config::QBITTORRENT_PASSWORD_KEY).is_none(),
+        recorded_secret(&ctx, crate::config::TORRENT_PASSWORD_KEY).is_none(),
         "no password recorded"
     );
     // An empty value is not a password.
-    let _ = store::set(&path, crate::config::QBITTORRENT_PASSWORD_KEY, "");
+    let _ = store::set(&path, crate::config::TORRENT_PASSWORD_KEY, "");
     assert!(
-        recorded_secret(&ctx, crate::config::QBITTORRENT_PASSWORD_KEY).is_none(),
+        recorded_secret(&ctx, crate::config::TORRENT_PASSWORD_KEY).is_none(),
         "an empty value is absent"
     );
     // The value recorded on an earlier run is handed back.
-    let _ = store::set(
-        &path,
-        crate::config::QBITTORRENT_PASSWORD_KEY,
-        "minted-earlier",
-    );
+    let _ = store::set(&path, crate::config::TORRENT_PASSWORD_KEY, "minted-earlier");
     assert_eq!(
-        recorded_secret(&ctx, crate::config::QBITTORRENT_PASSWORD_KEY).as_deref(),
+        recorded_secret(&ctx, crate::config::TORRENT_PASSWORD_KEY).as_deref(),
         Some("minted-earlier")
     );
 }
 
 #[tokio::test]
 async fn seed_leaves_each_curators_already_present_download_clients() {
-    // qBittorrent announces a temporary password, so it is set and its value
+    // The torrent client announces a temporary password, so it is set and its value
     // threaded to the download clients; each curator already holds both clients.
-    const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    const SABNZBD: &str = "[misc]\napi_key = the-sab-key\n";
+    const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+    const USENET_CONFIG: &str = "[misc]\napi_key = the-sab-key\n";
     let env = config_scratch("seed_leaves_each_curators_already_present_download_clients");
     let ctx = seed_ctx(
         Some(TEMP_LOG),
@@ -387,7 +383,10 @@ async fn seed_leaves_each_curators_already_present_download_clients() {
         Some(env.to_path_buf()),
     )
     .with_http(seeding())
-    .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), Some(SABNZBD))));
+    .with_filesystem(Arc::new(SeedFs::keyed(
+        Some(CURATOR_CONFIG),
+        Some(USENET_CONFIG),
+    )));
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     let clients = download_client_wirings(&report);
@@ -415,8 +414,8 @@ async fn adopt_runs_the_wiring_and_reports_each_present_client() {
     // no value to take on, an adopt pass reports it unmanaged just as a seed does,
     // never registering it a second time. The point guarded here is that the adopt
     // command dispatches and reports every present client.
-    const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    const SABNZBD: &str = "[misc]\napi_key = the-sab-key\n";
+    const CURATOR_CONFIG: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+    const USENET_CONFIG: &str = "[misc]\napi_key = the-sab-key\n";
     let env = config_scratch("adopt_runs_the_wiring_and_reports_each_present_client");
     let ctx = seed_ctx(
         Some(TEMP_LOG),
@@ -426,7 +425,10 @@ async fn adopt_runs_the_wiring_and_reports_each_present_client() {
         Some(env.to_path_buf()),
     )
     .with_http(seeding())
-    .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), Some(SABNZBD))));
+    .with_filesystem(Arc::new(SeedFs::keyed(
+        Some(CURATOR_CONFIG),
+        Some(USENET_CONFIG),
+    )));
 
     let report = seeded(dispatch(Command::Adopt, &ctx).await).unwrap_or_default();
     let clients = download_client_wirings(&report);
@@ -445,7 +447,7 @@ async fn adopt_runs_the_wiring_and_reports_each_present_client() {
 async fn seed_skips_download_clients_when_the_curator_key_is_not_readable() {
     // The clients' own credentials are in hand, but the curators have not written
     // their keys, so registration is skipped for a re-run rather than failed.
-    const SABNZBD: &str = "[misc]\napi_key = the-sab-key\n";
+    const USENET_CONFIG: &str = "[misc]\napi_key = the-sab-key\n";
     let env = config_scratch("seed_skips_download_clients_when_the_curator_key_is_not_readable");
     let ctx = seed_ctx(
         Some(TEMP_LOG),
@@ -455,7 +457,7 @@ async fn seed_skips_download_clients_when_the_curator_key_is_not_readable() {
         Some(env.to_path_buf()),
     )
     .with_http(seeding())
-    .with_filesystem(Arc::new(SeedFs::keyed(None, Some(SABNZBD))));
+    .with_filesystem(Arc::new(SeedFs::keyed(None, Some(USENET_CONFIG))));
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     let clients = download_client_wirings(&report);
@@ -472,7 +474,7 @@ fn contracted_curator(
     let mut installed = contracted("curating", "shows", "library.curate");
     for placed in &mut installed.services {
         placed.media_types = media.iter().map(|one| (*one).to_owned()).collect();
-        placed.api = Some(servarr_api(Some("/config/config.xml")));
+        placed.api = Some(curator_api(Some("/config/config.xml")));
     }
     let fillers = fillers_trusting(
         vec![curator("sonarr", 8989, "tv")],
@@ -550,7 +552,7 @@ fn a_plugin_under_a_stack_curators_id_is_told_about_none_of_its_clients() {
     let mut impostor = crate::test_support::a_placed(
         "sonarr",
         &["library.curate"],
-        Some(servarr_api(Some("/config/config.xml"))),
+        Some(curator_api(Some("/config/config.xml"))),
         Some(8989),
     );
     impostor.media_types = vec!["tv".to_owned()];

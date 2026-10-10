@@ -1,13 +1,13 @@
 //! Bringing each service back on its new image.
 
-use super::{asking, behind, came_to, ctx, reported, Coming, Kept, Machine, SONARR};
+use super::{asking, behind, came_to, ctx, reported, Coming, Kept, Machine, CURATOR_VERSIONS};
 use lemonfiber_core::app::{dispatch, Waiting};
 use lemonfiber_core::ports::process::{Failure as RunFailure, Output};
 use lemonfiber_core::update::{Ending, Reversal, State};
 use std::time::Duration;
 
-/// The same for Radarr, which the manifest declares after it.
-const RADARR: (&str, &str) = ("5.13.0", "5.14.0");
+/// The same for the second curator, which the manifest declares after it.
+const SECOND_CURATOR_VERSIONS: (&str, &str) = ("5.13.0", "5.14.0");
 
 #[tokio::test]
 async fn a_service_that_does_not_come_back_halts_the_run_and_says_what_did_not_move() {
@@ -15,7 +15,10 @@ async fn a_service_that_does_not_come_back_halts_the_run_and_says_what_did_not_m
     let archive = Kept::writing(true);
     let context = ctx(
         &machine,
-        behind(&[("sonarr", SONARR.0), ("radarr", RADARR.0)]),
+        behind(&[
+            ("sonarr", CURATOR_VERSIONS.0),
+            ("radarr", SECOND_CURATOR_VERSIONS.0),
+        ]),
         &archive,
     );
 
@@ -59,7 +62,11 @@ async fn a_service_that_does_not_come_back_halts_the_run_and_says_what_did_not_m
 async fn a_service_that_comes_back_unwell_is_told_apart_from_one_that_never_came_back() {
     let machine = Machine::coming(Coming::Unwell);
     let archive = Kept::writing(true);
-    let context = ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive);
+    let context = ctx(
+        &machine,
+        behind(&[("sonarr", CURATOR_VERSIONS.0)]),
+        &archive,
+    );
 
     let report = reported(dispatch(asking(true, Waiting::Never), &context).await);
 
@@ -86,8 +93,12 @@ async fn a_service_still_starting_is_asked_again_rather_than_written_off() {
     // wait has somewhere to go rather than expiring on the first look.
     let machine = Machine::coming(Coming::Slowly(2));
     let archive = Kept::writing(true);
-    let context = ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive)
-        .with_patience(Duration::from_secs(600));
+    let context = ctx(
+        &machine,
+        behind(&[("sonarr", CURATOR_VERSIONS.0)]),
+        &archive,
+    )
+    .with_patience(Duration::from_secs(600));
 
     let report = reported(dispatch(asking(true, Waiting::Never), &context).await);
 
@@ -103,7 +114,11 @@ async fn a_service_still_starting_is_asked_again_rather_than_written_off() {
 async fn an_engine_that_stops_answering_mid_run_is_reported_rather_than_waited_out() {
     let machine = Machine::coming(Coming::Silent);
     let archive = Kept::writing(true);
-    let context = ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive);
+    let context = ctx(
+        &machine,
+        behind(&[("sonarr", CURATOR_VERSIONS.0)]),
+        &archive,
+    );
 
     let report = reported(dispatch(asking(true, Waiting::Never), &context).await);
 
@@ -119,7 +134,11 @@ async fn a_start_that_could_not_be_run_leaves_the_service_where_it_was() {
         program: "docker".to_owned(),
     }));
     let archive = Kept::writing(true);
-    let context = ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive);
+    let context = ctx(
+        &machine,
+        behind(&[("sonarr", CURATOR_VERSIONS.0)]),
+        &archive,
+    );
 
     let report = reported(dispatch(asking(true, Waiting::Never), &context).await);
 
@@ -150,7 +169,11 @@ async fn a_compose_that_refuses_a_start_is_reported_in_composes_own_words() {
         stderr: "no such image".to_owned(),
     }));
     let archive = Kept::writing(true);
-    let context = ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive);
+    let context = ctx(
+        &machine,
+        behind(&[("sonarr", CURATOR_VERSIONS.0)]),
+        &archive,
+    );
 
     let report = reported(dispatch(asking(true, Waiting::Never), &context).await);
 
@@ -168,7 +191,11 @@ async fn a_refusal_that_went_to_the_other_stream_is_still_the_operators_only_acc
         stderr: String::new(),
     }));
     let archive = Kept::writing(true);
-    let context = ctx(&machine, behind(&[("sonarr", SONARR.0)]), &archive);
+    let context = ctx(
+        &machine,
+        behind(&[("sonarr", CURATOR_VERSIONS.0)]),
+        &archive,
+    );
 
     let report = reported(dispatch(asking(true, Waiting::Never), &context).await);
 

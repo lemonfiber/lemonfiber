@@ -8,7 +8,7 @@
 //! two together are the whole of an update check.
 //!
 //! The ordering is [`crate::migration::version`]'s, which is the same comparison
-//! adopting somebody else's stack makes and for the same reason: an \*arr's database
+//! adopting somebody else's stack makes and for the same reason: a curator's database
 //! is migrated forward by whichever binary opened it last, and an older binary
 //! cannot open it afterwards. A wrong answer about which of two versions is later
 //! is somebody's library, so a pair that cannot be ordered says so rather than

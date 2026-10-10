@@ -82,8 +82,8 @@ const NAMED: &[(&str, Reach, &str)] = &[
     (
         "github.com",
         Reach::Asked,
-        "the community quality guides Recyclarr syncs profiles from, asked for once per \
-         diagnosis so a sync that would bring nothing back is reported rather than assumed \
+        "the community quality guides the quality sync tool syncs profiles from, asked for once \
+         per diagnosis so a sync that would bring nothing back is reported rather than assumed \
          fine",
     ),
     (
@@ -102,8 +102,8 @@ const NAMED: &[(&str, Reach, &str)] = &[
     (
         "trash-guides.info",
         Reach::Printed,
-        "named in a comment as where the community profiles come from; Recyclarr syncs them \
-         on its own schedule and lemonfiber never reads that site",
+        "named in a comment as where the community profiles come from; the quality sync tool \
+         syncs them on its own schedule and lemonfiber never reads that site",
     ),
 ];
 
@@ -144,9 +144,10 @@ const MINTING: &[(&str, &str)] = &[
     ),
     (
         "crates/lemonfiber-core/src/secret.rs",
-        "the two passwords lemonfiber has to mint rather than read: qBittorrent's web UI and \
-         Jellyfin's administrator. Recorded in the settings file because the services \
-         authenticate with them, and sent to those services on this machine and nowhere else",
+        "the two passwords lemonfiber has to mint rather than read: the torrent client's web UI \
+         and the media server's administrator. Recorded in the settings file because the \
+         services authenticate with them, and sent to those services on this machine and \
+         nowhere else",
     ),
     (
         "crates/lemonfiber-core/src/admission.rs",

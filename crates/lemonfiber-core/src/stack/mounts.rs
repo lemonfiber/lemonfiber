@@ -1,6 +1,6 @@
 //! The single-mount rule: one mount beneath the data root, per service.
 //!
-//! Hardlinking is what makes an import cost nothing — the \*arr links the
+//! Hardlinking is what makes an import cost nothing — the curator links the
 //! downloaded file into the library instead of copying it, so the file exists in
 //! both places, once on disk, and the torrent goes on seeding from it. A link
 //! only works within one filesystem, and inside a container a bind mount *is* a

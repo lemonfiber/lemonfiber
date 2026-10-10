@@ -7,7 +7,8 @@ use crate::plugin::Verdict;
 
 const STACK: &str = lemonfiber_bundled::STACK;
 
-/// Both probes `media.serve` declares, bound under Jellyfin's own recordings.
+/// Both probes `media.serve` declares, bound under the bundled media server's own
+/// recordings.
 const CLAIM: &str = r#"
 capability = "media.serve"
 
@@ -24,7 +25,8 @@ expect = { status = 200, json_has_keys = ["Items"] }
 fixture = "recordings/jellyfin/catalogue.json"
 "#;
 
-/// The shipped stack, with Jellyfin alone providing and claiming `media.serve` as `claim` writes it.
+/// The shipped stack, with the bundled media server alone providing and claiming
+/// `media.serve` as `claim` writes it.
 fn claiming(claim: &str) -> Manifest {
     let mut manifest = Manifest::from_toml(STACK).unwrap_or_else(|why| unreachable!("{why}"));
     for service in &mut manifest.services {
@@ -41,7 +43,7 @@ fn claiming(claim: &str) -> Manifest {
     manifest
 }
 
-/// Where Jellyfin's image is pinned in the shipped stack.
+/// Where the media server's image is pinned in the shipped stack.
 fn pinned(manifest: &Manifest) -> String {
     manifest
         .services

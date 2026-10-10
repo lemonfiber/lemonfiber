@@ -6,13 +6,13 @@
 //! its key expired months ago and it says so by answering politely with an empty
 //! list.
 //!
-//! Each service knows about its own stall and none of them tell anyone. Sonarr
+//! Each service knows about its own stall and none of them tell anyone. A curator
 //! will show it if you open the queue and look. The operator's experience is that
 //! things stopped appearing, and their diagnosis is "it broke".
 //!
 //! The failure that matters most belongs to nobody: an item that **downloaded
 //! successfully and was never imported**. The client considers it finished. The
-//! \*arr never picked it up. From each service's own perspective there is nothing
+//! curator never picked it up. From each service's own perspective there is nothing
 //! wrong, and only something holding both sides at once can see it. That is why
 //! this assesses across services rather than within one.
 //!

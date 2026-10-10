@@ -25,7 +25,7 @@ mod settle;
 mod walk;
 mod watch;
 
-use crate::app::targets::open_servarrs;
+use crate::app::targets::open_curators;
 use crate::app::Ctx;
 use crate::error::{Diagnose, Problem};
 use crate::model::WalkthroughReport;
@@ -54,31 +54,33 @@ pub async fn walkthrough(
         .stack
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
-    let arrs = open_servarrs(ctx, &manifest.services).await;
+    let curators = open_curators(ctx, &manifest.services).await;
     let mut walk = Walk::new(ctx, narrator);
 
-    match offer::offered(ctx, &arrs).await {
+    match offer::offered(ctx, &curators).await {
         // Asked for by a stack that cannot search: not a walk that failed, but the one
         // thing missing before there could be one, said with what to do about it.
         Why::Not(reason) => Ok(walk.stopped(Shape::Pipeline, None, reason)),
         Why::Offer(Shape::LibraryOnly) => Ok(library::walk(&mut walk, &manifest, term).await),
-        Why::Offer(Shape::Pipeline) => pipeline(&mut walk, &arrs, &manifest, term).await,
+        Why::Offer(Shape::Pipeline) => pipeline(&mut walk, &curators, &manifest, term).await,
     }
 }
 
 /// The full walk: choose, ask for it, wait on it, and see it land.
 async fn pipeline(
     walk: &mut Walk<'_>,
-    arrs: &[crate::app::targets::OpenArr],
+    curators: &[crate::app::targets::OpenCurator],
     manifest: &lemonfiber_manifest::Manifest,
     term: Option<&str>,
 ) -> Result<WalkthroughReport, Box<Problem>> {
-    let chosen = match choose::choose(walk, arrs, term).await {
+    let chosen = match choose::choose(walk, curators, term).await {
         Ok(chosen) => chosen,
         Err(choose::NotChosen::Stopped(reason)) => {
             return Ok(walk.stopped(Shape::Pipeline, None, reason))
         }
-        Err(choose::NotChosen::AlreadyHere(title)) => return Ok(walk.already_here(&title, arrs)),
+        Err(choose::NotChosen::AlreadyHere(title)) => {
+            return Ok(walk.already_here(&title, curators))
+        }
     };
 
     let item = match acquire::acquire(walk, &chosen).await {
@@ -112,8 +114,8 @@ pub async fn worth_offering(ctx: &Ctx) -> Result<Why, Box<Problem>> {
         .stack
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
-    let arrs = open_servarrs(ctx, &manifest.services).await;
-    Ok(offer::offered(ctx, &arrs).await)
+    let curators = open_curators(ctx, &manifest.services).await;
+    Ok(offer::offered(ctx, &curators).await)
 }
 
 #[cfg(test)]

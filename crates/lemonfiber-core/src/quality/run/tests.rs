@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use include_dir::{include_dir, Dir};
 
 use super::{quality, straining, Ctx, QualityAction};
-use crate::config::{store, Settings, JELLYFIN_MODE_KEY};
+use crate::config::{store, Settings, MEDIA_SERVER_MODE_KEY};
 use crate::model::{Disposition, PresetChoice, QualityReport};
 use crate::platform::Environment;
 use crate::quality::Preset;
@@ -130,8 +130,8 @@ fn showing_with_no_music_chosen_reports_none() {
 #[test]
 fn a_transcoding_choice_is_held_on_a_software_only_host() {
     let env = scratch("held");
-    // A Docker Jellyfin on macOS cannot hardware-transcode.
-    let _ = store::set(&env, JELLYFIN_MODE_KEY, "docker");
+    // A media server in Docker on macOS cannot hardware-transcode.
+    let _ = store::set(&env, MEDIA_SERVER_MODE_KEY, "docker");
     let context = ctx(Some(env.to_path_buf()), Environment::MacOs);
 
     let report = run(&context, set(Preset::Maximum, None, false));
@@ -145,7 +145,7 @@ fn a_transcoding_choice_is_held_on_a_software_only_host() {
 #[test]
 fn a_confirmed_transcoding_choice_is_recorded() {
     let env = scratch("confirmed");
-    let _ = store::set(&env, JELLYFIN_MODE_KEY, "docker");
+    let _ = store::set(&env, MEDIA_SERVER_MODE_KEY, "docker");
     let context = ctx(Some(env.to_path_buf()), Environment::MacOs);
 
     let report = run(&context, set(Preset::Maximum, None, true));
@@ -161,7 +161,7 @@ fn a_confirmed_transcoding_choice_is_recorded() {
 #[test]
 fn a_recorded_choice_that_would_be_transcoded_is_still_strained_afterwards() {
     let env = scratch("straining");
-    let _ = store::set(&env, JELLYFIN_MODE_KEY, "docker");
+    let _ = store::set(&env, MEDIA_SERVER_MODE_KEY, "docker");
     let context = ctx(Some(env.to_path_buf()), Environment::MacOs);
     assert!(
         straining(&context).is_none(),
@@ -182,7 +182,7 @@ fn a_recorded_choice_that_would_be_transcoded_is_still_strained_afterwards() {
 #[test]
 fn a_host_that_transcodes_in_hardware_is_never_strained() {
     let env = scratch("unstrained");
-    let _ = store::set(&env, JELLYFIN_MODE_KEY, "docker");
+    let _ = store::set(&env, MEDIA_SERVER_MODE_KEY, "docker");
     let context = ctx(Some(env.to_path_buf()), Environment::LinuxNative);
 
     let recorded = run(&context, set(Preset::Maximum, None, false));
@@ -197,9 +197,9 @@ fn a_machine_with_no_choice_and_no_stack_is_strained_by_nothing() {
 }
 
 #[test]
-fn native_jellyfin_lets_a_transcoding_choice_through_unheld() {
+fn a_native_media_server_lets_a_transcoding_choice_through_unheld() {
     let env = scratch("native");
-    let _ = store::set(&env, JELLYFIN_MODE_KEY, "native");
+    let _ = store::set(&env, MEDIA_SERVER_MODE_KEY, "native");
     let context = ctx(Some(env.to_path_buf()), Environment::MacOs);
 
     let report = run(&context, set(Preset::Maximum, None, false));
@@ -344,11 +344,11 @@ fn reapply_overwrites_a_customised_config_through_the_command() {
 
     // Choose a preset and bring it onto disk, then hand-edit the config.
     let _ = quality(&context, set(Preset::Maximum, None, true));
-    let recyclarr = into.join("config/recyclarr/recyclarr.yml");
+    let quality_sync = into.join("config/recyclarr/recyclarr.yml");
     // The set records the choice but does not materialise; bring it on disk via a
     // reapply, then the operator edits it by hand.
     let _ = quality(&context, QualityAction::Reapply);
-    let _ = std::fs::write(&recyclarr, "# mine\n");
+    let _ = std::fs::write(&quality_sync, "# mine\n");
 
     // The command sees the customisation and, being the explicit consent,
     // overwrites it with the recorded preset.
@@ -362,7 +362,7 @@ fn reapply_overwrites_a_customised_config_through_the_command() {
         .map(|edit| edit.diff.clone())
         .unwrap_or_default();
     assert!(lost.contains("- # mine"), "{lost}");
-    assert!(std::fs::read_to_string(&recyclarr)
+    assert!(std::fs::read_to_string(&quality_sync)
         .unwrap_or_default()
         .contains("sonarr-web-2160p.yml"));
 }
@@ -385,7 +385,7 @@ fn a_reapply_over_a_config_nobody_edited_shows_no_diff() {
 
 #[test]
 fn a_reapply_with_nowhere_to_write_is_reported() {
-    // The embedded stack has a Recyclarr config to re-assert, but no directory it
+    // The embedded stack has a quality sync config to re-assert, but no directory it
     // is materialised into, so the reapply is refused rather than guessing.
     let refused = quality(
         &embedded_ctx(Some(scratch("reapply-nowhere").to_path_buf()), None),

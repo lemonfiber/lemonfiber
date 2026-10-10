@@ -231,7 +231,7 @@ impl Scripted {
         Self {
             protocols: Protocols::both(),
             service_user: Some((1000, 1000)),
-            library: Library::JellyfinDocker,
+            library: Library::Docker,
             household: true,
             notifications: Appetite::default_appetite(),
             autostart: false,

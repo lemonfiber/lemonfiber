@@ -2,7 +2,7 @@
 //!
 //! Deliberately not "a download" or "a queue record": the failure that matters
 //! most is invisible inside either. An item that finished downloading and was
-//! never imported is, to the client, a completed download; to the \*arr, nothing
+//! never imported is, to the client, a completed download; to the curator, nothing
 //! at all. Both are content. Only a view that holds the two together sees that
 //! something is wrong.
 //!
@@ -30,13 +30,13 @@ impl Fetching {
     }
 }
 
-/// What an \*arr says about it, where an \*arr has it.
+/// What a curator says about it, where a curator has it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Importing {
     /// How many times importing it has failed. Zero where it has not been tried
     /// or has not failed.
     pub failures: u32,
-    /// Whether the \*arr has finished with it — imported and done.
+    /// Whether the curator has finished with it — imported and done.
     pub imported: bool,
 }
 
@@ -47,7 +47,7 @@ pub struct Item {
     pub name: String,
     /// What the client says, or nothing where no client has it.
     pub fetching: Option<Fetching>,
-    /// What an \*arr says, or nothing where none is waiting for it.
+    /// What a curator says, or nothing where none is waiting for it.
     pub importing: Option<Importing>,
     /// How long it has been in this state.
     pub held_for: Duration,
@@ -82,7 +82,7 @@ impl Item {
 
     /// Whether it has finished downloading and nothing has taken it.
     ///
-    /// The failure nobody owns. An \*arr that has imported it is done — the client
+    /// The failure nobody owns. A curator that has imported it is done — the client
     /// keeping the file to seed is not a problem, it is the arrangement working.
     #[must_use]
     pub(crate) fn is_completed_not_imported(&self) -> bool {

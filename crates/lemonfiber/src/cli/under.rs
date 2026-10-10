@@ -188,7 +188,7 @@ pub enum QualityCommand {
         #[arg(long)]
         confirm: bool,
     },
-    /// Re-assert the recorded preset over a Recyclarr config you have hand-edited.
+    /// Re-assert the recorded preset over a quality sync config you have hand-edited.
     ///
     /// An ordinary run keeps your edits; this is the explicit consent to let the
     /// preset win instead.

@@ -73,11 +73,11 @@ fn a_port_another_of_our_own_services_wants_is_stepped_over() {
         &wanting(&[("sonarr", 8989), ("radarr", 8990)]),
         &BTreeSet::new(),
     );
-    let sonarr = moved
+    let curator = moved
         .iter()
         .find(|one| one.service == "sonarr")
         .map(|one| one.to);
-    assert_eq!(sonarr, Some(8991), "{moved:?}");
+    assert_eq!(curator, Some(8991), "{moved:?}");
 }
 
 #[test]

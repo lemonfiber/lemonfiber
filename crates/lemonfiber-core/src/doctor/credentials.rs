@@ -69,9 +69,9 @@ pub struct Target {
     pub base: String,
     /// The host path to the configuration file holding the generated key.
     pub config: PathBuf,
-    /// The major version of its API — the `/api/vN` segment. Sonarr and Radarr
-    /// are v3, Lidarr and Prowlarr v1, so it travels with the target rather than
-    /// being assumed.
+    /// The major version of its API — the `/api/vN` segment. The TV and movie curators are
+    /// v3, the music curator and the indexer aggregator v1, so it travels with the target
+    /// rather than being assumed.
     pub version: u32,
     /// The directory the key file has to stay beneath, where a plugin's container owns
     /// the directory it is in; nothing for the stack's own services.
@@ -86,7 +86,7 @@ impl Target {
     /// yet — the "still starting, try again later" case every caller skips the same
     /// way (a missing key is a service that has not written it, not a fault). The
     /// read-back and the build are one step, so the callers that open a
-    /// Servarr-shape service — the credentials check, the dashboard's queues, and
+    /// curator-shape service — the credentials check, the dashboard's queues, and
     /// seeding — cannot drift on how they do it.
     pub(crate) async fn open(&self, http: &Arc<dyn Http>, fs: &dyn FileSystem) -> Option<Servarr> {
         let key = self.key(fs).await?;
@@ -118,7 +118,7 @@ impl Target {
     }
 }
 
-/// Proves each Servarr-shape service still answers to the key it wrote.
+/// Proves each curator-shape service still answers to the key it wrote.
 pub struct CredentialsCheck {
     http: Arc<dyn Http>,
     filesystem: Arc<dyn FileSystem>,

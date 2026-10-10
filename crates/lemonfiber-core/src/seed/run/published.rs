@@ -2,7 +2,7 @@
 //!
 //! Two services in the stack are configured by what they read out of the environment
 //! rather than by an API call: the quality sync and the archive extractor each name the
-//! \*arrs they work with and expect a key for each. Neither can be told anything over
+//! curators they work with and expect a key for each. Neither can be told anything over
 //! HTTP — there is nothing to POST to — so the only way to wire them is to put the keys
 //! where they look.
 //!
@@ -25,7 +25,7 @@
 use lemonfiber_manifest::Service;
 
 use super::clients::Held;
-use super::keys::read_servarr_key;
+use super::keys::read_curator_key;
 use super::Ctx;
 use crate::ports::service::Credential;
 
@@ -146,11 +146,11 @@ fn under_its_service(
 
 /// The keys the services wrote to disk themselves.
 ///
-/// Every Servarr-shaped service, not only the ones that file media: Prowlarr manages
-/// none and so declares no media types, which is what keeps it out of the \*arr list
-/// used for root folders and download clients — but it has a key like the rest, and a
+/// Every curator-shaped service, not only the ones that file media: the indexer aggregator
+/// manages none and so declares no media types, which is what keeps it out of the curator
+/// list used for root folders and download clients — but it has a key like the rest, and a
 /// service added to the stack is given it with a line of Compose. The other two are not
-/// Servarr-shaped and each keeps its key in a file of its own shape.
+/// curator-shaped and each keeps its key in a file of its own shape.
 async fn written_down(
     ctx: &Ctx,
     services: &[Service],
@@ -161,21 +161,21 @@ async fn written_down(
         let Some(target) = project.and_then(|project| super::target_for(service, project)) else {
             continue;
         };
-        if let Some(key) = read_servarr_key(ctx, &target.config).await {
+        if let Some(key) = read_curator_key(ctx, &target.config).await {
             found.push((published_as(&target.id), key));
         }
     }
-    let bazarr = crate::app::targets::bazarr_key(ctx, services, project).await;
+    let subtitle_finder = crate::app::targets::subtitle_finder_key(ctx, services, project).await;
     found.extend(under_its_service(
         services,
         lemonfiber_manifest::ApiKind::Bazarr,
-        bazarr,
+        subtitle_finder,
     ));
-    let seerr = crate::app::targets::seerr_key(ctx, services, project).await;
+    let requests = crate::app::targets::stack_requests_key(ctx, services, project).await;
     found.extend(under_its_service(
         services,
         lemonfiber_manifest::ApiKind::Seerr,
-        seerr,
+        requests,
     ));
     found
 }

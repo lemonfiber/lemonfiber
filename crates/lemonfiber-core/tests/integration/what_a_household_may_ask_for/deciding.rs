@@ -1,7 +1,7 @@
 //! Ruling on a request, and what the household is told.
 
 use super::common::household::{answering, recorded_admin, refusing, watched, with};
-use super::{seerr, MEMBER};
+use super::{request_service, MEMBER};
 use lemonfiber_core::app::{dispatch, Answer as Ruling, Chosen, Command, Ctx, Decision, Outcome};
 use lemonfiber_core::asking::Policy;
 use lemonfiber_core::config::Settings;
@@ -26,7 +26,7 @@ async fn a_decision_is_the_path_and_the_body_is_empty() {
             Answer::reply(200, "{}"),
         )]);
 
-        let ruled = seerr(&fake).decide(7, approve).await;
+        let ruled = request_service(&fake).decide(7, approve).await;
 
         assert!(ruled.is_ok(), "{ruled:?}");
         let asked = fake.requests();
@@ -43,7 +43,7 @@ async fn a_decision_is_the_path_and_the_body_is_empty() {
 #[tokio::test]
 async fn a_service_that_refuses_is_a_refusal() {
     let fake = Fake::always(Answer::reply(500, "boom"));
-    let client = seerr(&fake);
+    let client = request_service(&fake);
 
     assert!(client.asking().await.is_err());
     assert!(client.left(MEMBER).await.is_err());
@@ -58,7 +58,7 @@ async fn a_service_that_refuses_is_a_refusal() {
 #[tokio::test]
 async fn an_unreadable_answer_is_not_a_household_with_no_limit() {
     let fake = Fake::always(Answer::reply(200, "not json"));
-    let client = seerr(&fake);
+    let client = request_service(&fake);
 
     assert!(client.asking().await.is_err());
     assert!(client.left(MEMBER).await.is_err());

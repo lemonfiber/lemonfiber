@@ -2,7 +2,7 @@
 //!
 //! The pure half of proving a credential: given a status and a body, is this a valid key,
 //! a rejected one, or a service that could not be asked? Three protocols answer three
-//! different ways — a Servarr status, an NNTP greeting, a Torznab search — and each is read
+//! different ways — a curator status, an NNTP greeting, a Torznab search — and each is read
 //! on its own terms rather than through a shared guess.
 //!
 //! Nothing here reaches a service, so every case runs in a test with no network.
@@ -213,7 +213,7 @@ pub(crate) fn code(line: &str) -> Option<u16> {
 
 /// What a service says about itself, from the identity it answered with.
 ///
-/// A Servarr status names the instance and its version; either alone is worth
+/// A curator status names the instance and its version; either alone is worth
 /// reporting, and where neither is there the fact that the key was accepted is
 /// still the observation.
 pub(crate) fn identity(body: &str) -> String {

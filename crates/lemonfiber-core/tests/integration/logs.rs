@@ -26,7 +26,7 @@ fn line(service: &str, at: Option<&str>, said: &str) -> LogLine {
 #[test]
 fn every_way_this_stacks_services_spell_a_level_reads_the_same() {
     for (line, expected) in [
-        // The \*arr services, NLog style.
+        // The curator services, NLog style.
         (
             "2026-08-21 19:04:11.2|Info|SonarrBootstrapper|Starting",
             Level::Info,
@@ -38,7 +38,7 @@ fn every_way_this_stacks_services_spell_a_level_reads_the_same() {
             Level::Error,
         ),
         ("INFO [routing] default route found", Level::Info),
-        // sabnzbd, double-colon delimited.
+        // The Usenet client's own, double-colon delimited.
         (
             "2026-08-21 19:04:11,123::INFO::[__init__:1234] Preparing",
             Level::Info,

@@ -14,23 +14,25 @@ use serde::{Deserialize, Serialize};
 pub enum Library {
     /// No media server; an existing player, or downloads only.
     None,
-    /// Jellyfin in a container — the portable default that works everywhere.
-    JellyfinDocker,
-    /// Jellyfin on the host, for a hardware encoder the container cannot reach.
+    /// The media server in a container — the portable default that works everywhere.
+    #[serde(rename = "jellyfin-docker")]
+    Docker,
+    /// The media server on the host, for a hardware encoder the container cannot reach.
     ///
     /// Only a valid answer where the platform offers it; the wizard rejects it
     /// elsewhere rather than letting a surface record a choice that buys nothing.
-    JellyfinNative,
+    #[serde(rename = "jellyfin-native")]
+    Native,
 }
 
 impl Library {
-    /// The `JELLYFIN_MODE` this choice records, where it runs Jellyfin at all.
+    /// The `JELLYFIN_MODE` this choice records, where it runs a media server at all.
     ///
     /// `None` means no media server, which writes no mode rather than a third one.
     pub(crate) const fn mode(self) -> Option<&'static str> {
         match self {
-            Self::JellyfinDocker => Some("docker"),
-            Self::JellyfinNative => Some("native"),
+            Self::Docker => Some("docker"),
+            Self::Native => Some("native"),
             Self::None => None,
         }
     }
@@ -40,7 +42,7 @@ impl Library {
     /// reader draws no conclusion from a setting it does not recognise.
     #[must_use]
     pub fn from_mode(mode: &str) -> Option<Self> {
-        [Self::JellyfinDocker, Self::JellyfinNative]
+        [Self::Docker, Self::Native]
             .into_iter()
             .find(|library| library.mode() == Some(mode))
     }
@@ -226,9 +228,9 @@ pub enum Answer {
 /// would silently do nothing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Rejected {
-    /// Native Jellyfin was chosen where the platform cannot reach a hardware
+    /// A native media server was chosen where the platform cannot reach a hardware
     /// encoder, so the choice would buy nothing.
-    NativeJellyfinUnavailable,
+    NativeMediaServerUnavailable,
     /// A container user was given where ownership is mapped away, so it would have
     /// no observable effect.
     ServiceUserNotApplicable,

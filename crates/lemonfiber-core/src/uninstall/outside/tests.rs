@@ -90,21 +90,21 @@ fn the_binary_and_the_engine_are_told_apart_by_where_they_are_looked_for() {
 
 #[test]
 fn a_media_server_and_a_tunnel_are_looked_for_where_each_platform_keeps_them() {
-    let jellyfin = EVERY
+    let media_server = EVERY
         .iter()
         .find(|beside| beside.what.contains("media server"));
     let tunnel = EVERY.iter().find(|beside| beside.what.contains("tunnel"));
 
     assert_eq!(
-        jellyfin.and_then(|beside| looked_for(beside, Environment::MacOs)),
+        media_server.and_then(|beside| looked_for(beside, Environment::MacOs)),
         Some("/Applications/Jellyfin.app")
     );
     assert_eq!(
-        jellyfin.and_then(|beside| looked_for(beside, Environment::LinuxDesktop)),
+        media_server.and_then(|beside| looked_for(beside, Environment::LinuxDesktop)),
         Some("/var/lib/jellyfin")
     );
     assert_eq!(
-        jellyfin.and_then(|beside| looked_for(beside, Environment::Unsupported)),
+        media_server.and_then(|beside| looked_for(beside, Environment::Unsupported)),
         None
     );
     assert_eq!(

@@ -58,7 +58,7 @@ fn recorded_admin(name: &str) -> std::path::PathBuf {
     let env = dir.join(".env");
     let _ = crate::config::store::set(
         &env,
-        crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         "minted-earlier",
     );
     env

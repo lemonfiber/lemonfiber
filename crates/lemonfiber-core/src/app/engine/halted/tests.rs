@@ -70,8 +70,8 @@ async fn a_start_lets_go_of_what_it_addresses() {
     let both = named(&["gluetun", "sonarr"]);
     after(&ctx, &Action::Stop(Vec::new()), &both).await;
 
-    let sonarr = named(&["sonarr"]);
-    before(&ctx, &Action::Start(sonarr.clone()), &sonarr);
+    let curator = named(&["sonarr"]);
+    before(&ctx, &Action::Start(curator.clone()), &curator);
 
     let halted = load(&ctx);
     assert!(!halted.holds(&exited("sonarr")), "started again, so let go");

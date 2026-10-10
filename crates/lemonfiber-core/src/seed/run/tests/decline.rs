@@ -1,4 +1,5 @@
-//! The decline service's own Jellyfin key: minted for it alone, and handed over in a file.
+//! The decline service's own media server key: minted for it alone, and handed over in a
+//! file.
 
 use super::*;
 
@@ -8,15 +9,15 @@ const APP: &str = crate::app_keys::DECLINE_APP;
 /// A stack with the media server, the request service and, where `declining`, the
 /// decline service.
 fn stack(declining: bool) -> Vec<lemonfiber_manifest::Service> {
-    let mut services = vec![jellyfin_svc(), seerr_svc()];
+    let mut services = vec![media_server_svc(), requests_svc()];
     if declining {
         services.push(manifest_service("decline", None, Some(5056)));
     }
     services
 }
 
-/// Jellyfin's key list, holding `keys` under the decline service's name and Seerr's
-/// own key beside them.
+/// The media server's key list, holding `keys` under the decline service's name and the
+/// request service's own key beside them.
 fn listed(keys: &[&str]) -> String {
     let mut items: Vec<serde_json::Value> = keys
         .iter()
@@ -75,7 +76,7 @@ fn decline_ctx(
     if administered {
         let _ = store::set(
             &env,
-            crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+            crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
             &lemonfiber_fixtures::support::a_password(),
         );
     }
@@ -143,7 +144,7 @@ async fn a_key_is_minted_and_handed_over_in_the_service_file() {
     assert!(http.asked_for(&format!("/Auth/Keys?App={APP}")));
 }
 
-/// A key the file holds and Jellyfin lists is left as it is.
+/// A key the file holds and the media server lists is left as it is.
 #[tokio::test]
 async fn a_key_both_sides_hold_is_left_alone() {
     let http = serving(&[&["kept"]], 204);
@@ -169,10 +170,10 @@ async fn a_key_nothing_holds_is_revoked() {
     assert_eq!(held(&at).as_deref(), Some("kept"));
 }
 
-/// A key the file holds that Jellyfin no longer lists is replaced, and what was filed
-/// before the replacement is revoked once the new key is written.
+/// A key the file holds that the media server no longer lists is replaced, and what was
+/// filed before the replacement is revoked once the new key is written.
 #[tokio::test]
-async fn a_key_jellyfin_dropped_is_replaced() {
+async fn a_key_the_media_server_dropped_is_replaced() {
     let http = serving(&[&["stray"], &["stray"], &["stray", "fresh"]], 204);
     let (ctx, at) = decline_ctx("decline-key-dropped", true, Some("gone"), http.clone());
 
@@ -281,9 +282,9 @@ async fn without_an_administrator_only_a_rehearsal_says_anything() {
     assert!(http.requests().is_empty());
 }
 
-/// A stack with no Jellyfin has no key to hold.
+/// A stack with no media server has no key to hold.
 #[tokio::test]
-async fn a_stack_without_jellyfin_holds_no_key() {
+async fn a_stack_without_a_media_server_holds_no_key() {
     let http = serving(&[&[]], 204);
     let (ctx, _) = decline_ctx("decline-key-no-jellyfin", true, None, http.clone());
     let services = vec![manifest_service("decline", None, Some(5056))];
@@ -323,7 +324,8 @@ async fn without_a_stack_directory_nothing_is_minted() {
         .any(|asked| asked.method == Method::Post && asked.url.contains("/Auth/Keys")));
 }
 
-/// Jellyfin refusing the key list, the mint or a revocation is reported, never called done.
+/// The media server refusing the key list, the mint or a revocation is reported, never
+/// called done.
 #[tokio::test]
 async fn a_refusal_is_reported() {
     let unlisted = Fake::by_route(vec![
@@ -420,8 +422,8 @@ async fn a_mint_the_list_does_not_show_hands_nothing_over() {
     }
 }
 
-/// A key handed over whose predecessor Jellyfin will not revoke is said, not called done;
-/// the new key stays where the service reads it.
+/// A key handed over whose predecessor the media server will not revoke is said, not called
+/// done; the new key stays where the service reads it.
 #[tokio::test]
 async fn a_replaced_key_the_server_will_not_revoke_is_said() {
     let http = serving_apart(&[&["stray"], &["stray"], &["stray", "fresh"]], 204, 500);

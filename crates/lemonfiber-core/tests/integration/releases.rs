@@ -4,7 +4,7 @@
 //! reading the result against the profile. Both sides are faked here: a filesystem that
 //! hands back the service's config, and a transport routed by URL so the wanted list and
 //! the search answer independently. The check is built on `#[async_trait]` clients built
-//! on another, so — as with the credentials check and the Servarr client — it is
+//! on another, so — as with the credentials check and the curator client — it is
 //! exercised from here rather than a `#[cfg(test)]` module, where async-trait code is
 //! compiled twice and its coverage counted from the wrong copy.
 
@@ -19,15 +19,15 @@ use lemonfiber_core::error::codes::qual::PRESET_UNMET;
 use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::http::{Answer, Fake};
 
-/// The Servarr config that opens a target, carrying a readable key.
+/// The curator config that opens a target, carrying a readable key.
 const CONFIG_WITH_KEY: &str = "<Config><ApiKey>a1b2c3d4e5</ApiKey></Config>";
 
-/// Where the Sonarr config is read from.
+/// Where the curator's config is read from.
 fn config_path() -> PathBuf {
     PathBuf::from("/stack/config/sonarr/config.xml")
 }
 
-fn sonarr() -> Target {
+fn curator() -> Target {
     Target {
         id: "sonarr".to_owned(),
         name: "Sonarr".to_owned(),
@@ -39,14 +39,14 @@ fn sonarr() -> Target {
     }
 }
 
-/// A filesystem that opens the Sonarr target.
+/// A filesystem that opens the curator target.
 fn opening_fs() -> Arc<Files> {
     Files::at(vec![(config_path(), CONFIG_WITH_KEY)])
 }
 
-/// Run a disruptive check over one Sonarr target and return its single verdict.
-async fn sonarr_verdict(fs: Arc<Files>, http: Arc<Fake>) -> Verdict {
-    let check = ReleasesCheck::new(http, fs, vec![sonarr()], true);
+/// Run a disruptive check over one curator target and return its single verdict.
+async fn curator_verdict(fs: Arc<Files>, http: Arc<Fake>) -> Verdict {
+    let check = ReleasesCheck::new(http, fs, vec![curator()], true);
     let mut findings = check.run().await;
     findings.pop().map_or(
         Verdict::Skipped {
@@ -61,7 +61,7 @@ async fn sonarr_verdict(fs: Arc<Files>, http: Arc<Fake>) -> Verdict {
 /// name, both of those features simply skip this check.
 #[tokio::test]
 async fn a_finding_about_a_service_names_it() {
-    let check = ReleasesCheck::new(Fake::silent(), opening_fs(), vec![sonarr()], true);
+    let check = ReleasesCheck::new(Fake::silent(), opening_fs(), vec![curator()], true);
 
     let named: Vec<Option<String>> = check
         .run()
@@ -100,7 +100,7 @@ async fn releases_meeting_the_preset_pass() {
         ("release", Answer::reply(200, r#"[{"rejections":[]}]"#)),
     ]);
     assert!(matches!(
-        sonarr_verdict(opening_fs(), http).await,
+        curator_verdict(opening_fs(), http).await,
         Verdict::Pass { .. }
     ));
 }
@@ -119,7 +119,7 @@ async fn releases_the_preset_rejects_warn_that_the_preset_is_unmet() {
             ),
         ),
     ]);
-    let verdict = sonarr_verdict(opening_fs(), http).await;
+    let verdict = curator_verdict(opening_fs(), http).await;
     assert_eq!(warned(&verdict), Some(PRESET_UNMET));
 }
 
@@ -129,7 +129,7 @@ async fn a_clean_search_that_finds_nothing_warns_that_none_are_available() {
         ("wanted/missing", Answer::reply(200, ONE_WANTED)),
         ("release", Answer::reply(200, "[]")),
     ]);
-    let verdict = sonarr_verdict(opening_fs(), http).await;
+    let verdict = curator_verdict(opening_fs(), http).await;
     assert_eq!(warned(&verdict), Some(NONE_AVAILABLE));
 }
 
@@ -139,7 +139,7 @@ async fn a_search_that_cannot_run_is_unverified_not_a_verdict_on_the_preset() {
     // case: nothing was learned about releases, so it is unverified, never a warning.
     let http = Fake::by_path(vec![("wanted/missing", Answer::reply(200, ONE_WANTED))]);
     assert!(matches!(
-        sonarr_verdict(opening_fs(), http).await,
+        curator_verdict(opening_fs(), http).await,
         Verdict::Unverified { .. }
     ));
 }
@@ -151,7 +151,7 @@ async fn nothing_wanted_is_skipped_rather_than_searched() {
         Answer::reply(200, r#"{"records":[]}"#),
     )]);
     assert!(matches!(
-        sonarr_verdict(opening_fs(), http).await,
+        curator_verdict(opening_fs(), http).await,
         Verdict::Skipped { .. }
     ));
 }
@@ -162,7 +162,7 @@ async fn a_service_that_has_not_started_is_skipped() {
     let http = Fake::by_path(vec![("wanted/missing", Answer::reply(200, ONE_WANTED))]);
     let fs = Files::at(Vec::new());
     assert!(matches!(
-        sonarr_verdict(fs, http).await,
+        curator_verdict(fs, http).await,
         Verdict::Skipped { .. }
     ));
 }
@@ -186,7 +186,7 @@ async fn no_resolution_service_is_skipped() {
 #[tokio::test]
 async fn an_ordinary_run_leaves_the_live_search_unverified_rather_than_skipped() {
     let http = Fake::by_path(Vec::new());
-    let check = ReleasesCheck::new(http, opening_fs(), vec![sonarr()], false);
+    let check = ReleasesCheck::new(http, opening_fs(), vec![curator()], false);
     let findings = check.run().await;
     assert_eq!(findings.len(), 1);
     let said = findings.first().map(|found| &found.verdict);
@@ -212,7 +212,7 @@ async fn an_ordinary_run_leaves_the_live_search_unverified_rather_than_skipped()
 #[tokio::test]
 async fn the_remedy_names_a_check_a_run_can_be_narrowed_to() {
     let http = Fake::by_path(Vec::new());
-    let check = ReleasesCheck::new(http, opening_fs(), vec![sonarr()], false);
+    let check = ReleasesCheck::new(http, opening_fs(), vec![curator()], false);
     let found = check.run().await.pop();
 
     let named = found
@@ -248,7 +248,7 @@ async fn the_remedy_names_a_check_a_run_can_be_narrowed_to() {
 #[tokio::test]
 async fn what_the_live_search_costs_is_stated_with_how_long_it_lasts() {
     let http = Fake::by_path(Vec::new());
-    let check = ReleasesCheck::new(http, opening_fs(), vec![sonarr()], false);
+    let check = ReleasesCheck::new(http, opening_fs(), vec![curator()], false);
     let said = check
         .run()
         .await
@@ -274,13 +274,13 @@ async fn what_the_live_search_costs_is_stated_with_how_long_it_lasts() {
 
 #[tokio::test]
 async fn a_film_service_is_searched_by_its_own_id() {
-    // Radarr searches by movieId rather than episodeId — the same probe, the other
-    // resolution service, so both media types' search parameters are exercised.
+    // The movie curator searches by movieId rather than episodeId — the same probe, the
+    // other resolution service, so both media types' search parameters are exercised.
     let http = Fake::by_path(vec![
         ("wanted/missing", Answer::reply(200, ONE_WANTED)),
         ("release", Answer::reply(200, r#"[{"rejections":[]}]"#)),
     ]);
-    let radarr = Target {
+    let movie_curator = Target {
         id: "radarr".to_owned(),
         name: "Radarr".to_owned(),
         base: "http://127.0.0.1:7878".to_owned(),
@@ -293,7 +293,7 @@ async fn a_film_service_is_searched_by_its_own_id() {
         PathBuf::from("/stack/config/radarr/config.xml"),
         CONFIG_WITH_KEY,
     )]);
-    let verdict = ReleasesCheck::new(http, fs, vec![radarr], true)
+    let verdict = ReleasesCheck::new(http, fs, vec![movie_curator], true)
         .run()
         .await
         .pop()

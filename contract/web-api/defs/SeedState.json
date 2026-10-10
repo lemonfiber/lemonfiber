@@ -218,7 +218,7 @@
       ]
     },
     {
-      "description": "Refused by lemonfiber's own policy, carrying the reason a re-run will not\nresolve — such as two \\*arrs pointed at one root folder, or a service that\ndoes not serve the API version this build speaks. Either way nothing it\nnames was written, whether it was refused before the write or the write\nitself found nothing to land in.",
+      "description": "Refused by lemonfiber's own policy, carrying the reason a re-run will not\nresolve — such as two curators pointed at one root folder, or a service that\ndoes not serve the API version this build speaks. Either way nothing it\nnames was written, whether it was refused before the write or the write\nitself found nothing to land in.",
       "type": "object",
       "properties": {
         "reason": {

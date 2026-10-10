@@ -189,7 +189,7 @@ pub const PLAYBACK_WILL_STRUGGLE: &str =
 pub const A_LIGHTER_PRESET: &str =
     "A lighter preset leaves most devices nothing to transcode: `lemonfiber quality set \
      balanced` decides what arrives next and changes nothing already on disk. Running \
-     Jellyfin natively, where it can reach the encoder, is the other answer.";
+     the media server natively, where it can reach the encoder, is the other answer.";
 
 /// Why playback here is likely to struggle, whatever app the household installs.
 ///
@@ -293,13 +293,13 @@ pub const TROUBLE: &[Trouble] = &[
                 because: "Nothing has been scanned yet.",
                 tell: "Nobody sees anything, including you.",
                 fix: "A new library, or one whose files moved, has nothing until it is \
-                      scanned. Jellyfin scans on a schedule and can be told to now.",
+                      scanned. The media server scans on a schedule and can be told to now.",
             },
             Cause {
                 because: "The account has been given access to no library.",
                 tell: "Somebody else sees content and this person does not.",
                 fix: "The account exists and can sign in — what it lacks is permission. Give \
-                      it the libraries it should see in Jellyfin's user settings.",
+                      it the libraries it should see in the media server's user settings.",
             },
         ],
     },

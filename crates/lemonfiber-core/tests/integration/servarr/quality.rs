@@ -1,6 +1,6 @@
 //! The music quality choice written to a service's profiles.
 
-use super::{lidarr, sonarr, PROFILES};
+use super::{curator, music_curator, PROFILES};
 use lemonfiber_core::audio::Format;
 use lemonfiber_core::ports::http::{Method, Request};
 use lemonfiber_core::ports::service::RootFolder;
@@ -22,7 +22,9 @@ async fn a_lossless_choice_updates_each_addressable_profile() {
             Answer::reply(200, String::new()),
         ),
     ]);
-    let applied = lidarr(&router).apply_music_format(Format::Lossless).await;
+    let applied = music_curator(&router)
+        .apply_music_format(Format::Lossless)
+        .await;
     assert!(applied.is_ok());
 
     // Only the profile that carries an id is addressed — the stray and the id-less one
@@ -60,7 +62,9 @@ async fn a_compact_choice_updates_the_profile_without_touching_a_custom_format()
             Answer::reply(200, String::new()),
         ),
     ]);
-    let applied = lidarr(&router).apply_music_format(Format::Compact).await;
+    let applied = music_curator(&router)
+        .apply_music_format(Format::Compact)
+        .await;
     assert!(applied.is_ok());
     // Compact addresses the profile but, like every non-hi-res choice, leaves custom
     // formats alone.
@@ -98,7 +102,9 @@ async fn a_hi_res_choice_creates_the_24_bit_format_and_prefers_it() {
             Answer::reply(200, String::new()),
         ),
     ]);
-    let applied = lidarr(&router).apply_music_format(Format::HiRes).await;
+    let applied = music_curator(&router)
+        .apply_music_format(Format::HiRes)
+        .await;
     assert!(applied.is_ok());
 
     // The 24-bit format is created, as a release-title match.
@@ -142,7 +148,9 @@ async fn an_existing_24_bit_format_is_not_created_again() {
             Answer::reply(200, String::new()),
         ),
     ]);
-    let applied = lidarr(&router).apply_music_format(Format::HiRes).await;
+    let applied = music_curator(&router)
+        .apply_music_format(Format::HiRes)
+        .await;
     assert!(applied.is_ok());
     assert!(
         !router
@@ -160,7 +168,7 @@ async fn an_unreadable_profile_list_is_a_failure() {
         "/qualityprofile",
         Answer::reply(200, "not json".to_owned()),
     )]);
-    assert!(lidarr(&router)
+    assert!(music_curator(&router)
         .apply_music_format(Format::Lossless)
         .await
         .is_err());
@@ -180,7 +188,7 @@ async fn a_refused_profile_update_is_a_failure() {
             Answer::reply(500, "boom".to_owned()),
         ),
     ]);
-    assert!(lidarr(&router)
+    assert!(music_curator(&router)
         .apply_music_format(Format::Lossless)
         .await
         .is_err());
@@ -193,7 +201,7 @@ async fn an_unreadable_custom_format_list_is_a_failure() {
         "/customformat",
         Answer::reply(200, "not json".to_owned()),
     )]);
-    assert!(lidarr(&router)
+    assert!(music_curator(&router)
         .apply_music_format(Format::HiRes)
         .await
         .is_err());
@@ -213,13 +221,13 @@ async fn a_refused_custom_format_creation_is_a_failure() {
             Answer::reply(500, "nope".to_owned()),
         ),
     ]);
-    assert!(lidarr(&router)
+    assert!(music_curator(&router)
         .apply_music_format(Format::HiRes)
         .await
         .is_err());
 }
 
-/// The \*arr that files by artist is given a root folder it will accept.
+/// The curator that files by artist is given a root folder it will accept.
 ///
 /// It refuses one described by path alone: it wants a name and the two profiles
 /// anything found beneath the folder is fetched at. The ids are read from the service
@@ -241,7 +249,10 @@ async fn a_music_root_folder_carries_the_name_and_profiles_that_service_requires
         path: "/data/media/music".to_owned(),
         media_type: "music".to_owned(),
     };
-    assert!(lidarr(&fake).register_root_folder(&folder).await.is_ok());
+    assert!(music_curator(&fake)
+        .register_root_folder(&folder)
+        .await
+        .is_ok());
 
     let body = fake
         .requests()
@@ -275,7 +286,7 @@ async fn a_root_folder_for_a_service_without_metadata_profiles_carries_only_its_
         path: "/data/media/tv".to_owned(),
         media_type: "tv".to_owned(),
     };
-    assert!(sonarr(&fake).register_root_folder(&folder).await.is_ok());
+    assert!(curator(&fake).register_root_folder(&folder).await.is_ok());
 
     let body = fake
         .requests()

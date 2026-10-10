@@ -98,7 +98,7 @@ fn answering_autostart(data_root: &Path, on_boot: bool) -> Wizard {
         .answer(Answer::ServiceUser(Some((1000, 1000))))
         .unwrap_or(());
     wizard
-        .answer(Answer::Library(Library::JellyfinDocker))
+        .answer(Answer::Library(Library::Docker))
         .unwrap_or(());
     wizard.answer(Answer::Household(true)).unwrap_or(());
     wizard

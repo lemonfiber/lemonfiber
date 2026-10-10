@@ -22,7 +22,7 @@ use lemonfiber_fixtures::http::Fake;
 
 use crate::common;
 
-fn seerr(fake: &Arc<Fake>) -> Seerr {
+fn request_service(fake: &Arc<Fake>) -> Seerr {
     let http: Arc<dyn Http> = fake.clone();
     Seerr::new(http, "http://127.0.0.1:5055", "seerr")
 }

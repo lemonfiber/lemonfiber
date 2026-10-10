@@ -6,10 +6,10 @@
 //! costly — it re-acquires the library at the higher quality, potentially terabytes
 //! of bandwidth and hours to days of time. So it is never a side effect of a preset
 //! change: it is this explicit action, which states that cost and does nothing until
-//! confirmed, and only then asks each \*arr to re-search what it already has for a
+//! confirmed, and only then asks each curator to re-search what it already has for a
 //! better release meeting the raised bar.
 
-use super::targets::{project_directory, servarr_targets};
+use super::targets::{curator_targets, project_directory};
 use super::Ctx;
 use crate::doctor::credentials::Target;
 use crate::error::{Diagnose, Problem};
@@ -18,12 +18,12 @@ use crate::ports::service::Maintenance;
 use crate::recyclarr::Kind;
 
 /// State the cost of upgrading existing content to the chosen quality, per media
-/// type, and — only when confirmed — ask each resolution \*arr to re-search its
+/// type, and — only when confirmed — ask each resolution curator to re-search its
 /// library for upgrades.
 ///
 /// The cost is stated per media type because each carries its own preset: film at
 /// maximum and television at space-saving are upgraded to different bars. Only the
-/// resolution \*arrs present in the stack are covered; a music or index service is
+/// resolution curators present in the stack are covered; a music or index service is
 /// not a resolution preset's concern, so it is left out rather than sent a command
 /// it has no equivalent for.
 pub(crate) async fn upgrade(ctx: &Ctx, confirm: bool) -> Result<UpgradeReport, Box<Problem>> {
@@ -43,7 +43,7 @@ pub(crate) async fn upgrade(ctx: &Ctx, confirm: bool) -> Result<UpgradeReport, B
     }
 
     let mut media = Vec::new();
-    for target in servarr_targets(&manifest.services, project.as_deref()) {
+    for target in curator_targets(&manifest.services, project.as_deref()) {
         let Some(kind) = target.kind else {
             continue;
         };
@@ -69,8 +69,8 @@ pub(crate) async fn upgrade(ctx: &Ctx, confirm: bool) -> Result<UpgradeReport, B
     })
 }
 
-/// Ask one resolution \*arr to re-search its existing content for an upgrade, and read
-/// what it said. The \*arr searches against its own current cutoff — whatever the last
+/// Ask one resolution curator to re-search its existing content for an upgrade, and read
+/// what it said. The curator searches against its own current cutoff — whatever the last
 /// applied preset set — so what actually upgrades is what sits below that bar.
 async fn trigger(ctx: &Ctx, kind: Kind, target: &Target) -> Triggered {
     match target

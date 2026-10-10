@@ -80,8 +80,8 @@ fn a_download_client_published_to_the_household_is_still_not_a_door() {
         let published = service("client", Some(Bind::Lan), Some(kind));
         assert_eq!(facing(&published), Some(Facing::Unstated), "{kind:?}");
     }
-    let bindery = service("bindery", Some(Bind::Lan), Some(ApiKind::Bindery));
-    assert_eq!(facing(&bindery), Some(Facing::Unstated));
+    let book_curator = service("bindery", Some(Bind::Lan), Some(ApiKind::Bindery));
+    assert_eq!(facing(&book_curator), Some(Facing::Unstated));
 }
 
 #[test]

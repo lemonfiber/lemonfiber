@@ -170,7 +170,7 @@ pub struct Transfer {
     pub eta: Option<Duration>,
 }
 
-/// One `*arr`'s queue, and how much of it is stuck.
+/// One curator's queue, and how much of it is stuck.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Queue {
     /// The service whose queue this is.
@@ -323,7 +323,7 @@ pub struct Snapshot {
     /// Every download client the stack runs, and whether each is paused.
     pub downloaders: Panel<Vec<Downloader>>,
     /// What in the pipeline has stopped, worst first — assessed across the
-    /// download clients and the \*arrs together, because the failure that matters
+    /// download clients and the curators together, because the failure that matters
     /// most is invisible inside either.
     pub stuck: Vec<crate::queue::Stuck>,
     /// What the operator has been told, newest first: what is owed them where a

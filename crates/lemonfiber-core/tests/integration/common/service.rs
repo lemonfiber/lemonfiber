@@ -1,7 +1,7 @@
-//! The \*arr a seed test wires, standing in for a running one.
+//! The curator a seed test wires, standing in for a running one.
 //!
 //! Shared because the drivers a seed runs — root folders, download clients,
-//! Prowlarr applications, the media server's identity — are the same driver
+//! indexer aggregator applications, the media server's identity — are the same driver
 //! against the same port, scripted differently. One fake rather than four that
 //! drift apart.
 
@@ -233,7 +233,7 @@ impl Client for FakeService {
                     folders.push(RegisteredFolder {
                         id: id.to_string(),
                         // The service stores the canonical path, dropping a
-                        // trailing slash — as the Servarr apps do.
+                        // trailing slash — as the curators do.
                         path: folder.path.trim_end_matches('/').to_owned(),
                     });
                     *id += 1;
@@ -279,13 +279,13 @@ pub fn folder(path: &str) -> RootFolder {
 }
 
 /// Run the driver for one wanted folder, returning its resulting state and the
-/// number of changes journalled. No folder is contested by another \*arr.
+/// number of changes journalled. No folder is contested by another curator.
 pub async fn seed(service: FakeService, wanted: &[RootFolder]) -> (Vec<State>, usize) {
     seed_contested(service, wanted, &BTreeMap::new()).await
 }
 
 /// Run the driver with a set of contested root-folder paths, so a folder another
-/// \*arr also claims is refused rather than wired.
+/// curator also claims is refused rather than wired.
 pub async fn seed_contested(
     service: FakeService,
     wanted: &[RootFolder],

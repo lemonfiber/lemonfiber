@@ -32,12 +32,12 @@ fn the_project_directory_is_the_external_path_or_the_materialise_target() {
 }
 
 #[test]
-fn only_reachable_servarr_services_with_a_config_path_become_targets() {
+fn only_reachable_curators_with_a_config_path_become_targets() {
     let project = std::path::Path::new("/opt/lemonfiber/stack");
     let services = vec![
         manifest_service(
             "sonarr",
-            Some(servarr_api(Some("/config/config.xml"))),
+            Some(curator_api(Some("/config/config.xml"))),
             Some(8989),
         ),
         manifest_service(
@@ -53,18 +53,18 @@ fn only_reachable_servarr_services_with_a_config_path_become_targets() {
         manifest_service("jellyfin", None, Some(8096)),
         manifest_service(
             "radarr",
-            Some(servarr_api(Some("/config/config.xml"))),
+            Some(curator_api(Some("/config/config.xml"))),
             None,
         ),
         manifest_service(
             "lidarr",
-            Some(servarr_api(Some("/data/elsewhere.xml"))),
+            Some(curator_api(Some("/data/elsewhere.xml"))),
             Some(8686),
         ),
-        manifest_service("prowlarr", Some(servarr_api(None)), Some(9696)),
+        manifest_service("prowlarr", Some(curator_api(None)), Some(9696)),
     ];
 
-    let targets = servarr_targets(&services, Some(project));
+    let targets = curator_targets(&services, Some(project));
 
     assert_eq!(
         targets.len(),
@@ -94,9 +94,9 @@ fn shipped_fillers(project: Option<&std::path::Path>) -> crate::wiring::Fillers 
 /// against that client rather than against its kind.
 #[tokio::test]
 async fn a_usenet_clients_key_is_held_against_the_client_it_was_read_from() {
-    const SABNZBD: &str = "[misc]\napi_key = the-sab-key\n";
+    const USENET_CONFIG: &str = "[misc]\napi_key = the-sab-key\n";
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
-        .with_filesystem(Arc::new(SeedFs::keyed(None, Some(SABNZBD))));
+        .with_filesystem(Arc::new(SeedFs::keyed(None, Some(USENET_CONFIG))));
 
     let held = super::super::clients::held(
         &ctx,
@@ -115,9 +115,9 @@ async fn a_usenet_clients_key_is_held_against_the_client_it_was_read_from() {
 /// client's key is in hand — and one that has written nothing yet holds none either.
 #[tokio::test]
 async fn a_usenet_key_needs_a_project_and_a_file_that_holds_one() {
-    const SABNZBD: &str = "[misc]\napi_key = the-sab-key\n";
+    const USENET_CONFIG: &str = "[misc]\napi_key = the-sab-key\n";
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
-        .with_filesystem(Arc::new(SeedFs::keyed(None, Some(SABNZBD))));
+        .with_filesystem(Arc::new(SeedFs::keyed(None, Some(USENET_CONFIG))));
     let unwritten = seed_ctx(None, true, Vec::new(), None, None)
         .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
 
@@ -149,11 +149,7 @@ async fn a_usenet_key_needs_a_project_and_a_file_that_holds_one() {
 #[tokio::test]
 async fn a_torrent_clients_password_is_the_one_minted_or_recorded_for_it() {
     let path = config_scratch("held-torrent");
-    let _ = store::set(
-        &path,
-        crate::config::QBITTORRENT_PASSWORD_KEY,
-        "minted-earlier",
-    );
+    let _ = store::set(&path, crate::config::TORRENT_PASSWORD_KEY, "minted-earlier");
     let ctx = seed_ctx(None, true, Vec::new(), None, Some(path.to_path_buf()));
     let fillers = shipped_fillers(None);
 
@@ -194,7 +190,7 @@ fn the_bundled_torrent_clients_password_setting_is_the_one_the_tunnel_reads() {
         .and_then(|client| fillers.setting(client, crate::config::PASSWORD_SUFFIX));
     assert_eq!(
         setting.as_deref(),
-        Some(crate::config::QBITTORRENT_PASSWORD_KEY)
+        Some(crate::config::TORRENT_PASSWORD_KEY)
     );
 }
 
@@ -205,7 +201,7 @@ async fn a_plugin_named_after_a_setting_lemonfiber_keeps_is_never_handed_it() {
     let path = config_scratch("held-namesake");
     let _ = store::set(
         &path,
-        crate::config::JELLYFIN_ADMIN_PASSWORD_KEY,
+        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         "the-administrator",
     );
     let ctx = seed_ctx(None, true, Vec::new(), None, Some(path.to_path_buf()));
@@ -328,7 +324,7 @@ async fn a_torrent_client_publishing_no_port_has_no_password_set() {
     assert!(minted.is_empty());
 }
 
-/// qBittorrent's adapter, as a plugin's torrent client names it.
+/// The bundled torrent client's adapter, as a plugin's torrent client names it.
 fn torrent_api() -> lemonfiber_manifest::Api {
     lemonfiber_manifest::Api {
         kind: lemonfiber_manifest::ApiKind::Qbittorrent,
@@ -342,10 +338,10 @@ fn torrent_api() -> lemonfiber_manifest::Api {
 fn nothing_can_be_proven_without_a_project_directory() {
     let services = vec![manifest_service(
         "sonarr",
-        Some(servarr_api(Some("/config/config.xml"))),
+        Some(curator_api(Some("/config/config.xml"))),
         Some(8989),
     )];
-    assert!(servarr_targets(&services, None).is_empty());
+    assert!(curator_targets(&services, None).is_empty());
 }
 
 #[tokio::test]
@@ -360,33 +356,33 @@ async fn a_media_server_the_household_set_up_leaves_the_request_identity_to_them
 }
 
 #[test]
-fn a_target_carries_the_servarr_api_version() {
+fn a_target_carries_the_curator_api_version() {
     let project = std::path::Path::new("/opt/lemonfiber/stack");
-    // Sonarr answers at v3, Lidarr at v1: the version travels with the target
-    // rather than being assumed by the client.
-    let sonarr = manifest_service(
+    // The TV curator answers at v3, the music curator at v1: the version travels with the
+    // target rather than being assumed by the client.
+    let tv_curator = manifest_service(
         "sonarr",
-        Some(servarr_api_at(Some("/config/config.xml"), Some(3))),
+        Some(curator_api_at(Some("/config/config.xml"), Some(3))),
         Some(8989),
     );
     assert_eq!(
-        super::super::target_for(&sonarr, project).map(|target| target.version),
+        super::super::target_for(&tv_curator, project).map(|target| target.version),
         Some(3)
     );
-    let lidarr = manifest_service(
+    let music_curator = manifest_service(
         "lidarr",
-        Some(servarr_api_at(Some("/config/config.xml"), Some(1))),
+        Some(curator_api_at(Some("/config/config.xml"), Some(1))),
         Some(8686),
     );
     assert_eq!(
-        super::super::target_for(&lidarr, project).map(|target| target.version),
+        super::super::target_for(&music_curator, project).map(|target| target.version),
         Some(1)
     );
-    // A servarr service that names no version cannot be reached at a known
+    // A curator that names no version cannot be reached at a known
     // path, so it is no target rather than one guessed at the wrong version.
     let versionless = manifest_service(
         "sonarr",
-        Some(servarr_api_at(Some("/config/config.xml"), None)),
+        Some(curator_api_at(Some("/config/config.xml"), None)),
         Some(8989),
     );
     assert!(super::super::target_for(&versionless, project).is_none());

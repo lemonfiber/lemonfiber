@@ -115,7 +115,7 @@ fn compose(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Composed, Box
         .env_file
         .as_deref()
         .map(|env| env.with_file_name("materialised.json"));
-    // The quality choice is carried into the Recyclarr config only when a real run
+    // The quality choice is carried into the quality sync config only when a real run
     // brings the stack up or fetches for it. A teardown or restart has no business
     // rewriting a config the running container reads, and a rehearsal changes
     // nothing — so those neither apply the choice nor read it, which keeps a
@@ -332,7 +332,7 @@ async fn worked(
     grounded::grounded(ctx, action).await?;
 
     // One credential has to exist before the service that uses it has ever run: the
-    // book *arr takes a key from its environment on its first start and generates its
+    // book curator takes a key from its environment on its first start and generates its
     // own otherwise, and what it generates lives in a database nothing here can read.
     // Minted here rather than while seeding, because seeding happens after the service
     // is already up and has therefore already decided.
@@ -387,19 +387,19 @@ async fn worked(
 /// the services from running at all.
 pub(crate) fn mint_adopted_secrets(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) {
     crate::screening::door::made_before_start(ctx, manifest);
-    let declares_bindery = manifest.services.iter().any(|service| {
+    let declares_book_curator = manifest.services.iter().any(|service| {
         service
             .api
             .as_ref()
             .is_some_and(|api| api.kind == lemonfiber_manifest::ApiKind::Bindery)
     });
-    if !declares_bindery
-        || super::targets::recorded_secret(ctx, crate::config::BINDERY_API_KEY).is_some()
+    if !declares_book_curator
+        || super::targets::recorded_secret(ctx, crate::config::BOOK_CURATOR_API_KEY).is_some()
     {
         return;
     }
     if let Some(key) = crate::secret::generate(ctx.seams.random.as_ref()) {
-        let _ = super::targets::record_secret(ctx, crate::config::BINDERY_API_KEY, &key);
+        let _ = super::targets::record_secret(ctx, crate::config::BOOK_CURATOR_API_KEY, &key);
     }
 }
 

@@ -149,7 +149,7 @@ async fn a_word_a_script_asked_about_is_the_whole_entry() {
     let seen = asked(world(running(), stack()), "/api/explain?word=indexer").await;
     assert!(
         seen.is_some_and(|(_, body)| body.lines().count() == 1
-            && body.contains("Prowlarr")
+            && body.contains("indexer aggregator lists")
             && body.contains(r#""also_called":["search provider"]"#)),
         "one document, the longer form and the other names in it"
     );

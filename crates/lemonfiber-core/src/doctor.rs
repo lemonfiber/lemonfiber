@@ -189,7 +189,7 @@ pub struct Finding {
     /// What the stack calls that service in front of an operator.
     ///
     /// Carried beside the id rather than left for a surface to derive, because the id is
-    /// a key and not a name: capitalising `qbittorrent` does not arrive at qBittorrent,
+    /// a key and not a name: capitalising `qbittorrent` does not arrive at `qBittorrent`,
     /// and the stack has already written the name down. Absent where the finding is about
     /// no service, and where the stack declares no service by that id — an id standing in
     /// for a name would put the key back in front of the operator.

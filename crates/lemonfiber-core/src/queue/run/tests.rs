@@ -3,7 +3,7 @@ use crate::condition::Conditions;
 use crate::ports::service::Queued;
 use crate::queue::{Stall, Stuck, Thresholds};
 
-/// One thing an \*arr is waiting for, fetched once.
+/// One thing a curator is waiting for, fetched once.
 fn queued(title: &str, status: &str, message: Option<&str>) -> Queued {
     grabbed(title, status, message, 1)
 }
@@ -21,7 +21,7 @@ fn grabbed(title: &str, status: &str, message: Option<&str>, grabs: u32) -> Queu
 }
 
 /// One service answering with these items.
-fn sonarr(items: Vec<Queued>) -> Vec<(String, Answered)> {
+fn curator(items: Vec<Queued>) -> Vec<(String, Answered)> {
     vec![("sonarr".to_owned(), Answered::Queue(items))]
 }
 
@@ -46,7 +46,7 @@ fn a_fault_says_nothing_until_it_has_held_long_enough() {
     // The age is the store's, not the item's: the first pass records it and
     // says nothing, and only a later one reports it.
     let mut conditions = Conditions::new();
-    let answers = sonarr(vec![queued("Some.Release", "ok", None)]);
+    let answers = curator(vec![queued("Some.Release", "ok", None)]);
     let fetching = vec![("Some.Release".to_owned(), 42, false)];
 
     let first = watched(&answers, &fetching, &mut conditions, "1000");
@@ -63,7 +63,7 @@ fn a_stall_that_resolved_itself_is_cleared_rather_than_left_standing() {
     // store records the resolution, which is what an operator reading the
     // history needs to see.
     let mut conditions = Conditions::new();
-    let answers = sonarr(vec![queued("Some.Release", "ok", None)]);
+    let answers = curator(vec![queued("Some.Release", "ok", None)]);
 
     watched(
         &answers,
@@ -102,8 +102,8 @@ fn a_torrent_seeding_after_a_successful_import_is_never_called_an_orphan() {
     // whole feature exists to avoid.
     let mut conditions = Conditions::new();
     let complete = [("Some.Release".to_owned(), 100u8, false)];
-    watched(&sonarr(Vec::new()), &complete, &mut conditions, "1000");
-    let later = watched(&sonarr(Vec::new()), &complete, &mut conditions, "9000000");
+    watched(&curator(Vec::new()), &complete, &mut conditions, "1000");
+    let later = watched(&curator(Vec::new()), &complete, &mut conditions, "9000000");
     assert!(later.stuck.is_empty(), "{:?}", later.stuck);
 }
 
@@ -129,8 +129,8 @@ fn a_long_queue_is_summarised_by_category_rather_than_listed() {
     let fetching: Vec<(String, u8, bool)> = (0..20)
         .map(|n| (format!("Release.{n}"), 42, false))
         .collect();
-    watched(&sonarr(items.clone()), &fetching, &mut conditions, "1000");
-    let later = watched(&sonarr(items), &fetching, &mut conditions, "100000");
+    watched(&curator(items.clone()), &fetching, &mut conditions, "1000");
+    let later = watched(&curator(items), &fetching, &mut conditions, "100000");
 
     assert_eq!(later.stuck.len(), 20);
     assert_eq!(later.by_category(), vec![(Stall::StalledDownload, 20)]);
@@ -143,7 +143,7 @@ fn an_import_the_service_complains_about_once_is_not_yet_called_repeated() {
     // nobody watched — it is a finished download nothing has taken, which is
     // what it is, and the cause is named beside it.
     let mut conditions = Conditions::new();
-    let answers = sonarr(vec![queued(
+    let answers = curator(vec![queued(
         "Some.Release",
         "warning",
         Some("Permission denied writing to /data/media"),
@@ -161,8 +161,8 @@ fn an_import_that_has_failed_come_back_and_failed_again_is_structural() {
     // That is a different problem from one bad import, and it will not resolve
     // itself.
     let mut conditions = Conditions::new();
-    let complaining = sonarr(vec![queued("Some.Release", "warning", Some("denied"))]);
-    let fine = sonarr(Vec::new());
+    let complaining = curator(vec![queued("Some.Release", "warning", Some("denied"))]);
+    let fine = curator(Vec::new());
     let stuck_at_100 = vec![("Some.Release".to_owned(), 100, false)];
     let imported: Vec<(String, u8, bool)> = Vec::new();
 
@@ -187,7 +187,7 @@ fn a_stall_nothing_explained_says_what_is_usually_behind_it() {
     // service did say why, that is carried instead — what actually happened beats
     // what usually does.
     let mut conditions = Conditions::new();
-    let answers = sonarr(vec![queued("Some.Release", "ok", None)]);
+    let answers = curator(vec![queued("Some.Release", "ok", None)]);
     watched(
         &answers,
         &[("Some.Release".to_owned(), 42, false)],
@@ -207,7 +207,7 @@ fn the_condition_a_stuck_item_raises_carries_its_remedies() {
     // What an operator does about it, in the category's own words — a stuck
     // item they can do nothing with is a status line.
     let mut conditions = Conditions::new();
-    let answers = sonarr(vec![queued("Some.Release", "ok", None)]);
+    let answers = curator(vec![queued("Some.Release", "ok", None)]);
     watched(
         &answers,
         &[("Some.Release".to_owned(), 42, false)],
@@ -225,7 +225,7 @@ fn the_condition_a_stuck_item_raises_carries_its_remedies() {
 fn a_download_that_started_moving_again_stops_being_reported() {
     // The other way a stall resolves: still in the pipeline, but going again.
     let mut conditions = Conditions::new();
-    let answers = sonarr(vec![queued("Some.Release", "ok", None)]);
+    let answers = curator(vec![queued("Some.Release", "ok", None)]);
     let stopped = [("Some.Release".to_owned(), 42u8, false)];
     watched(&answers, &stopped, &mut conditions, "1000");
     let reported = watched(&answers, &stopped, &mut conditions, "100000");
@@ -249,10 +249,10 @@ fn a_download_that_started_moving_again_stops_being_reported() {
 
 #[test]
 fn something_monitored_that_nothing_has_fetched_is_waiting() {
-    // Only the *arr knows about it: nothing is downloading, so there is no
+    // Only the curator knows about it: nothing is downloading, so there is no
     // stall to report — it is waiting, and the longest rope of all applies.
     let mut conditions = Conditions::new();
-    let answers = sonarr(vec![queued("Some.Film", "ok", None)]);
+    let answers = curator(vec![queued("Some.Film", "ok", None)]);
     watched(&answers, &[], &mut conditions, "1000");
     let much_later = watched(&answers, &[], &mut conditions, "9000000");
     let reported: Vec<Stall> = much_later.stuck.iter().map(|stuck| stuck.stall).collect();
@@ -277,7 +277,7 @@ fn one_cause_stopping_several_downloads_is_reported_once() {
     // are twenty alerts for one thing to fix, which is how an operator learns
     // to mute the check that would have told them.
     let full = Some("No space left on device");
-    let answers = sonarr(vec![
+    let answers = curator(vec![
         queued("First.Release", "warning", full),
         queued("Second.Release", "warning", full),
         queued("Third.Release", "warning", full),
@@ -313,7 +313,7 @@ fn one_cause_stopping_several_downloads_is_reported_once() {
 fn one_item_blocked_by_something_is_still_named_by_its_own_name() {
     // A single item blocked by something is that item's problem, and naming the
     // cause instead would lose which download to look at.
-    let answers = sonarr(vec![queued(
+    let answers = curator(vec![queued(
         "Only.Release",
         "warning",
         Some("Permission denied"),
@@ -335,7 +335,7 @@ fn one_item_blocked_by_something_is_still_named_by_its_own_name() {
 fn two_items_stopped_by_different_things_stay_two() {
     // Grouping is about one cause, not about tidiness: two different faults are
     // two things to fix, and folding them together would hide one of them.
-    let answers = sonarr(vec![
+    let answers = curator(vec![
         queued("First.Release", "warning", Some("No space left on device")),
         queued("Second.Release", "warning", Some("Permission denied")),
     ]);
@@ -354,7 +354,7 @@ fn an_item_fetched_over_and_over_is_reported_as_the_loop_it_is() {
     // The category the model has always carried and nothing could reach: the
     // count comes from the service's own history, and without it a loop reads
     // as an ordinary download.
-    let answers = sonarr(vec![grabbed("Some.Release", "ok", None, 3)]);
+    let answers = curator(vec![grabbed("Some.Release", "ok", None, 3)]);
     let moving = [("Some.Release".to_owned(), 40u8, true)];
     let mut conditions = Conditions::new();
     watched(&answers, &moving, &mut conditions, "1000");
@@ -373,7 +373,7 @@ fn an_item_fetched_over_and_over_is_reported_as_the_loop_it_is() {
 fn an_item_fetched_once_is_not_a_loop() {
     // Twice is a retry, which is a system working. The count has to come from
     // somewhere real, or every download reads as a loop.
-    let answers = sonarr(vec![grabbed("Some.Release", "ok", None, 1)]);
+    let answers = curator(vec![grabbed("Some.Release", "ok", None, 1)]);
     let moving = [("Some.Release".to_owned(), 40u8, true)];
     let mut conditions = Conditions::new();
     watched(&answers, &moving, &mut conditions, "1000");

@@ -1,15 +1,15 @@
-//! The \*arrs the request service hands a request to.
+//! The curators the request service hands a request to.
 //!
 //! The request service does not discover them. Until it is told, a household member
 //! asks for something, the ask is accepted, and no downloader ever hears about it.
 //!
-//! Only the \*arrs actually in the stack are offered, which is the half that decides
+//! Only the curators actually in the stack are offered, which is the half that decides
 //! what the household may ask for at all: the request service offers what its
 //! targets can deliver, so television is not offered where no curator files it.
 //!
-//! Two of the four \*arrs are request targets. The request service fetches film and
+//! Two of the four curators are request targets. The request service fetches film and
 //! television and nothing else, so the ones filing music and books are not targets —
-//! not an omission, but the same rule applied: an \*arr that cannot fulfil a request
+//! not an omission, but the same rule applied: a curator that cannot fulfil a request
 //! is not offered as somewhere to send one.
 
 use std::path::Path;
@@ -55,15 +55,15 @@ pub(super) fn fulfilling(fillers: &Fillers) -> Vec<Fulfils<'_>> {
         .collect()
 }
 
-/// Every \*arr the request service should hand requests to, and the wiring for each
+/// Every curator the request service should hand requests to, and the wiring for each
 /// whose credential file was refused, said on the target it would have been.
 ///
 /// Each is read rather than assumed: the profile it fetches at and the folder it
-/// files into are asked of the \*arr itself, because the request service must name
+/// files into are asked of the curator itself, because the request service must name
 /// both when it hands over a request, and an operator may have renamed or replaced
 /// what setup created.
 ///
-/// An \*arr that cannot answer, that this machine cannot reach, or that has no profile
+/// A curator that cannot answer, that this machine cannot reach, or that has no profile
 /// or folder to name, is left out rather than registered half-configured — a target the
 /// request service holds but cannot fetch through is worse than one it does not hold,
 /// because the request is accepted either way and only the second is visibly missing.
@@ -75,7 +75,7 @@ async fn wanted_targets(
     let mut refused = Vec::new();
     for fulfils in curators {
         let filler = fulfils.filler;
-        let key = match super::keys::servarr_key(ctx, filler).await {
+        let key = match super::keys::curator_key(ctx, filler).await {
             Beneath::Read(key) => key,
             Beneath::Absent => continue,
             Beneath::Escaped => {
@@ -127,7 +127,7 @@ async fn wanted_targets(
 
 /// The profile requests are fetched at.
 ///
-/// The first the \*arr reports, which is what setup wired: a stack with several is
+/// The first the curator reports, which is what setup wired: a stack with several is
 /// one the operator has arranged themselves, and the request service takes one
 /// default rather than choosing between them.
 async fn first_profile(client: &crate::servarr::Servarr) -> Option<QualityProfile> {
@@ -145,7 +145,7 @@ async fn first_folder(client: &crate::servarr::Servarr) -> Option<String> {
         .next()
 }
 
-/// Hand the request service every \*arr this stack has that can fulfil a request.
+/// Hand the request service every curator this stack has that can fulfil a request.
 ///
 /// Nothing to do where the stack has no request service: there is nobody to tell.
 pub(super) async fn seed_fulfilment_targets(

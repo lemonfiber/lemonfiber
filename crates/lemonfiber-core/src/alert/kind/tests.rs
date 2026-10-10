@@ -17,8 +17,8 @@ fn the_conditions_nothing_else_observes_are_ours() {
 
 #[test]
 fn the_request_lifecycle_belongs_to_the_service_that_already_sends_it() {
-    // Seerr tells the requester itself. A second message from lemonfiber is not
-    // an extra courtesy — it is what teaches an operator to mute the channel.
+    // The request service tells the requester itself. A second message from lemonfiber is
+    // not an extra courtesy — it is what teaches an operator to mute the channel.
     for kind in [
         "request.approved",
         "request.denied",

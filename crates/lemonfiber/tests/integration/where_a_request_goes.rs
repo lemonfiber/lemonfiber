@@ -36,7 +36,7 @@ use lemonfiber_core::ports::http::{Http, Method, Request};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
-/// The credential a \*arr request carries, and the one a redirect strips from
+/// The credential a curator request carries, and the one a redirect strips from
 /// nothing: reqwest drops `Authorization`, `Cookie` and `Proxy-Authorization` on a
 /// cross-host hop and has no reason to know this header is one too.
 const API_KEY_HEADER: &str = "X-Api-Key";
@@ -147,7 +147,7 @@ fn answered() -> String {
     "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nhi".to_owned()
 }
 
-/// A request as every \*arr call in this product makes one: the credential in a
+/// A request as every curator call in this product makes one: the credential in a
 /// header, and — as an indexer authenticates — a second one in the query.
 fn asking(base: &str, key: &str) -> Request {
     Request {
@@ -198,7 +198,7 @@ async fn a_service_cannot_send_this_machine_to_a_host_it_was_not_addressed_to() 
 /// And the half that says what the hop would have cost.
 ///
 /// A connection count proves the request did not arrive; this proves what it would
-/// have carried if it had. The credential a \*arr authenticates with travels in
+/// have carried if it had. The credential a curator authenticates with travels in
 /// `X-Api-Key`, which is not one of the three headers a redirect strips, and an
 /// indexer's travels in the query, which nothing strips at all. Both are asserted
 /// against the bytes the second host actually received, so this stays true however

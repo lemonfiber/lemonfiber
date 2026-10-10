@@ -82,7 +82,7 @@ pub struct PrerequisiteMap {
 /// The prerequisites the given protocol choices imply.
 ///
 /// Nothing chosen needs nothing bought: a folder of existing media reaches a
-/// working Jellyfin with no accounts, and that path is stated rather than left
+/// working media server with no accounts, and that path is stated rather than left
 /// for the operator to infer. Each chosen protocol adds exactly its own
 /// prerequisites and no others, in the order they have to be obtained — a
 /// provider before the indexer that searches it produces a confusing partial
@@ -107,9 +107,9 @@ pub fn prerequisites(protocols: Protocols) -> PrerequisiteMap {
 }
 
 /// The zero-cost path, stated whenever nothing else is required.
-const LIBRARY_ONLY: &str = "A library-only setup needs no third-party accounts. \
-     An existing folder of media reaches a working Jellyfin with nothing bought — \
-     a supported end state, not a lesser one.";
+const LIBRARY_ONLY: &str = "A library-only setup needs no third-party accounts. An existing \
+     folder of media reaches a working media server with nothing bought — a supported end state, \
+     not a lesser one.";
 
 /// The Usenet provider: where the files actually are.
 fn usenet_provider() -> Prerequisite {
