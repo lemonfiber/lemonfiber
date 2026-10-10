@@ -51,8 +51,8 @@
 //!
 //! **A user is written for an adapter and for nothing else.** A service that speaks a
 //! contract is built for lemonfiber's, and reads a key written readable by the
-//! operator's uid alone, so it runs as that uid (`F14-R27`). Any other service is a
-//! stranger's image, and a user would break every one that drops to its own.
+//! operator's uid alone, so it runs as that uid. Any other service is a stranger's
+//! image, and a user would break every one that drops to its own.
 
 use serde::Serialize;
 
