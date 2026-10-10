@@ -3,6 +3,7 @@
   "actions": {
     "accept": "actions/accept.json",
     "adopt": "actions/adopt.json",
+    "ask": "actions/ask.json",
     "backup": "actions/backup.json",
     "bandwidth": "actions/bandwidth.json",
     "companion-pair": "actions/companion-pair.json",
@@ -66,6 +67,8 @@
     "alert": "kinds/alert.json",
     "alerts": "kinds/alerts.json",
     "archives": "kinds/archives.json",
+    "askable": "kinds/askable.json",
+    "asked": "kinds/asked.json",
     "backup": "kinds/backup.json",
     "bandwidth": "kinds/bandwidth.json",
     "beside": "kinds/beside.json",

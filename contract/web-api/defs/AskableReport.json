@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One page of what a member's search found, under their limits.",
+  "type": "object",
+  "properties": {
+    "approval": {
+      "description": "Whether what they ask for waits for whoever runs the house, as one sentence.",
+      "type": "string"
+    },
+    "asking": {
+      "description": "What the member may ask for: what their period allows and has left of each kind.",
+      "$ref": "MemberAsking.json"
+    },
+    "kinds": {
+      "description": "The kinds of title the house can fetch now, which are the kinds searched.",
+      "type": "array",
+      "items": {
+        "$ref": "TitleKind.json"
+      }
+    },
+    "member": {
+      "description": "The member the search was made for, by the name they are known by.",
+      "type": "string"
+    },
+    "next": {
+      "description": "Where the next page begins, absent on the last.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "term": {
+      "description": "The words searched for, trimmed.",
+      "type": "string"
+    },
+    "titles": {
+      "description": "The titles on this page, in the order they were found.",
+      "type": "array",
+      "items": {
+        "$ref": "Askable.json"
+      }
+    }
+  },
+  "required": [
+    "member",
+    "term",
+    "kinds",
+    "titles",
+    "asking",
+    "approval"
+  ]
+}

@@ -37,6 +37,7 @@ mod trace;
 mod upgrade;
 mod walkthrough;
 mod wiring;
+mod wishing;
 
 pub use alerts::*;
 pub use asking::*;
@@ -63,6 +64,7 @@ pub use trace::*;
 pub use upgrade::*;
 pub use walkthrough::*;
 pub use wiring::*;
+pub use wishing::*;
 
 #[cfg(test)]
 mod tests;

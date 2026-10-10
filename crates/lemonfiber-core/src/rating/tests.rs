@@ -192,3 +192,21 @@ fn a_reading_already_taken_says_what_taking_it_again_would_say() {
 
     assert_eq!(reading(&table, Some(12)), said(12, &rated(&table, 12)));
 }
+
+#[test]
+fn a_certificate_is_held_at_the_age_this_servers_table_names_it_at() {
+    let named = [
+        Certificate {
+            name: "12A".to_owned(),
+            age: 12,
+        },
+        Certificate {
+            name: "15".to_owned(),
+            age: 15,
+        },
+    ];
+    assert_eq!(super::age_of(&named, "12a"), Some(12));
+    assert_eq!(super::age_of(&named, " 15 "), Some(15));
+    assert_eq!(super::age_of(&named, "PG-13"), None);
+    assert_eq!(super::age_of(&[], "15"), None);
+}

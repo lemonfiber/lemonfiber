@@ -114,6 +114,46 @@ pub enum HouseholdCommand {
         #[arg(long)]
         ended: bool,
     },
+    /// Search, as somebody in the house, for titles the house does not hold yet.
+    ///
+    /// Only what they may ask for is shown, under their own limits, among the kinds the
+    /// house can fetch now. A page ends with where the next one begins.
+    Search {
+        /// Who is searching, named the way they sign in.
+        name: String,
+        /// The title, as they would say it.
+        #[arg(required = true)]
+        term: Vec<String>,
+        /// Go on from where the previous page said the next one begins.
+        #[arg(long)]
+        after: Option<String>,
+    },
+    /// Ask for a title on somebody's behalf, as their own ask.
+    ///
+    /// With `--dry-run` it says what asking would leave of their allowance and whether
+    /// it waits for approval, and asks for nothing.
+    Ask {
+        /// Who is asking, named the way they sign in.
+        name: String,
+        /// The title, by the id their search listed it under.
+        id: String,
+        /// Whether it is a series or a film.
+        #[arg(long, value_enum)]
+        kind: Wished,
+        /// A season to ask for, given once for each. None asks for every season not
+        /// already here or on its way.
+        #[arg(long = "season")]
+        seasons: Vec<u32>,
+    },
+}
+
+/// Which kind of title is asked for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum Wished {
+    /// A series.
+    Tv,
+    /// A film.
+    Movies,
 }
 
 /// What to do about a setup already on this machine.

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where a title a member's search found stands in the house.",
+  "oneOf": [
+    {
+      "description": "All of it is here.",
+      "type": "string",
+      "const": "here"
+    },
+    {
+      "description": "Some of it is here, and the rest may be asked for.",
+      "type": "string",
+      "const": "partly-here"
+    },
+    {
+      "description": "Somebody asked for it and it is coming.",
+      "type": "string",
+      "const": "on-its-way"
+    },
+    {
+      "description": "It may be asked for.",
+      "type": "string",
+      "const": "askable"
+    }
+  ]
+}

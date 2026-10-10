@@ -67,7 +67,7 @@ pub(super) async fn allow_only(jellyfin: &Jellyfin, origin: &str) -> Result<(), 
 }
 
 /// The server's whole configuration, as it answers it.
-async fn configuration(jellyfin: &Jellyfin) -> Result<serde_json::Value, Failure> {
+pub(super) async fn configuration(jellyfin: &Jellyfin) -> Result<serde_json::Value, Failure> {
     let response = jellyfin.as_admin(Method::Get, CONFIGURATION, None).await?;
     jellyfin
         .endpoint

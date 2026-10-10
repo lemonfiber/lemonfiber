@@ -136,6 +136,27 @@
     "file": false
   },
   {
+    "path": "/api/askable",
+    "parameters": [
+      {
+        "name": "member",
+        "repeatable": false
+      },
+      {
+        "name": "term",
+        "repeatable": false
+      },
+      {
+        "name": "after",
+        "repeatable": false
+      }
+    ],
+    "kinds": [
+      "askable"
+    ],
+    "file": false
+  },
+  {
     "path": "/api/playing",
     "parameters": [
       {

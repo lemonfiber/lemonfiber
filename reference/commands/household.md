@@ -24,6 +24,8 @@ Commands:
   handoff   Hand somebody's phone or television the way onto the stack, and see whether it arrived
   grant     Open a session on somebody's own account for one of their devices
   watched   Record how far somebody got through a title, as their own progress
+  search    Search, as somebody in the house, for titles the house does not hold yet
+  ask       Ask for a title on somebody's behalf, as their own ask
   help      Print this message or the help of the given subcommand(s)
 
 Options:
@@ -332,4 +334,95 @@ Options:
 
   -h, --help
           Print help
+```
+
+## `lemonfiber household search`
+
+```text
+Search, as somebody in the house, for titles the house does not hold yet.
+
+Only what they may ask for is shown, under their own limits, among the kinds the house can fetch now. A page ends with where the next one begins.
+
+Usage: lemonfiber household search [OPTIONS] <NAME> <TERM>...
+
+Arguments:
+  <NAME>
+          Who is searching, named the way they sign in
+
+  <TERM>...
+          The title, as they would say it
+
+Options:
+      --after <AFTER>
+          Go on from where the previous page said the next one begins
+
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber household ask`
+
+```text
+Ask for a title on somebody's behalf, as their own ask.
+
+With `--dry-run` it says what asking would leave of their allowance and whether it waits for approval, and asks for nothing.
+
+Usage: lemonfiber household ask [OPTIONS] --kind <KIND> <NAME> <ID>
+
+Arguments:
+  <NAME>
+          Who is asking, named the way they sign in
+
+  <ID>
+          The title, by the id their search listed it under
+
+Options:
+      --json
+          Print machine-readable output
+
+      --kind <KIND>
+          Whether it is a series or a film
+
+          Possible values:
+          - tv:     A series
+          - movies: A film
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --season <SEASONS>
+          A season to ask for, given once for each. None asks for every season not already here or on its way
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
+  -h, --help
+          Print help (see a summary with '-h')
 ```

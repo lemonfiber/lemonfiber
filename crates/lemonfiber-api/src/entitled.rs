@@ -19,7 +19,7 @@
 //! fact about the wire, and it is what the requirement about one member seeing
 //! another's requests asks for.
 
-use lemonfiber_core::app::{Command, Diagnosing, Viewing, Whom};
+use lemonfiber_core::app::{Command, Diagnosing, Viewing, Whom, Wishing};
 use lemonfiber_core::keys::Scope;
 
 use crate::admission::Caller;
@@ -96,6 +96,13 @@ pub fn may(caller: &Caller, door: Door, command: Command) -> Permitted {
         Caller::Key(keyed) => match (&keyed.scope, door) {
             // Exactly what that member's own session admits, at either door.
             (Scope::Member { id, .. }, _) => members(id, &command),
+            // A member's own search is theirs and the operator's to make, and nobody
+            // else's: every search is a live question to whatever answers for titles
+            // beyond the house, and a key is the credential most likely to be held
+            // somewhere the household is not.
+            (Scope::Read | Scope::Act, Door::Reading) if matches!(command, Command::Wish(_)) => {
+                Permitted::Nothing
+            }
             (Scope::Read | Scope::Act, Door::Reading) => Permitted::This(command),
             (Scope::Act, Door::Acting) if callable_by_a_key(&command) => Permitted::This(command),
             (scope @ (Scope::Read | Scope::Act), Door::Acting) => {
@@ -175,6 +182,22 @@ pub(crate) fn their_viewing(id: &str, viewing: &Viewing) -> Viewing {
     }
 }
 
+/// A member's search or ask, made for them whoever it named.
+#[must_use]
+pub(crate) fn their_wish(id: &str, wishing: &Wishing) -> Wishing {
+    match wishing.clone() {
+        Wishing::Find { term, after, .. } => Wishing::Find {
+            member: id.to_owned(),
+            term,
+            after,
+        },
+        Wishing::Ask { wish, .. } => Wishing::Ask {
+            member: id.to_owned(),
+            wish,
+        },
+    }
+}
+
 /// What a household member may have of a command.
 fn members(id: &str, command: &Command) -> Permitted {
     match command {
@@ -198,6 +221,10 @@ fn members(id: &str, command: &Command) -> Permitted {
         // is discarded, so a member cannot grant a device to somebody else's account or
         // move somebody else's place in a film.
         Command::Viewing(viewing) => Permitted::This(Command::Viewing(their_viewing(id, viewing))),
+        // Theirs, narrowed the same way: a search under their own limits, and an ask on
+        // their own account and allowance. Whoever the request named is discarded, so a
+        // member cannot search under somebody else's limits or spend their allowance.
+        Command::Wish(wishing) => Permitted::This(Command::Wish(their_wish(id, wishing))),
         // **Everything not named above is refused**, and the catch-all is the
         // statement rather than an omission: a command added later is not a
         // member's until somebody decides it is and writes it down. Listing what

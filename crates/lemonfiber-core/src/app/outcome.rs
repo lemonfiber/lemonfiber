@@ -136,6 +136,10 @@ outcomes! {
     Granted(crate::model::GrantReport) => GRANT [rehearsed],
     /// How far a member got, as the media server now holds it.
     Watched(crate::model::WatchedReport) => WATCHED [rehearsed],
+    /// One page of what a member's search for a title found, under their limits.
+    Askable(crate::model::AskableReport) => ASKABLE,
+    /// What asking for a title on a member's behalf came to.
+    Asked(crate::model::AskedReport) => ASKED [rehearsed],
     /// What this machine keeps running for lemonfiber, and what a change to it did.
     Hosting(HostingReport) => HOSTING [rehearsed],
     /// The one address to hand somebody who lives here.

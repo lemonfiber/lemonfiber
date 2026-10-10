@@ -206,6 +206,7 @@ impl Searching for Upstream {
 
     async fn detail(&self, kind: Kind, id: &str, region: &str) -> Result<Option<Detail>, Failure> {
         Ok((id == "603").then(|| Detail {
+            status: MediaStatus::PartlyAvailable,
             overview: Some(format!("a {kind:?} rated in {region}")),
             certification: Some("12".to_owned()),
             released: true,

@@ -2,14 +2,15 @@
 //! is read, and what they may ask for.
 
 use lemonfiber_core::app::{
-    Allowance, Answer, Arranged, Chosen, Command, Decision, Inviting, Viewing, Whom,
+    Allowance, Answer, Arranged, Chosen, Command, Decision, Inviting, Viewing, Whom, Wishing,
 };
 use lemonfiber_core::asking::Policy;
-use lemonfiber_core::ports::service::{HowFar, Quota, Unrated};
+use lemonfiber_core::ports::media::Kind;
+use lemonfiber_core::ports::service::{HowFar, Quota, Unrated, Wish};
 
 use crate::exit::USAGE;
 use crate::say::complain;
-use lemonfiber::cli::{HouseholdCommand, RawAllowance, RawShelf, RawUnrated, RawWhom};
+use lemonfiber::cli::{HouseholdCommand, RawAllowance, RawShelf, RawUnrated, RawWhom, Wished};
 
 /// The command line spells what somebody may watch as three flags and the core carries
 /// them as one choice, because they are one decision taken at one moment. Only the
@@ -143,6 +144,27 @@ pub(crate) fn household(whom: RawWhom, action: Option<HouseholdCommand>) -> Resu
             how_far: HowFar {
                 position: at,
                 ended,
+            },
+        })),
+        HouseholdCommand::Search { name, term, after } => Ok(Command::Wish(Wishing::Find {
+            member: name,
+            term: term.join(" "),
+            after,
+        })),
+        HouseholdCommand::Ask {
+            name,
+            id,
+            kind,
+            seasons,
+        } => Ok(Command::Wish(Wishing::Ask {
+            member: name,
+            wish: Wish {
+                id,
+                kind: match kind {
+                    Wished::Tv => Kind::Tv,
+                    Wished::Movies => Kind::Movies,
+                },
+                seasons,
             },
         })),
     }

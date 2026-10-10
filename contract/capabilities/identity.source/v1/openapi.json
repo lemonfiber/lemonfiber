@@ -94,6 +94,9 @@
     "/lemonfiber/identity.source/v1/claimable": {
       "$ref": "operations/claimable.json"
     },
+    "/lemonfiber/identity.source/v1/country": {
+      "$ref": "operations/country.json"
+    },
     "/lemonfiber/identity.source/v1/create_admin": {
       "$ref": "operations/create_admin.json"
     },

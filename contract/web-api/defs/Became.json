@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What asking for a title came to.",
+  "oneOf": [
+    {
+      "description": "Asked for, and on its way without anybody saying yes first.",
+      "type": "string",
+      "const": "asked"
+    },
+    {
+      "description": "Asked for, and waiting for whoever runs the house to say yes.",
+      "type": "string",
+      "const": "waiting"
+    },
+    {
+      "description": "Somebody already asked for it, so nothing new was asked for.",
+      "type": "string",
+      "const": "on-its-way"
+    }
+  ]
+}

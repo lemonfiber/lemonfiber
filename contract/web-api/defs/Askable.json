@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One title a member's search found.",
+  "type": "object",
+  "properties": {
+    "id": {
+      "description": "The id it is asked for by.",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Whether it is a series or a film.",
+      "$ref": "TitleKind.json"
+    },
+    "stands": {
+      "description": "Where it stands in the house.",
+      "$ref": "Stands.json"
+    },
+    "title": {
+      "description": "What it is called.",
+      "type": "string"
+    },
+    "year": {
+      "description": "The year it came out, where that is known.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0
+    }
+  },
+  "required": [
+    "id",
+    "kind",
+    "title",
+    "stands"
+  ]
+}

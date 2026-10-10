@@ -494,6 +494,9 @@ impl Household for AHousehold {
     async fn ratings(&self) -> Result<Vec<Certificate>, Failure> {
         unreachable!("the door asks this household who somebody is and nothing else")
     }
+    async fn country(&self) -> Result<Option<String>, Failure> {
+        unreachable!("the door asks this household who somebody is and nothing else")
+    }
     async fn allow(&self, _: &str, _: &Allowed) -> Result<(), Failure> {
         unreachable!("the door asks this household who somebody is and nothing else")
     }

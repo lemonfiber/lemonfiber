@@ -4,8 +4,9 @@
 //! Read off `ghcr.io/seerr-team/seerr:v3.5.0`: a search answers mixed pages of films,
 //! series and people, each film and series carrying where it stands in the house; a
 //! film's certifications are its release dates per region, a series' its content ratings;
-//! a series counts its specials as season 0, which is never asked for. The owner's key may
-//! file a request for any member by naming them.
+//! a series counts its specials as season 0, which is never asked for. The owner's key
+//! files a member's request acting as that member, which is what makes the service hold it
+//! to their own approval and allowance.
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -30,6 +31,15 @@ const UNRELEASED_SERIES: [&str; 3] = ["Planned", "In Production", "Pilot"];
 
 /// The number a series files its specials under.
 const SPECIALS: u32 = 0;
+
+/// The header naming the account the owner's key acts as.
+///
+/// The service decides whether a request waits for approval from the permissions of the
+/// account the call is made as, and not from the account it is filed for: filed by the
+/// owner's key alone, every ask would be approved on the spot. Made as the member, it
+/// waits exactly where their own permissions say it does, and counts against their own
+/// allowance.
+const ACTING_AS: &str = "X-API-User";
 
 /// One page of a search, as the service answers it.
 #[derive(Deserialize)]
@@ -146,14 +156,13 @@ struct SeasonNumber {
     season_number: u32,
 }
 
-/// A request to file: the title, the member it is filed for, and for a series the seasons
-/// of it, every one where none are named.
+/// A request to file: the title, and for a series the seasons of it, every one where none
+/// are named. The member it is filed for is who the call is made as.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Filing {
     media_type: &'static str,
     media_id: u64,
-    user_id: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     seasons: Option<serde_json::Value>,
 }
@@ -225,6 +234,7 @@ impl Full {
             Kind::Movies => status == RELEASED,
             Kind::Tv => self.first_air_date.is_some() && !UNRELEASED_SERIES.contains(&status),
         };
+        let whole = standing(self.media_info.as_ref());
         let held = self.media_info.unwrap_or_default().seasons;
         let seasons = self
             .seasons
@@ -241,6 +251,7 @@ impl Full {
             })
             .collect();
         Detail {
+            status: whole,
             overview: self.overview.filter(|overview| !overview.is_empty()),
             certification,
             released,
@@ -311,7 +322,6 @@ async fn ask(seerr: &Seerr, member: &str, wish: &Wish) -> Result<Asked, Failure>
     let filing = Filing {
         media_type: media_type(wish.kind),
         media_id: media,
-        user_id: user,
         seasons: (wish.kind == Kind::Tv).then(|| {
             if wish.seasons.is_empty() {
                 serde_json::json!("all")
@@ -321,10 +331,11 @@ async fn ask(seerr: &Seerr, member: &str, wish: &Wish) -> Result<Asked, Failure>
         }),
     };
     let body = serde_json::to_string(&filing).unwrap_or_default();
-    let response = seerr
-        .endpoint
-        .send(&seerr.request(Method::Post, "/request", Some(body)))
-        .await?;
+    let mut filing = seerr.request(Method::Post, "/request", Some(body));
+    filing
+        .headers
+        .push((ACTING_AS.to_owned(), user.to_string()));
+    let response = seerr.endpoint.send(&filing).await?;
     let filed: Filed = seerr
         .endpoint
         .decode(&response, "the request could not be filed")?;

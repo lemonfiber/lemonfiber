@@ -50,6 +50,8 @@ fn settings_of(
             | Outcome::PartWay(_)
             | Outcome::Granted(_)
             | Outcome::Watched(_)
+            | Outcome::Askable(_)
+            | Outcome::Asked(_)
             | Outcome::FrontDoor(_)
             | Outcome::News(_)
             | Outcome::Stuck(_)

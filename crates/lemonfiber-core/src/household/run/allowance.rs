@@ -20,7 +20,7 @@ use std::time::SystemTime;
 
 use crate::asking::{Estimate, Policy, Standing};
 use crate::model::{Counted, MemberAsking};
-use crate::ports::service::{Asking, Headroom, Left, Member};
+use crate::ports::service::{Asking, Failure, Headroom, HouseholdRequest, Left, Member};
 use crate::quality::Selection;
 use crate::recyclarr::Kind;
 
@@ -100,6 +100,84 @@ pub(super) async fn gathered(
         household: requests.asking().await.ok(),
         members,
     }
+}
+
+/// What the request service holds for one member, read for them alone.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct OwnAllowance {
+    /// The identifier the request service tells them apart by, or nothing where it holds
+    /// no account for them yet and they are under the household's own setting.
+    pub(crate) id: Option<String>,
+    /// Whether what they ask for arrives without anybody seeing it first.
+    pub(crate) approves_own: bool,
+    /// What their period has counted and what it still allows.
+    pub(crate) headroom: Headroom,
+    /// The same, as the household read reports it.
+    pub(crate) asking: MemberAsking,
+}
+
+/// What one member may ask for, as the request service holds it: their own account's
+/// standing where it holds one, and the household's own setting, with nothing yet
+/// counted, where it does not.
+///
+/// # Errors
+///
+/// The [`Failure`] of whichever question the request service did not answer.
+pub(crate) async fn allowance_of(
+    requests: &dyn lemonfiber_contract::capabilities::request::intake::Fills,
+    account: &Member,
+    now: SystemTime,
+) -> Result<OwnAllowance, Failure> {
+    let (id, approves_own, headroom) =
+        if let Some(requesting) = requests.requesting(&account.id).await? {
+            let headroom = requests.left(&requesting.id).await?;
+            (Some(requesting.id), requesting.approves_own, headroom)
+        } else {
+            let household = requests.asking().await?;
+            let left = Left {
+                limit: household.quota.map(|quota| quota.requests),
+                used: 0,
+                days: household.quota.map(|quota| quota.days),
+            };
+            (
+                None,
+                household.approves_own,
+                Headroom {
+                    films: left,
+                    television: left,
+                },
+            )
+        };
+    let asked = requests.requests().await?;
+    let made: Vec<&str> = asked
+        .iter()
+        .filter(|request| made_by(request, account))
+        .filter(|request| {
+            crate::household::State::of(request.request_status, request.media_status)
+                != Some(crate::household::State::Declined)
+        })
+        .filter_map(|request| request.made.as_deref())
+        .collect();
+    let held = Held {
+        id: id.clone().unwrap_or_default(),
+        approves_own,
+        headroom,
+    };
+    Ok(OwnAllowance {
+        asking: reported(&held, &made, now),
+        id,
+        approves_own,
+        headroom,
+    })
+}
+
+/// Whether `account` made `request`: by the media server's id where the record carries
+/// one, and by name only where it carries none.
+fn made_by(request: &HouseholdRequest, account: &Member) -> bool {
+    request.member_id.as_ref().map_or_else(
+        || request.member.eq_ignore_ascii_case(&account.name),
+        |id| id.eq_ignore_ascii_case(&account.id),
+    )
 }
 
 /// What one member may ask for, as the report carries it.

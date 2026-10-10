@@ -437,7 +437,7 @@
         },
         {
           "path": "request.intake/v1/operations/detail.json",
-          "sha256": "3c57ab430af9bb34b74591a8b061c7d1bbc7ec2433ea7664f22df04db94720cc"
+          "sha256": "fd086afdcbcafd226dd210ca1a4ea8b085c0a9e228e477fc8ad3d3f9a12bf0bc"
         },
         {
           "path": "request.intake/v1/operations/ask.json",
@@ -460,7 +460,7 @@
       "files": [
         {
           "path": "identity.source/v1/openapi.json",
-          "sha256": "b686dfa3e5d755c5dd2587b8331f758af85d1c4a6fb7be4d518782b1f86b20b0"
+          "sha256": "ca82c8976f0b6c3e36d495b429c42415790e1bf477b164144d5ebc379ce5d706"
         },
         {
           "path": "identity.source/v1/operations/startup_completed.json",
@@ -511,6 +511,10 @@
           "sha256": "505cb3c167aab7d132028b97e8211f9deb7f4c127499e56d479c79fe2c8afcfa"
         },
         {
+          "path": "identity.source/v1/operations/country.json",
+          "sha256": "84eb40e9bf58bd7302d364dc794afb56024be777352eb206e714512f0d2c087d"
+        },
+        {
           "path": "identity.source/v1/operations/allow.json",
           "sha256": "8dcb93f2933fdedab3c13c5c68490da4556e4a4d2180affb1f7eb7d2ade73e72"
         },
@@ -532,14 +536,14 @@
         },
         {
           "path": "identity.source/v1/conformance.json",
-          "sha256": "cb1cda31028b3b6828cd79a159871c382144e57d5e1d3c7700f0607cb04b5011"
+          "sha256": "5e9f0e1fda58ddd9d09903081a70af2f45149bcaa97b175bd8a71b432c234b51"
         }
       ],
       "majors": [
         1
       ],
       "openapi": "identity.source/v1/openapi.json",
-      "operations": 17
+      "operations": 18
     },
     {
       "capability": "media.serve",

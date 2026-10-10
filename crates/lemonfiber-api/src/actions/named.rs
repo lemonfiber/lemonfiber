@@ -39,6 +39,7 @@ mod household;
 mod migrating;
 mod sharing;
 mod viewing;
+mod wishing;
 
 use super::asked::{unwanted, Arguments, Disturbing};
 use super::reading::{consent, diagnosing, following, listing, widening};
@@ -86,6 +87,7 @@ pub const OFFERED: &[&str] = &[
     "household-handoff",
     "grant",
     "watched",
+    "ask",
     "support",
     "restore",
     "watch",
@@ -430,11 +432,6 @@ fn unknown(action: &str) -> Refused {
     }
 }
 
-/// Which long-running command was named, or why the word names none.
-///
-/// Named apart from the table for the reason the setting is: it can refuse, and a
-/// reading that can refuse belongs beside its refusal rather than inside a list of
-/// arms. What it offers is built from the list itself, so a command that becomes
 /// Which of the four removals was asked for, and what was answered about it.
 ///
 /// The removal is required: one with none named has lost the only part of it that
@@ -495,7 +492,9 @@ fn updating(
     })
 }
 
-/// hostable is offered here without anybody remembering to say so.
+/// Which long-running command was named, or why the word names none: it can refuse, so it
+/// sits beside its refusal rather than in the table, and what it offers is built from the
+/// list itself, so a command that becomes hostable is offered without anybody saying so.
 fn keeping(action: &str, kept: Option<String>) -> Result<Hostable, Refused> {
     let Some(named) = kept else {
         return Err(Refused::Missing {

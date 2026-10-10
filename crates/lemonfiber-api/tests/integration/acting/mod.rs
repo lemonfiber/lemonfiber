@@ -9,7 +9,7 @@ pub(crate) use lemonfiber_api::actions::{
     TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_NAME,
     TAKES_NARROWING, TAKES_PLUGIN, TAKES_POLICY, TAKES_PRESET, TAKES_PROGRESS, TAKES_REASON,
     TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING,
-    TAKES_SOURCE, TAKES_TERM, TAKES_TIER, TAKES_WAITING,
+    TAKES_SOURCE, TAKES_TERM, TAKES_TIER, TAKES_TITLE, TAKES_WAITING, TAKES_WISH,
 };
 pub(crate) use lemonfiber_core::app::Command;
 pub(crate) use std::collections::BTreeSet;
@@ -135,8 +135,14 @@ pub(crate) fn exactly_what(action: &str) -> Arguments {
         exceeded: takes(TAKES_SHARING).then(|| AT_THE_CAP.to_owned()),
         unrestricted_for: takes(TAKES_SHARING).then_some(MINUTES),
         device: takes(TAKES_DEVICE).then(|| DEVICE.to_owned()),
-        id: takes(TAKES_PROGRESS).then(|| TITLE.to_owned()),
+        id: takes(TAKES_TITLE).then(|| TITLE.to_owned()),
         position: takes(TAKES_PROGRESS).then_some(POSITION),
+        kind: takes(TAKES_WISH).then(|| WISHED_KIND.to_owned()),
+        seasons: if takes(TAKES_WISH) {
+            vec![SEASON]
+        } else {
+            Vec::new()
+        },
         // Left as the plainer of the two answers; the sweep gives the other.
         ended: None,
         // Never handed here: a rehearsal is carried on the run rather than on the
@@ -153,6 +159,9 @@ pub(crate) const TITLE: &str = "0123456789abcdef0123456789abcdef";
 
 /// How far into it, in seconds.
 pub(crate) const POSITION: u64 = 1234;
+
+/// The kind of title a member asks for, as a page of their search names it.
+pub(crate) const WISHED_KIND: &str = "tv";
 
 /// A capability a choice of filler is about.
 pub(crate) const CAPABILITY: &str = "indexer.search";

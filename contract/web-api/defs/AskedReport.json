@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What asking for one title came to, or would come to under a rehearsal.",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "description": "Whether it is a series or a film.",
+      "$ref": "TitleKind.json"
+    },
+    "leaves": {
+      "description": "What is left of the member's allowance once it is counted.",
+      "$ref": "LeftAfter.json"
+    },
+    "member": {
+      "description": "The member it was asked for, by the name they are known by.",
+      "type": "string"
+    },
+    "outcome": {
+      "description": "What it came to.",
+      "$ref": "Became.json"
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what would have happened, with none of it done.",
+      "type": "boolean"
+    },
+    "released": {
+      "description": "Whether the title has come out yet. One that has not is asked for, and arrives\nonce it is out.",
+      "type": "boolean"
+    },
+    "said": {
+      "description": "All of it, in one household sentence.",
+      "type": "string"
+    },
+    "seasons": {
+      "description": "The seasons asked for, none for a film.",
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "format": "uint32",
+        "minimum": 0
+      }
+    },
+    "title": {
+      "description": "The id of the title asked for.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "member",
+    "title",
+    "kind",
+    "seasons",
+    "outcome",
+    "leaves",
+    "released",
+    "said",
+    "rehearsed"
+  ]
+}

@@ -238,6 +238,7 @@ fn refusals() -> BTreeMap<String, Listed> {
         .chain(wiring::REFUSED)
         .chain(REFUSALS)
         .chain(lemonfiber_core::screening::REFUSALS)
+        .chain(lemonfiber_core::wishing::REFUSALS)
         .filter_map(|code| {
             let declared = declared(code)?;
             Some((
@@ -279,7 +280,9 @@ fn key_callable() -> Vec<Callable> {
 ///
 /// The command is named from the plainest arguments that name one — nothing, a form,
 /// or the checks that disturb the system — because what an action reaches is decided by
-/// its name and those, never by which form or which service it was given.
+/// its name and those, never by which form or which service it was given. An action that
+/// none of those names, because it cannot be asked without its subject, is named from
+/// something for every argument any action reads.
 #[must_use]
 pub fn rehearsable(action: &str) -> bool {
     let given = |forms: bool, disruptive: bool| Arguments {
@@ -294,6 +297,7 @@ pub fn rehearsable(action: &str) -> bool {
     [given(false, false), given(true, false), given(false, true)]
         .into_iter()
         .find_map(|arguments| named(action, arguments).ok())
+        .or_else(|| crate::actions::reached(action, Arguments::naming_everything()).ok())
         .is_some_and(|command| {
             matches!(
                 lemonfiber_core::app::rehearsal::asked(&command).rehearsal,

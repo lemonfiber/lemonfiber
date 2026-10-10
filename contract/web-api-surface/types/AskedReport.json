@@ -1,0 +1,59 @@
+{
+  "fields": {
+    "kind": {
+      "type": [
+        "ref:TitleKind"
+      ],
+      "required": true
+    },
+    "leaves": {
+      "type": [
+        "ref:LeftAfter"
+      ],
+      "required": true
+    },
+    "member": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "outcome": {
+      "type": [
+        "ref:Became"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "released": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "said": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "seasons": {
+      "type": [
+        "array[integer/uint32]"
+      ],
+      "required": true
+    },
+    "title": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

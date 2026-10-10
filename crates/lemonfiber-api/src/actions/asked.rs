@@ -20,7 +20,7 @@ pub use takers::{
     TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_NAME, TAKES_NARROWING, TAKES_PLUGIN, TAKES_POLICY,
     TAKES_PRESET, TAKES_PROGRESS, TAKES_REASON, TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE,
     TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING, TAKES_SOURCE, TAKES_TERM, TAKES_TIER,
-    TAKES_WAITING,
+    TAKES_TITLE, TAKES_WAITING, TAKES_WISH,
 };
 pub(crate) use unwanted::{unwanted, TAKEN};
 
@@ -46,7 +46,7 @@ pub struct Arguments {
     pub wait: Waiting,
     /// The one service to act on instead of the whole stack.
     pub service: Option<String>,
-    /// Who an invitation is for, as they will sign in.
+    /// Who an action addressed to somebody in the household is for, as they sign in.
     pub name: Option<String>,
     /// The libraries an invitation lets them open, by the names the media server
     /// gives those libraries. Empty is every one.
@@ -175,14 +175,21 @@ pub struct Arguments {
     /// The id a player keeps for the device it plays on, which a grant opens a session
     /// for.
     pub device: Option<String>,
-    /// The title or episode a player's progress is about, by the identifier the shelf
-    /// lists it under.
+    /// The title an action is about: the title or episode a player's progress is on,
+    /// by the identifier the shelf lists it under, or the title a member asks for, by
+    /// the identifier their search listed it under.
     pub id: Option<String>,
     /// How far into it the member is, in whole seconds.
     pub position: Option<u64>,
     /// Whether the member finished it. Absent says nothing about finishing, which is
     /// a position like any other.
     pub ended: Option<bool>,
+    /// Whether the title asked for is a series or a film, as a page of a member's search
+    /// names it: `tv` or `movies`.
+    pub kind: Option<String>,
+    /// The seasons of a series asked for. None names every season not already here or
+    /// on its way.
+    pub seasons: Vec<u32>,
     /// Whether to say what the action would do and do none of it.
     ///
     /// The command line's `--dry-run`, taken by every action. It is carried on the
@@ -251,6 +258,8 @@ impl Arguments {
             device: Some("a-phone-0123".to_owned()),
             id: Some("0123456789abcdef0123456789abcdef".to_owned()),
             position: Some(1),
+            kind: Some("tv".to_owned()),
+            seasons: vec![1],
             ..Self::default()
         }
     }

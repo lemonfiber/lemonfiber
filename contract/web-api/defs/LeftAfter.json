@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What is left of a member's allowance once an ask is counted, for each kind a limit\nholds them to.",
+  "type": "object",
+  "properties": {
+    "films": {
+      "description": "Films still to ask for, absent where nothing limits them.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "minimum": 0
+    },
+    "television": {
+      "description": "Seasons of television still to ask for, absent where nothing limits them.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "minimum": 0
+    }
+  }
+}

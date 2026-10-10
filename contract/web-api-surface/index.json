@@ -6,6 +6,8 @@
     "alert": "ref:Alert",
     "alerts": "ref:AlertReport",
     "archives": "ref:Listing",
+    "askable": "ref:AskableReport",
+    "asked": "ref:AskedReport",
     "backup": "ref:BackupReport",
     "bandwidth": "ref:Sharing",
     "beside": "ref:BesideReport",
@@ -193,6 +195,18 @@
     "WIRE-4": 500,
     "WIRE-5": 400,
     "WIRE-6": 400,
-    "WIRE-7": 400
+    "WIRE-7": 400,
+    "WISH-1": 400,
+    "WISH-10": 400,
+    "WISH-11": 400,
+    "WISH-12": 404,
+    "WISH-2": 400,
+    "WISH-3": 404,
+    "WISH-4": 409,
+    "WISH-5": 409,
+    "WISH-6": 409,
+    "WISH-7": 503,
+    "WISH-8": 503,
+    "WISH-9": 503
   }
 }

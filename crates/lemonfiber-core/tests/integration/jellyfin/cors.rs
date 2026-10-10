@@ -125,3 +125,33 @@ async fn a_write_the_server_refuses_is_reported() {
 
     assert!(reader(&fake).allow_only(DOOR).await.is_err());
 }
+
+/// The country its rating table is named for is read out of the same configuration, as
+/// the two capital letters a certification is looked up by.
+#[tokio::test]
+async fn the_country_its_ratings_are_named_for_is_read_out_of_the_configuration() {
+    use lemonfiber_core::ports::service::Household as _;
+    for (configuration, country) in [
+        (r#"{"MetadataCountryCode":"gb"}"#, Some("GB")),
+        (r#"{"MetadataCountryCode":"US"}"#, Some("US")),
+        (r#"{"MetadataCountryCode":""}"#, None),
+        (r#"{"MetadataCountryCode":"G1"}"#, None),
+        (r#"{"MetadataCountryCode":"GBR"}"#, None),
+        (r#"{"ServerName":"nas"}"#, None),
+    ] {
+        let fake = Fake::in_turn(vec![
+            Answer::reply(200, SIGNED_IN),
+            Answer::reply(200, configuration),
+        ]);
+
+        let read = reader(&fake).country().await;
+
+        assert_eq!(
+            read.ok(),
+            Some(country.map(str::to_owned)),
+            "{configuration}"
+        );
+    }
+    let refused = Fake::in_turn(vec![Answer::reply(200, SIGNED_IN), Answer::reply(500, "")]);
+    assert!(reader(&refused).country().await.is_err());
+}

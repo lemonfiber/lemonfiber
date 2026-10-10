@@ -51,6 +51,7 @@ mod update;
 mod viewing;
 pub(crate) mod walkthrough;
 mod wiring;
+mod wishing;
 
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::model::{
@@ -246,6 +247,8 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::PartWay(report) => viewing::part_way(report),
         Outcome::Granted(report) => viewing::grant(report),
         Outcome::Watched(report) => viewing::watched(report),
+        Outcome::Askable(report) => wishing::askable(report),
+        Outcome::Asked(report) => wishing::asked(report),
         Outcome::Hosting(report) => hosting::hosting(report),
         Outcome::FrontDoor(report) => door::front_door(report),
         Outcome::News(report) => news::news(report),

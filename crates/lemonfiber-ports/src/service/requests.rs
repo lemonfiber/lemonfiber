@@ -76,11 +76,20 @@ pub enum RequestStatus {
 
 /// What became of the media one request asked for.
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
 )]
 #[serde(rename_all = "kebab-case")]
 pub enum MediaStatus {
     /// Nothing is known about it yet.
+    #[default]
     Unknown,
     /// Known and waiting.
     Pending,

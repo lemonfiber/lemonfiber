@@ -10,7 +10,7 @@ use super::takers::{
     TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_NAME, TAKES_NARROWING, TAKES_PLUGIN, TAKES_POLICY,
     TAKES_PRESET, TAKES_PROGRESS, TAKES_REASON, TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE,
     TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING, TAKES_SOURCE, TAKES_TERM, TAKES_TIER,
-    TAKES_WAITING,
+    TAKES_TITLE, TAKES_WAITING, TAKES_WISH,
 };
 use super::Arguments;
 use crate::actions::Refused;
@@ -96,8 +96,18 @@ pub(crate) const TAKEN: &[Taken] = &[
     },
     Taken {
         name: "id",
-        takers: TAKES_PROGRESS,
+        takers: TAKES_TITLE,
         given: |arguments| arguments.id.is_some(),
+    },
+    Taken {
+        name: "kind",
+        takers: TAKES_WISH,
+        given: |arguments| arguments.kind.is_some(),
+    },
+    Taken {
+        name: "seasons",
+        takers: TAKES_WISH,
+        given: |arguments| !arguments.seasons.is_empty(),
     },
     Taken {
         name: "position",

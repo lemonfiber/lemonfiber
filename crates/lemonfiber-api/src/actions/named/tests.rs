@@ -18,6 +18,8 @@ fn everything(confirm: bool) -> Arguments {
         id: Some("0123456789abcdef0123456789abcdef".to_owned()),
         position: Some(1),
         ended: Some(true),
+        kind: Some("movies".to_owned()),
+        seasons: Vec::new(),
         libraries: vec!["Films".to_owned()],
         age_limit: Some(12),
         unrated: Some("allow".to_owned()),
@@ -203,4 +205,41 @@ fn progress_without_a_position_and_a_grant_without_a_device_are_refused_by_name(
         super::viewing::asked_for("grant", Arguments::default()).err(),
         Some(missing("grant", "device"))
     );
+}
+
+/// An ask without the title or its kind is refused by the argument it lacks, a kind that
+/// is neither is refused naming both, and an ask naming nobody is the core's to refuse.
+#[test]
+fn an_ask_is_refused_by_what_it_lacks_and_a_kind_that_is_neither() {
+    use lemonfiber_core::app::{Command, Wishing};
+    use lemonfiber_core::ports::media::Kind;
+    let missing = |argument: &str| crate::actions::Refused::Missing {
+        action: "ask".to_owned(),
+        argument: argument.to_owned(),
+    };
+    let titled = |kind: Option<&str>| Arguments {
+        id: Some("603".to_owned()),
+        kind: kind.map(str::to_owned),
+        ..Arguments::default()
+    };
+    assert_eq!(
+        super::wishing::asked_for(Arguments::default()).err(),
+        Some(missing("id"))
+    );
+    assert_eq!(
+        super::wishing::asked_for(titled(None)).err(),
+        Some(missing("kind"))
+    );
+    assert_eq!(
+        super::wishing::asked_for(titled(Some("film"))).err(),
+        Some(crate::actions::Refused::Unrecognised {
+            argument: "kind".to_owned(),
+            offered: "`film` is neither `movies` nor `tv`".to_owned(),
+        })
+    );
+    assert!(matches!(
+        super::wishing::asked_for(titled(Some("movies"))),
+        Ok(Command::Wish(Wishing::Ask { member, wish }))
+            if member.is_empty() && wish.kind == Kind::Movies && wish.seasons.is_empty()
+    ));
 }

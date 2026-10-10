@@ -134,6 +134,7 @@ pub mod stored;
 pub mod telling;
 #[cfg(test)]
 pub mod test_support;
+pub mod wishing;
 
 // So the context builder the core's tests share with every other crate's can name this
 // crate the way the others do.
