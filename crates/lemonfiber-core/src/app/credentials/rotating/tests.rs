@@ -215,9 +215,9 @@ async fn the_stacks_administrator_password_is_not_rotated_against_a_plugins_serv
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
 
-/// A contracted media server's administrator's password is never changed: it is spoken
-/// to over its contracts, which change none, so it is asked nothing even where a password
-/// is recorded for it.
+/// A contracted media server's administrator's password is never changed: with none
+/// recorded there is nothing to change, and with one recorded it is still spoken to over
+/// its contracts, which change none, so it is asked nothing either way.
 #[tokio::test]
 async fn a_contracted_servers_administrator_password_is_not_replaced() {
     let installed = [crate::test_support::a_contracted_media_server(Some(
@@ -241,6 +241,12 @@ async fn a_contracted_servers_administrator_password_is_not_replaced() {
         .with_http(http.clone());
     let server = crate::app::targets::MediaServer::of(&fillers);
 
+    let unheld = match server.as_ref() {
+        Some(server) => super::replace_jellyfin_password(&ctx, server, false)
+            .await
+            .err(),
+        None => None,
+    };
     let recorded = server
         .as_ref()
         .map(|one| one.record_password(&ctx, &lemonfiber_fixtures::support::a_password()));
@@ -252,6 +258,10 @@ async fn a_contracted_servers_administrator_password_is_not_replaced() {
     };
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 
+    assert!(matches!(
+        &unheld,
+        Some(super::Replacing::Unproven(detail)) if detail == super::NO_ADMINISTRATOR_HELD
+    ));
     assert_eq!(recorded, Some(Ok(())));
     assert!(matches!(
         &refused,
