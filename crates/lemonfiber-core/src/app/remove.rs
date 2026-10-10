@@ -16,7 +16,7 @@
 
 use crate::app::Ctx;
 use crate::model::{HouseholdRemoval, Revoked};
-use crate::ports::service::{Member, Requests as _};
+use crate::ports::service::Member;
 
 /// Remove somebody from the household, or — until `confirm` — say what that would cost.
 ///
@@ -60,7 +60,7 @@ pub(crate) async fn remove(
         return Err(Box::new(runs_the_server(&member.name)));
     }
 
-    let asking = super::targets::seerr_reader(ctx, &manifest).await;
+    let asking = super::targets::household_requests(ctx, &manifest).await;
     let mut cost = what_it_costs(asking.as_ref(), &member).await;
 
     if !confirm {
@@ -150,7 +150,7 @@ async fn also_from_the_request_service(
         // Nothing there to revoke, so nothing is outstanding.
         _ => return Revoked::Everywhere,
     };
-    if access.seerr.remove_member(id).await.is_ok() {
+    if access.requests.remove_member(id).await.is_ok() {
         return Revoked::Everywhere;
     }
     findings.push(
@@ -176,10 +176,10 @@ enum Held {
 
 /// The account the request service holds for this member, where it holds one.
 async fn their_account(access: &super::targets::HouseholdAccess, member: &Member) -> Held {
-    if access.seerr.answers().await.is_err() {
+    if access.requests.answers().await.is_err() {
         return Held::Unreadable;
     }
-    match access.seerr.member_for(&member.id).await {
+    match access.requests.member_for(&member.id).await {
         Ok(Some(id)) => Held::Account(id),
         Ok(None) => Held::None,
         Err(_) => Held::Unreadable,
@@ -194,7 +194,7 @@ async fn their_account(access: &super::targets::HouseholdAccess, member: &Member
 async fn theirs(access: &super::targets::HouseholdAccess, member: &Member) -> usize {
     let id = member.id.to_lowercase();
     let name = member.name.to_lowercase();
-    access.seerr.requests().await.map_or(0, |requests| {
+    access.requests.requests().await.map_or(0, |requests| {
         requests
             .iter()
             .filter(|request| {

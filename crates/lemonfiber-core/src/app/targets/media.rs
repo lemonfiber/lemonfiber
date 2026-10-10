@@ -64,7 +64,7 @@ impl MediaServer {
     /// nothing to sign in to rather than something to guess at.
     #[must_use]
     pub(crate) fn of(fillers: &Fillers) -> Option<Self> {
-        let (filler, asker) = settled(fillers)?;
+        let (filler, asker) = fillers.filling(IDENTITY)?;
         let adapter = ApiKind::Jellyfin;
         if !filler.speaks(adapter) {
             return None;
@@ -155,32 +155,6 @@ impl MediaServer {
         self.recorded_password(ctx)
             .map(|password| self.signed_in(ctx, password))
     }
-}
-
-/// The service filling the identity source, with the service asking for it where one
-/// does: the one the ask settled on, or where nothing asks, the one service here serving
-/// identity. Nothing where the ask is contested, or where nothing asks and more than one
-/// service serves it.
-pub(crate) fn settled(fillers: &Fillers) -> Option<(&Filler, Option<&Filler>)> {
-    match fillers.asks().iter().find(|ask| ask.capability == IDENTITY) {
-        Some(ask) => {
-            let [filler] = ask.fillers.as_slice() else {
-                return None;
-            };
-            Some((filler, fillers.service(&ask.by)))
-        }
-        None => Some((serving_unasked(fillers)?, None)),
-    }
-}
-
-/// The one service here serving identity, where nothing asks for one: nothing where none
-/// does, or where more than one does and nothing settles which.
-fn serving_unasked(fillers: &Fillers) -> Option<&Filler> {
-    let mut serving = fillers
-        .services()
-        .filter(|one| one.provides.iter().any(|capability| capability == IDENTITY));
-    let one = serving.next()?;
-    serving.next().is_none().then_some(one)
 }
 
 /// The media server as a read from the host finds it: the stack's services and every

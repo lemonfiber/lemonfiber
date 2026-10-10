@@ -4,6 +4,12 @@
 //! hands back something that can talk. Absent where the key is not written yet, which is a
 //! service still starting rather than a fault.
 
+use std::path::Path;
+use std::sync::Arc;
+
+use lemonfiber_contract::capabilities::request::intake;
+use lemonfiber_manifest::ApiKind;
+
 use crate::app::Ctx;
 use crate::doctor::credentials::Target;
 use crate::jellyfin::Jellyfin;
@@ -11,13 +17,12 @@ use crate::ports::service::UsenetAccounts;
 use crate::prowlarr::Prowlarr;
 use crate::seerr::Seerr;
 use crate::servarr::Servarr;
-use crate::wiring::Fillers;
-use std::path::Path;
-use std::sync::Arc;
+use crate::wiring::{Filler, Fillers, Holder};
 
 use crate::recyclarr::Kind;
 
 use super::downloads::download_targets;
+use super::filled::{spoken, Spoken};
 use super::layout::{project_directory, read_owned, service_config_dir};
 use super::servarr::{servarr_targets, target_for};
 
@@ -29,7 +34,7 @@ pub(crate) fn declined_reader(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
 ) -> Option<Jellyfin> {
-    let addr = service_addr(services, lemonfiber_manifest::ApiKind::Jellyfin)?;
+    let addr = service_addr(services, ApiKind::Jellyfin)?;
     let password =
         super::secrets::recorded_secret(ctx, crate::config::JELLYFIN_ADMIN_PASSWORD_KEY)?;
     Some(
@@ -111,32 +116,69 @@ pub(crate) async fn seerr_as_owner(
     }
 }
 
-/// What reading the household's requests needs: the request service, carrying the key
-/// it answers as its owner, whose reads see every member's requests.
+/// What reading the household's requests needs: the request service, asked as its
+/// owner, whose reads see every member's requests.
 pub(crate) struct HouseholdAccess {
-    /// The request service, reached on the host.
-    pub seerr: Seerr,
+    /// The request service.
+    pub requests: Arc<dyn intake::Fills>,
 }
 
-/// The request service to read the household from, or nothing where the stack has no
-/// request service, no media server for it to authenticate the household against, or a
-/// request service that has not written its own key yet.
+/// The request service to read the household from, or nothing where there is no media
+/// server for it to authenticate the household against or [`requests_from`] finds none.
 ///
-/// The household view treats any of those as nothing to report rather than a fault: a
-/// stack without a request service has no household requests, and one not yet set up
-/// has nobody to have asked for anything.
-pub(crate) async fn seerr_reader(
+/// The household view treats either as nothing to report rather than a fault: a stack
+/// without a request service has no household requests, and one not yet set up has
+/// nobody to have asked for anything.
+pub(crate) async fn household_requests(
     ctx: &Ctx,
     manifest: &lemonfiber_manifest::Manifest,
 ) -> Option<HouseholdAccess> {
-    let services = manifest.services.as_slice();
-    let seerr = service_addr(services, lemonfiber_manifest::ApiKind::Seerr)?;
-    super::media::hosted(ctx, manifest)?;
-    let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-    let key = seerr_key(ctx, services, project.as_deref()).await?;
-    Some(HouseholdAccess {
-        seerr: Seerr::keyed(ctx.seams.http.clone(), seerr.loopback, "seerr", key),
-    })
+    let fillers = super::media::fillers_here(ctx, manifest);
+    super::media::MediaServer::of(&fillers)?;
+    requests_from(ctx, &fillers).await
+}
+
+/// Whatever among `fillers` fills `request.intake`, asked over the contract where it
+/// speaks it, and otherwise as the stack's own request service through
+/// [`owned_requests`].
+///
+/// Nothing where nothing here fills it, where it speaks the contract and cannot be
+/// asked over it — never then asked any other way — or where it speaks none and is not
+/// the stack's own request service holding the key it wrote for itself.
+pub(crate) async fn requests_from(ctx: &Ctx, fillers: &Fillers) -> Option<HouseholdAccess> {
+    let (filler, _) = fillers.filling(intake::CAPABILITY)?;
+    let requests: Arc<dyn intake::Fills> =
+        match spoken(ctx, filler, intake::CAPABILITY, intake::MAJOR).await {
+            Spoken::Over(adapter) => Arc::new(intake::Adapter(adapter)),
+            Spoken::Unanswered => return None,
+            Spoken::Not => Arc::new(owned_requests(ctx, filler).await?),
+        };
+    Some(HouseholdAccess { requests })
+}
+
+/// Where the host reaches `filler` as the stack's own request service: nothing where it
+/// is a plugin's, is spoken to through another adapter, or publishes no port. The one
+/// gate before the stack's own request service is asked through this build's adapter
+/// for it.
+pub(crate) fn bundled_requests(filler: &Filler) -> Option<String> {
+    (filler.holder() == Holder::Stack && filler.speaks(ApiKind::Seerr))
+        .then_some(filler.published)
+        .flatten()
+        .map(loopback)
+}
+
+/// The key the stack's own request service `filler` wrote for itself, read from the
+/// settings beneath its own directory; nothing before it has written one.
+pub(crate) async fn requests_key(ctx: &Ctx, filler: &Filler) -> Option<String> {
+    crate::seerr::api_key(&credential_file(ctx, filler).await.text()?)
+}
+
+/// The stack's own request service `filler` is, carrying the key it wrote for itself;
+/// nothing where [`bundled_requests`] refuses it or it has not written its key yet.
+async fn owned_requests(ctx: &Ctx, filler: &Filler) -> Option<Seerr> {
+    let base = bundled_requests(filler)?;
+    let key = requests_key(ctx, filler).await?;
+    Some(Seerr::keyed(ctx.seams.http.clone(), base, &filler.id, key))
 }
 
 /// Where the host reaches a service, and the id it runs under.
@@ -155,7 +197,7 @@ pub(crate) struct ServiceAddr {
 /// own credential. Absent where the service names no such file.
 pub(crate) async fn credential_file(
     ctx: &Ctx,
-    filler: &crate::wiring::Filler,
+    filler: &Filler,
 ) -> crate::ports::filesystem::Beneath {
     match (filler.key_file.as_deref(), filler.confined_to.as_deref()) {
         (Some(file), Some(within)) => ctx.seams.filesystem.read_beneath(file, within).await,
@@ -165,7 +207,7 @@ pub(crate) async fn credential_file(
 
 /// Why a service's credential file was refused rather than read, naming the plugin
 /// that brought it where a plugin did.
-pub(crate) fn escaped(filler: &crate::wiring::Filler) -> String {
+pub(crate) fn escaped(filler: &Filler) -> String {
     let whose = match &filler.origin {
         crate::origin::Origin::Plugin { named } => named.as_str(),
         _ => filler.name.as_str(),
@@ -187,7 +229,7 @@ pub(crate) fn loopback(port: u16) -> String {
 /// named service resolves it the same way rather than re-deriving the URLs.
 pub(crate) fn service_addr(
     services: &[lemonfiber_manifest::Service],
-    kind: lemonfiber_manifest::ApiKind,
+    kind: ApiKind,
 ) -> Option<ServiceAddr> {
     services.iter().find_map(|service| {
         let api = service.api.as_ref()?;
@@ -267,7 +309,7 @@ pub(crate) async fn revoke_jellyfin_key(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
 ) -> Option<bool> {
-    let addr = service_addr(services, lemonfiber_manifest::ApiKind::Jellyfin)?;
+    let addr = service_addr(services, ApiKind::Jellyfin)?;
     let password = crate::seed::run::identity::recorded_jellyfin_password(ctx)?;
     let client = crate::jellyfin::Jellyfin::authenticated(
         ctx.seams.http.clone(),
@@ -289,7 +331,7 @@ pub(crate) async fn seerr_key(
     services: &[lemonfiber_manifest::Service],
     project: Option<&std::path::Path>,
 ) -> Option<String> {
-    let addr = service_addr(services, lemonfiber_manifest::ApiKind::Seerr)?;
+    let addr = service_addr(services, ApiKind::Seerr)?;
     let service = services.iter().find(|service| service.id == addr.id)?;
     let path = crate::app::targets::config_path(
         project?,
@@ -311,7 +353,7 @@ pub(crate) async fn bazarr_key(
     services: &[lemonfiber_manifest::Service],
     project: Option<&std::path::Path>,
 ) -> Option<String> {
-    let addr = service_addr(services, lemonfiber_manifest::ApiKind::Bazarr)?;
+    let addr = service_addr(services, ApiKind::Bazarr)?;
     let service = services.iter().find(|service| service.id == addr.id)?;
     let path = crate::app::targets::config_path(
         project?,
@@ -321,3 +363,6 @@ pub(crate) async fn bazarr_key(
     let within = service_config_dir(project?, &service.id);
     crate::bazarr::api_key(&read_owned(ctx.seams.filesystem.as_ref(), &path, &within).await?)
 }
+
+#[cfg(test)]
+mod tests;

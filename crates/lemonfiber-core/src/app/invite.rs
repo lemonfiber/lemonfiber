@@ -35,7 +35,7 @@ pub(crate) use reissuing::reissue;
 use crate::app::{Allowance, Ctx};
 use crate::invitation::{Spent, HOURS_TO_CLAIM};
 use crate::model::{Applied, Invitation, InvitationStanding, Linked};
-use crate::ports::service::{Allowed, Household as _, Member, Requests as _};
+use crate::ports::service::{Allowed, Household as _, Member};
 
 use allowing::{allowing, would_not_allow};
 use refusals::{
@@ -288,13 +288,13 @@ async fn undone(
 /// Reached with the service already signed in, because telling it about the household
 /// and holding one of them are one errand: see [`told`].
 async fn holding(access: &crate::app::targets::HouseholdAccess, member: &str) -> Linked {
-    match access.seerr.requesting(member).await {
+    match access.requests.requesting(member).await {
         // Nothing to hold rather than a failure to hold something: a member this
         // service has never heard of has no second permission to disagree with the
         // first, and the next run makes the account and holds it then.
         Ok(None) => Linked::NotTried,
         Ok(Some(requesting)) if !requesting.approves_own => Linked::Made,
-        Ok(Some(requesting)) => match access.seerr.approval_first(&requesting.id).await {
+        Ok(Some(requesting)) => match access.requests.approval_first(&requesting.id).await {
             Ok(()) => Linked::Made,
             Err(_) => Linked::NotYet,
         },
@@ -386,19 +386,19 @@ async fn told(
     members: &[String],
     narrowed: Option<&str>,
 ) -> Told {
-    let Some(access) = crate::app::targets::seerr_reader(ctx, manifest).await else {
+    let Some(access) = crate::app::targets::household_requests(ctx, manifest).await else {
         return Told {
             linked: Linked::NotTried,
             requesting: Linked::NotTried,
         };
     };
-    if access.seerr.answers().await.is_err() {
+    if access.requests.answers().await.is_err() {
         return Told {
             linked: Linked::NotYet,
             requesting: Linked::NotYet,
         };
     }
-    let linked = if access.seerr.link_members(members).await.is_err() {
+    let linked = if access.requests.link_members(members).await.is_err() {
         Linked::NotYet
     } else {
         Linked::Made

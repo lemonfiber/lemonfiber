@@ -20,7 +20,7 @@ use std::time::SystemTime;
 
 use crate::asking::{Estimate, Policy, Standing};
 use crate::model::{Counted, MemberAsking};
-use crate::ports::service::{Approving as _, Asking, Headroom, Left, Member, Requests as _};
+use crate::ports::service::{Asking, Headroom, Left, Member};
 use crate::quality::Selection;
 use crate::recyclarr::Kind;
 
@@ -75,13 +75,16 @@ pub(super) struct Held {
 ///
 /// One reach for both questions, because a second would be a second chance to disagree
 /// about whether the service answered at all.
-pub(super) async fn gathered(seerr: &crate::seerr::Seerr, accounts: &[Member]) -> Asked {
+pub(super) async fn gathered(
+    requests: &dyn lemonfiber_contract::capabilities::request::intake::Fills,
+    accounts: &[Member],
+) -> Asked {
     let mut members = BTreeMap::new();
     for account in accounts {
-        let Ok(Some(requesting)) = seerr.requesting(&account.id).await else {
+        let Ok(Some(requesting)) = requests.requesting(&account.id).await else {
             continue;
         };
-        let Ok(headroom) = seerr.left(&requesting.id).await else {
+        let Ok(headroom) = requests.left(&requesting.id).await else {
             continue;
         };
         members.insert(
@@ -94,7 +97,7 @@ pub(super) async fn gathered(seerr: &crate::seerr::Seerr, accounts: &[Member]) -
         );
     }
     Asked {
-        household: seerr.asking().await.ok(),
+        household: requests.asking().await.ok(),
         members,
     }
 }

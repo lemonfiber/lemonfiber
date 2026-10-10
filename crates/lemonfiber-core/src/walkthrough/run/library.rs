@@ -7,7 +7,7 @@
 //! everything after the first play is the same for both.
 
 use super::walk::Walk;
-use crate::app::targets::{seerr_reader, serving};
+use crate::app::targets::{household_requests, serving};
 use crate::model::WalkthroughReport;
 use crate::recyclarr::Kind;
 use crate::walkthrough::{Line, Reason, Shape, Step};
@@ -45,7 +45,7 @@ pub(super) async fn walk(
 
     let named = term.map_or_else(|| "your library".to_owned(), str::to_owned);
     walk.say(Line::saying(Step::Available, named.clone()));
-    let household = seerr_reader(walk.ctx, manifest).await.is_some();
+    let household = household_requests(walk.ctx, manifest).await.is_some();
     // No import happened, so there is nothing to say about hardlinks: the files were
     // already where they are.
     walk.finished(Shape::LibraryOnly, &named, None, household)

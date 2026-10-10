@@ -31,7 +31,7 @@
 use crate::error::{Diagnose, Problem};
 use crate::household::State;
 use crate::model::HouseholdReport;
-use crate::ports::service::{Approving as _, HouseholdRequest, Requests as _};
+use crate::ports::service::HouseholdRequest;
 
 use crate::app::command::{Answer, Decision};
 use crate::app::Ctx;
@@ -48,7 +48,7 @@ pub(crate) async fn deciding(
         .map_err(|err| Box::new(err.problem()))?;
     let access = super::reached(ctx, &manifest).await?;
     let asked = access
-        .seerr
+        .requests
         .requests()
         .await
         .map_err(|_| Box::new(crate::asking::unreachable(NOTHING_DECIDED)))?;
@@ -67,7 +67,7 @@ pub(crate) async fn deciding(
     let mut notes = Vec::new();
     if !ctx.dry_run {
         access
-            .seerr
+            .requests
             .decide(decision.request, approve)
             .await
             .map_err(|_| Box::new(crate::asking::unreachable(NOTHING_DECIDED)))?;

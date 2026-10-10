@@ -27,7 +27,7 @@ use std::collections::BTreeSet;
 
 use crate::asking::Reasons;
 use crate::config::REACH_HOUSEHOLD_KEY;
-use crate::ports::service::{Addressing as _, HouseholdRequest};
+use crate::ports::service::HouseholdRequest;
 use crate::telling::{tell, Told};
 
 use crate::app::targets::HouseholdAccess;
@@ -133,7 +133,7 @@ async fn passed_on(
             "nothing was sent to them — {REACH_HOUSEHOLD_KEY} is off, {YOURS}"
         ));
     }
-    let Ok(addresses) = access.seerr.reachable(request).await else {
+    let Ok(addresses) = access.requests.reachable(request).await else {
         return Some(format!(
             "where they are reached could not be read from the request service, {YOURS}"
         ));
