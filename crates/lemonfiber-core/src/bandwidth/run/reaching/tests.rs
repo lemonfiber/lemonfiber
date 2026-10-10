@@ -2,12 +2,15 @@ use std::sync::Arc;
 
 use lemonfiber_fixtures::http::{Answer as Replies, Fake};
 
+use lemonfiber_contract::Contracted;
+
 use super::{answer, holding, opened, said, DownloadTarget, Fetch};
 use crate::app::targets::DownloadKind;
 use crate::bandwidth::{Answer, Held, Period, Pulling, Verdict};
 use crate::config::Settings;
-use crate::ports::service::{Failure, Hours, Rates, Throttled, Wanted};
-use crate::test_support::{a_context, a_password, env_at};
+use crate::dashboard::Protocol;
+use crate::ports::service::{Failure, Hours, Moved, Pulling as Answered, Rates, Throttled, Wanted};
+use crate::test_support::{a_context, a_password, env_at, json};
 
 /// The three parts of an answer, where the client answered at all.
 fn parts(answer: &Answer) -> Option<(Held, Held, Option<Period>)> {
@@ -147,7 +150,10 @@ fn both() -> Vec<DownloadTarget> {
 fn both_kinds_of_client_are_opened_by_what_each_authenticates_with() {
     let ctx = a_context().build();
     let opened = opened(&ctx, &both());
-    let names: Vec<&str> = opened.iter().map(super::Client::name).collect();
+    let names: Vec<&str> = opened
+        .iter()
+        .map(|client| client.service.as_str())
+        .collect();
     assert_eq!(names, ["qbittorrent", "sabnzbd"]);
 }
 
@@ -392,4 +398,84 @@ fn a_client_that_would_not_answer_says_so_in_its_own_words() {
         service: "qbittorrent".to_owned(),
     })
     .contains("credential"));
+}
+
+/// A client asked over the contract of `protocol`, answering every limit and metering
+/// question with figures of its own, uploading where `uploads`.
+fn contracted(protocol: Protocol, uploads: bool) -> (DownloadTarget, Arc<Fake>) {
+    let held = json(&Throttled {
+        rates: wanted().active,
+        uploads,
+        hours: None,
+    });
+    let http = Fake::by_path(vec![
+        ("/restrain", Replies::reply(200, held.clone())),
+        ("/throttled", Replies::reply(200, held)),
+        ("/moving", Replies::reply(200, json(&Rates::default()))),
+        (
+            "/moved",
+            Replies::reply(
+                200,
+                json(&Moved {
+                    down: 900,
+                    up: 80,
+                    since_start: false,
+                }),
+            ),
+        ),
+        ("/pulling", Replies::reply(200, json(&Answered::Fetching))),
+    ]);
+    let target = DownloadTarget {
+        service: "fetcher".to_owned(),
+        kind: DownloadKind::Over {
+            protocol,
+            adapter: Contracted::new(http.clone(), "http://127.0.0.1:8080", "fetcher", "the-key"),
+        },
+        tunnelled: false,
+    };
+    (target, http)
+}
+
+#[tokio::test]
+async fn a_client_speaking_its_protocols_contract_is_limited_and_metered_over_it() {
+    let ctx = a_context().build();
+    for (protocol, capability, uploads) in [
+        (Protocol::Torrent, "download.torrent", true),
+        (Protocol::Usenet, "download.usenet", false),
+    ] {
+        let (target, http) = contracted(protocol, uploads);
+        let clients = opened(&ctx, &[target]);
+        assert_eq!(clients.len(), 1, "the contracted client opened");
+        for client in &clients {
+            let reported = holding(client, &wanted(), Some(Fetch::Ask), true).await;
+            assert_eq!(reported.client, "fetcher");
+            assert_eq!(reported.pulling, Some(Pulling::Fetching));
+            let up = if uploads {
+                Verdict::Holding
+            } else {
+                Verdict::NothingToLimit
+            };
+            assert!(
+                parts(&reported.answer).is_some_and(|(down, held_up, period)| {
+                    down.accepted == Some(SLOW)
+                        && down.verdict == Verdict::Holding
+                        && held_up.verdict == up
+                        && period.is_none()
+                }),
+                "{:?}",
+                reported.answer
+            );
+            assert!(client
+                .moved("2026-09")
+                .await
+                .is_some_and(|moved| moved.down == 900 && moved.up == 80));
+        }
+        let base = format!("http://127.0.0.1:8080/lemonfiber/{capability}/v1/");
+        let asked: Vec<String> = http.requests().into_iter().map(|one| one.url).collect();
+        assert!(
+            asked.iter().any(|url| url.ends_with("/restrain")),
+            "{asked:?}"
+        );
+        assert!(asked.iter().all(|url| url.starts_with(&base)), "{asked:?}");
+    }
 }

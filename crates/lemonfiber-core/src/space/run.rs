@@ -13,6 +13,8 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
+use lemonfiber_contract::capabilities::download::torrent;
+
 use crate::error::codes::space::ANOTHER_OFFER;
 use crate::error::{Diagnose, Problem, Remedy, State};
 use crate::ports::service::{Queued, Queues, Seeded};
@@ -180,7 +182,7 @@ pub(crate) struct Gathered {
     pub(crate) measured: Measured,
     /// The torrent client the completed downloads came from, where the stack has one
     /// this run can authenticate to.
-    pub(crate) holder: Option<Box<dyn lemonfiber_contract::capabilities::download::torrent::Fills>>,
+    pub(crate) holder: Option<Box<dyn torrent::Fills>>,
 }
 
 /// Read everything one reckoning is made of.
@@ -260,9 +262,7 @@ fn now(ctx: &Ctx) -> u64 {
 /// Only a torrent client has an answer — Usenet has no seeding to have — so a
 /// stack with no torrent client, or one lemonfiber cannot authenticate to, holds
 /// nothing rather than failing the reading.
-async fn holding(
-    holder: Option<&dyn lemonfiber_contract::capabilities::download::torrent::Fills>,
-) -> Vec<Seeded> {
+async fn holding(holder: Option<&dyn torrent::Fills>) -> Vec<Seeded> {
     match holder {
         Some(client) => client.seeding().await.unwrap_or_default(),
         None => Vec::new(),

@@ -1,6 +1,7 @@
 use lemonfiber_fixtures::http::{Answer as Replies, Fake};
 
 use super::{bandwidth, counting, fetch, possible, settled, wanted, zone, Asked, Fetch};
+use crate::app::targets::Downloading;
 use crate::bandwidth::capacity::Source;
 use crate::bandwidth::{
     Answer, Cap, Capacity, Declared, Held, Holding, Limit, Pulling, Reached, Respite, Restraint,
@@ -242,12 +243,12 @@ fn a_respite_lifts_the_limits_rather_than_changing_them() {
 /// One download client this stack could reach, for the refusals that come after
 /// the one about having none.
 fn a_client() -> Vec<super::reaching::Client> {
-    vec![super::reaching::Client::Torrent {
+    vec![super::reaching::Client {
         service: crate::qbittorrent::SERVICE.to_owned(),
-        client: Box::new(crate::qbittorrent::Qbittorrent::new(
+        client: Downloading::Torrent(Box::new(crate::qbittorrent::Qbittorrent::new(
             Fake::silent(),
             "http://127.0.0.1:8081",
-        )),
+        ))),
     }]
 }
 
@@ -365,9 +366,9 @@ fn a_cap() -> Declared {
 /// The torrent client, answering what it has moved from a transport of its
 /// own so the client beside it can be given a different one.
 fn a_client_that_says_what_it_moved() -> super::reaching::Client {
-    super::reaching::Client::Torrent {
+    super::reaching::Client {
         service: crate::qbittorrent::SERVICE.to_owned(),
-        client: Box::new(crate::qbittorrent::Qbittorrent::authenticated(
+        client: Downloading::Torrent(Box::new(crate::qbittorrent::Qbittorrent::authenticated(
             Fake::by_path(vec![
                 ("/api/v2/auth/login", Replies::reply(200, "Ok.")),
                 (
@@ -381,19 +382,19 @@ fn a_client_that_says_what_it_moved() -> super::reaching::Client {
             ]),
             "http://127.0.0.1:8081",
             a_password(),
-        )),
+        ))),
     }
 }
 
 /// The Usenet client on the same stack, which is not there.
 fn a_client_that_will_not_say() -> super::reaching::Client {
-    super::reaching::Client::Usenet {
+    super::reaching::Client {
         service: crate::sabnzbd::SERVICE.to_owned(),
-        client: Box::new(crate::sabnzbd::Sabnzbd::new(
+        client: Downloading::Usenet(Box::new(crate::sabnzbd::Sabnzbd::new(
             Fake::silent(),
             "http://127.0.0.1:8080",
             "the-key",
-        )),
+        ))),
     }
 }
 

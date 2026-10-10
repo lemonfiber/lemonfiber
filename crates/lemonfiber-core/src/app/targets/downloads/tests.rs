@@ -2,12 +2,21 @@ use std::sync::Arc;
 
 use lemonfiber_fixtures::http::{Answer, Fake};
 
+use lemonfiber_contract::capabilities::download::{torrent, usenet};
+use lemonfiber_contract::Contracted;
+use lemonfiber_fixtures::scratch::Scratch;
+
 use super::{
-    declared_downloads, download_targets, forwarded_client, read_transfers, torrent_client,
-    DownloadKind, DownloadTarget,
+    declared_downloads, download_targets, forwarded_client, protocol_of, read_transfers,
+    torrent_client, DownloadKind, DownloadTarget, Downloading,
 };
 use crate::config::Settings;
-use crate::test_support::{a_context, a_password, a_placed, an_installed, env_at, stack};
+use crate::dashboard::Protocol;
+use crate::ports::service::{Download, Seeded, UsenetAccount};
+use crate::test_support::{
+    a_context, a_password, a_placed, an_installed, contracted, contracted_context, env_at,
+    first_party, json, stack, CONTRACTED_KEY,
+};
 use crate::wiring::{Chosen, Fillers};
 
 /// The port the plugin's torrent client publishes on the host.
@@ -16,18 +25,22 @@ const BROUGHT_PORT: u16 = 9091;
 /// The password recorded for the plugin's torrent client alone.
 const BROUGHT_PASSWORD: &str = "the-plugins-own";
 
-/// The embedded stack beside a plugin's torrent client, reached on its own loopback port.
-fn beside_a_plugin_client() -> Fillers {
-    let api = lemonfiber_manifest::Api {
+/// The bundled torrent client's adapter, as a plugin's service names it.
+const fn torrent_api() -> lemonfiber_manifest::Api {
+    lemonfiber_manifest::Api {
         kind: lemonfiber_manifest::ApiKind::Qbittorrent,
         key_source: lemonfiber_manifest::KeySource::ConfigIni,
         path: None,
         version: None,
-    };
+    }
+}
+
+/// The embedded stack beside a plugin's torrent client, reached on its own loopback port.
+fn beside_a_plugin_client() -> Fillers {
     let client = a_placed(
         "seedbox",
         &["download.torrent"],
-        Some(api),
+        Some(torrent_api()),
         Some(BROUGHT_PORT),
     );
     stack()
@@ -139,9 +152,7 @@ async fn a_plugin_torrent_client_is_never_the_forwarded_one() {
     let targets = download_targets(&ctx, &fillers).await;
     let brought: Vec<_> = targets
         .into_iter()
-        .filter(|target| {
-            matches!(&target.kind, DownloadKind::Torrent { base, .. } if base.ends_with(&format!(":{BROUGHT_PORT}")))
-        })
+        .filter(|target| target.service == "seedbox")
         .collect();
 
     assert!(brought.iter().all(|target| !target.tunnelled));
@@ -229,13 +240,7 @@ fn a_usenet_client_declared_first_is_not_taken_for_the_torrent_client() {
 /// named with nothing to reach them by, where the read leaves both out.
 #[tokio::test]
 async fn every_download_client_is_declared_whether_or_not_it_is_reached() {
-    let api = lemonfiber_manifest::Api {
-        kind: lemonfiber_manifest::ApiKind::Qbittorrent,
-        key_source: lemonfiber_manifest::KeySource::ConfigIni,
-        path: None,
-        version: None,
-    };
-    let unpublished = a_placed("portless", &["download.torrent"], Some(api), None);
+    let unpublished = a_placed("portless", &["download.torrent"], Some(torrent_api()), None);
     let fillers = stack()
         .manifest()
         .map(|manifest| {
@@ -261,5 +266,284 @@ async fn every_download_client_is_declared_whether_or_not_it_is_reached() {
             .iter()
             .filter(|client| client.target.is_some())
             .count()
+    );
+}
+
+/// The plugin service that speaks a download client's contract.
+const FETCHER: &str = "fetcher";
+
+/// Where the contracted client answers on the host, for `capability`.
+fn contract_base(capability: &str) -> String {
+    format!("http://127.0.0.1:8080/lemonfiber/{capability}/v1/")
+}
+
+/// What the contracted client says it is downloading.
+fn arriving() -> Download {
+    Download {
+        name: "Arriving".to_owned(),
+        progress: 40,
+        speed: Some(9),
+        eta: None,
+        remaining: Some(600),
+    }
+}
+
+/// A first-party plugin's service speaking `capability`, holding its key where `keyed`,
+/// beside the stack's own clients. It names the bundled torrent client's adapter too,
+/// with a password recorded for it, so asking it the bundled way is open to a read
+/// that falls back.
+fn speaking(
+    name: &str,
+    capability: &str,
+    keyed: bool,
+    http: Arc<Fake>,
+) -> (Scratch, crate::app::Ctx, Fillers) {
+    let project = Scratch::new(name);
+    let mut installed = contracted("downloading", FETCHER, capability);
+    for placed in &mut installed.services {
+        placed.api = Some(torrent_api());
+    }
+    let fillers = stack()
+        .manifest()
+        .map(|manifest| {
+            Fillers::trusting(
+                &manifest,
+                &[installed],
+                &Chosen::default(),
+                Some(&project),
+                &first_party("downloading"),
+            )
+        })
+        .unwrap_or_default();
+    let env = env_at(name, &a_password());
+    let setting = fillers
+        .service(FETCHER)
+        .and_then(|filler| fillers.setting(filler, crate::config::PASSWORD_SUFFIX))
+        .unwrap_or_default();
+    assert!(crate::config::store::set(&env, &setting, BROUGHT_PASSWORD).is_ok());
+    let ctx = contracted_context(&project, FETCHER, keyed)
+        .settings(Settings {
+            env_file: Some(env),
+            ..Settings::default()
+        })
+        .build()
+        .with_http(http);
+    (project, ctx, fillers)
+}
+
+/// The targets among `targets` that are the contracted client.
+fn fetching(targets: Vec<DownloadTarget>) -> Vec<DownloadTarget> {
+    targets
+        .into_iter()
+        .filter(|target| target.service == FETCHER)
+        .collect()
+}
+
+/// Every request `http` was sent on the contracted client's port, each with the key it
+/// was sent under.
+fn to_the_fetcher(http: &Fake) -> Vec<(String, Option<String>)> {
+    http.requests()
+        .into_iter()
+        .filter(|asked| asked.url.starts_with("http://127.0.0.1:8080/"))
+        .map(|asked| {
+            let key = asked
+                .headers
+                .into_iter()
+                .find(|(name, _)| name == "Authorization")
+                .map(|(_, value)| value);
+            (asked.url, key)
+        })
+        .collect()
+}
+
+/// Whether every request in `asked` went to `capability`'s contract under the client's
+/// own key.
+fn over_the_contract(asked: &[(String, Option<String>)], capability: &str) -> bool {
+    let base = contract_base(capability);
+    let key = format!("Bearer {CONTRACTED_KEY}");
+    asked
+        .iter()
+        .all(|(url, sent)| url.starts_with(&base) && sent.as_deref() == Some(key.as_str()))
+}
+
+#[tokio::test]
+async fn a_torrent_client_speaking_its_contract_is_read_over_it_with_its_own_key() {
+    let held = Seeded {
+        name: "Imported".to_owned(),
+        bytes: 8_000,
+        ratio: 175,
+    };
+    let http = Fake::by_path(vec![
+        (
+            "download.torrent/v1/transfers",
+            Answer::reply(200, json(&vec![arriving()])),
+        ),
+        (
+            "download.torrent/v1/seeding",
+            Answer::reply(200, json(&vec![held.clone()])),
+        ),
+    ]);
+    let (_project, ctx, fillers) = speaking(
+        "downloads-contracted-torrent",
+        torrent::CAPABILITY,
+        true,
+        http.clone(),
+    );
+
+    let targets = fetching(download_targets(&ctx, &fillers).await);
+    assert!(
+        matches!(
+            targets.as_slice(),
+            [one] if matches!(one.kind, DownloadKind::Over { protocol: Protocol::Torrent, .. })
+                && !one.tunnelled
+        ),
+        "asked over the contract, never as the bundled client with the password recorded"
+    );
+    let mut read = Vec::new();
+    for target in &targets {
+        read.extend(read_transfers(&ctx, target).await);
+    }
+    assert_eq!(read, vec![arriving()]);
+    let seeding = match torrent_client(&ctx, &targets) {
+        Some(holder) => holder.seeding().await.ok(),
+        None => None,
+    };
+    assert_eq!(seeding, Some(vec![held]));
+    assert!(forwarded_client(&ctx, &targets).is_none());
+
+    let asked = to_the_fetcher(&http);
+    assert_eq!(asked.len(), 2, "{asked:?}");
+    assert!(over_the_contract(&asked, torrent::CAPABILITY), "{asked:?}");
+}
+
+#[tokio::test]
+async fn a_usenet_client_speaking_its_contract_is_read_over_it_with_its_own_key() {
+    let account = UsenetAccount {
+        name: "news.example".to_owned(),
+        enabled: true,
+        quota: None,
+        downloaded: 2_000,
+        daily: Vec::new(),
+        expires_on: None,
+        standing: None,
+    };
+    let http = Fake::by_path(vec![
+        (
+            "download.usenet/v1/transfers",
+            Answer::reply(200, json(&vec![arriving()])),
+        ),
+        (
+            "download.usenet/v1/accounts",
+            Answer::reply(200, json(&vec![account.clone()])),
+        ),
+    ]);
+    let (_project, ctx, fillers) = speaking(
+        "downloads-contracted-usenet",
+        usenet::CAPABILITY,
+        true,
+        http.clone(),
+    );
+
+    let targets = fetching(download_targets(&ctx, &fillers).await);
+    assert!(matches!(
+        targets.as_slice(),
+        [one] if protocol_of(&one.kind) == Protocol::Usenet
+    ));
+    let mut read = Vec::new();
+    for target in &targets {
+        read.extend(read_transfers(&ctx, target).await);
+    }
+    assert_eq!(read, vec![arriving()]);
+    assert!(torrent_client(&ctx, &targets).is_none());
+    let accounts = match crate::app::targets::usenet_client(&ctx, &fillers).await {
+        Some(client) => client.accounts().await.ok(),
+        None => None,
+    };
+    assert_eq!(accounts, Some(vec![account]));
+
+    let asked = to_the_fetcher(&http);
+    assert_eq!(asked.len(), 2, "{asked:?}");
+    assert!(over_the_contract(&asked, usenet::CAPABILITY), "{asked:?}");
+}
+
+#[tokio::test]
+async fn a_contracted_client_without_its_key_is_asked_nothing() {
+    let http = Fake::always(Answer::reply(200, "[]"));
+    let (_project, ctx, fillers) = speaking(
+        "downloads-contracted-unkeyed",
+        torrent::CAPABILITY,
+        false,
+        http.clone(),
+    );
+
+    let declared = declared_downloads(&ctx, &fillers).await;
+    assert!(declared
+        .iter()
+        .any(|client| client.id == FETCHER && client.target.is_none()));
+    for target in &download_targets(&ctx, &fillers).await {
+        let _ = read_transfers(&ctx, target).await;
+    }
+    assert_eq!(to_the_fetcher(&http), Vec::new());
+}
+
+#[test]
+fn every_kind_of_client_is_asked_as_the_protocol_it_moves() {
+    let ctx = a_context().build();
+    let adapter = Contracted::new(
+        Fake::silent(),
+        "http://127.0.0.1:8080",
+        FETCHER,
+        CONTRACTED_KEY,
+    );
+    let kinds = [
+        (
+            DownloadKind::Torrent {
+                base: "http://127.0.0.1:8081".to_owned(),
+                password: a_password(),
+            },
+            Protocol::Torrent,
+        ),
+        (
+            DownloadKind::Usenet {
+                base: "http://127.0.0.1:8085".to_owned(),
+                key: "usenet-key".to_owned(),
+            },
+            Protocol::Usenet,
+        ),
+        (
+            DownloadKind::Over {
+                protocol: Protocol::Torrent,
+                adapter: adapter.clone(),
+            },
+            Protocol::Torrent,
+        ),
+        (
+            DownloadKind::Over {
+                protocol: Protocol::Usenet,
+                adapter,
+            },
+            Protocol::Usenet,
+        ),
+    ];
+    let mut forwarded = Vec::new();
+    for (kind, moves) in kinds {
+        let target = DownloadTarget {
+            service: FETCHER.to_owned(),
+            kind,
+            tunnelled: true,
+        };
+        let asked = match target.client(&ctx) {
+            Downloading::Torrent(_) => Protocol::Torrent,
+            Downloading::Usenet(_) => Protocol::Usenet,
+        };
+        assert_eq!((protocol_of(&target.kind), asked), (moves, moves));
+        assert_eq!(target.torrent(&ctx).is_some(), moves == Protocol::Torrent);
+        assert_eq!(target.usenet(&ctx).is_some(), moves == Protocol::Usenet);
+        forwarded.push(forwarded_client(&ctx, std::slice::from_ref(&target)).is_some());
+    }
+    assert_eq!(
+        forwarded,
+        [true, false, false, false],
+        "only the bundled torrent client is offered the forwarded port"
     );
 }

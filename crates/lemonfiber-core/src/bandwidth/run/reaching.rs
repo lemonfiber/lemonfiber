@@ -10,8 +10,6 @@
 //! the unconfirmed run and the applying one produce the same shape of answer and
 //! there is no second rendering to fall out of step with the first.
 
-use lemonfiber_contract::capabilities::download::{torrent, usenet};
-
 use crate::app::targets::{DownloadTarget, Downloading};
 use crate::app::Ctx;
 use crate::bandwidth::{Answer, Held, Holding, Period, Pulling};
@@ -36,56 +34,35 @@ pub(super) enum Fetch {
 }
 
 /// A download client this command can reach.
-///
-/// Boxed on both arms because the two clients are very different sizes and an
-/// enum as large as its largest arm would be carried around at that size for
-/// every one of them.
-pub(super) enum Client {
-    /// A torrent client, which uploads and keeps a schedule of its own.
-    Torrent {
-        /// The id it runs under.
-        service: String,
-        /// The client.
-        client: Box<dyn torrent::Fills>,
-    },
-    /// A Usenet client, which does neither.
-    Usenet {
-        /// The id it runs under.
-        service: String,
-        /// The client.
-        client: Box<dyn usenet::Fills>,
-    },
+pub(super) struct Client {
+    /// The id it runs under, which is what the report names it by.
+    pub(super) service: String,
+    /// The client, as the protocol it moves.
+    pub(super) client: Downloading,
 }
 
 impl Client {
-    /// The name the stack knows it under, which is what the report names it by.
-    pub(super) fn name(&self) -> &str {
-        match self {
-            Self::Torrent { service, .. } | Self::Usenet { service, .. } => service,
-        }
-    }
-
     /// The limits on it.
     fn throttling(&self) -> &dyn Throttling {
-        match self {
-            Self::Torrent { client, .. } => client.as_ref(),
-            Self::Usenet { client, .. } => client.as_ref(),
+        match &self.client {
+            Downloading::Torrent(client) => client.as_ref(),
+            Downloading::Usenet(client) => client.as_ref(),
         }
     }
 
     /// What it has moved.
     fn metering(&self) -> &dyn Metering {
-        match self {
-            Self::Torrent { client, .. } => client.as_ref(),
-            Self::Usenet { client, .. } => client.as_ref(),
+        match &self.client {
+            Downloading::Torrent(client) => client.as_ref(),
+            Downloading::Usenet(client) => client.as_ref(),
         }
     }
 
     /// Whether it is fetching at all.
     pub(super) fn fetching(&self) -> &dyn Fetching {
-        match self {
-            Self::Torrent { client, .. } => client.as_ref(),
-            Self::Usenet { client, .. } => client.as_ref(),
+        match &self.client {
+            Downloading::Torrent(client) => client.as_ref(),
+            Downloading::Usenet(client) => client.as_ref(),
         }
     }
 
@@ -107,10 +84,9 @@ pub(super) fn opened(ctx: &Ctx, targets: &[DownloadTarget]) -> Vec<Client> {
 
 /// One download client, opened as the protocol it moves.
 pub(super) fn open(ctx: &Ctx, target: &DownloadTarget) -> Client {
-    let service = target.service.clone();
-    match target.client(ctx) {
-        Downloading::Torrent(client) => Client::Torrent { service, client },
-        Downloading::Usenet(client) => Client::Usenet { service, client },
+    Client {
+        service: target.service.clone(),
+        client: target.client(ctx),
     }
 }
 
@@ -135,7 +111,7 @@ pub(super) async fn holding(
         None => None,
     };
     Holding {
-        client: client.name().to_owned(),
+        client: client.service.clone(),
         answer: match answered {
             Ok(held) => {
                 let moving = client.throttling().moving().await.unwrap_or_default();

@@ -150,4 +150,64 @@ pub(crate) fn an_installed(
     }
 }
 
+/// The digest a contracted plugin was installed from.
+pub(crate) const CONTRACTED_MANIFEST: &str = "contracted-manifest";
+
+/// The port a contracted plugin's service speaks on, inside its container and on the
+/// host's loopback alike.
+pub(crate) const CONTRACTED_PORT: u16 = 8080;
+
+/// The key a contracted plugin's service holds in a context built for it.
+pub(crate) const CONTRACTED_KEY: &str = "contracted-key";
+
+/// A plugin whose service `service` provides `capability` and speaks its first major on
+/// [`CONTRACTED_PORT`].
+pub(crate) fn contracted(
+    plugin: &str,
+    service: &str,
+    capability: &str,
+) -> crate::plugin::Installed {
+    let mut placed = a_placed(service, &[capability], None, Some(CONTRACTED_PORT));
+    placed.speaks = vec![format!("{capability}@1")];
+    let mut installed = an_installed(plugin, vec![placed]);
+    installed.manifest = CONTRACTED_MANIFEST.to_owned();
+    installed
+}
+
+/// `plugin`, installed from its contracted manifest, as first-party.
+pub(crate) const fn first_party(
+    plugin: &'static str,
+) -> [crate::plugin::first_party::FirstParty; 1] {
+    [crate::plugin::first_party::FirstParty {
+        plugin,
+        manifest: CONTRACTED_MANIFEST,
+    }]
+}
+
+/// A context reaching `service` on loopback [`CONTRACTED_PORT`], holding its key in
+/// `project` where `keyed`.
+pub(crate) fn contracted_context(
+    project: &std::path::Path,
+    service: &str,
+    keyed: bool,
+) -> context::Context {
+    if keyed {
+        let at = crate::plugin::key_file(project, service);
+        let _ = std::fs::create_dir_all(at.parent().unwrap_or(&at));
+        let _ = std::fs::write(&at, CONTRACTED_KEY);
+    }
+    let engine = Reporting::holding(
+        &[service],
+        crate::ports::docker::Lifecycle::Running,
+        crate::ports::docker::Health::Healthy,
+    )
+    .publishing(&[(service, "127.0.0.1", CONTRACTED_PORT)]);
+    a_context().engine(std::sync::Arc::new(engine))
+}
+
+/// A value as a contract carries it.
+pub(crate) fn json<T: serde::Serialize>(value: &T) -> String {
+    serde_json::to_string(value).unwrap_or_default()
+}
+
 mod tests;
