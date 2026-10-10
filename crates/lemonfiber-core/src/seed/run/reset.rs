@@ -8,7 +8,7 @@ use super::{
 };
 
 /// Revert every drifted service connection to lemonfiber's own — or, unconfirmed, report
-/// which would be. The connection side of a full reset: for each \*curator, a download-client
+/// which would be. The connection side of a full reset: for each curator, a download-client
 /// category the operator changed is written back through the update op (on confirm) or
 /// only listed (on preview). Read-only until confirmed, so a preview changes nothing.
 pub(crate) async fn reset_connections(ctx: &Ctx, confirm: bool) -> Vec<crate::seed::Wiring> {
@@ -31,8 +31,8 @@ pub(crate) async fn reset_connections(ctx: &Ctx, confirm: bool) -> Vec<crate::se
     let at = ctx.stamp();
 
     let mut wirings = Vec::new();
-    for curator in &curating {
-        let wanted = wanted_clients(*curator, &fillers, &held);
+    for curator in curating {
+        let wanted = wanted_clients(curator, &fillers, &held);
         if wanted.is_empty() {
             continue;
         }
@@ -40,7 +40,7 @@ pub(crate) async fn reset_connections(ctx: &Ctx, confirm: bool) -> Vec<crate::se
             continue;
         };
         wirings.extend(
-            reset_arr_connections(
+            reset_curator_connections(
                 client.as_ref(),
                 curator.name(),
                 &wanted,
@@ -61,13 +61,13 @@ pub(crate) async fn reset_connections(ctx: &Ctx, confirm: bool) -> Vec<crate::se
     wirings
 }
 
-/// One \*curator's side of a connection reset: on confirm, revert each drifted
+/// One curator's side of a connection reset: on confirm, revert each drifted
 /// download-client category in place and report only the reverts that landed; on a
 /// preview, read the clients and report which categories would be reverted, writing
 /// nothing.
-pub(super) async fn reset_arr_connections(
+pub(super) async fn reset_curator_connections(
     client: &dyn crate::ports::service::Client,
-    arr_name: &str,
+    curator: &str,
     wanted: &[crate::ports::service::DownloadClient],
     confirm: bool,
     baseline: &crate::baseline::Baseline,
@@ -78,7 +78,7 @@ pub(super) async fn reset_arr_connections(
         let mut journal = crate::journal::Journal::new();
         let reverted = crate::seed::wire_download_clients(
             client,
-            arr_name,
+            curator,
             wanted,
             &mut journal,
             &mut crate::seed::Baselines {
@@ -100,7 +100,7 @@ pub(super) async fn reset_arr_connections(
             .filter(|wiring| matches!(wiring.state, crate::seed::State::Wired))
             .collect()
     } else if let Ok(existing) = client.download_clients().await {
-        preview_reverts(&existing, wanted, arr_name, baseline)
+        preview_reverts(&existing, wanted, curator, baseline)
     } else {
         Vec::new()
     }
@@ -113,20 +113,22 @@ pub(super) async fn reset_arr_connections(
 pub(super) fn preview_reverts(
     existing: &[crate::ports::service::RegisteredClient],
     wanted: &[crate::ports::service::DownloadClient],
-    arr_name: &str,
+    curator: &str,
     baseline: &crate::baseline::Baseline,
 ) -> Vec<crate::seed::Wiring> {
     let mut wirings = Vec::new();
     for want in wanted {
-        let field = format!("downloadclient:{}:{}", want.host, want.port);
         let Some(have) = existing
             .iter()
             .find(|have| have.host == want.host && have.port == want.port)
         else {
             continue;
         };
-        let observed =
-            crate::seed::observe_client(Some(have), want, baseline.entry(arr_name, &field));
+        let observed = crate::seed::observe_client(
+            Some(have),
+            want,
+            baseline.entry(curator, &crate::seed::client_field(want)),
+        );
         if matches!(
             observed,
             crate::seed::Observed::Drifted
@@ -135,7 +137,7 @@ pub(super) fn preview_reverts(
                 | crate::seed::Observed::Adopted
         ) {
             wirings.push(crate::seed::Wiring::settled(
-                format!("{} into {arr_name}", want.name),
+                format!("{} into {curator}", want.name),
                 crate::seed::State::Drifted,
             ));
         }

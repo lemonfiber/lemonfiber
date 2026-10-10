@@ -2,7 +2,7 @@
 //!
 //! Three values decide every case here — what lemonfiber recorded, what the service holds,
 //! and what lemonfiber would write — so every test is a different arrangement of those
-//! three. Both sides are faked: a filesystem handing back the \*arr's key, and a transport
+//! three. Both sides are faked: a filesystem handing back the curator's key, and a transport
 //! answering as the service would.
 //!
 //! From here rather than a `#[cfg(test)]` module, as the credentials and releases checks
@@ -12,6 +12,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use lemonfiber_contract::Contracted;
 use lemonfiber_core::baseline::{Origin, Record};
 use lemonfiber_core::doctor::credentials::{Reach, Target};
 use lemonfiber_core::doctor::wiring::{Managed, Wired, WiringCheck};
@@ -512,7 +513,7 @@ async fn a_service_whose_key_is_not_written_yet_is_left_as_it_was() {
 
     assert!(changes(attempt.as_ref()).is_none(), "something was written");
     assert!(
-        stopped(attempt.as_ref()).is_some_and(|why| why.contains("could not be authenticated to")),
+        stopped(attempt.as_ref()).is_some_and(|why| why.contains("could not be asked")),
         "{:?}",
         stopped(attempt.as_ref())
     );
@@ -603,7 +604,7 @@ async fn a_wiring_still_where_lemonfiber_put_it_is_offered_nothing() {
     assert!(offer(&check).await.is_none());
 }
 
-/// What this repair would write to is the \*arr, by the id the stack declares it
+/// What this repair would write to is the curator, by the id the stack declares it
 /// under — which is the name an operator writes down when they say a service is
 /// theirs to tune.
 ///
@@ -614,7 +615,7 @@ async fn a_wiring_still_where_lemonfiber_put_it_is_offered_nothing() {
 /// decided beside it, because the gate that reads this answer is one function above
 /// every mender and cannot know what any of them touches.
 #[tokio::test]
-async fn a_wiring_repair_declares_the_arr_it_would_write_inside() {
+async fn a_wiring_repair_declares_the_curator_it_would_write_inside() {
     let check = stale();
     let repair = offer(&check).await;
 
@@ -639,4 +640,118 @@ fn a_repair_naming_a_wiring_nobody_manages_declares_no_write() {
     let check = stale();
 
     assert_eq!(writes(&check, &for_something_else()), Some(Vec::new()));
+}
+
+/// The wiring of a curator asked over `library.curate` under its own key.
+fn contracted(recorded: Option<Record>, http: Arc<Fake>) -> Managed {
+    Managed {
+        id: "shows".to_owned(),
+        name: "Shows".to_owned(),
+        reach: Some(Reach::Over(Contracted::new(
+            http,
+            "http://127.0.0.1:8080",
+            "shows",
+            "shows-key",
+        ))),
+        clients: vec![Wired {
+            want: want(),
+            recorded,
+        }],
+    }
+}
+
+/// A curator over `library.curate` holding the client at `category`, and taking a write.
+fn over_the_contract(category: &str) -> Arc<Fake> {
+    Fake::by_path(vec![
+        (
+            "library.curate/v1/update_download_client",
+            Answer::reply(204, ""),
+        ),
+        (
+            "library.curate/v1/download_clients",
+            Answer::reply(
+                200,
+                format!(
+                    r#"[{{"id":"7","host":"sabnzbd","port":8080,"category":{{"field":"tvCategory","value":"{category}"}}}}]"#
+                ),
+            ),
+        ),
+    ])
+}
+
+/// A curator asked over its contract is read and put right over it, every request under
+/// its own key.
+#[tokio::test]
+async fn a_contracted_curator_is_read_and_mended_over_its_contract() {
+    let http = over_the_contract("old-sonarr");
+    let check = WiringCheck::new(
+        http.clone(),
+        Files::empty(),
+        vec![contracted(
+            Some(recorded("old-sonarr", Origin::Written)),
+            http.clone(),
+        )],
+        "2000".to_owned(),
+    );
+
+    let repair = offer(&check).await;
+    let attempt = match &repair {
+        Some(repair) => carried(&check, repair).await,
+        None => None,
+    };
+
+    assert_eq!(
+        changes(attempt.as_ref())
+            .and_then(<[Change]>::first)
+            .map(|change| change.target.as_str()),
+        Some("shows")
+    );
+    let requests = http.requests();
+    assert!(
+        requests
+            .iter()
+            .any(|asked| asked.url.ends_with("/update_download_client")),
+        "{requests:?}"
+    );
+    let bearer = ("Authorization".to_owned(), "Bearer shows-key".to_owned());
+    assert!(
+        requests.iter().all(|asked| asked
+            .url
+            .starts_with("http://127.0.0.1:8080/lemonfiber/library.curate/v1/")
+            && asked.headers.contains(&bearer)),
+        "{requests:?}"
+    );
+}
+
+/// A curator that speaks its contract and cannot be asked over it is unverified, its
+/// repair is left undone, and nothing is asked of anything.
+#[tokio::test]
+async fn a_curator_that_cannot_be_asked_is_unverified_and_left_as_it_was() {
+    let repair = offer(&stale()).await;
+    let http = answering(Some("old-sonarr"));
+    let mut unasked = managed(Some(recorded("old-sonarr", Origin::Written)));
+    unasked.reach = None;
+    let check = WiringCheck::new(
+        http.clone(),
+        Files::at(vec![(config(), CONFIG)]),
+        vec![unasked],
+        "2000".to_owned(),
+    );
+
+    let mut findings = check.run().await;
+    let attempt = match &repair {
+        Some(repair) => carried(&check, repair).await,
+        None => None,
+    };
+
+    assert!(matches!(
+        findings.pop().map(|found| found.verdict),
+        Some(Verdict::Unverified { .. })
+    ));
+    assert!(
+        stopped(attempt.as_ref()).is_some_and(|why| why.contains("could not be asked")),
+        "{:?}",
+        stopped(attempt.as_ref())
+    );
+    assert!(http.requests().is_empty(), "{:?}", http.requests());
 }

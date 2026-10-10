@@ -25,7 +25,7 @@
 use lemonfiber_manifest::Service;
 
 use super::clients::Held;
-use super::curating::read_servarr_key;
+use super::keys::read_servarr_key;
 use super::Ctx;
 use crate::ports::service::Credential;
 

@@ -30,6 +30,7 @@ mod gate;
 // The Jellyfin keys minted for the services lemonfiber builds.
 mod claiming;
 mod guarding;
+mod keys;
 mod minted;
 mod published;
 pub(crate) use published::published_as;
@@ -77,7 +78,7 @@ pub(crate) use subtitles::rewatch;
 ///   is answered by signing in;
 /// - what the household is told, and which curators the request service hands a request
 ///   to — both read as the owner, and the owner's session is a sign-in;
-/// - whether a drifted download client still reaches anything, which the \*curator answers
+/// - whether a drifted download client still reaches anything, which the curator answers
 ///   only by being asked to test it. The drift is reported; what is left out is the
 ///   claim that it broke something.
 ///
@@ -129,7 +130,7 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
 
     // Each torrent client's password, the one credential lemonfiber mints. A later run
     // mints nothing — the password in force is the one already set — so the value
-    // recorded on the run that minted it stands in. Without that an \*curator that came up
+    // recorded on the run that minted it stands in. Without that a curator that came up
     // after the first seed would never learn about the client, since its password
     // cannot be read back from the client itself.
     let (minted, passwords) = seed_passwords(ctx, &fillers).await;
@@ -137,17 +138,17 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     let held = held(ctx, &fillers, &passwords).await;
     wirings.extend(clients::refused(&fillers, &held));
 
-    // Root folders and download clients for each \*curator that files media, and the
+    // Root folders and download clients for each curator, and the
     // pairs that come to no connection at all, said rather than left out.
     wirings.extend(connecting::unmatched(&fillers));
-    // The host data root, read once, so each \*curator's root folders can be checked
+    // The host data root, read once, so each curator's root folders can be checked
     // against the filesystem they file into and a folder pointing nowhere raised as a
     // warning.
     let data_root = crate::app::targets::data_root(ctx);
     let curating = curators(&fillers);
-    // A root folder one \*curator wants and another does too is contested: two curators
+    // A root folder one curator wants and another does too is contested: two curators
     // on one folder would each rewrite the other's files, so it is refused rather
-    // than wired. Detected across every \*curator up front, before any is wired.
+    // than wired. Detected across every curator up front, before any is wired.
     let root_claims: Vec<(&str, Vec<crate::ports::service::RootFolder>)> = curating
         .iter()
         .map(|curator| (curator.name(), wanted_roots(curator.media_types())))
@@ -170,8 +171,8 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // proceeds and re-forms it while an ordinary seed leaves the lost record untouched
     // rather than silently replacing it.
     let (mut baseline, lost) = load_baseline(ctx).starting();
-    // Each \*curator's wiring is independent of the others, so the curators are seeded at
-    // once rather than in series: a pass's time then tracks the slowest \*curator, not
+    // Each curator's wiring is independent of the others, so the curators are seeded at
+    // once rather than in series: a pass's time then tracks the slowest curator, not
     // their sum. Each records what it wrote into its own baseline, read against the
     // loaded snapshot; the records are folded back into one below, and since a
     // field key carries the service, no two curators collide.
@@ -186,11 +187,11 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     let seeded = futures_util::future::join_all(
         curating
             .iter()
-            .map(|curator| seed_curator(ctx, curator, &seeding)),
+            .map(|curator| seed_curator(ctx, *curator, &seeding)),
     )
     .await;
-    for (arr_wirings, records) in seeded {
-        wirings.extend(arr_wirings);
+    for (curator_wirings, records) in seeded {
+        wirings.extend(curator_wirings);
         baseline.merge(&records);
     }
 
@@ -199,7 +200,7 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // it is among the pairs reported above as reached by nothing.
     wirings.extend(seed_applications(ctx, &fillers).await);
 
-    // The book *curator, which the aggregator cannot register itself into: it keeps its own
+    // The book curator, which the aggregator cannot register itself into: it keeps its own
     // list of aggregators and pulls from them, so it is told where one is instead.
     wirings.extend(aggregators::seed_aggregators(ctx, &fillers).await);
 
@@ -369,7 +370,7 @@ pub(crate) fn managed_telling(
 }
 
 /// The download-client wirings lemonfiber manages, as a caller that only reads them needs
-/// them: each \*curator, the clients lemonfiber would write there, and what it last recorded
+/// them: each curator, the clients lemonfiber would write there, and what it last recorded
 /// for each.
 ///
 /// Here rather than where it is used, so the read-only half of drift and the writing half
@@ -450,7 +451,7 @@ async fn read_temporary_password(ctx: &Ctx, service: &str) -> Option<String> {
 /// ask and nothing downstream ever hears, and with it the request surface offers only
 /// what the stack can actually deliver.
 ///
-/// Which \*curator keys the request service holds is noted first, because the move to the
+/// Which curators' keys the request service holds is noted first, because the move to the
 /// gate is what hides it; once it reaches everything through the gate, those keys and
 /// the Jellyfin key it minted itself are taken back.
 async fn seed_requests(

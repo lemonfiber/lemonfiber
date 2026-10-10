@@ -1,4 +1,4 @@
-//! Root folders and download clients on each *arr.
+//! Root folders and download clients on each curator.
 
 use super::*;
 
@@ -12,10 +12,10 @@ fn root_folder_wirings(report: &crate::seed::Report) -> Vec<&crate::seed::Wiring
 }
 
 #[tokio::test]
-async fn seed_wires_each_arrs_root_folders() {
+async fn seed_wires_each_curators_root_folders() {
     // Each application already holds the folders, so each is left as wired. Each
-    // \*arr also reads its version for the schema check first; that read decodes a
-    // folder list as no status, so a spare reply per \*arr covers it and the
+    // curator also reads its version for the schema check first; that read decodes a
+    // folder list as no status, so a spare reply per curator covers it and the
     // version is simply not learned — the folders are what this test reads.
     const FOLDERS: &str = r#"[{"id":1,"path":"/data/media/tv"},{"id":2,"path":"/data/media/movies"},{"id":3,"path":"/data/media/music"}]"#;
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
@@ -30,16 +30,16 @@ async fn seed_wires_each_arrs_root_folders() {
 
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     let folders = root_folder_wirings(&report);
-    assert_eq!(folders.len(), 3, "one root folder per media-filing arr");
+    assert_eq!(folders.len(), 3, "one root folder per curator");
     let all_wired = folders
         .iter()
         .all(|wiring| wiring.state == crate::seed::State::AlreadyWired);
     assert!(all_wired, "a folder already present is left wired");
 }
 
-/// Each root folder an \*arr lacks has its directory made under the recorded data
+/// Each root folder a curator lacks has its directory made under the recorded data
 /// root before it is registered, and one whose directory cannot be made is failed
-/// naming the host path rather than handed to the \*arr.
+/// naming the host path rather than handed to the curator.
 #[tokio::test]
 async fn seed_makes_each_root_folders_directory_under_the_data_root_first() {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
@@ -71,8 +71,8 @@ async fn seed_makes_each_root_folders_directory_under_the_data_root_first() {
 }
 
 #[tokio::test]
-async fn seed_skips_arr_root_folders_when_the_key_is_not_readable() {
-    // No configuration to read a key from, so the arrs have not finished
+async fn seed_skips_curator_root_folders_when_the_key_is_not_readable() {
+    // No configuration to read a key from, so the curators have not finished
     // starting: their folders are skipped for a re-run, not failed.
     let ctx = seed_ctx(None, true, Vec::new(), Some(vec![0x11; 24]), None)
         .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
@@ -165,14 +165,14 @@ fn told(
                 crate::wiring::Fillers::of(&manifest, installed, chosen, Some(stack_root()));
             curators(&fillers)
                 .iter()
-                .filter(|arr| arr.id() == "sonarr")
-                .map(|arr| super::super::curating::wanted_clients(*arr, &fillers, held))
+                .filter(|curator| curator.id() == "sonarr")
+                .map(|curator| super::super::curating::wanted_clients(*curator, &fillers, held))
                 .collect()
         })
         .unwrap_or_default()
 }
 
-/// Where each client is reached, by name, for each \*arr told about them.
+/// Where each client is reached, by name, for each curator told about them.
 fn reached(told: &[Vec<crate::ports::service::DownloadClient>]) -> Vec<Vec<(String, String, u16)>> {
     told.iter()
         .map(|clients| {
@@ -184,7 +184,7 @@ fn reached(told: &[Vec<crate::ports::service::DownloadClient>]) -> Vec<Vec<(Stri
         .collect()
 }
 
-/// Each \*arr is told about what fills its download asks, at the port each says it
+/// Each curator is told about what fills its download asks, at the port each says it
 /// answers on beside the others — the torrent client through the tunnel whose network it
 /// shares — and only where the credential is in hand.
 #[test]
@@ -252,7 +252,7 @@ fn a_plugin_standing_in_for_the_usenet_client_is_reached_where_it_answers() {
     assert_eq!(credentials, vec![&Credential::ApiKey("its-own".to_owned())]);
 }
 
-/// A filler the \*arr is connected to nothing by is told about as nothing, while the
+/// A filler the curator is connected to nothing by is told about as nothing, while the
 /// client beside it is told about as ever.
 #[test]
 fn a_filler_nothing_connects_is_not_told_about() {
@@ -274,7 +274,7 @@ fn a_filler_nothing_connects_is_not_told_about() {
 }
 
 /// A plugin's Usenet client whose key file leads away from the directory its container
-/// owns is not read, and each \*arr that asks for it is told why on that connection.
+/// owns is not read, and each curator that asks for it is told why on that connection.
 #[tokio::test]
 async fn a_plugin_client_whose_key_file_leads_away_is_refused_on_its_connection() {
     const SABNZBD: &str = "[misc]\napi_key = the-sab-key\n";
@@ -326,9 +326,9 @@ async fn a_plugin_client_whose_key_file_leads_away_is_refused_on_its_connection(
     )));
 }
 
-/// An \*arr filing a media type with no category field is told about no client.
+/// A curator filing a media type with no category field is told about no client.
 #[test]
-fn an_arr_with_no_category_is_told_about_no_client() {
+fn a_curator_with_no_category_is_told_about_no_client() {
     assert_eq!(
         told(
             &[],
@@ -373,12 +373,12 @@ fn a_recorded_password_is_read_back_or_read_as_absent() {
 }
 
 #[tokio::test]
-async fn seed_leaves_each_arrs_already_present_download_clients() {
+async fn seed_leaves_each_curators_already_present_download_clients() {
     // qBittorrent announces a temporary password, so it is set and its value
-    // threaded to the download clients; each arr already holds both clients.
+    // threaded to the download clients; each curator already holds both clients.
     const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     const SABNZBD: &str = "[misc]\napi_key = the-sab-key\n";
-    let env = config_scratch("seed_leaves_each_arrs_already_present_download_clients");
+    let env = config_scratch("seed_leaves_each_curators_already_present_download_clients");
     let ctx = seed_ctx(
         Some(TEMP_LOG),
         true,
@@ -394,7 +394,7 @@ async fn seed_leaves_each_arrs_already_present_download_clients() {
     assert_eq!(
         clients.len(),
         6,
-        "SABnzbd and qBittorrent into each of three arrs"
+        "SABnzbd and qBittorrent into each of three curators"
     );
     // Each client is already registered at its endpoint, so none is written a
     // second time. The service reports no category for them and there is no
@@ -433,7 +433,7 @@ async fn adopt_runs_the_wiring_and_reports_each_present_client() {
     assert_eq!(
         clients.len(),
         6,
-        "SABnzbd and qBittorrent into each of three arrs"
+        "SABnzbd and qBittorrent into each of three curators"
     );
     let all_reported = clients
         .iter()
@@ -442,11 +442,11 @@ async fn adopt_runs_the_wiring_and_reports_each_present_client() {
 }
 
 #[tokio::test]
-async fn seed_skips_download_clients_when_the_arr_key_is_not_readable() {
-    // The clients' own credentials are in hand, but the arrs have not written
+async fn seed_skips_download_clients_when_the_curator_key_is_not_readable() {
+    // The clients' own credentials are in hand, but the curators have not written
     // their keys, so registration is skipped for a re-run rather than failed.
     const SABNZBD: &str = "[misc]\napi_key = the-sab-key\n";
-    let env = config_scratch("seed_skips_download_clients_when_the_arr_key_is_not_readable");
+    let env = config_scratch("seed_skips_download_clients_when_the_curator_key_is_not_readable");
     let ctx = seed_ctx(
         Some(TEMP_LOG),
         true,
@@ -463,8 +463,8 @@ async fn seed_skips_download_clients_when_the_arr_key_is_not_readable() {
     assert!(clients.iter().all(|wiring| is_skipped(wiring)));
 }
 
-/// A plugin `curating` whose service `shows` files television over `library.curate`,
-/// beside the stack's own curators.
+/// A plugin `curating` whose service `shows` files `media` over `library.curate` and
+/// declares the bundled curator's adapter as well, beside the stack's own curators.
 fn contracted_curator(
     project: &std::path::Path,
     media: &[&str],
@@ -472,6 +472,7 @@ fn contracted_curator(
     let mut installed = contracted("curating", "shows", "library.curate");
     for placed in &mut installed.services {
         placed.media_types = media.iter().map(|one| (*one).to_owned()).collect();
+        placed.api = Some(servarr_api(Some("/config/config.xml")));
     }
     let fillers = fillers_trusting(
         vec![arr("sonarr", 8989, "tv")],
@@ -505,9 +506,19 @@ async fn a_curator_speaking_the_contract_is_asked_over_it_and_never_as_the_bundl
         None => None,
     };
     assert_eq!(folders.map(|held| held.len()), Some(0));
+    let asked = http.request();
     assert_eq!(
-        http.request().map(|asked| asked.url),
-        Some("http://127.0.0.1:8080/lemonfiber/library.curate/v1/root_folders".to_owned())
+        asked.as_ref().map(|asked| asked.url.as_str()),
+        Some("http://127.0.0.1:8080/lemonfiber/library.curate/v1/root_folders")
+    );
+    assert_eq!(
+        asked.map(|asked| asked.headers).and_then(|headers| {
+            headers
+                .into_iter()
+                .find(|(name, _)| name == "Authorization")
+                .map(|(_, value)| value)
+        }),
+        Some("Bearer contracted-key".to_owned())
     );
 
     let unkeyed = lemonfiber_fixtures::scratch::Scratch::new("curators-contracted-unkeyed");
@@ -530,4 +541,34 @@ fn a_contracted_service_filing_no_media_is_no_curator() {
     let project = lemonfiber_fixtures::scratch::Scratch::new("curators-contracted-no-media");
     let (_, fillers) = contracted_curator(&project, &[]);
     assert!(curators(&fillers).iter().all(|one| one.id() != "shows"));
+}
+
+/// A plugin's curator under the id of one of the stack's is told about none of the
+/// clients the stack's own asks for: their credentials were cleared for that one alone.
+#[test]
+fn a_plugin_under_a_stack_curators_id_is_told_about_none_of_its_clients() {
+    let mut impostor = crate::test_support::a_placed(
+        "sonarr",
+        &["library.curate"],
+        Some(servarr_api(Some("/config/config.xml"))),
+        Some(8989),
+    );
+    impostor.media_types = vec!["tv".to_owned()];
+    let installed = [crate::test_support::an_installed(
+        "impostor",
+        vec![impostor],
+    )];
+
+    let told = told(
+        &installed,
+        &crate::wiring::Chosen::default(),
+        &both_held(),
+        "tv",
+    );
+
+    assert_eq!(
+        told.iter().map(Vec::len).collect::<Vec<_>>(),
+        vec![2, 0],
+        "{told:?}"
+    );
 }

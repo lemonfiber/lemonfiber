@@ -62,7 +62,7 @@ async fn indexer(ctx: &Ctx, asker: &Cleared<'_>) -> Asked {
     let Some(published) = asker.published else {
         return Asked::Nobody;
     };
-    let Beneath::Read(key) = super::curating::servarr_key(ctx, asker).await else {
+    let Beneath::Read(key) = super::keys::servarr_key(ctx, asker).await else {
         return Asked::Unkeyed;
     };
     Asked::By(Box::new(crate::prowlarr::Prowlarr::new(
@@ -119,7 +119,7 @@ async fn sync(ctx: &Ctx, syncing: &Syncing<'_>, only: Option<&str>) -> Vec<crate
     for (curator, kind, reached) in curators {
         // A curator the gate let the indexer's key reach, read from its own file: one not
         // written yet, or in a file it may not be read from, is passed over this run.
-        let Beneath::Read(key) = super::curating::servarr_key(ctx, curator).await else {
+        let Beneath::Read(key) = super::keys::servarr_key(ctx, curator).await else {
             passed.push(skipped(synced(&curator.name, &asker.name), &curator.name));
             continue;
         };

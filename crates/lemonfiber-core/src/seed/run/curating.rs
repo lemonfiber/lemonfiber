@@ -1,6 +1,6 @@
-//! Seeding one media service.
+//! Seeding one curator.
 //!
-//! Everything a single \*curator needs pointed at it, and the order it has to happen in.
+//! Everything a single curator needs pointed at it, and the order it has to happen in.
 
 use lemonfiber_contract::capabilities::library::curate;
 
@@ -12,7 +12,6 @@ use super::{
 };
 use crate::app::targets::{spoken, Spoken};
 use crate::doctor::credentials::Reach;
-use crate::ports::filesystem::Beneath;
 use crate::ports::service::{Client, DownloadClient};
 use crate::wiring::{Filler, Fillers};
 
@@ -57,8 +56,8 @@ impl<'a> Curator<'a> {
     }
 }
 
-/// Every service that files media and that this machine can ask: over `library.curate`,
-/// or as the bundled curator.
+/// Every service that files media and is asked over `library.curate` or as the bundled
+/// curator.
 pub(crate) fn curators(fillers: &Fillers) -> Vec<Curator<'_>> {
     fillers
         .services()
@@ -71,13 +70,14 @@ pub(crate) fn curators(fillers: &Fillers) -> Vec<Curator<'_>> {
         .collect()
 }
 
-/// The inputs a seed pass reads once and hands to every \*curator it seeds: the
-/// cross-\*curator contested-root map, who fills each ask and the credential each
-/// download client answers to, the host data root each root folder is checked
-/// against, the loaded baseline to compare with, and whether this is an adopt pass. Grouped so seeding one \*curator takes the pass and the
-/// \*curator rather than a long list that only `curator` varies across.
+/// The inputs a seed pass reads once and hands to every curator it seeds: the
+/// contested-root map across every curator, who fills each ask and the credential each
+/// download client answers to, the host data root each root folder is checked against,
+/// the loaded baseline to compare with, and whether this is an adopt pass. Grouped so
+/// seeding one curator takes the pass and the curator rather than a long list that only
+/// `curator` varies across.
 pub(super) struct CuratorSeeding<'a> {
-    /// Root-folder paths more than one \*curator wants — refused rather than wired.
+    /// Root-folder paths more than one curator wants — refused rather than wired.
     pub(super) contested: &'a std::collections::BTreeMap<String, Vec<String>>,
     /// Who fills each of the stack's asks, and where each is reached.
     pub(super) fillers: &'a Fillers,
@@ -91,25 +91,23 @@ pub(super) struct CuratorSeeding<'a> {
     pub(super) adopt: bool,
 }
 
-/// Register an application's root folders, one per media type, under
-/// `/data/media`, and its download clients beside them. The application's key is
-/// read from its configuration; without it — the application has not finished
+/// Register a curator's root folders, one per media type, under `/data/media`, and its
+/// download clients beside them. Where it cannot be asked yet — it has not finished
 /// starting — both are skipped for a re-run rather than failed.
 pub(super) async fn seed_curator(
     ctx: &Ctx,
-    curator: &Curator<'_>,
+    curator: Curator<'_>,
     seeding: &CuratorSeeding<'_>,
 ) -> (Vec<crate::seed::Wiring>, crate::baseline::Baseline) {
     let wanted = wanted_roots(curator.media_types());
-    let clients = wanted_clients(*curator, seeding.fillers, seeding.held);
-    // What this \*curator writes is recorded in its own baseline, against the loaded
-    // snapshot, so several \*curating can be seeded at once without sharing one; the
+    let clients = wanted_clients(curator, seeding.fillers, seeding.held);
+    // What this curator writes is recorded in its own baseline, against the loaded
+    // snapshot, so several curators can be seeded at once without sharing one; the
     // caller folds them back into one afterwards.
     let mut records = crate::baseline::Baseline::new();
 
-    // The service's key is read once, opening the client for both its root folders
-    // and its download clients rather than once each. Without it the service has not
-    // finished starting, so both are skipped for a re-run and nothing is recorded.
+    // The curator is opened once, for both its root folders and its download clients.
+    // One that cannot be asked yet has both skipped for a re-run and nothing recorded.
     let Some(client) = curator.client(ctx).await else {
         let mut wirings: Vec<_> = wanted
             .iter()
@@ -185,7 +183,7 @@ pub(super) async fn seed_curator(
     .await;
     // Before the download clients are appended, `wirings` holds exactly one entry per
     // wanted root folder in order, so each is escalated against the folder it reports
-    // on: one the \*curator files into that resolves to nothing on the host is a root
+    // on: one the curator files into that resolves to nothing on the host is a root
     // folder pointing where nothing exists — a drift that breaks the stack.
     escalate_broken_roots(
         ctx.seams.filesystem.as_ref(),
@@ -216,13 +214,13 @@ pub(super) async fn seed_curator(
     (wirings, records)
 }
 
-/// The download clients an \*curator is told about: each service filling one of its asks
+/// The download clients a curator is told about: each service filling one of its asks
 /// that lemonfiber connects to it as a download client, at the address that service
-/// declares, under the category the \*curator's first media type files as.
+/// declares, under the category the curator's first media type files as.
 ///
 /// None where it manages no category. A filler whose credential is not in hand yet is
 /// left out rather than told about with nothing to prove itself with, and a later run
-/// that finds the credential tells the \*curator then.
+/// that finds the credential tells the curator then.
 pub(super) fn wanted_clients(
     curator: Curator<'_>,
     fillers: &Fillers,
@@ -237,7 +235,7 @@ pub(super) fn wanted_clients(
     };
     let mut wanted = Vec::new();
     for pairing in pairings(fillers) {
-        if pairing.ask.by != curator.id() {
+        if pairing.asker != curator.0 {
             continue;
         }
         let Ok((Connection::DownloadClient(protocol), at, _)) = &pairing.made else {
@@ -256,43 +254,4 @@ pub(super) fn wanted_clients(
         });
     }
     wanted
-}
-
-/// The API key a service of the Servarr shape wrote for itself, read from the file
-/// its own declaration names — beneath its own directory where a plugin brought it.
-///
-/// [`Beneath::Read`] holds the key itself; a file holding none is as absent as one not
-/// written, and a file refused stays refused, so the caller can say so.
-pub(super) async fn servarr_key(ctx: &Ctx, filler: &crate::wiring::Filler) -> Beneath {
-    match crate::app::targets::credential_file(ctx, filler).await {
-        Beneath::Read(text) => {
-            crate::servarr::api_key(&text).map_or(Beneath::Absent, Beneath::Read)
-        }
-        other => other,
-    }
-}
-
-/// A connection refused because the filler's credential file was, saying why.
-///
-/// Refused rather than skipped: no later run reads the file while it stays what it is,
-/// and it is either a mistake in the plugin or an attempt by it, which the operator has
-/// to see either way.
-pub(super) fn refused(connection: String, filler: &crate::wiring::Filler) -> crate::seed::Wiring {
-    crate::seed::Wiring::settled(connection, refusal(filler))
-}
-
-/// What a connection comes to where the filler's credential file was refused.
-pub(super) fn refusal(filler: &crate::wiring::Filler) -> crate::seed::State {
-    crate::seed::State::Refused {
-        reason: crate::app::targets::escaped(filler),
-    }
-}
-
-/// A Servarr application's API key, read from the configuration file it wrote it
-/// to, or nothing where it has not written one yet.
-pub(super) async fn read_servarr_key(ctx: &Ctx, config: &Path) -> Option<String> {
-    let within = crate::within::directory_of(config);
-    let text =
-        crate::app::targets::read_owned(ctx.seams.filesystem.as_ref(), config, within).await?;
-    crate::servarr::api_key(&text)
 }

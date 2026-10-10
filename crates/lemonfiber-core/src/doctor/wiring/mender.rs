@@ -21,7 +21,7 @@ use crate::seed::CLIENT;
 
 use super::{holding, Managed, Reading, Wired};
 
-/// Bringing one \*arr's download client back to the category lemonfiber files under.
+/// Bringing one curator's download client back to the category lemonfiber files under.
 ///
 /// Holds the same wirings the check does, and reads them the same way: the service is
 /// asked afresh when the repair runs, because a category can move between looking and
@@ -90,7 +90,7 @@ impl Mend for WiringMender {
     }
 
     fn writes_to(&self, repair: &Repair) -> Vec<String> {
-        // The \*arr, by the id the stack declares it under. What is written is a
+        // The curator, by the id it is declared under. What is written is a
         // download client's category *inside* that service, so the service is the thing
         // an operator would have declared theirs — nothing here has a name of its own
         // that a declaration could reach.
@@ -143,7 +143,7 @@ async fn mended(mender: &WiringMender, repair: &Repair) -> Attempt {
     let Some(client) = mender.reading.open(managed).await else {
         return Attempt::Stopped {
             leaving: format!(
-                "{} could not be authenticated to, so it was left as it was",
+                "{} could not be asked, so it was left as it was",
                 managed.name
             ),
         };

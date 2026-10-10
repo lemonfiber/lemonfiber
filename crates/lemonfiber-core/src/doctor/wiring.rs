@@ -1,7 +1,7 @@
 //! Whether each download client still sits where lemonfiber wired it.
 //!
 //! The one place an operator and lemonfiber write to the same field. lemonfiber tells each
-//! \*arr which category to file its downloads under; the operator can open the same page
+//! curator which category to file its downloads under; the operator can open the same page
 //! and change it. Both are legitimate, and the difference between them is not visible in
 //! the value — only in what lemonfiber last recorded for it.
 //!
@@ -34,10 +34,10 @@ mod mender;
 pub(crate) use mender::WiringMender;
 
 /// The stem every wiring finding is named from. The service and the client follow it, so
-/// two clients drifting in one \*arr are two findings to answer rather than one.
+/// two clients drifting in one curator are two findings to answer rather than one.
 const CHECK: &str = "config.download-client";
 
-/// The download-client wiring of one \*arr: how to reach it, and the clients lemonfiber
+/// The download-client wiring of one curator: how to reach it, and the clients lemonfiber
 /// manages there.
 ///
 /// Held rather than read at assembly, so the check opens the service and reads what it
@@ -67,7 +67,7 @@ impl Wired {
     /// The name this wiring's finding and its repair share.
     ///
     /// Carries the service and the client, so a repair offered for one drift is not
-    /// answered by another \*arr's.
+    /// answered by another curator's.
     #[must_use]
     pub fn check(&self, service: &str) -> String {
         format!("{CHECK}:{service}:{}", self.want.name.to_lowercase())
@@ -89,14 +89,15 @@ pub(crate) struct Reading {
 impl Reading {
     /// The clients a service holds, or nothing where it could not be asked.
     ///
-    /// Nothing covers both "the key is not written yet" and "the service would not
-    /// answer". Neither is a drift, and neither is a pass; the caller reports both as
+    /// Nothing covers "it cannot be asked", "the key is not written yet" and "the service
+    /// would not answer". None is a drift, and none is a pass; the caller reports each as
     /// unverified.
     pub(crate) async fn held(&self, managed: &Managed) -> Option<Vec<RegisteredClient>> {
         self.open(managed).await?.download_clients().await.ok()
     }
 
-    /// The service itself, authenticated, or nothing where its key cannot be read yet.
+    /// The curator as a client, or nothing where it cannot be asked or its key is not
+    /// written yet.
     pub(crate) async fn open(&self, managed: &Managed) -> Option<Box<dyn Client>> {
         managed
             .reach
@@ -133,7 +134,7 @@ impl WiringCheck {
         }
     }
 
-    /// What one \*arr's managed clients look like now.
+    /// What one curator's managed clients look like now.
     ///
     /// The service is opened and asked once, however many clients lemonfiber manages
     /// there: they are all rows of the same answer, and asking per client would be the

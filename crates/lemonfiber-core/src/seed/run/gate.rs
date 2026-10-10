@@ -182,7 +182,7 @@ async fn arr_routes(ctx: &Ctx, fillers: &crate::wiring::Fillers) -> Vec<Upstream
     let mut routes = Vec::new();
     for fulfils in super::fulfilling(fillers) {
         let crate::ports::filesystem::Beneath::Read(key) =
-            super::curating::servarr_key(ctx, fulfils.filler).await
+            super::keys::servarr_key(ctx, fulfils.filler).await
         else {
             continue;
         };

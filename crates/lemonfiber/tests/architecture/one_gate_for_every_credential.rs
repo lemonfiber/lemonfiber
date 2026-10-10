@@ -47,7 +47,7 @@ const BESIDE_THE_GATE: [(&str, &str); 2] = [
         "crates/lemonfiber-core/src/seed/run/clients.rs",
         "reads every download client's credential into the map the stack's own published \
          keys and the refused report are made from; it is handed to an asker only by \
-         arrs.rs, through the table's pairings",
+         curating.rs, through the table's pairings",
     ),
     (
         "crates/lemonfiber-core/src/seed/run/published.rs",

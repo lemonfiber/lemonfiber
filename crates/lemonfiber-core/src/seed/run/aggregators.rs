@@ -43,11 +43,11 @@ pub(super) async fn seed_aggregators(ctx: &Ctx, fillers: &Fillers) -> Vec<crate:
             continue;
         };
         let connection = connection(&asker.name);
-        let key = match super::curating::servarr_key(ctx, pairing.filler).await {
+        let key = match super::keys::servarr_key(ctx, pairing.filler).await {
             Beneath::Read(key) => key,
             Beneath::Absent => continue,
             Beneath::Escaped => {
-                wirings.push(super::curating::refused(connection, pairing.filler));
+                wirings.push(super::keys::refused(connection, pairing.filler));
                 continue;
             }
         };
