@@ -37,7 +37,7 @@ pub(super) async fn seed_jellyfin_admin(ctx: &Ctx, server: Option<&MediaServer>)
     let client = server.client(ctx);
     let recorded = server.recorded_password(ctx);
     let keep = |password: &str| server.record_password(ctx, password);
-    let administered = crate::seed::wire_jellyfin_admin(
+    let administered = crate::seed::wire_media_server_admin(
         &client,
         ctx.seams.random.as_ref(),
         recorded.as_deref(),
@@ -87,7 +87,7 @@ pub(super) async fn seed_jellyfin_identity(
         Ok(password) => {
             let seerr_client =
                 crate::seerr::Seerr::new(ctx.seams.http.clone(), &seerr_base, "seerr");
-            crate::seed::wire_seerr_identity(
+            crate::seed::wire_request_identity(
                 &seerr_client,
                 server.protocol(),
                 &password,

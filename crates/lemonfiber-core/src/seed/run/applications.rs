@@ -196,6 +196,6 @@ pub(super) fn skipped(connection: String, service: &str) -> crate::seed::Wiring 
 }
 
 /// What a curator's application in an indexer is called where it is reported.
-fn synced(arr: &str, prowlarr: &str) -> String {
-    format!("{arr} indexer sync via {prowlarr}")
+fn synced(curator: &str, indexer: &str) -> String {
+    format!("{curator} indexer sync via {indexer}")
 }

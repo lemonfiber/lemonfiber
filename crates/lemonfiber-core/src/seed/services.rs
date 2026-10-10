@@ -27,7 +27,7 @@ pub(crate) use telling::{observed_telling, said, wanted_telling, TELLING};
 ///
 /// Only the \*arrs actually in the stack are offered, and that is the half worth
 /// stating — the request service offers what its targets can deliver, so television
-/// is not offered where Sonarr is not running. An \*arr that is absent is simply
+/// is not offered where no curator files it. A curator that is absent is simply
 /// never handed over.
 ///
 /// One already held is matched by where it is reached, never by its label. Held there
@@ -36,7 +36,7 @@ pub(crate) use telling::{observed_telling, said, wanted_telling, TELLING};
 /// place: its endpoint and key are rewritten and everything the operator chose about
 /// it stays, so requests already tied to it stay tied to it.
 pub async fn wire_fulfilment_targets(
-    seerr: &dyn Requests,
+    requests: &dyn Requests,
     wanted: &[FulfilmentTarget],
     journal: &mut Journal,
     at: &str,
@@ -46,7 +46,7 @@ pub async fn wire_fulfilment_targets(
     // comes back unauthorised and each wanted target says it could not be told rather
     // than naming a credential fault nobody has.
     let existing = match observe_or_untold(
-        seerr.fulfilment_targets().await,
+        requests.fulfilment_targets().await,
         wanted,
         described_target,
         rehearsing,
@@ -64,14 +64,21 @@ pub async fn wire_fulfilment_targets(
             .and_then(|from| held_at(&existing, from, target.kind));
         let state = match here.or(before) {
             Some(held) if held.at == target.at && held.key == target.key => State::AlreadyWired,
-            Some(held) => tested(seerr, target, moved(seerr, held, target, rehearsing).await).await,
+            Some(held) => {
+                tested(
+                    requests,
+                    target,
+                    moved(requests, held, target, rehearsing).await,
+                )
+                .await
+            }
             None => {
                 let added = wire_one(
-                    seerr.add_fulfilment_target(target),
-                    seerr.fulfilment_targets(),
+                    requests.add_fulfilment_target(target),
+                    requests.fulfilment_targets(),
                     |rows| held_at(rows, &target.at, target.kind).map(|have| have.id.clone()),
                     Naming {
-                        service: "seerr",
+                        service: "requests",
                         resource: "fulfilment target",
                         noun: "request target",
                     },
@@ -83,7 +90,7 @@ pub async fn wire_fulfilment_targets(
                     }),
                 )
                 .await;
-                tested(seerr, target, added).await
+                tested(requests, target, added).await
             }
         };
         wirings.push(Wiring::settled(described_target(target), state));
@@ -93,17 +100,17 @@ pub async fn wire_fulfilment_targets(
 
 /// `written`, where it is a target just wired, held to the request service's own test
 /// of it: a target is wired only once the service has reached the \*arr with it.
-async fn tested(seerr: &dyn Requests, target: &FulfilmentTarget, written: State) -> State {
+async fn tested(requests: &dyn Requests, target: &FulfilmentTarget, written: State) -> State {
     if written != State::Wired {
         return written;
     }
-    match seerr
+    match requests
         .test_fulfilment_target(target.kind, &target.at, &target.key)
         .await
     {
         Ok(()) => State::Wired,
         Err(failure) => State::Failed {
-            detail: format!("Seerr's own test of the target failed: {failure}"),
+            detail: format!("the request service's own test of the target failed: {failure}"),
         },
     }
 }
@@ -111,7 +118,7 @@ async fn tested(seerr: &dyn Requests, target: &FulfilmentTarget, written: State)
 /// Move a target the request service holds to where, and with what, it should be
 /// reached.
 async fn moved(
-    seerr: &dyn Requests,
+    requests: &dyn Requests,
     held: &RegisteredTarget,
     target: &FulfilmentTarget,
     rehearsing: bool,
@@ -123,7 +130,7 @@ async fn moved(
             ours: Some(reached_at(&target.at)),
         };
     }
-    match seerr
+    match requests
         .move_fulfilment_target(held, &target.at, &target.key)
         .await
     {
@@ -165,23 +172,23 @@ pub(crate) fn as_request_target(name: &str) -> String {
     format!("{name} as a request target")
 }
 
-/// Wire Prowlarr's applications: register the media-filing \*arrs it lacks, leave
+/// Wire the indexer's applications: register the media-filing curators it lacks, leave
 /// the ones it already has, and record each write as a change.
 ///
-/// The same shape as [`wire_root_folders`], matched by the address Prowlarr
+/// The same shape as [`wire_root_folders`], matched by the address the indexer
 /// reaches an \*arr on rather than by a label, so an application an operator
 /// renamed is recognised as the same connection and not registered a second time.
 /// An application already present is left exactly as it is and never rewritten,
 /// which is what preserves an operator's own change to its sync settings.
 pub async fn wire_applications(
-    prowlarr: &dyn AppSync,
+    indexer: &dyn AppSync,
     service: &str,
     wanted: &[Application],
     journal: &mut Journal,
     at: &str,
     rehearsing: bool,
 ) -> Vec<Wiring> {
-    let existing = match observe_or_skip(prowlarr.applications().await, wanted, |application| {
+    let existing = match observe_or_skip(indexer.applications().await, wanted, |application| {
         describe_application(service, application)
     }) {
         Ok(existing) => existing,
@@ -194,11 +201,11 @@ pub async fn wire_applications(
             .iter()
             .find(|have| same_base_url(&have.base_url, &application.base_url));
         let state = if let Some(held) = already {
-            current_key(prowlarr, held, application, rehearsing).await
+            current_key(indexer, held, application, rehearsing).await
         } else {
             wire_one(
-                prowlarr.register_application(application),
-                prowlarr.applications(),
+                indexer.register_application(application),
+                indexer.applications(),
                 |rows| {
                     rows.iter()
                         .find(|have| same_base_url(&have.base_url, &application.base_url))
@@ -226,26 +233,26 @@ pub async fn wire_applications(
     wirings
 }
 
-/// An application Prowlarr already holds, kept on the \*arr's current key.
+/// An application the indexer already holds, kept on the curator's current key.
 ///
-/// Prowlarr shows a stored key only masked, so the only way to tell a key the \*arr
-/// has since replaced is Prowlarr's own test, which runs with the key it stores. One
+/// The indexer shows a stored key only masked, so the only way to tell a key the curator
+/// has since replaced is the indexer's own test, which runs with the key it stores. One
 /// that fails is given the \*arr's current key, in place and nothing else, and tested
 /// again. A rehearsal asks nothing: the test is a `POST`, which a rehearsal does not
 /// send.
 async fn current_key(
-    prowlarr: &dyn AppSync,
+    indexer: &dyn AppSync,
     held: &RegisteredApplication,
     application: &Application,
     rehearsing: bool,
 ) -> State {
-    if rehearsing || prowlarr.test_application(held).await.is_ok() {
+    if rehearsing || indexer.test_application(held).await.is_ok() {
         return State::AlreadyWired;
     }
-    if let Err(failure) = prowlarr.rekey_application(held, &application.api_key).await {
+    if let Err(failure) = indexer.rekey_application(held, &application.api_key).await {
         return unreached(&failure);
     }
-    match prowlarr.test_application(held).await {
+    match indexer.test_application(held).await {
         Ok(()) => State::Wired,
         Err(failure) => unreached(&failure),
     }
@@ -326,33 +333,35 @@ pub async fn wire_qbittorrent_password(
     }
 }
 
-/// What the report calls Jellyfin's being the identity Seerr signs in against.
-pub const IDENTITY: &str = "Jellyfin as Seerr's identity";
+/// What the report calls the media server being the identity the request service signs
+/// in against.
+pub const IDENTITY: &str = "The media server as the request service's identity";
 
-/// The first half of making Jellyfin the identity source for Seerr: Jellyfin's admin
-/// credential.
+/// The first half of making the media server the identity source for the request
+/// service: the media server's admin credential.
 ///
-/// Jellyfin has no key to read, so — like qBittorrent — its admin password is one
+/// The media server has no key to read, so its admin password is one
 /// lemonfiber mints, records through `keep`, and only then sets by driving the
 /// first-run wizard; a wizard already run by the household leaves its password
 /// unknown, so the wiring is skipped rather than reset. One recorded and then not
 /// taken is replaced by the next run, which finds the wizard still waiting and mints
 /// again.
 ///
-/// Apart from the second half, [`wire_seerr_identity`], because what Seerr is pointed
-/// at may need this credential first: the request gate's Jellyfin key is minted with it.
+/// Apart from the second half, [`wire_request_identity`], because what the request service
+/// is pointed at may need this credential first: the request gate's media server key is
+/// minted with it.
 ///
 /// # Errors
 ///
 /// The state the connection rests in where there is no credential to go on with.
-pub async fn wire_jellyfin_admin(
-    jellyfin: &dyn MediaServer,
+pub async fn wire_media_server_admin(
+    server: &dyn MediaServer,
     random: &dyn Random,
     recorded: Option<&str>,
     rehearsing: bool,
     keep: Keep<'_>,
 ) -> Result<String, State> {
-    let completed = match jellyfin.startup_completed().await {
+    let completed = match server.startup_completed().await {
         Ok(done) => done,
         Err(failure) => return Err(unreached(&failure)),
     };
@@ -360,7 +369,7 @@ pub async fn wire_jellyfin_admin(
         return match recorded {
             Some(password) => Ok(password.to_owned()),
             None => Err(State::Skipped {
-                reason: "Jellyfin was set up outside lemonfiber, so its admin password is unknown; a later run cannot complete this until it is set up through lemonfiber".to_owned(),
+                reason: "The media server was set up outside lemonfiber, so its admin password is unknown; a later run cannot complete this until it is set up through lemonfiber".to_owned(),
             }),
         };
     }
@@ -379,7 +388,7 @@ pub async fn wire_jellyfin_admin(
         });
     };
     keep(&password).map_err(|why| unkept(&why))?;
-    match jellyfin.create_admin(ADMIN, &password).await {
+    match server.create_admin(ADMIN, &password).await {
         Ok(()) => Ok(password),
         Err(failure) => Err(unreached(&failure)),
     }
@@ -389,8 +398,8 @@ pub async fn wire_jellyfin_admin(
 /// `server_url`, spoken to in `protocol`, as the administrator with `password`, which on
 /// a fresh request service also creates its owner. An already-initialised one is never
 /// re-pointed, since that would cost the household its existing sign-ins.
-pub async fn wire_seerr_identity(
-    seerr: &dyn Requests,
+pub async fn wire_request_identity(
+    requests: &dyn Requests,
     protocol: Protocol,
     password: &str,
     server_url: &str,
@@ -404,16 +413,20 @@ pub async fn wire_seerr_identity(
             password: password.to_owned(),
         },
     };
-    let state = configure_seerr(seerr, &source, rehearsing).await;
+    let state = configure_requests(requests, &source, rehearsing).await;
     Wiring::settled(IDENTITY.to_owned(), state)
 }
 
-/// Point Seerr at the media server, unless it is already initialised — which is
+/// Point the request service at the media server, unless it is already initialised — which is
 /// left untouched, whether lemonfiber initialised it on an earlier run or the
-/// household set it up with accounts of its own. A fresh Seerr is signed in and
+/// household set it up with accounts of its own. A fresh request service is signed in and
 /// then read back: it must report itself initialised, or the write did not land.
-async fn configure_seerr(seerr: &dyn Requests, source: &IdentitySource, rehearsing: bool) -> State {
-    let initialized = match seerr.initialized().await {
+async fn configure_requests(
+    requests: &dyn Requests,
+    source: &IdentitySource,
+    rehearsing: bool,
+) -> State {
+    let initialized = match requests.initialized().await {
         Ok(done) => done,
         Err(failure) => return unreached(&failure),
     };
@@ -429,13 +442,15 @@ async fn configure_seerr(seerr: &dyn Requests, source: &IdentitySource, rehearsi
             ours: Some(source.at.clone()),
         };
     }
-    if let Err(failure) = seerr.configure_identity(source).await {
+    if let Err(failure) = requests.configure_identity(source).await {
         return unreached(&failure);
     }
-    match seerr.initialized().await {
+    match requests.initialized().await {
         Ok(true) => State::Wired,
         Ok(false) => State::Failed {
-            detail: "Seerr accepted the sign-in but did not report itself initialised".to_owned(),
+            detail:
+                "the request service accepted the sign-in but did not report itself initialised"
+                    .to_owned(),
         },
         Err(failure) => unreached(&failure),
     }

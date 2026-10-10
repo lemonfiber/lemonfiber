@@ -15,6 +15,7 @@
 //! could not tell a filler nothing reaches from one lemonfiber forgot.
 
 use lemonfiber_contract::capabilities::indexer::search;
+use lemonfiber_contract::capabilities::request::intake;
 use lemonfiber_contract::capabilities::subtitles::fetch;
 use lemonfiber_manifest::ApiKind;
 
@@ -50,9 +51,10 @@ pub(super) const MUSIC: &str = ApplicationKind::Music.media_type();
 const ANSWERED: [&str; 4] = [USENET, TORRENT, CURATES, SEARCHES];
 
 /// Every contract an asker is paired by, as capability and major.
-const CONTRACTED: [(&str, u32); 2] = [
+const CONTRACTED: [(&str, u32); 3] = [
     (fetch::CAPABILITY, fetch::MAJOR),
     (search::CAPABILITY, search::MAJOR),
+    (intake::CAPABILITY, intake::MAJOR),
 ];
 
 /// An asker, as the table pairs it.
@@ -178,7 +180,11 @@ fn connection(
         ) => super::applications::application_kind(media)
             .map(Connection::Application)
             .ok_or(Unmade::Files),
-        (Asking::Bundled(ApiKind::Seerr), CURATES, ApiKind::Servarr) => Kind::of_declared(media)
+        (
+            Asking::Bundled(ApiKind::Seerr) | Asking::Over(intake::CAPABILITY),
+            CURATES,
+            ApiKind::Servarr,
+        ) => Kind::of_declared(media)
             .map(|kind| Connection::Fulfilment { kind })
             .ok_or(Unmade::Files),
         (

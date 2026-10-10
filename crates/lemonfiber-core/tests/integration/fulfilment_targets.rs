@@ -540,7 +540,7 @@ async fn a_target_the_request_service_cannot_reach_is_not_wired() {
     let states = wire(&seerr, &[gated()]).await;
 
     assert!(
-        matches!(states.first(), Some(State::Failed { detail }) if detail.starts_with("Seerr's own test of the target failed: ")),
+        matches!(states.first(), Some(State::Failed { detail }) if detail.starts_with("the request service's own test of the target failed: ")),
         "{states:?}"
     );
     let tested = http

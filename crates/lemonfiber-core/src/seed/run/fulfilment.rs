@@ -5,7 +5,7 @@
 //!
 //! Only the \*arrs actually in the stack are offered, which is the half that decides
 //! what the household may ask for at all: the request service offers what its
-//! targets can deliver, so television is not offered where Sonarr is not running.
+//! targets can deliver, so television is not offered where no curator files it.
 //!
 //! Two of the four \*arrs are request targets. The request service fetches film and
 //! television and nothing else, so the ones filing music and books are not targets —
@@ -14,10 +14,13 @@
 
 use std::path::Path;
 
+use lemonfiber_contract::capabilities::request::intake;
+use lemonfiber_contract::Contracted;
 use lemonfiber_manifest::Service;
 
-use super::connecting::{pairings, Connection};
+use super::connecting::{pairings, Cleared, Connection};
 use super::Ctx;
+use crate::app::targets::{spoken, Spoken};
 use crate::ports::filesystem::Beneath;
 use crate::ports::media::Kind;
 use crate::ports::service::{Client as _, Endpoint, FulfilmentTarget, QualityProfile, Requests};
@@ -148,31 +151,64 @@ pub(super) async fn seed_fulfilment_targets(
     fillers: &Fillers,
     project: Option<&Path>,
 ) -> Vec<Wiring> {
-    // Asked before anything else, because what follows asks every \*arr what it holds
-    // and there is no sense doing that with nobody to tell about it.
-    let Some(base) = super::identity::seerr_service(services) else {
+    let Some(requester) = requester(ctx, services, fillers).await else {
         return Vec::new();
     };
     let (wanted, refused) = wanted_targets(ctx, fillers).await;
     if wanted.is_empty() {
         return refused;
     }
-    // Signed in, because every call that follows is an authenticated one: registering
-    // a target reads what the service already holds and then writes. Unsigned, all of
-    // it comes back as a refusal about a credential.
-    let seerr = crate::app::targets::seerr_as_owner(ctx, services, base).await;
+    let requests: Box<dyn Requests> = match requester {
+        Requester::Over(adapter) => Box::new(intake::Adapter(adapter)),
+        Requester::Bundled(base) => {
+            Box::new(crate::app::targets::seerr_as_owner(ctx, services, base).await)
+        }
+    };
+    let requests = requests.as_ref();
     let mut wirings = match project.filter(|_| crate::app::gating::service(services).is_some()) {
-        Some(project) => through_the_gate(ctx, &seerr, wanted, project).await,
-        None => wired(ctx, &seerr, &wanted).await,
+        Some(project) => through_the_gate(ctx, requests, wanted, project).await,
+        None => wired(ctx, requests, &wanted).await,
     };
     wirings.extend(refused);
     wirings
 }
 
+/// How the request service is asked.
+enum Requester {
+    /// Over `request.intake`.
+    Over(Contracted),
+    /// As the bundled request service, at this address.
+    Bundled(String),
+}
+
+/// The request service the curators are handed to: over `request.intake` where the
+/// service asking for them speaks it, otherwise the stack's bundled one. Nothing where
+/// it speaks the contract and cannot be asked over it, or where there is none.
+async fn requester(ctx: &Ctx, services: &[Service], fillers: &Fillers) -> Option<Requester> {
+    if let Some(asker) = asker(fillers) {
+        match spoken(ctx, &asker, intake::CAPABILITY, intake::MAJOR).await {
+            Spoken::Over(adapter) => return Some(Requester::Over(adapter)),
+            Spoken::Unanswered => return None,
+            Spoken::Not => {}
+        }
+    }
+    super::identity::seerr_service(services).map(Requester::Bundled)
+}
+
+/// The service asking for the curators requests are handed to, as the gate cleared it.
+fn asker(fillers: &Fillers) -> Option<Cleared<'_>> {
+    pairings(fillers)
+        .into_iter()
+        .find_map(|pairing| match pairing.made {
+            Ok((Connection::Fulfilment { .. }, _, asker)) => Some(asker),
+            _ => None,
+        })
+}
+
 /// Hand the request service `wanted` as they are.
-async fn wired(ctx: &Ctx, seerr: &dyn Requests, wanted: &[FulfilmentTarget]) -> Vec<Wiring> {
+async fn wired(ctx: &Ctx, requests: &dyn Requests, wanted: &[FulfilmentTarget]) -> Vec<Wiring> {
     let mut journal = crate::journal::Journal::new();
-    crate::seed::wire_fulfilment_targets(seerr, wanted, &mut journal, &ctx.stamp(), ctx.dry_run)
+    crate::seed::wire_fulfilment_targets(requests, wanted, &mut journal, &ctx.stamp(), ctx.dry_run)
         .await
 }
 
@@ -180,15 +216,15 @@ async fn wired(ctx: &Ctx, seerr: &dyn Requests, wanted: &[FulfilmentTarget]) -> 
 /// route that the gate accepts.
 async fn through_the_gate(
     ctx: &Ctx,
-    seerr: &dyn Requests,
+    requests: &dyn Requests,
     wanted: Vec<FulfilmentTarget>,
     project: &Path,
 ) -> Vec<Wiring> {
     let kept = super::tokens::Kept::read(ctx, project).await;
-    let held = seerr.fulfilment_targets().await.unwrap_or_default();
+    let held = requests.fulfilment_targets().await.unwrap_or_default();
     let (gated, mut wirings) = kept.targets(ctx, wanted, &held);
     if ctx.dry_run {
-        wirings.extend(wired(ctx, seerr, &gated).await);
+        wirings.extend(wired(ctx, requests, &gated).await);
         return wirings;
     }
     let presented: Vec<super::tokens::Presented> =
@@ -208,7 +244,7 @@ async fn through_the_gate(
             return wirings;
         }
     };
-    let told = wired(ctx, seerr, &gated).await;
+    let told = wired(ctx, requests, &gated).await;
     let holding: Vec<bool> = told
         .iter()
         .map(|wiring| matches!(wiring.state, State::Wired | State::AlreadyWired))
