@@ -210,7 +210,10 @@ fn a_contracted_server_is_reached_over_its_contracts_and_paired_at_its_upstream(
     );
     assert_eq!(server.as_ref().and_then(MediaServer::gate_kind), None);
     assert!(server.as_ref().is_some_and(|one| one
-        .signed_in(&crate::test_support::a_context().build(), "x")
+        .signed_in(
+            &crate::test_support::a_context().build(),
+            crate::test_support::a_password()
+        )
         .is_none()));
 }
 

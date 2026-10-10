@@ -259,6 +259,17 @@ impl Fillers {
         self.services.iter().find(|one| one.id == id)
     }
 
+    /// The upstream `adapter` stands in front of: the service of its own plugin it names
+    /// in `fronts`, and nothing where it names none or its plugin brings no such service.
+    #[must_use]
+    pub fn fronted_by(&self, adapter: &Filler) -> Option<&Filler> {
+        let upstream = adapter.fronts.as_deref()?;
+        let plugin = adapter.brought_by()?;
+        self.services
+            .iter()
+            .find(|one| one.id == upstream && one.brought_by() == Some(plugin))
+    }
+
     /// Every service on this machine, the stack's first, each in the order it is declared.
     pub fn services(&self) -> impl Iterator<Item = &Filler> {
         self.services.iter()

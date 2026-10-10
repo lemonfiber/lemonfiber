@@ -262,9 +262,7 @@ impl MediaServer {
 /// adapter's own plugin, which the administrator's password handed to a request service
 /// to reach it would otherwise leave for.
 fn upstream_pairing(fillers: &Fillers, filler: &Filler) -> Option<Pairing> {
-    let upstream = fillers
-        .service(filler.fronts.as_deref()?)
-        .filter(|upstream| upstream.origin == filler.origin)?;
+    let upstream = fillers.fronted_by(filler)?;
     Some(Pairing {
         protocol: Protocol(upstream.native.clone()?),
         at: upstream.address.clone()?,

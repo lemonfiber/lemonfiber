@@ -243,7 +243,7 @@ async fn a_contracted_servers_administrator_password_is_not_replaced() {
 
     let recorded = server
         .as_ref()
-        .map(|one| one.record_password(&ctx, &format!("{}{}", "7777ffff", "8888aaaa9999")));
+        .map(|one| one.record_password(&ctx, &lemonfiber_fixtures::support::a_password()));
     let refused = match server.as_ref() {
         Some(server) => super::replace_jellyfin_password(&ctx, server, false)
             .await

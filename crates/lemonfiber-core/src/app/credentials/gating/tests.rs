@@ -273,6 +273,21 @@ async fn without_the_gate_jellyfin_or_a_stack_directory_there_is_no_line() {
             .await
             .is_none()
     );
+    let contracted = crate::test_support::stack_fillers(
+        gate_alone.clone(),
+        &[crate::test_support::a_contracted_media_server(Some(
+            "upstream",
+        ))],
+        None,
+        crate::plugin::first_party::EMBEDDED,
+    );
+    assert!(crate::app::targets::MediaServer::of(&contracted).is_some());
+    assert!(held(&ctx, &gate_alone, &contracted, Some(&at))
+        .await
+        .is_none());
+    let rotation = rotate(&ctx, &routes_held(&at), &contracted).await;
+    assert!(unproven(&rotation.settled)
+        .is_some_and(|said| said == crate::app::credentials::declining::NO_ADMINISTRATOR));
 }
 
 #[tokio::test]
@@ -415,6 +430,10 @@ async fn without_an_administrator_or_on_a_rehearsal_nothing_is_minted() {
 
     let unadministered = rotate(&ctx, &listed, &filling(stack(true))).await;
     assert!(unproven(&unadministered.settled).is_some_and(|said| said.contains("no administrator")));
+    let gate_alone = vec![service("request-gate", None, PORT)];
+    let unserved = rotate(&ctx, &listed, &filling(gate_alone)).await;
+    assert!(unproven(&unserved.settled)
+        .is_some_and(|said| said == crate::app::credentials::declining::NO_ADMINISTRATOR));
 
     let (mut rehearsing, _) = scene("gate-rotate-rehearsed", true, Some("old"), http.clone());
     rehearsing.dry_run = true;
