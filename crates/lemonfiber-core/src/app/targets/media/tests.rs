@@ -385,7 +385,7 @@ fn a_contracted_servers_password_is_handed_to_its_adapter_and_the_stacks_is_not(
         written
             .get(lemonfiber_contract::adapter::UPSTREAM_USERNAME)
             .map(String::as_str),
-        Some(crate::config::JELLYFIN_ADMIN_USER)
+        Some(crate::config::MEDIA_SERVER_ADMIN_USER)
     );
     assert_eq!(
         written

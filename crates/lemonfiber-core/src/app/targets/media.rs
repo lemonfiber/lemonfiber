@@ -206,7 +206,7 @@ impl MediaServer {
             )
         })?;
         let credential = BTreeMap::from([
-            (UPSTREAM_USERNAME, crate::config::JELLYFIN_ADMIN_USER),
+            (UPSTREAM_USERNAME, crate::config::MEDIA_SERVER_ADMIN_USER),
             (UPSTREAM_PASSWORD, password),
         ]);
         let written = serde_json::to_string(&credential).map_err(|err| err.to_string())?;
