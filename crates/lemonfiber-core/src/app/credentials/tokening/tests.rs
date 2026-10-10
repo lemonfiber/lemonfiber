@@ -80,18 +80,12 @@ fn fillers_beside(
     installed: &[crate::plugin::Installed],
     project: Option<&std::path::Path>,
 ) -> crate::wiring::Fillers {
-    crate::test_support::stack()
-        .manifest()
-        .map(|mut manifest| {
-            manifest.services = services;
-            crate::wiring::Fillers::of(
-                &manifest,
-                installed,
-                &crate::wiring::Chosen::default(),
-                project,
-            )
-        })
-        .unwrap_or_default()
+    crate::test_support::stack_fillers(
+        services,
+        installed,
+        project,
+        crate::plugin::first_party::EMBEDDED,
+    )
 }
 
 /// Jellyfin, the request service, Sonarr and, where `gating`, the request gate.

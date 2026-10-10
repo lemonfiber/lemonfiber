@@ -56,11 +56,11 @@ pub(crate) fn said(telling: &Telling) -> String {
 /// operator set before lemonfiber ever ran is theirs to adopt and the caller needs it
 /// to write the baseline down.
 pub async fn wire_household_telling(
-    seerr: &dyn Requests,
+    requests: &dyn Requests,
     recorded: Option<&Record>,
     rehearsing: bool,
 ) -> (Wiring, Telling) {
-    let (state, held) = tell_the_household(seerr, recorded, rehearsing).await;
+    let (state, held) = tell_the_household(requests, recorded, rehearsing).await;
     (
         Wiring::settled("What the household is told".to_owned(), state),
         held,
@@ -95,11 +95,11 @@ pub(crate) fn observed_telling(recorded: Option<&Record>, held: &Telling) -> Obs
 
 /// The comparison and the write, apart from the reporting shape around them.
 pub(crate) async fn tell_the_household(
-    seerr: &dyn Requests,
+    requests: &dyn Requests,
     recorded: Option<&Record>,
     rehearsing: bool,
 ) -> (State, Telling) {
-    let held = match seerr.telling().await {
+    let held = match requests.telling().await {
         Ok(held) => held,
         Err(failure) => return (unread(&failure, rehearsing), Telling::default()),
     };
@@ -116,7 +116,7 @@ pub(crate) async fn tell_the_household(
             yours: Some(holding.clone()),
             ours: Some(said(&want)),
         },
-        Observed::Absent | Observed::Unavailable => match seerr.tell(&want).await {
+        Observed::Absent | Observed::Unavailable => match requests.tell(&want).await {
             Ok(()) => State::Wired,
             Err(failure) => unreached(&failure),
         },

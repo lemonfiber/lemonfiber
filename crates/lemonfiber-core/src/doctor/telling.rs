@@ -38,7 +38,7 @@ const TITLE: &str = "What the household is told";
 /// they asked for.
 pub struct TellingCheck {
     /// The request service, absent where the stack has none to ask.
-    seerr: Option<Arc<dyn Requests>>,
+    requests: Option<Arc<dyn Requests>>,
     /// What lemonfiber last recorded having set the telling to.
     recorded: Option<Record>,
 }
@@ -46,8 +46,8 @@ pub struct TellingCheck {
 impl TellingCheck {
     /// A check over the request service given, against what was last recorded for it.
     #[must_use]
-    pub fn new(seerr: Option<Arc<dyn Requests>>, recorded: Option<Record>) -> Self {
-        Self { seerr, recorded }
+    pub fn new(requests: Option<Arc<dyn Requests>>, recorded: Option<Record>) -> Self {
+        Self { requests, recorded }
     }
 }
 
@@ -64,7 +64,7 @@ impl Check for TellingCheck {
 
 /// Whether the operator can be told anything, and by which route.
 async fn ran(check: &TellingCheck) -> Vec<Finding> {
-    let Some(seerr) = check.seerr.as_ref() else {
+    let Some(requests) = check.requests.as_ref() else {
         return vec![finding(Verdict::Skipped {
             reason: "this stack has no request service, so there is nothing to ask \
                      and nobody asking"
@@ -72,7 +72,7 @@ async fn ran(check: &TellingCheck) -> Vec<Finding> {
         })];
     };
 
-    let held = match seerr.telling().await {
+    let held = match requests.telling().await {
         Ok(held) => held,
         // Nobody could find out. Said as its own thing rather than dressed as a
         // verdict about the household, which is the distinction between not

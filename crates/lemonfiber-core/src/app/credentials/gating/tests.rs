@@ -72,13 +72,7 @@ fn stack(gating: bool) -> Vec<lemonfiber_manifest::Service> {
 
 /// Who fills each of the shipped stack's asks among `services`.
 fn filling(services: Vec<lemonfiber_manifest::Service>) -> crate::wiring::Fillers {
-    crate::test_support::stack()
-        .manifest()
-        .map(|mut manifest| {
-            manifest.services = services;
-            crate::wiring::Fillers::of(&manifest, &[], &crate::wiring::Chosen::default(), None)
-        })
-        .unwrap_or_default()
+    crate::test_support::stack_fillers(services, &[], None, crate::plugin::first_party::EMBEDDED)
 }
 
 /// The gate's routes: Sonarr's, and Jellyfin's presenting `key`.
@@ -337,9 +331,8 @@ async fn a_new_key_jellyfin_refuses_is_revoked_and_the_old_routes_put_back() {
 
     let rotation = rotate(&ctx, &listed, &filling(stack(true))).await;
 
-    assert!(
-        unproven(&rotation.settled).is_some_and(|said| said.starts_with("Jellyfin did not take"))
-    );
+    assert!(unproven(&rotation.settled)
+        .is_some_and(|said| said.starts_with("The media server did not take")));
     assert_eq!(on_disk(&at), Some(routes("old")));
     assert_eq!(revoked(&http), vec!["fresh".to_owned()]);
 }

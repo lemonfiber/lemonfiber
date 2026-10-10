@@ -234,7 +234,9 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // configured that way and by no other means — the quality sync and the archive
     // extractor — so without this they run with nothing, and the quality sync refuses
     // its whole configuration over a single undefined name.
-    wirings.push(published::publish_keys(ctx, &manifest.services, project.as_deref(), &held).await);
+    wirings.push(
+        published::publish_keys(ctx, &manifest.services, &fillers, project.as_deref(), &held).await,
+    );
 
     // The listening server's first account, which is anybody's until somebody makes it.
     wirings.extend(claiming::claimed(ctx, &manifest.services).await);
@@ -503,7 +505,7 @@ async fn seed_media_server(
     wirings.extend(cors::seed_cors(ctx, services, server).await);
 
     // The decline service's key, minted in the server the decline service names.
-    wirings.extend(decline::seed_decline_key(ctx, services, server, project).await);
+    wirings.extend(decline::seed_decline_key(ctx, services, fillers, project).await);
 
     // The request gate's routes, with the same session.
     wirings.extend(gate::seed_gate_routes(ctx, services, fillers, server, project).await);

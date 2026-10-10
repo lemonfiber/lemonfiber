@@ -264,6 +264,29 @@ pub(crate) fn asker(server: &crate::app::targets::MediaServer) -> Option<&str> {
     server.asked_by.as_ref().map(|asker| asker.id.as_str())
 }
 
+/// The shipped stack's fillers with `services` as its services and `installed` beside
+/// them, written at `project`, trusting `trusted` as first-party.
+pub(crate) fn stack_fillers(
+    services: Vec<lemonfiber_manifest::Service>,
+    installed: &[crate::plugin::Installed],
+    project: Option<&std::path::Path>,
+    trusted: &[crate::plugin::first_party::FirstParty],
+) -> crate::wiring::Fillers {
+    stack()
+        .manifest()
+        .map(|mut manifest| {
+            manifest.services = services;
+            crate::wiring::Fillers::trusting(
+                &manifest,
+                installed,
+                &crate::wiring::Chosen::default(),
+                project,
+                trusted,
+            )
+        })
+        .unwrap_or_default()
+}
+
 /// A value as a contract carries it.
 pub(crate) fn json<T: serde::Serialize>(value: &T) -> String {
     serde_json::to_string(value).unwrap_or_default()

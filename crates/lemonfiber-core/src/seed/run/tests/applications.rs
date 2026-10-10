@@ -37,7 +37,8 @@ async fn app_sync_does_nothing_where_the_stack_has_no_prowlarr() {
     let ctx = seed_ctx(None, true, Vec::new(), None, None);
     // Only a media-filing arr, so nothing asks for it at all.
     let wirings =
-        super::super::seed_applications(&ctx, &fillers_of(vec![arr("sonarr", 8989, "tv")])).await;
+        super::super::seed_applications(&ctx, &fillers_of(vec![curator("sonarr", 8989, "tv")]))
+            .await;
     assert!(wirings.is_empty(), "no Prowlarr, no app sync");
 }
 
@@ -59,7 +60,7 @@ async fn app_sync_passes_over_an_indexer_nothing_can_reach() {
     for indexer in [unpublished, unlistening] {
         let wirings = super::super::seed_applications(
             &ctx,
-            &fillers_of(vec![indexer, arr("sonarr", 8989, "tv")]),
+            &fillers_of(vec![indexer, curator("sonarr", 8989, "tv")]),
         )
         .await;
 
@@ -79,7 +80,7 @@ async fn app_sync_never_registers_a_plugin_curator() {
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
         .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), None)));
-    let fillers = beside_a_stand_in(vec![prowlarr(), arr("sonarr", 8989, "tv")], "movies");
+    let fillers = beside_a_stand_in(vec![prowlarr(), curator("sonarr", 8989, "tv")], "movies");
 
     let wirings = super::super::seed_applications(&ctx, &fillers).await;
     let said: Vec<crate::seed::Wiring> = super::super::connecting::unmatched(&fillers)
@@ -115,7 +116,7 @@ async fn app_sync_never_hands_a_plugin_indexer_a_curators_key() {
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
         .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), None)));
-    let fillers = asked_by_a_plugin(&prowlarr(), vec![arr("sonarr", 8989, "tv")]);
+    let fillers = asked_by_a_plugin(&prowlarr(), vec![curator("sonarr", 8989, "tv")]);
 
     let wirings = super::super::seed_applications(&ctx, &fillers).await;
     let resynced = super::super::resync_application(&ctx, &fillers, "sonarr").await;
@@ -133,7 +134,7 @@ async fn a_replaced_key_resyncs_each_indexer_that_registers_the_curator() {
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
         .with_http(seeding())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), None)));
-    let fillers = fillers_of(vec![prowlarr(), arr("sonarr", 8989, "tv")]);
+    let fillers = fillers_of(vec![prowlarr(), curator("sonarr", 8989, "tv")]);
 
     let resynced = super::super::resync_application(&ctx, &fillers, "sonarr").await;
     let nobody = super::super::resync_application(&ctx, &fillers, "radarr").await;
@@ -154,7 +155,7 @@ async fn a_replaced_key_resyncs_each_indexer_that_registers_the_curator() {
 async fn a_replaced_key_owes_an_indexer_with_no_key_yet_nothing() {
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
         .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
-    let fillers = fillers_of(vec![prowlarr(), arr("sonarr", 8989, "tv")]);
+    let fillers = fillers_of(vec![prowlarr(), curator("sonarr", 8989, "tv")]);
 
     let resynced = super::super::resync_application(&ctx, &fillers, "sonarr").await;
 
@@ -170,7 +171,7 @@ async fn a_replaced_key_owes_the_indexer_nothing_for_a_plugin_curator() {
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
         .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), None)));
-    let fillers = beside_a_stand_in(vec![prowlarr(), arr("sonarr", 8989, "tv")], "movies");
+    let fillers = beside_a_stand_in(vec![prowlarr(), curator("sonarr", 8989, "tv")], "movies");
 
     let resynced = super::super::resync_application(&ctx, &fillers, "kept").await;
 
@@ -180,7 +181,7 @@ async fn a_replaced_key_owes_the_indexer_nothing_for_a_plugin_curator() {
 
 #[tokio::test]
 async fn app_sync_skips_every_arr_until_prowlarr_has_written_its_key() {
-    let services = fillers_of(vec![prowlarr(), arr("sonarr", 8989, "tv")]);
+    let services = fillers_of(vec![prowlarr(), curator("sonarr", 8989, "tv")]);
     // Prowlarr's key is not readable yet, so it is still starting: every
     // application is skipped for a re-run rather than failed.
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
@@ -199,7 +200,7 @@ async fn app_sync_skips_every_arr_until_prowlarr_has_written_its_key() {
 #[tokio::test]
 async fn app_sync_skips_only_the_arr_that_has_not_written_its_key() {
     const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    let services = fillers_of(vec![prowlarr(), arr("sonarr", 8989, "tv")]);
+    let services = fillers_of(vec![prowlarr(), curator("sonarr", 8989, "tv")]);
     // Prowlarr's key is readable but Sonarr's is not — Sonarr came up after
     // Prowlarr — so Sonarr's application waits while Prowlarr itself proceeds.
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
@@ -215,7 +216,7 @@ async fn app_sync_skips_only_the_arr_that_has_not_written_its_key() {
 #[tokio::test]
 async fn app_sync_registers_an_arr_whose_keys_are_all_readable() {
     const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    let services = fillers_of(vec![prowlarr(), arr("sonarr", 8989, "tv")]);
+    let services = fillers_of(vec![prowlarr(), curator("sonarr", 8989, "tv")]);
     // The seeding routes report Sonarr already registered — its baseUrl is in the
     // application list — so the connection reads back as already wired.
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
@@ -257,7 +258,7 @@ fn registering_prowlarr() -> Arc<Fake> {
 #[tokio::test]
 async fn app_sync_registers_an_absent_arr_and_reads_it_back() {
     const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    let services = fillers_of(vec![prowlarr(), arr("sonarr", 8989, "tv")]);
+    let services = fillers_of(vec![prowlarr(), curator("sonarr", 8989, "tv")]);
     // Prowlarr holds no applications, so Sonarr is genuinely written and then
     // read back — the write path a pre-populated list would hide.
     let http = registering_prowlarr();
@@ -323,7 +324,10 @@ fn contracted_indexer(
     trusted: &[crate::plugin::first_party::FirstParty],
 ) -> crate::wiring::Fillers {
     fillers_trusting(
-        vec![arr("sonarr", 8989, "tv"), arr("radarr", 7878, "movies")],
+        vec![
+            curator("sonarr", 8989, "tv"),
+            curator("radarr", 7878, "movies"),
+        ],
         &[contracted("indexing", "prowlarr", "indexer.search")],
         project,
         trusted,

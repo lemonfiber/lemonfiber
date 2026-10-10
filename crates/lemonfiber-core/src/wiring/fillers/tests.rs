@@ -462,3 +462,24 @@ fn a_capability_nothing_asks_for_is_filled_by_its_one_provider() {
     let two = shipped(&[second], &Chosen::default(), |_| ());
     assert_eq!(filled_by(&two, "request.intake"), None);
 }
+
+/// A link by name reaches the stack's own service it names, where the stack runs it, and
+/// nothing for a service that makes no such link or names one the stack does not run.
+#[test]
+fn a_link_by_name_reaches_the_stacks_own_service_it_names() {
+    let fillers = shipped(&[], &Chosen::default(), |_| ());
+    let gone = shipped(&[], &Chosen::default(), |manifest| {
+        manifest.services.retain(|service| service.id != "jellyfin");
+    });
+
+    assert_eq!(
+        fillers.named_by("decline").map(|one| one.id.as_str()),
+        Some("jellyfin")
+    );
+    assert_eq!(
+        fillers.named_by("decline").map(|one| one.origin.clone()),
+        Some(Origin::Bundled)
+    );
+    assert_eq!(fillers.named_by("seerr"), None);
+    assert_eq!(gone.named_by("decline"), None);
+}

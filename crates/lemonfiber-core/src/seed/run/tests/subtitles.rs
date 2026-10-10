@@ -8,8 +8,8 @@ const WATCHING_NOTHING: &str = r#"{"general":{"use_sonarr":false,"use_radarr":fa
 /// The stack a subtitle test runs against: both \*arrs and the finder.
 fn subtitle_stack() -> Vec<lemonfiber_manifest::Service> {
     vec![
-        arr("sonarr", 8989, "tv"),
-        arr("radarr", 7878, "movies"),
+        curator("sonarr", 8989, "tv"),
+        curator("radarr", 7878, "movies"),
         bazarr_svc(),
     ]
 }
@@ -84,7 +84,10 @@ async fn a_plugin_finder_is_never_handed_a_curators_key() {
     let ctx = subtitle_ctx(http.clone(), Some(FINDER_CONFIG));
     let fillers = asked_by_a_plugin(
         &bazarr_svc(),
-        vec![arr("sonarr", 8989, "tv"), arr("radarr", 7878, "movies")],
+        vec![
+            curator("sonarr", 8989, "tv"),
+            curator("radarr", 7878, "movies"),
+        ],
     );
 
     let wirings = super::super::subtitles::seed_subtitles(&ctx, &fillers).await;
@@ -102,7 +105,10 @@ fn contracted_finder(
     trusted: &[crate::plugin::first_party::FirstParty],
 ) -> crate::wiring::Fillers {
     fillers_trusting(
-        vec![arr("sonarr", 8989, "tv"), arr("radarr", 7878, "movies")],
+        vec![
+            curator("sonarr", 8989, "tv"),
+            curator("radarr", 7878, "movies"),
+        ],
         &[contracted("subber", "bazarr", "subtitles.fetch")],
         project,
         trusted,
@@ -244,7 +250,7 @@ async fn a_stack_without_a_subtitle_finder_has_nothing_to_wire() {
         Answer::reply(200, WATCHING_NOTHING),
     )]);
     let ctx = subtitle_ctx(http, Some(FINDER_CONFIG));
-    let without = vec![arr("sonarr", 8989, "tv")];
+    let without = vec![curator("sonarr", 8989, "tv")];
 
     assert!(
         super::super::subtitles::seed_subtitles(&ctx, &fillers_of(without))
@@ -315,8 +321,8 @@ async fn an_arr_filing_media_with_no_subtitles_is_passed_over() {
     )]);
     let ctx = subtitle_ctx(http, Some(FINDER_CONFIG));
     let with_music = vec![
-        arr("sonarr", 8989, "tv"),
-        arr("lidarr", 8686, "music"),
+        curator("sonarr", 8989, "tv"),
+        curator("lidarr", 8686, "music"),
         bazarr_svc(),
     ];
 
@@ -347,7 +353,7 @@ async fn an_arr_with_no_port_declared_is_passed_over() {
         Answer::reply(200, WATCHING_NOTHING),
     )]);
     let ctx = subtitle_ctx(http, Some(FINDER_CONFIG));
-    let mut portless = arr("sonarr", 8989, "tv");
+    let mut portless = curator("sonarr", 8989, "tv");
     portless.listens = None;
 
     let wirings =
@@ -378,7 +384,7 @@ async fn a_finder_with_no_configuration_path_is_no_target() {
 
     let wirings = super::super::subtitles::seed_subtitles(
         &ctx,
-        &fillers_of(vec![arr("sonarr", 8989, "tv"), pathless]),
+        &fillers_of(vec![curator("sonarr", 8989, "tv"), pathless]),
     )
     .await;
 
@@ -500,7 +506,7 @@ async fn a_curator_whose_key_file_leads_away_is_refused_its_watch() {
         .with_filesystem(Arc::new(
             leading_away_from_the_stand_in().with_bazarr(FINDER_CONFIG),
         ));
-    let fillers = beside_a_stand_in(vec![arr("sonarr", 8989, "tv"), bazarr_svc()], "movies");
+    let fillers = beside_a_stand_in(vec![curator("sonarr", 8989, "tv"), bazarr_svc()], "movies");
 
     let wirings = super::super::subtitles::seed_subtitles(&ctx, &fillers).await;
 
@@ -539,7 +545,7 @@ async fn a_replaced_key_rewatches_each_finder_and_refuses_one_read_from_a_file_l
         .with_filesystem(Arc::new(
             SeedFs::keyed(None, None).with_bazarr(FINDER_CONFIG),
         ));
-    let fillers = beside_a_stand_in(vec![arr("sonarr", 8989, "tv"), bazarr_svc()], "movies");
+    let fillers = beside_a_stand_in(vec![curator("sonarr", 8989, "tv"), bazarr_svc()], "movies");
 
     let watched = super::super::rewatch(&refusing, &fillers, "sonarr").await;
     let refused = super::super::rewatch(&refusing, &fillers, "kept").await;
@@ -575,8 +581,8 @@ async fn a_replaced_key_owes_a_finder_nothing_it_cannot_be_told() {
     };
     let stack = || {
         vec![
-            arr("sonarr", 8989, "tv"),
-            arr("lidarr", 8686, "music"),
+            curator("sonarr", 8989, "tv"),
+            curator("lidarr", 8686, "music"),
             bazarr_svc(),
         ]
     };
@@ -594,7 +600,7 @@ async fn a_replaced_key_owes_a_finder_nothing_it_cannot_be_told() {
         super::super::rewatch(&watched(Some(NOT_ITS_OWN)), &fillers_of(stack()), "sonarr").await;
     let unreached = super::super::rewatch(
         &watched(Some(FINDER_CONFIG)),
-        &fillers_of(vec![arr("sonarr", 8989, "tv"), unpublished]),
+        &fillers_of(vec![curator("sonarr", 8989, "tv"), unpublished]),
         "sonarr",
     )
     .await;

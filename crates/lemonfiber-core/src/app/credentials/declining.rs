@@ -1,4 +1,4 @@
-//! The decline service's Jellyfin key, as the inventory lists it, prints it and
+//! The decline service's media server key, as the inventory lists it, prints it and
 //! replaces it.
 //!
 //! It is held in one place, the key file in the service's configuration directory,
@@ -7,10 +7,10 @@
 //! written there.
 //!
 //! **A replacement keeps a working key at every moment.** A new key is minted, written,
-//! proven against Jellyfin and confirmed by the service, and only then is the old one
-//! revoked. Where any step fails the new key is revoked and the old one put back. A
-//! revocation of the old key that Jellyfin refuses leaves it filed under the service's
-//! name and held by nothing, which the next seed revokes.
+//! proven against the media server and confirmed by the service, and only then is the
+//! old one revoked. Where any step fails the new key is revoked and the old one put back.
+//! A revocation of the old key that the media server refuses leaves it filed under the
+//! service's name and held by nothing, which the next seed revokes.
 
 use std::path::{Path, PathBuf};
 
@@ -24,42 +24,41 @@ use crate::app_keys::DECLINE_APP;
 use crate::credential::{fingerprint, Held, Origin, Propagation, Reach, Rotation, State};
 use crate::jellyfin::Jellyfin;
 use crate::ports::service::AppKeys as _;
-use crate::seed::run::identity;
 
 /// What the key is recorded as: where it lives inside the stack's configuration.
 pub(super) const SETTING: &str = "decline/jellyfin.key";
 
 /// What the inventory calls it.
-const NAME: &str = "Jellyfin decline key";
+const NAME: &str = "Media server decline key";
 
 /// The one thing that authenticates with it.
 const CONSUMER: &str = "the decline service, which switches off an invitation the invitee refuses";
 
 /// What is said where the key is not there.
-const ABSENT: &str = "Jellyfin decline key is not there yet, so the decline service cannot \
+const ABSENT: &str = "Media server decline key is not there yet, so the decline service cannot \
                       switch off an invitation anybody refuses. Run `lemonfiber seed`.";
 
 /// What a rehearsal says a replacement would take.
-const ROTATING: &str = "a real run would mint a new key on Jellyfin, write it where the decline \
-                        service reads it, prove Jellyfin takes it and that the service holds it, \
-                        and only then revoke the old one. Nothing was minted here, and nothing \
-                        was written.";
+const ROTATING: &str = "a real run would mint a new key on the media server, write it where \
+                        the decline service reads it, prove the media server takes it and \
+                        that the service holds it, and only then revoke the old one. Nothing \
+                        was minted here, and nothing was written.";
 
 /// What a landed replacement says.
-const LANDED: &str = "Jellyfin took the new key, and the decline service holds it";
+const LANDED: &str = "The media server took the new key, and the decline service holds it";
 
 /// Why there is nothing to mint with.
 pub(super) const NO_ADMINISTRATOR: &str =
-    "lemonfiber holds no administrator for this Jellyfin, so there \
-                                is nothing to mint a key with; run `lemonfiber seed`";
+    "lemonfiber holds no administrator for this media server, so there is nothing to mint \
+     a key with; run `lemonfiber seed`";
 
 /// Why a new key was revoked before it was ever used.
 const UNWRITTEN: &str =
     "the new key could not be written where the decline service reads it, so it was revoked again";
 
-/// Why a new key was revoked once Jellyfin refused it.
+/// Why a new key was revoked once the media server refused it.
 pub(super) const UNTAKEN: &str =
-    "Jellyfin did not take the new key, so it was revoked and the old one put back";
+    "The media server did not take the new key, so it was revoked and the old one put back";
 
 /// Why a new key was revoked once the service did not hold it.
 const UNHELD: &str = "the decline service did not report holding the new key, so it was revoked \
@@ -95,11 +94,15 @@ pub(super) async fn value(ctx: &Ctx, held: &Held) -> Option<String> {
 }
 
 /// Replace the key, keeping a working one at every moment.
-pub(super) async fn rotate(ctx: &Ctx, held: &Held, services: &[Service]) -> Rotation {
-    let (Some(jellyfin), Some(password)) = (
-        identity::jellyfin_service(services),
-        identity::recorded_jellyfin_password(ctx),
-    ) else {
+pub(super) async fn rotate(
+    ctx: &Ctx,
+    held: &Held,
+    services: &[Service],
+    fillers: &crate::wiring::Fillers,
+) -> Rotation {
+    let Some(client) =
+        crate::app::targets::declined_server(fillers).and_then(|server| server.administered(ctx))
+    else {
         return unproven(held, NO_ADMINISTRATOR);
     };
     let health = declining::service(services)
@@ -110,13 +113,6 @@ pub(super) async fn rotate(ctx: &Ctx, held: &Held, services: &[Service]) -> Rota
     if ctx.dry_run {
         return would_rotate(held, ROTATING);
     }
-    let client = Jellyfin::authenticated(
-        ctx.seams.http.clone(),
-        &jellyfin.loopback,
-        "jellyfin",
-        crate::config::JELLYFIN_ADMIN_USER,
-        password,
-    );
     let path = PathBuf::from(&held.location);
     let old = read(ctx, &path).await;
     let minted = match client.mint(DECLINE_APP).await {

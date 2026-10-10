@@ -66,7 +66,7 @@ const NOT_WRITTEN_DOWN: &str = "what the disk is holding back could not be writt
 /// because a permission would not be written would report nothing about anybody.
 pub(super) async fn as_the_disk_stands(
     ctx: &Ctx,
-    seerr: &dyn Approving,
+    requests: &dyn Approving,
     members: &[&str],
     no_room: bool,
     dry_run: bool,
@@ -76,9 +76,9 @@ pub(super) async fn as_the_disk_stands(
     }
     let was: HeldBack = record::beside(ctx, NAME);
     let (now, mut said) = if no_room {
-        taking_away(seerr, members, was.clone()).await
+        taking_away(requests, members, was.clone()).await
     } else {
-        giving_back(seerr, was.clone()).await
+        giving_back(requests, was.clone()).await
     };
     // Written only where it changed. This runs on every reading of the household, and a
     // file rewritten on every glance is one a backup and a watcher both see move for
@@ -99,13 +99,13 @@ pub(super) async fn as_the_disk_stands(
 /// every reading while the disk stays full, and the second run finds nothing left to take
 /// from anybody the first took from.
 async fn taking_away(
-    seerr: &dyn Approving,
+    requests: &dyn Approving,
     members: &[&str],
     mut held: HeldBack,
 ) -> (HeldBack, Vec<String>) {
     let mut said = Vec::new();
     for member in members {
-        match seerr.hold_requests(member).await {
+        match requests.hold_requests(member).await {
             Ok(came_off) if came_off.anything() => {
                 *held.entry((*member).to_owned()).or_default() |= came_off.taken;
             }
@@ -125,11 +125,11 @@ async fn taking_away(
 ///
 /// Whoever the service would not answer for keeps their line, so the next reading tries
 /// again rather than leaving somebody unable to ask for good.
-async fn giving_back(seerr: &dyn Approving, held: HeldBack) -> (HeldBack, Vec<String>) {
+async fn giving_back(requests: &dyn Approving, held: HeldBack) -> (HeldBack, Vec<String>) {
     let mut still = HeldBack::new();
     let mut said = Vec::new();
     for (member, taken) in held {
-        if seerr
+        if requests
             .release_requests(&member, Holding { taken })
             .await
             .is_err()

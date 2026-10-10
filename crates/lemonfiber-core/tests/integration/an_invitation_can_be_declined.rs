@@ -626,7 +626,7 @@ async fn the_decline_key_is_listed_shown_and_replaced() {
     let asked = |asking| dispatch(Command::Credentials(asking), &ctx);
 
     let shown = match asked(lemonfiber_core::app::Asking::Reveal {
-        credential: "Jellyfin decline key".to_owned(),
+        credential: "Media server decline key".to_owned(),
         confirmed: true,
     })
     .await
@@ -635,7 +635,7 @@ async fn the_decline_key_is_listed_shown_and_replaced() {
         _ => None,
     };
     let rotated = match asked(lemonfiber_core::app::Asking::Rotate {
-        credential: "Jellyfin decline key".to_owned(),
+        credential: "Media server decline key".to_owned(),
     })
     .await
     {

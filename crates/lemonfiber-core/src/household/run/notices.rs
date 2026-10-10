@@ -91,7 +91,7 @@ fn costs(quality: &Selection) -> String {
 /// household list that refused to be read because a notice could not be hung would report
 /// nothing about anybody over something nobody asked for.
 pub(super) async fn put_where_they_ask(
-    seerr: &dyn Noticing,
+    requests: &dyn Noticing,
     quality: &Selection,
     no_room: bool,
     limited: bool,
@@ -100,7 +100,7 @@ pub(super) async fn put_where_they_ask(
     if dry_run {
         return None;
     }
-    seerr
+    requests
         .set_notices(&for_the_house(quality, no_room, limited))
         .await
         .err()

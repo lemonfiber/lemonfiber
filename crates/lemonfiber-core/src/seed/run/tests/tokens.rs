@@ -13,7 +13,7 @@ fn minted() -> String {
 
 /// A stack with Sonarr and the request service and, where `gating`, the request gate.
 fn stack(gating: bool) -> Vec<lemonfiber_manifest::Service> {
-    let mut services = vec![arr("sonarr", 8989, "tv"), seerr_svc()];
+    let mut services = vec![curator("sonarr", 8989, "tv"), seerr_svc()];
     if gating {
         services.push(manifest_service("request-gate", None, Some(PORT)));
     }

@@ -35,8 +35,8 @@ async fn the_arrs_in_the_stack_are_handed_to_the_request_service() {
 
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
-        &[arr("sonarr", 8989, "tv"), seerr_svc()],
-        &fillers_of(vec![arr("sonarr", 8989, "tv"), seerr_svc()]),
+        &[curator("sonarr", 8989, "tv"), seerr_svc()],
+        &fillers_of(vec![curator("sonarr", 8989, "tv"), seerr_svc()]),
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
     )
     .await;
@@ -72,7 +72,8 @@ async fn each_services_key_is_published_where_the_stack_reads_it() {
 
     let wiring = super::super::published::publish_keys(
         &ctx,
-        &[arr("sonarr", 8989, "tv")],
+        &[curator("sonarr", 8989, "tv")],
+        &super::fillers_of(vec![curator("sonarr", 8989, "tv")]),
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
         // A plugin's client is in hand beside the stack's own, and nothing reads its key
         // out of the environment, so it is not written there.
@@ -121,6 +122,28 @@ pub(super) fn audiobookshelf_svc() -> lemonfiber_manifest::Service {
         }),
         Some(13378),
     )
+}
+
+/// A service of every shape whose key is published.
+fn every_keyed_service() -> Vec<lemonfiber_manifest::Service> {
+    vec![
+        curator("sonarr", 8989, "tv"),
+        prowlarr(),
+        bazarr_svc(),
+        seerr_with_settings(),
+        jellyfin_svc(),
+        audiobookshelf_svc(),
+        manifest_service(
+            "qbittorrent",
+            Some(lemonfiber_manifest::Api {
+                kind: lemonfiber_manifest::ApiKind::Qbittorrent,
+                key_source: lemonfiber_manifest::KeySource::Generated,
+                path: None,
+                version: None,
+            }),
+            Some(8081),
+        ),
+    ]
 }
 
 /// Every key a service wrote down is published, even where no \*arr list holds it.
@@ -175,26 +198,11 @@ async fn every_service_with_a_key_is_published_not_only_the_ones_that_file_media
                 .with_seerr(r#"{"main":{"apiKey":"request-key"}}"#),
         ));
 
+    let services = every_keyed_service();
     let wiring = super::super::published::publish_keys(
         &ctx,
-        &[
-            arr("sonarr", 8989, "tv"),
-            prowlarr(),
-            bazarr_svc(),
-            seerr_with_settings(),
-            jellyfin_svc(),
-            audiobookshelf_svc(),
-            manifest_service(
-                "qbittorrent",
-                Some(lemonfiber_manifest::Api {
-                    kind: lemonfiber_manifest::ApiKind::Qbittorrent,
-                    key_source: lemonfiber_manifest::KeySource::Generated,
-                    path: None,
-                    version: None,
-                }),
-                Some(8081),
-            ),
-        ],
+        &services,
+        &super::fillers_of(services.clone()),
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
         // The torrent client's password is in hand, which is what its account name is
         // published to pair with.
@@ -269,6 +277,7 @@ async fn a_key_that_would_not_be_revoked_is_not_forgotten() {
     let _ = super::super::published::publish_keys(
         &ctx,
         &[jellyfin_svc()],
+        &super::fillers_of(vec![jellyfin_svc()]),
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
         &Held::default(),
     )
@@ -299,7 +308,8 @@ async fn a_rehearsed_publish_of_a_stack_with_no_keys_yet_names_nothing() {
 
     let wiring = super::super::published::publish_keys(
         &ctx,
-        &[arr("sonarr", 8989, "tv")],
+        &[curator("sonarr", 8989, "tv")],
+        &super::fillers_of(vec![curator("sonarr", 8989, "tv")]),
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
         &Held::default(),
     )
@@ -334,7 +344,8 @@ async fn a_rehearsed_publish_names_the_settings_and_none_of_the_keys() {
 
     let wiring = super::super::published::publish_keys(
         &ctx,
-        &[arr("sonarr", 8989, "tv"), audiobookshelf_svc()],
+        &[curator("sonarr", 8989, "tv"), audiobookshelf_svc()],
+        &super::fillers_of(vec![curator("sonarr", 8989, "tv"), audiobookshelf_svc()]),
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
         &Held::default(),
     )
@@ -383,7 +394,8 @@ async fn a_service_whose_entry_names_no_file_publishes_no_key() {
 
     let wiring = super::super::published::publish_keys(
         &ctx,
-        &[pathless],
+        &[pathless.clone()],
+        &super::fillers_of(vec![pathless]),
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
         &Held::default(),
     )
@@ -411,7 +423,8 @@ async fn nothing_is_published_where_no_service_has_written_a_key() {
 
     let wiring = super::super::published::publish_keys(
         &ctx,
-        &[arr("sonarr", 8989, "tv")],
+        &[curator("sonarr", 8989, "tv")],
+        &super::fillers_of(vec![curator("sonarr", 8989, "tv")]),
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
         &Held::default(),
     )
