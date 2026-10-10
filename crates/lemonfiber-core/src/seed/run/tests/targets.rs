@@ -349,20 +349,14 @@ fn nothing_can_be_proven_without_a_project_directory() {
 }
 
 #[tokio::test]
-async fn seed_wires_jellyfin_as_seerrs_identity() {
-    // The whole command against the real manifest, which has both services;
-    // Jellyfin reports its wizard done and no password was recorded, so the
-    // household set it up and the identity is skipped for them to complete.
+async fn a_media_server_the_household_set_up_leaves_the_request_identity_to_them() {
     let ctx = seed_ctx(None, true, Vec::new(), None, None).with_http(household(true, false));
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     let identity = report
         .wirings
         .iter()
-        .find(|wiring| wiring.connection.contains("Seerr's identity"));
-    assert!(
-        identity.is_some_and(is_skipped),
-        "an externally set-up Jellyfin leaves the identity for the household"
-    );
+        .find(|wiring| wiring.connection == crate::seed::IDENTITY);
+    assert!(identity.is_some_and(is_skipped), "{:?}", report.wirings);
 }
 
 #[test]

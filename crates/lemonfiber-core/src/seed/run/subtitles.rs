@@ -10,11 +10,14 @@
 //! that is not running is skipped and completed on a later pass rather than holding
 //! up the other.
 
+use lemonfiber_contract::capabilities::subtitles::fetch;
+
 use super::connecting::{pairings, Cleared, Connection};
 use super::Ctx;
+use crate::app::targets::{spoken, Spoken};
 use crate::ports::filesystem::Beneath;
 use crate::ports::media::Kind;
-use crate::ports::service::{Subtitles as _, Watched};
+use crate::ports::service::Watched;
 use crate::wiring::{Address, Filler, Fillers};
 
 /// One subtitle finder, and every curator it is told about with where it reaches each.
@@ -43,23 +46,29 @@ fn watching(fillers: &Fillers) -> Vec<Watching<'_>> {
     found
 }
 
-/// The finder as a client holding the key it wrote for itself, or nothing where this
-/// machine cannot reach it, it has not written one yet — a service still starting
-/// rather than a fault, so a later run completes it — or its file is not one it may be
-/// read from.
-async fn finder(ctx: &Ctx, asker: Cleared<'_>) -> Option<crate::bazarr::Bazarr> {
+/// The finder as the core asks it: over `subtitles.fetch` where it speaks the contract,
+/// otherwise as the bundled finder holding the key it wrote for itself. Nothing where it
+/// speaks the contract and cannot be asked over it, where this machine cannot reach it, it
+/// has not written a key yet — a service still starting rather than a fault, so a later
+/// run completes it — or its file is not one it may be read from.
+async fn finder(ctx: &Ctx, asker: Cleared<'_>) -> Option<Box<dyn fetch::Fills>> {
+    match spoken(ctx, &asker, fetch::CAPABILITY, fetch::MAJOR).await {
+        Spoken::Over(adapter) => return Some(Box::new(fetch::Adapter(adapter))),
+        Spoken::Unanswered => return None,
+        Spoken::Not => {}
+    }
     let published = asker.published?;
     let key = crate::bazarr::api_key(
         &crate::app::targets::credential_file(ctx, &asker)
             .await
             .text()?,
     )?;
-    Some(crate::bazarr::Bazarr::new(
+    Some(Box::new(crate::bazarr::Bazarr::new(
         ctx.seams.http.clone(),
         crate::app::targets::loopback(published),
         &asker.id,
         key,
-    ))
+    )))
 }
 
 /// What a curator's watch in a subtitle finder is called where it is reported.
@@ -99,7 +108,7 @@ pub(super) async fn seed_subtitles(ctx: &Ctx, fillers: &Fillers) -> Vec<crate::s
             };
             wirings.push(crate::seed::Wiring::settled(
                 connection,
-                watch(&finder, &watched, ctx.dry_run).await,
+                watch(finder.as_ref(), &watched, ctx.dry_run).await,
             ));
         }
     }
@@ -159,7 +168,7 @@ pub(crate) async fn rewatch(
 /// may have done it: writing regardless would be a second write that changes nothing
 /// and reports as though it had.
 async fn watch(
-    finder: &crate::bazarr::Bazarr,
+    finder: &dyn fetch::Fills,
     watched: &Watched,
     rehearsing: bool,
 ) -> crate::seed::State {

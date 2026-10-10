@@ -25,10 +25,10 @@ fn connection(asker: &str) -> String {
 ///
 /// Which service that is comes from what the stack says the book \*arr asks for, not
 /// from a name written here, and it is reached where it says it listens on the stack's
-/// network with the key it wrote for itself. Only the stack's own book \*arr is told:
-/// it is handed the aggregator's key, and a plugin's service is handed no credential
-/// that is not its own. A pair nothing here connects is reported by the table, never
-/// dropped.
+/// network with the key it wrote for itself. Only a book \*arr the gate lets the
+/// aggregator's key reach is told, since it is handed that key: a third-party plugin's
+/// service is handed no credential that is not its own. A pair nothing here connects is
+/// reported by the table, never dropped.
 ///
 /// Nothing for a book \*arr with no key yet — the key is minted on the run that first
 /// reaches it, and a service started before that is completed by a later run rather

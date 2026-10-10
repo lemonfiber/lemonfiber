@@ -55,7 +55,7 @@ pub(crate) use baseline::{load_baseline, save_baseline, Loaded};
 use clients::{category_for, held, seed_passwords, Held};
 pub(crate) use gate::reroute;
 pub(crate) use guarding::exposure;
-use identity::seed_jellyfin_identity;
+use identity::seed_request_identity;
 pub(crate) use reset::reset_connections;
 pub(crate) use subtitles::rewatch;
 
@@ -488,7 +488,7 @@ async fn seed_media_server(
     // the first: the server has no key to read, so its administrator's password is
     // minted and recorded here, and the request gate's key below is minted with it.
     let mut wirings = Vec::new();
-    let admin = identity::seed_jellyfin_admin(ctx, server).await;
+    let admin = identity::seed_media_server_admin(ctx, server).await;
 
     // Which origins a browser may read the media server from: the front door's alone.
     // After the identity's first half, because that is what records the administrator
@@ -509,7 +509,7 @@ async fn seed_media_server(
     // pass that asked it for anything first would report a fresh stack as broken and
     // then, in the same run, fix what it had just reported.
     let (identity_wirings, identity_records) =
-        seed_jellyfin_identity(ctx, services, baseline, server, admin, project).await;
+        seed_request_identity(ctx, services, baseline, server, admin, project).await;
     baseline.merge(&identity_records);
     wirings.extend(identity_wirings);
 

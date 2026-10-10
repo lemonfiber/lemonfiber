@@ -123,7 +123,7 @@ fn the_request_service_is_set_up_before_anything_is_registered_into_it() {
     assert!(
         shipped
             .get(helper..)
-            .is_some_and(|body| body.contains("seed_jellyfin_identity(")),
+            .is_some_and(|body| body.contains("seed_request_identity(")),
         "the request service is set up among the media server's steps"
     );
     let (Some(identity), Some(targets)) = (

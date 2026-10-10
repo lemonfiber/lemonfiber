@@ -277,3 +277,171 @@ async fn a_curator_whose_key_file_leads_away_is_refused_as_a_request_target() {
         "{wirings:?}"
     );
 }
+
+/// A plugin `intake` whose service stands in for the stack's request service over
+/// `request.intake`, beside a television curator.
+fn contracted_requests(
+    project: &std::path::Path,
+    trusted: &[crate::plugin::first_party::FirstParty],
+) -> crate::wiring::Fillers {
+    fillers_trusting(
+        vec![arr("sonarr", 8989, "tv")],
+        &[contracted("intake", "seerr", "request.intake")],
+        project,
+        trusted,
+    )
+}
+
+/// What a television curator answers when asked for its profiles and folders.
+fn a_curator() -> Vec<(&'static str, Vec<Answer>)> {
+    vec![
+        (
+            "/qualityprofile",
+            vec![Answer::reply(200, r#"[{"id":4,"name":"HD-1080p"}]"#)],
+        ),
+        (
+            "/rootfolder",
+            vec![Answer::reply(200, r#"[{"id":1,"path":"/data/media/tv"}]"#)],
+        ),
+    ]
+}
+
+#[tokio::test]
+async fn a_first_party_request_service_speaking_the_contract_is_handed_each_curator_over_it() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("requests-contracted");
+    let mut routes = a_curator();
+    routes.extend([
+        (
+            "/lemonfiber/request.intake/v1/fulfilment_targets",
+            vec![
+                Answer::reply(200, "[]"),
+                Answer::reply(
+                    200,
+                    r#"[{"id": "1", "at": {"host": "sonarr", "port": 8989, "base": ""}, "key": "the-key", "kind": "tv"}]"#,
+                ),
+            ],
+        ),
+        (
+            "/lemonfiber/request.intake/v1/add_fulfilment_target",
+            vec![Answer::reply(204, "")],
+        ),
+        (
+            "/lemonfiber/request.intake/v1/test_fulfilment_target",
+            vec![Answer::reply(204, "")],
+        ),
+    ]);
+    let http = Fake::by_path_in_turn(routes);
+    let ctx = contracted_ctx(&project, "seerr", true, http.clone());
+
+    let wirings = super::super::seed_fulfilment_targets(
+        &ctx,
+        &[arr("sonarr", 8989, "tv")],
+        &contracted_requests(&project, &first_party("intake")),
+        Some(&project),
+    )
+    .await;
+
+    assert_eq!(
+        wirings
+            .iter()
+            .map(|wiring| &wiring.state)
+            .collect::<Vec<_>>(),
+        vec![&crate::seed::State::Wired],
+        "{wirings:?}"
+    );
+    let asked = http.requests();
+    let added: Vec<String> = asked
+        .iter()
+        .filter(|one| {
+            one.url == "http://127.0.0.1:8080/lemonfiber/request.intake/v1/add_fulfilment_target"
+        })
+        .filter_map(|one| one.body.clone())
+        .collect();
+    assert!(
+        added.len() == 1 && added.iter().all(|body| body.contains("the-key")),
+        "{asked:?}"
+    );
+    assert!(!asked.iter().any(|one| one.url.contains("/api/v1/")));
+}
+
+#[tokio::test]
+async fn a_contracted_request_service_untrusted_or_unreachable_is_handed_nothing_and_never_as_the_bundled_one(
+) {
+    for (tag, trusted, keyed) in [
+        ("untrusted", &[][..], true),
+        ("unkeyed", &first_party("intake")[..], false),
+    ] {
+        let project =
+            lemonfiber_fixtures::scratch::Scratch::new(&format!("requests-contracted-{tag}"));
+        let http = Fake::by_path_in_turn(a_curator());
+        let ctx = contracted_ctx(&project, "seerr", keyed, http.clone());
+
+        let wirings = super::super::seed_fulfilment_targets(
+            &ctx,
+            &[arr("sonarr", 8989, "tv")],
+            &contracted_requests(&project, trusted),
+            Some(&project),
+        )
+        .await;
+
+        assert!(
+            wirings
+                .iter()
+                .all(|wiring| !matches!(wiring.state, crate::seed::State::Wired)),
+            "{tag}: {wirings:?}"
+        );
+        assert!(
+            !http
+                .requests()
+                .iter()
+                .any(|one| one.url.contains("/lemonfiber/request.intake/")
+                    || one.url.contains("/api/v1/")),
+            "{tag}: {:?}",
+            http.requests()
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_first_party_plugin_naming_the_bundled_request_adapter_is_never_asked_with_the_stacks_key(
+) {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("requests-bundled-plugin");
+    let stand_in = crate::test_support::a_placed("seerr", &[], Some(seerr_api()), Some(5055));
+    let mut asking = crate::test_support::an_installed("asking", vec![stand_in]);
+    asking.manifest = "asking-manifest".to_owned();
+    let trusted = [crate::plugin::first_party::FirstParty {
+        plugin: "asking",
+        manifest: "asking-manifest",
+    }];
+    let fillers = fillers_trusting(
+        vec![arr("sonarr", 8989, "tv")],
+        &[asking],
+        &project,
+        &trusted,
+    );
+    let http = Fake::by_path_in_turn(a_curator());
+    let ctx = contracted_ctx(&project, "seerr", true, http.clone());
+
+    let wirings = super::super::seed_fulfilment_targets(
+        &ctx,
+        &[arr("sonarr", 8989, "tv")],
+        &fillers,
+        Some(&project),
+    )
+    .await;
+
+    assert!(
+        wirings
+            .iter()
+            .all(|wiring| !matches!(wiring.state, crate::seed::State::Wired)),
+        "{wirings:?}"
+    );
+    assert!(
+        !http
+            .requests()
+            .iter()
+            .any(|one| one.url.contains("/api/v1/")),
+        "{:?}",
+        http.requests()
+    );
+}

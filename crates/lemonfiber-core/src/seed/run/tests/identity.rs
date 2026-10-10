@@ -20,9 +20,8 @@ async fn identity_beside(
 ) -> (Vec<Wiring>, crate::baseline::Baseline) {
     let fillers = fillers_beside(services.to_vec(), installed, stack_root());
     let server = crate::app::targets::MediaServer::of(&fillers);
-    let admin = super::super::identity::seed_jellyfin_admin(ctx, server.as_ref()).await;
-    super::super::seed_jellyfin_identity(ctx, services, expected, server.as_ref(), admin, None)
-        .await
+    let admin = super::super::identity::seed_media_server_admin(ctx, server.as_ref()).await;
+    super::super::seed_request_identity(ctx, services, expected, server.as_ref(), admin, None).await
 }
 
 #[tokio::test]

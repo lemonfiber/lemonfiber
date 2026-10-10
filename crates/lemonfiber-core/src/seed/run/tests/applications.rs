@@ -46,19 +46,26 @@ async fn app_sync_does_nothing_where_the_stack_has_no_prowlarr() {
 #[tokio::test]
 async fn app_sync_passes_over_an_indexer_nothing_can_reach() {
     const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+    let http = seeding();
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
+        .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), None)));
     let mut unpublished = prowlarr();
     unpublished.port = None;
     unpublished.listens = Some(9696);
+    let mut unlistening = prowlarr();
+    unlistening.listens = None;
 
-    let wirings = super::super::seed_applications(
-        &ctx,
-        &fillers_of(vec![unpublished, arr("sonarr", 8989, "tv")]),
-    )
-    .await;
+    for indexer in [unpublished, unlistening] {
+        let wirings = super::super::seed_applications(
+            &ctx,
+            &fillers_of(vec![indexer, arr("sonarr", 8989, "tv")]),
+        )
+        .await;
 
-    assert!(wirings.is_empty(), "{wirings:?}");
+        assert!(wirings.is_empty(), "{wirings:?}");
+    }
+    assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
 
 /// A plugin's curator is never registered into the indexer, which would hand it the
@@ -94,7 +101,7 @@ async fn app_sync_never_registers_a_plugin_curator() {
         matches!(said.as_slice(), [wiring]
             if wiring.connection == "kept the stand-in into prowlarr the app"
                 && matches!(&wiring.state, crate::seed::State::Unmatched { reason }
-                    if reason.contains("is a plugin's service"))),
+                    if reason.contains("is a third-party plugin's service"))),
         "{said:?}"
     );
 }
@@ -307,4 +314,90 @@ async fn seed_registers_each_arr_into_prowlarr() {
     assert!(applications
         .iter()
         .all(|wiring| wiring.state == crate::seed::State::AlreadyWired));
+}
+
+/// A plugin `indexing` whose service stands in for the stack's indexer over
+/// `indexer.search`, beside both curators.
+fn contracted_indexer(
+    project: &std::path::Path,
+    trusted: &[crate::plugin::first_party::FirstParty],
+) -> crate::wiring::Fillers {
+    fillers_trusting(
+        vec![arr("sonarr", 8989, "tv"), arr("radarr", 7878, "movies")],
+        &[contracted("indexing", "prowlarr", "indexer.search")],
+        project,
+        trusted,
+    )
+}
+
+#[tokio::test]
+async fn a_first_party_indexer_speaking_the_contract_registers_each_curator_over_it() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("applications-contracted");
+    let http = Fake::by_path_in_turn(vec![
+        (
+            "/lemonfiber/indexer.search/v1/applications",
+            vec![
+                Answer::reply(200, "[]"),
+                Answer::reply(
+                    200,
+                    r#"[{"id": "1", "base_url": "http://sonarr:8989"}, {"id": "2", "base_url": "http://radarr:7878"}]"#,
+                ),
+            ],
+        ),
+        (
+            "/lemonfiber/indexer.search/v1/register_application",
+            vec![Answer::reply(204, "")],
+        ),
+    ]);
+    let ctx = contracted_ctx(&project, "prowlarr", true, http.clone());
+
+    let wirings = super::super::seed_applications(
+        &ctx,
+        &contracted_indexer(&project, &first_party("indexing")),
+    )
+    .await;
+
+    assert_eq!(wirings.len(), 2, "{wirings:?}");
+    assert!(
+        wirings
+            .iter()
+            .all(|wiring| wiring.state == crate::seed::State::Wired),
+        "{wirings:?}"
+    );
+    let asked = http.requests();
+    assert!(asked.iter().all(|one| one
+        .url
+        .starts_with("http://127.0.0.1:8080/lemonfiber/indexer.search/v1/")));
+    let registered: Vec<String> = asked
+        .iter()
+        .filter(|one| one.url.ends_with("/register_application"))
+        .filter_map(|one| one.body.clone())
+        .collect();
+    assert_eq!(registered.len(), 2, "{registered:?}");
+    assert!(registered.iter().all(|body| body.contains("the-key")));
+}
+
+#[tokio::test]
+async fn a_contracted_indexer_untrusted_or_unreachable_registers_nothing_and_is_never_the_bundled_one(
+) {
+    for (tag, trusted, keyed) in [
+        ("untrusted", &[][..], true),
+        ("unkeyed", &first_party("indexing")[..], false),
+    ] {
+        let project =
+            lemonfiber_fixtures::scratch::Scratch::new(&format!("applications-contracted-{tag}"));
+        let http = Fake::always(Answer::reply(200, "[]"));
+        let ctx = contracted_ctx(&project, "prowlarr", keyed, http.clone());
+
+        let wirings =
+            super::super::seed_applications(&ctx, &contracted_indexer(&project, trusted)).await;
+
+        assert!(
+            wirings
+                .iter()
+                .all(|wiring| !matches!(wiring.state, crate::seed::State::Wired)),
+            "{tag}: {wirings:?}"
+        );
+        assert!(http.requests().is_empty(), "{tag}: {:?}", http.requests());
+    }
 }

@@ -95,6 +95,87 @@ async fn a_plugin_finder_is_never_handed_a_curators_key() {
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
 
+/// A plugin `subber` whose service stands in for the stack's finder over
+/// `subtitles.fetch`, beside both curators.
+fn contracted_finder(
+    project: &std::path::Path,
+    trusted: &[crate::plugin::first_party::FirstParty],
+) -> crate::wiring::Fillers {
+    fillers_trusting(
+        vec![arr("sonarr", 8989, "tv"), arr("radarr", 7878, "movies")],
+        &[contracted("subber", "bazarr", "subtitles.fetch")],
+        project,
+        trusted,
+    )
+}
+
+#[tokio::test]
+async fn a_first_party_finder_speaking_the_contract_is_told_each_curator_over_it() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("subtitles-contracted");
+    let http = Fake::by_path(vec![
+        (
+            "/lemonfiber/subtitles.fetch/v1/watching",
+            Answer::reply(
+                200,
+                r#"{"enabled": false, "host": "", "port": 0, "keyed": false}"#,
+            ),
+        ),
+        (
+            "/lemonfiber/subtitles.fetch/v1/watch",
+            Answer::reply(204, ""),
+        ),
+    ]);
+    let ctx = contracted_ctx(&project, "bazarr", true, http.clone());
+    let fillers = contracted_finder(&project, &first_party("subber"));
+
+    let wirings = super::super::subtitles::seed_subtitles(&ctx, &fillers).await;
+    let rewatched = super::super::subtitles::rewatch(&ctx, &fillers, "sonarr").await;
+
+    assert_eq!(wirings.len(), 2, "{wirings:?}");
+    assert!(
+        wirings
+            .iter()
+            .all(|wiring| wiring.state == crate::seed::State::Wired),
+        "{wirings:?}"
+    );
+    assert_eq!(rewatched.len(), 1, "{rewatched:?}");
+    let asked = http.requests();
+    assert!(asked.iter().all(|one| one
+        .url
+        .starts_with("http://127.0.0.1:8080/lemonfiber/subtitles.fetch/v1/")));
+    let written: Vec<String> = asked
+        .iter()
+        .filter(|one| one.url.ends_with("/watch"))
+        .filter_map(|one| one.body.clone())
+        .collect();
+    assert_eq!(written.len(), 3, "{written:?}");
+    assert!(written
+        .iter()
+        .all(|body| body.contains("the-key") && body.contains("8989") != body.contains("7878")));
+}
+
+#[tokio::test]
+async fn a_contracted_finder_untrusted_or_unreachable_is_asked_nothing_and_never_as_the_bundled_one(
+) {
+    for (tag, trusted, keyed) in [
+        ("untrusted", &[][..], true),
+        ("unkeyed", &first_party("subber")[..], false),
+    ] {
+        let project =
+            lemonfiber_fixtures::scratch::Scratch::new(&format!("subtitles-contracted-{tag}"));
+        let http = Fake::always(Answer::reply(200, WATCHING_NOTHING));
+        let ctx = contracted_ctx(&project, "bazarr", keyed, http.clone());
+        let fillers = contracted_finder(&project, trusted);
+
+        let wirings = super::super::subtitles::seed_subtitles(&ctx, &fillers).await;
+        let rewatched = super::super::subtitles::rewatch(&ctx, &fillers, "sonarr").await;
+
+        assert!(wirings.is_empty(), "{tag}: {wirings:?}");
+        assert!(rewatched.is_empty(), "{tag}: {rewatched:?}");
+        assert!(http.requests().is_empty(), "{tag}: {:?}", http.requests());
+    }
+}
+
 /// The key the finder is reached with is its own, not the one filed beside it.
 ///
 /// Its configuration holds an `apikey` under `auth` and another under each \*arr,

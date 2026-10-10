@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use lemonfiber_core::ports::service::{
     Failure, HouseholdRequest, MediaServer, Protocol, Requests, Telling,
 };
-use lemonfiber_core::seed::{wire_jellyfin_admin, wire_seerr_identity, State};
+use lemonfiber_core::seed::{wire_media_server_admin, wire_request_identity, State};
 
 // ---- Jellyfin as Seerr's identity: two services and a minted credential. ----
 
@@ -283,9 +283,9 @@ async fn identity_keeping(
         }
         Ok(())
     };
-    let state = match wire_jellyfin_admin(&media, &random, recorded, false, &keep).await {
+    let state = match wire_media_server_admin(&media, &random, recorded, false, &keep).await {
         Ok(password) => {
-            wire_seerr_identity(
+            wire_request_identity(
                 &seerr,
                 Protocol("jellyfin".to_owned()),
                 &password,
@@ -316,9 +316,9 @@ async fn would_identity(
         }
         Ok(())
     };
-    let state = match wire_jellyfin_admin(&media, &random, recorded, true, &keep).await {
+    let state = match wire_media_server_admin(&media, &random, recorded, true, &keep).await {
         Ok(password) => {
-            wire_seerr_identity(
+            wire_request_identity(
                 &seerr,
                 Protocol("jellyfin".to_owned()),
                 &password,

@@ -3,10 +3,13 @@
 //! The indexer needs to know what to search on behalf of, which is the one connection
 //! that runs from the indexer outward rather than into it.
 
+use lemonfiber_contract::capabilities::indexer::search;
+
 use super::connecting::{pairings, Cleared, Connection};
 use super::Ctx;
+use crate::app::targets::{spoken, Spoken};
 use crate::ports::filesystem::Beneath;
-use crate::ports::service::Application;
+use crate::ports::service::{AppSync, Application};
 use crate::wiring::{Filler, Fillers};
 
 /// One indexer and the curators it is told about: each one's application, or the
@@ -38,6 +41,38 @@ fn syncing(fillers: &Fillers) -> Vec<Syncing<'_>> {
     found
 }
 
+/// How the indexer is asked.
+enum Asked {
+    /// By this client.
+    By(Box<dyn AppSync>),
+    /// Not at all: it cannot be reached, or speaks the contract and cannot be asked over it.
+    Nobody,
+    /// Not yet: it is the bundled indexer and its own key is not written yet.
+    Unkeyed,
+}
+
+/// The indexer as the core asks it: over `indexer.search` where it speaks the contract,
+/// otherwise as the bundled indexer holding its own key.
+async fn indexer(ctx: &Ctx, asker: &Cleared<'_>) -> Asked {
+    match spoken(ctx, asker, search::CAPABILITY, search::MAJOR).await {
+        Spoken::Over(adapter) => return Asked::By(Box::new(search::Adapter(adapter))),
+        Spoken::Unanswered => return Asked::Nobody,
+        Spoken::Not => {}
+    }
+    let Some(published) = asker.published else {
+        return Asked::Nobody;
+    };
+    let Beneath::Read(key) = super::arrs::servarr_key(ctx, asker).await else {
+        return Asked::Unkeyed;
+    };
+    Asked::By(Box::new(crate::prowlarr::Prowlarr::new(
+        ctx.seams.http.clone(),
+        crate::app::targets::loopback(published),
+        key,
+        &asker.id,
+    )))
+}
+
 /// Register each curator the indexer asks for as an application in it, so the indexer
 /// pushes it indexers.
 ///
@@ -63,22 +98,21 @@ async fn sync(ctx: &Ctx, syncing: &Syncing<'_>, only: Option<&str>) -> Vec<crate
         .iter()
         .filter(|(curator, _, _)| only.is_none_or(|id| curator.id == id))
         .collect();
-    // An indexer this machine cannot reach, or that the curators could not reach back,
-    // is one nothing can be registered into; it is passed over, as one the stack does
-    // not run would be.
-    let (Some(published), Some(back)) = (asker.published, asker.address.as_ref()) else {
+    let Some(back) = asker.address.as_ref() else {
         return Vec::new();
     };
     if curators.is_empty() {
         return Vec::new();
     }
-    // The indexer's own key, which every curator it registers is handed: one not written
-    // yet, or in a file it may not be read from, registers nothing this run.
-    let Beneath::Read(asker_key) = super::arrs::servarr_key(ctx, asker).await else {
-        return curators
-            .iter()
-            .map(|(curator, _, _)| skipped(synced(&curator.name, &asker.name), &asker.name))
-            .collect();
+    let client = match indexer(ctx, &syncing.asker).await {
+        Asked::By(client) => client,
+        Asked::Nobody => return Vec::new(),
+        Asked::Unkeyed => {
+            return curators
+                .iter()
+                .map(|(curator, _, _)| skipped(synced(&curator.name, &asker.name), &asker.name))
+                .collect()
+        }
     };
     let mut wanted = Vec::new();
     let mut passed = Vec::new();
@@ -97,19 +131,13 @@ async fn sync(ctx: &Ctx, syncing: &Syncing<'_>, only: Option<&str>) -> Vec<crate
             api_key: key,
         });
     }
-    let client = crate::prowlarr::Prowlarr::new(
-        ctx.seams.http.clone(),
-        crate::app::targets::loopback(published),
-        asker_key,
-        &asker.id,
-    );
     // The journal seed records each write into is not persisted: seeding is
     // idempotent, so a partial run is recovered by running it again, not reversed
     // — see the seed module doc. The record is groundwork for a future service-side
     // undo the current reversal cannot do.
     let mut journal = crate::journal::Journal::new();
     let mut wirings = crate::seed::wire_applications(
-        &client,
+        client.as_ref(),
         &asker.name,
         &wanted,
         &mut journal,
@@ -168,6 +196,6 @@ pub(super) fn skipped(connection: String, service: &str) -> crate::seed::Wiring 
 }
 
 /// What a curator's application in an indexer is called where it is reported.
-fn synced(arr: &str, prowlarr: &str) -> String {
-    format!("{arr} indexer sync via {prowlarr}")
+fn synced(curator: &str, indexer: &str) -> String {
+    format!("{curator} indexer sync via {indexer}")
 }
