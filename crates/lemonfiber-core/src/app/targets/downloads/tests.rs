@@ -77,8 +77,8 @@ fn passwords(targets: &[super::DownloadTarget]) -> Vec<(String, String)> {
     targets
         .iter()
         .filter_map(|target| match &target.kind {
-            DownloadKind::Qbittorrent { password } => Some((target.base.clone(), password.clone())),
-            DownloadKind::Sabnzbd { .. } => None,
+            DownloadKind::Torrent { base, password } => Some((base.clone(), password.clone())),
+            DownloadKind::Usenet { .. } | DownloadKind::Over { .. } => None,
         })
         .collect()
 }
@@ -139,7 +139,9 @@ async fn a_plugin_torrent_client_is_never_the_forwarded_one() {
     let targets = download_targets(&ctx, &fillers).await;
     let brought: Vec<_> = targets
         .into_iter()
-        .filter(|target| target.base.ends_with(&format!(":{BROUGHT_PORT}")))
+        .filter(|target| {
+            matches!(&target.kind, DownloadKind::Torrent { base, .. } if base.ends_with(&format!(":{BROUGHT_PORT}")))
+        })
         .collect();
 
     assert!(brought.iter().all(|target| !target.tunnelled));
@@ -200,15 +202,17 @@ fn a_usenet_client_declared_first_is_not_taken_for_the_torrent_client() {
     let ctx = a_context().build();
     let targets = [
         DownloadTarget {
-            base: "http://127.0.0.1:8085".to_owned(),
-            kind: DownloadKind::Sabnzbd {
+            service: "usenet".to_owned(),
+            kind: DownloadKind::Usenet {
+                base: "http://127.0.0.1:8085".to_owned(),
                 key: "usenet-key".to_owned(),
             },
             tunnelled: true,
         },
         DownloadTarget {
-            base: "http://127.0.0.1:8081".to_owned(),
-            kind: DownloadKind::Qbittorrent {
+            service: "torrent".to_owned(),
+            kind: DownloadKind::Torrent {
+                base: "http://127.0.0.1:8081".to_owned(),
                 password: a_password(),
             },
             tunnelled: true,

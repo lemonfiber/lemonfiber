@@ -11,7 +11,7 @@ use crate::doctor::providers::ProvidersCheck;
 use crate::doctor::{Check, Finding, Verdict};
 use crate::model::TraceReport;
 use crate::ports::service::{
-    Indexers, ItemPart, QualityReleases, QueueItem, ReleaseProbe, TraceEvent, UsenetAccounts,
+    Indexers, ItemPart, QualityReleases, QueueItem, ReleaseProbe, TraceEvent,
 };
 use crate::recyclarr::Kind;
 use crate::servarr::Servarr;
@@ -87,9 +87,7 @@ pub(crate) async fn providers(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifes
         crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     let fillers = crate::app::targets::host_fillers(ctx, manifest, project.as_deref());
     ProvidersCheck::new(
-        crate::app::targets::usenet_client(ctx, &fillers)
-            .await
-            .map(|client| Arc::new(client) as Arc<dyn UsenetAccounts>),
+        crate::app::targets::usenet_client(ctx, &fillers).await,
         crate::app::targets::indexer_aggregator(ctx, services, project.as_deref())
             .await
             .map(|aggregator| Arc::new(aggregator) as Arc<dyn Indexers>),

@@ -316,6 +316,15 @@ pub trait Seeding: Send + Sync {
     ///
     /// Returns [`Failure`] when the client is unreachable or refuses.
     async fn seeding(&self) -> Result<Vec<Seeded>, Failure>;
+
+    /// Let the one completed download called `name` go, with its files, and confirm it
+    /// is no longer held.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the client is unreachable or refuses, holds nothing of
+    /// that name or more than one of it, or still holds it afterwards.
+    async fn stop_seeding(&self, name: &str) -> Result<(), Failure>;
 }
 
 /// Reading a service's queue for the dashboard.

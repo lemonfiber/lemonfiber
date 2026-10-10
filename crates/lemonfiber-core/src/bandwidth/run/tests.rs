@@ -242,9 +242,13 @@ fn a_respite_lifts_the_limits_rather_than_changing_them() {
 /// One download client this stack could reach, for the refusals that come after
 /// the one about having none.
 fn a_client() -> Vec<super::reaching::Client> {
-    vec![super::reaching::Client::Torrent(Box::new(
-        crate::qbittorrent::Qbittorrent::new(Fake::silent(), "http://127.0.0.1:8081"),
-    ))]
+    vec![super::reaching::Client::Torrent {
+        service: crate::qbittorrent::SERVICE.to_owned(),
+        client: Box::new(crate::qbittorrent::Qbittorrent::new(
+            Fake::silent(),
+            "http://127.0.0.1:8081",
+        )),
+    }]
 }
 
 #[test]
@@ -361,30 +365,36 @@ fn a_cap() -> Declared {
 /// The torrent client, answering what it has moved from a transport of its
 /// own so the client beside it can be given a different one.
 fn a_client_that_says_what_it_moved() -> super::reaching::Client {
-    super::reaching::Client::Torrent(Box::new(crate::qbittorrent::Qbittorrent::authenticated(
-        Fake::by_path(vec![
-            ("/api/v2/auth/login", Replies::reply(200, "Ok.")),
-            (
-                "/api/v2/transfer/info",
-                Replies::reply(
-                    200,
-                    r#"{"dl_info_speed":0,"up_info_speed":0,
+    super::reaching::Client::Torrent {
+        service: crate::qbittorrent::SERVICE.to_owned(),
+        client: Box::new(crate::qbittorrent::Qbittorrent::authenticated(
+            Fake::by_path(vec![
+                ("/api/v2/auth/login", Replies::reply(200, "Ok.")),
+                (
+                    "/api/v2/transfer/info",
+                    Replies::reply(
+                        200,
+                        r#"{"dl_info_speed":0,"up_info_speed":0,
                             "dl_info_data":900,"up_info_data":80}"#,
+                    ),
                 ),
-            ),
-        ]),
-        "http://127.0.0.1:8081",
-        a_password(),
-    )))
+            ]),
+            "http://127.0.0.1:8081",
+            a_password(),
+        )),
+    }
 }
 
 /// The Usenet client on the same stack, which is not there.
 fn a_client_that_will_not_say() -> super::reaching::Client {
-    super::reaching::Client::Usenet(Box::new(crate::sabnzbd::Sabnzbd::new(
-        Fake::silent(),
-        "http://127.0.0.1:8080",
-        "the-key",
-    )))
+    super::reaching::Client::Usenet {
+        service: crate::sabnzbd::SERVICE.to_owned(),
+        client: Box::new(crate::sabnzbd::Sabnzbd::new(
+            Fake::silent(),
+            "http://127.0.0.1:8080",
+            "the-key",
+        )),
+    }
 }
 
 #[tokio::test]

@@ -104,6 +104,10 @@ impl Seeding for Client {
             ratio: 150,
         }])
     }
+
+    async fn stop_seeding(&self, _name: &str) -> Result<(), Failure> {
+        Ok(())
+    }
 }
 
 #[async_trait]

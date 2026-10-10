@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use lemonfiber_fixtures::http::{Answer as Replies, Fake};
 
-use super::{answer, holding, opened, said, DownloadKind, DownloadTarget, Fetch};
+use super::{answer, holding, opened, said, DownloadTarget, Fetch};
+use crate::app::targets::DownloadKind;
 use crate::bandwidth::{Answer, Held, Period, Pulling, Verdict};
 use crate::config::Settings;
 use crate::ports::service::{Failure, Hours, Rates, Throttled, Wanted};
@@ -116,8 +117,9 @@ fn a_client_with_no_schedule_of_its_own_is_judged_against_the_active_figure() {
 /// The torrent client as a read target, holding the password recorded for it.
 fn torrent() -> DownloadTarget {
     DownloadTarget {
-        base: "http://127.0.0.1:8081".to_owned(),
-        kind: DownloadKind::Qbittorrent {
+        service: crate::qbittorrent::SERVICE.to_owned(),
+        kind: DownloadKind::Torrent {
+            base: "http://127.0.0.1:8081".to_owned(),
             password: a_password(),
         },
         tunnelled: true,
@@ -127,8 +129,9 @@ fn torrent() -> DownloadTarget {
 /// The Usenet client as a read target, holding the key it wrote.
 fn usenet() -> DownloadTarget {
     DownloadTarget {
-        base: "http://127.0.0.1:8080".to_owned(),
-        kind: DownloadKind::Sabnzbd {
+        service: crate::sabnzbd::SERVICE.to_owned(),
+        kind: DownloadKind::Usenet {
+            base: "http://127.0.0.1:8080".to_owned(),
             key: "usenet-key".to_owned(),
         },
         tunnelled: false,
@@ -143,10 +146,8 @@ fn both() -> Vec<DownloadTarget> {
 #[test]
 fn both_kinds_of_client_are_opened_by_what_each_authenticates_with() {
     let ctx = a_context().build();
-    let names: Vec<&str> = opened(&ctx, &both())
-        .iter()
-        .map(super::Client::name)
-        .collect();
+    let opened = opened(&ctx, &both());
+    let names: Vec<&str> = opened.iter().map(super::Client::name).collect();
     assert_eq!(names, ["qbittorrent", "sabnzbd"]);
 }
 

@@ -10,14 +10,14 @@
 //! the unconfirmed run and the applying one produce the same shape of answer and
 //! there is no second rendering to fall out of step with the first.
 
-use crate::app::targets::{DownloadKind, DownloadTarget};
+use lemonfiber_contract::capabilities::download::{torrent, usenet};
+
+use crate::app::targets::{DownloadTarget, Downloading};
 use crate::app::Ctx;
 use crate::bandwidth::{Answer, Held, Holding, Period, Pulling};
 use crate::ports::service::{
     Failure, Fetching, Hours, Metering, Moved, Rates, Throttled, Throttling, Wanted,
 };
-use crate::qbittorrent::Qbittorrent;
-use crate::sabnzbd::Sabnzbd;
 
 /// What a run is to do about one client's fetching.
 ///
@@ -41,42 +41,51 @@ pub(super) enum Fetch {
 /// enum as large as its largest arm would be carried around at that size for
 /// every one of them.
 pub(super) enum Client {
-    /// The torrent client, which uploads and keeps a schedule of its own.
-    Torrent(Box<Qbittorrent>),
-    /// The Usenet client, which does neither.
-    Usenet(Box<Sabnzbd>),
+    /// A torrent client, which uploads and keeps a schedule of its own.
+    Torrent {
+        /// The id it runs under.
+        service: String,
+        /// The client.
+        client: Box<dyn torrent::Fills>,
+    },
+    /// A Usenet client, which does neither.
+    Usenet {
+        /// The id it runs under.
+        service: String,
+        /// The client.
+        client: Box<dyn usenet::Fills>,
+    },
 }
 
 impl Client {
     /// The name the stack knows it under, which is what the report names it by.
-    pub(super) fn name(&self) -> &'static str {
+    pub(super) fn name(&self) -> &str {
         match self {
-            Self::Torrent(_) => crate::qbittorrent::SERVICE,
-            Self::Usenet(_) => crate::sabnzbd::SERVICE,
+            Self::Torrent { service, .. } | Self::Usenet { service, .. } => service,
         }
     }
 
     /// The limits on it.
     fn throttling(&self) -> &dyn Throttling {
         match self {
-            Self::Torrent(client) => client.as_ref(),
-            Self::Usenet(client) => client.as_ref(),
+            Self::Torrent { client, .. } => client.as_ref(),
+            Self::Usenet { client, .. } => client.as_ref(),
         }
     }
 
     /// What it has moved.
     fn metering(&self) -> &dyn Metering {
         match self {
-            Self::Torrent(client) => client.as_ref(),
-            Self::Usenet(client) => client.as_ref(),
+            Self::Torrent { client, .. } => client.as_ref(),
+            Self::Usenet { client, .. } => client.as_ref(),
         }
     }
 
     /// Whether it is fetching at all.
     pub(super) fn fetching(&self) -> &dyn Fetching {
         match self {
-            Self::Torrent(client) => client.as_ref(),
-            Self::Usenet(client) => client.as_ref(),
+            Self::Torrent { client, .. } => client.as_ref(),
+            Self::Usenet { client, .. } => client.as_ref(),
         }
     }
 
@@ -96,17 +105,12 @@ pub(super) fn opened(ctx: &Ctx, targets: &[DownloadTarget]) -> Vec<Client> {
     targets.iter().map(|target| open(ctx, target)).collect()
 }
 
-/// One download client, opened with the credential it answers to.
+/// One download client, opened as the protocol it moves.
 pub(super) fn open(ctx: &Ctx, target: &DownloadTarget) -> Client {
-    match &target.kind {
-        DownloadKind::Qbittorrent { password } => Client::Torrent(Box::new(
-            Qbittorrent::authenticated(ctx.seams.http.clone(), &target.base, password.clone()),
-        )),
-        DownloadKind::Sabnzbd { key } => Client::Usenet(Box::new(Sabnzbd::new(
-            ctx.seams.http.clone(),
-            &target.base,
-            key.clone(),
-        ))),
+    let service = target.service.clone();
+    match target.client(ctx) {
+        Downloading::Torrent(client) => Client::Torrent { service, client },
+        Downloading::Usenet(client) => Client::Usenet { service, client },
     }
 }
 
