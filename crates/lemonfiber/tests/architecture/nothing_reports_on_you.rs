@@ -35,6 +35,9 @@ enum Reach {
     Asked,
     /// The name appears in something an operator reads and nothing fetches it.
     Printed,
+    /// The name is the start of an address lemonfiber hands on through a port, and
+    /// nothing in this build fetches it.
+    Carried,
 }
 
 /// Every host outside this machine that the shipped half of this workspace names,
@@ -98,6 +101,13 @@ const NAMED: &[(&str, Reach, &str)] = &[
         Reach::Asked,
         "the first of those two, and the default an operator replaces or switches off with \
          one setting",
+    ),
+    (
+        "image.tmdb.org",
+        Reach::Carried,
+        "where the request service's catalogue publishes a title's poster; the address of a \
+         title a member's search finds is built on it and carried through the request port \
+         with the title, and nothing in this build fetches it",
     ),
     (
         "trash-guides.info",

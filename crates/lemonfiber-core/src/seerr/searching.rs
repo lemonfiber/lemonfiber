@@ -271,54 +271,67 @@ impl Searching for Seerr {
     }
 
     async fn detail(&self, kind: Kind, id: &str, region: &str) -> Result<Option<Detail>, Failure> {
-        let Some(id) = number(id) else {
-            return Ok(None);
-        };
-        let path = format!("/{}/{id}", media_type(kind));
-        let response = self
-            .endpoint
-            .send(&self.request(Method::Get, &path, None))
-            .await?;
-        if response.status == NOT_FOUND {
-            return Ok(None);
-        }
-        let full: Full = self
-            .endpoint
-            .decode(&response, "the title could not be read")?;
-        Ok(Some(full.detail(kind, region)))
+        detail(self, kind, id, region).await
     }
 
     async fn ask(&self, member: &str, wish: &Wish) -> Result<Asked, Failure> {
-        let (Some(media), Some(user)) = (number(&wish.id), number(member)) else {
-            return Err(self
-                .endpoint
-                .refused("the title or the member is not one the service names"));
-        };
-        let filing = Filing {
-            media_type: media_type(wish.kind),
-            media_id: media,
-            user_id: user,
-            seasons: (wish.kind == Kind::Tv).then(|| {
-                if wish.seasons.is_empty() {
-                    serde_json::json!("all")
-                } else {
-                    serde_json::json!(wish.seasons)
-                }
-            }),
-        };
-        let body = serde_json::to_string(&filing).unwrap_or_default();
-        let response = self
-            .endpoint
-            .send(&self.request(Method::Post, "/request", Some(body)))
-            .await?;
-        let filed: Filed = self
-            .endpoint
-            .decode(&response, "the request could not be filed")?;
-        Ok(Asked {
-            request: filed.id,
-            waiting: request_status(filed.status) == Some(RequestStatus::Pending),
-        })
+        ask(self, member, wish).await
     }
+}
+
+async fn detail(
+    seerr: &Seerr,
+    kind: Kind,
+    id: &str,
+    region: &str,
+) -> Result<Option<Detail>, Failure> {
+    let Some(id) = number(id) else {
+        return Ok(None);
+    };
+    let path = format!("/{}/{id}", media_type(kind));
+    let response = seerr
+        .endpoint
+        .send(&seerr.request(Method::Get, &path, None))
+        .await?;
+    if response.status == NOT_FOUND {
+        return Ok(None);
+    }
+    let full: Full = seerr
+        .endpoint
+        .decode(&response, "the title could not be read")?;
+    Ok(Some(full.detail(kind, region)))
+}
+
+async fn ask(seerr: &Seerr, member: &str, wish: &Wish) -> Result<Asked, Failure> {
+    let (Some(media), Some(user)) = (number(&wish.id), number(member)) else {
+        return Err(seerr
+            .endpoint
+            .refused("the title or the member is not one the service names"));
+    };
+    let filing = Filing {
+        media_type: media_type(wish.kind),
+        media_id: media,
+        user_id: user,
+        seasons: (wish.kind == Kind::Tv).then(|| {
+            if wish.seasons.is_empty() {
+                serde_json::json!("all")
+            } else {
+                serde_json::json!(wish.seasons)
+            }
+        }),
+    };
+    let body = serde_json::to_string(&filing).unwrap_or_default();
+    let response = seerr
+        .endpoint
+        .send(&seerr.request(Method::Post, "/request", Some(body)))
+        .await?;
+    let filed: Filed = seerr
+        .endpoint
+        .decode(&response, "the request could not be filed")?;
+    Ok(Asked {
+        request: filed.id,
+        waiting: request_status(filed.status) == Some(RequestStatus::Pending),
+    })
 }
 
 #[cfg(test)]
