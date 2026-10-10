@@ -299,12 +299,13 @@ async fn an_install_says_which_asks_it_would_leave_contested() {
         .ok()
         .zip(would)
         .map(|(manifest, would)| {
-            super::super::standing::contested(
+            super::super::standing::standing(
                 &ctx,
                 &manifest,
                 &crate::plugin::Register::empty(),
                 &would,
             )
+            .contests
         })
         .unwrap_or_default();
 
@@ -315,6 +316,57 @@ async fn an_install_says_which_asks_it_would_leave_contested() {
             .claimants
             .iter()
             .any(|named| named == "komga (plugin komga)")));
+}
+
+#[tokio::test]
+async fn an_install_says_what_its_services_would_ask_for_and_reach() {
+    let ctx = ctx("asking");
+    let would = crate::plugin::read(&source("asking", MANIFEST))
+        .ok()
+        .map(|manifest| crate::plugin::Installed::of(&manifest))
+        .map(|mut would| {
+            let _ = would.services.first_mut().map(|placed| {
+                placed.asks = vec![crate::plugin::Asking {
+                    capability: "library.curate".to_owned(),
+                    each: true,
+                }];
+            });
+            would
+        });
+
+    let asks = super::super::writing::stack_manifest(&ctx)
+        .ok()
+        .zip(would)
+        .map(|(manifest, would)| {
+            super::super::standing::standing(
+                &ctx,
+                &manifest,
+                &crate::plugin::Register::empty(),
+                &would,
+            )
+            .asks
+        })
+        .unwrap_or_default();
+
+    assert!(
+        matches!(
+            asks.as_slice(),
+            [crate::wiring::Wired {
+                by,
+                origin: crate::origin::Origin::Plugin { named },
+                reaches: crate::wiring::Reaches::Asked {
+                    capability,
+                    services,
+                    settled: crate::wiring::Settled::Each,
+                    ..
+                },
+            }] if by == "komga"
+                && named == "komga"
+                && capability == "library.curate"
+                && services.iter().any(|one| one == "sonarr")
+        ),
+        "{asks:?}"
+    );
 }
 
 /// An install or an update on a stack this build cannot read is refused before

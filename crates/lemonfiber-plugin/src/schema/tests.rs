@@ -55,6 +55,11 @@ fixture = "fixtures/media-serve-catalogue.json"
 hostname        = "comics"
 dashboard_group = "Library"
 
+[[ask]]
+service    = "komga"
+capability = "library.curate"
+each       = true
+
 [[proof]]
 id      = "komga.serves"
 title   = "Komga answers on its declared health path"
@@ -531,6 +536,22 @@ fn reads_how_the_stack_is_told_to_reach_it() {
         read,
         Some((None, Some("comics".to_owned()), Some("Library".to_owned())))
     );
+}
+
+#[test]
+fn reads_what_a_service_asks_for() {
+    let read = parse(WHOLE).map(|manifest| manifest.asking);
+    assert_eq!(
+        read,
+        Some(vec![super::Ask {
+            service: Some("komga".to_owned()),
+            capability: "library.curate".to_owned(),
+            each: true,
+        }])
+    );
+    let unsaid = parse(&WHOLE.replace("each       = true\n", ""))
+        .and_then(|manifest| manifest.asking.first().map(|ask| ask.each));
+    assert_eq!(unsaid, Some(false));
 }
 
 /// A wiring naming its service, which is how a plugin with two says which is which.

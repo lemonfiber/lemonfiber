@@ -189,6 +189,21 @@ pub struct Placed {
     /// The privileged shape lemonfiber writes for it, where it took one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shape: Option<lemonfiber_plugin::Shape>,
+    /// Every capability it asks for.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub asks: Vec<Asking>,
+}
+
+/// One capability a placed service asks for.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(rename = "PluginAsking")]
+pub struct Asking {
+    /// The core capability asked for.
+    pub capability: String,
+    /// Whether every service that fills it is reached rather than one.
+    #[serde(default)]
+    pub each: bool,
 }
 
 impl Placed {
@@ -217,6 +232,19 @@ impl Placed {
             speaks: service.speaks.clone(),
             fronts: service.fronts.clone(),
             shape: service.shape,
+            asks: manifest
+                .asking
+                .iter()
+                .filter(|ask| {
+                    manifest
+                        .asks(ask.service.as_deref())
+                        .is_some_and(|asker| asker.id == service.id)
+                })
+                .map(|ask| Asking {
+                    capability: ask.capability.clone(),
+                    each: ask.each,
+                })
+                .collect(),
         }
     }
 

@@ -7,6 +7,7 @@ use lemonfiber_core::wiring::{Reaches, Settled, Substitution, Unfilled, Whose, W
 fn asking(by: &str, capability: &str, services: &[&str], settled: Settled) -> Wired {
     Wired {
         by: by.to_owned(),
+        origin: lemonfiber_core::origin::Origin::Bundled,
         reaches: Reaches::Asked {
             capability: capability.to_owned(),
             services: services.iter().map(|one| (*one).to_owned()).collect(),
@@ -40,12 +41,30 @@ fn an_ask_names_the_capability_rather_than_the_service_it_reaches() {
     assert!(said.contains("reaches  jellyfin (bundled)"), "{said}");
 }
 
+#[test]
+fn a_plugins_ask_names_the_plugin_beside_the_service_that_asks() {
+    let said = shown(&WiringReport {
+        wired: vec![Wired {
+            origin: lemonfiber_core::origin::Origin::Plugin {
+                named: "subfinder".to_owned(),
+            },
+            ..asking("subs", "library.curate", &["sonarr"], Settled::Each)
+        }],
+        unfilled: Vec::new(),
+    });
+    assert!(
+        said.contains("subs (plugin subfinder) asks for library.curate"),
+        "{said}"
+    );
+}
+
 /// A service a plugin brought is named as the plugin's beside the name, and one the
 /// answer gives no origin for says so rather than reading as this build's own.
 #[test]
 fn what_an_ask_reaches_says_where_each_service_came_from() {
     let link = Wired {
         by: "seerr".to_owned(),
+        origin: lemonfiber_core::origin::Origin::Bundled,
         reaches: Reaches::Asked {
             capability: "media.serve".to_owned(),
             services: vec!["kavita".to_owned(), "stray".to_owned()],
@@ -75,6 +94,7 @@ fn a_by_name_link_says_it_is_by_name_and_why() {
     let said = shown(&WiringReport {
         wired: vec![Wired {
             by: "qbittorrent".to_owned(),
+            origin: lemonfiber_core::origin::Origin::Bundled,
             reaches: Reaches::ByName {
                 service: "gluetun".to_owned(),
                 why: "It has no network namespace of its own.".to_owned(),

@@ -33,6 +33,7 @@ fn placed(service: &str) -> Placed {
         speaks: Vec::new(),
         fronts: None,
         shape: None,
+        asks: Vec::new(),
     }
 }
 

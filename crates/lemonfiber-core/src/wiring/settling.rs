@@ -18,7 +18,7 @@ use lemonfiber_manifest::{Manifest, Wiring};
 
 use crate::filling::{fills, Claimant, Filling, Shown};
 use crate::origin::Origin;
-use crate::plugin::Installed;
+use crate::plugin::{Asking, Installed};
 
 use super::{Chosen, Contest, Reaches, Settled, Unfilled, Whose, Wired};
 
@@ -130,8 +130,8 @@ fn asked(
     }
 }
 
-/// Every link the stack declares, answered against everything installed that claims
-/// what it asks.
+/// Every link the stack declares, then every ask each installed plugin's services make,
+/// answered against everything installed that claims what it asks.
 ///
 /// A link naming a `why` it should not have, or asking for something of the wrong
 /// shape, is the validator's business rather than this one's: what is read here is a
@@ -139,32 +139,88 @@ fn asked(
 /// be a second opinion on the same file.
 #[must_use]
 pub fn settle(manifest: &Manifest, installed: &[Installed], chosen: &Chosen) -> Vec<Wired> {
-    manifest
-        .wirings
-        .iter()
-        .filter_map(|wiring| {
-            let reaches = match (wiring.asks.as_deref(), wiring.to.as_deref()) {
-                (Some(capability), None) => {
-                    let held = claimants(manifest, installed, capability);
-                    let (services, settled) = asked(wiring, capability, &held, chosen);
-                    Reaches::Asked {
-                        capability: capability.to_owned(),
-                        services,
-                        settled,
-                        origins: origins(&held),
-                    }
+    let stack = manifest.wirings.iter().filter_map(|wiring| {
+        let reaches = match (wiring.asks.as_deref(), wiring.to.as_deref()) {
+            (Some(capability), None) => reached(manifest, installed, wiring, capability, chosen),
+            (None, Some(service)) => Reaches::ByName {
+                service: service.to_owned(),
+                why: wiring.why.clone().unwrap_or_default(),
+            },
+            _ => return None,
+        };
+        Some(Wired {
+            by: wiring.by.clone(),
+            origin: Origin::Bundled,
+            reaches,
+        })
+    });
+    let brought = installed.iter().flat_map(|one| {
+        one.services.iter().flat_map(move |placed| {
+            placed.asks.iter().map(move |ask| {
+                let wiring = plugins_ask(manifest, &placed.service, ask);
+                Wired {
+                    by: placed.service.clone(),
+                    origin: Origin::Plugin {
+                        named: one.plugin.clone(),
+                    },
+                    reaches: reached(manifest, installed, &wiring, &ask.capability, chosen),
                 }
-                (None, Some(service)) => Reaches::ByName {
-                    service: service.to_owned(),
-                    why: wiring.why.clone().unwrap_or_default(),
-                },
-                _ => return None,
-            };
-            Some(Wired {
-                by: wiring.by.clone(),
-                reaches,
             })
         })
+    });
+    stack.chain(brought).collect()
+}
+
+/// What an ask for `capability` reaches, against everything installed that claims it.
+fn reached(
+    manifest: &Manifest,
+    installed: &[Installed],
+    wiring: &Wiring,
+    capability: &str,
+    chosen: &Chosen,
+) -> Reaches {
+    let held = claimants(manifest, installed, capability);
+    let (services, settled) = asked(wiring, capability, &held, chosen);
+    Reaches::Asked {
+        capability: capability.to_owned(),
+        services,
+        settled,
+        origins: origins(&held),
+    }
+}
+
+/// A plugin's ask as a link of the stack's, carrying the stack's own choice for that
+/// capability.
+fn plugins_ask(manifest: &Manifest, by: &str, ask: &Asking) -> Wiring {
+    let stacks = manifest.wirings.iter().find(|wiring| {
+        wiring.asks.as_deref() == Some(ask.capability.as_str()) && wiring.filled_by.is_some()
+    });
+    Wiring {
+        by: by.to_owned(),
+        asks: Some(ask.capability.clone()),
+        each: ask.each,
+        filled_by: stacks.and_then(|wiring| wiring.filled_by.clone()),
+        to: None,
+        why: stacks.and_then(|wiring| wiring.why.clone()),
+    }
+}
+
+/// Every ask `adding`'s services would make once it is installed beside `installed`, as
+/// each would then stand.
+#[must_use]
+pub fn asked_by(
+    manifest: &Manifest,
+    installed: &[Installed],
+    adding: &Installed,
+    chosen: &Chosen,
+) -> Vec<Wired> {
+    let mut after = installed.to_vec();
+    after.push(adding.clone());
+    settle(manifest, &after, chosen)
+        .into_iter()
+        .filter(
+            |wired| matches!(&wired.origin, Origin::Plugin { named } if *named == adding.plugin),
+        )
         .collect()
 }
 

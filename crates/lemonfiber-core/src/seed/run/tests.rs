@@ -492,6 +492,7 @@ fn nothing_declared_leaves_every_service_in_the_pass() {
 
 mod aggregators;
 mod applications;
+mod asking;
 mod baseline;
 mod claiming;
 mod cors;

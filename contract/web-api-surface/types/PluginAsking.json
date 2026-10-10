@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "capability": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "each": {
+      "type": [
+        "boolean"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

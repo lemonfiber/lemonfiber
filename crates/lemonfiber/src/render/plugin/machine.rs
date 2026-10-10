@@ -53,6 +53,7 @@ pub(crate) fn installs(report: &Installs) -> Lines {
         lines.put(format!("    from {}", listed::origin(&install.would)));
         lines.extend(services(&install.would));
         lines.extend(contesting(&install.contests, install.recorded));
+        lines.extend(asking(&install.asks, install.recorded));
         lines.extend(changes(&install.changes, acted));
         lines.extend(proving(&install.proofs, install.against, acted));
         lines.extend(verified(install.verified.as_ref()));
@@ -378,6 +379,37 @@ pub(super) fn contesting(contests: &[lemonfiber_core::wiring::Contest], recorded
         ));
     }
     lines.put("      Choose which fills it with `lemonfiber wiring fill`.");
+    lines
+}
+
+/// Every ask the plugin's services make, with what each reaches and how that is settled.
+pub(super) fn asking(asks: &[lemonfiber_core::wiring::Wired], recorded: bool) -> Lines {
+    let mut lines = Lines::default();
+    if asks.is_empty() {
+        return lines;
+    }
+    lines.spaced(format!(
+        "    What it {} for:",
+        if recorded { "asks" } else { "would ask" }
+    ));
+    for link in asks {
+        if let lemonfiber_core::wiring::Reaches::Asked {
+            capability,
+            services,
+            settled,
+            origins,
+        } = &link.reaches
+        {
+            lines.put(format!(
+                "      {} asks for {capability}, reaching {}",
+                link.by,
+                super::super::wiring::reached(services, origins)
+            ));
+            for said in super::super::wiring::settling(settled) {
+                lines.put(format!("        {said}"));
+            }
+        }
+    }
     lines
 }
 

@@ -51,7 +51,7 @@ fn entry(link: &Wired) -> Lines {
             settled,
             origins,
         } => {
-            lines.spaced(format!("  {} asks for {capability}", link.by));
+            lines.spaced(format!("  {} asks for {capability}", asker(link)));
             lines.put(format!("    reaches  {}", reached(services, origins)));
             for said in settling(settled) {
                 lines.put(format!("    {said}"));
@@ -65,12 +65,20 @@ fn entry(link: &Wired) -> Lines {
     lines
 }
 
+/// The service an ask runs from, beside the plugin that brought it where one did.
+fn asker(link: &Wired) -> String {
+    match &link.origin {
+        lemonfiber_core::origin::Origin::Bundled => link.by.clone(),
+        other => format!("{} ({})", link.by, from(Some(other))),
+    }
+}
+
 /// What an ask reaches, or that it reaches nothing, each beside where it came from.
 ///
 /// Beside the name rather than in a column of its own, because reading the one and
 /// reading the other has to be the same act: an operator who never thought to ask
 /// whether a plugin is involved is the one this is for.
-fn reached(
+pub(super) fn reached(
     services: &[String],
     origins: &std::collections::BTreeMap<String, lemonfiber_core::origin::Origin>,
 ) -> String {
@@ -103,7 +111,7 @@ fn from(origin: Option<&lemonfiber_core::origin::Origin>) -> String {
 /// Nothing for the ordinary case. One claimant and nothing to settle is what most
 /// links are, and a line saying so on every one of them would bury the three that
 /// somebody has to act on.
-fn settling(settled: &Settled) -> Vec<String> {
+pub(super) fn settling(settled: &Settled) -> Vec<String> {
     match settled {
         Settled::Outright => Vec::new(),
         Settled::Each => vec!["reaching  every service that fills it".to_owned()],

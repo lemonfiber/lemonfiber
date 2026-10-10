@@ -164,3 +164,34 @@ fn a_plugin_service_named_as_a_stack_service_settles_for_nothing_by_the_name() {
     assert!(joined(&server).is_empty(), "{:?}", joined(&server));
     assert!(joined(&claiming).is_empty(), "{:?}", joined(&claiming));
 }
+
+#[test]
+fn a_service_only_another_plugins_ask_reaches_joins_nothing() {
+    let server = placed(ApiKind::Jellyfin, &["identity.source"], &[]);
+    let mut asker = a_placed("asker", &[], None, None);
+    asker.asks = vec![crate::plugin::Asking {
+        capability: "identity.source".to_owned(),
+        each: true,
+    }];
+    let installed = vec![
+        an_installed("stand-in", vec![server.clone()]),
+        an_installed("asking", vec![asker]),
+    ];
+    let stack = crate::test_support::stack();
+    let (reached, joined) = stack
+        .manifest()
+        .map(|manifest| {
+            let settled = crate::wiring::settle(&manifest, &installed, &Chosen::default());
+            let reached = settled.iter().any(|wired| {
+                wired.by == "asker"
+                    && matches!(&wired.reaches, crate::wiring::Reaches::Asked { services, .. }
+                        if services.iter().any(|one| one == "stand-in"))
+            });
+            let joined = super::Joins::of(&manifest, &stack.attached(), &settled)
+                .of_service("stand-in", &server);
+            (reached, joined)
+        })
+        .unwrap_or_default();
+    assert!(reached, "the plugin's ask reaches the stand-in");
+    assert!(joined.is_empty(), "{joined:?}");
+}

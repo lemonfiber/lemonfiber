@@ -27,6 +27,7 @@
 //! contribution was judged.
 
 mod adapting;
+mod asking;
 mod bundled;
 pub mod carried;
 mod colliding;
@@ -67,6 +68,7 @@ pub fn refusals(manifest: &Manifest, occupied: &[&str]) -> Vec<Violation> {
     colliding::with_the_stack(manifest, &mut found);
     reaching::beyond(manifest, &mut found);
     naming::wired(manifest, &mut found);
+    asking::asked(manifest, &mut found);
     naming::about(manifest, &mut found);
     carried::carried(manifest, &mut found);
     evidence::asking(manifest, &mut found);

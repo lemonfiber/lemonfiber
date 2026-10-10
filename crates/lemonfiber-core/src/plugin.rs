@@ -85,7 +85,7 @@ pub use conforming::{conformed, Conformed, Judged};
 pub use container::{profile, written};
 pub use declared::{Declaration, Secret};
 pub use fronting::{proxied as fronting_proxied, taken as label_taken, DASHBOARD, PROXY};
-pub use installed::{answering, spelled_alike, Installed, Placed, Reached};
+pub use installed::{answering, spelled_alike, Asking, Installed, Placed, Reached};
 pub use joining::Joins;
 pub use owning::{owner, owns};
 pub(crate) use placing::OVERLAYS;

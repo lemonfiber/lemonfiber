@@ -91,7 +91,7 @@ pub(super) fn about(manifest: &Manifest, found: &mut Vec<Violation>) {
 /// One function for the three places that name a service, because the two mistakes are
 /// the same two each time and an author meeting them in three wordings would be reading
 /// three rules where there is one.
-fn names<'a>(
+pub(super) fn names<'a>(
     manifest: &'a Manifest,
     named: Option<&str>,
     at: &str,

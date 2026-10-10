@@ -560,6 +560,7 @@ fn plugin_filling(plugin: &str, service: &str, capability: &str) -> crate::plugi
             speaks: Vec::new(),
             fronts: None,
             shape: None,
+            asks: Vec::new(),
         }],
         provides: vec![capability.to_owned()],
         contributions: Vec::new(),
@@ -717,3 +718,5 @@ fn a_link_that_says_neither_what_it_asks_for_nor_what_it_names_is_left_out() {
         Some(Vec::new())
     );
 }
+
+mod asking;

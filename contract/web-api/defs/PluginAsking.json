@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One capability a placed service asks for.",
+  "type": "object",
+  "properties": {
+    "capability": {
+      "description": "The core capability asked for.",
+      "type": "string"
+    },
+    "each": {
+      "description": "Whether every service that fills it is reached rather than one.",
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "capability"
+  ]
+}

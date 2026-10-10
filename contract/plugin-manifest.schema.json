@@ -4,6 +4,11 @@
   "description": "A whole plugin manifest.",
   "type": "object",
   "properties": {
+    "ask": {
+      "description": "The capabilities its services ask for.",
+      "type": "array",
+      "items": {"$ref": "#/$defs/PluginAsk"}
+    },
     "claim": {
       "description": "The core capabilities this plugin claims, and the probes each is shown by.",
       "type": "array",
@@ -365,6 +370,21 @@
       },
       "additionalProperties": false,
       "required": ["id", "name", "version", "description", "without_it", "upstream", "license", "forms"]
+    },
+    "PluginAsk": {
+      "description": "One capability a plugin's service asks for.",
+      "type": "object",
+      "properties": {
+        "capability": {"description": "The core capability asked for.", "type": "string"},
+        "each": {"description": "Whether every service that fills it is reached rather than one.", "type": "boolean", "default": false},
+        "service": {
+          "description": "The plugin's own service that asks; optional where the plugin declares one.",
+          "type": ["string", "null"],
+          "default": null
+        }
+      },
+      "additionalProperties": false,
+      "required": ["capability"]
     },
     "PluginBind": {
       "description": "Which tier a plugin's port is published on.\n\nA tier, not an address. lemonfiber renders it to an address exactly as it does for\na bundled service, so the two-tier policy stays a property of the system rather\nthan a request the plugin makes.",
