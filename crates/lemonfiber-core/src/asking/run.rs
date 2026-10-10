@@ -24,7 +24,7 @@ pub(crate) use deciding::deciding;
 use crate::asking::Policy;
 use crate::error::{Diagnose, Problem};
 use crate::model::HouseholdReport;
-use crate::ports::service::{Approving as _, Asking, Headroom, Member, Quota, Requests as _};
+use crate::ports::service::{Asking, Headroom, Member, Quota};
 
 use crate::app::command::Chosen;
 use crate::app::targets::{identity, HouseholdAccess};
@@ -102,7 +102,7 @@ async fn everybody(
     chosen: &Chosen,
 ) -> Result<String, Box<Problem>> {
     let held = access
-        .seerr
+        .requests
         .asking()
         .await
         .map_err(|_| Box::new(crate::asking::unreachable(NOTHING_SET)))?;
@@ -112,7 +112,7 @@ async fn everybody(
         return Ok(format!("{said} — rehearsed, and nothing was written"));
     }
     access
-        .seerr
+        .requests
         .set_asking(&wanted)
         .await
         .map_err(|_| Box::new(crate::asking::unreachable(NOTHING_SET)))?;
@@ -133,7 +133,7 @@ async fn one_person(
 ) -> Result<String, Box<Problem>> {
     let account = found(ctx, manifest, name).await?;
     let held = access
-        .seerr
+        .requests
         .requesting(&account.id)
         .await
         .map_err(|_| Box::new(crate::asking::unreachable(NOTHING_SET)))?;
@@ -141,7 +141,7 @@ async fn one_person(
         return Err(Box::new(crate::asking::never_asked_here(&account.name)));
     };
     let headroom = access
-        .seerr
+        .requests
         .left(&held.id)
         .await
         .map_err(|_| Box::new(crate::asking::unreachable(NOTHING_SET)))?;
@@ -154,12 +154,12 @@ async fn one_person(
     // to the new limit under the old policy, which is the harmless order: the other way
     // round would let requests through unseen against a limit not yet in force.
     access
-        .seerr
+        .requests
         .set_quota(&held.id, wanted.quota)
         .await
         .map_err(|_| Box::new(crate::asking::unreachable(NOTHING_SET)))?;
     access
-        .seerr
+        .requests
         .approves_own(&held.id, wanted.approves_own)
         .await
         .map_err(|_| Box::new(crate::asking::unreachable(NOTHING_SET)))?;

@@ -111,16 +111,17 @@ pub(crate) async fn seerr_as_owner(
     }
 }
 
-/// What reading the household's requests needs: the request service, carrying the key
-/// it answers as its owner, whose reads see every member's requests.
+/// What reading the household's requests needs: the request service, asked as its
+/// owner, whose reads see every member's requests.
 pub(crate) struct HouseholdAccess {
-    /// The request service, reached on the host.
-    pub seerr: Seerr,
+    /// The request service.
+    pub requests: std::sync::Arc<dyn lemonfiber_contract::capabilities::request::intake::Fills>,
 }
 
-/// The request service to read the household from, or nothing where the stack has no
-/// request service, no media server for it to authenticate the household against, or a
-/// request service that has not written its own key yet.
+/// The request service to read the household from, or nothing where nothing here fills
+/// `request.intake`, there is no media server for it to authenticate the household
+/// against, it speaks the contract and cannot be asked over it, or it is the bundled
+/// request service and has not written its own key yet.
 ///
 /// The household view treats any of those as nothing to report rather than a fault: a
 /// stack without a request service has no household requests, and one not yet set up
@@ -129,14 +130,33 @@ pub(crate) async fn seerr_reader(
     ctx: &Ctx,
     manifest: &lemonfiber_manifest::Manifest,
 ) -> Option<HouseholdAccess> {
-    let services = manifest.services.as_slice();
-    let seerr = service_addr(services, lemonfiber_manifest::ApiKind::Seerr)?;
+    use lemonfiber_contract::capabilities::request::intake;
     super::media::hosted(ctx, manifest)?;
-    let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-    let key = seerr_key(ctx, services, project.as_deref()).await?;
-    Some(HouseholdAccess {
-        seerr: Seerr::keyed(ctx.seams.http.clone(), seerr.loopback, "seerr", key),
-    })
+    let fillers = super::media::fillers_here(ctx, manifest);
+    let (filler, _) = super::media::filling(&fillers, intake::CAPABILITY)?;
+    let requests: std::sync::Arc<dyn intake::Fills> =
+        match super::filled::spoken(ctx, filler, intake::CAPABILITY, intake::MAJOR).await {
+            super::filled::Spoken::Over(adapter) => std::sync::Arc::new(intake::Adapter(adapter)),
+            super::filled::Spoken::Unanswered => return None,
+            super::filled::Spoken::Not => std::sync::Arc::new(owned_requests(ctx, filler).await?),
+        };
+    Some(HouseholdAccess { requests })
+}
+
+/// The bundled request service `filler` is, holding the key it wrote for itself, read
+/// from beneath its own directory; nothing where it is not the bundled request service,
+/// publishes no port, or has not written its key yet.
+pub(crate) async fn owned_requests(ctx: &Ctx, filler: &crate::wiring::Filler) -> Option<Seerr> {
+    if !filler.speaks(lemonfiber_manifest::ApiKind::Seerr) {
+        return None;
+    }
+    let key = crate::seerr::api_key(&credential_file(ctx, filler).await.text()?)?;
+    Some(Seerr::keyed(
+        ctx.seams.http.clone(),
+        loopback(filler.published?),
+        &filler.id,
+        key,
+    ))
 }
 
 /// Where the host reaches a service, and the id it runs under.

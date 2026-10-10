@@ -28,7 +28,7 @@ use crate::asking::Policy;
 use crate::error::{Diagnose, Problem};
 use crate::household::State;
 use crate::model::{HouseholdMember, HouseholdReport, MemberRequest, Restriction};
-use crate::ports::service::{HouseholdRequest, Member, Requests};
+use crate::ports::service::{HouseholdRequest, Member};
 use crate::quality::Selection;
 use crate::recyclarr::Kind;
 
@@ -196,7 +196,7 @@ async fn asked_of(
             },
         );
     };
-    let requests = access.seerr.requests().await.unwrap_or_else(|_| {
+    let requests = access.requests.requests().await.unwrap_or_else(|_| {
         findings.push(
             "the request service's own record could not be read, so what the household \
              has asked for is not shown"
@@ -204,7 +204,10 @@ async fn asked_of(
         );
         Vec::new()
     });
-    (requests, allowance::gathered(&access.seerr, accounts).await)
+    (
+        requests,
+        allowance::gathered(access.requests.as_ref(), accounts).await,
+    )
 }
 
 /// The half of this reading the household itself sees, and the block that goes with it.
@@ -229,7 +232,7 @@ async fn shown_to_the_household(
 ) -> Vec<String> {
     let mut findings = Vec::new();
     if let Some(finding) = notices::put_where_they_ask(
-        &access.seerr,
+        access.requests.as_ref(),
         quality,
         no_room,
         asked.under_a_limit(),
@@ -240,7 +243,14 @@ async fn shown_to_the_household(
         findings.push(finding);
     }
     findings.extend(
-        holding::as_the_disk_stands(ctx, &access.seerr, &asked.known(), no_room, ctx.dry_run).await,
+        holding::as_the_disk_stands(
+            ctx,
+            access.requests.as_ref(),
+            &asked.known(),
+            no_room,
+            ctx.dry_run,
+        )
+        .await,
     );
     findings
 }
@@ -261,7 +271,7 @@ pub(crate) async fn reaching(
         );
     };
 
-    if access.seerr.answers().await.is_err() {
+    if access.requests.answers().await.is_err() {
         return Err(
             "the request service would not accept lemonfiber's key, so what it has been \
              asked for is not shown"

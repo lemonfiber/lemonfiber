@@ -15,7 +15,7 @@ use crate::app::Ctx;
 use crate::asking::Policy;
 use crate::error::{Diagnose, Problem};
 use crate::model::{HouseholdMember, HouseholdReport, MemberAccess};
-use crate::ports::service::{Approving as _, Asking, Headroom, Left};
+use crate::ports::service::{Asking, Headroom, Left};
 
 use super::{allowance, handing_over, reaching};
 
@@ -32,7 +32,7 @@ pub(crate) async fn as_the_defaults(ctx: &Ctx) -> Result<HouseholdReport, Box<Pr
 
     let mut findings = Vec::new();
     let asking = match reaching(ctx, &manifest).await {
-        Ok(access) => access.seerr.asking().await.ok(),
+        Ok(access) => access.requests.asking().await.ok(),
         Err(reason) => {
             findings.push(reason);
             None

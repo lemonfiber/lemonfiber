@@ -33,7 +33,7 @@ use crate::asking::Expiry;
 use crate::error::{Diagnose, Problem};
 use crate::household::State;
 use crate::model::HouseholdReport;
-use crate::ports::service::{Approving as _, HouseholdRequest, Requests as _};
+use crate::ports::service::HouseholdRequest;
 
 use super::asking::passing_on::{carried, Said};
 use super::command::Arranged;
@@ -241,7 +241,7 @@ async fn swept(ctx: &Ctx, after: u32, came_to: &mut CameTo) {
         Ok(access) => access,
         Err(reason) => return came_to.missed(&reason),
     };
-    let Ok(asked) = access.seerr.requests().await else {
+    let Ok(asked) = access.requests.requests().await else {
         return came_to.missed(
             "the request service's own record could not be read, so nothing was looked at",
         );
@@ -290,7 +290,7 @@ async fn close(
         came_to.closed += 1;
         return;
     }
-    if access.seerr.decide(request.id, false).await.is_err() {
+    if access.requests.decide(request.id, false).await.is_err() {
         return came_to.missed(&format!(
             "the request service would not close request {}, so it is still waiting on you",
             request.id

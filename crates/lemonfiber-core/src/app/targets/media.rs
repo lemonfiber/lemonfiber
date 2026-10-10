@@ -162,25 +162,31 @@ impl MediaServer {
 /// identity. Nothing where the ask is contested, or where nothing asks and more than one
 /// service serves it.
 pub(crate) fn settled(fillers: &Fillers) -> Option<(&Filler, Option<&Filler>)> {
-    match fillers.asks().iter().find(|ask| ask.capability == IDENTITY) {
-        Some(ask) => {
-            let [filler] = ask.fillers.as_slice() else {
-                return None;
-            };
-            Some((filler, fillers.service(&ask.by)))
-        }
-        None => Some((serving_unasked(fillers)?, None)),
-    }
+    filling(fillers, IDENTITY)
 }
 
-/// The one service here serving identity, where nothing asks for one: nothing where none
-/// does, or where more than one does and nothing settles which.
-fn serving_unasked(fillers: &Fillers) -> Option<&Filler> {
+/// The one service filling `capability`, with the service that asks for it: as the ask
+/// for it settles where one is made, otherwise the one service here providing it.
+/// Nothing where none does, or where more than one does and nothing settles which.
+pub(crate) fn filling<'a>(
+    fillers: &'a Fillers,
+    capability: &str,
+) -> Option<(&'a Filler, Option<&'a Filler>)> {
+    if let Some(ask) = fillers
+        .asks()
+        .iter()
+        .find(|ask| ask.capability == capability)
+    {
+        let [filler] = ask.fillers.as_slice() else {
+            return None;
+        };
+        return Some((filler, fillers.service(&ask.by)));
+    }
     let mut serving = fillers
         .services()
-        .filter(|one| one.provides.iter().any(|capability| capability == IDENTITY));
+        .filter(|one| one.provides.iter().any(|provided| provided == capability));
     let one = serving.next()?;
-    serving.next().is_none().then_some(one)
+    serving.next().is_none().then_some((one, None))
 }
 
 /// The media server as a read from the host finds it: the stack's services and every
