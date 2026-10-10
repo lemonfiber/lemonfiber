@@ -46,19 +46,26 @@ async fn app_sync_does_nothing_where_the_stack_has_no_prowlarr() {
 #[tokio::test]
 async fn app_sync_passes_over_an_indexer_nothing_can_reach() {
     const SERVARR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+    let http = seeding();
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
+        .with_http(http.clone())
         .with_filesystem(Arc::new(SeedFs::keyed(Some(SERVARR), None)));
     let mut unpublished = prowlarr();
     unpublished.port = None;
     unpublished.listens = Some(9696);
+    let mut unlistening = prowlarr();
+    unlistening.listens = None;
 
-    let wirings = super::super::seed_applications(
-        &ctx,
-        &fillers_of(vec![unpublished, arr("sonarr", 8989, "tv")]),
-    )
-    .await;
+    for indexer in [unpublished, unlistening] {
+        let wirings = super::super::seed_applications(
+            &ctx,
+            &fillers_of(vec![indexer, arr("sonarr", 8989, "tv")]),
+        )
+        .await;
 
-    assert!(wirings.is_empty(), "{wirings:?}");
+        assert!(wirings.is_empty(), "{wirings:?}");
+    }
+    assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
 
 /// A plugin's curator is never registered into the indexer, which would hand it the

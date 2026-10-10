@@ -196,9 +196,7 @@ async fn handed(
     }
     let requests: Box<dyn Requests> = match requester {
         Requester::Over(adapter) => Box::new(intake::Adapter(adapter)),
-        Requester::Bundled(base) => {
-            Box::new(crate::app::targets::seerr_as_owner(ctx, services, base).await)
-        }
+        Requester::Bundled(port) => Box::new(owned(ctx, &asker, port).await),
     };
     let requests = requests.as_ref();
     let mut wirings = match project.filter(|_| crate::app::gating::service(services).is_some()) {
@@ -213,8 +211,8 @@ async fn handed(
 enum Requester {
     /// Over `request.intake`.
     Over(Contracted),
-    /// As the bundled request service, at this address.
-    Bundled(String),
+    /// As the bundled request service, at the port it publishes.
+    Bundled(u16),
 }
 
 /// How `asker` is asked: over `request.intake` where it speaks it, otherwise as the
@@ -228,7 +226,22 @@ async fn requester(ctx: &Ctx, asker: &Cleared<'_>) -> Option<Requester> {
         Spoken::Not => (asker.holder() == crate::wiring::Holder::Stack)
             .then_some(asker.published)
             .flatten()
-            .map(|port| Requester::Bundled(crate::app::targets::loopback(port))),
+            .map(Requester::Bundled),
+    }
+}
+
+/// The stack's own request service `asker` as its owner, at `port`: carrying the key it
+/// wrote for itself, read from its own file, or none before it has written one.
+async fn owned(ctx: &Ctx, asker: &Cleared<'_>, port: u16) -> crate::seerr::Seerr {
+    let base = crate::app::targets::loopback(port);
+    let http = ctx.seams.http.clone();
+    match crate::app::targets::credential_file(ctx, asker)
+        .await
+        .text()
+        .and_then(|settings| crate::seerr::api_key(&settings))
+    {
+        Some(key) => crate::seerr::Seerr::keyed(http, base, &asker.id, key),
+        None => crate::seerr::Seerr::new(http, base, &asker.id),
     }
 }
 
