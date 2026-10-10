@@ -19,11 +19,7 @@ const SEEDING: &str = "crates/lemonfiber-core/src/seed/";
 
 /// The stack's services filling an ask that seeding spells by id, each with why that is
 /// not a consumer naming what fills its ask.
-const SPELLED: [(&str, &str); 1] = [(
-    "jellyfin",
-    "the decline service reaches Jellyfin by name, a link the stack declares with its \
-     reason; the identity source is reached through the lookup",
-)];
+const SPELLED: [(&str, &str); 0] = [];
 
 /// The pinned stack, read the way lemonfiber reads it.
 fn pinned() -> Option<Manifest> {

@@ -475,7 +475,7 @@ fn contracted_curator(
         placed.api = Some(servarr_api(Some("/config/config.xml")));
     }
     let fillers = fillers_trusting(
-        vec![arr("sonarr", 8989, "tv")],
+        vec![curator("sonarr", 8989, "tv")],
         std::slice::from_ref(&installed),
         project,
         &first_party("curating"),

@@ -155,12 +155,12 @@ fn download_client_wirings(report: &crate::seed::Report) -> Vec<&crate::seed::Wi
         .collect()
 }
 
-// ---- Prowlarr app sync: register each media-filing arr back into Prowlarr. ----
+// ---- Indexer app sync: each media-filing curator registered back. ----
 
-/// A media-filing \*arr as a manifest service, with the media that makes it
+/// A media-filing curator as a manifest service, with the media that makes it
 /// syncable — `manifest_service` alone leaves the media empty, which is what
-/// marks Prowlarr.
-fn arr(id: &str, port: u16, media: &str) -> lemonfiber_manifest::Service {
+/// marks the indexer aggregator.
+fn curator(id: &str, port: u16, media: &str) -> lemonfiber_manifest::Service {
     let mut service = manifest_service(
         id,
         Some(servarr_api(Some("/config/config.xml"))),

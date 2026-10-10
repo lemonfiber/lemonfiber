@@ -41,8 +41,8 @@ async fn the_registration_carries_the_request_services_own_key() {
 
     let _ = super::super::seed_fulfilment_targets(
         &ctx,
-        &[arr("sonarr", 8989, "tv"), seerr_with_settings()],
-        &fillers_of(vec![arr("sonarr", 8989, "tv"), seerr_with_settings()]),
+        &[curator("sonarr", 8989, "tv"), seerr_with_settings()],
+        &fillers_of(vec![curator("sonarr", 8989, "tv"), seerr_with_settings()]),
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
     )
     .await;
@@ -107,8 +107,8 @@ async fn a_rehearsed_pass_takes_the_request_service_unsigned_and_opens_no_sessio
 
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
-        &[arr("sonarr", 8989, "tv"), seerr_svc()],
-        &fillers_of(vec![arr("sonarr", 8989, "tv"), seerr_svc()]),
+        &[curator("sonarr", 8989, "tv"), seerr_svc()],
+        &fillers_of(vec![curator("sonarr", 8989, "tv"), seerr_svc()]),
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
     )
     .await;
@@ -146,8 +146,8 @@ async fn a_stack_with_no_request_service_is_handed_nothing() {
 
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
-        &[arr("sonarr", 8989, "tv")],
-        &fillers_of(vec![arr("sonarr", 8989, "tv")]),
+        &[curator("sonarr", 8989, "tv")],
+        &fillers_of(vec![curator("sonarr", 8989, "tv")]),
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
     )
     .await;
@@ -180,8 +180,8 @@ async fn an_arr_that_will_not_say_where_it_files_is_left_out() {
 
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
-        &[arr("sonarr", 8989, "tv"), seerr_svc()],
-        &fillers_of(vec![arr("sonarr", 8989, "tv"), seerr_svc()]),
+        &[curator("sonarr", 8989, "tv"), seerr_svc()],
+        &fillers_of(vec![curator("sonarr", 8989, "tv"), seerr_svc()]),
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
     )
     .await;
@@ -196,7 +196,7 @@ async fn an_arr_that_will_not_say_where_it_files_is_left_out() {
 #[tokio::test]
 async fn an_arr_publishing_no_port_is_left_out() {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-    let mut portless = arr("sonarr", 8989, "tv");
+    let mut portless = curator("sonarr", 8989, "tv");
     portless.port = None;
     let ctx = seed_ctx(None, true, Vec::new(), None, None)
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)));
@@ -219,8 +219,8 @@ async fn nothing_is_handed_over_where_there_is_no_request_service() {
 
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
-        &[arr("sonarr", 8989, "tv")],
-        &fillers_of(vec![arr("sonarr", 8989, "tv")]),
+        &[curator("sonarr", 8989, "tv")],
+        &fillers_of(vec![curator("sonarr", 8989, "tv")]),
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
     )
     .await;
@@ -241,8 +241,8 @@ async fn an_arr_that_cannot_be_read_is_not_handed_over_half_configured() {
 
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
-        &[arr("sonarr", 8989, "tv"), seerr_svc()],
-        &fillers_of(vec![arr("sonarr", 8989, "tv"), seerr_svc()]),
+        &[curator("sonarr", 8989, "tv"), seerr_svc()],
+        &fillers_of(vec![curator("sonarr", 8989, "tv"), seerr_svc()]),
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
     )
     .await;
@@ -285,7 +285,7 @@ fn contracted_requests(
     trusted: &[crate::plugin::first_party::FirstParty],
 ) -> crate::wiring::Fillers {
     fillers_trusting(
-        vec![arr("sonarr", 8989, "tv")],
+        vec![curator("sonarr", 8989, "tv")],
         &[contracted("intake", "seerr", "request.intake")],
         project,
         trusted,
@@ -335,7 +335,7 @@ async fn a_first_party_request_service_speaking_the_contract_is_handed_each_cura
 
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
-        &[arr("sonarr", 8989, "tv")],
+        &[curator("sonarr", 8989, "tv")],
         &contracted_requests(&project, &first_party("intake")),
         Some(&project),
     )
@@ -378,7 +378,7 @@ async fn a_contracted_request_service_untrusted_or_unreachable_is_handed_nothing
 
         let wirings = super::super::seed_fulfilment_targets(
             &ctx,
-            &[arr("sonarr", 8989, "tv")],
+            &[curator("sonarr", 8989, "tv")],
             &contracted_requests(&project, trusted),
             Some(&project),
         )
@@ -414,7 +414,7 @@ async fn a_first_party_plugin_naming_the_bundled_request_adapter_is_never_asked_
         manifest: "asking-manifest",
     }];
     let fillers = fillers_trusting(
-        vec![arr("sonarr", 8989, "tv")],
+        vec![curator("sonarr", 8989, "tv")],
         &[asking],
         &project,
         &trusted,
@@ -424,7 +424,7 @@ async fn a_first_party_plugin_naming_the_bundled_request_adapter_is_never_asked_
 
     let wirings = super::super::seed_fulfilment_targets(
         &ctx,
-        &[arr("sonarr", 8989, "tv")],
+        &[curator("sonarr", 8989, "tv")],
         &fillers,
         Some(&project),
     )

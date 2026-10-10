@@ -12,7 +12,6 @@ use lemonfiber_manifest::ApiKind;
 
 use crate::app::Ctx;
 use crate::doctor::credentials::Target;
-use crate::jellyfin::Jellyfin;
 use crate::ports::service::UsenetAccounts;
 use crate::prowlarr::Prowlarr;
 use crate::seerr::Seerr;
@@ -32,16 +31,6 @@ use super::servarr::{servarr_targets, target_for};
 pub(crate) fn declined_server(fillers: &Fillers) -> Option<super::MediaServer> {
     let filler = fillers.named_by(crate::app::invite::declining::SERVICE)?;
     super::MediaServer::at(fillers, filler)
-}
-
-/// [`declined_server`] as a reading client signed in as its administrator: nothing where
-/// there is none or lemonfiber holds no password for it.
-pub(crate) fn declined_reader(ctx: &Ctx, fillers: &Fillers) -> Option<Jellyfin> {
-    Some(
-        declined_server(fillers)?
-            .administered(ctx)?
-            .remembering(Arc::clone(&ctx.sessions)),
-    )
 }
 
 /// One \*arr a read can be made against: the service it files, a client already carrying

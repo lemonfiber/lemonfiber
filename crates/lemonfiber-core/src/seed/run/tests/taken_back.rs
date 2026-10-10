@@ -26,8 +26,8 @@ const LINK_TOKEN: &str = "link-token";
 /// A stack running Sonarr, the media server, the request service and the gate.
 fn gated() -> Vec<lemonfiber_manifest::Service> {
     vec![
-        arr("sonarr", 8989, "tv"),
-        arr("lidarr", 8686, "music"),
+        curator("sonarr", 8989, "tv"),
+        curator("lidarr", 8686, "music"),
         jellyfin_svc(),
         seerr_with_settings(),
         manifest_service("request-gate", None, Some(PORT)),

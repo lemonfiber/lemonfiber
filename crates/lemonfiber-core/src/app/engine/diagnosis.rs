@@ -235,8 +235,12 @@ fn decline_key(
         .map(|project| Decline {
             refusals: crate::app::invite::declining::path(project, File::Refusals),
             lapses: crate::app::invite::declining::path(project, File::Lapses),
-            keys: crate::app::targets::declined_reader(ctx, fillers)
-                .map(|server| Arc::new(server) as Arc<dyn crate::doctor::declining::KeyDates>),
+            keys: crate::app::targets::declined_server(fillers)
+                .and_then(|server| server.administered(ctx))
+                .map(|server| {
+                    Arc::new(server.remembering(Arc::clone(&ctx.sessions)))
+                        as Arc<dyn crate::doctor::declining::KeyDates>
+                }),
         });
     DeclineKeyCheck::new(ctx.seams.filesystem.clone(), decline)
 }

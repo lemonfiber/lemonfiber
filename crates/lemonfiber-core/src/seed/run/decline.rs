@@ -5,8 +5,7 @@
 //! is an administrator's act on every supported line — and no credential narrower than an
 //! API key, which administers the whole server, can do it. So the key is the service's
 //! and nothing else's: filed under its own name, so the server's key list says what holds
-//! it,
-//! and written owner-only into the service's configuration directory rather than its
+//! it, and written owner-only into the service's configuration directory rather than its
 //! environment, which `docker compose config` and `docker inspect` print.
 //!
 //! **The file is what holds the key.** A key filed under the service's name that the
@@ -93,7 +92,8 @@ pub(super) async fn seed_decline_key(
     Some(settled(server, state))
 }
 
-/// The key the file holds is one the media server holds: revoke whatever else is filed beside it.
+/// The key the file holds is one the media server holds: revoke whatever else is filed
+/// beside it.
 async fn kept(ctx: &Ctx, client: &Jellyfin, filed: &[String], key: &str) -> State {
     let others: Vec<&String> = filed.iter().filter(|one| *one != key).collect();
     if others.is_empty() {

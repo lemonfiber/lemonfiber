@@ -54,14 +54,14 @@ fn service(
 
 /// Jellyfin, and the decline service where `declining`.
 fn stack(declining: bool) -> Vec<lemonfiber_manifest::Service> {
-    let mut jellyfin = service(
+    let mut media_server = service(
         "jellyfin",
         Some(lemonfiber_manifest::ApiKind::Jellyfin),
         8096,
     );
-    jellyfin.provides = vec!["identity.source".to_owned()];
-    jellyfin.listens = Some(8096);
-    let mut services = vec![jellyfin];
+    media_server.provides = vec!["identity.source".to_owned()];
+    media_server.listens = Some(8096);
+    let mut services = vec![media_server];
     if declining {
         services.push(service("decline", None, 5056));
     }
@@ -262,7 +262,7 @@ async fn a_confirmed_ask_prints_the_key_from_its_file() {
 }
 
 #[tokio::test]
-async fn a_rotation_lands_only_once_jellyfin_takes_the_key_and_the_service_holds_it() {
+async fn a_rotation_lands_only_once_the_media_server_takes_the_key_and_the_service_holds_it() {
     let http = serving(
         &[&["old"], &["old", "fresh"], &["old", "fresh"]],
         204,
@@ -305,7 +305,7 @@ async fn a_rotation_lands_only_once_jellyfin_takes_the_key_and_the_service_holds
 }
 
 #[tokio::test]
-async fn a_new_key_jellyfin_refuses_is_revoked_and_the_old_one_put_back() {
+async fn a_new_key_the_media_server_refuses_is_revoked_and_the_old_one_put_back() {
     let http = serving(&[&["old"], &["old", "fresh"]], 204, 204, 401, "fresh");
     let (ctx, at) = scene("decline-rotate-untaken", true, Some("old"), http.clone());
     let listed = listed(&ctx, &at).await;
@@ -370,7 +370,7 @@ async fn a_new_key_that_cannot_be_written_is_revoked_again() {
 }
 
 #[tokio::test]
-async fn a_mint_jellyfin_refuses_changes_nothing() {
+async fn a_mint_the_media_server_refuses_changes_nothing() {
     let http = serving(&[&["old"]], 500, 204, 200, "fresh");
     let (ctx, at) = scene("decline-rotate-unminted", true, Some("old"), http.clone());
     let listed = listed(&ctx, &at).await;

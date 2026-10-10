@@ -14,9 +14,9 @@ fn stack(gating: bool) -> Vec<lemonfiber_manifest::Service> {
     let mut services = vec![
         jellyfin_svc(),
         seerr_svc(),
-        arr("sonarr", 8989, "tv"),
-        arr("radarr", 7878, "movies"),
-        arr("lidarr", 8686, "music"),
+        curator("sonarr", 8989, "tv"),
+        curator("radarr", 7878, "movies"),
+        curator("lidarr", 8686, "music"),
     ];
     if gating {
         services.push(manifest_service(

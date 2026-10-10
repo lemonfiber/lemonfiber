@@ -7,10 +7,10 @@
 //! written there.
 //!
 //! **A replacement keeps a working key at every moment.** A new key is minted, written,
-//! proven against the media server and confirmed by the service, and only then is the old one
-//! revoked. Where any step fails the new key is revoked and the old one put back. A
-//! revocation of the old key that the media server refuses leaves it filed under the service's
-//! name and held by nothing, which the next seed revokes.
+//! proven against the media server and confirmed by the service, and only then is the
+//! old one revoked. Where any step fails the new key is revoked and the old one put back.
+//! A revocation of the old key that the media server refuses leaves it filed under the
+//! service's name and held by nothing, which the next seed revokes.
 
 use std::path::{Path, PathBuf};
 
@@ -39,10 +39,10 @@ const ABSENT: &str = "Media server decline key is not there yet, so the decline 
                       switch off an invitation anybody refuses. Run `lemonfiber seed`.";
 
 /// What a rehearsal says a replacement would take.
-const ROTATING: &str = "a real run would mint a new key on the media server, write it where the decline \
-                        service reads it, prove the media server takes it and that the service holds it, \
-                        and only then revoke the old one. Nothing was minted here, and nothing \
-                        was written.";
+const ROTATING: &str = "a real run would mint a new key on the media server, write it where \
+                        the decline service reads it, prove the media server takes it and \
+                        that the service holds it, and only then revoke the old one. Nothing \
+                        was minted here, and nothing was written.";
 
 /// What a landed replacement says.
 const LANDED: &str = "The media server took the new key, and the decline service holds it";
