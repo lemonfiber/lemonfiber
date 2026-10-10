@@ -12,7 +12,6 @@
 
 use super::Ctx;
 use crate::app::targets::MediaServer;
-use crate::ports::service::Fronted as _;
 use crate::seed::{State, Wiring};
 
 /// What the report calls this connection.
@@ -36,9 +35,9 @@ pub(super) async fn seed_cors(
     // is not one it configures. A rehearsal before the first run finds none recorded
     // either, because the identity step mints it, so where that step would it says what
     // the run would write.
-    let recorded = server.recorded_password(ctx);
+    let client = server.administering(ctx).await;
     let minting = server.would_mint(ctx);
-    if recorded.is_none() && !minting {
+    if client.is_none() && !minting {
         return None;
     }
     let Some(origin) = front_door_origin(ctx, services).await else {
@@ -63,7 +62,7 @@ pub(super) async fn seed_cors(
         );
         return Some(wiring);
     };
-    let Some(password) = recorded else {
+    let Some(client) = client else {
         return Some(Wiring::settled(
             connection(server),
             State::WouldWire {
@@ -72,7 +71,6 @@ pub(super) async fn seed_cors(
             },
         ));
     };
-    let client = server.signed_in(ctx, password);
     let state = match client.allowed_origins().await {
         Err(failure) => crate::seed::unreached(&failure),
         Ok(held) if held == [origin.as_str()] => State::AlreadyWired,

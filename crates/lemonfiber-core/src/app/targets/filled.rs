@@ -15,7 +15,6 @@ use lemonfiber_manifest::Manifest;
 
 use crate::app::plugins::conformance;
 use crate::app::Ctx;
-use crate::jellyfin::Jellyfin;
 use crate::wiring::{Filler, Fillers};
 
 use super::media::{fillers_here, MediaServer, IDENTITY};
@@ -65,21 +64,15 @@ fn provider<'f>(fillers: &'f Fillers, capability: &str) -> Option<&'f Filler> {
 }
 
 async fn identified(ctx: &Ctx, fillers: &Fillers) -> Option<Arc<dyn source::Fills>> {
-    Some(
-        match reached(ctx, fillers, source::CAPABILITY, source::MAJOR).await? {
-            Reached::Contracted(adapter) => Arc::new(source::Adapter(adapter)),
-            Reached::Bundled(server) => Arc::new(server),
-        },
-    )
+    provider(fillers, source::CAPABILITY)?;
+    let server = MediaServer::of(fillers)?;
+    Box::pin(server.identifying(ctx)).await
 }
 
 async fn served(ctx: &Ctx, fillers: &Fillers) -> Option<Arc<dyn serve::Fills>> {
-    Some(
-        match reached(ctx, fillers, serve::CAPABILITY, serve::MAJOR).await? {
-            Reached::Contracted(adapter) => Arc::new(serve::Adapter(adapter)),
-            Reached::Bundled(server) => Arc::new(server),
-        },
-    )
+    provider(fillers, serve::CAPABILITY)?;
+    let server = MediaServer::of(fillers)?;
+    Box::pin(server.administering(ctx)).await
 }
 
 /// How a service is asked for one capability's contract.
@@ -109,34 +102,6 @@ pub(crate) async fn spoken(ctx: &Ctx, filler: &Filler, capability: &str, major: 
         Ok(adapter) => Spoken::Over(adapter.witnessed_by(witness)),
         Err(_) => Spoken::Unanswered,
     }
-}
-
-/// How the media server is asked for one capability.
-enum Reached {
-    /// Over the contract it speaks.
-    Contracted(Contracted),
-    /// Through this build's adapter for the bundled server, as its administrator.
-    Bundled(Jellyfin),
-}
-
-/// How the service filling the identity source is asked for `capability`.
-///
-/// Nothing where it does not provide `capability`, where it speaks the contract and is
-/// a plugin with an answer kept against it as outside that contract, or cannot be
-/// reached, and where it speaks none and is not a server this build holds an adapter
-/// and a recorded password for. Every answer outside the contract is kept against the
-/// plugin.
-async fn reached(ctx: &Ctx, fillers: &Fillers, capability: &str, major: u32) -> Option<Reached> {
-    let filler = provider(fillers, capability)?;
-    match spoken(ctx, filler, capability, major).await {
-        Spoken::Over(adapter) => return Some(Reached::Contracted(adapter)),
-        Spoken::Unanswered => return None,
-        Spoken::Not => {}
-    }
-    let server = MediaServer::of(fillers)?.administered(ctx)?;
-    Some(Reached::Bundled(
-        server.remembering(Arc::clone(&ctx.sessions)),
-    ))
 }
 
 #[cfg(test)]

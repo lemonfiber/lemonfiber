@@ -38,11 +38,21 @@ pub(super) async fn seed_media_server_admin(
 ) -> Option<Admin> {
     let server = server?;
     let requests = server.asked_by.clone()?;
-    let client = server.client(ctx);
+    let Some(client) = server.setting_up(ctx).await else {
+        return Some(Admin {
+            administered: Err(crate::seed::State::Skipped {
+                reason: format!(
+                    "{} speaks the identity source's contract and cannot be asked over it",
+                    server.name()
+                ),
+            }),
+            requests,
+        });
+    };
     let recorded = server.recorded_password(ctx);
     let keep = |password: &str| server.record_password(ctx, password);
     let administered = crate::seed::wire_media_server_admin(
-        &client,
+        client.as_ref(),
         ctx.seams.random.as_ref(),
         recorded.as_deref(),
         ctx.dry_run,
@@ -78,13 +88,19 @@ pub(super) async fn seed_request_identity(
     else {
         return (Vec::new(), records);
     };
-    let gate = project.filter(|_| crate::app::gating::service(services).is_some());
+    let Some(pairing) = server.pairing.as_ref() else {
+        return (vec![unpaired(server)], records);
+    };
+    // The gate answers for the server only where it speaks the server's API.
+    let gate = project.filter(|_| {
+        crate::app::gating::service(services).is_some() && server.gate_kind().is_some()
+    });
     let server_url = match gate {
         Some(_) => {
             let at = super::tokens::through_the_gate(server.id());
             format!("http://{}:{}{}", at.host, at.port, at.base)
         }
-        None => server.network.url(),
+        None => pairing.at.url(),
     };
 
     let Some(client) = crate::app::targets::requests_as_owner(ctx, &requests).await else {
@@ -94,7 +110,7 @@ pub(super) async fn seed_request_identity(
         Ok(password) => {
             crate::seed::wire_request_identity(
                 client.as_ref(),
-                server.protocol(),
+                pairing.protocol.clone(),
                 &password,
                 &server_url,
                 ctx.dry_run,
@@ -157,6 +173,22 @@ fn changed(server: &MediaServer) -> String {
     format!(
         "{}'s administrator password, changed once the request service was set up",
         server.name()
+    )
+}
+
+/// What is said where the media server names no API the request service could sign the
+/// household in through: an adapter whose upstream declares none.
+fn unpaired(server: &MediaServer) -> crate::seed::Wiring {
+    let plugin = server.brought_by().unwrap_or_default();
+    crate::seed::Wiring::settled(
+        crate::seed::IDENTITY.to_owned(),
+        crate::seed::State::Skipped {
+            reason: format!(
+                "the plugin {plugin} brings {} without naming the API its upstream answers in, so \
+                 the request service is not set up to sign the household in through it",
+                server.name()
+            ),
+        },
     )
 }
 

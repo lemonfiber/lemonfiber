@@ -475,6 +475,7 @@ fn a_plugins_service_declares_exactly_the_fields_the_contract_permits() {
         "listens",
         "media_types",
         "name",
+        "native",
         "port",
         "provides",
         "shape",

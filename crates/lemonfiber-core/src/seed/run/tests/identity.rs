@@ -686,3 +686,69 @@ async fn without_a_request_service_there_is_no_telling_to_ask_about() {
     assert!(recorded.is_none());
     assert!(http.requests().is_empty());
 }
+
+/// **A contracted media server whose upstream names no API is paired with nothing.** The
+/// step says which plugin left the API out, and neither the server nor the request
+/// service is asked anything.
+#[tokio::test]
+async fn a_contracted_server_whose_upstream_names_no_api_is_paired_with_nothing() {
+    let http = Fake::always(Answer::reply(200, "{}"));
+    let ctx = seed_ctx(None, true, Vec::new(), None, None).with_http(http.clone());
+
+    let (wirings, _) = identity_beside(
+        &ctx,
+        &[seerr_svc()],
+        &[crate::test_support::a_contracted_media_server(None)],
+        &crate::baseline::Baseline::new(),
+    )
+    .await;
+
+    assert_eq!(wirings.len(), 1, "{wirings:?}");
+    assert!(
+        wirings
+            .iter()
+            .all(|one| one.connection == crate::seed::IDENTITY
+                && matches!(&one.state, State::Skipped { reason }
+                if reason.starts_with("the plugin contracted brings ")
+                    && reason.contains("without naming the API its upstream answers in"))),
+        "{wirings:?}"
+    );
+    assert!(http.requests().is_empty(), "{:?}", http.requests());
+}
+
+/// **A contracted media server that cannot be asked over `identity.source` is not set
+/// up any other way.** The step says so, and nothing is sent to the server, over its
+/// contract or through this build's adapter.
+#[tokio::test]
+async fn a_contracted_server_unanswered_over_its_contract_is_not_set_up() {
+    let http = Fake::always(Answer::reply(200, "{}"));
+    let ctx = seed_ctx(None, true, Vec::new(), None, None).with_http(http.clone());
+
+    let (wirings, _) = identity_beside(
+        &ctx,
+        &[seerr_svc()],
+        &[crate::test_support::a_contracted_media_server(Some(
+            "upstream",
+        ))],
+        &crate::baseline::Baseline::new(),
+    )
+    .await;
+
+    assert!(
+        wirings
+            .iter()
+            .any(|one| one.connection == crate::seed::IDENTITY
+                && matches!(&one.state, State::Skipped { reason }
+                if reason.ends_with(
+                    " speaks the identity source's contract and cannot be asked over it"
+                ))),
+        "{wirings:?}"
+    );
+    let asked = http.requests();
+    assert!(
+        !asked
+            .iter()
+            .any(|one| one.url.contains(":8080") || one.url.contains(":9000")),
+        "{asked:?}"
+    );
+}

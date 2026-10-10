@@ -60,6 +60,12 @@
       ],
       "required": false
     },
+    "native": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "networks": {
       "type": [
         "array[string]"

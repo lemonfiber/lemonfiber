@@ -585,6 +585,11 @@
           "items": {"type": "string"}
         },
         "name": {"description": "Human-facing.", "type": "string"},
+        "native": {
+          "description": "The API this service answers the stack's other services in, by the name those\nservices know it by: declared on the upstream an adapter of the same plugin fronts,\nwhere other services reach that upstream directly rather than through the adapter.",
+          "type": ["string", "null"],
+          "default": null
+        },
         "port": {
           "description": "Primary UI or API port, absent for a service with no listener.",
           "type": ["integer", "null"],

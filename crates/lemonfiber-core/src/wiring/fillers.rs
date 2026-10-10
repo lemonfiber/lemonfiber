@@ -78,6 +78,10 @@ pub struct Filler {
     /// The majors of its image that run here: the first number of the tag it is pinned
     /// by, or nothing where the tag does not open with one.
     pub majors: Vec<u32>,
+    /// The service of the same plugin it stands in front of, where it is an adapter.
+    pub fronts: Option<String>,
+    /// The API it answers the stack's other services in, where it names one.
+    pub native: Option<String>,
 }
 
 impl Filler {
@@ -255,6 +259,17 @@ impl Fillers {
         self.services.iter().find(|one| one.id == id)
     }
 
+    /// The upstream `adapter` stands in front of: the service of its own plugin it names
+    /// in `fronts`, and nothing where it names none or its plugin brings no such service.
+    #[must_use]
+    pub fn fronted_by(&self, adapter: &Filler) -> Option<&Filler> {
+        let upstream = adapter.fronts.as_deref()?;
+        let plugin = adapter.brought_by()?;
+        self.services
+            .iter()
+            .find(|one| one.id == upstream && one.brought_by() == Some(plugin))
+    }
+
     /// Every service on this machine, the stack's first, each in the order it is declared.
     pub fn services(&self) -> impl Iterator<Item = &Filler> {
         self.services.iter()
@@ -403,6 +418,8 @@ fn bundled(service: &Service, services: &[Service], project: Option<&Path>) -> F
         contracts: Vec::new(),
         first_party: false,
         majors: service.majors(),
+        fronts: None,
+        native: None,
     }
 }
 
@@ -432,6 +449,8 @@ fn brought(plugin: &str, placed: &Placed, project: Option<&Path>, first_party: b
         contracts: placed.speaks.clone(),
         first_party,
         majors: lemonfiber_manifest::majors(&placed.tag),
+        fronts: placed.fronts.clone(),
+        native: placed.native.clone(),
     }
 }
 

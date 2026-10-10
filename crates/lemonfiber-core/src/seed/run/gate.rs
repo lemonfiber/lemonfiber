@@ -21,15 +21,15 @@ use super::Ctx;
 use crate::app::gating;
 use crate::app::targets::MediaServer;
 use crate::app_keys::GATE_APP;
-use crate::jellyfin::Jellyfin;
-use crate::ports::service::AppKeys as _;
+use crate::ports::service::AppKeys;
 use crate::seed::{State, Wiring};
 
 /// What the report calls this connection.
 const CONNECTION: &str = "The request gate's routes";
 
-/// Hold the gate to a route for each fulfilling \*arr and one for the media server, under
-/// a key of its own — or, where the stack no longer runs the gate, to no key at all.
+/// Hold the gate to a route for each fulfilling curator and, where it speaks the media
+/// server's API, one for the media server under a key of its own — or, where the stack no
+/// longer runs the gate, to no key at all.
 pub(super) async fn seed_gate_routes(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
@@ -37,11 +37,64 @@ pub(super) async fn seed_gate_routes(
     server: Option<&MediaServer>,
     project: Option<&Path>,
 ) -> Option<Wiring> {
-    let server = server?;
+    let routed = server.and_then(|server| server.gate_kind().map(|kind| (server, kind)));
+    match routed {
+        Some((server, kind)) => {
+            with_the_media_server(ctx, services, fillers, server, kind, project).await
+        }
+        None => curators_alone(ctx, services, fillers, project).await,
+    }
+}
+
+/// The gate's routes where it answers for no media server: one for each fulfilling
+/// curator, and no key minted for it anywhere.
+async fn curators_alone(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    fillers: &crate::wiring::Fillers,
+    project: Option<&Path>,
+) -> Option<Wiring> {
+    gating::service(services)?;
+    let Some(project) = project else {
+        return Some(settled(no_project()));
+    };
+    let (path, current) = routes_file(ctx, project).await;
+    let wanted = Upstreams::of(arr_routes(ctx, fillers).await);
+    let state = if current.as_ref() == Some(&wanted) {
+        State::AlreadyWired
+    } else if ctx.dry_run {
+        State::WouldWire {
+            yours: Some(listed(current.as_ref())),
+            ours: Some(listed(Some(&wanted))),
+        }
+    } else {
+        match crate::config::store::write(&path, &wanted.written()) {
+            Ok(()) => State::Wired,
+            Err(failure) => State::Failed {
+                detail: format!(
+                    "the routes could not be written to {}: {failure}",
+                    path.display()
+                ),
+            },
+        }
+    };
+    Some(settled(state))
+}
+
+/// The gate's routes with one for the media server, a route of `kind`, under a key minted
+/// for the gate alone and filed under its name.
+async fn with_the_media_server(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    fillers: &crate::wiring::Fillers,
+    server: &MediaServer,
+    kind: Kind,
+    project: Option<&Path>,
+) -> Option<Wiring> {
     let gating = gating::service(services).is_some();
     // Minted with the administrator's session, which lemonfiber holds only on a server
     // it set up; a rehearsal before the first run finds none recorded yet.
-    let Some(password) = server.recorded_password(ctx) else {
+    let Some(client) = server.administering(ctx).await else {
         let minting = server.would_mint(ctx);
         return (gating && minting).then(|| {
             settled(State::WouldWire {
@@ -50,30 +103,21 @@ pub(super) async fn seed_gate_routes(
             })
         });
     };
-    let client = server.signed_in(ctx, password);
+    let client = client.as_ref();
     let filed = client.filed_as(GATE_APP).await;
     // A stack that does not run the gate asked for nothing here: a key list that could
     // not be read is left for the next run to retire from, not reported.
     if !gating {
-        return minted::retired(ctx, &client, GATE_APP, CONNECTION, &filed.ok()?).await;
+        return minted::retired(ctx, client, GATE_APP, CONNECTION, &filed.ok()?).await;
     }
     let filed = match filed {
         Ok(filed) => filed,
         Err(failure) => return Some(settled(crate::seed::unreached(&failure))),
     };
     let Some(project) = project else {
-        return Some(settled(State::Skipped {
-            reason: "there is no stack directory to hand the request gate its routes in".to_owned(),
-        }));
+        return Some(settled(no_project()));
     };
-    let path = gating::path(project, File::Upstreams);
-    let current = crate::app::targets::read_owned(
-        ctx.seams.filesystem.as_ref(),
-        &path,
-        crate::within::directory_of(&path),
-    )
-    .await
-    .and_then(|text| Upstreams::read(&text).ok());
+    let (path, current) = routes_file(ctx, project).await;
     let routes = arr_routes(ctx, fillers).await;
     let held = current
         .as_ref()
@@ -82,20 +126,20 @@ pub(super) async fn seed_gate_routes(
         .filter(|key| filed.contains(key));
     let state = match held {
         Some(key) => {
-            let wanted = Upstreams::of(with(&routes, to_jellyfin(server, &key)));
+            let wanted = Upstreams::of(with(&routes, to_media(server, kind, &key)));
             let others: Vec<&String> = filed.iter().filter(|one| **one != key).collect();
-            kept(ctx, &client, current.as_ref(), &wanted, others, &path).await
+            kept(ctx, client, current.as_ref(), &wanted, others, &path).await
         }
         None if ctx.dry_run => State::WouldWire {
             yours: Some(listed(current.as_ref())),
-            ours: Some(named(&with(&routes, to_jellyfin(server, "")))),
+            ours: Some(named(&with(&routes, to_media(server, kind, "")))),
         },
         None => {
-            let key = match minted::mint(&client, GATE_APP).await {
+            let key = match minted::mint(client, GATE_APP).await {
                 Ok(key) => key,
                 Err(state) => return Some(settled(state)),
             };
-            let wanted = Upstreams::of(with(&routes, to_jellyfin(server, &key)));
+            let wanted = Upstreams::of(with(&routes, to_media(server, kind, &key)));
             if let Err(failure) = crate::config::store::write(&path, &wanted.written()) {
                 let _ = client.revoke(&key).await;
                 return Some(settled(State::Failed {
@@ -106,10 +150,30 @@ pub(super) async fn seed_gate_routes(
                     ),
                 }));
             }
-            minted::revoking(&client, &filed).await
+            minted::revoking(client, &filed).await
         }
     };
     Some(settled(state))
+}
+
+/// Where the gate's routes file sits under `project`, and the routes it holds now.
+async fn routes_file(ctx: &Ctx, project: &Path) -> (std::path::PathBuf, Option<Upstreams>) {
+    let path = gating::path(project, File::Upstreams);
+    let current = crate::app::targets::read_owned(
+        ctx.seams.filesystem.as_ref(),
+        &path,
+        crate::within::directory_of(&path),
+    )
+    .await
+    .and_then(|text| Upstreams::read(&text).ok());
+    (path, current)
+}
+
+/// What is said where there is no stack directory to hand the gate its routes in.
+fn no_project() -> State {
+    State::Skipped {
+        reason: "there is no stack directory to hand the request gate its routes in".to_owned(),
+    }
 }
 
 /// Write the gate's routes again after the \*arr `arr` replaced its key, so its route
@@ -136,11 +200,11 @@ pub(crate) async fn reroute(
         .map(|wiring| wiring.state)
 }
 
-/// The gate already holds a key Jellyfin lists: bring its routes up to what they should
-/// be, and revoke whatever else is filed under its name.
+/// The gate already holds a key the media server lists: bring its routes up to what they
+/// should be, and revoke whatever else is filed under its name.
 async fn kept(
     ctx: &Ctx,
-    client: &Jellyfin,
+    client: &dyn AppKeys,
     current: Option<&Upstreams>,
     wanted: &Upstreams,
     others: Vec<&String>,
@@ -197,12 +261,12 @@ async fn arr_routes(ctx: &Ctx, fillers: &crate::wiring::Fillers) -> Vec<Upstream
     routes
 }
 
-/// The route to the media server, at its address on the stack's network, forwarding to
-/// the lines its image runs and presenting `key`.
-fn to_jellyfin(server: &MediaServer, key: &str) -> Upstream {
+/// The route to the media server, a route of `kind` at its address on the stack's
+/// network, forwarding to the lines its image runs and presenting `key`.
+fn to_media(server: &MediaServer, kind: Kind, key: &str) -> Upstream {
     Upstream {
         route: server.id().to_owned(),
-        kind: Kind::Jellyfin,
+        kind,
         address: server.network.url(),
         credential: Credential::new(key),
         majors: server.filler.majors.clone(),

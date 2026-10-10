@@ -395,6 +395,9 @@ async fn without_an_administrator_or_on_a_rehearsal_nothing_is_minted() {
 
     let unadministered = rotate(&ctx, &listed, &stack(true), &fillers(&stack(true))).await;
     assert!(unproven(&unadministered.settled).is_some_and(|said| said.contains("no administrator")));
+    let declined_alone = vec![service("decline", None, 5056)];
+    let unserved = rotate(&ctx, &listed, &declined_alone, &fillers(&declined_alone)).await;
+    assert!(unproven(&unserved.settled).is_some_and(|said| said == super::NO_ADMINISTRATOR));
 
     let (mut rehearsing, _) = scene("decline-rotate-rehearsed", true, Some("old"), http.clone());
     rehearsing.dry_run = true;

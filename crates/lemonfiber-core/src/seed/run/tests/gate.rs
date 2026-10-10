@@ -380,26 +380,118 @@ async fn without_an_administrator_only_a_rehearsal_says_anything() {
     assert!(http.requests().is_empty());
 }
 
-/// A stack with no Jellyfin has no routes to hand over.
+/// A stack with no media server the gate answers for still has a route to each curator
+/// the request service fulfils through, and nothing is asked of any server.
 #[tokio::test]
-async fn a_stack_without_jellyfin_has_no_routes() {
+async fn without_a_media_server_the_curators_are_still_routed() {
     let http = serving(&[&[]], 204, 204);
-    let (ctx, _) = gate_ctx("gate-routes-no-jellyfin", true, ARRS, None, http.clone());
-    let services = vec![manifest_service(
-        "request-gate",
+    let curators = [("sonarr", "sonarr-key")];
+    let (ctx, project) = gate_ctx(
+        "gate-routes-no-media-server",
+        true,
+        &curators,
         None,
-        Some(lemonfiber_sidecar::gate::PORT),
-    )];
+        http.clone(),
+    );
+    let services = vec![
+        seerr_svc(),
+        curator("sonarr", 8989, "tv"),
+        manifest_service("request-gate", None, Some(lemonfiber_sidecar::gate::PORT)),
+    ];
 
-    assert!(super::super::gate::seed_gate_routes(
+    let wiring = super::super::gate::seed_gate_routes(
         &ctx,
         &services,
-        &fillers_of(services.clone()),
+        &fillers_at(services.clone(), &project),
         served(&services).as_ref(),
-        None
+        Some(&project),
     )
-    .await
-    .is_none());
+    .await;
+
+    let mut expected = holding(&curators, "").upstreams;
+    expected.retain(|route| route.kind != Kind::Jellyfin);
+    assert_eq!(wiring.map(|one| one.state), Some(State::Wired));
+    assert_eq!(routes(&project), Some(Upstreams::of(expected)));
+    assert!(http.requests().is_empty(), "{:?}", http.requests());
+}
+
+/// What the gate's routes come to where only `services` stand, under `project` where
+/// one is given.
+async fn curators_seeded(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    fillers: &crate::wiring::Fillers,
+    project: Option<&std::path::Path>,
+) -> Option<State> {
+    super::super::gate::seed_gate_routes(ctx, services, fillers, served(services).as_ref(), project)
+        .await
+        .map(|one| one.state)
+}
+
+/// Without a media server the gate answers for, a rehearsal says what it would write and
+/// writes nothing, a run writes the curators' routes and the next leaves them alone, a
+/// missing stack directory is said, and routes that cannot be written are reported.
+#[tokio::test]
+async fn the_curators_routes_alone_are_rehearsed_held_and_reported() {
+    let http = serving(&[&[]], 204, 204);
+    let curators = [("sonarr", "sonarr-key")];
+    let (mut ctx, project) = gate_ctx(
+        "gate-routes-curators-alone",
+        true,
+        &curators,
+        None,
+        http.clone(),
+    );
+    let services = vec![
+        seerr_svc(),
+        curator("sonarr", 8989, "tv"),
+        manifest_service("request-gate", None, Some(lemonfiber_sidecar::gate::PORT)),
+    ];
+    let fillers = fillers_at(services.clone(), &project);
+    let mut expected = holding(&curators, "").upstreams;
+    expected.retain(|route| route.kind != Kind::Jellyfin);
+
+    ctx.dry_run = true;
+    let rehearsed = curators_seeded(&ctx, &services, &fillers, Some(&project)).await;
+    ctx.dry_run = false;
+    assert!(
+        matches!(
+            rehearsed,
+            Some(State::WouldWire {
+                yours: Some(_),
+                ours: Some(_)
+            })
+        ),
+        "{rehearsed:?}"
+    );
+    assert_eq!(routes(&project), None);
+
+    assert_eq!(
+        curators_seeded(&ctx, &services, &fillers, Some(&project)).await,
+        Some(State::Wired)
+    );
+    assert_eq!(
+        curators_seeded(&ctx, &services, &fillers, Some(&project)).await,
+        Some(State::AlreadyWired)
+    );
+    assert_eq!(routes(&project), Some(Upstreams::of(expected)));
+
+    assert_eq!(
+        curators_seeded(&ctx, &services, &fillers, None).await,
+        Some(State::Skipped {
+            reason: "there is no stack directory to hand the request gate its routes in".to_owned(),
+        })
+    );
+
+    let _ = std::fs::remove_file(routes_file(&project));
+    let _ = std::fs::create_dir_all(routes_file(&project));
+    let failed = curators_seeded(&ctx, &services, &fillers, Some(&project)).await;
+    assert!(
+        matches!(&failed, Some(State::Failed { detail })
+            if detail.starts_with("the routes could not be written to ")),
+        "{failed:?}"
+    );
+    assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
 
 /// With no stack directory there is nowhere to hand the routes over, and nothing is

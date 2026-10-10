@@ -173,6 +173,8 @@ fn filler(stack: Option<&std::path::Path>) -> crate::wiring::Filler {
         contracts: vec!["media.serve@1".to_owned()],
         first_party: false,
         majors: Vec::new(),
+        fronts: None,
+        native: None,
     }
 }
 

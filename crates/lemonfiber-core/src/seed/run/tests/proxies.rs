@@ -161,12 +161,16 @@ async fn a_server_that_does_not_come_back_is_unreached() {
         ),
         (
             "/System/Configuration/network",
-            vec![
-                Answer::reply(200, NOBODY),
-                Answer::reply(200, NOBODY),
-                Answer::reply(204, ""),
-                Answer::reply(200, THE_DOOR),
-            ],
+            [
+                vec![
+                    Answer::reply(200, NOBODY),
+                    Answer::reply(200, NOBODY),
+                    Answer::reply(204, ""),
+                    Answer::reply(200, THE_DOOR),
+                ],
+                vec![Answer::reply(503, ""); 60],
+            ]
+            .concat(),
         ),
         ("/System/Restart", vec![Answer::reply(204, "")]),
     ]);

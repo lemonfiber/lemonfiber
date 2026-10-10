@@ -21,7 +21,9 @@ use std::path::Path;
 use lemonfiber_manifest::{ApiKind, Service};
 
 use super::pending::{forgotten, kept, pending, promoted};
-use crate::app::targets::{record_secret, recorded_secret, service_addr, target_for, MediaServer};
+use crate::app::targets::{
+    record_secret, recorded_secret, service_addr, target_for, MediaServer, Unsigned,
+};
 use crate::app::Ctx;
 use crate::config;
 use crate::credential::{Consumer, Held, Origin, Propagation, Reach, Rotation, Settled, CATALOGUE};
@@ -299,9 +301,22 @@ pub(crate) enum Replacing {
     Unkept(String),
 }
 
+/// What is said where the media server is spoken to over its contracts, which change no
+/// administrator's password.
+const OVER_ITS_CONTRACTS: &str = "this media server is spoken to over its contracts, which \
+                                  change no administrator's password";
+
 /// What is said where lemonfiber holds no administrator password for the media server.
 const NO_ADMINISTRATOR_HELD: &str = "lemonfiber holds no administrator password for this media \
                                      server, so there is nothing to change; run `lemonfiber seed`";
+
+/// What is said where the media server cannot be signed in to as its administrator.
+const fn unsigned(why: Unsigned) -> &'static str {
+    match why {
+        Unsigned::Unheld => NO_ADMINISTRATOR_HELD,
+        Unsigned::Contracted => OVER_ITS_CONTRACTS,
+    }
+}
 
 /// Mint a new administrator password, record it under its pending name, set it on the
 /// media server and prove it by signing in with it, and only then move it into place —
@@ -314,9 +329,9 @@ pub(crate) async fn replace_jellyfin_password(
     server: &MediaServer,
     rehearsing: bool,
 ) -> Result<Replaced, Replacing> {
-    let Some(current) = server.recorded_password(ctx) else {
-        return Err(Replacing::Unproven(NO_ADMINISTRATOR_HELD.to_owned()));
-    };
+    let client = server
+        .signing_in(ctx)
+        .map_err(|why| Replacing::Unproven(unsigned(why).to_owned()))?;
     // Below what can be told without acting, and above the mint: a password generated to
     // describe a rotation is a secret that exists because somebody asked a question.
     if rehearsing {
@@ -333,7 +348,6 @@ pub(crate) async fn replace_jellyfin_password(
     if let Err(failure) = record_secret(ctx, &pending(setting), &replacement) {
         return Err(Replacing::Unproven(unrecorded(&failure)));
     }
-    let client = server.signed_in(ctx, current);
     match client.replace_password(&replacement).await {
         Ok(()) => promoted(ctx, setting, &replacement)
             .map(|()| Replaced::Done)

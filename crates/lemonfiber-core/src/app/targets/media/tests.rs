@@ -2,7 +2,9 @@ use lemonfiber_manifest::{Api, ApiKind, KeySource, Manifest};
 
 use super::MediaServer;
 use crate::plugin::Installed;
-use crate::test_support::{a_placed, an_installed};
+use crate::test_support::{
+    a_contracted_media_server, a_placed, an_installed, MEDIA_ADAPTER, MEDIA_UPSTREAM,
+};
 use crate::wiring::{Address, Chosen, Fillers};
 
 /// The shipped stack, changed by `changing`, with `installed` beside it and `chosen` as the
@@ -175,4 +177,145 @@ fn a_stack_asking_for_no_identity_still_has_its_media_server() {
 
     let contested = shipped(&[a_plugin_server()], &Chosen::default(), unasked);
     assert_eq!(MediaServer::of(&contested), None);
+}
+
+/// A contracted media server is spoken to over its contracts alone, and another service
+/// signs the household in through the upstream its adapter fronts, in the API that
+/// upstream names; the request gate, which speaks only this build's adapter's API,
+/// answers no route for it.
+#[test]
+fn a_contracted_server_is_reached_over_its_contracts_and_paired_at_its_upstream() {
+    let chosen = Chosen::read(Some("identity.source=media-adapter"));
+    let fillers = shipped(
+        &[a_contracted_media_server(Some("upstream"))],
+        &chosen,
+        |_| (),
+    );
+    let server = MediaServer::of(&fillers);
+
+    assert_eq!(server.as_ref().map(MediaServer::id), Some(MEDIA_ADAPTER));
+    assert_eq!(
+        server.as_ref().map(|one| one.reach),
+        Some(super::Reach::Over)
+    );
+    assert_eq!(
+        server.as_ref().and_then(|one| one.pairing.clone()),
+        Some(super::Pairing {
+            protocol: crate::ports::service::Protocol("upstream".to_owned()),
+            at: Address {
+                host: MEDIA_UPSTREAM.to_owned(),
+                port: 9000
+            },
+        })
+    );
+    assert_eq!(server.as_ref().and_then(MediaServer::gate_kind), None);
+    assert!(server.as_ref().is_some_and(|one| one
+        .signed_in(
+            &crate::test_support::a_context().build(),
+            crate::test_support::a_password()
+        )
+        .is_none()));
+}
+
+/// An upstream that names no native API leaves the contracted server unpaired: there is
+/// no API to tell another service to sign the household in through.
+#[test]
+fn a_contracted_server_whose_upstream_names_no_api_is_unpaired() {
+    let chosen = Chosen::read(Some("identity.source=media-adapter"));
+    let fillers = shipped(&[a_contracted_media_server(None)], &chosen, |_| ());
+    let server = MediaServer::of(&fillers);
+
+    assert_eq!(
+        server.as_ref().map(|one| one.reach),
+        Some(super::Reach::Over)
+    );
+    assert_eq!(server.as_ref().and_then(|one| one.pairing.clone()), None);
+}
+
+/// The stack's own server is reached through this build's adapter, paired at its own
+/// address in that adapter's API, and the gate answers a route for it.
+#[test]
+fn the_stacks_server_is_reached_through_the_adapter_and_paired_at_itself() {
+    let fillers = shipped(&[], &Chosen::default(), |_| ());
+    let server = MediaServer::of(&fillers);
+
+    assert_eq!(
+        server.as_ref().map(|one| one.reach),
+        Some(super::Reach::Bundled(ApiKind::Jellyfin))
+    );
+    assert_eq!(
+        server
+            .as_ref()
+            .and_then(|one| one.pairing.as_ref())
+            .map(|pairing| (pairing.protocol.0.as_str(), pairing.at.url())),
+        Some(("jellyfin", "http://jellyfin:8096".to_owned()))
+    );
+    assert_eq!(
+        server.as_ref().and_then(MediaServer::gate_kind),
+        Some(lemonfiber_sidecar::gate::Kind::Jellyfin)
+    );
+}
+
+/// An adapter naming a service outside its own plugin as the upstream it fronts is paired
+/// nowhere: the administrator's password is never pointed at another's service.
+#[test]
+fn a_contracted_server_fronting_another_plugins_service_is_unpaired() {
+    let mut installed = a_contracted_media_server(Some("upstream"));
+    installed
+        .services
+        .retain(|placed| placed.service != MEDIA_UPSTREAM);
+    let mut stranger = a_placed(MEDIA_UPSTREAM, &[], None, Some(9000));
+    stranger.native = Some("upstream".to_owned());
+    let chosen = Chosen::read(Some("identity.source=media-adapter"));
+    let fillers = shipped(
+        &[installed, an_installed("other", vec![stranger])],
+        &chosen,
+        |_| (),
+    );
+
+    let server = MediaServer::of(&fillers);
+
+    assert_eq!(
+        fillers
+            .service(MEDIA_UPSTREAM)
+            .map(|one| (one.brought_by(), one.native.as_deref())),
+        Some((Some("other"), Some("upstream")))
+    );
+    assert_eq!(server.as_ref().map(MediaServer::id), Some(MEDIA_ADAPTER));
+    assert_eq!(
+        server.as_ref().map(|one| one.reach),
+        Some(super::Reach::Over)
+    );
+    assert_eq!(server.and_then(|one| one.pairing), None);
+}
+
+/// A contracted media server that cannot be asked over its contracts is asked nothing
+/// any other way: not set up, identified or administered through this build's adapter.
+#[tokio::test]
+async fn a_contracted_server_unanswered_over_its_contracts_is_asked_nothing() {
+    let chosen = Chosen::read(Some("identity.source=media-adapter"));
+    let fillers = shipped(
+        &[a_contracted_media_server(Some("upstream"))],
+        &chosen,
+        |_| (),
+    );
+    let http = lemonfiber_fixtures::http::Fake::always(lemonfiber_fixtures::http::Answer::reply(
+        200, "{}",
+    ));
+    let ctx = crate::test_support::a_context()
+        .build()
+        .with_http(http.clone());
+    let server = MediaServer::of(&fillers);
+
+    assert_eq!(
+        server.as_ref().map(|one| one.reach),
+        Some(super::Reach::Over)
+    );
+    if let Some(server) = server.as_ref() {
+        assert!(server.setting_up(&ctx).await.is_none());
+        assert!(server.identifying(&ctx).await.is_none());
+        assert!(server.administering(&ctx).await.is_none());
+        assert!(server.administered(&ctx).is_none());
+    }
+    assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
