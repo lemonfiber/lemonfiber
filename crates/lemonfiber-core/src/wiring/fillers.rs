@@ -153,6 +153,8 @@ pub struct Fillers {
     services: Vec<Filler>,
     /// Each ask, the stack's in the order it declares them and then each plugin's.
     asks: Vec<Ask>,
+    /// Each link the stack makes by name, as the service it runs from and the one it names.
+    named: Vec<(String, String)>,
 }
 
 impl Fillers {
@@ -198,7 +200,15 @@ impl Fillers {
                 .map(move |placed| brought(&one.plugin, placed, project, first_party))
         });
         let services: Vec<Filler> = bundled.chain(brought).collect();
-        let asks = settle(manifest, installed, chosen)
+        let settled = settle(manifest, installed, chosen);
+        let named = settled
+            .iter()
+            .filter_map(|wired| match &wired.reaches {
+                Reaches::ByName { service, .. } => Some((wired.by.clone(), service.clone())),
+                Reaches::Asked { .. } => None,
+            })
+            .collect();
+        let asks = settled
             .into_iter()
             .filter_map(|wired| match wired.reaches {
                 Reaches::Asked {
@@ -216,7 +226,21 @@ impl Fillers {
                 Reaches::ByName { .. } => None,
             })
             .collect();
-        Self { services, asks }
+        Self {
+            services,
+            asks,
+            named,
+        }
+    }
+
+    /// The stack's own service that `by` is linked to by name, where the stack declares
+    /// such a link and runs that service: never a plugin's, which a link by name does not
+    /// reach whatever it stands in for.
+    #[must_use]
+    pub fn named_by(&self, by: &str) -> Option<&Filler> {
+        let (_, to) = self.named.iter().find(|(from, _)| from == by)?;
+        self.service(to)
+            .filter(|filler| matches!(filler.origin, Origin::Bundled))
     }
 
     /// Every ask, the stack's in the order it declares them and then each plugin's.

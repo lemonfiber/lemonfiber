@@ -26,26 +26,21 @@ use super::filled::{spoken, Spoken};
 use super::layout::{project_directory, read_owned, service_config_dir};
 use super::servarr::{servarr_targets, target_for};
 
-/// The stack's own Jellyfin as a reading client signed in as its administrator: the
-/// server the decline service acts on, which it names rather than asking for whatever
-/// serves identity. Nothing where the stack has none or lemonfiber holds no password
-/// for it.
-pub(crate) fn declined_reader(
-    ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
-) -> Option<Jellyfin> {
-    let addr = service_addr(services, ApiKind::Jellyfin)?;
-    let password =
-        super::secrets::recorded_secret(ctx, crate::config::JELLYFIN_ADMIN_PASSWORD_KEY)?;
+/// The server the decline service acts on: the stack's own service its link by name
+/// reaches, rather than whatever serves identity, where that is one lemonfiber speaks to
+/// as a media server.
+pub(crate) fn declined_server(fillers: &Fillers) -> Option<super::MediaServer> {
+    let filler = fillers.named_by(crate::app::invite::declining::SERVICE)?;
+    super::MediaServer::at(fillers, filler)
+}
+
+/// [`declined_server`] as a reading client signed in as its administrator: nothing where
+/// there is none or lemonfiber holds no password for it.
+pub(crate) fn declined_reader(ctx: &Ctx, fillers: &Fillers) -> Option<Jellyfin> {
     Some(
-        Jellyfin::authenticated(
-            ctx.seams.http.clone(),
-            addr.loopback,
-            &addr.id,
-            crate::config::JELLYFIN_ADMIN_USER,
-            password,
-        )
-        .remembering(Arc::clone(&ctx.sessions)),
+        declined_server(fillers)?
+            .administered(ctx)?
+            .remembering(Arc::clone(&ctx.sessions)),
     )
 }
 

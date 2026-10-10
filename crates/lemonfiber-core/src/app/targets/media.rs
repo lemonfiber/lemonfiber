@@ -65,17 +65,27 @@ impl MediaServer {
     #[must_use]
     pub(crate) fn of(fillers: &Fillers) -> Option<Self> {
         let (filler, asker) = fillers.filling(IDENTITY)?;
+        let mut server = Self::at(fillers, filler)?;
+        // The request service is handed the server's administrator's password once, to be
+        // set up, so it is named only where the gate lets that password reach it.
+        server.asked_by = asker
+            .filter(|asker| crate::wiring::crosses(filler.holder(), asker.holder()))
+            .cloned();
+        Some(server)
+    }
+
+    /// `filler` as a media server nothing asks for, where it speaks the media server's
+    /// adapter, the host and the stack's network can each reach it, and a setting can be
+    /// kept for its administrator: what a service linked to one server by name acts on.
+    #[must_use]
+    pub(crate) fn at(fillers: &Fillers, filler: &Filler) -> Option<Self> {
         let adapter = ApiKind::Jellyfin;
         if !filler.speaks(adapter) {
             return None;
         }
         let port = filler.published?;
         Some(Self {
-            // The request service is handed the server's administrator's password once,
-            // to be set up, so it is named only where the gate lets that password reach it.
-            asked_by: asker
-                .filter(|asker| crate::wiring::crosses(filler.holder(), asker.holder()))
-                .cloned(),
+            asked_by: None,
             loopback: loopback(port),
             port,
             network: filler.address.clone()?,

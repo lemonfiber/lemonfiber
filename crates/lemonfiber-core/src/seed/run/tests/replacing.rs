@@ -218,3 +218,37 @@ fn replacing_the_media_server_changes_nothing_that_signs_in_to_it() {
         Some("PLUGIN_REPLACEMENT_STAND__IN_ADMIN_PASSWORD")
     );
 }
+
+/// The decline service acts on the server its link by name reaches, so a plugin standing
+/// in as the household's media server leaves its key in the stack's own server: never
+/// minted on, or handed for, a server the decline service does not reach.
+#[test]
+fn replacing_the_media_server_leaves_the_decline_service_on_its_own_server() {
+    let shipped_stack = shipped(&[], &Chosen::default(), |_| ());
+    let after = shipped_stack.as_ref().and_then(|(manifest, before)| {
+        let identity = crate::app::targets::IDENTITY;
+        let asking = before
+            .asks()
+            .iter()
+            .find(|ask| ask.capability == identity)?;
+        let replaced = before.service(MediaServer::of(before)?.id())?;
+        swapped(manifest, &asking.by, identity, replaced)
+    });
+    let declined = after
+        .as_ref()
+        .and_then(crate::app::targets::declined_server);
+
+    assert_eq!(
+        after
+            .as_ref()
+            .and_then(MediaServer::of)
+            .map(|one| one.id().to_owned()),
+        Some(STAND_IN.to_owned())
+    );
+    assert_eq!(declined.as_ref().map(MediaServer::id), Some("jellyfin"));
+    assert_eq!(
+        declined.as_ref().map(|one| one.setting.as_str()),
+        Some(crate::config::JELLYFIN_ADMIN_PASSWORD_KEY)
+    );
+    assert_eq!(declined.as_ref().and_then(crate::test_support::asker), None);
+}

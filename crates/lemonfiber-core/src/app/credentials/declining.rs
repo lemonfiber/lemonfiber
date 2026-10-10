@@ -101,7 +101,7 @@ pub(super) async fn rotate(
     fillers: &crate::wiring::Fillers,
 ) -> Rotation {
     let Some(client) =
-        crate::app::targets::MediaServer::of(fillers).and_then(|server| server.administered(ctx))
+        crate::app::targets::declined_server(fillers).and_then(|server| server.administered(ctx))
     else {
         return unproven(held, NO_ADMINISTRATOR);
     };

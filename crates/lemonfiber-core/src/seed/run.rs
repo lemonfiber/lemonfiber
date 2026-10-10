@@ -505,7 +505,7 @@ async fn seed_media_server(
     wirings.extend(cors::seed_cors(ctx, services, server).await);
 
     // The decline service's key, minted in the server the decline service names.
-    wirings.extend(decline::seed_decline_key(ctx, services, server, project).await);
+    wirings.extend(decline::seed_decline_key(ctx, services, fillers, project).await);
 
     // The request gate's routes, with the same session.
     wirings.extend(gate::seed_gate_routes(ctx, services, fillers, server, project).await);

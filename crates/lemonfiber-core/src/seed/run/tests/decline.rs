@@ -108,7 +108,7 @@ async fn seeded(
     let wiring = super::super::decline::seed_decline_key(
         ctx,
         &stack(declining),
-        served(&stack(declining)).as_ref(),
+        &super::fillers_of(stack(declining)),
         Some(project),
     )
     .await;
@@ -288,9 +288,13 @@ async fn a_stack_without_jellyfin_holds_no_key() {
     let (ctx, _) = decline_ctx("decline-key-no-jellyfin", true, None, http.clone());
     let services = vec![manifest_service("decline", None, Some(5056))];
 
-    let wiring =
-        super::super::decline::seed_decline_key(&ctx, &services, served(&services).as_ref(), None)
-            .await;
+    let wiring = super::super::decline::seed_decline_key(
+        &ctx,
+        &services,
+        &super::fillers_of(services.clone()),
+        None,
+    )
+    .await;
 
     assert!(wiring.is_none());
 }
@@ -304,7 +308,7 @@ async fn without_a_stack_directory_nothing_is_minted() {
     let wiring = super::super::decline::seed_decline_key(
         &ctx,
         &stack(true),
-        served(&stack(true)).as_ref(),
+        &super::fillers_of(stack(true)),
         None,
     )
     .await;

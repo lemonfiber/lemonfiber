@@ -31,21 +31,23 @@ fn connection(server: &MediaServer) -> String {
     format!("The decline service's own {} key", server.name())
 }
 
-/// Hold the decline service to one key of its own, where the stack has a media server —
-/// or, where the stack no longer runs the service, to none.
+/// Hold the decline service to one key of its own, in the server its link by name
+/// reaches — or, where the stack no longer runs the service, to none.
 pub(super) async fn seed_decline_key(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
-    server: Option<&MediaServer>,
+    fillers: &crate::wiring::Fillers,
     project: Option<&Path>,
 ) -> Option<Wiring> {
-    let server = server?;
+    let server = &crate::app::targets::declined_server(fillers)?;
     let declining = declining::service(services).is_some();
     // Minted with the administrator's session, which lemonfiber holds only on a server
     // it set up. A rehearsal before the first run finds none recorded, because the
-    // identity step mints it, and so finds no key on the server either.
+    // identity step mints it, and so finds no key on the server either — where the
+    // server the decline service acts on is the one the identity step sets up.
     let Some(client) = server.administered(ctx) else {
-        let minting = server.would_mint(ctx);
+        let minting = MediaServer::of(fillers)
+            .is_some_and(|identity| identity.id() == server.id() && identity.would_mint(ctx));
         return (declining && minting).then(|| would_mint(server));
     };
     let filed = client.filed_as(DECLINE_APP).await;
