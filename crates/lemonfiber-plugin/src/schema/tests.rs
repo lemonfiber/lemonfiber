@@ -777,3 +777,16 @@ fn a_manifest_declaring_no_wiring_leaves_the_service_its_own_id_and_no_group() {
     assert_eq!(entry.map(|entry| entry.hostname), Some("komga"));
     assert_eq!(entry.map(|entry| entry.group), Some(None));
 }
+
+#[test]
+fn the_egress_guard_shape_is_named_as_a_manifest_spells_it_and_gives_the_tunnel_alone() {
+    let shape = super::Shape::EgressGuard;
+    assert_eq!(
+        serde_json::to_value(shape).ok(),
+        Some(serde_json::Value::from(shape.name()))
+    );
+    assert_eq!(shape.grants(), [lemonfiber_manifest::GATEWAY_GRANT]);
+    assert_eq!(shape.devices(), [lemonfiber_manifest::TUNNEL_DEVICE]);
+    assert_eq!(shape.fronted_by(), crate::vocabulary::EGRESS_GUARD);
+    assert_eq!(shape.approval("gluetun"), "egress-guard@gluetun");
+}

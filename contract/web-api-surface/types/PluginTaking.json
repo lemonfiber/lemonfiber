@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "approval": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "devices": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "grants": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "shape": {
+      "type": [
+        "ref:PluginShape"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

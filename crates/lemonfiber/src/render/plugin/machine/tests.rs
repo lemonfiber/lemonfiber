@@ -37,6 +37,7 @@ fn recorded(plugin: &str, reached: Option<Reached>) -> Installed {
             networks: Vec::new(),
             speaks: Vec::new(),
             fronts: None,
+            shape: None,
         }],
         provides: Vec::new(),
         contributions: Vec::new(),
@@ -67,6 +68,7 @@ fn install(would: Installed, recorded: bool) -> Install {
         reversed: None,
         contests: Vec::new(),
         recipes_ran: Vec::new(),
+        taking: Vec::new(),
     }
 }
 

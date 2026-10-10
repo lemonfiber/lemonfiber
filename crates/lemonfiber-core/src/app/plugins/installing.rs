@@ -101,14 +101,7 @@ pub(super) async fn install(
     let contests = standing::contested(ctx, &stack_manifest, &held, &would);
     let changes = crate::plugin::changes(&planned);
     let offer = offering::installing(&read.digest, &would, &changes, &contests);
-    let acting = offering::acting(
-        ctx,
-        consent,
-        &would.plugin,
-        &offer,
-        &offering::INSTALLING,
-        &crate::plugin::approvals(&would.recipes),
-    )?;
+    let (acting, taking) = offering::answered(ctx, consent, &would, &offer, &offering::INSTALLING)?;
 
     let mut stated = crate::plugin::proofs(&read.manifest);
     let mut against = None;
@@ -207,6 +200,7 @@ pub(super) async fn install(
             overrides: crate::plugin::overrides(&read.manifest),
             reversed: put_back,
             recipes_ran,
+            taking,
         })),
         update: None,
         substituted: Vec::new(),

@@ -1,8 +1,10 @@
 use std::path::Path;
 
-use lemonfiber_plugin::Manifest;
+use lemonfiber_plugin::{Manifest, Shape};
 
-use super::{changes, overrides, proofs, Changing, Overriding, Proving, Puts};
+use super::{
+    asked, changes, overrides, proofs, taking, Changing, Overriding, Proving, Puts, Taking,
+};
 use crate::plugin::installed::Installed;
 
 /// A manifest declaring one service, one proof and one override.
@@ -201,5 +203,59 @@ fn a_proof_that_does_not_settle_which_service_it_asks_names_none() {
             .next()
             .and_then(|one| one.of),
         None
+    );
+}
+
+#[test]
+fn a_service_taking_the_egress_guard_shape_is_stated_with_what_it_is_given() {
+    let shaped = manifest(|read| {
+        for service in &mut read.services {
+            service.shape = Some(Shape::EgressGuard);
+        }
+    })
+    .map(|read| Installed::of(&read));
+    assert_eq!(
+        shaped.as_ref().map(taking),
+        Some(vec![Taking {
+            service: "komga".to_owned(),
+            shape: Shape::EgressGuard,
+            grants: vec!["NET_ADMIN".to_owned()],
+            devices: vec!["/dev/net/tun".to_owned()],
+            approval: "egress-guard@komga".to_owned(),
+        }])
+    );
+    assert_eq!(
+        whole().map(|read| taking(&Installed::of(&read))),
+        Some(Vec::new())
+    );
+}
+
+#[test]
+fn a_shape_is_asked_to_be_approved_after_every_value_the_recipes_send_elsewhere() {
+    let mut shaped = crate::test_support::an_installed(
+        "gluetun",
+        vec![crate::plugin::Placed {
+            shape: Some(Shape::EgressGuard),
+            ..crate::test_support::a_placed("gluetun", &[], None, None)
+        }],
+    );
+    shaped.recipes = vec![crate::plugin::Recipe {
+        id: "adopt".to_owned(),
+        title: "Adopt".to_owned(),
+        why: "Held".to_owned(),
+        steps: Vec::new(),
+        pairs: vec![crate::plugin::Pair {
+            value: "token".to_owned(),
+            origin: "operator".to_owned(),
+            to: "meta.example.org".to_owned(),
+            approval: Some(crate::plugin::approval("token", "meta.example.org")),
+            release: None,
+            from: None,
+        }],
+    }];
+    let taken = taking(&shaped);
+    assert_eq!(
+        asked(&shaped, &taken),
+        ["token@meta.example.org", "egress-guard@gluetun"]
     );
 }

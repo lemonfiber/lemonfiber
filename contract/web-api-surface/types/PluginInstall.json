@@ -48,6 +48,12 @@
       ],
       "required": false
     },
+    "taking": {
+      "type": [
+        "array[ref:PluginTaking]"
+      ],
+      "required": true
+    },
     "verified": {
       "type": [
         "anyOf(null,ref:PluginVerification)"

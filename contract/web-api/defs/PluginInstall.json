@@ -64,6 +64,13 @@
         }
       ]
     },
+    "taking": {
+      "description": "Every service taking a privileged shape, with what it is given, each approved\napart from the offer.",
+      "type": "array",
+      "items": {
+        "$ref": "PluginTaking.json"
+      }
+    },
     "verified": {
       "description": "What the stack's own checks made of the install, or nothing on a run that\nasked them nothing.\n\nThe other half of what an install has to establish, and the half a plugin\ncannot establish for itself: its proofs say the plugin works, and this says the\nstack still does. Absent on a rehearsal, which writes nothing and so has\nnothing to hold a reading against.",
       "anyOf": [
@@ -87,6 +94,7 @@
     "proofs",
     "contests",
     "overrides",
-    "recipes_ran"
+    "recipes_ran",
+    "taking"
   ]
 }

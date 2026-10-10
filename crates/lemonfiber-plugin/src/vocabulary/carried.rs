@@ -8,7 +8,7 @@
 //! probes, outgrew what one file may hold — not because the two are separate
 //! concerns. Nothing here decides anything; it is the table the module reads.
 
-use super::{Capability, Constraint, Credential, Probe, Removed, Requirement};
+use super::{Capability, Constraint, Credential, Probe, Removed, Requirement, EGRESS_GUARD};
 
 /// Every capability this generation carries, in the order the artefact lists them.
 pub(super) const CARRIED: &[Capability] = &[
@@ -167,7 +167,7 @@ pub(super) const CARRIED: &[Capability] = &[
         ],
     },
     Capability {
-        name: "network.egress-guard",
+        name: EGRESS_GUARD,
         summary: "Carries another service's traffic out through a tunnel and stops it when the \
                   tunnel drops.",
         contract: "Carries the traffic of whatever is placed inside its network, out through a \

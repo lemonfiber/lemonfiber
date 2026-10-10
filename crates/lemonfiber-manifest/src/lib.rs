@@ -25,7 +25,9 @@ pub use schema::{
     Manifest, Profile, Protocol, Removed, Service, Wiring, CLAIM,
 };
 pub use spelling::environment_name;
-pub use validate::{is_core_name, is_digest, validate, Violation, ALLOWED_GRANTS};
+pub use validate::{
+    is_core_name, is_digest, validate, Violation, ALLOWED_GRANTS, GATEWAY_GRANT, TUNNEL_DEVICE,
+};
 
 /// The manifest schema version this crate prefers.
 pub const SCHEMA_VERSION: u32 = 1;

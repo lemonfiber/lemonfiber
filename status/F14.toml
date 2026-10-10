@@ -1,0 +1,7 @@
+# One row per requirement this repository has worked on; read by spec's
+# status_check.py and the release gate.
+
+requirement = [
+  { id = "F14-R12", state = "done", evidence = ["crates/lemonfiber-plugin/src/schema.rs", "crates/lemonfiber-plugin/src/refusing/shaping.rs", "crates/lemonfiber-plugin/src/refusing/shaping/tests.rs", "crates/lemonfiber-core/src/plugin/container.rs", "crates/lemonfiber-core/src/plugin/container/tests.rs", "contract/plugin-manifest.schema.json"] },
+  { id = "F14-R21", state = "done", evidence = ["crates/lemonfiber-core/src/plugin/stating.rs", "crates/lemonfiber-core/src/plugin/stating/tests.rs", "crates/lemonfiber-core/src/app/plugins/offering.rs", "crates/lemonfiber/src/render/plugin/machine/answering.rs", "crates/lemonfiber/src/render/plugin/machine/answering/tests.rs"] },
+]

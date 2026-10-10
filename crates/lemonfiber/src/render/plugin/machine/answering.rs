@@ -9,7 +9,7 @@
 //! The manifest's own rules refuse such a word before an install reads it; this is the
 //! second wall, not the first.
 
-use lemonfiber_core::plugin::{Adapter, Recipe};
+use lemonfiber_core::plugin::{Adapter, Recipe, Taking};
 use lemonfiber_core::text::plain;
 
 use super::super::super::Lines;
@@ -61,6 +61,34 @@ pub(super) fn recipes(declared: &[Recipe]) -> Lines {
                 ));
             }
         }
+    }
+    lines
+}
+
+/// Every service taking a privileged shape, with what it is given and, before it is
+/// given it, what approving it is written as.
+pub(super) fn taking(taken: &[Taking], acted: bool) -> Lines {
+    let mut lines = Lines::default();
+    if taken.is_empty() {
+        return lines;
+    }
+    lines.spaced(format!(
+        "    The privileged shape it {}, approved apart from the offer:",
+        if acted { "was given" } else { "would be given" }
+    ));
+    for one in taken {
+        let asked = if acted {
+            String::new()
+        } else {
+            format!(" — approve with --approve {}", plain(&one.approval))
+        };
+        lines.put(format!(
+            "      {} takes {}: the {} capability and the {} device{asked}",
+            plain(&one.service),
+            one.shape.name(),
+            one.grants.join(", "),
+            one.devices.join(", "),
+        ));
     }
     lines
 }

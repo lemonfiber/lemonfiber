@@ -579,6 +579,14 @@
           "default": [],
           "items": {"type": "string"}
         },
+        "shape": {
+          "description": "The one privileged shape lemonfiber writes for this service, where it is the\nupstream an adapter of the same plugin fronts and that adapter speaks\n`network.egress-guard`.",
+          "anyOf": [
+            {"$ref": "#/$defs/PluginShape"},
+            {"type": "null"}
+          ],
+          "default": null
+        },
         "speaks": {
           "description": "Each capability contract it answers, as `capability@major`: the service is an\nadapter, and lemonfiber asks it over those contracts.",
           "type": "array",
@@ -590,6 +598,12 @@
       },
       "additionalProperties": false,
       "required": ["id", "name", "image", "digest", "tag", "criticality"]
+    },
+    "PluginShape": {
+      "description": "A privileged shape lemonfiber writes for a plugin's service.",
+      "oneOf": [
+        {"description": "The `NET_ADMIN` capability and the `/dev/net/tun` device, added to the entry\nevery plugin's service gets.", "type": "string", "const": "egress-guard"}
+      ]
     },
     "PluginValueOrigin": {
       "description": "Where a value a recipe carries comes from.\n\nFour, and no fifth: a service in this stack and a host outside it each answer a\ncall, and lemonfiber's credential store and the operator each supply a value no call\nanswered. Written by the manifest, and held to where the value really comes from.",

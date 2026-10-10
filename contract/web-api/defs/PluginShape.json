@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A privileged shape lemonfiber writes for a plugin's service.",
+  "oneOf": [
+    {
+      "description": "The `NET_ADMIN` capability and the `/dev/net/tun` device, added to the entry\nevery plugin's service gets.",
+      "type": "string",
+      "const": "egress-guard"
+    }
+  ]
+}

@@ -29,7 +29,7 @@ pub use refusing::{names_a_header_by_substitution, names_a_path_not_plain, outsi
 pub use schema::{
     Bind, Capture, Claim, ClaimProbe, Condition, Contribution, Criticality, Declaration, Declared,
     Entry, Expect, Expected, ExpectedKind, Health, HealthKind, Input, Manifest, On, Origin,
-    Override, Pair, Plugin, Proof, Recipe, Request, Requires, Retry, Secret, Service, Step,
+    Override, Pair, Plugin, Proof, Recipe, Request, Requires, Retry, Secret, Service, Shape, Step,
     StepCall, Wiring, ALL_WAITING, CALL_DEADLINE, CONFIGURATION, HEADER, LARGEST_ANSWER,
     LONGEST_WAIT, MOST_RETRIES, RUN,
 };

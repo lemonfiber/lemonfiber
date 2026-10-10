@@ -28,7 +28,14 @@ const FLOATING_TAGS: &[&str] = &[
 /// Public because it is one of two sets of things called capabilities in this system,
 /// and the rule that no name may be in both is only checkable by something that can
 /// see both.
-pub const ALLOWED_GRANTS: &[&str] = &["NET_ADMIN"];
+pub const ALLOWED_GRANTS: &[&str] = &[GATEWAY_GRANT];
+
+/// The kernel capability a tunnel needs to build its interface and route the traffic
+/// placed inside its network.
+pub const GATEWAY_GRANT: &str = "NET_ADMIN";
+
+/// The device a tunnel opens its interface through.
+pub const TUNNEL_DEVICE: &str = "/dev/net/tun";
 
 /// Whether a name has the shape of a core capability: an area, a dot and a verb.
 ///

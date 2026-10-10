@@ -43,10 +43,12 @@
 //! privilege gained after it starts; every kernel capability dropped but the six an
 //! image needs to start as root, give its files to the operator's uid and drop to it;
 //! and a ceiling on how many processes it may hold. A manifest has no field to widen
-//! any of it. What is not set is set nowhere for a reason: a memory ceiling that fits a
-//! media server transcoding is no ceiling for a sidecar, a read-only root breaks every
-//! image that writes outside its configuration directory, and a user would break every
-//! image that drops to one itself.
+//! any of it but `shape`, which names the egress guard's shape rather than spelling it:
+//! this adds `NET_ADMIN` and `/dev/net/tun` for it, and nothing else. What is not set
+//! is set nowhere for a reason: a memory ceiling that fits a media server transcoding
+//! is no ceiling for a sidecar, a read-only root breaks every image that writes outside
+//! its configuration directory, and a user would break every image that drops to one
+//! itself.
 
 use serde::Serialize;
 
@@ -175,9 +177,9 @@ impl Serialize for Services<'_> {
 /// One service's entry, and the whole of what one can carry.
 ///
 /// A key is a field here, so a key a plugin may not have — a mount of its own, a
-/// device, a kernel grant, a network mode, a user, an entrypoint, a command, an
-/// environment — is one there is no field for. The four that bound what it may do are
-/// fields, and every value in them is this build's.
+/// network mode, a user, an entrypoint, a command, an environment — is one there is no
+/// field for. The fields that bound what it may do, the devices included, hold only
+/// this build's values.
 #[derive(Serialize)]
 struct Entry {
     /// The template it extends.
@@ -200,8 +202,11 @@ struct Entry {
     security_opt: [&'static str; 1],
     /// The capabilities it starts without.
     cap_drop: [&'static str; 1],
-    /// The capabilities it is given back.
-    cap_add: [&'static str; 6],
+    /// The capabilities it is given back, and those its shape adds.
+    cap_add: Vec<&'static str>,
+    /// The devices its shape adds.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    devices: Vec<String>,
     /// How many processes it may hold.
     pids_limit: u32,
 }
@@ -262,7 +267,21 @@ fn entry(plugin: &str, placed: &Placed) -> Entry {
         networks: placed.networks.iter().map(|name| literal(name)).collect(),
         security_opt: SECURITY,
         cap_drop: DROPPED,
-        cap_add: KEPT,
+        cap_add: KEPT
+            .into_iter()
+            .chain(
+                placed
+                    .shape
+                    .iter()
+                    .flat_map(|shape| shape.grants().iter().copied()),
+            )
+            .collect(),
+        devices: placed
+            .shape
+            .iter()
+            .flat_map(|shape| shape.devices().iter())
+            .map(|device| format!("{device}:{device}"))
+            .collect(),
         pids_limit: PROCESSES,
     }
 }

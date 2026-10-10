@@ -559,6 +559,7 @@ fn plugin_filling(plugin: &str, service: &str, capability: &str) -> crate::plugi
             networks: Vec::new(),
             speaks: Vec::new(),
             fronts: None,
+            shape: None,
         }],
         provides: vec![capability.to_owned()],
         contributions: Vec::new(),

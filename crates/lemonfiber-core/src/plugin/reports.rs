@@ -77,6 +77,9 @@ pub struct Install {
     /// A recipe that did not hold ends the act with a problem carrying the same account,
     /// so this is the account of recipes that held.
     pub recipes_ran: Vec<super::running::Ran>,
+    /// Every service taking a privileged shape, with what it is given, each approved
+    /// apart from the offer.
+    pub taking: Vec<super::Taking>,
 }
 
 /// A capability that would have nothing filling it.

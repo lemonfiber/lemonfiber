@@ -293,7 +293,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `PLUGIN-23` | `NOT_AS_REVIEWED` | error | 1 | 500 | 0.17.0 | Raised when what the catalogue's origin served is not what the catalogue reviewed. |
 | `PLUGIN-24` | `SPELLED_ALIKE` | error | 1 | 400 | 0.17.0 | Raised when a plugin's service would be named, where lemonfiber keeps what a service holds, as another installed plugin's service already is. |
 | `PLUGIN-25` | `PLUGIN_OFFER_MOVED` | error | 1 | 400 | 0.17.0 | Raised when an install, an update or a removal answers an offer that was read against a plugin, a stack or a record that has since moved. |
-| `PLUGIN-26` | `UNAPPROVED` | error | 1 | 400 | 0.17.0 | Raised when a value a recipe would carry to a destination was not approved as itself, or an approval names a pair the recipe does not carry. |
+| `PLUGIN-26` | `UNAPPROVED` | error | 1 | 400 | 0.17.0 | Raised when a value a recipe would carry to a destination, or the egress guard's shape a service would take, was not approved as itself, or an approval names something the reading does not list. |
 | `PLUGIN-27` | `ANOTHER_PLUGIN` | error | 1 | 400 | 0.17.0 | Raised when the source an update names holds a different plugin from the one it was asked to update. |
 | `PLUGIN-28` | `OCCUPIED` | error | 1 | 400 | 0.17.0 | Raised when a plugin's service would take a name, a port or a label something already on this machine holds: a service of the stack or of the operator's overlay, another plugin's port, or a site in the proxy's live configuration. |
 | `PLUGIN-29` | `CATALOGUE_REPLACED` | error | 1 | 500 | 0.17.0 | Raised when the catalogue's index verifies and is older than the newest one this machine has verified. |

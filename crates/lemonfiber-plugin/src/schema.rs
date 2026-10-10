@@ -231,6 +231,63 @@ pub struct Service {
     /// against. Required where `speaks` is.
     #[serde(default)]
     pub fronts: Option<String>,
+    /// The one privileged shape lemonfiber writes for this service, where it is the
+    /// upstream an adapter of the same plugin fronts and that adapter speaks
+    /// `network.egress-guard`.
+    #[serde(default)]
+    pub shape: Option<Shape>,
+}
+
+/// A privileged shape lemonfiber writes for a plugin's service.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Deserialize, serde::Serialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
+#[schemars(rename = "PluginShape")]
+pub enum Shape {
+    /// The `NET_ADMIN` capability and the `/dev/net/tun` device, added to the entry
+    /// every plugin's service gets.
+    EgressGuard,
+}
+
+impl Shape {
+    /// The name a manifest and an approval give the shape.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::EgressGuard => "egress-guard",
+        }
+    }
+
+    /// The kernel capabilities the shape adds.
+    #[must_use]
+    pub const fn grants(self) -> &'static [&'static str] {
+        match self {
+            Self::EgressGuard => &[lemonfiber_manifest::GATEWAY_GRANT],
+        }
+    }
+
+    /// The devices the shape adds.
+    #[must_use]
+    pub const fn devices(self) -> &'static [&'static str] {
+        match self {
+            Self::EgressGuard => &[lemonfiber_manifest::TUNNEL_DEVICE],
+        }
+    }
+
+    /// The capability whose adapter the service taking the shape has to be fronted by.
+    #[must_use]
+    pub const fn fronted_by(self) -> &'static str {
+        match self {
+            Self::EgressGuard => crate::vocabulary::EGRESS_GUARD,
+        }
+    }
+
+    /// What approving this shape for `service` is written as.
+    #[must_use]
+    pub fn approval(self, service: &str) -> String {
+        format!("{}@{service}", self.name())
+    }
 }
 
 /// Where a service's own configuration directory lands when it names nowhere.

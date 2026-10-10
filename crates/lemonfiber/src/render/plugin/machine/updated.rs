@@ -32,6 +32,7 @@ pub(super) fn updated(one: &Update) -> Lines {
     ));
     lines.extend(super::changes(&one.install.changes, acted));
     lines.extend(super::answering::recipes(&one.install.would.recipes));
+    lines.extend(super::answering::taking(&one.install.taking, acted));
     lines.extend(super::proving(
         &one.install.proofs,
         one.install.against,

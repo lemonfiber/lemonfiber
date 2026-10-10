@@ -95,6 +95,17 @@
       "description": "The service's id, which is the name its container is written under.",
       "type": "string"
     },
+    "shape": {
+      "description": "The privileged shape lemonfiber writes for it, where it took one.",
+      "anyOf": [
+        {
+          "$ref": "PluginShape.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "speaks": {
       "description": "Each capability contract it answers as an adapter, as `capability@major`.",
       "type": "array",

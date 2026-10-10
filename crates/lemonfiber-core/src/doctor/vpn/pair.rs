@@ -12,10 +12,7 @@
 
 use lemonfiber_manifest::{Manifest, Protocol};
 
-/// The kernel capability a VPN gateway needs to route the traffic of the containers
-/// sharing its network, and so the mark by which one is recognised — the unit is
-/// what the manifest grants it, not the container's name.
-pub(crate) const GATEWAY_GRANT: &str = "NET_ADMIN";
+pub(crate) use lemonfiber_manifest::GATEWAY_GRANT;
 
 /// The two containers the check compares: the tunnel and the client contained
 /// by it.

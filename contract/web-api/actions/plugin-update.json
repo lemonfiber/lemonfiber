@@ -38,7 +38,7 @@
       "name": "approved",
       "type": {
         "default": [],
-        "description": "Every value a recipe would carry elsewhere that is approved, as `value@destination`\nexactly as the reading lists it.",
+        "description": "Every value a recipe would carry elsewhere that is approved, as `value@destination`,\nand every privileged shape, as `shape@service`, exactly as the reading lists them.",
         "items": {
           "type": "string"
         },

@@ -18,7 +18,7 @@ use std::collections::BTreeMap;
 
 use crate::error::codes::plugin::{PLUGIN_OFFER_MOVED, UNAPPROVED};
 use crate::error::{Problem, Remedy, State};
-use crate::plugin::{Changing, Installed};
+use crate::plugin::{Changing, Installed, Taking};
 use crate::wiring::Contest;
 
 use super::super::Ctx;
@@ -56,7 +56,8 @@ pub(super) const PROVING: [&str; 2] = ["the plugin it proves", "what is kept aga
 pub struct Consent {
     /// The offer being answered, as its reading named it. Nothing is the reading itself.
     pub agreement: Option<String>,
-    /// Every value a recipe would carry elsewhere that was approved, as `value@to`.
+    /// Every value a recipe would carry elsewhere that was approved, as `value@to`, and
+    /// every privileged shape, as `shape@service`.
     pub approved: Vec<String>,
     /// Every value the operator supplied for a recipe to bring in, by the input's name.
     pub inputs: Inputs,
@@ -177,15 +178,15 @@ pub(super) fn stopping(plugin: &Installed) -> Vec<String> {
 /// yes to this reading.
 ///
 /// No offer is the reading, and acts on nothing. An offer is checked part by part and
-/// the approvals beside it pair by pair, on a rehearsal as on the real run, so a
+/// the approvals beside it one by one, on a rehearsal as on the real run, so a
 /// rehearsal answering an offer says what the real run would say to it; and only the
 /// real run acts.
 ///
 /// # Errors
 ///
 /// Where the offer names a reading that has since moved, naming each part that did;
-/// and where a value the recipes would carry elsewhere was not approved, or an approval
-/// names a pair they do not carry.
+/// and where something the reading lists was not approved, or an approval names
+/// something it does not list.
 pub(super) fn acting(
     ctx: &Ctx,
     consent: &Consent,
@@ -217,6 +218,25 @@ pub(super) fn acting(
         return Err(Box::new(approves_nothing(plugin, stray)));
     }
     Ok(!ctx.dry_run)
+}
+
+/// Whether this run acts on an install's or an update's reading, refused as [`acting`]
+/// refuses, and every service that reading has taking a privileged shape.
+///
+/// # Errors
+///
+/// As [`acting`], over every approval the reading lists.
+pub(super) fn answered(
+    ctx: &Ctx,
+    consent: &Consent,
+    would: &Installed,
+    standing: &str,
+    parts: &[&str],
+) -> Result<(bool, Vec<Taking>), Box<Problem>> {
+    let taking = crate::plugin::taking(would);
+    let asked = crate::plugin::asked(would, &taking);
+    let acts = acting(ctx, consent, &would.plugin, standing, parts, &asked)?;
+    Ok((acts, taking))
 }
 
 /// The plugin as an operator reads it, sealed: the bytes of its manifest as they were
@@ -257,31 +277,33 @@ fn offer_moved(plugin: &str, moved: &[&str], standing: &str) -> Problem {
     .in_state(State::Guided)
 }
 
-/// A value a recipe would carry elsewhere that nobody approved.
+/// What the reading lists as approved one by one that nobody approved.
 fn unapproved(plugin: &str, missing: &[&str]) -> Problem {
     Problem::new(
         UNAPPROVED,
-        format!("{plugin} would send values elsewhere that were not approved"),
-        "Nothing was changed. A value a recipe would carry to another host is agreed to as \
-         itself, apart from the plugin, and these were not.",
+        format!("{plugin} asks for approvals it was not given"),
+        "Nothing was changed. A value a recipe would carry to another host, and a privileged \
+         shape a service would take, are each agreed to as themselves, apart from the plugin, \
+         and these were not.",
         Remedy::new("Approve each one the reading lists, by name, with the offer")
             .with_detail(missing.join(", ")),
     )
     .in_state(State::Guided)
 }
 
-/// An approval naming a pair the recipes do not carry, said through the sanitiser
+/// An approval naming something the reading does not list, said through the sanitiser
 /// because it is the asker's own words rather than the reading's.
 fn approves_nothing(plugin: &str, stray: &str) -> Problem {
     Problem::new(
         UNAPPROVED,
         format!(
-            "{} is not something {plugin} would send",
+            "{} is not something {plugin} asks to be approved",
             crate::text::plain(stray)
         ),
-        "Nothing was changed. An approval names one value and one destination the reading \
-         lists, and one naming anything else was given for a different reading.",
-        Remedy::new("Read it again, and approve only the pairs it lists"),
+        "Nothing was changed. An approval names one value and one destination, or one shape \
+         and the service taking it, as the reading lists them, and one naming anything else \
+         was given for a different reading.",
+        Remedy::new("Read it again, and approve only what it lists"),
     )
     .in_state(State::Guided)
 }

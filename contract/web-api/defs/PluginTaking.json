@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One service taking a privileged shape, as the reading states it.",
+  "type": "object",
+  "properties": {
+    "approval": {
+      "description": "What approving it is written as, apart from the offer.",
+      "type": "string"
+    },
+    "devices": {
+      "description": "The devices it is given.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "grants": {
+      "description": "The kernel capabilities it is given.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "service": {
+      "description": "The service taking it.",
+      "type": "string"
+    },
+    "shape": {
+      "description": "The shape it takes.",
+      "$ref": "PluginShape.json"
+    }
+  },
+  "required": [
+    "service",
+    "shape",
+    "grants",
+    "devices",
+    "approval"
+  ]
+}

@@ -64,7 +64,8 @@ pub enum PluginCommand {
     /// account of it, writes nothing, and prints a name for that offer; answering with
     /// that name is the yes. The source is read again first, and an answer given for a
     /// different reading is refused, naming what moved. Every value a recipe would send
-    /// to another host is listed, and each is approved as itself with `--approve`.
+    /// to another host, and the egress guard's shape a service would take, is listed,
+    /// and each is approved as itself with `--approve`.
     /// `--dry-run` answers an offer the same way and writes nothing either.
     Install {
         /// The plugin's source: its name in the catalogue, its directory, the
@@ -74,8 +75,8 @@ pub enum PluginCommand {
         /// The offer being answered, as the run that made it printed it.
         #[arg(long, value_name = "NAME")]
         offer: Option<String>,
-        /// A value a recipe would send elsewhere, approved as itself, as the reading
-        /// lists it. Once for each.
+        /// A value a recipe would send elsewhere, or the egress guard's shape a service
+        /// would take, approved as itself, as the reading lists it. Once for each.
         #[arg(long = "approve", value_name = "VALUE@DESTINATION")]
         approved: Vec<String>,
         /// A value a recipe asks for, written as its name, `=`, and the value. Once for
@@ -157,8 +158,8 @@ pub enum PluginCommand {
     ///
     /// Named on its own it says what would go back, what the new version would write and
     /// prove, what would stop meanwhile and what a recipe of the new version would send
-    /// where, touches nothing, and prints a name for that offer; answering with that
-    /// name, and approving each value with `--approve`, is the yes.
+    /// where and what shape it would take, touches nothing, and prints a name for that
+    /// offer; answering with that name, and approving each with `--approve`, is the yes.
     Update {
         /// The plugin's id, as `lemonfiber plugin installed` lists it.
         plugin: String,
@@ -168,8 +169,8 @@ pub enum PluginCommand {
         /// The offer being answered, as the run that made it printed it.
         #[arg(long, value_name = "NAME")]
         offer: Option<String>,
-        /// A value a recipe would send elsewhere, approved as itself, as the reading
-        /// lists it. Once for each.
+        /// A value a recipe would send elsewhere, or the egress guard's shape a service
+        /// would take, approved as itself, as the reading lists it. Once for each.
         #[arg(long = "approve", value_name = "VALUE@DESTINATION")]
         approved: Vec<String>,
         /// A value a recipe asks for, written as its name, `=`, and the value. Once for

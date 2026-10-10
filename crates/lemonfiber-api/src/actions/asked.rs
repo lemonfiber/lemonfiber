@@ -133,8 +133,8 @@ pub struct Arguments {
     /// machine or the `plugin.toml` inside it, or a git repository, at a branch, tag or
     /// commit named after its last `@`.
     pub source: Option<String>,
-    /// Every value a recipe would carry elsewhere that is approved, as `value@destination`
-    /// exactly as the reading lists it.
+    /// Every value a recipe would carry elsewhere that is approved, as `value@destination`,
+    /// and every privileged shape, as `shape@service`, exactly as the reading lists them.
     pub approved: Vec<String>,
     /// Every value the operator supplies for an input a recipe asks for, as `name=value`.
     /// What follows the `=` may be a secret, and is never repeated back.

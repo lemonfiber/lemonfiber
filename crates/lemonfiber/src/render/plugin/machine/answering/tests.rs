@@ -1,7 +1,7 @@
-use lemonfiber_core::plugin::{Adapter, Owner, Pair, Recipe, Step};
+use lemonfiber_core::plugin::{Adapter, Owner, Pair, Recipe, Step, Taking};
 use lemonfiber_manifest::ApiKind;
 
-use super::{recipes, unanswered};
+use super::{recipes, taking, unanswered};
 
 /// A recipe with one call through lemonfiber's adapter, one to a host outside, and a
 /// value carried there.
@@ -170,4 +170,48 @@ fn a_reading_is_answered_with_its_offer_and_every_approval() {
 fn a_report_with_no_offer_says_only_that_nothing_changed() {
     let said = unanswered("update", None, &[], false).text();
     assert_eq!(said.trim(), "Nothing has been changed.");
+}
+
+fn gluetun() -> Taking {
+    Taking {
+        service: "gluetun".to_owned(),
+        shape: lemonfiber_core::plugin::Shape::EgressGuard,
+        grants: vec!["NET_ADMIN".to_owned()],
+        devices: vec!["/dev/net/tun".to_owned()],
+        approval: "egress-guard@gluetun".to_owned(),
+    }
+}
+
+#[test]
+fn a_shape_not_yet_given_is_said_with_what_it_gives_and_how_to_approve_it() {
+    let said = taking(&[gluetun()], false).text();
+    assert!(
+        said.contains("The privileged shape it would be given, approved apart from the offer:"),
+        "{said}"
+    );
+    assert!(
+        said.contains(
+            "gluetun takes egress-guard: the NET_ADMIN capability and the /dev/net/tun device \
+             — approve with --approve egress-guard@gluetun"
+        ),
+        "{said}"
+    );
+}
+
+#[test]
+fn a_shape_given_is_said_without_asking_for_it_again() {
+    let said = taking(&[gluetun()], true).text();
+    assert!(said.contains("The privileged shape it was given"), "{said}");
+    assert!(
+        said.ends_with(
+            "gluetun takes egress-guard: the NET_ADMIN capability and the /dev/net/tun device"
+        ),
+        "{said}"
+    );
+    assert!(!said.contains("--approve"), "{said}");
+}
+
+#[test]
+fn a_plugin_taking_no_shape_draws_nothing() {
+    assert!(taking(&[], false).text().is_empty());
 }
