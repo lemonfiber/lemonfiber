@@ -263,3 +263,21 @@ fn the_stacks_server_is_reached_through_the_adapter_and_paired_at_itself() {
         Some(lemonfiber_sidecar::gate::Kind::Jellyfin)
     );
 }
+
+/// An adapter naming a service outside its own plugin as the upstream it fronts is paired
+/// nowhere: the administrator's password is never pointed at another's service.
+#[test]
+fn a_contracted_server_fronting_another_plugins_service_is_unpaired() {
+    let mut installed = a_contracted_server(Some("plex"));
+    installed.services.retain(|placed| placed.service != "plex");
+    let mut stranger = a_placed("plex", &[], None, Some(32400));
+    stranger.native = Some("plex".to_owned());
+    let chosen = Chosen::read(Some("identity.source=plex-adapter"));
+    let fillers = shipped(
+        &[installed, an_installed("other", vec![stranger])],
+        &chosen,
+        |_| (),
+    );
+
+    assert_eq!(MediaServer::of(&fillers).and_then(|one| one.pairing), None);
+}

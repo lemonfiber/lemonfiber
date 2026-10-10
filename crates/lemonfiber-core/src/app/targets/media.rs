@@ -258,9 +258,13 @@ impl MediaServer {
 }
 
 /// Where the upstream the adapter `filler` fronts answers the services beside it, in the
-/// API it names: nothing where it names none or answers nowhere.
+/// API it names: nothing where it names none, answers nowhere, or is not a service of the
+/// adapter's own plugin, which the administrator's password handed to a request service
+/// to reach it would otherwise leave for.
 fn upstream_pairing(fillers: &Fillers, filler: &Filler) -> Option<Pairing> {
-    let upstream = fillers.service(filler.fronts.as_deref()?)?;
+    let upstream = fillers
+        .service(filler.fronts.as_deref()?)
+        .filter(|upstream| upstream.origin == filler.origin)?;
     Some(Pairing {
         protocol: Protocol(upstream.native.clone()?),
         at: upstream.address.clone()?,
