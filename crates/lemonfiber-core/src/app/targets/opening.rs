@@ -91,31 +91,6 @@ pub(crate) async fn open_servarrs(
     open
 }
 
-/// The request service, carrying its own key, which it answers as its owner.
-///
-/// **Its own key, never the media server's administrator password.** That password
-/// passes through the request service once, on the sign-in that sets it up, and every
-/// read and write after that carries the key the service wrote for itself. A key is a
-/// header on each request rather than a session left open on somebody else's service,
-/// so a pass that only says what it would do reads with it too.
-///
-/// **Takes the address rather than finding it**, so it always hands a client back and
-/// the caller keeps the one place that decides there is nobody to talk to. A service
-/// that has not written its key yet still gets a client: whatever is about to use it
-/// reports the refusal in its own words, and handing back nothing would leave the
-/// operator with no line at all about work that was attempted and failed.
-pub(crate) async fn seerr_as_owner(
-    ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
-    base: String,
-) -> Seerr {
-    let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-    match seerr_key(ctx, services, project.as_deref()).await {
-        Some(key) => Seerr::keyed(ctx.seams.http.clone(), base, "seerr", key),
-        None => Seerr::new(ctx.seams.http.clone(), base, "seerr"),
-    }
-}
-
 /// What reading the household's requests needs: the request service, asked as its
 /// owner, whose reads see every member's requests.
 pub(crate) struct HouseholdAccess {
@@ -154,6 +129,36 @@ pub(crate) async fn requests_from(ctx: &Ctx, fillers: &Fillers) -> Option<Househ
             Spoken::Not => Arc::new(owned_requests(ctx, filler).await?),
         };
     Some(HouseholdAccess { requests })
+}
+
+/// The service filling `request.intake` among `fillers`, as the ask for it settles or as
+/// the one service providing it.
+pub(crate) fn request_service(fillers: &Fillers) -> Option<&Filler> {
+    fillers
+        .filling(intake::CAPABILITY)
+        .map(|(filler, _)| filler)
+}
+
+/// The request service `filler` is, asked as its owner: over `request.intake` where it
+/// speaks it, otherwise the stack's own request service holding the key it wrote for
+/// itself, or holding none where it has not written one yet, so whatever uses it reports
+/// the refusal in its own words. Nothing where it speaks the contract and cannot be asked
+/// over it, or where [`bundled_requests`] refuses it.
+pub(crate) async fn requests_as_owner(
+    ctx: &Ctx,
+    filler: &Filler,
+) -> Option<Arc<dyn intake::Fills>> {
+    match spoken(ctx, filler, intake::CAPABILITY, intake::MAJOR).await {
+        Spoken::Over(adapter) => Some(Arc::new(intake::Adapter(adapter))),
+        Spoken::Unanswered => None,
+        Spoken::Not => match owned_requests(ctx, filler).await {
+            Some(owned) => Some(Arc::new(owned)),
+            None => bundled_requests(filler).map(|base| {
+                Arc::new(Seerr::new(ctx.seams.http.clone(), base, &filler.id))
+                    as Arc<dyn intake::Fills>
+            }),
+        },
+    }
 }
 
 /// Where the host reaches `filler` as the stack's own request service: nothing where it

@@ -61,23 +61,42 @@ fn service(
     }
 }
 
+/// The stack's fillers with `stack(gating)` as its services, written at `project`.
+fn fillers(gating: bool, project: Option<&std::path::Path>) -> crate::wiring::Fillers {
+    fillers_from(stack(gating), project)
+}
+
+/// The stack's fillers with `services` as its services, written at `project`.
+fn fillers_from(
+    services: Vec<lemonfiber_manifest::Service>,
+    project: Option<&std::path::Path>,
+) -> crate::wiring::Fillers {
+    crate::test_support::stack()
+        .manifest()
+        .map(|mut manifest| {
+            manifest.services = services;
+            crate::wiring::Fillers::of(&manifest, &[], &crate::wiring::Chosen::default(), project)
+        })
+        .unwrap_or_default()
+}
+
 /// Jellyfin, the request service, Sonarr and, where `gating`, the request gate.
 fn stack(gating: bool) -> Vec<lemonfiber_manifest::Service> {
-    let mut services = vec![
-        service(
-            "jellyfin",
-            "Jellyfin",
-            Some(lemonfiber_manifest::ApiKind::Jellyfin),
-            8096,
-        ),
-        service(
-            "seerr",
-            "Seerr",
-            Some(lemonfiber_manifest::ApiKind::Seerr),
-            5055,
-        ),
-        service("sonarr", "Sonarr", None, 8989),
-    ];
+    let mut jellyfin = service(
+        "jellyfin",
+        "Jellyfin",
+        Some(lemonfiber_manifest::ApiKind::Jellyfin),
+        8096,
+    );
+    jellyfin.provides = vec!["media.serve".to_owned(), "identity.source".to_owned()];
+    let mut requests = service(
+        "seerr",
+        "Seerr",
+        Some(lemonfiber_manifest::ApiKind::Seerr),
+        5055,
+    );
+    requests.provides = vec!["request.intake".to_owned()];
+    let mut services = vec![jellyfin, requests, service("sonarr", "Sonarr", None, 8989)];
     if gating {
         services.push(service("request-gate", "Request gate", None, PORT));
     }
@@ -248,7 +267,7 @@ async fn each_route_has_a_line_read_from_the_request_service() {
         true,
     );
 
-    let lines = held(&ctx, &stack(true), Some(&at)).await;
+    let lines = held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at)).await;
 
     let sonarr = named(&lines, SONARR);
     assert_eq!(sonarr.state, State::Active);
@@ -291,7 +310,7 @@ async fn a_token_not_handed_over_or_unread_says_so() {
         ),
     ]);
     let (ctx, at) = scene("tokens-unheld", true, &accepting(&[], &[]), http, true);
-    let lines = held(&ctx, &stack(true), Some(&at)).await;
+    let lines = held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at)).await;
     for name in [SONARR, JELLYFIN] {
         let line = named(&lines, name);
         assert_eq!(line.state, State::Absent, "{name}");
@@ -302,7 +321,7 @@ async fn a_token_not_handed_over_or_unread_says_so() {
 
     let silent = Fake::by_route_in_turn(vec![(Method::Get, "", vec![Answer::Silent])]);
     let (ctx, at) = scene("tokens-unread", true, &accepting(&[], &[]), silent, true);
-    let lines = held(&ctx, &stack(true), Some(&at)).await;
+    let lines = held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at)).await;
     assert_eq!(named(&lines, SONARR).state, State::Stale);
     assert_eq!(named(&lines, JELLYFIN).state, State::Stale);
 }
@@ -317,11 +336,21 @@ async fn without_the_gate_its_routes_or_a_stack_directory_there_are_no_lines() {
         http.clone(),
         true,
     );
-    assert!(held(&ctx, &stack(false), Some(&at)).await.is_empty());
-    assert!(held(&ctx, &stack(true), None).await.is_empty());
+    assert!(
+        held(&ctx, &stack(false), &fillers(false, Some(&at)), Some(&at))
+            .await
+            .is_empty()
+    );
+    assert!(held(&ctx, &stack(true), &fillers(true, None), None)
+        .await
+        .is_empty());
 
     let (ctx, at) = scene("tokens-unrouted", false, &accepting(&[], &[]), http, true);
-    assert!(held(&ctx, &stack(true), Some(&at)).await.is_empty());
+    assert!(
+        held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at))
+            .await
+            .is_empty()
+    );
 }
 
 #[tokio::test]
@@ -334,7 +363,10 @@ async fn a_token_is_never_printed() {
         http,
         true,
     );
-    let line = named(&held(&ctx, &stack(true), Some(&at)).await, SONARR);
+    let line = named(
+        &held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at)).await,
+        SONARR,
+    );
 
     let shown = super::super::revealing::reveal(&ctx, &line, true).await;
 
@@ -352,13 +384,16 @@ async fn an_arr_token_is_replaced_once_the_request_service_proves_it() {
         http.clone(),
         true,
     );
-    let line = named(&held(&ctx, &stack(true), Some(&at)).await, SONARR);
+    let line = named(
+        &held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at)).await,
+        SONARR,
+    );
 
     let rotation = super::super::rotating::rotate(
         &ctx,
         &line,
         &stack(true),
-        &crate::wiring::Fillers::default(),
+        &fillers(true, Some(&at)),
         Some(&at),
     )
     .await;
@@ -392,9 +427,19 @@ async fn an_arr_token_the_request_service_cannot_prove_is_taken_back() {
         http.clone(),
         true,
     );
-    let line = named(&held(&ctx, &stack(true), Some(&at)).await, SONARR);
+    let line = named(
+        &held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at)).await,
+        SONARR,
+    );
 
-    let rotation = rotate(&ctx, &line, &stack(true), Some(&at)).await;
+    let rotation = rotate(
+        &ctx,
+        &line,
+        &stack(true),
+        &fillers(true, Some(&at)),
+        Some(&at),
+    )
+    .await;
 
     assert_eq!(
         unproven(&rotation.settled),
@@ -426,9 +471,19 @@ async fn the_jellyfin_token_is_replaced_once_the_request_service_keeps_it() {
         http,
         true,
     );
-    let line = named(&held(&ctx, &stack(true), Some(&at)).await, JELLYFIN);
+    let line = named(
+        &held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at)).await,
+        JELLYFIN,
+    );
 
-    let rotation = rotate(&ctx, &line, &stack(true), Some(&at)).await;
+    let rotation = rotate(
+        &ctx,
+        &line,
+        &stack(true),
+        &fillers(true, Some(&at)),
+        Some(&at),
+    )
+    .await;
 
     assert!(
         matches!(rotation.settled, Settled::Replaced { .. }),
@@ -444,7 +499,14 @@ async fn the_jellyfin_token_is_replaced_once_the_request_service_keeps_it() {
         refused,
         true,
     );
-    let rotation = rotate(&ctx, &line, &stack(true), Some(&at)).await;
+    let rotation = rotate(
+        &ctx,
+        &line,
+        &stack(true),
+        &fillers(true, Some(&at)),
+        Some(&at),
+    )
+    .await;
     assert!(unproven(&rotation.settled).is_some_and(|said| said.contains("reach Jellyfin")));
     assert_eq!(accepted(&at), Some(accepting(&["held"], &["linked"])));
 }
@@ -459,20 +521,37 @@ async fn a_rotation_that_cannot_start_changes_nothing() {
         http.clone(),
         false,
     );
-    let line = named(&held(&ctx, &stack(true), Some(&at)).await, SONARR);
+    let line = named(
+        &held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at)).await,
+        SONARR,
+    );
 
-    let unrandom = rotate(&ctx, &line, &stack(true), Some(&at)).await;
+    let unrandom = rotate(
+        &ctx,
+        &line,
+        &stack(true),
+        &fillers(true, Some(&at)),
+        Some(&at),
+    )
+    .await;
     assert_eq!(
         unproven(&unrandom.settled),
         Some("no randomness was available to generate a token")
     );
-    let unrouted = rotate(&ctx, &line, &stack(true), None).await;
+    let unrouted = rotate(&ctx, &line, &stack(true), &fillers(true, None), None).await;
     assert!(
         unproven(&unrouted.settled).is_some_and(|said| said.ends_with("Run `lemonfiber seed`."))
     );
     let mut gone = line.clone();
     gone.setting = "request-gate/tokens.json#radarr".to_owned();
-    let unknown = rotate(&ctx, &gone, &stack(true), Some(&at)).await;
+    let unknown = rotate(
+        &ctx,
+        &gone,
+        &stack(true),
+        &fillers(true, Some(&at)),
+        Some(&at),
+    )
+    .await;
     assert!(unproven(&unknown.settled).is_some());
 
     let (mut rehearsing, _) = scene(
@@ -483,7 +562,14 @@ async fn a_rotation_that_cannot_start_changes_nothing() {
         true,
     );
     rehearsing.dry_run = true;
-    let rehearsed = rotate(&rehearsing, &line, &stack(true), Some(&at)).await;
+    let rehearsed = rotate(
+        &rehearsing,
+        &line,
+        &stack(true),
+        &fillers(true, Some(&at)),
+        Some(&at),
+    )
+    .await;
     assert!(
         matches!(rehearsed.settled, Settled::Rehearsed { .. }),
         "{rehearsed:?}"
@@ -543,7 +629,14 @@ async fn a_rotation_the_service_or_the_file_stops_is_unproven() {
             ctx
         };
 
-        let rotation = rotate(&ctx, &line, &stack(true), Some(&at)).await;
+        let rotation = rotate(
+            &ctx,
+            &line,
+            &stack(true),
+            &fillers(true, Some(&at)),
+            Some(&at),
+        )
+        .await;
 
         assert!(
             unproven(&rotation.settled).is_some(),
@@ -570,9 +663,19 @@ async fn an_old_token_the_gate_cannot_be_told_to_drop_is_said() {
         (tokens_file(&at), &both),
         (crate::app::gating::path(&at, File::Upstreams), &routes_text),
     ]));
-    let line = named(&held(&ctx, &stack(true), Some(&at)).await, SONARR);
+    let line = named(
+        &held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at)).await,
+        SONARR,
+    );
 
-    let rotation = rotate(&ctx, &line, &stack(true), Some(&at)).await;
+    let rotation = rotate(
+        &ctx,
+        &line,
+        &stack(true),
+        &fillers(true, Some(&at)),
+        Some(&at),
+    )
+    .await;
 
     assert!(
         unproven(&rotation.settled)
@@ -596,7 +699,13 @@ async fn a_route_for_a_service_the_stack_no_longer_names_is_called_by_its_route(
         .filter(|service| service.id != "sonarr")
         .collect();
 
-    let lines = held(&ctx, &without_sonarr, Some(&at)).await;
+    let lines = held(
+        &ctx,
+        &without_sonarr,
+        &fillers_from(without_sonarr.clone(), Some(&at)),
+        Some(&at),
+    )
+    .await;
 
     assert_eq!(
         named(&lines, "Request gate token for sonarr").state,
@@ -630,7 +739,14 @@ async fn a_request_service_that_stops_answering_mid_rotation_changes_nothing() {
         advisory: None,
     };
 
-    let rotation = rotate(&ctx, &line, &stack(true), Some(&at)).await;
+    let rotation = rotate(
+        &ctx,
+        &line,
+        &stack(true),
+        &fillers(true, Some(&at)),
+        Some(&at),
+    )
+    .await;
 
     assert!(unproven(&rotation.settled).is_some(), "{rotation:?}");
     assert_eq!(accepted(&at), Some(accepting(&["held"], &[])));

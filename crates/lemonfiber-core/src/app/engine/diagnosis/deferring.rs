@@ -41,6 +41,22 @@ pub(super) fn tunnel(
     })
 }
 
+/// Whether the people in the house will hear back about what they asked for, built when
+/// it runs, so the request service is asked over its contract where it speaks it.
+pub(super) fn telling(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> Deferred {
+    let (ctx, manifest) = (ctx.clone(), manifest.clone());
+    Deferred::new(Category::Services, CHECK_BUDGET, move || {
+        let (ctx, manifest) = (ctx.clone(), manifest.clone());
+        async move {
+            let fillers = crate::app::targets::fillers_here(&ctx, &manifest);
+            let (requests, recorded) = crate::seed::run::managed_telling(&ctx, &fillers).await;
+            Box::new(crate::doctor::telling::TellingCheck::new(
+                requests, recorded,
+            )) as Box<dyn Check>
+        }
+    })
+}
+
 /// What the accounts underneath the stack have left, built when it runs.
 pub(super) fn providing(
     ctx: &Ctx,

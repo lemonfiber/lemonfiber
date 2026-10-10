@@ -343,30 +343,29 @@ fn withheld_brought(
 }
 
 /// The request service to ask about the household's telling, and what lemonfiber
-/// last recorded setting it to.
+/// last recorded setting it to, under that service's id.
 ///
 /// Both or neither: a stack with no request service has nothing to ask, and a
 /// baseline that was never formed leaves the recorded value absent — which the check
 /// reads as nobody having set this rather than as a value to have drifted from.
-pub(crate) fn managed_telling(
+pub(crate) async fn managed_telling(
     ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
+    fillers: &crate::wiring::Fillers,
 ) -> (
     Option<std::sync::Arc<dyn crate::ports::service::Requests>>,
     Option<crate::baseline::Record>,
 ) {
-    let seerr = identity::seerr_service(services).map(|base| {
-        std::sync::Arc::new(crate::seerr::Seerr::new(
-            ctx.seams.http.clone(),
-            &base,
-            "seerr",
-        )) as std::sync::Arc<dyn crate::ports::service::Requests>
-    });
+    let Some(filler) = crate::app::targets::request_service(fillers) else {
+        return (None, None);
+    };
+    let requests = crate::app::targets::requests_as_owner(ctx, filler)
+        .await
+        .map(|requests| requests as std::sync::Arc<dyn crate::ports::service::Requests>);
     let recorded = match load_baseline(ctx) {
-        Loaded::Formed(baseline) => baseline.entry("seerr", crate::seed::TELLING).cloned(),
+        Loaded::Formed(baseline) => baseline.entry(&filler.id, crate::seed::TELLING).cloned(),
         Loaded::Fresh | Loaded::Lost => None,
     };
-    (seerr, recorded)
+    (requests, recorded)
 }
 
 /// The download-client wirings lemonfiber manages, as a caller that only reads them needs
