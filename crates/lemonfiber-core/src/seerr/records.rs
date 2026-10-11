@@ -63,8 +63,8 @@ pub(super) struct RequestRecord {
 
 /// The media a request asked for. It carries no title — Seerr looks those up from a
 /// metadata service rather than storing them — but it does carry the id Seerr finds the
-/// title by, the id the \*arr filing it knows it by, which is the exact join a name is
-/// found through, and, once the media server holds it, when it arrived there and the
+/// title by, the id the \*arr filing it knows it by (the exact join a library names it
+/// through), and, once the media server holds it, when it arrived there and the
 /// identifier it is held under.
 #[derive(Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
