@@ -219,3 +219,37 @@ fn a_missing_bundle_is_unread() {
         "{read:?}"
     );
 }
+
+#[test]
+fn a_catalogue_without_a_copies_directory_holds_none() {
+    let root = catalogue("bare", "schema = 1\nplugin = []\n", &[]);
+    let removed = std::fs::remove_dir_all(root.join(COPIES));
+    assert!(removed.is_ok(), "{removed:?}");
+    let read = read(&root);
+    assert!(matches!(read.as_deref(), Ok([])), "{read:?}");
+}
+
+#[test]
+fn a_copies_path_that_is_not_a_directory_is_unread() {
+    let root = catalogue("listless", "schema = 1\nplugin = []\n", &[]);
+    let replaced = std::fs::remove_dir_all(root.join(COPIES))
+        .and_then(|()| std::fs::write(root.join(COPIES), ""));
+    assert!(replaced.is_ok(), "{replaced:?}");
+    let read = read(&root);
+    assert!(
+        matches!(&read, Err(Refused::Unread { path, .. }) if path.ends_with(COPIES)),
+        "{read:?}"
+    );
+}
+
+#[test]
+fn a_copy_that_cannot_be_read_is_unread() {
+    let root = catalogue("unreadable", &pinning(&hex(COPY), &[]), &[]);
+    let made = std::fs::create_dir(root.join(COPIES).join("jellyfin.toml"));
+    assert!(made.is_ok(), "{made:?}");
+    let read = read(&root);
+    assert!(
+        matches!(&read, Err(Refused::Unread { path, .. }) if path.ends_with("jellyfin.toml")),
+        "{read:?}"
+    );
+}
