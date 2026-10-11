@@ -11,7 +11,7 @@ mod parts;
 mod rules;
 mod tree;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::path::Path;
 
@@ -149,15 +149,22 @@ pub enum Refused {
 ///
 /// # Errors
 ///
-/// [`Refused`] where a file cannot be read, where the bundle is not TOML of this shape,
-/// and where it breaks a rule: a schema this crate does not read, plugins out of order
-/// or named twice, a pin malformed, a copy missing, unpinned, naming another plugin or
-/// not matching its digests, or a stack table naming what no pinned plugin declares.
+/// [`Refused`] where a file cannot be read or is reached through a symbolic link, where a
+/// name is not UTF-8, where the bundle is not TOML of this shape, and where it breaks a
+/// rule: a schema this crate does not read, plugins out of order or named twice, a pin
+/// malformed, a copy missing, unpinned, naming another plugin, holding two paths that
+/// differ only in case or not matching its digests, or a stack table naming what no
+/// pinned plugin declares.
 pub fn read(root: &Path) -> Result<(Bundle, Vec<Held>), Refused> {
-    let text = std::fs::read_to_string(root.join(FILE)).map_err(|source| Refused::Unread {
-        path: root.join(FILE).display().to_string(),
-        source,
-    })?;
+    let linked: BTreeSet<String> = [FILE, COPIES]
+        .iter()
+        .filter_map(|relative| copies::linked(root, relative))
+        .map(|at| format!("{at} is a symbolic link, which nothing the bundle reads may be"))
+        .collect();
+    if !linked.is_empty() {
+        return Err(Refused::Rules(linked.into_iter().collect()));
+    }
+    let text = copies::text(&root.join(FILE))?;
     let bundle: Bundle = toml::from_str(&text)?;
     let copies = copies::read(&root.join(COPIES), bundle.schema)?;
     let mut broken = rules::broken(&bundle, &copies);

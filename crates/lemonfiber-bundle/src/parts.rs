@@ -72,6 +72,20 @@ fn copied(pin: &Pin, copy: Option<&Copy>, broken: &mut Vec<String>) -> Option<Pa
             "{id}/{link} is a symbolic link, which no copy may hold"
         ));
     }
+    let mut folded = BTreeMap::new();
+    for path in copy
+        .manifest
+        .iter()
+        .map(|_| MANIFEST)
+        .chain(copy.files.keys().map(String::as_str))
+    {
+        if let Some(earlier) = folded.insert(path.to_lowercase(), path) {
+            broken.push(format!(
+                "{id}/{earlier} and {id}/{path} differ only in case, which one file holds where \
+                 case is not told apart"
+            ));
+        }
+    }
     let Some(manifest) = &copy.manifest else {
         broken.push(format!("plugin {id} has no {id}/{MANIFEST}"));
         return None;

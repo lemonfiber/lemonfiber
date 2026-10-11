@@ -273,27 +273,6 @@ fn a_file_outside_the_tree_is_refused() {
     );
 }
 
-#[cfg(unix)]
-#[test]
-fn a_symbolic_link_in_a_copy_is_refused() {
-    let root = catalogue(
-        "linked",
-        &bundle(PART, &files(), &[], TABLES),
-        "sabnzbd",
-        PART,
-        &files(),
-    );
-    let linked = std::os::unix::fs::symlink(
-        "/etc/passwd",
-        root.join(COPIES).join("sabnzbd/config/sabnzbd/passwd"),
-    );
-    assert!(linked.is_ok(), "{linked:?}");
-    assert!(names(
-        &refused(&root),
-        &["sabnzbd/config/sabnzbd/passwd", "symbolic link"]
-    ));
-}
-
 #[test]
 fn starting_files_past_the_bound_are_refused() {
     let mut many = files();
@@ -530,100 +509,6 @@ fn schema_1_declares_no_stack_table_and_no_schema_2_field() {
 }
 
 #[test]
-fn a_pinned_part_without_its_copy_or_its_manifest_is_refused() {
-    let root = catalogue(
-        "uncopied",
-        &bundle(PART, &files(), &[], TABLES),
-        "nzbget",
-        PART,
-        &files(),
-    );
-    assert!(
-        names(&refused(&root), &["plugin sabnzbd has no copy at sabnzbd/"]),
-        "{:?}",
-        refused(&root)
-    );
-    let root = catalogue(
-        "unmanifested",
-        &bundle(PART, &files(), &[], TABLES),
-        "sabnzbd",
-        PART,
-        &files(),
-    );
-    let removed = std::fs::remove_file(root.join(COPIES).join("sabnzbd/plugin.toml"));
-    assert!(removed.is_ok(), "{removed:?}");
-    let said = refused(&root);
-    assert!(
-        names(&said, &["plugin sabnzbd has no sabnzbd/plugin.toml"]),
-        "{said:?}"
-    );
-}
-
-#[cfg(unix)]
-#[test]
-fn a_link_in_place_of_a_copy_is_refused_and_not_followed() {
-    let root = catalogue(
-        "relinked",
-        &bundle(PART, &files(), &[], TABLES),
-        "real",
-        PART,
-        &files(),
-    );
-    let linked = std::os::unix::fs::symlink("real", root.join(COPIES).join("sabnzbd"));
-    assert!(linked.is_ok(), "{linked:?}");
-    let said = refused(&root);
-    for words in [
-        &["sabnzbd/ is a symbolic link"][..],
-        &["plugin sabnzbd has no sabnzbd/plugin.toml"],
-        &["real is a copy the bundle pins no plugin for"],
-    ] {
-        assert!(names(&said, words), "{words:?} in {said:?}");
-    }
-}
-
-#[test]
-fn a_manifest_that_is_not_utf_8_is_unread() {
-    let root = catalogue(
-        "garbled",
-        &bundle(PART, &files(), &[], TABLES),
-        "sabnzbd",
-        PART,
-        &files(),
-    );
-    let written = std::fs::write(root.join(COPIES).join("sabnzbd/plugin.toml"), [0xff, 0xfe]);
-    assert!(written.is_ok(), "{written:?}");
-    let path = unread(&root);
-    assert!(path.ends_with("sabnzbd/plugin.toml"), "{path}");
-}
-
-#[cfg(unix)]
-#[test]
-fn a_directory_or_file_in_a_copy_that_cannot_be_read_is_unread() {
-    use std::os::unix::fs::PermissionsExt as _;
-
-    let root = catalogue(
-        "shut",
-        &bundle(PART, &files(), &[], TABLES),
-        "sabnzbd",
-        PART,
-        &files(),
-    );
-    let copy = root.join(COPIES).join("sabnzbd");
-    for (shut, open) in [
-        ("config/sabnzbd", 0o700),
-        ("config/sabnzbd/sabnzbd.ini", 0o600),
-    ] {
-        let at = copy.join(shut);
-        let closed = std::fs::set_permissions(&at, std::fs::Permissions::from_mode(0o000));
-        assert!(closed.is_ok(), "{closed:?}");
-        let path = unread(&root);
-        let opened = std::fs::set_permissions(&at, std::fs::Permissions::from_mode(open));
-        assert!(opened.is_ok(), "{opened:?}");
-        assert!(path.ends_with(shut), "{shut}: {path}");
-    }
-}
-
-#[test]
 fn a_manifest_that_is_not_toml_declares_nothing() {
     let said = broken("untoml", "schema_version = [\n", &files(), &[], TABLES);
     for words in [
@@ -756,3 +641,5 @@ fn a_choice_needs_an_ask_made_once_by_a_known_asker() {
         );
     }
 }
+
+mod reading;

@@ -18,5 +18,9 @@ serde = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
 
+[target.'cfg(unix)'.dependencies]
+# The flags that refuse to read a copy through a link or to wait on a pipe.
+libc = { workspace = true }
+
 [lints]
 workspace = true
