@@ -25,7 +25,7 @@ fn a_line_break_in_a_configuration_directory_is_refused() {
         &format!("config_path = {}", toml("/config\n      - /:/host")),
     );
     assert!(
-        names(&said, &["komga.config_path", "plain absolute directory"]),
+        names(&said, &["komga.config_path", "plain absolute path"]),
         "got: {said:?}"
     );
 }

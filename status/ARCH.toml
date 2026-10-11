@@ -146,4 +146,12 @@ requirement = [
   { id = "ARCH-R218", state = "done", evidence = ["crates/lemonfiber-core/src/model/invitation.rs", "contract/web-api/defs/Invitation.json", "crates/lemonfiber-core/src/app/invite/joining.rs"] },
   { id = "ARCH-R219", state = "done", evidence = ["crates/lemonfiber-api/src/admission.rs", "crates/lemonfiber-api/src/refusal.rs", "crates/lemonfiber-error/src/codes/admit.rs", "contract/web-api/bodies/session.json", "crates/lemonfiber-api/tests/integration/what_a_claim_opens.rs"] },
   { id = "ARCH-R220", state = "done", evidence = ["crates/lemonfiber-core/src/model/invitation.rs", "crates/lemonfiber/src/render/qr.rs"] },
+  { id = "ARCH-R225", state = "partial", evidence = ["crates/lemonfiber-manifest/src/container.rs", "crates/lemonfiber-manifest/src/container/tests.rs", "crates/lemonfiber-plugin/src/schema.rs", "crates/lemonfiber-manifest/src/schema/contained.rs"] },
+  { id = "ARCH-R227", state = "partial", evidence = ["crates/lemonfiber-manifest/src/container.rs", "crates/lemonfiber-manifest/src/container/tests.rs"] },
+  { id = "ARCH-R229", state = "partial", evidence = ["crates/lemonfiber-manifest/src/container.rs", "crates/lemonfiber-manifest/src/container/tests.rs"] },
+  { id = "ARCH-R231", state = "partial", evidence = ["crates/lemonfiber-manifest/src/container.rs", "crates/lemonfiber-manifest/src/container/tests.rs"] },
+  { id = "ARCH-R232", state = "partial", evidence = ["crates/lemonfiber-manifest/src/container.rs", "crates/lemonfiber-manifest/src/container/tests.rs"] },
+  { id = "ARCH-R233", state = "partial", evidence = ["crates/lemonfiber-manifest/src/container.rs", "crates/lemonfiber-manifest/src/container/tests.rs"] },
+  { id = "ARCH-R236", state = "partial", evidence = ["crates/lemonfiber-manifest/src/container.rs", "crates/lemonfiber-manifest/src/container/tests.rs"] },
+  { id = "ARCH-R237", state = "partial", evidence = ["crates/lemonfiber-manifest/src/container.rs", "crates/lemonfiber-manifest/src/container/tests.rs", "crates/lemonfiber-plugin/src/refusing/shaping.rs", "crates/lemonfiber-manifest/src/validate.rs"] },
 ]

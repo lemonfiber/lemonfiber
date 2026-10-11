@@ -5,8 +5,11 @@
 //! lemonfiber silently declines to wire up, because a typo that degrades into
 //! "no API integration" is indistinguishable from meaning it.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
+use crate::container::{Mount, Network, Posture, Publish, Shape, UserMode, Value};
 use crate::recognising::unrecognised;
 use crate::{is_compatible, Failure, SUPPORTED_SCHEMA_VERSIONS};
 
@@ -294,37 +297,43 @@ pub struct Service {
     /// the sum rather than counted as costing nothing.
     #[serde(default)]
     pub memory_mib: Option<u32>,
+    /// The most memory the container may hold, in MiB.
+    #[serde(default)]
+    pub mem_limit_mib: Option<u32>,
+    /// Each further port it publishes on its tier.
+    #[serde(default)]
+    pub publish: Vec<Publish>,
+    /// Whether it takes the data mount.
+    #[serde(default)]
+    pub takes_data: bool,
+    /// Where its configuration directory lands inside the container.
+    #[serde(default)]
+    pub config_path: Option<String>,
+    /// Whether its configuration directory is mounted read-only.
+    #[serde(default)]
+    pub config_ro: bool,
+    /// Each further path mounted from inside its own configuration directory.
+    #[serde(default)]
+    pub mount: Vec<Mount>,
+    /// Absolute paths given scratch space in memory.
+    #[serde(default)]
+    pub tmpfs: Vec<String>,
+    /// Its environment, each variable one of four typed kinds of value.
+    #[serde(default)]
+    pub env: BTreeMap<String, Value>,
+    /// Who the container runs as.
+    #[serde(default)]
+    pub user_mode: Option<UserMode>,
+    /// How tightly the container is held.
+    #[serde(default)]
+    pub posture: Posture,
+    /// The capability whose filler's network it runs inside.
+    #[serde(default)]
+    pub network: Option<Network>,
+    /// Its privileged shape.
+    #[serde(default)]
+    pub shape: Option<Shape>,
 }
-
-/// One `[[service.claim]]` table, exactly as the stack wrote it.
-///
-/// Compared as TOML values compare. `Eq` is claimed although a TOML float is not
-/// reflexive for `NaN`: a claim carries statuses, paths and names, and a `NaN` in one
-/// is a claim the plugin contract's reader refuses before anything compares it.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(transparent)]
-pub struct Claimed(pub toml::Table);
-
-impl Eq for Claimed {}
-
-/// Described as an open table here, because a claim is the plugin contract's shape and
-/// this crate cannot reach that contract's types. What publishes the stack's schema
-/// sees both, and puts the plugin manifest's own definition of a claim in its place.
-impl schemars::JsonSchema for Claimed {
-    fn schema_name() -> std::borrow::Cow<'static, str> {
-        CLAIM.into()
-    }
-
-    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
-        schemars::json_schema!({
-            "type": "object",
-            "description": "A claim, written as the plugin manifest writes one."
-        })
-    }
-}
-
-/// The name a claim's definition is published under in the stack's schema.
-pub const CLAIM: &str = "StackClaim";
 
 impl Service {
     /// The name the engine files this service's image under: `image@digest` where the
@@ -505,7 +514,10 @@ fn yes() -> bool {
 }
 
 mod api;
+mod claimed;
+mod contained;
 #[cfg(test)]
 mod tests;
 
 pub use api::{Api, ApiKind, KeySource};
+pub use claimed::{Claimed, CLAIM};

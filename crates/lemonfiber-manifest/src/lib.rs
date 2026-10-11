@@ -9,6 +9,7 @@
 
 pub mod assembly;
 mod binary;
+pub mod container;
 mod date;
 mod error;
 pub mod names;

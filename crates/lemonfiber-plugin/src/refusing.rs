@@ -146,9 +146,6 @@ fn declaring(plugin: &Plugin, found: &mut Vec<Violation>) {
 /// The prefix a digest carries, and the length of what follows it.
 const DIGEST: (&str, usize) = ("sha256:", 64);
 
-/// The mount every plugin's service gets, which its own directory may not be inside.
-const DATA: &str = "/data";
-
 /// What runs, and whether what runs is fixed.
 ///
 /// At least one, because a plugin declaring none would leave the rest of the manifest
@@ -183,7 +180,7 @@ fn running(manifest: &Manifest, found: &mut Vec<Violation>) {
             });
         }
         pinned(service, found);
-        placed(service, found);
+        contained(manifest, service, found);
         adapting::adapted(service, found);
         speaking::spoken(service, &manifest.services, found);
         shaping::shaped(service, &manifest.services, found);
@@ -247,39 +244,21 @@ fn has_tag(last: &str) -> bool {
     last.contains(':')
 }
 
-/// Where the service's one configuration directory lands inside its container.
-///
-/// The number of mounts and their sources are lemonfiber's, and that is what makes what
-/// a plugin can reach answerable from the format. Only the target is the plugin's, and
-/// it is checked: a target inside the library would be a second mount over the
-/// operator's media wearing a different name.
-fn placed(service: &Service, found: &mut Vec<Violation>) {
-    let Some(path) = &service.config_path else {
-        return;
-    };
-    let at = format!("service {}.config_path", service.id);
-    let inside_data = path == DATA || path.starts_with(&format!("{DATA}/"));
-    if !path.starts_with('/') || path == "/" || path.contains("..") || !carried::is_directory(path)
-    {
-        found.push(Violation {
-            location: at,
-            message: format!(
-                "{path} is not one plain absolute directory; what is permitted is a single \
-                 absolute path that is not the root, with no \"..\", written in letters, digits \
-                 and \"._/-\" alone"
-            ),
-        });
-        return;
-    }
-    if inside_data {
-        found.push(Violation {
-            location: at,
-            message: format!(
-                "{path} is inside {DATA}, which is the library mount; a configuration directory \
-                 there would be a second mount over the operator's media under another name"
-            ),
-        });
-    }
+/// Every rule the service's container fields break, as the one model holds every
+/// service's.
+fn contained(manifest: &Manifest, service: &Service, found: &mut Vec<Violation>) {
+    let secrets: Vec<&str> = manifest
+        .secrets
+        .iter()
+        .map(|secret| secret.id.as_str())
+        .collect();
+    found.extend(
+        service
+            .container(&manifest.plugin.id, &secrets)
+            .broken()
+            .into_iter()
+            .map(|(location, message)| Violation { location, message }),
+    );
 }
 
 /// What the plugin needs of lemonfiber, against what this build has.

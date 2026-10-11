@@ -675,3 +675,15 @@ fn a_refusal_carries_nowhere_to_say_it_is_only_advisory() {
              reported and proceeded past"
     );
 }
+
+#[test]
+fn a_container_field_breaking_the_model_is_refused_through_the_reader() {
+    let said = without(
+        "config_path = \"/config\"",
+        "config_path = \"/config\"\n\n[service.env]\nTZ = \"UTC\"",
+    );
+    assert!(
+        names(&said, &["service komga.env.TZ", "lemonfiber's to write"]),
+        "{said:?}"
+    );
+}
