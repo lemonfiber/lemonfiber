@@ -1,5 +1,5 @@
-use crate::refusing::tests::{names, said, INSTALLABLE};
-use crate::Manifest;
+use crate::refusing::installing::tests::uninstallable;
+use crate::refusing::tests::{names, said, with, INSTALLABLE};
 
 const ADAPTER: &str = "komga";
 
@@ -15,14 +15,6 @@ criticality = "important"
 "#;
 
 const ASKED: &str = "shape = \"egress-guard\"\n";
-
-/// The fixture's service with `added` after its configuration directory.
-fn with(added: &str) -> String {
-    INSTALLABLE.replace(
-        "config_path = \"/config\"\n",
-        &format!("config_path = \"/config\"\n{added}"),
-    )
-}
 
 /// The fixture's service as an adapter speaking `speaks` in front of an upstream of its
 /// own, with `upstream` added to the upstream's table and `adapter` to the adapter's.
@@ -170,19 +162,6 @@ fn critical_with_the_egress_guard_s_shape_is_read() {
     assert!(!names(&said, &[".criticality"]), "{said:?}");
 }
 
-/// What an install or an update refuses of `text` beyond what reading it does.
-fn uninstallable(text: &str) -> Vec<String> {
-    Manifest::from_toml(text).map_or_else(
-        |refused| vec![refused.to_string()],
-        |manifest| {
-            crate::uninstallable(&manifest)
-                .iter()
-                .map(ToString::to_string)
-                .collect()
-        },
-    )
-}
-
 #[test]
 fn a_plugin_s_one_egress_guard_is_refused_at_install() {
     let refused = uninstallable(&guarding(""));
@@ -210,20 +189,4 @@ fn an_egress_guard_an_adapter_fronts_is_installable() {
     );
     let refused = uninstallable(&text);
     assert!(!names(&refused, &[".shape"]), "{refused:?}");
-}
-
-#[test]
-fn a_service_naming_an_in_process_adapter_is_refused_at_install() {
-    let refused = uninstallable(&with(
-        "api = { kind = \"servarr\", key_source = \"config-xml\", path = \"/config/config.xml\", version = 3 }\nlistens = 8989\n",
-    ));
-    assert!(
-        names(&refused, &["service komga.api", "in-process adapter"]),
-        "{refused:?}"
-    );
-}
-
-#[test]
-fn a_plugin_with_neither_is_installable() {
-    assert!(uninstallable(INSTALLABLE).is_empty());
 }

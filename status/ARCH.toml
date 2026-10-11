@@ -164,6 +164,6 @@ requirement = [
   { id = "ARCH-R243", state = "partial", evidence = ["crates/lemonfiber-core/src/topology.rs", "crates/lemonfiber-core/src/topology/tests.rs"] },
   { id = "ARCH-R244", state = "partial", evidence = ["crates/lemonfiber-core/src/topology.rs", "crates/lemonfiber-core/src/topology/tests.rs"] },
   { id = "ARCH-R246", state = "partial", evidence = ["crates/lemonfiber-manifest/src/validate.rs", "crates/lemonfiber-manifest/src/validate/tests.rs"] },
-  { id = "ARCH-R270", state = "partial", evidence = ["crates/lemonfiber-plugin/src/refusing.rs", "crates/lemonfiber-plugin/src/refusing/tests.rs", "crates/lemonfiber-core/src/outbound/theirs.rs", "crates/lemonfiber-core/src/outbound/theirs/tests.rs"] },
-  { id = "ARCH-R272", state = "partial", evidence = ["crates/lemonfiber-plugin/src/refusing.rs", "crates/lemonfiber-plugin/src/refusing/shaping/tests.rs", "crates/lemonfiber-core/src/app/plugins/installing.rs"] },
+  { id = "ARCH-R270", state = "partial", evidence = ["crates/lemonfiber-plugin/src/refusing/leaving.rs", "crates/lemonfiber-plugin/src/refusing/leaving/tests.rs", "crates/lemonfiber-core/src/outbound/theirs.rs", "crates/lemonfiber-core/src/outbound/theirs/tests.rs"] },
+  { id = "ARCH-R272", state = "partial", evidence = ["crates/lemonfiber-plugin/src/refusing/installing.rs", "crates/lemonfiber-plugin/src/refusing/installing/tests.rs", "crates/lemonfiber-core/src/app/plugins/installing.rs"] },
 ]
