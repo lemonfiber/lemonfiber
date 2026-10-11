@@ -160,18 +160,6 @@ pub fn is_digest(text: &str) -> bool {
     })
 }
 
-/// Whether `text` is written only in what a configuration directory may carry:
-/// letters, digits, `.`, `_`, `/` and `-`.
-///
-/// Whether it is absolute, the root, or inside the library are the reader's other
-/// rules; this is only the alphabet, which is what keeps it one value in the file it
-/// is written into.
-#[must_use]
-pub fn is_directory(text: &str) -> bool {
-    text.chars()
-        .all(|letter| letter.is_ascii_alphanumeric() || matches!(letter, '.' | '_' | '/' | '-'))
-}
-
 /// Whether `text` is a route on the service it is sent to, and nothing more.
 ///
 /// It is appended to the address lemonfiber resolved for that service, so it has to

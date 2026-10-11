@@ -2,7 +2,7 @@
 // the reader with that file's own punctuation in it. What is asserted is the
 // refusal and where it is placed: a manifest carrying any of these is one this
 // build does not act on, so nothing below reaches a writer.
-use super::{is_directory, is_label, is_reference, is_route, substituted};
+use super::{is_label, is_reference, is_route, substituted};
 use crate::refusing::tests::{names, without};
 
 /// A manifest this build would act on, with its one service renamed.
@@ -270,14 +270,6 @@ fn a_reference_is_what_a_registry_reads_as_a_name() {
         &format!("a/{}", "b".repeat(255)),
     ] {
         assert!(!is_reference(bad), "{bad}");
-    }
-}
-
-#[test]
-fn a_directory_is_written_in_letters_digits_and_four_marks() {
-    assert!(is_directory("/app/data-1/x_y.z"));
-    for bad in ["/a b", "/a:b", "/a$b", "/a\nb", "/a{b"] {
-        assert!(!is_directory(bad), "{bad:?}");
     }
 }
 

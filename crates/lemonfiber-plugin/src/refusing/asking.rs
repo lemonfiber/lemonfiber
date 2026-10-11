@@ -2,6 +2,8 @@
 
 use std::collections::BTreeSet;
 
+use lemonfiber_manifest::container::Value;
+
 use crate::schema::Manifest;
 use crate::{claiming, vocabulary, Violation};
 
@@ -47,6 +49,19 @@ pub(super) fn asked(manifest: &Manifest, found: &mut Vec<Violation>) {
                     service.id, ask.capability
                 ),
             });
+        }
+        if ask.each {
+            let held = service.env.iter().filter(
+                |(_, value)| matches!(value, Value::Url(url) if url.url_of == ask.capability),
+            );
+            found.extend(held.map(|(name, _)| Violation {
+                location: format!("service {}.env.{name}", service.id),
+                message: format!(
+                    "asks for the address of {}, which {} asks each of; a variable holds one \
+                     address",
+                    ask.capability, service.id
+                ),
+            }));
         }
     }
 }

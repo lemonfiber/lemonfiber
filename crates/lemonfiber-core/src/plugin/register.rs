@@ -102,8 +102,9 @@ impl Register {
     /// A record that fails is one this build did not write, and it is refused rather
     /// than acted on.
     fn as_written(&self) -> Result<(), Unreadable> {
+        use lemonfiber_manifest::container::is_plain;
         use lemonfiber_plugin::refusing::carried::{
-            is_digest, is_directory, is_label, is_plugin_id, is_reference, substituted,
+            is_digest, is_label, is_plugin_id, is_reference, substituted,
         };
         let refused = |what: String| {
             Err(Unreadable::Damaged(format!(
@@ -127,7 +128,7 @@ impl Register {
                     && is_digest(&placed.digest)
                     && directory.starts_with('/')
                     && !directory.contains("..")
-                    && is_directory(directory)
+                    && is_plain(directory)
                     && hostname.is_none_or(is_label)
                     && [
                         Some(placed.name.as_str()),

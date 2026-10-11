@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
+use super::{is_plain, UrlOf, UserMode, Value};
 use super::{Constant, Container, Mount, Network, Posture, Publish, SecretOf, Setting, Shape};
-use super::{UrlOf, UserMode, Value};
 
 const NONE: BTreeMap<String, Value> = BTreeMap::new();
 
@@ -136,10 +136,14 @@ fn a_configuration_directory_is_never_the_data_and_never_the_root() {
 #[test]
 fn scratch_space_is_held_to_the_targets_rules() {
     let none = NONE;
-    let tmpfs = ["/tmp".to_owned(), "tmp".to_owned()];
+    let tmpfs = ["/tmp".to_owned(), "tmp".to_owned(), "/config".to_owned()];
     let mut scratch = plain(&none);
     scratch.tmpfs = &tmpfs;
-    assert_eq!(wrong(&scratch).len(), 1);
+    let said = wrong(&scratch);
+    assert_eq!(said.len(), 2, "{said:#?}");
+    assert!(said.iter().any(
+        |line| line == "service jellyfin.tmpfs /config: /config is the target of another mount"
+    ));
 }
 
 #[test]
@@ -308,8 +312,66 @@ fn a_value_holding_a_control_character_is_refused_and_a_dollar_is_not() {
                 default: Constant::Text("x\ry".to_owned()),
             }),
         ),
+        (
+            "FOREIGN",
+            Value::Setting(Setting {
+                setting: "gluetun:countries".to_owned(),
+                default: Constant::Text("a\tb".to_owned()),
+            }),
+        ),
         ("PRICE", Value::Constant(Constant::Text("$5".to_owned()))),
     ]);
     let said = wrong(&plain(&named));
-    assert_eq!(said.len(), 2, "{said:#?}");
+    assert_eq!(said.len(), 4, "{said:#?}");
+    assert_eq!(
+        said.iter()
+            .filter(|line| line.starts_with("service jellyfin.env.FOREIGN:"))
+            .count(),
+        2,
+        "{said:#?}"
+    );
+}
+
+#[test]
+fn a_plain_path_is_written_in_letters_digits_and_four_marks() {
+    assert!(is_plain("/app/data-1/x_y.z"));
+    for bad in ["/a b", "/a:b", "/a$b", "/a\nb", "/a{b"] {
+        assert!(!is_plain(bad), "{bad:?}");
+    }
+}
+
+#[test]
+fn each_field_is_read_as_written_and_defaulted_where_left_out() {
+    let publish: Result<Publish, _> = toml::from_str("port = 8920");
+    assert_eq!(
+        publish.ok(),
+        Some(Publish {
+            port: 8920,
+            listens: None
+        })
+    );
+    let mount: Result<Mount, _> = toml::from_str("from = \"cache\"\nto = \"/cache\"");
+    assert_eq!(mount.ok().map(|read| read.ro), Some(false));
+    let network: Result<Network, _> = toml::from_str("via = \"network.egress-guard\"");
+    assert_eq!(
+        network.ok().map(|read| read.via),
+        Some("network.egress-guard".to_owned())
+    );
+    let modes: Result<BTreeMap<String, UserMode>, _> =
+        toml::from_str("a = \"image\"\nb = \"puid-env\"\nc = \"uid\"");
+    assert_eq!(
+        modes
+            .ok()
+            .map(|read| read.into_values().collect::<Vec<_>>()),
+        Some(vec![UserMode::Image, UserMode::PuidEnv, UserMode::Uid])
+    );
+    let postures: Result<BTreeMap<String, Posture>, _> =
+        toml::from_str("a = \"standard\"\nb = \"confined\"");
+    assert_eq!(
+        postures
+            .ok()
+            .map(|read| read.into_values().collect::<Vec<_>>()),
+        Some(vec![Posture::Standard, Posture::Confined])
+    );
+    assert_eq!(Posture::default(), Posture::Standard);
 }

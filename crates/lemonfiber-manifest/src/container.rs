@@ -22,8 +22,14 @@ pub const RESERVED: [&str; 3] = ["TZ", "PUID", "PGID"];
 /// The settings the core publishes to every service.
 pub const PUBLISHED: [&str; 2] = ["domain", "lan-host"];
 
+/// The egress guard's capability.
+pub const EGRESS_GUARD: &str = "network.egress-guard";
+
+/// The media server's capability.
+pub const MEDIA_SERVE: &str = "media.serve";
+
 /// The capabilities a service may run inside the network of.
-pub const VIA: [&str; 1] = ["network.egress-guard"];
+pub const VIA: [&str; 1] = [EGRESS_GUARD];
 
 /// What separates a setting's namespace from its name.
 const NAMESPACED: char = ':';
@@ -71,8 +77,8 @@ impl Shape {
     #[must_use]
     pub const fn serves(self) -> &'static str {
         match self {
-            Self::EgressGuard => VIA[0],
-            Self::Render => "media.serve",
+            Self::EgressGuard => EGRESS_GUARD,
+            Self::Render => MEDIA_SERVE,
         }
     }
 
@@ -316,19 +322,27 @@ impl Container<'_> {
                     ),
                 ));
             }
-            if let Some(wrong) = target(&mount.to, self.takes_data) {
-                found.push((at.clone(), format!("{} {wrong}", mount.to)));
-            }
-            if targets.contains(&mount.to.as_str()) {
-                found.push((at, format!("{} is the target of another mount", mount.to)));
-            }
-            targets.push(&mount.to);
+            self.landed(at, &mount.to, &mut targets, found);
         }
         for path in self.tmpfs {
-            if let Some(wrong) = target(path, self.takes_data) {
-                found.push((self.at("tmpfs"), format!("{path} {wrong}")));
-            }
+            self.landed(self.at(&format!("tmpfs {path}")), path, &mut targets, found);
         }
+    }
+
+    fn landed<'a>(
+        &self,
+        at: String,
+        to: &'a str,
+        targets: &mut Vec<&'a str>,
+        found: &mut Vec<(String, String)>,
+    ) {
+        if let Some(wrong) = target(to, self.takes_data) {
+            found.push((at.clone(), format!("{to} {wrong}")));
+        }
+        if targets.contains(&to) {
+            found.push((at, format!("{to} is the target of another mount")));
+        }
+        targets.push(to);
     }
 
     fn environed(&self, found: &mut Vec<(String, String)>) {
@@ -344,38 +358,43 @@ impl Container<'_> {
             if RESERVED.contains(&name.as_str()) {
                 found.push((at.clone(), format!("{name} is lemonfiber's to write")));
             }
-            if let Some(wrong) = self.valued(value) {
-                found.push((at, wrong));
-            }
+            found.extend(self.valued(value).map(|wrong| (at.clone(), wrong)));
         }
     }
 
-    fn valued(&self, value: &Value) -> Option<String> {
-        match value {
-            Value::Constant(constant) => unshown(constant),
-            Value::Setting(setting) if unshown(&setting.default).is_some() => {
-                unshown(&setting.default)
-            }
-            Value::Setting(setting) => (!self.owns(&setting.setting)).then(|| {
-                format!(
-                    "names setting {}, which is neither one the core publishes nor in the {} \
-                     namespace",
-                    setting.setting, self.namespace
-                )
-            }),
-            Value::Url(url) => (!is_core_name(&url.url_of)).then(|| {
-                format!(
-                    "asks for the address of {}, which is not a core capability",
-                    url.url_of
-                )
-            }),
-            Value::Secret(secret) => (!self.secrets.contains(&secret.secret.as_str())).then(|| {
-                format!(
-                    "names secret {}, which the manifest does not declare",
-                    secret.secret
-                )
-            }),
-        }
+    fn valued(&self, value: &Value) -> impl Iterator<Item = String> {
+        let (shown, named) = match value {
+            Value::Constant(constant) => (unshown(constant), None),
+            Value::Setting(setting) => (
+                unshown(&setting.default),
+                (!self.owns(&setting.setting)).then(|| {
+                    format!(
+                        "names setting {}, which is neither one the core publishes nor in the {} \
+                         namespace",
+                        setting.setting, self.namespace
+                    )
+                }),
+            ),
+            Value::Url(url) => (
+                None,
+                (!is_core_name(&url.url_of)).then(|| {
+                    format!(
+                        "asks for the address of {}, which is not a core capability",
+                        url.url_of
+                    )
+                }),
+            ),
+            Value::Secret(secret) => (
+                None,
+                (!self.secrets.contains(&secret.secret.as_str())).then(|| {
+                    format!(
+                        "names secret {}, which the manifest does not declare",
+                        secret.secret
+                    )
+                }),
+            ),
+        };
+        shown.into_iter().chain(named)
     }
 
     fn owns(&self, setting: &str) -> bool {
@@ -459,7 +478,9 @@ fn is_relative(path: &str) -> bool {
             .all(|step| !step.is_empty() && step != "." && step != "..")
 }
 
-fn is_plain(text: &str) -> bool {
+/// Whether `text` is written only in letters, digits, `.`, `_`, `/` and `-`.
+#[must_use]
+pub fn is_plain(text: &str) -> bool {
     text.chars()
         .all(|letter| letter.is_ascii_alphanumeric() || matches!(letter, '.' | '_' | '/' | '-'))
 }

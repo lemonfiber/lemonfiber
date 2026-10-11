@@ -55,7 +55,7 @@ fn beneath(path: &str, service: &Service) -> bool {
     else {
         return false;
     };
-    super::carried::is_directory(path)
+    lemonfiber_manifest::container::is_plain(path)
         && inside
             .split('/')
             .all(|segment| !matches!(segment, "" | "." | ".."))

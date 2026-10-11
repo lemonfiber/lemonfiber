@@ -124,3 +124,30 @@ fn an_ask_carrying_a_service_to_reach_is_refused_by_the_schema() {
         assert!(names(&said, &[field]), "{field} refused: {said:?}");
     }
 }
+
+#[test]
+fn a_variable_holding_the_address_of_a_capability_asked_each_of_is_refused() {
+    let with_url = |each: bool| {
+        said(&format!(
+            "{}\n[[ask]]\ncapability = \"library.curate\"\neach = {each}\n",
+            INSTALLABLE.replace(
+                "config_path = \"/config\"\n",
+                "config_path = \"/config\"\n\n[service.env]\nCURATOR = { url_of = \"library.curate\" }\nKEPT = \"x\"\n",
+            )
+        ))
+    };
+    let said = with_url(true);
+    assert_eq!(said.len(), 1, "{said:?}");
+    assert!(
+        names(
+            &said,
+            &[
+                "service komga.env.CURATOR",
+                "library.curate",
+                "asks each of"
+            ]
+        ),
+        "{said:?}"
+    );
+    assert_eq!(with_url(false), Vec::<String>::new());
+}
