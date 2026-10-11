@@ -46,42 +46,35 @@ jobs:
         run: |
           echo "::notice title=Pre-release::${TAG} moves no manifest status; the lane that cut it wrote its record before the tag."
 
-  record:
+  version:
     if: ${{ !contains(github.event.release.tag_name, '-') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # The release App's key is held by the `release` environment, which only
-    # `main` and `v*` tags may deploy to.
-    environment: release
-    permissions:
-      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
-      - name: Mint a token that can reach the spec
-        id: token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          client-id: ${{ vars.RELEASE_CLIENT_ID }}
-          private-key: ${{ secrets.RELEASE_APP_KEY }}
-          owner: ${{ github.repository_owner }}
-          permission-contents: write
-          repositories: spec
-
-      - name: Ask the spec to record it
+      - name: The manifest is named by version, not by tag
+        id: version
         env:
-          GH_TOKEN: ${{ steps.token.outputs.token }}
-          OWNER: ${{ github.repository_owner }}
           TAG: ${{ github.event.release.tag_name }}
         run: |
           set -euo pipefail
-          # The manifest is named by version, not by tag. Matched strictly rather
-          # than by a glob: the value only ever travels as a quoted argument, so
-          # nothing is evaluated, but a check worth writing is worth meaning.
           version="${TAG#v}"
-          printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || {
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "::error::${TAG} is not a version tag; nothing to record."
             exit 1
-          }
-          gh api --method POST "repos/${OWNER}/spec/dispatches" \
-            -f event_type=release-published \
-            -F "client_payload[version]=${version}"
-          echo "asked the spec to record ${version}."
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+  record:
+    needs: version
+    permissions:
+      contents: read
+    uses: lemonfiber/spec/.github/workflows/tell.yml@164464d71266bdc36d90272c58eb8bd02f1ba10d # v1.0.80
+    with:
+      repos: spec
+      event: release-published
+      payload: ${{ format('{{"version":"{0}"}}', needs.version.outputs.version) }}
+      environment: release
+    secrets:
+      RELEASE_APP_KEY: ${{ secrets.RELEASE_APP_KEY }}
