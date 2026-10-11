@@ -67,7 +67,8 @@ pub(super) fn with_the_stack(manifest: &Manifest, found: &mut Vec<Violation>) {
         found.push(Violation {
             location: format!("service {again}.publish"),
             message: format!(
-                "publishes {port}, which service {first} already publishes, and one address                  answers for one service"
+                "publishes {port}, which service {first} already publishes, and one address \
+                 answers for one service"
             ),
         });
     }

@@ -162,7 +162,7 @@ fn a_port_two_of_the_plugins_services_publish_is_refused_naming_both() {
             &said,
             &[
                 "service komga-reader.publish",
-                "publishes 25600, which service komga already publishes"
+                "publishes 25600, which service komga already publishes, and one address answers for one service"
             ]
         ),
         "got: {said:?}"
