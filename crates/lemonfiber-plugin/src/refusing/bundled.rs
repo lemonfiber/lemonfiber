@@ -100,20 +100,18 @@ pub(super) fn routed_to(label: &str) -> Option<&'static str> {
 
 /// Each label the proxy configuration answers on, with the service its first
 /// `reverse_proxy` inside that stanza names.
-pub(super) fn routes(text: &str) -> Vec<(String, String)> {
+fn routes(text: &str) -> Vec<(String, String)> {
     let mut found = Vec::new();
     let mut open: Option<String> = None;
     for line in text.lines() {
-        let said = line.trim_start().trim_start_matches('#').trim_start();
-        if let Some((label, rest)) = said.split_once(DOMAIN) {
-            if !label.is_empty() && label.chars().all(is_label) {
-                open = Some(label.to_owned());
-                if let Some(service) = proxied_service(rest) {
-                    found.push((label.to_owned(), service));
-                    open = None;
-                }
-                continue;
+        let (said, stanza) = opened(line);
+        if let Some((label, rest)) = stanza {
+            open = Some(label.to_owned());
+            if let Some(service) = proxied_service(rest) {
+                found.push((label.to_owned(), service));
+                open = None;
             }
+            continue;
         }
         let Some(label) = open.as_ref() else {
             continue;
@@ -146,18 +144,24 @@ fn proxied_service(text: &str) -> Option<String> {
 pub(super) fn proxied(text: &str) -> Vec<String> {
     let mut found: Vec<String> = Vec::new();
     for line in text.lines() {
-        let said = line.trim_start().trim_start_matches('#').trim_start();
-        let Some((label, _)) = said.split_once(DOMAIN) else {
+        let Some((label, _)) = opened(line).1 else {
             continue;
         };
-        if label.is_empty() || !label.chars().all(is_label) {
-            continue;
-        }
         if !found.iter().any(|held| held == label) {
             found.push(label.to_owned());
         }
     }
     found
+}
+
+/// A line with any leading comment marker set aside, and the label and the rest of it
+/// where it opens a stanza in front of the operator's domain.
+fn opened(line: &str) -> (&str, Option<(&str, &str)>) {
+    let said = line.trim_start().trim_start_matches('#').trim_start();
+    let stanza = said
+        .split_once(DOMAIN)
+        .filter(|(label, _)| !label.is_empty() && label.chars().all(is_label));
+    (said, stanza)
 }
 
 /// Whether one character may appear in a DNS label.

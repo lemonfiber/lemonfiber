@@ -20,7 +20,7 @@
 //! mistake in it, and the author is the only one who can say which of the two names
 //! they meant.
 
-use crate::schema::Manifest;
+use crate::schema::{Manifest, Service};
 use crate::Violation;
 
 use super::bundled;
@@ -31,27 +31,8 @@ pub(super) fn with_the_stack(manifest: &Manifest, found: &mut Vec<Violation>) {
     for service in &manifest.services {
         let at = format!("service {}", service.id);
         let replaced = standing_in(service).map(|held| held.id.as_str());
-        if replaced.is_some() {
-        } else if let Some(held) = bundled::named(&service.id) {
-            found.push(Violation {
-                location: format!("{at}.id"),
-                message: format!(
-                    "{} is the id the stack's own {} is declared under, and lemonfiber writes a \
-                     plugin's container, its proxy route and its dashboard link from that id — a \
-                     second one would be written over the bundled service rather than beside it",
-                    service.id, held.name
-                ),
-            });
-        } else if let Some(held) = bundled::spelled_like(&service.id) {
-            found.push(Violation {
-                location: format!("{at}.id"),
-                message: format!(
-                    "{} is written as the stack's own {} is ({}) once case and `-` or `_` are set \
-                     aside, and lemonfiber keeps what a service holds in settings named that way \
-                     — the two would share them",
-                    service.id, held.name, held.id
-                ),
-            });
+        if replaced.is_none() {
+            named_like_the_stack(service, &at, found);
         }
         let clash = service
             .port
@@ -70,6 +51,31 @@ pub(super) fn with_the_stack(manifest: &Manifest, found: &mut Vec<Violation>) {
         }
     }
     addressed(manifest, found);
+}
+
+/// An id the shipped stack declares, or one written as a shipped id is.
+fn named_like_the_stack(service: &Service, at: &str, found: &mut Vec<Violation>) {
+    if let Some(held) = bundled::named(&service.id) {
+        found.push(Violation {
+            location: format!("{at}.id"),
+            message: format!(
+                "{} is the id the stack's own {} is declared under, and lemonfiber writes a \
+                 plugin's container, its proxy route and its dashboard link from that id — a \
+                 second one would be written over the bundled service rather than beside it",
+                service.id, held.name
+            ),
+        });
+    } else if let Some(held) = bundled::spelled_like(&service.id) {
+        found.push(Violation {
+            location: format!("{at}.id"),
+            message: format!(
+                "{} is written as the stack's own {} is ({}) once case and `-` or `_` are set \
+                 aside, and lemonfiber keeps what a service holds in settings named that way \
+                 — the two would share them",
+                service.id, held.name, held.id
+            ),
+        });
+    }
 }
 
 /// The name a plugin would be reached by, against the ones the stack answers on.
