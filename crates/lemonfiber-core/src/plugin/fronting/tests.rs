@@ -25,6 +25,8 @@ fn placed(service: &str, reached: Option<Reached>) -> Placed {
         replaces: None,
         shape: None,
         asks: Vec::new(),
+        reaches: None,
+        asks_for: None,
     }
 }
 

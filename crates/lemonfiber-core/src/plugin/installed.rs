@@ -114,6 +114,12 @@ pub struct Placed {
     /// Its container fields beyond those above.
     #[serde(default, skip_serializing_if = "Fields::is_plain")]
     pub fields: Fields,
+    /// Where it reaches outside the machine, where it says.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reaches: Option<String>,
+    /// What it asks for there, where it says.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub asks_for: Option<String>,
 }
 
 /// Every capability a service asks for: each `[[ask]]` it makes, then each capability a
@@ -199,6 +205,8 @@ impl Placed {
             replaces: service.replaces.clone(),
             shape: service.shape,
             asks: asks(manifest, service),
+            reaches: service.reaches.clone(),
+            asks_for: service.asks_for.clone(),
         }
     }
 

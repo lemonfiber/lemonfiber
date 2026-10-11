@@ -408,8 +408,9 @@
       ]
     },
     "PluginCriticality": {
-      "description": "How much a plugin's service costs when it is absent.\n\nFour rather than the stack's five. `critical` means *its failure has consequences\noutside the machine*, and in the bundled stack exactly one service holds it; it is\nnot a severity a contributor assigns to their own work, because the classification\ndrives how failures are reported and how hard lemonfiber tries to stop the operator\nproceeding. A manifest declaring it is refused by name, with these four listed.",
+      "description": "How much a plugin's service costs when it is absent.\n\n`critical` means *its failure has consequences outside the machine*, which is the\negress guard's alone: a service declares it only with `shape = \"egress-guard\"`, and\none that declares it without is refused naming the shape and the four it may declare.",
       "oneOf": [
+        {"description": "Its failure has consequences outside the machine.", "type": "string", "const": "critical"},
         {"description": "The form does not work without it.", "type": "string", "const": "core"},
         {"description": "The form works, badly.", "type": "string", "const": "important"},
         {"description": "Makes things better.", "type": "string", "const": "enhancing"},
@@ -542,6 +543,11 @@
           ],
           "default": null
         },
+        "asks_for": {
+          "description": "What it asks for out there, in the same terms; never blank.",
+          "type": ["string", "null"],
+          "default": null
+        },
         "bind": {
           "description": "Which tier every port it publishes is published on.",
           "anyOf": [
@@ -645,6 +651,11 @@
           "type": "array",
           "default": [],
           "items": {"$ref": "#/$defs/ServicePublish"}
+        },
+        "reaches": {
+          "description": "Where it reaches outside the machine, in words an operator reads, as a stack\nservice says it; declared with [`Self::asks_for`] or not at all.",
+          "type": ["string", "null"],
+          "default": null
         },
         "replaces": {
           "description": "The id of the stack's own service this service moves in place of, which is its own\nid: it keeps that service's container, configuration and data, and may take its\nport and the name the proxy answers for it.",

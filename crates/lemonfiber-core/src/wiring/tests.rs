@@ -582,6 +582,8 @@ fn plugin_filling(plugin: &str, service: &str, capability: &str) -> crate::plugi
             replaces: None,
             shape: None,
             asks: Vec::new(),
+            reaches: None,
+            asks_for: None,
         }],
         provides: vec![capability.to_owned()],
         contributions: Vec::new(),

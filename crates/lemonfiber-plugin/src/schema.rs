@@ -201,6 +201,13 @@ pub struct Service {
     /// and is inert until something asks for it.
     #[serde(default)]
     pub provides: Vec<String>,
+    /// Where it reaches outside the machine, in words an operator reads, as a stack
+    /// service says it; declared with [`Self::asks_for`] or not at all.
+    #[serde(default)]
+    pub reaches: Option<String>,
+    /// What it asks for out there, in the same terms; never blank.
+    #[serde(default)]
+    pub asks_for: Option<String>,
     /// The memory it expects to need, in MiB, never written as a limit.
     #[serde(default)]
     pub memory_mib: Option<u32>,
@@ -449,15 +456,15 @@ pub enum Bind {
 
 /// How much a plugin's service costs when it is absent.
 ///
-/// Four rather than the stack's five. `critical` means *its failure has consequences
-/// outside the machine*, and in the bundled stack exactly one service holds it; it is
-/// not a severity a contributor assigns to their own work, because the classification
-/// drives how failures are reported and how hard lemonfiber tries to stop the operator
-/// proceeding. A manifest declaring it is refused by name, with these four listed.
+/// `critical` means *its failure has consequences outside the machine*, which is the
+/// egress guard's alone: a service declares it only with `shape = "egress-guard"`, and
+/// one that declares it without is refused naming the shape and the four it may declare.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 #[schemars(rename = "PluginCriticality")]
 pub enum Criticality {
+    /// Its failure has consequences outside the machine.
+    Critical,
     /// The form does not work without it.
     Core,
     /// The form works, badly.
@@ -466,6 +473,23 @@ pub enum Criticality {
     Enhancing,
     /// Nice to have.
     Optional,
+}
+
+impl Criticality {
+    /// The criticalities a service may declare without the egress guard's shape.
+    pub const UNSHAPED: [Self; 4] = [Self::Core, Self::Important, Self::Enhancing, Self::Optional];
+
+    /// The name a manifest gives it.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Critical => "critical",
+            Self::Core => "core",
+            Self::Important => "important",
+            Self::Enhancing => "enhancing",
+            Self::Optional => "optional",
+        }
+    }
 }
 
 /// How to tell a plugin's service has started.

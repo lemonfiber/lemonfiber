@@ -637,19 +637,13 @@ fn refuses_a_field_it_does_not_know() {
 fn names_every_unrecognised_declaration_in_one_pass() {
     let text = WHOLE
         .replace(r#"bind        = "lan""#, r#"bind        = "wan""#)
-        .replace(
-            r#"criticality = "important""#,
-            r#"criticality = "critical""#,
-        );
+        .replace(r#"criticality = "important""#, r#"criticality = "dire""#);
     let refusal = Manifest::from_toml(&text)
         .err()
         .map(|refused| refused.to_string())
         .unwrap_or_default();
     assert!(refusal.contains("wan"), "names the first: {refusal}");
-    assert!(
-        refusal.contains("critical"),
-        "names the second too: {refusal}"
-    );
+    assert!(refusal.contains("dire"), "names the second too: {refusal}");
 }
 
 #[test]

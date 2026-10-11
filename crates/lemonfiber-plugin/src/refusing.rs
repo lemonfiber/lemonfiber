@@ -82,6 +82,29 @@ pub fn refusals(manifest: &Manifest, occupied: &[&str]) -> Vec<Violation> {
     found
 }
 
+/// Everything an install or an update refuses beyond [`refusals`]: what only a plugin the
+/// bundle assembles may declare.
+///
+/// A service naming an in-process adapter (`ARCH-R272`), and one taking the egress
+/// guard's shape with no adapter of its plugin fronting it (`F14-R12`), are read in a
+/// manifest the bundle pins and refused anywhere else.
+#[must_use]
+pub fn uninstallable(manifest: &Manifest) -> Vec<Violation> {
+    let mut found = Vec::new();
+    for service in &manifest.services {
+        if service.api.is_some() {
+            found.push(Violation {
+                location: format!("service {}.api", service.id),
+                message: "names an in-process adapter, which only a part the bundle assembles \
+                          may; a plugin speaks its capabilities' contracts instead"
+                    .to_owned(),
+            });
+        }
+        shaping::unfronted(service, &manifest.services, &mut found);
+    }
+    found
+}
+
 /// Every label a proxy configuration puts in front of the operator's domain, read the
 /// way the shipped one is read.
 ///
@@ -184,8 +207,34 @@ fn running(manifest: &Manifest, found: &mut Vec<Violation>) {
         adapting::adapted(service, found);
         speaking::spoken(service, &manifest.services, found);
         shaping::shaped(service, &manifest.services, found);
+        shaping::critical(service, found);
+        outbound(service, found);
         fronting::native(service, &manifest.services, found);
         replacing::replaced(service, found);
+    }
+}
+
+/// Whether a service says where it reaches and what it asks for there, both or neither,
+/// and what it asks for in words.
+fn outbound(service: &Service, found: &mut Vec<Violation>) {
+    let refused = |field: &str, message: &str| Violation {
+        location: format!("service {}.{field}", service.id),
+        message: message.to_owned(),
+    };
+    match (&service.reaches, &service.asks_for) {
+        (Some(_), None) => found.push(refused(
+            "asks_for",
+            "is missing: a service saying where it reaches says what it asks for there",
+        )),
+        (None, Some(_)) => found.push(refused(
+            "reaches",
+            "is missing: a service saying what it asks for says where it reaches",
+        )),
+        (_, Some(asked)) if asked.trim().is_empty() => found.push(refused(
+            "asks_for",
+            "is blank: say what it asks for, or that nothing leaves the machine",
+        )),
+        _ => {}
     }
 }
 
@@ -378,6 +427,14 @@ fn declared(manifest: &Manifest) -> Vec<(String, &str)> {
         every.push((format!("{at}.tag"), service.tag.as_str()));
         if let Some(path) = &service.config_path {
             every.push((format!("{at}.config_path"), path.as_str()));
+        }
+        for (field, text) in [
+            ("reaches", service.reaches.as_deref()),
+            ("asks_for", service.asks_for.as_deref()),
+        ] {
+            if let Some(text) = text {
+                every.push((format!("{at}.{field}"), text));
+            }
         }
     }
     for (at, wiring) in manifest.wirings.iter().enumerate() {

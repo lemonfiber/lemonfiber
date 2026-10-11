@@ -104,10 +104,10 @@ fn no_record_of(service: &Service) -> Elsewhere {
 /// What installed plugins bring to this account: each of their services, and every
 /// destination outside the stack their recipes declare.
 ///
-/// A plugin's service says nothing about where it reaches — the manifest format has no
-/// field for it — so it is listed as one lemonfiber has no record of, attributed to its
-/// plugin, for the reason an undescribed bundled service is listed: leaving it out
-/// would make the account read as complete while it was short. A destination a recipe
+/// A plugin's service is listed as it says where it reaches and what it asks for, and
+/// one that says nothing as one lemonfiber has no record of, attributed to its plugin,
+/// for the reason an undescribed bundled service is listed: leaving it out would make
+/// the account read as complete while it was short. A destination a recipe
 /// declares is recorded, because the plugin declared it and was held to it, and it is
 /// listed only where it is outside the stack: a recipe reaching one of the stack's own
 /// services is not something leaving the machine.
@@ -121,12 +121,21 @@ pub(super) fn brought(stack: &[Service], installed: &[crate::plugin::Installed])
             };
             let services = one.services.iter().map({
                 let origin = origin.clone();
-                move |placed| Elsewhere {
-                    service: placed.service.clone(),
-                    destination: UNKNOWN.to_owned(),
-                    purpose: NO_RECORD.to_owned(),
-                    recorded: false,
-                    origin: origin.clone(),
+                move |placed| match (&placed.reaches, &placed.asks_for) {
+                    (Some(destination), Some(purpose)) => Elsewhere {
+                        service: placed.service.clone(),
+                        destination: destination.clone(),
+                        purpose: purpose.clone(),
+                        recorded: true,
+                        origin: origin.clone(),
+                    },
+                    _ => Elsewhere {
+                        service: placed.service.clone(),
+                        destination: UNKNOWN.to_owned(),
+                        purpose: NO_RECORD.to_owned(),
+                        recorded: false,
+                        origin: origin.clone(),
+                    },
                 }
             });
             let hosts = one
