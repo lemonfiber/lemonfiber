@@ -4,11 +4,9 @@
 //! member's allowance are all settled before the request service is asked to file
 //! anything, and a rehearsal settles all of them and files nothing.
 
-use super::{not_working, reached, refused, refused_with, Reached};
+use super::{not_working, reached, refused, refused_with, titled, Reached};
 use crate::app::Ctx;
-use crate::error::codes::wish::{
-    ALREADY_HERE, CANNOT_FETCH, NOTHING_LEFT, NOT_ASKABLE, NOT_ITS_SEASON, NO_ROOM,
-};
+use crate::error::codes::wish::{ALREADY_HERE, NOTHING_LEFT, NOT_ITS_SEASON, NO_ROOM};
 use crate::error::Problem;
 use crate::household::run::OwnAllowance;
 use crate::model::{AskedReport, Became, LeftAfter};
@@ -37,16 +35,7 @@ enum Choice {
 /// wherever [`reached`] refuses or what answers does not.
 pub(super) async fn asked(ctx: &Ctx, named: &str, wish: Wish) -> Result<AskedReport, Box<Problem>> {
     let reached = reached(ctx, named).await?;
-    if !reached.kinds.contains(&wish.kind) {
-        return Err(refused(
-            CANNOT_FETCH,
-            &format!(
-                "This house can't fetch {} right now.",
-                plural_noun(wish.kind)
-            ),
-        ));
-    }
-    let detail = admitted(&reached, &wish).await?;
+    let detail = titled(&reached, wish.kind, &wish.id).await?;
     let theirs = crate::household::run::allowance_of(
         reached.requests.as_ref(),
         &reached.member,
@@ -106,29 +95,6 @@ pub(super) async fn asked(ctx: &Ctx, named: &str, wish: Wish) -> Result<AskedRep
         released: detail.released,
         rehearsed: ctx.dry_run,
     })
-}
-
-/// What `wish` names, where it is a title the member may ask for.
-///
-/// # Errors
-///
-/// The refusal for a title nobody knows and for one outside the member's limits, which
-/// are the same answer, and for what answers not answering.
-async fn admitted(reached: &Reached, wish: &Wish) -> Result<Detail, Box<Problem>> {
-    let unknown = || refused(NOT_ASKABLE, "There's no such title to ask for.");
-    if wish.id.trim().is_empty() {
-        return Err(unknown());
-    }
-    let detail = reached
-        .requests
-        .detail(wish.kind, &wish.id, reached.limits.region())
-        .await
-        .map_err(|_| not_working())?
-        .ok_or_else(unknown)?;
-    if reached.limits.restricted() && !reached.limits.admits(detail.certification.as_deref()) {
-        return Err(unknown());
-    }
-    Ok(detail)
 }
 
 /// What asking for `wish` comes to, from where each part of the title stands.
@@ -330,14 +296,6 @@ fn more(count: u32, noun: &str, after: &str) -> String {
 /// The ending a count of `many` takes.
 fn plural(many: u32) -> &'static str {
     crate::plural::s(usize::try_from(many).unwrap_or(usize::MAX))
-}
-
-/// What the household calls titles of `kind`, many of them.
-const fn plural_noun(kind: Kind) -> &'static str {
-    match kind {
-        Kind::Movies => "films",
-        Kind::Tv => "series",
-    }
 }
 
 #[cfg(test)]

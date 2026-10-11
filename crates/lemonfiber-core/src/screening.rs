@@ -62,7 +62,7 @@ pub struct Pictured {
 
 /// The picture as the core passes it on, where it is a raster image of at most
 /// [`PICTURE_MOST`] bytes.
-fn passed_on(image: Image) -> Option<Pictured> {
+pub(crate) fn passed_on(image: Image) -> Option<Pictured> {
     let declared = image
         .media_type
         .split(';')

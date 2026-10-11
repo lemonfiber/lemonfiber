@@ -17,6 +17,7 @@ mod ask;
 mod find;
 mod limits;
 mod place;
+mod poster;
 
 use std::collections::BTreeSet;
 use std::sync::Arc;
@@ -27,18 +28,21 @@ use crate::app::targets::{fillers_here, identity, request_service, requests_as_o
 use crate::app::{Ctx, Outcome, Wishing};
 use crate::error::codes::wish::{
     ALREADY_HERE, CANNOT_FETCH, NOBODY_ASKING, NOTHING_LEFT, NOT_ASKABLE, NOT_A_MEMBER,
-    NOT_A_PLACE, NOT_A_SEARCH, NOT_ITS_SEASON, NOT_SET_UP, NOT_WORKING, NO_ROOM,
+    NOT_A_PLACE, NOT_A_SEARCH, NOT_ITS_SEASON, NOT_SET_UP, NOT_WORKING, NO_PICTURE, NO_ROOM,
 };
 use crate::error::{Code, Problem, Remedy, State};
 use crate::ports::docker::Lifecycle;
 use crate::ports::media::Kind;
-use crate::ports::service::Member;
+use crate::ports::service::{Detail, Member};
 use crate::wiring::Fillers;
 
 use limits::Limits;
 
-/// Every refusal a member's search or ask answers with, which a client names by its code.
-pub const REFUSALS: [Code; 12] = [
+pub use poster::poster;
+
+/// Every refusal a member's search, ask or poster answers with, which a client names by
+/// its code.
+pub const REFUSALS: [Code; 13] = [
     NOT_A_SEARCH,
     NOT_A_PLACE,
     NOT_ASKABLE,
@@ -51,6 +55,7 @@ pub const REFUSALS: [Code; 12] = [
     NOT_ITS_SEASON,
     NOBODY_ASKING,
     NOT_A_MEMBER,
+    NO_PICTURE,
 ];
 
 /// What a member's search or ask comes to.
@@ -151,6 +156,51 @@ async fn deliverable(ctx: &Ctx, fillers: &Fillers) -> Vec<Kind> {
             })
         })
         .collect()
+}
+
+/// What the title `id` of `kind` is, where it is one `reached` may ask for.
+///
+/// A title outside the member's limits and one the service does not know get the same
+/// answer, so nothing reveals a title a search hides.
+///
+/// # Errors
+///
+/// The refusal for a kind this house cannot fetch, for a title it may not ask for, and
+/// for a service that does not answer.
+async fn titled(reached: &Reached, kind: Kind, id: &str) -> Result<Detail, Box<Problem>> {
+    if !reached.kinds.contains(&kind) {
+        return Err(refused(
+            CANNOT_FETCH,
+            &format!("This house can't fetch {} right now.", plural_noun(kind)),
+        ));
+    }
+    if id.trim().is_empty() {
+        return Err(no_such_title());
+    }
+    let detail = reached
+        .requests
+        .detail(kind, id, reached.limits.region())
+        .await
+        .map_err(|_| not_working())?
+        .ok_or_else(no_such_title)?;
+    if reached.limits.restricted() && !reached.limits.admits(detail.certification.as_deref()) {
+        return Err(no_such_title());
+    }
+    Ok(detail)
+}
+
+/// The refusal for a title the member may not ask for, whether nobody knows it or it is
+/// outside their limits.
+fn no_such_title() -> Box<Problem> {
+    refused(NOT_ASKABLE, "There's no such title to ask for.")
+}
+
+/// What a household calls titles of `kind`, many of them.
+const fn plural_noun(kind: Kind) -> &'static str {
+    match kind {
+        Kind::Movies => "films",
+        Kind::Tv => "series",
+    }
 }
 
 /// A refusal under `code`, said to the household, with the registry's remedy.

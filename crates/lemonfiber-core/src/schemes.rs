@@ -8,3 +8,6 @@ pub(crate) const PLAIN: u16 = 80;
 
 /// Where `https://` is reached on.
 pub(crate) const SECURE: u16 = 443;
+
+/// The scheme an address is reached over when what travels must be encrypted.
+pub(crate) const SECURE_SCHEME: &str = "https";

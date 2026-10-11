@@ -139,6 +139,11 @@ pub const SHOWN: &[(&str, &str)] = &[
          fetched",
     ),
     (
+        super::REACH_POSTERS_KEY,
+        "whether the poster of a title a member's search found may be fetched, which \
+         explains a search whose titles show no picture",
+    ),
+    (
         super::EXPOSED_KEY,
         "which admin services the operator wrote down as deliberately reachable, and why — \
          a record whose whole worth is that somebody can read it back",

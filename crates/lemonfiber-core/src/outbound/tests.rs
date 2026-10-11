@@ -101,6 +101,7 @@ fn a_name_is_given_for_every_request() {
             "indexer",
             "usenet",
             "household",
+            "posters",
             "updates",
             "plugin-source",
             "catalogue"

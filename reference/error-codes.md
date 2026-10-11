@@ -608,6 +608,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `WISH-10` | `NOT_ITS_SEASON` | error | 1 | 400 | 0.18.0 | Said where a season named is not one the title has, or seasons were named for a film. |
 | `WISH-11` | `NOBODY_ASKING` | error | 1 | 400 | 0.18.0 | Said where nobody is named for something only a member can do. |
 | `WISH-12` | `NOT_A_MEMBER` | error | 1 | 404 | 0.18.0 | Said where the member named is not somebody in the household. |
+| `WISH-13` | `NO_PICTURE` | error | 1 | 404 | 0.18.0 | Said where a title a member may ask for has no picture to show them. |
 
 ## `WORD` — the glossary
 

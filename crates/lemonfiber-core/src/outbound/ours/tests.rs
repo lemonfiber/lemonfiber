@@ -128,6 +128,17 @@ fn where_a_household_member_is_told_is_the_two_the_list_names() {
     assert!(named.contains(&super::PUSHBULLET.to_owned()), "{named:?}");
 }
 
+/// A poster is fetched only from beneath the one address the list names.
+///
+/// Read from here by [`crate::wishing`], which fetches nothing that is not beneath it.
+#[test]
+fn where_a_poster_is_fetched_from_is_the_one_address_the_list_names() {
+    let named = destination(Reach::Posters, &Settings::default(), &[], &[]);
+
+    assert_eq!(named, vec![super::POSTERS.to_owned()]);
+    assert!(super::POSTERS.starts_with("https://"), "{named:?}");
+}
+
 #[test]
 fn each_of_the_others_answers_its_own_switch() {
     let others: Vec<&Reach> = EVERY

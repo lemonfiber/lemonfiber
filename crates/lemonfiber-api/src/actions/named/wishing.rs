@@ -35,17 +35,14 @@ pub(super) fn asked_for(given: Arguments) -> Result<Command, Refused> {
     };
     let id = id.ok_or_else(|| missing("id"))?;
     let written = kind.ok_or_else(|| missing("kind"))?;
-    let kind = Kind::ALL
-        .into_iter()
-        .find(|kind| kind.media_type() == written)
-        .ok_or_else(|| Refused::Unrecognised {
-            argument: "kind".to_owned(),
-            offered: format!(
-                "`{written}` is neither `{}` nor `{}`",
-                Kind::Movies.media_type(),
-                Kind::Tv.media_type()
-            ),
-        })?;
+    let kind = Kind::for_media_type(&written).ok_or_else(|| Refused::Unrecognised {
+        argument: "kind".to_owned(),
+        offered: format!(
+            "`{written}` is neither `{}` nor `{}`",
+            Kind::Movies.media_type(),
+            Kind::Tv.media_type()
+        ),
+    })?;
     Ok(Command::Wish(Wishing::Ask {
         member: name.unwrap_or_default(),
         wish: Wish { id, kind, seasons },

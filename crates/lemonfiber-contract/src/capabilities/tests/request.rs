@@ -214,6 +214,7 @@ impl Searching for Upstream {
                 number: 1,
                 status: MediaStatus::Available,
             }],
+            poster: Some("https://posters.example/603.jpg".to_owned()),
         }))
     }
 

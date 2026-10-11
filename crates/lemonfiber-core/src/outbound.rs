@@ -1,6 +1,6 @@
 //! Everything that leaves this machine, why, and what stops if you refuse it.
 //!
-//! Two lists, and keeping them apart is most of the point. lemonfiber makes nine requests
+//! Two lists, and keeping them apart is most of the point. lemonfiber makes ten requests
 //! on its own account and they are enumerated here in full; the services in the stack make
 //! a great many more, and those are **theirs** — an indexer query is the indexer aggregator
 //! asking an indexer, a poster is a curator asking a metadata provider, and a peer
@@ -27,11 +27,13 @@ use serde::Serialize;
 use crate::config::Settings;
 use lemonfiber_manifest::Service;
 
-pub use ours::{nothing_configured, EVERY, GUIDE_SOURCE, PUSHBULLET, PUSHOVER, RELEASE_LIST};
+pub use ours::{
+    nothing_configured, EVERY, GUIDE_SOURCE, POSTERS, PUSHBULLET, PUSHOVER, RELEASE_LIST,
+};
 
 /// One of the requests lemonfiber makes on its own account.
 ///
-/// Nine, and the closed set is the claim. A tenth is a decision somebody makes by
+/// Ten, and the closed set is the claim. An eleventh is a decision somebody makes by
 /// adding a variant here and answering four questions about it, rather than one
 /// that happens by somebody building a request.
 ///
@@ -55,6 +57,10 @@ pub use ours::{nothing_configured, EVERY, GUIDE_SOURCE, PUSHBULLET, PUSHOVER, RE
 /// The ninth goes to one place this build names, and only when an operator installs a
 /// plugin by name: the catalogue's newest release, for its index and the signature over
 /// it.
+///
+/// The tenth is made for a member rather than for the operator: the poster of a title
+/// their search found, from the one catalogue address this build names, so their client
+/// draws it without ever being sent there.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 #[schemars(rename = "OutboundReach")]
@@ -77,6 +83,8 @@ pub enum Reach {
     PluginSource,
     /// Reading the catalogue's index to resolve a plugin installed by name.
     Catalogue,
+    /// Fetching the poster of a title a member's search found.
+    Posters,
 }
 
 impl Reach {
@@ -93,6 +101,7 @@ impl Reach {
             Self::Updates => "updates",
             Self::PluginSource => "plugin-source",
             Self::Catalogue => "catalogue",
+            Self::Posters => "posters",
         }
     }
 }

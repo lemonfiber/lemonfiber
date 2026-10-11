@@ -78,7 +78,8 @@ async fn a_search_for_one_kind_leaves_the_other_out_and_the_last_page_has_no_nex
 
 #[tokio::test]
 async fn a_films_certification_is_its_first_one_in_the_region_asked() {
-    let film = r#"{"overview":"Set in the 22nd century.","status":"Released","releases":{"results":[
+    let film = r#"{"overview":"Set in the 22nd century.","status":"Released",
+        "posterPath":"/film.jpg","releases":{"results":[
         {"iso_3166_1":"NL","release_dates":[{"certification":""},{"certification":"12"}]},
         {"iso_3166_1":"US","release_dates":[{"certification":"R"}]}]}}"#;
     let http = Fake::by_path(vec![("/api/v1/movie/603", Answer::reply(200, film))]);
@@ -94,11 +95,15 @@ async fn a_films_certification_is_its_first_one_in_the_region_asked() {
     assert!(detail.released);
     assert!(detail.seasons.is_empty());
     assert_eq!(detail.overview.as_deref(), Some("Set in the 22nd century."));
+    assert_eq!(
+        detail.poster.as_deref(),
+        Some("https://image.tmdb.org/t/p/w342/film.jpg")
+    );
 }
 
 #[tokio::test]
 async fn a_series_is_rated_by_region_and_never_offers_its_specials() {
-    let series = r#"{"status":"Ended","firstAirDate":"2011-04-17",
+    let series = r#"{"status":"Ended","firstAirDate":"2011-04-17","posterPath":"@elsewhere.example/x.jpg",
         "contentRatings":{"results":[{"iso_3166_1":"US","rating":"TV-MA"},{"iso_3166_1":"NL","rating":"16"}]},
         "seasons":[{"seasonNumber":0},{"seasonNumber":1},{"seasonNumber":2}],
         "mediaInfo":{"status":4,"seasons":[{"seasonNumber":1,"status":5}]}}"#;
@@ -123,6 +128,7 @@ async fn a_series_is_rated_by_region_and_never_offers_its_specials() {
     );
     assert_eq!(detail.overview, None);
     assert_eq!(detail.status, MediaStatus::PartlyAvailable);
+    assert_eq!(detail.poster, None);
 }
 
 #[tokio::test]
@@ -141,6 +147,7 @@ async fn a_title_with_no_certification_in_the_region_has_none_and_one_not_out_is
     assert_eq!(detail.certification, None);
     assert!(!detail.released);
     assert_eq!(detail.status, MediaStatus::Unknown);
+    assert_eq!(detail.poster, None);
 }
 
 #[tokio::test]

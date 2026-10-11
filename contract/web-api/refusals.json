@@ -589,6 +589,11 @@
     "status": 404,
     "description": "Said where the member named is not somebody in the household."
   },
+  "WISH-13": {
+    "name": "NO_PICTURE",
+    "status": 404,
+    "description": "Said where a title a member may ask for has no picture to show them."
+  },
   "WISH-2": {
     "name": "NOT_A_PLACE",
     "status": 400,

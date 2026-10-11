@@ -1,11 +1,11 @@
 use axum::body::to_bytes;
 use axum::http::{header, StatusCode};
 use axum::response::Response;
-use lemonfiber_core::app::{Command, Viewing, Whom};
+use lemonfiber_core::app::{Command, Viewing, Whom, Wishing};
 use lemonfiber_core::keys::Scope;
 use lemonfiber_core::screening::Pictured;
 
-use super::{shown, titled};
+use super::{searcher, shown, titled};
 use crate::admission::{Caller, Keyed};
 use crate::entitled::{may, Door, Permitted};
 use crate::refusal::Refusal;
@@ -18,6 +18,15 @@ fn title(member: Whom) -> Command {
     Command::Viewing(Viewing::Title {
         member,
         id: FILM.to_owned(),
+    })
+}
+
+/// The search read naming `member`.
+fn search(member: &str) -> Command {
+    Command::Wish(Wishing::Find {
+        member: member.to_owned(),
+        term: String::new(),
+        after: None,
     })
 }
 
@@ -97,6 +106,46 @@ async fn a_ruling_that_grants_no_title_read_is_answered_with_its_own_refusal() {
     }
     let Err(answered) = titled(Ok(Command::Version)) else {
         unreachable!("the versions in play are not a title read")
+    };
+    assert_eq!(
+        said(*answered).await,
+        said(Refusal::NoSuchRead.answered()).await
+    );
+}
+
+#[test]
+fn a_poster_is_fetched_for_whoever_the_search_read_is_ruled_to_be_for() {
+    let their_key = key(Scope::Member {
+        id: "a7f3".to_owned(),
+        name: "ana".to_owned(),
+    });
+    for (caller, asked, read_for) in [
+        (Caller::Member("a7f3".to_owned()), "bo", "a7f3"),
+        (their_key, "bo", "a7f3"),
+        (Caller::Operator, "ana", "ana"),
+    ] {
+        let granted = may(&caller, Door::Reading, search(asked)).granted();
+        assert_eq!(
+            searcher(granted).ok().as_deref(),
+            Some(read_for),
+            "{caller:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_ruling_that_grants_no_search_is_answered_with_its_own_refusal() {
+    for caller in [key(Scope::Read), key(Scope::Act)] {
+        let (Err(answered), Err(expected)) = (
+            searcher(may(&caller, Door::Reading, search("bo")).granted()),
+            may(&caller, Door::Reading, search("bo")).granted(),
+        ) else {
+            unreachable!("a key is never granted a member's search")
+        };
+        assert_eq!(said(*answered).await, said(*expected).await, "{caller:?}");
+    }
+    let Err(answered) = searcher(Ok(Command::Version)) else {
+        unreachable!("the versions in play are not a search")
     };
     assert_eq!(
         said(*answered).await,

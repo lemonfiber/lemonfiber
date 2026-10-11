@@ -118,6 +118,10 @@ pub const WATCHING: &str = "/api/watching";
 /// they may ask for, and a title outside their limits is never on it at all.
 pub const ASKABLE: &str = "/api/askable";
 
+/// The poster of a title a member's search found, fetched by the core and handed to that
+/// member alone, so their client never reaches the catalogue.
+pub const ASKABLE_POSTER: &str = "/api/askable/{id}/poster";
+
 /// What this machine keeps running when no terminal is open.
 pub const HOSTING: &str = "/api/hosting";
 
@@ -355,6 +359,8 @@ pub struct Wanted {
     pub most: Option<String>,
     /// Where a page of a search said the next one begins.
     pub after: Option<String>,
+    /// Whether the title a read is about is a series or a film, as it was written.
+    pub kind: Option<String>,
     /// The title a read is about, as its path names it.
     pub title: Option<String>,
 }
@@ -413,6 +419,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, Refusal> {
         most,
         after,
         title,
+        kind: _,
     } = given;
     match read {
         VERSION => Ok(Command::Version),

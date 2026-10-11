@@ -69,6 +69,8 @@ pub struct Detail {
     pub released: bool,
     /// Each season of a series, and none for a film.
     pub seasons: Vec<Season>,
+    /// Where its poster is published, as the service gives it, or nothing.
+    pub poster: Option<String>,
 }
 
 /// What a member asks for: one title, and for a series the seasons of it.
