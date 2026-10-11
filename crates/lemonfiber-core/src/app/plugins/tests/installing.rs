@@ -490,18 +490,26 @@ async fn an_install_whose_source_was_rewritten_after_the_reading_is_refused() {
     assert_eq!(made_paths(&ctx), Vec::<String>::new());
 }
 
-/// A service published on a port the stack already publishes is refused before anything
-/// is written, naming what holds it: the proxy's 443 is in no `stack.toml` port, and the
-/// stack's Compose files are where it is read from.
+/// A service published on a port a forked stack's Compose files publish is refused
+/// before anything is written, naming what holds it: no service the stack declares
+/// publishes the port, and the stack's Compose files are where it is read from.
 #[tokio::test]
 async fn a_port_the_stacks_compose_files_publish_is_refused_before_anything_is_written() {
-    let ctx = ctx("occupied-port");
-    let at = source(
-        "occupied-port",
-        &MANIFEST.replace("port        = 25600", "port        = 443"),
-    );
+    let mut ctx = ctx("occupied-port");
+    let fork = lemonfiber_fixtures::scratch::Scratch::named("occupied-port-fork").kept();
+    let _ = std::fs::remove_dir_all(&fork);
+    lemonfiber_fixtures::stack::manifest_into(&fork);
+    assert!(std::fs::create_dir_all(fork.join("compose")).is_ok());
+    assert!(std::fs::write(
+        fork.join("compose/theirs.yml"),
+        "services:\n  theirs:\n    image: theirs\n    ports: [\"25600:80\"]\n",
+    )
+    .is_ok());
+    ctx.stack = crate::stack::Source::External(Box::leak(fork.into_boxed_path()));
 
-    let refused = installing(&ctx, &at).await.err();
+    let refused = installing(&ctx, &source("occupied-port", MANIFEST))
+        .await
+        .err();
 
     assert_eq!(
         refused.as_ref().map(|one| one.code.to_string()).as_deref(),
@@ -510,7 +518,7 @@ async fn a_port_the_stacks_compose_files_publish_is_refused_before_anything_is_w
     assert!(refused
         .as_ref()
         .and_then(|one| one.detail.as_deref())
-        .is_some_and(|detail| detail.contains("443") && detail.contains("caddy")));
+        .is_some_and(|detail| detail.contains("25600") && detail.contains("theirs")));
     assert_eq!(counted(reading(&ctx).await), Some(0));
     assert!(!stack_of(&ctx).join("compose/plugins/komga.yml").exists());
 }
