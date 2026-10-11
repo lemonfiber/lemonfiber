@@ -154,4 +154,8 @@ requirement = [
   { id = "ARCH-R233", state = "partial", evidence = ["crates/lemonfiber-manifest/src/container.rs", "crates/lemonfiber-manifest/src/container/tests.rs"] },
   { id = "ARCH-R236", state = "partial", evidence = ["crates/lemonfiber-manifest/src/container.rs", "crates/lemonfiber-manifest/src/container/tests.rs"] },
   { id = "ARCH-R237", state = "partial", evidence = ["crates/lemonfiber-manifest/src/container.rs", "crates/lemonfiber-manifest/src/container/tests.rs", "crates/lemonfiber-plugin/src/refusing/shaping.rs", "crates/lemonfiber-manifest/src/validate.rs"] },
+  { id = "ARCH-R241", state = "partial", evidence = ["crates/lemonfiber-core/src/topology.rs", "crates/lemonfiber-core/src/topology/tests.rs"] },
+  { id = "ARCH-R242", state = "partial", evidence = ["crates/lemonfiber-core/src/topology.rs", "crates/lemonfiber-core/src/topology/tests.rs"] },
+  { id = "ARCH-R243", state = "partial", evidence = ["crates/lemonfiber-core/src/topology.rs", "crates/lemonfiber-core/src/topology/tests.rs"] },
+  { id = "ARCH-R244", state = "partial", evidence = ["crates/lemonfiber-core/src/topology.rs", "crates/lemonfiber-core/src/topology/tests.rs"] },
 ]
