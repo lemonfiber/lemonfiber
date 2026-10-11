@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use lemonfiber_fixtures::ports::Renamed;
+use lemonfiber_fixtures::ports::{stamp, Renamed, DAY};
 use lemonfiber_fixtures::scratch::Scratch;
 use lemonfiber_fixtures::support::FixedRandom;
 use lemonfiber_sidecar::TokenHash;
@@ -88,13 +88,13 @@ fn on_record(ctx: &Ctx) -> Offers {
 
 #[test]
 fn a_link_carries_its_parameters_in_order_each_percent_encoded() {
-    let link = written(&material(), 1_791_417_600, "Ana Lu+é", Some("c1"));
+    let link = written(&material(), IN_TWO_DAYS, "Ana Lu+é", Some("c1"));
 
     assert_eq!(
         link,
         format!(
             "lemonfiber://join?address=https%3A%2F%2Fden.local%3A8443&fingerprint={}&stack=a1b2\
-             &expires=1791417600&name=Ana%20Lu%2B%C3%A9&claim=c1",
+             &expires={IN_TWO_DAYS}&name=Ana%20Lu%2B%C3%A9&claim=c1",
             "ab".repeat(32)
         )
     );
@@ -113,8 +113,8 @@ fn a_claim_is_recorded_as_its_hash_on_an_offer_already_recorded() {
     let offers: Offers = [(
         "9".to_owned(),
         Offer {
-            offered: "2026-10-06T00:00:00Z".to_owned(),
-            lapses: "2026-10-08T00:00:00Z".to_owned(),
+            offered: format!("{}Z", stamp(0)),
+            lapses: format!("{}Z", stamp(2 * DAY)),
             decline: None,
             claim: None,
         },
@@ -131,8 +131,8 @@ fn a_claim_is_recorded_as_its_hash_on_an_offer_already_recorded() {
         Some(TokenHash::of("a-token"))
     );
     assert_eq!(
-        claimed.map(|(_, lapses)| lapses).as_deref(),
-        Some("2026-10-08T00:00:00Z")
+        claimed.map(|(_, lapses)| lapses),
+        Some(format!("{}Z", stamp(2 * DAY)))
     );
     assert!(with_claim(offers, "10", "a-token").is_none());
 }

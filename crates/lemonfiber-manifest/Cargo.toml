@@ -7,6 +7,11 @@ edition.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 
+[features]
+# `TODAY`, the day every test validating the bundled stack shares. Taken only through
+# `lemonfiber-fixtures`, a development dependency, so shipped code never sees it.
+testing = []
+
 [dependencies]
 schemars = { workspace = true }
 serde = { workspace = true }

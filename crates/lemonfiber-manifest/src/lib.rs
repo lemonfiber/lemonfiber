@@ -56,6 +56,20 @@ pub const SCHEMA_VERSION: u32 = 1;
 /// else would then have to drop generation 1 to make room for itself.
 pub const SUPPORTED_SCHEMA_VERSIONS: &[u32] = &[SCHEMA_VERSION];
 
+/// A day the bundled stack is not ahead of: 2030-01-01T00:00:00Z, in seconds since the
+/// Unix epoch.
+///
+/// A test that validates the manifest is validating it against whatever day its
+/// clock says it is, and a service records the day its upstream last released — so
+/// a clock behind the manifest reads those dates as being in the future and fails
+/// validation. The manifest is a submodule that moves forward and these clocks do
+/// not, so every one of them reads this day rather than each going stale on its own.
+///
+/// `the_day_these_tests_use_is_after_everything_the_stack_records` is the guard. When
+/// it fails, move this forward; do not pin an older image to satisfy it.
+#[cfg(any(test, feature = "testing"))]
+pub const TODAY: u64 = 1_893_456_000;
+
 /// Whether a manifest declaring schema `version` can be read by this crate.
 ///
 /// Refusal is loud and names both versions rather than guessing at a layout

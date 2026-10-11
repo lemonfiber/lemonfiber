@@ -251,15 +251,7 @@ pub(super) struct Ticking {
     readings: std::sync::atomic::AtomicU64,
 }
 
-/// Where the ticking clock starts — a plausible present, because the stack manifest is
-/// validated against whatever day the clock says it is, and 1970 is not a day any stack
-/// was released before.
-///
-/// **It must not fall behind the manifest.** A service records the day its upstream
-/// last released, and a date after this one reads as being in the future, which fails
-/// validation and takes every walkthrough test down with a fault about a service none
-/// of them is testing. `the_fixture_clock_is_not_older_than_the_stack_it_validates`
-/// is the guard; when it fails, move this forward rather than pinning an older image.
+/// Where the ticking clock starts: the day every test validating the stack shares.
 const TODAY: std::time::Duration =
     std::time::Duration::from_secs(lemonfiber_fixtures::ports::TODAY);
 
@@ -324,6 +316,3 @@ pub(super) fn ctx_library_only(fake: &Fake) -> Ctx {
     ctx.settings.protocols = acquires_nothing().protocols;
     ctx
 }
-
-#[cfg(test)]
-mod tests;

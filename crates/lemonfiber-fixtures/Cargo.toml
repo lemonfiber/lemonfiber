@@ -17,8 +17,8 @@ publish = false
 # one copy's trait is not the other copy's. That cycle is why these fakes existed twice.
 lemonfiber-ports = { workspace = true }
 # Where a stack's manifest files are, for writing the carried stack where a test can
-# change it.
-lemonfiber-manifest = { workspace = true }
+# change it, and the day the tests validating it share.
+lemonfiber-manifest = { workspace = true, features = ["testing"] }
 async-trait = { workspace = true }
 tokio = { workspace = true, features = ["sync", "time"] }
 
