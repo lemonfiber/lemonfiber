@@ -1,6 +1,6 @@
 [package]
 name = "lemonfiber-bundled"
-description = "The stack this build embeds, read as one manifest when it is built."
+description = "The stack and the default bundle this build embeds, read when it is built."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -15,6 +15,9 @@ build = "build.rs"
 # The same assembly every other reader uses, so the text compiled in here is the
 # manifest lemonfiber reads at run time and not a second idea of it.
 lemonfiber-manifest = { workspace = true }
+# The default bundle's reader, which holds every copy to its pin before the pins are
+# compiled in.
+lemonfiber-bundle = { workspace = true }
 
 [lints]
 workspace = true

@@ -1392,9 +1392,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "lemonfiber-bundle"
+version = "0.17.0"
+dependencies = [
+ "ring",
+ "serde",
+ "thiserror",
+ "toml",
+]
+
+[[package]]
 name = "lemonfiber-bundled"
 version = "0.17.0"
 dependencies = [
+ "lemonfiber-bundle",
  "lemonfiber-manifest",
 ]
 

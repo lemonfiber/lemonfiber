@@ -4,3 +4,6 @@
 [submodule "assets/web"]
 	path = assets/web
 	url = https://github.com/lemonfiber/lemonfiber-web.git
+[submodule "assets/plugins"]
+	path = assets/plugins
+	url = https://github.com/lemonfiber/lemonfiber-plugins.git
