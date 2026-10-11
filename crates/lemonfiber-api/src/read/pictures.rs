@@ -15,6 +15,7 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 use lemonfiber_core::app::{Command, Viewing, Whom, Wishing};
+use lemonfiber_core::error::Problem;
 use lemonfiber_core::ports::service::Picture;
 use lemonfiber_core::screening::{picture, spoke, Pictured};
 
@@ -58,10 +59,7 @@ async fn found(
     if let Some(asker) = caller.member() {
         spoke(&serving.ctx, asker);
     }
-    match lemonfiber_core::wishing::poster(&serving.ctx, &member, &kind, &id).await {
-        Ok(pictured) => shown(pictured),
-        Err(problem) => went_wrong(&problem),
-    }
+    answered(lemonfiber_core::wishing::poster(&serving.ctx, &member, &kind, &id).await)
 }
 
 /// Whose search a poster read is for and the kind of title it names, ruled on as the
@@ -106,10 +104,7 @@ async fn pictured(
     if let Some(asker) = caller.member() {
         spoke(&serving.ctx, asker);
     }
-    match picture(&serving.ctx, &member, &id, which).await {
-        Ok(pictured) => shown(pictured),
-        Err(problem) => went_wrong(&problem),
-    }
+    answered(picture(&serving.ctx, &member, &id, which).await)
 }
 
 /// Whose shelf and which title a picture read asks for, ruled on as the title read is,
@@ -136,6 +131,14 @@ fn titled(granted: Result<Command, Box<Response>>) -> Result<(Whom, String), Box
         Ok(Command::Viewing(Viewing::Title { member, id })) => Ok((member, id)),
         Ok(_) => Err(Box::new(Refusal::NoSuchRead.answered())),
         Err(refused) => Err(refused),
+    }
+}
+
+/// The picture a read fetched, or what went wrong fetching it.
+fn answered(outcome: Result<Pictured, Box<Problem>>) -> Response {
+    match outcome {
+        Ok(pictured) => shown(pictured),
+        Err(problem) => went_wrong(&problem),
     }
 }
 
