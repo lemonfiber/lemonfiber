@@ -7,6 +7,8 @@
 use std::collections::BTreeMap;
 use std::net::Ipv4Addr;
 
+use lemonfiber_contract::capabilities::media::serve;
+
 /// A block of addresses, as its first address and its prefix length.
 pub type Block = (Ipv4Addr, u8);
 
@@ -30,7 +32,7 @@ const PROXY_SUBNET: Subnet = Subnet {
 const DOOR_ON_PROXY: Ipv4Addr = Ipv4Addr::new(10, 80, 96, 2);
 
 /// The proxy's fixed address there, the one proxy the door trusts to name a client.
-const PROXY_ON_PROXY: Ipv4Addr = Ipv4Addr::new(10, 80, 96, 3);
+pub const PROXY_ON_PROXY: Ipv4Addr = Ipv4Addr::new(10, 80, 96, 3);
 
 /// The subnet the guarded door and the media server share, on the door's ask of
 /// `media.serve`.
@@ -41,13 +43,10 @@ const MEDIA_SUBNET: Subnet = Subnet {
 
 /// The door's fixed address on its ask of `media.serve`, the one proxy the media server
 /// trusts to name a client.
-const DOOR_ON_MEDIA: Ipv4Addr = Ipv4Addr::new(10, 80, 96, 18);
+pub const DOOR_ON_MEDIA: Ipv4Addr = Ipv4Addr::new(10, 80, 96, 18);
 
 /// The capability whose filler is the proxy.
-pub const PROXY_FRONT: &str = "proxy.front";
-
-/// The capability whose filler serves media.
-pub const MEDIA_SERVE: &str = "media.serve";
+const PROXY_FRONT: &str = "proxy.front";
 
 /// One service, as its place on the project's networks needs it.
 #[derive(Debug, Clone, Copy)]
@@ -132,27 +131,17 @@ pub fn derived(
             .unwrap_or(id)
             .to_owned()
     };
-    let mut topology = Topology::default();
-    let join = |topology: &mut Topology, network: &str, id: &str, address: Option<Ipv4Addr>| {
-        if let Placed::On(on) = topology
-            .placed
-            .entry(id.to_owned())
-            .or_insert_with(|| Placed::On(BTreeMap::new()))
-        {
-            on.insert(network.to_owned(), address);
-        }
+    let mut networks = BTreeMap::new();
+    let mut on: BTreeMap<String, BTreeMap<String, Option<Ipv4Addr>>> = BTreeMap::new();
+    let mut join = |network: &str, id: &str, address: Option<Ipv4Addr>| {
+        on.entry(id.to_owned())
+            .or_default()
+            .insert(network.to_owned(), address);
     };
-    for member in members {
-        if let Some(inside) = member.inside {
-            topology
-                .placed
-                .insert(member.id.to_owned(), Placed::Inside(inside.to_owned()));
-        }
-    }
     for member in members.iter().filter(|member| member.inside.is_none()) {
         if member.publishes || !member.confined {
             let name = named(&["own", member.id]);
-            topology.networks.insert(
+            networks.insert(
                 name.clone(),
                 Network {
                     internal: false,
@@ -160,13 +149,13 @@ pub fn derived(
                     fixed: None,
                 },
             );
-            join(&mut topology, &name, member.id, None);
+            join(&name, member.id, None);
         }
         if let Some(upstream) = member.fronts {
             let name = named(&["front", member.id]);
-            topology.networks.insert(name.clone(), internal(None));
-            join(&mut topology, &name, member.id, None);
-            join(&mut topology, &name, &host(upstream), None);
+            networks.insert(name.clone(), internal(None));
+            join(&name, member.id, None);
+            join(&name, &host(upstream), None);
         }
     }
     let guard = guard.map(&host);
@@ -177,16 +166,9 @@ pub fn derived(
         }
         let name = named(&["ask", &asker, ask.capability, &reached]);
         let fixed = fixing(guard.as_deref(), &asker, ask.capability);
-        topology
-            .networks
-            .insert(name.clone(), internal(fixed.map(|fixed| fixed.subnet)));
-        join(&mut topology, &name, &asker, fixed.map(|fixed| fixed.asker));
-        join(
-            &mut topology,
-            &name,
-            &reached,
-            fixed.and_then(|fixed| fixed.reached),
-        );
+        networks.insert(name.clone(), internal(fixed.map(|fixed| fixed.subnet)));
+        join(&name, &asker, fixed.map(|fixed| fixed.asker));
+        join(&name, &reached, fixed.and_then(|fixed| fixed.reached));
     }
     for link in links {
         let (by, to) = (host(link.by), host(link.to));
@@ -194,17 +176,27 @@ pub fn derived(
             continue;
         }
         let name = named(&["link", &by, &to]);
-        topology.networks.insert(name.clone(), internal(None));
-        join(&mut topology, &name, &by, None);
-        join(&mut topology, &name, &to, None);
+        networks.insert(name.clone(), internal(None));
+        join(&name, &by, None);
+        join(&name, &to, None);
     }
+    let mut placed: BTreeMap<String, Placed> = on
+        .into_iter()
+        .map(|(id, on)| (id, Placed::On(on)))
+        .collect();
     for member in members {
-        topology
-            .placed
-            .entry(member.id.to_owned())
-            .or_insert(Placed::Nowhere);
+        match member.inside {
+            Some(inside) => {
+                placed.insert(member.id.to_owned(), Placed::Inside(inside.to_owned()));
+            }
+            None => {
+                placed
+                    .entry(member.id.to_owned())
+                    .or_insert(Placed::Nowhere);
+            }
+        }
     }
-    topology
+    Topology { networks, placed }
 }
 
 /// The fixed subnet and addresses one ask's network carries.
@@ -230,7 +222,7 @@ fn fixing(guard: Option<&str>, asker: &str, capability: &str) -> Option<Fixing> 
             asker: DOOR_ON_PROXY,
             reached: Some(PROXY_ON_PROXY),
         }),
-        MEDIA_SERVE => Some(Fixing {
+        serve::CAPABILITY => Some(Fixing {
             subnet: MEDIA_SUBNET,
             asker: DOOR_ON_MEDIA,
             reached: None,
@@ -277,18 +269,6 @@ fn named(parts: &[&str]) -> String {
         })
         .collect::<Vec<_>>()
         .join(SEPARATOR)
-}
-
-/// The door's address the media server trusts as the one proxy naming a client.
-#[must_use]
-pub const fn trusted_by_media() -> Ipv4Addr {
-    DOOR_ON_MEDIA
-}
-
-/// The proxy's address the door trusts as the one proxy naming a client.
-#[must_use]
-pub const fn trusted_by_door() -> Ipv4Addr {
-    PROXY_ON_PROXY
 }
 
 #[cfg(test)]

@@ -142,6 +142,19 @@ const REFUSES: &[(&str, &str)] = &[
     ),
 ];
 
+/// The files that name addresses the core assigns on the project's own networks, and
+/// why none of those is one this product listens on or connects to.
+///
+/// Every address written here is one a container of the generated project holds on a
+/// network with no route off the host, and one the core hands to another service as
+/// the proxy it trusts. A file arriving on this list is somebody writing down that it
+/// only ever assigns, which is the claim a reviewer checks.
+const ASSIGNS: &[(&str, &str)] = &[(
+    "crates/lemonfiber-core/src/topology.rs",
+    "the subnets and the fixed addresses the guarded door and the proxy hold on the \
+     networks of the door's asks, which the media server and the door are told to trust",
+)];
+
 /// The addresses beyond this machine that the policy names, and what each is for.
 ///
 /// Two, and they are one decision written on both families. An entry arriving here
@@ -358,11 +371,22 @@ fn every_address_beyond_this_machine_is_one_the_policy_names() {
         "the sweep found no address in the file that decides the tier, so it is reading the \
          wrong thing: {found:?}"
     );
+    let listed: Vec<&str> = REFUSES
+        .iter()
+        .chain(ASSIGNS)
+        .map(|(file, _)| *file)
+        .filter(|file| !found.iter().any(|address| address.file == *file))
+        .collect();
+    assert!(
+        listed.is_empty(),
+        "these are listed as naming addresses and name none: {listed:?}"
+    );
     let declared: BTreeSet<&str> = POLICY.iter().map(|(named, _)| *named).collect();
     let unnamed: Vec<String> = found
         .iter()
         .filter(|address| !address.loopback)
         .filter(|address| !REFUSES.iter().any(|(file, _)| *file == address.file))
+        .filter(|address| !ASSIGNS.iter().any(|(file, _)| *file == address.file))
         .filter(|address| !declared.contains(address.written.as_str()) || address.file != DECIDES)
         .map(|address| format!("{}:{}: `{}`", address.file, address.line, address.written))
         .collect();

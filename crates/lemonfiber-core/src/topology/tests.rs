@@ -1,7 +1,12 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::net::Ipv4Addr;
 
-use super::{derived, Member, Named, Placed, Settled, Topology, MEDIA_SERVE, PROXY_FRONT};
+use lemonfiber_contract::capabilities::media::serve::CAPABILITY as MEDIA_SERVE;
+
+use super::{
+    derived, Block, Member, Named, Placed, Settled, Topology, DOOR_ON_MEDIA, DOOR_ON_PROXY,
+    MEDIA_SUBNET, PROXY_FRONT, PROXY_ON_PROXY, PROXY_SUBNET,
+};
 
 const fn member(id: &str) -> Member<'_> {
     Member {
@@ -30,6 +35,41 @@ fn on(topology: &Topology, id: &str) -> BTreeMap<String, Option<Ipv4Addr>> {
 
 fn names(topology: &Topology, id: &str) -> Vec<String> {
     on(topology, id).into_keys().collect()
+}
+
+fn joined(topology: &Topology) -> BTreeMap<String, BTreeSet<String>> {
+    let mut joined: BTreeMap<String, BTreeSet<String>> = topology
+        .networks
+        .keys()
+        .map(|name| (name.clone(), BTreeSet::new()))
+        .collect();
+    for (id, placed) in &topology.placed {
+        if let Placed::On(on) = placed {
+            for name in on.keys() {
+                joined.entry(name.clone()).or_default().insert(id.clone());
+            }
+        }
+    }
+    joined
+}
+
+fn spelled(networks: &[(&str, &[&str])]) -> BTreeMap<String, BTreeSet<String>> {
+    networks
+        .iter()
+        .map(|(name, ids)| {
+            (
+                (*name).to_owned(),
+                ids.iter().map(|id| (*id).to_owned()).collect(),
+            )
+        })
+        .collect()
+}
+
+fn holds(block: Block, address: Ipv4Addr) -> bool {
+    let mask = u32::MAX
+        .checked_shl(u32::BITS - u32::from(block.1))
+        .unwrap_or(0);
+    u32::from(address) & mask == u32::from(block.0) & mask
 }
 
 #[test]
@@ -158,15 +198,15 @@ fn the_door_holds_fixed_addresses_on_its_asks_of_the_proxy_and_the_media_server(
     let door_on = on(&topology, "door");
     assert_eq!(
         door_on.get("ask__door__proxy.front__caddy"),
-        Some(&Some(Ipv4Addr::new(10, 80, 96, 2)))
+        Some(&Some(DOOR_ON_PROXY))
     );
     assert_eq!(
         door_on.get("ask__door__media.serve__jellyfin"),
-        Some(&Some(super::trusted_by_media()))
+        Some(&Some(DOOR_ON_MEDIA))
     );
     assert_eq!(
         on(&topology, "caddy").get("ask__door__proxy.front__caddy"),
-        Some(&Some(super::trusted_by_door()))
+        Some(&Some(PROXY_ON_PROXY))
     );
     assert_eq!(
         on(&topology, "jellyfin").get("ask__door__media.serve__jellyfin"),
@@ -176,7 +216,12 @@ fn the_door_holds_fixed_addresses_on_its_asks_of_the_proxy_and_the_media_server(
         .networks
         .get("ask__door__media.serve__jellyfin")
         .and_then(|network| network.fixed)
-        .is_some_and(|subnet| subnet.whole == (Ipv4Addr::new(10, 80, 96, 16), 28)));
+        .is_some_and(|subnet| subnet == MEDIA_SUBNET));
+    assert!(topology
+        .networks
+        .get("ask__door__proxy.front__caddy")
+        .and_then(|network| network.fixed)
+        .is_some_and(|subnet| subnet == PROXY_SUBNET));
     let unguarded = derived(&members, &asks, &[], None);
     assert!(unguarded
         .networks
@@ -186,20 +231,108 @@ fn the_door_holds_fixed_addresses_on_its_asks_of_the_proxy_and_the_media_server(
 
 #[test]
 fn no_network_joins_services_that_no_rule_joins() {
-    let members = [member("a"), member("b"), member("c")];
-    let topology = derived(&members, &[ask("a", "x.y", "b")], &[], None);
-    for name in topology.networks.keys() {
-        let joined: Vec<&String> = topology
-            .placed
-            .iter()
-            .filter(|(_, placed)| matches!(placed, Placed::On(on) if on.contains_key(name)))
-            .map(|(id, _)| id)
-            .collect();
-        assert!(
-            !joined.contains(&&"c".to_owned()) || name == "own__c",
-            "{name}: {joined:?}"
-        );
+    let adapter = Member {
+        confined: true,
+        fronts: Some("jellyfin-server"),
+        ..member("jellyfin")
+    };
+    let client = Member {
+        inside: Some("gluetun"),
+        ..member("qbittorrent")
+    };
+    let quiet = Member {
+        confined: true,
+        ..member("gate")
+    };
+    let members = [
+        member("seerr"),
+        member("sonarr"),
+        member("jellyfin-server"),
+        adapter,
+        member("gluetun"),
+        client,
+        quiet,
+    ];
+    let asks = [
+        ask("seerr", "library.curate", "sonarr"),
+        ask("seerr", MEDIA_SERVE, "jellyfin"),
+        ask("sonarr", "download.torrent", "qbittorrent"),
+        ask("qbittorrent", "network.egress-guard", "gluetun"),
+    ];
+    let links = [Named {
+        by: "sonarr",
+        to: "qbittorrent",
+    }];
+    let topology = derived(&members, &asks, &links, None);
+    assert_eq!(
+        joined(&topology),
+        spelled(&[
+            ("ask__seerr__library.curate__sonarr", &["seerr", "sonarr"]),
+            ("ask__seerr__media.serve__jellyfin", &["jellyfin", "seerr"]),
+            (
+                "ask__sonarr__download.torrent__gluetun",
+                &["gluetun", "sonarr"]
+            ),
+            ("front__jellyfin", &["jellyfin", "jellyfin-server"]),
+            ("link__sonarr__gluetun", &["gluetun", "sonarr"]),
+            ("own__gluetun", &["gluetun"]),
+            ("own__jellyfin-server", &["jellyfin-server"]),
+            ("own__seerr", &["seerr"]),
+            ("own__sonarr", &["sonarr"]),
+        ])
+    );
+    assert_eq!(topology.placed.get("gate"), Some(&Placed::Nowhere));
+}
+
+#[test]
+fn a_link_by_name_within_one_network_namespace_is_no_network() {
+    let client = Member {
+        inside: Some("gluetun"),
+        ..member("qbittorrent")
+    };
+    let topology = derived(
+        &[member("gluetun"), client],
+        &[],
+        &[Named {
+            by: "qbittorrent",
+            to: "gluetun",
+        }],
+        None,
+    );
+    assert_eq!(names(&topology, "gluetun"), ["own__gluetun"]);
+    assert_eq!(topology.networks.len(), 1);
+}
+
+#[test]
+fn the_door_holds_no_fixed_address_on_an_ask_of_anything_else() {
+    let members = [member("door"), member("tinyauth")];
+    let asks = [ask("door", "identity.source", "tinyauth")];
+    let topology = derived(&members, &asks, &[], Some("door"));
+    assert_eq!(
+        on(&topology, "door").get("ask__door__identity.source__tinyauth"),
+        Some(&None)
+    );
+    assert!(topology
+        .networks
+        .values()
+        .all(|network| network.fixed.is_none()));
+}
+
+#[test]
+fn each_fixed_address_lies_in_its_subnet_where_the_engine_hands_out_no_other() {
+    for (subnet, addresses) in [
+        (PROXY_SUBNET, &[DOOR_ON_PROXY, PROXY_ON_PROXY][..]),
+        (MEDIA_SUBNET, &[DOOR_ON_MEDIA][..]),
+    ] {
+        assert!(holds(subnet.whole, subnet.handed_out.0));
+        assert!(subnet.handed_out.1 > subnet.whole.1);
+        for address in addresses {
+            assert!(holds(subnet.whole, *address), "{address}");
+            assert!(!holds(subnet.handed_out, *address), "{address}");
+        }
     }
+    assert!(!holds(PROXY_SUBNET.whole, MEDIA_SUBNET.whole.0));
+    assert!(!holds(MEDIA_SUBNET.whole, PROXY_SUBNET.whole.0));
 }
 
 #[test]
