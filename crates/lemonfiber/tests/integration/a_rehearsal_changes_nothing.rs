@@ -490,8 +490,8 @@ fn typed(named: &str) -> bool {
 
 /// Every name a refusal publishes is a command line that can actually be typed.
 ///
-/// A refusal ends with ``Run `lemonfiber <named>` without `--dry-run` when you mean
-/// it``, and `<named>` comes from `app::rehearsal`, which is in another crate and had
+/// A refusal ends with `Run lemonfiber <named> without --dry-run when you mean it`,
+/// and `<named>` comes from `app::rehearsal`, which is in another crate and had
 /// never been read against clap. Three of them named nothing: `household remove` for a
 /// subcommand that is top-level, `self-update` for what is spelled `update self`, and
 /// `repair` for a thing the command line does not offer at all — it arrives from the
