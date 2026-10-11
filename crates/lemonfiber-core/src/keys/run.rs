@@ -141,7 +141,10 @@ pub async fn mint(
     let secret = Secret::mint(ctx.seams.random.as_ref()).ok_or_else(|| Box::new(no_secret()))?;
     let now = crate::instant::written(ctx.seams.clock.now()).unwrap_or_default();
     let record = Record::minted(name, scope, purpose, &secret, now, by.clone());
-    changed(ctx, &path, |kept| added(ctx, &path, kept, &record, by)).await?;
+    let mut opened = Opened::at(ctx, &path).await?;
+    let made = added(ctx, &path, &mut opened.kept, &record, by);
+    opened.let_go(ctx).await;
+    made?;
     heard(ctx, &record, Heard::Minted).await;
     let reached = crate::companion::reaching(ctx).await;
     Ok(Minted {
@@ -234,33 +237,46 @@ fn added(
     kept.keep(path).map_err(|why| Box::new(unkept(why)))
 }
 
-/// What `change` makes of the keys at `path`, read while they are held and with every
-/// lapsed claim revoked first, each lapse heard once the hold is let go.
-///
-/// A rehearsal takes no hold: it writes nothing for another process to write over.
-///
-/// # Errors
-///
-/// A [`Problem`] where the keys cannot be held, read or written, a lapse cannot be
-/// journaled, or wherever `change` refuses.
-async fn changed<T>(
-    ctx: &Ctx,
-    path: &Path,
-    change: impl FnOnce(&mut Kept) -> Result<T, Box<Problem>>,
-) -> Result<T, Box<Problem>> {
-    let held = if ctx.dry_run {
-        None
-    } else {
-        Some(held(path).await?)
-    };
-    let mut kept = read(path)?;
-    let lapsed = claimed::lapse(ctx, path, &mut kept)?;
-    let made = change(&mut kept);
-    drop(held);
-    for record in &lapsed {
-        heard(ctx, record, Heard::Lapsed).await;
+/// The keys as one change finds them: held, read under the hold, and with every claim
+/// that lapsed revoked.
+struct Opened {
+    /// The hold, kept until [`Opened::let_go`]; none in a rehearsal, which writes nothing
+    /// for another process to write over.
+    held: Option<Held>,
+    /// The keys.
+    kept: Kept,
+    /// The keys whose claims lapsed, heard once the hold is let go.
+    lapsed: Vec<Record>,
+}
+
+impl Opened {
+    /// The keys at `path`, held and read.
+    ///
+    /// # Errors
+    ///
+    /// A [`Problem`] where the keys cannot be held, read or written, or a lapse cannot be
+    /// journaled.
+    async fn at(ctx: &Ctx, path: &Path) -> Result<Self, Box<Problem>> {
+        let held = if ctx.dry_run {
+            None
+        } else {
+            Some(held(path).await?)
+        };
+        let mut kept = read(path)?;
+        let lapsed = claimed::lapse(ctx, path, &mut kept)?;
+        Ok(Self { held, kept, lapsed })
     }
-    made
+
+    /// Let the keys go, tell the operator of every lapse, and answer with the keys as
+    /// they were left.
+    async fn let_go(self, ctx: &Ctx) -> Kept {
+        let Self { held, kept, lapsed } = self;
+        drop(held);
+        for record in &lapsed {
+            heard(ctx, record, Heard::Lapsed).await;
+        }
+        kept
+    }
 }
 
 /// The hold on the keys at `path`, or why it could not be taken.
@@ -277,7 +293,7 @@ async fn held(path: &Path) -> Result<Held, Box<Problem>> {
 /// cannot be read.
 pub async fn list(ctx: &Ctx, by: &Minter) -> Result<Listing, Box<Problem>> {
     let path = at(ctx).ok_or_else(|| Box::new(nowhere()))?;
-    let kept = changed(ctx, &path, |kept| Ok(std::mem::take(kept))).await?;
+    let kept = Opened::at(ctx, &path).await?.let_go(ctx).await;
     Ok(listed(ctx, &seen_by(kept, by), None).await)
 }
 
@@ -321,29 +337,46 @@ pub fn members_may_mint(ctx: &Ctx) -> bool {
 /// revoke a key that is not theirs, or the keys or the journal cannot be read or written.
 pub async fn revoke(ctx: &Ctx, name: &str, by: &Minter) -> Result<Listing, Box<Problem>> {
     let path = at(ctx).ok_or_else(|| Box::new(nowhere()))?;
-    let (found, kept) = changed(ctx, &path, |kept| {
-        let seen = seen_by(kept.clone(), by);
-        let Some(found) = active(&seen, name) else {
-            return Err(Box::new(no_such_key(name, seen.named(name))));
-        };
-        if !ctx.dry_run {
-            journalled(
-                ctx,
-                &found,
-                Kind::KeyRevoked {
-                    name: found.name.clone(),
-                    scope: found.scope.written(),
-                },
-            )?;
-            revoked(ctx, &path, kept, &found.name)?;
-        }
-        Ok((found, std::mem::take(kept)))
-    })
-    .await?;
+    let mut opened = Opened::at(ctx, &path).await?;
+    let found = revoking(ctx, &path, &mut opened.kept, name, by);
+    let kept = opened.let_go(ctx).await;
+    let found = found?;
     if !ctx.dry_run {
         heard(ctx, &found, Heard::Revoked).await;
     }
     Ok(listed(ctx, &seen_by(kept, by), Some(found.name)).await)
+}
+
+/// The active key holding `name` that `by` may revoke, revoked and journaled unless this
+/// is a rehearsal.
+///
+/// # Errors
+///
+/// A [`Problem`] where no such key is `by`'s to revoke, or the journal or the keys cannot
+/// be written.
+fn revoking(
+    ctx: &Ctx,
+    path: &Path,
+    kept: &mut Kept,
+    name: &str,
+    by: &Minter,
+) -> Result<Record, Box<Problem>> {
+    let seen = seen_by(kept.clone(), by);
+    let Some(found) = active(&seen, name) else {
+        return Err(Box::new(no_such_key(name, seen.named(name))));
+    };
+    if !ctx.dry_run {
+        journalled(
+            ctx,
+            &found,
+            Kind::KeyRevoked {
+                name: found.name.clone(),
+                scope: found.scope.written(),
+            },
+        )?;
+        revoked(ctx, path, kept, &found.name)?;
+    }
+    Ok(found)
 }
 
 /// Revoke a key as the reversal of the run that minted it.

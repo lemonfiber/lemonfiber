@@ -10,7 +10,7 @@ use crate::journal::Kind;
 use super::super::claiming::{Claim, Claimed, KEY_LINK, MINUTES_TO_COLLECT};
 use super::super::{Kept, Minted, Minter, Record, Secret};
 use super::refused::{claim_not_open, no_secret, nowhere, unkept, unlinkable};
-use super::{added, at, changed, heard, journalled, prepared, Heard, Prepared};
+use super::{added, at, heard, journalled, prepared, Heard, Opened, Prepared};
 
 /// Mint a key as a claim, and answer with the link that collects it.
 ///
@@ -51,7 +51,10 @@ pub(super) async fn mint(
         .map_or(0, |since| since.as_secs());
     let minted = crate::instant::written(now).unwrap_or_default();
     let record = Record::claimed(name, scope, purpose, &claim, lapses, minted, by.clone());
-    changed(ctx, &path, |kept| added(ctx, &path, kept, &record, by)).await?;
+    let mut opened = Opened::at(ctx, &path).await?;
+    let made = added(ctx, &path, &mut opened.kept, &record, by);
+    opened.let_go(ctx).await;
+    made?;
     heard(ctx, &record, Heard::Minted).await;
     Ok(Claimed {
         link: crate::companion::linked(KEY_LINK, &material, expires, &[("claim", claim.as_str())]),
@@ -79,7 +82,10 @@ pub(super) async fn collect(
     from: Option<String>,
 ) -> Result<Minted, Box<Problem>> {
     let path = at(ctx).ok_or_else(|| Box::new(nowhere()))?;
-    let (record, secret) = changed(ctx, &path, |kept| collected(ctx, &path, kept, offered)).await?;
+    let mut opened = Opened::at(ctx, &path).await?;
+    let made = collected(ctx, &path, &mut opened.kept, offered);
+    opened.let_go(ctx).await;
+    let (record, secret) = made?;
     heard(ctx, &record, Heard::Collected { from }).await;
     let reached = crate::companion::reaching(ctx).await;
     Ok(Minted {

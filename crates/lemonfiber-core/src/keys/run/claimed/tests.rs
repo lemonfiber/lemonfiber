@@ -5,12 +5,13 @@ use lemonfiber_fixtures::heard::Heard;
 use lemonfiber_fixtures::ports::{Chance, Renamed, Stopped};
 use lemonfiber_fixtures::scratch::Scratch;
 
-use super::super::{at, list};
+use super::super::{at, list, undone};
 use super::{collect, lapse, mint};
 use crate::app::Ctx;
 use crate::companion::served;
 use crate::config::Settings;
-use crate::error::codes::key::{CLAIM_NOT_OPEN, UNLINKABLE};
+use crate::error::codes::config::{CONFIG_NOT_WRITTEN, CONFIG_NOWHERE};
+use crate::error::codes::key::{BAD_NAME, CLAIM_NOT_OPEN, NAME_TAKEN, NO_SECRET, UNLINKABLE};
 use crate::journal::Kind;
 use crate::keys::claiming::MINUTES_TO_COLLECT;
 use crate::keys::{Kept, Minter, State};
@@ -320,4 +321,107 @@ fn a_pairing_refused_without_a_remedy_still_says_how_to_mint_a_claim() {
         .remedies
         .iter()
         .any(|remedy| remedy.action.contains("Serve the stack encrypted")));
+}
+
+/// The claim the machine's first key, `ha`, was minted with.
+async fn minted_claim(machine: &Machine) -> String {
+    let (ctx, _) = machine.at(0);
+    mint(&ctx, "ha", "read", "home-assistant", &Minter::Operator)
+        .await
+        .map(|claimed| claim_in(&claimed.link))
+        .unwrap_or_default()
+}
+
+/// Something kept where the keys are staged before they are written, so no write lands.
+fn unwritable(ctx: &Ctx) {
+    let staging = at(ctx)
+        .unwrap_or_default()
+        .with_file_name("keys.json.writing");
+    assert!(std::fs::create_dir_all(staging.join("taken")).is_ok());
+}
+
+#[tokio::test]
+async fn a_claim_is_refused_whatever_a_mint_of_a_secret_refuses() {
+    let machine = Machine::new("claim-refusals", true);
+    let (ctx, _) = machine.at(0);
+    let bad = mint(&ctx, "Not A Name", "read", "other", &Minter::Operator).await;
+    assert!(bad.is_err_and(|problem| problem.code == BAD_NAME));
+    let _ = minted_claim(&machine).await;
+    let taken = mint(&ctx, "ha", "read", "other", &Minter::Operator).await;
+    assert!(taken.is_err_and(|problem| problem.code == NAME_TAKEN));
+    let starved = ctx.with_random(Arc::new(Chance::exactly(None)));
+    let refused = mint(&starved, "mcp", "read", "mcp", &Minter::Operator).await;
+    assert!(refused.is_err_and(|problem| problem.code == NO_SECRET));
+    assert!(kept(&starved).named("mcp").is_none());
+}
+
+#[tokio::test]
+async fn nothing_is_collected_where_no_keys_are_kept() {
+    let refused = collect(
+        &a_context().build(),
+        &format!("lfc_{}", "0".repeat(64)),
+        None,
+    )
+    .await;
+    assert!(refused.is_err_and(|problem| problem.code == CONFIG_NOWHERE));
+}
+
+#[tokio::test]
+async fn a_collection_with_no_randomness_for_its_secret_leaves_the_key_waiting() {
+    let machine = Machine::new("collect-starved", true);
+    let claim = minted_claim(&machine).await;
+    let (later, _) = machine.at(60);
+    let starved = later.with_random(Arc::new(Chance::exactly(None)));
+    let refused = collect(&starved, &claim, None).await;
+    assert!(refused.is_err_and(|problem| problem.code == NO_SECRET));
+    assert!(kept(&starved)
+        .named("ha")
+        .is_some_and(crate::keys::Record::is_waiting));
+}
+
+#[tokio::test]
+async fn a_collection_that_cannot_be_written_hands_over_nothing() {
+    let machine = Machine::new("collect-unwritten", true);
+    let claim = minted_claim(&machine).await;
+    let (later, heard) = machine.at(60);
+    unwritable(&later);
+    assert!(collect(&later, &claim, None).await.is_err());
+    assert!(kept(&later)
+        .named("ha")
+        .is_some_and(crate::keys::Record::is_waiting));
+    assert!(!heard.said().iter().any(|said| said.contains("collected")));
+}
+
+#[tokio::test]
+async fn a_lapse_that_cannot_be_written_revokes_nothing() {
+    let machine = Machine::new("lapse-unwritten", true);
+    let _ = minted_claim(&machine).await;
+    let (later, heard) = machine.at(3_600);
+    unwritable(&later);
+    assert!(list(&later, &Minter::Operator).await.is_err());
+    assert!(kept(&later)
+        .named("ha")
+        .is_some_and(crate::keys::Record::is_waiting));
+    assert!(!heard.said().iter().any(|said| said.contains("in time")));
+}
+
+#[tokio::test]
+async fn keys_that_cannot_be_held_are_neither_read_nor_changed() {
+    let machine = Machine::new("unheld", true);
+    let claim = minted_claim(&machine).await;
+    let (later, _) = machine.at(60);
+    let hold = at(&later)
+        .unwrap_or_default()
+        .with_file_name("keys.json.lock");
+    let _ = std::fs::remove_file(&hold);
+    assert!(std::fs::create_dir_all(&hold).is_ok());
+    let refused = collect(&later, &claim, None).await;
+    assert!(refused.is_err_and(|problem| problem.code == CONFIG_NOT_WRITTEN));
+    let listed = list(&later, &Minter::Operator).await;
+    assert!(listed.is_err_and(|problem| problem.code == CONFIG_NOT_WRITTEN));
+    let undone = undone(&later, "ha").await;
+    assert!(undone.is_err_and(|problem| problem.code == CONFIG_NOT_WRITTEN));
+    assert!(kept(&later)
+        .named("ha")
+        .is_some_and(crate::keys::Record::is_waiting));
 }
