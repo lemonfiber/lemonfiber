@@ -261,7 +261,7 @@ def claim_tag(workflow: dict, _cargo: dict) -> list[str]:
 WRITTEN = {
     "the workflow's own permission": permissions.SCOPED,
     "the host job's scope": permissions.HOST_SCOPED,
-    "the minted token": permissions.HOST_MINTS,
+    "the minted token": permissions.MINT,
     "the release step's token": permissions.CREATES_WITH_TOKEN,
     "the plan step": by_env.PLAN_BY_ENV,
     "the local build step": by_env.LOCAL_BY_ENV,
@@ -498,7 +498,7 @@ READS_THE_TEXT = frozenset({claim_applied})
 # the patches run backwards, taken from the scripts that apply them.
 BREAKS = {
     "applied": lambda w, c: (
-        w.replace(permissions.HOST_MINTS, permissions.HOST_STEPS),
+        w.replace(permissions.MINT, ""),
         c,
     ),
     "draft": lambda w, c: (w.replace(f"{RELEASE_CREATE} --draft ", f"{RELEASE_CREATE} "), c),

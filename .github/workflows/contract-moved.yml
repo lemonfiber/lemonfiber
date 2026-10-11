@@ -51,6 +51,7 @@ jobs:
             sdk-ts
             sdk-php
             sdk-python
+          permission-actions: write
 
       - name: Ask each SDK to take what we serve
         env:
