@@ -89,6 +89,53 @@ pub(super) fn answering(label: &str) -> bool {
     hostnames().iter().any(|held| held == label)
 }
 
+/// The service the shipped proxy sends this name to, where it answers on it.
+pub(super) fn routed_to(label: &str) -> Option<&'static str> {
+    static ROUTED: LazyLock<Vec<(String, String)>> = LazyLock::new(|| routes(PROXY));
+    ROUTED
+        .iter()
+        .find(|(held, _)| held == label)
+        .map(|(_, service)| service.as_str())
+}
+
+/// Each label the proxy configuration answers on, with the service its first
+/// `reverse_proxy` inside that stanza names.
+pub(super) fn routes(text: &str) -> Vec<(String, String)> {
+    let mut found = Vec::new();
+    let mut open: Option<String> = None;
+    for line in text.lines() {
+        let said = line.trim_start().trim_start_matches('#').trim_start();
+        if let Some((label, rest)) = said.split_once(DOMAIN) {
+            if !label.is_empty() && label.chars().all(is_label) {
+                open = Some(label.to_owned());
+                if let Some(service) = proxied_service(rest) {
+                    found.push((label.to_owned(), service));
+                    open = None;
+                }
+                continue;
+            }
+        }
+        let Some(label) = open.as_ref() else {
+            continue;
+        };
+        if let Some(service) = proxied_service(said) {
+            found.push((label.clone(), service));
+            open = None;
+        } else if said.starts_with('}') {
+            open = None;
+        }
+    }
+    found
+}
+
+/// The service a `reverse_proxy <service>:<port>` in `text` names.
+fn proxied_service(text: &str) -> Option<String> {
+    let (_, after) = text.split_once("reverse_proxy ")?;
+    let target = after.split_whitespace().next()?;
+    let service = target.split(':').next()?;
+    (!service.is_empty()).then(|| service.to_owned())
+}
+
 /// Every label the proxy configuration puts in front of the operator's domain.
 ///
 /// Read off the one shape the file is written in — a label, the domain placeholder,

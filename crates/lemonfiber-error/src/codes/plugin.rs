@@ -435,4 +435,16 @@ codes! {
         remedy: "See what is on this machine with `lemonfiber plugin installed`, and prove it by \
             that id.",
     }
+    /// Raised when a plugin that is not first-party declares a service replacing one the
+    /// stack ships.
+    STRANGER_REPLACING = "PLUGIN-40" {
+        severity: Error,
+        status: 403,
+        since: "0.18.0",
+        meaning: "The plugin declares a service that moves one of the stack's own services in \
+            place, and only a plugin this build embeds as first-party may do that. Nothing was \
+            written.",
+        remedy: "Install the plugin without that service's `replaces`, or use the first-party \
+            plugin this build names for that part.",
+    }
 }

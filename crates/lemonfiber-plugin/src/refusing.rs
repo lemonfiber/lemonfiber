@@ -37,6 +37,7 @@ mod fronting;
 mod naming;
 mod reaching;
 mod recipes;
+mod replacing;
 mod shaping;
 mod speaking;
 
@@ -187,6 +188,7 @@ fn running(manifest: &Manifest, found: &mut Vec<Violation>) {
         speaking::spoken(service, &manifest.services, found);
         shaping::shaped(service, &manifest.services, found);
         fronting::native(service, &manifest.services, found);
+        replacing::replaced(service, found);
     }
 }
 

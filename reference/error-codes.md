@@ -315,6 +315,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `PLUGIN-37` | `PATH_NOT_PLAIN` | error | 1 | 400 | 0.18.0 | Raised when a recipe's call path is not a plain absolute path; the manifest's every other fault is listed beside it. |
 | `PLUGIN-38` | `VALUE_WITHHELD` | error | 1 | 400 | 0.18.0 | Raised when a recipe's call was not sent because a value it carries may not go where it was going: not where its pairs say, not back to the service a credential belongs to, or outside without its approval; the install or update was put back. |
 | `PLUGIN-39` | `NOTHING_TO_PROVE` | error | 1 | 404 | 0.18.0 | Nothing by that id is installed, so there is nothing to prove again. |
+| `PLUGIN-40` | `STRANGER_REPLACING` | error | 1 | 403 | 0.18.0 | Raised when a plugin that is not first-party declares a service replacing one the stack ships. |
 
 ## `PROC` — the program underneath
 

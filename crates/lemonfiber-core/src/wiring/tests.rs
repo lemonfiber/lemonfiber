@@ -560,6 +560,7 @@ fn plugin_filling(plugin: &str, service: &str, capability: &str) -> crate::plugi
             speaks: Vec::new(),
             fronts: None,
             native: None,
+            replaces: None,
             shape: None,
             asks: Vec::new(),
         }],

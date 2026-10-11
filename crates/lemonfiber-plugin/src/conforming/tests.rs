@@ -478,6 +478,7 @@ fn a_plugins_service_declares_exactly_the_fields_the_contract_permits() {
         "native",
         "port",
         "provides",
+        "replaces",
         "shape",
         "speaks",
         "tag",

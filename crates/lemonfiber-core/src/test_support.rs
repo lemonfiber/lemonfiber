@@ -123,6 +123,7 @@ pub(crate) fn a_placed(
         speaks: Vec::new(),
         fronts: None,
         native: None,
+        replaces: None,
         shape: None,
         asks: Vec::new(),
     }

@@ -94,3 +94,19 @@ UPPER.{$DOMAIN:home.local} {\n\
 fn a_configuration_with_no_stanza_in_it_reserves_no_name() {
     assert!(proxied("# nothing here\nreverse_proxy jellyfin:8096\n").is_empty());
 }
+
+#[test]
+fn each_proxied_name_is_routed_to_the_service_its_stanza_names() {
+    let routed = super::routes(
+        "watch.{$DOMAIN:home.local} {\n\treverse_proxy door:8096\n}\n\n# sonarr.{$DOMAIN:home.local}      { reverse_proxy sonarr:8989 }\nhome.{$DOMAIN} {\n}\n",
+    );
+    assert_eq!(
+        routed,
+        vec![
+            ("watch".to_owned(), "door".to_owned()),
+            ("sonarr".to_owned(), "sonarr".to_owned()),
+        ]
+    );
+    assert_eq!(super::routed_to("watch"), Some("door"));
+    assert_eq!(super::routed_to("nowhere"), None);
+}

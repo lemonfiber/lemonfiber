@@ -24,12 +24,15 @@ use crate::schema::Manifest;
 use crate::Violation;
 
 use super::bundled;
+use super::replacing::standing_in;
 
 /// Everything a manifest declares that the shipped stack already holds.
 pub(super) fn with_the_stack(manifest: &Manifest, found: &mut Vec<Violation>) {
     for service in &manifest.services {
         let at = format!("service {}", service.id);
-        if let Some(held) = bundled::named(&service.id) {
+        let replaced = standing_in(service).map(|held| held.id.as_str());
+        if replaced.is_some() {
+        } else if let Some(held) = bundled::named(&service.id) {
             found.push(Violation {
                 location: format!("{at}.id"),
                 message: format!(
@@ -52,7 +55,8 @@ pub(super) fn with_the_stack(manifest: &Manifest, found: &mut Vec<Violation>) {
         }
         let clash = service
             .port
-            .and_then(|port| bundled::publishing(port).map(|held| (port, held)));
+            .and_then(|port| bundled::publishing(port).map(|held| (port, held)))
+            .filter(|(_, held)| replaced != Some(held.id.as_str()));
         if let Some((port, held)) = clash {
             found.push(Violation {
                 location: format!("{at}.port"),
@@ -82,6 +86,10 @@ fn addressed(manifest: &Manifest, found: &mut Vec<Violation>) {
     for service in proxied(manifest) {
         let hostname = manifest.entry(service).hostname;
         if !bundled::answering(hostname) {
+            continue;
+        }
+        let replaced = standing_in(service).map(|held| held.id.as_str());
+        if replaced.is_some() && bundled::routed_to(hostname) == replaced {
             continue;
         }
         let declared = manifest.wirings.iter().any(|wiring| {

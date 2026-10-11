@@ -105,6 +105,13 @@
         }
       ]
     },
+    "replaces": {
+      "description": "The stack's own service it moves in place of, where it names one.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "service": {
       "description": "The service's id, which is the name its container is written under.",
       "type": "string"

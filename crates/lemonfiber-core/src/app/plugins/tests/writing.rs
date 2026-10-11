@@ -415,3 +415,37 @@ fn an_adapters_key_is_minted_once_kept_after_and_never_made_up() {
     assert!(super::super::writing::carry_out(&ctx, "plex", "3", &key).is_err());
     assert!(!path.exists());
 }
+
+/// A service replacing one the stack ships is installed only from a plugin this build
+/// embeds as first-party; any other plugin declaring one is refused before anything is
+/// written, and a plugin replacing nothing is not asked.
+#[test]
+fn only_a_first_party_plugin_replaces_a_stack_service() {
+    let mut placed = crate::test_support::a_placed("jellyfin", &[], None, Some(8096));
+    placed.replaces = Some("jellyfin".to_owned());
+    let mut replacing = crate::test_support::an_installed("contracted", vec![placed]);
+    replacing.manifest = crate::test_support::CONTRACTED_MANIFEST.to_owned();
+    let plain = crate::test_support::an_installed(
+        "contracted",
+        vec![crate::test_support::a_placed(
+            "komga",
+            &[],
+            None,
+            Some(25600),
+        )],
+    );
+
+    let stranger = super::super::replacing::unreplaced(&replacing, &[]);
+    let trusted = super::super::replacing::unreplaced(
+        &replacing,
+        &crate::test_support::first_party("contracted"),
+    );
+    let nothing = super::super::replacing::unreplaced(&plain, &[]);
+
+    assert_eq!(
+        stranger.err().map(|problem| problem.code),
+        Some(crate::error::codes::plugin::STRANGER_REPLACING)
+    );
+    assert!(trusted.is_ok());
+    assert!(nothing.is_ok());
+}

@@ -604,6 +604,11 @@
           "default": [],
           "items": {"type": "string"}
         },
+        "replaces": {
+          "description": "The id of the stack's own service this service moves in place of, which is its own\nid: it keeps that service's container, configuration and data, and may take its\nport and the name the proxy answers for it.",
+          "type": ["string", "null"],
+          "default": null
+        },
         "shape": {
           "description": "The one privileged shape lemonfiber writes for this service, where it is the\nupstream an adapter of the same plugin fronts and that adapter speaks\n`network.egress-guard`.",
           "anyOf": [

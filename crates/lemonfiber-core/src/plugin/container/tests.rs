@@ -68,6 +68,7 @@ fn placed() -> Placed {
         speaks: Vec::new(),
         fronts: None,
         native: None,
+        replaces: None,
         shape: None,
         asks: Vec::new(),
     }
