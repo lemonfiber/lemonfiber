@@ -14,8 +14,8 @@ use lemonfiber_core::model::kind::Kind;
 
 use super::logs;
 use super::table::{
-    self, taken, Wanted, ASKABLE_POSTER, BACKDROP, BUNDLE, LOGS, OFFERED, POSTER, REPEATABLE,
-    THIS_BINARY,
+    self, taken, Wanted, ASKABLE, ASKABLE_POSTER, BACKDROP, BUNDLE, LOGS, OFFERED, POSTER,
+    REPEATABLE, THIS_BINARY, TITLE,
 };
 
 /// One read, as the contract lists it.
@@ -48,7 +48,7 @@ pub struct Parameter {
 pub fn every() -> Vec<Read> {
     OFFERED
         .iter()
-        .chain(BESIDE)
+        .chain(BESIDE.iter().map(|(path, _)| path))
         .map(|path| Read {
             path,
             parameters: taken(path)
@@ -64,9 +64,25 @@ pub fn every() -> Vec<Read> {
         .collect()
 }
 
-/// The reads served beside the table's own, by the modules that answer them: the logs,
-/// which open a stream, and the bundle and the pictures, which are files.
-pub(crate) const BESIDE: &[&str] = &[LOGS, BUNDLE, POSTER, BACKDROP, ASKABLE_POSTER];
+/// The reads served beside the table's own, by the modules that answer them, each with
+/// the ruling its route makes: the logs, which open a stream, and the bundle and the
+/// pictures, which are files.
+pub(crate) const BESIDE: &[(&str, Ruled)] = &[
+    (LOGS, Ruled::AllButAMember),
+    (BUNDLE, Ruled::AllButAMember),
+    (POSTER, Ruled::As(TITLE)),
+    (BACKDROP, Ruled::As(TITLE)),
+    (ASKABLE_POSTER, Ruled::As(ASKABLE)),
+];
+
+/// Who a read served beside the table is given to, as its route rules.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Ruled {
+    /// Everyone but a member, the one check a route that reaches no command makes.
+    AllButAMember,
+    /// Whoever the table read named here is given to: the read its route asks about.
+    As(&'static str),
+}
 
 /// The reads that answer with a file rather than an envelope.
 const FILES: [&str; 4] = [BUNDLE, POSTER, BACKDROP, ASKABLE_POSTER];

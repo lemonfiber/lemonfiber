@@ -32,7 +32,7 @@ use crate::actions::{reached, Arguments, ACTION};
 use crate::admission::Caller;
 use crate::entitled::{may, Door, Permitted};
 use crate::read::enveloped;
-use crate::read::published::BESIDE;
+use crate::read::published::{Ruled, BESIDE};
 use crate::read::table::{self, Wanted};
 use crate::router::Serving;
 use crate::serve::operator_only;
@@ -139,23 +139,28 @@ pub fn declared(ctx: &Ctx, caller: &Caller) -> Capabilities {
             table::named(read, Wanted::naming_everything()).ok(),
         )
     });
-    // The logs and the bundle are answered beside the table, by the one check their
-    // own routes make: everyone but a member may have them.
-    let beside = BESIDE.iter().map(|read| {
-        let standing = match operator_only(caller) {
-            Some(_) => Standing::Unpermitted,
-            None => Standing::Available,
-        };
-        ((*read).to_owned(), standing)
-    });
+    let mut capabilities: BTreeMap<String, Standing> = actions
+        .chain(reads)
+        .filter_map(|(path, door, command)| Some((path, standing(ctx, caller, door, command?))))
+        .collect();
+    let beside: Vec<(String, Standing)> = BESIDE
+        .iter()
+        .filter_map(|(read, ruled)| {
+            let standing = match ruled {
+                Ruled::AllButAMember => Some(match operator_only(caller) {
+                    Some(_) => Standing::Unpermitted,
+                    None => Standing::Available,
+                }),
+                Ruled::As(table_read) => capabilities.get(*table_read).copied(),
+            };
+            standing.map(|standing| ((*read).to_owned(), standing))
+        })
+        .collect();
+    capabilities.extend(beside);
     Capabilities {
         stack: lemonfiber_core::companion::identified(ctx),
         scope: Scope::of(caller),
-        capabilities: actions
-            .chain(reads)
-            .filter_map(|(path, door, command)| Some((path, standing(ctx, caller, door, command?))))
-            .chain(beside)
-            .collect(),
+        capabilities,
     }
 }
 
