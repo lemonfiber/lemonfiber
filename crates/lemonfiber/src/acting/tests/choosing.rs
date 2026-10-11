@@ -278,7 +278,7 @@ fn an_action_needing_a_form_is_refused_where_the_stack_declares_none() {
 
         let said = showing(&acting);
 
-        assert!(said.contains("needs `forms`"), "{key}: {said}");
+        assert!(said.contains("needs forms,"), "{key}: {said}");
     }
 }
 

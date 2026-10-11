@@ -5,7 +5,7 @@ codes! {
         status: 400,
         since: "0.1.0",
         meaning: "No form was named, so there is nothing to start.",
-        remedy: "Name a form, or list the ones this stack has with `lemonfiber forms`.",
+        remedy: "Name a form, or list the ones this stack has with lemonfiber forms.",
     }
     /// Raised when a named form is not declared by the stack.
     NO_SUCH_FORM = "FORM-2" {
@@ -33,6 +33,6 @@ codes! {
         since: "0.1.0",
         meaning: "Everything these forms would start needs a download provider, and none is \
             configured. Starting them would give you services that cannot fetch anything.",
-        remedy: "Add a Usenet provider, or a VPN and a torrent client, with `lemonfiber setup`.",
+        remedy: "Add a Usenet provider, or a VPN and a torrent client, with lemonfiber setup.",
     }
 }

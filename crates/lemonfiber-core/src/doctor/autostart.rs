@@ -246,7 +246,7 @@ async fn daemon_enabled(check: &AutostartCheck) -> Prerequisite {
             why: "the service manager could not be asked whether the Docker service starts at \
                   boot"
                 .to_owned(),
-            how: "Run `systemctl is-enabled docker` yourself to see what it says".to_owned(),
+            how: "Run systemctl is-enabled docker yourself to see what it says".to_owned(),
         };
     };
     match output.stdout.trim() {
@@ -261,11 +261,11 @@ async fn daemon_enabled(check: &AutostartCheck) -> Prerequisite {
         },
         "enabled-runtime" => Prerequisite::Absent {
             what: "The Docker service is enabled only until the next restart".to_owned(),
-            how: "Run `sudo systemctl enable docker` so it survives a restart".to_owned(),
+            how: "Run sudo systemctl enable docker so it survives a restart".to_owned(),
         },
         "disabled" | "masked" | "masked-runtime" => Prerequisite::Absent {
             what: "The Docker service is not enabled at boot".to_owned(),
-            how: "Run `sudo systemctl enable docker`, then restart this machine to confirm the \
+            how: "Run sudo systemctl enable docker, then restart this machine to confirm the \
                   stack comes back"
                 .to_owned(),
         },
@@ -274,7 +274,7 @@ async fn daemon_enabled(check: &AutostartCheck) -> Prerequisite {
                 "the service manager answered {} when asked whether Docker starts at boot",
                 quoted(said)
             ),
-            how: "Run `systemctl is-enabled docker` yourself to see what it says".to_owned(),
+            how: "Run systemctl is-enabled docker yourself to see what it says".to_owned(),
         },
     }
 }
@@ -288,7 +288,7 @@ fn quoted(said: &str) -> String {
     if said.is_empty() {
         return "nothing at all".to_owned();
     }
-    format!("`{said}`")
+    format!("{said:?}")
 }
 
 /// Where Docker Desktop keeps the setting, relative to the operator's home.

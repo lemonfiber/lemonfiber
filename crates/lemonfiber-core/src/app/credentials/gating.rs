@@ -37,7 +37,7 @@ const CONSUMER: &str =
 /// What is said where the key is not there.
 const ABSENT: &str = "The media server's request-gate key is not there yet, so the request \
                       gate cannot read the media server for the request service. Run \
-                      `lemonfiber seed`.";
+                      lemonfiber seed.";
 
 /// What a rehearsal says a replacement would take.
 const ROTATING: &str = "a real run would mint a new key on the media server, write it into the \

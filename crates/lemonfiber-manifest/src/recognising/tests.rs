@@ -22,7 +22,7 @@ api = { kind = \"plex\", key_source = \"config-xml\" }
         said.first()
             .is_some_and(|one| one.contains("service jellyfin")
                 && one.contains("api.kind")
-                && one.contains("`plex`")),
+                && one.contains("plex")),
         "got: {said:?}"
     );
 }

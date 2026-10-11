@@ -241,14 +241,14 @@ pub(crate) fn taken(read: &str) -> &'static [&'static str] {
 /// one. What they wrote is repeated back so they can see which of the two it was.
 fn unwanted(read: &str, parameter: &str, takes: &[&str]) -> Problem {
     Refusal::Unwanted
-        .problem(format!("The read `{read}` takes no `{parameter}`"))
+        .problem(format!("The read {read} takes no {parameter}"))
         .with_detail(taking(takes))
 }
 
 /// A parameter that names one thing, given more than once.
 fn repeated(read: &str, parameter: &str) -> Problem {
     Refusal::Repeated.problem(format!(
-        "The read `{read}` takes one `{parameter}`, and it was given more than once"
+        "The read {read} takes one {parameter}, and it was given more than once"
     ))
 }
 

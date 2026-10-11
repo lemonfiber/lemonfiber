@@ -172,7 +172,7 @@ async fn a_request_service_that_cannot_be_asked_over_the_contract_is_handed_noth
 
     assert!(lines.is_empty(), "{lines:?}");
     assert!(
-        unproven(&rotation.settled).is_some_and(|said| said.ends_with("Run `lemonfiber seed`.")),
+        unproven(&rotation.settled).is_some_and(|said| said.ends_with("Run lemonfiber seed.")),
         "{rotation:?}"
     );
     assert_eq!(accepted(&at), Some(accepting(&["held"], &[])));
@@ -344,9 +344,7 @@ async fn a_rotation_that_cannot_start_changes_nothing() {
         Some("no randomness was available to generate a token")
     );
     let unrouted = rotate(&ctx, &line, &stack(true), &fillers(true, None), None).await;
-    assert!(
-        unproven(&unrouted.settled).is_some_and(|said| said.ends_with("Run `lemonfiber seed`."))
-    );
+    assert!(unproven(&unrouted.settled).is_some_and(|said| said.ends_with("Run lemonfiber seed.")));
     let mut gone = line.clone();
     gone.setting = "request-gate/tokens.json#radarr".to_owned();
     let unknown = rotate(

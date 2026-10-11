@@ -190,7 +190,7 @@ fn a_form_that_shares_a_service_with_a_running_one_is_named() {
     assert!(
         told.as_ref()
             .is_some_and(|forms| forms.iter().any(|form| form == "full")),
-        "`full` is up and holds what stopping `tv` would take away: {told:?}"
+        "full is up and holds what stopping tv would take away: {told:?}"
     );
     assert!(
         told.as_ref()

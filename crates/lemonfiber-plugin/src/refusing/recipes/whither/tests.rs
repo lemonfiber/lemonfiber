@@ -159,9 +159,9 @@ fn an_input_says_what_its_origin_needs_and_nothing_else() {
         "{unknown:?}"
     );
     let silent = refused(&carrying("operator", "", "sonarr"));
-    assert!(says(&silent, &["says nothing in `ask`"]), "{silent:?}");
+    assert!(says(&silent, &["says nothing in ask"]), "{silent:?}");
     let empty = refused(&carrying("operator", r#"ask = """#, "sonarr"));
-    assert!(says(&empty, &["says nothing in `ask`"]), "{empty:?}");
+    assert!(says(&empty, &["says nothing in ask"]), "{empty:?}");
     let whose = refused(&carrying(
         "operator",
         "ask = \"Your key\"\nof = \"sonarr\"",

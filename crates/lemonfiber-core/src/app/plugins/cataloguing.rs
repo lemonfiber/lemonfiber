@@ -160,7 +160,7 @@ fn switched_off(name: &str) -> Problem {
          from reading the catalogue's index.",
         Remedy::new(format!(
             "Install it from a git source or a directory you name instead, or allow it with \
-             `lemonfiber config set {REACH_CATALOGUE_KEY} on`"
+             lemonfiber config set {REACH_CATALOGUE_KEY} on"
         )),
     )
     .in_state(State::Guided)
@@ -220,7 +220,7 @@ fn not_catalogued(name: &str) -> Problem {
         format!("The catalogue holds no plugin called {name}"),
         "Nothing was fetched and nothing was installed.",
         Remedy::new(format!(
-            "Check the name, or write `./{name}` to install the directory of that name"
+            "Check the name, or write ./{name} to install the directory of that name"
         )),
     )
     .in_state(State::Guided)

@@ -101,7 +101,7 @@ fn not_installed(plugin: &str, held: &[Installed]) -> Problem {
         NOTHING_TO_PROVE,
         format!("{plugin} is not installed"),
         meaning,
-        Remedy::new("Run `lemonfiber plugin installed` to see what is on this machine"),
+        Remedy::new("Run lemonfiber plugin installed to see what is on this machine"),
     )
     .in_state(State::Guided)
 }

@@ -25,7 +25,7 @@ codes! {
         since: "0.12.0",
         meaning: "What was asked for could not be read as a limit, a window or a cap. A cap has \
             to be told what happens when it is reached.",
-        remedy: "Say what happens at the cap: `--when-exceeded pause`, `throttle` or `continue`.",
+        remedy: "Say what happens at the cap: --when-exceeded pause, throttle or continue.",
     }
     /// Raised when there is no download client to limit.
     NOTHING_TO_LIMIT = "RATE-4" {
@@ -43,7 +43,7 @@ codes! {
         meaning: "There is no download client on this stack to pause or resume. A pause is asked \
             of the download clients themselves, and this stack declares none, so nothing is \
             taking the line either.",
-        remedy: "Start a form that has a download client in it, as in `lemonfiber up tv`.",
+        remedy: "Start a form that has a download client in it, as in lemonfiber up tv.",
     }
     /// Raised where pausing or resuming the download clients names an offer that is not
     /// the one a fresh look at them builds.

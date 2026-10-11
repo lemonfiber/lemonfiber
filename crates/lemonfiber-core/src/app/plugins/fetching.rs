@@ -183,8 +183,8 @@ fn switched_off(url: &str) -> Problem {
         "Nothing was fetched and nothing was installed. This machine's settings keep lemonfiber \
          from fetching from a git source you name.",
         Remedy::new(format!(
-            "Install it from a directory instead, or allow it with `lemonfiber config set \
-             {REACH_PLUGIN_SOURCE_KEY} on`"
+            "Install it from a directory instead, or allow it with lemonfiber config set \
+             {REACH_PLUGIN_SOURCE_KEY} on"
         )),
     )
     .in_state(State::Guided)
@@ -210,7 +210,7 @@ fn no_revision(url: &str, asked: &str) -> Problem {
         format!("{url} holds no branch, tag or commit called {asked}"),
         "Nothing was fetched and nothing was installed.",
         Remedy::new(
-            "Name a branch, a tag or a whole commit after the last `@`, or leave it off for what \
+            "Name a branch, a tag or a whole commit after the last \"@\", or leave it off for what \
              the source serves by default",
         ),
     )

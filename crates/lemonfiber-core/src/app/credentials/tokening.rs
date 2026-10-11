@@ -128,7 +128,7 @@ fn line(route: &Route, found: Found, kept: &Kept) -> Held {
             Some(token),
             Some(format!(
                 "the gate does not accept the token the request service holds for {}. Run \
-                 `lemonfiber seed`, which replaces it.",
+                 lemonfiber seed, which replaces it.",
                 route.name
             )),
         ),
@@ -280,7 +280,7 @@ fn withheld(route: &Route, filler: &crate::wiring::Filler) -> String {
 
 /// What is said where the token a line names is not handed over yet.
 fn not_handed(name: &str) -> String {
-    format!("{name} is not handed to the request service yet. Run `lemonfiber seed`.")
+    format!("{name} is not handed to the request service yet. Run lemonfiber seed.")
 }
 
 /// Why a new token was taken back out.

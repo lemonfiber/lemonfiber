@@ -73,7 +73,7 @@ fn the_committed_surface_is_the_one_this_build_would_write() {
 
     assert!(
         apart.is_empty(),
-        "the committed surface is out of date — run `just surface`:\n{}",
+        "the committed surface is out of date — run just surface:\n{}",
         apart.join("\n")
     );
 }

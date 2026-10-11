@@ -16,8 +16,8 @@ codes! {
         meaning: "Docker is installed and its daemon is not answering, or would not start. The \
             client being present usually means this is the daemon stopped, or a permission \
             problem, rather than a missing install.",
-        remedy: "Start Docker Desktop, or the `docker` service on Linux. If it is running, check \
-            that your account may run `docker`.",
+        remedy: "Start Docker Desktop, or the docker service on Linux. If it is running, check \
+            that your account may run docker.",
     }
     /// Raised when the Compose plugin is missing or too old to drive.
     COMPOSE_UNUSABLE = "ENV-3" {

@@ -614,7 +614,7 @@ fn a_request_carries_its_year_its_arrival_and_its_shelf_id_where_each_is_known()
             written
                 .get(1)
                 .is_some_and(|waiting| waiting.get(absent).is_none()),
-            "`{absent}` was written for a request that has not arrived: {written:?}"
+            "{absent} was written for a request that has not arrived: {written:?}"
         );
     }
 }

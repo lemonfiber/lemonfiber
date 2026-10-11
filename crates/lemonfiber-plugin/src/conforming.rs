@@ -296,7 +296,7 @@ fn is(value: &Toml, only: &Json) -> bool {
 /// A value as an author would recognise it, quoted where it is a word.
 fn said(value: &Toml) -> String {
     match value {
-        Toml::String(word) => format!("`{word}`"),
+        Toml::String(word) => format!("{word:?}"),
         Toml::Integer(number) => number.to_string(),
         Toml::Boolean(flag) => flag.to_string(),
         other => named(other).to_owned(),
@@ -306,7 +306,7 @@ fn said(value: &Toml) -> String {
 /// One of a closed set, as an author would type it.
 fn rendered(only: &Json) -> String {
     only.as_str()
-        .map_or_else(|| only.to_string(), |word| format!("`{word}`"))
+        .map_or_else(|| only.to_string(), |word| format!("{word:?}"))
 }
 
 /// What a value is, in the words TOML uses for it.

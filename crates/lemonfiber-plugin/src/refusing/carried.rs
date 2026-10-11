@@ -229,7 +229,7 @@ pub(super) fn carried(manifest: &Manifest, found: &mut Vec<Violation>) {
                 location: format!("{at}.image"),
                 message: format!(
                     "{} is not a registry path; what is permitted is an optional registry host \
-                     and lowercase path components joined by `/`, which is the whole of what a \
+                     and lowercase path components joined by \"/\", which is the whole of what a \
                      registry reads there",
                     service.image
                 ),
@@ -264,8 +264,8 @@ pub(super) fn carried(manifest: &Manifest, found: &mut Vec<Violation>) {
             found.push(Violation {
                 location: format!("{at}.request.path"),
                 message: format!(
-                    "{} is not a route on the service it asks; it has to start with `/` and \
-                     carry no `@`, `\\`, `#` or whitespace, because it is appended to the \
+                    "{} is not a route on the service it asks; it has to start with \"/\" and \
+                     carry no \"@\", \"\\\", \"#\" or whitespace, because it is appended to the \
                      address lemonfiber resolved and anything else could name another host",
                     request.path
                 ),
@@ -280,7 +280,7 @@ fn prose(at: &str, text: &str, found: &mut Vec<Violation>) {
         found.push(Violation {
             location: at.to_owned(),
             message: format!(
-                "carries `{what}`, which the file it is written into substitutes from an \
+                "carries {what}, which the file it is written into substitutes from an \
                  environment holding the stack's keys; a plugin's text is shown, never expanded"
             ),
         });

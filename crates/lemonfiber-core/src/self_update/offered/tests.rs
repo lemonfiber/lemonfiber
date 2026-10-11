@@ -291,7 +291,7 @@ fn a_withdrawn_release_has_no_notes_and_declares_nothing() {
 #[test]
 fn a_marker_anywhere_but_the_first_line_withdraws_nothing() {
     for body in [
-        page("### Fixed\n- Pass over a page opening `<!-- withdrawn: why -->`"),
+        page("### Fixed\n- Pass over a page opening <!-- withdrawn: why -->"),
         page("### Fixed\n<!-- withdrawn: quoted on a line of its own -->"),
         format!(
             "{}\n<!-- withdrawn: at the very end -->",

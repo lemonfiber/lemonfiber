@@ -88,7 +88,7 @@ fn a_claim_for_what_the_service_does_not_provide_is_refused() {
     assert!(
         read.violations
             .iter()
-            .any(|refused| refused.message.contains("not in this service's `provides`")),
+            .any(|refused| refused.message.contains("not in this service's provides")),
         "{:?}",
         read.violations
     );

@@ -157,10 +157,7 @@ async fn stopping(ctx: &Ctx, tier: Tier, went: &mut Went) {
     let outcome = match crate::app::engine::lifecycle(ctx, &[], &action).await {
         Err(problem) => Err(problem.summary.clone()),
         Ok(report) if report.status.unwrap_or_default() == 0 => Ok(()),
-        Ok(_) => Err(format!(
-            "`docker compose {}` did not succeed",
-            action.name()
-        )),
+        Ok(_) => Err(format!("docker compose {} did not succeed", action.name())),
     };
     went.step(
         name,

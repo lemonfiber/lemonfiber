@@ -31,7 +31,7 @@ pub(super) fn already(held: &crate::plugin::Already, path: &Path) -> Problem {
              can tell, and which of them this machine runs is yours to choose rather than this \
              command's.",
             Remedy::new(format!(
-                "To run this source in its place, `lemonfiber plugin update {}`; to keep the one \
+                "To run this source in its place, lemonfiber plugin update {}; to keep the one \
                  installed, nothing needs doing",
                 path.display()
             )),
@@ -51,7 +51,7 @@ pub(super) fn already(held: &crate::plugin::Already, path: &Path) -> Problem {
          of changes back before it applies another — doing it as an install would leave the \
          record describing one version and the machine carrying two.",
         Remedy::new(format!(
-            "Run `lemonfiber plugin update` on the new source, or remove {} first",
+            "Run lemonfiber plugin update on the new source, or remove {} first",
             held.plugin
         )),
     )

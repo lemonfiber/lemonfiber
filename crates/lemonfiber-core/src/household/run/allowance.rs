@@ -323,8 +323,8 @@ fn waited_too_long(
                     )
                 } else {
                     format!(
-                        "they are closed after {after} days while `lemonfiber household \
-                         expiring` is running, and nothing runs it for you"
+                        "they are closed after {after} days while lemonfiber household \
+                         expiring is running, and nothing runs it for you"
                     )
                 }
             },

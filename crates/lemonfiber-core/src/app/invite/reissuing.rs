@@ -143,7 +143,7 @@ fn nobody_here(name: &str) -> crate::error::Problem {
         format!("nobody called {name} is in this household"),
         "Nothing was reset. The name has to match an account the media server holds, \
          though not its capitalisation",
-        crate::error::Remedy::new("Run `lemonfiber household` to see who is here"),
+        crate::error::Remedy::new("Run lemonfiber household to see who is here"),
     )
 }
 /// Said where the account named administers the server.

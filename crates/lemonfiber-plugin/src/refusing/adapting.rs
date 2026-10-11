@@ -25,8 +25,8 @@ pub(super) fn adapted(service: &Service, found: &mut Vec<Violation>) {
             location: format!("service {}.api.path", service.id),
             message: format!(
                 "{path} is not one file beneath {}; what is permitted is an absolute path \
-                 inside the service's configuration directory, with no `..`, no empty or `.` \
-                 segment, written in letters, digits and `._/-` alone",
+                 inside the service's configuration directory, with no \"..\", no empty or \".\" \
+                 segment, written in letters, digits and \"._/-\" alone",
                 service.configuration()
             ),
         });

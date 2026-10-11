@@ -319,7 +319,7 @@ fn a_substitution_that_would_leave_something_unfilled_says_so_before_it_is_appli
     assert_eq!(
         cost(substituting(manifest, &chosen, "media.serve", "player")),
         Some(Ok(Vec::new())),
-        "`both` still declares identity.source, so nothing stopped being filled"
+        "both still declares identity.source, so nothing stopped being filled"
     );
 
     // The same change where the service being stood down claims nothing else: it

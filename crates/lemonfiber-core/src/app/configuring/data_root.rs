@@ -90,7 +90,7 @@ pub(super) async fn refusal(ctx: &Ctx, value: &str) -> Option<String> {
         .all(|part| !matches!(part, Component::ParentDir | Component::Prefix(_)));
     let judge = Judge::of(ctx);
     let why = if !plain {
-        "it is written with `..`, which hides where it really is"
+        "it is written with \"..\", which hides where it really is"
     } else if path.is_absolute() {
         judge.handed_over(ctx, path).await?
     } else {

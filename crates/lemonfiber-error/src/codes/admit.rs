@@ -88,7 +88,7 @@ codes! {
         since: "0.17.0",
         meaning: "Too many wrong passwords. The door has stopped looking at passwords for a \
             while, and another attempt now makes the wait longer. The message says how long, and \
-            so does the answer's `Retry-After` header.",
+            so does the answer's Retry-After header.",
         remedy: "Wait as long as it says, then try once more.",
     }
     /// Raised when what was offered at the door is not a password.
@@ -99,7 +99,7 @@ codes! {
         meaning: "What was offered at the door is not a password. The door reads a password, and \
             a household member's name beside it, and the body carried neither in a form it can \
             read.",
-        remedy: "Send the password as the body's `password`.",
+        remedy: "Send the password as the body's password.",
     }
     /// Raised when a key arrived from another machine over a connection its pin does
     /// not verify.
@@ -112,7 +112,7 @@ codes! {
             secret crosses a network only over the encrypted connection whose certificate the \
             key was minted with, because one sent any other way may have been read on the way.",
         remedy: "Connect over https, pinning the certificate the key was minted with, and revoke \
-            the key with `lemonfiber key revoke` if it may have been read.",
+            the key with lemonfiber key revoke if it may have been read.",
     }
     /// Raised when a key asked for something its scope does not reach.
     NOT_FOR_A_KEY = "ADMIT-12" {
@@ -120,7 +120,7 @@ codes! {
         status: 403,
         since: "0.17.0",
         meaning: "The key asked for something its scope does not reach, and nothing was done. A \
-            key has one scope — `read`, `act` or one member's own — and admits that and nothing \
+            key has one scope — read, act or one member's own — and admits that and nothing \
             more.",
         remedy: "Call only what the contract lists as callable by a key, or ask whoever looks \
             after this machine.",

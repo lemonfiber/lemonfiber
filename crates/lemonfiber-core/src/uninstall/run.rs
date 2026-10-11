@@ -123,7 +123,7 @@ async fn survey(ctx: &Ctx, tier: Tier) -> Manifest {
 /// before the destruction, and a capture that fails stops the removal.
 const BACKUP: &str = "A backup is taken before any of this goes — after the services stop \
      and before anything is removed — so this machine can be set up like it is now again. \
-     `lemonfiber restore` puts it back, which is a great deal less work than answering \
+     lemonfiber restore puts it back, which is a great deal less work than answering \
      setup again. If that backup cannot be taken, nothing is removed.";
 
 /// The tier that takes the library was confirmed without an agreement.

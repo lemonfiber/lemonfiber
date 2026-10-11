@@ -16,7 +16,7 @@ pub(super) fn replaced(service: &Service, found: &mut Vec<Violation>) {
         found.push(Violation {
             location: location.clone(),
             message: format!(
-                "names `{replaces}`, and a service replaces only the stack's own service whose \
+                "names {replaces}, and a service replaces only the stack's own service whose \
                  id it takes, which is its own"
             ),
         });
@@ -24,9 +24,7 @@ pub(super) fn replaced(service: &Service, found: &mut Vec<Violation>) {
     if bundled::named(replaces).is_none() {
         found.push(Violation {
             location,
-            message: format!(
-                "names `{replaces}`, which the stack lemonfiber ships does not declare"
-            ),
+            message: format!("names {replaces}, which the stack lemonfiber ships does not declare"),
         });
     }
 }

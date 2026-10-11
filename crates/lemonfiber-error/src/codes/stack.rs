@@ -6,9 +6,9 @@ codes! {
         leaves: Validation,
         since: "0.1.0",
         meaning: "No readable manifest was found where a stack was expected. A stack directory \
-            holds a `stack.toml` beside its compose files.",
-        remedy: "Point at a directory containing `stack.toml`, with `lemonfiber --stack-dir \
-            <path>`.",
+            holds a stack.toml beside its compose files.",
+        remedy: "Point at a directory containing stack.toml, with lemonfiber --stack-dir \
+            <path>.",
     }
     /// Raised when a manifest is readable and this build cannot use it.
     STACK_UNUSABLE = "STACK-2" {
@@ -35,7 +35,7 @@ codes! {
         status: 500,
         since: "0.1.0",
         meaning: "There is nowhere to write the stack, because no location has been chosen.",
-        remedy: "Run `lemonfiber setup`.",
+        remedy: "Run lemonfiber setup.",
     }
     /// Raised when the stack could not be written to disk.
     STACK_NOT_WRITTEN = "STACK-5" {
@@ -62,7 +62,7 @@ codes! {
         status: 500,
         leaves: Validation,
         since: "0.14.0",
-        meaning: "The file is not written in the format a `stack.toml` uses, so nothing in it \
+        meaning: "The file is not written in the format a stack.toml uses, so nothing in it \
             has been read. The message names the line the reader stopped on.",
         remedy: "Fix the file at the line the message names.",
     }
@@ -86,8 +86,8 @@ codes! {
         meaning: "The stack names the oldest lemonfiber it works with, and the one running is \
             older. It relies on something this version cannot do, so nothing in it is started \
             rather than started in part. The message names both versions.",
-        remedy: "Update lemonfiber to the version named, with `lemonfiber update self`. Or point \
-            at a stack this version runs, with `lemonfiber --stack-dir <path>`.",
+        remedy: "Update lemonfiber to the version named, with lemonfiber update self. Or point \
+            at a stack this version runs, with lemonfiber --stack-dir <path>.",
     }
     /// Raised when a manifest's files are not laid out as the contract says.
     STACK_UNASSEMBLED = "STACK-10" {
@@ -95,10 +95,10 @@ codes! {
         status: 500,
         leaves: Validation,
         since: "0.18.0",
-        meaning: "The stack's manifest files are not laid out as a stack is: a `stack.toml` \
-            whose `include` list names one file per service under `services/`, each describing \
+        meaning: "The stack's manifest files are not laid out as a stack is: a stack.toml \
+            whose include list names one file per service under services/, each describing \
             one service. Which services the stack holds cannot be told, so nothing in it was \
-            started. A stack that keeps every service in `stack.toml` itself is refused this \
+            started. A stack that keeps every service in stack.toml itself is refused this \
             way.",
         remedy: "Fix the files named under the message. All of them were found in one pass.",
     }

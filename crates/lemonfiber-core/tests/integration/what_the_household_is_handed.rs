@@ -228,5 +228,5 @@ async fn the_index_over_every_service_cannot_be_named_as_the_door_either() {
     // exactly what the household must not be handed.
     let report = answered(Some("homepage")).await;
     assert_eq!(report.service.as_deref(), Some("Seerr"));
-    assert!(report.meaning.contains("`homepage`"), "{}", report.meaning);
+    assert!(report.meaning.contains("homepage"), "{}", report.meaning);
 }

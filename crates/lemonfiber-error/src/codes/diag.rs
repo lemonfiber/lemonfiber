@@ -7,7 +7,7 @@ codes! {
         meaning: "Nothing on this stack reports under the name you narrowed the run to. A check \
             is named by the identifier its finding carries, and no finding here carries that \
             one. Answering with an empty report would read as nothing being wrong.",
-        remedy: "Run the checks with `lemonfiber doctor`, and narrow to a name this stack \
+        remedy: "Run the checks with lemonfiber doctor, and narrow to a name this stack \
             reports.",
     }
 }

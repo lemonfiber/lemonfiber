@@ -63,7 +63,7 @@ async fn narrowing_stops_only_what_left_the_closure() {
     assert_eq!(
         switched.as_ref().map(|moved| moved.stopped.clone()),
         Some(vec!["qbittorrent".to_owned()]),
-        "the torrent client is outside `library`, and it is the only thing stopped: \
+        "the torrent client is outside library, and it is the only thing stopped: \
          {switched:?}"
     );
     assert!(

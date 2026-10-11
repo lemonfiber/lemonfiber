@@ -250,7 +250,7 @@ fn nowhere_held() -> Problem {
 fn not_held(name: &str) -> Problem {
     Problem::new(
         NOT_HELD,
-        format!("`{name}` is not one of the bundles kept here"),
+        format!("{name} is not one of the bundles kept here"),
         "A bundle asked for by name is one of the files this run wrote into lemonfiber's own \
          directory. A name holding a path, or climbing out of that directory, is refused \
          rather than followed.",

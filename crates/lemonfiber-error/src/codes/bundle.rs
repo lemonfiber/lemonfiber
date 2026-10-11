@@ -17,7 +17,7 @@ codes! {
         since: "0.7.0",
         meaning: "There is not enough room to write the bundle where it was to be written, with \
             space left over for the machine to keep working in.",
-        remedy: "Free some space, or write the bundle somewhere with more room using `--out`.",
+        remedy: "Free some space, or write the bundle somewhere with more room using --out.",
     }
     /// Raised when the archive could not be written.
     BUNDLE_UNWRITTEN = "BUNDLE-3" {
@@ -36,7 +36,7 @@ codes! {
         meaning: "A setting was asked to be shown as it is, without that being confirmed on the \
             same run. Showing one puts the real value in a file people post in public, so it \
             takes saying twice.",
-        remedy: "Run it again with `--confirm` if you meant it.",
+        remedy: "Run it again with --confirm if you meant it.",
     }
     /// Raised when the machine can offer no randomness to derive stand-ins from.
     BUNDLE_NO_MARKS = "BUNDLE-5" {

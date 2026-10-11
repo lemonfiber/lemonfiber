@@ -313,7 +313,7 @@ fn a_core_name_its_service_speaks_the_contract_of_is_demonstrated_by_the_contrac
 fn a_claim_for_a_capability_no_service_declares_names_both_halves() {
     let said = changed("\"media.serve\", \"komga:opds\"", "\"komga:opds\"");
     assert!(
-        says(&said, &["media.serve", "in no service's `provides`"]),
+        says(&said, &["media.serve", "in no service's provides"]),
         "got: {said:?}"
     );
 }

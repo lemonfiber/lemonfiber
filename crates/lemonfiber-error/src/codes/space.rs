@@ -7,7 +7,7 @@ codes! {
         meaning: "There is no room left, so nothing new is being fetched. A service that cannot \
             write its database can take the file with it, which turns a full disk into work that \
             is gone — fetching more onto it is what this prevents.",
-        remedy: "Free space, then run this again. `lemonfiber space` names an offer, and \
+        remedy: "Free space, then run this again. lemonfiber space names an offer, and \
             answering it takes what it offers.",
     }
     /// Raised when there is no data location to measure.
@@ -16,7 +16,7 @@ codes! {
         status: 400,
         since: "0.12.0",
         meaning: "No data location is configured, so there is no disk to account for.",
-        remedy: "Set the data location, with `lemonfiber setup`.",
+        remedy: "Set the data location, with lemonfiber setup.",
     }
     /// Raised when the data location is there and could not be read.
     WALK_REFUSED = "SPACE-3" {
@@ -35,7 +35,7 @@ codes! {
             a torrent client's business, and this stack has none lemonfiber can reach and prove \
             itself to.",
         remedy: "Check the download client is running and lemonfiber knows its password. \
-            `lemonfiber doctor` says which.",
+            lemonfiber doctor says which.",
     }
     /// Raised when the client answers and is holding nothing of the name given.
     NOT_HELD = "SPACE-5" {
@@ -45,7 +45,7 @@ codes! {
         meaning: "The client answered and is holding nothing of the name given. One that has \
             finished seeding, or was removed already, is not there to be removed again.",
         remedy: "Read the account and name one of the completed downloads it lists, with \
-            `lemonfiber space`.",
+            lemonfiber space.",
     }
     /// Raised when an agreement names an offer that is not the one standing now.
     ANOTHER_OFFER = "SPACE-6" {

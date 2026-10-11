@@ -35,14 +35,14 @@ fn a_nonconforming_manifest_reports_every_fault_in_it() {
     let message = Failure::Nonconforming(vec![
         Violation {
             location: "service komga".to_owned(),
-            message: "criticality: unknown variant `critical`".to_owned(),
+            message: "criticality: unknown variant critical".to_owned(),
         },
         Violation {
             location: "service komga".to_owned(),
-            message: "bind: unknown variant `wan`".to_owned(),
+            message: "bind: unknown variant wan".to_owned(),
         },
     ])
     .to_string();
-    assert!(message.contains("`critical`"), "got: {message}");
-    assert!(message.contains("`wan`"), "got: {message}");
+    assert!(message.contains("critical"), "got: {message}");
+    assert!(message.contains("wan"), "got: {message}");
 }

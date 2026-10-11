@@ -109,7 +109,7 @@ codes! {
         severity: Error,
         status: 400,
         since: "0.18.0",
-        meaning: "An action's `Idempotency-Key` is not one to 255 visible characters, or was \
+        meaning: "An action's Idempotency-Key is not one to 255 visible characters, or was \
             given more than once. The action was not carried out, and nothing was changed: a key \
             that cannot be read is one a second send could not be recognised by.",
         remedy: "Send the key once, as up to 255 visible characters with no spaces.",
@@ -120,7 +120,7 @@ codes! {
         severity: Error,
         status: 400,
         since: "0.18.0",
-        meaning: "This `Idempotency-Key` was already sent with another action or other \
+        meaning: "This Idempotency-Key was already sent with another action or other \
             arguments. Nothing was carried out under it a second time; the attempt it names \
             asked for something else, and that is what it was answered with.",
         remedy: "Send a new key with each new attempt, and the same key only with the same \

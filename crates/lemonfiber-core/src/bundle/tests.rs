@@ -268,7 +268,7 @@ fn nothing_a_bundle_publishes_is_hidden_from_the_operator_who_owns_it() {
         .collect();
     assert!(
         undisplayable.is_empty(),
-        "a bundle shows these to anybody it is sent to and `config show` withholds \
+        "a bundle shows these to anybody it is sent to and config show withholds \
          them from the operator: {undisplayable:?}"
     );
 }

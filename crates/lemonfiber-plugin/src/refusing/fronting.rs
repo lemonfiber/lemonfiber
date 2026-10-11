@@ -14,7 +14,7 @@ pub(super) fn native(service: &Service, services: &[Service], found: &mut Vec<Vi
         found.push(Violation {
             location: location.clone(),
             message: format!(
-                "names `{native}`, and the API a service answers in is named in one lowercase \
+                "names {native}, and the API a service answers in is named in one lowercase \
                  word"
             ),
         });

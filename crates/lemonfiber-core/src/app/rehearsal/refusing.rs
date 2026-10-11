@@ -46,13 +46,13 @@ pub fn verdict(asked: &Asked) -> Result<(), Box<Problem>> {
 pub(super) fn refused(asked: &Asked, why: &'static str) -> Problem {
     Problem::new(
         CANNOT,
-        format!("`{}` cannot be rehearsed", asked.named),
+        format!("{} cannot be rehearsed", asked.named),
         format!(
             "Nothing was done. {why}, so a rehearsal of this would be a report with \
              nothing in it that a rehearsal could have found out."
         ),
         Remedy::new(format!(
-            "Run `lemonfiber {}` without `--dry-run` when you mean it",
+            "Run lemonfiber {} without --dry-run when you mean it",
             asked.named
         )),
     )
@@ -75,13 +75,13 @@ pub(super) fn refused(asked: &Asked, why: &'static str) -> Problem {
 pub fn not_taught_yet(named: &str) -> Problem {
     Problem::new(
         NOT_YET,
-        format!("`{named}` does not rehearse yet"),
+        format!("{named} does not rehearse yet"),
         "Nothing was done. This command changes things and has not yet been taught to \
          say what it would change, so it refuses the flag rather than accepting it and \
          going ahead — which is what it used to do."
             .to_owned(),
         Remedy::new(format!(
-            "Run `lemonfiber {named}` without `--dry-run` when you mean it"
+            "Run lemonfiber {named} without --dry-run when you mean it"
         )),
     )
     .in_state(State::Guided)

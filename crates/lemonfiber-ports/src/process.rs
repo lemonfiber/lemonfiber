@@ -35,13 +35,13 @@ impl Output {
 #[derive(Debug, Error)]
 pub enum Failure {
     /// The program is not installed, or is not on the path.
-    #[error("`{program}` was not found")]
+    #[error("{program} was not found")]
     NotFound {
         /// The program that was looked for.
         program: String,
     },
     /// The program exists but could not be started.
-    #[error("`{program}` could not be started: {reason}")]
+    #[error("{program} could not be started: {reason}")]
     Unusable {
         /// The program that was found.
         program: String,

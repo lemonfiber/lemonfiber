@@ -501,7 +501,7 @@ fn a_setting_that_was_refused_is_on_the_screen_rather_than_only_in_the_answer() 
     ));
     assert_eq!(
         lines.last().map(String::as_str),
-        Some("`sonarr` was named as the front door and cannot be one")
+        Some("sonarr was named as the front door and cannot be one")
     );
 }
 

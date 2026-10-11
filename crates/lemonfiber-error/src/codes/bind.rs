@@ -10,7 +10,7 @@ codes! {
             on your network reaching it is a way in.",
         remedy: "Publish it on this machine only, and apply the change. The message names the \
             address to use. Or, if you meant to expose it, say so once and say why, with \
-            `LEMONFIBER_EXPOSED=<service>=<why>` in your settings.",
+            LEMONFIBER_EXPOSED=<service>=<why> in your settings.",
     }
     /// Raised where a published port is reached without the host's own firewall rules
     /// being consulted.
@@ -23,7 +23,7 @@ codes! {
             its own forwarding rules ahead of the ones you add, so a port you believe is shut \
             may still answer. This is how publishing is meant to work and nothing is broken.",
         remedy: "Narrow what the household tier is published on, which is what does decide: \
-            `LAN_BIND` in your settings, set to this machine's own address on your network. Or \
+            LAN_BIND in your settings, set to this machine's own address on your network. Or \
             leave it, if every device on this network is one you would let in anyway.",
     }
     /// Raised where an admin service answers off this machine and the operator has

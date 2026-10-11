@@ -271,7 +271,7 @@ async fn a_narrowed_disturbing_run_is_answered_the_same_way() {
 async fn asking_for_it_without_the_widening_is_refused_over_the_wire_too() {
     let (status, answered) = said("{}").await;
     assert_eq!(status, StatusCode::BAD_REQUEST.as_u16());
-    assert!(answered.contains("needs `disruptive`"), "{answered}");
+    assert!(answered.contains("needs disruptive"), "{answered}");
 }
 
 #[tokio::test]

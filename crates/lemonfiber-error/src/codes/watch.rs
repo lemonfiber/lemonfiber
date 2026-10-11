@@ -5,7 +5,7 @@ codes! {
         status: 500,
         since: "0.2.0",
         meaning: "No data location is configured, so there is nothing for a watch to guard.",
-        remedy: "Run `lemonfiber setup` to choose a data location, then start the watch again.",
+        remedy: "Run lemonfiber setup to choose a data location, then start the watch again.",
     }
     /// Raised when the data location is already gone when the watch is asked to
     /// start.

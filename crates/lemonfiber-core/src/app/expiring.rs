@@ -145,7 +145,7 @@ fn standing(ctx: &Ctx, agreed: &Expiry, arranged: Arranged) -> String {
     format!(
         "a request may now wait {after} days before it is closed, and the household is \
          told so before anything reaches it — nothing closes one until you run \
-         `lemonfiber household expiring`, because this product starts nothing by \
+         lemonfiber household expiring, because this product starts nothing by \
          itself{rehearsed}"
     )
 }

@@ -6,7 +6,7 @@ codes! {
         since: "0.18.0",
         meaning: "That does not name anything the media server holds. A title is named by the \
             identifier the shelf lists it under, which is thirty-two letters and digits.",
-        remedy: "Name a title by the `id` the shelf answered with.",
+        remedy: "Name a title by the id the shelf answered with.",
     }
     /// Said where the title is not one this member may watch, or is not there at all.
     NOT_ON_THEIR_SHELF = "PLAY-2" {
@@ -33,7 +33,7 @@ codes! {
         since: "0.18.0",
         meaning: "There is no media server to play from, or its own account was never \
             recorded, so nothing can be asked of it for a member.",
-        remedy: "Add a media server to the stack and run `lemonfiber setup`.",
+        remedy: "Add a media server to the stack and run lemonfiber setup.",
     }
     /// Said where the media server would not answer for a member.
     SERVER_SILENT = "PLAY-5" {
@@ -42,7 +42,7 @@ codes! {
         since: "0.18.0",
         meaning: "The media server did not answer, so nothing was read or recorded for this \
             member. Nothing was changed.",
-        remedy: "Check the media server is running with `lemonfiber status`, then ask again.",
+        remedy: "Check the media server is running with lemonfiber status, then ask again.",
     }
     /// Said where nobody is named for something only a member can be.
     NOBODY_NAMED = "PLAY-6" {

@@ -39,7 +39,7 @@ pub(crate) fn nowhere() -> Problem {
 pub(crate) fn not_kept_here(name: &str) -> Problem {
     Problem::new(
         NOT_KEPT_HERE,
-        format!("`{name}` is not one of the backups kept here"),
+        format!("{name} is not one of the backups kept here"),
         "A restore asked for by name restores one of the archives this machine took, which are \
          files in one directory. A name holding a path, or climbing out of that directory, is \
          refused rather than followed. Nothing was touched.",
@@ -117,7 +117,7 @@ pub(crate) fn not_ours(project: &str, paths: &[String]) -> Problem {
          that was already here rather than to lemonfiber's own layout. Putting it back means \
          writing into directories lemonfiber does not manage, which is not something it will do \
          on your behalf. Nothing was touched.",
-        Remedy::new("Unpack it yourself with `tar -xzf`, into the paths it names"),
+        Remedy::new("Unpack it yourself with tar -xzf, into the paths it names"),
     )
     .in_state(State::Guided)
     .with_detail(format!(

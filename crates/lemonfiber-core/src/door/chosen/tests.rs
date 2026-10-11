@@ -152,7 +152,7 @@ fn a_screen_with_one_line_is_told_the_same_thing_in_fewer_words() {
     );
     assert_eq!(
         refused("sonarr", WITHHELD).said(),
-        Some("`sonarr` was named as the front door and cannot be one".to_owned())
+        Some("sonarr was named as the front door and cannot be one".to_owned())
     );
 }
 

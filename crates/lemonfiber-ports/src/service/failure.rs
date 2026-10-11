@@ -25,19 +25,19 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum Failure {
     /// The service is not answering yet.
-    #[error("`{service}` is not answering")]
+    #[error("{service} is not answering")]
     Unavailable {
         /// The service that was asked.
         service: String,
     },
     /// The service answered, and refused the credential.
-    #[error("`{service}` rejected the credential")]
+    #[error("{service} rejected the credential")]
     Unauthorised {
         /// The service that refused.
         service: String,
     },
     /// The service answered with something unexpected.
-    #[error("`{service}` answered unexpectedly: {detail}")]
+    #[error("{service} answered unexpectedly: {detail}")]
     Refused {
         /// The service that answered.
         service: String,
@@ -47,7 +47,7 @@ pub enum Failure {
     /// The service answered, but does not serve the API version lemonfiber speaks
     /// — it has been upgraded past it (or is older than it). Writing to it would
     /// mean writing something malformed, so it is reported instead.
-    #[error("`{service}` does not serve the API version this build speaks: {detail}")]
+    #[error("{service} does not serve the API version this build speaks: {detail}")]
     Unsupported {
         /// The service that answered.
         service: String,

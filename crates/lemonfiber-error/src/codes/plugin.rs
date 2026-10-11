@@ -21,7 +21,7 @@ codes! {
         since: "0.16.0",
         meaning: "What was named is not a plugin lemonfiber can read. Nothing was installed or \
             written.",
-        remedy: "Point at the plugin's directory, or at the `plugin.toml` inside it.",
+        remedy: "Point at the plugin's directory, or at the plugin.toml inside it.",
     }
     /// The manifest is read and this build refuses what it declares.
     REFUSED = "PLUGIN-3" {
@@ -48,7 +48,7 @@ codes! {
         since: "0.16.0",
         meaning: "The plugin is already installed. Installing over it would be an update, and an \
             install is not one. Nothing was changed; the message names the version installed.",
-        remedy: "Update it with `lemonfiber plugin update` on the new source, or remove it \
+        remedy: "Update it with lemonfiber plugin update on the new source, or remove it \
             first.",
     }
     /// There is no stack on this machine to put a plugin's container in.
@@ -57,7 +57,7 @@ codes! {
         status: 500,
         since: "0.16.0",
         meaning: "There is nowhere to install the plugin to: no stack directory has been set up.",
-        remedy: "Run `lemonfiber setup` first, then install the plugin.",
+        remedy: "Run lemonfiber setup first, then install the plugin.",
     }
     /// A directory or a document the install decided on would not land.
     UNWRITABLE = "PLUGIN-7" {
@@ -67,7 +67,7 @@ codes! {
         meaning: "A file the install needed could not be written. The install stopped where it \
             was, and what it had written is on the change record.",
         remedy: "Check the permissions on the stack directory, then install it again. \
-            `lemonfiber history` shows what was written.",
+            lemonfiber history shows what was written.",
     }
     /// The wiring went down and the record of what is installed did not.
     UNRECORDABLE = "PLUGIN-8" {
@@ -95,7 +95,7 @@ codes! {
         since: "0.16.0",
         meaning: "There is no installed plugin by that name, so nothing was removed. The message \
             lists what is installed.",
-        remedy: "See what is on this machine with `lemonfiber plugin installed`, and remove it \
+        remedy: "See what is on this machine with lemonfiber plugin installed, and remove it \
             by that id.",
     }
     /// Nothing by that id is installed, so there is no version to replace.
@@ -105,7 +105,7 @@ codes! {
         since: "0.16.0",
         meaning: "The plugin is not installed, so there is nothing to update. Nothing was \
             changed.",
-        remedy: "Install it instead, with `lemonfiber plugin install` on the same source.",
+        remedy: "Install it instead, with lemonfiber plugin install on the same source.",
     }
     /// The version installed would not come off, so nothing else was touched.
     STUCK = "PLUGIN-12" {
@@ -137,7 +137,7 @@ codes! {
             for the same name. Two sources for one name are two plugins as far as anybody can \
             tell, and which of them this machine runs is yours to choose. Nothing was written; \
             the message names both sources.",
-        remedy: "To run the new source in its place, run `lemonfiber plugin update` on it. To \
+        remedy: "To run the new source in its place, run lemonfiber plugin update on it. To \
             keep the one installed, nothing needs doing.",
     }
     /// Raised when a plugin is named from a git source and fetching from one is
@@ -148,8 +148,8 @@ codes! {
         since: "0.17.0",
         meaning: "Fetching a plugin from a git source is switched off on this machine, so the \
             source was not asked. Nothing was fetched or installed.",
-        remedy: "Install it from a directory instead, or allow it with `lemonfiber config set \
-            LEMONFIBER_REACH_PLUGIN_SOURCE on`.",
+        remedy: "Install it from a directory instead, or allow it with lemonfiber config set \
+            LEMONFIBER_REACH_PLUGIN_SOURCE on.",
     }
     /// Raised when a git source could not be reached or would not hand over a revision.
     UNFETCHED = "PLUGIN-16" {
@@ -168,7 +168,7 @@ codes! {
         since: "0.17.0",
         meaning: "The git source holds no branch, tag or commit by the name given. Nothing was \
             fetched or installed.",
-        remedy: "Name a branch, a tag or a whole commit after the last `@`, or leave it off for \
+        remedy: "Name a branch, a tag or a whole commit after the last \"@\", or leave it off for \
             what the source serves by default.",
     }
     /// Raised when a plugin is installed by name and asking the catalogue is switched
@@ -180,7 +180,7 @@ codes! {
         meaning: "The plugin was named for the catalogue to look up, and asking the catalogue is \
             switched off on this machine. Nothing was fetched or installed.",
         remedy: "Install it from a git source or a directory you name instead, or allow it with \
-            `lemonfiber config set LEMONFIBER_REACH_CATALOGUE on`.",
+            lemonfiber config set LEMONFIBER_REACH_CATALOGUE on.",
     }
     /// Raised when the catalogue's index or its signature could not be fetched.
     CATALOGUE_UNREACHABLE = "PLUGIN-19" {
@@ -222,7 +222,7 @@ codes! {
         status: 404,
         since: "0.17.0",
         meaning: "The catalogue holds no plugin by that name. Nothing was fetched or installed.",
-        remedy: "Check the name, or write `./<name>` to install the directory of that name.",
+        remedy: "Check the name, or write ./<name> to install the directory of that name.",
     }
     /// Raised when what the catalogue's origin served is not what the catalogue
     /// reviewed.
@@ -243,7 +243,7 @@ codes! {
         status: 400,
         since: "0.17.0",
         meaning: "The plugin's service would be named as another installed plugin's service \
-            already is, once case and `-` or `_` are set aside. lemonfiber writes a plugin's \
+            already is, once case and \"-\" or \"_\" are set aside. lemonfiber writes a plugin's \
             container under its service's name and keeps what the service holds in settings \
             named after it, so the two would be one container sharing one credential. Nothing \
             was written; the message names both services.",
@@ -273,7 +273,7 @@ codes! {
             service would take, was not approved as itself, or an approval names something the \
             reading does not list. Each is agreed to on its own, apart from the plugin, so \
             nothing was changed.",
-        remedy: "Approve each one the reading lists, by name, with `--approve`, and nothing \
+        remedy: "Approve each one the reading lists, by name, with --approve, and nothing \
             else.",
     }
     /// Raised when the source an update names holds a different plugin from the one
@@ -325,7 +325,7 @@ codes! {
             record of the newest index it verified cannot be read or written. Without it, a \
             release the catalogue has replaced would verify as though it were current, so \
             nothing was resolved through it and nothing was installed.",
-        remedy: "Check `catalogue.json` in the configuration directory, or install it from its \
+        remedy: "Check catalogue.json in the configuration directory, or install it from its \
             git source.",
     }
     /// Raised when a git source is named over a transport other than https, before
@@ -432,7 +432,7 @@ codes! {
         since: "0.18.0",
         meaning: "The plugin is not installed, so nothing was asked and nothing was cleared. The \
             message lists what is installed.",
-        remedy: "See what is on this machine with `lemonfiber plugin installed`, and prove it by \
+        remedy: "See what is on this machine with lemonfiber plugin installed, and prove it by \
             that id.",
     }
     /// Raised when a plugin that is not first-party declares a service replacing one the
@@ -444,7 +444,7 @@ codes! {
         meaning: "The plugin declares a service that moves one of the stack's own services in \
             place, and only a plugin this build embeds as first-party may do that. Nothing was \
             written.",
-        remedy: "Install the plugin without that service's `replaces`, or use the first-party \
+        remedy: "Install the plugin without that service's replaces, or use the first-party \
             plugin this build names for that part.",
     }
 }

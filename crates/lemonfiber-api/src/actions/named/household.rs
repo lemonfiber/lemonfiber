@@ -155,7 +155,7 @@ fn unrated(written: Option<&str>) -> Result<Option<Unrated>, Refused> {
         Some("allow") => Ok(Some(Unrated::LetThrough)),
         Some(other) => Err(Refused::Unrecognised {
             argument: "unrated".to_owned(),
-            offered: format!("`{other}` is neither `block` nor `allow`"),
+            offered: format!("{other} is neither block nor allow"),
         }),
     }
 }

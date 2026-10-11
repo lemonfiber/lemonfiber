@@ -95,7 +95,7 @@ bind = \"wan\"
 ",
     );
     assert!(
-        names(&said, &["service komga.bind", "`wan`"]),
+        names(&said, &["service komga.bind", "wan"]),
         "got: {said:?}"
     );
     for available in ["loopback", "lan"] {
@@ -117,7 +117,7 @@ id          = \"komga\"
 criticality = \"critical\"
 ",
     );
-    assert!(names(&said, &["`critical`"]), "names the value: {said:?}");
+    assert!(names(&said, &["critical"]), "names the value: {said:?}");
     for available in ["core", "important", "enhancing", "optional"] {
         assert!(names(&said, &[available]), "names {available}: {said:?}");
     }
@@ -148,7 +148,7 @@ port        = \"25600\"
 environment = { PUID = \"1000\" }
 ",
     );
-    assert!(names(&said, &["bind", "`wan`"]), "the word: {said:?}");
+    assert!(names(&said, &["bind", "wan"]), "the word: {said:?}");
     assert!(
         names(&said, &["port", "whole number"]),
         "the kind: {said:?}"
@@ -326,7 +326,7 @@ fn every_kind_is_named_in_the_words_its_side_uses() {
 /// A value is said back as an author wrote it, and a shape has no spelling.
 #[test]
 fn a_value_is_quoted_as_a_word_and_a_shape_is_named_as_one() {
-    assert_eq!(spoken(&Toml::String("wan".to_owned())), "`wan`");
+    assert_eq!(spoken(&Toml::String("wan".to_owned())), "\"wan\"");
     assert_eq!(spoken(&Toml::Integer(7)), "7");
     assert_eq!(spoken(&Toml::Boolean(true)), "true");
     assert_eq!(spoken(&Toml::Array(Vec::new())), "a list");
@@ -442,7 +442,7 @@ fn the_format_has_no_field_for_code_for_reach_or_for_content_nobody_can_read() {
     for absent in ABSENT {
         assert!(
             !named.contains(*absent),
-            "the format declares `{absent}`, which is a way to reach past what it says"
+            "the format declares {absent}, which is a way to reach past what it says"
         );
     }
 }
@@ -531,7 +531,7 @@ fn the_format_has_no_field_by_which_a_plugin_could_wire_to_a_named_service() {
     for absent in ABSENT {
         assert!(
             !named.contains(*absent),
-            "the format declares `{absent}`, which is a way to say what reaches what"
+            "the format declares {absent}, which is a way to say what reaches what"
         );
     }
     // The one spelling it does declare, so the sweep above is read against a

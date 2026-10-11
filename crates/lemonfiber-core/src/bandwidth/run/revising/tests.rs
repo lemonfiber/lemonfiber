@@ -244,7 +244,7 @@ fn a_word_this_build_does_not_know_never_falls_back_to_the_cap_s_own_answer() {
     assert!(
         refused.is_err_and(|problem| {
             problem.code == UNREADABLE
-                && problem.summary.contains("`stop`")
+                && problem.summary.contains("stop")
                 && problem
                     .remedies
                     .first()

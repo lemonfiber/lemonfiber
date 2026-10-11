@@ -314,7 +314,7 @@ fn compose_outdated(found: &str) -> Problem {
     Problem::new(
         COMPOSE_UNUSABLE,
         format!("Docker Compose {found} is too old to drive this stack"),
-        "The stack's compose file assembles its parts with `include:`, which older Compose plugins do not read, so nothing in it could be started.",
+        "The stack's compose file assembles its parts with include:, which older Compose plugins do not read, so nothing in it could be started.",
         Remedy::new(format!("Update the Docker Compose plugin to {major}.{minor}.{patch} or newer"))
             .with_detail("https://docs.docker.com/compose/install/"),
     )

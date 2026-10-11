@@ -83,8 +83,8 @@ fn taken(name: &str) -> State {
         detail: format!(
             "{name} already has an account lemonfiber did not make, and whoever made it first \
              holds the server. If that was not you, someone else on your network claimed it: \
-             reset {name}'s configuration and run `lemonfiber seed` to claim it again. If it \
-             was you, record its password with `lemonfiber config set {setting} <password>`.",
+             reset {name}'s configuration and run lemonfiber seed to claim it again. If it \
+             was you, record its password with lemonfiber config set {setting} <password>.",
             setting = crate::config::LISTENING_SERVER_PASSWORD_KEY,
         ),
     }

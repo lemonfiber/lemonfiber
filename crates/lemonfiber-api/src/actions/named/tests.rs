@@ -98,7 +98,7 @@ fn every_action_that_reads_the_agreement_is_listed_as_taking_it() {
     assert_eq!(
         unlisted,
         Vec::<&&str>::new(),
-        "these read `confirm`, and the table refuses it before they can"
+        "these read confirm, and the table refuses it before they can"
     );
     assert!(
         reading.contains(&"migrate-adopt") && reading.contains(&"reset"),
@@ -234,7 +234,7 @@ fn an_ask_is_refused_by_what_it_lacks_and_a_kind_that_is_neither() {
         super::wishing::asked_for(titled(Some("film"))).err(),
         Some(crate::actions::Refused::Unrecognised {
             argument: "kind".to_owned(),
-            offered: "`film` is neither `movies` nor `tv`".to_owned(),
+            offered: "film is neither movies nor tv".to_owned(),
         })
     );
     assert!(matches!(

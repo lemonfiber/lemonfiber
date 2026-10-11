@@ -59,7 +59,7 @@ pub fn bundled(service: &lemonfiber_manifest::Service) -> Bundled {
             found.push(Violation {
                 location: place.clone(),
                 message: format!(
-                    "{} is not in this service's `provides`, so it demonstrates something the \
+                    "{} is not in this service's provides, so it demonstrates something the \
                      service has not said it can do",
                     claim.capability
                 ),

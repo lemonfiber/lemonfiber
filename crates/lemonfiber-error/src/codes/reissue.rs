@@ -16,7 +16,7 @@ codes! {
         since: "0.11.0",
         meaning: "Nobody by that name is in this household. Nothing was reset — the name has to \
             match an account the media server holds, though not its capitalisation.",
-        remedy: "Run `lemonfiber household` to see who is here.",
+        remedy: "Run lemonfiber household to see who is here.",
     }
     /// Said where the account named administers the server.
     RUNS_THE_SERVER = "REISSUE-3" {

@@ -136,7 +136,7 @@ fn a_definition_name_describes_one_shape() {
         clashing.is_empty(),
         "these definition names describe two different shapes, so anything keying types \
          by name across kinds has to pick one of them: {clashing:?} — give each type a \
-         name of its own with `#[schemars(rename = \"...\")]`"
+         name of its own with #[schemars(rename = \"...\")]"
     );
 }
 
@@ -167,7 +167,7 @@ fn no_definition_is_numbered_apart() {
 
     assert!(
         numbered.is_empty(),
-        "`schemars` numbered these to keep two types apart inside one kind, and the \
+        "schemars numbered these to keep two types apart inside one kind, and the \
          number is where the type was reached rather than anything about it: \
          {numbered:?} — give the types names of their own"
     );

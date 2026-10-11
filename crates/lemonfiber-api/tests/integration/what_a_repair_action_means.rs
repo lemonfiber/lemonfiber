@@ -381,14 +381,14 @@ async fn each_repairing_run_is_answered_with_a_name_for_the_work() {
 async fn an_answer_that_does_not_say_which_offer_it_answered_is_refused_by_name() {
     let (status, said) = said("repair", r#"{"confirm":true,"agreed":["vpn.killswitch"]}"#).await;
     assert_eq!(status, StatusCode::BAD_REQUEST.as_u16());
-    assert!(said.contains("`offer`"), "{said}");
+    assert!(said.contains("offer"), "{said}");
 }
 
 #[tokio::test]
 async fn an_argument_a_reversal_does_not_take_is_refused_rather_than_dropped() {
     let (status, said) = said("undo", r#"{"confirm":true}"#).await;
     assert_eq!(status, StatusCode::BAD_REQUEST.as_u16());
-    assert!(said.contains("takes no `confirm`"), "{said}");
+    assert!(said.contains("takes no confirm"), "{said}");
 }
 
 #[tokio::test]

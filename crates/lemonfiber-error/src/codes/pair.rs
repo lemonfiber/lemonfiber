@@ -19,7 +19,7 @@ codes! {
             reaches this machine from the network rather than from here. The material names the \
             port the surface was last served on that way, and it has not been.",
         remedy: "Serve the web interface encrypted and on your network, on a port that stays the \
-            same: `lemonfiber ui --lan --tls --port <port>`.",
+            same: lemonfiber ui --lan --tls --port <port>.",
     }
     /// Raised when the certificate the surface presents cannot be read or made.
     NO_CERTIFICATE = "PAIR-3" {
@@ -29,7 +29,7 @@ codes! {
         meaning: "The certificate this machine presents to a phone could not be read, or none \
             has been made; the message says which. A phone pins that certificate, so it is not \
             made again on its own — a new one is one every paired phone refuses.",
-        remedy: "Replace it with `lemonfiber companion certificate --confirm`, knowing every \
+        remedy: "Replace it with lemonfiber companion certificate --confirm, knowing every \
             paired phone will need pairing again.",
     }
     /// Raised when this machine has no address a phone could reach it at.
@@ -40,8 +40,8 @@ codes! {
         meaning: "This machine has no address a phone could reach it at. Pairing material names \
             the address a phone reaches, and this machine answers to no name on the network and \
             has none written down.",
-        remedy: "Record the address your household reaches this machine at, with `lemonfiber \
-            config set HOUSEHOLD_HOST <address>`.",
+        remedy: "Record the address your household reaches this machine at, with lemonfiber \
+            config set HOUSEHOLD_HOST <address>.",
     }
     /// Raised when the stack's identifier cannot be read or made.
     UNNAMED = "PAIR-5" {

@@ -7,8 +7,8 @@ codes! {
         since: "0.1.0",
         meaning: "A service never reached a state that starting could accept, so the run did not \
             finish starting.",
-        remedy: "Look at what the service said, then start it again: `lemonfiber logs \
-            <service>`.",
+        remedy: "Look at what the service said, then start it again: lemonfiber logs \
+            <service>.",
     }
     /// Raised when stopping would take a service out from under a form still running.
     STILL_NEEDED = "LIFE-2" {
@@ -29,7 +29,7 @@ codes! {
             before doing anything. Two runs issuing commands about the same containers leave the \
             stack in a state neither asked for.",
         remedy: "Wait for the other run to finish, then run this again. If you are sure that run \
-            is gone, `--force` takes the stack from it.",
+            is gone, --force takes the stack from it.",
     }
     /// Fetching images is switched off, so there was nothing to fetch with.
     REGISTRY_REFUSED = "LIFE-4" {
@@ -37,11 +37,11 @@ codes! {
         status: 400,
         since: "0.10.0",
         meaning: "Fetching images is switched off, so nothing was fetched. \
-            `LEMONFIBER_REACH_REGISTRY` is off, so this machine asks no registry for anything: a \
+            LEMONFIBER_REACH_REGISTRY is off, so this machine asks no registry for anything: a \
             start uses the images already here, and a service whose image is missing will not \
             start.",
-        remedy: "Turn fetching back on with `lemonfiber config set LEMONFIBER_REACH_REGISTRY \
-            on`, then run this again.",
+        remedy: "Turn fetching back on with lemonfiber config set LEMONFIBER_REACH_REGISTRY \
+            on, then run this again.",
     }
     /// Raised when a start was asked for over a data location that is not there.
     NO_DATA_LOCATION = "LIFE-5" {
@@ -65,7 +65,7 @@ codes! {
             started, because Docker would have made an empty directory in its place and the \
             services would have come up with nothing in them.",
         remedy: "Make the location on that machine, or point lemonfiber at one that is there: \
-            `lemonfiber config set DATA_ROOT <path on that machine>`.",
+            lemonfiber config set DATA_ROOT <path on that machine>.",
     }
     /// Raised when a path the stack mounts is not at the same path on the machine
     /// under the container lemonfiber runs in.
@@ -88,8 +88,8 @@ codes! {
         since: "0.17.0",
         meaning: "lemonfiber runs in a container and cannot reach Docker from inside it. It \
             drives the stack through the host's Docker socket, which the templates mount at \
-            `/var/run/docker.sock`, and nothing answered there. Nothing was started.",
-        remedy: "Mount the host's Docker socket into the container at `/var/run/docker.sock`, as \
+            /var/run/docker.sock, and nothing answered there. Nothing was started.",
+        remedy: "Mount the host's Docker socket into the container at /var/run/docker.sock, as \
             the templates do.",
     }
     /// Raised when the engine lemonfiber reaches from a container does not know that
@@ -103,7 +103,7 @@ codes! {
             behind the paths the container sees cannot be asked, so Compose would resolve them \
             somewhere nobody checked. Nothing was started.",
         remedy: "Mount the socket of the engine running this container at \
-            `/var/run/docker.sock`.",
+            /var/run/docker.sock.",
     }
     /// Raised where a restart names an offer that is not the one a fresh look at the
     /// stack builds.

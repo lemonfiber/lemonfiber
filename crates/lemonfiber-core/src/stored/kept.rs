@@ -324,7 +324,7 @@ pub fn beside() -> Vec<Beside> {
         Beside {
             what: "the containers, images and volumes".to_owned(),
             why: "The container engine's. lemonfiber starts and stops them and owns none of \
-                  them; `docker` is what lists and removes them."
+                  them; docker is what lists and removes them."
                 .to_owned(),
         },
         Beside {

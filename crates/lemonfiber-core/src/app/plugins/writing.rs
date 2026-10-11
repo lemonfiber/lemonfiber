@@ -345,7 +345,7 @@ fn not_overwritten(at: &Path, why: &str) -> Problem {
         crate::error::codes::wire::CHOICE_UNWRITABLE,
         format!("{} could not be written", at.display()),
         "The choice is recorded, and the change record holds what this file held, so \
-         `lemonfiber history` says what is there and it can be put back.",
+         lemonfiber history says what is there and it can be put back.",
         Remedy::new("Check the permissions on the stack directory, then make the choice again"),
     )
     .in_state(State::Guided)
@@ -476,7 +476,7 @@ pub(crate) fn unshared(
                 ),
                 "Nothing was written. lemonfiber writes a plugin's container under its \
                  service's name and keeps what the service holds in settings named after it, \
-                 once case and `-` or `_` are set aside, so the two would be one container \
+                 once case and \"-\" or \"_\" are set aside, so the two would be one container \
                  sharing one credential.",
                 Remedy::new(format!(
                     "Remove {plugin} first, or install a version of {} whose service is named \
@@ -496,7 +496,7 @@ pub(crate) fn nowhere_to_write(plugin: &str) -> Problem {
         format!("there is nowhere to install {plugin} to"),
         "Nothing was installed and nothing was written. A plugin's service is a container in \
          the stack, and this machine has no stack directory configured to put one in.",
-        Remedy::new("Run `lemonfiber setup` first, then install the plugin"),
+        Remedy::new("Run lemonfiber setup first, then install the plugin"),
     )
     .in_state(State::Guided)
 }
@@ -507,7 +507,7 @@ fn unwritable(at: &Path, why: &str) -> Problem {
         UNWRITABLE,
         format!("{} could not be written", at.display()),
         "The install stopped where it was. What it had already written is in the change \
-         record, so `lemonfiber history` says what is there and it can be put back.",
+         record, so lemonfiber history says what is there and it can be put back.",
         Remedy::new("Check the permissions on the stack directory, then install it again"),
     )
     .in_state(State::Guided)

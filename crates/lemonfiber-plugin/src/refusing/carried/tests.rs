@@ -38,7 +38,7 @@ fn a_configuration_directory_outside_its_alphabet_is_refused() {
             &format!("config_path = {}", toml(path)),
         );
         assert!(
-            names(&said, &["komga.config_path", "`._/-`"]),
+            names(&said, &["komga.config_path", "\"._/-\""]),
             "{path}: {said:?}"
         );
     }

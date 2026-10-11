@@ -103,8 +103,8 @@ pub(super) fn asked_for(action: &str, given: Arguments) -> Result<Command, Refus
 fn supplied(written: &[String]) -> Result<Inputs, Refused> {
     Inputs::written(written).ok_or_else(|| Refused::Unrecognised {
         argument: "inputs".to_owned(),
-        offered: "an input is written as its name, `=`, and its value, and one was written \
-                  without the `=`"
+        offered: "an input is written as its name, \"=\", and its value, and one was written \
+                  without the \"=\""
             .to_owned(),
     })
 }

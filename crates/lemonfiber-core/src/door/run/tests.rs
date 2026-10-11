@@ -520,7 +520,7 @@ async fn a_named_door_the_household_tier_does_not_publish_is_refused_and_said() 
         "the door this stack's own shape settles on still stands"
     );
     let said = report.map(|report| report.meaning).unwrap_or_default();
-    assert!(said.contains("`sonarr`"), "{said}");
+    assert!(said.contains("sonarr"), "{said}");
     assert!(said.contains("cannot be one"), "{said}");
 }
 
@@ -563,7 +563,7 @@ fn a_refusal_is_said_even_where_there_was_no_door_to_fall_back_to() {
     );
     assert_eq!(report.standing, Standing::Absent);
     assert!(report.meaning.starts_with(NOWHERE));
-    assert!(report.meaning.contains("`sonarr`"), "{}", report.meaning);
+    assert!(report.meaning.contains("sonarr"), "{}", report.meaning);
 }
 
 #[test]

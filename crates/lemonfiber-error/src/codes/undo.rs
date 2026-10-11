@@ -7,7 +7,7 @@ codes! {
         meaning: "No run in the record carries the stamp you asked for. It may have fallen \
             outside the horizon the record keeps, or the stamp may be mistyped. Nothing was put \
             back.",
-        remedy: "Run `lemonfiber history` and take the stamp from the entry you want.",
+        remedy: "Run lemonfiber history and take the stamp from the entry you want.",
     }
     /// Raised when a stamp names more than one run, so which to put back is not settled.
     MORE_THAN_ONE_RUN = "UNDO-2" {

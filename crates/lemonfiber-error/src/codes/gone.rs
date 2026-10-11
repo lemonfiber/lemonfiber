@@ -7,8 +7,8 @@ codes! {
         since: "0.13.0",
         meaning: "The removal that takes the library was confirmed without its own agreement. \
             Destroying a library takes an answer given to that reading and no other.",
-        remedy: "Read what would go, then answer that reading by its own name, as in `lemonfiber \
-            uninstall media --agreed <name>`.",
+        remedy: "Read what would go, then answer that reading by its own name, as in lemonfiber \
+            uninstall media --agreed <name>.",
     }
     /// Raised when an agreement names a reading of this machine that is not the one
     /// standing now.

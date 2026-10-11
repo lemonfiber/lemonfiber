@@ -43,7 +43,7 @@ codes! {
         since: "0.3.0",
         meaning: "The archive was taken against a different data root. Restoring it unchanged \
             would keep a setting naming a location that is not on this machine.",
-        remedy: "Re-run the restore with `--repoint` to accept moving it to this machine's data \
+        remedy: "Re-run the restore with --repoint to accept moving it to this machine's data \
             root.",
     }
     /// Raised when an archive could not be unpacked.
@@ -94,7 +94,7 @@ codes! {
         since: "0.9.0",
         meaning: "The archive was unpacked, and the data root it recorded could not be changed \
             to this machine's — so the settings that landed name a library that is not here.",
-        remedy: "Set the data root by hand, then run `lemonfiber seed`.",
+        remedy: "Set the data root by hand, then run lemonfiber seed.",
     }
     /// Raised when consent was given for a listing that no longer stands.
     MOVED_ON = "RESTORE-11" {
@@ -114,6 +114,6 @@ codes! {
         meaning: "The archive holds a setup lemonfiber does not manage. It was captured before \
             lemonfiber took over, so putting it back means writing into directories that are not \
             lemonfiber's to write to. Nothing was touched.",
-        remedy: "Unpack it yourself with `tar -xzf`, into the paths the message names.",
+        remedy: "Unpack it yourself with tar -xzf, into the paths the message names.",
     }
 }

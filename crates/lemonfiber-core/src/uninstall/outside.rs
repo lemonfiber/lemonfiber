@@ -80,16 +80,16 @@ const fn docker_by_hand(environment: Environment) -> &'static str {
     match environment {
         Environment::MacOs => {
             "Quit Docker Desktop, then drag Docker from Applications to the Bin — or \
-             `brew uninstall --cask docker` if you installed it that way"
+             brew uninstall --cask docker if you installed it that way"
         }
         Environment::Windows => "Uninstall Docker Desktop from Settings › Apps › Installed apps",
         Environment::LinuxDesktop => {
-            "Uninstall Docker Desktop with your package manager — `sudo apt remove \
-             docker-desktop` on Debian and Ubuntu"
+            "Uninstall Docker Desktop with your package manager — sudo apt remove \
+             docker-desktop on Debian and Ubuntu"
         }
         Environment::LinuxNative | Environment::Unsupported => {
-            "Remove the engine with your package manager — `sudo apt remove docker-ce \
-             docker-ce-cli containerd.io` on Debian and Ubuntu"
+            "Remove the engine with your package manager — sudo apt remove docker-ce \
+             docker-ce-cli containerd.io on Debian and Ubuntu"
         }
     }
 }
@@ -116,7 +116,7 @@ const fn media_server_by_hand(environment: Environment) -> &'static str {
              its own library database"
         }
         Environment::LinuxNative | Environment::LinuxDesktop | Environment::Unsupported => {
-            "`sudo apt remove jellyfin` and then remove /var/lib/jellyfin, which holds \
+            "sudo apt remove jellyfin and then remove /var/lib/jellyfin, which holds \
              its own library database"
         }
     }
@@ -137,7 +137,7 @@ const fn tailscale_by_hand(environment: Environment) -> &'static str {
         Environment::MacOs => "Quit Tailscale and drag it from Applications to the Bin",
         Environment::Windows => "Uninstall Tailscale from Settings › Apps › Installed apps",
         Environment::LinuxNative | Environment::LinuxDesktop | Environment::Unsupported => {
-            "`sudo tailscale down` and then `sudo apt remove tailscale`"
+            "sudo tailscale down and then sudo apt remove tailscale"
         }
     }
 }
@@ -159,8 +159,8 @@ const fn binary_by_hand(environment: Environment) -> &'static str {
         | Environment::LinuxNative
         | Environment::LinuxDesktop
         | Environment::Unsupported => {
-            "`brew uninstall lemonfiber` if you installed it that way, or delete the \
-             binary — `rm $(command -v lemonfiber)`"
+            "brew uninstall lemonfiber if you installed it that way, or delete the \
+             binary — rm $(command -v lemonfiber)"
         }
     }
 }

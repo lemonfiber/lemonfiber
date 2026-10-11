@@ -33,7 +33,7 @@ pub(super) fn plain(manifest: &Manifest, step: &Step, at: &str, found: &mut Vec<
         Some(Unaddressed::Path(why)) => found.push(Violation {
             location: format!("{at}.call.path"),
             message: format!(
-                "{:?} is not a plain absolute path: {why}; a call's path begins with one `/` \
+                "{:?} is not a plain absolute path: {why}; a call's path begins with one \"/\" \
                  and is set on the address its destination gives it",
                 step.call.path
             ),

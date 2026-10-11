@@ -135,10 +135,10 @@ fn the_two_escapes_are_read_in_one_pass_and_in_the_right_order() {
 #[test]
 fn an_escape_that_is_not_one_is_refused_by_name() {
     let said = read("/a~2b").err().unwrap_or_default();
-    assert!(said.contains("`~2`"), "names what it carries: {said}");
+    assert!(said.contains("~2"), "names what it carries: {said}");
     assert!(said.contains("~0"), "names the escapes: {said}");
     let ends = read("/a~").err().unwrap_or_default();
-    assert!(ends.contains("ends in a `~`"), "got: {ends}");
+    assert!(ends.contains("ends in a \"~\""), "got: {ends}");
     // Inside a selector too, on either side of the comparison.
     assert!(read("/[a~2=b]").is_err(), "a field's escape is read");
     assert!(read("/[a=b~2]").is_err(), "a value's escape is read");

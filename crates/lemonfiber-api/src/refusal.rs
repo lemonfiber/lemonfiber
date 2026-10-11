@@ -373,7 +373,7 @@ impl Refusal {
                 Remedy::new("Wait as long as the refusal says, then try once more")
                     .with_detail("Retry-After")
             }
-            Self::NotAPassword => Remedy::new("Send the password as the body's `password`"),
+            Self::NotAPassword => Remedy::new("Send the password as the body's password"),
             Self::NotOpen => Remedy::new("Ask whoever invited you for a new invitation"),
             Self::ShortChoice => Remedy::new(format!(
                 "Choose a password of at least {} characters",
