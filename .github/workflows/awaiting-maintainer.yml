@@ -34,6 +34,6 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    uses: lemonfiber/spec/.github/workflows/awaiting-maintainer.yml@164464d71266bdc36d90272c58eb8bd02f1ba10d # v1.0.80
+    uses: lemonfiber/spec/.github/workflows/awaiting-maintainer.yml@58d3ff792b2ba75ae67970c42fbe1bdc6d9bcff1 # v1.0.87
     secrets:
       DISCORD_MAINTAINERS_WEBHOOK: ${{ secrets.DISCORD_MAINTAINERS_WEBHOOK }}
