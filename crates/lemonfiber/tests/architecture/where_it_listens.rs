@@ -31,7 +31,7 @@
 
 use std::collections::BTreeSet;
 use std::fs;
-use std::net::{IpAddr, SocketAddr};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use crate::source_tree::{crates_that_ship, in_a_crate_that_ships, shipped};
 
@@ -142,15 +142,17 @@ const REFUSES: &[(&str, &str)] = &[
     ),
 ];
 
-/// The files that name addresses the core assigns on the project's own networks, and
-/// why none of those is one this product listens on or connects to.
+/// The files that name addresses the core assigns on the project's own networks, the
+/// block each such address lies in, and why none of those is one this product listens
+/// on or connects to.
 ///
 /// Every address written here is one a container of the generated project holds on a
 /// network with no route off the host, and one the core hands to another service as
-/// the proxy it trusts. A file arriving on this list is somebody writing down that it
-/// only ever assigns, which is the claim a reviewer checks.
-const ASSIGNS: &[(&str, &str)] = &[(
+/// the proxy it trusts. An address in a listed file outside its block, or one not
+/// written as four numbers, is held to the policy like any other.
+const ASSIGNS: &[(&str, (Ipv4Addr, u8), &str)] = &[(
     "crates/lemonfiber-core/src/topology.rs",
+    (Ipv4Addr::new(10, 80, 96, 0), 24),
     "the subnets and the fixed addresses the guarded door and the proxy hold on the \
      networks of the door's asks, which the media server and the door are told to trust",
 )];
@@ -223,6 +225,8 @@ struct Named {
     written: String,
     /// Whether it names somewhere only this machine can reach.
     loopback: bool,
+    /// The address it names, where it is written whole.
+    address: Option<IpAddr>,
 }
 
 /// The text inside double quotes on one line.
@@ -265,18 +269,41 @@ fn constants(line: &str) -> impl Iterator<Item = String> + '_ {
         })
 }
 
-/// The addresses written on one line, each with whether it is loopback.
-fn addresses_on(line: &str) -> Vec<(String, bool)> {
-    let mut found: Vec<(String, bool)> = constants(line)
+/// The address `Ipv4Addr::new` builds on one line, where its four parts are numbers.
+fn built(line: &str) -> Option<IpAddr> {
+    let (_, rest) = line.split_once("Ipv4Addr::new(")?;
+    let (parts, _) = rest.split_once(')')?;
+    let octets: Vec<u8> = parts
+        .split(',')
+        .map(|part| part.trim().parse().ok())
+        .collect::<Option<_>>()?;
+    let octets: [u8; 4] = octets.try_into().ok()?;
+    Some(IpAddr::V4(Ipv4Addr::from(octets)))
+}
+
+/// Whether an address lies in a block.
+fn within(address: Option<IpAddr>, (base, length): (Ipv4Addr, u8)) -> bool {
+    let Some(IpAddr::V4(address)) = address else {
+        return false;
+    };
+    let mask = u32::MAX.checked_shl(32 - u32::from(length)).unwrap_or(0);
+    u32::from(address) & mask == u32::from(base) & mask
+}
+
+/// The addresses written on one line, each with whether it is loopback and what it
+/// names where it is written whole.
+fn addresses_on(line: &str) -> Vec<(String, bool, Option<IpAddr>)> {
+    let mut found: Vec<(String, bool, Option<IpAddr>)> = constants(line)
         .map(|named| {
             let loopback = named.ends_with(LOOPBACK);
-            (named, loopback)
+            let address = (named == "Ipv4Addr::new").then(|| built(line)).flatten();
+            (named, loopback, address)
         })
         .collect();
     found.extend(
         quoted(line)
             .filter_map(parsed)
-            .map(|(written, address)| (written, address.is_loopback())),
+            .map(|(written, address)| (written, address.is_loopback(), Some(address))),
     );
     found
 }
@@ -296,11 +323,12 @@ fn named() -> Vec<Named> {
             found.extend(
                 addresses_on(line)
                     .into_iter()
-                    .map(|(written, loopback)| Named {
+                    .map(|(written, loopback, address)| Named {
                         file: file.clone(),
                         line: number + 1,
                         written,
                         loopback,
+                        address,
                     }),
             );
         }
@@ -373,8 +401,8 @@ fn every_address_beyond_this_machine_is_one_the_policy_names() {
     );
     let listed: Vec<&str> = REFUSES
         .iter()
-        .chain(ASSIGNS)
         .map(|(file, _)| *file)
+        .chain(ASSIGNS.iter().map(|(file, _, _)| *file))
         .filter(|file| !found.iter().any(|address| address.file == *file))
         .collect();
     assert!(
@@ -386,9 +414,18 @@ fn every_address_beyond_this_machine_is_one_the_policy_names() {
         .iter()
         .filter(|address| !address.loopback)
         .filter(|address| !REFUSES.iter().any(|(file, _)| *file == address.file))
-        .filter(|address| !ASSIGNS.iter().any(|(file, _)| *file == address.file))
+        .filter(|address| {
+            !ASSIGNS
+                .iter()
+                .any(|(file, block, _)| *file == address.file && within(address.address, *block))
+        })
         .filter(|address| !declared.contains(address.written.as_str()) || address.file != DECIDES)
-        .map(|address| format!("{}:{}: `{}`", address.file, address.line, address.written))
+        .map(|address| {
+            let named = address
+                .address
+                .map_or_else(|| address.written.clone(), |built| built.to_string());
+            format!("{}:{}: `{named}`", address.file, address.line)
+        })
         .collect();
     assert!(
         unnamed.is_empty(),
