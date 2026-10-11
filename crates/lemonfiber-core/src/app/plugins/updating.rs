@@ -497,5 +497,6 @@ fn unheld(
 ) -> Result<(), Box<Problem>> {
     super::writing::unanswered(would, others)?;
     super::writing::unshared(would, others)?;
+    super::replacing::unreplaced(would, crate::plugin::first_party::EMBEDDED)?;
     super::occupied::unoccupied(ctx, would, others, stack)
 }

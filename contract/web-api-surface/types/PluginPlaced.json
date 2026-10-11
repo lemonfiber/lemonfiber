@@ -84,6 +84,12 @@
       ],
       "required": false
     },
+    "replaces": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "service": {
       "type": [
         "string"

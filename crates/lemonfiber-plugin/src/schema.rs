@@ -239,6 +239,11 @@ pub struct Service {
     /// where other services reach that upstream directly rather than through the adapter.
     #[serde(default)]
     pub native: Option<String>,
+    /// The id of the stack's own service this service moves in place of, which is its own
+    /// id: it keeps that service's container, configuration and data, and may take its
+    /// port and the name the proxy answers for it.
+    #[serde(default)]
+    pub replaces: Option<String>,
     /// The one privileged shape lemonfiber writes for this service, where it is the
     /// upstream an adapter of the same plugin fronts and that adapter speaks
     /// `network.egress-guard`.

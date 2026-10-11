@@ -86,6 +86,7 @@ pub(super) async fn install(
         .map_err(|there| Box::new(already(&there, &named)))?;
     writing::unanswered(&would, held.installed())?;
     writing::unshared(&would, held.installed())?;
+    super::replacing::unreplaced(&would, crate::plugin::first_party::EMBEDDED)?;
 
     // Where the writes land, asked for before the branch rather than inside it. What
     // a rehearsal has to state is where every change goes, and a path is a fact about

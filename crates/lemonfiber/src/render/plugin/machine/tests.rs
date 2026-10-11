@@ -38,6 +38,7 @@ fn recorded(plugin: &str, reached: Option<Reached>) -> Installed {
             speaks: Vec::new(),
             fronts: None,
             native: None,
+            replaces: None,
             shape: None,
             asks: Vec::new(),
         }],

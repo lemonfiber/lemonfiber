@@ -238,6 +238,7 @@ pub(super) fn what_is_installed() -> lemonfiber_core::plugin::Installs {
             speaks: Vec::new(),
             fronts: None,
             native: None,
+            replaces: None,
             shape: None,
             asks: Vec::new(),
         }],

@@ -89,6 +89,51 @@ pub(super) fn answering(label: &str) -> bool {
     hostnames().iter().any(|held| held == label)
 }
 
+/// The service the shipped proxy sends this name to, where it answers on it.
+pub(super) fn routed_to(label: &str) -> Option<&'static str> {
+    static ROUTED: LazyLock<Vec<(String, String)>> = LazyLock::new(|| routes(PROXY));
+    ROUTED
+        .iter()
+        .find(|(held, _)| held == label)
+        .map(|(_, service)| service.as_str())
+}
+
+/// Each label the proxy configuration answers on, with the service its first
+/// `reverse_proxy` inside that stanza names.
+fn routes(text: &str) -> Vec<(String, String)> {
+    let mut found = Vec::new();
+    let mut open: Option<String> = None;
+    for line in text.lines() {
+        let (said, stanza) = opened(line);
+        if let Some((label, rest)) = stanza {
+            open = Some(label.to_owned());
+            if let Some(service) = proxied_service(rest) {
+                found.push((label.to_owned(), service));
+                open = None;
+            }
+            continue;
+        }
+        let Some(label) = open.as_ref() else {
+            continue;
+        };
+        if let Some(service) = proxied_service(said) {
+            found.push((label.clone(), service));
+            open = None;
+        } else if said.starts_with('}') {
+            open = None;
+        }
+    }
+    found
+}
+
+/// The service a `reverse_proxy <service>:<port>` in `text` names.
+fn proxied_service(text: &str) -> Option<String> {
+    let (_, after) = text.split_once("reverse_proxy ")?;
+    let target = after.split_whitespace().next()?;
+    let service = target.split(':').next()?;
+    (!service.is_empty()).then(|| service.to_owned())
+}
+
 /// Every label the proxy configuration puts in front of the operator's domain.
 ///
 /// Read off the one shape the file is written in — a label, the domain placeholder,
@@ -99,18 +144,24 @@ pub(super) fn answering(label: &str) -> bool {
 pub(super) fn proxied(text: &str) -> Vec<String> {
     let mut found: Vec<String> = Vec::new();
     for line in text.lines() {
-        let said = line.trim_start().trim_start_matches('#').trim_start();
-        let Some((label, _)) = said.split_once(DOMAIN) else {
+        let Some((label, _)) = opened(line).1 else {
             continue;
         };
-        if label.is_empty() || !label.chars().all(is_label) {
-            continue;
-        }
         if !found.iter().any(|held| held == label) {
             found.push(label.to_owned());
         }
     }
     found
+}
+
+/// A line with any leading comment marker set aside, and the label and the rest of it
+/// where it opens a stanza in front of the operator's domain.
+fn opened(line: &str) -> (&str, Option<(&str, &str)>) {
+    let said = line.trim_start().trim_start_matches('#').trim_start();
+    let stanza = said
+        .split_once(DOMAIN)
+        .filter(|(label, _)| !label.is_empty() && label.chars().all(is_label));
+    (said, stanza)
 }
 
 /// Whether one character may appear in a DNS label.
