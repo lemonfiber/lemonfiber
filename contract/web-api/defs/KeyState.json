@@ -8,6 +8,11 @@
       "const": "active"
     },
     {
+      "description": "Minted as a claim and not collected yet: it has no secret, admits nothing, and is\nrevoked when its claim lapses.",
+      "type": "string",
+      "const": "waiting"
+    },
+    {
       "description": "Refused as a wrong token is, and kept in the listing with when it was revoked.",
       "type": "string",
       "const": "revoked"

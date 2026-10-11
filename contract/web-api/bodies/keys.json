@@ -4,6 +4,11 @@
   "description": "What a mint is asked with.",
   "type": "object",
   "properties": {
+    "claim": {
+      "description": "Whether to mint it as a claim: the reply carries the link a program collects it\nwith, once, within ten minutes, and no secret.",
+      "type": "boolean",
+      "default": false
+    },
     "name": {
       "description": "What to call it.",
       "type": "string"

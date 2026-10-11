@@ -125,15 +125,19 @@ const DASHBOARD: &str = "dashboard";
 /// is the same kind of thing: a command line is already sitting at the machine that
 /// printed this run's token, so there is nothing for it to log in to. What the
 /// stack can do is read by a client that may be older or newer than the stack, and a
-/// command line is always the stack's own build, so it has nothing to ask.
+/// command line is always the stack's own build, so it has nothing to ask. The door a
+/// key minted as a claim is collected at is a program's, on another machine, holding
+/// nothing but the claim: the operator mints the claim at the command line, and the
+/// command line has no key to collect.
 ///
 /// Anything else this surface routes belongs in a row.
-const UNREQUESTED: [&str; 5] = [
+const UNREQUESTED: [&str; 6] = [
     "/api/events",
     "/api/capabilities",
     "/api/actions/{action}",
     "/api/jobs/{job}",
     "/api/session",
+    "/api/keys/claim",
 ];
 
 /// One row of the parity table.

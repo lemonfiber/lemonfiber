@@ -119,6 +119,8 @@ kinds! {
     REMOVAL = "removal",
     /// The name given to work that outlives the request that started it.
     JOB = "job",
+    /// A key minted as a claim: the link that collects it, shown this once.
+    KEY_CLAIM = "key-claim",
     /// Every key this machine has minted, and what became of a revoke.
     KEYS = "keys",
     /// What a lifecycle command did, or would have done.

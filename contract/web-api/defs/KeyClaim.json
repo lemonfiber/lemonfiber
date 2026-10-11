@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A key minted as a claim: the link that collects it, and no secret.",
+  "type": "object",
+  "properties": {
+    "lapses": {
+      "description": "When the claim stops collecting the key, written as every other instant is.",
+      "type": "string"
+    },
+    "link": {
+      "description": "The key link: `lemonfiber://key` with the address, the certificate fingerprint,\nthe stack, when the claim lapses and the claim. Shown once, and drawn as a code.",
+      "type": "string"
+    },
+    "name": {
+      "description": "The name it was minted under.",
+      "type": "string"
+    },
+    "purpose": {
+      "description": "What the minter said it is for.",
+      "$ref": "KeyPurpose.json"
+    },
+    "scope": {
+      "description": "What it admits: `read`, `act` or `member:<name>`.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "scope",
+    "purpose",
+    "link",
+    "lapses"
+  ]
+}

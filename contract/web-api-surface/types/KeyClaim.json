@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "lapses": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "link": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "purpose": {
+      "type": [
+        "ref:KeyPurpose"
+      ],
+      "required": true
+    },
+    "scope": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

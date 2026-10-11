@@ -176,6 +176,14 @@ pub enum Kind {
         /// What it admits, as every surface writes a scope.
         scope: String,
     },
+    /// A key minted as a claim was collected, and its secret minted in the reply that
+    /// collected it. Undoing revokes it, taking the key back from whatever collected it.
+    KeyCollected {
+        /// The key's name.
+        name: String,
+        /// What it admits.
+        scope: String,
+    },
     /// A key was revoked. Nothing undoes it: a revoked key is never made good again,
     /// and whatever still needs one is minted a new one.
     KeyRevoked {
@@ -243,7 +251,9 @@ impl Change {
                 field: field.clone(),
                 value: previous.clone(),
             },
-            Kind::KeyMinted { name, .. } => Action::Revoke { name: name.clone() },
+            Kind::KeyMinted { name, .. } | Kind::KeyCollected { name, .. } => {
+                Action::Revoke { name: name.clone() }
+            }
             Kind::KeyRevoked { name, .. } => Action::Reinstate { name: name.clone() },
         };
         Undo {

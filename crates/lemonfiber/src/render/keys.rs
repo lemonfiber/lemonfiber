@@ -3,7 +3,7 @@
 //! The secret comes first and once, because it is the one thing on the screen that is
 //! never shown again: everything under it is how to use it and what to know.
 
-use lemonfiber_core::keys::{Listed, Listing, Minted, State};
+use lemonfiber_core::keys::{Claimed, Listed, Listing, Minted, State};
 
 use super::{qr, Lines};
 
@@ -36,6 +36,26 @@ pub(super) fn minted(report: &Minted) -> Lines {
     if let Some(caution) = report.caution.as_deref() {
         lines.spaced(caution);
     }
+    lines
+}
+
+/// A key minted as a claim: the link and its code, which collect the key once.
+pub(super) fn claimed(report: &Claimed) -> Lines {
+    let mut lines = Lines::default();
+    lines.put(format!(
+        "Minted the key {} as a claim, with the scope {}, for {}.",
+        report.name,
+        report.scope,
+        report.purpose.written()
+    ));
+    lines.spaced("Its link, which is not shown again:");
+    lines.put(format!("  {}", report.link));
+    qr::labelled(&mut lines, "The same link, for a camera:", &report.link);
+    lines.spaced(format!(
+        "The program collects the key with it once, until {}. A key nobody collects by then \
+         is revoked, and collecting it is told to you.",
+        report.lapses
+    ));
     lines
 }
 
@@ -92,6 +112,7 @@ fn one(key: &Listed) -> Lines {
 const fn state(state: State) -> &'static str {
     match state {
         State::Active => "active",
+        State::Waiting => "waiting to be collected",
         State::Revoked => "revoked",
         State::Orphaned => "orphaned: the account it is for has left the household",
         State::Unconfirmed => "the media server could not be asked whether its account remains",

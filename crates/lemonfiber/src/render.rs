@@ -261,6 +261,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Pairing(report) => companion::pairing(report),
         Outcome::Certificate(report) => companion::certificate(report),
         Outcome::Minted(report) => keys::minted(report),
+        Outcome::KeyClaim(report) => keys::claimed(report),
         Outcome::Keys(report) => keys::listing(report),
         Outcome::Removal(report) => removal::removal(report),
         Outcome::Outbound(report) => outbound::leaving(report),

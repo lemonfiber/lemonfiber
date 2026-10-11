@@ -367,6 +367,7 @@ fn keeping() -> Vec<Outcome> {
         Outcome::Pausing(every_client_paused()),
         Outcome::Outbound(what_leaves()),
         Outcome::Minted(a_minted_key()),
+        Outcome::KeyClaim(a_key_claim()),
         Outcome::Keys(every_key()),
     ]
 }
@@ -387,6 +388,21 @@ fn a_minted_key() -> lemonfiber_core::keys::Minted {
         address: Some("https://lemonfiber.local:8443".to_owned()),
         pin: Some("ab".repeat(32)),
         caution: Some("Serve it encrypted on your network first.".to_owned()),
+    }
+}
+
+/// A key minted as a claim, with the link that collects it.
+fn a_key_claim() -> lemonfiber_core::keys::Claimed {
+    lemonfiber_core::keys::Claimed {
+        name: "ha".to_owned(),
+        scope: "read".to_owned(),
+        purpose: lemonfiber_core::keys::Purpose::HomeAssistant,
+        link: format!(
+            "lemonfiber://key?address=https%3A%2F%2Flemonfiber.local%3A8443&fingerprint={}&stack=a1b2&expires=1791245400&claim=lfc_{}",
+            "ab".repeat(32),
+            "07".repeat(32)
+        ),
+        lapses: "2026-10-06T00:10:00".to_owned(),
     }
 }
 

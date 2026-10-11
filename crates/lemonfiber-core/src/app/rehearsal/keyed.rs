@@ -14,6 +14,7 @@ pub(super) const fn keyed(asked: &Keyed) -> Asked {
     match asked {
         Keyed::List { .. } => reads("key list"),
         Keyed::Mint { .. } => cannot("key mint", A_KEY_IS_ITS_SECRET),
+        Keyed::Collect { .. } => cannot("key collect", A_KEY_IS_ITS_SECRET),
         Keyed::Revoke { .. } => reports("key revoke", &[kind::KEYS]),
     }
 }

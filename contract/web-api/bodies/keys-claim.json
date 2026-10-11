@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "KeyCollecting",
+  "description": "What a collection is asked with: the claim alone.",
+  "type": "object",
+  "properties": {
+    "claim": {
+      "description": "The claim the key link carried.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "claim"
+  ]
+}

@@ -27,6 +27,10 @@ pub enum KeyCommand {
         /// What it is for: home-assistant, mcp or other.
         #[arg(long)]
         purpose: String,
+        /// Mint it as a claim: show a link and its code, which the program collects the
+        /// key with once, within ten minutes, instead of showing the secret here.
+        #[arg(long)]
+        claim: bool,
     },
     /// List every key by name, scope, purpose, state, minting time and last use.
     List,

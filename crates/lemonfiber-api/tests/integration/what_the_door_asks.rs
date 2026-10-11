@@ -333,32 +333,39 @@ async fn everything_else_still_needs_a_secret_this_run_admits() {
     let _ = fs::remove_dir_all(a_directory("guarded"));
 }
 
-/// Exactly one path on this surface is let through the token half of the guard.
+/// Exactly two paths on this surface are let through the token half of the guard: the
+/// door a password is exchanged at, and the door a key minted as a claim is collected at.
 ///
 /// Read from the guard's own source rather than by trying every path, because the
-/// failure worth catching is a second exemption written beside the first — and a
-/// sweep over the paths that exist today would not see one added tomorrow.
+/// failure worth catching is a further exemption written beside these two, and a sweep
+/// over the paths that exist today would not see one added tomorrow.
 #[test]
-fn exactly_one_path_is_let_through_without_a_token() {
+fn only_the_two_doors_are_let_through_without_a_token() {
     let Ok(guard) = fs::read_to_string("src/router.rs") else {
         unreachable!("the guard this crate ships is in the tree this test is built from")
     };
-    let exempt: Vec<&str> = guard
+    let code: Vec<&str> = guard
         .lines()
         .map(str::trim)
         .filter(|line| !line.starts_with("//"))
-        .filter(|line| line.contains("request.uri().path() =="))
+        .collect();
+    let compared: Vec<&&str> = code
+        .iter()
+        .filter(|line| line.contains("request.uri().path()"))
         .collect();
     assert_eq!(
-        exempt.len(),
-        1,
-        "the guard lets more than one path through without a token: {exempt:?}"
+        compared,
+        [&"let at_the_door = DOORS.contains(&request.uri().path());"],
+        "the guard reads the path somewhere other than the list of doors"
     );
-    assert!(
-        exempt
-            .first()
-            .is_some_and(|line| line.contains("crate::admission::SESSION")),
-        "the one path let through is not the door: {exempt:?}"
+    let doors: Vec<&&str> = code
+        .iter()
+        .filter(|line| line.starts_with("const DOORS"))
+        .collect();
+    assert_eq!(
+        doors,
+        [&"const DOORS: [&str; 2] = [crate::admission::SESSION, crate::keys::COLLECTING];"],
+        "the doors let through without a token are not the sign-in door and the claim door"
     );
 }
 

@@ -77,6 +77,7 @@ fn settings_of(
             | Outcome::Bandwidth(_)
             | Outcome::Pausing(_)
             | Outcome::Minted(_)
+            | Outcome::KeyClaim(_)
             | Outcome::Keys(_)
             | Outcome::Status(_)
             | Outcome::Doctor(_)

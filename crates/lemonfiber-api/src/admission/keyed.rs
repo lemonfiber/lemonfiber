@@ -62,7 +62,7 @@ impl Admitting {
                 self.attempts.forgiven(&ticket).await;
                 return Knocking::Nobody;
             }
-            Holding::Active(record) => record,
+            Holding::Active(record) => *record,
         };
         let knocking = match record.scope.member() {
             None => Knocking::Known(Caller::Key(Keyed::from(&record))),

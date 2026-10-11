@@ -23,7 +23,7 @@
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
 use axum::response::Response;
-use axum::routing::{delete, get};
+use axum::routing::{delete, get, post};
 use axum::{Extension, Json, Router};
 use lemonfiber_core::app::Command;
 use lemonfiber_core::keys::run::members_may_mint;
@@ -31,7 +31,7 @@ use lemonfiber_core::keys::run::Asked;
 use lemonfiber_core::keys::Minter;
 use serde::Deserialize;
 
-use crate::admission::Caller;
+use crate::admission::{Caller, Door};
 use crate::guard::Arrived;
 use crate::read::carried_out;
 use crate::refusal::Refusal;
@@ -42,6 +42,9 @@ pub const KEYS: &str = "/api/keys";
 
 /// Where one key is revoked, by its name.
 pub const A_KEY: &str = "/api/keys/{name}";
+
+/// Where a key minted as a claim is collected, by a program holding nothing else.
+pub const COLLECTING: &str = "/api/keys/claim";
 
 /// What a mint is asked with.
 #[derive(Deserialize, schemars::JsonSchema)]
@@ -56,12 +59,39 @@ struct Minting {
     purpose: String,
     /// The operator's password, given again.
     password: String,
+    /// Whether to mint it as a claim: the reply carries the link a program collects it
+    /// with, once, within ten minutes, and no secret.
+    #[serde(default)]
+    claim: bool,
+}
+
+/// What a collection is asked with: the claim alone.
+#[derive(Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(rename = "KeyCollecting")]
+struct Collecting {
+    /// The claim the key link carried.
+    claim: String,
+}
+
+/// What a collection asked for, the claim withheld.
+impl std::fmt::Debug for Collecting {
+    fn fmt(&self, out: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        out.debug_struct("Collecting")
+            .field("claim", &"withheld")
+            .finish()
+    }
 }
 
 /// The body a mint takes, with the route it is sent to, described from the type the
 /// route reads it into.
 pub(crate) fn body() -> (&'static str, schemars::Schema) {
     (KEYS, schemars::schema_for!(Minting))
+}
+
+/// The body a collection takes, with the route it is sent to.
+pub(crate) fn collecting_body() -> (&'static str, schemars::Schema) {
+    (COLLECTING, schemars::schema_for!(Collecting))
 }
 
 /// What a mint asked for, the password withheld.
@@ -72,6 +102,7 @@ impl std::fmt::Debug for Minting {
             .field("scope", &self.scope)
             .field("purpose", &self.purpose)
             .field("password", &"withheld")
+            .field("claim", &self.claim)
             .finish()
     }
 }
@@ -80,6 +111,7 @@ impl std::fmt::Debug for Minting {
 pub fn routes() -> Router<Serving> {
     Router::new()
         .route(KEYS, get(listed).post(minted))
+        .route(COLLECTING, post(collected))
         .route(A_KEY, delete(revoked))
 }
 
@@ -114,6 +146,7 @@ async fn minted(
         scope: given.scope,
         purpose: given.purpose,
         by: by.clone(),
+        claim: given.claim,
     };
     // A member the operator has not allowed is told so before their password is put to
     // the media server: the answer does not turn on it, and asking would open a sign-in
@@ -147,6 +180,49 @@ async fn minted(
         Ok(false) => Refusal::NotThePassword.answered(),
         Err(left) => crate::admission::waiting(left.as_secs().max(1)),
     }
+}
+
+/// A key minted as a claim, collected with that claim, its secret shown this once.
+///
+/// The second door that opens without a credential, because the program collecting a
+/// key holds nothing else yet. A claim is counted as a guess at a key is, before it is
+/// looked at, and only over the connection a key may cross: a secret collected in the
+/// clear has been handed to everything on the way.
+async fn collected(
+    State(serving): State<Serving>,
+    arrived: Option<Extension<Arrived>>,
+    given: Result<Json<Collecting>, JsonRejection>,
+) -> Response {
+    let Some(Extension(arrived)) = arrived.filter(|Extension(arrived)| arrived.may_carry_a_key())
+    else {
+        return Refusal::KeyInTheClear.answered();
+    };
+    let Ok(Json(given)) = given else {
+        return Refusal::NotAKeyRequest.answered();
+    };
+    let now = serving.ctx.seams.clock.now();
+    let ticket = match serving
+        .admitting
+        .attempts
+        .taken_at_a_key(arrived.from, now)
+        .await
+    {
+        Ok(ticket) => ticket,
+        Err(left) => return crate::admission::waiting(left.as_secs().max(1)),
+    };
+    let asked = Asked::Collect {
+        claim: given.claim,
+        from: Some(arrived.from.to_canonical().to_string()),
+    };
+    let answered = carried_out(&serving.ctx, Command::Keys(asked)).await;
+    if answered.status().is_success() {
+        serving
+            .admitting
+            .attempts
+            .right(&ticket, Door::Key, now)
+            .await;
+    }
+    answered
 }
 
 /// A key revoked, by its name.

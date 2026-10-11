@@ -220,6 +220,8 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `KEY-9` | `NO_SECRET` | error | 1 | 500 | 0.17.0 | Raised when this machine would not supply the bytes a secret is made of. |
 | `KEY-10` | `NO_SUCH_KEY` | error | 1 | 404 | 0.17.0 | Raised when no active key holds the name a revoke gave. |
 | `KEY-11` | `MEMBERS_MAY_NOT_MINT` | warning | 1 | 409 | 0.17.0 | Raised when a household member asks to mint a key and the operator has not allowed members to. |
+| `KEY-12` | `CLAIM_NOT_OPEN` | warning | 1 | 401 | 0.18.0 | Raised when a key is asked to be collected with a claim that collects nothing. |
+| `KEY-13` | `UNLINKABLE` | warning | 1 | 409 | 0.18.0 | Raised when a key is asked to be minted as a claim and no address another machine reaches can go in its link. |
 
 ## `LIBRARY` — what the media server holds
 

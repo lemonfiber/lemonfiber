@@ -130,6 +130,25 @@ const CONSEQUENCE: &str = "Every phone paired with this machine refuses it from 
                            should for a certificate it was never shown, until it is paired \
                            again with new material.";
 
+/// A link the companion or another program opens: `at`, then the material's address,
+/// fingerprint and stack, `expires`, and `rest`, in that order, each percent-encoded.
+#[must_use]
+pub(crate) fn linked(at: &str, material: &Material, expires: u64, rest: &[(&str, &str)]) -> String {
+    let expires = expires.to_string();
+    let said = [
+        ("address", material.address.as_str()),
+        ("fingerprint", material.fingerprint.as_str()),
+        ("stack", material.stack.as_str()),
+        ("expires", expires.as_str()),
+    ];
+    let query: Vec<String> = said
+        .iter()
+        .chain(rest)
+        .map(|(key, value)| format!("{key}={}", crate::endpoint::query_encoded(value)))
+        .collect();
+    format!("{at}?{}", query.join("&"))
+}
+
 /// Pairing material for this stack, made now.
 ///
 /// # Errors

@@ -24,7 +24,7 @@ const NOTED_WITHIN: Duration = Duration::from_secs(60);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Holding {
     /// A key this machine minted and has not revoked.
-    Active(Record),
+    Active(Box<Record>),
     /// A key this machine knows and refuses: revoked, or kept in a record that does not
     /// read. Not a guess, so not counted as one.
     Known,
@@ -70,7 +70,7 @@ impl Keyring {
         };
         match kept.holding(offered) {
             Some(record) if record.is_revoked() => Holding::Known,
-            Some(record) => Holding::Active(record.clone()),
+            Some(record) => Holding::Active(Box::new(record.clone())),
             None => Holding::Unknown,
         }
     }

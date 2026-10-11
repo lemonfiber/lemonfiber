@@ -2,6 +2,11 @@
 # status_check.py and the release gate.
 
 requirement = [
+  { id = "C10-R18", state = "done", evidence = ["crates/lemonfiber-core/src/keys/run/claimed.rs", "crates/lemonfiber-core/src/keys/claiming.rs", "crates/lemonfiber-core/src/companion.rs", "crates/lemonfiber/src/render/keys.rs", "crates/lemonfiber-api/tests/integration/what_a_claim_collects.rs"] },
+  { id = "C10-R19", state = "done", evidence = ["crates/lemonfiber-core/src/keys/claiming.rs", "crates/lemonfiber-core/src/keys.rs", "crates/lemonfiber-core/src/keys/claiming/tests.rs", "crates/lemonfiber-core/src/keys/run/claimed/tests.rs"] },
+  { id = "C10-R20", state = "done", evidence = ["crates/lemonfiber-api/src/keys.rs", "crates/lemonfiber-api/src/router.rs", "crates/lemonfiber-core/src/keys/run/claimed.rs", "crates/lemonfiber-api/tests/integration/what_a_claim_collects.rs"] },
+  { id = "C10-R21", state = "done", evidence = ["crates/lemonfiber-core/src/keys/run/claimed.rs", "crates/lemonfiber-core/src/keys/run/heard.rs", "crates/lemonfiber-core/src/journal.rs", "crates/lemonfiber-core/src/keys/run/claimed/tests.rs"] },
+  { id = "C10-R22", state = "done", evidence = ["crates/lemonfiber/src/render/keys.rs", "crates/lemonfiber-core/src/keys/claiming.rs"] },
   { id = "C10-R1", state = "done", evidence = ["crates/lemonfiber-core/src/keys/run.rs", "crates/lemonfiber-core/src/keys.rs", "crates/lemonfiber-api/src/keys.rs", "crates/lemonfiber-api/src/admission.rs", "crates/lemonfiber-api/src/entitled.rs"] },
   { id = "C10-R2", state = "done", evidence = ["crates/lemonfiber-core/src/keys/run.rs", "crates/lemonfiber-core/src/keys.rs", "crates/lemonfiber-api/src/keys.rs", "crates/lemonfiber-api/src/admission.rs", "crates/lemonfiber-api/src/entitled.rs"] },
   { id = "C10-R3", state = "done", evidence = ["crates/lemonfiber-core/src/keys/run.rs", "crates/lemonfiber-core/src/keys.rs", "crates/lemonfiber-api/src/keys.rs", "crates/lemonfiber-api/src/admission.rs", "crates/lemonfiber-api/src/entitled.rs"] },

@@ -11,11 +11,9 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use crate::alert::{Alert, Moment};
 use crate::app::{Ctx, Outcome};
-use crate::error::{Diagnose, Problem, Severity};
+use crate::error::{Diagnose, Problem};
 use crate::journal::{Change, Kind};
-use crate::PRODUCT;
 
 use super::listing::PURPOSES;
 use super::{
@@ -40,6 +38,16 @@ pub enum Asked {
         purpose: String,
         /// Who is minting it.
         by: Minter,
+        /// Whether to mint it as a claim, collected once by the program it is for,
+        /// rather than handing over its secret now.
+        claim: bool,
+    },
+    /// Collect a key minted as a claim, with that claim.
+    Collect {
+        /// The claim, as the key link carried it.
+        claim: String,
+        /// The address the collecting request came from, where it is known.
+        from: Option<String>,
     },
     /// List the keys, without their secrets: every one to the operator, and to a
     /// member only those scoped to them.
@@ -89,7 +97,20 @@ pub async fn asked(ctx: &Ctx, asked: Asked) -> Result<Outcome, Box<Problem>> {
             scope,
             purpose,
             by,
+            claim: false,
         } => mint(ctx, &name, &scope, &purpose, &by)
+            .await
+            .map(Outcome::Minted),
+        Asked::Mint {
+            name,
+            scope,
+            purpose,
+            by,
+            claim: true,
+        } => claimed::mint(ctx, &name, &scope, &purpose, &by)
+            .await
+            .map(Outcome::KeyClaim),
+        Asked::Collect { claim, from } => claimed::collect(ctx, &claim, from)
             .await
             .map(Outcome::Minted),
         Asked::List { by } => list(ctx, &by).await.map(Outcome::Keys),
@@ -112,28 +133,12 @@ pub async fn mint(
     purpose: &str,
     by: &Minter,
 ) -> Result<Minted, Box<Problem>> {
-    if matches!(by, Minter::Member { .. }) && !members_may_mint(ctx) {
-        return Err(Box::new(members_may_not_mint()));
-    }
-    if !names_a_key(name) {
-        return Err(Box::new(bad_name(name)));
-    }
-    let wanted = Wanted::read(scope).ok_or_else(|| Box::new(not_a_scope(scope)))?;
-    let purpose = Purpose::read(purpose).ok_or_else(|| Box::new(not_a_purpose(purpose)))?;
-    let path = at(ctx).ok_or_else(|| Box::new(nowhere()))?;
-    let mut kept = read(&path)?;
-    if let Some(held) = kept.named(name) {
-        return Err(Box::new(match by {
-            Minter::Member { id } if held.scope.member() != Some(id.as_str()) => name_held(name),
-            _ => name_taken(held),
-        }));
-    }
-    let scope = resolved(ctx, wanted).await?;
-    if let Minter::Member { id } = by {
-        if scope.member() != Some(id.as_str()) {
-            return Err(Box::new(not_for_yourself()));
-        }
-    }
+    let Prepared {
+        path,
+        mut kept,
+        scope,
+        purpose,
+    } = prepared(ctx, name, scope, purpose, by).await?;
     let secret = Secret::mint(ctx.seams.random.as_ref()).ok_or_else(|| Box::new(no_secret()))?;
     let now = crate::instant::written(ctx.seams.clock.now()).unwrap_or_default();
     let record = Record::minted(name, scope, purpose, &secret, now, by.clone());
@@ -160,6 +165,64 @@ pub async fn mint(
     })
 }
 
+/// What a mint has settled before anything is minted: where the keys are, what they
+/// are, and the scope and purpose asked for, each read and allowed.
+struct Prepared {
+    /// Where the keys are kept.
+    path: PathBuf,
+    /// The keys, with any claim that lapsed already revoked.
+    kept: Kept,
+    /// What the key will admit.
+    scope: Scope,
+    /// What it is for.
+    purpose: Purpose,
+}
+
+/// Everything a mint, of a secret or of a claim, checks before it mints.
+///
+/// # Errors
+///
+/// A [`Problem`] where the name, the scope or the purpose names nothing, the name is
+/// taken, a member's account cannot be found, a member asked for anything but a key of
+/// their own or is not allowed keys, or the keys cannot be read or written.
+async fn prepared(
+    ctx: &Ctx,
+    name: &str,
+    scope: &str,
+    purpose: &str,
+    by: &Minter,
+) -> Result<Prepared, Box<Problem>> {
+    if matches!(by, Minter::Member { .. }) && !members_may_mint(ctx) {
+        return Err(Box::new(members_may_not_mint()));
+    }
+    if !names_a_key(name) {
+        return Err(Box::new(bad_name(name)));
+    }
+    let wanted = Wanted::read(scope).ok_or_else(|| Box::new(not_a_scope(scope)))?;
+    let purpose = Purpose::read(purpose).ok_or_else(|| Box::new(not_a_purpose(purpose)))?;
+    let path = at(ctx).ok_or_else(|| Box::new(nowhere()))?;
+    let mut kept = read(&path)?;
+    claimed::lapse(ctx, &path, &mut kept).await?;
+    if let Some(held) = kept.named(name) {
+        return Err(Box::new(match by {
+            Minter::Member { id } if held.scope.member() != Some(id.as_str()) => name_held(name),
+            _ => name_taken(held),
+        }));
+    }
+    let scope = resolved(ctx, wanted).await?;
+    if let Minter::Member { id } = by {
+        if scope.member() != Some(id.as_str()) {
+            return Err(Box::new(not_for_yourself()));
+        }
+    }
+    Ok(Prepared {
+        path,
+        kept,
+        scope,
+        purpose,
+    })
+}
+
 /// The keys `by` may see, without their secrets: every one to the operator, and to a
 /// member only those scoped to them.
 ///
@@ -169,7 +232,8 @@ pub async fn mint(
 /// cannot be read.
 pub async fn list(ctx: &Ctx, by: &Minter) -> Result<Listing, Box<Problem>> {
     let path = at(ctx).ok_or_else(|| Box::new(nowhere()))?;
-    let kept = read(&path)?;
+    let mut kept = read(&path)?;
+    claimed::lapse(ctx, &path, &mut kept).await?;
     Ok(listed(ctx, &seen_by(kept, by), None).await)
 }
 
@@ -214,6 +278,7 @@ pub fn members_may_mint(ctx: &Ctx) -> bool {
 pub async fn revoke(ctx: &Ctx, name: &str, by: &Minter) -> Result<Listing, Box<Problem>> {
     let path = at(ctx).ok_or_else(|| Box::new(nowhere()))?;
     let mut kept = read(&path)?;
+    claimed::lapse(ctx, &path, &mut kept).await?;
     let seen = seen_by(kept.clone(), by);
     let Some(found) = active(&seen, name) else {
         return Err(Box::new(no_such_key(name, seen.named(name))));
@@ -357,6 +422,9 @@ fn state(record: &Record, members: Option<&BTreeSet<String>>) -> State {
     if record.is_revoked() {
         return State::Revoked;
     }
+    if record.is_waiting() {
+        return State::Waiting;
+    }
     match (record.scope.member(), members) {
         (None, _) => State::Active,
         (Some(_), None) => State::Unconfirmed,
@@ -379,76 +447,11 @@ fn journalled(ctx: &Ctx, record: &Record, kind: Kind) -> Result<(), Box<Problem>
         .map_err(|failure| Box::new(failure.problem()))
 }
 
-/// Which of the two a key's alert is about.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Heard {
-    /// It was minted.
-    Minted,
-    /// It was revoked.
-    Revoked,
-}
-
-/// Tell the operator, now and in the record of alerts, that a key was minted or revoked.
-async fn heard(ctx: &Ctx, record: &Record, heard: Heard) {
-    let alert = alert(record, heard);
-    let mut outbox = crate::app::outbox::load(ctx);
-    outbox.owe(vec![alert.clone()]);
-    ctx.narrator.say(&alert.summary).await;
-    // Delivered because the narrator cannot fail: the operator has the sentence and the
-    // outbox the history of its having been given.
-    outbox.delivered(&|_| 0);
-    crate::app::outbox::save(ctx, &outbox);
-}
-
-/// The alert a key's mint or revoke raises, naming the key and its scope.
-fn alert(record: &Record, heard: Heard) -> Alert {
-    let scope = record.scope.written();
-    let (summary, meaning, remedy) = match heard {
-        Heard::Minted => (
-            format!(
-                "A key named {} was minted, with the scope {scope}",
-                record.name
-            ),
-            format!(
-                "Whoever holds it can reach {PRODUCT} as far as {scope} admits, from now until \
-                 it is revoked."
-            ),
-            format!(
-                "If nobody meant to mint it, revoke it: {PRODUCT} key revoke {}",
-                record.name
-            ),
-        ),
-        Heard::Revoked => (
-            format!(
-                "The key named {} was revoked, with the scope {scope}",
-                record.name
-            ),
-            "Whatever held it is refused from its next request.".to_owned(),
-            "Mint a new key for anything that still needs one".to_owned(),
-        ),
-    };
-    let check = format!("{CHECK}{}", record.name);
-    // A key is minted once and revoked once, and a name is never minted again, so which
-    // of the two happened is all there is to tell one of its alerts from the other.
-    let happened = match heard {
-        Heard::Minted => "minted",
-        Heard::Revoked => "revoked",
-    };
-    Alert {
-        id: Some(Alert::named(&check, happened)),
-        check: check.clone(),
-        kind: ALERT_KIND.to_owned(),
-        moment: Moment::Onset,
-        severity: Severity::Warning,
-        summary,
-        meaning,
-        remedies: vec![remedy],
-        affected: vec![check],
-        exit: None,
-    }
-}
-
+mod claimed;
+mod heard;
 mod refused;
+
+use heard::{heard, Heard};
 
 #[cfg(test)]
 mod tests;

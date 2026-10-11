@@ -4,6 +4,7 @@
     "\"active\"",
     "\"orphaned\"",
     "\"revoked\"",
-    "\"unconfirmed\""
+    "\"unconfirmed\"",
+    "\"waiting\""
   ]
 }

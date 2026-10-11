@@ -736,6 +736,12 @@ fn asking_the_keys_rehearses_as_each_request_is() {
         scope: "read".to_owned(),
         purpose: "other".to_owned(),
         by: Minter::Operator,
+        claim: false,
     }));
     assert!(matches!(mint.rehearsal, Rehearsal::Cannot(_)));
+    let collect = asked(&Command::Keys(Keyed::Collect {
+        claim: "lfc_".to_owned(),
+        from: None,
+    }));
+    assert!(matches!(collect.rehearsal, Rehearsal::Cannot(_)));
 }
