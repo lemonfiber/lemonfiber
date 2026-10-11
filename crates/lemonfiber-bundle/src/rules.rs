@@ -2,7 +2,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{hex, Bundle, Pin, DIGEST_PREFIX, EXTENSION, SCHEMA_VERSION};
+use crate::copies::Copy;
+use crate::{hex, parts, Bundle, Pin, DIGEST_PREFIX, EXTENSION, SCHEMAS};
 
 /// What an https origin starts with.
 const SECURE: &str = "https://";
@@ -16,14 +17,16 @@ const DIGEST_DIGITS: usize = 64;
 /// How many numbers a release is written in.
 const RELEASE_PARTS: usize = 3;
 
-/// Every rule `bundle` and the `copies` beside it break, by file name.
-pub(crate) fn broken(bundle: &Bundle, copies: &BTreeMap<String, String>) -> Vec<String> {
+/// Every rule `bundle` and the `copies` beside it break.
+pub(crate) fn broken(bundle: &Bundle, copies: &BTreeMap<String, Copy>) -> Vec<String> {
     let mut broken = Vec::new();
-    if bundle.schema != SCHEMA_VERSION {
+    if !SCHEMAS.contains(&bundle.schema) {
+        let [one, two] = SCHEMAS;
         broken.push(format!(
-            "schema {} is not {SCHEMA_VERSION}, the one this build reads",
+            "schema {} is not {one} or {two}, the ones this build reads",
             bundle.schema
         ));
+        return broken;
     }
     for (before, after) in bundle.plugin.iter().zip(bundle.plugin.iter().skip(1)) {
         if before.id >= after.id {
@@ -35,52 +38,96 @@ pub(crate) fn broken(bundle: &Bundle, copies: &BTreeMap<String, String>) -> Vec<
     }
     for pin in &bundle.plugin {
         pinned(pin, &mut broken);
-        copied(pin, copies.get(&file(&pin.id)), &mut broken);
     }
-    let named: BTreeSet<String> = bundle.plugin.iter().map(|pin| file(&pin.id)).collect();
-    for unpinned in copies.keys().filter(|name| !named.contains(*name)) {
+    let named: BTreeSet<&str> = bundle.plugin.iter().map(|pin| pin.id.as_str()).collect();
+    for (_, unpinned) in copies.iter().filter(|(id, _)| !named.contains(id.as_str())) {
         broken.push(format!(
-            "{unpinned} is a copy the bundle pins no plugin for"
+            "{} is a copy the bundle pins no plugin for",
+            unpinned.name
         ));
+    }
+    if bundle.schema == 1 {
+        first(bundle, copies, &mut broken);
+    } else {
+        parts::broken(bundle, copies, &mut broken);
     }
     broken
 }
 
-/// The file name `id`'s copy is filed under.
-pub(crate) fn file(id: &str) -> String {
-    format!("{id}{EXTENSION}")
+/// What a schema 1 bundle breaks: a stack table, or a field only schema 2 has, or a
+/// copy that is not its pinned manifest.
+fn first(bundle: &Bundle, copies: &BTreeMap<String, Copy>, broken: &mut Vec<String>) {
+    for (table, declared) in [
+        ("profile", bundle.profile.len()),
+        ("form", bundle.form.len()),
+        ("wiring", bundle.wiring.len()),
+        ("removed", bundle.removed.len()),
+    ] {
+        if declared > 0 {
+            broken.push(format!(
+                "[[{table}]] is declared at schema 1, which has none"
+            ));
+        }
+    }
+    for pin in &bundle.plugin {
+        let id = &pin.id;
+        if pin.release.is_none() {
+            broken.push(format!(
+                "plugin {id}.release is missing, which schema 1 requires"
+            ));
+        }
+        for (field, given) in [
+            ("tree", pin.tree.is_some()),
+            ("stage", pin.stage.is_some()),
+            ("profile", pin.profile.is_some()),
+            ("last_release", pin.last_release.is_some()),
+        ] {
+            if given {
+                broken.push(format!(
+                    "plugin {id}.{field} is declared at schema 1, which has none"
+                ));
+            }
+        }
+        match copies.get(id).and_then(|copy| copy.manifest.as_deref()) {
+            None => broken.push(format!("plugin {id} has no copy at {id}{EXTENSION}")),
+            Some(manifest) => manifested(pin, manifest, &format!("{id}{EXTENSION}"), broken),
+        }
+    }
 }
 
-/// Every rule `pin`'s own fields break.
+/// Every rule `pin`'s own fields break, whatever the schema.
 fn pinned(pin: &Pin, broken: &mut Vec<String>) {
     let id = &pin.id;
     if !is_id(id) {
         broken.push(format!(
-            "plugin {id:?} is not an id: a lowercase letter, then lowercase letters, digits and hyphens"
+            "plugin {id:?} is not an id: a lowercase letter, then lowercase letters and digits, \
+             in words joined by single hyphens"
         ));
     }
     if !pin.origin.starts_with(SECURE) || pin.origin.contains(char::is_whitespace) {
         broken.push(format!("plugin {id}.origin is not an https URL"));
     }
-    if !is_release(&pin.release) {
-        broken.push(format!(
-            "plugin {id}.release {:?} is not a version, three numbers without a v",
-            pin.release
-        ));
+    if let Some(release) = &pin.release {
+        if !is_release(release) {
+            broken.push(format!(
+                "plugin {id}.release {release:?} is not a version, three numbers without a v"
+            ));
+        }
     }
     if !is_hex(&pin.revision, REVISION_DIGITS) {
         broken.push(format!(
             "plugin {id}.revision is not a full commit, {REVISION_DIGITS} lowercase hex digits"
         ));
     }
-    if !pin
-        .manifest
-        .strip_prefix(DIGEST_PREFIX)
-        .is_some_and(|digest| is_hex(digest, DIGEST_DIGITS))
-    {
-        broken.push(format!(
-            "plugin {id}.manifest is not written {DIGEST_PREFIX}<{DIGEST_DIGITS} lowercase hex>"
-        ));
+    for (field, digest) in [
+        ("manifest", Some(&pin.manifest)),
+        ("tree", pin.tree.as_ref()),
+    ] {
+        if digest.is_some_and(|digest| !is_digest(digest)) {
+            broken.push(format!(
+                "plugin {id}.{field} is not written {DIGEST_PREFIX}<{DIGEST_DIGITS} lowercase hex>"
+            ));
+        }
     }
     let mut seen = BTreeSet::new();
     for capability in &pin.fills {
@@ -92,32 +139,32 @@ fn pinned(pin: &Pin, broken: &mut Vec<String>) {
     }
 }
 
-/// Every rule `pin`'s copy breaks, where it has one.
-fn copied(pin: &Pin, copy: Option<&String>, broken: &mut Vec<String>) {
+/// Every rule a copy's manifest at `at` breaks against `pin`.
+pub(crate) fn manifested(pin: &Pin, manifest: &str, at: &str, broken: &mut Vec<String>) {
     let id = &pin.id;
-    let Some(copy) = copy else {
-        broken.push(format!("plugin {id} has no copy at {}", file(id)));
-        return;
-    };
-    if pin.manifest.strip_prefix(DIGEST_PREFIX) != Some(hex(copy).as_str()) {
+    if pin.manifest.strip_prefix(DIGEST_PREFIX) != Some(hex(manifest.as_bytes()).as_str()) {
         broken.push(format!(
-            "{} does not match plugin {id}.manifest: the copy is not the pinned manifest",
-            file(id)
+            "{at} does not match plugin {id}.manifest: the copy is not the pinned manifest"
         ));
     }
-    let names = toml::from_str::<toml::Table>(copy)
+    let names = toml::from_str::<toml::Table>(manifest)
         .ok()
         .and_then(|table| table.get("plugin")?.get("id")?.as_str().map(str::to_owned));
     if names.as_deref() != Some(id.as_str()) {
-        broken.push(format!("{} is not the manifest of plugin {id}", file(id)));
+        broken.push(format!("{at} is not the manifest of plugin {id}"));
     }
 }
 
-/// Whether `text` is a plugin id.
-fn is_id(text: &str) -> bool {
-    let mut chars = text.chars();
-    chars.next().is_some_and(|first| first.is_ascii_lowercase())
-        && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+/// Whether `text` is a plugin id: lowercase words of letters and digits, the first
+/// opening with a letter, joined by single hyphens.
+pub(crate) fn is_id(text: &str) -> bool {
+    text.starts_with(|first: char| first.is_ascii_lowercase())
+        && text.split('-').all(|word| {
+            !word.is_empty()
+                && word
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+        })
 }
 
 /// Whether `text` is a release: three numbers, dot-separated, none with a leading zero.
@@ -129,6 +176,12 @@ fn is_release(text: &str) -> bool {
                 && part.chars().all(|c| c.is_ascii_digit())
                 && (*part == "0" || !part.starts_with('0'))
         })
+}
+
+/// Whether `text` is written `sha256:<64 lowercase hex>`.
+fn is_digest(text: &str) -> bool {
+    text.strip_prefix(DIGEST_PREFIX)
+        .is_some_and(|digest| is_hex(digest, DIGEST_DIGITS))
 }
 
 /// Whether `text` is `digits` lowercase hexadecimal digits.

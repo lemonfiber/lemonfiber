@@ -1395,6 +1395,8 @@ dependencies = [
 name = "lemonfiber-bundle"
 version = "0.17.0"
 dependencies = [
+ "lemonfiber-manifest",
+ "libc",
  "ring",
  "serde",
  "thiserror",

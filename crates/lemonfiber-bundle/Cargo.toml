@@ -10,11 +10,17 @@ license-file = "../../LICENSE"
 publish = false
 
 [dependencies]
+# The stack's own tables a schema 2 bundle declares are the stack manifest's.
+lemonfiber-manifest = { workspace = true }
 # Each copy is held to the digest its pin names, which is a SHA-256 of its bytes.
 ring = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+# The flags that refuse to read a copy through a link or to wait on a pipe.
+libc = { workspace = true }
 
 [lints]
 workspace = true

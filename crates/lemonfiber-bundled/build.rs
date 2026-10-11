@@ -67,7 +67,7 @@ fn bundle(out: &Path) {
         catalogue.join(lemonfiber_bundle::COPIES).display()
     );
 
-    let held = lemonfiber_bundle::read(&catalogue).unwrap_or_else(|refused| {
+    let (_, held) = lemonfiber_bundle::read(&catalogue).unwrap_or_else(|refused| {
         eprintln!("error: the embedded bundle cannot be read\n\n{refused}\n");
         eprintln!("Catalogue: {}", catalogue.display());
         eprintln!("If the directory is empty, the submodule is not populated:");
@@ -94,8 +94,8 @@ fn rust(held: &[lemonfiber_bundle::Held]) -> String {
         let _ = writeln!(first_party, "    {trusted},");
         let _ = writeln!(
             pinned,
-            "    Pinned {{ first_party: {trusted}, origin: {:?}, release: {:?}, revision: {:?}, fills: &{:?}, copy: {:?} }},",
-            one.pin.origin, one.pin.release, one.pin.revision, one.pin.fills, one.copy
+            "    Pinned {{ first_party: {trusted}, origin: {:?}, release: {:?}, revision: {:?}, tree: {:?}, fills: &{:?}, copy: {:?} }},",
+            one.pin.origin, one.pin.release, one.pin.revision, one.pin.tree, one.pin.fills, one.copy
         );
     }
     format!(

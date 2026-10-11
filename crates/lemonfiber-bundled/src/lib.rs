@@ -29,10 +29,12 @@ pub struct Pinned {
     pub first_party: FirstParty,
     /// Its repository, as an https URL.
     pub origin: &'static str,
-    /// The version the release train tagged it at.
-    pub release: &'static str,
+    /// The version the release train tagged it at, where it was tagged.
+    pub release: Option<&'static str>,
     /// The commit of its repository the manifest was copied from.
     pub revision: &'static str,
+    /// The digest of its tree, where the bundle pins one.
+    pub tree: Option<&'static str>,
     /// The capabilities it fills by default.
     pub fills: &'static [&'static str],
     /// Its manifest, byte for byte.
