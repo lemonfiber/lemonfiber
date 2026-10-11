@@ -45,19 +45,14 @@ permissions:
 # The job that cuts the release, and the permission it needs to.
 HOST = "  host:\n"
 
-# Where `host`'s steps begin, and the token minted before any of them run.
-HOST_STEPS = """    outputs:
-      val: ${{ steps.host.outputs.manifest }}
-    steps:
-"""
-
-HOST_MINTS = """    outputs:
-      val: ${{ steps.host.outputs.manifest }}
-    steps:
-      # The declaration above is one this token cannot honour: the default
+# The token the release is cut with, minted by the step just before the one that
+# uses it, so no step of `host` that runs `dist` or reads the artefacts runs
+# while it exists, and able to write this repository's contents and nothing else.
+MINT = """      # The declaration above is one this token cannot honour: the default
       # workflow permission is `read` at both org and repo, and a job may only ask
       # for what the default allows. So the release is created with the App the
-      # record, the site and the contract move already use.
+      # record, the site and the contract move already use, minted here, after
+      # every other step of this job has run, for this repository's contents only.
       #
       # Kept across regenerations by `verify_release_workflow.py`'s
       # `token-can-write` claim, which refuses a file that has lost this step. A
@@ -72,6 +67,7 @@ HOST_MINTS = """    outputs:
           private-key: ${{ secrets.RELEASE_APP_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: lemonfiber
+          permission-contents: write
 """
 
 # The step that cuts the release, and the token it cuts it with.
@@ -118,19 +114,17 @@ def main() -> int:
         )
         return 1
 
-    for mark, why in (
-        (HOST_STEPS, "no `host` job steps, so there is nowhere to mint a token"),
-        (CREATES, "no step that creates the release, so nothing to give one to"),
-    ):
-        if mark not in text:
-            print(f"{WORKFLOW} has {why}.", file=sys.stderr)
-            return 1
+    if CREATES not in text:
+        print(
+            f"{WORKFLOW} has no step that creates the release, so nothing to give one to.",
+            file=sys.stderr,
+        )
+        return 1
 
     text = (
         text.replace(GENERATED, SCOPED, 1)
         .replace(HOST, HOST_SCOPED, 1)
-        .replace(HOST_STEPS, HOST_MINTS, 1)
-        .replace(CREATES, CREATES_WITH_TOKEN, 1)
+        .replace(CREATES, MINT + CREATES_WITH_TOKEN, 1)
     )
     WORKFLOW.write_text(text, encoding="utf-8")
     print("release.yml: the release token is the host job's alone, and can write one")
