@@ -389,7 +389,7 @@ mod keyed;
 mod refusing;
 mod withheld;
 
-pub use refusing::{not_taught_yet, verdict};
+pub use refusing::{not_taught_yet, verdict, REFUSALS};
 pub use withheld::carried;
 /// What a run of a plugin command reads, writes and disturbs.
 const fn plugin(asked: &plugins::Asked) -> Asked {

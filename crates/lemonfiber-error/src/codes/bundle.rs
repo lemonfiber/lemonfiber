@@ -71,7 +71,7 @@ codes! {
         remedy: "Set a home directory for this user, then ask for the bundle again.",
     }
     /// Raised when a name does not name one of the bundles this run kept.
-    NOT_HELD = "BUNDLE-8" {
+    BUNDLE_NOT_HELD = "BUNDLE-8" {
         severity: Error,
         status: 404,
         since: "0.9.0",

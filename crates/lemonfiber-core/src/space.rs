@@ -52,9 +52,16 @@ pub use tally::{Counting, Tally};
 pub use volume::{Freshness, Role, Volume};
 pub use waste::{ratio_reads, Candidate, Standing, RATIO_CONSEQUENCE};
 
-use crate::error::codes::space::{HALTED, NOWHERE_TO_MEASURE, WALK_REFUSED};
+use crate::error::codes::space::{
+    HALTED, NOTHING_TO_ASK, NOT_HELD, NOWHERE_TO_MEASURE, WALK_REFUSED,
+};
+use crate::error::Code;
 use crate::ports::occupancy::Occupant;
 use crate::ports::service::Seeded;
+
+/// Every refusal the account of the disk, or letting one download go, answers with, which
+/// a client names by its code.
+pub const REFUSALS: [Code; 3] = [NOWHERE_TO_MEASURE, NOTHING_TO_ASK, NOT_HELD];
 
 /// An import that stopped part-way, in the words of whatever stopped it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]

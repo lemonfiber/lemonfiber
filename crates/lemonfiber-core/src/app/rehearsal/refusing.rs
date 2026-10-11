@@ -5,9 +5,12 @@
 //! refusal are kept apart so the temporary never reads as the permanent.
 
 use crate::error::codes::rehearse::{CANNOT, NOT_YET};
-use crate::error::{Problem, Remedy, State};
+use crate::error::{Code, Problem, Remedy, State};
 
 use super::{Asked, Rehearsal};
+
+/// Every refusal a rehearsal answers with, which a client names by its code.
+pub const REFUSALS: [Code; 2] = [CANNOT, NOT_YET];
 
 /// What one of the four answers comes to, given what was asked.
 ///

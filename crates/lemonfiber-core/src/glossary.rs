@@ -29,7 +29,11 @@
 
 use serde::Serialize;
 
-use crate::error::{Problem, Remedy};
+use crate::error::codes::word::UNRECOGNISED;
+use crate::error::{Code, Problem, Remedy};
+
+/// Every refusal asking what a word means answers with, which a client names by its code.
+pub const REFUSALS: [Code; 1] = [UNRECOGNISED];
 
 /// A word this product uses, and what somebody meeting it needs to know.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
@@ -325,7 +329,7 @@ pub fn vocabulary() -> Vocabulary {
 pub fn unrecognised(word: &str) -> Problem {
     let words: Vec<&str> = TERMS.iter().map(|term| term.word).collect();
     Problem::new(
-        crate::error::codes::word::UNRECOGNISED,
+        UNRECOGNISED,
         format!("{word} is not one of the words this product explains"),
         "What is explained here is this ecosystem's own vocabulary — the words that \
          are load-bearing and cannot be guessed. Having no entry is not the same as \

@@ -21,7 +21,11 @@ use thiserror::Error;
 
 use crate::config::Protocols;
 use crate::error::codes::form::{FORMS_CONFLICT, NOTHING_TO_RUN, NO_FORM_NAMED, NO_SUCH_FORM};
-use crate::error::{Diagnose, Problem, Remedy, State};
+use crate::error::{Code, Diagnose, Problem, Remedy, State};
+
+/// Every refusal naming the forms a run starts answers with, which a client names by its
+/// code.
+pub const REFUSALS: [Code; 3] = [NO_FORM_NAMED, NO_SUCH_FORM, FORMS_CONFLICT];
 
 /// What will be run, and what was left out.
 ///
