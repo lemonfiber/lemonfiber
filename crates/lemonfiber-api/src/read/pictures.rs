@@ -21,7 +21,7 @@ use lemonfiber_core::screening::{picture, spoke, Pictured};
 
 use crate::admission::Caller;
 use crate::entitled::{may, Door};
-use crate::read::table::{named, wanted, Wanted, ASKABLE, ASKABLE_POSTER, BACKDROP, POSTER, TITLE};
+use crate::read::table::{askable, named, wanted, Wanted, ASKABLE_POSTER, BACKDROP, POSTER, TITLE};
 use crate::refusal::Refusal;
 use crate::router::Serving;
 use crate::serve::carrying;
@@ -66,12 +66,8 @@ async fn found(
 /// search read is, or what the caller is answered with instead.
 fn searched_for(caller: &Caller, query: Option<&str>) -> Result<(String, String), Box<Response>> {
     let given = wanted(ASKABLE_POSTER, query).map_err(|problem| Box::new(went_wrong(&problem)))?;
-    let search = Wanted {
-        member: given.member,
-        ..Wanted::default()
-    };
-    let command = named(ASKABLE, search).map_err(|why| Box::new(why.answered()))?;
-    let member = searcher(may(caller, Door::Reading, command).granted())?;
+    let search = askable(given.member, None, None);
+    let member = searcher(may(caller, Door::Reading, search).granted())?;
     Ok((member, given.kind.unwrap_or_default()))
 }
 

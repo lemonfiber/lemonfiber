@@ -31,11 +31,11 @@
 mod asked;
 mod naming;
 
+pub(crate) use naming::{askable, THE_STACK, THIS_BINARY};
 use naming::{
-    askable, diagnosing, following, household, moving, narrowed, part_way, removing, setting,
-    shelf, titled, watching,
+    diagnosing, following, household, moving, narrowed, part_way, removing, setting, shelf, titled,
+    watching,
 };
-pub(crate) use naming::{THE_STACK, THIS_BINARY};
 
 /// How much of a shelf a read answers with, and the most it ever will.
 ///
