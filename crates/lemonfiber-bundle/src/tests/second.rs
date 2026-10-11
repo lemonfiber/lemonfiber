@@ -150,6 +150,32 @@ fn refused(root: &Path) -> Vec<String> {
     }
 }
 
+/// The path the catalogue at `root` could not read.
+fn unread(root: &Path) -> String {
+    match read(root) {
+        Err(Refused::Unread { path, .. }) => path,
+        other => format!("read: {other:?}"),
+    }
+}
+
+/// Whether the one-part catalogue with `manifest`, `files`, `fields` and `tables` reads.
+fn reads(
+    name: &str,
+    manifest: &str,
+    files: &BTreeMap<String, Vec<u8>>,
+    fields: &[(&str, &str)],
+    tables: &str,
+) -> bool {
+    read(&catalogue(
+        name,
+        &bundle(manifest, files, fields, tables),
+        "sabnzbd",
+        manifest,
+        files,
+    ))
+    .is_ok()
+}
+
 /// Whether one refusal carries every word.
 fn names(said: &[String], words: &[&str]) -> bool {
     said.iter()
@@ -371,13 +397,18 @@ fn a_first_party_service_says_where_it_reaches_and_what_it_asks_for() {
 
 #[test]
 fn schema_2_requires_the_tree_stage_profile_and_last_release() {
+    let fields = ["tree", "stage", "profile", "last_release"];
     let pinned = bundle(PART, &files(), &[], TABLES)
         .lines()
-        .filter(|line| !line.starts_with("stage") && !line.starts_with("last_release"))
+        .filter(|line| {
+            !fields
+                .iter()
+                .any(|field| line.starts_with(&format!("{field} =")))
+        })
         .collect::<Vec<_>>()
         .join("\n");
     let said = refused(&catalogue("unstaged", &pinned, "sabnzbd", PART, &files()));
-    for field in ["stage", "last_release"] {
+    for field in fields {
         assert!(
             names(&said, &[&format!("plugin sabnzbd.{field} is missing")]),
             "{said:?}"
@@ -495,5 +526,233 @@ fn schema_1_declares_no_stack_table_and_no_schema_2_field() {
         &["plugin sabnzbd.tree is declared at schema 1"],
     ] {
         assert!(names(&said, words), "{words:?} in {said:?}");
+    }
+}
+
+#[test]
+fn a_pinned_part_without_its_copy_or_its_manifest_is_refused() {
+    let root = catalogue(
+        "uncopied",
+        &bundle(PART, &files(), &[], TABLES),
+        "nzbget",
+        PART,
+        &files(),
+    );
+    assert!(
+        names(&refused(&root), &["plugin sabnzbd has no copy at sabnzbd/"]),
+        "{:?}",
+        refused(&root)
+    );
+    let root = catalogue(
+        "unmanifested",
+        &bundle(PART, &files(), &[], TABLES),
+        "sabnzbd",
+        PART,
+        &files(),
+    );
+    let removed = std::fs::remove_file(root.join(COPIES).join("sabnzbd/plugin.toml"));
+    assert!(removed.is_ok(), "{removed:?}");
+    let said = refused(&root);
+    assert!(
+        names(&said, &["plugin sabnzbd has no sabnzbd/plugin.toml"]),
+        "{said:?}"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_link_in_place_of_a_copy_is_refused_and_not_followed() {
+    let root = catalogue(
+        "relinked",
+        &bundle(PART, &files(), &[], TABLES),
+        "real",
+        PART,
+        &files(),
+    );
+    let linked = std::os::unix::fs::symlink("real", root.join(COPIES).join("sabnzbd"));
+    assert!(linked.is_ok(), "{linked:?}");
+    let said = refused(&root);
+    for words in [
+        &["sabnzbd/ is a symbolic link"][..],
+        &["plugin sabnzbd has no sabnzbd/plugin.toml"],
+        &["real is a copy the bundle pins no plugin for"],
+    ] {
+        assert!(names(&said, words), "{words:?} in {said:?}");
+    }
+}
+
+#[test]
+fn a_manifest_that_is_not_utf_8_is_unread() {
+    let root = catalogue(
+        "garbled",
+        &bundle(PART, &files(), &[], TABLES),
+        "sabnzbd",
+        PART,
+        &files(),
+    );
+    let written = std::fs::write(root.join(COPIES).join("sabnzbd/plugin.toml"), [0xff, 0xfe]);
+    assert!(written.is_ok(), "{written:?}");
+    let path = unread(&root);
+    assert!(path.ends_with("sabnzbd/plugin.toml"), "{path}");
+}
+
+#[cfg(unix)]
+#[test]
+fn a_directory_or_file_in_a_copy_that_cannot_be_read_is_unread() {
+    use std::os::unix::fs::PermissionsExt as _;
+
+    let root = catalogue(
+        "shut",
+        &bundle(PART, &files(), &[], TABLES),
+        "sabnzbd",
+        PART,
+        &files(),
+    );
+    let copy = root.join(COPIES).join("sabnzbd");
+    for (shut, open) in [
+        ("config/sabnzbd", 0o700),
+        ("config/sabnzbd/sabnzbd.ini", 0o600),
+    ] {
+        let at = copy.join(shut);
+        let closed = std::fs::set_permissions(&at, std::fs::Permissions::from_mode(0o000));
+        assert!(closed.is_ok(), "{closed:?}");
+        let path = unread(&root);
+        let opened = std::fs::set_permissions(&at, std::fs::Permissions::from_mode(open));
+        assert!(opened.is_ok(), "{opened:?}");
+        assert!(path.ends_with(shut), "{shut}: {path}");
+    }
+}
+
+#[test]
+fn a_manifest_that_is_not_toml_declares_nothing() {
+    let said = broken("untoml", "schema_version = [\n", &files(), &[], TABLES);
+    for words in [
+        &["sabnzbd/plugin.toml is not the manifest of plugin sabnzbd"][..],
+        &["sabnzbd/config/sabnzbd/sabnzbd.ini is not part of plugin sabnzbd's tree"],
+    ] {
+        assert!(names(&said, words), "{words:?} in {said:?}");
+    }
+}
+
+#[test]
+fn a_conformance_recording_is_part_of_the_tree_and_its_namesake_is_not() {
+    let mut recorded = files();
+    recorded.insert(
+        "conformance/download.usenet.json".to_owned(),
+        b"{}\n".to_vec(),
+    );
+    assert!(reads("recorded", PART, &recorded, &[], TABLES));
+    recorded.insert("conformance.json".to_owned(), b"{}\n".to_vec());
+    let said = broken("namesake", PART, &recorded, &[], TABLES);
+    assert_eq!(
+        said,
+        ["sabnzbd/conformance.json is not part of plugin sabnzbd's tree"]
+    );
+}
+
+#[test]
+fn starting_files_up_to_the_bound_are_read() {
+    let size = 1024 * 1024 / 64;
+    let mut bounded = files();
+    bounded.remove("config/sabnzbd/sabnzbd.ini");
+    for at in 0..64 {
+        bounded.insert(format!("config/sabnzbd/{at}.ini"), vec![b'x'; size]);
+    }
+    assert!(reads("bounded", PART, &bounded, &[], TABLES));
+    let mut heavy = bounded.clone();
+    heavy.insert("config/sabnzbd/0.ini".to_owned(), vec![b'x'; size + 1]);
+    let said = broken("heavy", PART, &heavy, &[], TABLES);
+    assert!(
+        names(&said, &["ships 64 starting files of 1048577 bytes"]),
+        "{said:?}"
+    );
+    let mut many = bounded;
+    many.insert("config/sabnzbd/64.ini".to_owned(), Vec::new());
+    let said = broken("sixty-five", PART, &many, &[], TABLES);
+    assert!(
+        names(&said, &["ships 65 starting files of 1048576 bytes"]),
+        "{said:?}"
+    );
+}
+
+#[test]
+fn a_profile_is_an_id_declared_once() {
+    let tables = format!(
+        "{TABLES}\n[[profile]]\nid = \"usenet\"\nname = \"Again\"\ndescription = \"Twice\"\nprotocol = \"usenet\"\n\n[[profile]]\nid = \"Usenet Two\"\nname = \"Spaced\"\ndescription = \"Not an id\"\nprotocol = \"usenet\"\n"
+    );
+    let said = broken("profiles", PART, &files(), &[], &tables);
+    for words in [
+        &["profile \"usenet\" is not an id or is declared twice"][..],
+        &["profile \"Usenet Two\" is not an id or is declared twice"],
+    ] {
+        assert!(names(&said, words), "{words:?} in {said:?}");
+    }
+}
+
+#[test]
+fn a_removed_service_replaced_by_a_pinned_part_or_by_none_is_read() {
+    let tables = format!(
+        "{TABLES}\n[[removed]]\nid = \"nzbget\"\nremoved_in = \"0.1.0\"\nreason = \"Gone\"\nreplaced_by = \"sabnzbd\"\n\n[[removed]]\nid = \"sickrage\"\nremoved_in = \"0.1.0\"\nreason = \"Unmaintained\"\n"
+    );
+    assert!(reads("replaced", PART, &files(), &[], &tables));
+}
+
+#[test]
+fn a_link_by_name_names_a_pinned_service() {
+    let link = |to: &str| {
+        format!("{TABLES}\n[[wiring]]\nby = \"sabnzbd\"\nto = \"{to}\"\nwhy = \"Because\"\n")
+    };
+    assert!(reads("linked-in", PART, &files(), &[], &link("sabnzbd")));
+    let said = broken("linked-out", PART, &files(), &[], &link("ghost"));
+    assert_eq!(
+        said,
+        ["wiring by sabnzbd names ghost, which no pinned plugin declares"]
+    );
+}
+
+#[test]
+fn a_choice_reads_an_ask_its_named_service_makes_and_a_filler_speaking_it() {
+    let speaking = PART
+        .replace(
+            "provides = [",
+            "replaces = \"sabnzbd\"\nspeaks = [\"indexer.search@1\"]\nprovides = [",
+        )
+        .replace(
+            "capability = \"indexer.search\"",
+            "capability = \"indexer.search\"\nservice = \"sabnzbd\"",
+        );
+    let choice = format!("{TABLES}\n[[wiring]]\nby = \"sabnzbd\"\nasks = \"indexer.search\"\nfilled_by = \"sabnzbd\"\nwhy = \"The stack's choice\"\n");
+    assert!(reads(
+        "speaking",
+        &speaking,
+        &files(),
+        &[("stage", "\"installed\"")],
+        &choice
+    ));
+}
+
+#[test]
+fn a_choice_needs_an_ask_made_once_by_a_known_asker() {
+    let choice = format!("{TABLES}\n[[wiring]]\nby = \"sabnzbd\"\nasks = \"indexer.search\"\nfilled_by = \"sabnzbd\"\nwhy = \"The stack's choice\"\n");
+    let unnamed = PART.replace(
+        "[[ask]]",
+        "[[service]]\nid = \"sabnzbd-sidecar\"\nreaches = \"Nowhere\"\nasks_for = \"Nothing\"\n\n[[ask]]",
+    );
+    let each = PART.replace(
+        "capability = \"indexer.search\"",
+        "capability = \"indexer.search\"\neach = true",
+    );
+    for (name, manifest) in [("unnamed", unnamed), ("each", each)] {
+        let said = broken(name, &manifest, &files(), &[], &choice);
+        assert!(
+            names(
+                &said,
+                &[
+                    "wiring by sabnzbd chooses for indexer.search",
+                    "does not ask once"
+                ]
+            ),
+            "{name}: {said:?}"
+        );
     }
 }
