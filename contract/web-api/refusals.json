@@ -124,6 +124,56 @@
     "status": 400,
     "description": "Raised when an agreement names a reading of this machine that is not the one standing now."
   },
+  "KEY-1": {
+    "name": "BAD_NAME",
+    "status": 400,
+    "description": "Raised when a key is asked for under a word that cannot name one."
+  },
+  "KEY-10": {
+    "name": "NO_SUCH_KEY",
+    "status": 404,
+    "description": "Raised when no active key holds the name a revoke gave."
+  },
+  "KEY-11": {
+    "name": "MEMBERS_MAY_NOT_MINT",
+    "status": 409,
+    "description": "Raised when a household member asks to mint a key and the operator has not allowed members to."
+  },
+  "KEY-12": {
+    "name": "CLAIM_NOT_OPEN",
+    "status": 401,
+    "description": "Raised when a key is asked to be collected with a claim that collects nothing."
+  },
+  "KEY-13": {
+    "name": "UNLINKABLE",
+    "status": 409,
+    "description": "Raised when a key is asked to be minted as a claim and no address another machine reaches can go in its link."
+  },
+  "KEY-2": {
+    "name": "NOT_A_SCOPE",
+    "status": 400,
+    "description": "Raised when a key is asked for with a scope that is none of the three."
+  },
+  "KEY-3": {
+    "name": "NOT_A_PURPOSE",
+    "status": 400,
+    "description": "Raised when a key is asked for with a purpose that is none of the three."
+  },
+  "KEY-5": {
+    "name": "NAME_TAKEN",
+    "status": 400,
+    "description": "Raised when a key is asked for under a name another key holds."
+  },
+  "KEY-6": {
+    "name": "NO_SUCH_MEMBER",
+    "status": 404,
+    "description": "Raised when a member's key names an account the household does not hold."
+  },
+  "KEY-8": {
+    "name": "NOT_FOR_YOURSELF",
+    "status": 400,
+    "description": "Raised when a household member asks for a key, or a revoke, that is not theirs alone."
+  },
   "LIFE-10": {
     "name": "RESTART_MOVED",
     "status": 400,

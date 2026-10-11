@@ -239,6 +239,7 @@ fn refusals() -> BTreeMap<String, Listed> {
         .chain(REFUSALS)
         .chain(lemonfiber_core::screening::REFUSALS)
         .chain(lemonfiber_core::wishing::REFUSALS)
+        .chain(lemonfiber_core::keys::REFUSALS)
         .filter_map(|code| {
             let declared = declared(code)?;
             Some((

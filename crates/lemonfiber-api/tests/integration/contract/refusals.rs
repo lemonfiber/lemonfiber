@@ -4,6 +4,7 @@ use std::collections::BTreeSet;
 
 use lemonfiber_api::contract::Contract;
 use lemonfiber_core::agreement::MOVED;
+use lemonfiber_core::error::codes;
 
 /// A generator names a value per refusal after the name it is declared under, so two
 /// codes declared under one name would be one value standing for two refusals — and
@@ -25,4 +26,19 @@ fn every_code_a_moved_offer_ends_with_is_listed_as_an_answer_to_correct() {
         let status = listed.get(code.as_str()).map(|refusal| refusal.status);
         assert_eq!(status, Some(400), "{code:?}");
     }
+}
+
+/// A key refusal reaches an SDK by its code, so the claim the collection door turns
+/// away is named at the status the door answers with, and so is every other refusal
+/// minting, collecting or revoking a key answers with.
+#[test]
+fn every_refusal_a_key_answers_with_is_listed_at_its_own_status() {
+    let listed = Contract::describe().refusals;
+    for code in lemonfiber_core::keys::REFUSALS {
+        let declared = codes::declared(code).map(codes::Declared::status);
+        let status = listed.get(code.as_str()).map(|refusal| refusal.status);
+        assert!(status.is_some() && status == declared, "{code:?}");
+    }
+    let claim = listed.get("KEY-12").map(|refusal| refusal.status);
+    assert_eq!(claim, Some(401));
 }

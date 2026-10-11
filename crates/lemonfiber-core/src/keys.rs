@@ -30,6 +30,11 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::config::store;
+use crate::error::codes::key::{
+    BAD_NAME, CLAIM_NOT_OPEN, MEMBERS_MAY_NOT_MINT, NAME_TAKEN, NOT_A_PURPOSE, NOT_A_SCOPE,
+    NOT_FOR_YOURSELF, NO_SUCH_KEY, NO_SUCH_MEMBER, UNLINKABLE,
+};
+use crate::error::Code;
 use crate::ports::random::Random;
 use crate::secret::render;
 
@@ -40,6 +45,21 @@ pub use scope::{Minter, Purpose, Scope, Wanted};
 
 /// What every secret begins with.
 pub const PREFIX: &str = "lfk_";
+
+/// Every refusal minting, collecting or revoking a key answers with, which a client names
+/// by its code.
+pub const REFUSALS: [Code; 10] = [
+    BAD_NAME,
+    NOT_A_SCOPE,
+    NOT_A_PURPOSE,
+    NAME_TAKEN,
+    NO_SUCH_MEMBER,
+    NOT_FOR_YOURSELF,
+    NO_SUCH_KEY,
+    MEMBERS_MAY_NOT_MINT,
+    CLAIM_NOT_OPEN,
+    UNLINKABLE,
+];
 
 /// The file the keys are kept in, beside the configuration a backup carries.
 pub const FILE: &str = "keys.json";
