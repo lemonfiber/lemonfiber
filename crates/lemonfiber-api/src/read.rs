@@ -22,7 +22,7 @@
 mod bundle;
 pub mod kept;
 mod logs;
-mod pictures;
+pub(crate) mod pictures;
 pub mod published;
 pub mod table;
 

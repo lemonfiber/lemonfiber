@@ -32,6 +32,7 @@ use crate::actions::{reached, Arguments, ACTION};
 use crate::admission::Caller;
 use crate::entitled::{may, Door, Permitted};
 use crate::read::enveloped;
+use crate::read::pictures::RULED_AS;
 use crate::read::published::BESIDE;
 use crate::read::table::{self, Wanted};
 use crate::router::Serving;
@@ -139,23 +140,25 @@ pub fn declared(ctx: &Ctx, caller: &Caller) -> Capabilities {
             table::named(read, Wanted::naming_everything()).ok(),
         )
     });
-    // The logs and the bundle are answered beside the table, by the one check their
-    // own routes make: everyone but a member may have them.
-    let beside = BESIDE.iter().map(|read| {
-        let standing = match operator_only(caller) {
+    let mut capabilities: BTreeMap<String, Standing> = actions
+        .chain(reads)
+        .filter_map(|(path, door, command)| Some((path, standing(ctx, caller, door, command?))))
+        .collect();
+    for read in BESIDE {
+        let ruled = RULED_AS
+            .iter()
+            .find(|(picture, _)| picture == read)
+            .and_then(|(_, as_read)| capabilities.get(*as_read).copied());
+        let standing = ruled.unwrap_or(match operator_only(caller) {
             Some(_) => Standing::Unpermitted,
             None => Standing::Available,
-        };
-        ((*read).to_owned(), standing)
-    });
+        });
+        capabilities.insert((*read).to_owned(), standing);
+    }
     Capabilities {
         stack: lemonfiber_core::companion::identified(ctx),
         scope: Scope::of(caller),
-        capabilities: actions
-            .chain(reads)
-            .filter_map(|(path, door, command)| Some((path, standing(ctx, caller, door, command?))))
-            .chain(beside)
-            .collect(),
+        capabilities,
     }
 }
 

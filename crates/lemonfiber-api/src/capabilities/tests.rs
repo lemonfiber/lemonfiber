@@ -84,8 +84,11 @@ fn a_member_is_offered_what_the_core_gives_a_member() {
             "/api/actions/grant",
             "/api/actions/watched",
             "/api/askable",
+            "/api/askable/{id}/poster",
             "/api/held",
             "/api/held/{id}",
+            "/api/held/{id}/backdrop",
+            "/api/held/{id}/poster",
             "/api/playing",
             "/api/requests",
             "/api/watching",
@@ -120,11 +123,18 @@ fn a_key_is_offered_what_its_scope_admits_at_each_door() {
             .collect()
     };
     // Every served read, the logs and the bundle among them, and the event stream, but
-    // a member's search, which is a member's own and the operator's.
+    // a member's search and the poster of what it found, which are a member's own and
+    // the operator's.
     let reads: Vec<String> = crate::read::table::OFFERED
         .iter()
         .chain(crate::read::published::BESIDE)
-        .filter(|read| **read != crate::read::table::ASKABLE)
+        .filter(|read| {
+            ![
+                crate::read::table::ASKABLE,
+                crate::read::table::ASKABLE_POSTER,
+            ]
+            .contains(*read)
+        })
         .map(|read| (*read).to_owned())
         .collect();
 
@@ -183,9 +193,9 @@ fn a_machine_with_nowhere_to_keep_an_identifier_says_none() {
 fn the_logs_and_the_bundle_are_listed_and_kept_from_a_member() {
     let operator = declared(&reaching(None), &Caller::Operator);
     let member = declared(&reaching(None), &Caller::Member("ana".to_owned()));
-    for read in crate::read::published::BESIDE {
-        assert_eq!(operator.capabilities.get(*read), Some(&Standing::Available));
-        assert_eq!(member.capabilities.get(*read), Some(&Standing::Unpermitted));
+    for read in [crate::read::table::LOGS, crate::read::table::BUNDLE] {
+        assert_eq!(operator.capabilities.get(read), Some(&Standing::Available));
+        assert_eq!(member.capabilities.get(read), Some(&Standing::Unpermitted));
     }
 }
 
@@ -212,5 +222,23 @@ fn each_credential_is_told_its_scope() {
             name: "Ana".to_owned(),
         })),
         Said::Member
+    );
+}
+
+/// A picture is offered to a member exactly where the read its route rules it as is: the
+/// title read for a title's two pictures, the search read for a found title's poster.
+#[test]
+fn a_member_is_offered_the_pictures_of_what_they_may_read() {
+    let declared = declared(&reaching(None), &Caller::Member("ana".to_owned()));
+    for (picture, ruled_as) in crate::read::pictures::RULED_AS {
+        assert_eq!(
+            declared.capabilities.get(picture),
+            declared.capabilities.get(ruled_as),
+            "{picture}"
+        );
+    }
+    assert_eq!(
+        declared.capabilities.get("/api/held/{id}/poster"),
+        Some(&Standing::Available)
     );
 }

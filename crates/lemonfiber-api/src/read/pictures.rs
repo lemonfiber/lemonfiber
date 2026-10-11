@@ -21,12 +21,21 @@ use lemonfiber_core::screening::{picture, spoke, Pictured};
 
 use crate::admission::Caller;
 use crate::entitled::{may, Door};
-use crate::read::table::{askable, named, wanted, Wanted, ASKABLE_POSTER, BACKDROP, POSTER, TITLE};
+use crate::read::table::{
+    askable, named, wanted, Wanted, ASKABLE, ASKABLE_POSTER, BACKDROP, POSTER, TITLE,
+};
 use crate::refusal::Refusal;
 use crate::router::Serving;
 use crate::serve::carrying;
 
 use super::went_wrong;
+
+/// Each picture read, and the read its route rules it as.
+pub(crate) const RULED_AS: [(&str, &str); 3] = [
+    (POSTER, TITLE),
+    (BACKDROP, TITLE),
+    (ASKABLE_POSTER, ASKABLE),
+];
 
 /// That a picture is the asker's own to keep, and nobody else's.
 const PRIVATE: &str = "private";
