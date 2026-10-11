@@ -40,16 +40,6 @@ pub(crate) enum Reach {
     Over,
 }
 
-/// Why the media server cannot be signed in to as its administrator through this build's
-/// adapter.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Unsigned {
-    /// lemonfiber holds no password for it.
-    Unheld,
-    /// It is spoken to over its contracts.
-    Contracted,
-}
-
 /// Where, and in which API, another service signs the household in through the media
 /// server.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -265,17 +255,6 @@ impl MediaServer {
         }
     }
 
-    /// The server through this build's adapter as its administrator, signing in with the
-    /// password lemonfiber recorded for it.
-    ///
-    /// # Errors
-    ///
-    /// Where lemonfiber holds no password for it, or it is spoken to over its contracts.
-    pub(crate) fn signing_in(&self, ctx: &Ctx) -> Result<Jellyfin, Unsigned> {
-        let password = self.recorded_password(ctx).ok_or(Unsigned::Unheld)?;
-        self.signed_in(ctx, password).ok_or(Unsigned::Contracted)
-    }
-
     /// The server through this build's adapter as its administrator, signing in with
     /// `password`: nothing where it is spoken to over its contracts.
     fn signed_in(&self, ctx: &Ctx, password: impl Into<String>) -> Option<Jellyfin> {
@@ -296,7 +275,8 @@ impl MediaServer {
     /// somebody else set up, which is one this cannot sign in to.
     #[must_use]
     pub(crate) fn administered(&self, ctx: &Ctx) -> Option<Jellyfin> {
-        self.signing_in(ctx).ok()
+        self.recorded_password(ctx)
+            .and_then(|password| self.signed_in(ctx, password))
     }
 
     /// The server over `identity.source`, where it can be asked over it.

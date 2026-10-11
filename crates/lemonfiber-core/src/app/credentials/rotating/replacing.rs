@@ -2,98 +2,67 @@
 //! build's adapter, in the order that leaves the password in force recorded wherever it
 //! stops.
 
+use std::sync::Arc;
+
+use lemonfiber_contract::capabilities::identity::source;
+
 use super::super::pending::{forgotten, kept, pending, promoted};
-use super::{said, unrecorded, unsigned, Replaced, Replacing};
+use super::{said, unrecorded, Replaced, Replacing, NO_ADMINISTRATOR_HELD};
 use crate::app::targets::{record_secret, MediaServer, Reach as Spoken};
 use crate::app::Ctx;
 use crate::ports::service::Failure;
 
 /// Mint a new administrator password, record it under its pending name, set it on the
-/// media server and prove it by signing in with it, and only then move it into place —
-/// the order that leaves the recorded password the one in force wherever this stops.
+/// media server and prove it by signing in with it, and only then move it into place and
+/// hand it to the server's adapter — the order that leaves the recorded password the one
+/// in force wherever this stops.
 ///
 /// Kept under the server's own setting throughout, so a plugin's server is given a
-/// replacement for its own password and the stack's is never touched for it.
+/// replacement for its own password and the stack's is never touched for it. A rehearsal
+/// stops before the mint, so no password exists because somebody asked a question.
 pub(crate) async fn replace_admin_password(
     ctx: &Ctx,
     server: &MediaServer,
     rehearsing: bool,
 ) -> Result<Replaced, Replacing> {
-    match server.reach {
-        Spoken::Over => {
-            let client = Box::pin(server.setting_up(ctx))
-                .await
-                .ok_or_else(|| Replacing::Unproven(UNASKED_OVER_ITS_CONTRACTS.to_owned()))?;
-            let Some(replacement) = minted(ctx, rehearsing)? else {
-                return Ok(Replaced::Rehearsed);
-            };
-            swapped(
-                ctx,
-                server,
-                &replacement,
-                client.replace_admin_password(&replacement),
-            )
-            .await
-        }
-        Spoken::Bundled(_) => {
-            let client = server
-                .signing_in(ctx)
-                .map_err(|why| Replacing::Unproven(unsigned(why).to_owned()))?;
-            let Some(replacement) = minted(ctx, rehearsing)? else {
-                return Ok(Replaced::Rehearsed);
-            };
-            swapped(
-                ctx,
-                server,
-                &replacement,
-                client.replace_password(&replacement),
-            )
-            .await
-        }
-    }
-}
-
-/// A freshly minted replacement, or nothing where this run only says what it would do.
-///
-/// Below what can be told without acting: a password generated to describe a rotation is
-/// a secret that exists because somebody asked a question.
-fn minted(ctx: &Ctx, rehearsing: bool) -> Result<Option<String>, Replacing> {
+    let client = asked(ctx, server).await?;
     if rehearsing {
-        return Ok(None);
+        return Ok(Replaced::Rehearsed);
     }
-    crate::secret::generate(ctx.seams.random.as_ref())
-        .map(Some)
-        .ok_or_else(|| Replacing::Unproven(UNMINTED.to_owned()))
-}
-
-/// Record `replacement` as pending, let `change` set it on the server, and move it into
-/// place and hand it to the server's adapter only once the server took it.
-async fn swapped(
-    ctx: &Ctx,
-    server: &MediaServer,
-    replacement: &str,
-    change: impl std::future::Future<Output = Result<(), Failure>>,
-) -> Result<Replaced, Replacing> {
+    let replacement = crate::secret::generate(ctx.seams.random.as_ref())
+        .ok_or_else(|| Replacing::Unproven(UNMINTED.to_owned()))?;
     let setting = server.setting.as_str();
-    if let Err(failure) = record_secret(ctx, &pending(setting), replacement) {
+    if let Err(failure) = record_secret(ctx, &pending(setting), &replacement) {
         return Err(Replacing::Unproven(unrecorded(&failure)));
     }
-    match change.await {
-        Ok(()) => {
-            promoted(ctx, setting, replacement).map_err(Replacing::Unkept)?;
-            server
-                .hand_upstream_if_contracted(replacement)
-                .map(|()| Replaced::Done)
-                .map_err(Replacing::Unkept)
-        }
+    match client.replace_admin_password(&replacement).await {
+        Ok(()) => promoted(ctx, setting, &replacement)
+            .and_then(|()| server.hand_upstream_if_contracted(&replacement))
+            .map(|()| Replaced::Done)
+            .map_err(Replacing::Unkept),
         Err(Failure::Unauthorised { .. }) => {
             forgotten(ctx, setting);
             Err(Replacing::Refused)
         }
         Err(failure) => {
-            kept(ctx, setting, replacement);
+            kept(ctx, setting, &replacement);
             Err(Replacing::Unproven(said(&failure)))
         }
+    }
+}
+
+/// The media server as its administrator's password is changed on it: over
+/// `identity.source` where it speaks it, otherwise through this build's adapter signed in
+/// with the password lemonfiber recorded for it.
+async fn asked(ctx: &Ctx, server: &MediaServer) -> Result<Arc<dyn source::Fills>, Replacing> {
+    match server.reach {
+        Spoken::Over => Box::pin(server.setting_up(ctx))
+            .await
+            .ok_or_else(|| Replacing::Unproven(UNASKED_OVER_ITS_CONTRACTS.to_owned())),
+        Spoken::Bundled(_) => server
+            .administered(ctx)
+            .map(|client| Arc::new(client) as Arc<dyn source::Fills>)
+            .ok_or_else(|| Replacing::Unproven(NO_ADMINISTRATOR_HELD.to_owned())),
     }
 }
 

@@ -21,9 +21,7 @@ use std::path::Path;
 use lemonfiber_manifest::{ApiKind, Service};
 
 use super::pending::{forgotten, kept, pending, promoted};
-use crate::app::targets::{
-    record_secret, recorded_secret, service_addr, target_for, MediaServer, Unsigned,
-};
+use crate::app::targets::{record_secret, recorded_secret, service_addr, target_for, MediaServer};
 use crate::app::Ctx;
 use crate::config;
 use crate::credential::{Consumer, Held, Origin, Propagation, Reach, Rotation, Settled, CATALOGUE};
@@ -32,7 +30,6 @@ use crate::seed::run::published_as;
 
 mod replacing;
 pub(crate) use replacing::replace_admin_password;
-use replacing::UNASKED_OVER_ITS_CONTRACTS;
 
 /// What a rehearsal says about replacing the credential lemonfiber mints itself.
 const MINTING: &str = "a real run would generate a new web UI password, record it beside \
@@ -314,14 +311,6 @@ pub(crate) enum Replacing {
 /// What is said where lemonfiber holds no administrator password for the media server.
 const NO_ADMINISTRATOR_HELD: &str = "lemonfiber holds no administrator password for this media \
                                      server, so there is nothing to change; run `lemonfiber seed`";
-
-/// What is said where the media server cannot be signed in to as its administrator.
-const fn unsigned(why: Unsigned) -> &'static str {
-    match why {
-        Unsigned::Unheld => NO_ADMINISTRATOR_HELD,
-        Unsigned::Contracted => UNASKED_OVER_ITS_CONTRACTS,
-    }
-}
 
 /// Hand a service's own current key back to everything that reads it.
 ///

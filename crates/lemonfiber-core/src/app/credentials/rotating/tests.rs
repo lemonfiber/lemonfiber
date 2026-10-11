@@ -250,7 +250,7 @@ async fn a_contracted_server_unanswered_over_its_contracts_is_not_rotated() {
 
     assert!(matches!(
         &refused,
-        Some(super::Replacing::Unproven(detail)) if detail == super::UNASKED_OVER_ITS_CONTRACTS
+        Some(super::Replacing::Unproven(detail)) if detail == super::replacing::UNASKED_OVER_ITS_CONTRACTS
     ));
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
