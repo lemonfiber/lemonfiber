@@ -28,7 +28,7 @@ codes! {
             stops the download clients, and what is part-way down does not always resume where \
             it left off — so a run that would interrupt one is refused rather than carried out. \
             Nothing was changed.",
-        remedy: "Let them finish with `lemonfiber update stack --confirm --wait`, or wait and \
+        remedy: "Let them finish with lemonfiber update stack --confirm --wait, or wait and \
             ask again.",
     }
     /// Raised when the stack came down for the capture and the capture would not write.
@@ -40,7 +40,7 @@ codes! {
             writing to, and the backup would not write. Nothing was updated and nothing opened \
             its state on a newer image, so there is nothing to undo — but the stack is down, \
             because stopping it is what came first.",
-        remedy: "Bring the stack back up with `lemonfiber up`, then fix what stopped the capture \
+        remedy: "Bring the stack back up with lemonfiber up, then fix what stopped the capture \
             and ask again.",
     }
     /// Raised where an update names an offer that is not the one a fresh look at the

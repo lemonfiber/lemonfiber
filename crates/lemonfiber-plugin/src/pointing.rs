@@ -77,8 +77,8 @@ fn token(token: &str) -> Result<Step, Malformed> {
     }
     if token.contains('[') || token.contains(']') {
         return Err(Malformed(format!(
-            "`{token}` carries a bracket, and `[` and `]` are the selector's; an entry of a list \
-             is picked by a step of its own, written `[field=value]`"
+            "{token} carries a bracket, and \"[\" and \"]\" are the selector's; an entry of a list \
+             is picked by a step of its own, written [field=value]"
         )));
     }
     unescaped(token).map(Step::Named)
@@ -88,17 +88,17 @@ fn token(token: &str) -> Result<Step, Malformed> {
 fn selected(inside: &str, token: &str) -> Result<Step, Malformed> {
     let Some((field, value)) = inside.split_once('=') else {
         return Err(Malformed(format!(
-            "`{token}` names no field to pick by; a selector is written `[field=value]`"
+            "{token} names no field to pick by; a selector is written [field=value]"
         )));
     };
     if field.is_empty() {
         return Err(Malformed(format!(
-            "`{token}` picks by no field; a selector is written `[field=value]`"
+            "{token} picks by no field; a selector is written [field=value]"
         )));
     }
     if field.contains('[') || field.contains(']') || value.contains('[') || value.contains(']') {
         return Err(Malformed(format!(
-            "`{token}` carries a bracket inside a selector, and one selector picks one entry"
+            "{token} carries a bracket inside a selector, and one selector picks one entry"
         )));
     }
     Ok(Step::Selected {
@@ -130,13 +130,13 @@ fn unescaped(token: &str) -> Result<String, Malformed> {
             Some('1') => read.push('/'),
             Some(next) => {
                 return Err(Malformed(format!(
-                    "`{token}` carries `~{next}`, and the only escapes are `~0` for a tilde and \
-                     `~1` for a slash"
+                    "{token} carries ~{next}, and the only escapes are ~0 for a tilde and \
+                     ~1 for a slash"
                 )))
             }
             None => {
                 return Err(Malformed(format!(
-                    "`{token}` ends in a `~`, which begins an escape and finishes none"
+                    "{token} ends in a \"~\", which begins an escape and finishes none"
                 )))
             }
         }

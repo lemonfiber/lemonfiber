@@ -7,7 +7,7 @@ codes! {
         since: "0.1.0",
         meaning: "The container engine is not running. Nothing about your stack can be read or \
             changed while it is down.",
-        remedy: "Start Docker Desktop, or the `docker` service on Linux. This is the first thing \
+        remedy: "Start Docker Desktop, or the docker service on Linux. This is the first thing \
             to fix.",
     }
     /// Raised when a container that should exist does not.
@@ -17,7 +17,7 @@ codes! {
         since: "0.1.0",
         meaning: "A container that should be up is not. It may have stopped on its own, or never \
             been started.",
-        remedy: "Start the form that includes it. `lemonfiber ps` shows what is running.",
+        remedy: "Start the form that includes it. lemonfiber ps shows what is running.",
     }
     /// Raised when the host an endpoint names cannot be found on the network.
     HOST_UNRESOLVED = "DOCKER-3" {
@@ -48,7 +48,7 @@ codes! {
         meaning: "The host was reached and would not accept the SSH login. This is about keys \
             and accounts rather than about Docker — lemonfiber uses the SSH configuration you \
             already have and makes no keys of its own.",
-        remedy: "Connect to the host with `ssh` and read what it says, then try again.",
+        remedy: "Connect to the host with ssh and read what it says, then try again.",
     }
     /// Raised when an endpoint names a transport this build cannot drive.
     ENDPOINT_UNSUPPORTED = "DOCKER-6" {
@@ -58,7 +58,7 @@ codes! {
         meaning: "The endpoint names a transport lemonfiber cannot drive. Nothing was read and \
             nothing was changed, because reading one machine while writing to another is worse \
             than reaching neither.",
-        remedy: "Point `DOCKER_HOST` at an `ssh://` or `tcp://` endpoint, or at a local socket.",
+        remedy: "Point DOCKER_HOST at an ssh:// or tcp:// endpoint, or at a local socket.",
     }
     /// Raised when a named Docker context is not one this machine records.
     UNKNOWN_CONTEXT = "DOCKER-7" {
@@ -68,7 +68,7 @@ codes! {
         meaning: "A Docker context was named and this machine records no endpoint under that \
             name. Nothing was read and nothing was changed, because falling back to the local \
             daemon would answer about this machine while you were asking about another.",
-        remedy: "List the contexts this machine has with `docker context ls`, and name one of \
+        remedy: "List the contexts this machine has with docker context ls, and name one of \
             those.",
     }
     /// Raised when a remote host does not answer for a reason nothing here recognises.

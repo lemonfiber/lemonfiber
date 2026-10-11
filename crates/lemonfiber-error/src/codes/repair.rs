@@ -29,8 +29,8 @@ codes! {
             from the download client, and the release check spends one of the indexers' daily \
             searches — and a run that only says what it would put right has agreed to neither. \
             Nothing was disturbed.",
-        remedy: "Ask for the diagnosis with those checks in it, with `lemonfiber doctor \
-            --disruptive`. Or agree to the repairs first, and the checks that disturb run with \
+        remedy: "Ask for the diagnosis with those checks in it, with lemonfiber doctor \
+            --disruptive. Or agree to the repairs first, and the checks that disturb run with \
             them.",
     }
 }

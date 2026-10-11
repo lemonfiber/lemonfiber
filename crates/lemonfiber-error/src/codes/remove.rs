@@ -6,7 +6,7 @@ codes! {
         since: "0.11.0",
         meaning: "No name was given, so there is nobody to remove. Removing somebody takes the \
             name their account is held under.",
-        remedy: "Name the person, as they appear in `lemonfiber household`.",
+        remedy: "Name the person, as they appear in lemonfiber household.",
     }
     /// Said where the stack holds no media server: there is no account to remove.
     NO_MEDIA_SERVER = "REMOVE-2" {
@@ -34,7 +34,7 @@ codes! {
         since: "0.11.0",
         meaning: "Nobody by that name is in this household. Nothing was removed — the name has \
             to match an account the media server holds, though not its capitalisation.",
-        remedy: "Run `lemonfiber household` to see who is here.",
+        remedy: "Run lemonfiber household to see who is here.",
     }
     /// Said where the account named administers the server.
     RUNS_THE_SERVER = "REMOVE-5" {

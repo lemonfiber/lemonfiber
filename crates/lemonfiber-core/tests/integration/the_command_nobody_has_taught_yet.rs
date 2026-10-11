@@ -38,7 +38,7 @@ fn an_untaught_command_is_refused_and_says_so_in_its_own_words() {
         refusal
             .remedies
             .iter()
-            .any(|remedy| remedy.action.contains("without `--dry-run`")),
+            .any(|remedy| remedy.action.contains("without --dry-run")),
         "an operator told no is entitled to be told what to do instead: {:?}",
         refusal.remedies
     );

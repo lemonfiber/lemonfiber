@@ -338,7 +338,7 @@ fn raised(ctx: &Ctx, said: &str, means: &str) {
         Severity::Warning,
         said,
         means,
-        "Run `lemonfiber up` to bring it back, then `lemonfiber doctor` to see what stopped it",
+        "Run lemonfiber up to bring it back, then lemonfiber doctor to see what stopped it",
     );
     observed(ctx, Some(&fault));
 }

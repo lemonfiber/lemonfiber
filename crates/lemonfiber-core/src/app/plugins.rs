@@ -333,7 +333,7 @@ async fn reversing(
 pub(crate) fn left_behind(back: &super::putting_back::Reversal) -> String {
     if back.left.is_empty() {
         return "The install was put back, and nothing is recorded as installed. \
-                `lemonfiber history` says what went back."
+                lemonfiber history says what went back."
             .to_owned();
     }
     let standing = back
@@ -390,7 +390,7 @@ fn unreadable_source(why: &crate::plugin::Unreadable) -> Problem {
         UNREADABLE,
         "That is not a plugin lemonfiber can read",
         "Nothing was installed and nothing was written.",
-        Remedy::new("Point at the plugin's directory, or the `plugin.toml` inside it"),
+        Remedy::new("Point at the plugin's directory, or the plugin.toml inside it"),
     )
     .in_state(State::Guided)
     .with_detail(why.to_string())

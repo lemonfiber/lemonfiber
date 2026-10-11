@@ -88,7 +88,7 @@ impl Chosen {
             Self::Derived => None,
             Self::Named(_) => Some("named rather than worked out".to_owned()),
             Self::Refused(refusal) => Some(format!(
-                "`{}` was named as the front door and cannot be one",
+                "{} was named as the front door and cannot be one",
                 refusal.named
             )),
         }

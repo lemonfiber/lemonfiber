@@ -6,7 +6,7 @@ codes! {
         since: "0.17.0",
         meaning: "The hand-off is for nobody — the name was blank. The name is the account their \
             device signs in to, so a blank one leads nowhere.",
-        remedy: "Give the name they sign in as, as in `lemonfiber household handoff ana`.",
+        remedy: "Give the name they sign in as, as in lemonfiber household handoff ana.",
     }
     /// Said where the stack holds no media server for a device to sign in to.
     NO_MEDIA_SERVER = "HANDOFF-2" {
@@ -25,7 +25,7 @@ codes! {
         meaning: "The media server's own account has not been set up yet. Finding somebody's \
             account and the devices signed in to it is done as the administrator, and this \
             machine has not recorded one.",
-        remedy: "Run `lemonfiber setup`, so the media server's account is made and recorded.",
+        remedy: "Run lemonfiber setup, so the media server's account is made and recorded.",
     }
     /// Said where the account named administers the media server.
     RUNS_THE_SERVER = "HANDOFF-4" {

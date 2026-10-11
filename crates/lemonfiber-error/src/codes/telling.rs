@@ -9,6 +9,6 @@ codes! {
             through no choice of yours. A newer version sends more than what is currently wired \
             in.",
         remedy: "Bring what the household is told up to what lemonfiber now sends, by running \
-            `lemonfiber seed`.",
+            lemonfiber seed.",
     }
 }

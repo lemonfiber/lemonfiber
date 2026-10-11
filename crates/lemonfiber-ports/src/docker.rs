@@ -237,13 +237,13 @@ pub enum Failure {
         reason: String,
     },
     /// The container was asked about and does not exist.
-    #[error("no container named `{name}` is running")]
+    #[error("no container named {name} is running")]
     NoSuchContainer {
         /// The container that was looked for.
         name: String,
     },
     /// The host the endpoint names could not be turned into an address.
-    #[error("`{host}` could not be found on the network: {reason}")]
+    #[error("{host} could not be found on the network: {reason}")]
     Unresolved {
         /// The host as it may be shown.
         host: String,
@@ -251,7 +251,7 @@ pub enum Failure {
         reason: String,
     },
     /// The host was found and would not accept a connection.
-    #[error("`{host}` refused the connection: {reason}")]
+    #[error("{host} refused the connection: {reason}")]
     Refused {
         /// The host as it may be shown.
         host: String,
@@ -259,7 +259,7 @@ pub enum Failure {
         reason: String,
     },
     /// The host was reached and would not accept the login.
-    #[error("`{host}` did not accept the SSH login: {reason}")]
+    #[error("{host} did not accept the SSH login: {reason}")]
     Rejected {
         /// The host as it may be shown.
         host: String,
@@ -267,13 +267,13 @@ pub enum Failure {
         reason: String,
     },
     /// The endpoint names a transport this build cannot drive.
-    #[error("`{endpoint}` is not an endpoint lemonfiber can reach")]
+    #[error("{endpoint} is not an endpoint lemonfiber can reach")]
     Unsupported {
         /// The endpoint as it may be shown.
         endpoint: String,
     },
     /// A Docker context was named and this machine records no such context.
-    #[error("no Docker context named `{name}` is recorded on this machine")]
+    #[error("no Docker context named {name} is recorded on this machine")]
     NoSuchContext {
         /// The context that was asked for.
         name: String,
@@ -283,7 +283,7 @@ pub enum Failure {
     /// Its own variant rather than the local engine's, because the local one's
     /// remedy is to start Docker on this machine — which, for an operator whose
     /// laptop is talking to a server, is running perfectly.
-    #[error("`{host}` did not answer: {reason}")]
+    #[error("{host} did not answer: {reason}")]
     Unanswered {
         /// The host as it may be shown.
         host: String,

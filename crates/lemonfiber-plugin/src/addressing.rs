@@ -61,19 +61,19 @@ const BLANK: &str = "unset.invalid";
 const NEVER: &[(char, &str)] = &[
     (
         '@',
-        "an `@`, which a URL reads as ending a user and beginning a host",
+        "an \"@\", which a URL reads as ending a user and beginning a host",
     ),
     ('\\', "a backslash, which some parsers read as a slash"),
-    ('#', "a `#`, which ends the path and starts a fragment"),
+    ('#', "a \"#\", which ends the path and starts a fragment"),
 ];
 
 /// Percent-encodings a path never holds, each with what it decodes to.
 const NEVER_ENCODED: &[(&str, &str)] = &[
-    ("%2F", "`/`"),
+    ("%2F", "\"/\""),
     ("%5C", "a backslash"),
-    ("%40", "`@`"),
-    ("%23", "`#`"),
-    ("%2E", "`.`"),
+    ("%40", "\"@\""),
+    ("%23", "\"#\""),
+    ("%2E", "\".\""),
 ];
 
 /// Where a call goes, as its address is built.
@@ -262,7 +262,7 @@ fn valued(query: &str, value: &dyn Fn(&str) -> String) -> String {
 #[must_use]
 pub fn unplain(path: &str) -> Option<String> {
     if !path.starts_with(ROOT) || path[1..].starts_with(ROOT) {
-        return Some("it does not begin with exactly one `/`".to_owned());
+        return Some("it does not begin with exactly one \"/\"".to_owned());
     }
     if let Some((_, what)) = NEVER.iter().find(|(held, _)| path.contains(*held)) {
         return Some(format!("it holds {what}"));
@@ -282,7 +282,7 @@ pub fn unplain(path: &str) -> Option<String> {
         .split(ROOT)
         .any(|segment| segment == "." || segment == "..")
     {
-        return Some("it holds a `.` or `..` segment".to_owned());
+        return Some("it holds a \".\" or \"..\" segment".to_owned());
     }
     None
 }

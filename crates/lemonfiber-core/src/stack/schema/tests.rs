@@ -16,12 +16,12 @@ fn the_committed_schemas_still_match_the_types() {
     assert_eq!(
         committed(ROOT_PATH),
         root().unwrap_or_default(),
-        "the stack manifest schema is out of date — regenerate it with `just stack-schema`"
+        "the stack manifest schema is out of date — regenerate it with just stack-schema"
     );
     assert_eq!(
         committed(SERVICE_PATH),
         service().unwrap_or_default(),
-        "the stack service schema is out of date — regenerate it with `just stack-schema`"
+        "the stack service schema is out of date — regenerate it with just stack-schema"
     );
 }
 

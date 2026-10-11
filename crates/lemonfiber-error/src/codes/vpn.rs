@@ -9,7 +9,7 @@ codes! {
             every swarm can see your home address. This is the one failure whose consequences \
             reach outside your machine.",
         remedy: "Stop torrent transfers now, then confirm the client shares the VPN's network — \
-            `network_mode: service:<gateway>` in the stack.",
+            network_mode: service:<gateway> in the stack.",
     }
     /// Raised when the VPN container that should carry traffic is not running.
     VPN_CONTAINER_DOWN = "VPN-2" {
@@ -19,8 +19,8 @@ codes! {
         meaning: "The VPN container that should carry traffic is not running. Nothing routes \
             through a tunnel that is not up, so torrents cannot transfer — though nothing is \
             leaking while it is down.",
-        remedy: "Start the form that includes it, then read its logs: `lemonfiber logs \
-            <gateway>`.",
+        remedy: "Start the form that includes it, then read its logs: lemonfiber logs \
+            <gateway>.",
     }
     /// Raised when the client cannot reach the internet through the tunnel.
     CLIENT_ISOLATED = "VPN-3" {
@@ -52,7 +52,7 @@ codes! {
             internet. Every torrent would continue in the open the moment the VPN fails, and a \
             VPN that never fails is not a thing.",
         remedy: "Enable the tunnel container's own killswitch. For gluetun that is \
-            `FIREWALL=on`, which is its default.",
+            FIREWALL=on, which is its default.",
     }
     /// The code a stack whose tunnel could not be put back earns.
     TUNNEL_NOT_RESTORED = "VPN-6" {
@@ -72,7 +72,7 @@ codes! {
         meaning: "The provider forwards one port and the download client is listening on \
             another. Downloads still arrive, so nothing looks wrong — but no peer can reach the \
             client, so it cannot seed and connects to fewer sources.",
-        remedy: "Run `lemonfiber up` to move the client onto the forwarded port.",
+        remedy: "Run lemonfiber up to move the client onto the forwarded port.",
     }
     /// Raised when torrents are configured with nothing containing them.
     NO_TUNNEL = "VPN-8" {
@@ -83,6 +83,6 @@ codes! {
             so every torrent is visible under this connection's own address — to the network it \
             is on, and to every peer in the swarm.",
         remedy: "Put the torrent client behind a VPN container in the stack. Where this is \
-            deliberate, answer it once with `lemonfiber doctor --accept vpn.unprotected`.",
+            deliberate, answer it once with lemonfiber doctor --accept vpn.unprotected.",
     }
 }

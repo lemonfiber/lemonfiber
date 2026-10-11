@@ -9,8 +9,8 @@ codes! {
             somewhere the rest of the stack no longer looks; or you moved the client off \
             lemonfiber's category and the service can no longer reach it, so the queue fills and \
             never empties.",
-        remedy: "Let lemonfiber bring it up to date with `lemonfiber doctor --fix`. To keep your \
-            own value instead, adopt it with `lemonfiber adopt`; to discard it and restore \
-            lemonfiber's, run `lemonfiber reset --confirm`.",
+        remedy: "Let lemonfiber bring it up to date with lemonfiber doctor --fix. To keep your \
+            own value instead, adopt it with lemonfiber adopt; to discard it and restore \
+            lemonfiber's, run lemonfiber reset --confirm.",
     }
 }

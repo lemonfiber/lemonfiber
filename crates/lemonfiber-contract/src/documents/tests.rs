@@ -14,7 +14,7 @@ fn the_committed_documents_are_what_the_types_generate() {
         let committed = std::fs::read_to_string(root.join(path)).unwrap_or_default();
         assert_eq!(
             &committed, text,
-            "{path} is stale: run `just capability-contracts`"
+            "{path} is stale: run just capability-contracts"
         );
     }
     let mut committed: Vec<String> = Vec::new();

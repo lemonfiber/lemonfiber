@@ -43,7 +43,7 @@ fn quoted(line: &str) -> Vec<&str> {
 }
 
 /// Every piece of prose this product ships, with where it was found.
-fn shipped_prose() -> Vec<(String, usize, String)> {
+pub(crate) fn shipped_prose() -> Vec<(String, usize, String)> {
     let mut prose = Vec::new();
     for (path, text) in sources() {
         let where_it_lives = path.to_string_lossy().replace('\\', "/");

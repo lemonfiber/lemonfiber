@@ -284,7 +284,7 @@ async fn stopping_the_only_form_that_is_up_is_not_refused() {
     assert_eq!(
         produced.map(|report| report.action),
         Some("down".to_owned()),
-        "nothing else holds what `library` holds, so it simply stops"
+        "nothing else holds what library holds, so it simply stops"
     );
 }
 

@@ -78,7 +78,7 @@ pub(crate) fn nothing_by_that_name(credential: &str, known: &[String]) -> Reveal
         name: credential.to_owned(),
         value: None,
         warning: format!(
-            "Nothing here is called `{credential}`. What is: {}.",
+            "Nothing here is called {credential}. What is: {}.",
             known.join(", ")
         ),
     }

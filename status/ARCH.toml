@@ -2,6 +2,7 @@
 # status_check.py and the release gate.
 
 requirement = [
+  { id = "ARCH-R223", state = "done", evidence = ["crates/lemonfiber/tests/architecture/nothing_sent_carries_markup.rs", "crates/lemonfiber-contract/src/wire.rs", "crates/lemonfiber-error/src/codes/config.rs", "contract/codes.json"] },
   { id = "ARCH-R2", state = "done", evidence = ["crates/lemonfiber-manifest/src/schema.rs", "crates/lemonfiber-plugin/src/schema.rs", "contract/plugin-manifest.schema.json"] },
   { id = "ARCH-R3", state = "done", evidence = ["crates/lemonfiber-manifest/src/schema.rs", "crates/lemonfiber-plugin/src/schema.rs", "contract/plugin-manifest.schema.json"] },
   { id = "ARCH-R4", state = "done", evidence = ["crates/lemonfiber-manifest/src/binary.rs", "crates/lemonfiber-core/src/stack.rs"] },

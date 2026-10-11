@@ -395,7 +395,7 @@ impl Requests for Seerr {
 async fn configure_identity(seerr: &Seerr, source: &IdentitySource) -> Result<(), Failure> {
     if source.protocol.0 != ApiKind::Jellyfin.name() {
         return Err(seerr.endpoint.unsupported(&format!(
-            "it signs a household in through no identity source spoken to as `{}`",
+            "it signs a household in through no identity source spoken to as {}",
             source.protocol.0
         )));
     }

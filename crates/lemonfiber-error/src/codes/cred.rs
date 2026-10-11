@@ -8,7 +8,7 @@ codes! {
             its configuration no longer matches the one the running service expects, usually \
             because the configuration was regenerated after the service last started.",
         remedy: "Restart the service so it reloads its configuration, then check again: \
-            `lemonfiber restart`.",
+            lemonfiber restart.",
     }
     /// Raised when the indexer answers and refuses the key it was given.
     INDEXER_REJECTED = "CRED-2" {

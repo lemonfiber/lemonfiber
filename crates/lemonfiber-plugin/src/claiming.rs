@@ -141,7 +141,7 @@ fn demonstrated(manifest: &Manifest, found: &mut Vec<Violation>) {
                 location: at,
                 message: format!(
                     "{} is this plugin's own capability, and a namespaced capability has no \
-                     published contract to satisfy — it is declared in `provides` and shown by a \
+                     published contract to satisfy — it is declared in provides and shown by a \
                      [[proof]] instead",
                     claim.capability
                 ),
@@ -158,7 +158,7 @@ fn demonstrated(manifest: &Manifest, found: &mut Vec<Violation>) {
             found.push(Violation {
                 location: at.clone(),
                 message: format!(
-                    "{} is in no service's `provides`, so nothing here has said it can do it",
+                    "{} is in no service's provides, so nothing here has said it can do it",
                     claim.capability
                 ),
             });

@@ -19,6 +19,7 @@ mod nothing_here_runs_what_somebody_sent;
 mod nothing_leaves_on_its_own;
 mod nothing_reports_on_you;
 mod nothing_resolves_a_second_host;
+mod nothing_sent_carries_markup;
 mod nothing_shapes_this_machines_traffic;
 mod one_gate_for_every_credential;
 mod one_number_one_place;

@@ -70,8 +70,8 @@ codes! {
             own filesystem inside the container and a file moved between them is copied rather \
             than linked. Nothing is broken — imports take longer and use twice the space.",
         remedy: "Mount the data location once and keep the downloads and the library as \
-            directories beneath it. Where the layout is deliberate, `lemonfiber doctor --accept \
-            storage.single-mount` settles it.",
+            directories beneath it. Where the layout is deliberate, lemonfiber doctor --accept \
+            storage.single-mount settles it.",
     }
     /// Raised where a location that stopped hardlinking leaves the stack copying in a
     /// mode it was not set up for.

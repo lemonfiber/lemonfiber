@@ -74,7 +74,7 @@ fn a_level_named_in_prose_is_something_the_line_is_talking_about() {
     assert_eq!(
         declared("Downloading Error.404.S01E01.1080p.WEB-DL"),
         None,
-        "a release somebody named `Error` is not an error"
+        "a release somebody named Error is not an error"
     );
     assert_eq!(
         declared("Import finished, and the second attempt did not error"),

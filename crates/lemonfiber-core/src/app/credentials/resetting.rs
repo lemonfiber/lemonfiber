@@ -38,7 +38,7 @@ const READS: u32 = 10;
 
 /// What a copy says that ended neither holding the new key nor failing in words of
 /// its own.
-const UNTAKEN: &str = "it did not take the new key; `lemonfiber seed` says why";
+const UNTAKEN: &str = "it did not take the new key; lemonfiber seed says why";
 
 /// The pause between those reads.
 const BETWEEN_READS: Duration = Duration::from_millis(500);
@@ -241,7 +241,7 @@ fn lost(name: &str, reason: &str) -> Rotation {
         Settled::ReplacedUnproven {
             detail: crate::config::store::withheld_text(&format!(
                 "the service replaced its key and the new one did not answer: {reason}. The old \
-                 key no longer works; run `lemonfiber seed` once the service answers, which \
+                 key no longer works; run lemonfiber seed once the service answers, which \
                  hands the new key to everything that reads it."
             )),
         },
@@ -255,7 +255,7 @@ fn unkept(name: &str, failure: &crate::config::store::Failure) -> Rotation {
         Settled::ReplacedUnproven {
             detail: crate::config::store::withheld_text(&format!(
                 "the service replaced its key and answered to the new one, but the new key could \
-                 not be recorded: {failure}. The old key no longer works; run `lemonfiber seed`, \
+                 not be recorded: {failure}. The old key no longer works; run lemonfiber seed, \
                  which reads the new key and hands it to everything that reads it."
             )),
         },

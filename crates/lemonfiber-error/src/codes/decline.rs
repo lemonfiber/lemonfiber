@@ -10,6 +10,6 @@ codes! {
             in somebody else's hands. The message gives when it was used, and when the service \
             last recorded something, if it ever did.",
         remedy: "If nobody declined an invitation or had one run out then, rotate the key with \
-            `lemonfiber credentials rotate`, and check what the decline service is running.",
+            lemonfiber credentials rotate, and check what the decline service is running.",
     }
 }

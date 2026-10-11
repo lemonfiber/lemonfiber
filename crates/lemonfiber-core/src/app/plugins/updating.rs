@@ -443,7 +443,7 @@ fn not_installed(plugin: &str) -> Problem {
         NOTHING_TO_UPDATE,
         format!("{plugin} is not installed, so there is nothing to update"),
         "Nothing was changed. An update replaces a version this machine already has.",
-        Remedy::new("Install it instead: `lemonfiber plugin install` on the same source"),
+        Remedy::new("Install it instead: lemonfiber plugin install on the same source"),
     )
     .in_state(State::Guided)
 }

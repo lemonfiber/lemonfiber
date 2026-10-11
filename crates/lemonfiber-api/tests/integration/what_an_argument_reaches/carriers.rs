@@ -749,7 +749,7 @@ pub(super) fn swept(
             Ok(command) if carries(&command) => {}
             Ok(command) => {
                 wrong.push(format!(
-                    "{action} took `{argument}` and dropped it: {command:?}"
+                    "{action} took {argument} and dropped it: {command:?}"
                 ));
             }
             Err(Refused::Unwanted {

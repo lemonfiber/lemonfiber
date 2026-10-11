@@ -33,7 +33,7 @@ pub(crate) fn refusal() -> Problem {
              whose image is missing will not start."
         ),
         Remedy::new(format!(
-            "Turn fetching back on with `lemonfiber config set {REACH_REGISTRY_KEY} on`, then \
+            "Turn fetching back on with lemonfiber config set {REACH_REGISTRY_KEY} on, then \
              run this again"
         )),
     )

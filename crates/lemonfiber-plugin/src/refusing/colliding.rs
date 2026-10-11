@@ -69,7 +69,7 @@ fn named_like_the_stack(service: &Service, at: &str, found: &mut Vec<Violation>)
         found.push(Violation {
             location: format!("{at}.id"),
             message: format!(
-                "{} is written as the stack's own {} is ({}) once case and `-` or `_` are set \
+                "{} is written as the stack's own {} is ({}) once case and \"-\" or \"_\" are set \
                  aside, and lemonfiber keeps what a service holds in settings named that way \
                  — the two would share them",
                 service.id, held.name, held.id

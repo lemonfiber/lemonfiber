@@ -335,7 +335,7 @@ async fn a_token_not_handed_over_or_unread_says_so() {
         assert_eq!(line.state, State::Absent, "{name}");
         assert!(line
             .advisory
-            .is_some_and(|said| said.ends_with("Run `lemonfiber seed`.")));
+            .is_some_and(|said| said.ends_with("Run lemonfiber seed.")));
     }
 
     let silent = Fake::by_route_in_turn(vec![(Method::Get, "", vec![Answer::Silent])]);

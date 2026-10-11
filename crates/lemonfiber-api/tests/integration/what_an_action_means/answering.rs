@@ -151,7 +151,7 @@ async fn a_name_the_route_does_not_offer_is_refused_by_the_route_too() {
 async fn an_action_missing_an_argument_is_refused_by_the_route_too() {
     let (status, body) = said(Chance::cycling(), "pull", "{}").await;
     assert_eq!(status, StatusCode::BAD_REQUEST.as_u16());
-    assert!(body.contains("needs `forms`"), "{body}");
+    assert!(body.contains("needs forms"), "{body}");
 }
 
 #[tokio::test]
@@ -159,7 +159,7 @@ async fn agreement_an_action_does_not_take_is_refused_by_the_route_too() {
     let asked = r#"{"forms":["tv"],"confirm":true}"#;
     let (status, body) = said(Chance::cycling(), "down", asked).await;
     assert_eq!(status, StatusCode::BAD_REQUEST.as_u16());
-    assert!(body.contains("takes no `confirm`"), "{body}");
+    assert!(body.contains("takes no confirm"), "{body}");
 }
 
 #[tokio::test]

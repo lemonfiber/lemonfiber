@@ -38,7 +38,7 @@ pub(super) fn asked_for(given: Arguments) -> Result<Command, Refused> {
     let kind = Kind::for_media_type(&written).ok_or_else(|| Refused::Unrecognised {
         argument: "kind".to_owned(),
         offered: format!(
-            "`{written}` is neither `{}` nor `{}`",
+            "{written} is neither {} nor {}",
             Kind::Movies.media_type(),
             Kind::Tv.media_type()
         ),

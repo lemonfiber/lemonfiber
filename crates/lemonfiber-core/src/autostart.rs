@@ -38,7 +38,7 @@ use serde::{Deserialize, Serialize};
 pub const DECLINE_CONSEQUENCE: &str =
     "After a restart — an overnight operating-system update, a power cut — nothing comes back on \
      its own. Downloads stop and the library goes offline, no error is shown and no notification \
-     is sent, and it stays that way until you run `lemonfiber up` yourself.";
+     is sent, and it stays that way until you run lemonfiber up yourself.";
 
 /// The operator's answer to the autostart question, kept between runs.
 ///

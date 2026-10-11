@@ -285,7 +285,7 @@ async fn a_run_narrowed_to_one_season_is_answered_the_same_way() {
 async fn asking_for_it_without_the_widening_is_refused_over_the_wire_too() {
     let (status, answered) = said(r#"{"term":"The Expanse"}"#).await;
     assert_eq!(status, StatusCode::BAD_REQUEST.as_u16());
-    assert!(answered.contains("needs `disruptive`"), "{answered}");
+    assert!(answered.contains("needs disruptive"), "{answered}");
 }
 
 #[tokio::test]

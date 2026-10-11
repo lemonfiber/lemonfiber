@@ -69,7 +69,7 @@ impl Refusal {
     pub fn unknown_operation(operation: &str) -> Self {
         Self::new(
             Kind::UnknownOperation,
-            format!("`{operation}` is not an operation this adapter serves"),
+            format!("{operation} is not an operation this adapter serves"),
         )
     }
 
@@ -93,11 +93,11 @@ impl From<&Failure> for Refusal {
     fn from(failure: &Failure) -> Self {
         match failure {
             Failure::Unavailable { service } => {
-                Self::new(Kind::Unavailable, format!("`{service}` is not answering"))
+                Self::new(Kind::Unavailable, format!("{service} is not answering"))
             }
             Failure::Unauthorised { service } => Self::new(
                 Kind::Unauthorised,
-                format!("`{service}` rejected the credential"),
+                format!("{service} rejected the credential"),
             ),
             Failure::Refused { detail, .. } => Self::new(Kind::Refused, detail.clone()),
             Failure::Unsupported { detail, .. } => Self::new(Kind::Unsupported, detail.clone()),

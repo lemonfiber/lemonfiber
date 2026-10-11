@@ -558,7 +558,7 @@ fn nothing_the_released_surface_describes_is_removed_or_retyped_under_one_versio
     assert!(
         before.is_some(),
         "there is no committed surface to hold this build to — write one with \
-         `just surface`, which refuses to write a surface that drops anything"
+         just surface, which refuses to write a surface that drops anything"
     );
 
     let broken = Surface::refused(
@@ -571,8 +571,8 @@ fn nothing_the_released_surface_describes_is_removed_or_retyped_under_one_versio
         broken.is_empty(),
         "these are promises the machine-readable output has made and this build no longer \
          keeps, under an unchanged api_version:\n{named}\nEither put them back, declare \
-         each in `stability::DECLARED`, or increment `API_VERSION` and rewrite the surface \
-         with `just surface`."
+         each in stability::DECLARED, or increment API_VERSION and rewrite the surface \
+         with just surface."
     );
 }
 
@@ -592,7 +592,7 @@ fn the_committed_surface_still_describes_what_these_types_do() {
     assert_eq!(
         stored.files(),
         fresh.files(),
-        "the surface is out of date — rewrite it with `just surface`"
+        "the surface is out of date — rewrite it with just surface"
     );
 }
 

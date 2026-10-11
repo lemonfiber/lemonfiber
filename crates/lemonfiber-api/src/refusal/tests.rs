@@ -139,7 +139,7 @@ async fn a_refusal_answers_with_the_error_envelope_carrying_its_code() {
 
 #[tokio::test]
 async fn a_refusal_saying_its_particulars_keeps_its_code() {
-    let response = Refusal::NoSuchAction.saying("There is no action named `x`.");
+    let response = Refusal::NoSuchAction.saying("There is no action named x.");
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
     let body = body_of(response).await;
     assert_eq!(
@@ -150,7 +150,7 @@ async fn a_refusal_saying_its_particulars_keeps_its_code() {
     assert_eq!(
         body.pointer("/data/summary")
             .and_then(serde_json::Value::as_str),
-        Some("There is no action named `x`.")
+        Some("There is no action named x.")
     );
 }
 

@@ -329,7 +329,7 @@ async fn an_update_with_no_engine_to_start_it_says_so() {
 
     assert!(failed
         .and_then(|one| one.stopped)
-        .is_some_and(|why| why.contains("`docker` was not found")));
+        .is_some_and(|why| why.contains("docker was not found")));
 }
 
 /// A new version that holds its own proofs and breaks the stack's checks does not

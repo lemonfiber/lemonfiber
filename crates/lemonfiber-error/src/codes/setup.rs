@@ -61,8 +61,8 @@ codes! {
         meaning: "This machine already holds configuration, so setup is not what it needs. \
             Answering setup again would walk a working stack back to its first question. Nothing \
             has been changed.",
-        remedy: "Change the setting you came to change, with `lemonfiber config set <key> \
-            <value>`.",
+        remedy: "Change the setting you came to change, with lemonfiber config set <key> \
+            <value>.",
     }
     /// Raised when a recovery is asked for and no apply stopped part-way.
     NOTHING_TO_RECOVER = "SETUP-8" {
@@ -72,7 +72,7 @@ codes! {
         meaning: "A recovery was asked for and no setup here stopped part-way through applying. \
             Recovering chooses what to do about a half-written apply, and there is none to \
             choose about. Nothing has been changed.",
-        remedy: "Ask where setup stands, with `lemonfiber setup --status`, before choosing a way \
+        remedy: "Ask where setup stands, with lemonfiber setup --status, before choosing a way \
             out of it.",
     }
     /// Raised when a reversal would write over a setting the operator has since chosen.

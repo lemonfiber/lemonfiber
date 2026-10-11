@@ -23,7 +23,7 @@ pub(super) fn no_such_run(at: &str) -> Problem {
             "No run in the record carries the stamp {at}. It may have fallen outside the \
              horizon the record keeps, or the stamp may be mistyped. Nothing was put back."
         ),
-        Remedy::new("Run `lemonfiber history` and take the stamp from the entry you want"),
+        Remedy::new("Run lemonfiber history and take the stamp from the entry you want"),
     )
     .in_state(State::Actionable)
 }

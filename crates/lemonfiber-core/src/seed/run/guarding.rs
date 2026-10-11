@@ -81,7 +81,7 @@ pub(super) async fn guarded(
             let mut wiring = Wiring::settled(connection(&aggregator.name), State::Drifted);
             wiring.escalate(
                 exposure(&aggregator.name),
-                "run `lemonfiber reset` to turn its authentication back on".to_owned(),
+                "run lemonfiber reset to turn its authentication back on".to_owned(),
             );
             return Some(wiring);
         }
@@ -143,7 +143,7 @@ async fn held(ctx: &Ctx, aggregator: &Aggregator) -> State {
             reason: format!(
                 "{name} has authentication lemonfiber did not turn on, and {setting} holds no \
                  password for it, so lemonfiber leaves it as it is. Record its \
-                 administrator's password with `lemonfiber config set {setting} <password>`.",
+                 administrator's password with lemonfiber config set {setting} <password>.",
                 name = aggregator.name,
             ),
         };
@@ -154,7 +154,7 @@ async fn held(ctx: &Ctx, aggregator: &Aggregator) -> State {
             reason: format!(
                 "{name} refuses the password {setting} holds, and lemonfiber does not turn its \
                  authentication off or give it another administrator to get back in. Record \
-                 the password it takes with `lemonfiber config set {setting} <password>`.",
+                 the password it takes with lemonfiber config set {setting} <password>.",
                 name = aggregator.name,
             ),
         },

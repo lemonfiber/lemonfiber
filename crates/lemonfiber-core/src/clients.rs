@@ -187,8 +187,8 @@ pub const PLAYBACK_WILL_STRUGGLE: &str =
 /// The two things that stop it, for an operator who would rather playback were
 /// smooth than deep.
 pub const A_LIGHTER_PRESET: &str =
-    "A lighter preset leaves most devices nothing to transcode: `lemonfiber quality set \
-     balanced` decides what arrives next and changes nothing already on disk. Running \
+    "A lighter preset leaves most devices nothing to transcode: lemonfiber quality set \
+     balanced decides what arrives next and changes nothing already on disk. Running \
      the media server natively, where it can reach the encoder, is the other answer.";
 
 /// Why playback here is likely to struggle, whatever app the household installs.
@@ -255,7 +255,7 @@ pub const TROUBLE: &[Trouble] = &[
             Cause {
                 because: "The address is wrong, or it has changed.",
                 tell: "Every device fails the same way, including one that worked yesterday.",
-                fix: "Check it against what `lemonfiber front-door` says now. That address is \
+                fix: "Check it against what lemonfiber front-door says now. That address is \
                       read from this machine at the moment of asking, so a machine that was \
                       renamed answers differently from the note somebody wrote down.",
             },
@@ -271,7 +271,7 @@ pub const TROUBLE: &[Trouble] = &[
                 because: "The server is not running.",
                 tell: "No device can reach it, and this is the one you can answer without \
                        leaving your chair.",
-                fix: "`lemonfiber status` says whether it is, and `lemonfiber up` starts it.",
+                fix: "lemonfiber status says whether it is, and lemonfiber up starts it.",
             },
         ],
     },
@@ -309,7 +309,7 @@ pub const TROUBLE: &[Trouble] = &[
             because: "The address changed and the app remembers the old one.",
             tell: "It stopped for everybody at once, and a browser opened at the current \
                    address still works.",
-            fix: "Change the saved server in the app to what `lemonfiber front-door` says \
+            fix: "Change the saved server in the app to what lemonfiber front-door says \
                   now. Where an app offers no way to edit it, remove the server and add it \
                   again.",
         }],

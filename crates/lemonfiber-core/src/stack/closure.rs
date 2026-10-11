@@ -332,7 +332,7 @@ pub enum Failure {
     #[error("no form was named")]
     NothingNamed,
     /// A named form is not declared by this stack.
-    #[error("this stack declares no form called `{name}`")]
+    #[error("this stack declares no form called {name}")]
     NoSuchForm {
         /// What was asked for.
         name: String,
@@ -343,7 +343,7 @@ pub enum Failure {
         nearest: Option<String>,
     },
     /// A form that refuses to be combined was named alongside others.
-    #[error("`{form}` cannot be combined with another form")]
+    #[error("{form} cannot be combined with another form")]
     NotComposable {
         /// The form that must run alone.
         form: String,

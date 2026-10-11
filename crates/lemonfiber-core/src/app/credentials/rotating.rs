@@ -168,7 +168,7 @@ fn elsewhere(setting: &str) -> String {
     format!(
         "A replacement for this one comes from {place}, not from here — a value invented here \
          would be one nothing has ever heard of. Change it there, then record it with \
-         `{afterwards}`, which proves it against the live service before it keeps it. Until \
+         {afterwards}, which proves it against the live service before it keeps it. Until \
          then the existing credential is untouched and still in force."
     )
 }
@@ -191,7 +191,7 @@ async fn replaced(ctx: &Ctx, held: &Held, services: &[Service]) -> Rotation {
         return unproven(
             held,
             "there is no torrent client with a password recorded, so there is nothing to \
-             authenticate with in order to change one; run `lemonfiber seed` to set one",
+             authenticate with in order to change one; run lemonfiber seed to set one",
         );
     };
     // Below everything that can be told without acting and above everything that
@@ -310,7 +310,7 @@ pub(crate) enum Replacing {
 
 /// What is said where lemonfiber holds no administrator password for the media server.
 const NO_ADMINISTRATOR_HELD: &str = "lemonfiber holds no administrator password for this media \
-                                     server, so there is nothing to change; run `lemonfiber seed`";
+                                     server, so there is nothing to change; run lemonfiber seed";
 
 /// Hand a service's own current key back to everything that reads it.
 ///
@@ -339,7 +339,7 @@ async fn republished(
             Settled::Elsewhere {
                 detail: "this service's key is not one lemonfiber can prove by asking the \
                          service who it is, so it is not one this will hand out unproven. Run \
-                         `lemonfiber seed`, which reads it and gives it to everything that \
+                         lemonfiber seed, which reads it and gives it to everything that \
                          reads it from the environment. Until then the existing credential is \
                          untouched and still in force."
                     .to_owned(),

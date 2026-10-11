@@ -254,7 +254,7 @@ fn worded(text: &str, at: &str, found: &mut Vec<Violation>) {
         found.push(Violation {
             location: at.to_owned(),
             message: format!(
-                "{text:?} is not one word of letters, digits, `-` and `_`, so what an operator \
+                "{text:?} is not one word of letters, digits, \"-\" and \"_\", so what an operator \
                  reads and what is matched could differ"
             ),
         });
@@ -268,7 +268,7 @@ fn destination(to: &str, at: &str, found: &mut Vec<Violation>) {
             location: at.to_owned(),
             message: format!(
                 "{to:?} is not a service id or a host name; a destination is lowercase labels of \
-                 letters, digits and `-`, joined by dots, so where a value goes is a thing the \
+                 letters, digits and \"-\", joined by dots, so where a value goes is a thing the \
                  operator can read and approve as it is written"
             ),
         });
@@ -398,7 +398,7 @@ fn written_out(step: &Step, at: &str, found: &mut Vec<Violation>) {
         found.push(Violation {
             location: format!("{at}.call.path"),
             message: "substitutes a value into the path itself; only a query value may carry one, \
-                      after `?` on the value side of a `name=value`"
+                      after \"?\" on the value side of a name=value"
                 .to_owned(),
         });
     }

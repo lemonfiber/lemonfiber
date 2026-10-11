@@ -35,7 +35,7 @@ const CONSUMER: &str = "the decline service, which switches off an invitation th
 
 /// What is said where the key is not there.
 const ABSENT: &str = "Media server decline key is not there yet, so the decline service cannot \
-                      switch off an invitation anybody refuses. Run `lemonfiber seed`.";
+                      switch off an invitation anybody refuses. Run lemonfiber seed.";
 
 /// What a rehearsal says a replacement would take.
 const ROTATING: &str = "a real run would mint a new key on the media server, write it where \
@@ -49,7 +49,7 @@ const LANDED: &str = "The media server took the new key, and the decline service
 /// Why there is nothing to mint with.
 pub(super) const NO_ADMINISTRATOR: &str =
     "lemonfiber holds no administrator for this media server, so there is nothing to mint \
-     a key with; run `lemonfiber seed`";
+     a key with; run lemonfiber seed";
 
 /// Why a new key was revoked before it was ever used.
 const UNWRITTEN: &str =

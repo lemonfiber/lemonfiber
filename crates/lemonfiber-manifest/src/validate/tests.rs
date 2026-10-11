@@ -197,9 +197,7 @@ fn a_digest_in_another_shape_is_caught() {
     ] {
         let text = STACK.replacen("digest = ", &format!("digest = \"{shape}\" # "), 1);
         assert!(
-            messages(&text)
-                .iter()
-                .any(|m| m.contains("is not `sha256:`")),
+            messages(&text).iter().any(|m| m.contains("is not sha256:")),
             "{shape} was accepted as a digest"
         );
     }

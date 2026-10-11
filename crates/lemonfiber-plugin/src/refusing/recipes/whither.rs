@@ -255,7 +255,7 @@ fn kept(recipe: &Recipe, held: Held<'_>, name: &str, to: &str) -> Option<String>
         )),
         Hold::Answered => Some(format!(
             "{name} was captured from the answer of {owner}, and what a service answers goes \
-             back only to it, unless a pair carrying it to {to} says in `release` why"
+             back only to it, unless a pair carrying it to {to} says in release why"
         )),
     }
 }
@@ -389,7 +389,7 @@ fn held(manifest: &Manifest, input: &Input, at: &str, found: &mut Vec<Violation>
         }),
         None => found.push(Violation {
             location: at.to_owned(),
-            message: "comes from the credential store and names no service in `of`, so whose \
+            message: "comes from the credential store and names no service in of, so whose \
                       credential it carries could not be read off the manifest"
                 .to_owned(),
         }),
@@ -415,7 +415,7 @@ fn asked(input: &Input, at: &str, found: &mut Vec<Violation>) {
     if input.ask.as_deref().is_none_or(str::is_empty) {
         found.push(Violation {
             location: at.to_owned(),
-            message: "comes from the operator and says nothing in `ask`, so they would be \
+            message: "comes from the operator and says nothing in ask, so they would be \
                       asked for a value with no word of what it is"
                 .to_owned(),
         });

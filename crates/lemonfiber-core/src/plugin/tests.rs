@@ -23,7 +23,7 @@ fn the_committed_schema_still_matches_the_types() {
     assert_eq!(
         committed(SCHEMA_PATH),
         fresh,
-        "the plugin manifest schema is out of date — regenerate it with `just plugin-schema`"
+        "the plugin manifest schema is out of date — regenerate it with just plugin-schema"
     );
 }
 
@@ -39,7 +39,7 @@ fn the_committed_vocabulary_still_matches_the_types_and_the_pinned_stack() {
     assert_eq!(
         committed(VOCABULARY_PATH),
         fresh,
-        "the capability vocabulary is out of date — regenerate it with `just capabilities`"
+        "the capability vocabulary is out of date — regenerate it with just capabilities"
     );
 }
 
@@ -49,7 +49,7 @@ fn the_committed_adapters_still_match_the_types() {
     assert_eq!(
         committed(ADAPTERS_PATH),
         adapters().unwrap_or_default(),
-        "the set of adapters is out of date — regenerate it with `just adapters`"
+        "the set of adapters is out of date — regenerate it with just adapters"
     );
 }
 
@@ -89,7 +89,7 @@ fn the_committed_extension_points_still_match_the_register() {
     assert_eq!(
         committed(POINTS_PATH),
         fresh,
-        "the extension points are out of date — regenerate them with `just extension-points`"
+        "the extension points are out of date — regenerate them with just extension-points"
     );
 }
 

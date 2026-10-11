@@ -155,7 +155,7 @@ impl Link {
             Self::Hardlinked => None,
             Self::Copied => Some(
                 "Put the downloads and the library on one volume, mounted at one path in \
-                 both containers — `lemonfiber doctor` names the mismatch",
+                 both containers — lemonfiber doctor names the mismatch",
             ),
         }
     }

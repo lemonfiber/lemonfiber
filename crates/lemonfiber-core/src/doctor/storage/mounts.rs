@@ -71,7 +71,7 @@ fn split(crowded: &Crowded) -> Finding {
             "Mount the data location once and keep the downloads and the library as \
              directories beneath it",
         )
-        .with_detail("one volume entry, `${DATA_ROOT}:/data`, in place of the ones below"),
+        .with_detail("one volume entry, ${DATA_ROOT}:/data, in place of the ones below"),
     )
     .or_try(
         Remedy::new(

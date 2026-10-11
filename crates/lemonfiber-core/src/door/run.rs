@@ -205,7 +205,7 @@ const fn standing(faces: Facing, answering: bool, addressed: bool) -> Standing {
 /// which is the right default for a machine nobody has told where it is and the
 /// wrong address to hand anybody. So it is not handed over — it is said, with the
 /// one thing that fixes it.
-const UNADDRESSED: &str = " Nothing here can work out an address for this machine that another                            device would reach: it does not publish its own name, and the                            address the household's links point at is still the one that means                            this machine and nowhere else. Set `HOMEPAGE_VAR_LAN_HOST` to this                            machine's address on your network and it will be the address given                            here.";
+const UNADDRESSED: &str = " Nothing here can work out an address for this machine that another                            device would reach: it does not publish its own name, and the                            address the household's links point at is still the one that means                            this machine and nowhere else. Set HOMEPAGE_VAR_LAN_HOST to this                            machine's address on your network and it will be the address given                            here.";
 
 /// What is said where nothing here can work out where `door` is reached: the fix for
 /// the way it is published.
@@ -224,7 +224,7 @@ const fn unaddressed(door: &Candidate<'_>) -> &'static str {
 /// another device is promised to resolve, and none is invented.
 const UNPROXIED: &str = " It is published to the household only through the stack's proxy, \
                          at a name in front of a domain, and no domain is configured for it. \
-                         Set `DOMAIN` to a domain whose addresses point at this machine and \
+                         Set DOMAIN to a domain whose addresses point at this machine and \
                          the address the proxy publishes it at will be the one given here.";
 
 /// What this comes to, in the words an operator would say it in.
@@ -252,7 +252,7 @@ fn meaning(standing: Standing, name: &str, unaddressed: &str, chosen: &Chosen) -
 /// the reason is the one the refusal came with rather than a second account of it.
 fn refused(refusal: &Refusal) -> String {
     format!(
-        "`{}` is named as the front door and it cannot be one: {}. What is said above is \
+        "{} is named as the front door and it cannot be one: {}. What is said above is \
          what this stack's own shape settles on, and it stands until the setting names \
          something that can be a door.",
         refusal.named, refusal.because

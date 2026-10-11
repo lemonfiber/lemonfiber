@@ -83,7 +83,7 @@ fn every_form_matches_its_golden_command_on_every_environment() {
                 None => rendered = Some(line),
                 Some(first) => assert_eq!(
                     &line, first,
-                    "`{}` builds a different command on {environment:?}; \
+                    "{} builds a different command on {environment:?}; \
                      if that is intended, split its golden file per environment",
                     form.id
                 ),
@@ -108,7 +108,7 @@ fn every_form_matches_its_golden_command_on_every_environment() {
         assert_eq!(
             recorded.trim_end(),
             line,
-            "`{}` no longer builds its recorded command ({})",
+            "{} no longer builds its recorded command ({})",
             form.id,
             path.display()
         );

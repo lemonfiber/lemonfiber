@@ -35,18 +35,18 @@ fn an_unrecognised_name_reports_every_one_of_them() {
     let message = Failure::Unrecognised(vec![
         Violation {
             location: "service jellyfin".to_owned(),
-            message: "api.kind: unknown variant `plex`".to_owned(),
+            message: "api.kind: unknown variant plex".to_owned(),
         },
         Violation {
             location: "profile tv".to_owned(),
-            message: "protocol: unknown variant `ftp`".to_owned(),
+            message: "protocol: unknown variant ftp".to_owned(),
         },
     ])
     .to_string();
     assert!(message.contains("service jellyfin"), "got: {message}");
-    assert!(message.contains("`plex`"), "got: {message}");
+    assert!(message.contains("plex"), "got: {message}");
     assert!(message.contains("profile tv"), "got: {message}");
-    assert!(message.contains("`ftp`"), "got: {message}");
+    assert!(message.contains("ftp"), "got: {message}");
 }
 
 #[test]

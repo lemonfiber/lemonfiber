@@ -64,7 +64,7 @@ fn pinned(pin: &Pin, broken: &mut Vec<String>) {
     }
     if !is_release(&pin.release) {
         broken.push(format!(
-            "plugin {id}.release {:?} is not a version, three numbers without a `v`",
+            "plugin {id}.release {:?} is not a version, three numbers without a v",
             pin.release
         ));
     }

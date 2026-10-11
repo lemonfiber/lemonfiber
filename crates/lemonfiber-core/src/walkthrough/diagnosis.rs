@@ -90,19 +90,19 @@ impl Reason {
     #[must_use]
     pub const fn remedy(self) -> &'static str {
         match self {
-            Self::NoIndexers => "Add an indexer to the indexer aggregator, then run `lemonfiber walkthrough`",
-            Self::IndexersFailed => "Run `lemonfiber doctor` — it tests each indexer and says which",
+            Self::NoIndexers => "Add an indexer to the indexer aggregator, then run lemonfiber walkthrough",
+            Self::IndexersFailed => "Run lemonfiber doctor — it tests each indexer and says which",
             Self::NothingMatched => "Try something else, or check the indexer covers this category",
             Self::NoneMetThePreset => {
-                "Run `lemonfiber quality` to see the preset, or choose something more widely available"
+                "Run lemonfiber quality to see the preset, or choose something more widely available"
             }
-            Self::TunnelDown => "Run `lemonfiber doctor --only vpn` and bring the tunnel up",
-            Self::NotGrabbed => "Run `lemonfiber doctor` — the download client is usually the reason",
-            Self::Stalled => "Run `lemonfiber stuck` to see it alongside anything else that is stalled",
+            Self::TunnelDown => "Run lemonfiber doctor --only vpn and bring the tunnel up",
+            Self::NotGrabbed => "Run lemonfiber doctor — the download client is usually the reason",
+            Self::Stalled => "Run lemonfiber stuck to see it alongside anything else that is stalled",
             Self::ImportFailed => {
                 "Check that the downloads and the library are one volume at one path in both containers"
             }
-            Self::NoMediaServer => "Start a form that includes the media server, such as `lemonfiber up tv`",
+            Self::NoMediaServer => "Start a form that includes the media server, such as lemonfiber up tv",
             Self::NotVisible => "Give the library a moment and look again, or rescan it from its own interface",
         }
     }

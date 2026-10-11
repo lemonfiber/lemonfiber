@@ -213,7 +213,7 @@ fn standing(ctx: &Ctx, entry: &Entry, present: bool) -> (State, Option<String>) 
             State::Stale,
             Some(format!(
                 "{} is set and nothing on record says it has ever been proven against what \
-                 takes it. Run `lemonfiber doctor` to find out. Nothing here expires it.",
+                 takes it. Run lemonfiber doctor to find out. Nothing here expires it.",
                 entry.name
             )),
         ),
@@ -305,8 +305,8 @@ fn key_standing(
             Some(format!(
                 "{name} has regenerated its API key. What it holds now is {}, and the copy the \
                  stack's own services read as {setting} is still {} — so every one of them is \
-                 authenticating with a key that no longer exists. Run `lemonfiber credentials \
-                 rotate {name}` to hand them the current one.",
+                 authenticating with a key that no longer exists. Run lemonfiber credentials \
+                 rotate {name} to hand them the current one.",
                 fingerprint(held),
                 fingerprint(published)
             )),
@@ -315,7 +315,7 @@ fn key_standing(
             State::Stale,
             Some(format!(
                 "{name} has written an API key and nothing has copied it to {setting}, where \
-                 the stack's own services read it. Run `lemonfiber seed`."
+                 the stack's own services read it. Run lemonfiber seed."
             )),
         ),
     }

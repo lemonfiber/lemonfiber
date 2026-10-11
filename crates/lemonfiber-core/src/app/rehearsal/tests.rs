@@ -672,7 +672,7 @@ fn every_kind_a_rehearsal_is_reported_under_says_it_was_one() {
     for kind in &reported {
         assert!(
             known.contains(&kind.as_str()),
-            "the table names no kind `{kind}`"
+            "the table names no kind {kind}"
         );
     }
     // Marked, the outcome sets its own field when the run was a rehearsal, and a

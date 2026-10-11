@@ -78,7 +78,7 @@ pub fn why_not(installed: Installed, version: Option<&str>) -> Option<&'static s
     match installed {
         Installed::Homebrew => Some(
             "Homebrew installs whatever version its tap carries, and has no command for an \
-             older one. Remove it with `brew uninstall lemonfiber` and install the version \
+             older one. Remove it with brew uninstall lemonfiber and install the version \
              you want another way.",
         ),
         Installed::Distribution => Some(

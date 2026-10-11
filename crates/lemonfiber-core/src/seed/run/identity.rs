@@ -220,10 +220,10 @@ async fn changed_after_setup(ctx: &Ctx, server: &MediaServer) -> crate::seed::Wi
 /// rotate.
 fn rotated_by(server: &MediaServer) -> String {
     match server.brought_by() {
-        None => format!("Run `lemonfiber credentials rotate {}`.", server.id()),
+        None => format!("Run lemonfiber credentials rotate {}.", server.id()),
         Some(_) => format!(
             "Change the administrator's password in {} itself, then record it with \
-             `lemonfiber config set {} <password>`.",
+             lemonfiber config set {} <password>.",
             server.name(),
             server.setting
         ),

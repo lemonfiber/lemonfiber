@@ -37,7 +37,7 @@ fn every_service_the_shipped_stack_declares_says_where_it_reaches() {
     assert!(
         silent.is_empty(),
         "these are in the stack this build ships and nothing says what they reach. \
-         Say it in the stack's own manifest entry — `reaches` and `asks_for`, which \
+         Say it in the stack's own manifest entry — reaches and asks_for, which \
          travel with the stack: {silent:?}"
     );
 }

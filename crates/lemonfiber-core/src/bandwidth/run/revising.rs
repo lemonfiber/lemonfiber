@@ -211,7 +211,7 @@ fn read<T>(
 fn unreadable(what: &str, given: &str, shape: &str) -> Problem {
     Problem::new(
         UNREADABLE,
-        format!("`{given}` could not be read as {what}"),
+        format!("{given} could not be read as {what}"),
         "A limit read wrongly is a household wondering all evening why the calls \
          keep dropping. Nothing here guesses at one.",
         Remedy::new(format!("Write {what} as {shape}")),

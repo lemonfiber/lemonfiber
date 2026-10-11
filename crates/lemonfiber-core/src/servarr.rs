@@ -360,7 +360,7 @@ fn download_client_body(
         .find(|filed| filed.spoken.name() == client.protocol.0)
     else {
         return Err(servarr.endpoint.unsupported(&format!(
-            "it files no download client spoken to as `{}`",
+            "it files no download client spoken to as {}",
             client.protocol.0
         )));
     };

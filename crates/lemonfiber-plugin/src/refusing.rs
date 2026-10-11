@@ -216,7 +216,7 @@ fn pinned(service: &Service, found: &mut Vec<Violation>) {
             location: format!("{at}.image"),
             message: format!(
                 "{} carries its own tag or digest; the registry path is declared here and what \
-                 runs is declared once, in `digest`, so a second pin here could disagree with it",
+                 runs is declared once, in digest, so a second pin here could disagree with it",
                 service.image
             ),
         });
@@ -265,8 +265,8 @@ fn placed(service: &Service, found: &mut Vec<Violation>) {
             location: at,
             message: format!(
                 "{path} is not one plain absolute directory; what is permitted is a single \
-                 absolute path that is not the root, with no `..`, written in letters, digits \
-                 and `._/-` alone"
+                 absolute path that is not the root, with no \"..\", written in letters, digits \
+                 and \"._/-\" alone"
             ),
         });
         return;

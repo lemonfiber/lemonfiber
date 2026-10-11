@@ -115,7 +115,7 @@ async fn the_household_is_told_before_anything_reaches_it() {
         .unwrap_or_default();
 
     assert!(
-        read.contains("closed after 30 days while `lemonfiber household expiring` is running"),
+        read.contains("closed after 30 days while lemonfiber household expiring is running"),
         "the operator is not told what closes them: {read}"
     );
     assert!(

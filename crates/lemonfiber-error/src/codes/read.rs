@@ -118,10 +118,10 @@ codes! {
         severity: Error,
         status: 400,
         since: "0.17.0",
-        meaning: "Moving forward was asked about and neither `stack` nor `self` was named. \
+        meaning: "Moving forward was asked about and neither stack nor self was named. \
             Neither is the smaller case of the other — one moves your services, the other this \
             program — so answering with either would answer the wrong question.",
-        remedy: "Ask again, naming `stack` or `self`.",
+        remedy: "Ask again, naming stack or self.",
     }
     /// Raised where how many log lines to begin with is not a number within the ceiling.
     NOT_A_LINE_COUNT = "READ-14" {
@@ -138,7 +138,7 @@ codes! {
         status: 400,
         since: "0.17.0",
         meaning: "Whether to keep reading is neither true nor false.",
-        remedy: "Ask again with `true` or `false`, or leave it off.",
+        remedy: "Ask again with true or false, or leave it off.",
     }
     /// Raised where a household read named a member and asked for the household's
     /// defaults as well.

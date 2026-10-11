@@ -182,7 +182,7 @@ fn every_core_name_is_an_area_and_a_verb_and_nothing_else() {
         .map(|held| held.name)
         .filter(|name| !is_core_name(name))
         .collect();
-    assert!(wrong.is_empty(), "these are not `area.verb`: {wrong:?}");
+    assert!(wrong.is_empty(), "these are not area.verb: {wrong:?}");
 }
 
 /// The shapes that are not core names, each for its own reason.

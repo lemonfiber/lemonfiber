@@ -243,7 +243,7 @@ async fn a_new_key_that_does_not_answer_is_not_handed_out() {
     let said = format!("{:?}", inventory.rotated.map(|one| one.settled));
     assert!(said.starts_with("Some(ReplacedUnproven"), "{said}");
     assert!(
-        said.contains("run `lemonfiber seed` once the service answers"),
+        said.contains("run lemonfiber seed once the service answers"),
         "{said}"
     );
     assert!(!said.contains(&the_new_key()), "{said}");

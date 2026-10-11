@@ -7,7 +7,7 @@ codes! {
         meaning: "That word cannot name a key. A key's name travels in an address, an alert and \
             the journal, so it is lower-case letters, digits, dots, dashes and underscores, \
             beginning with a letter or a digit, and at most 64 characters.",
-        remedy: "Name it as the program that holds it, as in `home-assistant`.",
+        remedy: "Name it as the program that holds it, as in home-assistant.",
     }
     /// Raised when a key is asked for with a scope that is none of the three.
     NOT_A_SCOPE = "KEY-2" {
@@ -16,7 +16,7 @@ codes! {
         since: "0.17.0",
         meaning: "That is not a scope a key can have. A key has exactly one scope, and it \
             decides everything the key admits.",
-        remedy: "Give it one of `read`, `act` or `member:<account>`.",
+        remedy: "Give it one of read, act or member:<account>.",
     }
     /// Raised when a key is asked for with a purpose that is none of the three.
     NOT_A_PURPOSE = "KEY-3" {
@@ -25,7 +25,7 @@ codes! {
         since: "0.17.0",
         meaning: "That is not a purpose a key can carry. A key says what it is for, so the \
             listing can tell keys apart.",
-        remedy: "Give it one of `home-assistant`, `mcp` or `other`.",
+        remedy: "Give it one of home-assistant, mcp or other.",
     }
     /// Raised when the record of keys is there and does not read as keys.
     UNREADABLE = "KEY-4" {
@@ -53,7 +53,7 @@ codes! {
         since: "0.17.0",
         meaning: "Nobody in the household goes by that name. A member's key admits exactly what \
             that member's own account does, so it is minted for an account the household holds.",
-        remedy: "Name them as they appear in the household, as `lemonfiber household` lists it.",
+        remedy: "Name them as they appear in the household, as lemonfiber household lists it.",
     }
     /// Raised when the household could not be asked about a member's account.
     UNASKED = "KEY-7" {
@@ -74,7 +74,7 @@ codes! {
         meaning: "A household member mints and revokes only keys of their own. A member's key \
             admits what their own account does and nothing more, so the only key a member may \
             mint or revoke is one scoped to themselves.",
-        remedy: "Ask for `member:<your own account>`, or ask whoever looks after this machine.",
+        remedy: "Ask for member:<your own account>, or ask whoever looks after this machine.",
     }
     /// Raised when this machine would not supply the bytes a secret is made of.
     NO_SECRET = "KEY-9" {
@@ -94,7 +94,7 @@ codes! {
         since: "0.17.0",
         meaning: "There is no active key by that name: none was minted under it, or it was \
             revoked already, and the message says when.",
-        remedy: "List the keys with `lemonfiber key list`, and revoke one by the name it shows.",
+        remedy: "List the keys with lemonfiber key list, and revoke one by the name it shows.",
     }
     /// Raised when a household member asks to mint a key and the operator has not
     /// allowed members to.
@@ -106,7 +106,7 @@ codes! {
             keys, so nothing was minted. A member's key carries that member's requests and \
             viewing to whatever program holds it, so minting one is something the operator \
             allows first.",
-        remedy: "Ask whoever looks after this machine to allow it, with `lemonfiber config set \
-            LEMONFIBER_MEMBER_KEYS on`.",
+        remedy: "Ask whoever looks after this machine to allow it, with lemonfiber config set \
+            LEMONFIBER_MEMBER_KEYS on.",
     }
 }

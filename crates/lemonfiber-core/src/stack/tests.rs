@@ -272,7 +272,7 @@ fn every_failure() -> [Failure; 10] {
             reason: "expected a value".to_owned(),
         },
         Failure::Unrecognised {
-            names: vec!["service jellyfin: api.kind: unknown variant `plex`".to_owned()],
+            names: vec!["service jellyfin: api.kind: unknown variant plex".to_owned()],
         },
         Failure::NotEmbedded,
         Failure::NowhereToWrite,

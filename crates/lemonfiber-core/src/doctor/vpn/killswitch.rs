@@ -164,7 +164,7 @@ pub(super) fn verdict(held: &Held) -> Verdict {
                  fails — and a VPN that never fails is not a thing.",
                 Remedy::new(
                     "Enable the tunnel container's own killswitch — for gluetun, \
-                             `FIREWALL=on`, which is its default",
+                             FIREWALL=on, which is its default",
                 ),
             )
             .or_try(Remedy::new(

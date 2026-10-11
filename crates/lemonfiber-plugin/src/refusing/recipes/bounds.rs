@@ -79,7 +79,7 @@ pub(super) fn retried(step: &Step, before: &Before<'_>, at: &str, found: &mut Ve
             location: format!("{here}.every"),
             message: format!(
                 "{:?} is not a whole number of seconds from 1 to {LONGEST_WAIT}, written like \
-                 `6s`",
+                 6s",
                 retry.every
             ),
         });

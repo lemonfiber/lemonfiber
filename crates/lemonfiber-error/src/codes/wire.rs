@@ -6,8 +6,8 @@ codes! {
         since: "0.16.0",
         meaning: "There is no service by that name in this stack, so it cannot fill anything. \
             Nothing was changed.",
-        remedy: "List the services with `lemonfiber catalogue`, then see what is wired with \
-            `lemonfiber wiring`.",
+        remedy: "List the services with lemonfiber catalogue, then see what is wired with \
+            lemonfiber wiring.",
     }
     /// The service named cannot do the thing it was asked to fill.
     CANNOT_FILL = "WIRE-2" {
@@ -18,8 +18,8 @@ codes! {
             capability, and pointing everything that asked at it would point them at something \
             that cannot answer. As an advisory: the service already fills it, so nothing was \
             changed and nothing needed to be.",
-        remedy: "See which services declare it with `lemonfiber plugin capabilities`, and what \
-            is wired now with `lemonfiber wiring`.",
+        remedy: "See which services declare it with lemonfiber plugin capabilities, and what \
+            is wired now with lemonfiber wiring.",
     }
     /// Nothing in this stack asks for the capability, so a choice would change nothing.
     NOTHING_ASKS = "WIRE-3" {
@@ -28,7 +28,7 @@ codes! {
         since: "0.16.0",
         meaning: "Nothing in this stack asks for that capability, so choosing who fills it would \
             record a setting no wiring reads. Nothing was changed.",
-        remedy: "See what the stack does ask for with `lemonfiber wiring`.",
+        remedy: "See what the stack does ask for with lemonfiber wiring.",
     }
     /// The setting recording the choice could not be written.
     CHOICE_UNWRITABLE = "WIRE-4" {
@@ -37,7 +37,7 @@ codes! {
         since: "0.16.0",
         meaning: "Which service fills a capability is a setting, and there is no settings file \
             to record it in. Nothing was changed.",
-        remedy: "Set this machine up first, with `lemonfiber setup`.",
+        remedy: "Set this machine up first, with lemonfiber setup.",
     }
     /// Raised when a choice answers an offer that was read against a wiring that has
     /// since moved.
@@ -70,6 +70,6 @@ codes! {
         since: "0.18.0",
         meaning: "The service asked for already fills the capability, so nothing was changed, \
             and nothing needed to be.",
-        remedy: "Nothing to do. `lemonfiber wiring` lists what fills each capability.",
+        remedy: "Nothing to do. lemonfiber wiring lists what fills each capability.",
     }
 }

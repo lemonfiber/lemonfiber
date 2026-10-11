@@ -256,7 +256,7 @@ fn no_such_service(named: &str, manifest: &Manifest) -> Problem {
         .collect();
     Problem::new(
         NO_SUCH_SERVICE,
-        format!("`{named}` is not a service this stack declares"),
+        format!("{named} is not a service this stack declares"),
         "An update narrowed to one service has to name one, and a name that matches nothing \
          would read as a stack already up to date.",
         Remedy::new("Name one of the services the stack declares").with_detail(declared.join(", ")),

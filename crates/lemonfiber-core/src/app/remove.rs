@@ -226,7 +226,7 @@ fn nobody_named() -> crate::error::Problem {
         crate::error::codes::remove::NOBODY_NAMED,
         "no name was given, so there is nobody to remove",
         "Removing somebody takes the name their account is held under",
-        crate::error::Remedy::new("Name the person, as they appear in `lemonfiber household`"),
+        crate::error::Remedy::new("Name the person, as they appear in lemonfiber household"),
     )
 }
 
@@ -258,7 +258,7 @@ fn nobody_here(name: &str) -> crate::error::Problem {
         format!("nobody called {name} is in this household"),
         "Nothing was removed. The name has to match an account the media server holds, \
          though not its capitalisation",
-        crate::error::Remedy::new("Run `lemonfiber household` to see who is here"),
+        crate::error::Remedy::new("Run lemonfiber household to see who is here"),
     )
 }
 

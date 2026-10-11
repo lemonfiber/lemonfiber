@@ -56,8 +56,8 @@ pub(super) async fn seed_cors(
                 "{} still answers a browser reading it from any origin.",
                 server.name()
             ),
-            "Give this machine an address the household reaches, with `lemonfiber config set \
-             HOMEPAGE_VAR_LAN_HOST <address>`, then run seed again."
+            "Give this machine an address the household reaches, with lemonfiber config set \
+             HOMEPAGE_VAR_LAN_HOST <address>, then run seed again."
                 .to_owned(),
         );
         return Some(wiring);

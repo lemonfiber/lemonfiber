@@ -6,7 +6,7 @@ codes! {
         since: "0.1.0",
         meaning: "A service was not answering yet, so it was skipped. Nothing was changed for \
             it.",
-        remedy: "Wait for it to finish starting, then run `lemonfiber seed` again.",
+        remedy: "Wait for it to finish starting, then run lemonfiber seed again.",
     }
     /// Raised when a service rejects the credential lemonfiber holds.
     SERVICE_UNAUTHORISED = "SEED-2" {
@@ -15,8 +15,8 @@ codes! {
         since: "0.1.0",
         meaning: "A service rejected the credential lemonfiber holds, usually because it was \
             changed in the service's own interface.",
-        remedy: "Have lemonfiber re-read the service's credential with `lemonfiber doctor \
-            --fix`.",
+        remedy: "Have lemonfiber re-read the service's credential with lemonfiber doctor \
+            --fix.",
     }
     /// Raised when a service answers with something unusable.
     SERVICE_REFUSED = "SEED-3" {
@@ -37,6 +37,6 @@ codes! {
         meaning: "A service is past — or stands before — the API version this build speaks, so \
             writing to it would mean writing something malformed. Nothing was changed for it.",
         remedy: "Match the service to the version lemonfiber supports, or update lemonfiber, \
-            then run `lemonfiber seed` again.",
+            then run lemonfiber seed again.",
     }
 }

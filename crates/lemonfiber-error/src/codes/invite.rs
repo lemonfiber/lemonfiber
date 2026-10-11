@@ -15,7 +15,7 @@ codes! {
         since: "0.11.0",
         meaning: "The media server's own account has not been set up yet. Making somebody else \
             an account is done as the administrator, and this machine has not recorded one.",
-        remedy: "Run `lemonfiber setup`, so the media server's account is made and recorded.",
+        remedy: "Run lemonfiber setup, so the media server's account is made and recorded.",
     }
     /// Said where this machine has no address the household could arrive at.
     ///
@@ -29,8 +29,8 @@ codes! {
         meaning: "This machine has no address the household could arrive at. An invitation is an \
             address somebody else opens, and this machine answers to no name on the network and \
             has none written down.",
-        remedy: "Record the address the household should use, with `lemonfiber config set \
-            HOUSEHOLD_HOST <address>`.",
+        remedy: "Record the address the household should use, with lemonfiber config set \
+            HOUSEHOLD_HOST <address>.",
     }
     /// Said where the invitation is for nobody: the name is blank, or only spaces.
     ///
@@ -43,7 +43,7 @@ codes! {
         since: "0.11.0",
         meaning: "The invitation is for nobody — the name was blank. The name is what they will \
             sign in as, so a blank one is an account nobody could use.",
-        remedy: "Give the name they will sign in as, as in `lemonfiber invite ana`.",
+        remedy: "Give the name they will sign in as, as in lemonfiber invite ana.",
     }
     /// Said where an invitation offered again could not be dated again, so its window is not
     /// real.

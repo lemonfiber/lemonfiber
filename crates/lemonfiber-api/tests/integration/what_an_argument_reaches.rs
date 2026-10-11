@@ -82,13 +82,13 @@ fn every_argument_the_carrier_holds_is_swept() {
     for field in &held {
         assert!(
             swept.contains(&field.as_str()),
-            "the carrier holds `{field}` and nothing sweeps for it"
+            "the carrier holds {field} and nothing sweeps for it"
         );
     }
     for argument in &swept {
         assert!(
             held.iter().any(|field| field == argument) || NOT_SWEPT.contains(argument),
-            "`{argument}` is swept for and the carrier no longer holds it"
+            "{argument} is swept for and the carrier no longer holds it"
         );
     }
 }

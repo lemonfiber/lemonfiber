@@ -109,7 +109,7 @@ fn a_command_is_not_a_term() {
             .collect::<Vec<_>>()
     };
 
-    assert!(words("Run `lemonfiber seed` to wire it.").is_empty());
+    assert!(words("Run lemonfiber seed to wire it.").is_empty());
     assert_eq!(
         words("Run lemonfiber seed; what has finished is yours to seed."),
         ["seed"],

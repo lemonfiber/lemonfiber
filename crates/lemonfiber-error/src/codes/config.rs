@@ -25,7 +25,7 @@ codes! {
         since: "0.1.0",
         meaning: "There is nowhere to keep settings, because setup has not chosen a location \
             yet.",
-        remedy: "Run `lemonfiber setup`.",
+        remedy: "Run lemonfiber setup.",
     }
     /// Raised when a file holding a credential can be read by more than its owner.
     CREDENTIALS_EXPOSED = "CONFIG-4" {
@@ -45,8 +45,8 @@ codes! {
             build will not write over them. Nothing has been changed — an older build writing \
             over a newer one's settings leaves a file neither version can make sense of, and no \
             way back to the one you had.",
-        remedy: "Run the newer lemonfiber, or take this one forward with `lemonfiber update \
-            self`. The message names both versions.",
+        remedy: "Run the newer lemonfiber, or take this one forward with lemonfiber update \
+            self. The message names both versions.",
     }
     /// Raised when a setting's key or value spans more than one line.
     CONFIG_SPANS_LINES = "CONFIG-6" {
@@ -69,7 +69,7 @@ codes! {
             accounts it holds, and their keys among it — to anything that can reach it, or could \
             not be asked whether it does. Nothing has been changed — this is the doctor \
             reporting what it found.",
-        remedy: "Run `lemonfiber seed` to turn its authentication on, or `lemonfiber reset` \
+        remedy: "Run lemonfiber seed to turn its authentication on, or lemonfiber reset \
             where you turned it off yourself. Where it could not be asked, check it is up and \
             has finished starting, then run the diagnosis again.",
     }

@@ -298,9 +298,8 @@ async fn a_plugins_server_refusing_its_changed_password_points_at_the_server() {
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 
     assert!(
-        changed.as_deref().is_some_and(|said| said.contains(
-            "`lemonfiber config set PLUGIN_EMBY__SERVER_EMBY_ADMIN_PASSWORD <password>`"
-        )),
+        changed.as_deref().is_some_and(|said| said
+            .contains("lemonfiber config set PLUGIN_EMBY__SERVER_EMBY_ADMIN_PASSWORD <password>")),
         "{changed:?}"
     );
     assert!(

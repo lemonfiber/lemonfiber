@@ -55,8 +55,8 @@ fn negotiable(accept: &str) -> Result<(), String> {
     let whole = parts.next().unwrap_or_default().trim();
     let Some((kind, sub)) = whole.split_once('/') else {
         return Err(format!(
-            "{accept} is not a media type; one is written `type/subtype`, optionally followed by \
-             `; name=value`"
+            "{accept} is not a media type; one is written type/subtype, optionally followed by \
+             ; name=value"
         ));
     };
     token(kind, accept)?;
@@ -64,7 +64,7 @@ fn negotiable(accept: &str) -> Result<(), String> {
     for parameter in parts {
         let Some((name, value)) = parameter.trim().split_once('=') else {
             return Err(format!(
-                "{accept} carries a parameter that is not one; a parameter is written `name=value`"
+                "{accept} carries a parameter that is not one; a parameter is written name=value"
             ));
         };
         token(name, accept)?;
@@ -85,7 +85,7 @@ fn token(part: &str, whole: &str) -> Result<(), String> {
     const ALSO: &str = "!#$%&'+-.^_`|~";
     if part.is_empty() {
         return Err(format!(
-            "{whole} leaves one half of a media type empty; one is written `type/subtype`"
+            "{whole} leaves one half of a media type empty; one is written type/subtype"
         ));
     }
     if let Some(outside) = part

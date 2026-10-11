@@ -64,8 +64,8 @@ codes! {
         meaning: "A run was asked to close what has waited too long, and this household has \
             never said how long that is. A request closed against a period nobody named is one \
             nobody agreed to close.",
-        remedy: "Say how many days a request may wait, as in `lemonfiber household expiring \
-            --after 30`.",
+        remedy: "Say how many days a request may wait, as in lemonfiber household expiring \
+            --after 30.",
     }
     /// Raised where the period named would close a request nobody was ever reminded about.
     TOO_SOON = "QUOTA-9" {

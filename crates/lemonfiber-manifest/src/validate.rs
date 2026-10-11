@@ -385,7 +385,7 @@ fn digested(service: &Service) -> Option<String> {
             service.tag
         )),
         Some(digest) if !is_digest(digest) => Some(format!(
-            "has digest {digest:?}, which is not `sha256:` and 64 lower-case hex digits"
+            "has digest {digest:?}, which is not sha256: and 64 lower-case hex digits"
         )),
         Some(_) => None,
     }

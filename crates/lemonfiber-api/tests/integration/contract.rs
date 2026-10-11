@@ -102,7 +102,7 @@ fn the_committed_contract_still_matches_the_types() {
 
     assert!(
         apart.is_empty(),
-        "the contract is out of date — regenerate it with `just contract`:\n{}",
+        "the contract is out of date — regenerate it with just contract:\n{}",
         apart.join("\n")
     );
 }

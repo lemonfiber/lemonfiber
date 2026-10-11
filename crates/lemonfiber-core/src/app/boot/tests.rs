@@ -553,7 +553,7 @@ fn failing(name: &str) -> Ctx {
             Severity::Warning,
             "the stack would not start",
             "nothing has been running since",
-            "Run `lemonfiber up`",
+            "Run lemonfiber up",
         )),
         "1000",
     );

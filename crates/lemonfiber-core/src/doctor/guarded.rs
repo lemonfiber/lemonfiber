@@ -118,7 +118,7 @@ fn exposed(name: &str) -> Problem {
         format!("{name} answers its configuration to anybody"),
         crate::seed::run::exposure(name),
         Remedy::new(format!(
-            "Run `lemonfiber seed`, or `lemonfiber reset` where you turned it off, to turn \
+            "Run lemonfiber seed, or lemonfiber reset where you turned it off, to turn \
              {name}'s authentication on"
         )),
     )

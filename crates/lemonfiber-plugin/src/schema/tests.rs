@@ -645,9 +645,9 @@ fn names_every_unrecognised_declaration_in_one_pass() {
         .err()
         .map(|refused| refused.to_string())
         .unwrap_or_default();
-    assert!(refusal.contains("`wan`"), "names the first: {refusal}");
+    assert!(refusal.contains("wan"), "names the first: {refusal}");
     assert!(
-        refusal.contains("`critical`"),
+        refusal.contains("critical"),
         "names the second too: {refusal}"
     );
 }
