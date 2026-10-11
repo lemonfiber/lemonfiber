@@ -3,7 +3,8 @@ use std::time::Duration;
 
 use lemonfiber_fixtures::scratch::Scratch;
 
-use super::{beside, Held};
+use super::Held;
+use crate::config::held::beside;
 use crate::keys::Unkept;
 
 fn record(scratch: &Scratch) -> PathBuf {

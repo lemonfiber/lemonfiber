@@ -352,6 +352,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
     // stopped part-way left its replacement beside it, and which of the two the
     // service takes is settled here so every command after it signs in with that one.
     credentials::pending::settled(ctx).await;
+    crate::settings::filing::filed(ctx);
     routed(rehearsal::carried(command, ctx), ctx)
         .await
         .map(|outcome| {

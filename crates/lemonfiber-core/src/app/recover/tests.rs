@@ -4,6 +4,9 @@ use std::path::Path;
 
 use super::undo;
 use crate::config::store;
+use crate::error::codes::setup::{
+    NEEDS_SERVICE, NOT_OPENED, NOT_PUT_BACK, NOT_REMOVED, NOT_WITHDRAWN, STILL_HOLDING,
+};
 use crate::journal::{Action, Change, Journal, Kind, Undo};
 
 /// The randomness a real machine supplies, for the key the journal's credentials
@@ -383,7 +386,7 @@ fn a_region_is_taken_out_left_where_edited_and_refused_where_unwritable() {
         Vec::new(),
     );
     assert!(
-        matches!(unreadable, Err(problem) if problem.code == super::NOT_WITHDRAWN),
+        matches!(unreadable, Err(problem) if problem.code == NOT_WITHDRAWN),
         "a file that cannot be read back is a region that could not be taken out"
     );
 }
@@ -416,7 +419,7 @@ fn a_directory_holding_something_else_is_named_and_left_where_it_is() {
     assert!(
         matches!(
             undo(&lemonfiber_adapters::Disk, &[delete(&made)], &env, Vec::new()),
-            Err(problem) if problem.code == super::STILL_HOLDING
+            Err(problem) if problem.code == STILL_HOLDING
         ),
         "and a reversal that has to refuse over what it left says which directory"
     );
@@ -446,7 +449,7 @@ fn a_directory_the_machine_refuses_to_remove_stops_the_reversal() {
 
     let _ = std::fs::set_permissions(&holding, std::fs::Permissions::from_mode(0o700));
     assert!(locked.is_ok(), "the parent was made unwritable");
-    assert!(matches!(stopped, Err(problem) if problem.code == super::NOT_REMOVED));
+    assert!(matches!(stopped, Err(problem) if problem.code == NOT_REMOVED));
     assert!(made.exists(), "and the directory is left where it is");
 }
 
@@ -473,7 +476,7 @@ fn a_service_made_change_is_reported_at_the_end_without_stopping_the_rest() {
         Vec::new(),
     );
 
-    assert!(matches!(outcome, Err(problem) if problem.code == super::NEEDS_SERVICE));
+    assert!(matches!(outcome, Err(problem) if problem.code == NEEDS_SERVICE));
     let file = store::read(&env).unwrap_or_default();
     assert_eq!(file.get("USENET"), None, "the setting was still reversed");
 }
@@ -554,7 +557,7 @@ fn a_second_reversal_does_not_write_over_what_the_operator_set() {
     let again = undo(&lemonfiber_adapters::Disk, &undos, &env, Vec::new());
 
     assert!(
-        matches!(&again, Err(problem) if problem.code == super::NOT_PUT_BACK),
+        matches!(&again, Err(problem) if problem.code == NOT_PUT_BACK),
         "{again:?}"
     );
     assert_eq!(
@@ -589,7 +592,7 @@ fn a_credential_whose_record_will_not_open_is_named_rather_than_written() {
     );
 
     assert!(
-        matches!(&refused, Err(problem) if problem.code == super::NOT_OPENED),
+        matches!(&refused, Err(problem) if problem.code == NOT_OPENED),
         "{refused:?}"
     );
     let file = store::read(&env).unwrap_or_default();
@@ -739,3 +742,4 @@ fn a_key_is_left_standing_and_named() {
 }
 
 mod rewinding;
+mod settling;

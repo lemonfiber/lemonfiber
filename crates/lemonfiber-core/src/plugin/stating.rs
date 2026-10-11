@@ -41,6 +41,8 @@ pub enum Puts {
     /// A region written into one of the stack's own files, marked out as the plugin's:
     /// its route through the proxy, or its entry on the dashboard.
     Region,
+    /// A service's own secrets file, readable by its owner alone, its values never shown.
+    Secrets,
 }
 
 /// One change installing a plugin makes to the machine.
@@ -170,6 +172,7 @@ pub fn changes(planned: &[Write]) -> Vec<Changing> {
                 Lands::Document(_) => Puts::Document,
                 Lands::Key => Puts::Key,
                 Lands::Region { .. } => Puts::Region,
+                Lands::Secrets(_) => Puts::Secrets,
             },
         })
         .collect()

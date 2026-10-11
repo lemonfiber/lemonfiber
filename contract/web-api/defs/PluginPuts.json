@@ -21,6 +21,11 @@
       "description": "A region written into one of the stack's own files, marked out as the plugin's:\nits route through the proxy, or its entry on the dashboard.",
       "type": "string",
       "const": "region"
+    },
+    {
+      "description": "A service's own secrets file, readable by its owner alone, its values never shown.",
+      "type": "string",
+      "const": "secrets"
     }
   ]
 }

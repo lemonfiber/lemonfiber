@@ -100,7 +100,7 @@ fn a_service_keeps_its_configuration_where_the_bundled_ones_keep_theirs() {
 fn document(planned: &[Write]) -> Option<String> {
     planned.iter().find_map(|one| match &one.lands {
         Lands::Document(content) => Some(content.clone()),
-        Lands::Directory { .. } | Lands::Key | Lands::Region { .. } => None,
+        Lands::Directory { .. } | Lands::Key | Lands::Region { .. } | Lands::Secrets(_) => None,
     })
 }
 
@@ -110,7 +110,7 @@ fn regions(planned: &[Write]) -> Vec<(String, String)> {
         .iter()
         .filter_map(|one| match &one.lands {
             Lands::Region { key, owner, .. } => Some((key.clone(), owner.clone())),
-            Lands::Directory { .. } | Lands::Document(_) | Lands::Key => None,
+            Lands::Directory { .. } | Lands::Document(_) | Lands::Key | Lands::Secrets(_) => None,
         })
         .collect()
 }
@@ -400,4 +400,41 @@ fn a_source_inside_another_is_planned_for_neither() {
         .filter(|path| path.starts_with(&tree))
         .collect();
     assert_eq!(planned, vec![tree.clone(), tree.join("outer")]);
+}
+
+#[test]
+fn a_service_naming_a_secret_has_its_file_written_before_the_document_naming_it() {
+    let mut plugin = installed("komga", &["komga", "reader"]);
+    if let Some(first) = plugin.services.first_mut() {
+        first.fields.env.insert(
+            "KEY".to_owned(),
+            lemonfiber_manifest::container::Value::Secret(
+                lemonfiber_manifest::container::SecretOf {
+                    secret: "key".to_owned(),
+                },
+            ),
+        );
+    }
+    let file = |service: &str| Some(PathBuf::from(format!("/home/op/env/{service}.env")));
+    let reading = Reading {
+        secrets_file: &file,
+        ..Reading::bare()
+    };
+    let planned = writes(&plugin, stack(), &reading);
+    let at = |wanted: fn(&Lands) -> bool| planned.iter().position(|one| wanted(&one.lands));
+    let secrets: Vec<&Write> = planned
+        .iter()
+        .filter(|one| matches!(one.lands, Lands::Secrets(_)))
+        .collect();
+    assert_eq!(
+        secrets
+            .iter()
+            .map(|one| one.path.clone())
+            .collect::<Vec<_>>(),
+        [PathBuf::from("/home/op/env/komga.env")]
+    );
+    assert!(
+        at(|lands| matches!(lands, Lands::Secrets(_)))
+            < at(|lands| matches!(lands, Lands::Document(_)))
+    );
 }

@@ -37,13 +37,7 @@ pub fn history(ctx: &Ctx) -> Result<HistoryReport, Box<crate::error::Problem>> {
 
     // What the environment file holds now, for the drift question. Read once: asking per
     // change would read the same file as many times as there are entries.
-    let holds = |key: &str| -> Option<String> {
-        let file = ctx.settings.env_file.as_ref()?;
-        crate::config::store::read(file)
-            .ok()?
-            .get(key)
-            .map(str::to_owned)
-    };
+    let holds = crate::settings::holding(ctx);
 
     // And what a file holds, for a region: whether it is still the one written.
     let reads = |path: &str| -> Option<String> { std::fs::read_to_string(path).ok() };
@@ -139,6 +133,23 @@ fn did(kind: &Kind) -> String {
         Kind::KeyRevoked { name, scope } => {
             format!("revoked the key {name}, with the scope {scope}")
         }
+        Kind::Setting {
+            name,
+            current: Some(current),
+            ..
+        } => format!("set {name} to {current}"),
+        Kind::Setting { name, .. } => format!("cleared {name}"),
+        Kind::Secret {
+            name,
+            current: None,
+            ..
+        } => format!("forgot the secret {name}"),
+        Kind::Secret {
+            name,
+            previous: None,
+            ..
+        } => format!("kept the secret {name}"),
+        Kind::Secret { name, .. } => format!("replaced the secret {name}"),
     }
 }
 

@@ -61,7 +61,7 @@ pub use crate::error::withheld::{is_secret, withheld, withheld_by, withheld_text
 pub(crate) const WRITTEN_BY_KEY: &str = "LEMONFIBER_CONFIG_VERSION";
 
 /// The build doing the writing, which is what a marker is compared against.
-const RUNNING: &str = env!("CARGO_PKG_VERSION");
+pub(crate) const RUNNING: &str = env!("CARGO_PKG_VERSION");
 
 /// One setting, as it is safe to display.
 #[derive(Debug, Clone, PartialEq, Eq)]

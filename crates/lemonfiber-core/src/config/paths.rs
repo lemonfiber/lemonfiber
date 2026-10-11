@@ -42,6 +42,12 @@ pub(crate) const NONCONFORMING: &str = "nonconforming.json";
 /// named once for the reason the install record's is.
 pub(crate) const CATALOGUE: &str = "catalogue.json";
 
+pub(crate) const SETTINGS: &str = "settings.json";
+
+pub(crate) const SECRETS: &str = "secrets.json";
+
+pub(crate) const SECRETS_FILES: &str = "env";
+
 impl Paths {
     /// The layout beneath a configuration base and a data base.
     ///
@@ -274,6 +280,24 @@ impl Paths {
     #[must_use]
     pub fn plugins(&self) -> PathBuf {
         self.config.join(PLUGINS)
+    }
+
+    /// The settings the operator recorded, by name.
+    #[must_use]
+    pub fn settings(&self) -> PathBuf {
+        self.config.join(SETTINGS)
+    }
+
+    /// The secrets lemonfiber holds, by name.
+    #[must_use]
+    pub fn secrets(&self) -> PathBuf {
+        self.config.join(SECRETS)
+    }
+
+    /// The directory each service's own secrets file is written in.
+    #[must_use]
+    pub fn secrets_files(&self) -> PathBuf {
+        self.config.join(SECRETS_FILES)
     }
 
     /// The materialised stack — compose files written where Compose can read

@@ -484,6 +484,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `SETUP-11` | `STILL_HOLDING` | warning | 1 | 500 | 0.16.0 | Raised when a directory a reversal would remove still holds something else's files. |
 | `SETUP-12` | `NOT_WITHDRAWN` | error | 1 | 500 | 0.16.0 | Raised when a region a reversal would take out of a stack file cannot be. |
 | `SETUP-13` | `NOT_REWOUND` | error | 1 | 500 | 0.17.0 | Raised when a file a reversal would write back to what it held cannot be. |
+| `SETUP-14` | `UNKEPT` | warning | 1 | 500 | 0.18.0 | Raised when a reversal meets a secret whose earlier value lemonfiber kept no copy of. |
 
 ## `SPACE` — the disk, and letting a download go
 

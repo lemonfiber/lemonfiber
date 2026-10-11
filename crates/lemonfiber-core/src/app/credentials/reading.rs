@@ -72,44 +72,73 @@ pub(crate) async fn taken(
     taken.extend(super::declining::held(ctx, services, project).await);
     taken.extend(super::gating::held(ctx, services, fillers, project).await);
     taken.extend(super::tokening::held(ctx, services, fillers, project).await);
-    taken.extend(installed.iter().flat_map(declared));
+    let secrets = crate::settings::secrets_at(ctx);
+    let kept = secrets
+        .as_deref()
+        .and_then(|at| crate::settings::Secrets::at(at).ok())
+        .unwrap_or_default();
+    let location = secrets.map(|at| at.display().to_string());
+    for plugin in installed {
+        taken.extend(declared(ctx, &kept, location.as_deref(), fillers, plugin));
+    }
     taken
 }
 
-/// Where a plugin's secret lives, which is nowhere yet.
-const UNHELD: &str = "nowhere yet — lemonfiber holds a plugin's secret only once the plugin's \
-                      recipes capture it, and this build runs none";
+/// Where a plugin's secret lives while nothing holds it.
+const UNHELD: &str = "nowhere yet — lemonfiber holds a plugin's secret once the plugin's \
+                      recipes capture it";
 
 /// Every secret one installed plugin declared it would hold, attributed to it.
-///
-/// Listed from what the install recorded rather than from anything on disk, because
-/// there is nothing on disk: nothing captures a plugin's secret until its recipes run.
-/// So each is absent, and says why, and carries no likeness of a value there is not —
-/// a plugin's secret is on this list the day the plugin is, which is the day an
-/// operator needs to know it will be.
-fn declared(plugin: &Installed) -> Vec<Held> {
+fn declared(
+    ctx: &Ctx,
+    kept: &crate::settings::Secrets,
+    location: Option<&str>,
+    fillers: &crate::wiring::Fillers,
+    plugin: &Installed,
+) -> Vec<Held> {
     plugin
         .declared
         .secrets
         .iter()
-        .map(|secret| Held {
-            name: format!("{} {}", plugin.plugin, secret.id),
-            setting: format!("{}/{}", plugin.plugin, secret.id),
-            consumers: vec![secret.of.clone()],
-            location: UNHELD.to_owned(),
-            origin: Origin::Service,
-            from: crate::origin::Origin::Plugin {
-                named: plugin.plugin.clone(),
-            },
-            state: State::Absent,
-            fingerprint: None,
-            // The author's reason goes last and as written, so the sentence around it
-            // reads the same whatever punctuation it arrived with.
-            advisory: Some(format!(
-                "The plugin {} declared it will hold {} for {}. Nothing holds it yet, \
-                 because nothing runs a plugin's recipes. What it said it is for: {}",
-                plugin.plugin, secret.id, secret.of, secret.why
-            )),
+        .map(|secret| {
+            let setting = crate::settings::named(&plugin.plugin, &secret.id);
+            let owner = fillers
+                .service(&secret.of)
+                .filter(|owner| owner.brought_by() != Some(plugin.plugin.as_str()));
+            let crossing = owner.is_some();
+            let value = kept.value(&setting).filter(|_| !crossing);
+            let present = value.is_some()
+                || owner
+                    .and_then(|owner| fillers.setting(owner, crate::config::API_KEY_SUFFIX))
+                    .and_then(|held| recorded_secret(ctx, &held))
+                    .is_some();
+            Held {
+                name: format!("{} {}", plugin.plugin, secret.id),
+                consumers: vec![secret.of.clone()],
+                location: match (crossing, value, location) {
+                    (true, ..) => format!("not kept — it is {}'s, and read from there", secret.of),
+                    (false, Some(_), Some(at)) => at.to_owned(),
+                    _ => UNHELD.to_owned(),
+                },
+                origin: Origin::Service,
+                from: crate::origin::Origin::Plugin {
+                    named: plugin.plugin.clone(),
+                },
+                state: if present {
+                    State::Active
+                } else {
+                    State::Absent
+                },
+                fingerprint: value.map(fingerprint),
+                advisory: (!present).then(|| {
+                    format!(
+                        "The plugin {} declared it will hold {} for {}. Nothing holds it yet. \
+                         What it said it is for: {}",
+                        plugin.plugin, secret.id, secret.of, secret.why
+                    )
+                }),
+                setting,
+            }
         })
         .collect()
 }

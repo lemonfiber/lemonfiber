@@ -209,7 +209,7 @@ impl Line {
     }
 }
 
-mod quoted;
+pub(crate) mod quoted;
 
 #[cfg(test)]
 mod tests;

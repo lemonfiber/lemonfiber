@@ -501,8 +501,8 @@ fn unheld(
     others: &[Installed],
     stack: &Path,
 ) -> Result<(), Box<Problem>> {
-    super::writing::unanswered(would, others)?;
-    super::writing::unshared(would, others)?;
+    super::colliding::unanswered(would, others)?;
+    super::colliding::unshared(would, others)?;
     super::replacing::unreplaced(would, crate::plugin::first_party::EMBEDDED)?;
     super::occupied::unoccupied(ctx, would, others, stack)
 }

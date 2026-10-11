@@ -178,6 +178,21 @@ fn a_setting_is_published_or_the_services_own() {
 }
 
 #[test]
+fn a_setting_named_as_a_declared_secret_is_refused() {
+    let named = env(vec![(
+        "A",
+        Value::Setting(Setting {
+            setting: "jellyfin:admin-key".to_owned(),
+            default: Constant::Text(String::new()),
+        }),
+    )]);
+    assert_eq!(
+        wrong(&plain(&named)),
+        ["service jellyfin.env.A: names setting jellyfin:admin-key, which a secret it declares is also named"]
+    );
+}
+
+#[test]
 fn an_address_names_a_core_capability_and_a_secret_one_declared() {
     let named = env(vec![
         (

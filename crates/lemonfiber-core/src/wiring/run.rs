@@ -193,6 +193,8 @@ fn substituting(
         kept(path, key, value)?;
     }
     crate::app::plugins::writing::overwritten(&overwrites)?;
+    let plugins: Vec<&crate::plugin::Installed> = installed.installed().iter().collect();
+    crate::settings::written(ctx, &plugins).map_err(|failure| Box::new(failure.problem()))?;
 
     Ok(reading(true))
 }

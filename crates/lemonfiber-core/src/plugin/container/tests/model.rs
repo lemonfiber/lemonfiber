@@ -5,8 +5,8 @@ use lemonfiber_manifest::container::{
     Value,
 };
 
-use super::super::super::installed::Placed;
-use super::super::{written, Reading};
+use super::super::super::installed::{Installed, Placed};
+use super::super::{variables, written, Holding, Reading, Variable};
 use super::{document, installed, placed};
 
 fn with(fields: Fields) -> Placed {
@@ -308,5 +308,129 @@ fn a_record_naming_lemonfibers_own_variables_does_not_override_them() {
     assert_eq!(
         text(&entry, &["environment", "PGID"]).as_deref(),
         Some("${PGID:-1000}")
+    );
+}
+
+const SECRETS_ENTRY: &str = "services:\n  \
+         komga:\n    \
+         image: ghcr.io/gotson/komga@sha256:\
+         4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945\n    \
+         profiles:\n    \
+         - plugin-komga\n    \
+         restart: unless-stopped\n    \
+         environment:\n      \
+         MODE: fast$$1\n      \
+         TZ: ${TZ:-Europe/Amsterdam}\n    \
+         env_file:\n    \
+         - /home/op/.config/lemonfiber/env/komga.env\n    \
+         ports:\n    \
+         - ${LAN_BIND:-0.0.0.0}:25600:25600\n    \
+         volumes:\n    \
+         - ${DATA_ROOT:-./data}:/data\n    \
+         - ./config/komga:/config\n    \
+         security_opt:\n    \
+         - no-new-privileges:true\n    \
+         cap_drop:\n    \
+         - ALL\n    \
+         cap_add:\n    \
+         - CHOWN\n    \
+         - DAC_OVERRIDE\n    \
+         - FOWNER\n    \
+         - SETGID\n    \
+         - SETUID\n    \
+         - KILL\n    \
+         pids_limit: 1024\n";
+
+fn naming_a_secret() -> Placed {
+    with(Fields {
+        env: BTreeMap::from([
+            (
+                "MODE".to_owned(),
+                Value::Setting(Setting {
+                    setting: "komga:mode".to_owned(),
+                    default: Constant::Text("slow".to_owned()),
+                }),
+            ),
+            (
+                "KEY".to_owned(),
+                Value::Secret(SecretOf {
+                    secret: "key".to_owned(),
+                }),
+            ),
+        ]),
+        ..Fields::default()
+    })
+}
+
+#[test]
+fn a_service_naming_a_secret_reads_its_own_file_and_a_recorded_setting_is_written() {
+    let setting = |name: &str| (name == "komga:mode").then(|| "fast$1".to_owned());
+    let file = |service: &str| {
+        Some(std::path::PathBuf::from(format!(
+            "/home/op/.config/lemonfiber/env/{service}.env"
+        )))
+    };
+    let reading = Reading {
+        setting: &setting,
+        secrets_file: &file,
+        ..Reading::bare()
+    };
+    assert_eq!(
+        written(&installed(vec![naming_a_secret()]), &reading),
+        SECRETS_ENTRY
+    );
+}
+
+#[test]
+fn a_service_naming_no_secret_has_no_file_and_one_naming_a_secret_has_it_held_or_not() {
+    let file = |_: &str| Some(std::path::PathBuf::from("/x/komga.env"));
+    let reading = Reading {
+        secrets_file: &file,
+        ..Reading::bare()
+    };
+    let plain = entry_of(&written(&installed(vec![placed()]), &reading));
+    assert!(strings(&plain, "env_file").is_empty());
+    let naming = entry_of(&written(&installed(vec![naming_a_secret()]), &reading));
+    assert_eq!(strings(&naming, "env_file"), ["/x/komga.env"]);
+    let nowhere = entry_of(&document(naming_a_secret()));
+    assert!(strings(&nowhere, "env_file").is_empty());
+}
+
+#[test]
+fn a_secret_is_read_from_the_store_unless_its_holder_lets_it_cross() {
+    let one = installed(vec![naming_a_secret()]);
+    let declared = Installed {
+        declared: crate::plugin::Declaration {
+            secrets: vec![crate::plugin::Secret {
+                id: "key".to_owned(),
+                of: "sonarr".to_owned(),
+                why: "reads the curator".to_owned(),
+            }],
+            ..crate::plugin::Declaration::default()
+        },
+        ..one.clone()
+    };
+    let crossing = |plugin: &str, of: &str| {
+        (plugin == "komga" && of == "sonarr")
+            .then(|| Holding::Crossing("SONARR_API_KEY".to_owned()))
+    };
+    let reading = Reading {
+        crossing: &crossing,
+        ..Reading::bare()
+    };
+    let placed = naming_a_secret();
+    assert_eq!(
+        variables(&one, &placed, &reading),
+        [Variable {
+            name: "KEY".to_owned(),
+            holding: Holding::Store("komga:key".to_owned()),
+        }]
+    );
+    assert_eq!(
+        variables(&declared, &placed, &reading),
+        [Variable {
+            name: "KEY".to_owned(),
+            holding: Holding::Crossing("SONARR_API_KEY".to_owned()),
+        }]
     );
 }

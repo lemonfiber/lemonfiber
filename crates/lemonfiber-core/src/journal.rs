@@ -29,7 +29,7 @@ pub use sealing::{is_sealed, Seal, KEY_FILE};
 /// plugin's bare id, and whether such an entry is the plugin's is asked by whether that
 /// id is one of these. An operation missing here is one a plugin of the same name
 /// could take changes from on its way out.
-pub const OPERATIONS: [&str; 7] = [
+pub const OPERATIONS: [&str; 8] = [
     crate::wizard::APPLY,
     crate::seed::OPERATION,
     crate::repair::OPERATION,
@@ -37,6 +37,7 @@ pub const OPERATIONS: [&str; 7] = [
     crate::app::putting_back::OPERATION,
     crate::update::run::OPERATION,
     crate::app::forwarding::OPERATION,
+    crate::settings::OPERATION,
 ];
 
 /// A change lemonfiber made, recorded so it can be reversed — exactly this one.
@@ -192,6 +193,30 @@ pub enum Kind {
         /// What it admitted.
         scope: String,
     },
+    /// A setting in the settings store was recorded or cleared.
+    Setting {
+        /// The setting's name.
+        name: String,
+        /// What it held before, if anything.
+        previous: Option<String>,
+        /// What it holds now, or nothing where it was cleared.
+        current: Option<String>,
+    },
+    /// A secret in the secret store was kept, replaced or forgotten, recorded by
+    /// fingerprints alone.
+    Secret {
+        /// The secret's name.
+        name: String,
+        /// Where its value came from.
+        from: String,
+        /// The fingerprint of what it held before, if anything.
+        previous: Option<String>,
+        /// The fingerprint of what it holds now, or nothing where it was forgotten.
+        current: Option<String>,
+        /// The environment file's setting it was moved out of, where it was.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        filed: Option<String>,
+    },
 }
 
 impl Change {
@@ -255,6 +280,27 @@ impl Change {
                 Action::Revoke { name: name.clone() }
             }
             Kind::KeyRevoked { name, .. } => Action::Reinstate { name: name.clone() },
+            Kind::Setting {
+                name,
+                previous,
+                current,
+            } => Action::Resettle {
+                name: name.clone(),
+                value: previous.clone(),
+                recorded: current.clone(),
+            },
+            Kind::Secret {
+                name,
+                previous,
+                current,
+                filed,
+                ..
+            } => Action::Rehold {
+                name: name.clone(),
+                earlier: previous.clone(),
+                kept: current.clone(),
+                filed: filed.clone(),
+            },
         };
         Undo {
             target: self.target.clone(),
@@ -377,6 +423,26 @@ pub enum Action {
     Reinstate {
         /// The key's name.
         name: String,
+    },
+    /// Put a setting in the settings store back to what it held.
+    Resettle {
+        /// The setting's name.
+        name: String,
+        /// What to put back, or `None` to clear it.
+        value: Option<String>,
+        /// What lemonfiber recorded, which has to still be there.
+        recorded: Option<String>,
+    },
+    /// Put a secret in the secret store back to the value it held.
+    Rehold {
+        /// The secret's name.
+        name: String,
+        /// The fingerprint of the value to put back, or `None` to forget it.
+        earlier: Option<String>,
+        /// The fingerprint of what lemonfiber kept, which has to still be there.
+        kept: Option<String>,
+        /// The environment file's setting it goes back to, where it was moved out of one.
+        filed: Option<String>,
     },
 }
 

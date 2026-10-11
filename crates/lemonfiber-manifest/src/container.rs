@@ -46,8 +46,8 @@ pub const MEDIA: [&str; 5] = ["tv", "movies", "music", "books", "comics"];
 /// The capabilities a service may run inside the network of.
 pub const VIA: [&str; 1] = [EGRESS_GUARD];
 
-/// What separates a setting's namespace from its name.
-const NAMESPACED: char = ':';
+/// What separates a setting's or a secret's namespace from its name.
+pub const NAMESPACED: char = ':';
 
 /// A privileged shape lemonfiber writes for a service.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
@@ -419,16 +419,7 @@ impl Container<'_> {
     fn valued(&self, value: &Value) -> impl Iterator<Item = String> {
         let (shown, named) = match value {
             Value::Constant(constant) => (unshown(constant), None),
-            Value::Setting(setting) => (
-                unshown(&setting.default),
-                (!self.owns(&setting.setting)).then(|| {
-                    format!(
-                        "names setting {}, which is neither one the core publishes nor in the {} \
-                         namespace",
-                        setting.setting, self.namespace
-                    )
-                }),
-            ),
+            Value::Setting(setting) => (unshown(&setting.default), self.settled(&setting.setting)),
             Value::Url(url) => (None, narrowed(url)),
             Value::Secret(secret) => (
                 None,
@@ -441,6 +432,20 @@ impl Container<'_> {
             ),
         };
         shown.into_iter().chain(named)
+    }
+
+    fn settled(&self, setting: &str) -> Option<String> {
+        if !self.owns(setting) {
+            return Some(format!(
+                "names setting {setting}, which is neither one the core publishes nor in the {} \
+                 namespace",
+                self.namespace
+            ));
+        }
+        setting
+            .split_once(NAMESPACED)
+            .filter(|(_, name)| self.secrets.contains(name))
+            .map(|_| format!("names setting {setting}, which a secret it declares is also named"))
     }
 
     fn owns(&self, setting: &str) -> bool {

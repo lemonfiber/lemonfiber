@@ -93,6 +93,57 @@ async fn rotating_a_plugins_secret_replaces_nothing_and_says_why() {
     );
 }
 
+/// A plugin's secret its recipe captured is read from the secret store: held there, with
+/// a likeness of its value and no advisory, and printed only when asked for and confirmed.
+#[tokio::test]
+async fn a_captured_plugin_secret_is_read_from_the_secret_store() {
+    let env = beside("pluginheld", WITH_A_SECRET);
+    let secrets = env.with_file_name("secrets.json");
+    assert!(std::fs::write(
+        &secrets,
+        r#"{"schema":1,"written_by":"","held":{"comics:api_key":{"value":"v4lue","from":"recipe","at":1}}}"#
+    )
+    .is_ok());
+    let ctx = ctx(env, Files::empty(), silent());
+
+    let inventory = asked(&ctx, Asking::Read).await;
+
+    let line = inventory
+        .held
+        .iter()
+        .find(|one| one.plugins() == Some("comics"));
+    assert_eq!(
+        line.map(|one| (
+            one.setting.as_str(),
+            one.state,
+            one.fingerprint.clone(),
+            one.advisory.is_none(),
+            one.location == secrets.display().to_string()
+        )),
+        Some((
+            "comics:api_key",
+            State::Active,
+            Some(lemonfiber_core::credential::fingerprint("v4lue")),
+            true,
+            true
+        )),
+        "{:?}",
+        inventory.held
+    );
+    assert!(!format!("{inventory:?}").contains("v4lue"));
+
+    let revealed = asked(
+        &ctx,
+        Asking::Reveal {
+            credential: "comics api_key".to_owned(),
+            confirmed: true,
+        },
+    )
+    .await
+    .revealed;
+    assert_eq!(revealed.and_then(|one| one.value).as_deref(), Some("v4lue"));
+}
+
 /// A register that is there and will not read refuses the inventory rather than
 /// being read past: a list of what this stack holds with a plugin's secrets quietly
 /// missing from it would be believed.

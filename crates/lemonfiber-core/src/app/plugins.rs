@@ -81,6 +81,7 @@ mod occupied;
 mod replacing;
 // Installing what the record already holds: an update, or a second source for one name.
 mod addressing;
+mod colliding;
 mod twice;
 mod updating;
 pub(crate) mod writing;

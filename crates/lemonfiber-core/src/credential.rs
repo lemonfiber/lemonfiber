@@ -125,16 +125,21 @@ impl Held {
         }
     }
 
-    /// What is said of a plugin's secret wherever its value is asked for.
-    ///
-    /// One sentence for a reveal and a rotation both, because the answer to each is the
-    /// same fact: nothing holds it, so there is nothing to print and nothing to replace.
+    /// What is said of a plugin's secret where its value cannot be printed or replaced
+    /// from here: nothing holds it yet, or it comes from its recipe or its holder.
     #[must_use]
     pub fn unheld(&self, plugin: &str) -> String {
+        if self.state == State::Absent {
+            return format!(
+                "{} is the plugin {plugin}'s, and nothing holds it yet: lemonfiber holds a \
+                 plugin's secret once the plugin's recipes capture it. There is no value to \
+                 show or to replace.",
+                self.name
+            );
+        }
         format!(
-            "{} is the plugin {plugin}'s, and nothing holds it yet: lemonfiber holds a \
-             plugin's secret only once the plugin's recipes capture it, and this build runs \
-             none. There is no value to show or to replace.",
+            "{} is the plugin {plugin}'s, captured by its recipe or held by the service it \
+             belongs to, so a new one comes from there rather than from lemonfiber.",
             self.name
         )
     }

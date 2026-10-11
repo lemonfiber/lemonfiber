@@ -13,8 +13,8 @@
 //! install back.
 //!
 //! **What a recipe captures is kept.** Every value captured is a declared secret, and
-//! once every recipe has held it is written beside the settings under the plugin's
-//! name, journalled first so putting the install back takes it out again.
+//! once every recipe has held it is kept in the secret store under the plugin's name,
+//! journalled first so putting the install back takes it out again.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -220,7 +220,7 @@ pub(super) async fn followed(
         }
         captured.extend(outcome.captured);
     }
-    kept(ctx, &would.plugin, manifest, &captured, stamp).map_err(Unfollowed::Unkept)?;
+    kept(ctx, would, manifest, &captured, stamp).map_err(Unfollowed::Unkept)?;
     Ok(ran)
 }
 
@@ -356,7 +356,7 @@ fn failed(plugin: &str, ran: &[Ran], meaning: String) -> Problem {
     )
 }
 
-/// Every captured value a `[[secret]]` declares, by the setting it is kept under.
+/// Every captured value a `[[secret]]` declares, by the name it is kept under.
 ///
 /// Reading the manifest refused a capture no secret declares; one met here anyway is
 /// not kept, because what is kept is what the operator read they would be holding.
@@ -373,63 +373,59 @@ pub(super) fn keeping<'a>(
     captured
         .iter()
         .filter(|(name, _)| declared.contains(&name.as_str()))
-        .map(|(name, value)| {
-            (
-                crate::config::for_plugin(plugin, name, crate::config::CAPTURED_SUFFIX),
-                value,
-            )
-        })
+        .map(|(name, value)| (crate::settings::named(plugin, name), value))
         .collect()
 }
 
-/// Keep every value the recipes captured, beside the settings, under the plugin's name.
-///
-/// Journalled before it is written, so putting the install back, and removing the
-/// plugin later, takes each one out again.
-///
-/// # Errors
-///
-/// Where there is no settings file to keep them in, or it could not be written.
+/// Keep every value the recipes captured in the secret store, journalled first, and write
+/// its services' secrets files.
 fn kept(
     ctx: &Ctx,
-    plugin: &str,
+    would: &Installed,
     manifest: &Manifest,
     captured: &BTreeMap<String, String>,
     stamp: &str,
 ) -> Result<(), Box<Problem>> {
-    let keeping = keeping(plugin, manifest, captured);
+    let keeping = keeping(&would.plugin, manifest, captured);
     if keeping.is_empty() {
         return Ok(());
     }
-    let held = ctx
-        .settings
-        .env_file
-        .as_deref()
+    let held = crate::settings::secrets_at(ctx)
         .zip(crate::app::targets::layout(ctx))
         .ok_or(crate::config::store::Failure::Nowhere);
-    let (env, paths) = held.as_ref().map_err(diagnosed)?;
-    let changes: Vec<Change> = keeping
+    let (secrets, paths) = held.as_ref().map_err(diagnosed)?;
+    let at = ctx.seconds();
+    let kept: Vec<crate::settings::Keeping<'_>> = keeping
         .iter()
-        .map(|(setting, value)| Change {
-            at: stamp.to_owned(),
-            operation: crate::plugin::owner(plugin),
-            target: setting.clone(),
-            kind: Kind::Set {
-                key: setting.clone(),
-                previous: crate::app::targets::recorded_secret(ctx, setting),
-                current: (*value).clone(),
-            },
+        .map(|(name, value)| crate::settings::Keeping {
+            name,
+            value,
+            from: crate::settings::Source::Recipe,
+            at,
         })
         .collect();
-    crate::app::recover::journalled(&paths.journal(), &changes, ctx.seams.random.as_ref())
-        .as_ref()
-        .map_err(diagnosed)?;
-    for (setting, value) in &keeping {
-        crate::config::store::set(env, setting, value)
-            .as_ref()
-            .map_err(diagnosed)?;
-    }
-    Ok(())
+    crate::settings::kept(secrets, &kept, |replaced| {
+        let changes: Vec<Change> = kept
+            .iter()
+            .zip(replaced)
+            .map(|(one, (_, previous))| Change {
+                at: stamp.to_owned(),
+                operation: crate::plugin::owner(&would.plugin),
+                target: one.name.to_owned(),
+                kind: Kind::Secret {
+                    name: one.name.to_owned(),
+                    from: one.from.as_str().to_owned(),
+                    previous: previous.clone(),
+                    current: Some(crate::credential::fingerprint(one.value)),
+                    filed: None,
+                },
+            })
+            .collect();
+        crate::app::recover::journalled(&paths.journal(), &changes, ctx.seams.random.as_ref())
+    })
+    .as_ref()
+    .map_err(diagnosed)?;
+    crate::settings::written(ctx, &[would]).map_err(|failure| diagnosed(&failure))
 }
 
 /// A failure as the problem it is said as.
