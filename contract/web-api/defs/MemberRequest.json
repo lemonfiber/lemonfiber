@@ -63,7 +63,7 @@
       ]
     },
     "title": {
-      "description": "What it is called, where the service filing it has been told about it and its\nlibrary could be read. Absent for a request no service holds yet — one still\nawaiting approval has been handed to nobody, so there is no title to find.",
+      "description": "What it is called: from the library of the service filing it, where it has been\ntold about it and that library could be read, and otherwise from the request\nservice's own record of the title. Absent where neither names it.",
       "type": [
         "string",
         "null"
@@ -79,7 +79,7 @@
       "minimum": 0
     },
     "year": {
-      "description": "The year that title came out, where the service filing it knows one. Absent, not\nnull, until the request has been handed to that service, for the reason the title\nis.",
+      "description": "The year that title came out, where the service that named it knows one. Absent,\nnot null, otherwise.",
       "type": [
         "integer",
         "null"

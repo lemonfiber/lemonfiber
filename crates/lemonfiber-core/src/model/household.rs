@@ -12,13 +12,12 @@ pub struct MemberRequest {
     /// The number the request service files it under, which is how one is named again
     /// when somebody rules on it.
     pub id: i64,
-    /// What it is called, where the service filing it has been told about it and its
-    /// library could be read. Absent for a request no service holds yet — one still
-    /// awaiting approval has been handed to nobody, so there is no title to find.
+    /// What it is called: from the library of the service filing it, where it has been
+    /// told about it and that library could be read, and otherwise from the request
+    /// service's own record of the title. Absent where neither names it.
     pub title: Option<String>,
-    /// The year that title came out, where the service filing it knows one. Absent, not
-    /// null, until the request has been handed to that service, for the reason the title
-    /// is.
+    /// The year that title came out, where the service that named it knows one. Absent,
+    /// not null, otherwise.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub year: Option<u16>,
     /// When the title arrived on the media server, as the request service timestamps it.

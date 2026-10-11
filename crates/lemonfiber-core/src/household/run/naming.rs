@@ -9,6 +9,8 @@
 use std::collections::BTreeMap;
 use std::time::SystemTime;
 
+use futures_util::future::join_all;
+
 use crate::app::targets::open_curators;
 use crate::app::Ctx;
 use crate::asking::Reasons;
@@ -179,44 +181,60 @@ pub(super) struct Titled {
 /// by.
 ///
 /// A request awaiting approval has been handed to no curator, so no library can name it,
-/// and a request nobody can name is one nobody can rule on. One look-up per such request,
-/// and a look-up that does not answer costs that request its name and nothing else.
+/// and a request nobody can name is one nobody can rule on. One look-up per title asked
+/// for, made together, and the media server's country is read only when there is one to
+/// make; a look-up that does not answer costs its requests their name and nothing else.
 pub(super) async fn unheld_titles(
     reached: Option<&crate::app::targets::HouseholdAccess>,
+    server: &dyn crate::ports::service::Household,
     requests: &[HouseholdRequest],
     titles: &BTreeMap<(Kind, i64), Titled>,
-    region: &str,
 ) -> BTreeMap<i64, Titled> {
-    let mut named = BTreeMap::new();
     let Some(access) = reached else {
-        return named;
+        return BTreeMap::new();
     };
+    let mut wanted: BTreeMap<(Kind, &str), Vec<i64>> = BTreeMap::new();
     for request in requests
         .iter()
         .filter(|request| titled(request, titles).is_none())
     {
-        let (Some(kind), Some(id)) = (request.kind, request.title_id.as_deref()) else {
-            continue;
-        };
-        if let Ok(Some(detail)) = access.requests.detail(kind, id, region).await {
-            if let Some(title) = detail.title {
-                named.insert(
-                    request.id,
-                    Titled {
-                        title,
-                        year: detail.year,
-                    },
-                );
-            }
+        if let (Some(kind), Some(id)) = (request.kind, request.title_id.as_deref()) {
+            wanted.entry((kind, id)).or_default().push(request.id);
+        }
+    }
+    if wanted.is_empty() {
+        return BTreeMap::new();
+    }
+    let region = server.country().await.ok().flatten().unwrap_or_default();
+    let region = region.as_str();
+    let found = join_all(wanted.into_iter().map(|((kind, id), asked)| async move {
+        let detail = access
+            .requests
+            .detail(kind, id, region)
+            .await
+            .ok()
+            .flatten();
+        let named = detail.and_then(|detail| {
+            Some(Titled {
+                title: detail.title?,
+                year: detail.year,
+            })
+        });
+        (asked, named)
+    }))
+    .await;
+    let mut named = BTreeMap::new();
+    for (asked, one) in found {
+        if let Some(one) = one {
+            named.extend(asked.into_iter().map(|request| (request, one.clone())));
         }
     }
     named
 }
 
 /// What a request is called and when it came out, where the curator filing it has been told
-/// about it and its library could be read. Nothing otherwise — a request still awaiting
-/// approval has been handed to no service, so there is no title to find and none is
-/// invented.
+/// about it and its library could be read. Nothing otherwise, and nothing is invented: a
+/// request still awaiting approval is named by [`unheld_titles`] instead.
 pub(super) fn titled<'a>(
     request: &HouseholdRequest,
     titles: &'a BTreeMap<(Kind, i64), Titled>,

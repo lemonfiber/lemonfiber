@@ -465,6 +465,32 @@ async fn a_request_awaiting_approval_is_named_from_the_request_services_own_reco
 }
 
 #[tokio::test]
+async fn two_requests_for_one_title_awaiting_approval_are_both_named() {
+    let context = ctx_with(
+        &Fake {
+            answered: "",
+            requests: r#"{"pageInfo":{"results":2},"results":[
+                {"id":1,"status":1,"type":"movie","media":{"status":2,"tmdbId":603},
+                 "requestedBy":{"displayName":"Alex"}},
+                {"id":2,"status":1,"type":"movie","media":{"status":2,"tmdbId":603},
+                 "requestedBy":{"displayName":"Alex"}}
+            ]}"#,
+            library: "[]",
+            film: Some(r#"{"title":"The Matrix","releaseDate":"1999-03-31","status":"Released"}"#),
+            ..Fake::default()
+        },
+        "shared",
+    );
+    let report = household(&context, None).await.unwrap_or_default();
+    let titles: Vec<Option<String>> = report
+        .members
+        .iter()
+        .flat_map(|member| member.requests.iter().map(|request| request.title.clone()))
+        .collect();
+    assert_eq!(titles, vec![Some("The Matrix".to_owned()); 2]);
+}
+
+#[tokio::test]
 async fn a_request_nothing_names_is_still_shown() {
     let context = ctx_with(
         &Fake {
