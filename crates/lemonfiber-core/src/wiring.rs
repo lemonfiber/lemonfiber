@@ -37,7 +37,7 @@ mod settling;
 pub use chosen::{Chosen, REASON_MOST};
 pub use fillers::{crosses, Address, Ask, Filler, Fillers, Holder};
 use settling::claimants;
-pub use settling::{asked_by, contested_by, filled, settle, unfilled};
+pub use settling::{address, asked_by, contested_by, filled, settle, unfilled};
 
 /// Every code the wiring, or the record of what is installed, is refused with where
 /// something it is read from cannot be read.

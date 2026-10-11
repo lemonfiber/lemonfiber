@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use super::{configuration, documents, key_file, overlay, writes, Lands, Write};
+use super::{configuration, documents, key_file, overlay, writes, Lands, Reading, Write};
 use crate::plugin::installed::{Installed, Placed, Reached};
 
 /// The stack directory these are written beneath.
@@ -117,7 +117,7 @@ fn regions(planned: &[Write]) -> Vec<(String, String)> {
 /// the plugin's, both after the document that declares the service.
 #[test]
 fn a_household_service_is_written_into_the_proxy_and_the_dashboard_after_its_document() {
-    let planned = writes(&installed("komga", &["komga"]), stack());
+    let planned = writes(&installed("komga", &["komga"]), stack(), &Reading::bare());
 
     assert_eq!(
         regions(&planned),
@@ -149,7 +149,7 @@ fn a_service_the_household_does_not_reach_is_given_no_route() {
     let _ = plugin.services.get_mut(1).map(|one| one.reached = None);
 
     assert_eq!(
-        regions(&writes(&plugin, stack())),
+        regions(&writes(&plugin, stack(), &Reading::bare())),
         vec![(
             crate::plugin::DASHBOARD.to_owned(),
             "plugin komga".to_owned()
@@ -162,12 +162,16 @@ fn a_plugin_whose_services_nothing_reaches_writes_into_neither() {
     let mut plugin = installed("komga", &["komga"]);
     let _ = plugin.services.first_mut().map(|one| one.reached = None);
 
-    assert!(regions(&writes(&plugin, stack())).is_empty());
+    assert!(regions(&writes(&plugin, stack(), &Reading::bare())).is_empty());
 }
 
 #[test]
 fn installing_writes_a_directory_for_each_service_and_one_document_for_the_plugin() {
-    let planned = writes(&installed("komga", &["komga", "komga-worker"]), stack());
+    let planned = writes(
+        &installed("komga", &["komga", "komga-worker"]),
+        stack(),
+        &Reading::bare(),
+    );
     let paths: Vec<PathBuf> = planned.iter().map(|one| one.path.clone()).collect();
     assert_eq!(
         paths,
@@ -187,7 +191,7 @@ fn installing_writes_a_directory_for_each_service_and_one_document_for_the_plugi
 /// directory that is not there, which is a service that will not start.
 #[test]
 fn the_directories_a_document_mounts_are_written_before_the_document() {
-    let planned = writes(&installed("komga", &["komga"]), stack());
+    let planned = writes(&installed("komga", &["komga"]), stack(), &Reading::bare());
     let document = planned.iter().position(|one| !one.is_directory());
     let first = document
         .and_then(|at| planned.get(at))
@@ -205,7 +209,7 @@ fn the_directories_a_document_mounts_are_written_before_the_document() {
 
 #[test]
 fn a_directory_carries_no_content_and_the_document_carries_the_container() {
-    let planned = writes(&installed("komga", &["komga"]), stack());
+    let planned = writes(&installed("komga", &["komga"]), stack(), &Reading::bare());
     assert_eq!(
         planned.len(),
         4,
@@ -228,7 +232,7 @@ fn a_directory_carries_no_content_and_the_document_carries_the_container() {
 #[test]
 fn what_is_written_is_the_container_the_record_derives_and_not_a_copy_of_it() {
     let one = installed("komga", &["komga"]);
-    let planned = writes(&one, stack());
+    let planned = writes(&one, stack(), &Reading::bare());
     let written = document(&planned).unwrap_or_default();
     assert!(written.starts_with("services:\n"));
     assert!(written.contains("profiles:\n    - plugin-komga\n"));
@@ -289,7 +293,7 @@ fn an_adapter_service_is_keyed_before_the_document_that_starts_it() {
     if let Some(adapter) = plugin.services.get_mut(1) {
         adapter.speaks = vec!["media.serve@1".to_owned()];
     }
-    let planned = writes(&plugin, stack());
+    let planned = writes(&plugin, stack(), &Reading::bare());
     let at = |lands: fn(&Lands) -> bool| planned.iter().position(|one| lands(&one.lands));
     let key = planned
         .iter()
@@ -328,7 +332,7 @@ fn a_service_with_further_mounts_gets_its_mount_tree_and_each_writable_source_be
             },
         ];
     }
-    let planned = writes(&plugin, stack());
+    let planned = writes(&plugin, stack(), &Reading::bare());
     let paths: Vec<PathBuf> = planned.iter().map(|one| one.path.clone()).collect();
     let tree = PathBuf::from("/opt/lemonfiber/stack/mounts/komga");
     let at = |path: &PathBuf| paths.iter().position(|one| one == path);
@@ -340,9 +344,58 @@ fn a_service_with_further_mounts_gets_its_mount_tree_and_each_writable_source_be
     assert_eq!(at(&tree.join("Caddyfile")), None);
     assert_eq!(
         super::mount_sources(&plugin, stack()),
-        vec![
-            (tree.join("cache"), tree.clone()),
-            (tree.join("Caddyfile"), tree.clone())
-        ]
+        vec![tree.join("cache"), tree.join("Caddyfile")]
     );
+}
+
+#[test]
+fn a_mount_the_model_refuses_plans_no_directory_and_is_no_source() {
+    let mut plugin = installed("komga", &["komga"]);
+    let mount = |from: &str, to: &str| lemonfiber_manifest::container::Mount {
+        from: from.to_owned(),
+        to: to.to_owned(),
+        ro: false,
+    };
+    if let Some(service) = plugin.services.first_mut() {
+        service.takes_data = true;
+        service.fields.mount = vec![
+            mount("../../etc", "/etc-of-host"),
+            mount("/etc", "/absolute"),
+            mount("library", "/data/x"),
+            mount("a:b", "/colon"),
+            mount("ok", "/c:ro"),
+        ];
+    }
+    let tree = PathBuf::from("/opt/lemonfiber/stack/mounts/komga");
+    let planned = writes(&plugin, stack(), &Reading::bare());
+    assert!(
+        planned.iter().all(|one| !one.path.starts_with(&tree)),
+        "{planned:?}"
+    );
+    assert!(super::mount_sources(&plugin, stack()).is_empty());
+}
+
+#[test]
+fn a_source_inside_another_is_planned_for_neither() {
+    let mut plugin = installed("komga", &["komga"]);
+    if let Some(service) = plugin.services.first_mut() {
+        service.fields.mount = ["outer", "outer/inner"]
+            .map(|from| lemonfiber_manifest::container::Mount {
+                from: from.to_owned(),
+                to: format!("/{}", from.replace('/', "-")),
+                ro: false,
+            })
+            .to_vec();
+    }
+    let tree = PathBuf::from("/opt/lemonfiber/stack/mounts/komga");
+    assert_eq!(
+        super::mount_sources(&plugin, stack()),
+        vec![tree.join("outer")]
+    );
+    let planned: Vec<PathBuf> = writes(&plugin, stack(), &Reading::bare())
+        .into_iter()
+        .map(|one| one.path)
+        .filter(|path| path.starts_with(&tree))
+        .collect();
+    assert_eq!(planned, vec![tree.clone(), tree.join("outer")]);
 }

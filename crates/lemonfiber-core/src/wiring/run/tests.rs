@@ -535,13 +535,14 @@ fn without_a_stack_directory_no_plugin_document_is_written_over() {
     let overwrites = manifest
         .as_ref()
         .zip(read.as_ref())
-        .map(|(manifest, register)| {
+        .and_then(|(manifest, register)| {
             crate::app::plugins::writing::rejoined(
                 &ctx,
                 manifest,
                 register,
                 &crate::wiring::Chosen::read(Some("identity.source=server")),
             )
+            .ok()
         })
         .unwrap_or_default();
 
@@ -566,13 +567,14 @@ fn a_choice_over_what_was_installed_since_it_read_writes_nothing() {
     let overwrites = manifest
         .as_ref()
         .zip(read.as_ref())
-        .map(|(manifest, register)| {
+        .and_then(|(manifest, register)| {
             crate::app::plugins::writing::rejoined(
                 &ctx,
                 manifest,
                 register,
                 &crate::wiring::Chosen::read(Some("identity.source=server")),
             )
+            .ok()
         })
         .unwrap_or_default();
     let kept = crate::app::plugins::kept_at(&ctx).unwrap_or_default();

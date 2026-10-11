@@ -9,10 +9,14 @@
 
 use std::collections::BTreeMap;
 
-use lemonfiber_manifest::container::{Constant, Mount, Posture, Shape, UrlOf, UserMode, Value};
+use lemonfiber_manifest::container::{
+    is_source, is_target, lies_inside, Constant, Mount, Posture, Shape, UrlOf, UserMode, Value,
+    CONFIGURATION,
+};
 use serde::Serialize;
 
 use super::installed::{Installed, Placed, Reached};
+use crate::config::{DEFAULT_ZONE, PGID_KEY, PUID_KEY, ZONE_KEY};
 
 /// The word in front of a plugin's id, which is the profile its services sit in.
 const PROFILE: &str = "plugin-";
@@ -23,23 +27,11 @@ pub fn profile(plugin: &str) -> String {
     format!("{PROFILE}{plugin}")
 }
 
-/// Where lemonfiber keeps a service's own configuration directory.
-const CONFIGURATION: &str = "./config";
-
 /// The library, mounted exactly as every bundled service mounts it.
 const LIBRARY: &str = "${DATA_ROOT:-./data}:/data";
 
-/// The operator's uid and gid, spelled as the stack's own images are.
-const OPERATOR: &str = "${PUID:-1000}:${PGID:-1000}";
-
-/// The operator's uid alone.
-const OPERATOR_UID: &str = "${PUID:-1000}";
-
-/// The operator's gid alone.
-const OPERATOR_GID: &str = "${PGID:-1000}";
-
-/// The operator's time zone, written into every entry.
-const TIME_ZONE: &str = "${TZ:-Europe/Amsterdam}";
+/// The uid and gid Compose writes while the stack's environment file names neither.
+const OPERATOR_FALLBACK: &str = "1000";
 
 /// What brings a container back after it stops for any reason but being taken down.
 const RESTART: &str = "unless-stopped";
@@ -80,8 +72,8 @@ const HEALTHY: &str = "service_healthy";
 pub struct Reading<'a> {
     /// The operator's value for a setting, where one is recorded.
     pub setting: &'a dyn Fn(&str) -> Option<String>,
-    /// The address an ask reaches, where something fills it.
-    pub address: &'a dyn Fn(&UrlOf) -> Option<String>,
+    /// The address the named service's ask reaches, where something fills it.
+    pub address: &'a dyn Fn(&str, &UrlOf) -> Option<String>,
     /// The service that holds the tunnel of the capability a service runs inside.
     pub guard: &'a dyn Fn(&str) -> Option<String>,
     /// The group that owns the host's render devices, where the host has them.
@@ -94,7 +86,7 @@ impl Reading<'_> {
     pub const fn bare() -> Reading<'static> {
         Reading {
             setting: &|_| None,
-            address: &|_| None,
+            address: &|_, _| None,
             guard: &|_| None,
             render_group: None,
         }
@@ -148,7 +140,7 @@ struct Entry {
     restart: &'static str,
     /// Who it runs as, where not the image's choice.
     #[serde(skip_serializing_if = "Option::is_none")]
-    user: Option<&'static str>,
+    user: Option<String>,
     /// Its environment.
     environment: BTreeMap<String, String>,
     /// Where it is published.
@@ -211,7 +203,13 @@ fn entry(plugin: &str, placed: &Placed, reading: &Reading<'_>) -> Entry {
         image: format!("{}@{}", literal(&placed.image), literal(&placed.digest)),
         profiles: vec![profile(plugin)],
         restart: RESTART,
-        user: (user_of(placed) == UserMode::Uid).then_some(OPERATOR),
+        user: (user_of(placed) == UserMode::Uid).then(|| {
+            format!(
+                "{}:{}",
+                variable(PUID_KEY, OPERATOR_FALLBACK),
+                variable(PGID_KEY, OPERATOR_FALLBACK)
+            )
+        }),
         environment: environment(placed, reading),
         ports: if guard.is_some() {
             Vec::new()
@@ -219,7 +217,7 @@ fn entry(plugin: &str, placed: &Placed, reading: &Reading<'_>) -> Entry {
             ports(placed)
         },
         volumes: volumes(placed),
-        tmpfs: fields.tmpfs.iter().map(|path| literal(path)).collect(),
+        tmpfs: tmpfs(placed).map(|path| literal(path)).collect(),
         networks: if guard.is_some() {
             Vec::new()
         } else {
@@ -264,14 +262,12 @@ fn entry(plugin: &str, placed: &Placed, reading: &Reading<'_>) -> Entry {
 }
 
 /// Who the service runs as, the declared mode or the one its kind requires.
-fn user_of(placed: &Placed) -> UserMode {
-    match placed.fields.user_mode {
-        Some(mode) => mode,
-        None if !placed.speaks.is_empty() || placed.fields.posture == Posture::Confined => {
-            UserMode::Uid
-        }
-        None => UserMode::Image,
-    }
+const fn user_of(placed: &Placed) -> UserMode {
+    UserMode::of(
+        placed.fields.user_mode,
+        !placed.speaks.is_empty(),
+        placed.fields.posture,
+    )
 }
 
 /// The render devices and group, where the shape asks for them and the host has them.
@@ -289,30 +285,41 @@ fn rendered(shape: Option<Shape>, group: Option<u32>) -> (Vec<String>, Vec<Strin
     }
 }
 
-/// Its environment: the time zone, the operator's pair where it asks for it, and every
-/// variable the manifest declares that has a value to write.
+/// Its environment: every variable the manifest declares that has a value to write, then
+/// the time zone and the operator's pair where it asks for it, which no record overrides.
 fn environment(placed: &Placed, reading: &Reading<'_>) -> BTreeMap<String, String> {
-    let mut written = BTreeMap::from([("TZ".to_owned(), TIME_ZONE.to_owned())]);
+    let mut written: BTreeMap<String, String> = placed
+        .fields
+        .env
+        .iter()
+        .filter_map(|(name, value)| {
+            let text = valued(&placed.service, value, reading)?;
+            Some((name.clone(), literal(&text)))
+        })
+        .collect();
+    written.insert(ZONE_KEY.to_owned(), variable(ZONE_KEY, DEFAULT_ZONE));
     if user_of(placed) == UserMode::PuidEnv {
-        written.insert("PUID".to_owned(), OPERATOR_UID.to_owned());
-        written.insert("PGID".to_owned(), OPERATOR_GID.to_owned());
-    }
-    for (name, value) in &placed.fields.env {
-        if let Some(text) = valued(value, reading) {
-            written.insert(name.clone(), literal(&text));
+        for key in [PUID_KEY, PGID_KEY] {
+            written.insert(key.to_owned(), variable(key, OPERATOR_FALLBACK));
         }
     }
     written
 }
 
+/// A variable of the stack's environment file, with what Compose writes while it names
+/// none.
+fn variable(key: &str, fallback: &str) -> String {
+    format!("${{{key}:-{fallback}}}")
+}
+
 /// What one variable is written as, or nothing where it has no value to write.
-fn valued(value: &Value, reading: &Reading<'_>) -> Option<String> {
+fn valued(service: &str, value: &Value, reading: &Reading<'_>) -> Option<String> {
     match value {
         Value::Constant(constant) => Some(constant_text(constant)),
         Value::Setting(setting) => Some(
             (reading.setting)(&setting.setting).unwrap_or_else(|| constant_text(&setting.default)),
         ),
-        Value::Url(url) => (reading.address)(url),
+        Value::Url(url) => (reading.address)(service, url),
         Value::Secret(_) => None,
     }
 }
@@ -364,11 +371,11 @@ fn volumes(placed: &Placed) -> Vec<String> {
         volumes.push(LIBRARY.to_owned());
     }
     volumes.push(mounted(
-        &format!("{CONFIGURATION}/{service}"),
-        &placed.config_path,
+        &format!("./{}/{service}", super::placing::CONFIGURATION),
+        configuration(placed),
         placed.fields.config_ro,
     ));
-    volumes.extend(placed.fields.mount.iter().map(|Mount { from, to, ro }| {
+    volumes.extend(mounts(placed).map(|Mount { from, to, ro }| {
         mounted(
             &format!("./{}/{service}/{}", super::placing::MOUNTS, literal(from)),
             to,
@@ -376,6 +383,45 @@ fn volumes(placed: &Placed) -> Vec<String> {
         )
     }));
     volumes
+}
+
+/// Where its configuration directory lands: where the record says, where that is a target
+/// the model allows, and the model's own default otherwise.
+fn configuration(placed: &Placed) -> &str {
+    if is_target(&placed.config_path, true) {
+        &placed.config_path
+    } else {
+        CONFIGURATION
+    }
+}
+
+/// Each further mount the model allows: a source inside its own mount tree and inside no
+/// other of its sources, landing where a mount may land.
+pub(super) fn mounts(placed: &Placed) -> impl Iterator<Item = &Mount> {
+    let all = &placed.fields.mount;
+    all.iter().filter(move |mount| {
+        is_source(&mount.from)
+            && is_target(&mount.to, placed.takes_data)
+            && !all
+                .iter()
+                .any(|other| lies_inside(&mount.from, &other.from))
+    })
+}
+
+/// Each scratch path in memory the model allows.
+fn tmpfs(placed: &Placed) -> impl Iterator<Item = &String> {
+    placed
+        .fields
+        .tmpfs
+        .iter()
+        .filter(|path| is_target(path, placed.takes_data))
+}
+
+/// Whether every path the record keeps for the service is one the model allows.
+pub(super) fn sound(placed: &Placed) -> bool {
+    is_target(&placed.config_path, true)
+        && mounts(placed).count() == placed.fields.mount.len()
+        && tmpfs(placed).count() == placed.fields.tmpfs.len()
 }
 
 /// One bind mount of `source` at `to`.

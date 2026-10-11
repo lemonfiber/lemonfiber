@@ -187,3 +187,53 @@ fn installing_a_plugin_whose_ask_stands_contested_says_so_and_lists_its_asks_alo
         .collect();
     assert_eq!(askers, vec![("elsewhere", &from("other"))]);
 }
+
+#[test]
+fn a_variable_asking_an_address_reaches_the_one_service_its_ask_settles_on() {
+    let url = |files: Option<&str>| lemonfiber_manifest::container::UrlOf {
+        url_of: "indexer.search".to_owned(),
+        files: files.map(str::to_owned),
+        native: None,
+    };
+    let asker = plugin_asking("subs", "subfinder", "indexer.search", false);
+    let address = |manifest: Option<Manifest>, installed: &[Installed], by: &str, files| {
+        manifest.and_then(|manifest| {
+            let settled = settle(&manifest, installed, &Chosen::default());
+            crate::wiring::address(&settled, &manifest, installed, by, &url(files))
+        })
+    };
+
+    let bundled = || {
+        written(&format!(
+            "{}listens = 9696\n",
+            service("one", "\"indexer.search\"")
+        ))
+    };
+    let held = [asker.clone()];
+    assert_eq!(
+        address(bundled(), &held, "subfinder", None).as_deref(),
+        Some("http://one:9696")
+    );
+    assert_eq!(address(bundled(), &held, "subfinder", Some("tv")), None);
+    assert_eq!(address(bundled(), &held, "somebody", None), None);
+    assert_eq!(address(written(""), &held, "subfinder", None), None);
+
+    let mut finder = crate::test_support::a_placed("finder", &["indexer.search"], None, Some(8080));
+    let listening = [
+        asker.clone(),
+        crate::test_support::an_installed("idx", vec![finder.clone()]),
+    ];
+    assert_eq!(
+        address(written(""), &listening, "subfinder", None).as_deref(),
+        Some("http://finder:8080")
+    );
+    finder.listens = None;
+    let published = [
+        asker,
+        crate::test_support::an_installed("idx", vec![finder]),
+    ];
+    assert_eq!(
+        address(written(""), &published, "subfinder", None).as_deref(),
+        Some("http://finder:8080")
+    );
+}

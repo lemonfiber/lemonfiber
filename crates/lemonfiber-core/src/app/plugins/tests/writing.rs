@@ -472,3 +472,64 @@ fn a_directory_reached_through_a_link_is_not_made() {
     assert!(super::super::writing::carry_out(&ctx, "komga", "1", &directory).is_err());
     assert!(!elsewhere.join("komga").exists());
 }
+
+/// A mount source reached through a link from the stack directory refuses the write of
+/// the document that would mount it, read-only sources included, and one reached
+/// through none does not.
+#[cfg(unix)]
+#[test]
+fn a_mount_source_reached_through_a_link_refuses_its_document() {
+    let ctx = ctx("linked-mount-source");
+    let stack = stack_of(&ctx);
+    let mut placed = crate::test_support::a_placed("komga", &[], None, None);
+    placed.fields.mount = vec![lemonfiber_manifest::container::Mount {
+        from: "Caddyfile".to_owned(),
+        to: "/etc/caddy/Caddyfile".to_owned(),
+        ro: true,
+    }];
+    let plugin = crate::test_support::an_installed("komga", vec![placed]);
+    let tree = stack.join("mounts").join("komga");
+    let _ = std::fs::create_dir_all(&tree);
+    assert!(super::super::writing::unlinked(&ctx, &plugin, &stack).is_ok());
+    let _ = std::os::unix::fs::symlink("/etc/hostname", tree.join("Caddyfile"));
+    let refused = super::super::writing::unlinked(&ctx, &plugin, &stack);
+    assert!(
+        refused.is_err_and(|why| why.summary.contains("Caddyfile")),
+        "the linked source is named"
+    );
+}
+
+/// A variable asking the address of what the stack fills is written with the service its
+/// ask settles on, at the port that service listens on.
+#[test]
+fn a_variable_asking_an_address_is_written_with_the_one_its_ask_settles_on() {
+    use lemonfiber_manifest::container::{UrlOf, Value};
+
+    let ctx = ctx("addressed");
+    let mut placed = crate::test_support::a_placed("subfinder", &[], None, None);
+    placed.asks = vec![crate::plugin::Asking {
+        capability: "indexer.search".to_owned(),
+        each: false,
+    }];
+    placed.fields.env = [(
+        "INDEXER".to_owned(),
+        Value::Url(UrlOf {
+            url_of: "indexer.search".to_owned(),
+            files: None,
+            native: None,
+        }),
+    )]
+    .into();
+    let plugin = crate::test_support::an_installed("subs", vec![placed]);
+    let document = super::super::addressing::writes(&ctx, &plugin, &stack_of(&ctx))
+        .into_iter()
+        .find_map(|write| match write.lands {
+            crate::plugin::Lands::Document(text) => Some(text),
+            _ => None,
+        })
+        .unwrap_or_default();
+    assert!(
+        document.contains("INDEXER: http://prowlarr:9696"),
+        "{document}"
+    );
+}

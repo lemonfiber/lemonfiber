@@ -97,12 +97,11 @@ impl Register {
     /// dashboard entry, every time the plugin's files are derived — and the reader
     /// that held them to the format ran once, on a manifest, long before. So a record
     /// is held on the way in to the same definitions the reader used: a service name
-    /// that is one label, a registry path, a digest, a directory written in its own
-    /// alphabet, a hostname that is one label, and prose nothing downstream expands.
+    /// that is one label, a registry path, a digest, mounts the model allows, a hostname
+    /// that is one label, and prose nothing downstream expands.
     /// A record that fails is one this build did not write, and it is refused rather
     /// than acted on.
     fn as_written(&self) -> Result<(), Unreadable> {
-        use lemonfiber_manifest::container::is_plain;
         use lemonfiber_plugin::refusing::carried::{
             is_digest, is_label, is_plugin_id, is_reference, substituted,
         };
@@ -117,7 +116,6 @@ impl Register {
                 return refused(format!("a plugin id, {plugin:?},"));
             }
             for placed in &one.services {
-                let directory = &placed.config_path;
                 let hostname = placed
                     .reached
                     .as_ref()
@@ -126,9 +124,7 @@ impl Register {
                 let written = is_label(&placed.service)
                     && is_reference(&placed.image)
                     && is_digest(&placed.digest)
-                    && directory.starts_with('/')
-                    && !directory.contains("..")
-                    && is_plain(directory)
+                    && super::container::sound(placed)
                     && hostname.is_none_or(is_label)
                     && [
                         Some(placed.name.as_str()),

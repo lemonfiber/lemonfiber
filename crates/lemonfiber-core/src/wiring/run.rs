@@ -180,7 +180,7 @@ fn substituting(
         &manifest,
         &installed,
         &crate::wiring::Chosen::read(Some(&substitution.setting)),
-    );
+    )?;
     crate::app::plugins::writing::unmoved(&overwrites)?;
     changes.extend(
         overwrites

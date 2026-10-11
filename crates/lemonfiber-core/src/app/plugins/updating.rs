@@ -77,7 +77,7 @@ pub(crate) async fn update(
     unheld(ctx, &would, without.installed(), stack)?;
     let changes = crate::plugin::changes(&super::writing::landing(
         ctx,
-        crate::plugin::writes(&would, stack),
+        super::addressing::writes(ctx, &would, stack),
     ));
     let offer = super::offering::updating(&read.digest, &was, &would, &changes, &wiring);
     let (acting, taking) =
@@ -286,8 +286,13 @@ enum Came {
 /// reading taken before anything moved. It carries out no reversal of its own; the
 /// caller decides what a failure puts back, because on an update that is two things.
 async fn on(ctx: &Ctx, coming: &Coming<'_>, install: &mut Install) -> Came {
-    let planned = super::writing::landing(ctx, crate::plugin::writes(coming.would, coming.stack));
-    if let Err(why) = carry_out(ctx, &coming.would.plugin, coming.stamp, &planned) {
+    let planned = super::writing::landing(
+        ctx,
+        super::addressing::writes(ctx, coming.would, coming.stack),
+    );
+    let put = super::writing::unlinked(ctx, coming.would, coming.stack)
+        .and_then(|()| carry_out(ctx, &coming.would.plugin, coming.stamp, &planned));
+    if let Err(why) = put {
         return Came::Stopped(why.detail.unwrap_or(why.summary));
     }
     if let Some(why) = proving::up(ctx, coming.would, coming.stack).await {
@@ -393,13 +398,14 @@ pub(super) fn brought_back(
 /// started where the files would not land, since a container started without its
 /// document is one Compose has no description of.
 async fn restored(ctx: &Ctx, was: &Installed, stack: &Path, stamp: &str) -> Restored {
-    let placed = carry_out(
-        ctx,
-        &was.plugin,
-        stamp,
-        &super::writing::landing(ctx, crate::plugin::writes(was, stack)),
-    )
-    .is_ok();
+    let placed = super::writing::unlinked(ctx, was, stack).is_ok()
+        && carry_out(
+            ctx,
+            &was.plugin,
+            stamp,
+            &super::writing::landing(ctx, super::addressing::writes(ctx, was, stack)),
+        )
+        .is_ok();
     let running = placed && proving::up(ctx, was, stack).await.is_none();
     Restored {
         version: was.version.clone(),

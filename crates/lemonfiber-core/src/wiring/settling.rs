@@ -14,6 +14,7 @@
 
 use std::collections::BTreeMap;
 
+use lemonfiber_manifest::container::UrlOf;
 use lemonfiber_manifest::{Manifest, Wiring};
 
 use crate::filling::{fills, Claimant, Filling, Shown};
@@ -203,6 +204,49 @@ fn plugins_ask(manifest: &Manifest, by: &str, ask: &Asking) -> Wiring {
         to: None,
         why: stacks.and_then(|wiring| wiring.why.clone()),
     }
+}
+
+/// The address `by`'s ask for `url`'s capability reaches, where it settled on one
+/// service: that service at the port it listens on.
+///
+/// Nothing for an ask narrowed by a medium or an API, which settling does not narrow, and
+/// nothing where the ask reaches no service or several.
+#[must_use]
+pub fn address(
+    settled: &[Wired],
+    manifest: &Manifest,
+    installed: &[Installed],
+    by: &str,
+    url: &UrlOf,
+) -> Option<String> {
+    if url.files.is_some() || url.native.is_some() {
+        return None;
+    }
+    let filler = settled.iter().find_map(|wired| match &wired.reaches {
+        Reaches::Asked {
+            capability,
+            services,
+            ..
+        } if wired.by == by && *capability == url.url_of => match services.as_slice() {
+            [one] => Some(one),
+            _ => None,
+        },
+        Reaches::Asked { .. } | Reaches::ByName { .. } => None,
+    })?;
+    let placed = installed
+        .iter()
+        .flat_map(|one| &one.services)
+        .find(|placed| placed.service == *filler)
+        .map(|placed| placed.listens.or_else(|| placed.published()));
+    let bundled = || {
+        manifest
+            .services
+            .iter()
+            .find(|service| service.id == *filler)
+            .map(|service| service.listens.or(service.port))
+    };
+    let port = placed.or_else(bundled).flatten()?;
+    Some(format!("http://{filler}:{port}"))
 }
 
 /// Every ask `adding`'s services would make once it is installed beside `installed`, as

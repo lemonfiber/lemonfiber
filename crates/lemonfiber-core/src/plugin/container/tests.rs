@@ -4,9 +4,7 @@ use std::path::PathBuf;
 use lemonfiber_plugin::{Manifest, Shape};
 
 use super::super::installed::{Installed, Placed, Reached};
-use super::{
-    published, written, Reading, CONFIGURATION, HOUSEHOLD, LIBRARY, LOOPBACK, OPERATOR, PROFILE,
-};
+use super::{published, written, Reading, HOUSEHOLD, LIBRARY, LOOPBACK, PROFILE};
 
 /// The template the generated entries extend, as the stack ships it.
 ///
@@ -245,7 +243,11 @@ fn an_adapter_runs_as_the_operator_and_nothing_else_is_given_a_user() {
         .and_then(|entry| entry.get("user"))
         .and_then(serde_yaml_ng::Value::as_str)
         .map(str::to_owned);
-    assert_eq!(user.as_deref(), Some(OPERATOR), "got: {adapter}");
+    assert_eq!(
+        user.as_deref(),
+        Some("${PUID:-1000}:${PGID:-1000}"),
+        "got: {adapter}"
+    );
     let mut carried = keys(&adapter);
     assert!(carried.remove("user"), "got: {adapter}");
     let permitted: BTreeSet<String> = KEYS.iter().map(|&key| key.to_owned()).collect();
@@ -282,10 +284,7 @@ fn a_declared_configuration_directory_moves_the_target_and_nothing_else() {
         config_path: "/app/data".to_owned(),
         ..placed()
     });
-    assert!(
-        entry.contains(&format!("{CONFIGURATION}/komga:/app/data")),
-        "got: {entry}"
-    );
+    assert!(entry.contains("./config/komga:/app/data"), "got: {entry}");
     assert_eq!(mounts(&entry).len(), 2, "still two mounts: {entry}");
     assert_eq!(mounts(&document(placed())).len(), 2);
 }
@@ -665,7 +664,8 @@ fn each_tier_renders_to_its_own_interface() {
 /// The reader refuses every one of these, and a record read back from disk is held
 /// to the same rules; this is the writer's own half, asked of records built by hand
 /// so the reader is not what makes it pass. A line break stays inside the value it
-/// was written in, and the entry still carries only the permitted keys.
+/// was written in, a directory the model refuses lands at the model's own default, and
+/// the entry still carries only the permitted keys.
 #[test]
 fn a_value_carrying_a_line_break_stays_one_value() {
     let permitted: BTreeSet<String> = KEYS.iter().map(|&key| key.to_owned()).collect();
@@ -677,10 +677,7 @@ fn a_value_carrying_a_line_break_stays_one_value() {
     assert!(keys(&entry).is_subset(&permitted), "got: {entry}");
     assert_eq!(
         mounts(&entry),
-        vec![
-            LIBRARY.to_owned(),
-            "./config/komga:/config\n    - /:/host".to_owned()
-        ],
+        vec![LIBRARY.to_owned(), "./config/komga:/config".to_owned()],
         "got: {entry}"
     );
     let read = serde_yaml_ng::from_str::<serde_yaml_ng::Value>(&entry).ok();
@@ -696,8 +693,9 @@ fn a_value_carrying_a_line_break_stays_one_value() {
 /// A dollar a plugin supplied is written as the dollar Compose reads literally.
 ///
 /// Compose substitutes `${…}` from the stack's environment file in any value, so a
-/// value from a record is doubled where it is written. The two substitutions this
-/// build writes itself are left as they are.
+/// value from a record is doubled where it is written, and a directory holding one is
+/// not written at all. The two substitutions this build writes itself are left as they
+/// are.
 #[test]
 fn a_dollar_a_plugin_supplied_is_never_a_substitution() {
     let entry = document(Placed {
@@ -707,7 +705,7 @@ fn a_dollar_a_plugin_supplied_is_never_a_substitution() {
     });
     assert!(entry.contains("image: a/$${KEY}@"), "got: {entry}");
     assert!(
-        mounts(&entry).contains(&"./config/komga:/c$$x".to_owned()),
+        mounts(&entry).contains(&"./config/komga:/config".to_owned()),
         "got: {entry}"
     );
     assert!(

@@ -32,6 +32,7 @@
 
 use std::path::{Path, PathBuf};
 
+use super::container::Reading;
 use super::installed::Installed;
 
 /// The directory beneath the stack where a plugin's Compose document is written.
@@ -47,7 +48,7 @@ pub(crate) const OVERLAYS: &str = "compose/plugins";
 /// The same one the bundled services use, and the same one the generated container
 /// mounts from — `./config/<service>` in the entry is this directory, resolved
 /// against the project directory Compose is pointed at.
-const CONFIGURATION: &str = "config";
+pub(super) const CONFIGURATION: &str = "config";
 
 /// Where each service's own mount tree is kept, beneath the stack directory and apart
 /// from its configuration directory.
@@ -159,20 +160,16 @@ pub fn mount_tree(stack: &Path, service: &str) -> PathBuf {
     stack.join(MOUNTS).join(service)
 }
 
-/// Every further mount source of an installed plugin's services, each with the mount
-/// tree it must lie beneath.
+/// Every further mount source of an installed plugin's services the model allows, each
+/// inside its service's mount tree.
 #[must_use]
-pub fn mount_sources(installed: &Installed, stack: &Path) -> Vec<(PathBuf, PathBuf)> {
+pub fn mount_sources(installed: &Installed, stack: &Path) -> Vec<PathBuf> {
     installed
         .services
         .iter()
         .flat_map(|placed| {
             let tree = mount_tree(stack, &placed.service);
-            placed
-                .fields
-                .mount
-                .iter()
-                .map(move |mount| (tree.join(&mount.from), tree.clone()))
+            super::container::mounts(placed).map(move |mount| tree.join(&mount.from))
         })
         .collect()
 }
@@ -228,23 +225,21 @@ pub fn documents(installed: &[String], stack: &Path) -> Vec<PathBuf> {
 /// Each is planned only where it would hold something, so a plugin whose services
 /// nothing reaches writes into neither.
 #[must_use]
-pub fn writes(installed: &Installed, stack: &Path) -> Vec<Write> {
+pub fn writes(installed: &Installed, stack: &Path, reading: &Reading<'_>) -> Vec<Write> {
     let mut planned: Vec<Write> = installed
         .services
         .iter()
         .map(|placed| Write::directory(configuration(stack, &placed.service), stack))
         .collect();
     for placed in &installed.services {
-        if placed.fields.mount.is_empty() {
+        let mut writable = super::container::mounts(placed).peekable();
+        if writable.peek().is_none() {
             continue;
         }
         let tree = mount_tree(stack, &placed.service);
         planned.push(Write::directory(tree.clone(), stack));
         planned.extend(
-            placed
-                .fields
-                .mount
-                .iter()
+            writable
                 .filter(|mount| !mount.ro)
                 .map(|mount| Write::directory(tree.join(&mount.from), stack)),
         );
@@ -258,7 +253,7 @@ pub fn writes(installed: &Installed, stack: &Path) -> Vec<Write> {
     );
     planned.push(Write::file(
         overlay(stack, &installed.plugin),
-        super::container::written(installed, &super::container::Reading::bare()),
+        super::container::written(installed, reading),
     ));
     let owner = super::owning::owner(&installed.plugin);
     for (key, body) in [

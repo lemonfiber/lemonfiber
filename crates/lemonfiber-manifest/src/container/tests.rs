@@ -408,3 +408,58 @@ fn no_mount_source_lies_inside_another() {
         ["service jellyfin.mount /deep: cache/deep lies inside cache, another of its sources"]
     );
 }
+
+#[test]
+fn an_address_files_a_medium_of_the_vocabulary_and_names_its_api_in_one_word() {
+    let url = |files: Option<&str>, native: Option<&str>| {
+        Value::Url(UrlOf {
+            url_of: "library.curate".to_owned(),
+            files: files.map(str::to_owned),
+            native: native.map(str::to_owned),
+        })
+    };
+    let named = env(vec![
+        ("GOOD", url(Some("comics"), Some("servarr2"))),
+        ("MEDIUM", url(Some("anime"), None)),
+        ("API", url(None, Some("Servarr"))),
+        ("BOTH", url(Some("tv "), Some("2arr"))),
+    ]);
+    let said = wrong(&plain(&named));
+    assert_eq!(said.len(), 3, "{said:#?}");
+    assert!(said
+        .iter()
+        .any(|one| one.starts_with("service jellyfin.env.MEDIUM") && one.contains("files anime")));
+    assert!(said
+        .iter()
+        .any(|one| one.starts_with("service jellyfin.env.API") && one.contains("native Servarr")));
+    assert!(said
+        .iter()
+        .any(|one| one.starts_with("service jellyfin.env.BOTH")
+            && one.contains("files tv ")
+            && one.contains("native 2arr")));
+}
+
+#[test]
+fn a_port_two_services_publish_names_both() {
+    let further = [Publish {
+        port: 8920,
+        listens: Some(8920),
+    }];
+    let services = [
+        (
+            "jellyfin",
+            super::published(Some(8096), &further).collect::<Vec<_>>(),
+        ),
+        ("emby", vec![8097, 8920]),
+        ("plex", vec![8096]),
+        ("same", vec![9000, 9000]),
+    ];
+    assert_eq!(
+        super::doubled(
+            services
+                .iter()
+                .map(|(id, ports)| (*id, ports.iter().copied()))
+        ),
+        [(8920, "jellyfin", "emby"), (8096, "jellyfin", "plex")]
+    );
+}

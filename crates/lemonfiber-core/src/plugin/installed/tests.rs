@@ -153,6 +153,51 @@ fn each_ask_is_kept_on_the_service_that_makes_it() {
 }
 
 #[test]
+fn a_variable_asking_an_address_is_an_ask_once_unless_narrowed_or_already_asked() {
+    use lemonfiber_manifest::container::{UrlOf, Value};
+    let url = |capability: &str| {
+        Value::Url(UrlOf {
+            url_of: capability.to_owned(),
+            files: None,
+            native: None,
+        })
+    };
+    let narrowed = |files: Option<&str>, native: Option<&str>| {
+        Value::Url(UrlOf {
+            url_of: "library.curate".to_owned(),
+            files: files.map(str::to_owned),
+            native: native.map(str::to_owned),
+        })
+    };
+    let record = installed(|manifest| {
+        manifest.asking = vec![lemonfiber_plugin::Ask {
+            service: Some("komga".to_owned()),
+            capability: "download.usenet".to_owned(),
+            each: false,
+        }];
+        set(manifest, |service| {
+            service.env = [
+                ("USENET", url("download.usenet")),
+                ("INDEXER", url("indexer.search")),
+                ("AGAIN", url("indexer.search")),
+                ("TV", narrowed(Some("tv"), None)),
+                ("SERVARR", narrowed(None, Some("servarr"))),
+            ]
+            .map(|(name, value)| (name.to_owned(), value))
+            .into();
+        });
+    });
+    let asked = |capability: &str| super::Asking {
+        capability: capability.to_owned(),
+        each: false,
+    };
+    assert_eq!(
+        placed(record.as_ref(), "komga").map(|one| one.asks),
+        Some(vec![asked("download.usenet"), asked("indexer.search")])
+    );
+}
+
+#[test]
 fn a_service_asking_nothing_records_no_asks_and_reads_back_from_a_record_without_them() {
     let record = whole();
     let written = record
@@ -522,7 +567,7 @@ fn the_report_says_what_is_installed_and_what_this_run_did() {
 /// that otherwise reads back whole.
 #[test]
 fn a_record_carrying_a_value_this_build_would_not_have_written_is_refused() {
-    let altered: [(&str, Alter); 13] = [
+    let altered: [(&str, Alter); 17] = [
         ("an empty plugin id", |one| one.plugin = String::new()),
         ("a plugin id with a separator", |one| {
             one.plugin = "../x".to_owned();
@@ -546,6 +591,33 @@ fn a_record_carrying_a_value_this_build_would_not_have_written_is_refused() {
         }),
         ("a directory outside its alphabet", |one| {
             each(one, |placed| placed.config_path = "/a:ro".to_owned());
+        }),
+        ("a directory at the root", |one| {
+            each(one, |placed| placed.config_path = "/".to_owned());
+        }),
+        ("a mount leaving its tree", |one| {
+            each(one, |placed| {
+                placed.fields.mount = vec![lemonfiber_manifest::container::Mount {
+                    from: "../../etc".to_owned(),
+                    to: "/etc-of-host".to_owned(),
+                    ro: false,
+                }];
+            });
+        }),
+        ("a mount landing on the library", |one| {
+            each(one, |placed| {
+                placed.takes_data = true;
+                placed.fields.mount = vec![lemonfiber_manifest::container::Mount {
+                    from: "cache".to_owned(),
+                    to: "/data/x".to_owned(),
+                    ro: false,
+                }];
+            });
+        }),
+        ("scratch space with an option", |one| {
+            each(one, |placed| {
+                placed.fields.tmpfs = vec!["/tmp:exec".to_owned()];
+            });
         }),
         ("a hostname that is two labels", |one| {
             each(one, |placed| {

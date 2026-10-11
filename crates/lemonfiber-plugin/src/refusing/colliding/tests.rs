@@ -134,3 +134,37 @@ fn a_service_with_no_port_takes_none() {
     let said = without("port        = 25600", "");
     assert!(!names(&said, &["service komga.port"]), "got: {said:?}");
 }
+
+#[test]
+fn a_further_port_the_stack_publishes_is_refused_naming_both() {
+    let said = without(
+        "config_path = \"/config\"\n",
+        "config_path = \"/config\"\n\n[[service.publish]]\nport = 8096\n",
+    );
+    assert!(
+        names(&said, &["service komga.publish", "8096", "door"]),
+        "got: {said:?}"
+    );
+}
+
+#[test]
+fn a_port_two_of_the_plugins_services_publish_is_refused_naming_both() {
+    let said = without(
+        "config_path = \"/config\"\n",
+        "config_path = \"/config\"\n\n[[service]]\nid          = \"komga-reader\"\nname        = \
+         \"Komga reader\"\nimage       = \"docker.io/gotson/komga\"\ndigest      = \
+         \"sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945\"\ntag         \
+         = \"1.11.0\"\nport        = 9100\nbind        = \"loopback\"\ncriticality = \
+         \"enhancing\"\n\n[[service.publish]]\nport = 25600\n",
+    );
+    assert!(
+        names(
+            &said,
+            &[
+                "service komga-reader.publish",
+                "publishes 25600, which service komga already publishes"
+            ]
+        ),
+        "got: {said:?}"
+    );
+}

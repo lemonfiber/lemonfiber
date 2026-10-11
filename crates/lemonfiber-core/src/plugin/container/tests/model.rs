@@ -133,7 +133,7 @@ fn each_variable_is_written_as_its_kind_and_none_is_substituted() {
         ),
     ]);
     let setting = |name: &str| (name == "komga:mode").then(|| "fast".to_owned());
-    let address = |asked: &UrlOf| {
+    let address = |_: &str, asked: &UrlOf| {
         (asked.url_of == "indexer.search").then(|| "http://prowlarr:9696".to_owned())
     };
     let reading = Reading {
@@ -245,4 +245,66 @@ fn a_service_inside_its_guards_network_has_none_of_its_own_and_waits_for_it() {
     let unguarded = entry_of(&document(inside));
     assert_eq!(text(&unguarded, &["network_mode"]).as_deref(), Some("none"));
     assert!(strings(&unguarded, "ports").is_empty());
+}
+
+#[test]
+fn a_record_whose_paths_the_model_refuses_writes_none_of_them() {
+    let mount = |from: &str, to: &str| Mount {
+        from: from.to_owned(),
+        to: to.to_owned(),
+        ro: false,
+    };
+    let entry = entry_of(&document(Placed {
+        config_path: "/data/config".to_owned(),
+        ..with(Fields {
+            mount: vec![
+                mount("../../etc", "/etc-of-host"),
+                mount("/etc", "/absolute"),
+                mount("library", "/data/x"),
+                mount("a:b", "/colon"),
+                mount("ok", "/c:ro"),
+                mount("outer", "/outer"),
+                mount("outer/inner", "/inner"),
+            ],
+            tmpfs: vec!["/data/scratch".to_owned(), "/tmp:exec".to_owned()],
+            ..Fields::default()
+        })
+    }));
+    assert_eq!(
+        strings(&entry, "volumes"),
+        [
+            "${DATA_ROOT:-./data}:/data",
+            "./config/komga:/config",
+            "./mounts/komga/outer:/outer",
+        ]
+    );
+    assert!(strings(&entry, "tmpfs").is_empty());
+}
+
+#[test]
+fn a_record_naming_lemonfibers_own_variables_does_not_override_them() {
+    let entry = entry_of(&document(with(Fields {
+        user_mode: Some(UserMode::PuidEnv),
+        env: ["TZ", "PUID", "PGID"]
+            .map(|name| {
+                (
+                    name.to_owned(),
+                    Value::Constant(Constant::Text("0".to_owned())),
+                )
+            })
+            .into(),
+        ..Fields::default()
+    })));
+    assert_eq!(
+        text(&entry, &["environment", "TZ"]).as_deref(),
+        Some("${TZ:-Europe/Amsterdam}")
+    );
+    assert_eq!(
+        text(&entry, &["environment", "PUID"]).as_deref(),
+        Some("${PUID:-1000}")
+    );
+    assert_eq!(
+        text(&entry, &["environment", "PGID"]).as_deref(),
+        Some("${PGID:-1000}")
+    );
 }

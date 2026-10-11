@@ -22,7 +22,7 @@
 //! answers on. Which dashboard group a tier belongs to is the stack's answer rather
 //! than the format's, so nothing declared is kept as nothing declared.
 
-use lemonfiber_manifest::container::Fields;
+use lemonfiber_manifest::container::{Fields, Value};
 use lemonfiber_plugin::{Manifest, Service};
 use serde::{Deserialize, Serialize};
 
@@ -116,6 +116,37 @@ pub struct Placed {
     pub fields: Fields,
 }
 
+/// Every capability a service asks for: each `[[ask]]` it makes, then each capability a
+/// variable asks the address of, narrowed by no medium and no API, that no `[[ask]]`
+/// names, once.
+fn asks(manifest: &Manifest, service: &Service) -> Vec<Asking> {
+    let mut asks: Vec<Asking> = manifest
+        .asking
+        .iter()
+        .filter(|ask| {
+            manifest
+                .asks(ask.service.as_deref())
+                .is_some_and(|asker| asker.id == service.id)
+        })
+        .map(|ask| Asking {
+            capability: ask.capability.clone(),
+            each: ask.each,
+        })
+        .collect();
+    for value in service.env.values() {
+        if let Value::Url(url) = value {
+            let narrowed = url.files.is_some() || url.native.is_some();
+            if !narrowed && !asks.iter().any(|ask| ask.capability == url.url_of) {
+                asks.push(Asking {
+                    capability: url.url_of.clone(),
+                    each: false,
+                });
+            }
+        }
+    }
+    asks
+}
+
 /// One capability a placed service asks for.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -167,19 +198,7 @@ impl Placed {
             native: service.native.clone(),
             replaces: service.replaces.clone(),
             shape: service.shape,
-            asks: manifest
-                .asking
-                .iter()
-                .filter(|ask| {
-                    manifest
-                        .asks(ask.service.as_deref())
-                        .is_some_and(|asker| asker.id == service.id)
-                })
-                .map(|ask| Asking {
-                    capability: ask.capability.clone(),
-                    each: ask.each,
-                })
-                .collect(),
+            asks: asks(manifest, service),
         }
     }
 
@@ -202,6 +221,11 @@ impl Placed {
     #[must_use]
     pub fn published(&self) -> Option<u16> {
         self.reached.as_ref().map(Reached::port)
+    }
+
+    /// Every port it publishes on the host: the one it is reached on, then each further one.
+    pub fn ports(&self) -> impl Iterator<Item = u16> + '_ {
+        lemonfiber_manifest::container::published(self.published(), &self.fields.publish)
     }
 }
 

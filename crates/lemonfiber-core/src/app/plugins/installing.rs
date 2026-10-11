@@ -98,7 +98,7 @@ pub(super) async fn install(
         .as_deref()
         .ok_or_else(|| Box::new(nowhere_to_write(&would.plugin)))?;
     super::occupied::unoccupied(ctx, &would, held.installed(), stack)?;
-    let planned = writing::landing(ctx, crate::plugin::writes(&would, stack));
+    let planned = writing::landing(ctx, super::addressing::writes(ctx, &would, stack));
     let wiring = standing::standing(ctx, &stack_manifest, &held, &would);
     let changes = crate::plugin::changes(&planned);
     let offer = offering::installing(&read.digest, &would, &changes, &wiring);
@@ -127,6 +127,7 @@ pub(super) async fn install(
         // fact there is nothing left to ask.
         let (standing, before) = verifying::looked(ctx).await?;
 
+        writing::unlinked(ctx, &would, stack)?;
         carry_out(ctx, &would.plugin, &stamp, &planned)?;
 
         // Started before it is registered, which is why the invocation carries this

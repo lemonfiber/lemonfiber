@@ -20,6 +20,8 @@
 //! mistake in it, and the author is the only one who can say which of the two names
 //! they meant.
 
+use lemonfiber_manifest::container::{doubled, published};
+
 use crate::schema::{Manifest, Service};
 use crate::Violation;
 
@@ -34,13 +36,17 @@ pub(super) fn with_the_stack(manifest: &Manifest, found: &mut Vec<Violation>) {
         if replaced.is_none() {
             named_like_the_stack(service, &at, found);
         }
-        let clash = service
-            .port
-            .and_then(|port| bundled::publishing(port).map(|held| (port, held)))
+        let clashes = published(service.port, &service.publish)
+            .filter_map(|port| bundled::publishing(port).map(|held| (port, held)))
             .filter(|(_, held)| replaced != Some(held.id.as_str()));
-        if let Some((port, held)) = clash {
+        for (port, held) in clashes {
+            let field = if service.port == Some(port) {
+                "port"
+            } else {
+                "publish"
+            };
             found.push(Violation {
-                location: format!("{at}.port"),
+                location: format!("{at}.{field}"),
                 message: format!(
                     "{port} is the port the stack already publishes {} on, and one address \
                      answers for one service; lemonfiber assigns the address from the tier, so a \
@@ -51,6 +57,20 @@ pub(super) fn with_the_stack(manifest: &Manifest, found: &mut Vec<Violation>) {
         }
     }
     addressed(manifest, found);
+    let ports = manifest.services.iter().map(|service| {
+        (
+            service.id.as_str(),
+            published(service.port, &service.publish),
+        )
+    });
+    for (port, first, again) in doubled(ports) {
+        found.push(Violation {
+            location: format!("service {again}.publish"),
+            message: format!(
+                "publishes {port}, which service {first} already publishes, and one address                  answers for one service"
+            ),
+        });
+    }
 }
 
 /// An id the shipped stack declares, or one written as a shipped id is.

@@ -1,4 +1,6 @@
-use super::{answering, declared, hostnames, named, proxied, publishing, services, STACK};
+use super::{
+    answering, declared, hostnames, named, proxied, publishing, publishing_in, services, STACK,
+};
 
 /// The register found the stack, rather than finding nothing and passing.
 ///
@@ -109,4 +111,21 @@ fn each_proxied_name_is_routed_to_the_service_its_stanza_names() {
     );
     assert_eq!(super::routed_to("watch"), Some("door"));
     assert_eq!(super::routed_to("nowhere"), None);
+}
+
+/// A port a shipped service publishes as a further port is held as its first is.
+#[test]
+fn a_further_port_a_shipped_service_publishes_is_held() {
+    let mut shipped = declared(STACK);
+    if let Some(door) = shipped.iter_mut().find(|one| one.id == "jellyfin") {
+        door.publish = vec![lemonfiber_manifest::container::Publish {
+            port: 8920,
+            listens: None,
+        }];
+    }
+    assert_eq!(
+        publishing_in(&shipped, 8920).map(|held| held.id.as_str()),
+        Some("jellyfin")
+    );
+    assert_eq!(publishing_in(&shipped, 8921), None);
 }
