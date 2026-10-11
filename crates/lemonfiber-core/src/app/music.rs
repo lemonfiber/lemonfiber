@@ -14,10 +14,8 @@ use super::Ctx;
 use crate::audio::Format;
 use crate::error::Problem;
 use crate::model::{Disposition, MusicReport, Triggered};
+use crate::ports::media::MUSIC;
 use crate::ports::service::MusicQuality;
-
-/// The compose id of the music service the format is applied to.
-const MUSIC_SERVICE_ID: &str = "lidarr";
 
 /// Record the audio format for music and apply it to the music service, reporting what
 /// became of both.
@@ -63,11 +61,16 @@ async fn apply(ctx: &Ctx, format: Format) -> Triggered {
         .ok()
         .map(|manifest| {
             let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-            curator_targets(&manifest.services, project.as_deref())
+            let curating_music: Vec<_> = manifest
+                .services
+                .into_iter()
+                .filter(|service| service.media_types.iter().any(|media| media == MUSIC))
+                .collect();
+            curator_targets(&curating_music, project.as_deref())
         })
         .unwrap_or_default()
         .into_iter()
-        .find(|target| target.id == MUSIC_SERVICE_ID);
+        .next();
     let Some(target) = target else {
         return Triggered::NotStarted;
     };

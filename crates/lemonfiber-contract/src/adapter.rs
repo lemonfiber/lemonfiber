@@ -16,6 +16,12 @@ pub const KEY_FILE: &str = "lemonfiber.key";
 /// credential to, as a JSON object of named strings.
 pub const UPSTREAM_FILE: &str = "upstream.json";
 
+/// The part of an upstream's credential naming the account it signs in as.
+pub const UPSTREAM_USERNAME: &str = "username";
+
+/// The part of an upstream's credential holding that account's password.
+pub const UPSTREAM_PASSWORD: &str = "password";
+
 /// What every adapter answers under, beside the capabilities it serves.
 pub const ADAPTER: &str = "adapter";
 

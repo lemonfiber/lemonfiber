@@ -9,7 +9,7 @@ use lemonfiber_ports::media::Kind;
 use lemonfiber_ports::service::{Failure, Subtitles, Watched, Watching};
 use tower::ServiceExt as _;
 
-use super::{key_in, serve, serving, upstream_in, Kit};
+use super::{key_in, serve, serving, upstream_in, Kit, UPSTREAM_MOST};
 
 const KEY: &str = "the-plugins-key";
 
@@ -180,7 +180,24 @@ fn the_upstreams_credential_is_read_afresh_from_where_the_core_wrote_it() {
     let _ = std::fs::write(dir.join(UPSTREAM_FILE), r#"{"password":"rotated"}"#);
     let rotated = upstream_in(&dir).unwrap_or_default();
     assert_eq!(rotated.get("password").map(String::as_str), Some("rotated"));
-    let _ = std::fs::write(dir.join(UPSTREAM_FILE), r#"{"password":7}"#);
+    let _ = std::fs::write(
+        dir.join(UPSTREAM_FILE),
+        r#"{"password":"secret-value","n":7}"#,
+    );
+    let refused = upstream_in(&dir).err();
+    assert_eq!(
+        refused.as_ref().map(std::io::Error::kind),
+        Some(std::io::ErrorKind::InvalidData)
+    );
+    assert!(!refused
+        .map(|err| err.to_string())
+        .unwrap_or_default()
+        .contains("secret-value"));
+    let bulk = usize::try_from(UPSTREAM_MOST).unwrap_or(usize::MAX);
+    let _ = std::fs::write(
+        dir.join(UPSTREAM_FILE),
+        format!(r#"{{"password":"{}"}}"#, "x".repeat(bulk)),
+    );
     assert_eq!(
         upstream_in(&dir).err().map(|err| err.kind()),
         Some(std::io::ErrorKind::InvalidData)
