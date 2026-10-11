@@ -37,9 +37,9 @@ const STACK: &str = lemonfiber_bundled::STACK;
 /// `the_day_these_tests_use_is_after_everything_the_stack_records` is the guard;
 /// when it fails, move this forward rather than pinning an older image.
 pub(in crate::validate) const TODAY: Date = Date {
-    year: 2026,
-    month: 10,
-    day: 6,
+    year: 2030,
+    month: 1,
+    day: 1,
 };
 
 fn check(text: &str) -> Vec<Violation> {

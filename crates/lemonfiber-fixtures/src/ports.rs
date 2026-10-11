@@ -15,6 +15,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
+use lemonfiber_manifest::Date;
 use lemonfiber_ports::network::Site;
 use lemonfiber_ports::process::{Failure as RunFailure, Output, Runner};
 use lemonfiber_ports::random::Random;
@@ -39,7 +40,7 @@ impl Runner for Idle {
 /// A clock stopped at a fixed moment, so what a run stamps is the same every time.
 pub struct Stopped(SystemTime);
 
-/// A day the stack manifest is not ahead of: 2026-10-06T00:00:00Z, in seconds.
+/// A day the stack manifest is not ahead of: 2030-01-01T00:00:00Z, in seconds.
 ///
 /// A test that validates the manifest is validating it against whatever day its
 /// clock says it is, and a service records the day its upstream last released — so
@@ -47,9 +48,32 @@ pub struct Stopped(SystemTime);
 /// validation. The manifest is a submodule that moves forward and these clocks do
 /// not, so they share one day rather than each going stale on its own.
 ///
-/// `the_frozen_day_is_not_older_than_the_stack_it_validates` is the guard. When it
+/// `the_fixture_clock_is_not_older_than_the_stack_it_validates` is the guard. When it
 /// fails, move this forward; do not pin an older image to satisfy it.
-pub const TODAY: u64 = 1_791_244_800;
+pub const TODAY: u64 = 1_893_456_000;
+
+/// An hour, in seconds.
+pub const HOUR: i64 = 3_600;
+
+/// A day, in seconds.
+pub const DAY: i64 = 24 * HOUR;
+
+/// The moment `seconds` after [`TODAY`], or before it where negative, written
+/// `YYYY-MM-DDTHH:MM:SS` in UTC.
+#[must_use]
+pub fn stamp(seconds: i64) -> String {
+    let at = i64::try_from(TODAY).unwrap_or_default() + seconds;
+    let date = Date::from_unix_seconds(at)
+        .map(|date| date.to_string())
+        .unwrap_or_default();
+    let past = at.rem_euclid(DAY);
+    format!(
+        "{date}T{:02}:{:02}:{:02}",
+        past / HOUR,
+        past % HOUR / 60,
+        past % 60
+    )
+}
 
 impl Stopped {
     /// Stopped this many seconds after the epoch.

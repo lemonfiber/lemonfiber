@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use lemonfiber_fixtures::http::{Answer, Fake as Transport};
+use lemonfiber_fixtures::ports::{stamp, DAY, HOUR};
 
 use super::{chosen, counted, said, Choice};
 use crate::app::{Ctx, Outcome};
@@ -446,19 +447,25 @@ async fn seasons_named_wrongly_are_refused_and_seasons_all_here_or_coming_create
 
 #[tokio::test]
 async fn an_ask_past_the_members_allowance_is_refused_saying_when_it_frees_up() {
-    let requests = r#"{"pageInfo":{"results":4},"results":[
-        {"id":3,"status":2,"createdAt":"2026-10-05T10:00:00.000Z","type":"movie",
-            "media":{"status":5},"requestedBy":{"displayName":"Ada","jellyfinUserId":"a7f3"}},
-        {"id":4,"status":3,"createdAt":"2026-09-20T10:00:00.000Z","type":"movie",
-            "media":{"status":1},"requestedBy":{"displayName":"Ada","jellyfinUserId":"a7f3"}},
-        {"id":5,"status":2,"createdAt":"2026-09-21T10:00:00.000Z","type":"movie",
-            "media":{"status":5},"requestedBy":{"displayName":"Bea","jellyfinUserId":"b8e4"}},
-        {"id":6,"status":2,"createdAt":"2026-10-06T08:00:00.000Z","type":"movie",
-            "media":{"status":5},"requestedBy":{"displayName":"ada"}}]}"#;
+    let requests = format!(
+        r#"{{"pageInfo":{{"results":4}},"results":[
+        {{"id":3,"status":2,"createdAt":"{}.000Z","type":"movie",
+            "media":{{"status":5}},"requestedBy":{{"displayName":"Ada","jellyfinUserId":"a7f3"}}}},
+        {{"id":4,"status":3,"createdAt":"{}.000Z","type":"movie",
+            "media":{{"status":1}},"requestedBy":{{"displayName":"Ada","jellyfinUserId":"a7f3"}}}},
+        {{"id":5,"status":2,"createdAt":"{}.000Z","type":"movie",
+            "media":{{"status":5}},"requestedBy":{{"displayName":"Bea","jellyfinUserId":"b8e4"}}}},
+        {{"id":6,"status":2,"createdAt":"{}.000Z","type":"movie",
+            "media":{{"status":5}},"requestedBy":{{"displayName":"ada"}}}}]}}"#,
+        stamp(-DAY + 10 * HOUR),
+        stamp(-16 * DAY + 10 * HOUR),
+        stamp(-15 * DAY + 10 * HOUR),
+        stamp(8 * HOUR),
+    );
     let spent = r#"{"movie":{"days":30,"limit":1,"used":1},"tv":{}}"#;
     let transport = titled(vec![
         route(Method::Get, "/quota", 200, spent),
-        route(Method::Get, "/api/v1/request?", 200, requests),
+        route(Method::Get, "/api/v1/request?", 200, &requests),
     ]);
     let ctx = ctx_over(Arc::clone(&transport), "ask-spent");
 
@@ -476,9 +483,13 @@ async fn an_ask_past_the_members_allowance_is_refused_saying_when_it_frees_up() 
         .as_ref()
         .err()
         .is_some_and(
-            |problem| problem.remedies.first().is_some_and(|remedy| remedy
-                .action
-                .starts_with("You can ask again from 2026-11-04"))
+            |problem| problem
+                .remedies
+                .first()
+                .is_some_and(|remedy| remedy.action.starts_with(&format!(
+                    "You can ask again from {}",
+                    &stamp(29 * DAY)[..10]
+                )))
         ));
     assert!(filed(&transport).is_empty());
 }
