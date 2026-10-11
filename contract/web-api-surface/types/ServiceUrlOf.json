@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "files": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "native": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "url_of": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

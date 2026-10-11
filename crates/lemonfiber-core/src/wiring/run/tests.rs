@@ -435,14 +435,24 @@ fn a_choice_over_a_record_that_will_not_read_is_refused() {
 /// A media server a plugin brought, written into the layout at `at` as an install leaves
 /// it: recorded, and its document written, on no network of the stack's.
 fn a_plugin_media_server(ctx: &crate::app::Ctx, at: &std::path::Path) -> std::path::PathBuf {
+    a_plugin_media_server_as(ctx, at, |_| ())
+}
+
+/// The same, its media server changed by `change` first.
+fn a_plugin_media_server_as(
+    ctx: &crate::app::Ctx,
+    at: &std::path::Path,
+    change: impl FnOnce(&mut crate::plugin::Placed),
+) -> std::path::PathBuf {
     let api = lemonfiber_manifest::Api {
         kind: lemonfiber_manifest::ApiKind::Jellyfin,
         key_source: lemonfiber_manifest::KeySource::ConfigXml,
         path: Some("/config/config.xml".to_owned()),
         version: None,
     };
-    let server =
+    let mut server =
         crate::test_support::a_placed("server", &["identity.source"], Some(api), Some(8097));
+    change(&mut server);
     let installed = crate::test_support::an_installed("serving", vec![server]);
     let mut register = crate::plugin::Register::empty();
     assert!(register.record(installed.clone()).is_ok());
@@ -450,7 +460,11 @@ fn a_plugin_media_server(ctx: &crate::app::Ctx, at: &std::path::Path) -> std::pa
         crate::app::record::keep(crate::app::plugins::kept_at(ctx).as_deref(), &register).is_ok()
     );
     let document = crate::plugin::overlay(&at.join("data").join("stack"), "serving");
-    assert!(crate::config::store::write(&document, &crate::plugin::written(&installed)).is_ok());
+    assert!(crate::config::store::write(
+        &document,
+        &crate::plugin::written(&installed, &crate::plugin::Reading::bare())
+    )
+    .is_ok());
     document
 }
 
@@ -531,13 +545,14 @@ fn without_a_stack_directory_no_plugin_document_is_written_over() {
     let overwrites = manifest
         .as_ref()
         .zip(read.as_ref())
-        .map(|(manifest, register)| {
+        .and_then(|(manifest, register)| {
             crate::app::plugins::writing::rejoined(
                 &ctx,
                 manifest,
                 register,
                 &crate::wiring::Chosen::read(Some("identity.source=server")),
             )
+            .ok()
         })
         .unwrap_or_default();
 
@@ -562,13 +577,14 @@ fn a_choice_over_what_was_installed_since_it_read_writes_nothing() {
     let overwrites = manifest
         .as_ref()
         .zip(read.as_ref())
-        .map(|(manifest, register)| {
+        .and_then(|(manifest, register)| {
             crate::app::plugins::writing::rejoined(
                 &ctx,
                 manifest,
                 register,
                 &crate::wiring::Chosen::read(Some("identity.source=server")),
             )
+            .ok()
         })
         .unwrap_or_default();
     let kept = crate::app::plugins::kept_at(&ctx).unwrap_or_default();
@@ -620,5 +636,50 @@ fn a_file_that_will_not_be_written_over_is_said_unwritten() {
     assert_eq!(
         std::fs::read_to_string(&file).ok().as_deref(),
         Some("before\n")
+    );
+}
+
+/// A choice that would write over a plugin's document is refused, writing nothing, where
+/// one of that plugin's mount sources is reached through a link.
+#[cfg(unix)]
+#[test]
+fn a_choice_over_a_document_whose_mount_source_is_a_link_writes_nothing() {
+    let (ctx, at) = ctx("rejoined-linked");
+    let document = a_plugin_media_server_as(&ctx, &at, |server| {
+        server.fields.mount = vec![lemonfiber_manifest::container::Mount {
+            from: "Caddyfile".to_owned(),
+            to: "/etc/caddy/Caddyfile".to_owned(),
+            ro: true,
+        }];
+    });
+    let tree = at.join("data").join("stack").join("mounts").join("server");
+    let _ = std::fs::create_dir_all(&tree);
+    let _ = std::os::unix::fs::symlink("/etc/hostname", tree.join("Caddyfile"));
+    let before = std::fs::read_to_string(&document).unwrap_or_default();
+
+    let chosen = agreed(&ctx, fill("identity.source", "server"));
+
+    assert!(
+        chosen.is_err_and(|why| why.summary.contains("Caddyfile")),
+        "the linked source is named"
+    );
+    assert_eq!(std::fs::read_to_string(&document).ok(), Some(before));
+}
+
+/// A choice that moves the networks of a plugin whose document is not there writes no
+/// document for it, and moves its record alone.
+#[test]
+fn a_choice_moving_a_plugin_with_no_document_writes_its_record_alone() {
+    let (ctx, at) = ctx("rejoined-undocumented");
+    let document = a_plugin_media_server(&ctx, &at);
+    assert!(std::fs::remove_file(&document).is_ok());
+
+    let chosen = agreed(&ctx, fill("identity.source", "server")).ok();
+
+    assert_eq!(chosen.map(|report| report.applied), Some(true));
+    assert!(!document.exists());
+    assert_eq!(
+        joined(&ctx),
+        Some(vec!["default".to_owned(), "gate-upstream".to_owned()])
     );
 }

@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The container fields an install record keeps for a service, beyond those every\nrecord already holds.",
+  "type": "object",
+  "properties": {
+    "config_ro": {
+      "description": "Whether its configuration directory is read-only.",
+      "type": "boolean"
+    },
+    "env": {
+      "description": "Its environment.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "ServiceValue.json"
+      }
+    },
+    "mem_limit_mib": {
+      "description": "Its memory ceiling.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "minimum": 0
+    },
+    "mount": {
+      "description": "Its further mounts.",
+      "type": "array",
+      "items": {
+        "$ref": "ServiceMount.json"
+      }
+    },
+    "network": {
+      "description": "The network it runs inside.",
+      "anyOf": [
+        {
+          "$ref": "ServiceNetwork.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "posture": {
+      "description": "How tightly it is held.",
+      "$ref": "ServicePosture.json"
+    },
+    "publish": {
+      "description": "Its further published ports.",
+      "type": "array",
+      "items": {
+        "$ref": "ServicePublish.json"
+      }
+    },
+    "tmpfs": {
+      "description": "Its scratch paths in memory.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "user_mode": {
+      "description": "Who it runs as, where declared.",
+      "anyOf": [
+        {
+          "$ref": "ServiceUserMode.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "additionalProperties": false
+}

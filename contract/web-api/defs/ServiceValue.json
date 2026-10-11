@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One environment variable's value.",
+  "anyOf": [
+    {
+      "description": "A constant.",
+      "$ref": "ServiceConstant.json"
+    },
+    {
+      "description": "An operator setting.",
+      "$ref": "ServiceSetting.json"
+    },
+    {
+      "description": "A capability's filler's address.",
+      "$ref": "ServiceUrlOf.json"
+    },
+    {
+      "description": "A declared secret.",
+      "$ref": "ServiceSecretOf.json"
+    }
+  ]
+}

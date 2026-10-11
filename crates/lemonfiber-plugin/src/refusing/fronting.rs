@@ -10,7 +10,7 @@ pub(super) fn native(service: &Service, services: &[Service], found: &mut Vec<Vi
         return;
     };
     let location = format!("service {}.native", service.id);
-    if !one_word(native) {
+    if !lemonfiber_manifest::container::is_api_name(native) {
         found.push(Violation {
             location: location.clone(),
             message: format!(
@@ -27,13 +27,6 @@ pub(super) fn native(service: &Service, services: &[Service], found: &mut Vec<Vi
                 .to_owned(),
         });
     }
-}
-
-/// Whether `name` is one lowercase word: a letter, then letters and digits.
-fn one_word(name: &str) -> bool {
-    let mut chars = name.chars();
-    chars.next().is_some_and(|first| first.is_ascii_lowercase())
-        && chars.all(|one| one.is_ascii_lowercase() || one.is_ascii_digit())
 }
 
 /// Whether another of `services` fronts `service`.

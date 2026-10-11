@@ -77,6 +77,45 @@ fn a_port_the_stack_or_another_plugin_publishes_is_refused() {
     assert!(bound(&free, &stack, &[]).is_empty());
 }
 
+/// A further port the plugin publishes is held to the same as its first, against the stack
+/// and against every port another plugin publishes, further ones included.
+#[test]
+fn every_port_a_plugin_publishes_is_held_to_what_is_already_published() {
+    let further = |placed: Placed, port: u16| Placed {
+        fields: lemonfiber_manifest::container::Fields {
+            publish: vec![lemonfiber_manifest::container::Publish {
+                port,
+                listens: None,
+            }],
+            ..lemonfiber_manifest::container::Fields::default()
+        },
+        ..placed
+    };
+    let would = an_installed(
+        "tools",
+        vec![further(reached("web", 25600, Some("tools")), 8920)],
+    );
+    let stack = [Published {
+        port: 8920,
+        service: "jellyfin".to_owned(),
+        file: PathBuf::from("compose/media.yml"),
+    }];
+    let said = bound(&would, &stack, &[]);
+    assert_eq!(said.len(), 1, "{said:?}");
+    assert!(
+        said.iter()
+            .all(|one| one.contains("service web: port 8920") && one.contains("jellyfin")),
+        "{said:?}"
+    );
+
+    let other = an_installed("other", vec![further(reached("dash", 9000, None), 25600)]);
+    let said = bound(&would, &[], &[other]);
+    assert_eq!(
+        said,
+        ["service web: port 25600 is already published for other's dash"]
+    );
+}
+
 /// A label a site in the live proxy configuration answers on is refused; the plugin's
 /// own region in that file is not somebody else's site.
 #[test]

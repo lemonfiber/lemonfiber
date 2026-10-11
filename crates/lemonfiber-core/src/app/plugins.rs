@@ -80,6 +80,7 @@ mod occupied;
 // Which plugins may move one of the stack's own services in place.
 mod replacing;
 // Installing what the record already holds: an update, or a second source for one name.
+mod addressing;
 mod twice;
 mod updating;
 pub(crate) mod writing;

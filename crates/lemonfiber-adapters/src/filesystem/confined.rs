@@ -16,7 +16,7 @@
 use std::io::{Read as _, Write as _};
 use std::path::{Component, Path};
 
-use lemonfiber_ports::filesystem::{Beneath, Confined, Fault, READ_LIMIT};
+use lemonfiber_ports::filesystem::{Beneath, Confined, Fault, Lying, READ_LIMIT};
 
 use super::Disk;
 
@@ -27,6 +27,10 @@ impl Confined for Disk {
 
     fn overwrite(&self, path: &Path, within: &Path, contents: &[u8]) -> Result<(), Fault> {
         overwrite(path, within, contents)
+    }
+
+    fn lies(&self, path: &Path, within: &Path) -> Lying {
+        lies(path, within)
     }
 }
 
@@ -127,6 +131,52 @@ pub(super) fn make(path: &Path, within: &Path) -> Result<(), Fault> {
         }
     }
     Ok(())
+}
+
+/// Where `path` lies beneath `within`: each step opened through the handle of the one
+/// above it, never through a link and never waiting on what it opens.
+#[cfg(unix)]
+pub(super) fn lies(path: &Path, within: &Path) -> Lying {
+    use rustix::fs::{openat, Mode, OFlags, CWD};
+    let Ok(names) = steps(path, within) else {
+        return Lying::Escaped;
+    };
+    let opening = OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NONBLOCK;
+    let Ok(mut here) = openat(CWD, within, opening | OFlags::DIRECTORY, Mode::empty()) else {
+        return Lying::Absent;
+    };
+    let last = names.len().saturating_sub(1);
+    for (at, name) in names.into_iter().enumerate() {
+        let flags = if at == last {
+            opening | OFlags::NOFOLLOW
+        } else {
+            opening | OFlags::NOFOLLOW | OFlags::DIRECTORY
+        };
+        match openat(&here, name, flags, Mode::empty()) {
+            Ok(opened) => here = opened,
+            Err(rustix::io::Errno::NOENT) => return Lying::Absent,
+            Err(_) => return Lying::Escaped,
+        }
+    }
+    Lying::Plain
+}
+
+/// Where `path` lies beneath `within`, each step looked at and refused where it is a link.
+#[cfg(windows)]
+pub(super) fn lies(path: &Path, within: &Path) -> Lying {
+    let Ok(names) = steps(path, within) else {
+        return Lying::Escaped;
+    };
+    let mut here = within.to_path_buf();
+    for name in names {
+        here.push(name);
+        match std::fs::symlink_metadata(&here) {
+            Ok(found) if found.file_type().is_symlink() => return Lying::Escaped,
+            Ok(_) => {}
+            Err(_) => return Lying::Absent,
+        }
+    }
+    Lying::Plain
 }
 
 /// The names `path` is made of below `within`, refused where it is not beneath it or

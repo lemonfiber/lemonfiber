@@ -7,6 +7,18 @@ use serde::{Deserialize, Serialize};
 
 use crate::validate::{is_core_name, GATEWAY_GRANT, TUNNEL_DEVICE};
 
+mod paths;
+mod ports;
+mod record;
+mod words;
+
+use paths::target;
+pub use paths::{is_plain, is_source, is_target, lies_inside};
+pub use ports::{doubled, published};
+pub use record::Fields;
+pub use words::is_api_name;
+use words::is_variable;
+
 /// Where a service's configuration directory lands when it names nowhere.
 pub const CONFIGURATION: &str = "/config";
 
@@ -27,6 +39,9 @@ pub const EGRESS_GUARD: &str = "network.egress-guard";
 
 /// The media server's capability.
 pub const MEDIA_SERVE: &str = "media.serve";
+
+/// The media a service files, in the stack manifest's vocabulary.
+pub const MEDIA: [&str; 5] = ["tv", "movies", "music", "books", "comics"];
 
 /// The capabilities a service may run inside the network of.
 pub const VIA: [&str; 1] = [EGRESS_GUARD];
@@ -90,8 +105,9 @@ impl Shape {
 }
 
 /// A further port a service publishes on its tier.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[schemars(rename = "ServicePublish")]
 pub struct Publish {
     /// Where it is published on the host.
     pub port: u16,
@@ -100,11 +116,12 @@ pub struct Publish {
     pub listens: Option<u16>,
 }
 
-/// A further path mounted from inside the service's own configuration directory.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
+/// A further path mounted from the service's own mount tree.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[schemars(rename = "ServiceMount")]
 pub struct Mount {
-    /// The relative path inside the configuration directory.
+    /// The relative path inside the mount tree.
     pub from: String,
     /// The absolute path inside the container.
     pub to: String,
@@ -114,8 +131,9 @@ pub struct Mount {
 }
 
 /// A value written exactly as declared.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(untagged)]
+#[schemars(rename = "ServiceConstant")]
 pub enum Constant {
     /// A string.
     Text(String),
@@ -126,8 +144,9 @@ pub enum Constant {
 }
 
 /// An operator setting, with what is written while none is recorded.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[schemars(rename = "ServiceSetting")]
 pub struct Setting {
     /// The setting's name.
     pub setting: String,
@@ -136,8 +155,9 @@ pub struct Setting {
 }
 
 /// The address of a capability's filler.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[schemars(rename = "ServiceUrlOf")]
 pub struct UrlOf {
     /// The capability asked for.
     pub url_of: String,
@@ -150,16 +170,18 @@ pub struct UrlOf {
 }
 
 /// A secret the manifest declares.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[schemars(rename = "ServiceSecretOf")]
 pub struct SecretOf {
     /// The declared secret's name.
     pub secret: String,
 }
 
 /// One environment variable's value.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(untagged)]
+#[schemars(rename = "ServiceValue")]
 pub enum Value {
     /// A constant.
     Constant(Constant),
@@ -174,6 +196,7 @@ pub enum Value {
 /// Who the container runs as.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
+#[schemars(rename = "ServiceUserMode")]
 pub enum UserMode {
     /// No user: the image decides.
     Image,
@@ -183,11 +206,25 @@ pub enum UserMode {
     Uid,
 }
 
+impl UserMode {
+    /// Who a service runs as: the mode it declares, or else `uid` where it speaks a
+    /// contract or is confined, and the image's choice otherwise.
+    #[must_use]
+    pub const fn of(declared: Option<Self>, speaks: bool, posture: Posture) -> Self {
+        match declared {
+            Some(mode) => mode,
+            None if speaks || matches!(posture, Posture::Confined) => Self::Uid,
+            None => Self::Image,
+        }
+    }
+}
+
 /// How tightly the container is held.
 #[derive(
     Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema,
 )]
 #[serde(rename_all = "kebab-case")]
+#[schemars(rename = "ServicePosture")]
 pub enum Posture {
     /// Six kernel capabilities, no privilege gained, a bounded process count.
     #[default]
@@ -197,11 +234,20 @@ pub enum Posture {
 }
 
 /// The network a service runs inside instead of its own.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[schemars(rename = "ServiceNetwork")]
 pub struct Network {
     /// The capability whose filler's network it runs inside.
     pub via: String,
+}
+
+impl Posture {
+    /// Whether it is the standard posture.
+    #[must_use]
+    pub const fn is_standard(&self) -> bool {
+        matches!(self, Self::Standard)
+    }
 }
 
 /// One service's container fields, borrowed from whichever manifest declares them.
@@ -256,12 +302,8 @@ impl Container<'_> {
 
     /// Who it runs as, the declared mode or the one its kind requires.
     #[must_use]
-    pub fn user(&self) -> UserMode {
-        match self.user_mode {
-            Some(mode) => mode,
-            None if self.speaks || self.posture == Posture::Confined => UserMode::Uid,
-            None => UserMode::Image,
-        }
+    pub const fn user(&self) -> UserMode {
+        UserMode::of(self.user_mode, self.speaks, self.posture)
     }
 
     /// Every rule its fields break, each as where and what.
@@ -289,11 +331,7 @@ impl Container<'_> {
             ));
         }
         let mut seen = Vec::new();
-        for port in self
-            .port
-            .into_iter()
-            .chain(self.publish.iter().map(|it| it.port))
-        {
+        for port in published(self.port, self.publish) {
             if seen.contains(&port) {
                 found.push((self.at("publish"), format!("publishes {port} twice")));
             }
@@ -313,16 +351,29 @@ impl Container<'_> {
         let mut targets = vec![self.configuration()];
         for mount in self.mounts {
             let at = self.at(&format!("mount {}", mount.to));
-            if !is_relative(&mount.from) {
+            if !is_source(&mount.from) {
                 found.push((
                     at.clone(),
                     format!(
-                        "{} is not a relative path inside its own configuration directory",
+                        "{} is not a relative path inside its own mount tree",
                         mount.from
                     ),
                 ));
             }
-            self.landed(at, &mount.to, &mut targets, found);
+            self.landed(at.clone(), &mount.to, &mut targets, found);
+            if let Some(outer) = self
+                .mounts
+                .iter()
+                .find(|other| lies_inside(&mount.from, &other.from))
+            {
+                found.push((
+                    at,
+                    format!(
+                        "{} lies inside {}, another of its sources",
+                        mount.from, outer.from
+                    ),
+                ));
+            }
         }
         for path in self.tmpfs {
             self.landed(self.at(&format!("tmpfs {path}")), path, &mut targets, found);
@@ -375,15 +426,7 @@ impl Container<'_> {
                     )
                 }),
             ),
-            Value::Url(url) => (
-                None,
-                (!is_core_name(&url.url_of)).then(|| {
-                    format!(
-                        "asks for the address of {}, which is not a core capability",
-                        url.url_of
-                    )
-                }),
-            ),
+            Value::Url(url) => (None, narrowed(url)),
             Value::Secret(secret) => (
                 None,
                 (!self.secrets.contains(&secret.secret.as_str())).then(|| {
@@ -447,6 +490,29 @@ impl Container<'_> {
     }
 }
 
+/// What is wrong with an ask for an address: a capability outside the core's, a medium
+/// outside the vocabulary or an API that is not one lowercase word.
+fn narrowed(url: &UrlOf) -> Option<String> {
+    let mut wrong = Vec::new();
+    if !is_core_name(&url.url_of) {
+        wrong.push(format!("{} is not a core capability", url.url_of));
+    }
+    if let Some(medium) = url
+        .files
+        .as_deref()
+        .filter(|medium| !MEDIA.contains(medium))
+    {
+        wrong.push(format!(
+            "files {medium}, which is not one of {}",
+            MEDIA.join(", ")
+        ));
+    }
+    if let Some(api) = url.native.as_deref().filter(|api| !is_api_name(api)) {
+        wrong.push(format!("native {api} is not one lowercase word"));
+    }
+    (!wrong.is_empty()).then(|| format!("asks for an address where {}", wrong.join("; ")))
+}
+
 /// What is wrong with a constant that holds a character no reader can see.
 fn unshown(constant: &Constant) -> Option<String> {
     match constant {
@@ -455,43 +521,6 @@ fn unshown(constant: &Constant) -> Option<String> {
         }
         Constant::Text(_) | Constant::Number(_) | Constant::Flag(_) => None,
     }
-}
-
-/// What is wrong with `path` as a target inside a container, if anything.
-fn target(path: &str, takes_data: bool) -> Option<&'static str> {
-    if !path.starts_with('/') || path == "/" || path.contains("..") || !is_plain(path) {
-        return Some(
-            "is not one plain absolute path: not the root, with no \"..\", in letters, digits \
-             and \"._/-\" alone",
-        );
-    }
-    let in_data = path == DATA || path.starts_with(&format!("{DATA}/"));
-    (takes_data && in_data).then_some("is inside the data mount")
-}
-
-fn is_relative(path: &str) -> bool {
-    !path.is_empty()
-        && !path.starts_with('/')
-        && is_plain(path)
-        && path
-            .split('/')
-            .all(|step| !step.is_empty() && step != "." && step != "..")
-}
-
-/// Whether `text` is written only in letters, digits, `.`, `_`, `/` and `-`.
-#[must_use]
-pub fn is_plain(text: &str) -> bool {
-    text.chars()
-        .all(|letter| letter.is_ascii_alphanumeric() || matches!(letter, '.' | '_' | '/' | '-'))
-}
-
-fn is_variable(name: &str) -> bool {
-    name.chars()
-        .next()
-        .is_some_and(|first| first.is_ascii_uppercase() || first == '_')
-        && name
-            .chars()
-            .all(|letter| letter.is_ascii_uppercase() || letter.is_ascii_digit() || letter == '_')
 }
 
 mod fields;

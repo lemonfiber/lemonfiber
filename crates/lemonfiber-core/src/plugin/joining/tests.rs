@@ -130,7 +130,7 @@ fn the_record_carries_what_each_service_joins_into_its_container() {
         },
     );
 
-    let written = crate::plugin::written(&installed);
+    let written = crate::plugin::written(&installed, &crate::plugin::Reading::bare());
 
     assert_eq!(
         installed

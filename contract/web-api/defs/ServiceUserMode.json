@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Who the container runs as.",
+  "oneOf": [
+    {
+      "description": "No user: the image decides.",
+      "type": "string",
+      "const": "image"
+    },
+    {
+      "description": "`PUID` and `PGID` set to the operator's.",
+      "type": "string",
+      "const": "puid-env"
+    },
+    {
+      "description": "The operator's uid and gid as the container's user.",
+      "type": "string",
+      "const": "uid"
+    }
+  ]
+}

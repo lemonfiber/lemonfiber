@@ -70,7 +70,13 @@ fn whole() -> Option<Manifest> {
 /// What installing the fixture writes, beneath the stack above.
 fn planned() -> Vec<crate::plugin::Write> {
     whole()
-        .map(|read| crate::plugin::writes(&Installed::of(&read), stack()))
+        .map(|read| {
+            crate::plugin::writes(
+                &Installed::of(&read),
+                stack(),
+                &crate::plugin::Reading::bare(),
+            )
+        })
         .unwrap_or_default()
 }
 
@@ -115,7 +121,13 @@ fn an_adapter_service_states_its_key_by_path() {
         }
     });
     let planned = speaking
-        .map(|read| crate::plugin::writes(&Installed::of(&read), stack()))
+        .map(|read| {
+            crate::plugin::writes(
+                &Installed::of(&read),
+                stack(),
+                &crate::plugin::Reading::bare(),
+            )
+        })
         .unwrap_or_default();
     assert_eq!(
         changes(&planned)

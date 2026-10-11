@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "default": {
+      "type": [
+        "ref:ServiceConstant"
+      ],
+      "required": true
+    },
+    "setting": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

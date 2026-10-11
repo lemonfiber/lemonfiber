@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The network a service runs inside instead of its own.",
+  "type": "object",
+  "properties": {
+    "via": {
+      "description": "The capability whose filler's network it runs inside.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "via"
+  ]
+}

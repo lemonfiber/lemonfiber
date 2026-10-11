@@ -19,6 +19,7 @@ use crate::error::{Problem, Remedy, State};
 use crate::error::Diagnose as _;
 use crate::journal::{Change, Kind};
 use crate::plugin::Installed;
+use crate::ports::filesystem::Lying;
 
 use super::super::Ctx;
 use super::{NOWHERE, UNWRITABLE};
@@ -67,7 +68,10 @@ pub(crate) fn carry_out(
     for write in planned {
         let (key, owner, body) = match &write.lands {
             crate::plugin::Lands::Region { key, owner, body } => (key, owner, body),
-            crate::plugin::Lands::Directory => {
+            crate::plugin::Lands::Directory { beneath } => {
+                if ctx.seams.confined.lies(&write.path, beneath) == Lying::Escaped {
+                    return Err(Box::new(unwritable(&write.path, LINKED)));
+                }
                 made_whole(ctx, plugin, stamp, &journal, &write.path, None)?;
                 continue;
             }
@@ -105,6 +109,22 @@ pub(crate) fn carry_out(
         .map_err(|why| Box::new(unwritable(&write.path, &why)))?;
     }
     Ok(())
+}
+
+/// Why a path beneath the stack directory is not written to.
+const LINKED: &str = "it is reached through a link or lies outside the stack directory";
+
+/// Refuse where a mount source of `installed`'s services is reached through a link from
+/// the stack directory, before its document is written from the record.
+///
+/// # Errors
+///
+/// Naming the first source that is.
+pub(crate) fn unlinked(ctx: &Ctx, installed: &Installed, stack: &Path) -> Result<(), Box<Problem>> {
+    crate::plugin::mount_sources(installed, stack)
+        .into_iter()
+        .find(|source| ctx.seams.confined.lies(source, stack) == Lying::Escaped)
+        .map_or(Ok(()), |source| Err(Box::new(unwritable(&source, LINKED))))
 }
 
 /// Make one directory, or write one whole document holding `content`, journalling
@@ -246,17 +266,19 @@ pub(crate) struct Overwrite {
 /// Nothing where no network moves, and no document for a plugin whose document is not
 /// there to be written over — a plugin with no document is one nothing runs, and the
 /// record alone is what it is written from.
+///
+/// # Errors
+///
+/// Where a mount source of a plugin whose document it writes over is reached through a
+/// link.
 pub(crate) fn rejoined(
     ctx: &Ctx,
     manifest: &lemonfiber_manifest::Manifest,
     register: &crate::plugin::Register,
     chosen: &crate::wiring::Chosen,
-) -> Vec<Overwrite> {
-    let joins = crate::plugin::Joins::of(
-        manifest,
-        &ctx.stack.attached(),
-        &crate::wiring::settle(manifest, register.installed(), chosen),
-    );
+) -> Result<Vec<Overwrite>, Box<Problem>> {
+    let settled = crate::wiring::settle(manifest, register.installed(), chosen);
+    let joins = crate::plugin::Joins::of(manifest, &ctx.stack.attached(), &settled);
     let mut after = register.clone();
     let mut overwrites = Vec::new();
     for held in register.installed() {
@@ -267,10 +289,16 @@ pub(crate) fn rejoined(
         if let Some(stack) = ctx.settings.stack_dir.as_deref() {
             let path = crate::plugin::overlay(stack, &held.plugin);
             if let Ok(previous) = std::fs::read_to_string(&path) {
+                unlinked(ctx, &moved, stack)?;
                 overwrites.push(Overwrite {
                     path,
                     previous,
-                    text: crate::plugin::written(&moved),
+                    text: super::addressing::written(
+                        &settled,
+                        manifest,
+                        register.installed(),
+                        &moved,
+                    ),
                 });
             }
         }
@@ -287,7 +315,7 @@ pub(crate) fn rejoined(
             text: serde_json::to_string(&after).unwrap_or_default(),
         });
     }
-    overwrites
+    Ok(overwrites)
 }
 
 /// Refuse where any file to be written over no longer holds what was read from it.
@@ -368,7 +396,7 @@ pub(crate) fn landing(ctx: &Ctx, planned: Vec<crate::plugin::Write>) -> Vec<crat
             crate::plugin::Lands::Region { key, .. } => {
                 write.path.is_file() && !crate::unmanaged::covers(&ctx.settings.unmanaged, key)
             }
-            crate::plugin::Lands::Directory
+            crate::plugin::Lands::Directory { .. }
             | crate::plugin::Lands::Document(_)
             | crate::plugin::Lands::Key => true,
         })

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How tightly the container is held.",
+  "oneOf": [
+    {
+      "description": "Six kernel capabilities, no privilege gained, a bounded process count.",
+      "type": "string",
+      "const": "standard"
+    },
+    {
+      "description": "A read-only root and no kernel capability at all, besides.",
+      "type": "string",
+      "const": "confined"
+    }
+  ]
+}

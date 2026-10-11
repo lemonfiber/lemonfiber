@@ -166,7 +166,7 @@ pub fn changes(planned: &[Write]) -> Vec<Changing> {
         .map(|write| Changing {
             path: write.path.display().to_string(),
             puts: match write.lands {
-                Lands::Directory => Puts::Directory,
+                Lands::Directory { .. } => Puts::Directory,
                 Lands::Document(_) => Puts::Document,
                 Lands::Key => Puts::Key,
                 Lands::Region { .. } => Puts::Region,

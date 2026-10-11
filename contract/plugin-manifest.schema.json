@@ -136,14 +136,6 @@
       "additionalProperties": false,
       "required": ["id", "request", "expect", "fixture"]
     },
-    "Constant": {
-      "description": "A value written exactly as declared.",
-      "anyOf": [
-        {"description": "A string.", "type": "string"},
-        {"description": "An integer.", "type": "integer", "format": "int64"},
-        {"description": "A boolean.", "type": "boolean"}
-      ]
-    },
     "Contribution": {
       "description": "A row in a register lemonfiber already runs.\n\nThe fields beyond `at` and `id` are the row its point declares, and the point is\npublished — so the required set, the optional set, the closed sets and the bounds\nare read from `extension-points.json` rather than restated here. What this type\nfixes is that a contribution is declared in this block and nowhere else, and that\nit carries nothing outside the union of the rows the published points take.",
       "type": "object",
@@ -333,26 +325,6 @@
         {"description": "The service offers nothing durable, so lemonfiber mints and records one.", "type": "string", "const": "generated"},
         {"description": "The API needs no credential.", "type": "string", "const": "none"}
       ]
-    },
-    "Mount": {
-      "description": "A further path mounted from inside the service's own configuration directory.",
-      "type": "object",
-      "properties": {
-        "from": {"description": "The relative path inside the configuration directory.", "type": "string"},
-        "ro": {"description": "Whether it is mounted read-only.", "type": "boolean", "default": false},
-        "to": {"description": "The absolute path inside the container.", "type": "string"}
-      },
-      "additionalProperties": false,
-      "required": ["from", "to"]
-    },
-    "Network": {
-      "description": "The network a service runs inside instead of its own.",
-      "type": "object",
-      "properties": {
-        "via": {"description": "The capability whose filler's network it runs inside.", "type": "string"}
-      },
-      "additionalProperties": false,
-      "required": ["via"]
     },
     "Override": {
       "description": "A bundled thing the plugin will change.",
@@ -588,7 +560,8 @@
         "env": {
           "description": "Its environment, each variable one of four typed kinds of value.",
           "type": "object",
-          "additionalProperties": {"$ref": "#/$defs/Value"}
+          "additionalProperties": {"$ref": "#/$defs/ServiceValue"},
+          "default": {}
         },
         "fronts": {
           "description": "The plugin's own service this adapter stands in front of: the upstream it answers\nits contracts for, whose pinned digest its conformance recordings are taken\nagainst. Required where `speaks` is.",
@@ -633,9 +606,10 @@
           "minimum": 0
         },
         "mount": {
-          "description": "Each further path mounted from inside its own configuration directory.",
+          "description": "Each further path mounted from its own mount tree.",
           "type": "array",
-          "items": {"$ref": "#/$defs/Mount"}
+          "default": [],
+          "items": {"$ref": "#/$defs/ServiceMount"}
         },
         "name": {"description": "Human-facing.", "type": "string"},
         "native": {
@@ -646,9 +620,10 @@
         "network": {
           "description": "The capability whose filler's network it runs inside.",
           "anyOf": [
-            {"$ref": "#/$defs/Network"},
+            {"$ref": "#/$defs/ServiceNetwork"},
             {"type": "null"}
-          ]
+          ],
+          "default": null
         },
         "port": {
           "description": "Where it is published on the host, absent for a service that publishes nothing.",
@@ -658,7 +633,7 @@
           "maximum": 65535,
           "minimum": 0
         },
-        "posture": {"description": "How tightly the container is held.", "$ref": "#/$defs/Posture", "default": "standard"},
+        "posture": {"description": "How tightly the container is held.", "$ref": "#/$defs/ServicePosture", "default": "standard"},
         "provides": {
           "description": "The capabilities this service claims.\n\nA core name comes from the published vocabulary and means the contracted thing\nthat vocabulary defines; a plugin's own must be namespaced with the plugin's id\nand is inert until something asks for it.",
           "type": "array",
@@ -668,7 +643,8 @@
         "publish": {
           "description": "Each further port it publishes on its tier.",
           "type": "array",
-          "items": {"$ref": "#/$defs/Publish"}
+          "default": [],
+          "items": {"$ref": "#/$defs/ServicePublish"}
         },
         "replaces": {
           "description": "The id of the stack's own service this service moves in place of, which is its own\nid: it keeps that service's container, configuration and data, and may take its\nport and the name the proxy answers for it.",
@@ -700,7 +676,7 @@
         "user_mode": {
           "description": "Who the container runs as.",
           "anyOf": [
-            {"$ref": "#/$defs/UserMode"},
+            {"$ref": "#/$defs/ServiceUserMode"},
             {"type": "null"}
           ],
           "default": null
@@ -723,13 +699,6 @@
         {"description": "The answer of a call to a host outside it.", "type": "string", "const": "external-response"},
         {"description": "A credential lemonfiber already holds for a service.", "type": "string", "const": "credential-store"},
         {"description": "A value the operator supplies when the recipe runs.", "type": "string", "const": "operator"}
-      ]
-    },
-    "Posture": {
-      "description": "How tightly the container is held.",
-      "oneOf": [
-        {"description": "Six kernel capabilities, no privilege gained, a bounded process count.", "type": "string", "const": "standard"},
-        {"description": "A read-only root and no kernel capability at all, besides.", "type": "string", "const": "confined"}
       ]
     },
     "Proof": {
@@ -760,23 +729,6 @@
       },
       "additionalProperties": false,
       "required": ["id", "title", "request", "expect", "why"]
-    },
-    "Publish": {
-      "description": "A further port a service publishes on its tier.",
-      "type": "object",
-      "properties": {
-        "listens": {
-          "description": "Where it answers inside the container, `port` where absent.",
-          "type": ["integer", "null"],
-          "format": "uint16",
-          "default": null,
-          "maximum": 65535,
-          "minimum": 0
-        },
-        "port": {"description": "Where it is published on the host.", "type": "integer", "format": "uint16", "maximum": 65535, "minimum": 0}
-      },
-      "additionalProperties": false,
-      "required": ["port"]
     },
     "Recipe": {
       "description": "One named flow of calls.",
@@ -829,7 +781,59 @@
       "additionalProperties": false,
       "required": ["id", "of", "why"]
     },
-    "SecretOf": {
+    "ServiceConstant": {
+      "description": "A value written exactly as declared.",
+      "anyOf": [
+        {"description": "A string.", "type": "string"},
+        {"description": "An integer.", "type": "integer", "format": "int64"},
+        {"description": "A boolean.", "type": "boolean"}
+      ]
+    },
+    "ServiceMount": {
+      "description": "A further path mounted from the service's own mount tree.",
+      "type": "object",
+      "properties": {
+        "from": {"description": "The relative path inside the mount tree.", "type": "string"},
+        "ro": {"description": "Whether it is mounted read-only.", "type": "boolean", "default": false},
+        "to": {"description": "The absolute path inside the container.", "type": "string"}
+      },
+      "additionalProperties": false,
+      "required": ["from", "to"]
+    },
+    "ServiceNetwork": {
+      "description": "The network a service runs inside instead of its own.",
+      "type": "object",
+      "properties": {
+        "via": {"description": "The capability whose filler's network it runs inside.", "type": "string"}
+      },
+      "additionalProperties": false,
+      "required": ["via"]
+    },
+    "ServicePosture": {
+      "description": "How tightly the container is held.",
+      "oneOf": [
+        {"description": "Six kernel capabilities, no privilege gained, a bounded process count.", "type": "string", "const": "standard"},
+        {"description": "A read-only root and no kernel capability at all, besides.", "type": "string", "const": "confined"}
+      ]
+    },
+    "ServicePublish": {
+      "description": "A further port a service publishes on its tier.",
+      "type": "object",
+      "properties": {
+        "listens": {
+          "description": "Where it answers inside the container, `port` where absent.",
+          "type": ["integer", "null"],
+          "format": "uint16",
+          "default": null,
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "port": {"description": "Where it is published on the host.", "type": "integer", "format": "uint16", "maximum": 65535, "minimum": 0}
+      },
+      "additionalProperties": false,
+      "required": ["port"]
+    },
+    "ServiceSecretOf": {
       "description": "A secret the manifest declares.",
       "type": "object",
       "properties": {
@@ -838,15 +842,51 @@
       "additionalProperties": false,
       "required": ["secret"]
     },
-    "Setting": {
+    "ServiceSetting": {
       "description": "An operator setting, with what is written while none is recorded.",
       "type": "object",
       "properties": {
-        "default": {"description": "What is written while the operator has recorded no value.", "$ref": "#/$defs/Constant"},
+        "default": {"description": "What is written while the operator has recorded no value.", "$ref": "#/$defs/ServiceConstant"},
         "setting": {"description": "The setting's name.", "type": "string"}
       },
       "additionalProperties": false,
       "required": ["setting", "default"]
+    },
+    "ServiceUrlOf": {
+      "description": "The address of a capability's filler.",
+      "type": "object",
+      "properties": {
+        "files": {
+          "description": "The medium the filler asked for files.",
+          "type": ["string", "null"],
+          "default": null
+        },
+        "native": {
+          "description": "The upstream's own API, where the ask reaches the upstream an adapter fronts.",
+          "type": ["string", "null"],
+          "default": null
+        },
+        "url_of": {"description": "The capability asked for.", "type": "string"}
+      },
+      "additionalProperties": false,
+      "required": ["url_of"]
+    },
+    "ServiceUserMode": {
+      "description": "Who the container runs as.",
+      "oneOf": [
+        {"description": "No user: the image decides.", "type": "string", "const": "image"},
+        {"description": "`PUID` and `PGID` set to the operator's.", "type": "string", "const": "puid-env"},
+        {"description": "The operator's uid and gid as the container's user.", "type": "string", "const": "uid"}
+      ]
+    },
+    "ServiceValue": {
+      "description": "One environment variable's value.",
+      "anyOf": [
+        {"description": "A constant.", "$ref": "#/$defs/ServiceConstant"},
+        {"description": "An operator setting.", "$ref": "#/$defs/ServiceSetting"},
+        {"description": "A capability's filler's address.", "$ref": "#/$defs/ServiceUrlOf"},
+        {"description": "A declared secret.", "$ref": "#/$defs/ServiceSecretOf"}
+      ]
     },
     "Step": {
       "description": "One call in a flow.",
@@ -906,42 +946,6 @@
       },
       "additionalProperties": false,
       "required": ["method", "to", "path"]
-    },
-    "UrlOf": {
-      "description": "The address of a capability's filler.",
-      "type": "object",
-      "properties": {
-        "files": {
-          "description": "The medium the filler asked for files.",
-          "type": ["string", "null"],
-          "default": null
-        },
-        "native": {
-          "description": "The upstream's own API, where the ask reaches the upstream an adapter fronts.",
-          "type": ["string", "null"],
-          "default": null
-        },
-        "url_of": {"description": "The capability asked for.", "type": "string"}
-      },
-      "additionalProperties": false,
-      "required": ["url_of"]
-    },
-    "UserMode": {
-      "description": "Who the container runs as.",
-      "oneOf": [
-        {"description": "No user: the image decides.", "type": "string", "const": "image"},
-        {"description": "`PUID` and `PGID` set to the operator's.", "type": "string", "const": "puid-env"},
-        {"description": "The operator's uid and gid as the container's user.", "type": "string", "const": "uid"}
-      ]
-    },
-    "Value": {
-      "description": "One environment variable's value.",
-      "anyOf": [
-        {"description": "A constant.", "$ref": "#/$defs/Constant"},
-        {"description": "An operator setting.", "$ref": "#/$defs/Setting"},
-        {"description": "A capability's filler's address.", "$ref": "#/$defs/UrlOf"},
-        {"description": "A declared secret.", "$ref": "#/$defs/SecretOf"}
-      ]
     },
     "Wiring": {
       "description": "How the stack's own services reach a plugin's service.\n\nThe tier governs, not the plugin. Only a `lan` service is proxied, because the\nbundled policy is that an admin surface does not get a hostname — and a plugin\nthat could publish its own address could put an admin surface on the household\nnetwork without touching anything the web-security checks inspect.",

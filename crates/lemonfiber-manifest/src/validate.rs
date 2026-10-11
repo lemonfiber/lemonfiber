@@ -109,6 +109,7 @@ pub fn validate(manifest: &Manifest, today: Date) -> Vec<Violation> {
     let profiles = check_profiles(manifest, &mut found);
     check_forms(manifest, &profiles, &mut found);
     check_services(manifest, &profiles, today, &mut found);
+    check_ports(manifest, &mut found);
     check_removed(manifest, &mut found);
     wiring::check(manifest, &mut found);
     found
@@ -160,6 +161,20 @@ fn check_forms(manifest: &Manifest, profiles: &BTreeSet<String>, found: &mut Vec
                 });
             }
         }
+    }
+}
+
+/// No port is published by two services.
+fn check_ports(manifest: &Manifest, found: &mut Vec<Violation>) {
+    let services = manifest.services.iter().map(|service| {
+        let ports = crate::container::published(service.port, &service.publish);
+        (service.id.as_str(), ports)
+    });
+    for (port, first, again) in crate::container::doubled(services) {
+        found.push(Violation {
+            location: format!("service {again}.publish"),
+            message: format!("publishes {port}, which service {first} already publishes"),
+        });
     }
 }
 

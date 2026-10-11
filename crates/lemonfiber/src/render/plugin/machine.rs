@@ -446,7 +446,9 @@ fn overriding(overrides: &[Overriding], recorded: bool) -> Lines {
 fn container(one: &Installed) -> Lines {
     let mut lines = Lines::default();
     lines.spaced("    The container lemonfiber writes for it, from that and from nothing else:");
-    for line in lemonfiber_core::plugin::written(one).lines() {
+    for line in
+        lemonfiber_core::plugin::written(one, &lemonfiber_core::plugin::Reading::bare()).lines()
+    {
         lines.put(format!("      {line}"));
     }
     lines

@@ -81,7 +81,15 @@ pub(super) fn spelled_like(id: &str) -> Option<&'static Service> {
 
 /// The shipped service published on this port, where the stack publishes one there.
 pub(super) fn publishing(port: u16) -> Option<&'static Service> {
-    services().iter().find(|service| service.port == Some(port))
+    publishing_in(services(), port)
+}
+
+/// The one of `services` published on this port, its further ports included.
+fn publishing_in(services: &[Service], port: u16) -> Option<&Service> {
+    services.iter().find(|service| {
+        lemonfiber_manifest::container::published(service.port, &service.publish)
+            .any(|held| held == port)
+    })
 }
 
 /// Whether the shipped proxy is written to answer on this name.

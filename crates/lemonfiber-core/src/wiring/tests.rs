@@ -542,6 +542,7 @@ fn plugin_filling(plugin: &str, service: &str, capability: &str) -> crate::plugi
         name: None,
         description: None,
         services: vec![crate::plugin::Placed {
+            fields: lemonfiber_manifest::container::Fields::default(),
             service: service.to_owned(),
             image: format!("example.invalid/{service}"),
             digest: "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"

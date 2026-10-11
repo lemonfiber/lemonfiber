@@ -81,10 +81,11 @@ fn named(would: &Installed, services: &[Declared]) -> Vec<String> {
 /// Every port the plugin would publish that the stack or another plugin already does.
 fn bound(would: &Installed, ports: &[Published], installed: &[Installed]) -> Vec<String> {
     let mut clashes = Vec::new();
-    for placed in &would.services {
-        let Some(port) = placed.published() else {
-            continue;
-        };
+    for (placed, port) in would
+        .services
+        .iter()
+        .flat_map(|placed| placed.ports().map(move |port| (placed, port)))
+    {
         if let Some(held) = ports.iter().find(|held| held.port == port) {
             clashes.push(format!(
                 "service {}: port {port} is already published for {} in {}",
@@ -100,7 +101,7 @@ fn bound(would: &Installed, ports: &[Published], installed: &[Installed]) -> Vec
                 other
                     .services
                     .iter()
-                    .find(|one| one.published() == Some(port))
+                    .find(|one| one.ports().any(|held| held == port))
                     .map(|one| (other.plugin.as_str(), one.service.as_str()))
             });
         if let Some((plugin, service)) = theirs {

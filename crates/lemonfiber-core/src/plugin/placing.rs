@@ -32,6 +32,7 @@
 
 use std::path::{Path, PathBuf};
 
+use super::container::Reading;
 use super::installed::Installed;
 
 /// The directory beneath the stack where a plugin's Compose document is written.
@@ -47,7 +48,11 @@ pub(crate) const OVERLAYS: &str = "compose/plugins";
 /// The same one the bundled services use, and the same one the generated container
 /// mounts from — `./config/<service>` in the entry is this directory, resolved
 /// against the project directory Compose is pointed at.
-const CONFIGURATION: &str = "config";
+pub(super) const CONFIGURATION: &str = "config";
+
+/// Where each service's own mount tree is kept, beneath the stack directory and apart
+/// from its configuration directory.
+pub(super) const MOUNTS: &str = "mounts";
 
 /// One thing an install puts on the machine.
 ///
@@ -65,8 +70,12 @@ pub struct Write {
 /// What one write puts at its path.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Lands {
-    /// A directory brought into being.
-    Directory,
+    /// A directory brought into being beneath the stack directory, reached through no
+    /// link on the way.
+    Directory {
+        /// The stack directory it lies beneath.
+        beneath: PathBuf,
+    },
     /// A file written whole, holding this.
     Document(String),
     /// The key lemonfiber asks the plugin's adapter with, minted as it is written.
@@ -84,11 +93,13 @@ pub enum Lands {
 }
 
 impl Write {
-    /// A directory the install makes.
-    const fn directory(path: PathBuf) -> Self {
+    /// A directory the install makes beneath the stack directory `stack`.
+    fn directory(path: PathBuf, stack: &Path) -> Self {
         Self {
             path,
-            lands: Lands::Directory,
+            lands: Lands::Directory {
+                beneath: stack.to_path_buf(),
+            },
         }
     }
 
@@ -123,7 +134,7 @@ impl Write {
     /// Whether this write is a directory rather than a file.
     #[must_use]
     pub const fn is_directory(&self) -> bool {
-        matches!(self.lands, Lands::Directory)
+        matches!(self.lands, Lands::Directory { .. })
     }
 }
 
@@ -141,6 +152,26 @@ pub fn overlay(stack: &Path, plugin: &str) -> PathBuf {
 #[must_use]
 pub fn key_file(stack: &Path, service: &str) -> PathBuf {
     configuration(stack, service).join(lemonfiber_contract::adapter::KEY_FILE)
+}
+
+/// Where one of a plugin's services keeps the sources of its further mounts.
+#[must_use]
+pub fn mount_tree(stack: &Path, service: &str) -> PathBuf {
+    stack.join(MOUNTS).join(service)
+}
+
+/// Every further mount source of an installed plugin's services the model allows, each
+/// inside its service's mount tree.
+#[must_use]
+pub fn mount_sources(installed: &Installed, stack: &Path) -> Vec<PathBuf> {
+    installed
+        .services
+        .iter()
+        .flat_map(|placed| {
+            let tree = mount_tree(stack, &placed.service);
+            super::container::mounts(placed).map(move |mount| tree.join(&mount.from))
+        })
+        .collect()
 }
 
 /// Where one of a plugin's services keeps its own configuration.
@@ -194,12 +225,25 @@ pub fn documents(installed: &[String], stack: &Path) -> Vec<PathBuf> {
 /// Each is planned only where it would hold something, so a plugin whose services
 /// nothing reaches writes into neither.
 #[must_use]
-pub fn writes(installed: &Installed, stack: &Path) -> Vec<Write> {
+pub fn writes(installed: &Installed, stack: &Path, reading: &Reading<'_>) -> Vec<Write> {
     let mut planned: Vec<Write> = installed
         .services
         .iter()
-        .map(|placed| Write::directory(configuration(stack, &placed.service)))
+        .map(|placed| Write::directory(configuration(stack, &placed.service), stack))
         .collect();
+    for placed in &installed.services {
+        let mut writable = super::container::mounts(placed).peekable();
+        if writable.peek().is_none() {
+            continue;
+        }
+        let tree = mount_tree(stack, &placed.service);
+        planned.push(Write::directory(tree.clone(), stack));
+        planned.extend(
+            writable
+                .filter(|mount| !mount.ro)
+                .map(|mount| Write::directory(tree.join(&mount.from), stack)),
+        );
+    }
     planned.extend(
         installed
             .services
@@ -209,7 +253,7 @@ pub fn writes(installed: &Installed, stack: &Path) -> Vec<Write> {
     );
     planned.push(Write::file(
         overlay(stack, &installed.plugin),
-        super::container::written(installed),
+        super::container::written(installed, reading),
     ));
     let owner = super::owning::owner(&installed.plugin);
     for (key, body) in [

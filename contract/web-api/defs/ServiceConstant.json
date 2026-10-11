@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A value written exactly as declared.",
+  "anyOf": [
+    {
+      "description": "A string.",
+      "type": "string"
+    },
+    {
+      "description": "An integer.",
+      "type": "integer",
+      "format": "int64"
+    },
+    {
+      "description": "A boolean.",
+      "type": "boolean"
+    }
+  ]
+}

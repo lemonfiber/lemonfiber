@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "listens": {
+      "type": [
+        "integer|null/uint16"
+      ],
+      "required": false
+    },
+    "port": {
+      "type": [
+        "integer/uint16"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}
