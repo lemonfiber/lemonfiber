@@ -114,7 +114,8 @@ fn families_are_listed_in_prefix_order_and_each_once() {
 }
 
 /// A `since` is a version this crate has reached, or the one it is on the way to: a
-/// code is first published by the release that follows the commit adding it.
+/// code is first published by the release that follows the commit adding it. A
+/// pre-release is read as the version it precedes.
 #[test]
 fn a_code_appeared_in_a_released_version_or_the_next_one() {
     let version = |text: &str| -> Option<(u32, u32, u32)> {
@@ -126,7 +127,10 @@ fn a_code_appeared_in_a_released_version_or_the_next_one() {
             _ => None,
         }
     };
-    let running = version(env!("CARGO_PKG_VERSION"));
+    let running = env!("CARGO_PKG_VERSION")
+        .split('-')
+        .next()
+        .and_then(version);
     let next = running.map(|(major, minor, _)| (major, minor + 1, 0));
     for declared in super::every_declared() {
         let since = version(declared.since());
