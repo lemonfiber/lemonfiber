@@ -27,35 +27,13 @@ permissions:
 
 jobs:
   tell:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    # The release App's key is held by the `release` environment, which only
-    # `main` and `v*` tags may deploy to.
-    environment: release
     permissions:
       contents: read
-    steps:
-      - name: Mint a token that can reach spec
-        id: token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          client-id: ${{ vars.RELEASE_CLIENT_ID }}
-          private-key: ${{ secrets.RELEASE_APP_KEY }}
-          owner: ${{ github.repository_owner }}
-          permission-contents: write
-          repositories: spec
-
-      - name: Ask spec to read the trackers again
-        env:
-          GH_TOKEN: ${{ steps.token.outputs.token }}
-          OWNER: ${{ github.repository_owner }}
-          REPOSITORY: ${{ github.event.repository.name }}
-          SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          # The payload is for whoever reads that run: which push asked.
-          gh api --method POST "repos/${OWNER}/spec/dispatches" \
-            -f event_type=tracker-moved \
-            -F "client_payload[repository]=${REPOSITORY}" \
-            -F "client_payload[sha]=${SHA}"
-          echo "asked spec to read the trackers again for ${REPOSITORY}@${SHA}."
+    uses: lemonfiber/spec/.github/workflows/tell.yml@164464d71266bdc36d90272c58eb8bd02f1ba10d # v1.0.80
+    with:
+      repos: spec
+      event: tracker-moved
+      payload: ${{ format('{{"repository":"{0}","sha":"{1}"}}', github.event.repository.name, github.sha) }}
+      environment: release
+    secrets:
+      RELEASE_APP_KEY: ${{ secrets.RELEASE_APP_KEY }}

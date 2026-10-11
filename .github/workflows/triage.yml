@@ -1,5 +1,6 @@
 # New issues: label needs-triage, assign the covering maintainer from the
-# generated CODEOWNERS, and post to the private maintainer channel.
+# generated CODEOWNERS, and post to the private maintainer channel, through
+# spec's shared triage. OPS-R25, OPS-R27.
 name: triage
 on:
   issues:
@@ -8,31 +9,9 @@ permissions:
   contents: read
 jobs:
   triage:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
     permissions:
       contents: read
       issues: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Label and assign
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          NUM: ${{ github.event.issue.number }}
-        run: |
-          gh issue edit "$NUM" --add-label needs-triage || true
-          owners=$(awk '/^\* /{for (i=2; i<=NF; i++) print $i}' .github/CODEOWNERS | tr -d '@' | paste -sd, -)
-          if [ -n "$owners" ]; then gh issue edit "$NUM" --add-assignee "$owners" || true; fi
-  notify:
-    needs: triage
-    uses: lemonfiber/spec/.github/workflows/discord-notify.yml@f2769e5fae4a850b6e84d8523f29d30692176add # v1.0.79
-    with:
-      title: "📥 Needs triage · ${{ github.event.repository.name }} #${{ github.event.issue.number }}"
-      body: ${{ github.event.issue.title }}
-      url: ${{ github.event.issue.html_url }}
-      color: "15105570"
+    uses: lemonfiber/spec/.github/workflows/triage.yml@164464d71266bdc36d90272c58eb8bd02f1ba10d # v1.0.80
     secrets:
-      webhook: ${{ secrets.DISCORD_MAINTAINERS_WEBHOOK }}
+      DISCORD_MAINTAINERS_WEBHOOK: ${{ secrets.DISCORD_MAINTAINERS_WEBHOOK }}
