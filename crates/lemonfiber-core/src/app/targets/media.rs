@@ -192,10 +192,12 @@ impl MediaServer {
         self.hand_upstream_if_contracted(password)
     }
 
-    /// The administrator's credential written where the server's adapter reads its
-    /// upstream's, beside its key and readable by the operator alone.
-    /// The replacement handed to the server's adapter where it is reached over its
-    /// contracts; nothing where it is the stack's own.
+    /// The administrator's credential handed to the server's adapter where it is reached
+    /// over its contracts; nothing where it is the stack's own.
+    ///
+    /// # Errors
+    ///
+    /// Why the adapter's configuration would not take it, in words.
     pub(crate) fn hand_upstream_if_contracted(&self, password: &str) -> Result<(), String> {
         match self.reach {
             Reach::Over => self.hand_upstream(password),
@@ -203,6 +205,8 @@ impl MediaServer {
         }
     }
 
+    /// The administrator's credential written where the server's adapter reads its
+    /// upstream's, beside its key and readable by the operator alone.
     fn hand_upstream(&self, password: &str) -> Result<(), String> {
         let configuration = self.filler.confined_to.as_deref().ok_or_else(|| {
             format!(
