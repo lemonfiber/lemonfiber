@@ -13,7 +13,7 @@ Regenerating the file without running that recipe drops every patch at once, and
 the result is a workflow that reads as normal: it builds, it signs, it publishes.
 Nothing about it looks different until a release is already out.
 
-Twelve claims are read from the tree, and each is a claim rather than a string:
+Thirteen claims are read from the tree, and each is a claim rather than a string:
 
   applied      the file carries each patch's output verbatim, comments included
   draft        every `gh release create` carries `--draft`
@@ -38,6 +38,7 @@ Twelve claims are read from the tree, and each is a claim rather than a string:
   superseded-runs-cancel
                a pull request pushed again cancels the run it replaces, and a tag
                  is grouped by its own run so a release is never cancelled
+  bounded      every job carries the timeout bound_release_jobs.py gives it
 
 `--self-test` breaks each claim in turn against a copy of the real files and
 fails unless that claim refuses the copy. A claim that cannot fail is not a gate.
@@ -56,6 +57,7 @@ import sys
 import tomllib
 
 import attest_the_global_artifacts as attested
+import bound_release_jobs as bounds
 import cancel_superseded_runs as superseded
 import pin_release_actions
 import scope_release_permissions as permissions
@@ -441,6 +443,19 @@ def claim_allow_dirty(_workflow: dict, cargo: dict) -> list[str]:
     ]
 
 
+def claim_bounded(workflow: dict, _cargo: dict) -> list[str]:
+    jobs = workflow.get("jobs") or {}
+    return [
+        f"{job} runs with no timeout of {bound} minutes, so a hung build holds a runner for six hours"
+        for job, bound in bounds.BOUNDS.items()
+        if (jobs.get(job) or {}).get("timeout-minutes") != bound
+    ] + [
+        f"{job} is a job bound_release_jobs.py does not bound"
+        for job in jobs
+        if job not in bounds.BOUNDS
+    ]
+
+
 def claim_superseded_runs_cancel(workflow: dict, _cargo: dict) -> list[str]:
     grouped = workflow.get("concurrency") or {}
     wanted = yaml.safe_load(superseded.CONCURRENCY)["concurrency"]
@@ -488,6 +503,7 @@ CLAIMS = {
     "global-attested": claim_global_attested,
     "global-attested-with-grants": claim_global_attested,
     "superseded-runs-cancel": claim_superseded_runs_cancel,
+    "bounded": claim_bounded,
 }
 
 # Claims that read the file rather than the parsed workflow. YAML drops comments,
@@ -546,6 +562,7 @@ BREAKS = {
         c,
     ),
     "superseded-runs-cancel": lambda w, c: (w.replace(superseded.GROUPED, superseded.SCOPED), c),
+    "bounded": lambda w, c: (w.replace("    timeout-minutes: 120\n", "", 1), c),
 }
 
 

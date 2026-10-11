@@ -17,7 +17,7 @@ on:
   # is the one event that says so without waiting for the week to turn.
   branch_protection_rule:
   schedule:
-    - cron: "0 6 * * 1"
+    - cron: "16 6 * * 1"
   push:
     branches: [main]
 

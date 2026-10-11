@@ -41,6 +41,7 @@ jobs:
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
       # Reading the Release run's archives.
@@ -66,10 +67,27 @@ jobs:
           printf 'tag=%s\n' "$TAG" >> "$GITHUB_OUTPUT"
           printf 'version=%s\n' "${TAG#v}" >> "$GITHUB_OUTPUT"
 
+      # The run that built the release was for one commit, and a tag can be
+      # moved or pushed again after it. What is gathered here comes from that
+      # commit, and a tag naming another one stops the run.
+      - name: The tag still names the commit the release was built from
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          BUILT: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          held=$(gh api "repos/${GH_REPO}/commits/${TAG}" --jq .sha)
+          if [ "$held" != "$BUILT" ]; then
+            echo "::error::${TAG} names ${held}, and the release run was for ${BUILT}. Nothing is attached from a commit the release was not built from."
+            exit 1
+          fi
+
       - name: Take the tag's own copy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ steps.tag.outputs.tag }}
+          ref: ${{ github.event.workflow_run.head_sha }}
           persist-credentials: false
 
       - name: Take the Release run's musl archives
@@ -147,6 +165,7 @@ jobs:
   image:
     needs: gather
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       # Pushing the image. This job is the only one in the repository that may.
       packages: write
@@ -222,13 +241,14 @@ jobs:
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
     steps:
       - name: Take the tag's own copy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.gather.outputs.tag }}
+          ref: ${{ github.event.workflow_run.head_sha }}
           persist-credentials: false
 
       - name: Write the templates naming the image
@@ -250,6 +270,7 @@ jobs:
   attach:
     needs: [gather, templates]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: write
       # Signing the templates' attestation.

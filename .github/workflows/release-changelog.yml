@@ -43,6 +43,7 @@ jobs:
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
     outputs:
@@ -78,11 +79,29 @@ jobs:
             echo "tag=" >> "$GITHUB_OUTPUT"
           fi
 
+      # The run that built the release was for one commit, and a tag can be
+      # moved or pushed again after it. What is gathered here comes from that
+      # commit, and a tag naming another one stops the run.
+      - name: The tag still names the commit the release was built from
+        if: steps.tag.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          BUILT: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          held=$(gh api "repos/${GH_REPO}/commits/${TAG}" --jq .sha)
+          if [ "$held" != "$BUILT" ]; then
+            echo "::error::${TAG} names ${held}, and the release run was for ${BUILT}. Nothing is attached from a commit the release was not built from."
+            exit 1
+          fi
+
       - name: Check out the tagged tree
         if: steps.tag.outputs.tag != ''
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ steps.tag.outputs.tag }}
+          ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
           persist-credentials: false
           submodules: recursive
@@ -217,6 +236,7 @@ jobs:
     needs: changelog
     if: needs.changelog.outputs.tag != ''
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: write
     steps:

@@ -29,6 +29,7 @@ permissions:
 jobs:
   gate:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
     outputs:
@@ -104,6 +105,7 @@ jobs:
   tag:
     needs: gate
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     # The release App's key is held by the `release` environment, which only
     # `main` and `v*` tags may deploy to.
     environment: release

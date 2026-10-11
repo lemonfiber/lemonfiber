@@ -36,6 +36,7 @@ jobs:
   said:
     if: ${{ contains(github.event.release.tag_name, '-') }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
     steps:
@@ -48,6 +49,7 @@ jobs:
   record:
     if: ${{ !contains(github.event.release.tag_name, '-') }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     # The release App's key is held by the `release` environment, which only
     # `main` and `v*` tags may deploy to.
     environment: release

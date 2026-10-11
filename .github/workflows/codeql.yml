@@ -12,7 +12,7 @@ on:
   # under exactly that ref.
   merge_group:
   schedule:
-    - cron: "0 6 * * 2"
+    - cron: "58 6 * * 2"
 permissions:
   contents: read
 concurrency:
@@ -26,6 +26,7 @@ concurrency:
 jobs:
   analyze:
     runs-on: ubuntu-latest
+    timeout-minutes: 35
     permissions:
       security-events: write
     strategy:
