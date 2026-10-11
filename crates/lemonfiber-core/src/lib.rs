@@ -141,6 +141,7 @@ pub mod wishing;
 #[cfg(test)]
 extern crate self as lemonfiber_core;
 pub mod text;
+pub mod topology;
 pub mod transcoding;
 pub mod uninstall;
 pub mod unmanaged;
