@@ -7,7 +7,7 @@ use lemonfiber_core::model::{kind, Envelope};
 use serde_json::Value;
 
 use super::{Refusal, UNRENDERED};
-use crate::contract::Contract;
+use crate::contract::{Contract, CORE_REFUSALS};
 use crate::read::enveloped;
 
 /// The body a response carries, read as JSON.
@@ -176,25 +176,12 @@ async fn nothing_rendered_is_answered_as_the_refusal_saying_so() {
 #[test]
 fn the_contract_lists_every_refusal_at_the_status_it_is_answered_with() {
     let listed = Contract::describe().refusals;
-    // This surface's own, the core's refusals of an offer that has moved, which
-    // `contract/refusals` holds to their status, and what the plugins and wiring reads
-    // are refused with where what they read could not be read, and what a choice of
-    // filler and a plugin's install, update or removal are refused with, and a member's
-    // viewing.
     let unread: usize = lemonfiber_core::wiring::UNREAD
         .iter()
         .map(|codes| codes.len())
         .sum();
-    assert_eq!(
-        listed.len(),
-        Refusal::EVERY.len()
-            + lemonfiber_core::agreement::MOVED.len()
-            + unread
-            + lemonfiber_core::wiring::REFUSED.len()
-            + lemonfiber_core::app::plugins::REFUSALS.len()
-            + lemonfiber_core::screening::REFUSALS.len()
-            + lemonfiber_core::wishing::REFUSALS.len()
-    );
+    let core: usize = CORE_REFUSALS.iter().map(|codes| codes.len()).sum();
+    assert_eq!(listed.len(), Refusal::EVERY.len() + unread + core);
     for code in lemonfiber_core::wiring::UNREAD
         .iter()
         .flat_map(|codes| codes.iter())

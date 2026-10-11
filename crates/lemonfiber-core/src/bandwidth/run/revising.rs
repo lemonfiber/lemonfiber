@@ -11,7 +11,9 @@
 //! things to say differently, not things to try again.
 
 use crate::bandwidth::limit::UPLOAD_SHARE;
-use crate::bandwidth::{Cap, Capacity, Declared, Limit, Respite, Rhythm, WhenExceeded, UNREADABLE};
+use crate::bandwidth::{
+    Cap, Capacity, Declared, Limit, Respite, Rhythm, WhenExceeded, LIMIT_UNREADABLE,
+};
 use crate::error::{Problem, Remedy};
 
 use super::Asked;
@@ -138,7 +140,7 @@ fn declared_cap(text: &str, asked: &Asked, held: Option<Cap>) -> Result<Cap, Box
     };
     let Some(exceeded) = exceeded else {
         return Err(Box::new(Problem::new(
-            UNREADABLE,
+            LIMIT_UNREADABLE,
             "A cap needs to be told what happens when it is reached",
             "The point of declaring it in advance is that the answer is not \
                  decided at two in the morning by whatever is running. Say now what \
@@ -154,7 +156,7 @@ fn declared_cap(text: &str, asked: &Asked, held: Option<Cap>) -> Result<Cap, Box
 fn respite(now: u64, minutes: u64) -> Result<Respite, Box<Problem>> {
     Respite::asked_for(now, minutes.saturating_mul(60)).ok_or_else(|| {
         Box::new(Problem::new(
-            UNREADABLE,
+            LIMIT_UNREADABLE,
             format!("{minutes} minutes is not a length the limits may be lifted for"),
             "An override is time-boxed on purpose. Something switched off just \
                  for now at eleven at night is the thing nobody remembers at eight \
@@ -210,7 +212,7 @@ fn read<T>(
 /// A request that could not be answered as it stands.
 fn unreadable(what: &str, given: &str, shape: &str) -> Problem {
     Problem::new(
-        UNREADABLE,
+        LIMIT_UNREADABLE,
         format!("{given} could not be read as {what}"),
         "A limit read wrongly is a household wondering all evening why the calls \
          keep dropping. Nothing here guesses at one.",

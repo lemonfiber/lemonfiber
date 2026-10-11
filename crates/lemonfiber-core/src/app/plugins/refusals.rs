@@ -1,6 +1,6 @@
-//! Every refusal of an install, an update or a removal, listed so a client can name
-//! each code and read its status before it meets it. The status is the one each code
-//! is declared with in the registry.
+//! Every refusal of an install, an update, a removal or a proving, listed so a client can
+//! name each code and read its status before it meets it. The status is the one each
+//! code is declared with in the registry.
 //!
 //! The record that cannot be read and the offer that moved are listed with the reads
 //! and with every other moved offer, so they are not listed twice. A machine setup has
@@ -10,16 +10,17 @@
 use crate::error::codes::plugin::{
     ADDRESS_REFUSED, ALREADY, ANOTHER_PLUGIN, ANSWERED, CALL_REFUSED, CATALOGUE_OFF,
     CATALOGUE_REPLACED, CATALOGUE_UNREACHABLE, CATALOGUE_UNREADABLE, HEADER_NAMED, INPUT_UNMATCHED,
-    NEWEST_UNKEPT, NOTHING_TO_REMOVE, NOTHING_TO_UPDATE, NOT_AS_REVIEWED, NOT_CATALOGUED, NOWHERE,
-    NO_REVISION, OCCUPIED, PATH_NOT_PLAIN, REFUSED, SCHEME_REFUSED, SIGNATURE_UNVERIFIED,
-    SOURCE_OFF, SPELLED_ALIKE, STEP_FAILED, STUCK, TWO_SOURCES, UNAPPROVED, UNFETCHED, UNPROVED,
-    UNREADABLE, UNRECORDABLE, UNWRITABLE, VALUE_WITHHELD,
+    NEWEST_UNKEPT, NOTHING_TO_PROVE, NOTHING_TO_REMOVE, NOTHING_TO_UPDATE, NOT_AS_REVIEWED,
+    NOT_CATALOGUED, NOWHERE, NO_REVISION, OCCUPIED, PATH_NOT_PLAIN, REFUSED, SCHEME_REFUSED,
+    SIGNATURE_UNVERIFIED, SOURCE_OFF, SPELLED_ALIKE, STEP_FAILED, STRANGER_REPLACING, STUCK,
+    TWO_SOURCES, UNAPPROVED, UNFETCHED, UNPROVED, UNREADABLE, UNRECORDABLE, UNWRITABLE,
+    VALUE_WITHHELD,
 };
 use crate::error::Code;
 
-/// Every plugin code an install, an update or a removal is refused with, apart from the
-/// record that cannot be read and the offer that moved.
-pub const REFUSALS: [Code; 35] = [
+/// Every plugin code an install, an update, a removal or a proving is refused with, apart
+/// from the record that cannot be read and the offer that moved.
+pub const REFUSALS: [Code; 37] = [
     UNREADABLE,
     REFUSED,
     ALREADY,
@@ -55,6 +56,8 @@ pub const REFUSALS: [Code; 35] = [
     VALUE_WITHHELD,
     CATALOGUE_REPLACED,
     NEWEST_UNKEPT,
+    STRANGER_REPLACING,
+    NOTHING_TO_PROVE,
 ];
 
 #[cfg(test)]

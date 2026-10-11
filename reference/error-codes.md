@@ -82,7 +82,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `BUNDLE-5` | `BUNDLE_NO_MARKS` | error | 1 | 500 | 0.7.0 | Raised when the machine can offer no randomness to derive stand-ins from. |
 | `BUNDLE-6` | `NOWHERE_TO_KEEP` | error | 1 | 500 | 0.9.0 | Raised when this run has nowhere it knows to keep a bundle. |
 | `BUNDLE-7` | `NOWHERE_HELD` | error | 1 | 500 | 0.9.0 | Raised when this run has nowhere it knows to look for a bundle it kept. |
-| `BUNDLE-8` | `NOT_HELD` | error | 1 | 404 | 0.9.0 | Raised when a name does not name one of the bundles this run kept. |
+| `BUNDLE-8` | `BUNDLE_NOT_HELD` | error | 1 | 404 | 0.9.0 | Raised when a name does not name one of the bundles this run kept. |
 
 ## `CONFIG` — your settings
 
@@ -367,7 +367,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | ---- | ---- | -------- | ---- | ------ | ----- | ------- |
 | `RATE-1` | `NOTHING_MEASURED` | error | 1 | 400 | 0.12.0 | Raised when a limit is expressed as a share of a line nothing has measured. |
 | `RATE-2` | `NO_ZONE` | error | 1 | 400 | 0.12.0 | Raised when a schedule is asked for and nothing says which zone the clients would read it in. |
-| `RATE-3` | `UNREADABLE` | error | 1 | 400 | 0.12.0 | Raised when what was asked for could not be read as a limit, a window or a cap. |
+| `RATE-3` | `LIMIT_UNREADABLE` | error | 1 | 400 | 0.12.0 | Raised when what was asked for could not be read as a limit, a window or a cap. |
 | `RATE-4` | `NOTHING_TO_LIMIT` | error | 1 | 400 | 0.12.0 | Raised when there is no download client to limit. |
 | `RATE-5` | `NOTHING_TO_PAUSE` | error | 1 | 400 | 0.17.0 | Raised when there is no download client to pause or resume. |
 | `RATE-6` | `PAUSING_MOVED` | warning | 1 | 400 | 0.18.0 | Raised where pausing or resuming the download clients names an offer that is not the one a fresh look at them builds. |

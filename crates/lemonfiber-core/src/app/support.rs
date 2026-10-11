@@ -18,11 +18,15 @@ use std::path::PathBuf;
 use serde::Serialize;
 
 use crate::bundle::Contents;
-use crate::error::{Problem, Remedy, State};
+use crate::error::{Code, Problem, Remedy, State};
 
 use super::bundle::{collect, measure, unconfirmed, without_marks, write, Wanted};
 use super::Ctx;
-use crate::error::codes::bundle::{NOT_HELD, NOWHERE_HELD, NOWHERE_TO_KEEP};
+use crate::error::codes::bundle::{BUNDLE_NOT_HELD, NOWHERE_HELD, NOWHERE_TO_KEEP};
+
+/// Every refusal asking for a kept bundle by name answers with, which a client names by
+/// its code.
+pub const REFUSALS: [Code; 1] = [BUNDLE_NOT_HELD];
 
 /// Where a bundle is written.
 ///
@@ -249,7 +253,7 @@ fn nowhere_held() -> Problem {
 /// as the operator.
 fn not_held(name: &str) -> Problem {
     Problem::new(
-        NOT_HELD,
+        BUNDLE_NOT_HELD,
         format!("{name} is not one of the bundles kept here"),
         "A bundle asked for by name is one of the files this run wrote into lemonfiber's own \
          directory. A name holding a path, or climbing out of that directory, is refused \

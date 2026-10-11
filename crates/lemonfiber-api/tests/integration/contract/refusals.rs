@@ -2,9 +2,11 @@
 
 use std::collections::BTreeSet;
 
+use axum::http::StatusCode;
 use lemonfiber_api::contract::Contract;
 use lemonfiber_core::agreement::MOVED;
-use lemonfiber_core::error::codes;
+use lemonfiber_core::error::codes::{self, plugin, quota};
+use lemonfiber_core::error::Code;
 
 /// A generator names a value per refusal after the name it is declared under, so two
 /// codes declared under one name would be one value standing for two refusals — and
@@ -28,17 +30,42 @@ fn every_code_a_moved_offer_ends_with_is_listed_as_an_answer_to_correct() {
     }
 }
 
-/// A key refusal reaches an SDK by its code, so the claim the collection door turns
-/// away is named at the status the door answers with, and so is every other refusal
-/// minting, collecting or revoking a key answers with.
+/// A claim the collection door turns away is named at the status that door answers
+/// with, which a client tells apart from a refused key by it.
 #[test]
-fn every_refusal_a_key_answers_with_is_listed_at_its_own_status() {
+fn a_claim_that_collects_nothing_is_listed_as_unauthorised() {
     let listed = Contract::describe().refusals;
-    for code in lemonfiber_core::keys::REFUSALS {
-        let declared = codes::declared(code).map(codes::Declared::status);
+    let claim = listed
+        .get(codes::key::CLAIM_NOT_OPEN.as_str())
+        .map(|refusal| refusal.status);
+    assert_eq!(claim, Some(StatusCode::UNAUTHORIZED.as_u16()));
+}
+
+/// The codes at a status of the client's own making that no request on this surface is
+/// answered with: an arrangement for closing requests is made at a shell, and a check a
+/// plugin contributed fails inside a diagnosis rather than refusing one.
+const ANSWERED_ELSEWHERE: [Code; 3] = [
+    quota::NOTHING_AGREED,
+    quota::TOO_SOON,
+    plugin::CONTRIBUTED_FAILED,
+];
+
+/// A code at a status of the client's own making is one a client branches on, so each
+/// one a request on this surface can be answered with is listed, at that status.
+#[test]
+fn every_code_a_client_is_answered_for_its_own_request_with_is_listed() {
+    let listed = Contract::describe().refusals;
+    for declared in codes::every_declared() {
+        let code = declared.code();
+        let theirs =
+            StatusCode::from_u16(declared.status()).is_ok_and(|status| status.is_client_error());
+        if !theirs || ANSWERED_ELSEWHERE.contains(&code) {
+            continue;
+        }
         let status = listed.get(code.as_str()).map(|refusal| refusal.status);
-        assert!(status.is_some() && status == declared, "{code:?}");
+        assert_eq!(status, Some(declared.status()), "{code:?}");
     }
-    let claim = listed.get("KEY-12").map(|refusal| refusal.status);
-    assert_eq!(claim, Some(401));
+    for code in ANSWERED_ELSEWHERE {
+        assert!(!listed.contains_key(code.as_str()), "{code:?}");
+    }
 }

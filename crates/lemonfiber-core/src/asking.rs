@@ -40,7 +40,13 @@ pub(crate) use refusal::{
 };
 pub use window::{earliest, frees_up, waiting_for, REMINDING_AFTER};
 
+use crate::error::codes::quota::{NEVER_HERE, NOBODY, NOT_WAITING, NO_LIMIT, NO_REASON};
+use crate::error::Code;
 use crate::ports::service::{Asking, Headroom, Left, Quota};
+
+/// Every refusal choosing what a household may ask for, or ruling on what one of them
+/// asked for, answers with, which a client names by its code.
+pub const REFUSALS: [Code; 5] = [NO_LIMIT, NOT_WAITING, NO_REASON, NOBODY, NEVER_HERE];
 
 /// What happens to what a household member asks for.
 ///

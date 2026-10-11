@@ -370,7 +370,7 @@ fn every_code_this_module_raises_belongs_to_it() {
     for code in [
         super::NOTHING_MEASURED,
         super::NO_ZONE,
-        super::UNREADABLE,
+        super::LIMIT_UNREADABLE,
         super::NOTHING_TO_LIMIT,
     ] {
         // Bound rather than called inside the message: an argument to a

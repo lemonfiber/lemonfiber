@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use super::{held, landing, Destination, Held, NOT_HELD, NOWHERE_HELD};
+use super::{held, landing, Destination, Held, BUNDLE_NOT_HELD, NOWHERE_HELD};
 use crate::app::fixtures::{scratch, FakeArchive};
 use crate::app::Ctx;
 use crate::archive::Archiving;
@@ -54,7 +54,7 @@ fn a_name_climbing_out_of_the_directory_reaches_nothing_it_climbed_to() {
         held(&ctx, "../secrets.env")
             .err()
             .map(|problem| problem.code),
-        Some(NOT_HELD)
+        Some(BUNDLE_NOT_HELD)
     );
 }
 
@@ -62,7 +62,10 @@ fn a_name_climbing_out_of_the_directory_reaches_nothing_it_climbed_to() {
 fn a_name_that_names_no_bundle_is_refused_by_name() {
     let ctx = holding("held-missing", "lemonfiber-support-1.tar.gz", "an archive");
     let refused = held(&ctx, "lemonfiber-support-9.tar.gz").err();
-    assert_eq!(refused.as_ref().map(|problem| problem.code), Some(NOT_HELD));
+    assert_eq!(
+        refused.as_ref().map(|problem| problem.code),
+        Some(BUNDLE_NOT_HELD)
+    );
     assert!(
         refused.is_some_and(|problem| problem.summary.contains("lemonfiber-support-9.tar.gz")),
         "the name is quoted back so a mistyped one can be seen"

@@ -35,7 +35,10 @@
 //! touches anybody watching from the library, because that traffic does not go out
 //! over the line at all.
 
-use crate::error::codes::rate::{NOTHING_MEASURED, NOTHING_TO_LIMIT, NO_ZONE, UNREADABLE};
+use crate::error::codes::rate::{
+    LIMIT_UNREADABLE, NOTHING_MEASURED, NOTHING_TO_LIMIT, NOTHING_TO_PAUSE, NO_ZONE,
+};
+use crate::error::Code;
 use serde::{Deserialize, Serialize};
 
 pub mod cap;
@@ -73,6 +76,16 @@ pub(crate) const SLOWED_SEEDING: &str =
      can cost standing you cannot buy back. Throttling is offered rather than \
      stopping for exactly this reason: a slow seed still counts and a stopped one \
      does not.";
+
+/// Every refusal setting, measuring or pausing what the download clients may move answers
+/// with, which a client names by its code.
+pub const REFUSALS: [Code; 5] = [
+    NOTHING_MEASURED,
+    NO_ZONE,
+    LIMIT_UNREADABLE,
+    NOTHING_TO_LIMIT,
+    NOTHING_TO_PAUSE,
+];
 
 /// What is deliberately outside every limit here, always said.
 ///

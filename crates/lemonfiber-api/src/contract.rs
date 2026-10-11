@@ -52,7 +52,6 @@ use serde::Serialize;
 
 use lemonfiber_core::agreement;
 use lemonfiber_core::alert::Alert;
-use lemonfiber_core::app::plugins::REFUSALS;
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::dashboard::Snapshot;
 use lemonfiber_core::error::codes::declared;
@@ -211,17 +210,36 @@ fn beside(kinds: &mut BTreeMap<String, Schema>) {
     describing(kinds, kind::STEP, schema_for!(Envelope<Line>));
 }
 
+/// Every refusal of the core's that a request on this surface may be answered with, family
+/// by family.
+///
+/// The refusals of an answer that named an offer or a listing that has since moved end
+/// work rather than a request, and they are the one refusal a client answers by reading
+/// again rather than by reporting a failure. The rest are each family's refusals of what
+/// a request named or how it asked, which a client branches on by code.
+pub(crate) const CORE_REFUSALS: [&[Code]; 15] = [
+    &agreement::MOVED,
+    &wiring::REFUSED,
+    &lemonfiber_core::app::REFUSALS,
+    &lemonfiber_core::app::plugins::REFUSALS,
+    &lemonfiber_core::app::rehearsal::REFUSALS,
+    &lemonfiber_core::app::setup::REFUSALS,
+    &lemonfiber_core::app::support::REFUSALS,
+    &lemonfiber_core::asking::REFUSALS,
+    &lemonfiber_core::bandwidth::REFUSALS,
+    &lemonfiber_core::glossary::REFUSALS,
+    &lemonfiber_core::keys::REFUSALS,
+    &lemonfiber_core::screening::REFUSALS,
+    &lemonfiber_core::space::REFUSALS,
+    &lemonfiber_core::stack::closure::REFUSALS,
+    &lemonfiber_core::wishing::REFUSALS,
+];
+
 /// Every refusal this surface answers with, keyed by its code.
 ///
-/// Its own, and the core's refusals of an answer that named an offer or a listing that
-/// has since moved: those end work rather than a request, and they are the one refusal
-/// a client answers by reading again rather than by reporting a failure, so a client
-/// has to be able to name them as it names this surface's own.
-///
-/// And the refusals of the plugins and wiring reads where what they are read from could
-/// not be read, which a client has to tell apart from an empty answer by name, and of a
-/// choice of what fills a capability and of an install, an update or a removal, each at
-/// the status its code is declared with. And every refusal of a member's viewing.
+/// Its own, the refusals of the plugins and wiring reads where what they are read from
+/// could not be read, which a client has to tell apart from an empty answer by name,
+/// and every one of [`CORE_REFUSALS`], each at the status its code is declared with.
 ///
 /// A code the registry does not declare cannot be built, so every refusal is found;
 /// one missing here would be a code no client can name, and a test counts them.
@@ -229,17 +247,12 @@ fn refusals() -> BTreeMap<String, Listed> {
     Refusal::EVERY
         .iter()
         .map(|refusal| refusal.code())
-        .chain(agreement::MOVED)
         .chain(
             wiring::UNREAD
                 .iter()
                 .flat_map(|codes| codes.iter().copied()),
         )
-        .chain(wiring::REFUSED)
-        .chain(REFUSALS)
-        .chain(lemonfiber_core::screening::REFUSALS)
-        .chain(lemonfiber_core::wishing::REFUSALS)
-        .chain(lemonfiber_core::keys::REFUSALS)
+        .chain(CORE_REFUSALS.iter().flat_map(|codes| codes.iter().copied()))
         .filter_map(|code| {
             let declared = declared(code)?;
             Some((

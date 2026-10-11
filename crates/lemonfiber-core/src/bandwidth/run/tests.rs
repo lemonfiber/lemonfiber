@@ -5,7 +5,7 @@ use crate::app::targets::Downloading;
 use crate::bandwidth::capacity::Source;
 use crate::bandwidth::{
     Answer, Cap, Capacity, Declared, Held, Holding, Limit, Pulling, Reached, Respite, Restraint,
-    Rhythm, WhenExceeded, NOTHING_MEASURED, NOTHING_TO_LIMIT, NO_ZONE, UNREADABLE,
+    Rhythm, WhenExceeded, LIMIT_UNREADABLE, NOTHING_MEASURED, NOTHING_TO_LIMIT, NO_ZONE,
 };
 use crate::config::Settings;
 use crate::ports::service::Rates;
@@ -538,7 +538,7 @@ async fn a_word_this_does_not_read_never_reaches_a_client() {
         &asking(|asked| asked.down = Some("half of it".to_owned())),
     )
     .await;
-    assert!(refused.is_err_and(|problem| problem.code == UNREADABLE));
+    assert!(refused.is_err_and(|problem| problem.code == LIMIT_UNREADABLE));
 }
 
 #[tokio::test]
@@ -605,7 +605,7 @@ async fn an_override_lifts_the_limits_and_cannot_be_asked_for_beyond_an_evening(
         &asking(|asked| asked.unrestricted_for = Some(24 * 60)),
     )
     .await;
-    assert!(refused.is_err_and(|problem| problem.code == UNREADABLE));
+    assert!(refused.is_err_and(|problem| problem.code == LIMIT_UNREADABLE));
 }
 
 #[tokio::test]

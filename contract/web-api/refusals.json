@@ -119,6 +119,26 @@
     "status": 404,
     "description": "Raised where a path under the endpoints is one no endpoint answers."
   },
+  "BUNDLE-8": {
+    "name": "BUNDLE_NOT_HELD",
+    "status": 404,
+    "description": "Raised when a name does not name one of the bundles this run kept."
+  },
+  "FORM-1": {
+    "name": "NO_FORM_NAMED",
+    "status": 400,
+    "description": "Raised when no form was named."
+  },
+  "FORM-2": {
+    "name": "NO_SUCH_FORM",
+    "status": 404,
+    "description": "Raised when a named form is not declared by the stack."
+  },
+  "FORM-3": {
+    "name": "FORMS_CONFLICT",
+    "status": 400,
+    "description": "Raised when forms that cannot be combined are named together."
+  },
   "GONE-2": {
     "name": "ANOTHER_READING",
     "status": 400,
@@ -178,6 +198,16 @@
     "name": "RESTART_MOVED",
     "status": 400,
     "description": "Raised where a restart names an offer that is not the one a fresh look at the stack builds."
+  },
+  "LIFE-3": {
+    "name": "ALREADY_WORKING",
+    "status": 409,
+    "description": "Another run is already working on this stack."
+  },
+  "LIFE-4": {
+    "name": "REGISTRY_REFUSED",
+    "status": 400,
+    "description": "Fetching images is switched off, so there was nothing to fetch with."
   },
   "MIGRATE-1": {
     "name": "OFFER_MOVED",
@@ -384,10 +414,20 @@
     "status": 400,
     "description": "Raised when a recipe's call was not sent because a value it carries may not go where it was going: not where its pairs say, not back to the service a credential belongs to, or outside without its approval; the install or update was put back."
   },
+  "PLUGIN-39": {
+    "name": "NOTHING_TO_PROVE",
+    "status": 404,
+    "description": "Nothing by that id is installed, so there is nothing to prove again."
+  },
   "PLUGIN-4": {
     "name": "UNRECORDED",
     "status": 500,
     "description": "The record of what is installed cannot be read."
+  },
+  "PLUGIN-40": {
+    "name": "STRANGER_REPLACING",
+    "status": 403,
+    "description": "Raised when a plugin that is not first-party declares a service replacing one the stack ships."
   },
   "PLUGIN-5": {
     "name": "ALREADY",
@@ -413,6 +453,56 @@
     "name": "UNPROVED",
     "status": 500,
     "description": "The plugin's own service would not start, so nothing about it could be proved."
+  },
+  "QUOTA-2": {
+    "name": "NO_LIMIT",
+    "status": 400,
+    "description": "Raised where a policy that lives inside a limit was chosen without one."
+  },
+  "QUOTA-4": {
+    "name": "NOT_WAITING",
+    "status": 404,
+    "description": "Raised where the request named is not one that is waiting on anybody."
+  },
+  "QUOTA-5": {
+    "name": "NO_REASON",
+    "status": 400,
+    "description": "Raised where a request was turned down and the reason said nothing."
+  },
+  "QUOTA-6": {
+    "name": "NOBODY",
+    "status": 404,
+    "description": "Raised where nobody in the household goes by the name that was given."
+  },
+  "QUOTA-7": {
+    "name": "NEVER_HERE",
+    "status": 404,
+    "description": "Raised where the request service holds no account for somebody who has one here."
+  },
+  "RATE-1": {
+    "name": "NOTHING_MEASURED",
+    "status": 400,
+    "description": "Raised when a limit is expressed as a share of a line nothing has measured."
+  },
+  "RATE-2": {
+    "name": "NO_ZONE",
+    "status": 400,
+    "description": "Raised when a schedule is asked for and nothing says which zone the clients would read it in."
+  },
+  "RATE-3": {
+    "name": "LIMIT_UNREADABLE",
+    "status": 400,
+    "description": "Raised when what was asked for could not be read as a limit, a window or a cap."
+  },
+  "RATE-4": {
+    "name": "NOTHING_TO_LIMIT",
+    "status": 400,
+    "description": "Raised when there is no download client to limit."
+  },
+  "RATE-5": {
+    "name": "NOTHING_TO_PAUSE",
+    "status": 400,
+    "description": "Raised when there is no download client to pause or resume."
   },
   "RATE-6": {
     "name": "PAUSING_MOVED",
@@ -499,6 +589,16 @@
     "status": 400,
     "description": "Raised where how many holdings to answer with is not a whole number."
   },
+  "REHEARSE-1": {
+    "name": "CANNOT",
+    "status": 400,
+    "description": "The flag cannot be honoured by this command, and never will be."
+  },
+  "REHEARSE-2": {
+    "name": "NOT_YET",
+    "status": 400,
+    "description": "The flag is not honoured by this command yet."
+  },
   "REPAIR-1": {
     "name": "STALE",
     "status": 400,
@@ -523,6 +623,41 @@
     "name": "UNANSWERED",
     "status": 500,
     "description": "Raised when an action's work ended before it had an answer to give."
+  },
+  "SETUP-1": {
+    "name": "NOT_REVIEWED",
+    "status": 400,
+    "description": "Raised when apply is asked for before the answers have been reviewed."
+  },
+  "SETUP-5": {
+    "name": "DOES_NOT_APPLY",
+    "status": 400,
+    "description": "Raised when an answer is not meaningful on the platform setup is running on."
+  },
+  "SETUP-7": {
+    "name": "ALREADY_SET_UP",
+    "status": 400,
+    "description": "Raised when setup is answered on a machine that is already set up."
+  },
+  "SETUP-8": {
+    "name": "NOTHING_TO_RECOVER",
+    "status": 400,
+    "description": "Raised when a recovery is asked for and no apply stopped part-way."
+  },
+  "SPACE-2": {
+    "name": "NOWHERE_TO_MEASURE",
+    "status": 400,
+    "description": "Raised when there is no data location to measure."
+  },
+  "SPACE-4": {
+    "name": "NOTHING_TO_ASK",
+    "status": 400,
+    "description": "Raised when there is no torrent client here to be holding a completed download."
+  },
+  "SPACE-5": {
+    "name": "NOT_HELD",
+    "status": 400,
+    "description": "Raised when the client answers and is holding nothing of the name given."
   },
   "SPACE-6": {
     "name": "ANOTHER_OFFER",
@@ -683,5 +818,10 @@
     "name": "NOT_SET_UP",
     "status": 503,
     "description": "Said where the house has nothing to search or ask with at all."
+  },
+  "WORD-1": {
+    "name": "UNRECOGNISED",
+    "status": 404,
+    "description": "A word this product does not explain, as a refusal that says what it does. Through the error model rather than a bare line, so it carries a code and a way forward like every other refusal — and the way forward is the list itself, which is short enough to be the answer rather than a pointer at one. It lies in the naming: the word is the whole of what was asked for, and there is no entry for it. A surface that reported this as its own failure would be telling a caller to try again at something that will never work."
   }
 }

@@ -19,7 +19,7 @@ use crate::door::run as door;
 use crate::error::codes::life::{
     ABSENT_THERE, ALREADY_WORKING, NEVER_SETTLED, REGISTRY_REFUSED, STILL_NEEDED,
 };
-use crate::error::{Diagnose, Problem};
+use crate::error::{Code, Diagnose, Problem};
 use crate::household::run as household;
 use crate::migration::run as migration;
 use crate::notify::run as notify;
@@ -120,6 +120,10 @@ use self_update::standing as stands;
 // The data-location watch is a self-contained feature in its own module; these
 // are the names the rest of the crate and the binary reach it by.
 pub use watch::{supervise, WATCH};
+
+/// Every refusal a run working on the stack's containers answers with before it acts,
+/// which a client names by its code.
+pub const REFUSALS: [Code; 2] = [ALREADY_WORKING, REGISTRY_REFUSED];
 
 /// Ask the engine to act on a set of services, which five commands do identically.
 ///

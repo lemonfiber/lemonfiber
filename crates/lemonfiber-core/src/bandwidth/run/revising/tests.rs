@@ -1,7 +1,7 @@
 use super::{defaulted_upload, revised, Asked};
 use crate::bandwidth::capacity::Source;
 use crate::bandwidth::limit::UPLOAD_SHARE;
-use crate::bandwidth::{Cap, Capacity, Declared, Limit, WhenExceeded, UNREADABLE};
+use crate::bandwidth::{Cap, Capacity, Declared, Limit, WhenExceeded, LIMIT_UNREADABLE};
 
 /// A moment every case here reads against.
 const NOW: u64 = 1_790_812_800;
@@ -109,7 +109,7 @@ fn a_cap_declared_with_nothing_to_do_at_it_is_refused_rather_than_defaulted() {
     // default chosen here is a choice nobody made, arriving at two in the
     // morning on a stack nobody is watching.
     let refused = from_nothing(&asking(|asked| asked.cap = Some("1TiB".to_owned())));
-    assert_eq!(refused, Err(UNREADABLE.as_str().to_owned()));
+    assert_eq!(refused, Err(LIMIT_UNREADABLE.as_str().to_owned()));
 }
 
 #[test]
@@ -138,7 +138,7 @@ fn a_cap_that_already_has_a_choice_keeps_it_when_the_figure_changes() {
 #[test]
 fn what_to_do_at_a_cap_nobody_declared_cannot_be_answered_as_it_stands() {
     let refused = from_nothing(&asking(|asked| asked.exceeded = Some("pause".to_owned())));
-    assert_eq!(refused, Err(UNREADABLE.as_str().to_owned()));
+    assert_eq!(refused, Err(LIMIT_UNREADABLE.as_str().to_owned()));
 }
 
 #[test]
@@ -177,7 +177,7 @@ fn a_word_this_does_not_know_is_refused_wherever_it_appears() {
     ] {
         assert_eq!(
             from_nothing(&asked),
-            Err(UNREADABLE.as_str().to_owned()),
+            Err(LIMIT_UNREADABLE.as_str().to_owned()),
             "{asked:?}"
         );
     }
@@ -243,7 +243,7 @@ fn a_word_this_build_does_not_know_never_falls_back_to_the_cap_s_own_answer() {
     let refused = revised(NOW, held, &asked);
     assert!(
         refused.is_err_and(|problem| {
-            problem.code == UNREADABLE
+            problem.code == LIMIT_UNREADABLE
                 && problem.summary.contains("stop")
                 && problem
                     .remedies
@@ -262,7 +262,7 @@ fn an_override_longer_than_one_may_ask_for_is_refused_with_what_may_be() {
         &asking(|asked| asked.unrestricted_for = Some(24 * 60)),
     );
     assert!(refused.as_ref().is_err_and(|problem| {
-        problem.code == UNREADABLE
+        problem.code == LIMIT_UNREADABLE
             && problem
                 .remedies
                 .first()

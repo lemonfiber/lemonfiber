@@ -19,7 +19,7 @@ codes! {
         remedy: "Set the zone, then ask again.",
     }
     /// Raised when what was asked for could not be read as a limit, a window or a cap.
-    UNREADABLE = "RATE-3" {
+    LIMIT_UNREADABLE = "RATE-3" {
         severity: Error,
         status: 400,
         since: "0.12.0",
