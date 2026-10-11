@@ -14,14 +14,12 @@ use serde::{Deserialize, Serialize};
 use super::records::{kind_of, media_status, media_type, request_status};
 use super::{Seerr, NOT_FOUND};
 use crate::endpoint::query_encoded;
+use crate::outbound::POSTERS;
 use crate::ports::http::Method;
 use crate::ports::media::Kind;
 use crate::ports::service::{
     Asked, Detail, Failure, Found, MediaStatus, Page, RequestStatus, Searching, Season, Wish,
 };
-
-/// Where every published poster is served from, at the width a phone shows it.
-const POSTERS: &str = "https://image.tmdb.org/t/p/w342";
 
 /// The status a film is filed under once it has come out.
 const RELEASED: &str = "Released";
@@ -108,6 +106,8 @@ struct Full {
     content_ratings: Option<Ratings>,
     #[serde(default)]
     seasons: Vec<SeasonNumber>,
+    #[serde(default)]
+    poster_path: Option<String>,
     #[serde(default)]
     media_info: Option<MediaInfo>,
 }
@@ -201,7 +201,7 @@ impl Hit {
             title: self.title.or(self.name)?,
             year: year_of(self.release_date.or(self.first_air_date).as_deref()),
             status: standing(self.media_info.as_ref()),
-            poster: self.poster_path.map(|path| format!("{POSTERS}{path}")),
+            poster: published(self.poster_path),
         })
     }
 }
@@ -256,8 +256,16 @@ impl Full {
             certification,
             released,
             seasons,
+            poster: published(self.poster_path),
         }
     }
+}
+
+/// Where the catalogue publishes the poster at `path`, or nothing where the service
+/// named none or named something other than a path.
+fn published(path: Option<String>) -> Option<String> {
+    path.filter(|path| path.starts_with('/'))
+        .map(|path| format!("{POSTERS}{path}"))
 }
 
 #[async_trait]

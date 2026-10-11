@@ -100,4 +100,12 @@ codes! {
         meaning: "Nobody in this household is known by that.",
         remedy: "Name somebody the household lists, by their name or their id.",
     }
+    /// Said where a title a member may ask for has no picture to show them.
+    NO_PICTURE = "WISH-13" {
+        severity: Error,
+        status: 404,
+        since: "0.18.0",
+        meaning: "That title has no picture to show.",
+        remedy: "The title can still be asked for by its name.",
+    }
 }

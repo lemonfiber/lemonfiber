@@ -175,3 +175,64 @@ async fn a_picture_comes_from_the_shelf_the_title_read_is_ruled_to_read() {
     let _ = fs::remove_dir_all(a_directory("pictured"));
     let _ = fs::remove_dir_all(a_directory("pictured-kept"));
 }
+
+/// The poster of a title a search found is the member's own, as the search is: it reaches
+/// the core for them, and a parameter the read does not take is refused before it does.
+#[tokio::test]
+async fn a_member_reaches_a_found_titles_poster_as_they_reach_the_search() {
+    let (router, carried) = as_a_member("member-found-poster").await;
+
+    let answer = asked(
+        router.clone(),
+        "GET",
+        "/api/askable/603/poster?kind=movies&member=bo",
+        &carried,
+        "",
+    )
+    .await;
+    assert_ne!(answer.status, StatusCode::FORBIDDEN, "{}", answer.body);
+    assert!(answer.body.contains("WISH-"), "{}", answer.body);
+
+    let answer = asked(
+        router.clone(),
+        "GET",
+        "/api/askable/603/poster?term=heat",
+        &carried,
+        "",
+    )
+    .await;
+    assert_eq!(answer.status, StatusCode::BAD_REQUEST, "{}", answer.body);
+    assert!(!answer.body.contains("WISH-"), "{}", answer.body);
+
+    let _ = fs::remove_dir_all(a_directory("member-found-poster"));
+}
+
+/// The operator's own session names the member the poster is for, and naming nobody is
+/// the member's search naming nobody.
+#[tokio::test]
+async fn a_found_titles_poster_for_nobody_is_refused_as_the_search_is() {
+    let (router, _, _) = over_a_picture("found-poster-nobody");
+    let operator = asked(
+        router.clone(),
+        "POST",
+        SESSION,
+        &from_here(),
+        &offering(&chosen()),
+    )
+    .await;
+    let (answer, _) = sent(
+        router,
+        "GET",
+        "/api/askable/603/poster?kind=movies",
+        &session(&operator.body),
+        None,
+        "",
+    )
+    .await;
+
+    assert_eq!(answer.status, StatusCode::BAD_REQUEST, "{}", answer.body);
+    assert!(answer.body.contains("WISH-11"), "{}", answer.body);
+
+    let _ = fs::remove_dir_all(a_directory("found-poster-nobody"));
+    let _ = fs::remove_dir_all(a_directory("found-poster-nobody-kept"));
+}

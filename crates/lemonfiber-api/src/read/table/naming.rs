@@ -271,7 +271,7 @@ pub(super) fn following(term: Option<String>, season: Option<&str>) -> Result<Co
 /// Nothing is refused here. Who is named, the words and the place are each the core's to
 /// judge, so a search naming nobody or too little is refused there, in the household's
 /// own sentence, on every surface alike.
-pub(super) fn askable(
+pub(crate) fn askable(
     member: Option<String>,
     term: Option<String>,
     after: Option<String>,

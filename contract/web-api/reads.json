@@ -457,5 +457,20 @@
     ],
     "kinds": [],
     "file": true
+  },
+  {
+    "path": "/api/askable/{id}/poster",
+    "parameters": [
+      {
+        "name": "member",
+        "repeatable": false
+      },
+      {
+        "name": "kind",
+        "repeatable": false
+      }
+    ],
+    "kinds": [],
+    "file": true
   }
 ]

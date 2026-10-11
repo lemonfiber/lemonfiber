@@ -75,6 +75,13 @@
                         "null"
                       ]
                     },
+                    "poster": {
+                      "description": "Where its poster is published, as the service gives it, or nothing.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
                     "released": {
                       "description": "Whether it has come out yet.",
                       "type": "boolean"
