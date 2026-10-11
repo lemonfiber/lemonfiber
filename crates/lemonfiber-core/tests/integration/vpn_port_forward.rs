@@ -423,6 +423,28 @@ async fn a_torrent_client_with_nothing_containing_it_is_warned_not_skipped() {
     );
 }
 
+/// A tunnel nothing runs inside contains no client, so the client is reported as
+/// unprotected, as it is when there is no tunnel at all.
+#[tokio::test]
+async fn a_torrent_client_outside_the_tunnel_s_network_is_warned_not_skipped() {
+    let mut outside = stack();
+    for service in &mut outside.services {
+        if service.id == "qbittorrent" {
+            service.network = None;
+        }
+    }
+    let findings = asking(Fake::new(vec![]))
+        .against(outside)
+        .check()
+        .run()
+        .await;
+    assert!(matches!(
+        verdict(&findings, "vpn.unprotected"),
+        Some(Verdict::Warn(_))
+    ));
+    assert!(verdict(&findings, "vpn").is_none());
+}
+
 /// The one fault in this category lemonfiber can put right itself: the provider forwards a
 /// port and the client is listening on another. What is offered says what it would do and
 /// what else changes, and admits it cannot be undone.
