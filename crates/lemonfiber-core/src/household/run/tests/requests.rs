@@ -496,10 +496,11 @@ async fn a_request_nothing_names_is_still_shown() {
         &Fake {
             answered: "",
             requests: r#"{"pageInfo":{"results":1},"results":[
-                {"status":1,"type":"movie","media":{"status":2},
+                {"status":1,"type":"movie","media":{"status":2,"tmdbId":603},
                  "requestedBy":{"displayName":"Alex"}}
             ]}"#,
             library: "[]",
+            film: Some(r#"{"status":"Released"}"#),
             ..Fake::default()
         },
         "nameless",
