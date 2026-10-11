@@ -245,6 +245,29 @@ fn the_adapter_a_service_names_survives_the_install() {
 }
 
 #[test]
+fn where_a_service_reaches_and_what_it_asks_for_there_survive_the_install() {
+    let record = installed(|manifest| {
+        set(manifest, |service| {
+            service.reaches = Some("comicvine.gamespot.com".to_owned());
+            service.asks_for = Some("Issue details".to_owned());
+        });
+    });
+
+    assert_eq!(
+        placed(record.as_ref(), "komga").map(|one| (one.reaches, one.asks_for)),
+        Some((
+            Some("comicvine.gamespot.com".to_owned()),
+            Some("Issue details".to_owned())
+        ))
+    );
+    assert_eq!(
+        placed(record.as_ref(), "komga-sidecar").map(|one| (one.reaches, one.asks_for)),
+        Some((None, None)),
+        "and the service that said neither keeps neither"
+    );
+}
+
+#[test]
 fn the_configuration_directory_a_service_declares_survives_the_install() {
     assert_eq!(
         config_path(whole().as_ref(), "komga"),

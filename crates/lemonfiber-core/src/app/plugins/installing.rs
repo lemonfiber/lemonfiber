@@ -341,7 +341,8 @@ pub(super) fn accepted(path: &Path, from: Option<&Fetched<'_>>) -> Result<Accept
             return Err(Box::new(super::cataloguing::not_as_reviewed(vouched.entry)));
         }
     }
-    let refusals = lemonfiber_plugin::refusals(&manifest, BUNDLED_CHECKS);
+    let mut refusals = lemonfiber_plugin::refusals(&manifest, BUNDLED_CHECKS);
+    refusals.extend(lemonfiber_plugin::uninstallable(&manifest));
     if refusals.is_empty() {
         Ok(Accepted { manifest, digest })
     } else {

@@ -1,4 +1,4 @@
-use crate::refusing::tests::{names, said, INSTALLABLE};
+use crate::refusing::tests::{names, said, with};
 
 const ADAPTER: &str = "komga";
 
@@ -12,14 +12,6 @@ digest      = "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f111612
 tag         = "1.11.0"
 criticality = "important"
 "#;
-
-/// The fixture's service with `added` after its configuration directory.
-fn with(added: &str) -> String {
-    INSTALLABLE.replace(
-        "config_path = \"/config\"\n",
-        &format!("config_path = \"/config\"\n{added}"),
-    )
-}
 
 /// The fixture's service as an adapter speaking `media.serve` in front of an upstream of
 /// its own, with `upstream` added to the upstream's table and `adapter` to the adapter's.

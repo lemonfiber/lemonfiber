@@ -363,6 +363,36 @@ mod brought {
     }
 
     #[test]
+    fn a_plugins_service_saying_where_it_reaches_is_taken_at_its_word() {
+        let said = INSTALLED.replace(
+            r#""takes_data": true"#,
+            r#""takes_data": true,
+              "reaches": "comicvine.gamespot.com",
+              "asks_for": "Series and issue details for the comics it files""#,
+        );
+        let listed = Register::parse(&said)
+            .map(|register| brought(&stack(), register.installed()))
+            .unwrap_or_default();
+
+        let service = listed.iter().find(|one| one.service == "komga");
+        assert_eq!(
+            service.map(|one| (
+                one.recorded,
+                one.destination.as_str(),
+                one.purpose.as_str(),
+                one.origin.clone()
+            )),
+            Some((
+                true,
+                "comicvine.gamespot.com",
+                "Series and issue details for the comics it files",
+                comics()
+            )),
+            "{listed:?}"
+        );
+    }
+
+    #[test]
     fn nothing_installed_brings_nothing() {
         assert!(brought(&stack(), &[]).is_empty());
     }

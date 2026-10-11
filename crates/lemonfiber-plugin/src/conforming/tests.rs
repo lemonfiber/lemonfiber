@@ -103,26 +103,6 @@ bind = \"wan\"
     }
 }
 
-/// The severity a plugin may not assign itself is refused as a word.
-///
-/// It means *its failure has consequences outside the machine*, which is not a
-/// judgement a contributor makes about their own work. The four that are available
-/// come from the type, so nothing here holds a second copy of the list.
-#[test]
-fn the_criticality_a_plugin_may_not_claim_is_named_with_the_four_it_may() {
-    let said = said(
-        "
-[[service]]
-id          = \"komga\"
-criticality = \"critical\"
-",
-    );
-    assert!(names(&said, &["critical"]), "names the value: {said:?}");
-    for available in ["core", "important", "enhancing", "optional"] {
-        assert!(names(&said, &[available]), "names {available}: {said:?}");
-    }
-}
-
 #[test]
 fn an_entry_with_no_id_yet_is_still_placed_by_where_it_sits() {
     let said = said(
@@ -462,6 +442,7 @@ fn the_format_has_no_field_for_code_for_reach_or_for_content_nobody_can_read() {
 fn a_plugins_service_declares_exactly_the_fields_the_contract_permits() {
     const PERMITTED: &[&str] = &[
         "api",
+        "asks_for",
         "bind",
         "config_path",
         "config_ro",
@@ -484,6 +465,7 @@ fn a_plugins_service_declares_exactly_the_fields_the_contract_permits() {
         "posture",
         "provides",
         "publish",
+        "reaches",
         "replaces",
         "shape",
         "speaks",
@@ -519,7 +501,8 @@ fn a_plugins_service_declares_exactly_the_fields_the_contract_permits() {
 ///
 /// A recipe's `to` is not one of these and is deliberately left off the list: it
 /// names where a captured value goes inside the plugin's own recipe, and what a
-/// call may address is bounded where recipes are read.
+/// call may address is bounded where recipes are read. Nor is a service's `reaches`,
+/// which says in words where it goes outside the machine and names no service.
 #[test]
 fn the_format_has_no_field_by_which_a_plugin_could_wire_to_a_named_service() {
     const ABSENT: &[&str] = &[
@@ -529,7 +512,6 @@ fn the_format_has_no_field_by_which_a_plugin_could_wire_to_a_named_service() {
         "depends_on",
         "filled_by",
         "fills",
-        "reaches",
         "wire",
         "wires",
     ];

@@ -37,6 +37,8 @@ fn placed(service: &str) -> Placed {
         replaces: None,
         shape: None,
         asks: Vec::new(),
+        reaches: None,
+        asks_for: None,
     }
 }
 

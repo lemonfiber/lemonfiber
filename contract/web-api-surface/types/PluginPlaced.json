@@ -12,6 +12,12 @@
       ],
       "required": false
     },
+    "asks_for": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "config_path": {
       "type": [
         "string"
@@ -87,6 +93,12 @@
     "reached": {
       "type": [
         "anyOf(null,ref:PluginReached)"
+      ],
+      "required": false
+    },
+    "reaches": {
+      "type": [
+        "null|string"
       ],
       "required": false
     },

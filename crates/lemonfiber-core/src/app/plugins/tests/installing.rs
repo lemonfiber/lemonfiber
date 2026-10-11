@@ -102,6 +102,33 @@ async fn a_manifest_this_build_refuses_is_not_installed() {
     assert!(!record_of(&ctx).exists(), "the record was written");
 }
 
+#[tokio::test]
+async fn a_service_naming_an_in_process_adapter_is_not_installed() {
+    let ctx = ctx("in-process");
+    let at = source(
+        "in-process",
+        &MANIFEST.replace(
+            r#"config_path = "/app/data""#,
+            "config_path = \"/app/data\"\nlistens     = 25600\napi         = { kind = \"servarr\", \
+             key_source = \"config-xml\", path = \"/app/data/config.xml\", version = 3 }",
+        ),
+    );
+
+    let refused = installing(&ctx, &at)
+        .await
+        .err()
+        .map(|problem| (problem.code.to_string(), problem.detail.unwrap_or_default()))
+        .unwrap_or_default();
+
+    assert_eq!(refused.0, "PLUGIN-3");
+    assert!(
+        refused.1.contains("service komga.api") && refused.1.contains("in-process adapter"),
+        "{}",
+        refused.1
+    );
+    assert!(!record_of(&ctx).exists(), "the record was written");
+}
+
 /// A header's name is written out, so a recipe substituting into one is refused with a
 /// code of its own — and every other fault is still listed beside it.
 #[tokio::test]

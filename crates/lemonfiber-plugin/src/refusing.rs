@@ -34,6 +34,8 @@ mod colliding;
 mod evidence;
 mod failing;
 mod fronting;
+mod installing;
+mod leaving;
 mod naming;
 mod reaching;
 mod recipes;
@@ -41,6 +43,7 @@ mod replacing;
 mod shaping;
 mod speaking;
 
+pub use installing::uninstallable;
 pub use recipes::{names_a_header_by_substitution, names_a_path_not_plain, outside};
 
 use std::collections::BTreeSet;
@@ -184,6 +187,8 @@ fn running(manifest: &Manifest, found: &mut Vec<Violation>) {
         adapting::adapted(service, found);
         speaking::spoken(service, &manifest.services, found);
         shaping::shaped(service, &manifest.services, found);
+        shaping::critical(service, found);
+        leaving::stated(service, found);
         fronting::native(service, &manifest.services, found);
         replacing::replaced(service, found);
     }
@@ -378,6 +383,14 @@ fn declared(manifest: &Manifest) -> Vec<(String, &str)> {
         every.push((format!("{at}.tag"), service.tag.as_str()));
         if let Some(path) = &service.config_path {
             every.push((format!("{at}.config_path"), path.as_str()));
+        }
+        for (field, text) in [
+            ("reaches", service.reaches.as_deref()),
+            ("asks_for", service.asks_for.as_deref()),
+        ] {
+            if let Some(text) = text {
+                every.push((format!("{at}.{field}"), text));
+            }
         }
     }
     for (at, wiring) in manifest.wirings.iter().enumerate() {

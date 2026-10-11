@@ -25,7 +25,9 @@ pub mod vocabulary;
 
 pub use conforming::Violation;
 pub use error::Failure;
-pub use refusing::{names_a_header_by_substitution, names_a_path_not_plain, outside, refusals};
+pub use refusing::{
+    names_a_header_by_substitution, names_a_path_not_plain, outside, refusals, uninstallable,
+};
 pub use schema::{
     Ask, Bind, Capture, Claim, ClaimProbe, Condition, Contribution, Criticality, Declaration,
     Declared, Entry, Expect, Expected, ExpectedKind, Health, HealthKind, Input, Manifest, On,

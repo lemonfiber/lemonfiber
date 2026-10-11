@@ -242,6 +242,8 @@ pub(super) fn what_is_installed() -> lemonfiber_core::plugin::Installs {
             replaces: None,
             shape: None,
             asks: Vec::new(),
+            reaches: None,
+            asks_for: None,
         }],
         provides: Vec::new(),
         contributions: Vec::new(),

@@ -42,6 +42,8 @@ fn recorded(plugin: &str, reached: Option<Reached>) -> Installed {
             replaces: None,
             shape: None,
             asks: Vec::new(),
+            reaches: None,
+            asks_for: None,
         }],
         provides: Vec::new(),
         contributions: Vec::new(),

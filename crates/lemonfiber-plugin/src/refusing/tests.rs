@@ -109,6 +109,14 @@ pub(crate) fn names(said: &[String], words: &[&str]) -> bool {
         .any(|one| words.iter().all(|word| one.contains(word)))
 }
 
+/// The fixture's service with `added` after its configuration directory.
+pub(crate) fn with(added: &str) -> String {
+    INSTALLABLE.replace(
+        "config_path = \"/config\"\n",
+        &format!("config_path = \"/config\"\n{added}"),
+    )
+}
+
 /// One edit to a manifest this build would act on, and what it then says about it.
 pub(crate) fn without(before: &str, after: &str) -> Vec<String> {
     assert!(

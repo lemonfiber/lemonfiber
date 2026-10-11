@@ -1,4 +1,5 @@
-use crate::refusing::tests::{names, said, INSTALLABLE};
+use crate::refusing::installing::tests::uninstallable;
+use crate::refusing::tests::{names, said, with, INSTALLABLE};
 
 const ADAPTER: &str = "komga";
 
@@ -14,14 +15,6 @@ criticality = "important"
 "#;
 
 const ASKED: &str = "shape = \"egress-guard\"\n";
-
-/// The fixture's service with `added` after its configuration directory.
-fn with(added: &str) -> String {
-    INSTALLABLE.replace(
-        "config_path = \"/config\"\n",
-        &format!("config_path = \"/config\"\n{added}"),
-    )
-}
 
 /// The fixture's service as an adapter speaking `speaks` in front of an upstream of its
 /// own, with `upstream` added to the upstream's table and `adapter` to the adapter's.
@@ -114,4 +107,86 @@ fn a_service_serving_no_media_may_not_take_the_render_shape() {
         names(&said, &["service komga.shape", "render", "media.serve"]),
         "{said:?}"
     );
+}
+
+/// The fixture's service providing the egress guard itself, with `added` after its
+/// configuration directory.
+fn guarding(added: &str) -> String {
+    with(&format!("{ASKED}{added}")).replace(
+        "provides    = [\"media.serve\", \"komga:kobo-sync\"]",
+        "provides    = [\"network.egress-guard\"]",
+    )
+}
+
+#[test]
+fn a_plugin_s_one_service_providing_the_egress_guard_may_take_the_shape() {
+    let said = said(&guarding(""));
+    assert!(!refused_at(&said, ADAPTER), "{said:?}");
+}
+
+#[test]
+fn a_service_providing_the_egress_guard_beside_another_may_not_take_the_shape() {
+    let said =
+        said(&guarding("").replace("[[claim]]\n", &format!("{UPSTREAM_SERVICE}\n[[claim]]\n")));
+    assert!(refused_at(&said, ADAPTER), "{said:?}");
+}
+
+#[test]
+fn critical_without_the_egress_guard_s_shape_is_refused_naming_the_four_without_it() {
+    let said = said(&INSTALLABLE.replacen(
+        "criticality = \"important\"",
+        "criticality = \"critical\"",
+        1,
+    ));
+    assert!(
+        names(
+            &said,
+            &[
+                "service komga.criticality",
+                "is critical,",
+                "shape = \"egress-guard\"",
+                "core, important, enhancing, optional"
+            ]
+        ),
+        "{said:?}"
+    );
+}
+
+#[test]
+fn critical_with_the_egress_guard_s_shape_is_read() {
+    let said = said(&guarding("").replacen(
+        "criticality = \"important\"",
+        "criticality = \"critical\"",
+        1,
+    ));
+    assert!(!names(&said, &[".criticality"]), "{said:?}");
+}
+
+#[test]
+fn a_plugin_s_one_egress_guard_is_refused_at_install() {
+    let refused = uninstallable(&guarding(""));
+    assert!(
+        names(
+            &refused,
+            &[
+                "service komga.shape",
+                "egress-guard",
+                "the bundle assembles"
+            ]
+        ),
+        "{refused:?}"
+    );
+}
+
+#[test]
+fn an_egress_guard_an_adapter_fronts_is_installable() {
+    let text = with(&format!(
+        "speaks      = [\"network.egress-guard@1\"]\nlistens     = 8080\nfronts      = \"{UPSTREAM}\"\n"
+    ))
+    .replace(
+        "[[claim]]\n",
+        &format!("{UPSTREAM_SERVICE}{ASKED}\n[[claim]]\n"),
+    );
+    let refused = uninstallable(&text);
+    assert!(!names(&refused, &[".shape"]), "{refused:?}");
 }
