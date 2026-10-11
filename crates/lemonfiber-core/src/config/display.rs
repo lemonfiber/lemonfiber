@@ -261,18 +261,6 @@ pub const SHOWN: &[(&str, &str)] = &[
         "the address the household's own links point at, which is where the front door is",
     ),
     (
-        "UN_SONARR_0_URL",
-        "where the extractor reaches the television service",
-    ),
-    (
-        "UN_RADARR_0_URL",
-        "where the extractor reaches the film service",
-    ),
-    (
-        "UN_LIDARR_0_URL",
-        "where the extractor reaches the music service",
-    ),
-    (
         "DOMAIN",
         "the hostname real certificates are obtained for, which is public in the certificate",
     ),

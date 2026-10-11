@@ -60,9 +60,13 @@ fn recorded(at: &std::path::Path) -> Option<String> {
 }
 
 /// What one asked-for capability reaches, as the listing answers it.
-fn asked(report: &crate::model::WiringReport, by: &str) -> Option<Vec<String>> {
+fn asked(report: &crate::model::WiringReport, by: &str, of: &str) -> Option<Vec<String>> {
     report.wired.iter().find_map(|link| match &link.reaches {
-        Reaches::Asked { services, .. } if link.by == by => Some(services.clone()),
+        Reaches::Asked {
+            capability,
+            services,
+            ..
+        } if link.by == by && capability == of => Some(services.clone()),
         _ => None,
     })
 }
@@ -82,7 +86,9 @@ fn the_listing_answers_every_link_the_pinned_stack_declares() {
         Some(Vec::new())
     );
     assert_eq!(
-        report.as_ref().and_then(|report| asked(report, "seerr")),
+        report
+            .as_ref()
+            .and_then(|report| asked(report, "seerr", "identity.source")),
         Some(vec!["jellyfin".to_owned()])
     );
 }
@@ -126,7 +132,7 @@ fn a_substitution_is_recorded_and_read_back() {
 
     let after = listing(&ctx).ok();
     assert_eq!(
-        after.and_then(|after| asked(&after, "bindery")),
+        after.and_then(|after| asked(&after, "bindery", "indexer.search")),
         Some(vec!["nzbhydra2".to_owned()])
     );
 }
@@ -259,9 +265,17 @@ fn held(at: &std::path::Path, key: &str) -> Option<String> {
 }
 
 /// How the listing says one asked-for capability was settled.
-fn settled(report: &crate::model::WiringReport, by: &str) -> Option<crate::wiring::Settled> {
+fn settled(
+    report: &crate::model::WiringReport,
+    by: &str,
+    of: &str,
+) -> Option<crate::wiring::Settled> {
     report.wired.iter().find_map(|link| match &link.reaches {
-        Reaches::Asked { settled, .. } if link.by == by => Some(settled.clone()),
+        Reaches::Asked {
+            capability,
+            settled,
+            ..
+        } if link.by == by && capability == of => Some(settled.clone()),
         _ => None,
     })
 }
@@ -345,7 +359,7 @@ fn a_reason_is_recorded_with_the_choice_and_read_back_beside_it() {
     let listed = listing(&ctx).ok();
     assert!(
         matches!(
-            listed.as_ref().and_then(|report| settled(report, "bindery")),
+            listed.as_ref().and_then(|report| settled(report, "bindery", "indexer.search")),
             Some(crate::wiring::Settled::Chosen { whose: crate::wiring::Whose::Operator, why: Some(why), .. })
                 if why == said
         ),

@@ -455,24 +455,11 @@ fn brought(plugin: &str, placed: &Placed, project: Option<&Path>, first_party: b
 }
 
 /// The name the stack's network resolves a bundled service to: its own id, or the id of
-/// the tunnel whose network it shares.
-///
-/// The tunnel is recognised by the kernel capability it is granted rather than by name,
-/// so a stack whose tunnel is called something else is read the same way.
+/// the service whose network it runs inside.
 fn host(service: &Service, services: &[Service]) -> String {
-    for on in &service.depends_on {
-        let tunnel = services.iter().find(|other| {
-            other.id == *on
-                && other
-                    .grants
-                    .iter()
-                    .any(|granted| granted == crate::doctor::vpn::GATEWAY_GRANT)
-        });
-        if let Some(tunnel) = tunnel {
-            return tunnel.id.clone();
-        }
-    }
-    service.id.clone()
+    service
+        .inside(services)
+        .map_or_else(|| service.id.clone(), |host| host.id.clone())
 }
 
 #[cfg(test)]

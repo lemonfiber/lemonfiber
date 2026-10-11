@@ -26,20 +26,6 @@ fn fault(from: &str, to: &str, expected: &str) {
     );
 }
 
-/// An ordering edge names a service, so it is a by-name link, so it has to be
-/// shown as one. Pointing the entry that shows it somewhere else leaves the edge
-/// unaccounted for.
-#[test]
-fn an_ordering_edge_no_wiring_shows_as_by_name_is_caught() {
-    fault(
-        "by = \"qbittorrent\"\nto = \"gluetun\"",
-        "by = \"unpackerr\"\nto = \"sonarr\"",
-        "depends_on gluetun and no wiring shows it as by name",
-    );
-}
-
-/// A by-name link with no reason beside it reads as an oversight rather than as
-/// the exception it is, which is the whole of why it is written down.
 #[test]
 fn a_by_name_wiring_that_does_not_say_why_is_caught() {
     fault(

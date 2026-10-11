@@ -127,6 +127,25 @@ fn without(name: &str) -> String {
         .join("\n")
 }
 
+/// The bundled stack with the first service declaring `name` declaring `nothing.here`
+/// beside it.
+fn beside(name: &str) -> String {
+    let declared = format!("\"{name}\"");
+    let mut edited = false;
+    STACK
+        .lines()
+        .map(|line| {
+            if edited || !line.trim_start().starts_with("provides = ") || !line.contains(&declared)
+            {
+                return line.to_owned();
+            }
+            edited = true;
+            line.replacen(&declared, &format!("{declared}, \"nothing.here\""), 1)
+        })
+        .collect::<Vec<String>>()
+        .join("\n")
+}
+
 /// A capability no bundled service declares fails generation, naming it.
 ///
 /// Every one of them in turn rather than the first, and not only for thoroughness:
@@ -156,16 +175,14 @@ fn a_capability_nothing_declares_fails_generation_by_name() {
 fn a_service_declaring_a_name_the_vocabulary_lacks_fails_generation_by_name() {
     let mut asked = 0;
     for held in lemonfiber_plugin::vocabulary::carried() {
-        let odd = STACK.replacen(
-            &format!("\"{}\"", held.name),
-            &format!("\"{}\", \"nothing.here\"", held.name),
-            1,
-        );
-        let said = capabilities_of(&odd)
+        let said = capabilities_of(&beside(held.name))
             .err()
             .map(|refused| refused.to_string())
             .unwrap_or_default();
-        assert!(said.contains("nothing.here"), "got: {said}");
+        assert!(
+            said.contains("declares nothing.here, which this vocabulary does not carry"),
+            "got: {said}"
+        );
         asked += 1;
     }
     assert!(asked > 1, "the vocabulary carries more than one capability");

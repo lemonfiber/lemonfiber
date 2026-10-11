@@ -39,34 +39,6 @@ pub(super) fn check(manifest: &Manifest, found: &mut Vec<Violation>) {
             message,
         }));
     }
-    shown_as_by_name(manifest, found);
-}
-
-/// Every ordering edge is also declared as a by-name link.
-///
-/// An ordering edge names a service and the engine acts on it, so it is a by-name
-/// link by any reading. One that is not declared here would be the exception without
-/// having had to say it was one, which is the whole of what the table is for.
-fn shown_as_by_name(manifest: &Manifest, found: &mut Vec<Violation>) {
-    let shown: BTreeSet<(&str, &str)> = manifest
-        .wirings
-        .iter()
-        .filter_map(|wiring| Some((wiring.by.as_str(), wiring.to.as_deref()?)))
-        .collect();
-    for service in &manifest.services {
-        for on in &service.depends_on {
-            if shown.contains(&(service.id.as_str(), on.as_str())) {
-                continue;
-            }
-            found.push(Violation {
-                location: format!("service {}", service.id),
-                message: format!(
-                    "depends_on {on} and no wiring shows it as by name; an ordering edge \
-                     names a service, so it is the exception and has to say so"
-                ),
-            });
-        }
-    }
 }
 
 /// Every end a link names is a service this stack declares, and is not its own end.

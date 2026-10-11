@@ -10,6 +10,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::container::Shape;
 use crate::{ApiKind, Date, Manifest, Protocol, Removed, Service};
 
 mod wiring;
@@ -18,17 +19,6 @@ mod wiring;
 const FLOATING_TAGS: &[&str] = &[
     "latest", "stable", "edge", "nightly", "develop", "dev", "main", "master", "rolling",
 ];
-
-/// The kernel capabilities a service may be granted.
-///
-/// Deliberately one entry. A kernel capability is a hole in the isolation the
-/// stack otherwise relies on, and the tunnel genuinely needs this one to build
-/// an interface. Anything else should have to argue for itself in a spec change.
-///
-/// Public because it is one of two sets of things called capabilities in this system,
-/// and the rule that no name may be in both is only checkable by something that can
-/// see both.
-pub const ALLOWED_GRANTS: &[&str] = &[GATEWAY_GRANT];
 
 /// The kernel capability a tunnel needs to build its interface and route the traffic
 /// placed inside its network.
@@ -192,12 +182,6 @@ fn check_services(
 ) {
     let osi = identifiers(OSI);
 
-    let of_service: BTreeMap<&str, &str> = manifest
-        .services
-        .iter()
-        .map(|service| (service.id.as_str(), service.profile.as_str()))
-        .collect();
-
     let mut declared = BTreeSet::new();
     for service in &manifest.services {
         let repeated = (!declared.insert(service.id.clone()))
@@ -212,12 +196,11 @@ fn check_services(
             .chain(estimated(service))
             .chain(licensed(service, &osi))
             .chain(released(service, today))
-            .chain(permitted(service))
+            .chain(retired(service))
             .chain(versioned(service))
             .chain(listened(service))
             .chain(outbound(service))
             .chain(offered(service))
-            .chain(depended(service, &of_service))
             .chain(contained(service));
 
         let location = format!("service {}", service.id);
@@ -489,14 +472,24 @@ fn offered(service: &Service) -> Vec<String> {
         .collect()
 }
 
-/// A service asks only for the kernel capabilities the stack is willing to grant.
-fn permitted(service: &Service) -> Vec<String> {
-    service
-        .grants
-        .iter()
-        .filter(|granted| !ALLOWED_GRANTS.contains(&granted.as_str()))
-        .map(|granted| format!("asks for kernel capability {granted}, which is not allowed"))
-        .collect()
+/// The fields the service model retired, each refused with what replaces it.
+fn retired(service: &Service) -> Vec<String> {
+    let grants = service.grants.iter().map(|granted| {
+        match Shape::ALL
+            .into_iter()
+            .find(|shape| shape.grants().contains(&granted.as_str()))
+        {
+            Some(shape) => format!(
+                "grants {granted}: refused; shape = \"{}\" grants it",
+                shape.name()
+            ),
+            None => format!("grants {granted}: refused, and no shape grants it"),
+        }
+    });
+    let ordering = service.depends_on.iter().map(|on| {
+        format!("depends_on {on}: refused; network = {{ via = \"<capability>\" }} replaces it")
+    });
+    grants.chain(ordering).collect()
 }
 
 /// Every rule the service's container fields break, and a shape taken by a service
@@ -519,26 +512,6 @@ fn contained(service: &Service) -> Vec<String> {
         .into_iter()
         .map(|(at, what)| format!("{}: {what}", at.trim_start_matches(&field)))
         .chain(shaped)
-        .collect()
-}
-
-/// A service waits only on things that will be running when it is.
-///
-/// Dependencies are allowed to exist; crossing a profile is what is not. A
-/// service waiting on something that may not be running is a start-up that
-/// hangs for a reason nothing reports.
-fn depended(service: &Service, of_service: &BTreeMap<&str, &str>) -> Vec<String> {
-    service
-        .depends_on
-        .iter()
-        .filter_map(|needed| match of_service.get(needed.as_str()) {
-            None => Some(format!("depends on {needed}, which is not a service here")),
-            Some(other) if *other != service.profile => Some(format!(
-                "depends on {needed}, which is in profile {other} rather than {}",
-                service.profile
-            )),
-            Some(_) => None,
-        })
         .collect()
 }
 

@@ -53,6 +53,24 @@ fn came(manifest: Option<Manifest>, chosen: &Chosen, by: &str) -> Option<Reaches
     })
 }
 
+/// How the stack settled `by`'s ask of `capability`.
+fn asked(
+    manifest: Option<Manifest>,
+    chosen: &Chosen,
+    by: &str,
+    capability: &str,
+) -> Option<Reaches> {
+    manifest.and_then(|manifest| {
+        settle(&manifest, &[], chosen)
+            .into_iter()
+            .filter(|one| one.by == by)
+            .map(|one| one.reaches)
+            .find(|reaches| {
+                matches!(reaches, Reaches::Asked { capability: asked, .. } if asked == capability)
+            })
+    })
+}
+
 /// Every ask the stack leaves unfilled, as an option that carries a stack that
 /// did not read at all rather than reporting it as nothing missing.
 fn nothing_fills(manifest: Option<Manifest>, chosen: &Chosen) -> Option<Vec<super::Unfilled>> {
@@ -151,7 +169,7 @@ fn several_claimants_and_no_choice_is_contested_and_names_each() {
 /// The stack's own choice settles a contest, and says it was the stack's and why.
 #[test]
 fn the_stack_s_choice_settles_a_contest_and_says_whose_it_is() {
-    let reaches = came(stack(), &Chosen::default(), "bindery");
+    let reaches = asked(stack(), &Chosen::default(), "bindery", "indexer.search");
     assert!(
         reaches.as_ref().is_some_and(|one| matches!(
             one,
@@ -178,7 +196,7 @@ fn the_stack_s_choice_settles_a_contest_and_says_whose_it_is() {
 #[test]
 fn the_operator_s_choice_is_over_the_stack_s() {
     let chosen = Chosen::read(Some("indexer.search=nzbhydra2"));
-    let reaches = came(stack(), &chosen, "bindery");
+    let reaches = asked(stack(), &chosen, "bindery", "indexer.search");
     assert!(
         reaches.as_ref().is_some_and(|one| matches!(
             one,
@@ -201,7 +219,7 @@ fn the_operator_s_choice_is_over_the_stack_s() {
 #[test]
 fn a_choice_of_something_that_stopped_claiming_it_leaves_the_contest_standing() {
     let chosen = Chosen::read(Some("indexer.search=sabnzbd"));
-    let reaches = came(stack(), &chosen, "bindery");
+    let reaches = asked(stack(), &chosen, "bindery", "indexer.search");
     assert!(
         reaches.as_ref().is_some_and(|one| matches!(
             one,
@@ -217,12 +235,12 @@ fn a_choice_of_something_that_stopped_claiming_it_leaves_the_contest_standing() 
 /// A by-name link is shown as one, carrying the reason it is the exception.
 #[test]
 fn a_by_name_link_is_shown_as_by_name_with_its_reason() {
-    let reaches = came(stack(), &Chosen::default(), "qbittorrent");
+    let reaches = came(stack(), &Chosen::default(), "door");
     assert!(
         reaches.as_ref().is_some_and(|one| matches!(
             one,
             Reaches::ByName { service, why }
-                if service == "gluetun" && why.contains("network namespace")
+                if service == "jellyfin" && why.contains("What it guards is Jellyfin")
         )),
         "{reaches:?}"
     );
@@ -475,7 +493,7 @@ fn a_stack_with_nothing_chosen_says_nothing_rather_than_an_empty_setting() {
 }
 
 /// Every link the shipped stack declares is answered, and the by-name ones are
-/// the six the manifest says they are.
+/// the seven the manifest says they are.
 #[test]
 fn every_link_the_shipped_stack_declares_is_answered() {
     let counted = stack().map(|manifest| {
@@ -490,7 +508,7 @@ fn every_link_the_shipped_stack_declares_is_answered() {
         counted.map(|(answered, _, _)| answered),
         counted.map(|(_, declared, _)| declared)
     );
-    assert_eq!(counted.map(|(_, _, by_name)| by_name), Some(8));
+    assert_eq!(counted.map(|(_, _, by_name)| by_name), Some(7));
 }
 
 /// An ask for every filler with nothing to fill it is unfilled, not "every one of

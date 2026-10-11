@@ -9,6 +9,7 @@
 //! keeps this from becoming a second copy of an enumeration, silently disagreeing
 //! with the first about what a service is allowed to say.
 
+use crate::container::{Posture, Shape, UserMode};
 use crate::names::{refused, scan, Closed};
 use crate::schema::{ApiKind, Bind, Criticality, HealthKind, KeySource, Protocol};
 use crate::Violation;
@@ -40,6 +41,18 @@ const ON_SERVICE: &[Closed] = &[
     Closed {
         at: "api.key_source",
         reads: refused::<KeySource>,
+    },
+    Closed {
+        at: "user_mode",
+        reads: refused::<UserMode>,
+    },
+    Closed {
+        at: "posture",
+        reads: refused::<Posture>,
+    },
+    Closed {
+        at: "shape",
+        reads: refused::<Shape>,
     },
 ];
 

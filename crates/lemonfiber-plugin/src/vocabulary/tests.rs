@@ -224,9 +224,9 @@ fn a_name_that_is_not_an_area_and_a_verb_is_not_a_core_name() {
 /// which is what this asks.
 #[test]
 fn no_name_is_in_two_of_the_three_sets_called_capabilities() {
-    let granted: BTreeSet<&str> = lemonfiber_manifest::ALLOWED_GRANTS
-        .iter()
-        .copied()
+    let granted: BTreeSet<&str> = lemonfiber_manifest::container::Shape::ALL
+        .into_iter()
+        .flat_map(|shape| shape.grants().iter().copied())
         .collect();
     assert!(!granted.is_empty(), "there are kernel grants to be unlike");
     let shared: Vec<&str> = carried()

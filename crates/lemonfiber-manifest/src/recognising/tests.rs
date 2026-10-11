@@ -135,12 +135,16 @@ fn no_closed_field_in_the_shipped_stack_is_left_off_the_table() {
 /// And the sweep can fail, which is the half a passing sweep says nothing about.
 ///
 /// A gate nobody has watched refuse is a gate nobody knows works: run against a
-/// table with the last service field taken off it, every service declaring that
-/// field has to come back unnamed.
+/// table with one service field taken off it, every service declaring that field has
+/// to come back unnamed.
 #[test]
 fn a_field_left_off_the_table_is_what_the_sweep_refuses() {
-    let short = ON_SERVICE.split_last().map_or(&[][..], |(_, rest)| rest);
-    let (_, escaped) = sweeping(&[("profile", ON_PROFILE), ("service", short)]);
+    let short: Vec<Closed> = ON_SERVICE
+        .iter()
+        .filter(|closed| closed.at != "api.key_source")
+        .copied()
+        .collect();
+    let (_, escaped) = sweeping(&[("profile", ON_PROFILE), ("service", &short)]);
     assert!(
         escaped.iter().any(|said| said.contains("key_source")),
         "a table missing api.key_source lets it through as a parse failure: \

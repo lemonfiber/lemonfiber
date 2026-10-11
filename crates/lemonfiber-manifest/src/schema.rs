@@ -317,6 +317,22 @@ impl Service {
     pub fn majors(&self) -> Vec<u32> {
         majors(&self.tag)
     }
+
+    /// Whether this service takes the egress guard's shape: the tunnel others run inside.
+    #[must_use]
+    pub fn guards_egress(&self) -> bool {
+        self.shape == Some(crate::container::Shape::EgressGuard)
+    }
+
+    /// The service among `services` whose network this one runs inside: the one
+    /// providing the capability its `network.via` names.
+    #[must_use]
+    pub fn inside<'a>(&self, services: &'a [Self]) -> Option<&'a Self> {
+        let via = &self.network.as_ref()?.via;
+        services
+            .iter()
+            .find(|other| other.id != self.id && other.provides.iter().any(|named| named == via))
+    }
 }
 
 /// The majors an image pinned by `tag` runs: the first number of the tag, or nothing

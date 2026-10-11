@@ -42,7 +42,7 @@ use findings::{
 pub use forwarding::{Answer, Forwarding};
 use leak::{labelled, Reach};
 use pair::torrent_client;
-pub(crate) use pair::{resolve_pair, Pair, GATEWAY_GRANT};
+pub(crate) use pair::{resolve_pair, Pair};
 pub use port_forward::granted_port;
 use port_forward::{port_forward_offline, Grant};
 use probe::{addresses, exit_country, find, public_address, read_grant};

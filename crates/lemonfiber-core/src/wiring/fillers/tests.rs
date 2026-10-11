@@ -150,13 +150,19 @@ fn a_plugins_service_is_reached_at_its_own_id_and_answers_where_chosen() {
         stand_in.and_then(|one| one.key_file.clone()),
         Some(project().join("config/nzbget/nzbget.conf"))
     );
+    let asking = fillers
+        .asks()
+        .iter()
+        .filter(|ask| ask.capability == "download.usenet")
+        .count();
     let answering: Vec<&str> = fillers
         .asks()
         .iter()
         .filter(|ask| ask.capability == "download.usenet")
         .flat_map(|ask| ask.fillers.iter().map(|one| one.id.as_str()))
         .collect();
-    assert_eq!(answering, vec!["nzbget"; 3]);
+    assert!(asking > 0, "the shipped stack asks for a usenet client");
+    assert_eq!(answering, vec!["nzbget"; asking]);
 }
 
 /// A plugin's service recorded before names were kept is called by its id, and one that

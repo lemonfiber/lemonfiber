@@ -61,6 +61,9 @@ pub enum Shape {
 }
 
 impl Shape {
+    /// Every shape lemonfiber writes.
+    pub const ALL: [Self; 2] = [Self::EgressGuard, Self::Render];
+
     /// The name a manifest and an approval give the shape.
     #[must_use]
     pub const fn name(self) -> &'static str {
