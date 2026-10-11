@@ -1,10 +1,12 @@
-# Post every workflow run's outcome to the public #build-log channel.
+# Post each run's outcome that the public #build-log channel carries (OPS-R24):
+# every run for main, a tag, a release, a schedule or a dispatch, and every pull
+# request run that failed. The notifier decides which before a runner starts.
 # workflow_run executes in the base repo with the org secret available and never
 # in fork-PR code; values reach the reusable as inputs, not shell interpolations.
 name: discord-build
 on:
   workflow_run:
-    workflows: [gates, build, codeql, validate, tokens, sonar, scorecard, release, release-dispatch, integrity, docs]
+    workflows: [gates, build, codeql, sonar, scorecard, Release, release-dispatch]
     types: [completed]
 permissions:
   contents: read
@@ -16,5 +18,6 @@ jobs:
       body: "${{ github.event.repository.name }} — ${{ github.event.workflow_run.conclusion }} · ${{ github.event.workflow_run.head_sha }}"
       url: ${{ github.event.workflow_run.html_url }}
       color: ${{ github.event.workflow_run.conclusion == 'success' && '3066993' || '15158332' }}
+      build-log: true
     secrets:
       webhook: ${{ secrets.DISCORD_BUILD_WEBHOOK }}
