@@ -63,6 +63,7 @@ fn request(
         member: member.to_owned(),
         member_id: None,
         kind,
+        title_id: None,
         item,
         request_status: Some(statuses.0),
         media_status: Some(statuses.1),
@@ -101,6 +102,8 @@ struct Fake {
     /// One answer for both because the write only has to succeed: what it was sent
     /// is read back off the transport rather than out of its reply.
     permissions: (u16, &'static str),
+    /// What the request service's own record of a film answers, where a case names one.
+    film: Option<&'static str>,
 }
 
 impl Default for Fake {
@@ -120,6 +123,7 @@ impl Default for Fake {
             refuse: false,
             account: None,
             permissions: (200, r#"{"permissions":32}"#),
+            film: None,
         }
     }
 }
@@ -157,6 +161,9 @@ impl Fake {
                 "/settings/permissions",
                 Answer::reply(self.permissions.0, self.permissions.1),
             ));
+        }
+        if let Some(film) = self.film {
+            routes.push(("/api/v1/movie/", Answer::reply(200, film)));
         }
         routes.push(("/api/v1/request", Answer::reply(200, self.requests)));
         routes.push(("", Answer::reply(200, self.library)));

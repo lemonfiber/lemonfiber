@@ -65,6 +65,9 @@ pub(super) struct Naming<'a> {
     pub(super) libraries: &'a BTreeMap<String, String>,
     /// The title each curator knows its items by, and the year it says each came out.
     pub(super) titles: &'a BTreeMap<(Kind, i64), Titled>,
+    /// The title the request service names each request no curator holds yet by, keyed
+    /// by the request.
+    pub(super) unheld: &'a BTreeMap<i64, Titled>,
     /// The media server's own certificates, in the operator's country.
     pub(super) certificates: &'a [Certificate],
     /// Whether each member's requests arrive unseen, how much of their period is
@@ -169,6 +172,45 @@ pub(super) struct Titled {
     pub(super) title: String,
     /// The year it came out, where the curator knows one.
     pub(super) year: Option<u16>,
+}
+
+/// The title the request service names each request by that no curator holds yet,
+/// keyed by the request, where the request carries the id the service finds its title
+/// by.
+///
+/// A request awaiting approval has been handed to no curator, so no library can name it,
+/// and a request nobody can name is one nobody can rule on. One look-up per such request,
+/// and a look-up that does not answer costs that request its name and nothing else.
+pub(super) async fn unheld_titles(
+    reached: Option<&crate::app::targets::HouseholdAccess>,
+    requests: &[HouseholdRequest],
+    titles: &BTreeMap<(Kind, i64), Titled>,
+    region: &str,
+) -> BTreeMap<i64, Titled> {
+    let mut named = BTreeMap::new();
+    let Some(access) = reached else {
+        return named;
+    };
+    for request in requests
+        .iter()
+        .filter(|request| titled(request, titles).is_none())
+    {
+        let (Some(kind), Some(id)) = (request.kind, request.title_id.as_deref()) else {
+            continue;
+        };
+        if let Ok(Some(detail)) = access.requests.detail(kind, id, region).await {
+            if let Some(title) = detail.title {
+                named.insert(
+                    request.id,
+                    Titled {
+                        title,
+                        year: detail.year,
+                    },
+                );
+            }
+        }
+    }
+    named
 }
 
 /// What a request is called and when it came out, where the curator filing it has been told

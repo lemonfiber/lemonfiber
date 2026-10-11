@@ -95,6 +95,12 @@ struct SeasonInfo {
 #[serde(rename_all = "camelCase")]
 struct Full {
     #[serde(default)]
+    title: Option<String>,
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    release_date: Option<String>,
+    #[serde(default)]
     overview: Option<String>,
     #[serde(default)]
     status: Option<String>,
@@ -229,6 +235,11 @@ impl Full {
                     .filter(|rating| !rating.is_empty())
             }),
         };
+        let year = year_of(
+            self.release_date
+                .as_deref()
+                .or(self.first_air_date.as_deref()),
+        );
         let status = self.status.as_deref().unwrap_or_default();
         let released = match kind {
             Kind::Movies => status == RELEASED,
@@ -251,6 +262,8 @@ impl Full {
             })
             .collect();
         Detail {
+            title: self.title.or(self.name).filter(|title| !title.is_empty()),
+            year,
             status: whole,
             overview: self.overview.filter(|overview| !overview.is_empty()),
             certification,

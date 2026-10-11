@@ -96,6 +96,25 @@
                     "status": {
                       "$ref": "#/$defs/MediaStatus",
                       "description": "Where it stands in the house, taken whole."
+                    },
+                    "title": {
+                      "default": null,
+                      "description": "What it is called, as the service names it, where it names it at all.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "year": {
+                      "default": null,
+                      "description": "The year it came out, where the service knows one.",
+                      "format": "uint16",
+                      "maximum": 65535,
+                      "minimum": 0,
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
                     }
                   },
                   "required": [
