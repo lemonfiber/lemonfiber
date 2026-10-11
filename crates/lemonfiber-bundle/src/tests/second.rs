@@ -375,6 +375,34 @@ fn a_first_party_service_says_where_it_reaches_and_what_it_asks_for() {
 }
 
 #[test]
+fn a_first_party_service_reaching_nothing_says_so_with_an_empty_reaches() {
+    let local = PART.replace(
+        "reaches = \"The Usenet providers you configure\"",
+        "reaches = \"\"",
+    );
+    let said = broken("local", &local, &files(), &[], TABLES);
+    assert!(
+        !names(&said, &["says nothing of where it reaches"]),
+        "{said:?}"
+    );
+    let blank = PART.replace(
+        "asks_for = \"The articles each download is made of\"",
+        "asks_for = \" \"",
+    );
+    let said = broken("blank", &blank, &files(), &[], TABLES);
+    assert!(
+        names(&said, &["service sabnzbd says nothing of where it reaches"]),
+        "{said:?}"
+    );
+    let unsaid = PART.replace("reaches = \"The Usenet providers you configure\"\n", "");
+    let said = broken("unsaid", &unsaid, &files(), &[], TABLES);
+    assert!(
+        names(&said, &["service sabnzbd says nothing of where it reaches"]),
+        "{said:?}"
+    );
+}
+
+#[test]
 fn schema_2_requires_the_tree_stage_profile_and_last_release() {
     let fields = ["tree", "stage", "profile", "last_release"];
     let pinned = bundle(PART, &files(), &[], TABLES)

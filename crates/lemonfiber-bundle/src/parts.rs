@@ -168,9 +168,11 @@ fn staged(pin: &Pin, part: &Part, bundle: &Bundle, broken: &mut Vec<String>) {
         Some(Stage::Installed) | None => {}
     }
     for service in &part.services {
-        let said =
-            |text: &Option<String>| text.as_deref().is_some_and(|text| !text.trim().is_empty());
-        if !said(&service.reaches) || !said(&service.asks_for) {
+        let asked = service
+            .asks_for
+            .as_deref()
+            .is_some_and(|text| !text.trim().is_empty());
+        if service.reaches.is_none() || !asked {
             broken.push(format!(
                 "plugin {id} service {} says nothing of where it reaches or what it asks for, \
                  which every first-party service says",
