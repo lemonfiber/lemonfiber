@@ -11,7 +11,7 @@ mod rules;
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::io::ErrorKind;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
@@ -109,7 +109,7 @@ pub enum Refused {
 pub fn read(root: &Path) -> Result<Vec<Held>, Refused> {
     let text = readable(&root.join(FILE))?;
     let bundle: Bundle = toml::from_str(&text)?;
-    let copies = copies(&root.join(COPIES))?;
+    let mut copies = copies(&root.join(COPIES))?;
     let mut broken = rules::broken(&bundle, &copies);
     if !broken.is_empty() {
         broken.sort();
@@ -118,23 +118,22 @@ pub fn read(root: &Path) -> Result<Vec<Held>, Refused> {
     Ok(bundle
         .plugin
         .into_iter()
-        .filter_map(|pin| {
-            let copy = copies.get(&rules::file(&pin.id))?.clone();
-            Some(Held { pin, copy })
+        .map(|pin| {
+            let copy = copies.remove(&rules::file(&pin.id)).unwrap_or_default();
+            Held { pin, copy }
         })
         .collect())
 }
 
 /// Every copy in `directory`, by its file name; a missing directory holds none.
 fn copies(directory: &Path) -> Result<BTreeMap<String, String>, Refused> {
-    let entries = match std::fs::read_dir(directory) {
-        Ok(entries) => entries,
+    let paths = match listed(directory) {
+        Ok(paths) => paths,
         Err(missing) if missing.kind() == ErrorKind::NotFound => return Ok(BTreeMap::new()),
         Err(source) => return Err(unread(directory, source)),
     };
     let mut copies = BTreeMap::new();
-    for entry in entries {
-        let path = entry.map_err(|source| unread(directory, source))?.path();
+    for path in paths {
         let name = path
             .file_name()
             .map(|name| name.to_string_lossy().into_owned())
@@ -145,6 +144,13 @@ fn copies(directory: &Path) -> Result<BTreeMap<String, String>, Refused> {
         copies.insert(name, readable(&path)?);
     }
     Ok(copies)
+}
+
+/// Every path in `directory`.
+fn listed(directory: &Path) -> std::io::Result<Vec<PathBuf>> {
+    std::fs::read_dir(directory)?
+        .map(|entry| entry.map(|entry| entry.path()))
+        .collect()
 }
 
 /// The text at `path`.

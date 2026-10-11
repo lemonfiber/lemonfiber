@@ -25,14 +25,12 @@ pub(crate) fn broken(bundle: &Bundle, copies: &BTreeMap<String, String>) -> Vec<
             bundle.schema
         ));
     }
-    for pair in bundle.plugin.windows(2) {
-        if let [before, after] = pair {
-            if before.id >= after.id {
-                broken.push(format!(
-                    "plugin {} comes after {}: plugins are ordered by id and named once",
-                    after.id, before.id
-                ));
-            }
+    for (before, after) in bundle.plugin.iter().zip(bundle.plugin.iter().skip(1)) {
+        if before.id >= after.id {
+            broken.push(format!(
+                "plugin {} comes after {}: plugins are ordered by id and named once",
+                after.id, before.id
+            ));
         }
     }
     for pin in &bundle.plugin {
