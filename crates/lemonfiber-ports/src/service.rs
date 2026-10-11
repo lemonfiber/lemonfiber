@@ -220,6 +220,15 @@ pub trait MediaServer: Send + Sync {
     ///
     /// Returns [`Failure`] when the server is unreachable or refuses.
     async fn create_admin(&self, name: &str, password: &str) -> Result<(), Failure>;
+
+    /// Change the administrator's password to `replacement`, signed in with the one in
+    /// force, and prove the replacement by signing in with it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the server is unreachable, refuses the password in force
+    /// or the change, or will not take the replacement at a sign-in.
+    async fn replace_admin_password(&self, replacement: &str) -> Result<(), Failure>;
 }
 
 /// Asking a curator to start the operator-triggered maintenance a stack sometimes

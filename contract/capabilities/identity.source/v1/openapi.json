@@ -112,6 +112,9 @@
     "/lemonfiber/identity.source/v1/ratings": {
       "$ref": "operations/ratings.json"
     },
+    "/lemonfiber/identity.source/v1/replace_admin_password": {
+      "$ref": "operations/replace_admin_password.json"
+    },
     "/lemonfiber/identity.source/v1/sessions": {
       "$ref": "operations/sessions.json"
     },

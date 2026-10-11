@@ -460,7 +460,7 @@
       "files": [
         {
           "path": "identity.source/v1/openapi.json",
-          "sha256": "ca82c8976f0b6c3e36d495b429c42415790e1bf477b164144d5ebc379ce5d706"
+          "sha256": "973260050ee6de5f00dbb8092326b9b7616d1a8d62cd959c72651c4066da6680"
         },
         {
           "path": "identity.source/v1/operations/startup_completed.json",
@@ -469,6 +469,10 @@
         {
           "path": "identity.source/v1/operations/create_admin.json",
           "sha256": "6b851bf400bac54165d97614a6910956f6f3bc5fe8c1fb34a0f7913d19b8f003"
+        },
+        {
+          "path": "identity.source/v1/operations/replace_admin_password.json",
+          "sha256": "6f58e0cdb547cd699624de4391b446a7e4450d1ea22b20b56f40918998975395"
         },
         {
           "path": "identity.source/v1/operations/household.json",
@@ -536,14 +540,14 @@
         },
         {
           "path": "identity.source/v1/conformance.json",
-          "sha256": "5e9f0e1fda58ddd9d09903081a70af2f45149bcaa97b175bd8a71b432c234b51"
+          "sha256": "ff0ce8293bf23d3a87f10eeef84825e166f506a12db5a027337a4da742e669a9"
         }
       ],
       "majors": [
         1
       ],
       "openapi": "identity.source/v1/openapi.json",
-      "operations": 18
+      "operations": 19
     },
     {
       "capability": "media.serve",
