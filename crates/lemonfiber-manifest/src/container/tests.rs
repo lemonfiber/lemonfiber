@@ -251,11 +251,15 @@ fn only_the_egress_guard_is_a_network_to_run_inside_and_never_ones_own() {
 
 #[test]
 fn a_shape_adds_its_own_and_is_approved_by_name() {
+    assert_eq!(Shape::EgressGuard.name(), "egress-guard");
     assert_eq!(Shape::EgressGuard.grants(), ["NET_ADMIN"]);
-    assert_eq!(Shape::Render.devices(), ["/dev/dri"]);
+    assert_eq!(Shape::EgressGuard.devices(), ["/dev/net/tun"]);
+    assert_eq!(Shape::EgressGuard.serves(), "network.egress-guard");
+    assert_eq!(Shape::Render.name(), "render");
     assert!(Shape::Render.grants().is_empty());
-    assert_eq!(Shape::Render.approval("jellyfin"), "render@jellyfin");
+    assert_eq!(Shape::Render.devices(), ["/dev/dri"]);
     assert_eq!(Shape::Render.serves(), "media.serve");
+    assert_eq!(Shape::Render.approval("jellyfin"), "render@jellyfin");
 }
 
 #[test]
