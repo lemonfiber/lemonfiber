@@ -38,6 +38,11 @@ pub struct HouseholdRequest {
     /// Which service files the media — television or film — or `None` where the
     /// request service names a media type this build does not know.
     pub kind: Option<crate::media::Kind>,
+    /// The id the request service finds the title it asks for by, which its own record of
+    /// that title is read under: how a request still awaiting approval, which no curator
+    /// holds, is named.
+    #[serde(default)]
+    pub title_id: Option<String>,
     /// The id the curator filing this media knows it by, where the request service has
     /// handed it over yet. Nothing for a request still awaiting approval, which no
     /// curator has been told about — so the item cannot be named from the library, and

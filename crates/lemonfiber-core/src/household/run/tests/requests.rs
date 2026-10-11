@@ -22,6 +22,7 @@ fn assembled(
         &Naming {
             libraries,
             titles,
+            unheld: &BTreeMap::new(),
             certificates: &[],
             asked: &nothing_asked(),
             quality: &Selection::everywhere(crate::quality::Preset::Balanced),
@@ -437,6 +438,76 @@ async fn the_household_view_reads_the_requests_and_names_them_from_the_library()
         Some("The Expanse".to_owned())
     );
     assert_eq!(first.and_then(|request| request.state), Some(State::Here));
+}
+
+#[tokio::test]
+async fn a_request_awaiting_approval_is_named_from_the_request_services_own_record() {
+    let context = ctx_with(
+        &Fake {
+            answered: "",
+            requests: r#"{"pageInfo":{"results":1},"results":[
+                {"status":1,"type":"movie","media":{"status":2,"tmdbId":603},
+                 "requestedBy":{"displayName":"Alex"},"createdAt":"2026-08-30T09:00:00Z"}
+            ]}"#,
+            library: "[]",
+            film: Some(r#"{"title":"The Matrix","releaseDate":"1999-03-31","status":"Released"}"#),
+            ..Fake::default()
+        },
+        "unheld",
+    );
+    let report = household(&context, None).await.unwrap_or_default();
+    let first = report.members.first().and_then(|m| m.requests.first());
+    assert_eq!(
+        first.and_then(|request| request.title.clone()),
+        Some("The Matrix".to_owned())
+    );
+    assert_eq!(first.and_then(|request| request.year), Some(1999));
+}
+
+#[tokio::test]
+async fn two_requests_for_one_title_awaiting_approval_are_both_named() {
+    let context = ctx_with(
+        &Fake {
+            answered: "",
+            requests: r#"{"pageInfo":{"results":2},"results":[
+                {"id":1,"status":1,"type":"movie","media":{"status":2,"tmdbId":603},
+                 "requestedBy":{"displayName":"Alex"}},
+                {"id":2,"status":1,"type":"movie","media":{"status":2,"tmdbId":603},
+                 "requestedBy":{"displayName":"Alex"}}
+            ]}"#,
+            library: "[]",
+            film: Some(r#"{"title":"The Matrix","releaseDate":"1999-03-31","status":"Released"}"#),
+            ..Fake::default()
+        },
+        "shared",
+    );
+    let report = household(&context, None).await.unwrap_or_default();
+    let titles: Vec<Option<String>> = report
+        .members
+        .iter()
+        .flat_map(|member| member.requests.iter().map(|request| request.title.clone()))
+        .collect();
+    assert_eq!(titles, vec![Some("The Matrix".to_owned()); 2]);
+}
+
+#[tokio::test]
+async fn a_request_nothing_names_is_still_shown() {
+    let context = ctx_with(
+        &Fake {
+            answered: "",
+            requests: r#"{"pageInfo":{"results":1},"results":[
+                {"status":1,"type":"movie","media":{"status":2,"tmdbId":603},
+                 "requestedBy":{"displayName":"Alex"}}
+            ]}"#,
+            library: "[]",
+            film: Some(r#"{"status":"Released"}"#),
+            ..Fake::default()
+        },
+        "nameless",
+    );
+    let report = household(&context, None).await.unwrap_or_default();
+    let first = report.members.first().and_then(|m| m.requests.first());
+    assert!(first.is_some_and(|request| request.title.is_none()));
 }
 
 /// The name the request service shows is the requester's own to change, so a request

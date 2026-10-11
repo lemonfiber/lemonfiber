@@ -42,6 +42,7 @@ impl Requests for Upstream {
             member: "Ana".to_owned(),
             member_id: Some("a7f3".to_owned()),
             kind: Some(Kind::Tv),
+            title_id: None,
             item: Some(4),
             arrived: None,
             shelf_id: None,
@@ -206,6 +207,8 @@ impl Searching for Upstream {
 
     async fn detail(&self, kind: Kind, id: &str, region: &str) -> Result<Option<Detail>, Failure> {
         Ok((id == "603").then(|| Detail {
+            title: None,
+            year: None,
             status: MediaStatus::PartlyAvailable,
             overview: Some(format!("a {kind:?} rated in {region}")),
             certification: Some("12".to_owned()),

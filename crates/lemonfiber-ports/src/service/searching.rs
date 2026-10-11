@@ -59,6 +59,12 @@ pub struct Season {
 )]
 #[serde(deny_unknown_fields)]
 pub struct Detail {
+    /// What it is called, as the service names it, where it names it at all.
+    #[serde(default)]
+    pub title: Option<String>,
+    /// The year it came out, where the service knows one.
+    #[serde(default)]
+    pub year: Option<u16>,
     /// Where it stands in the house, taken whole.
     pub status: MediaStatus,
     /// What it is about, in the service's words, where it has any.

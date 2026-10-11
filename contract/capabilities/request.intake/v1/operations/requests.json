@@ -102,6 +102,14 @@
                         "string",
                         "null"
                       ]
+                    },
+                    "title_id": {
+                      "default": null,
+                      "description": "The id the request service finds the title it asks for by, which its own record of\nthat title is read under: how a request still awaiting approval, which no curator\nholds, is named.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
                     }
                   },
                   "required": [

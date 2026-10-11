@@ -23,7 +23,7 @@ use std::collections::BTreeMap;
 use crate::app::targets::{household_requests, identity};
 use crate::app::{Ctx, Hostable, Whom};
 pub(crate) use allowance::{allowance_of, OwnAllowance};
-use naming::{library_titles, named_access, named_by_the_server, titled, Naming};
+use naming::{library_titles, named_access, named_by_the_server, titled, unheld_titles, Naming};
 
 use crate::asking::Policy;
 use crate::error::{Diagnose, Problem};
@@ -133,6 +133,7 @@ async fn everybody(ctx: &Ctx, member: Option<&str>) -> Result<HouseholdReport, B
     // One library read per service names every request that has been handed over, rather
     // than a lookup per request: the same read either way, made once.
     let (titles, named) = library_titles(ctx, &manifest.services).await;
+    let unheld = unheld_titles(reached.as_ref(), server.as_ref(), &requests, &titles).await;
     if !named {
         findings.push(
             "a library could not be read, so some requests are named by what they are \
@@ -164,6 +165,7 @@ async fn everybody(ctx: &Ctx, member: Option<&str>) -> Result<HouseholdReport, B
         &Naming {
             libraries: &libraries,
             titles: &titles,
+            unheld: &unheld,
             certificates: &certificates,
             asked: &asked,
             quality: &quality,
@@ -357,7 +359,7 @@ fn grouped(
         if let Some(made) = made.clone().filter(|_| state != Some(State::Declined)) {
             theirs.made.push(made);
         }
-        let named = titled(&request, naming.titles);
+        let named = titled(&request, naming.titles).or_else(|| naming.unheld.get(&request.id));
         theirs.requests.push(MemberRequest {
             id: request.id,
             title: named.map(|named| named.title.clone()),

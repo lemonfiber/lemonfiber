@@ -298,6 +298,21 @@ fn a_request_with_no_title_is_still_named() {
     );
 }
 
+/// A request made today reads as asked today rather than as asked 0 days ago.
+#[test]
+fn a_request_made_today_reads_as_asked_today() {
+    let mut fresh = request(1, State::WaitingForApproval, None);
+    fresh.waiting_days = Some(0);
+
+    let said = to_hand_over(&member(None, vec![fresh]), &quality(), None, false);
+
+    assert!(
+        said.iter().any(|line| line.contains(", asked today")),
+        "{said:?}"
+    );
+    assert!(!said.iter().any(|line| line.contains("0 days")), "{said:?}");
+}
+
 /// One day reads as one day rather than as one days.
 #[test]
 fn one_day_waiting_reads_as_one_day() {

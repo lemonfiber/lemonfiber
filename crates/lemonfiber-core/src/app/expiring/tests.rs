@@ -33,6 +33,7 @@ fn asked(id: i64, made: Option<&str>, request_status: RequestStatus) -> Househol
         member: "Ana".to_owned(),
         member_id: None,
         kind: Some(crate::recyclarr::Kind::Movies),
+        title_id: None,
         item: None,
         request_status: Some(request_status),
         media_status: Some(MediaStatus::Pending),

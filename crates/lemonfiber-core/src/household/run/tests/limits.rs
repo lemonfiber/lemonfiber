@@ -12,6 +12,7 @@ fn a_household_of(accounts: Vec<Member>, requesting: &BTreeMap<String, bool>) ->
         &Naming {
             libraries: &unnamed(),
             titles: &titles(),
+            unheld: &BTreeMap::new(),
             certificates: &british(),
             asked: &asked_of(requesting),
             quality: &Selection::everywhere(crate::quality::Preset::Balanced),
@@ -194,6 +195,7 @@ fn a_reason_this_machine_holds_reaches_the_request_it_belongs_to() {
         &Naming {
             libraries: &unnamed(),
             titles: &titles(),
+            unheld: &BTreeMap::new(),
             certificates: &[],
             asked: &nothing_asked(),
             quality: &Selection::everywhere(crate::quality::Preset::Balanced),
@@ -245,6 +247,7 @@ fn a_full_disk_reaches_whoever_is_about_to_ask() {
         &Naming {
             libraries: &unnamed(),
             titles: &titles(),
+            unheld: &BTreeMap::new(),
             certificates: &[],
             asked: &nothing_asked(),
             quality: &Selection::everywhere(crate::quality::Preset::Balanced),

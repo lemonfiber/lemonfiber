@@ -18,6 +18,7 @@ fn asked(id: i64) -> HouseholdRequest {
         member: "Ana".to_owned(),
         member_id: None,
         kind: Some(crate::recyclarr::Kind::Movies),
+        title_id: None,
         item: None,
         request_status: Some(RequestStatus::Pending),
         media_status: Some(MediaStatus::Pending),

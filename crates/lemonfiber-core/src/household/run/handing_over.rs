@@ -118,15 +118,21 @@ fn waiting(requests: &[MemberRequest], expiring: Option<u32>) -> Vec<String> {
             request
                 .estimate
                 .map_or_else(String::new, |estimate| format!(", {}", estimate.reading())),
-            request
-                .waiting_days
-                .map_or_else(String::new, |days| format!(
-                    ", asked {days} day{} ago",
-                    crate::plural::s(usize::try_from(days).unwrap_or(2))
-                )),
+            request.waiting_days.map_or_else(String::new, asked_ago),
         ));
     }
     said
+}
+
+/// When a request still waiting was asked for, said from the whole days it has waited.
+fn asked_ago(days: u64) -> String {
+    if days == 0 {
+        return ", asked today".to_owned();
+    }
+    format!(
+        ", asked {days} day{} ago",
+        crate::plural::s(usize::try_from(days).unwrap_or(2))
+    )
 }
 
 /// What was refused and why, where this machine refused it.

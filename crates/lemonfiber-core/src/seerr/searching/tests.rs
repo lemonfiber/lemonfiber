@@ -4,7 +4,7 @@ use lemonfiber_fixtures::http::{Answer, Fake};
 
 use crate::ports::http::Method;
 use crate::ports::media::Kind;
-use crate::ports::service::{Asked, MediaStatus, Searching, Wish};
+use crate::ports::service::{Asked, Detail, MediaStatus, Searching, Wish};
 use crate::seerr::Seerr;
 
 /// The request service, carrying its own key, answering over `http`.
@@ -91,6 +91,7 @@ async fn a_films_certification_is_its_first_one_in_the_region_asked() {
         .flatten()
         .unwrap_or_default();
 
+    assert_eq!(detail.title, None);
     assert_eq!(detail.certification.as_deref(), Some("12"));
     assert!(detail.released);
     assert!(detail.seasons.is_empty());
@@ -116,6 +117,7 @@ async fn a_series_is_rated_by_region_and_never_offers_its_specials() {
         .flatten()
         .unwrap_or_default();
 
+    assert_eq!(detail.year, Some(2011));
     assert_eq!(detail.certification.as_deref(), Some("TV-MA"));
     assert!(detail.released);
     assert_eq!(
@@ -260,5 +262,25 @@ async fn a_film_is_asked_for_without_seasons_and_an_unnamed_member_or_title_is_r
             .and_then(|asked| asked.body.as_deref())
             .and_then(|body| serde_json::from_str::<serde_json::Value>(body).ok()),
         Some(serde_json::json!({"mediaType":"movie","mediaId":603}))
+    );
+}
+
+#[tokio::test]
+async fn a_title_is_named_by_its_film_title_or_its_series_name_with_its_year() {
+    let film = r#"{"title":"The Matrix","releaseDate":"1999-03-31","status":"Released"}"#;
+    let series = r#"{"name":"Game of Thrones","firstAirDate":"2011-04-17","status":"Ended"}"#;
+    let http = Fake::by_path(vec![
+        ("/api/v1/movie/603", Answer::reply(200, film)),
+        ("/api/v1/tv/1399", Answer::reply(200, series)),
+    ]);
+    let seerr = service(&http);
+    let named = |detail: Option<Detail>| detail.map(|detail| (detail.title, detail.year));
+    assert_eq!(
+        named(seerr.detail(Kind::Movies, "603", "NL").await.ok().flatten()),
+        Some((Some("The Matrix".to_owned()), Some(1999)))
+    );
+    assert_eq!(
+        named(seerr.detail(Kind::Tv, "1399", "NL").await.ok().flatten()),
+        Some((Some("Game of Thrones".to_owned()), Some(2011)))
     );
 }

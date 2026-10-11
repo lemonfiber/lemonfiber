@@ -14,6 +14,7 @@ fn asked(id: i64, request_status: RequestStatus, media_status: MediaStatus) -> H
         member: "Ana".to_owned(),
         member_id: None,
         kind: Some(crate::recyclarr::Kind::Movies),
+        title_id: None,
         item: None,
         request_status: Some(request_status),
         media_status: Some(media_status),
