@@ -20,6 +20,7 @@ use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::{InvitationStanding, MemberStanding};
 use lemonfiber_core::ports::http::{Method, Request};
 use lemonfiber_fixtures::http::{Answer, Fake};
+use lemonfiber_fixtures::ports::{stamp, DAY, HOUR};
 use lemonfiber_fixtures::support::Reporting;
 use lemonfiber_ports::docker::{Health, Lifecycle};
 
@@ -32,25 +33,34 @@ use lemonfiber_ports::docker::{Health, Lifecycle};
 ///   watched on this account.
 /// - `ed` was offered yesterday and has not claimed it yet.
 /// - `fay` is a member with a password.
-const HOUSEHOLD: &str = r#"[
-    {"Id":"1","Name":"owner","HasPassword":true,"Policy":{"IsAdministrator":true}},
-    {"Id":"9","Name":"ana","HasPassword":false,"LastActivityDate":"2026-03-01T10:00:00.0000000Z",
-     "Policy":{"IsDisabled":true}},
-    {"Id":"7","Name":"bo","HasPassword":false},
-    {"Id":"5","Name":"cy","HasPassword":false,"LastActivityDate":"2025-12-01T10:00:00.0000000Z"},
-    {"Id":"11","Name":"ed","HasPassword":false},
-    {"Id":"12","Name":"fay","HasPassword":true,"LastActivityDate":"2026-10-04T10:00:00.0000000Z"}
-]"#;
+fn household() -> String {
+    format!(
+        r#"[
+    {{"Id":"1","Name":"owner","HasPassword":true,"Policy":{{"IsAdministrator":true}}}},
+    {{"Id":"9","Name":"ana","HasPassword":false,"LastActivityDate":"2026-03-01T10:00:00.0000000Z",
+     "Policy":{{"IsDisabled":true}}}},
+    {{"Id":"7","Name":"bo","HasPassword":false}},
+    {{"Id":"5","Name":"cy","HasPassword":false,"LastActivityDate":"2025-12-01T10:00:00.0000000Z"}},
+    {{"Id":"11","Name":"ed","HasPassword":false}},
+    {{"Id":"12","Name":"fay","HasPassword":true,"LastActivityDate":"{}.0000000Z"}}
+]"#,
+        stamp(-2 * DAY + 10 * HOUR)
+    )
+}
 
 /// What the media server recorded: the old offers in January, and `ed`'s yesterday.
 ///
-/// The test clock is stopped at the fourth of October, so January is long past the window
-/// and the thirtieth of September is inside it.
-const RECORDED: &str = r#"{"Items":[
-    {"Type":"UserCreated","Date":"2026-01-04T09:00:00.0000000Z","UserId":"7"},
-    {"Type":"UserPasswordChanged","Date":"2026-01-04T09:00:00.0000000Z","UserId":"5"},
-    {"Type":"UserCreated","Date":"2026-10-05T10:00:00.0000000Z","UserId":"11"}
-]}"#;
+/// January is long past the window, and yesterday is inside it.
+fn recorded() -> String {
+    format!(
+        r#"{{"Items":[
+    {{"Type":"UserCreated","Date":"2026-01-04T09:00:00.0000000Z","UserId":"7"}},
+    {{"Type":"UserPasswordChanged","Date":"2026-01-04T09:00:00.0000000Z","UserId":"5"}},
+    {{"Type":"UserCreated","Date":"{}.0000000Z","UserId":"11"}}
+]}}"#,
+        stamp(-DAY + 10 * HOUR)
+    )
+}
 
 /// An account as the media server answers a read of it, for a policy to be written over.
 const ACCOUNT: &str = r#"{"Id":"0","Policy":{"IsDisabled":false,"EnableAllFolders":true}}"#;
@@ -78,12 +88,12 @@ impl Answers {
             taking_back: Answer::reply(204, ""),
             narrowing: Answer::reply(204, ""),
             switching_on: Answer::reply(204, ""),
-            recorded: Answer::reply(200, RECORDED),
+            recorded: Answer::reply(200, recorded()),
         }
     }
 }
 
-/// A media server holding [`HOUSEHOLD`], answering the writes that can fail with `answers`
+/// A media server holding [`household`], answering the writes that can fail with `answers`
 /// and every other write with a yes.
 fn a_server(answers: Answers) -> Arc<Fake> {
     let yes = Answer::reply(204, "");
@@ -108,7 +118,7 @@ fn a_server(answers: Answers) -> Arc<Fake> {
         (Method::Post, "/Password", yes.clone()),
         (Method::Delete, "/Users/", yes),
         (Method::Get, "/Users/", account),
-        (Method::Get, "/Users", Answer::reply(200, HOUSEHOLD)),
+        (Method::Get, "/Users", Answer::reply(200, household())),
         (Method::Get, "", Answer::Silent),
         (Method::Post, "", Answer::Silent),
     ])
@@ -616,12 +626,12 @@ async fn an_invitation_that_could_not_be_taken_back_is_said() {
         (
             Method::Get,
             "/System/ActivityLog",
-            Answer::reply(200, RECORDED),
+            Answer::reply(200, recorded()),
         ),
         (Method::Delete, "/Users/", Answer::reply(500, "")),
         (Method::Get, "/Users/", Answer::reply(200, ACCOUNT)),
         (Method::Post, "/Policy", Answer::reply(204, "")),
-        (Method::Get, "/Users", Answer::reply(200, HOUSEHOLD)),
+        (Method::Get, "/Users", Answer::reply(200, household())),
         (Method::Get, "", Answer::Silent),
         (Method::Post, "", Answer::Silent),
     ]);
@@ -660,8 +670,11 @@ async fn an_invitation_that_could_not_be_taken_back_is_said() {
 fn offered_to_fay_and_owner(directory: &std::path::Path) {
     let _ = std::fs::write(
         directory.join("invitations.json"),
-        r#"{"12":{"offered":"2026-10-05T10:00:00Z","lapses":"2999-01-01T00:00:00Z"},
-            "1":{"offered":"2026-01-01T10:00:00Z","lapses":"2026-01-03T10:00:00Z"}}"#,
+        format!(
+            r#"{{"12":{{"offered":"{}Z","lapses":"2999-01-01T00:00:00Z"}},
+            "1":{{"offered":"2026-01-01T10:00:00Z","lapses":"2026-01-03T10:00:00Z"}}}}"#,
+            stamp(-DAY + 10 * HOUR)
+        ),
     );
 }
 

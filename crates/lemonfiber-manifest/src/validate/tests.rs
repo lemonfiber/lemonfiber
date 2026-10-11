@@ -29,23 +29,23 @@ fn the_licence_list_holds_what_the_stack_s_own_copy_holds() {
 
 const STACK: &str = lemonfiber_bundled::STACK;
 
-/// After every date the stack records, and not the real clock.
-///
-/// A service records the day its upstream last released, and a date after this
-/// one is a fault — so bumping a pin to a newer release puts the stack ahead of
-/// this and the fixture reports a fault that is nobody's mistake.
-/// `the_day_these_tests_use_is_after_everything_the_stack_records` is the guard;
-/// when it fails, move this forward rather than pinning an older image.
-pub(in crate::validate) const TODAY: Date = Date {
-    year: 2026,
-    month: 10,
-    day: 6,
-};
+/// [`crate::TODAY`] as a date, which is after every date the stack records, and not
+/// the real clock.
+pub(in crate::validate) fn today() -> Date {
+    i64::try_from(crate::TODAY)
+        .ok()
+        .and_then(Date::from_unix_seconds)
+        .unwrap_or(Date {
+            year: 1970,
+            month: 1,
+            day: 1,
+        })
+}
 
 fn check(text: &str) -> Vec<Violation> {
     Manifest::from_toml(text)
         .ok()
-        .map(|manifest| validate(&manifest, TODAY))
+        .map(|manifest| validate(&manifest, today()))
         .unwrap_or_default()
 }
 
@@ -61,10 +61,10 @@ fn edited(from: &str, to: &str) -> String {
 
 /// The day these tests use is after everything the stack records.
 ///
-/// Every fixture here validates the committed stack against `TODAY`, and the
-/// stack is a submodule that moves forward while this constant does not. Without
-/// this, a pin bump makes `the_stack_this_binary_ships_is_valid` fail for a
-/// reason that has nothing to do with the stack being invalid.
+/// Every test validating the committed stack does so against [`crate::TODAY`], and
+/// the stack is a submodule that moves forward while that constant does not. Without
+/// this, a pin bump makes `the_stack_this_binary_ships_is_valid` and every fixture
+/// clock's tests fail for a reason that has nothing to do with the stack being invalid.
 #[test]
 fn the_day_these_tests_use_is_after_everything_the_stack_records() {
     let latest = STACK
@@ -73,7 +73,7 @@ fn the_day_these_tests_use_is_after_everything_the_stack_records() {
         .map(|value| value.trim().trim_matches('"').to_owned())
         .max()
         .unwrap_or_default();
-    let said = format!("{:04}-{:02}-{:02}", TODAY.year, TODAY.month, TODAY.day);
+    let said = today().to_string();
 
     assert!(
         said.as_str() >= latest.as_str(),

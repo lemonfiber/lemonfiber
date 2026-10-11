@@ -85,8 +85,8 @@ async fn material_names_where_the_stack_is_and_the_certificate_it_presents() {
         .unwrap_or_default();
     assert_eq!(keys, ["address", "expires", "fingerprint", "stack"]);
     assert_eq!(
-        pairing.as_ref().map(|made| made.until.as_str()).ok(),
-        Some("2026-10-06T00:10:00")
+        pairing.as_ref().map(|made| made.until.clone()).ok(),
+        Some(lemonfiber_fixtures::ports::stamp(600))
     );
     assert!(
         pairing

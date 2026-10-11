@@ -1,4 +1,4 @@
-use crate::validate::tests::TODAY;
+use crate::validate::tests::today;
 use crate::{validate, Manifest};
 
 const STACK: &str = lemonfiber_bundled::STACK;
@@ -8,7 +8,7 @@ fn messages(text: &str) -> Vec<String> {
     Manifest::from_toml(text)
         .ok()
         .map(|manifest| {
-            validate(&manifest, TODAY)
+            validate(&manifest, today())
                 .iter()
                 .map(ToString::to_string)
                 .collect()

@@ -28,6 +28,7 @@ use lemonfiber_core::config::Settings;
 use lemonfiber_core::model::{Invitation, InvitationStanding, Linked};
 use lemonfiber_core::ports::http::{Method, Request};
 use lemonfiber_fixtures::http::{Answer, Fake};
+use lemonfiber_fixtures::ports::{stamp, HOUR};
 use lemonfiber_fixtures::support::Reporting;
 use lemonfiber_ports::docker::{Health, Lifecycle};
 
@@ -286,17 +287,23 @@ async fn a_reset_needs_somebody_to_be_for() {
 #[tokio::test]
 async fn a_reset_stands_for_its_own_window_and_not_the_account_s_age() {
     // Ana joined in January and was reset today, so she is unclaimed and her account is
-    // eight months old. Bo is a real expired invitation: made long ago and never claimed.
-    let household = r#"[
-        {"Id":"1","Name":"owner","HasPassword":true,"Policy":{"IsAdministrator":true}},
-        {"Id":"9","Name":"Ana","HasPassword":false,"LastActivityDate":"2026-09-30T10:00:00.0000000Z"},
-        {"Id":"7","Name":"bo","HasPassword":false}
-    ]"#;
-    let recorded = r#"{"Items":[
-        {"Type":"UserCreated","Date":"2026-01-04T09:00:00.0000000Z","UserId":"9"},
-        {"Type":"UserPasswordChanged","Date":"2026-09-30T09:00:00.0000000Z","UserId":"9"},
-        {"Type":"UserCreated","Date":"2026-01-04T09:00:00.0000000Z","UserId":"7"}
-    ]}"#;
+    // years old. Bo is a real expired invitation: made long ago and never claimed.
+    let household = format!(
+        r#"[
+        {{"Id":"1","Name":"owner","HasPassword":true,"Policy":{{"IsAdministrator":true}}}},
+        {{"Id":"9","Name":"Ana","HasPassword":false,"LastActivityDate":"{}.0000000Z"}},
+        {{"Id":"7","Name":"bo","HasPassword":false}}
+    ]"#,
+        stamp(-HOUR)
+    );
+    let recorded = format!(
+        r#"{{"Items":[
+        {{"Type":"UserCreated","Date":"2026-01-04T09:00:00.0000000Z","UserId":"9"}},
+        {{"Type":"UserPasswordChanged","Date":"{}.0000000Z","UserId":"9"}},
+        {{"Type":"UserCreated","Date":"2026-01-04T09:00:00.0000000Z","UserId":"7"}}
+    ]}}"#,
+        stamp(-2 * HOUR)
+    );
     let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
     let http = Fake::by_path_in_turn(vec![
         (
@@ -336,6 +343,17 @@ async fn a_reset_stands_for_its_own_window_and_not_the_account_s_age() {
         Some(Outcome::Invitation(invitation)) => invitation.withdrawn,
         _ => Vec::new(),
     };
+    let touched: Vec<String> = http
+        .requests()
+        .into_iter()
+        .map(|request| request.url)
+        .filter(|url| url.contains("/Users/9"))
+        .collect();
+    assert!(
+        touched.is_empty(),
+        "Ana's account was reached for, so her reset was dated by when her account was \
+         made: {touched:?}"
+    );
     assert_eq!(
         withdrawn,
         ["bo".to_owned()],
@@ -369,9 +387,12 @@ async fn a_reset_stands_for_its_own_window_and_not_the_account_s_age() {
 /// is what it found.
 #[tokio::test]
 async fn offering_an_account_to_somebody_reset_says_their_password_went() {
-    let household = r#"[
-        {"Id":"9","Name":"Ana","HasPassword":false,"LastActivityDate":"2026-09-30T10:00:00.0000000Z"}
-    ]"#;
+    let household = format!(
+        r#"[
+        {{"Id":"9","Name":"Ana","HasPassword":false,"LastActivityDate":"{}.0000000Z"}}
+    ]"#,
+        stamp(-HOUR)
+    );
     let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
     let http = Fake::by_path_in_turn(vec![
         (
@@ -382,10 +403,13 @@ async fn offering_an_account_to_somebody_reset_says_their_password_went() {
             "/System/ActivityLog",
             vec![Answer::reply(
                 200,
-                r#"{"Items":[
-                    {"Type":"UserCreated","Date":"2026-01-04T09:00:00.0000000Z","UserId":"9"},
-                    {"Type":"UserPasswordChanged","Date":"2026-09-30T09:00:00.0000000Z","UserId":"9"}
-                ]}"#,
+                format!(
+                    r#"{{"Items":[
+                    {{"Type":"UserCreated","Date":"2026-01-04T09:00:00.0000000Z","UserId":"9"}},
+                    {{"Type":"UserPasswordChanged","Date":"{}.0000000Z","UserId":"9"}}
+                ]}}"#,
+                    stamp(-2 * HOUR)
+                ),
             )],
         ),
         ("/Users", vec![Answer::reply(200, household)]),
