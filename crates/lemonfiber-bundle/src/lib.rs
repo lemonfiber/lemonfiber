@@ -1,36 +1,42 @@
 //! The default bundle's file, `bundle/bundle.toml` in `lemonfiber-plugins`, read and
-//! held to its rules, with every manifest copy beside it held to its pin.
+//! held to its rules, with every copy beside it held to its pin.
 //!
 //! This crate is inert, as `lemonfiber-manifest` is: it reads the bundle into types and
 //! refuses one it cannot read. The core compiles what it reads in, so a pin a copy does
 //! not match is a build that fails rather than a plugin trusted at a manifest nobody
 //! pinned.
 
+mod copies;
+mod parts;
 mod rules;
+mod tree;
 
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
-use std::io::ErrorKind;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
+use lemonfiber_manifest::{Form, Profile, Removed, Wiring};
 use serde::Deserialize;
+
+pub use tree::digest as tree_digest;
 
 /// The bundle's file, from the root of `lemonfiber-plugins`.
 pub const FILE: &str = "bundle/bundle.toml";
 
-/// The directory each pinned plugin's manifest is copied into, from the same root.
+/// The directory each pinned plugin's copy is held in, from the same root.
 pub const COPIES: &str = "bundle/plugins";
 
-/// What a copy's file name ends with, after the plugin's id.
+/// What a schema 1 copy's file name ends with, after the plugin's id.
 pub const EXTENSION: &str = ".toml";
 
-/// The one file in [`COPIES`] that is not a copy: what keeps an empty directory in git.
-const KEEP: &str = ".gitkeep";
+/// The manifest at the root of a schema 2 copy.
+pub const MANIFEST: &str = "plugin.toml";
 
-/// The schema version this crate reads.
-pub const SCHEMA_VERSION: u32 = 1;
+/// The schema versions this crate reads: a bundle of plugins alone, and one that also
+/// declares the stack's own tables and pins each plugin by its tree.
+pub const SCHEMAS: [u32; 2] = [1, 2];
 
-/// What a pinned manifest's digest starts with.
+/// What a pinned digest starts with.
 pub const DIGEST_PREFIX: &str = "sha256:";
 
 /// The bundle's file, as written.
@@ -39,8 +45,32 @@ pub const DIGEST_PREFIX: &str = "sha256:";
 pub struct Bundle {
     /// The schema version the file is written in.
     pub schema: u32,
+    /// Every profile of the stack it ships, at schema 2.
+    #[serde(default)]
+    pub profile: Vec<Profile>,
+    /// Every form of the stack it ships, at schema 2.
+    #[serde(default)]
+    pub form: Vec<Form>,
+    /// The stack's choices of filler and its links by name, at schema 2.
+    #[serde(default)]
+    pub wiring: Vec<Wiring>,
+    /// Every service the catalogue no longer carries, at schema 2.
+    #[serde(default)]
+    pub removed: Vec<Removed>,
     /// Every first-party plugin, ordered by id.
+    #[serde(default)]
     pub plugin: Vec<Pin>,
+}
+
+/// Whether the bundle assembles a part into the stack it ships or installs it through the
+/// plugin path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Stage {
+    /// Its one service is a stack service, its in-process adapter included.
+    Assembled,
+    /// Its adapter has shipped and it moves in place of the service it replaces.
+    Installed,
 }
 
 /// One first-party plugin, as the bundle pins it.
@@ -51,31 +81,48 @@ pub struct Pin {
     pub id: String,
     /// The plugin's repository, as an https URL.
     pub origin: String,
-    /// The version the release train tagged it at, without the `v`.
-    pub release: String,
-    /// The full commit of its repository whose manifest names that release's image.
+    /// The version the release train tagged it at, without the `v`; absent at schema 2
+    /// for a plugin pinned at a commit on its main branch.
+    #[serde(default)]
+    pub release: Option<String>,
+    /// The full commit of its repository the copy was taken from.
     pub revision: String,
     /// The digest of its manifest at that revision, written `sha256:<64 hex>`.
     pub manifest: String,
+    /// The digest of its tree at that revision, written `sha256:<64 hex>`, at schema 2.
+    #[serde(default)]
+    pub tree: Option<String>,
     /// The capabilities it fills by default.
     pub fills: Vec<String>,
+    /// Whether it is assembled or installed, at schema 2.
+    #[serde(default)]
+    pub stage: Option<Stage>,
+    /// The profile its services sit in, at schema 2.
+    #[serde(default)]
+    pub profile: Option<String>,
+    /// The day its upstream last released, `YYYY-MM-DD`, at schema 2.
+    #[serde(default)]
+    pub last_release: Option<String>,
 }
 
-/// One pinned plugin with the copy of its manifest the bundle holds.
+/// One pinned plugin with the copy the bundle holds of it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Held {
     /// The pin.
     pub pin: Pin,
-    /// The copy's text, which is the plugin's manifest byte for byte.
+    /// Its manifest's text, byte for byte.
     pub copy: String,
+    /// Every file of its tree beside the manifest, by its path from the copy's root;
+    /// empty at schema 1.
+    pub tree: BTreeMap<String, Vec<u8>>,
 }
 
 impl Held {
-    /// The SHA-256 of the copy, in lower-case hexadecimal, as the core records an
+    /// The SHA-256 of the manifest, in lower-case hexadecimal, as the core records an
     /// installed manifest's.
     #[must_use]
     pub fn digest(&self) -> String {
-        hex(&self.copy)
+        hex(self.copy.as_bytes())
     }
 }
 
@@ -105,70 +152,39 @@ pub enum Refused {
 /// [`Refused`] where a file cannot be read, where the bundle is not TOML of this shape,
 /// and where it breaks a rule: a schema this crate does not read, plugins out of order
 /// or named twice, a pin malformed, a copy missing, unpinned, naming another plugin or
-/// not matching its digest.
-pub fn read(root: &Path) -> Result<Vec<Held>, Refused> {
-    let text = readable(&root.join(FILE))?;
+/// not matching its digests, or a stack table naming what no pinned plugin declares.
+pub fn read(root: &Path) -> Result<(Bundle, Vec<Held>), Refused> {
+    let text = std::fs::read_to_string(root.join(FILE)).map_err(|source| Refused::Unread {
+        path: root.join(FILE).display().to_string(),
+        source,
+    })?;
     let bundle: Bundle = toml::from_str(&text)?;
-    let mut copies = copies(&root.join(COPIES))?;
+    let copies = copies::read(&root.join(COPIES), bundle.schema)?;
     let mut broken = rules::broken(&bundle, &copies);
     if !broken.is_empty() {
         broken.sort();
+        broken.dedup();
         return Err(Refused::Rules(broken));
     }
-    Ok(bundle
+    let mut copies = copies;
+    let held = bundle
         .plugin
-        .into_iter()
+        .iter()
         .map(|pin| {
-            let copy = copies.remove(&rules::file(&pin.id)).unwrap_or_default();
-            Held { pin, copy }
+            let copy = copies.remove(&pin.id).unwrap_or_default();
+            Held {
+                pin: pin.clone(),
+                copy: copy.manifest.unwrap_or_default(),
+                tree: copy.files,
+            }
         })
-        .collect())
+        .collect();
+    Ok((bundle, held))
 }
 
-/// Every copy in `directory`, by its file name; a missing directory holds none.
-fn copies(directory: &Path) -> Result<BTreeMap<String, String>, Refused> {
-    let paths = match listed(directory) {
-        Ok(paths) => paths,
-        Err(missing) if missing.kind() == ErrorKind::NotFound => return Ok(BTreeMap::new()),
-        Err(source) => return Err(unread(directory, source)),
-    };
-    let mut copies = BTreeMap::new();
-    for path in paths {
-        let name = path
-            .file_name()
-            .map(|name| name.to_string_lossy().into_owned())
-            .unwrap_or_default();
-        if name == KEEP {
-            continue;
-        }
-        copies.insert(name, readable(&path)?);
-    }
-    Ok(copies)
-}
-
-/// Every path in `directory`.
-fn listed(directory: &Path) -> std::io::Result<Vec<PathBuf>> {
-    std::fs::read_dir(directory)?
-        .map(|entry| entry.map(|entry| entry.path()))
-        .collect()
-}
-
-/// The text at `path`.
-fn readable(path: &Path) -> Result<String, Refused> {
-    std::fs::read_to_string(path).map_err(|source| unread(path, source))
-}
-
-/// The refusal for `path`, which reading answered with `source`.
-fn unread(path: &Path, source: std::io::Error) -> Refused {
-    Refused::Unread {
-        path: path.display().to_string(),
-        source,
-    }
-}
-
-/// The SHA-256 of `text`, in lower-case hexadecimal.
-fn hex(text: &str) -> String {
-    let digest = ring::digest::digest(&ring::digest::SHA256, text.as_bytes());
+/// The SHA-256 of `bytes`, in lower-case hexadecimal.
+fn hex(bytes: &[u8]) -> String {
+    let digest = ring::digest::digest(&ring::digest::SHA256, bytes);
     let mut rendered = String::with_capacity(digest.as_ref().len() * 2);
     for byte in digest.as_ref() {
         let _ = write!(rendered, "{byte:02x}");

@@ -1,7 +1,7 @@
 use std::fmt::Write as _;
 use std::path::PathBuf;
 
-use super::{hex, read, Refused, COPIES, FILE};
+use super::{hex, Held, Refused, COPIES, FILE};
 
 const COPY: &str = "[plugin]\nid = \"jellyfin\"\nversion = \"0.18.0\"\n";
 
@@ -51,6 +51,11 @@ fn pinning(manifest: &str, fields: &[(&str, &str)]) -> String {
     format!("schema = 1\n\n[[plugin]]\n{body}")
 }
 
+/// What the catalogue at `root` holds, without the bundle's own tables.
+fn read(root: &std::path::Path) -> Result<Vec<Held>, Refused> {
+    super::read(root).map(|(_, held)| held)
+}
+
 fn broken(name: &str, bundle: &str, copies: &[(&str, &str)]) -> Vec<String> {
     let read = read(&catalogue(name, bundle, copies));
     assert!(matches!(read, Err(Refused::Rules(_))), "{read:?}");
@@ -76,7 +81,7 @@ fn an_empty_bundle_pins_nothing() {
 fn a_pinned_copy_is_read_with_its_digest() {
     let read = read(&catalogue(
         "pinned",
-        &pinning(&hex(COPY), &[]),
+        &pinning(&hex(COPY.as_bytes()), &[]),
         &[("jellyfin.toml", COPY)],
     ));
     let held = read.unwrap_or_default();
@@ -84,7 +89,7 @@ fn a_pinned_copy_is_read_with_its_digest() {
     for one in &held {
         assert_eq!(one.pin.id, "jellyfin");
         assert_eq!(one.copy, COPY);
-        assert_eq!(one.digest(), hex(COPY));
+        assert_eq!(one.digest(), hex(COPY.as_bytes()));
         assert_eq!(one.pin.fills, ["media.serve@1", "identity.source@1"]);
     }
 }
@@ -92,7 +97,7 @@ fn a_pinned_copy_is_read_with_its_digest() {
 fn a_copy_that_is_not_the_pinned_manifest_is_refused() {
     let said = broken(
         "tampered",
-        &pinning(&hex(COPY), &[]),
+        &pinning(&hex(COPY.as_bytes()), &[]),
         &[("jellyfin.toml", &format!("{COPY}# changed\n"))],
     );
     assert!(
@@ -103,7 +108,7 @@ fn a_copy_that_is_not_the_pinned_manifest_is_refused() {
 
 #[test]
 fn a_pin_without_its_copy_is_refused() {
-    let said = broken("uncopied", &pinning(&hex(COPY), &[]), &[]);
+    let said = broken("uncopied", &pinning(&hex(COPY.as_bytes()), &[]), &[]);
     assert!(names(&said, &["jellyfin", "no copy"]), "{said:?}");
 }
 
@@ -125,7 +130,7 @@ fn a_copy_of_another_plugins_manifest_is_refused() {
     let other = COPY.replace("jellyfin", "emby");
     let said = broken(
         "other",
-        &pinning(&hex(&other), &[]),
+        &pinning(&hex(other.as_bytes()), &[]),
         &[("jellyfin.toml", &other)],
     );
     assert!(
@@ -168,7 +173,10 @@ fn a_release_is_three_numbers_without_leading_zeros() {
     for release in ["0.18", "0.18.0.1", "0.18.0-pre.1", "0.018.0", "0..0"] {
         let said = broken(
             "release",
-            &pinning(&hex(COPY), &[("release", &format!("\"{release}\""))]),
+            &pinning(
+                &hex(COPY.as_bytes()),
+                &[("release", &format!("\"{release}\""))],
+            ),
             &[("jellyfin.toml", COPY)],
         );
         assert!(
@@ -180,7 +188,7 @@ fn a_release_is_three_numbers_without_leading_zeros() {
 
 #[test]
 fn plugins_out_of_order_or_named_twice_are_refused() {
-    let one = pinning(&hex(COPY), &[]);
+    let one = pinning(&hex(COPY.as_bytes()), &[]);
     let pin = one.split_once("[[plugin]]").map_or("", |(_, pin)| pin);
     let said = broken(
         "twice",
@@ -195,8 +203,8 @@ fn plugins_out_of_order_or_named_twice_are_refused() {
 
 #[test]
 fn another_schema_is_refused() {
-    let said = broken("schema", "schema = 2\nplugin = []\n", &[]);
-    assert_eq!(said, ["schema 2 is not 1, the one this build reads"]);
+    let said = broken("schema", "schema = 3\nplugin = []\n", &[]);
+    assert_eq!(said, ["schema 3 is not 1 or 2, the ones this build reads"]);
 }
 
 #[test]
@@ -243,13 +251,18 @@ fn a_copies_path_that_is_not_a_directory_is_unread() {
 }
 
 #[test]
-fn a_copy_that_cannot_be_read_is_unread() {
-    let root = catalogue("unreadable", &pinning(&hex(COPY), &[]), &[]);
+fn a_copy_that_is_not_a_file_is_refused() {
+    let root = catalogue("unreadable", &pinning(&hex(COPY.as_bytes()), &[]), &[]);
     let made = std::fs::create_dir(root.join(COPIES).join("jellyfin.toml"));
     assert!(made.is_ok(), "{made:?}");
-    let read = read(&root);
+    let said = match read(&root) {
+        Err(Refused::Rules(said)) => said,
+        other => vec![format!("{other:?}")],
+    };
     assert!(
-        matches!(&read, Err(Refused::Unread { path, .. }) if path.ends_with("jellyfin.toml")),
-        "{read:?}"
+        names(&said, &["plugin jellyfin has no copy at jellyfin.toml"]),
+        "{said:?}"
     );
 }
+
+mod second;
