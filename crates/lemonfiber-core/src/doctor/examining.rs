@@ -57,8 +57,8 @@ pub async fn examine(checks: &[Box<dyn Check>], narrowing: &Narrowing) -> Doctor
 ///
 /// A stack whose VPN is down raises a finding for every service behind it, and a flat list
 /// of them reads as a dozen unrelated faults rather than as one. What relates them is the
-/// manifest's own `depends_on`: a service that cannot work because something it needs is
-/// also in trouble is one problem with the thing underneath, not two.
+/// manifest's own `network.via`: a service that cannot work because the one it runs inside
+/// is also in trouble is one problem with the thing underneath, not two.
 ///
 /// The relationship is read from the manifest rather than from a table of check ids here,
 /// for the same reason narrowing reads `profile.protocol` rather than recognising profile
@@ -86,9 +86,12 @@ pub fn attributed(
                 .service
                 .as_deref()
                 .and_then(|service| services.iter().find(|had| had.id == service))
-                .into_iter()
-                .flat_map(|service| service.depends_on.iter())
-                .find_map(|needed| troubled.get(needed.as_str()).map(|&check| check.to_owned()))
+                .and_then(|service| service.inside(services))
+                .and_then(|host| {
+                    troubled
+                        .get(host.id.as_str())
+                        .map(|&check| check.to_owned())
+                })
         })
         .collect();
 

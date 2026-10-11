@@ -122,7 +122,7 @@ fn tunnel(egress: Egress, services: &[Service]) -> Option<Fault> {
 /// Whether a service is what other services route their traffic through — the one
 /// whose failure takes the tunnel with it.
 fn is_gateway(service: &Service) -> bool {
-    service.depends_on.is_empty() && service.criticality == Criticality::Critical
+    service.inside.is_none() && service.criticality == Criticality::Critical
 }
 
 /// What is wrong with one service, or nothing where it is fine.
@@ -142,10 +142,10 @@ fn service_fault(service: &Service, services: &[Service]) -> Option<Fault> {
 
     // A service that cannot start because something it depends on is down is one
     // problem with the thing underneath, not two independent failures.
-    match service.depends_on.iter().find(|needed| {
+    match service.inside.as_ref().filter(|needed| {
         services
             .iter()
-            .any(|other| &&other.id == needed && other.state.wants_attention())
+            .any(|other| &other.id == *needed && other.state.wants_attention())
     }) {
         Some(needed) => Some(fault.caused_by(&format!("service.{needed}"))),
         None => Some(fault),

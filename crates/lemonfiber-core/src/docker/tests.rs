@@ -45,8 +45,8 @@ fn a_probe_s_verdict_outranks_the_process_existing() {
     }
 }
 
-/// One service depending on another, for the ordering tests.
-fn depending(id: &str, on: &[&str]) -> Service {
+/// One service running inside another, for the ordering tests.
+fn depending(id: &str, on: Option<&str>) -> Service {
     Service {
         id: id.to_owned(),
         name: id.to_owned(),
@@ -55,7 +55,7 @@ fn depending(id: &str, on: &[&str]) -> Service {
         forms: Vec::new(),
         state: State::Healthy,
         criticality: Criticality::Core,
-        depends_on: on.iter().map(|id| (*id).to_owned()).collect(),
+        inside: on.map(str::to_owned),
         exit: None,
     }
 }
@@ -65,8 +65,8 @@ fn depending(id: &str, on: &[&str]) -> Service {
 #[test]
 fn the_tunnel_goes_down_after_what_is_using_its_network() {
     let running = vec![
-        depending("gluetun", &[]),
-        depending("qbittorrent", &["gluetun"]),
+        depending("gluetun", None),
+        depending("qbittorrent", Some("gluetun")),
     ];
     assert_eq!(
         stopping_order(&running, &["gluetun".to_owned(), "qbittorrent".to_owned()]),
@@ -80,9 +80,9 @@ fn the_tunnel_goes_down_after_what_is_using_its_network() {
 #[test]
 fn anything_depended_on_goes_last_whatever_it_is() {
     let running = vec![
-        depending("under", &[]),
-        depending("over", &["under"]),
-        depending("above", &["over"]),
+        depending("under", None),
+        depending("over", Some("under")),
+        depending("above", Some("over")),
     ];
     assert_eq!(
         stopping_order(
@@ -98,9 +98,9 @@ fn anything_depended_on_goes_last_whatever_it_is() {
 #[test]
 fn services_that_do_not_depend_on_each_other_are_ordered_by_name() {
     let running = vec![
-        depending("sonarr", &[]),
-        depending("radarr", &[]),
-        depending("bazarr", &[]),
+        depending("sonarr", None),
+        depending("radarr", None),
+        depending("bazarr", None),
     ];
     assert_eq!(
         stopping_order(
@@ -123,7 +123,10 @@ fn services_that_do_not_depend_on_each_other_are_ordered_by_name() {
 /// beats refusing to stop them at all.
 #[test]
 fn services_that_need_each_other_are_still_stopped() {
-    let running = vec![depending("one", &["other"]), depending("other", &["one"])];
+    let running = vec![
+        depending("one", Some("other")),
+        depending("other", Some("one")),
+    ];
     let order = stopping_order(&running, &["one".to_owned(), "other".to_owned()]);
     assert_eq!(order.len(), 2, "both are stopped: {order:?}");
     assert!(order.contains(&"one".to_owned()) && order.contains(&"other".to_owned()));
@@ -133,8 +136,8 @@ fn services_that_need_each_other_are_still_stopped() {
 #[test]
 fn a_dependency_that_is_not_being_stopped_does_not_hold_anything_back() {
     let running = vec![
-        depending("gluetun", &[]),
-        depending("qbittorrent", &["gluetun"]),
+        depending("gluetun", None),
+        depending("qbittorrent", Some("gluetun")),
     ];
     assert_eq!(
         stopping_order(&running, &["qbittorrent".to_owned()]),

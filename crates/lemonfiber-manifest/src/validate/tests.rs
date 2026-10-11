@@ -278,12 +278,43 @@ fn a_last_release_in_the_future_is_caught() {
         .any(|m| m.contains("which is in the future")));
 }
 
+/// What the stack says about a service given one more line.
+fn added(line: &str) -> Vec<String> {
+    messages(&edited(AN_ID, &format!("{AN_ID}\n{line}")))
+}
+
 #[test]
-fn a_grant_outside_the_allow_list_is_caught() {
-    let text = edited(r#"grants = ["NET_ADMIN"]"#, r#"grants = ["SYS_ADMIN"]"#);
-    assert!(messages(&text)
-        .iter()
-        .any(|m| m.contains("kernel capability SYS_ADMIN, which is not allowed")));
+fn a_grant_is_refused_naming_the_shape_that_grants_it() {
+    for spelling in ["grants", "capabilities"] {
+        let said = added(&format!(r#"{spelling} = ["NET_ADMIN"]"#));
+        assert!(
+            said.iter()
+                .any(|m| m
+                    .contains(r#"grants NET_ADMIN: refused; shape = "egress-guard" grants it"#)),
+            "{spelling}: {said:?}"
+        );
+    }
+}
+
+#[test]
+fn a_grant_no_shape_gives_is_refused_saying_so() {
+    let said = added(r#"grants = ["SYS_ADMIN"]"#);
+    assert!(
+        said.iter()
+            .any(|m| m.contains("grants SYS_ADMIN: refused, and no shape grants it")),
+        "{said:?}"
+    );
+}
+
+#[test]
+fn an_ordering_edge_is_refused_naming_network_via() {
+    let said = added(r#"depends_on = ["gluetun"]"#);
+    assert!(
+        said.iter().any(|m| m.contains(
+            r#"depends_on gluetun: refused; network = { via = "<capability>" } replaces it"#
+        )),
+        "{said:?}"
+    );
 }
 
 /// The line every service in the shipped stack has, which these cases add to.
@@ -426,28 +457,6 @@ fn a_service_that_declares_both_or_neither_says_nothing_is_wrong() {
         "id = \"prowlarr\"\nreaches = \"\"\nasks_for = \"Nothing leaves this machine\"",
     ));
     assert!(quiet.is_empty(), "{quiet:?}");
-}
-
-#[test]
-fn a_dependency_across_a_profile_boundary_is_caught() {
-    let text = edited(
-        r#"depends_on = ["gluetun"]"#,
-        r#"depends_on = ["prowlarr"]"#,
-    );
-    assert!(
-        messages(&text)
-            .iter()
-            .any(|m| m.contains("which is in profile search rather than torrent")),
-        "a dependency across a profile boundary must be named"
-    );
-}
-
-#[test]
-fn a_dependency_on_nothing_at_all_is_caught() {
-    let text = edited(r#"depends_on = ["gluetun"]"#, r#"depends_on = ["ghost"]"#);
-    assert!(messages(&text)
-        .iter()
-        .any(|m| m.contains("depends on ghost, which is not a service here")));
 }
 
 #[test]

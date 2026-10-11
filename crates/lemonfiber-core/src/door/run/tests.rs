@@ -256,7 +256,7 @@ fn up(id: &str, state: crate::docker::State) -> crate::docker::Service {
         forms: Vec::new(),
         state,
         criticality: lemonfiber_manifest::Criticality::Important,
-        depends_on: Vec::new(),
+        inside: None,
         exit: None,
     }
 }

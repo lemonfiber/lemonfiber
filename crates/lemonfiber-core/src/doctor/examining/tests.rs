@@ -95,6 +95,8 @@ upstream = "https://github.com/qdm12/gluetun"
 last_release = "2026-01-01"
 describes = "The tunnel"
 without_it = "Nothing downloads over a tunnel"
+provides = ["network.egress-guard"]
+shape = "egress-guard"
 
 [[service]]
 id = "qbittorrent"
@@ -108,7 +110,7 @@ upstream = "https://github.com/qbittorrent/qBittorrent"
 last_release = "2026-01-01"
 describes = "The client"
 without_it = "Nothing is downloaded"
-depends_on = ["gluetun"]
+network = { via = "network.egress-guard" }
 "#;
     lemonfiber_manifest::Manifest::from_toml(text)
         .map(|manifest| manifest.services)

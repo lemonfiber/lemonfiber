@@ -12,8 +12,6 @@
 
 use lemonfiber_manifest::{Manifest, Protocol};
 
-pub(crate) use lemonfiber_manifest::GATEWAY_GRANT;
-
 /// The two containers the check compares: the tunnel and the client contained
 /// by it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -40,9 +38,9 @@ pub(crate) struct Pair {
 /// Whether this stack declares something that downloads torrents.
 ///
 /// Asked only where no pair resolved, to tell "nothing contains the client" from
-/// "there is no client". The gateway itself is excluded by what it is granted rather
-/// than by name, the same way the pair is resolved, so a stack that names its
-/// tunnel something else is read the same way.
+/// "there is no client". The gateway itself is excluded by its shape rather than by
+/// name, the same way the pair is resolved, so a stack that names its tunnel something
+/// else is read the same way.
 pub(super) fn torrent_client(manifest: &Manifest) -> bool {
     let torrent: Vec<&str> = manifest
         .profiles
@@ -50,13 +48,10 @@ pub(super) fn torrent_client(manifest: &Manifest) -> bool {
         .filter(|profile| profile.protocol == Some(Protocol::Torrent))
         .map(|profile| profile.id.as_str())
         .collect();
-    manifest.services.iter().any(|service| {
-        torrent.contains(&service.profile.as_str())
-            && !service
-                .grants
-                .iter()
-                .any(|granted| granted == GATEWAY_GRANT)
-    })
+    manifest
+        .services
+        .iter()
+        .any(|service| torrent.contains(&service.profile.as_str()) && !service.guards_egress())
 }
 
 pub(crate) fn resolve_pair(manifest: &Manifest) -> Option<Pair> {
@@ -67,17 +62,16 @@ pub(crate) fn resolve_pair(manifest: &Manifest) -> Option<Pair> {
         .map(|profile| profile.id.as_str())
         .collect();
 
-    let gateway = manifest.services.iter().find(|service| {
-        torrent.contains(&service.profile.as_str())
-            && service
-                .grants
-                .iter()
-                .any(|granted| granted == GATEWAY_GRANT)
-    })?;
+    let gateway = manifest
+        .services
+        .iter()
+        .find(|service| torrent.contains(&service.profile.as_str()) && service.guards_egress())?;
 
     let client = manifest.services.iter().find(|service| {
         torrent.contains(&service.profile.as_str())
-            && service.depends_on.iter().any(|on| on == &gateway.id)
+            && service
+                .inside(&manifest.services)
+                .is_some_and(|host| host.id == gateway.id)
     })?;
 
     Some(Pair {

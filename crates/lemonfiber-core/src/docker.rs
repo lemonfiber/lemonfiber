@@ -120,10 +120,10 @@ pub struct Service {
     pub state: State,
     /// How much its absence costs, so a summary can weigh it.
     pub criticality: Criticality,
-    /// The services it needs before it can work, as the manifest declares them.
+    /// The service whose network it runs inside, which it needs before it can work.
     /// Carried so a failure can be attributed to the thing underneath it rather
     /// than counted as one more independent thing wrong.
-    pub depends_on: Vec<String>,
+    pub inside: Option<String>,
     /// How it exited, where it has exited.
     pub exit: Option<i32>,
 }
@@ -265,7 +265,9 @@ fn surveyed(manifest: &Manifest, containers: &[Container], halted: &Halted) -> V
                     .map_or(State::Absent, |c| read(c, halted))
             },
             criticality: service.criticality,
-            depends_on: service.depends_on.clone(),
+            inside: service
+                .inside(&manifest.services)
+                .map(|host| host.id.clone()),
             exit: found.get(service.id.as_str()).and_then(|c| c.exit),
         })
         .collect();
@@ -409,7 +411,7 @@ pub(crate) fn condition_of_the_stack(services: &[Service], active_forms: &[Strin
 /// cannot tell. Stopping the client first costs a few seconds and leaves it able to
 /// shut down the way it knows how.
 ///
-/// Read from each service's own `depends_on` rather than from a rule about VPNs. The
+/// Read from each service's own `network.via` rather than from a rule about VPNs. The
 /// tunnel is the case that matters on this stack, but "stop a thing before the thing
 /// it needs" is the general shape, and a stack that adds another such pair gets the
 /// same treatment without lemonfiber learning about it.
@@ -424,7 +426,7 @@ pub(crate) fn stopping_order(running: &[Service], stopping: &[String]) -> Vec<St
     let depends = |dependent: &str, on: &str| {
         running
             .iter()
-            .any(|service| service.id == dependent && service.depends_on.iter().any(|id| id == on))
+            .any(|service| service.id == dependent && service.inside.as_deref() == Some(on))
     };
 
     let mut left: Vec<String> = stopping.to_vec();

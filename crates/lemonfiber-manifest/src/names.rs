@@ -40,6 +40,7 @@ pub struct Refusal {
 }
 
 /// A declaration whose value has to be a name, and the type that knows the names.
+#[derive(Clone, Copy)]
 pub struct Closed {
     /// Where it sits inside one entry, spelled as the manifest spells it.
     pub at: &'static str,

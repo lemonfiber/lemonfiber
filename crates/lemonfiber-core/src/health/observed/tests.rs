@@ -24,7 +24,7 @@ fn service(id: &str, state: State, criticality: Criticality) -> Service {
         state,
         criticality,
         exit: None,
-        depends_on: Vec::new(),
+        inside: None,
     }
 }
 
@@ -242,7 +242,7 @@ fn a_service_restarting_on_a_loop_carries_the_code_it_last_left_with() {
 fn a_service_down_because_what_it_needs_is_down_names_the_one_underneath() {
     // One problem with the thing underneath, not two independent failures.
     let client = Service {
-        depends_on: vec!["gluetun".to_owned()],
+        inside: Some("gluetun".to_owned()),
         ..service("qbittorrent", State::Failed, Criticality::Core)
     };
     let gateway = service("gluetun", State::Failed, Criticality::Critical);
@@ -265,7 +265,7 @@ fn a_service_down_because_what_it_needs_is_down_names_the_one_underneath() {
 #[test]
 fn a_service_down_while_what_it_needs_is_fine_stands_on_its_own() {
     let client = Service {
-        depends_on: vec!["gluetun".to_owned()],
+        inside: Some("gluetun".to_owned()),
         ..service("qbittorrent", State::Failed, Criticality::Core)
     };
     let gateway = service("gluetun", State::Healthy, Criticality::Critical);
