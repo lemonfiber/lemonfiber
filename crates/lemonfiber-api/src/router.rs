@@ -138,6 +138,11 @@ pub fn routes(serving: Serving, streaming: Arc<Streaming>) -> Router {
     endpoints.layer(middleware::from_fn_with_state(serving, guarded))
 }
 
+/// The paths that open without a credential: the sign-in door, where a caller holding a
+/// password and nothing else carries none by definition, and the door a key minted as a
+/// claim is collected at, by a program holding nothing but the claim.
+const DOORS: [&str; 2] = [crate::admission::SESSION, crate::keys::COLLECTING];
+
 /// Let a request through, or turn it away before a handler runs.
 async fn guarded(State(serving): State<Serving>, request: Request, next: Next) -> Response {
     let now = serving.ctx.seams.clock.now();
@@ -153,7 +158,7 @@ async fn guarded(State(serving): State<Serving>, request: Request, next: Next) -
     // Said as what it is, rather than folded into the silence below. The sign-in door
     // stays open to all of them, since none is about the password offered there: a
     // media server coming back is all it takes for somebody it could not vouch for.
-    let at_the_door = request.uri().path() == crate::admission::SESSION;
+    let at_the_door = DOORS.contains(&request.uri().path());
     if !at_the_door {
         if let Some(refused) = refused(&knocking) {
             return refused;

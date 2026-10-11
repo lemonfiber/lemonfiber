@@ -164,6 +164,8 @@ outcomes! {
     Certificate(crate::companion::Replacement) => CERTIFICATE [rehearsed],
     /// A key minted, with its secret, shown this once.
     Minted(crate::keys::Minted) => MINTED_KEY,
+    /// A key minted as a claim: the link that collects it, shown this once.
+    KeyClaim(crate::keys::Claimed) => KEY_CLAIM,
     /// Every key this machine has minted, and what became of a revoke.
     Keys(crate::keys::Listing) => KEYS [rehearsed],
     /// Somebody taken out of the household, or what taking them would cost.

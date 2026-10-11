@@ -109,4 +109,27 @@ codes! {
         remedy: "Ask whoever looks after this machine to allow it, with lemonfiber config set \
             LEMONFIBER_MEMBER_KEYS on.",
     }
+    /// Raised when a key is asked to be collected with a claim that collects nothing.
+    CLAIM_NOT_OPEN = "KEY-12" {
+        severity: Warning,
+        status: 401,
+        since: "0.18.0",
+        meaning: "That claim collects no key: no key was minted with it, it collected its key \
+            already, or its ten minutes have passed. Which of the three is not said, so a guess \
+            learns nothing.",
+        remedy: "Ask whoever looks after this machine to mint the key as a claim again, and \
+            collect it within ten minutes.",
+    }
+    /// Raised when a key is asked to be minted as a claim and no address another machine
+    /// reaches can go in its link.
+    UNLINKABLE = "KEY-13" {
+        severity: Warning,
+        status: 409,
+        since: "0.18.0",
+        meaning: "A claim is collected by another machine, over the address and certificate its \
+            link carries, and this stack has not been served where another machine reaches it, \
+            so there is no link to write. Nothing was minted.",
+        remedy: "Serve the stack encrypted on the network first, then mint the key as a claim \
+            again.",
+    }
 }

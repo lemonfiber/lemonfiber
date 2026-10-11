@@ -94,14 +94,16 @@ codes! {
         remedy: "Ask again with the method the contract names.",
     }
     /// Raised where the body of a mint is not a key's name, scope, purpose and the
-    /// password.
+    /// password, or the body of a collection is not a claim alone.
     NOT_A_KEY_REQUEST = "ASK-11" {
         severity: Error,
         status: 400,
         since: "0.17.0",
         meaning: "The body of a request to mint a key is not a key's name, scope and purpose \
-            with the password, so no key was minted.",
-        remedy: "Send the name, scope, purpose and password as the body's four fields.",
+            with the password, or the body of a request to collect one is not a claim alone, \
+            so no key was minted or collected.",
+        remedy: "Send a mint the name, scope, purpose and password, and a collection the claim \
+            alone.",
     }
     /// Raised where an action's `Idempotency-Key` is not one to 255 visible
     /// characters, or is given more than once.

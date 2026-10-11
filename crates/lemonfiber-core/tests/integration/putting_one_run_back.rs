@@ -690,6 +690,7 @@ async fn a_run_that_minted_a_key_goes_back_by_revoking_it() {
             scope: "read".to_owned(),
             purpose: "other".to_owned(),
             by: lemonfiber_core::keys::Minter::Operator,
+            claim: false,
         }),
         &ctx,
     )

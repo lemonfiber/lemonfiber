@@ -152,7 +152,7 @@ pub fn described(change: &Change) -> String {
             resource, field, ..
         } => format!("a {resource}'s {field}"),
         // Not something a first run writes either, and named for the same reason.
-        Kind::KeyMinted { name, .. } => format!("the key {name}"),
+        Kind::KeyMinted { name, .. } | Kind::KeyCollected { name, .. } => format!("the key {name}"),
         Kind::KeyRevoked { name, .. } => format!("the revoke of the key {name}"),
     }
 }

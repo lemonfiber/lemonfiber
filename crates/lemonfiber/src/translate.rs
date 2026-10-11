@@ -423,11 +423,13 @@ pub(crate) fn keyed(asked: RawKey) -> Command {
             name,
             scope,
             purpose,
+            claim,
         } => Keyed::Mint {
             name,
             scope,
             purpose,
             by: Minter::Operator,
+            claim,
         },
         KeyCommand::List => Keyed::List {
             by: Minter::Operator,

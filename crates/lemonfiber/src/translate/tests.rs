@@ -36,6 +36,7 @@ fn the_key_commands_reach_the_core_as_the_operator_asks_them() {
             name: "ha".to_owned(),
             scope: "act".to_owned(),
             purpose: "home-assistant".to_owned(),
+            claim: true,
         },
     });
     assert_eq!(
@@ -45,6 +46,7 @@ fn the_key_commands_reach_the_core_as_the_operator_asks_them() {
             scope: "act".to_owned(),
             purpose: "home-assistant".to_owned(),
             by: Minter::Operator,
+            claim: true,
         })
     );
     assert_eq!(

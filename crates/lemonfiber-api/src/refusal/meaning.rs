@@ -89,7 +89,7 @@ impl Refusal {
                  goes by this name. Work from an earlier run is not tracked here."
             }
             Self::NotAnAnswer => "Setup did not move, and nothing was changed.",
-            Self::NotAKeyRequest => "No key was minted.",
+            Self::NotAKeyRequest => "No key was minted or collected.",
             Self::NoEndpoint => {
                 "Every endpoint this surface answers is named in the contract, and this \
                  path is not one of them."

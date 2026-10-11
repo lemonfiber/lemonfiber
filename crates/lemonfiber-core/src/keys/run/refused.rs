@@ -1,8 +1,8 @@
 //! Every refusal asking the keys for something can meet, each in its own words.
 
 use crate::error::codes::key::{
-    BAD_NAME, MEMBERS_MAY_NOT_MINT, NAME_TAKEN, NOT_A_PURPOSE, NOT_A_SCOPE, NOT_FOR_YOURSELF,
-    NO_SECRET, NO_SUCH_KEY, NO_SUCH_MEMBER, UNASKED, UNREADABLE,
+    BAD_NAME, CLAIM_NOT_OPEN, MEMBERS_MAY_NOT_MINT, NAME_TAKEN, NOT_A_PURPOSE, NOT_A_SCOPE,
+    NOT_FOR_YOURSELF, NO_SECRET, NO_SUCH_KEY, NO_SUCH_MEMBER, UNASKED, UNLINKABLE, UNREADABLE,
 };
 use crate::error::{Diagnose, Problem, Remedy};
 use crate::PRODUCT;
@@ -172,5 +172,37 @@ pub(super) fn no_secret() -> Problem {
             "Try again, and if it happens twice the operating system's own random source is at \
              fault",
         ),
+    )
+}
+
+/// The claim collects no key: unknown, collected already or lapsed, said alike.
+pub(super) fn claim_not_open() -> Problem {
+    Problem::new(
+        CLAIM_NOT_OPEN,
+        "That claim collects no key",
+        "No key waits on it: it may never have been minted, it may have collected its key \
+         already, or its ten minutes may have passed.",
+        Remedy::new(
+            "Ask for the key to be minted as a claim again, and collect it within ten minutes",
+        ),
+    )
+}
+
+/// No key link can be written, because the stack has not been served where another
+/// machine reaches it; `why` is what refused the pairing material the link is built on.
+pub(super) fn unlinkable(why: &Problem) -> Problem {
+    let remedy = why.remedies.first().map_or_else(
+        || Remedy::new("Serve the stack encrypted on the network first"),
+        Clone::clone,
+    );
+    Problem::new(
+        UNLINKABLE,
+        "A key cannot be minted as a claim here yet",
+        format!(
+            "A claim is collected by another machine over the address its link carries, and \
+             there is no address to write: {}. Nothing was minted.",
+            why.summary
+        ),
+        remedy,
     )
 }

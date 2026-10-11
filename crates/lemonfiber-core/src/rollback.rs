@@ -261,9 +261,11 @@ pub fn standing(
         } => overwritten(path, previous, *written, reads),
         // A setting, a path, one field of a service's record, or a key to revoke — each
         // reversed by something this product actually does.
-        Kind::Set { .. } | Kind::Made { .. } | Kind::Configured { .. } | Kind::KeyMinted { .. } => {
-            Standing::whole()
-        }
+        Kind::Set { .. }
+        | Kind::Made { .. }
+        | Kind::Configured { .. }
+        | Kind::KeyMinted { .. }
+        | Kind::KeyCollected { .. } => Standing::whole(),
     }
 }
 

@@ -1446,6 +1446,7 @@ dependencies = [
  "lemonfiber-ports",
  "lemonfiber-sidecar",
  "lemonfiber-testing",
+ "libc",
  "rcgen",
  "ring",
  "schemars",

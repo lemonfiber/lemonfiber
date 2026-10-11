@@ -133,6 +133,9 @@ fn did(kind: &Kind) -> String {
         } => format!("moved from {previous} to {current}"),
         Kind::Configured { field, .. } => format!("set {field} on the service"),
         Kind::KeyMinted { name, scope } => format!("minted the key {name}, with the scope {scope}"),
+        Kind::KeyCollected { name, scope } => {
+            format!("handed over the key {name}, with the scope {scope}, to what collected it")
+        }
         Kind::KeyRevoked { name, scope } => {
             format!("revoked the key {name}, with the scope {scope}")
         }

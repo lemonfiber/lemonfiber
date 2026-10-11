@@ -47,7 +47,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `ASK-8` | `NOT_AN_ANSWER` | error | 1 | 400 | 0.17.0 | Raised where the body of a setup step is not an answer it can read. |
 | `ASK-9` | `NO_ENDPOINT` | error | 1 | 404 | 0.17.0 | Raised where a path under the endpoints is one no endpoint answers. |
 | `ASK-10` | `WRONG_METHOD` | error | 1 | 405 | 0.17.0 | Raised where an endpoint was asked with a method it does not answer. |
-| `ASK-11` | `NOT_A_KEY_REQUEST` | error | 1 | 400 | 0.17.0 | Raised where the body of a mint is not a key's name, scope, purpose and the password. |
+| `ASK-11` | `NOT_A_KEY_REQUEST` | error | 1 | 400 | 0.17.0 | Raised where the body of a mint is not a key's name, scope, purpose and the password, or the body of a collection is not a claim alone. |
 | `ASK-12` | `NOT_AN_IDEMPOTENCY_KEY` | error | 1 | 400 | 0.18.0 | Raised where an action's `Idempotency-Key` is not one to 255 visible characters, or is given more than once. |
 | `ASK-13` | `IDEMPOTENCY_KEY_REUSED` | error | 1 | 400 | 0.18.0 | Raised where an `Idempotency-Key` already sent with one action and its arguments is sent with another. |
 
@@ -220,6 +220,8 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `KEY-9` | `NO_SECRET` | error | 1 | 500 | 0.17.0 | Raised when this machine would not supply the bytes a secret is made of. |
 | `KEY-10` | `NO_SUCH_KEY` | error | 1 | 404 | 0.17.0 | Raised when no active key holds the name a revoke gave. |
 | `KEY-11` | `MEMBERS_MAY_NOT_MINT` | warning | 1 | 409 | 0.17.0 | Raised when a household member asks to mint a key and the operator has not allowed members to. |
+| `KEY-12` | `CLAIM_NOT_OPEN` | warning | 1 | 401 | 0.18.0 | Raised when a key is asked to be collected with a claim that collects nothing. |
+| `KEY-13` | `UNLINKABLE` | warning | 1 | 409 | 0.18.0 | Raised when a key is asked to be minted as a claim and no address another machine reaches can go in its link. |
 
 ## `LIBRARY` — what the media server holds
 

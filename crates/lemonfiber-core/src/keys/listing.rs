@@ -37,6 +37,9 @@ pub struct Minted {
 pub enum State {
     /// Admitted within its scope.
     Active,
+    /// Minted as a claim and not collected yet: it has no secret, admits nothing, and is
+    /// revoked when its claim lapses.
+    Waiting,
     /// Refused as a wrong token is, and kept in the listing with when it was revoked.
     Revoked,
     /// A member's key whose account has left the household: refused, and listed so it

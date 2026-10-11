@@ -19,6 +19,8 @@
 //! with when it was revoked, so a name read in an old alert or journal entry still
 //! names the one key it named then.
 
+pub mod claiming;
+mod held;
 pub mod listing;
 pub mod run;
 pub mod scope;
@@ -31,6 +33,8 @@ use crate::config::store;
 use crate::ports::random::Random;
 use crate::secret::render;
 
+pub use claiming::{Claim, Claimed, Pending, CLAIM_PREFIX};
+pub(crate) use held::Held;
 pub use listing::{Listed, Listing, Minted, State};
 pub use scope::{Minter, Purpose, Scope, Wanted};
 
@@ -75,8 +79,7 @@ impl Secret {
     /// not say: a narrower secret looks exactly like a wide one until somebody guesses
     /// it.
     pub fn mint(random: &dyn Random) -> Option<Self> {
-        let bytes = random.bytes(WIDTH)?;
-        (bytes.len() == WIDTH).then(|| Self(format!("{PREFIX}{}", render(&bytes))))
+        minted_as(random, PREFIX).map(Self)
     }
 
     /// The secret as a client sends it back.
@@ -92,6 +95,23 @@ impl Secret {
     }
 }
 
+/// Bytes in a secret or a claim, rendered as `prefix` and lower-case hex, or nothing
+/// where the operating system will not supply every byte asked for.
+fn minted_as(random: &dyn Random, prefix: &str) -> Option<String> {
+    let bytes = random.bytes(WIDTH)?;
+    (bytes.len() == WIDTH).then(|| format!("{prefix}{}", render(&bytes)))
+}
+
+/// Whether `offered` is `prefix` followed by a minted value's width of lower-case hex.
+fn shaped_as(offered: &str, prefix: &str) -> bool {
+    offered.strip_prefix(prefix).is_some_and(|rest| {
+        rest.len() == WIDTH * 2
+            && rest
+                .bytes()
+                .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+    })
+}
+
 /// The SHA-256 of `offered`, in lower-case hex.
 #[must_use]
 pub fn digest(offered: &str) -> String {
@@ -102,12 +122,7 @@ pub fn digest(offered: &str) -> String {
 /// in lower-case hex.
 #[must_use]
 pub fn shaped(offered: &str) -> bool {
-    offered.strip_prefix(PREFIX).is_some_and(|rest| {
-        rest.len() == WIDTH * 2
-            && rest
-                .bytes()
-                .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
-    })
+    shaped_as(offered, PREFIX)
 }
 
 /// Whether two digests are the same, looked at over every byte whatever is found.
@@ -149,8 +164,14 @@ pub struct Record {
     pub scope: Scope,
     /// What the minter said it is for.
     pub purpose: Purpose,
-    /// The SHA-256 of its secret, in lower-case hex.
-    digest: String,
+    /// The SHA-256 of its secret, in lower-case hex, or nothing for a key minted as a
+    /// claim and not yet collected, which has no secret yet.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    digest: Option<String>,
+    /// The claim it waits to be collected with, where it was minted as one and nobody
+    /// has collected it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pending: Option<Pending>,
     /// When it was minted, written as every other instant this product writes.
     pub minted: String,
     /// Who minted it.
@@ -174,6 +195,10 @@ impl std::fmt::Debug for Record {
             .field("minted", &self.minted)
             .field("by", &self.by)
             .field("revoked", &self.revoked)
+            .field(
+                "pending",
+                &self.pending.as_ref().map(|pending| &pending.lapses),
+            )
             .finish_non_exhaustive()
     }
 }
@@ -193,11 +218,51 @@ impl Record {
             name: name.to_owned(),
             scope,
             purpose,
-            digest: secret.digest(),
+            digest: Some(secret.digest()),
+            pending: None,
             minted,
             by,
             revoked: None,
         }
+    }
+
+    /// A key minted now as `claim`, waiting until `lapses` to be collected, with no
+    /// secret yet.
+    #[must_use]
+    pub fn claimed(
+        name: &str,
+        scope: Scope,
+        purpose: Purpose,
+        claim: &Claim,
+        lapses: String,
+        minted: String,
+        by: Minter,
+    ) -> Self {
+        Self {
+            name: name.to_owned(),
+            scope,
+            purpose,
+            digest: None,
+            pending: Some(Pending {
+                digest: claim.digest(),
+                lapses,
+            }),
+            minted,
+            by,
+            revoked: None,
+        }
+    }
+
+    /// This key collected with `secret`: the secret's digest kept, the claim gone.
+    pub fn collected(&mut self, secret: &Secret) {
+        self.digest = Some(secret.digest());
+        self.pending = None;
+    }
+
+    /// Whether this key waits to be collected.
+    #[must_use]
+    pub const fn is_waiting(&self) -> bool {
+        self.pending.is_some() && self.revoked.is_none()
     }
 
     /// Whether this key has been revoked.
@@ -266,13 +331,37 @@ impl Kept {
     pub fn holding(&self, offered: &str) -> Option<&Record> {
         let offered = digest(offered);
         self.keys.iter().fold(None, |found, record| {
-            let matches = same(&record.digest, &offered);
+            let matches = same(record.digest.as_deref().unwrap_or_default(), &offered);
             if matches && found.is_none() {
                 Some(record)
             } else {
                 found
             }
         })
+    }
+
+    /// The index of the key waiting to be collected with `offered`, where one is.
+    ///
+    /// Compared over every kept claim's every byte, as [`Kept::holding`] compares
+    /// secrets, so the time it takes says nothing about which claim matched.
+    #[must_use]
+    pub fn awaiting(&self, offered: &str) -> Option<usize> {
+        let offered = digest(offered);
+        self.keys
+            .iter()
+            .enumerate()
+            .fold(None, |found, (at, record)| {
+                let kept = record
+                    .pending
+                    .as_ref()
+                    .map(|pending| pending.digest.as_str())
+                    .unwrap_or_default();
+                if same(kept, &offered) && record.revoked.is_none() && found.is_none() {
+                    Some(at)
+                } else {
+                    found
+                }
+            })
     }
 }
 

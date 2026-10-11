@@ -33,6 +33,7 @@
     "import": "ref:ImportReport",
     "invitation": "ref:Invitation",
     "job": "ref:Started",
+    "key-claim": "ref:KeyClaim",
     "keys": "ref:KeyListing",
     "lifecycle": "ref:LifecycleReport",
     "log": "ref:LogLine",

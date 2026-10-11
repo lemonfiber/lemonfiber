@@ -492,10 +492,12 @@ fn inverted(kind: &crate::journal::Kind) -> Option<crate::journal::Kind> {
             previous: Some(current.clone()),
             current: previous.clone().unwrap_or_default(),
         }),
-        Kind::KeyMinted { name, scope } => Some(Kind::KeyRevoked {
-            name: name.clone(),
-            scope: scope.clone(),
-        }),
+        Kind::KeyMinted { name, scope } | Kind::KeyCollected { name, scope } => {
+            Some(Kind::KeyRevoked {
+                name: name.clone(),
+                scope: scope.clone(),
+            })
+        }
         Kind::Created { .. }
         | Kind::Made { .. }
         | Kind::Region { .. }

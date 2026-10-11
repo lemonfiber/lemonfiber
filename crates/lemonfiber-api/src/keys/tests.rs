@@ -3,7 +3,7 @@ use lemonfiber_core::keys::Scope;
 
 use lemonfiber_core::keys::Minter;
 
-use super::{keeper, Minting};
+use super::{keeper, Collecting, Minting};
 use crate::admission::{Caller, Keyed};
 
 /// A key of `scope`, as the door hands it over.
@@ -71,4 +71,19 @@ fn a_mint_never_prints_the_password_it_was_asked_with() {
         printed.contains("ha") && !printed.contains(&password),
         "{printed}"
     );
+}
+
+#[test]
+fn a_collection_takes_the_claim_alone_and_never_prints_it() {
+    let claim = format!("lfc_{}", "7".repeat(64));
+    let asked = serde_json::json!({ "claim": claim }).to_string();
+    let printed = serde_json::from_str::<Collecting>(&asked)
+        .map(|collecting| format!("{collecting:?}"))
+        .unwrap_or_default();
+    assert!(
+        printed.contains("withheld") && !printed.contains(&claim),
+        "{printed}"
+    );
+    let padded = serde_json::json!({ "claim": claim, "name": "ha" }).to_string();
+    assert!(serde_json::from_str::<Collecting>(&padded).is_err());
 }

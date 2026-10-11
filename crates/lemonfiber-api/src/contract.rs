@@ -257,7 +257,11 @@ fn refusals() -> BTreeMap<String, Listed> {
 fn bodies() -> BTreeMap<String, Schema> {
     crate::setup::bodies()
         .into_iter()
-        .chain([crate::keys::body(), crate::admission::body()])
+        .chain([
+            crate::keys::body(),
+            crate::keys::collecting_body(),
+            crate::admission::body(),
+        ])
         .map(|(route, schema)| (route.to_owned(), schema))
         .collect()
 }

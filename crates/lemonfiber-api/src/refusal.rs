@@ -326,10 +326,10 @@ impl Refusal {
                 "The body of this request is not one of setup's answers, nor a way out of \
                  an interrupted apply."
             }
-            // What arrived is not quoted back, because it carries the password.
+            // What arrived is not quoted back, because it carries the password or a claim.
             Self::NotAKeyRequest => {
                 "The body of this request is not a key's name, scope and purpose with the \
-                 password."
+                 password, nor a claim alone."
             }
             Self::NotAnIdempotencyKey => {
                 "An Idempotency-Key is one to 255 visible characters, given once, and this \
@@ -404,9 +404,10 @@ impl Refusal {
             | Self::NotArguments => Remedy::new("Ask again with the arguments the action takes"),
             Self::NoSuchJob => Remedy::new("Ask about a job this run started"),
             Self::NotAnAnswer => Remedy::new("Answer the question setup is asking"),
-            Self::NotAKeyRequest => {
-                Remedy::new("Send the name, scope, purpose and password as the body's four fields")
-            }
+            Self::NotAKeyRequest => Remedy::new(
+                "Send a mint the name, scope, purpose and password, and a collection the claim \
+                 alone",
+            ),
             Self::WrongMethod => Remedy::new("Ask again with the method the contract names"),
             Self::NotAnIdempotencyKey => {
                 Remedy::new("Send the key once, as up to 255 visible characters with no spaces")

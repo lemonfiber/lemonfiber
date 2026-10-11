@@ -78,22 +78,11 @@ fn with_claim(mut offers: Offers, member: &str, token: &str) -> Option<(Offers, 
 /// The link itself: [`JOIN`] and its parameters, in a fixed order, each percent-encoded.
 #[must_use]
 fn written(material: &Material, expires: u64, name: &str, claim: Option<&str>) -> String {
-    let expires = expires.to_string();
-    let mut said = vec![
-        ("address", material.address.as_str()),
-        ("fingerprint", material.fingerprint.as_str()),
-        ("stack", material.stack.as_str()),
-        ("expires", expires.as_str()),
-        ("name", name),
-    ];
+    let mut rest = vec![("name", name)];
     if let Some(claim) = claim {
-        said.push(("claim", claim));
+        rest.push(("claim", claim));
     }
-    let query: Vec<String> = said
-        .into_iter()
-        .map(|(key, value)| format!("{key}={}", crate::endpoint::query_encoded(value)))
-        .collect();
-    format!("{JOIN}?{}", query.join("&"))
+    crate::companion::linked(JOIN, material, expires, &rest)
 }
 
 /// Why there is no join link, from what refused the pairing material it is built on.

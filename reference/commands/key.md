@@ -65,6 +65,9 @@ Options:
       --purpose <PURPOSE>
           What it is for: home-assistant, mcp or other
 
+      --claim
+          Mint it as a claim: show a link and its code, which the program collects the key with once, within ten minutes, instead of showing the secret here
+
       --force
           Take the stack from a run that claimed it and did not give it back
 
