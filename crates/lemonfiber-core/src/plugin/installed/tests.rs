@@ -182,6 +182,10 @@ fn a_variable_asking_an_address_is_an_ask_once_unless_narrowed_or_already_asked(
                 ("AGAIN", url("indexer.search")),
                 ("TV", narrowed(Some("tv"), None)),
                 ("SERVARR", narrowed(None, Some("servarr"))),
+                (
+                    "PLAIN",
+                    Value::Constant(lemonfiber_manifest::container::Constant::Flag(true)),
+                ),
             ]
             .map(|(name, value)| (name.to_owned(), value))
             .into();

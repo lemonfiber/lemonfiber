@@ -29,22 +29,15 @@ pub(crate) fn writes(ctx: &Ctx, installed: &Installed, stack: &Path) -> Vec<Writ
         .into_iter()
         .chain(std::iter::once(installed.clone()))
         .collect();
-    let settled = manifest.as_ref().map(|manifest| {
-        crate::wiring::settle(manifest, &beside, &crate::app::targets::chosen_fillers(ctx))
-    });
-    let address = |by: &str, url: &UrlOf| {
-        manifest
-            .as_ref()
-            .zip(settled.as_deref())
-            .and_then(|(manifest, settled)| {
-                crate::wiring::address(settled, manifest, &beside, by, url)
-            })
-    };
-    let reading = Reading {
-        address: &address,
-        ..Reading::bare()
-    };
-    crate::plugin::writes(installed, stack, &reading)
+    let settled = manifest
+        .as_ref()
+        .map(|manifest| {
+            crate::wiring::settle(manifest, &beside, &crate::app::targets::chosen_fillers(ctx))
+        })
+        .unwrap_or_default();
+    addressed(&settled, manifest.as_ref(), &beside, |reading| {
+        crate::plugin::writes(installed, stack, reading)
+    })
 }
 
 /// The Compose document of `one`, each variable asking for an address written with the
@@ -55,13 +48,23 @@ pub(crate) fn written(
     installed: &[Installed],
     one: &Installed,
 ) -> String {
-    let address =
-        |by: &str, url: &UrlOf| crate::wiring::address(settled, manifest, installed, by, url);
-    crate::plugin::written(
-        one,
-        &Reading {
-            address: &address,
-            ..Reading::bare()
-        },
-    )
+    addressed(settled, Some(manifest), installed, |reading| {
+        crate::plugin::written(one, reading)
+    })
+}
+
+/// What `write` makes of a reading answering each ask for an address from `settled`.
+fn addressed<T>(
+    settled: &[Wired],
+    manifest: Option<&Manifest>,
+    installed: &[Installed],
+    write: impl FnOnce(&Reading<'_>) -> T,
+) -> T {
+    let address = |by: &str, url: &UrlOf| {
+        manifest.and_then(|manifest| crate::wiring::address(settled, manifest, installed, by, url))
+    };
+    write(&Reading {
+        address: &address,
+        ..Reading::bare()
+    })
 }

@@ -109,6 +109,7 @@ fn each_variable_is_written_as_its_kind_and_none_is_substituted() {
             Value::Constant(Constant::Text("$5".to_owned())),
         ),
         ("COUNT".to_owned(), Value::Constant(Constant::Number(3))),
+        ("ON".to_owned(), Value::Constant(Constant::Flag(true))),
         (
             "DOMAIN".to_owned(),
             Value::Setting(Setting {
@@ -152,6 +153,7 @@ fn each_variable_is_written_as_its_kind_and_none_is_substituted() {
     let environment = |name: &str| text(&entry, &["environment", name]);
     assert_eq!(environment("PRICE").as_deref(), Some("$$5"));
     assert_eq!(environment("COUNT").as_deref(), Some("3"));
+    assert_eq!(environment("ON").as_deref(), Some("true"));
     assert_eq!(environment("DOMAIN").as_deref(), Some("home.local"));
     assert_eq!(environment("SET").as_deref(), Some("fast"));
     assert_eq!(
