@@ -331,6 +331,10 @@ async fn every_kind_of_change_reads_as_the_sentence_it_was() {
                 name: "ha".to_owned(),
                 scope: "read".to_owned(),
             }),
+            key(Kind::KeyCollected {
+                name: "ha".to_owned(),
+                scope: "read".to_owned(),
+            }),
             key(Kind::KeyRevoked {
                 name: "ha".to_owned(),
                 scope: "read".to_owned(),
@@ -346,6 +350,7 @@ async fn every_kind_of_change_reads_as_the_sentence_it_was() {
         said,
         [
             "revoked the key ha, with the scope read",
+            "handed over the key ha, with the scope read, to what collected it",
             "minted the key ha, with the scope read",
             "moved from 4.0.14 to 4.0.15",
             "set TZ to Europe/Amsterdam",

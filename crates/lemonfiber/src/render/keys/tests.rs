@@ -1,7 +1,7 @@
-use lemonfiber_core::keys::{Listed, Listing, Minted, Purpose, Secret, State};
+use lemonfiber_core::keys::{Claimed, Listed, Listing, Minted, Purpose, Secret, State};
 use lemonfiber_fixtures::ports::Chance;
 
-use super::{listing, minted};
+use super::{claimed, listing, minted};
 
 /// A secret minted from a source a test chose.
 fn a_secret() -> Secret {
@@ -74,6 +74,7 @@ fn the_listing_names_each_key_and_where_it_stands() {
             a_key("old", State::Revoked, false),
             a_key("anas", State::Orphaned, true),
             a_key("bens", State::Unconfirmed, true),
+            a_key("camera", State::Waiting, false),
         ],
         revoked: None,
         purposes: "What a purpose is worth.".to_owned(),
@@ -86,6 +87,10 @@ fn the_listing_names_each_key_and_where_it_stands() {
     assert!(said.contains("orphaned"), "{said}");
     assert!(said.contains("minted by the member"), "{said}");
     assert!(said.contains("could not be asked"), "{said}");
+    assert!(
+        said.contains("  camera  act  other  waiting to be collected"),
+        "{said}"
+    );
     assert!(said.contains("What a purpose is worth."), "{said}");
 }
 
@@ -129,4 +134,24 @@ fn a_key_in_use_says_when_it_was_last_used() {
     })
     .text();
     assert!(said.contains("last used 2026-10-05T08:00:00"), "{said}");
+}
+
+#[test]
+fn a_claim_is_shown_once_as_a_link_and_a_code_with_when_it_lapses() {
+    let link = format!("lemonfiber://key?claim=lfc_{}", "7".repeat(64));
+    let said = claimed(&Claimed {
+        name: "camera".to_owned(),
+        scope: "read".to_owned(),
+        purpose: Purpose::Other,
+        link: link.clone(),
+        lapses: "2026-10-05T06:10:00".to_owned(),
+    })
+    .text();
+    assert!(
+        said.contains("Minted the key camera as a claim, with the scope read, for other."),
+        "{said}"
+    );
+    assert!(said.contains(&format!("  {link}")), "{said}");
+    assert!(said.contains("The same link, for a camera:"), "{said}");
+    assert!(said.contains("until 2026-10-05T06:10:00"), "{said}");
 }

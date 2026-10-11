@@ -17,8 +17,8 @@ use crate::journal::{Change, Kind};
 
 use super::listing::PURPOSES;
 use super::{
-    names_a_key, Kept, Listed, Listing, Minted, Minter, Purpose, Record, Scope, Secret, State,
-    Used, Wanted, FILE, USED_FILE,
+    names_a_key, Held, Kept, Listed, Listing, Minted, Minter, Purpose, Record, Scope, Secret,
+    State, Used, Wanted, FILE, USED_FILE,
 };
 use refused::{
     bad_name, members_may_not_mint, name_held, name_taken, no_secret, no_such_key, no_such_member,
@@ -135,23 +135,13 @@ pub async fn mint(
 ) -> Result<Minted, Box<Problem>> {
     let Prepared {
         path,
-        mut kept,
         scope,
         purpose,
     } = prepared(ctx, name, scope, purpose, by).await?;
     let secret = Secret::mint(ctx.seams.random.as_ref()).ok_or_else(|| Box::new(no_secret()))?;
     let now = crate::instant::written(ctx.seams.clock.now()).unwrap_or_default();
     let record = Record::minted(name, scope, purpose, &secret, now, by.clone());
-    journalled(
-        ctx,
-        &record,
-        Kind::KeyMinted {
-            name: record.name.clone(),
-            scope: record.scope.written(),
-        },
-    )?;
-    kept.keys.push(record.clone());
-    kept.keep(&path).map_err(|why| Box::new(unkept(why)))?;
+    changed(ctx, &path, |kept| added(ctx, &path, kept, &record, by)).await?;
     heard(ctx, &record, Heard::Minted).await;
     let reached = crate::companion::reaching(ctx).await;
     Ok(Minted {
@@ -165,26 +155,24 @@ pub async fn mint(
     })
 }
 
-/// What a mint has settled before anything is minted: where the keys are, what they
-/// are, and the scope and purpose asked for, each read and allowed.
+/// What a mint has settled before the keys are held: where they are, and the scope and
+/// purpose asked for, each read and allowed.
 struct Prepared {
     /// Where the keys are kept.
     path: PathBuf,
-    /// The keys, with any claim that lapsed already revoked.
-    kept: Kept,
     /// What the key will admit.
     scope: Scope,
     /// What it is for.
     purpose: Purpose,
 }
 
-/// Everything a mint, of a secret or of a claim, checks before it mints.
+/// Everything a mint, of a secret or of a claim, checks before it holds the keys.
 ///
 /// # Errors
 ///
-/// A [`Problem`] where the name, the scope or the purpose names nothing, the name is
-/// taken, a member's account cannot be found, a member asked for anything but a key of
-/// their own or is not allowed keys, or the keys cannot be read or written.
+/// A [`Problem`] where the name, the scope or the purpose names nothing, a member's
+/// account cannot be found, a member asked for anything but a key of their own or is not
+/// allowed keys, or there is nowhere keys are kept.
 async fn prepared(
     ctx: &Ctx,
     name: &str,
@@ -201,14 +189,6 @@ async fn prepared(
     let wanted = Wanted::read(scope).ok_or_else(|| Box::new(not_a_scope(scope)))?;
     let purpose = Purpose::read(purpose).ok_or_else(|| Box::new(not_a_purpose(purpose)))?;
     let path = at(ctx).ok_or_else(|| Box::new(nowhere()))?;
-    let mut kept = read(&path)?;
-    claimed::lapse(ctx, &path, &mut kept).await?;
-    if let Some(held) = kept.named(name) {
-        return Err(Box::new(match by {
-            Minter::Member { id } if held.scope.member() != Some(id.as_str()) => name_held(name),
-            _ => name_taken(held),
-        }));
-    }
     let scope = resolved(ctx, wanted).await?;
     if let Minter::Member { id } = by {
         if scope.member() != Some(id.as_str()) {
@@ -217,10 +197,75 @@ async fn prepared(
     }
     Ok(Prepared {
         path,
-        kept,
         scope,
         purpose,
     })
+}
+
+/// Add `record` to the keys, journaled first, where its name is nobody's yet.
+///
+/// # Errors
+///
+/// A [`Problem`] where the name is taken, or the journal or the keys cannot be written.
+fn added(
+    ctx: &Ctx,
+    path: &Path,
+    kept: &mut Kept,
+    record: &Record,
+    by: &Minter,
+) -> Result<(), Box<Problem>> {
+    if let Some(held) = kept.named(&record.name) {
+        return Err(Box::new(match by {
+            Minter::Member { id } if held.scope.member() != Some(id.as_str()) => {
+                name_held(&record.name)
+            }
+            _ => name_taken(held),
+        }));
+    }
+    journalled(
+        ctx,
+        record,
+        Kind::KeyMinted {
+            name: record.name.clone(),
+            scope: record.scope.written(),
+        },
+    )?;
+    kept.keys.push(record.clone());
+    kept.keep(path).map_err(|why| Box::new(unkept(why)))
+}
+
+/// What `change` makes of the keys at `path`, read while they are held and with every
+/// lapsed claim revoked first, each lapse heard once the hold is let go.
+///
+/// A rehearsal takes no hold: it writes nothing for another process to write over.
+///
+/// # Errors
+///
+/// A [`Problem`] where the keys cannot be held, read or written, a lapse cannot be
+/// journaled, or wherever `change` refuses.
+async fn changed<T>(
+    ctx: &Ctx,
+    path: &Path,
+    change: impl FnOnce(&mut Kept) -> Result<T, Box<Problem>>,
+) -> Result<T, Box<Problem>> {
+    let held = if ctx.dry_run {
+        None
+    } else {
+        Some(held(path).await?)
+    };
+    let mut kept = read(path)?;
+    let lapsed = claimed::lapse(ctx, path, &mut kept)?;
+    let made = change(&mut kept);
+    drop(held);
+    for record in &lapsed {
+        heard(ctx, record, Heard::Lapsed).await;
+    }
+    made
+}
+
+/// The hold on the keys at `path`, or why it could not be taken.
+async fn held(path: &Path) -> Result<Held, Box<Problem>> {
+    Held::taken(path).await.map_err(|why| Box::new(unkept(why)))
 }
 
 /// The keys `by` may see, without their secrets: every one to the operator, and to a
@@ -232,8 +277,7 @@ async fn prepared(
 /// cannot be read.
 pub async fn list(ctx: &Ctx, by: &Minter) -> Result<Listing, Box<Problem>> {
     let path = at(ctx).ok_or_else(|| Box::new(nowhere()))?;
-    let mut kept = read(&path)?;
-    claimed::lapse(ctx, &path, &mut kept).await?;
+    let kept = changed(ctx, &path, |kept| Ok(std::mem::take(kept))).await?;
     Ok(listed(ctx, &seen_by(kept, by), None).await)
 }
 
@@ -277,25 +321,28 @@ pub fn members_may_mint(ctx: &Ctx) -> bool {
 /// revoke a key that is not theirs, or the keys or the journal cannot be read or written.
 pub async fn revoke(ctx: &Ctx, name: &str, by: &Minter) -> Result<Listing, Box<Problem>> {
     let path = at(ctx).ok_or_else(|| Box::new(nowhere()))?;
-    let mut kept = read(&path)?;
-    claimed::lapse(ctx, &path, &mut kept).await?;
-    let seen = seen_by(kept.clone(), by);
-    let Some(found) = active(&seen, name) else {
-        return Err(Box::new(no_such_key(name, seen.named(name))));
-    };
-    if ctx.dry_run {
-        return Ok(listed(ctx, &seen, Some(name.to_owned())).await);
+    let (found, kept) = changed(ctx, &path, |kept| {
+        let seen = seen_by(kept.clone(), by);
+        let Some(found) = active(&seen, name) else {
+            return Err(Box::new(no_such_key(name, seen.named(name))));
+        };
+        if !ctx.dry_run {
+            journalled(
+                ctx,
+                &found,
+                Kind::KeyRevoked {
+                    name: found.name.clone(),
+                    scope: found.scope.written(),
+                },
+            )?;
+            revoked(ctx, &path, kept, &found.name)?;
+        }
+        Ok((found, std::mem::take(kept)))
+    })
+    .await?;
+    if !ctx.dry_run {
+        heard(ctx, &found, Heard::Revoked).await;
     }
-    journalled(
-        ctx,
-        &found,
-        Kind::KeyRevoked {
-            name: found.name.clone(),
-            scope: found.scope.written(),
-        },
-    )?;
-    revoked(ctx, &path, &mut kept, &found.name)?;
-    heard(ctx, &found, Heard::Revoked).await;
     Ok(listed(ctx, &seen_by(kept, by), Some(found.name)).await)
 }
 
@@ -310,11 +357,13 @@ pub async fn revoke(ctx: &Ctx, name: &str, by: &Minter) -> Result<Listing, Box<P
 /// A [`Problem`] where the keys cannot be read or written.
 pub(crate) async fn undone(ctx: &Ctx, name: &str) -> Result<(), Box<Problem>> {
     let path = at(ctx).ok_or_else(|| Box::new(nowhere()))?;
+    let hold = held(&path).await?;
     let mut kept = read(&path)?;
     let Some(found) = active(&kept, name) else {
         return Ok(());
     };
     revoked(ctx, &path, &mut kept, &found.name)?;
+    drop(hold);
     heard(ctx, &found, Heard::Revoked).await;
     Ok(())
 }

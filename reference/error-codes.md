@@ -47,7 +47,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `ASK-8` | `NOT_AN_ANSWER` | error | 1 | 400 | 0.17.0 | Raised where the body of a setup step is not an answer it can read. |
 | `ASK-9` | `NO_ENDPOINT` | error | 1 | 404 | 0.17.0 | Raised where a path under the endpoints is one no endpoint answers. |
 | `ASK-10` | `WRONG_METHOD` | error | 1 | 405 | 0.17.0 | Raised where an endpoint was asked with a method it does not answer. |
-| `ASK-11` | `NOT_A_KEY_REQUEST` | error | 1 | 400 | 0.17.0 | Raised where the body of a mint is not a key's name, scope, purpose and the password. |
+| `ASK-11` | `NOT_A_KEY_REQUEST` | error | 1 | 400 | 0.17.0 | Raised where the body of a mint is not a key's name, scope, purpose and the password, or the body of a collection is not a claim alone. |
 | `ASK-12` | `NOT_AN_IDEMPOTENCY_KEY` | error | 1 | 400 | 0.18.0 | Raised where an action's `Idempotency-Key` is not one to 255 visible characters, or is given more than once. |
 | `ASK-13` | `IDEMPOTENCY_KEY_REUSED` | error | 1 | 400 | 0.18.0 | Raised where an `Idempotency-Key` already sent with one action and its arguments is sent with another. |
 

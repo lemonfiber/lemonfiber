@@ -128,6 +128,25 @@ async fn a_claim_sent_in_the_clear_from_another_machine_collects_nothing() {
 }
 
 #[tokio::test]
+async fn a_body_that_is_not_a_claim_alone_collects_nothing() {
+    let claim = a_claim(12);
+    let (router, _, _) = waiting_machine("not-a-claim", &claim);
+    let padded = serde_json::json!({ "claim": claim.as_str(), "name": "ha" }).to_string();
+    let (refused, _) = sent(
+        router,
+        "POST",
+        "/api/keys/claim",
+        "",
+        Some((NEXT_DOOR, true)),
+        &padded,
+    )
+    .await;
+    assert_eq!(refused.status, StatusCode::BAD_REQUEST, "{}", refused.body);
+    assert_eq!(code(&refused), "ASK-11");
+    assert!(!refused.body.contains(claim.as_str()), "{}", refused.body);
+}
+
+#[tokio::test]
 async fn guessed_claims_earn_the_wait_guessed_keys_do() {
     let (router, _, _) = waiting_machine("guessed", &a_claim(9));
     let mut held = false;

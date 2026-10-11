@@ -74,10 +74,11 @@ fn every_outcome() -> Vec<Outcome> {
     every
 }
 
-/// The two a key answers with: one just minted, with everything a client elsewhere
-/// needs, and a listing holding a key in use and one revoked.
+/// The three a key answers with: one just minted, with everything a client elsewhere
+/// needs, one minted as a claim, and a listing holding a key in use, one waiting to be
+/// collected and one revoked.
 fn the_keys() -> Vec<Outcome> {
-    use lemonfiber_core::keys::{Listed, Listing, Minted, Purpose, Secret, State};
+    use lemonfiber_core::keys::{Claimed, Listed, Listing, Minted, Purpose, Secret, State};
     let source = lemonfiber_fixtures::ports::Chance::exactly(Some(vec![7; 32]));
     let Some(secret) = Secret::mint(&source) else {
         unreachable!("thirty-two bytes mint a key")
@@ -102,9 +103,17 @@ fn the_keys() -> Vec<Outcome> {
             pin: Some("ab".repeat(32)),
             caution: None,
         }),
+        Outcome::KeyClaim(Claimed {
+            name: "camera".to_owned(),
+            scope: "read".to_owned(),
+            purpose: Purpose::Other,
+            link: format!("lemonfiber://key?claim=lfc_{}", "7".repeat(64)),
+            lapses: "2026-10-05T06:10:00".to_owned(),
+        }),
         Outcome::Keys(Listing {
             keys: vec![
                 listed("assistant", State::Active),
+                listed("camera", State::Waiting),
                 listed("gone", State::Revoked),
             ],
             revoked: Some("gone".to_owned()),

@@ -25,19 +25,22 @@ pub(super) enum Heard {
     Lapsed,
 }
 
-/// Tell the operator, now and in the record of alerts, that a key was minted or revoked.
+/// Tell the operator, now and in the record of alerts, what became of a key.
+///
+/// Recorded as delivered once said, because the narrator cannot fail.
 pub(super) async fn heard(ctx: &Ctx, record: &Record, heard: Heard) {
     let alert = alert(record, &heard);
     let mut outbox = crate::app::outbox::load(ctx);
     outbox.owe(vec![alert.clone()]);
     ctx.narrator.say(&alert.summary).await;
-    // Delivered because the narrator cannot fail: the operator has the sentence and the
-    // outbox the history of its having been given.
     outbox.delivered(&|_| 0);
     crate::app::outbox::save(ctx, &outbox);
 }
 
-/// The alert a key's mint or revoke raises, naming the key and its scope.
+/// The alert a key raises, naming the key and its scope.
+///
+/// A key is minted, collected and revoked at most once each, and a name is never minted
+/// again, so which of those happened is all that tells its alerts apart.
 fn alert(record: &Record, heard: &Heard) -> Alert {
     let scope = record.scope.written();
     let (summary, meaning, remedy) = match heard {
@@ -92,8 +95,6 @@ fn alert(record: &Record, heard: &Heard) -> Alert {
         ),
     };
     let check = format!("{CHECK}{}", record.name);
-    // A key is minted once and revoked once, and a name is never minted again, so which
-    // of the two happened is all there is to tell one of its alerts from the other.
     let happened = match heard {
         Heard::Minted => "minted",
         Heard::Collected { .. } => "collected",

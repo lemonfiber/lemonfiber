@@ -160,6 +160,39 @@ async fn a_key_is_collected_once_and_its_secret_is_minted_then() {
     assert!(again.is_err_and(|problem| problem.code == CLAIM_NOT_OPEN));
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn collections_of_one_claim_at_once_hand_the_key_to_one() {
+    let machine = Machine::new("raced", true);
+    let (ctx, _) = machine.at(0);
+    let claimed = mint(&ctx, "ha", "read", "home-assistant", &Minter::Operator).await;
+    let claim = claimed
+        .map(|claimed| claim_in(&claimed.link))
+        .unwrap_or_default();
+    let racing: Vec<_> = (b'a'..b'i')
+        .map(|letter| {
+            let (racer, _) = machine.at(60);
+            let racer = racer.with_random(Arc::new(Chance::exactly(Some(vec![letter; 32]))));
+            let claim = claim.clone();
+            tokio::spawn(async move { collect(&racer, &claim, None).await })
+        })
+        .collect();
+    let (collected, refused): (Vec<_>, Vec<_>) = futures_util::future::join_all(racing)
+        .await
+        .into_iter()
+        .flatten()
+        .partition(Result::is_ok);
+    assert_eq!(collected.len(), 1, "{refused:?}");
+    assert_eq!(refused.len(), 7);
+    assert!(refused.iter().all(|refused| refused
+        .as_ref()
+        .is_err_and(|problem| problem.code == CLAIM_NOT_OPEN)));
+    let holder = collected
+        .into_iter()
+        .find_map(Result::ok)
+        .and_then(|minted| kept(&ctx).holding(minted.secret.as_str()).cloned());
+    assert!(holder.is_some_and(|record| record.name == "ha"));
+}
+
 #[tokio::test]
 async fn an_unknown_claim_collects_nothing() {
     let machine = Machine::new("unknown", true);
@@ -200,7 +233,7 @@ async fn a_rehearsal_revokes_no_lapsed_claim() {
     later.dry_run = true;
     let path = at(&later).unwrap_or_default();
     let mut keys = kept(&later);
-    assert!(lapse(&later, &path, &mut keys).await.is_ok());
+    assert!(lapse(&later, &path, &mut keys).is_ok_and(|lapsed| lapsed.is_empty()));
     assert!(kept(&later)
         .named("ha")
         .is_some_and(crate::keys::Record::is_waiting));
@@ -213,4 +246,78 @@ async fn a_claim_is_not_minted_where_no_other_machine_reaches_the_stack() {
     let refused = mint(&ctx, "ha", "read", "home-assistant", &Minter::Operator).await;
     assert!(refused.is_err_and(|problem| problem.code == UNLINKABLE));
     assert!(kept(&ctx).named("ha").is_none());
+}
+
+/// Where the machine keeps its journal, made a directory so nothing can be journaled.
+fn unjournalled(ctx: &Ctx) {
+    let journal = crate::app::targets::layout(ctx)
+        .map(|paths| paths.journal())
+        .unwrap_or_default();
+    let _ = std::fs::remove_file(&journal);
+    assert!(std::fs::create_dir_all(journal).is_ok());
+}
+
+#[tokio::test]
+async fn a_collection_the_journal_cannot_take_hands_over_nothing() {
+    let machine = Machine::new("collect-unjournalled", true);
+    let (ctx, _) = machine.at(0);
+    let claimed = mint(&ctx, "ha", "read", "home-assistant", &Minter::Operator).await;
+    let claim = claimed
+        .map(|claimed| claim_in(&claimed.link))
+        .unwrap_or_default();
+    let (later, heard) = machine.at(60);
+    unjournalled(&later);
+    assert!(collect(&later, &claim, None).await.is_err());
+    assert!(kept(&later)
+        .named("ha")
+        .is_some_and(crate::keys::Record::is_waiting));
+    assert!(!heard.said().iter().any(|said| said.contains("collected")));
+}
+
+#[tokio::test]
+async fn a_lapse_the_journal_cannot_take_revokes_nothing() {
+    let machine = Machine::new("lapse-unjournalled", true);
+    let (ctx, _) = machine.at(0);
+    let _ = mint(&ctx, "ha", "read", "home-assistant", &Minter::Operator).await;
+    let (later, heard) = machine.at(3_600);
+    unjournalled(&later);
+    assert!(list(&later, &Minter::Operator).await.is_err());
+    assert!(kept(&later)
+        .named("ha")
+        .is_some_and(crate::keys::Record::is_waiting));
+    assert!(!heard.said().iter().any(|said| said.contains("in time")));
+}
+
+#[tokio::test]
+async fn a_collection_from_an_address_nobody_could_tell_says_so() {
+    let machine = Machine::new("from-nowhere", true);
+    let (ctx, _) = machine.at(0);
+    let claimed = mint(&ctx, "ha", "read", "home-assistant", &Minter::Operator).await;
+    let claim = claimed
+        .map(|claimed| claim_in(&claimed.link))
+        .unwrap_or_default();
+    let (later, _) = machine.at(60);
+    assert!(collect(&later, &claim, None).await.is_ok());
+    let alerts = format!("{:?}", crate::app::outbox::load(&later));
+    assert!(
+        alerts.contains("an address that could not be told"),
+        "{alerts}"
+    );
+}
+
+#[test]
+fn a_pairing_refused_without_a_remedy_still_says_how_to_mint_a_claim() {
+    let mut why = crate::error::Problem::new(
+        UNLINKABLE,
+        "Nothing serves the stack",
+        "It was never served.",
+        crate::error::Remedy::new("unused"),
+    );
+    why.remedies.clear();
+    let refused = super::super::refused::unlinkable(&why);
+    assert_eq!(refused.code, UNLINKABLE);
+    assert!(refused
+        .remedies
+        .iter()
+        .any(|remedy| remedy.action.contains("Serve the stack encrypted")));
 }

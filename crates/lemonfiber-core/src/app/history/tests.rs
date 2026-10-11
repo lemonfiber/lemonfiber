@@ -45,7 +45,7 @@ fn a_stamp_that_is_not_seconds_is_read_as_the_epoch() {
     }
 }
 
-/// A key is named with its scope, minted or revoked.
+/// A key is named with its scope, minted, collected or revoked.
 #[test]
 fn a_key_reads_as_its_name_and_scope() {
     assert_eq!(
@@ -61,6 +61,13 @@ fn a_key_reads_as_its_name_and_scope() {
             scope: "act".to_owned(),
         }),
         "revoked the key ha, with the scope act"
+    );
+    assert_eq!(
+        did(&crate::journal::Kind::KeyCollected {
+            name: "ha".to_owned(),
+            scope: "act".to_owned(),
+        }),
+        "handed over the key ha, with the scope act, to what collected it"
     );
 }
 

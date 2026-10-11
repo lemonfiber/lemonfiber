@@ -10,7 +10,7 @@ use crate::journal::Kind;
 use super::super::claiming::{Claim, Claimed, KEY_LINK, MINUTES_TO_COLLECT};
 use super::super::{Kept, Minted, Minter, Record, Secret};
 use super::refused::{claim_not_open, no_secret, nowhere, unkept, unlinkable};
-use super::{at, heard, journalled, prepared, read, Heard, Prepared};
+use super::{added, at, changed, heard, journalled, prepared, Heard, Prepared};
 
 /// Mint a key as a claim, and answer with the link that collects it.
 ///
@@ -31,7 +31,6 @@ pub(super) async fn mint(
 ) -> Result<Claimed, Box<Problem>> {
     let Prepared {
         path,
-        mut kept,
         scope,
         purpose,
     } = prepared(ctx, name, scope, purpose, by).await?;
@@ -52,16 +51,7 @@ pub(super) async fn mint(
         .map_or(0, |since| since.as_secs());
     let minted = crate::instant::written(now).unwrap_or_default();
     let record = Record::claimed(name, scope, purpose, &claim, lapses, minted, by.clone());
-    journalled(
-        ctx,
-        &record,
-        Kind::KeyMinted {
-            name: record.name.clone(),
-            scope: record.scope.written(),
-        },
-    )?;
-    kept.keys.push(record.clone());
-    kept.keep(&path).map_err(|why| Box::new(unkept(why)))?;
+    changed(ctx, &path, |kept| added(ctx, &path, kept, &record, by)).await?;
     heard(ctx, &record, Heard::Minted).await;
     Ok(Claimed {
         link: crate::companion::linked(KEY_LINK, &material, expires, &[("claim", claim.as_str())]),
@@ -89,8 +79,34 @@ pub(super) async fn collect(
     from: Option<String>,
 ) -> Result<Minted, Box<Problem>> {
     let path = at(ctx).ok_or_else(|| Box::new(nowhere()))?;
-    let mut kept = read(&path)?;
-    lapse(ctx, &path, &mut kept).await?;
+    let (record, secret) = changed(ctx, &path, |kept| collected(ctx, &path, kept, offered)).await?;
+    heard(ctx, &record, Heard::Collected { from }).await;
+    let reached = crate::companion::reaching(ctx).await;
+    Ok(Minted {
+        name: record.name,
+        scope: record.scope.written(),
+        purpose: record.purpose,
+        secret,
+        address: reached.address,
+        pin: reached.pin,
+        caution: reached.caution,
+    })
+}
+
+/// The key `offered` claims, collected in `kept` with a secret minted now, and the
+/// secret.
+///
+/// # Errors
+///
+/// A [`Problem`] where no key waits on that claim, it was collected already or it has
+/// lapsed, all said the same way; where the journal or the keys cannot be written; and
+/// where this machine will not supply a secret's randomness.
+fn collected(
+    ctx: &Ctx,
+    path: &Path,
+    kept: &mut Kept,
+    offered: &str,
+) -> Result<(Record, Secret), Box<Problem>> {
     let now = ctx.seams.clock.now();
     let found = kept.awaiting(offered).filter(|&at| {
         kept.keys
@@ -112,31 +128,21 @@ pub(super) async fn collect(
     )?;
     record.collected(&secret);
     let collected = record.clone();
-    kept.keep(&path).map_err(|why| Box::new(unkept(why)))?;
-    heard(ctx, &collected, Heard::Collected { from }).await;
-    let reached = crate::companion::reaching(ctx).await;
-    Ok(Minted {
-        name: collected.name,
-        scope: collected.scope.written(),
-        purpose: collected.purpose,
-        secret,
-        address: reached.address,
-        pin: reached.pin,
-        caution: reached.caution,
-    })
+    kept.keep(path).map_err(|why| Box::new(unkept(why)))?;
+    Ok((collected, secret))
 }
 
-/// Revoke every key whose claim lapsed with nobody having collected it, each journaled
-/// and heard as a revoke nothing undoes.
+/// Revoke every key whose claim lapsed with nobody having collected it, each journaled,
+/// and answer with them for the caller to have heard once it lets the keys go.
 ///
 /// A rehearsal revokes nothing: it writes nothing anywhere.
 ///
 /// # Errors
 ///
 /// A [`Problem`] where the journal or the keys cannot be written.
-pub(super) async fn lapse(ctx: &Ctx, path: &Path, kept: &mut Kept) -> Result<(), Box<Problem>> {
+pub(super) fn lapse(ctx: &Ctx, path: &Path, kept: &mut Kept) -> Result<Vec<Record>, Box<Problem>> {
     if ctx.dry_run {
-        return Ok(());
+        return Ok(Vec::new());
     }
     let now = ctx.seams.clock.now();
     let lapsed: Vec<Record> = kept
@@ -152,7 +158,7 @@ pub(super) async fn lapse(ctx: &Ctx, path: &Path, kept: &mut Kept) -> Result<(),
         .cloned()
         .collect();
     if lapsed.is_empty() {
-        return Ok(());
+        return Ok(lapsed);
     }
     let written = crate::instant::written(now).unwrap_or_default();
     for record in &lapsed {
@@ -173,10 +179,7 @@ pub(super) async fn lapse(ctx: &Ctx, path: &Path, kept: &mut Kept) -> Result<(),
         }
     }
     kept.keep(path).map_err(|why| Box::new(unkept(why)))?;
-    for record in &lapsed {
-        heard(ctx, record, Heard::Lapsed).await;
-    }
-    Ok(())
+    Ok(lapsed)
 }
 
 #[cfg(test)]

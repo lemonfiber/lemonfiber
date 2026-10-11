@@ -20,6 +20,7 @@
 //! names the one key it named then.
 
 pub mod claiming;
+mod held;
 pub mod listing;
 pub mod run;
 pub mod scope;
@@ -33,6 +34,7 @@ use crate::ports::random::Random;
 use crate::secret::render;
 
 pub use claiming::{Claim, Claimed, Pending, CLAIM_PREFIX};
+pub(crate) use held::Held;
 pub use listing::{Listed, Listing, Minted, State};
 pub use scope::{Minter, Purpose, Scope, Wanted};
 
