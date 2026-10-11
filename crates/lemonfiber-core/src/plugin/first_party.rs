@@ -6,17 +6,10 @@
 
 use super::Installed;
 
-/// One first-party plugin, as the signed default bundle names it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct FirstParty {
-    /// Its id.
-    pub plugin: &'static str,
-    /// The SHA-256 of its manifest, in lower-case hexadecimal.
-    pub manifest: &'static str,
-}
+pub use lemonfiber_bundled::FirstParty;
 
-/// Every first-party plugin this build embeds.
-pub const EMBEDDED: &[FirstParty] = &[];
+/// Every first-party plugin this build embeds, as the bundle pins them.
+pub const EMBEDDED: &[FirstParty] = lemonfiber_bundled::FIRST_PARTY;
 
 /// Whether `installed` is one of `set`, by id and manifest alike.
 #[must_use]
