@@ -215,11 +215,10 @@ async fn the_stacks_administrator_password_is_not_rotated_against_a_plugins_serv
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
 
-/// A contracted media server's administrator's password is never changed: with none
-/// recorded there is nothing to change, and with one recorded it is still spoken to over
-/// its contracts, which change none, so it is asked nothing either way.
+/// A contracted media server that cannot be asked over its contracts is asked nothing,
+/// and the password in force stays as it was.
 #[tokio::test]
-async fn a_contracted_servers_administrator_password_is_not_replaced() {
+async fn a_contracted_server_unanswered_over_its_contracts_is_not_rotated() {
     let installed = [crate::test_support::a_contracted_media_server(Some(
         "upstream",
     ))];
@@ -239,24 +238,8 @@ async fn a_contracted_servers_administrator_password_is_not_replaced() {
         })
         .build()
         .with_http(http.clone());
-    let configuration = env
-        .parent()
-        .unwrap_or(std::path::Path::new("."))
-        .join("adapter");
-    let server = crate::app::targets::MediaServer::of(&fillers).map(|mut server| {
-        server.filler.confined_to = Some(configuration.clone());
-        server
-    });
+    let server = crate::app::targets::MediaServer::of(&fillers);
 
-    let unheld = match server.as_ref() {
-        Some(server) => super::replace_admin_password(&ctx, server, false)
-            .await
-            .err(),
-        None => None,
-    };
-    let recorded = server
-        .as_ref()
-        .map(|one| one.record_password(&ctx, &lemonfiber_fixtures::support::a_password()));
     let refused = match server.as_ref() {
         Some(server) => super::replace_admin_password(&ctx, server, false)
             .await
@@ -266,13 +249,137 @@ async fn a_contracted_servers_administrator_password_is_not_replaced() {
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 
     assert!(matches!(
-        &unheld,
-        Some(super::Replacing::Unproven(detail)) if detail == super::NO_ADMINISTRATOR_HELD
-    ));
-    assert_eq!(recorded, Some(Ok(())));
-    assert!(matches!(
         &refused,
-        Some(super::Replacing::Unproven(detail)) if detail == super::OVER_ITS_CONTRACTS
+        Some(super::Replacing::Unproven(detail)) if detail == super::replacing::UNASKED_OVER_ITS_CONTRACTS
     ));
     assert!(http.requests().is_empty(), "{:?}", http.requests());
+}
+
+/// What a rotation over the contract came to: its outcome, the password recorded under
+/// the server's setting, the credential handed to the adapter, and what it was asked.
+struct OverItsContract {
+    rotated: Result<super::Replaced, super::Replacing>,
+    recorded: String,
+    handed: std::collections::BTreeMap<String, String>,
+    sent: Vec<Option<String>>,
+}
+
+/// Rotate a contracted media server's administrator password over its contract, with
+/// the file its adapter reads its upstream's credential from writable or not.
+async fn rotated_over_its_contract(
+    name: &str,
+    rehearsing: bool,
+    writable: bool,
+) -> OverItsContract {
+    use crate::test_support::{a_contracted_media_server, contracted_context, MEDIA_ADAPTER};
+    use lemonfiber_fixtures::http::{Answer, Fake};
+
+    let env = crate::test_support::env_without_password(name);
+    let project = env
+        .parent()
+        .unwrap_or(std::path::Path::new("."))
+        .join("stack");
+    let asking = Fake::by_path(vec![(
+        "identity.source/v1/replace_admin_password",
+        Answer::reply(200, "null"),
+    )]);
+    let ctx = contracted_context(&project, MEDIA_ADAPTER, true)
+        .settings(config::Settings {
+            env_file: Some(env.clone()),
+            stack_dir: Some(project.clone()),
+            ..config::Settings::default()
+        })
+        .build()
+        .with_http(asking.clone());
+    let fillers = crate::test_support::stack()
+        .manifest()
+        .map(|manifest| {
+            crate::wiring::Fillers::of(
+                &manifest,
+                &[a_contracted_media_server(Some("upstream"))],
+                &crate::wiring::Chosen::read(Some("identity.source=media-adapter")),
+                Some(&project),
+            )
+        })
+        .unwrap_or_default();
+    let server = crate::app::targets::MediaServer::of(&fillers);
+    let upstream = crate::app::targets::service_config_dir(&project, MEDIA_ADAPTER)
+        .join(lemonfiber_contract::adapter::UPSTREAM_FILE);
+    if !writable {
+        let _ = std::fs::create_dir_all(&upstream);
+    }
+
+    let rotated = match server.as_ref() {
+        Some(server) => super::replace_admin_password(&ctx, server, rehearsing).await,
+        None => Err(super::Replacing::Refused),
+    };
+    let recorded = server
+        .as_ref()
+        .and_then(|server| crate::app::targets::recorded_secret(&ctx, &server.setting))
+        .unwrap_or_default();
+    let handed = std::fs::read(&upstream)
+        .ok()
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .unwrap_or_default();
+    let sent = asking
+        .requests()
+        .into_iter()
+        .filter(|asked| asked.url.ends_with("/replace_admin_password"))
+        .map(|asked| asked.body)
+        .collect();
+    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    OverItsContract {
+        rotated,
+        recorded,
+        handed,
+        sent,
+    }
+}
+
+/// A contracted media server's administrator's password rotates over its contract: the
+/// adapter is handed the replacement alone, and once it answers that the server took it
+/// the replacement is recorded under the server's setting and written where the adapter
+/// reads its upstream's credential.
+#[tokio::test]
+async fn a_contracted_servers_administrator_password_rotates_over_its_contract() {
+    let over = rotated_over_its_contract("rotate-over-contract", false, true).await;
+
+    assert!(matches!(over.rotated, Ok(super::Replaced::Done)));
+    assert!(!over.recorded.is_empty());
+    assert_eq!(
+        over.handed
+            .get(lemonfiber_contract::adapter::UPSTREAM_PASSWORD)
+            .map(String::as_str),
+        Some(over.recorded.as_str())
+    );
+    assert_eq!(
+        over.sent,
+        vec![Some(crate::test_support::json(
+            &serde_json::json!({ "replacement": over.recorded })
+        ))]
+    );
+}
+
+/// A rehearsed rotation over the contract mints nothing, asks the adapter nothing and
+/// hands it nothing.
+#[tokio::test]
+async fn a_rehearsed_rotation_over_the_contract_asks_nothing() {
+    let over = rotated_over_its_contract("rehearse-over-contract", true, true).await;
+
+    assert!(matches!(over.rotated, Ok(super::Replaced::Rehearsed)));
+    assert!(over.recorded.is_empty());
+    assert!(over.handed.is_empty());
+    assert!(over.sent.is_empty(), "{:?}", over.sent);
+}
+
+/// Where the server took the replacement but its adapter's credential file cannot be
+/// written, the replacement stays recorded and the rotation says it was not handed on.
+#[tokio::test]
+async fn a_replacement_the_adapter_cannot_be_handed_is_kept_and_said() {
+    let over = rotated_over_its_contract("unhanded-over-contract", false, false).await;
+
+    assert!(matches!(&over.rotated, Err(super::Replacing::Unkept(detail)) if !detail.is_empty()));
+    assert!(!over.recorded.is_empty());
+    assert!(over.handed.is_empty());
+    assert_eq!(over.sent.len(), 1);
 }

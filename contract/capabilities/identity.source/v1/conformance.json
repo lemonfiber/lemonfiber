@@ -31,6 +31,15 @@
       "operation": "create_admin"
     },
     {
+      "case": "replace_admin_password-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "replace_admin_password"
+    },
+    {
       "case": "household-answers",
       "expect": {
         "conforms": true

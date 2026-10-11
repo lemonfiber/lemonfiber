@@ -47,6 +47,10 @@ impl MediaServer for FakeMedia {
         }
     }
 
+    async fn replace_admin_password(&self, _replacement: &str) -> Result<(), Failure> {
+        Ok(())
+    }
+
     async fn create_admin(&self, _name: &str, _password: &str) -> Result<(), Failure> {
         match self.create {
             Create::Ok => Ok(()),

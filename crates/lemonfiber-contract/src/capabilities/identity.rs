@@ -19,6 +19,8 @@ crate::contract! {
             fn startup_completed() -> bool;
             /// Create its first administrator.
             fn create_admin(str name: &str, str password: &str) -> ();
+            /// Change its administrator's password, signed in with the one in force.
+            fn replace_admin_password(str replacement: &str) -> ();
         }
         impl Household {
             /// Every account.

@@ -18,6 +18,10 @@ impl MediaServer for Upstream {
         self.tell(format!("admin {name} {}", password.len()));
         Ok(())
     }
+    async fn replace_admin_password(&self, replacement: &str) -> Result<(), Failure> {
+        self.tell(format!("rotated {}", replacement.len()));
+        Ok(())
+    }
 }
 
 #[async_trait]

@@ -21,14 +21,15 @@ use std::path::Path;
 use lemonfiber_manifest::{ApiKind, Service};
 
 use super::pending::{forgotten, kept, pending, promoted};
-use crate::app::targets::{
-    record_secret, recorded_secret, service_addr, target_for, MediaServer, Unsigned,
-};
+use crate::app::targets::{record_secret, recorded_secret, service_addr, target_for, MediaServer};
 use crate::app::Ctx;
 use crate::config;
 use crate::credential::{Consumer, Held, Origin, Propagation, Reach, Rotation, Settled, CATALOGUE};
 use crate::ports::service::{Client, Failure};
 use crate::seed::run::published_as;
+
+mod replacing;
+pub(crate) use replacing::replace_admin_password;
 
 /// What a rehearsal says about replacing the credential lemonfiber mints itself.
 const MINTING: &str = "a real run would generate a new web UI password, record it beside \
@@ -307,67 +308,9 @@ pub(crate) enum Replacing {
     Unkept(String),
 }
 
-/// What is said where the media server is spoken to over its contracts, which change no
-/// administrator's password.
-const OVER_ITS_CONTRACTS: &str = "this media server is spoken to over its contracts, which \
-                                  change no administrator's password";
-
 /// What is said where lemonfiber holds no administrator password for the media server.
 const NO_ADMINISTRATOR_HELD: &str = "lemonfiber holds no administrator password for this media \
                                      server, so there is nothing to change; run `lemonfiber seed`";
-
-/// What is said where the media server cannot be signed in to as its administrator.
-const fn unsigned(why: Unsigned) -> &'static str {
-    match why {
-        Unsigned::Unheld => NO_ADMINISTRATOR_HELD,
-        Unsigned::Contracted => OVER_ITS_CONTRACTS,
-    }
-}
-
-/// Mint a new administrator password, record it under its pending name, set it on the
-/// media server and prove it by signing in with it, and only then move it into place —
-/// the order that leaves the recorded password the one in force wherever this stops.
-///
-/// Kept under the server's own setting throughout, so a plugin's server is given a
-/// replacement for its own password and the stack's is never touched for it.
-pub(crate) async fn replace_admin_password(
-    ctx: &Ctx,
-    server: &MediaServer,
-    rehearsing: bool,
-) -> Result<Replaced, Replacing> {
-    let client = server
-        .signing_in(ctx)
-        .map_err(|why| Replacing::Unproven(unsigned(why).to_owned()))?;
-    // Below what can be told without acting, and above the mint: a password generated to
-    // describe a rotation is a secret that exists because somebody asked a question.
-    if rehearsing {
-        return Ok(Replaced::Rehearsed);
-    }
-    let Some(replacement) = crate::secret::generate(ctx.seams.random.as_ref()) else {
-        return Err(Replacing::Unproven(
-            "no randomness was available to generate a replacement, and a guessable password on \
-             the account that administers the media server is worse than the one in force"
-                .to_owned(),
-        ));
-    };
-    let setting = server.setting.as_str();
-    if let Err(failure) = record_secret(ctx, &pending(setting), &replacement) {
-        return Err(Replacing::Unproven(unrecorded(&failure)));
-    }
-    match client.replace_password(&replacement).await {
-        Ok(()) => promoted(ctx, setting, &replacement)
-            .map(|()| Replaced::Done)
-            .map_err(Replacing::Unkept),
-        Err(Failure::Unauthorised { .. }) => {
-            forgotten(ctx, setting);
-            Err(Replacing::Refused)
-        }
-        Err(failure) => {
-            kept(ctx, setting, &replacement);
-            Err(Replacing::Unproven(said(&failure)))
-        }
-    }
-}
 
 /// Hand a service's own current key back to everything that reads it.
 ///

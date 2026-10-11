@@ -1,6 +1,6 @@
 //! The media server's own setup and administrator.
 
-use super::media_server;
+use super::{media_server, reader, SIGNED_IN_AS};
 use lemonfiber_core::ports::http::Method;
 use lemonfiber_core::ports::service::Failure;
 use lemonfiber_fixtures::http::{Answer, Fake};
@@ -165,4 +165,33 @@ async fn creating_the_admin_on_an_unreachable_media_server_is_unavailable() {
         media_server(&fake).create_admin("admin", &password).await,
         Err(Failure::Unavailable { .. })
     ));
+}
+
+/// The administrator's password is changed with the session the one in force opens,
+/// and the replacement is then signed in with.
+#[tokio::test]
+async fn the_administrators_password_is_replaced_and_proven() {
+    let replacement = a_word();
+    let fake = Fake::in_turn(vec![
+        Answer::reply(200, SIGNED_IN_AS),
+        Answer::reply(204, ""),
+        Answer::reply(200, SIGNED_IN_AS),
+    ]);
+    assert!(
+        MediaServer::replace_admin_password(&reader(&fake), &replacement)
+            .await
+            .is_ok()
+    );
+
+    let requests = fake.requests();
+    let changed = requests
+        .iter()
+        .find(|asked| asked.url.ends_with("/Users/a7f3/Password"))
+        .and_then(|asked| asked.body.clone())
+        .unwrap_or_default();
+    assert!(changed.contains(&format!(r#""NewPw":"{replacement}""#)));
+    assert!(requests
+        .last()
+        .and_then(|asked| asked.body.as_deref())
+        .is_some_and(|body| body.contains(&format!(r#""Pw":"{replacement}""#))));
 }

@@ -33,6 +33,10 @@ impl MediaServer for Jellyfin {
         Ok(info.startup_wizard_completed)
     }
 
+    async fn replace_admin_password(&self, replacement: &str) -> Result<(), Failure> {
+        self.replace_password(replacement).await
+    }
+
     async fn create_admin(&self, name: &str, password: &str) -> Result<(), Failure> {
         // Read the account before writing it. The write **updates the first account
         // Jellyfin holds** rather than creating one, and a server nobody has set up
