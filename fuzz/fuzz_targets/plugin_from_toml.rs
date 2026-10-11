@@ -10,7 +10,8 @@
 //! through.
 
 use libfuzzer_sys::fuzz_target;
-use lemonfiber_plugin::refusing::carried::{is_directory, is_label, is_reference, is_route};
+use lemonfiber_manifest::container::is_plain;
+use lemonfiber_plugin::refusing::carried::{is_label, is_reference, is_route};
 
 fuzz_target!(|data: &[u8]| {
     // The installer reads the file as a string, so only valid UTF-8 reaches the parser.
@@ -26,7 +27,7 @@ fuzz_target!(|data: &[u8]| {
     for service in &manifest.services {
         assert!(is_label(&service.id));
         assert!(is_reference(&service.image));
-        assert!(is_directory(service.configuration()));
+        assert!(is_plain(service.configuration()));
         assert!(is_label(manifest.entry(service).hostname));
     }
     for proof in &manifest.proofs {

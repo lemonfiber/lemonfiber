@@ -106,6 +106,14 @@
       "additionalProperties": false,
       "required": ["id", "request", "expect", "fixture"]
     },
+    "Constant": {
+      "description": "A value written exactly as declared.",
+      "anyOf": [
+        {"description": "A string.", "type": "string"},
+        {"description": "An integer.", "type": "integer", "format": "int64"},
+        {"description": "A boolean.", "type": "boolean"}
+      ]
+    },
     "Criticality": {
       "description": "How much a service's absence costs.\n\nSerialisable as well as readable, because it reaches an operator: a status\nreport that says a service is down without saying whether that matters\nleaves them to guess, and the manifest already holds the answer.",
       "oneOf": [
@@ -253,6 +261,26 @@
         {"description": "The API needs no credential.", "type": "string", "const": "none"}
       ]
     },
+    "Mount": {
+      "description": "A further path mounted from inside the service's own configuration directory.",
+      "type": "object",
+      "properties": {
+        "from": {"description": "The relative path inside the configuration directory.", "type": "string"},
+        "ro": {"description": "Whether it is mounted read-only.", "type": "boolean", "default": false},
+        "to": {"description": "The absolute path inside the container.", "type": "string"}
+      },
+      "additionalProperties": false,
+      "required": ["from", "to"]
+    },
+    "Network": {
+      "description": "The network a service runs inside instead of its own.",
+      "type": "object",
+      "properties": {
+        "via": {"description": "The capability whose filler's network it runs inside.", "type": "string"}
+      },
+      "additionalProperties": false,
+      "required": ["via"]
+    },
     "PluginRequest": {
       "description": "What is asked, and where.\n\nThree fields and no more, and the third is the one worth explaining. A service that\nanswers XML unless a caller asks for JSON cannot satisfy a capability whose probe\nrequires a JSON assertion, and until this field there was nowhere to ask: Plex\nanswers `text/xml` at every path, including the one its health probe uses, unless\nthe request carries `Accept: application/json`.\n\n**It is one media type and not a header map, and the difference is the point.** A\nprobe declares who it is asked as, and `none` on every `guarded` probe has meant what\nit says partly because nothing could be presented. A map of headers would make that a\nconvention a reviewer has to hold — any service may name its credential header\nwhatever it likes, so no list of refused names could ever be closed — where one named\nfield keeps it a property of the format. A probe still cannot present anything,\nbecause there is nowhere to write it.",
       "type": "object",
@@ -267,6 +295,20 @@
       },
       "additionalProperties": false,
       "required": ["method", "path"]
+    },
+    "PluginShape": {
+      "description": "A privileged shape lemonfiber writes for a service.",
+      "oneOf": [
+        {"description": "`NET_ADMIN` and the tunnel device.", "type": "string", "const": "egress-guard"},
+        {"description": "The host's render devices and the group that owns them.", "type": "string", "const": "render"}
+      ]
+    },
+    "Posture": {
+      "description": "How tightly the container is held.",
+      "oneOf": [
+        {"description": "Six kernel capabilities, no privilege gained, a bounded process count.", "type": "string", "const": "standard"},
+        {"description": "A read-only root and no kernel capability at all, besides.", "type": "string", "const": "confined"}
+      ]
     },
     "Profile": {
       "description": "A Compose profile — one service's role in the stack.",
@@ -287,6 +329,23 @@
       "additionalProperties": false,
       "required": ["id", "name", "description"]
     },
+    "Publish": {
+      "description": "A further port a service publishes on its tier.",
+      "type": "object",
+      "properties": {
+        "listens": {
+          "description": "Where it answers inside the container, `port` where absent.",
+          "type": ["integer", "null"],
+          "format": "uint16",
+          "default": null,
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "port": {"description": "Where it is published on the host.", "type": "integer", "format": "uint16", "maximum": 65535, "minimum": 0}
+      },
+      "additionalProperties": false,
+      "required": ["port"]
+    },
     "Removed": {
       "description": "A service this stack used to carry, and what became of it.\n\nKept beside the services rather than in a changelog because of who asks and when:\nan operator who remembers a service and cannot find it is holding a gap, and a gap\nis closed by a record that travels with the stack they are running rather than by a\nfile they would have to know exists. It versions with the stack for the same reason\nevery other per-service fact here does — the stack decided the removal, so the stack\nis what carries the answer, and a lemonfiber release is not needed to say what\nbecame of a service lemonfiber never chose.\n\n`replaced_by` is optional because the honest answer is sometimes that nothing\nreplaced it. Recording a replacement that does not exist to avoid an empty field is\nworse than the gap it fills.",
       "type": "object",
@@ -302,6 +361,15 @@
       },
       "additionalProperties": false,
       "required": ["id", "removed_in", "reason"]
+    },
+    "SecretOf": {
+      "description": "A secret the manifest declares.",
+      "type": "object",
+      "properties": {
+        "secret": {"description": "The declared secret's name.", "type": "string"}
+      },
+      "additionalProperties": false,
+      "required": ["secret"]
     },
     "Service": {
       "description": "One container in the stack.",
@@ -332,6 +400,12 @@
           "type": "array",
           "items": {"$ref": "#/$defs/StackClaim"}
         },
+        "config_path": {
+          "description": "Where inside the container its one configuration directory is mounted,\n`/config` where absent.",
+          "type": ["string", "null"],
+          "default": null
+        },
+        "config_ro": {"description": "Whether its configuration directory is mounted read-only.", "type": "boolean", "default": false},
         "criticality": {"description": "How much its absence costs.", "$ref": "#/$defs/Criticality"},
         "depends_on": {
           "description": "Same-profile dependencies only.",
@@ -344,6 +418,11 @@
           "description": "The digest of the image's multi-architecture index, `sha256:` and 64 lower-case\nhex digits.\n\nWhat actually runs. A digest names one index for good, where the tag beside it\ncould be moved to a different one tomorrow, so the stack resolves every image by\nthis and a service without one is refused by validation. Optional here so that\nrefusal can name the service, rather than the file failing to parse.",
           "type": ["string", "null"],
           "default": null
+        },
+        "env": {
+          "description": "Its environment, each variable one of four typed kinds of value.",
+          "type": "object",
+          "additionalProperties": {"$ref": "#/$defs/Value"}
         },
         "grants": {
           "description": "Extra kernel capabilities granted to the container, checked against an allow-list.\n\nNamed `grants` rather than `capabilities` because the word is about to mean\nsomething else entirely: what a service *can do*, which is how a plugin declares\nitself and how wiring asks for a filler. Two meanings under one spelling is how a\nsetting that decides what a container may do to the kernel gets read as a\ndescription of what it offers.\n\nThe old spelling is still accepted, because an operator's own stack description is\ntheirs and a rename is not a reason to refuse to read it.",
@@ -377,6 +456,13 @@
           "default": [],
           "items": {"type": "string"}
         },
+        "mem_limit_mib": {
+          "description": "The most memory the container may hold, in MiB.",
+          "type": ["integer", "null"],
+          "format": "uint32",
+          "default": null,
+          "minimum": 0
+        },
         "memory_mib": {
           "description": "The memory it expects to need, in MiB.\n\nThe stack's estimate, and only ever shown as one: a form's footprint is the sum\nof these over the services it would start, and a figure read as a measurement\nis one an operator believes and acts on. Optional because a stack that says\nnothing has not said zero, and the services that are silent are named beside\nthe sum rather than counted as costing nothing.",
           "type": ["integer", "null"],
@@ -384,7 +470,19 @@
           "default": null,
           "minimum": 0
         },
+        "mount": {
+          "description": "Each further path mounted from inside its own configuration directory.",
+          "type": "array",
+          "items": {"$ref": "#/$defs/Mount"}
+        },
         "name": {"description": "Human-facing name.", "type": "string"},
+        "network": {
+          "description": "The capability whose filler's network it runs inside.",
+          "anyOf": [
+            {"$ref": "#/$defs/Network"},
+            {"type": "null"}
+          ]
+        },
         "port": {
           "description": "Primary UI or API port, absent for services with no listener.",
           "type": ["integer", "null"],
@@ -393,6 +491,7 @@
           "maximum": 65535,
           "minimum": 0
         },
+        "posture": {"description": "How tightly the container is held.", "$ref": "#/$defs/Posture", "default": "standard"},
         "profile": {"description": "Exactly one profile.", "type": "string"},
         "provides": {
           "description": "What this service can be asked for, as named capabilities.\n\nAn open list of strings here and checked for shape only, deliberately. The\npublished vocabulary is the set these names come from, and it is generated from\nthis field — a reader that held the set as well would be a cycle, and one that\nheld a copy of it would be a second answer to what the vocabulary carries. The\ngenerator refuses a name the vocabulary does not carry, by name.",
@@ -400,17 +499,55 @@
           "default": [],
           "items": {"type": "string"}
         },
+        "publish": {
+          "description": "Each further port it publishes on its tier.",
+          "type": "array",
+          "items": {"$ref": "#/$defs/Publish"}
+        },
         "reaches": {
           "description": "Where this service's own requests go, in the terms an operator would\nrecognise — not in protocol names.\n\nAn empty string is an answer: this service reaches nothing. That is not the\nsame as the field being absent, which is the stack declining to say, and the\ntwo must never be read as one — an inventory of what leaves a machine that\nrendered \"we were not told\" as \"nothing leaves\" would be making a privacy\nclaim out of its own ignorance.\n\nOptional because a stack written before this existed says nothing, and a build\nthat refused such a manifest would refuse the stack it ships with. Where it is\nabsent, lemonfiber answers from what it knows about the services it ships, and\nreports that it knows nothing where it does not.",
           "type": ["string", "null"],
           "default": null
         },
+        "shape": {
+          "description": "The one privileged shape lemonfiber writes for it, from a closed set.",
+          "anyOf": [
+            {"$ref": "#/$defs/PluginShape"},
+            {"type": "null"}
+          ],
+          "default": null
+        },
         "tag": {"description": "Explicit version — a floating tag is a validation failure.\n\nThe version an operator reads, and nothing more: a tag is a label its publisher\ncan move to another image, so what runs is named by [`Self::digest`].", "type": "string"},
+        "takes_data": {"description": "Whether it takes the data mount.", "type": "boolean", "default": false},
+        "tmpfs": {
+          "description": "Absolute paths given scratch space in memory.",
+          "type": "array",
+          "default": [],
+          "items": {"type": "string"}
+        },
         "upstream": {"description": "Project URL, for maintenance review.", "type": "string"},
+        "user_mode": {
+          "description": "Who the container runs as.",
+          "anyOf": [
+            {"$ref": "#/$defs/UserMode"},
+            {"type": "null"}
+          ],
+          "default": null
+        },
         "without_it": {"description": "The consequence of not running it.", "type": "string"}
       },
       "additionalProperties": false,
       "required": ["id", "name", "profile", "image", "tag", "criticality", "license", "upstream", "last_release", "describes", "without_it"]
+    },
+    "Setting": {
+      "description": "An operator setting, with what is written while none is recorded.",
+      "type": "object",
+      "properties": {
+        "default": {"description": "What is written while the operator has recorded no value.", "$ref": "#/$defs/Constant"},
+        "setting": {"description": "The setting's name.", "type": "string"}
+      },
+      "additionalProperties": false,
+      "required": ["setting", "default"]
     },
     "StackClaim": {"$ref": "#/$defs/Claim"},
     "StackProtocol": {
@@ -418,6 +555,42 @@
       "oneOf": [
         {"description": "Needs a Usenet provider.", "type": "string", "const": "usenet"},
         {"description": "Needs a VPN and a torrent client.", "type": "string", "const": "torrent"}
+      ]
+    },
+    "UrlOf": {
+      "description": "The address of a capability's filler.",
+      "type": "object",
+      "properties": {
+        "files": {
+          "description": "The medium the filler asked for files.",
+          "type": ["string", "null"],
+          "default": null
+        },
+        "native": {
+          "description": "The upstream's own API, where the ask reaches the upstream an adapter fronts.",
+          "type": ["string", "null"],
+          "default": null
+        },
+        "url_of": {"description": "The capability asked for.", "type": "string"}
+      },
+      "additionalProperties": false,
+      "required": ["url_of"]
+    },
+    "UserMode": {
+      "description": "Who the container runs as.",
+      "oneOf": [
+        {"description": "No user: the image decides.", "type": "string", "const": "image"},
+        {"description": "`PUID` and `PGID` set to the operator's.", "type": "string", "const": "puid-env"},
+        {"description": "The operator's uid and gid as the container's user.", "type": "string", "const": "uid"}
+      ]
+    },
+    "Value": {
+      "description": "One environment variable's value.",
+      "anyOf": [
+        {"description": "A constant.", "$ref": "#/$defs/Constant"},
+        {"description": "An operator setting.", "$ref": "#/$defs/Setting"},
+        {"description": "A capability's filler's address.", "$ref": "#/$defs/UrlOf"},
+        {"description": "A declared secret.", "$ref": "#/$defs/SecretOf"}
       ]
     },
     "Wiring": {

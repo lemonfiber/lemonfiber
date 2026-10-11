@@ -770,7 +770,7 @@ fn the_egress_guard_shape_is_named_as_a_manifest_spells_it_and_gives_the_tunnel_
     );
     assert_eq!(shape.grants(), [lemonfiber_manifest::GATEWAY_GRANT]);
     assert_eq!(shape.devices(), [lemonfiber_manifest::TUNNEL_DEVICE]);
-    assert_eq!(shape.fronted_by(), crate::vocabulary::EGRESS_GUARD);
+    assert_eq!(shape.serves(), crate::vocabulary::EGRESS_GUARD);
     assert_eq!(shape.approval("gluetun"), "egress-guard@gluetun");
 }
 

@@ -202,7 +202,8 @@ fn check_services(
             .chain(listened(service))
             .chain(outbound(service))
             .chain(offered(service))
-            .chain(depended(service, &of_service));
+            .chain(depended(service, &of_service))
+            .chain(contained(service));
 
         let location = format!("service {}", service.id);
         found.extend(faults.map(|message| Violation {
@@ -480,6 +481,29 @@ fn permitted(service: &Service) -> Vec<String> {
         .iter()
         .filter(|granted| !ALLOWED_GRANTS.contains(&granted.as_str()))
         .map(|granted| format!("asks for kernel capability {granted}, which is not allowed"))
+        .collect()
+}
+
+/// Every rule the service's container fields break, and a shape taken by a service
+/// that does not provide what the shape serves.
+fn contained(service: &Service) -> Vec<String> {
+    let field = format!("service {}.", service.id);
+    let shaped = service
+        .shape
+        .filter(|shape| !service.provides.iter().any(|named| named == shape.serves()))
+        .map(|shape| {
+            format!(
+                "shape: takes {}, which only a service providing {} may",
+                shape.name(),
+                shape.serves()
+            )
+        });
+    service
+        .container()
+        .broken()
+        .into_iter()
+        .map(|(at, what)| format!("{}: {what}", at.trim_start_matches(&field)))
+        .chain(shaped)
         .collect()
 }
 

@@ -13,6 +13,7 @@
 mod evidence;
 mod recipe;
 
+use lemonfiber_manifest::container::Container;
 use serde::Deserialize;
 
 use crate::conforming::nonconforming;
@@ -22,6 +23,7 @@ pub use evidence::{
     Claim, ClaimProbe, Contribution, Declaration, Declared, Expect, Expected, ExpectedKind, Proof,
     Request,
 };
+pub use lemonfiber_manifest::container::Shape;
 pub use recipe::{
     Capture, Condition, Input, On, Origin, Pair, Recipe, Retry, Step, StepCall, ALL_WAITING,
     CALL_DEADLINE, HEADER, LARGEST_ANSWER, LONGEST_WAIT, MOST_RETRIES, RUN,
@@ -152,6 +154,7 @@ pub struct Plugin {
     pub forms: Vec<String>,
 }
 
+lemonfiber_manifest::container_fields! {
 /// What runs.
 ///
 /// Declared in the stack manifest's service vocabulary, restricted to these fields.
@@ -177,10 +180,10 @@ pub struct Service {
     /// The human-readable version the digest corresponds to. Recorded and shown;
     /// never resolved.
     pub tag: String,
-    /// Primary UI or API port, absent for a service with no listener.
+    /// Where it is published on the host, absent for a service that publishes nothing.
     #[serde(default)]
     pub port: Option<u16>,
-    /// Which tier the port is published on.
+    /// Which tier every port it publishes is published on.
     #[serde(default)]
     pub bind: Option<Bind>,
     /// How to tell the service has actually started.
@@ -191,9 +194,6 @@ pub struct Service {
     /// Which media types it handles, in the stack manifest's vocabulary.
     #[serde(default)]
     pub media_types: Vec<String>,
-    /// Whether it needs the data root mounted.
-    #[serde(default)]
-    pub takes_data: bool,
     /// The capabilities this service claims.
     ///
     /// A core name comes from the published vocabulary and means the contracted thing
@@ -201,18 +201,9 @@ pub struct Service {
     /// and is inert until something asks for it.
     #[serde(default)]
     pub provides: Vec<String>,
-    /// Where inside the container the one configuration directory is mounted.
-    ///
-    /// `/config` is a LinuxServer.io convention rather than a standard, and assuming
-    /// it made a whole class of image uninstallable: a plugin whose image reads its
-    /// configuration somewhere else would be generated a container mounting a
-    /// directory the application never reads, passing its health probe and losing
-    /// everything it had written the moment the container was replaced.
-    ///
-    /// The target is data; the source is still lemonfiber's, and there is still
-    /// exactly one of it.
+    /// The memory it expects to need, in MiB, never written as a limit.
     #[serde(default)]
-    pub config_path: Option<String>,
+    pub memory_mib: Option<u32>,
     /// The adapter lemonfiber reaches it through, in the stack manifest's own shape.
     ///
     /// Named from a fixed set rather than supplied: a plugin cannot bring an adapter of
@@ -244,63 +235,7 @@ pub struct Service {
     /// port and the name the proxy answers for it.
     #[serde(default)]
     pub replaces: Option<String>,
-    /// The one privileged shape lemonfiber writes for this service, where it is the
-    /// upstream an adapter of the same plugin fronts and that adapter speaks
-    /// `network.egress-guard`.
-    #[serde(default)]
-    pub shape: Option<Shape>,
 }
-
-/// A privileged shape lemonfiber writes for a plugin's service.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Deserialize, serde::Serialize, schemars::JsonSchema,
-)]
-#[serde(rename_all = "kebab-case")]
-#[schemars(rename = "PluginShape")]
-pub enum Shape {
-    /// The `NET_ADMIN` capability and the `/dev/net/tun` device, added to the entry
-    /// every plugin's service gets.
-    EgressGuard,
-}
-
-impl Shape {
-    /// The name a manifest and an approval give the shape.
-    #[must_use]
-    pub const fn name(self) -> &'static str {
-        match self {
-            Self::EgressGuard => "egress-guard",
-        }
-    }
-
-    /// The kernel capabilities the shape adds.
-    #[must_use]
-    pub const fn grants(self) -> &'static [&'static str] {
-        match self {
-            Self::EgressGuard => &[lemonfiber_manifest::GATEWAY_GRANT],
-        }
-    }
-
-    /// The devices the shape adds.
-    #[must_use]
-    pub const fn devices(self) -> &'static [&'static str] {
-        match self {
-            Self::EgressGuard => &[lemonfiber_manifest::TUNNEL_DEVICE],
-        }
-    }
-
-    /// The capability whose adapter the service taking the shape has to be fronted by.
-    #[must_use]
-    pub const fn fronted_by(self) -> &'static str {
-        match self {
-            Self::EgressGuard => crate::vocabulary::EGRESS_GUARD,
-        }
-    }
-
-    /// What approving this shape for `service` is written as.
-    #[must_use]
-    pub fn approval(self, service: &str) -> String {
-        format!("{}@{service}", self.name())
-    }
 }
 
 /// Where a service's own configuration directory lands when it names nowhere.
@@ -309,7 +244,7 @@ impl Shape {
 /// fallback rather than the rule. Published as a constant because it is part of the
 /// contract an author writes against: a manifest that leaves the field out has still
 /// said where its directory goes, and the answer is this.
-pub const CONFIGURATION: &str = "/config";
+pub const CONFIGURATION: &str = lemonfiber_manifest::container::CONFIGURATION;
 
 impl Service {
     /// Where inside the container this service's one configuration directory is
@@ -321,6 +256,33 @@ impl Service {
     #[must_use]
     pub fn configuration(&self) -> &str {
         self.config_path.as_deref().unwrap_or(CONFIGURATION)
+    }
+
+    /// Its container fields, as the one model every service's are, its settings in
+    /// `plugin`'s namespace and `secrets` the ones its manifest declares.
+    #[must_use]
+    pub fn container<'a>(&'a self, plugin: &'a str, secrets: &'a [&'a str]) -> Container<'a> {
+        Container {
+            id: &self.id,
+            namespace: plugin,
+            port: self.port,
+            listens: self.listens,
+            publish: &self.publish,
+            takes_data: self.takes_data,
+            config_path: self.config_path.as_deref(),
+            config_ro: self.config_ro,
+            mounts: &self.mount,
+            tmpfs: &self.tmpfs,
+            env: &self.env,
+            secrets,
+            user_mode: self.user_mode,
+            posture: self.posture,
+            mem_limit_mib: self.mem_limit_mib,
+            network: self.network.as_ref(),
+            shape: self.shape,
+            provides: &self.provides,
+            speaks: !self.speaks.is_empty(),
+        }
     }
 }
 

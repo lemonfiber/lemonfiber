@@ -653,3 +653,32 @@ fn a_duplicate_service_id_is_caught() {
         "a repeated service id must be named"
     );
 }
+
+#[test]
+fn a_stack_service_is_held_to_the_container_model() {
+    let text = edited(
+        AN_ID,
+        "id = \"prowlarr\"\nconfig_path = \"/data/config\"\nenv = { TZ = \"UTC\" }",
+    );
+    let said = messages(&text);
+    assert!(
+        said.iter().any(|m| m.contains("config_path: /data/config")),
+        "{said:#?}"
+    );
+    assert!(
+        said.iter()
+            .any(|m| m.contains("env.TZ: TZ is lemonfiber's to write")),
+        "{said:#?}"
+    );
+}
+
+#[test]
+fn a_stack_service_takes_a_shape_only_where_it_provides_what_the_shape_serves() {
+    let text = edited(AN_ID, "id = \"prowlarr\"\nshape = \"render\"");
+    assert!(
+        messages(&text)
+            .iter()
+            .any(|m| m
+                .contains("shape: takes render, which only a service providing media.serve may"))
+    );
+}

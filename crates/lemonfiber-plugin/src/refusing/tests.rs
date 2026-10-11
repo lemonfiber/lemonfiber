@@ -675,3 +675,44 @@ fn a_refusal_carries_nowhere_to_say_it_is_only_advisory() {
              reported and proceeded past"
     );
 }
+
+#[test]
+fn a_container_field_breaking_the_model_is_refused_through_the_reader() {
+    let said = without(
+        "config_path = \"/config\"",
+        "config_path = \"/config\"\n\n[service.env]\nTZ = \"UTC\"",
+    );
+    assert!(
+        names(&said, &["service komga.env.TZ", "lemonfiber's to write"]),
+        "{said:?}"
+    );
+}
+
+#[test]
+fn a_service_declaring_every_container_field_within_the_rules_is_refused_nothing() {
+    let said = without(
+        "config_path = \"/config\"",
+        r#"config_path   = "/app/config"
+config_ro     = true
+tmpfs         = ["/tmp"]
+user_mode     = "puid-env"
+posture       = "standard"
+memory_mib    = 600
+mem_limit_mib = 1024
+
+[[service.publish]]
+port    = 25601
+listens = 8443
+
+[[service.mount]]
+from = "cache"
+to   = "/cache"
+ro   = true
+
+[service.env]
+KOMGA_DOMAIN = { setting = "domain", default = "home.local" }
+KOMGA_SYNC   = { setting = "komga:sync", default = false }
+KOMGA_LIMIT  = 5"#,
+    );
+    assert_eq!(said, Vec::<String>::new());
+}

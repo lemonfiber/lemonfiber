@@ -98,3 +98,20 @@ fn a_shape_outside_the_closed_set_is_refused_by_name() {
     let said = said(&with("shape = \"privileged\"\n"));
     assert!(names(&said, &["shape", "privileged"]), "{said:?}");
 }
+
+#[test]
+fn a_service_serving_media_may_take_the_render_shape() {
+    assert!(said(&with("shape = \"render\"\n")).is_empty());
+}
+
+#[test]
+fn a_service_serving_no_media_may_not_take_the_render_shape() {
+    let said = said(&with("shape = \"render\"\n").replace(
+        "provides    = [\"media.serve\", \"komga:kobo-sync\"]",
+        "provides = [\"komga:kobo-sync\"]",
+    ));
+    assert!(
+        names(&said, &["service komga.shape", "render", "media.serve"]),
+        "{said:?}"
+    );
+}

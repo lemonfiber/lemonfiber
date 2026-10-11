@@ -8,6 +8,8 @@
 //! probes, outgrew what one file may hold — not because the two are separate
 //! concerns. Nothing here decides anything; it is the table the module reads.
 
+use lemonfiber_manifest::container::MEDIA_SERVE;
+
 use super::{Capability, Constraint, Credential, Probe, Removed, Requirement, EGRESS_GUARD};
 
 /// Every capability this generation carries, in the order the artefact lists them.
@@ -275,7 +277,7 @@ pub(super) const CARRIED: &[Capability] = &[
         ],
     },
     Capability {
-        name: "media.serve",
+        name: MEDIA_SERVE,
         summary: "Serves the filed library to a player, with its own catalogue of what it holds.",
         contract: "Holds a catalogue of what is in the library and serves it to a player over \
                    HTTP. The catalogue is not readable without a credential — a library server \

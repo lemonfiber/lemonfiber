@@ -41,8 +41,7 @@ pub const VOCABULARY: &str = "service-capabilities";
 /// does not move it, because nothing already written stops being true.
 pub const VOCABULARY_VERSION: u32 = 1;
 
-/// The egress guard's capability.
-pub const EGRESS_GUARD: &str = "network.egress-guard";
+pub use lemonfiber_manifest::container::EGRESS_GUARD;
 
 /// A named, contracted thing a service can do, as this project authors it.
 ///
