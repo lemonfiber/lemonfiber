@@ -45,8 +45,8 @@ fn a_probe_s_verdict_outranks_the_process_existing() {
     }
 }
 
-/// One service running inside another, for the ordering tests.
-fn depending(id: &str, on: Option<&str>) -> Service {
+/// One service depending on another, for the ordering tests.
+fn depending(id: &str, on: &[&str]) -> Service {
     Service {
         id: id.to_owned(),
         name: id.to_owned(),
@@ -55,7 +55,7 @@ fn depending(id: &str, on: Option<&str>) -> Service {
         forms: Vec::new(),
         state: State::Healthy,
         criticality: Criticality::Core,
-        inside: on.map(str::to_owned),
+        depends_on: on.iter().map(|id| (*id).to_owned()).collect(),
         exit: None,
     }
 }
@@ -65,8 +65,8 @@ fn depending(id: &str, on: Option<&str>) -> Service {
 #[test]
 fn the_tunnel_goes_down_after_what_is_using_its_network() {
     let running = vec![
-        depending("gluetun", None),
-        depending("qbittorrent", Some("gluetun")),
+        depending("gluetun", &[]),
+        depending("qbittorrent", &["gluetun"]),
     ];
     assert_eq!(
         stopping_order(&running, &["gluetun".to_owned(), "qbittorrent".to_owned()]),
@@ -80,9 +80,9 @@ fn the_tunnel_goes_down_after_what_is_using_its_network() {
 #[test]
 fn anything_depended_on_goes_last_whatever_it_is() {
     let running = vec![
-        depending("under", None),
-        depending("over", Some("under")),
-        depending("above", Some("over")),
+        depending("under", &[]),
+        depending("over", &["under"]),
+        depending("above", &["over"]),
     ];
     assert_eq!(
         stopping_order(
@@ -98,9 +98,9 @@ fn anything_depended_on_goes_last_whatever_it_is() {
 #[test]
 fn services_that_do_not_depend_on_each_other_are_ordered_by_name() {
     let running = vec![
-        depending("sonarr", None),
-        depending("radarr", None),
-        depending("bazarr", None),
+        depending("sonarr", &[]),
+        depending("radarr", &[]),
+        depending("bazarr", &[]),
     ];
     assert_eq!(
         stopping_order(
@@ -123,10 +123,7 @@ fn services_that_do_not_depend_on_each_other_are_ordered_by_name() {
 /// beats refusing to stop them at all.
 #[test]
 fn services_that_need_each_other_are_still_stopped() {
-    let running = vec![
-        depending("one", Some("other")),
-        depending("other", Some("one")),
-    ];
+    let running = vec![depending("one", &["other"]), depending("other", &["one"])];
     let order = stopping_order(&running, &["one".to_owned(), "other".to_owned()]);
     assert_eq!(order.len(), 2, "both are stopped: {order:?}");
     assert!(order.contains(&"one".to_owned()) && order.contains(&"other".to_owned()));
@@ -136,8 +133,8 @@ fn services_that_need_each_other_are_still_stopped() {
 #[test]
 fn a_dependency_that_is_not_being_stopped_does_not_hold_anything_back() {
     let running = vec![
-        depending("gluetun", None),
-        depending("qbittorrent", Some("gluetun")),
+        depending("gluetun", &[]),
+        depending("qbittorrent", &["gluetun"]),
     ];
     assert_eq!(
         stopping_order(&running, &["qbittorrent".to_owned()]),
@@ -265,6 +262,33 @@ fn a_service_that_was_never_started_is_absent_rather_than_missing_from_the_repor
         Some(false),
         "the media profile declares services"
     );
+}
+
+/// A service that runs inside another's network depends on that one, read from what
+/// its `network.via` names rather than from either service's name.
+#[test]
+fn a_service_running_inside_another_s_network_depends_on_it() {
+    let profiles = ["torrent".to_owned()];
+    let surveyed = manifest()
+        .map(|manifest| {
+            survey(
+                &manifest,
+                &profiles,
+                &[],
+                &Halted::default(),
+                Protocols::both(),
+            )
+        })
+        .unwrap_or_default();
+    let needs = |id: &str| {
+        surveyed
+            .iter()
+            .find(|service| service.id == id)
+            .map(|service| service.depends_on.clone())
+    };
+
+    assert_eq!(needs("qbittorrent"), Some(vec!["gluetun".to_owned()]));
+    assert_eq!(needs("gluetun"), Some(Vec::new()));
 }
 
 #[test]

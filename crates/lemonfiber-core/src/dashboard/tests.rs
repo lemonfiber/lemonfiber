@@ -84,7 +84,7 @@ fn service(id: &str, state: State) -> Service {
         state,
         criticality: Criticality::Core,
         exit: None,
-        inside: None,
+        depends_on: Vec::new(),
     }
 }
 

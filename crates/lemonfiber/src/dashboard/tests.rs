@@ -299,7 +299,7 @@ fn a_wordy_snapshot() -> Snapshot {
         forms: Vec::new(),
         state: lemonfiber_core::docker::State::Running,
         criticality: lemonfiber_core::docker::Criticality::Core,
-        inside: None,
+        depends_on: Vec::new(),
         exit: None,
     }]);
     snapshot.alerts = vec![lemonfiber_core::alert::Alert {

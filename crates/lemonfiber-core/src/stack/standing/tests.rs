@@ -21,7 +21,7 @@ fn healthy(id: &str) -> Service {
         forms: Vec::new(),
         state: State::Healthy,
         criticality: Criticality::Core,
-        inside: None,
+        depends_on: Vec::new(),
         exit: None,
     }
 }

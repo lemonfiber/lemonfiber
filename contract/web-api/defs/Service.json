@@ -8,7 +8,7 @@
       "$ref": "Criticality.json"
     },
     "depends_on": {
-      "description": "The services it needs before it can work, as the manifest declares them.\nCarried so a failure can be attributed to the thing underneath it rather\nthan counted as one more independent thing wrong.",
+      "description": "The services it needs before it can work: the one whose network it runs inside.\nCarried so a failure can be attributed to the thing underneath it rather\nthan counted as one more independent thing wrong.",
       "type": "array",
       "items": {
         "type": "string"

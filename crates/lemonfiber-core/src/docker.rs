@@ -120,10 +120,10 @@ pub struct Service {
     pub state: State,
     /// How much its absence costs, so a summary can weigh it.
     pub criticality: Criticality,
-    /// The service whose network it runs inside, which it needs before it can work.
+    /// The services it needs before it can work: the one whose network it runs inside.
     /// Carried so a failure can be attributed to the thing underneath it rather
     /// than counted as one more independent thing wrong.
-    pub inside: Option<String>,
+    pub depends_on: Vec<String>,
     /// How it exited, where it has exited.
     pub exit: Option<i32>,
 }
@@ -265,9 +265,11 @@ fn surveyed(manifest: &Manifest, containers: &[Container], halted: &Halted) -> V
                     .map_or(State::Absent, |c| read(c, halted))
             },
             criticality: service.criticality,
-            inside: service
+            depends_on: service
                 .inside(&manifest.services)
-                .map(|host| host.id.clone()),
+                .map(|host| host.id.clone())
+                .into_iter()
+                .collect(),
             exit: found.get(service.id.as_str()).and_then(|c| c.exit),
         })
         .collect();
@@ -426,7 +428,7 @@ pub(crate) fn stopping_order(running: &[Service], stopping: &[String]) -> Vec<St
     let depends = |dependent: &str, on: &str| {
         running
             .iter()
-            .any(|service| service.id == dependent && service.inside.as_deref() == Some(on))
+            .any(|service| service.id == dependent && service.depends_on.iter().any(|id| id == on))
     };
 
     let mut left: Vec<String> = stopping.to_vec();

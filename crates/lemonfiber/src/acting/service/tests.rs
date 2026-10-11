@@ -23,7 +23,7 @@ fn a_service(id: &str, name: &str, state: State) -> Service {
         forms: Vec::new(),
         state,
         criticality: Criticality::Core,
-        inside: None,
+        depends_on: Vec::new(),
         exit: None,
     }
 }

@@ -58,17 +58,19 @@ fn reasons(fillers: &Fillers) -> Vec<String> {
         .collect()
 }
 
-/// Every download ask the shipped stack makes comes to a download client of the kind
-/// its filler speaks.
+/// Every download ask a \*arr curator in the shipped stack makes comes to a download
+/// client of the kind its filler speaks, and the book curator's come to nothing, since
+/// lemonfiber tells it about no download client.
 #[test]
 fn every_download_ask_the_shipped_stack_makes_comes_to_a_client() {
     let fillers = shipped(&[], &Chosen::default(), |_| ());
 
-    let made: Vec<(String, Option<Connection>)> = pairings(&fillers)
+    let made: Vec<(String, String, Option<Connection>)> = pairings(&fillers)
         .iter()
         .filter(|pairing| pairing.ask.capability.starts_with("download."))
         .map(|pairing| {
             (
+                pairing.asker.id.clone(),
                 pairing.filler.id.clone(),
                 pairing
                     .made
@@ -78,20 +80,32 @@ fn every_download_ask_the_shipped_stack_makes_comes_to_a_client() {
             )
         })
         .collect();
+    let client = |asker: &str, filler: &str| {
+        (
+            asker.to_owned(),
+            filler.to_owned(),
+            Some(Connection::DownloadClient(Protocol(filler.to_owned()))),
+        )
+    };
     assert_eq!(
-        made.len(),
-        6,
-        "two asks from each of three curators: {made:?}"
+        made,
+        vec![
+            client("sonarr", "sabnzbd"),
+            client("sonarr", "qbittorrent"),
+            client("radarr", "sabnzbd"),
+            client("radarr", "qbittorrent"),
+            client("lidarr", "sabnzbd"),
+            client("lidarr", "qbittorrent"),
+            ("bindery".to_owned(), "sabnzbd".to_owned(), None),
+            ("bindery".to_owned(), "qbittorrent".to_owned(), None),
+        ]
     );
-    assert!(made.iter().all(|(id, connection)| {
-        *connection == Some(Connection::DownloadClient(Protocol(id.clone())))
-    }));
 }
 
 /// Every curator the shipped stack's curation asks reach comes to the connection its
-/// media makes it, and the ones nothing connects are said — the music and book curators
-/// to the two askers that deal in neither, and not the book curator to the indexer, which
-/// it reaches itself through what it asks for.
+/// media makes it, and the ones nothing connects are said — the download clients to the
+/// book curator, the music and book curators to the two askers that deal in neither, and
+/// not the book curator to the indexer, which it reaches itself through what it asks for.
 #[test]
 fn every_curation_ask_the_shipped_stack_makes_is_connected_or_said() {
     let fillers = shipped(&[], &Chosen::default(), |_| ());
@@ -162,6 +176,8 @@ fn every_curation_ask_the_shipped_stack_makes_is_connected_or_said() {
     assert_eq!(
         said,
         vec![
+            "SABnzbd into Bindery",
+            "qBittorrent into Bindery",
             "Lidarr into Seerr",
             "Bindery into Seerr",
             "Lidarr into Bazarr",
@@ -219,6 +235,7 @@ fn a_filler_naming_no_adapter_is_reported_as_reached_by_nothing() {
             "stand-in the stand-in into Sonarr",
             "stand-in the stand-in into Radarr",
             "stand-in the stand-in into Lidarr",
+            "stand-in the stand-in into Bindery",
         ]
     );
     assert_eq!(
