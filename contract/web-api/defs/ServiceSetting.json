@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "An operator setting, with what is written while none is recorded.",
+  "type": "object",
+  "properties": {
+    "default": {
+      "description": "What is written while the operator has recorded no value.",
+      "$ref": "ServiceConstant.json"
+    },
+    "setting": {
+      "description": "The setting's name.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "setting",
+    "default"
+  ]
+}

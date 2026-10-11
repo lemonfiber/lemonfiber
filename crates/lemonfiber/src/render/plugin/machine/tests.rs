@@ -20,6 +20,7 @@ fn recorded(plugin: &str, reached: Option<Reached>) -> Installed {
         name: None,
         description: None,
         services: vec![Placed {
+            fields: lemonfiber_core::plugin::Fields::default(),
             service: plugin.to_owned(),
             image: format!("example.invalid/{plugin}"),
             digest: "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"

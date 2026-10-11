@@ -90,8 +90,9 @@ impl Shape {
 }
 
 /// A further port a service publishes on its tier.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[schemars(rename = "ServicePublish")]
 pub struct Publish {
     /// Where it is published on the host.
     pub port: u16,
@@ -100,11 +101,12 @@ pub struct Publish {
     pub listens: Option<u16>,
 }
 
-/// A further path mounted from inside the service's own configuration directory.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
+/// A further path mounted from the service's own mount tree.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[schemars(rename = "ServiceMount")]
 pub struct Mount {
-    /// The relative path inside the configuration directory.
+    /// The relative path inside the mount tree.
     pub from: String,
     /// The absolute path inside the container.
     pub to: String,
@@ -114,8 +116,9 @@ pub struct Mount {
 }
 
 /// A value written exactly as declared.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(untagged)]
+#[schemars(rename = "ServiceConstant")]
 pub enum Constant {
     /// A string.
     Text(String),
@@ -126,8 +129,9 @@ pub enum Constant {
 }
 
 /// An operator setting, with what is written while none is recorded.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[schemars(rename = "ServiceSetting")]
 pub struct Setting {
     /// The setting's name.
     pub setting: String,
@@ -136,8 +140,9 @@ pub struct Setting {
 }
 
 /// The address of a capability's filler.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[schemars(rename = "ServiceUrlOf")]
 pub struct UrlOf {
     /// The capability asked for.
     pub url_of: String,
@@ -150,16 +155,18 @@ pub struct UrlOf {
 }
 
 /// A secret the manifest declares.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[schemars(rename = "ServiceSecretOf")]
 pub struct SecretOf {
     /// The declared secret's name.
     pub secret: String,
 }
 
 /// One environment variable's value.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(untagged)]
+#[schemars(rename = "ServiceValue")]
 pub enum Value {
     /// A constant.
     Constant(Constant),
@@ -174,6 +181,7 @@ pub enum Value {
 /// Who the container runs as.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
+#[schemars(rename = "ServiceUserMode")]
 pub enum UserMode {
     /// No user: the image decides.
     Image,
@@ -188,6 +196,7 @@ pub enum UserMode {
     Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema,
 )]
 #[serde(rename_all = "kebab-case")]
+#[schemars(rename = "ServicePosture")]
 pub enum Posture {
     /// Six kernel capabilities, no privilege gained, a bounded process count.
     #[default]
@@ -197,11 +206,63 @@ pub enum Posture {
 }
 
 /// The network a service runs inside instead of its own.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[schemars(rename = "ServiceNetwork")]
 pub struct Network {
     /// The capability whose filler's network it runs inside.
     pub via: String,
+}
+
+/// The container fields an install record keeps for a service, beyond those every
+/// record already holds.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(rename = "ServiceFields")]
+pub struct Fields {
+    /// Its further published ports.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub publish: Vec<Publish>,
+    /// Whether its configuration directory is read-only.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub config_ro: bool,
+    /// Its further mounts.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mount: Vec<Mount>,
+    /// Its scratch paths in memory.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tmpfs: Vec<String>,
+    /// Its environment.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub env: BTreeMap<String, Value>,
+    /// Who it runs as, where declared.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user_mode: Option<UserMode>,
+    /// How tightly it is held.
+    #[serde(default, skip_serializing_if = "Posture::is_standard")]
+    pub posture: Posture,
+    /// Its memory ceiling.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mem_limit_mib: Option<u32>,
+    /// The network it runs inside.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub network: Option<Network>,
+}
+
+impl Fields {
+    /// Whether it declares nothing beyond what every record holds.
+    #[must_use]
+    pub fn is_plain(&self) -> bool {
+        *self == Self::default()
+    }
+}
+
+impl Posture {
+    /// Whether it is the standard posture.
+    #[must_use]
+    pub const fn is_standard(&self) -> bool {
+        matches!(self, Self::Standard)
+    }
 }
 
 /// One service's container fields, borrowed from whichever manifest declares them.
@@ -317,12 +378,25 @@ impl Container<'_> {
                 found.push((
                     at.clone(),
                     format!(
-                        "{} is not a relative path inside its own configuration directory",
+                        "{} is not a relative path inside its own mount tree",
                         mount.from
                     ),
                 ));
             }
-            self.landed(at, &mount.to, &mut targets, found);
+            self.landed(at.clone(), &mount.to, &mut targets, found);
+            if let Some(outer) = self
+                .mounts
+                .iter()
+                .find(|other| inside(&mount.from, &other.from))
+            {
+                found.push((
+                    at,
+                    format!(
+                        "{} lies inside {}, another of its sources",
+                        mount.from, outer.from
+                    ),
+                ));
+            }
         }
         for path in self.tmpfs {
             self.landed(self.at(&format!("tmpfs {path}")), path, &mut targets, found);
@@ -467,6 +541,13 @@ fn target(path: &str, takes_data: bool) -> Option<&'static str> {
     }
     let in_data = path == DATA || path.starts_with(&format!("{DATA}/"));
     (takes_data && in_data).then_some("is inside the data mount")
+}
+
+/// Whether the source `path` lies inside the source `other`, and is not it.
+fn inside(path: &str, other: &str) -> bool {
+    path.len() > other.len()
+        && path.starts_with(other)
+        && path.as_bytes().get(other.len()) == Some(&b'/')
 }
 
 fn is_relative(path: &str) -> bool {

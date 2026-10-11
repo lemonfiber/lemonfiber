@@ -1,125 +1,63 @@
-//! The container lemonfiber writes for a plugin's service, and the whole of what
-//! that service may reach of the machine.
+//! The Compose entry lemonfiber writes for each of a plugin's services, from the one
+//! typed service model its install record keeps, and nothing else.
 //!
-//! A plugin supplies no container definition, and lemonfiber writes one from what it
-//! declared. The two halves are one rule rather than two: a format that refused a
-//! supplied fragment and then let a declaration widen the generated one would be
-//! refusing the paperwork rather than the reach. So the set of fields a manifest may
-//! carry *is* the set of things a plugin may ask for, and this is the only place that
-//! set is turned into a container.
-//!
-//! **Everything here is derived and nothing here is remembered.** The profile is the
-//! plugin's id with a word in front of it; the interface behind a published port is
-//! the tier rendered by lemonfiber's own rule; the source of the configuration mount
-//! is lemonfiber's own directory named for the service. None of those is in the
-//! install record, because a copy of a derivation is free to disagree with the
-//! derivation — so the record holds what was decided and this holds what follows
-//! from it.
-//!
-//! **The mount set is fixed, and that is the whole of what makes the question
-//! answerable.** A service gets its own configuration directory, and the library
-//! where it declared it needs one. There is no third, and no field anywhere in the
-//! format by which a third could be asked for — which is why "what can this plugin
-//! reach" is answered by reading the format rather than by inspecting the machine it
-//! was installed on.
-//!
-//! **What refuses a manifest is the reader, once.** This writes the entry the record
-//! describes rather than forming a second opinion about it: the values were held to
-//! the format when the install was settled, and a rule applied again here would refuse
-//! a plugin at a point where nobody is looking at a manifest and nothing could say
-//! which line of it was wrong. A record this build would not have written is the
-//! register's problem, and it refuses one it cannot read rather than reading it as
-//! nothing.
-//!
-//! **It extends `defaults` rather than `rootless`, and that is a decision rather
-//! than an omission.** The bundled stack picks between the two per image, because
-//! the pair a `rootless` service is told is read by some images and silently ignored
-//! by others — and setting them on an image that ignores them is a no-op that reads
-//! like a security control. A plugin has no field by which to say which shape its
-//! image is, so writing `rootless` for it would be this build asserting something
-//! about a stranger's image that nobody checked.
-//!
-//! **What the container may do is fixed here too, and the same for every plugin.** No
-//! privilege gained after it starts; every kernel capability dropped but the six an
-//! image needs to start as root, give its files to the operator's uid and drop to it;
-//! and a ceiling on how many processes it may hold. A manifest has no field to widen
-//! any of it but `shape`, which names the egress guard's shape rather than spelling it:
-//! this adds `NET_ADMIN` and `/dev/net/tun` for it, and nothing else. What is not set
-//! is set nowhere for a reason: a memory ceiling that fits a media server transcoding
-//! is no ceiling for a sidecar, and a read-only root breaks every image that writes
-//! outside its configuration directory.
-//!
-//! **A user is written for an adapter and for nothing else.** A service that speaks a
-//! contract is built for lemonfiber's, and reads a key written readable by the
-//! operator's uid alone, so it runs as that uid. Any other service is a stranger's
-//! image, and a user would break every one that drops to its own.
+//! A function of the record and of what [`Reading`] answers: the operator's settings,
+//! the addresses asks reach, the egress guard a service runs inside and the host's
+//! render group. Every value a manifest supplied is written so Compose substitutes
+//! nothing in it; the variables this writes itself are the only substitutions an entry
+//! carries.
 
+use std::collections::BTreeMap;
+
+use lemonfiber_manifest::container::{Constant, Mount, Posture, Shape, UrlOf, UserMode, Value};
 use serde::Serialize;
 
 use super::installed::{Installed, Placed, Reached};
 
-/// The shared template every bundled service extends, and the service inside it.
-///
-/// Named as a pair because the two are one reference: `extends` without the file is
-/// a service in the same document, and the template deliberately lives in a file no
-/// include list names so that it can never become a container of its own.
-const TEMPLATE: (&str, &str) = ("compose/_common.yml", "defaults");
-
 /// The word in front of a plugin's id, which is the profile its services sit in.
-///
-/// Its own profile rather than one the stack already has: a profile is the unit that
-/// starts and stops together, and a stranger's service joining `tv` would mean
-/// `lemonfiber up tv` could no longer be described without naming what is installed.
 const PROFILE: &str = "plugin-";
 
 /// The Compose profile this plugin's services sit in.
-///
-/// Published because an install has to start exactly them and a removal has to take
-/// exactly them back, and a caller that spelled the name itself would be a second
-/// answer to which profile the entry above was written into.
 #[must_use]
 pub fn profile(plugin: &str) -> String {
     format!("{PROFILE}{plugin}")
 }
 
 /// Where lemonfiber keeps a service's own configuration directory.
-///
-/// The source is lemonfiber's and the target is the plugin's: an image that reads
-/// its configuration somewhere other than the convention says where, and gets the
-/// same one directory mounted where it actually reads it.
 const CONFIGURATION: &str = "./config";
 
 /// The library, mounted exactly as every bundled service mounts it.
 const LIBRARY: &str = "${DATA_ROOT:-./data}:/data";
 
-/// Who an adapter runs as: the operator, spelled as the stack's own images are.
+/// The operator's uid and gid, spelled as the stack's own images are.
 const OPERATOR: &str = "${PUID:-1000}:${PGID:-1000}";
 
+/// The operator's uid alone.
+const OPERATOR_UID: &str = "${PUID:-1000}";
+
+/// The operator's gid alone.
+const OPERATOR_GID: &str = "${PGID:-1000}";
+
+/// The operator's time zone, written into every entry.
+const TIME_ZONE: &str = "${TZ:-Europe/Amsterdam}";
+
+/// What brings a container back after it stops for any reason but being taken down.
+const RESTART: &str = "unless-stopped";
+
 /// The interface a household port is published on.
-///
-/// The same variable and the same fallback the bundled stack's own household
-/// services are written with. A second spelling here would be a plugin's service
-/// published on terms a bundled one is not, which is the thing the tier exists to
-/// prevent.
 const HOUSEHOLD: &str = "${LAN_BIND:-0.0.0.0}";
 
 /// The interface an operator surface or an adapter's contracts are published on.
 pub(super) const LOOPBACK: &str = "127.0.0.1";
 
-/// What the container may not do once it has started: gain a privilege, through a
-/// setuid program or a file capability.
+/// What the container may not do once it has started: gain a privilege.
 const SECURITY: [&str; 1] = ["no-new-privileges:true"];
 
-/// Every kernel capability, all of which are dropped before the few below are given
-/// back.
+/// Every kernel capability, all of which are dropped before any is given back.
 const DROPPED: [&str; 1] = ["ALL"];
 
-/// The capabilities given back: what an image that starts as root needs to give its
-/// files to the operator's uid, become that uid, and signal the processes it then runs.
-///
-/// Raw sockets, device nodes, chroot and the rest of the engine's defaults are not
-/// among them, so a plugin cannot forge traffic on the stack's network or make a device
-/// it was not given.
+/// The capabilities a standard container is given back: what an image that starts as
+/// root needs to give its files to the operator, become them and signal its processes.
 const KEPT: [&str; 6] = [
     "CHOWN",
     "DAC_OVERRIDE",
@@ -129,50 +67,68 @@ const KEPT: [&str; 6] = [
     "KILL",
 ];
 
-/// How many processes the container may hold at once, which is far past what a service
-/// runs and well short of what exhausts the machine.
+/// How many processes a container may hold at once.
 const PROCESSES: u32 = 1024;
 
-/// The container entries lemonfiber writes for an installed plugin.
-///
-/// One document rather than one entry, because a plugin is several services in the
-/// contract even where this generation of the format admits one — and a caller
-/// handed a single entry would be a caller that has to learn to join them the day
-/// the second arrives.
-///
-/// A function of the record alone. Everything it needs was settled when the plugin
-/// was installed, so this answers the same on a machine whose plugin source is long
-/// gone as on the one that installed it.
-///
-/// **Serialised, never formatted.** The document is built as values and handed to a
-/// YAML writer, so a value holds its place whatever it carries: a line break is
-/// escaped inside its scalar rather than starting a key of its own. The reader has
-/// already refused every value that would need that, and this is the second wall
-/// rather than the first — a record is read back from disk, and what is on disk is
-/// not always what this build wrote.
+/// The network a service whose egress guard nothing fills is held to: none at all.
+const NO_NETWORK: &str = "none";
+
+/// The condition a service running inside its guard's network waits for.
+const HEALTHY: &str = "service_healthy";
+
+/// What an entry's values are read from beyond the record.
+pub struct Reading<'a> {
+    /// The operator's value for a setting, where one is recorded.
+    pub setting: &'a dyn Fn(&str) -> Option<String>,
+    /// The address an ask reaches, where something fills it.
+    pub address: &'a dyn Fn(&UrlOf) -> Option<String>,
+    /// The service that holds the tunnel of the capability a service runs inside.
+    pub guard: &'a dyn Fn(&str) -> Option<String>,
+    /// The group that owns the host's render devices, where the host has them.
+    pub render_group: Option<u32>,
+}
+
+impl Reading<'_> {
+    /// Nothing recorded, nothing filled, no guard and no render devices.
+    #[must_use]
+    pub const fn bare() -> Reading<'static> {
+        Reading {
+            setting: &|_| None,
+            address: &|_| None,
+            guard: &|_| None,
+            render_group: None,
+        }
+    }
+}
+
+/// The Compose document lemonfiber writes for an installed plugin.
 #[must_use]
-pub fn written(installed: &Installed) -> String {
+pub fn written(installed: &Installed, reading: &Reading<'_>) -> String {
     let document = Document {
         services: Services(
             installed
                 .services
                 .iter()
-                .map(|placed| (placed.service.as_str(), entry(&installed.plugin, placed)))
+                .map(|placed| {
+                    (
+                        placed.service.as_str(),
+                        entry(&installed.plugin, placed, reading),
+                    )
+                })
                 .collect(),
         ),
     };
-    // Maps of strings and lists of strings, which a YAML writer cannot fail to write.
     serde_yaml_ng::to_string(&document).unwrap_or_default()
 }
 
-/// The document an overlay is: services, and nothing else at the top.
+/// The document: services, and nothing else at the top.
 #[derive(Serialize)]
 struct Document<'a> {
     /// Every one of the plugin's services, by name.
     services: Services<'a>,
 }
 
-/// Services in the order the record keeps them, so the file reads the same twice.
+/// Services in the order the record keeps them.
 struct Services<'a>(Vec<(&'a str, Entry)>);
 
 impl Serialize for Services<'_> {
@@ -182,131 +138,258 @@ impl Serialize for Services<'_> {
 }
 
 /// One service's entry, and the whole of what one can carry.
-///
-/// A key is a field here, so a key a plugin may not have — a mount of its own, a
-/// network mode, an entrypoint, a command, an environment — is one there is no field
-/// for. The fields that bound what it may do, the devices included, hold only
-/// this build's values.
 #[derive(Serialize)]
 struct Entry {
-    /// The template it extends.
-    extends: Extends,
     /// The registry path joined to the digest that pins it.
     image: String,
     /// The plugin's own profile.
     profiles: Vec<String>,
-    /// The operator, where it speaks a contract.
+    /// What brings it back.
+    restart: &'static str,
+    /// Who it runs as, where not the image's choice.
     #[serde(skip_serializing_if = "Option::is_none")]
     user: Option<&'static str>,
-    /// Where it is published, where it listens.
+    /// Its environment.
+    environment: BTreeMap<String, String>,
+    /// Where it is published.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     ports: Vec<String>,
-    /// The library where it asked for it, and its own configuration directory.
+    /// The library where it asked for it, its own directory and what lies inside it.
     volumes: Vec<String>,
-    /// The stack's networks it joins, where it stands in for a stack service on more
-    /// than the default one. Listed with the default one where that service is on it,
-    /// because naming any network takes a service off the default unless it is named.
+    /// Its scratch paths in memory.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    tmpfs: Vec<String>,
+    /// The networks it joins.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     networks: Vec<String>,
+    /// The network it runs inside instead of its own.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    network_mode: Option<String>,
+    /// The guard it waits on, where it runs inside one.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    depends_on: BTreeMap<String, Waiting>,
     /// What it may not gain once started.
     security_opt: [&'static str; 1],
     /// The capabilities it starts without.
     cap_drop: [&'static str; 1],
     /// The capabilities it is given back, and those its shape adds.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     cap_add: Vec<&'static str>,
     /// The devices its shape adds.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     devices: Vec<String>,
+    /// The groups its shape adds.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    group_add: Vec<String>,
     /// How many processes it may hold.
     pids_limit: u32,
+    /// Whether its root filesystem is read-only.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    read_only: bool,
+    /// Its memory ceiling.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    mem_limit: Option<String>,
 }
 
-/// The template reference an entry extends.
+/// What a service waits for in the one it depends on.
 #[derive(Serialize)]
-struct Extends {
-    /// The file the template is in.
-    file: &'static str,
-    /// The service inside it.
-    service: &'static str,
+struct Waiting {
+    /// The state it waits for.
+    condition: &'static str,
 }
 
-/// One service's entry, in the shape the bundled fragments are written in.
-///
-/// The digest rather than the tag, joined to the image by the `@` a registry reads:
-/// the tag is a name its publisher can repoint, so an entry written from one could
-/// run something other than what was reviewed with nothing in the manifest having
-/// changed.
-///
-/// Every value the plugin supplied is written as a literal: Compose substitutes
-/// `${…}` from the stack's environment file in any value, quoted or not, and `$$` is
-/// how a Compose file says a dollar that is only a dollar. The variables this
-/// build writes itself — the interface, the library and an adapter's user — are the
-/// only substitutions an entry carries.
-fn entry(plugin: &str, placed: &Placed) -> Entry {
-    let (file, service) = TEMPLATE;
-    let ports = placed
-        .reached
+/// One service's entry.
+fn entry(plugin: &str, placed: &Placed, reading: &Reading<'_>) -> Entry {
+    let fields = &placed.fields;
+    let confined = fields.posture == Posture::Confined;
+    let guard = fields
+        .network
         .as_ref()
-        .map(|reached| {
-            let port = reached.port();
-            format!("{}:{port}:{port}", published(reached))
-        })
-        .into_iter()
+        .map(|network| (reading.guard)(&network.via));
+    let (render_devices, render_groups) = rendered(placed.shape, reading.render_group);
+    Entry {
+        image: format!("{}@{}", literal(&placed.image), literal(&placed.digest)),
+        profiles: vec![profile(plugin)],
+        restart: RESTART,
+        user: (user_of(placed) == UserMode::Uid).then_some(OPERATOR),
+        environment: environment(placed, reading),
+        ports: if guard.is_some() {
+            Vec::new()
+        } else {
+            ports(placed)
+        },
+        volumes: volumes(placed),
+        tmpfs: fields.tmpfs.iter().map(|path| literal(path)).collect(),
+        networks: if guard.is_some() {
+            Vec::new()
+        } else {
+            placed.networks.iter().map(|name| literal(name)).collect()
+        },
+        network_mode: guard.as_ref().map(|held| match held {
+            Some(service) => format!("service:{}", literal(service)),
+            None => NO_NETWORK.to_owned(),
+        }),
+        depends_on: guard
+            .flatten()
+            .map(|service| (literal(&service), Waiting { condition: HEALTHY }))
+            .into_iter()
+            .collect(),
+        security_opt: SECURITY,
+        cap_drop: DROPPED,
+        cap_add: if confined {
+            Vec::new()
+        } else {
+            KEPT.into_iter()
+                .chain(
+                    placed
+                        .shape
+                        .iter()
+                        .flat_map(|shape| shape.grants().iter().copied()),
+                )
+                .collect()
+        },
+        devices: placed
+            .shape
+            .filter(|shape| *shape != Shape::Render)
+            .iter()
+            .flat_map(|shape| shape.devices().iter())
+            .map(|device| format!("{device}:{device}"))
+            .chain(render_devices)
+            .collect(),
+        group_add: render_groups,
+        pids_limit: PROCESSES,
+        read_only: confined,
+        mem_limit: fields.mem_limit_mib.map(|mib| format!("{mib}m")),
+    }
+}
+
+/// Who the service runs as, the declared mode or the one its kind requires.
+fn user_of(placed: &Placed) -> UserMode {
+    match placed.fields.user_mode {
+        Some(mode) => mode,
+        None if !placed.speaks.is_empty() || placed.fields.posture == Posture::Confined => {
+            UserMode::Uid
+        }
+        None => UserMode::Image,
+    }
+}
+
+/// The render devices and group, where the shape asks for them and the host has them.
+fn rendered(shape: Option<Shape>, group: Option<u32>) -> (Vec<String>, Vec<String>) {
+    match (shape, group) {
+        (Some(Shape::Render), Some(group)) => (
+            Shape::Render
+                .devices()
+                .iter()
+                .map(|device| format!("{device}:{device}"))
+                .collect(),
+            vec![group.to_string()],
+        ),
+        _ => (Vec::new(), Vec::new()),
+    }
+}
+
+/// Its environment: the time zone, the operator's pair where it asks for it, and every
+/// variable the manifest declares that has a value to write.
+fn environment(placed: &Placed, reading: &Reading<'_>) -> BTreeMap<String, String> {
+    let mut written = BTreeMap::from([("TZ".to_owned(), TIME_ZONE.to_owned())]);
+    if user_of(placed) == UserMode::PuidEnv {
+        written.insert("PUID".to_owned(), OPERATOR_UID.to_owned());
+        written.insert("PGID".to_owned(), OPERATOR_GID.to_owned());
+    }
+    for (name, value) in &placed.fields.env {
+        if let Some(text) = valued(value, reading) {
+            written.insert(name.clone(), literal(&text));
+        }
+    }
+    written
+}
+
+/// What one variable is written as, or nothing where it has no value to write.
+fn valued(value: &Value, reading: &Reading<'_>) -> Option<String> {
+    match value {
+        Value::Constant(constant) => Some(constant_text(constant)),
+        Value::Setting(setting) => Some(
+            (reading.setting)(&setting.setting).unwrap_or_else(|| constant_text(&setting.default)),
+        ),
+        Value::Url(url) => (reading.address)(url),
+        Value::Secret(_) => None,
+    }
+}
+
+/// A constant as the text an environment variable holds.
+fn constant_text(constant: &Constant) -> String {
+    match constant {
+        Constant::Text(text) => text.clone(),
+        Constant::Number(number) => number.to_string(),
+        Constant::Flag(flag) => flag.to_string(),
+    }
+}
+
+/// Every port it publishes, each on its tier, and an adapter's contract port on the
+/// loopback interface at a port the engine chooses.
+fn ports(placed: &Placed) -> Vec<String> {
+    let Some(reached) = &placed.reached else {
+        return contract_port(placed).into_iter().collect();
+    };
+    let on = published(reached);
+    let first = reached.port();
+    std::iter::once((first, placed.listens.unwrap_or(first)))
         .chain(
             placed
-                .listens
-                .filter(|_| !placed.speaks.is_empty())
-                .map(|listens| format!("{LOOPBACK}::{listens}")),
+                .fields
+                .publish
+                .iter()
+                .map(|further| (further.port, further.listens.unwrap_or(further.port))),
         )
-        .collect();
+        .map(|(host, inside)| format!("{on}:{host}:{inside}"))
+        .chain(contract_port(placed))
+        .collect()
+}
+
+/// An adapter's contract port, on the loopback interface at a port the engine chooses.
+fn contract_port(placed: &Placed) -> Option<String> {
+    placed
+        .listens
+        .filter(|_| !placed.speaks.is_empty())
+        .map(|listens| format!("{LOOPBACK}::{listens}"))
+}
+
+/// The library where it asked for it, its own configuration directory, and each path
+/// mounted from its own mount tree.
+fn volumes(placed: &Placed) -> Vec<String> {
+    let service = literal(&placed.service);
     let mut volumes = Vec::new();
     if placed.takes_data {
         volumes.push(LIBRARY.to_owned());
     }
-    volumes.push(format!(
-        "{CONFIGURATION}/{}:{}",
-        literal(&placed.service),
-        literal(&placed.config_path)
+    volumes.push(mounted(
+        &format!("{CONFIGURATION}/{service}"),
+        &placed.config_path,
+        placed.fields.config_ro,
     ));
-    Entry {
-        extends: Extends { file, service },
-        image: format!("{}@{}", literal(&placed.image), literal(&placed.digest)),
-        profiles: vec![profile(plugin)],
-        user: (!placed.speaks.is_empty()).then_some(OPERATOR),
-        ports,
-        volumes,
-        networks: placed.networks.iter().map(|name| literal(name)).collect(),
-        security_opt: SECURITY,
-        cap_drop: DROPPED,
-        cap_add: KEPT
-            .into_iter()
-            .chain(
-                placed
-                    .shape
-                    .iter()
-                    .flat_map(|shape| shape.grants().iter().copied()),
-            )
-            .collect(),
-        devices: placed
-            .shape
-            .iter()
-            .flat_map(|shape| shape.devices().iter())
-            .map(|device| format!("{device}:{device}"))
-            .collect(),
-        pids_limit: PROCESSES,
-    }
+    volumes.extend(placed.fields.mount.iter().map(|Mount { from, to, ro }| {
+        mounted(
+            &format!("./{}/{service}/{}", super::placing::MOUNTS, literal(from)),
+            to,
+            *ro,
+        )
+    }));
+    volumes
 }
 
-/// A value Compose reads back as exactly itself, substitution included.
+/// One bind mount of `source` at `to`.
+fn mounted(source: &str, to: &str, ro: bool) -> String {
+    let mode = if ro { ":ro" } else { "" };
+    format!("{source}:{}{mode}", literal(to))
+}
+
+/// A value Compose reads back as exactly itself.
 fn literal(text: &str) -> String {
     text.replace('$', "$$")
 }
 
 /// Which interface a tier publishes on.
-///
-/// Read off the tier and never off a field, because there is no field: a plugin that
-/// could write its own interface could put a full-control surface on the household
-/// network without touching anything the web-security checks inspect.
 const fn published(reached: &Reached) -> &'static str {
     match reached {
         Reached::Loopback { .. } => LOOPBACK,

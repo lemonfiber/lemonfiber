@@ -27,7 +27,7 @@ async fn the_document_on_disk_is_the_container_the_record_derives() {
     let shown = report(installing(&ctx, &source("derives", MANIFEST)).await);
     let recorded = shown
         .and_then(|one| one.install)
-        .map(|one| crate::plugin::written(&one.would))
+        .map(|one| crate::plugin::written(&one.would, &crate::plugin::Reading::bare()))
         .unwrap_or_default();
 
     let written = std::fs::read_to_string(stack_of(&ctx).join("compose/plugins/komga.yml"))
@@ -362,7 +362,9 @@ fn a_write_whose_record_cannot_be_written_is_not_made() {
     let made = stack_of(&ctx).join("config").join("komga");
     let directory = vec![Write {
         path: made.clone(),
-        lands: Lands::Directory,
+        lands: Lands::Directory {
+            beneath: stack_of(&ctx),
+        },
     }];
     assert!(super::super::writing::carry_out(&ctx, "komga", "1", &directory).is_err());
     assert!(
@@ -448,4 +450,25 @@ fn only_a_first_party_plugin_replaces_a_stack_service() {
     );
     assert!(trusted.is_ok());
     assert!(nothing.is_ok());
+}
+
+/// A directory the install would make through a link, or outside the stack, is not
+/// made, and nothing lands where the link leads.
+#[cfg(unix)]
+#[test]
+fn a_directory_reached_through_a_link_is_not_made() {
+    use crate::plugin::{Lands, Write};
+
+    let ctx = ctx("linked-mount-tree");
+    let stack = stack_of(&ctx);
+    let elsewhere = stack.with_file_name("elsewhere");
+    let _ = std::fs::create_dir_all(&elsewhere);
+    let _ = std::fs::create_dir_all(&stack);
+    let _ = std::os::unix::fs::symlink(&elsewhere, stack.join("mounts"));
+    let directory = vec![Write {
+        path: stack.join("mounts").join("komga"),
+        lands: Lands::Directory { beneath: stack },
+    }];
+    assert!(super::super::writing::carry_out(&ctx, "komga", "1", &directory).is_err());
+    assert!(!elsewhere.join("komga").exists());
 }

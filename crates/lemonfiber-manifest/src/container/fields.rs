@@ -21,7 +21,7 @@ macro_rules! container_fields {
             /// Whether its configuration directory is mounted read-only.
             #[serde(default)]
             pub config_ro: bool,
-            /// Each further path mounted from inside its own configuration directory.
+            /// Each further path mounted from its own mount tree.
             #[serde(default)]
             pub mount: ::std::vec::Vec<$crate::container::Mount>,
             /// Absolute paths given scratch space in memory.

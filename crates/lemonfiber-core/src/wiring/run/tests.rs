@@ -450,7 +450,11 @@ fn a_plugin_media_server(ctx: &crate::app::Ctx, at: &std::path::Path) -> std::pa
         crate::app::record::keep(crate::app::plugins::kept_at(ctx).as_deref(), &register).is_ok()
     );
     let document = crate::plugin::overlay(&at.join("data").join("stack"), "serving");
-    assert!(crate::config::store::write(&document, &crate::plugin::written(&installed)).is_ok());
+    assert!(crate::config::store::write(
+        &document,
+        &crate::plugin::written(&installed, &crate::plugin::Reading::bare())
+    )
+    .is_ok());
     document
 }
 

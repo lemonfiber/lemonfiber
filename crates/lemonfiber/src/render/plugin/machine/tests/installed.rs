@@ -186,7 +186,9 @@ fn the_install_shows_the_container_that_is_written_for_it() {
         said.contains("The container lemonfiber writes for it"),
         "{said}"
     );
-    for line in lemonfiber_core::plugin::written(&one).lines() {
+    for line in
+        lemonfiber_core::plugin::written(&one, &lemonfiber_core::plugin::Reading::bare()).lines()
+    {
         assert!(said.contains(&format!("      {line}")), "{line} in {said}");
     }
     assert!(said.contains("      services:"), "{said}");
@@ -215,7 +217,7 @@ fn a_rehearsal_is_shown_the_same_container_the_install_is() {
         })
         .text()
     };
-    let written = lemonfiber_core::plugin::written(&one);
+    let written = lemonfiber_core::plugin::written(&one, &lemonfiber_core::plugin::Reading::bare());
     for line in written.lines() {
         let indented = format!("      {line}");
         assert!(shown(false).contains(&indented), "{line}");

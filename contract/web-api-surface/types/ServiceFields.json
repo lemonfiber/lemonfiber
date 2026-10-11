@@ -1,0 +1,59 @@
+{
+  "fields": {
+    "config_ro": {
+      "type": [
+        "boolean"
+      ],
+      "required": false
+    },
+    "env": {
+      "type": [
+        "object{ref:ServiceValue}"
+      ],
+      "required": false
+    },
+    "mem_limit_mib": {
+      "type": [
+        "integer|null/uint32"
+      ],
+      "required": false
+    },
+    "mount": {
+      "type": [
+        "array[ref:ServiceMount]"
+      ],
+      "required": false
+    },
+    "network": {
+      "type": [
+        "anyOf(null,ref:ServiceNetwork)"
+      ],
+      "required": false
+    },
+    "posture": {
+      "type": [
+        "ref:ServicePosture"
+      ],
+      "required": false
+    },
+    "publish": {
+      "type": [
+        "array[ref:ServicePublish]"
+      ],
+      "required": false
+    },
+    "tmpfs": {
+      "type": [
+        "array[string]"
+      ],
+      "required": false
+    },
+    "user_mode": {
+      "type": [
+        "anyOf(null,ref:ServiceUserMode)"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

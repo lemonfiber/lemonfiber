@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The address of a capability's filler.",
+  "type": "object",
+  "properties": {
+    "files": {
+      "description": "The medium the filler asked for files.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "native": {
+      "description": "The upstream's own API, where the ask reaches the upstream an adapter fronts.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "url_of": {
+      "description": "The capability asked for.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "url_of"
+  ]
+}

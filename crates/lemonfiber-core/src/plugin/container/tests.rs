@@ -4,7 +4,9 @@ use std::path::PathBuf;
 use lemonfiber_plugin::{Manifest, Shape};
 
 use super::super::installed::{Installed, Placed, Reached};
-use super::{published, written, CONFIGURATION, HOUSEHOLD, LIBRARY, LOOPBACK, OPERATOR, PROFILE};
+use super::{
+    published, written, Reading, CONFIGURATION, HOUSEHOLD, LIBRARY, LOOPBACK, OPERATOR, PROFILE,
+};
 
 /// The template the generated entries extend, as the stack ships it.
 ///
@@ -19,13 +21,13 @@ const DIGEST: &str = "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2
 /// The entry a household service that handles media is written as.
 const HOUSEHOLD_ENTRY: &str = "services:\n  \
          komga:\n    \
-         extends:\n      \
-         file: compose/_common.yml\n      \
-         service: defaults\n    \
          image: ghcr.io/gotson/komga@sha256:\
          4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945\n    \
          profiles:\n    \
          - plugin-komga\n    \
+         restart: unless-stopped\n    \
+         environment:\n      \
+         TZ: ${TZ:-Europe/Amsterdam}\n    \
          ports:\n    \
          - ${LAN_BIND:-0.0.0.0}:25600:25600\n    \
          volumes:\n    \
@@ -47,6 +49,7 @@ const HOUSEHOLD_ENTRY: &str = "services:\n  \
 /// One service, as installing a plugin settles it.
 fn placed() -> Placed {
     Placed {
+        fields: lemonfiber_manifest::container::Fields::default(),
         service: "komga".to_owned(),
         image: "ghcr.io/gotson/komga".to_owned(),
         digest: DIGEST.to_owned(),
@@ -97,7 +100,7 @@ fn installed(services: Vec<Placed>) -> Installed {
 
 /// The document written for one placed service.
 fn document(one: Placed) -> String {
-    written(&installed(vec![one]))
+    written(&installed(vec![one]), &Reading::bare())
 }
 
 /// The whole entry, written out once so a reader can see what is claimed below.
@@ -151,7 +154,7 @@ dashboard_group = "Library"
 fn the_entry_is_written_from_what_installing_a_manifest_settles() {
     let written_for = Manifest::from_toml(INSTALLABLE)
         .ok()
-        .map(|manifest| written(&Installed::of(&manifest)));
+        .map(|manifest| written(&Installed::of(&manifest), &Reading::bare()));
     assert_eq!(written_for.as_deref(), Some(HOUSEHOLD_ENTRY));
 }
 
@@ -300,7 +303,10 @@ fn the_service_sits_in_a_profile_named_for_the_plugin() {
 /// than a document that is not one.
 #[test]
 fn a_plugin_that_places_nothing_writes_a_document_with_nothing_in_it() {
-    assert_eq!(written(&installed(Vec::new())), "services: {}\n");
+    assert_eq!(
+        written(&installed(Vec::new()), &Reading::bare()),
+        "services: {}\n"
+    );
 }
 
 /// Several services are several entries under one heading.
@@ -317,7 +323,7 @@ fn a_plugin_placing_two_services_writes_both_under_one_heading() {
         reached: None,
         ..placed()
     };
-    let both = written(&installed(vec![placed(), second]));
+    let both = written(&installed(vec![placed(), second]), &Reading::bare());
     assert_eq!(both.matches("services:").count(), 1, "got: {both}");
     assert!(both.contains("  komga:\n"), "got: {both}");
     assert!(both.contains("  komga-sync:\n"), "got: {both}");
@@ -342,7 +348,10 @@ fn services_are_written_in_the_order_the_record_keeps_them() {
         service: service.to_owned(),
         ..placed()
     };
-    let both = written(&installed(vec![named("zeta"), named("alpha")]));
+    let both = written(
+        &installed(vec![named("zeta"), named("alpha")]),
+        &Reading::bare(),
+    );
     let at = |service: &str| both.find(&format!("  {service}:\n"));
     assert!(
         at("zeta").is_some() && at("zeta") < at("alpha"),
@@ -358,15 +367,24 @@ fn services_are_written_in_the_order_the_record_keeps_them() {
 /// a key that is not in this set, so a generator that grew one would fail here
 /// rather than on somebody's machine.
 const KEYS: &[&str] = &[
-    "extends",
     "image",
     "profiles",
+    "restart",
+    "environment",
     "ports",
     "volumes",
+    "tmpfs",
+    "networks",
+    "network_mode",
+    "depends_on",
     "security_opt",
     "cap_drop",
     "cap_add",
+    "devices",
+    "group_add",
     "pids_limit",
+    "read_only",
+    "mem_limit",
 ];
 
 /// Every key one generated entry carries, read off the document itself.
@@ -550,21 +568,22 @@ fn every_entry_is_bounded_alike_whatever_it_declared() {
 ///
 /// Without this the gate is a measurement nobody has watched succeed: a reader
 /// that always answered with the permitted set would pass every assertion above
-/// and would notice nothing it exists to notice. The keys planted are the ones
-/// a plugin may not have, each on an entry otherwise exactly as generated.
+/// and would notice nothing it exists to notice. The keys planted are ones no
+/// field of the model writes, each on an entry otherwise exactly as generated.
 #[test]
 fn the_reading_finds_a_key_the_permitted_set_does_not_carry() {
     let permitted: BTreeSet<String> = KEYS.iter().map(|&key| key.to_owned()).collect();
     for reach in [
         "    sysctls: {net.ipv4.ip_forward: 1}",
         "    pid: host",
-        "    devices: [/dev/net/tun]",
-        "    network_mode: host",
+        "    ipc: host",
         "    privileged: true",
         "    user: \"0:0\"",
+        "    userns_mode: host",
         "    entrypoint: /bin/sh",
         "    command: -c 'cat /etc/shadow'",
-        "    environment: {TZ: UTC}",
+        "    env_file: /etc/shadow",
+        "    volumes_from: [door]",
     ] {
         let planted = format!("{}{reach}\n", document(placed()));
         assert!(
@@ -696,3 +715,5 @@ fn a_dollar_a_plugin_supplied_is_never_a_substitution() {
         "got: {entry}"
     );
 }
+
+mod model;

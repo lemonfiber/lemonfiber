@@ -30,6 +30,12 @@
       ],
       "required": true
     },
+    "fields": {
+      "type": [
+        "ref:ServiceFields"
+      ],
+      "required": false
+    },
     "fronts": {
       "type": [
         "null|string"

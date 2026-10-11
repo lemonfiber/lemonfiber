@@ -11,6 +11,7 @@ fn stack() -> &'static Path {
 /// One placed service, as a record holds one.
 fn placed(service: &str) -> Placed {
     Placed {
+        fields: lemonfiber_manifest::container::Fields::default(),
         service: service.to_owned(),
         image: "example.invalid/komga".to_owned(),
         digest: "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
@@ -97,7 +98,7 @@ fn a_service_keeps_its_configuration_where_the_bundled_ones_keep_theirs() {
 fn document(planned: &[Write]) -> Option<String> {
     planned.iter().find_map(|one| match &one.lands {
         Lands::Document(content) => Some(content.clone()),
-        Lands::Directory | Lands::Key | Lands::Region { .. } => None,
+        Lands::Directory { .. } | Lands::Key | Lands::Region { .. } => None,
     })
 }
 
@@ -107,7 +108,7 @@ fn regions(planned: &[Write]) -> Vec<(String, String)> {
         .iter()
         .filter_map(|one| match &one.lands {
             Lands::Region { key, owner, .. } => Some((key.clone(), owner.clone())),
-            Lands::Directory | Lands::Document(_) | Lands::Key => None,
+            Lands::Directory { .. } | Lands::Document(_) | Lands::Key => None,
         })
         .collect()
 }
@@ -214,10 +215,10 @@ fn a_directory_carries_no_content_and_the_document_carries_the_container() {
     assert_eq!(planned.first().map(super::Write::is_directory), Some(true));
     assert_eq!(
         document(&planned),
-        Some(crate::plugin::container::written(&installed(
-            "komga",
-            &["komga"]
-        )))
+        Some(crate::plugin::container::written(
+            &installed("komga", &["komga"]),
+            &crate::plugin::Reading::bare()
+        ))
     );
 }
 
@@ -305,6 +306,43 @@ fn an_adapter_service_is_keyed_before_the_document_that_starts_it() {
         key_file(stack(), "plex-adapter"),
         key.first().cloned().unwrap_or_default()
     );
-    assert!(at(|one| *one == Lands::Directory) < at(|one| *one == Lands::Key));
+    assert!(at(|one| matches!(one, Lands::Directory { .. })) < at(|one| *one == Lands::Key));
     assert!(at(|one| *one == Lands::Key) < at(|one| matches!(one, Lands::Document(_))));
+}
+
+#[test]
+fn a_service_with_further_mounts_gets_its_mount_tree_and_each_writable_source_before_the_document()
+{
+    let mut plugin = installed("komga", &["komga"]);
+    if let Some(service) = plugin.services.first_mut() {
+        service.fields.mount = vec![
+            lemonfiber_manifest::container::Mount {
+                from: "cache".to_owned(),
+                to: "/cache".to_owned(),
+                ro: false,
+            },
+            lemonfiber_manifest::container::Mount {
+                from: "Caddyfile".to_owned(),
+                to: "/etc/caddy/Caddyfile".to_owned(),
+                ro: true,
+            },
+        ];
+    }
+    let planned = writes(&plugin, stack());
+    let paths: Vec<PathBuf> = planned.iter().map(|one| one.path.clone()).collect();
+    let tree = PathBuf::from("/opt/lemonfiber/stack/mounts/komga");
+    let at = |path: &PathBuf| paths.iter().position(|one| one == path);
+    let document = at(&PathBuf::from(
+        "/opt/lemonfiber/stack/compose/plugins/komga.yml",
+    ));
+    assert!(at(&tree) < at(&tree.join("cache")));
+    assert!(at(&tree.join("cache")) < document);
+    assert_eq!(at(&tree.join("Caddyfile")), None);
+    assert_eq!(
+        super::mount_sources(&plugin, stack()),
+        vec![
+            (tree.join("cache"), tree.clone()),
+            (tree.join("Caddyfile"), tree.clone())
+        ]
+    );
 }

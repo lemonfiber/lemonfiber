@@ -22,6 +22,7 @@
 //! answers on. Which dashboard group a tier belongs to is the stack's answer rather
 //! than the format's, so nothing declared is kept as nothing declared.
 
+use lemonfiber_manifest::container::Fields;
 use lemonfiber_plugin::{Manifest, Service};
 use serde::{Deserialize, Serialize};
 
@@ -110,6 +111,9 @@ pub struct Placed {
     /// Every capability it asks for.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub asks: Vec<Asking>,
+    /// Its container fields beyond those above.
+    #[serde(default, skip_serializing_if = "Fields::is_plain")]
+    pub fields: Fields,
 }
 
 /// One capability a placed service asks for.
@@ -128,6 +132,17 @@ impl Placed {
     /// One service, as installing it settles it.
     fn of(manifest: &Manifest, service: &Service) -> Self {
         Self {
+            fields: Fields {
+                publish: service.publish.clone(),
+                config_ro: service.config_ro,
+                mount: service.mount.clone(),
+                tmpfs: service.tmpfs.clone(),
+                env: service.env.clone(),
+                user_mode: service.user_mode,
+                posture: service.posture,
+                mem_limit_mib: service.mem_limit_mib,
+                network: service.network.clone(),
+            },
             service: service.id.clone(),
             image: service.image.clone(),
             digest: service.digest.clone(),

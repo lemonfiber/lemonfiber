@@ -379,3 +379,32 @@ fn each_field_is_read_as_written_and_defaulted_where_left_out() {
     );
     assert_eq!(Posture::default(), Posture::Standard);
 }
+
+#[test]
+fn no_mount_source_lies_inside_another() {
+    let none = NONE;
+    let mounts = [
+        Mount {
+            from: "cache".to_owned(),
+            to: "/cache".to_owned(),
+            ro: false,
+        },
+        Mount {
+            from: "cache/deep".to_owned(),
+            to: "/deep".to_owned(),
+            ro: false,
+        },
+        Mount {
+            from: "cachet".to_owned(),
+            to: "/cachet".to_owned(),
+            ro: false,
+        },
+    ];
+    let mut nested = plain(&none);
+    nested.mounts = &mounts;
+    let said = wrong(&nested);
+    assert_eq!(
+        said,
+        ["service jellyfin.mount /deep: cache/deep lies inside cache, another of its sources"]
+    );
+}

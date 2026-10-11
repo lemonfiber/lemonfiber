@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use lemonfiber_fixtures::scratch::Scratch;
-use lemonfiber_ports::filesystem::{Beneath, Confined, READ_LIMIT};
+use lemonfiber_ports::filesystem::{Beneath, Confined, Lying, READ_LIMIT};
 
 use super::super::Disk;
 use super::landed;
@@ -152,4 +152,38 @@ fn a_write_that_failed_part_way_is_said_in_the_platforms_words() {
 
     assert!(landed(Ok(())).is_ok());
     assert!(landed(Err(full)).is_err_and(|fault| fault.message == "no space left on device"));
+}
+
+/// A file or a directory reached through no link lies plainly beneath; one not there
+/// yet is absent; one outside, or reached through a link at its name or on the way, has
+/// escaped.
+#[test]
+fn a_mount_source_lies_beneath_only_through_no_link() {
+    let (dir, owned, operator) = owned();
+    let _ = std::fs::create_dir_all(owned.join("cache").join("deep"));
+    assert_eq!(Disk.lies(&owned.join("kept.yml"), &owned), Lying::Plain);
+    assert_eq!(
+        Disk.lies(&owned.join("cache").join("deep"), &owned),
+        Lying::Plain
+    );
+    assert_eq!(
+        Disk.lies(&owned.join("missing").join("x"), &owned),
+        Lying::Absent
+    );
+    assert_eq!(Disk.lies(&operator, &owned), Lying::Escaped);
+    assert_eq!(
+        Disk.lies(&owned.join("..").join("x"), &owned),
+        Lying::Escaped
+    );
+    #[cfg(unix)]
+    {
+        let _ = std::os::unix::fs::symlink(dir.join("config"), owned.join("linked"));
+        let _ = std::os::unix::fs::symlink(&operator, owned.join("pointer"));
+        assert_eq!(Disk.lies(&owned.join("linked"), &owned), Lying::Escaped);
+        assert_eq!(
+            Disk.lies(&owned.join("linked").join("stand-in"), &owned),
+            Lying::Escaped
+        );
+        assert_eq!(Disk.lies(&owned.join("pointer"), &owned), Lying::Escaped);
+    }
 }

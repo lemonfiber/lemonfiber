@@ -534,6 +534,21 @@ pub trait Confined: Send + Sync {
     /// Returns a [`Fault`] where a link, a path leading outside `within` or something that
     /// is not a plain file is where the file is expected, or where the write itself fails.
     fn overwrite(&self, path: &Path, within: &Path, contents: &[u8]) -> Result<(), Fault>;
+
+    /// Whether `path` lies beneath `within` with no link at any step on the way, itself
+    /// included, whatever it is.
+    fn lies(&self, path: &Path, within: &Path) -> Lying;
+}
+
+/// Where a path somebody else's container can write lies.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Lying {
+    /// Beneath the directory, reached through no link.
+    Plain,
+    /// Not there, every step that is there reached through no link.
+    Absent,
+    /// A link on the way or at its name, or not beneath the directory at all.
+    Escaped,
 }
 
 #[cfg(test)]

@@ -1,0 +1,11 @@
+{
+  "fields": {
+    "via": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

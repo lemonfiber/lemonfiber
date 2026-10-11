@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A further port a service publishes on its tier.",
+  "type": "object",
+  "properties": {
+    "listens": {
+      "description": "Where it answers inside the container, `port` where absent.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint16",
+      "default": null,
+      "maximum": 65535,
+      "minimum": 0
+    },
+    "port": {
+      "description": "Where it is published on the host.",
+      "type": "integer",
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "port"
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A further path mounted from the service's own mount tree.",
+  "type": "object",
+  "properties": {
+    "from": {
+      "description": "The relative path inside the mount tree.",
+      "type": "string"
+    },
+    "ro": {
+      "description": "Whether it is mounted read-only.",
+      "type": "boolean",
+      "default": false
+    },
+    "to": {
+      "description": "The absolute path inside the container.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "from",
+    "to"
+  ]
+}

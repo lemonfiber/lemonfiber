@@ -19,6 +19,7 @@ use crate::error::{Problem, Remedy, State};
 use crate::error::Diagnose as _;
 use crate::journal::{Change, Kind};
 use crate::plugin::Installed;
+use crate::ports::filesystem::Lying;
 
 use super::super::Ctx;
 use super::{NOWHERE, UNWRITABLE};
@@ -67,7 +68,13 @@ pub(crate) fn carry_out(
     for write in planned {
         let (key, owner, body) = match &write.lands {
             crate::plugin::Lands::Region { key, owner, body } => (key, owner, body),
-            crate::plugin::Lands::Directory => {
+            crate::plugin::Lands::Directory { beneath } => {
+                if ctx.seams.confined.lies(&write.path, beneath) == Lying::Escaped {
+                    return Err(Box::new(unwritable(
+                        &write.path,
+                        "it is reached through a link or lies outside the stack directory",
+                    )));
+                }
                 made_whole(ctx, plugin, stamp, &journal, &write.path, None)?;
                 continue;
             }
@@ -270,7 +277,7 @@ pub(crate) fn rejoined(
                 overwrites.push(Overwrite {
                     path,
                     previous,
-                    text: crate::plugin::written(&moved),
+                    text: crate::plugin::written(&moved, &crate::plugin::Reading::bare()),
                 });
             }
         }
@@ -368,7 +375,7 @@ pub(crate) fn landing(ctx: &Ctx, planned: Vec<crate::plugin::Write>) -> Vec<crat
             crate::plugin::Lands::Region { key, .. } => {
                 write.path.is_file() && !crate::unmanaged::covers(&ctx.settings.unmanaged, key)
             }
-            crate::plugin::Lands::Directory
+            crate::plugin::Lands::Directory { .. }
             | crate::plugin::Lands::Document(_)
             | crate::plugin::Lands::Key => true,
         })

@@ -35,6 +35,10 @@
       "description": "The digest that fixes what runs.",
       "type": "string"
     },
+    "fields": {
+      "description": "Its container fields beyond those above.",
+      "$ref": "ServiceFields.json"
+    },
     "fronts": {
       "description": "The service of the same plugin it stands in front of, as an adapter.",
       "type": [
