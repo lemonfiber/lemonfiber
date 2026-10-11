@@ -665,3 +665,21 @@ fn a_choice_over_a_document_whose_mount_source_is_a_link_writes_nothing() {
     );
     assert_eq!(std::fs::read_to_string(&document).ok(), Some(before));
 }
+
+/// A choice that moves the networks of a plugin whose document is not there writes no
+/// document for it, and moves its record alone.
+#[test]
+fn a_choice_moving_a_plugin_with_no_document_writes_its_record_alone() {
+    let (ctx, at) = ctx("rejoined-undocumented");
+    let document = a_plugin_media_server(&ctx, &at);
+    assert!(std::fs::remove_file(&document).is_ok());
+
+    let chosen = agreed(&ctx, fill("identity.source", "server")).ok();
+
+    assert_eq!(chosen.map(|report| report.applied), Some(true));
+    assert!(!document.exists());
+    assert_eq!(
+        joined(&ctx),
+        Some(vec!["default".to_owned(), "gate-upstream".to_owned()])
+    );
+}
