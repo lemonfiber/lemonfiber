@@ -188,7 +188,7 @@ fn running(manifest: &Manifest, found: &mut Vec<Violation>) {
         speaking::spoken(service, &manifest.services, found);
         shaping::shaped(service, &manifest.services, found);
         shaping::critical(service, found);
-        leaving::declared(service, found);
+        leaving::stated(service, found);
         fronting::native(service, &manifest.services, found);
         replacing::replaced(service, found);
     }

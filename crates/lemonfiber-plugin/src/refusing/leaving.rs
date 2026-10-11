@@ -5,7 +5,7 @@ use crate::Violation;
 
 /// Whether a service says where it reaches and what it asks for there, both or neither,
 /// and what it asks for in words.
-pub(super) fn declared(service: &Service, found: &mut Vec<Violation>) {
+pub(super) fn stated(service: &Service, found: &mut Vec<Violation>) {
     let refused = |field: &str, message: &str| Violation {
         location: format!("service {}.{field}", service.id),
         message: message.to_owned(),

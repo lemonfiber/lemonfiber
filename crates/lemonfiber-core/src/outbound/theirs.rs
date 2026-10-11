@@ -62,42 +62,46 @@ const NO_RECORD: &str = "This service is not one lemonfiber knows, so nothing he
 pub(super) fn elsewhere(services: &[Service]) -> Vec<Elsewhere> {
     services
         .iter()
-        .map(|service| from_the_stack(service).unwrap_or_else(|| no_record_of(service)))
+        .map(|service| {
+            said(
+                &service.id,
+                service.reaches.as_deref(),
+                service.asks_for.as_deref(),
+                crate::origin::Origin::Bundled,
+            )
+        })
         .collect()
 }
 
-/// What a service says about itself, where its own manifest entry says anything.
+/// What a service says about itself, or the admission that nothing describes it.
 ///
 /// Both halves or neither, which the manifest's own validation holds it to: half an
 /// answer here would attribute a purpose to a service the same report says goes
-/// nowhere, so it is treated as the silence it is. This is the only source, because
-/// it is the one that travels with the stack — a fork describes its own services, and
-/// a service added to the stack needs no release of this binary to be described.
-fn from_the_stack(service: &Service) -> Option<Elsewhere> {
-    let destination = service.reaches.clone()?;
-    let purpose = service.asks_for.clone()?;
-    Some(Elsewhere {
-        service: service.id.clone(),
-        destination,
-        purpose,
-        recorded: true,
-        origin: crate::origin::Origin::Bundled,
-    })
-}
-
-/// The admission that nothing describes this service.
+/// nowhere, so it is treated as the silence it is. A stack service's own entry is the
+/// only source for it, because it is the one that travels with the stack — a fork
+/// describes its own services, and a service added to the stack needs no release of
+/// this binary to be described.
 ///
-/// Reached by a service an operator's own stack declares and says nothing about. For
-/// the stack this binary embeds it is reached by nothing at all, which is a property
-/// of that stack rather than of this function, and the test below is what keeps it
-/// one.
-fn no_record_of(service: &Service) -> Elsewhere {
+/// The admission is reached by a service an operator's own stack declares and says
+/// nothing about. For the stack this binary embeds it is reached by nothing at all,
+/// which is a property of that stack rather than of this function, and the test below
+/// is what keeps it one.
+fn said(
+    service: &str,
+    reaches: Option<&str>,
+    asks_for: Option<&str>,
+    origin: crate::origin::Origin,
+) -> Elsewhere {
+    let (destination, purpose, recorded) = match (reaches, asks_for) {
+        (Some(destination), Some(purpose)) => (destination, purpose, true),
+        _ => (UNKNOWN, NO_RECORD, false),
+    };
     Elsewhere {
-        service: service.id.clone(),
-        destination: UNKNOWN.to_owned(),
-        purpose: NO_RECORD.to_owned(),
-        recorded: false,
-        origin: crate::origin::Origin::Bundled,
+        service: service.to_owned(),
+        destination: destination.to_owned(),
+        purpose: purpose.to_owned(),
+        recorded,
+        origin,
     }
 }
 
@@ -121,21 +125,13 @@ pub(super) fn brought(stack: &[Service], installed: &[crate::plugin::Installed])
             };
             let services = one.services.iter().map({
                 let origin = origin.clone();
-                move |placed| match (&placed.reaches, &placed.asks_for) {
-                    (Some(destination), Some(purpose)) => Elsewhere {
-                        service: placed.service.clone(),
-                        destination: destination.clone(),
-                        purpose: purpose.clone(),
-                        recorded: true,
-                        origin: origin.clone(),
-                    },
-                    _ => Elsewhere {
-                        service: placed.service.clone(),
-                        destination: UNKNOWN.to_owned(),
-                        purpose: NO_RECORD.to_owned(),
-                        recorded: false,
-                        origin: origin.clone(),
-                    },
+                move |placed| {
+                    said(
+                        &placed.service,
+                        placed.reaches.as_deref(),
+                        placed.asks_for.as_deref(),
+                        origin.clone(),
+                    )
                 }
             });
             let hosts = one

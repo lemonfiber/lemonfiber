@@ -143,7 +143,7 @@ fn critical_without_the_egress_guard_s_shape_is_refused_naming_the_four_without_
             &said,
             &[
                 "service komga.criticality",
-                "critical",
+                "is critical,",
                 "shape = \"egress-guard\"",
                 "core, important, enhancing, optional"
             ]

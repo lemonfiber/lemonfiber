@@ -49,3 +49,13 @@ fn an_unshown_character_in_what_it_asks_for_is_refused() {
         "{said:?}"
     );
 }
+
+#[test]
+fn an_unshown_character_in_where_it_reaches_is_refused() {
+    let said =
+        outbound("reaches = \"comicvine\u{202e}gamespot.com\"\nasks_for = \"Issue details\"\n");
+    assert!(
+        names(&said, &["service komga.reaches", "U+202E"]),
+        "{said:?}"
+    );
+}
