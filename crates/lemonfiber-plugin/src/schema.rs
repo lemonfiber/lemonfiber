@@ -13,11 +13,7 @@
 mod evidence;
 mod recipe;
 
-use std::collections::BTreeMap;
-
-use lemonfiber_manifest::container::{
-    Container, Mount, Network, Posture, Publish, UserMode, Value,
-};
+use lemonfiber_manifest::container::Container;
 use serde::Deserialize;
 
 use crate::conforming::nonconforming;
@@ -158,6 +154,7 @@ pub struct Plugin {
     pub forms: Vec<String>,
 }
 
+lemonfiber_manifest::container_fields! {
 /// What runs.
 ///
 /// Declared in the stack manifest's service vocabulary, restricted to these fields.
@@ -189,9 +186,6 @@ pub struct Service {
     /// Which tier every port it publishes is published on.
     #[serde(default)]
     pub bind: Option<Bind>,
-    /// Each further port it publishes on its tier.
-    #[serde(default)]
-    pub publish: Vec<Publish>,
     /// How to tell the service has actually started.
     #[serde(default)]
     pub health: Option<Health>,
@@ -200,9 +194,6 @@ pub struct Service {
     /// Which media types it handles, in the stack manifest's vocabulary.
     #[serde(default)]
     pub media_types: Vec<String>,
-    /// Whether it needs the data root mounted.
-    #[serde(default)]
-    pub takes_data: bool,
     /// The capabilities this service claims.
     ///
     /// A core name comes from the published vocabulary and means the contracted thing
@@ -210,45 +201,9 @@ pub struct Service {
     /// and is inert until something asks for it.
     #[serde(default)]
     pub provides: Vec<String>,
-    /// Where inside the container the one configuration directory is mounted.
-    ///
-    /// `/config` is a LinuxServer.io convention rather than a standard, and assuming
-    /// it made a whole class of image uninstallable: a plugin whose image reads its
-    /// configuration somewhere else would be generated a container mounting a
-    /// directory the application never reads, passing its health probe and losing
-    /// everything it had written the moment the container was replaced.
-    ///
-    /// The target is data; the source is still lemonfiber's, and there is still
-    /// exactly one of it.
-    #[serde(default)]
-    pub config_path: Option<String>,
-    /// Whether the configuration directory is mounted read-only.
-    #[serde(default)]
-    pub config_ro: bool,
-    /// Each further path mounted from inside its own configuration directory.
-    #[serde(default)]
-    pub mount: Vec<Mount>,
-    /// Absolute paths given scratch space in memory.
-    #[serde(default)]
-    pub tmpfs: Vec<String>,
-    /// Its environment, each variable one of four typed kinds of value.
-    #[serde(default)]
-    pub env: BTreeMap<String, Value>,
-    /// Who the container runs as.
-    #[serde(default)]
-    pub user_mode: Option<UserMode>,
-    /// How tightly the container is held.
-    #[serde(default)]
-    pub posture: Posture,
     /// The memory it expects to need, in MiB, never written as a limit.
     #[serde(default)]
     pub memory_mib: Option<u32>,
-    /// The most memory the container may hold, in MiB.
-    #[serde(default)]
-    pub mem_limit_mib: Option<u32>,
-    /// The capability whose filler's network it runs inside.
-    #[serde(default)]
-    pub network: Option<Network>,
     /// The adapter lemonfiber reaches it through, in the stack manifest's own shape.
     ///
     /// Named from a fixed set rather than supplied: a plugin cannot bring an adapter of
@@ -280,9 +235,7 @@ pub struct Service {
     /// port and the name the proxy answers for it.
     #[serde(default)]
     pub replaces: Option<String>,
-    /// The one privileged shape lemonfiber writes for this service, from a closed set.
-    #[serde(default)]
-    pub shape: Option<Shape>,
+}
 }
 
 /// Where a service's own configuration directory lands when it names nowhere.

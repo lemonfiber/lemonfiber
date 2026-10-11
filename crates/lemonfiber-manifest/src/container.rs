@@ -494,5 +494,6 @@ fn is_variable(name: &str) -> bool {
             .all(|letter| letter.is_ascii_uppercase() || letter.is_ascii_digit() || letter == '_')
 }
 
+mod fields;
 #[cfg(test)]
 mod tests;

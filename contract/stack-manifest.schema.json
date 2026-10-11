@@ -401,7 +401,7 @@
           "items": {"$ref": "#/$defs/StackClaim"}
         },
         "config_path": {
-          "description": "Where its configuration directory lands inside the container.",
+          "description": "Where inside the container its one configuration directory is mounted,\n`/config` where absent.",
           "type": ["string", "null"],
           "default": null
         },
@@ -510,7 +510,7 @@
           "default": null
         },
         "shape": {
-          "description": "Its privileged shape.",
+          "description": "The one privileged shape lemonfiber writes for it, from a closed set.",
           "anyOf": [
             {"$ref": "#/$defs/PluginShape"},
             {"type": "null"}

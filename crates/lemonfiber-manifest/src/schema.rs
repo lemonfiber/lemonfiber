@@ -5,11 +5,8 @@
 //! lemonfiber silently declines to wire up, because a typo that degrades into
 //! "no API integration" is indistinguishable from meaning it.
 
-use std::collections::BTreeMap;
-
 use serde::{Deserialize, Serialize};
 
-use crate::container::{Mount, Network, Posture, Publish, Shape, UserMode, Value};
 use crate::recognising::unrecognised;
 use crate::{is_compatible, Failure, SUPPORTED_SCHEMA_VERSIONS};
 
@@ -168,6 +165,7 @@ pub struct Form {
     pub composable: bool,
 }
 
+crate::container_fields! {
 /// One container in the stack.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -297,42 +295,7 @@ pub struct Service {
     /// the sum rather than counted as costing nothing.
     #[serde(default)]
     pub memory_mib: Option<u32>,
-    /// The most memory the container may hold, in MiB.
-    #[serde(default)]
-    pub mem_limit_mib: Option<u32>,
-    /// Each further port it publishes on its tier.
-    #[serde(default)]
-    pub publish: Vec<Publish>,
-    /// Whether it takes the data mount.
-    #[serde(default)]
-    pub takes_data: bool,
-    /// Where its configuration directory lands inside the container.
-    #[serde(default)]
-    pub config_path: Option<String>,
-    /// Whether its configuration directory is mounted read-only.
-    #[serde(default)]
-    pub config_ro: bool,
-    /// Each further path mounted from inside its own configuration directory.
-    #[serde(default)]
-    pub mount: Vec<Mount>,
-    /// Absolute paths given scratch space in memory.
-    #[serde(default)]
-    pub tmpfs: Vec<String>,
-    /// Its environment, each variable one of four typed kinds of value.
-    #[serde(default)]
-    pub env: BTreeMap<String, Value>,
-    /// Who the container runs as.
-    #[serde(default)]
-    pub user_mode: Option<UserMode>,
-    /// How tightly the container is held.
-    #[serde(default)]
-    pub posture: Posture,
-    /// The capability whose filler's network it runs inside.
-    #[serde(default)]
-    pub network: Option<Network>,
-    /// Its privileged shape.
-    #[serde(default)]
-    pub shape: Option<Shape>,
+}
 }
 
 impl Service {

@@ -578,11 +578,11 @@
           ]
         },
         "config_path": {
-          "description": "Where inside the container the one configuration directory is mounted.\n\n`/config` is a LinuxServer.io convention rather than a standard, and assuming\nit made a whole class of image uninstallable: a plugin whose image reads its\nconfiguration somewhere else would be generated a container mounting a\ndirectory the application never reads, passing its health probe and losing\neverything it had written the moment the container was replaced.\n\nThe target is data; the source is still lemonfiber's, and there is still\nexactly one of it.",
+          "description": "Where inside the container its one configuration directory is mounted,\n`/config` where absent.",
           "type": ["string", "null"],
           "default": null
         },
-        "config_ro": {"description": "Whether the configuration directory is mounted read-only.", "type": "boolean", "default": false},
+        "config_ro": {"description": "Whether its configuration directory is mounted read-only.", "type": "boolean", "default": false},
         "criticality": {"description": "How much its absence costs.", "$ref": "#/$defs/PluginCriticality"},
         "digest": {"description": "`sha256:…`. What actually runs.\n\nA tag is not a pin: it is a name the publisher can repoint, so the image\nreviewed and the image run can differ with nothing in the manifest changing.\nThe digest is what lemonfiber writes into the generated entry.", "type": "string"},
         "env": {
@@ -676,7 +676,7 @@
           "default": null
         },
         "shape": {
-          "description": "The one privileged shape lemonfiber writes for this service, from a closed set.",
+          "description": "The one privileged shape lemonfiber writes for it, from a closed set.",
           "anyOf": [
             {"$ref": "#/$defs/PluginShape"},
             {"type": "null"}
@@ -690,7 +690,7 @@
           "items": {"type": "string"}
         },
         "tag": {"description": "The human-readable version the digest corresponds to. Recorded and shown;\nnever resolved.", "type": "string"},
-        "takes_data": {"description": "Whether it needs the data root mounted.", "type": "boolean", "default": false},
+        "takes_data": {"description": "Whether it takes the data mount.", "type": "boolean", "default": false},
         "tmpfs": {
           "description": "Absolute paths given scratch space in memory.",
           "type": "array",
