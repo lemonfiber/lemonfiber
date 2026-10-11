@@ -152,6 +152,7 @@ families! {
     watch => "WATCH": "guarding the data location",
     wire => "WIRE": "choosing what fills a capability",
     wiring => "WIRING": "drift between services",
+    wish => "WISH": "a member searching for a title and asking for it",
     word => "WORD": "the glossary",
 }
 

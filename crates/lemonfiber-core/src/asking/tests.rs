@@ -209,3 +209,19 @@ fn a_limit_reads_as_a_sentence() {
         "3 requests a month"
     );
 }
+
+/// What a member is told about the policy they are under is said to them, and never in
+/// the operator's voice: nobody in the house is told that they themselves say yes.
+#[test]
+fn every_policy_is_said_to_the_household_in_its_own_words() {
+    for policy in Policy::ALL {
+        let said = policy.household();
+        assert!(!said.is_empty(), "{policy:?}");
+        assert!(!said.contains("you have said yes"), "{policy:?}: {said}");
+        assert_ne!(said, policy.means(), "{policy:?}");
+    }
+    assert_eq!(
+        Policy::EverythingWaits.household(),
+        "nothing arrives until whoever runs the house has said yes to it"
+    );
+}

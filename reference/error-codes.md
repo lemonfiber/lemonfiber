@@ -592,6 +592,23 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | ---- | ---- | -------- | ---- | ------ | ----- | ------- |
 | `WIRING-1` | `DRIFTED` | warning | 1 | 500 | 0.7.0 | Raised when a download client no longer files where lemonfiber wired it. |
 
+## `WISH` — a member searching for a title and asking for it
+
+| Code | Name | Severity | Exit | Status | Since | Summary |
+| ---- | ---- | -------- | ---- | ------ | ----- | ------- |
+| `WISH-1` | `NOT_A_SEARCH` | error | 1 | 400 | 0.18.0 | Said where the words searched for are too few or too many to search with. |
+| `WISH-2` | `NOT_A_PLACE` | error | 1 | 400 | 0.18.0 | Said where the place a search was asked to go on from is not one a page answered. |
+| `WISH-3` | `NOT_ASKABLE` | error | 1 | 404 | 0.18.0 | Said where no title this member may ask for goes by the id and kind named. |
+| `WISH-4` | `CANNOT_FETCH` | error | 1 | 409 | 0.18.0 | Said where the house cannot fetch that kind of title, or anything, right now. |
+| `WISH-5` | `ALREADY_HERE` | error | 1 | 409 | 0.18.0 | Said where the title asked for is already in the house. |
+| `WISH-6` | `NOTHING_LEFT` | error | 1 | 409 | 0.18.0 | Said where the member has asked for all their allowance lets them, until it frees up. |
+| `WISH-7` | `NO_ROOM` | error | 1 | 503 | 0.18.0 | Said where the house has no room for new things, which is the house's and nobody's limit. |
+| `WISH-8` | `NOT_WORKING` | error | 1 | 503 | 0.18.0 | Said where what answers the household's asks did not answer, so nothing was asked. |
+| `WISH-9` | `NOT_SET_UP` | error | 1 | 503 | 0.18.0 | Said where the house has nothing to search or ask with at all. |
+| `WISH-10` | `NOT_ITS_SEASON` | error | 1 | 400 | 0.18.0 | Said where a season named is not one the title has, or seasons were named for a film. |
+| `WISH-11` | `NOBODY_ASKING` | error | 1 | 400 | 0.18.0 | Said where nobody is named for something only a member can do. |
+| `WISH-12` | `NOT_A_MEMBER` | error | 1 | 404 | 0.18.0 | Said where the member named is not somebody in the household. |
+
 ## `WORD` — the glossary
 
 | Code | Name | Severity | Exit | Status | Since | Summary |

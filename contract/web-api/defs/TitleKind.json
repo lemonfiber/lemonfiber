@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Whether a title is a series or a film, as a member's search and ask name it.\n\nThe web surface's own name for [`Kind`], whose name an SDK already gives to the kinds\nof envelope: the same two words on the wire, under a name nothing else takes.",
+  "oneOf": [
+    {
+      "description": "A series.",
+      "type": "string",
+      "const": "tv"
+    },
+    {
+      "description": "A film.",
+      "type": "string",
+      "const": "movies"
+    }
+  ]
+}

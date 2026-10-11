@@ -105,6 +105,10 @@ kinds! {
     GRANT = "grant",
     /// How far a member got, as the media server now holds it.
     WATCHED = "watched",
+    /// One page of what a member's search for a title found, under their limits.
+    ASKABLE = "askable",
+    /// What asking for a title on a member's behalf came to.
+    ASKED = "asked",
     /// Where handing somebody's device the way onto the stack stands.
     HANDOFF = "handoff",
     /// What copying an operator's own records across came to.

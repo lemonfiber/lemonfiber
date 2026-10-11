@@ -80,8 +80,10 @@ fn a_member_is_offered_what_the_core_gives_a_member() {
     assert_eq!(
         available,
         [
+            "/api/actions/ask",
             "/api/actions/grant",
             "/api/actions/watched",
+            "/api/askable",
             "/api/held",
             "/api/held/{id}",
             "/api/playing",
@@ -117,10 +119,12 @@ fn a_key_is_offered_what_its_scope_admits_at_each_door() {
             .map(|(path, _)| path.clone())
             .collect()
     };
-    // Every served read, the logs and the bundle among them, and the event stream.
+    // Every served read, the logs and the bundle among them, and the event stream, but
+    // a member's search, which is a member's own and the operator's.
     let reads: Vec<String> = crate::read::table::OFFERED
         .iter()
         .chain(crate::read::published::BESIDE)
+        .filter(|read| **read != crate::read::table::ASKABLE)
         .map(|read| (*read).to_owned())
         .collect();
 
@@ -128,6 +132,10 @@ fn a_key_is_offered_what_its_scope_admits_at_each_door() {
     let mut sorted = reads.clone();
     sorted.sort();
     assert_eq!(available(&reading), sorted);
+    assert_eq!(
+        reading.capabilities.get(crate::read::table::ASKABLE),
+        Some(&Standing::Unpermitted)
+    );
 
     let acting = declared(&reaching(None), &key(Scope::Act));
     let callable = available(&acting);

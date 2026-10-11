@@ -32,8 +32,8 @@ mod asked;
 mod naming;
 
 use naming::{
-    diagnosing, following, household, moving, narrowed, part_way, removing, setting, shelf, titled,
-    watching,
+    askable, diagnosing, following, household, moving, narrowed, part_way, removing, setting,
+    shelf, titled, watching,
 };
 pub(crate) use naming::{THE_STACK, THIS_BINARY};
 
@@ -110,6 +110,13 @@ pub const BACKDROP: &str = "/api/held/{id}/backdrop";
 
 /// What a member was part-way through, and how far, most recent first.
 pub const WATCHING: &str = "/api/watching";
+
+/// One page of a member's search for titles the house does not hold yet, under their
+/// limits.
+///
+/// Named for what it answers rather than for searching: what a member is shown is what
+/// they may ask for, and a title outside their limits is never on it at all.
+pub const ASKABLE: &str = "/api/askable";
 
 /// What this machine keeps running when no terminal is open.
 pub const HOSTING: &str = "/api/hosting";
@@ -282,6 +289,7 @@ pub const OFFERED: &[&str] = &[
     HELD,
     TITLE,
     WATCHING,
+    ASKABLE,
     PLAYING,
     HOSTING,
     FRONT_DOOR,
@@ -345,6 +353,8 @@ pub struct Wanted {
     pub what: Option<String>,
     /// How many holdings a shelf answers with.
     pub most: Option<String>,
+    /// Where a page of a search said the next one begins.
+    pub after: Option<String>,
     /// The title a read is about, as its path names it.
     pub title: Option<String>,
 }
@@ -401,6 +411,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, Refusal> {
         to,
         what,
         most,
+        after,
         title,
     } = given;
     match read {
@@ -419,6 +430,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, Refusal> {
         PLAYING => watching(member),
         TITLE => titled(member, defaults.as_deref(), title),
         WATCHING => part_way(member, most),
+        ASKABLE => Ok(askable(member, term, after)),
         // Nothing asked of it, because what is hosted is a property of the machine
         // rather than of the caller: the two words that change it are actions, at the
         // other door, and a parameter here would let one surface be told a different

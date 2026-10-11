@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "id": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "kind": {
+      "type": [
+        "ref:TitleKind"
+      ],
+      "required": true
+    },
+    "stands": {
+      "type": [
+        "ref:Stands"
+      ],
+      "required": true
+    },
+    "title": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "year": {
+      "type": [
+        "integer|null/uint16"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

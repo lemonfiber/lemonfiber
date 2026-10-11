@@ -59,6 +59,8 @@ pub struct Season {
 )]
 #[serde(deny_unknown_fields)]
 pub struct Detail {
+    /// Where it stands in the house, taken whole.
+    pub status: MediaStatus,
     /// What it is about, in the service's words, where it has any.
     pub overview: Option<String>,
     /// Its certification in the region asked for, or nothing where it has none there.

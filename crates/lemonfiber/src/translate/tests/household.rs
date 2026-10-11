@@ -439,3 +439,49 @@ fn a_grant_and_progress_are_addressed_to_somebody() {
         }))
     );
 }
+
+/// A search is made as somebody, its words joined back into the title they said, and an
+/// ask names the title, its kind and the seasons of it.
+#[test]
+fn a_search_and_an_ask_are_made_as_somebody_in_the_house() {
+    use lemonfiber::cli::{HouseholdCommand, Wished};
+    use lemonfiber_core::app::Wishing;
+    use lemonfiber_core::ports::media::Kind;
+    use lemonfiber_core::ports::service::Wish;
+    assert_eq!(
+        super::super::household(
+            whom(None, false),
+            Some(HouseholdCommand::Search {
+                name: "ana".to_owned(),
+                term: vec!["harbour".to_owned(), "lights".to_owned()],
+                after: Some("next-place".to_owned()),
+            })
+        ),
+        Ok(Command::Wish(Wishing::Find {
+            member: "ana".to_owned(),
+            term: "harbour lights".to_owned(),
+            after: Some("next-place".to_owned()),
+        }))
+    );
+    for (wished, kind) in [(Wished::Tv, Kind::Tv), (Wished::Movies, Kind::Movies)] {
+        assert_eq!(
+            super::super::household(
+                whom(None, false),
+                Some(HouseholdCommand::Ask {
+                    name: "ana".to_owned(),
+                    id: "1399".to_owned(),
+                    kind: wished,
+                    seasons: vec![2, 3],
+                })
+            ),
+            Ok(Command::Wish(Wishing::Ask {
+                member: "ana".to_owned(),
+                wish: Wish {
+                    id: "1399".to_owned(),
+                    kind,
+                    seasons: vec![2, 3],
+                },
+            }))
+        );
+    }
+}

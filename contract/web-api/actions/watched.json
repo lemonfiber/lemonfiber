@@ -5,7 +5,7 @@
       "name": "name",
       "type": {
         "default": null,
-        "description": "Who an invitation is for, as they will sign in.",
+        "description": "Who an action addressed to somebody in the household is for, as they sign in.",
         "type": [
           "string",
           "null"
@@ -16,7 +16,7 @@
       "name": "id",
       "type": {
         "default": null,
-        "description": "The title or episode a player's progress is about, by the identifier the shelf\nlists it under.",
+        "description": "The title an action is about: the title or episode a player's progress is on,\nby the identifier the shelf lists it under, or the title a member asks for, by\nthe identifier their search listed it under.",
         "type": [
           "string",
           "null"
@@ -49,5 +49,5 @@
     }
   ],
   "consent": [],
-  "rehearsal": false
+  "rehearsal": true
 }

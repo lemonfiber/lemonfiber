@@ -40,7 +40,7 @@ use super::disturbance::Situation;
 use super::engine::Waiting;
 use super::plugins;
 use super::setup::SetupAction;
-use super::{Command, Ctx, Viewing};
+use super::{Command, Ctx, Viewing, Wishing};
 
 /// Why a search cannot be rehearsed.
 ///
@@ -171,6 +171,13 @@ const fn cannot(named: &'static str, why: &'static str) -> Asked {
 
 /// What a member's viewing requests are: each reports, and a rehearsal of a grant or of
 /// progress writes nothing to the media server.
+const fn wished(wishing: &Wishing) -> Asked {
+    match wishing {
+        Wishing::Find { .. } => reads("household search"),
+        Wishing::Ask { .. } => reports("household ask", &[kind::ASKED]),
+    }
+}
+
 const fn viewed(viewing: &Viewing) -> Asked {
     match viewing {
         Viewing::Title { .. } => reports("title", &[kind::TITLE]),
@@ -287,6 +294,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Household { .. } => reports("household", HOUSEHOLD),
         Command::Held { .. } => reports("held", &[kind::HELD]),
         Command::Viewing(viewing) => viewed(viewing),
+        Command::Wish(wishing) => wished(wishing),
         Command::Allowing(_) => reports("allow", HOUSEHOLD),
         Command::Deciding(_) => reports("decide", HOUSEHOLD),
         Command::Expiring(_) => reports("expiring", HOUSEHOLD),

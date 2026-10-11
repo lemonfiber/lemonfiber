@@ -390,5 +390,10 @@ fn every_policy_has_words_to_be_told_in() {
                 .is_some_and(|line| line.starts_with("What you may ask for: ")),
             "{said:?}"
         );
+        assert!(
+            said.first()
+                .is_some_and(|line| line.contains(policy.household())),
+            "a member was told the policy in the operator's words: {said:?}"
+        );
     }
 }

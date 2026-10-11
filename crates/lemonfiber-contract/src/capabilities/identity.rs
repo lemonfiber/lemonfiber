@@ -3,9 +3,9 @@
 //!
 //! Its first-run setup; the household's accounts, who somebody is by name and password,
 //! and whether a signed-in account still stands; invitations made, taken back and
-//! withdrawn; the libraries and the certificates an account's limits are said in; what one
-//! account may watch; switching an account off; the devices signed in to one; and whether
-//! a new device signs in by a code.
+//! withdrawn; the libraries and the certificates an account's limits are said in, and the
+//! country they are named for; what one account may watch; switching an account off; the
+//! devices signed in to one; and whether a new device signs in by a code.
 
 use lemonfiber_ports::service::{
     Allowed, Certificate, Household, Invited, MediaServer, Member, NamedLibrary, Session, Signed,
@@ -41,6 +41,8 @@ crate::contract! {
             fn libraries() -> Vec<NamedLibrary>;
             /// The certificates its rating table names.
             fn ratings() -> Vec<Certificate>;
+            /// The country its rating table names certificates for.
+            fn country() -> Option<String>;
             /// Set what one account may watch.
             fn allow(str id: &str, refer allowed: &Allowed as Allowed) -> ();
             /// Put an account where its person can claim it.

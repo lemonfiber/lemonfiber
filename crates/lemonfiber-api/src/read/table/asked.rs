@@ -24,10 +24,10 @@ use lemonfiber_core::error::Problem;
 use crate::refusal::Refusal;
 
 use super::{
-    Wanted, ALERTS, BACKDROP, BACKUPS, BANDWIDTH, BUNDLE, CATALOGUE, CHECKS, CLIENTS, CONFIG,
-    CREDENTIALS, EXPLAIN, FORMS, FRONT_DOOR, HELD, HOSTING, LOGS, NEWS, OUTBOUND, PLAYING, PLUGINS,
-    POSTER, QUALITY, REQUESTS, SERVICES, SPACE, STATUS, STORAGE, STORED, STUCK, TITLE, TRACE,
-    UNINSTALL, UPDATE, VERSION, WATCHING, WIRING,
+    Wanted, ALERTS, ASKABLE, BACKDROP, BACKUPS, BANDWIDTH, BUNDLE, CATALOGUE, CHECKS, CLIENTS,
+    CONFIG, CREDENTIALS, EXPLAIN, FORMS, FRONT_DOOR, HELD, HOSTING, LOGS, NEWS, OUTBOUND, PLAYING,
+    PLUGINS, POSTER, QUALITY, REQUESTS, SERVICES, SPACE, STATUS, STORAGE, STORED, STUCK, TITLE,
+    TRACE, UNINSTALL, UPDATE, VERSION, WATCHING, WIRING,
 };
 
 /// The parameter naming a form to narrow to.
@@ -75,6 +75,9 @@ const TO: &str = "to";
 /// Which of the two things that can be moved forward is being asked about.
 const WHAT: &str = "what";
 
+/// Where a page of a search said the next one begins.
+const AFTER: &str = "after";
+
 /// What each read takes, and nothing else.
 ///
 /// In the order the endpoints declare them, so this reads beside the routes rather
@@ -104,6 +107,7 @@ const TAKEN: &[(&str, &[&str])] = &[
     (POSTER, &[MEMBER, DEFAULTS]),
     (BACKDROP, &[MEMBER, DEFAULTS]),
     (WATCHING, &[MEMBER, MOST]),
+    (ASKABLE, &[MEMBER, TERM, AFTER]),
     (HOSTING, &[]),
     (FRONT_DOOR, &[]),
     (NEWS, &[]),
@@ -211,6 +215,7 @@ impl Asked {
             to: self.one(TO).map(str::to_owned),
             what: self.one(WHAT).map(str::to_owned),
             most: self.one(MOST).map(str::to_owned),
+            after: self.one(AFTER).map(str::to_owned),
             title: None,
         }
     }

@@ -59,7 +59,7 @@ pub use asked::{
     TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_NAME,
     TAKES_NARROWING, TAKES_PLUGIN, TAKES_POLICY, TAKES_PRESET, TAKES_PROGRESS, TAKES_REASON,
     TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING,
-    TAKES_SOURCE, TAKES_TERM, TAKES_TIER, TAKES_WAITING,
+    TAKES_SOURCE, TAKES_TERM, TAKES_TIER, TAKES_TITLE, TAKES_WAITING, TAKES_WISH,
 };
 pub(crate) use named::carried as reached;
 pub use named::{named, ByAKey, KEY_CALLABLE, OFFERED};
@@ -113,6 +113,9 @@ pub const fn answering(command: &Command) -> Answering {
         // a job's name is redeemed by the operator alone: behind one, the member would
         // never read the token their grant answers, and the operator would.
         | Command::Viewing(_)
+        // A member's ask is a few questions to the request service, answered to the
+        // member, who could not redeem a job's name.
+        | Command::Wish(_)
         | Command::Restore(Restoring {
             consent: RestoreConsent::List,
             ..

@@ -370,6 +370,7 @@ pub const TAKES_NAME: &[&str] = &[
     "household-allow",
     "grant",
     "watched",
+    "ask",
 ];
 
 /// The action whose command carries what the household may ask for.
@@ -509,5 +510,13 @@ pub const TAKES_APPROVED: &[&str] = &["plugin-install", "plugin-update"];
 pub const TAKES_DEVICE: &[&str] = &["grant"];
 
 /// The action whose command carries how far a member got through one title: the
-/// title, the position and whether they finished it, which are one report.
+/// position and whether they finished it, which are one report.
 pub const TAKES_PROGRESS: &[&str] = &["watched"];
+
+/// The actions whose command carries one title by its id: a player's progress on a title
+/// the house holds, and a member's ask for one it does not.
+pub const TAKES_TITLE: &[&str] = &["watched", "ask"];
+
+/// The action whose command carries what kind of title is asked for and which of its
+/// seasons, which are one wish.
+pub const TAKES_WISH: &[&str] = &["ask"];

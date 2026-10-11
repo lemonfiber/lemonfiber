@@ -44,7 +44,10 @@ pub(super) fn to_hand_over(
     }
     let mut said = Vec::new();
     if let Some(asking) = &member.asking {
-        said.push(format!("What you may ask for: {}.", asking.policy.means()));
+        said.push(format!(
+            "What you may ask for: {}.",
+            asking.policy.household()
+        ));
         said.push(asking.sentence().map_or_else(
             || "Nothing limits how much you may ask for.".to_owned(),
             |sentence| format!("Your limit: {sentence}."),

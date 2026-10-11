@@ -22,6 +22,7 @@ use std::collections::BTreeMap;
 
 use crate::app::targets::{household_requests, identity};
 use crate::app::{Ctx, Hostable, Whom};
+pub(crate) use allowance::{allowance_of, OwnAllowance};
 use naming::{library_titles, named_access, named_by_the_server, titled, Naming};
 
 use crate::asking::Policy;

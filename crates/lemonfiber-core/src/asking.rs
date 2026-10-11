@@ -118,6 +118,22 @@ impl Policy {
         }
     }
 
+    /// What it comes to for whoever asks, in the household's words rather than the
+    /// operator's.
+    #[must_use]
+    pub const fn household(self) -> &'static str {
+        match self {
+            Self::Trusted => "everything you ask for arrives without anybody saying yes first",
+            Self::WithinALimit => {
+                "everything you ask for arrives without anybody saying yes first, as long as \
+                 your allowance has room for it"
+            }
+            Self::EverythingWaits => {
+                "nothing arrives until whoever runs the house has said yes to it"
+            }
+        }
+    }
+
     /// Whether choosing this policy needs a limit named alongside it.
     #[must_use]
     pub(crate) const fn needs_a_limit(self) -> bool {

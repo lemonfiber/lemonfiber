@@ -16,4 +16,10 @@ requirement = [
   { id = "D4-R12", state = "done", evidence = ["lemonfiber-media-stack:stack.toml"] },
   { id = "D4-R13", state = "done", evidence = ["lemonfiber-media-stack:stack.toml"] },
   { id = "D4-R14", state = "done", evidence = ["lemonfiber-media-stack:stack.toml"] },
+  { id = "D4-R15", state = "done", evidence = ["crates/lemonfiber-core/src/wishing/find.rs", "crates/lemonfiber-core/src/wishing/limits.rs", "crates/lemonfiber-core/src/wishing/find/tests.rs"] },
+  { id = "D4-R16", state = "done", evidence = ["crates/lemonfiber-core/src/wishing/ask.rs", "crates/lemonfiber-api/src/actions/named/wishing.rs", "crates/lemonfiber-api/src/entitled.rs", "crates/lemonfiber-core/src/wishing/ask/tests.rs"] },
+  { id = "D4-R17", state = "done", evidence = ["crates/lemonfiber-core/src/wishing/place.rs", "crates/lemonfiber-core/src/wishing/find.rs", "crates/lemonfiber-core/src/wishing/place/tests.rs"] },
+  { id = "D4-R18", state = "done", evidence = ["crates/lemonfiber-core/src/wishing.rs", "crates/lemonfiber-core/src/wishing/find/tests.rs"] },
+  { id = "D4-R19", state = "done", evidence = ["crates/lemonfiber-core/src/wishing/limits.rs", "crates/lemonfiber-core/src/jellyfin/household.rs", "crates/lemonfiber-core/src/wishing/limits/tests.rs"] },
+  { id = "D4-R20", state = "done", evidence = ["crates/lemonfiber-core/src/wishing/ask.rs", "crates/lemonfiber-api/src/actions.rs", "crates/lemonfiber-core/src/seerr/searching.rs", "crates/lemonfiber-core/src/wishing/ask/tests.rs"] },
 ]

@@ -121,6 +121,15 @@
       "operation": "ratings"
     },
     {
+      "case": "country-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "country"
+    },
+    {
       "case": "allow-answers",
       "expect": {
         "conforms": true

@@ -5,7 +5,7 @@
       "name": "name",
       "type": {
         "default": null,
-        "description": "Who an invitation is for, as they will sign in.",
+        "description": "Who an action addressed to somebody in the household is for, as they sign in.",
         "type": [
           "string",
           "null"
@@ -25,5 +25,5 @@
     }
   ],
   "consent": [],
-  "rehearsal": false
+  "rehearsal": true
 }

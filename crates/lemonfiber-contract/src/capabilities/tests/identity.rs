@@ -88,6 +88,9 @@ impl Household for Upstream {
             age: 12,
         }])
     }
+    async fn country(&self) -> Result<Option<String>, Failure> {
+        Ok(Some("GB".to_owned()))
+    }
     async fn allow(&self, id: &str, allowed: &Allowed) -> Result<(), Failure> {
         self.tell(format!("allow {id} {allowed:?}"));
         Ok(())
@@ -143,6 +146,7 @@ async fn script<I: MediaServer + Household>(source: &I) -> Vec<String> {
         format!("{:?}", source.when_invited("2026-10-01").await),
         format!("{:?}", source.libraries().await),
         format!("{:?}", source.ratings().await),
+        format!("{:?}", source.country().await),
         format!("{:?}", source.allow("a7f3", &allowed).await),
         format!("{:?}", source.claimable("b8e4", &Allowed::default()).await),
         format!("{:?}", source.suspend("admin").await),

@@ -349,3 +349,71 @@ fn the_operator_and_a_read_key_read_what_is_playing_as_asked() {
         }
     }
 }
+
+/// A search for `member`.
+fn a_search(member: &str) -> Command {
+    Command::Wish(lemonfiber_core::app::Wishing::Find {
+        member: member.to_owned(),
+        term: "harbour".to_owned(),
+        after: Some("next-place".to_owned()),
+    })
+}
+
+/// An ask for `member`.
+fn an_ask(member: &str) -> Command {
+    Command::Wish(lemonfiber_core::app::Wishing::Ask {
+        member: member.to_owned(),
+        wish: lemonfiber_core::ports::service::Wish {
+            id: "1399".to_owned(),
+            kind: lemonfiber_core::ports::media::Kind::Tv,
+            seasons: vec![2],
+        },
+    })
+}
+
+#[test]
+fn a_member_searches_and_asks_as_themselves_whoever_they_named() {
+    use lemonfiber_core::keys::Scope;
+    let theirs = key(Scope::Member {
+        id: ASKING.to_owned(),
+        name: "ana".to_owned(),
+    });
+    for asking in [member(), theirs] {
+        assert_eq!(
+            may(&asking, Door::Reading, a_search(SOMEBODY_ELSE)),
+            Permitted::This(a_search(ASKING))
+        );
+        assert_eq!(
+            may(&asking, Door::Acting, an_ask(SOMEBODY_ELSE)),
+            Permitted::This(an_ask(ASKING))
+        );
+    }
+}
+
+#[test]
+fn the_operator_searches_and_asks_for_whoever_they_name_and_a_key_does_neither() {
+    use lemonfiber_core::keys::Scope;
+    assert_eq!(
+        may(&Caller::Operator, Door::Reading, a_search(SOMEBODY_ELSE)),
+        Permitted::This(a_search(SOMEBODY_ELSE))
+    );
+    assert_eq!(
+        may(&Caller::Operator, Door::Acting, an_ask(SOMEBODY_ELSE)),
+        Permitted::This(an_ask(SOMEBODY_ELSE))
+    );
+    for scope in [Scope::Read, Scope::Act] {
+        let keyed = key(scope);
+        assert_eq!(
+            may(&keyed, Door::Reading, a_search(ASKING)),
+            Permitted::Nothing
+        );
+        assert!(matches!(
+            may(&keyed, Door::Acting, an_ask(ASKING)),
+            Permitted::NotForAKey(_)
+        ));
+        assert_eq!(
+            may(&keyed, Door::Reading, Command::Version),
+            Permitted::This(Command::Version)
+        );
+    }
+}

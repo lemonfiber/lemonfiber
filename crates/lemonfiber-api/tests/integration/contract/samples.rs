@@ -213,6 +213,8 @@ fn serving() -> Vec<Outcome> {
         Outcome::PartWay(lemonfiber_core::model::PartWayReport::default()),
         Outcome::Granted(lemonfiber_core::model::GrantReport::default()),
         Outcome::Watched(lemonfiber_core::model::WatchedReport::default()),
+        Outcome::Askable(a_search()),
+        Outcome::Asked(an_ask()),
         Outcome::Stuck(StuckReport::default()),
         Outcome::Invitation(lemonfiber_core::model::Invitation {
             name: "ana".to_owned(),
@@ -502,6 +504,60 @@ fn a_title() -> lemonfiber_core::model::TitleReport {
                 }],
             }],
         }),
+        rehearsed: false,
+    }
+}
+
+/// One page of a member's search, with every field a page can carry.
+fn a_search() -> lemonfiber_core::model::AskableReport {
+    use lemonfiber_core::asking::{Policy, Standing};
+    use lemonfiber_core::model::{
+        Askable, AskableReport, Counted, MemberAsking, Stands, TitleKind,
+    };
+    let counted = |limit, used| Counted {
+        limit: Some(limit),
+        used,
+        remaining: Some(limit - used),
+        period: Some("a month".to_owned()),
+    };
+    AskableReport {
+        member: "ana".to_owned(),
+        term: "harbour".to_owned(),
+        kinds: vec![TitleKind::Tv, TitleKind::Movies],
+        titles: vec![Askable {
+            id: "1399".to_owned(),
+            kind: TitleKind::Tv,
+            title: "Harbour Lights".to_owned(),
+            year: Some(2011),
+            stands: Stands::Askable,
+        }],
+        next: Some("eyJwYWdlIjoyLCJzaG93biI6WyIxMzk5Il19".to_owned()),
+        asking: MemberAsking {
+            policy: Policy::EverythingWaits,
+            standing: Standing::WithinQuota,
+            films: counted(2, 1),
+            television: counted(5, 0),
+            frees_up: Some("2026-11-04T10:00:00Z".to_owned()),
+        },
+        approval: "Nothing arrives until whoever runs the house has said yes to it.".to_owned(),
+    }
+}
+
+/// What asking for a series came to, with every field an answer can carry.
+fn an_ask() -> lemonfiber_core::model::AskedReport {
+    use lemonfiber_core::model::{AskedReport, Became, LeftAfter, TitleKind};
+    AskedReport {
+        member: "ana".to_owned(),
+        title: "1399".to_owned(),
+        kind: TitleKind::Tv,
+        seasons: vec![3],
+        outcome: Became::Waiting,
+        leaves: LeftAfter {
+            films: Some(1),
+            television: Some(4),
+        },
+        released: true,
+        said: "Asked. Whoever runs the house will say yes or no.".to_owned(),
         rehearsed: false,
     }
 }

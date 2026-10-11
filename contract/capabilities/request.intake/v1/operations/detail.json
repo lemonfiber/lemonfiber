@@ -85,9 +85,14 @@
                         "$ref": "#/$defs/Season"
                       },
                       "type": "array"
+                    },
+                    "status": {
+                      "$ref": "#/$defs/MediaStatus",
+                      "description": "Where it stands in the house, taken whole."
                     }
                   },
                   "required": [
+                    "status",
                     "released",
                     "seasons"
                   ],

@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "films": {
+      "type": [
+        "integer|null/uint32"
+      ],
+      "required": false
+    },
+    "television": {
+      "type": [
+        "integer|null/uint32"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

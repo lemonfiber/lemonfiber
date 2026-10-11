@@ -1,0 +1,47 @@
+{
+  "fields": {
+    "approval": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "asking": {
+      "type": [
+        "ref:MemberAsking"
+      ],
+      "required": true
+    },
+    "kinds": {
+      "type": [
+        "array[ref:TitleKind]"
+      ],
+      "required": true
+    },
+    "member": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "next": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "term": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "titles": {
+      "type": [
+        "array[ref:Askable]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

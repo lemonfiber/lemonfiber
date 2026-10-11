@@ -10,7 +10,9 @@
 //! The reads that take nothing have no function here, which is the shape of the file
 //! rather than an omission: there is nothing for them to mean.
 
-use lemonfiber_core::app::{Command, Diagnosing, Removing, Tracing, Viewing, Waiting, Whom};
+use lemonfiber_core::app::{
+    Command, Diagnosing, Removing, Tracing, Viewing, Waiting, Whom, Wishing,
+};
 use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::uninstall::Tier;
 use lemonfiber_core::update::run as update;
@@ -262,4 +264,21 @@ pub(super) fn following(term: Option<String>, season: Option<&str>) -> Result<Co
         season,
         searching: false,
     }))
+}
+
+/// One page of a member's search.
+///
+/// Nothing is refused here. Who is named, the words and the place are each the core's to
+/// judge, so a search naming nobody or too little is refused there, in the household's
+/// own sentence, on every surface alike.
+pub(super) fn askable(
+    member: Option<String>,
+    term: Option<String>,
+    after: Option<String>,
+) -> Command {
+    Command::Wish(Wishing::Find {
+        member: member.unwrap_or_default(),
+        term: term.unwrap_or_default(),
+        after,
+    })
 }

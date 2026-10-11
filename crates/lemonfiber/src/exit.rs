@@ -218,6 +218,10 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::PartWay(_)
         | Outcome::Granted(_)
         | Outcome::Watched(_)
+        // A page of a search and an ask each arrived; a refusal already came back as a
+        // problem, and an ask already on its way is answered rather than refused.
+        | Outcome::Askable(_)
+        | Outcome::Asked(_)
         // What is hosted is a reading, and an install or a removal that could not be
         // carried out already comes back as a problem — so a report here is one that
         // arrived, whatever it says stands.

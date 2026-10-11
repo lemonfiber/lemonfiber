@@ -105,6 +105,20 @@ pub fn rated(named: &[Certificate], age: u32) -> Rated {
     }
 }
 
+/// The age this media server's own table holds a certificate at, or nothing where the
+/// table does not name it.
+///
+/// Compared without regard to case, since the same certificate is written `12a` by one
+/// source and `12A` by another.
+#[must_use]
+pub fn age_of(named: &[Certificate], certificate: &str) -> Option<u32> {
+    let wanted = certificate.trim();
+    named
+        .iter()
+        .find(|one| one.name.eq_ignore_ascii_case(wanted))
+        .map(|one| one.age)
+}
+
 /// The certificates a table names at one age, in the order it named them.
 ///
 /// Nothing where there is no such age, which is what an empty side of a [`Rated`]

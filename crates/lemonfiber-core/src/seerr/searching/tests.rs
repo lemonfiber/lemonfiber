@@ -122,6 +122,7 @@ async fn a_series_is_rated_by_region_and_never_offers_its_specials() {
         vec![(1, MediaStatus::Available), (2, MediaStatus::Unknown)]
     );
     assert_eq!(detail.overview, None);
+    assert_eq!(detail.status, MediaStatus::PartlyAvailable);
 }
 
 #[tokio::test]
@@ -139,6 +140,7 @@ async fn a_title_with_no_certification_in_the_region_has_none_and_one_not_out_is
 
     assert_eq!(detail.certification, None);
     assert!(!detail.released);
+    assert_eq!(detail.status, MediaStatus::Unknown);
 }
 
 #[tokio::test]
@@ -204,10 +206,14 @@ async fn an_ask_is_filed_for_the_member_with_every_season_or_the_ones_named() {
     assert_eq!(
         bodies,
         vec![
-            serde_json::json!({"mediaType":"tv","mediaId":1399,"userId":4,"seasons":"all"}),
-            serde_json::json!({"mediaType":"tv","mediaId":1399,"userId":4,"seasons":[2,3]}),
+            serde_json::json!({"mediaType":"tv","mediaId":1399,"seasons":"all"}),
+            serde_json::json!({"mediaType":"tv","mediaId":1399,"seasons":[2,3]}),
         ]
     );
+    assert!(http.requests().iter().all(|asked| asked
+        .headers
+        .iter()
+        .any(|(name, value)| name == "X-API-User" && value == "4")));
 }
 
 #[tokio::test]
@@ -246,6 +252,6 @@ async fn a_film_is_asked_for_without_seasons_and_an_unnamed_member_or_title_is_r
             .first()
             .and_then(|asked| asked.body.as_deref())
             .and_then(|body| serde_json::from_str::<serde_json::Value>(body).ok()),
-        Some(serde_json::json!({"mediaType":"movie","mediaId":603,"userId":4}))
+        Some(serde_json::json!({"mediaType":"movie","mediaId":603}))
     );
 }

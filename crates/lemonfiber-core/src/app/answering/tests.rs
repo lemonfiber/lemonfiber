@@ -1,5 +1,7 @@
 use super::answered_under;
-use crate::app::command::{Asking, Diagnosing, Keeping, Linking, MigrateAction, Tracing, Whom};
+use crate::app::command::{
+    Asking, Diagnosing, Keeping, Linking, MigrateAction, Tracing, Whom, Wishing,
+};
 use crate::app::{plugins, rehearsal, Command};
 use crate::model::kind::{self, Kind};
 
@@ -62,6 +64,14 @@ fn reading() -> Vec<(Command, Kind)> {
         (Command::Plugins(plugins::Asked::Installed), kind::PLUGINS),
         (Command::Wiring(Linking::Read), kind::WIRING),
         (Command::Playing { member: None }, kind::PLAYING),
+        (
+            Command::Wish(Wishing::Find {
+                member: "Ada".to_owned(),
+                term: "harbour".to_owned(),
+                after: None,
+            }),
+            kind::ASKABLE,
+        ),
     ]
 }
 

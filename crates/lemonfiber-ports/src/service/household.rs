@@ -187,6 +187,17 @@ pub trait Household: Send + Sync {
     /// Returns [`Failure`] when the server is unreachable or refuses.
     async fn ratings(&self) -> Result<Vec<Certificate>, Failure>;
 
+    /// The country [`Household::ratings`] names its certificates for, as its two-letter
+    /// ISO 3166-1 code, or nothing where the server keeps none.
+    ///
+    /// A certification read anywhere else is said in this country's words, so it can be
+    /// held against the same table an account's age limit is.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when the server is unreachable or refuses.
+    async fn country(&self) -> Result<Option<String>, Failure>;
+
     /// Set what one account may watch.
     ///
     /// The only write in this port that changes an account rather than making or

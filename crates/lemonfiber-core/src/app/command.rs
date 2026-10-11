@@ -30,6 +30,7 @@ mod teardown;
 mod tracing;
 mod uninstall;
 mod viewing;
+mod wishing;
 
 pub use alerts::AlertAction;
 pub use allowance::Allowance;
@@ -51,6 +52,7 @@ pub use teardown::Teardown;
 pub use tracing::Tracing;
 pub use uninstall::Removing;
 pub use viewing::Viewing;
+pub use wishing::Wishing;
 
 /// What a surface is asking for.
 ///
@@ -210,6 +212,8 @@ pub enum Command {
     /// One title, what a member was part-way through, a grant for a device to play on,
     /// or how far a member got.
     Viewing(Viewing),
+    /// A member's search for titles beyond the house, or their ask for one.
+    Wish(Wishing),
     /// Report what the media server is playing now: who is watching what, and where.
     ///
     /// Every session in the house, or one member's. A member asking is answered with

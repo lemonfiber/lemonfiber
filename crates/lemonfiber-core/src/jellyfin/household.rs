@@ -28,6 +28,9 @@ use crate::ports::service::{
 /// Where the media server lists every session signed in, and what each is playing.
 const SESSIONS: &str = "/Sessions";
 
+/// The configuration field naming the country its rating table and metadata are read for.
+const METADATA_COUNTRY: &str = "MetadataCountryCode";
+
 /// The account list, as the media server names its fields.
 #[derive(serde::Deserialize)]
 struct UserResource {
@@ -308,6 +311,15 @@ impl crate::ports::service::Household for Jellyfin {
                 })
             })
             .collect())
+    }
+
+    async fn country(&self) -> Result<Option<String>, Failure> {
+        let configuration = super::cors::configuration(self).await?;
+        Ok(configuration
+            .get(METADATA_COUNTRY)
+            .and_then(serde_json::Value::as_str)
+            .filter(|code| code.len() == 2 && code.bytes().all(|byte| byte.is_ascii_alphabetic()))
+            .map(str::to_ascii_uppercase))
     }
 
     async fn allow(&self, id: &str, allowed: &Allowed) -> Result<(), Failure> {

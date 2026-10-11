@@ -193,6 +193,7 @@ fn the_contract_lists_every_refusal_at_the_status_it_is_answered_with() {
             + lemonfiber_core::wiring::REFUSED.len()
             + lemonfiber_core::app::plugins::REFUSALS.len()
             + lemonfiber_core::screening::REFUSALS.len()
+            + lemonfiber_core::wishing::REFUSALS.len()
     );
     for code in lemonfiber_core::wiring::UNREAD
         .iter()
