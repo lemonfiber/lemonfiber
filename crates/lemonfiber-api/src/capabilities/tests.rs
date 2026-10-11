@@ -1,6 +1,31 @@
 use super::{declared, served_at, Standing};
 use crate::admission::Caller;
+use crate::read::published::{Ruled, BESIDE};
 use lemonfiber_core::config::{Reaching, Settings, REACH_REGISTRY_KEY};
+use lemonfiber_core::keys::Scope;
+
+/// A key named for the integration that holds it, scoped to `scope`.
+fn key(scope: Scope) -> Caller {
+    Caller::Key(crate::admission::Keyed {
+        name: "home-assistant".to_owned(),
+        scope,
+    })
+}
+
+/// One caller of every kind and scope a request can arrive as.
+fn every_caller() -> [Caller; 6] {
+    [
+        Caller::Machine,
+        Caller::Operator,
+        Caller::Member("ana".to_owned()),
+        key(Scope::Read),
+        key(Scope::Act),
+        key(Scope::Member {
+            id: "ana".to_owned(),
+            name: "Ana".to_owned(),
+        }),
+    ]
+}
 
 /// A context where `refused` is switched off, or nothing is.
 fn reaching(refused: Option<&'static str>) -> lemonfiber_core::app::Ctx {
@@ -20,7 +45,7 @@ fn every_path() -> Vec<String> {
         .chain(
             crate::read::table::OFFERED
                 .iter()
-                .chain(crate::read::published::BESIDE)
+                .chain(BESIDE.iter().map(|(read, _)| read))
                 .map(|read| (*read).to_owned()),
         )
         .collect();
@@ -106,14 +131,6 @@ fn a_member_is_offered_what_the_core_gives_a_member() {
 /// action, and a key that may act the actions a key may call as well.
 #[test]
 fn a_key_is_offered_what_its_scope_admits_at_each_door() {
-    use lemonfiber_core::keys::Scope;
-
-    let key = |scope| {
-        Caller::Key(crate::admission::Keyed {
-            name: "home-assistant".to_owned(),
-            scope,
-        })
-    };
     let available = |declared: &super::Capabilities| -> Vec<String> {
         declared
             .capabilities
@@ -127,7 +144,7 @@ fn a_key_is_offered_what_its_scope_admits_at_each_door() {
     // the operator's.
     let reads: Vec<String> = crate::read::table::OFFERED
         .iter()
-        .chain(crate::read::published::BESIDE)
+        .chain(BESIDE.iter().map(|(read, _)| read))
         .filter(|read| {
             ![
                 crate::read::table::ASKABLE,
@@ -194,6 +211,7 @@ fn the_logs_and_the_bundle_are_listed_and_kept_from_a_member() {
     let operator = declared(&reaching(None), &Caller::Operator);
     let member = declared(&reaching(None), &Caller::Member("ana".to_owned()));
     for read in [crate::read::table::LOGS, crate::read::table::BUNDLE] {
+        assert!(BESIDE.contains(&(read, Ruled::AllButAMember)), "{read}");
         assert_eq!(operator.capabilities.get(read), Some(&Standing::Available));
         assert_eq!(member.capabilities.get(read), Some(&Standing::Unpermitted));
     }
@@ -203,13 +221,6 @@ fn the_logs_and_the_bundle_are_listed_and_kept_from_a_member() {
 #[test]
 fn each_credential_is_told_its_scope() {
     use super::Scope as Said;
-    use lemonfiber_core::keys::Scope;
-    let key = |scope| {
-        Caller::Key(crate::admission::Keyed {
-            name: "home-assistant".to_owned(),
-            scope,
-        })
-    };
     let told = |caller: &Caller| declared(&reaching(None), caller).scope;
     assert_eq!(told(&Caller::Machine), Said::Operator);
     assert_eq!(told(&Caller::Operator), Said::Operator);
@@ -225,20 +236,48 @@ fn each_credential_is_told_its_scope() {
     );
 }
 
-/// A picture is offered to a member exactly where the read its route rules it as is: the
-/// title read for a title's two pictures, the search read for a found title's poster.
+/// A read served beside the table as a table read is offered to every caller exactly
+/// where that read is: the title read for a title's two pictures, the search read for a
+/// found title's poster.
 #[test]
-fn a_member_is_offered_the_pictures_of_what_they_may_read() {
-    let declared = declared(&reaching(None), &Caller::Member("ana".to_owned()));
-    for (picture, ruled_as) in crate::read::pictures::RULED_AS {
-        assert_eq!(
-            declared.capabilities.get(picture),
-            declared.capabilities.get(ruled_as),
-            "{picture}"
+fn a_read_ruled_as_a_table_read_is_offered_where_that_read_is() {
+    let ruled_as: Vec<(&str, &str)> = BESIDE
+        .iter()
+        .filter_map(|(read, ruled)| match ruled {
+            Ruled::As(table_read) => Some((*read, *table_read)),
+            Ruled::AllButAMember => None,
+        })
+        .collect();
+    assert_eq!(
+        ruled_as,
+        [
+            (crate::read::table::POSTER, crate::read::table::TITLE),
+            (crate::read::table::BACKDROP, crate::read::table::TITLE),
+            (
+                crate::read::table::ASKABLE_POSTER,
+                crate::read::table::ASKABLE
+            ),
+        ]
+    );
+    for (_, table_read) in &ruled_as {
+        assert!(
+            crate::read::table::OFFERED.contains(table_read),
+            "{table_read}"
         );
     }
+    for caller in every_caller() {
+        let declared = declared(&reaching(None), &caller);
+        for (read, table_read) in &ruled_as {
+            assert_eq!(
+                declared.capabilities.get(*read),
+                declared.capabilities.get(*table_read),
+                "{read} for {caller:?}"
+            );
+        }
+    }
+    let member = declared(&reaching(None), &Caller::Member("ana".to_owned()));
     assert_eq!(
-        declared.capabilities.get("/api/held/{id}/poster"),
+        member.capabilities.get(crate::read::table::POSTER),
         Some(&Standing::Available)
     );
 }
