@@ -402,6 +402,8 @@ fn undone(undo: &Undo) -> String {
         Action::Reconfigure { field, .. } => format!("put {field} back on {}", undo.target),
         Action::Revoke { name } => format!("revoked the key {name}"),
         Action::Reinstate { name } => format!("made the key {name} good again"),
+        Action::RevokeDevice { name } => format!("revoked the device key {name}"),
+        Action::ReinstateDevice { name } => format!("made the device key {name} good again"),
         Action::Resettle { name, .. } => format!("put the setting {name} back"),
         Action::Rehold { name, .. } => format!("put the secret {name} back"),
     }

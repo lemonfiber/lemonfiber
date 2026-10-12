@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Every device key this machine has registered, and what became of a revoke.",
+  "type": "object",
+  "properties": {
+    "keys": {
+      "description": "In the order they were registered.",
+      "type": "array",
+      "items": {
+        "$ref": "ListedDeviceKey.json"
+      }
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal: what revoking would come to, with nothing revoked.",
+      "type": "boolean"
+    },
+    "revoked": {
+      "description": "The device key this request revoked, where it revoked one.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "keys",
+    "rehearsed"
+  ]
+}

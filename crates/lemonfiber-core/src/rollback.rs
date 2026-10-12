@@ -258,6 +258,13 @@ pub fn standing(
             &format!("the key {name} was revoked, and a revoked key is never made good again"),
             Some("mint a new key for whatever still needs one"),
         ),
+        Kind::DeviceKeyRevoked { name } => Standing::refused(
+            &format!(
+                "the device key {name} was revoked, and a revoked device key is never made good \
+                 again"
+            ),
+            Some("register a new device key from the phone"),
+        ),
         Kind::Rewritten {
             path,
             previous,
@@ -270,6 +277,7 @@ pub fn standing(
         | Kind::Configured { .. }
         | Kind::KeyMinted { .. }
         | Kind::KeyCollected { .. }
+        | Kind::DeviceKeyRegistered { .. }
         | Kind::Setting { .. }
         | Kind::Secret { .. } => Standing::whole(),
     }

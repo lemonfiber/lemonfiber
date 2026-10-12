@@ -124,6 +124,13 @@ rcgen = { version = "0.14", default-features = false, features = ["crypto", "rin
 # Verifying the signature a registry offers beside an image, with the library rustls
 # already builds on.
 ring = "0.17"
+# Reading the certificates a phone's attestation carries, and the Android key description
+# inside one. Already in the tree via rcgen; its own signature checks are left off, and
+# each signature is checked with ring against the algorithms a device key accepts.
+x509-parser = "0.18"
+# Reading the CBOR an App Attest attestation object is written in. No dependencies of
+# its own with its defaults off.
+minicbor = { version = "2", default-features = false, features = ["alloc"] }
 # Reading a secret without echoing it needs raw-terminal control, which
 # `unsafe_code = "forbid"` rules out doing directly.
 rpassword = "7"

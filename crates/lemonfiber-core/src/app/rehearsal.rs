@@ -311,6 +311,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Bandwidth(_) => reports("bandwidth", &[kind::BANDWIDTH]),
         Command::Downloads { .. } => reports("downloads", &[kind::PAUSING]),
         Command::Keys(asked) => keyed::keyed(asked),
+        Command::DeviceKeys(asked) => keyed::devices(asked),
         Command::Uninstall(_) => reports("uninstall", &[kind::UNINSTALL]),
         // A guard is the one command with no ending of its own, so a rehearsal of it
         // cannot be the command run with the last step left out — it would hold the

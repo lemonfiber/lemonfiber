@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "keys": {
+      "type": [
+        "array[ref:ListedDeviceKey]"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "revoked": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

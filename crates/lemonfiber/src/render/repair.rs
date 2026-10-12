@@ -126,6 +126,8 @@ fn restoring(action: &Action) -> String {
         Action::Repin { previous, .. } => format!("the version pinned back to {previous}"),
         Action::Revoke { name } => format!("the key {name} revoked"),
         Action::Reinstate { name } => format!("the key {name} good again"),
+        Action::RevokeDevice { name } => format!("the device key {name} revoked"),
+        Action::ReinstateDevice { name } => format!("the device key {name} good again"),
         Action::Resettle {
             name,
             value: Some(value),

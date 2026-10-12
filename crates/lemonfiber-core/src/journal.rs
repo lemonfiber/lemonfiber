@@ -193,6 +193,20 @@ pub enum Kind {
         /// What it admitted.
         scope: String,
     },
+    /// A device key was registered, to prove the operator from a phone. Undoing revokes
+    /// it.
+    DeviceKeyRegistered {
+        /// The device key's name, which identifies it for good.
+        name: String,
+        /// Where it lives, as its attestation said.
+        backing: String,
+    },
+    /// A device key was revoked. Nothing undoes it: a revoked device key is never made
+    /// good again, and the phone registers a new one.
+    DeviceKeyRevoked {
+        /// The device key's name.
+        name: String,
+    },
     /// A setting in the settings store was recorded or cleared.
     Setting {
         /// The setting's name.
@@ -283,6 +297,8 @@ impl Change {
                 Action::Revoke { name: name.clone() }
             }
             Kind::KeyRevoked { name, .. } => Action::Reinstate { name: name.clone() },
+            Kind::DeviceKeyRegistered { name, .. } => Action::RevokeDevice { name: name.clone() },
+            Kind::DeviceKeyRevoked { name } => Action::ReinstateDevice { name: name.clone() },
             Kind::Setting {
                 name,
                 previous,
@@ -427,6 +443,19 @@ pub enum Action {
     /// minted a new one.
     Reinstate {
         /// The key's name.
+        name: String,
+    },
+    /// Revoke the device key a registration made.
+    RevokeDevice {
+        /// The device key's name.
+        name: String,
+    },
+    /// Make a revoked device key good again.
+    ///
+    /// Worked out so the record of a revoke has a reversal to name, and never carried
+    /// out, for the reason [`Action::Reinstate`] never is.
+    ReinstateDevice {
+        /// The device key's name.
         name: String,
     },
     /// Put a setting in the settings store back to what it held.

@@ -57,6 +57,7 @@
     "wiring-fill": "actions/wiring-fill.json"
   },
   "bodies": {
+    "/api/device-keys": "bodies/device-keys.json",
     "/api/keys": "bodies/keys.json",
     "/api/keys/claim": "bodies/keys-claim.json",
     "/api/session": "bodies/session.json",
@@ -83,6 +84,9 @@
     "config": "kinds/config.json",
     "credentials": "kinds/credentials.json",
     "dashboard": "kinds/dashboard.json",
+    "device-challenge": "kinds/device-challenge.json",
+    "device-key": "kinds/device-key.json",
+    "device-keys": "kinds/device-keys.json",
     "doctor": "kinds/doctor.json",
     "error": "kinds/error.json",
     "forms": "kinds/forms.json",

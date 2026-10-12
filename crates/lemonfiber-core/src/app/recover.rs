@@ -299,6 +299,9 @@ fn carry_out(confined: &dyn Confined, action: &Action, env_file: &Path) -> Resul
         Action::Revoke { name } | Action::Reinstate { name } => {
             Ok(Step::BeyondReach(format!("the key {name}")))
         }
+        Action::RevokeDevice { name } | Action::ReinstateDevice { name } => {
+            Ok(Step::BeyondReach(format!("the device key {name}")))
+        }
         Action::Resettle {
             name,
             value,

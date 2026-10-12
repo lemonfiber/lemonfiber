@@ -63,6 +63,8 @@ fn diagnosis(
             | Outcome::Minted(_)
             | Outcome::KeyClaim(_)
             | Outcome::Keys(_)
+            | Outcome::DeviceKey(_)
+            | Outcome::DeviceKeys(_)
             | Outcome::Status(_)
             | Outcome::Repair(_)
             | Outcome::Undo(_)

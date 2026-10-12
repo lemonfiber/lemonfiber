@@ -146,7 +146,7 @@ pub fn shaped(offered: &str) -> bool {
 }
 
 /// Whether two digests are the same, looked at over every byte whatever is found.
-fn same(kept: &str, offered: &str) -> bool {
+pub(crate) fn same(kept: &str, offered: &str) -> bool {
     let (kept, offered) = (kept.as_bytes(), offered.as_bytes());
     kept.len() == offered.len()
         && kept

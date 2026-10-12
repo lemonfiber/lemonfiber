@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "challenge": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "expires": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

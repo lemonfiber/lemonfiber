@@ -264,6 +264,8 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Minted(report) => keys::minted(report),
         Outcome::KeyClaim(report) => keys::claimed(report),
         Outcome::Keys(report) => keys::listing(report),
+        Outcome::DeviceKey(report) => keys::registered(report),
+        Outcome::DeviceKeys(report) => keys::devices(report),
         Outcome::Removal(report) => removal::removal(report),
         Outcome::Outbound(report) => outbound::leaving(report),
         Outcome::Plugins(report) => plugin::installs(report),

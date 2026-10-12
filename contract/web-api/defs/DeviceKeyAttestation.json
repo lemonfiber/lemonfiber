@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "An attestation as a phone sends it, tagged by the platform that made it.",
+  "oneOf": [
+    {
+      "description": "An Android key attestation.",
+      "type": "object",
+      "properties": {
+        "chain": {
+          "description": "The chain, each certificate's DER in base64url, the key's own certificate\nfirst.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "platform": {
+          "type": "string",
+          "const": "android"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "platform",
+        "chain"
+      ]
+    },
+    {
+      "description": "An iOS App Attest attestation, made with the SHA-256 of exactly the bytes\n`public_key` decodes to as its client data hash.",
+      "type": "object",
+      "properties": {
+        "object": {
+          "description": "The attestation object's CBOR, in base64url.",
+          "type": "string"
+        },
+        "platform": {
+          "type": "string",
+          "const": "ios"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "platform",
+        "object"
+      ]
+    }
+  ]
+}

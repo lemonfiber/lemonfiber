@@ -159,6 +159,15 @@ impl Credential {
         })
     }
 
+    /// The SHA-256 of the verifier, in lower-case hex: what tells one password set apart
+    /// from the next without carrying the verifier anywhere.
+    #[must_use]
+    pub fn fingerprint(&self) -> String {
+        crate::secret::render(
+            ring::digest::digest(&ring::digest::SHA256, self.verifier.as_bytes()).as_ref(),
+        )
+    }
+
     /// What was kept, where it can be read back.
     #[must_use]
     pub fn parse(text: &str) -> Option<Self> {

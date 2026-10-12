@@ -75,6 +75,12 @@ kinds! {
     CREDENTIALS = "credentials",
     /// One moment of what the stack is doing, as the dashboard assembles it.
     DASHBOARD = "dashboard",
+    /// A challenge a phone signs to prove the operator for one mint.
+    DEVICE_CHALLENGE = "device-challenge",
+    /// A device key registered, to prove the operator from a phone.
+    DEVICE_KEY = "device-key",
+    /// Every device key this machine has registered, and what became of a revoke.
+    DEVICE_KEYS = "device-keys",
     /// What the diagnostic checks found.
     DOCTOR = "doctor",
     /// A command could not do what was asked.

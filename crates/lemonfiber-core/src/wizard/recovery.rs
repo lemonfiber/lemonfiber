@@ -154,6 +154,8 @@ pub fn described(change: &Change) -> String {
         // Not something a first run writes either, and named for the same reason.
         Kind::KeyMinted { name, .. } | Kind::KeyCollected { name, .. } => format!("the key {name}"),
         Kind::KeyRevoked { name, .. } => format!("the revoke of the key {name}"),
+        Kind::DeviceKeyRegistered { name, .. } => format!("the device key {name}"),
+        Kind::DeviceKeyRevoked { name } => format!("the revoke of the device key {name}"),
         Kind::Setting { name, .. } => format!("the setting {name}"),
         Kind::Secret { name, .. } => format!("the secret {name}"),
     }

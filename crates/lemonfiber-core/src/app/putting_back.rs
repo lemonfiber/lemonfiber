@@ -222,13 +222,18 @@ async fn carried_out(
         super::recover::reconfigured(ctx, &undos, &manifest.services, project.as_deref()).await;
     // A key goes back through the keys themselves, where the clock and the narrator a
     // revoke is heard through are; everything else on this machine goes back on disk.
-    let (revoking, left): (Vec<Undo>, Vec<Undo>) = reached
-        .left
-        .iter()
-        .cloned()
-        .partition(|undo| crate::keys::run::revoked_by(undo).is_some());
+    let (revoking, left): (Vec<Undo>, Vec<Undo>) = reached.left.iter().cloned().partition(|undo| {
+        crate::keys::run::revoked_by(undo).is_some()
+            || crate::device_keys::run::revoked_by(undo).is_some()
+    });
     for name in revoking.iter().filter_map(crate::keys::run::revoked_by) {
         crate::keys::run::undone(ctx, name).await?;
+    }
+    for name in revoking
+        .iter()
+        .filter_map(crate::device_keys::run::revoked_by)
+    {
+        crate::device_keys::run::undone(ctx, name).await?;
     }
     let carried = super::recover::carrying_out(
         ctx.seams.confined.as_ref(),
@@ -498,6 +503,9 @@ fn inverted(kind: &crate::journal::Kind) -> Option<crate::journal::Kind> {
                 scope: scope.clone(),
             })
         }
+        Kind::DeviceKeyRegistered { name, .. } => {
+            Some(Kind::DeviceKeyRevoked { name: name.clone() })
+        }
         Kind::Setting {
             name,
             previous,
@@ -527,7 +535,8 @@ fn inverted(kind: &crate::journal::Kind) -> Option<crate::journal::Kind> {
         | Kind::Region { .. }
         | Kind::Rewritten { .. }
         | Kind::Pinned { .. }
-        | Kind::KeyRevoked { .. } => None,
+        | Kind::KeyRevoked { .. }
+        | Kind::DeviceKeyRevoked { .. } => None,
     }
 }
 

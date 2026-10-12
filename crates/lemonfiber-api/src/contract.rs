@@ -200,6 +200,11 @@ fn beside(kinds: &mut BTreeMap<String, Schema>) {
         schema_for!(Envelope<Capabilities>),
     );
     describing(kinds, kind::DASHBOARD, schema_for!(Envelope<Snapshot>));
+    describing(
+        kinds,
+        kind::DEVICE_CHALLENGE,
+        schema_for!(Envelope<lemonfiber_core::device_keys::Challenged>),
+    );
     describing(kinds, kind::ERROR, schema_for!(Envelope<Problem>));
     describing(kinds, kind::JOB, schema_for!(Envelope<Started>));
     describing(kinds, kind::LOG, schema_for!(Envelope<LogLine>));
@@ -229,6 +234,7 @@ pub(crate) const CORE_REFUSALS: [&[Code]; 16] = [
     &lemonfiber_core::bandwidth::REFUSALS,
     &lemonfiber_core::glossary::REFUSALS,
     &lemonfiber_core::keys::REFUSALS,
+    &lemonfiber_core::device_keys::REFUSALS,
     &lemonfiber_core::screening::REFUSALS,
     &lemonfiber_core::SETTINGS_REFUSALS,
     &lemonfiber_core::space::REFUSALS,
@@ -275,6 +281,7 @@ fn bodies() -> BTreeMap<String, Schema> {
         .chain([
             crate::keys::body(),
             crate::keys::collecting_body(),
+            crate::device_keys::body(),
             crate::admission::body(),
         ])
         .map(|(route, schema)| (route.to_owned(), schema))

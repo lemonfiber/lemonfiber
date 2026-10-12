@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A challenge, as the phone is handed it to sign.",
+  "type": "object",
+  "properties": {
+    "challenge": {
+      "description": "The challenge, in base64url, signed as it is written here.",
+      "type": "string"
+    },
+    "expires": {
+      "description": "When it stops standing, one minute after it was issued.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "challenge",
+    "expires"
+  ]
+}

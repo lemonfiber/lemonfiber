@@ -1,0 +1,47 @@
+{
+  "fields": {
+    "app": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "backing": {
+      "type": [
+        "ref:DeviceKeyBacking"
+      ],
+      "required": true
+    },
+    "fingerprint": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "registered": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "revoked": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "used": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

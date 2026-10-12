@@ -49,6 +49,9 @@ tokio = { workspace = true, features = ["macros", "rt", "test-util"] }
 # Calling the assembled router as the service it is, so a test reaches an endpoint
 # through the guard rather than around it. Already in the tree, via axum.
 tower = { workspace = true, features = ["util"] }
+# Making a phone's key pair and signing a mint with it, as a phone does.
+ring = { workspace = true }
+base64 = { workspace = true }
 
 [lints]
 workspace = true

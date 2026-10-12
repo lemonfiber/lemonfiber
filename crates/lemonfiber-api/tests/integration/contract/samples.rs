@@ -370,7 +370,41 @@ fn keeping() -> Vec<Outcome> {
         Outcome::Minted(a_minted_key()),
         Outcome::KeyClaim(a_key_claim()),
         Outcome::Keys(every_key()),
+        Outcome::DeviceKey(a_device_key()),
+        Outcome::DeviceKeys(every_device_key()),
     ]
+}
+
+/// A device key registered from an Android phone's `StrongBox`.
+fn a_device_key() -> lemonfiber_core::device_keys::Registered {
+    lemonfiber_core::device_keys::Registered {
+        name: "pixel".to_owned(),
+        fingerprint: "cd".repeat(32),
+        backing: lemonfiber_core::device_keys::Backing::Strongbox,
+        app: format!("android:app.lemonfiber.companion@{}", "ef".repeat(32)),
+        registered: "2026-10-12T06:00:00".to_owned(),
+    }
+}
+
+/// One device key in use and one revoked, so every optional half is compared.
+fn every_device_key() -> lemonfiber_core::device_keys::Listing {
+    use lemonfiber_core::device_keys::{Backing, Listed, Listing};
+    let listed = |name: &str, backing: Backing| Listed {
+        name: name.to_owned(),
+        fingerprint: "cd".repeat(32),
+        backing,
+        app: "ios:ABCDE12345.app.lemonfiber.companion".to_owned(),
+        registered: "2026-10-12T06:00:00".to_owned(),
+        used: Some("2026-10-12T07:00:00".to_owned()),
+        revoked: None,
+    };
+    let mut gone = listed("old-phone", Backing::Tee);
+    gone.revoked = Some("2026-10-12T08:00:00".to_owned());
+    Listing {
+        keys: vec![listed("iphone", Backing::Enclave), gone],
+        revoked: Some("old-phone".to_owned()),
+        rehearsed: false,
+    }
 }
 
 /// A key just minted, with every optional half present: the address, the pin and a

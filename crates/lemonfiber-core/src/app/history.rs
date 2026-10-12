@@ -133,6 +133,10 @@ fn did(kind: &Kind) -> String {
         Kind::KeyRevoked { name, scope } => {
             format!("revoked the key {name}, with the scope {scope}")
         }
+        Kind::DeviceKeyRegistered { name, backing } => {
+            format!("registered the device key {name}, held in {backing}")
+        }
+        Kind::DeviceKeyRevoked { name } => format!("revoked the device key {name}"),
         Kind::Setting {
             name,
             current: Some(current),

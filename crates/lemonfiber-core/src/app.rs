@@ -513,6 +513,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Bandwidth(asked) => bandwidth::shared(ctx, &asked).await,
         Command::Downloads { asked, offer } => bandwidth::pausing::paused(ctx, asked, offer).await,
         Command::Keys(asked) => crate::keys::run::asked(ctx, asked).await,
+        Command::DeviceKeys(asked) => crate::device_keys::run::asked(ctx, asked).await,
         Command::Watch { forms } => watching(ctx, &forms).await,
         // Said onto whatever the surface is listening with, which is how a walk is
         // watched rather than read afterwards.

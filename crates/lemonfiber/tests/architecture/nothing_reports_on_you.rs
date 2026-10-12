@@ -178,6 +178,13 @@ const MINTING: &[(&str, &str)] = &[
          makes, no report sent anywhere and no bundle",
     ),
     (
+        "crates/lemonfiber-core/src/device_keys/challenge.rs",
+        "the challenge a phone signs to prove the operator for one mint. Drawn fresh for each \
+         asking, held in memory for one minute and spent by the first request presenting it, \
+         never written down — so it names one mint and nothing about the installation, and \
+         the next mint is handed another",
+    ),
+    (
         "crates/lemonfiber-core/src/journal/sealing.rs",
         "the key the change journal's credentials are sealed under, and a fresh nonce for each \
          value sealed with it. The key outlives the run and has to — a key made afresh opens \

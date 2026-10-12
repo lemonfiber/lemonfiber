@@ -128,16 +128,21 @@ const DASHBOARD: &str = "dashboard";
 /// command line is always the stack's own build, so it has nothing to ask. The door a
 /// key minted as a claim is collected at is a program's, on another machine, holding
 /// nothing but the claim: the operator mints the claim at the command line, and the
-/// command line has no key to collect.
+/// command line has no key to collect. The device-key routes are a phone's: a device
+/// key proves the operator for a mint asked over the web, and a command line at the
+/// machine proves nothing to anybody, so it registers, lists and challenges none.
 ///
 /// Anything else this surface routes belongs in a row.
-const UNREQUESTED: [&str; 6] = [
+const UNREQUESTED: [&str; 9] = [
     "/api/events",
     "/api/capabilities",
     "/api/actions/{action}",
     "/api/jobs/{job}",
     "/api/session",
     "/api/keys/claim",
+    "/api/device-keys",
+    "/api/device-keys/{name}",
+    "/api/device-keys/{name}/challenge",
 ];
 
 /// One row of the parity table.

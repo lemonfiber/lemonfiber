@@ -80,6 +80,8 @@ fn settings_of(
             | Outcome::Minted(_)
             | Outcome::KeyClaim(_)
             | Outcome::Keys(_)
+            | Outcome::DeviceKey(_)
+            | Outcome::DeviceKeys(_)
             | Outcome::Status(_)
             | Outcome::Doctor(_)
             | Outcome::Repair(_)
