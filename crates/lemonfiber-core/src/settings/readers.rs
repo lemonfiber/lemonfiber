@@ -19,7 +19,7 @@ impl Readers {
                 Value::Setting(setting) => (
                     &mut self.settings,
                     setting.setting.clone(),
-                    Some(crate::plugin::constant_text(&setting.default)),
+                    Some(crate::project::entry::constant_text(&setting.default)),
                 ),
                 Value::Secret(secret) => (
                     &mut self.secrets,

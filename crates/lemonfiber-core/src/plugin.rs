@@ -82,7 +82,7 @@ pub use claimed::{
     FailingAsDeclared, Ran, Unreadable, Verdict,
 };
 pub use conforming::{conformed, Conformed, Judged};
-pub(crate) use container::{constant_text, holding, secrets_file, variables};
+pub(crate) use container::{holding, secrets_file, unit, variables};
 pub use container::{profile, written, Holding, Reading, Variable};
 pub use declared::{Declaration, Secret};
 pub use fronting::{proxied as fronting_proxied, taken as label_taken, DASHBOARD, PROXY};
