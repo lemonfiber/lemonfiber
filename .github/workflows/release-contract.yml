@@ -185,7 +185,7 @@ jobs:
           echo "declared $marker for $TAG"
 
       - name: Hand it to the half that attaches it
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-contract
           path: ${{ runner.temp }}/attached/
@@ -199,7 +199,7 @@ jobs:
       contents: write
     steps:
       - name: Take what was gathered
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: release-contract
           path: attached

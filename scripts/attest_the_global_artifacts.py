@@ -48,7 +48,7 @@ GLOBAL_JOB_MAY_ATTEST = """  build-global-artifacts:
 
 # The action at the commit the platform jobs attest with, so both halves of a release
 # are attested by the same code.
-ATTEST_SHA, ATTEST_VERSION = pin_release_actions.PINNED["actions/attest@v4"]
+ATTEST_SHA, ATTEST_VERSION = pin_release_actions.pinned_in_the_tree()["actions/attest@v4"]
 ATTEST = f"actions/attest@{ATTEST_SHA} # {ATTEST_VERSION}"
 
 ATTESTED = (

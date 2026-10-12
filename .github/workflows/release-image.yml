@@ -91,7 +91,7 @@ jobs:
           persist-credentials: false
 
       - name: Take the Release run's musl archives
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ github.token }}
@@ -156,7 +156,7 @@ jobs:
           cp packaging/image/Dockerfile "$context/Dockerfile"
 
       - name: Hand the context to the half that pushes it
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-image-context
           path: ${{ runner.temp }}/context/
@@ -176,7 +176,7 @@ jobs:
       digest: ${{ steps.pushed.outputs.digest }}
     steps:
       - name: Take the context
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: release-image-context
           path: ${{ runner.temp }}/context
@@ -261,7 +261,7 @@ jobs:
             --digest "$DIGEST" --version "$VERSION" --out "$RUNNER_TEMP/templates"
 
       - name: Hand them to the half that attaches them
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-image-templates
           path: ${{ runner.temp }}/templates/
@@ -278,7 +278,7 @@ jobs:
       attestations: write
     steps:
       - name: Take the templates
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: release-image-templates
           path: templates
