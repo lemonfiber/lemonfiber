@@ -29,10 +29,32 @@ fn the_release_a_build_precedes_is_what_orders_it_against_everything_else() {
 }
 
 #[test]
-fn an_image_tag_keeps_the_reading_written_for_image_tags() {
-    // `4.0.15-ls123` is the same upstream release packaged differently, and
-    // `against` says so by refusing to order it rather than calling it earlier.
+fn two_tags_of_one_release_with_different_suffixes_are_not_ordered() {
     assert_eq!(against("4.0.15-ls123", "4.0.15"), Standing::Untellable);
+    assert_eq!(
+        against("4.0.20.3014-ls326", "4.0.20.3014-ls327"),
+        Standing::Untellable
+    );
+    assert_eq!(against("4.0", "4.0.0"), Standing::Same);
+}
+
+#[test]
+fn a_build_tag_is_ordered_by_the_release_it_carries() {
+    assert_eq!(against("9.0.0", "4.0.20.3014-ls327"), Standing::Later);
+    assert_eq!(against("4.0.14", "4.0.20.3014-ls327"), Standing::Earlier);
+    assert_eq!(
+        against("4.0.20.3014-ls327", "4.0.20.3014-ls327"),
+        Standing::Same
+    );
+    assert_eq!(step("4.0.14", "4.0.20.3014-ls327"), Jump::Patch);
+}
+
+#[test]
+fn a_release_that_is_not_a_run_of_numbers_is_not_ordered_whatever_its_build() {
+    assert_eq!(
+        against("5.2.4_v2.0.15-ls479", "5.2.4_v2.0.15-ls480"),
+        Standing::Untellable
+    );
 }
 
 #[test]

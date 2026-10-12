@@ -1,6 +1,8 @@
 //! What a finished run records, and what it waits for first.
 
-use super::{asking, behind, recording, reported, Coming, Kept, Machine, CURATOR_VERSIONS};
+use super::{
+    asking, behind, curator_pin, recording, reported, Coming, Kept, Machine, CURATOR_BEHIND,
+};
 use lemonfiber_core::app::{dispatch, Ctx, Waiting};
 use lemonfiber_core::archive::{Archiving, Vault};
 use lemonfiber_core::config::paths::Paths;
@@ -38,8 +40,8 @@ async fn a_confirmed_run_records_what_it_moved_and_where_the_capture_went() {
         r#""operation":"update""#.to_owned(),
         r#""target":"sonarr""#.to_owned(),
         r#""action":"pinned""#.to_owned(),
-        format!(r#""previous":"{}""#, CURATOR_VERSIONS.0),
-        format!(r#""current":"{}""#, CURATOR_VERSIONS.1),
+        format!(r#""previous":"{CURATOR_BEHIND}""#),
+        format!(r#""current":"{}""#, curator_pin()),
     ] {
         assert!(written.contains(&held), "{held} is missing from {written}");
     }
@@ -82,7 +84,7 @@ fn transferring(
             ..Settings::default()
         })
         .build()
-        .with_images(Pulled::holding(behind(&[("sonarr", CURATOR_VERSIONS.0)])))
+        .with_images(Pulled::holding(behind(&[("sonarr", CURATOR_BEHIND)])))
         .with_http(http)
         .with_archives(Archiving {
             paths: Paths::rooted(Path::new("/cfg"), Path::new("/data")),

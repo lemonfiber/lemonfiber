@@ -53,7 +53,7 @@ async fn a_manifest_names_the_containers_the_network_and_the_images_with_a_total
     );
     let image = manifest
         .as_ref()
-        .and_then(|manifest| named(manifest, CURATOR_IMAGE).first().cloned());
+        .and_then(|manifest| named(manifest, curator_image()).first().cloned());
     assert_eq!(image.as_ref().map(|item| item.sort), Some(Sort::Image));
     assert_eq!(image.and_then(|item| item.bytes), Some(400));
     assert_eq!(
@@ -467,7 +467,7 @@ async fn a_program_that_is_not_installed_is_reported_in_its_own_words() {
         .build()
         .with_filesystem(a_filesystem())
         .with_images(Pulled::holding(vec![Pulled::image(
-            CURATOR_IMAGE,
+            curator_image(),
             400,
             &["lemonfiber"],
         )]))
@@ -480,7 +480,7 @@ async fn a_program_that_is_not_installed_is_reported_in_its_own_words() {
     assert!(
         stuck
             .iter()
-            .any(|one| one.name == CURATOR_IMAGE && one.why.contains("docker")),
+            .any(|one| one.name == curator_image() && one.why.contains("docker")),
         "{stuck:?}"
     );
 }

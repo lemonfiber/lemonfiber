@@ -31,9 +31,16 @@ use crate::uninstall::{
 /// The data location every case here is about.
 const ROOT: &str = "/srv/media";
 
-/// One image this stack declares, named once so a case does not spell the digest twice.
-const CURATOR_IMAGE: &str =
-    "lscr.io/linuxserver/sonarr@sha256:f247545d23ba8b233d6604575347e48a623fe6ad75dda02348bf81917f3b5c06";
+/// The image this stack pins the curator at, read from the carried stack so a case
+/// follows the pin rather than spelling a digest that moves with every build.
+fn curator_image() -> &'static str {
+    static PINNED: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
+        lemonfiber_fixtures::stack::pinned("sonarr")
+            .map(|service| service.reference())
+            .unwrap_or_default()
+    });
+    &PINNED
+}
 
 /// Settings naming a project, a layout and a data location — the three a survey
 /// reads before it asks anything.
@@ -86,7 +93,7 @@ fn a_machine() -> Ctx {
     kept(
         running(Lifecycle::Running, Health::Healthy)
             .with_images(Pulled::holding(vec![Pulled::image(
-                CURATOR_IMAGE,
+                curator_image(),
                 400,
                 &["lemonfiber"],
             )]))

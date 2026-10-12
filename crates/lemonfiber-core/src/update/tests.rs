@@ -53,6 +53,20 @@ fn a_pin_older_than_what_is_running_is_refused_rather_than_attempted() {
 }
 
 #[test]
+fn a_new_build_of_the_release_running_is_offered_and_backed_up_first() {
+    let change = moving("4.0.20.3014-ls326", "4.0.20.3014-ls327");
+    let read = change.map(|one| (one.refused, one.irreversible));
+    assert_eq!(read, Some((false, true)));
+}
+
+#[test]
+fn a_build_tag_pin_older_than_what_is_running_is_refused() {
+    let change = moving("4.1.0", "4.0.20.3014-ls327");
+    let read = change.map(|one| (one.refused, one.irreversible));
+    assert_eq!(read, Some((true, false)));
+}
+
+#[test]
 fn versions_that_cannot_be_ordered_are_backed_up_rather_than_assumed_safe() {
     let change = moving("release-0.14.5", "0.14.6");
     let read = change.map(|one| (one.refused, one.irreversible, one.jump));

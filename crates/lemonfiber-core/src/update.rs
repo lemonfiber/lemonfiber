@@ -197,8 +197,8 @@ fn change(pin: &Ours, standing: &str) -> Option<Change> {
             true,
             false,
             format!(
-                "neither {standing} nor {} reads as a version, so which came first cannot be told \
-                 from the tags — it is backed up first rather than assumed safe",
+                "which of {standing} and {} came first cannot be told from the tags, so it is \
+                 backed up first rather than assumed safe",
                 pin.tag
             ),
         ),
