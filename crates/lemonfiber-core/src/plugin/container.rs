@@ -138,7 +138,7 @@ pub fn written(installed: &Installed, reading: &Reading<'_>) -> String {
                 .collect(),
         ),
     };
-    serde_yaml_ng::to_string(&document).unwrap_or_default()
+    serde_norway::to_string(&document).unwrap_or_default()
 }
 
 /// The document: services, and nothing else at the top.

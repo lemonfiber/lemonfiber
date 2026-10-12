@@ -12,7 +12,7 @@
 
 use std::path::PathBuf;
 
-use serde_yaml_ng::Value;
+use serde_norway::Value;
 
 /// One service a Compose file declares, and the file that declares it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -67,7 +67,7 @@ pub fn read(
 /// The services one file declares, each with its body, or none where it is not a
 /// Compose file this can read.
 fn in_file(text: &str) -> Vec<(String, Value)> {
-    let Ok(mut document) = serde_yaml_ng::from_str::<Value>(text) else {
+    let Ok(mut document) = serde_norway::from_str::<Value>(text) else {
         return Vec::new();
     };
     if document.apply_merge().is_err() {
@@ -197,7 +197,7 @@ fn resolve(value: &str, variable: &dyn Fn(&str) -> Option<String>) -> String {
 /// it, or nothing where the file gives it none.
 #[must_use]
 pub fn fixed_address(text: &str, service: &str, network: &str) -> Option<String> {
-    let document: Value = serde_yaml_ng::from_str(text).ok()?;
+    let document: Value = serde_norway::from_str(text).ok()?;
     document
         .get("services")?
         .get(service)?

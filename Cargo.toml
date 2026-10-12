@@ -138,7 +138,7 @@ serde_json = "1"
 # Compose files are YAML, and the single-mount rule can only be read from them. A
 # parser rather than line-matching, because anchors, merge keys and both volume
 # syntaxes have to read the way Compose reads them.
-serde_yaml_ng = "0.10"
+serde_norway = "0.9"
 # The syntax tree the architecture checks read the code as, on the line the
 # workspace's proc macros already build on.
 syn = { version = "3", default-features = false, features = ["clone-impls", "full", "parsing", "printing", "visit"] }

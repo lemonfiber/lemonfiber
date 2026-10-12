@@ -243,7 +243,7 @@ fn an_adapter_runs_as_the_operator_and_nothing_else_is_given_a_user() {
         .get("services")
         .and_then(|services| services.get("komga"))
         .and_then(|entry| entry.get("user"))
-        .and_then(serde_yaml_ng::Value::as_str)
+        .and_then(serde_norway::Value::as_str)
         .map(str::to_owned);
     assert_eq!(
         user.as_deref(),
@@ -417,7 +417,7 @@ fn mounts(document: &str) -> Vec<String> {
 /// container engine would make of the document; which keys are *written* is asked
 /// of the text itself, by [`keys`].
 fn list(document: &str, service: &str, key: &str) -> Vec<String> {
-    serde_yaml_ng::from_str::<serde_yaml_ng::Value>(document)
+    serde_norway::from_str::<serde_norway::Value>(document)
         .ok()
         .and_then(|read| {
             read.get("services")?
@@ -462,8 +462,8 @@ fn shapes() -> Vec<String> {
 }
 
 /// What an entry is, as a YAML reader reads it back.
-fn read(document: &str) -> serde_yaml_ng::Value {
-    serde_yaml_ng::from_str(document).unwrap_or_default()
+fn read(document: &str) -> serde_norway::Value {
+    serde_norway::from_str(document).unwrap_or_default()
 }
 
 #[test]
@@ -501,18 +501,18 @@ fn the_egress_guard_shape_adds_its_grant_and_its_device_and_nothing_else() {
     let entry = taken
         .get_mut("services")
         .and_then(|services| services.get_mut("komga"))
-        .and_then(serde_yaml_ng::Value::as_mapping_mut);
+        .and_then(serde_norway::Value::as_mapping_mut);
     let removed = entry.map(|entry| {
         let devices = entry.remove("devices");
         let granted = entry
             .get_mut("cap_add")
-            .and_then(serde_yaml_ng::Value::as_sequence_mut)
+            .and_then(serde_norway::Value::as_sequence_mut)
             .and_then(Vec::pop);
         (devices.is_some(), granted)
     });
     assert_eq!(
         removed,
-        Some((true, Some(serde_yaml_ng::Value::from("NET_ADMIN"))))
+        Some((true, Some(serde_norway::Value::from("NET_ADMIN"))))
     );
     assert_eq!(taken, read(&plain), "nothing else differs: {shaped}");
 }
@@ -554,7 +554,7 @@ fn every_entry_is_bounded_alike_whatever_it_declared() {
             ],
             "{entry}"
         );
-        let processes = serde_yaml_ng::from_str::<serde_yaml_ng::Value>(&entry)
+        let processes = serde_norway::from_str::<serde_norway::Value>(&entry)
             .ok()
             .and_then(|read| {
                 read.get("services")?
@@ -683,7 +683,7 @@ fn a_value_carrying_a_line_break_stays_one_value() {
         vec![LIBRARY.to_owned(), "./config/komga:/config".to_owned()],
         "got: {entry}"
     );
-    let read = serde_yaml_ng::from_str::<serde_yaml_ng::Value>(&entry).ok();
+    let read = serde_norway::from_str::<serde_norway::Value>(&entry).ok();
     let image = read
         .as_ref()
         .and_then(|read| read.get("services")?.get("komga")?.get("image")?.as_str());
