@@ -13,6 +13,18 @@ use lemonfiber_manifest::assembly::{ROOT, SERVICES};
 /// The stack this repository carries.
 pub const CARRIED: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/media-stack");
 
+/// The carried stack's service `id` as its manifest pins it, or nothing where the
+/// stack does not read or does not declare it.
+#[must_use]
+pub fn pinned(id: &str) -> Option<lemonfiber_manifest::Service> {
+    let text = lemonfiber_manifest::read(Path::new(CARRIED)).ok()?;
+    lemonfiber_manifest::Manifest::from_toml(&text)
+        .ok()?
+        .services
+        .into_iter()
+        .find(|service| service.id == id)
+}
+
 /// The carried stack's manifest files written into `into`, which is made if it is not
 /// there.
 pub fn manifest_into(into: &Path) {

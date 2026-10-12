@@ -11,7 +11,9 @@
 //! and a first-number change carries breaking changes far more often than the two
 //! behind it. Both readings come off the same parse, so they cannot disagree.
 //!
-//! Tags are compared as dotted runs of digits, with a leading `v` dropped. Anything
+//! Tags are compared by the dotted run of digits before the first `-`, with a leading
+//! `v` dropped: `4.0.20.3014-ls327` is release `4.0.20.3014`. Two tags of one release
+//! whose suffixes differ, a build or a pre-release, are not ordered at all. Anything
 //! that does not read that way answers [`Standing::Untellable`] rather than guessing:
 //! being wrong about which of two versions is later is the single failure this
 //! comparison exists to prevent, and a wrong answer here is somebody's library.
@@ -42,7 +44,8 @@ pub fn against(one: &str, two: &str) -> Standing {
     let mut right = second.iter();
     loop {
         match (left.next(), right.next()) {
-            (None, None) => return Standing::Same,
+            (None, None) if split(one).1 == split(two).1 => return Standing::Same,
+            (None, None) => return Standing::Untellable,
             // A tag with fewer parts is the earlier where the parts it has agree: 4.0
             // precedes 4.0.1, and treating the absent part as zero is what says so.
             (one, two) => {
@@ -136,12 +139,13 @@ pub fn step(one: &str, two: &str) -> Jump {
     }
 }
 
-/// The dotted run of numbers a tag opens with, or nothing where it does not.
+/// The dotted run of numbers a tag's release is, or nothing where it is not.
 ///
-/// Nothing rather than a partial reading: a tag this cannot take whole is one whose
-/// ordering it has no business asserting.
+/// Nothing rather than a partial reading: a release this cannot take whole is one
+/// whose ordering it has no business asserting.
 fn numbers(tag: &str) -> Option<Vec<u64>> {
-    let read = tag.strip_prefix('v').unwrap_or(tag);
+    let (release, _) = split(tag);
+    let read = release.strip_prefix('v').unwrap_or(release);
     if read.is_empty() {
         return None;
     }

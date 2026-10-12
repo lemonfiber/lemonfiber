@@ -35,8 +35,15 @@ use lemonfiber_fixtures::pulled::Pulled;
 use lemonfiber_fixtures::support::spoke;
 use tokio::sync::mpsc::{channel, Receiver};
 
-/// The version the manifest pins the curator at, and the one behind it.
-const CURATOR_VERSIONS: (&str, &str) = ("4.0.14", "4.0.20");
+/// A version of the curator behind the one the manifest pins.
+const CURATOR_BEHIND: &str = "4.0.14";
+
+/// The tag the carried stack pins the curator at.
+fn curator_pin() -> String {
+    lemonfiber_fixtures::stack::pinned("sonarr")
+        .map(|service| service.tag)
+        .unwrap_or_default()
+}
 
 /// How a service the run started comes back, once it has been started.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -444,7 +451,7 @@ fn recording(machine: &Arc<Machine>, archive: &Arc<Kept>, name: &str) -> (Ctx, P
             ..Settings::default()
         })
         .build()
-        .with_images(Pulled::holding(behind(&[("sonarr", CURATOR_VERSIONS.0)])))
+        .with_images(Pulled::holding(behind(&[("sonarr", CURATOR_BEHIND)])))
         .with_http(Fake::silent())
         .with_archives(Archiving {
             paths: Paths::rooted(Path::new("/cfg"), Path::new("/data")),

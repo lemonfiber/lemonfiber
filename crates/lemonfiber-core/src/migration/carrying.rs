@@ -100,8 +100,8 @@ fn verdict(ours: &Ours, existing: &str) -> CarryingReport {
         Standing::Untellable => (
             "cannot tell",
             format!(
-                "neither {existing} nor {} reads as a version, so which came first cannot be \
-                 told from the tags — it is backed up first rather than assumed safe",
+                "which of {existing} and {} came first cannot be told from the tags, so it is \
+                 backed up first rather than assumed safe",
                 ours.tag
             ),
             true,

@@ -1,4 +1,4 @@
-use super::{manifest_into, manifest_without, manifest_written};
+use super::{manifest_into, manifest_without, manifest_written, pinned};
 use crate::scratch::Scratch;
 
 #[test]
@@ -65,4 +65,15 @@ fn a_manifest_with_no_services_is_written_as_it_is() {
         Some("version = \n")
     );
     let _ = std::fs::remove_dir_all(&into);
+}
+
+#[test]
+fn a_pin_is_read_from_the_carried_stack_and_an_unknown_id_is_none() {
+    let read = pinned("sonarr").map(|service| (service.id.clone(), service.reference()));
+    assert!(
+        read.as_ref()
+            .is_some_and(|(id, reference)| id == "sonarr" && reference.contains("@sha256:")),
+        "{read:?}"
+    );
+    assert!(pinned("no-such-service").is_none());
 }

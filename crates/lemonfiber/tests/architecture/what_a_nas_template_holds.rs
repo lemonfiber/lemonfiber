@@ -113,19 +113,19 @@ fn serves_only_this_machine(words: &[String], whose: &str) {
 }
 
 /// The `lemonfiber` service of a Compose-shaped template.
-fn service(path: &str) -> serde_yaml_ng::Value {
-    let Ok(document) = serde_yaml_ng::from_str::<serde_yaml_ng::Value>(&read(path)) else {
+fn service(path: &str) -> serde_norway::Value {
+    let Ok(document) = serde_norway::from_str::<serde_norway::Value>(&read(path)) else {
         unreachable!("{path} is YAML");
     };
     field(&field(&document, "services"), "lemonfiber")
 }
 
 /// One key of a YAML mapping, or nothing where it is absent.
-fn field(value: &serde_yaml_ng::Value, key: &str) -> serde_yaml_ng::Value {
+fn field(value: &serde_norway::Value, key: &str) -> serde_norway::Value {
     value.get(key).cloned().unwrap_or_default()
 }
 
-fn strings(value: &serde_yaml_ng::Value) -> Vec<String> {
+fn strings(value: &serde_norway::Value) -> Vec<String> {
     value
         .as_sequence()
         .map(|items| {

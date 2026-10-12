@@ -13,14 +13,14 @@ fn with(fields: Fields) -> Placed {
     Placed { fields, ..placed() }
 }
 
-fn entry_of(text: &str) -> serde_yaml_ng::Value {
-    serde_yaml_ng::from_str::<serde_yaml_ng::Value>(text)
+fn entry_of(text: &str) -> serde_norway::Value {
+    serde_norway::from_str::<serde_norway::Value>(text)
         .ok()
         .and_then(|document| document.get("services")?.get("komga").cloned())
         .unwrap_or_default()
 }
 
-fn scalar(value: &serde_yaml_ng::Value) -> Option<String> {
+fn scalar(value: &serde_norway::Value) -> Option<String> {
     value
         .as_str()
         .map(str::to_owned)
@@ -28,15 +28,15 @@ fn scalar(value: &serde_yaml_ng::Value) -> Option<String> {
         .or_else(|| value.as_bool().map(|flag| flag.to_string()))
 }
 
-fn strings(entry: &serde_yaml_ng::Value, key: &str) -> Vec<String> {
+fn strings(entry: &serde_norway::Value, key: &str) -> Vec<String> {
     entry
         .get(key)
-        .and_then(serde_yaml_ng::Value::as_sequence)
+        .and_then(serde_norway::Value::as_sequence)
         .map(|items| items.iter().filter_map(scalar).collect())
         .unwrap_or_default()
 }
 
-fn text(entry: &serde_yaml_ng::Value, path: &[&str]) -> Option<String> {
+fn text(entry: &serde_norway::Value, path: &[&str]) -> Option<String> {
     path.iter()
         .try_fold(entry, |at, key| at.get(*key))
         .and_then(scalar)

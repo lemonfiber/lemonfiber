@@ -149,7 +149,7 @@ async fn a_backup_is_taken_before_configuration_is_destroyed() {
     let ctx = crate::app::fixtures::keeping(
         running(Lifecycle::Running, Health::Healthy)
             .with_images(Pulled::holding(vec![Pulled::image(
-                CURATOR_IMAGE,
+                curator_image(),
                 400,
                 &["lemonfiber"],
             )]))
@@ -187,7 +187,7 @@ async fn a_backup_is_taken_before_configuration_is_destroyed() {
 #[tokio::test]
 async fn an_image_another_project_is_standing_on_is_listed_and_kept() {
     let ctx = a_machine().with_images(Pulled::holding(vec![Pulled::image(
-        CURATOR_IMAGE,
+        curator_image(),
         400,
         &["lemonfiber", "someone-else"],
     )]));
@@ -195,7 +195,7 @@ async fn an_image_another_project_is_standing_on_is_listed_and_kept() {
     let manifest = read(&ctx, Tier::Services).await;
     let image = manifest
         .as_ref()
-        .and_then(|manifest| named(manifest, CURATOR_IMAGE).first().cloned());
+        .and_then(|manifest| named(manifest, curator_image()).first().cloned());
 
     assert!(
         image
@@ -215,7 +215,7 @@ async fn an_image_another_project_is_standing_on_is_listed_and_kept() {
 async fn a_shared_image_is_never_handed_to_the_engine_to_remove() {
     let runner = Arc::new(Recording::answering(Ok(spoke(""))));
     let ctx = watching(&runner).with_images(Pulled::holding(vec![Pulled::image(
-        CURATOR_IMAGE,
+        curator_image(),
         400,
         &["lemonfiber", "someone-else"],
     )]));
@@ -235,7 +235,7 @@ async fn a_shared_image_is_never_handed_to_the_engine_to_remove() {
 async fn an_image_only_this_stack_stands_on_is_handed_to_the_engine() {
     let runner = Arc::new(Recording::answering(Ok(spoke(""))));
     let ctx = watching(&runner).with_images(Pulled::holding(vec![Pulled::image(
-        CURATOR_IMAGE,
+        curator_image(),
         400,
         &["lemonfiber"],
     )]));
@@ -247,7 +247,7 @@ async fn an_image_only_this_stack_stands_on_is_handed_to_the_engine() {
         runner
             .seen()
             .iter()
-            .any(|argv| argv.iter().any(|word| word == CURATOR_IMAGE)),
+            .any(|argv| argv.iter().any(|word| word == curator_image())),
         "{:?}",
         runner.seen()
     );
@@ -278,7 +278,7 @@ async fn an_image_the_engine_would_not_remove_is_named_with_what_it_said() {
         lemonfiber_fixtures::support::refused("image is in use by a container"),
     )));
     let ctx = watching(&runner).with_images(Pulled::holding(vec![Pulled::image(
-        CURATOR_IMAGE,
+        curator_image(),
         400,
         &["lemonfiber"],
     )]));
@@ -289,13 +289,13 @@ async fn an_image_the_engine_would_not_remove_is_named_with_what_it_said() {
     assert!(
         stuck
             .iter()
-            .any(|one| one.name == CURATOR_IMAGE && one.why.contains("in use")),
+            .any(|one| one.name == curator_image() && one.why.contains("in use")),
         "{stuck:?}"
     );
     assert!(
         stuck
             .iter()
-            .any(|one| one.by_hand == format!("docker image rm {CURATOR_IMAGE}")),
+            .any(|one| one.by_hand == format!("docker image rm {}", curator_image())),
         "{stuck:?}"
     );
 }
@@ -339,7 +339,7 @@ async fn nothing_it_runs_or_hands_back_about_its_own_files_escalates() {
     let ctx = kept(
         watching(&runner)
             .with_images(Pulled::holding(vec![Pulled::image(
-                CURATOR_IMAGE,
+                curator_image(),
                 400,
                 &["lemonfiber"],
             )]))

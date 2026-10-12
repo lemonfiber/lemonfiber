@@ -147,7 +147,7 @@ fn talking_to_the_outside_world_only_happens_in_adapters() {
         // and the day something else wants either, it asks the module that already
         // knows how.
         (
-            "serde_yaml_ng",
+            "serde_norway",
             &["stack/mounts.rs", "stack/declared.rs", "plugin/container"],
         ),
         // Nor is this one. Hashing a password is pure, and it is confined for a

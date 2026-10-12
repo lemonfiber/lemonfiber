@@ -35,7 +35,7 @@ schemars = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 # Confined to `stack/mounts.rs`.
-serde_yaml_ng = { workspace = true }
+serde_norway = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 chacha20poly1305 = { workspace = true }

@@ -71,7 +71,7 @@ fn runtime(root: &Path) -> BTreeSet<PathBuf> {
         .collect();
     for file in composed {
         let text = std::fs::read_to_string(root.join(&file)).unwrap_or_default();
-        let named = serde_yaml_ng::from_str::<serde_yaml_ng::Value>(&text)
+        let named = serde_norway::from_str::<serde_norway::Value>(&text)
             .map(|document| mounted(&document))
             .unwrap_or_default();
         carried.extend(
@@ -114,18 +114,18 @@ fn within(root: &Path, directory: &Path, into: &mut BTreeSet<PathBuf>) {
 /// Every host path a compose document names for a service to mount or read: each
 /// volume's source, in either of the two ways Compose takes one, and each
 /// environment file.
-fn mounted(document: &serde_yaml_ng::Value) -> Vec<String> {
+fn mounted(document: &serde_norway::Value) -> Vec<String> {
     let mut named = Vec::new();
     let Some(services) = document
         .get("services")
-        .and_then(serde_yaml_ng::Value::as_mapping)
+        .and_then(serde_norway::Value::as_mapping)
     else {
         return named;
     };
     for service in services.values() {
         for volume in listed(service.get("volumes")) {
             match volume {
-                serde_yaml_ng::Value::String(short) => {
+                serde_norway::Value::String(short) => {
                     named.extend(short.split(':').next().map(str::to_owned));
                 }
                 long => named.extend(
@@ -143,9 +143,9 @@ fn mounted(document: &serde_yaml_ng::Value) -> Vec<String> {
 }
 
 /// A field Compose takes as one value or as a list of them, as a list.
-fn listed(field: Option<&serde_yaml_ng::Value>) -> Vec<&serde_yaml_ng::Value> {
+fn listed(field: Option<&serde_norway::Value>) -> Vec<&serde_norway::Value> {
     match field {
-        Some(serde_yaml_ng::Value::Sequence(each)) => each.iter().collect(),
+        Some(serde_norway::Value::Sequence(each)) => each.iter().collect(),
         Some(one) => vec![one],
         None => Vec::new(),
     }

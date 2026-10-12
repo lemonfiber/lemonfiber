@@ -38,6 +38,14 @@ fn a_database_newer_than_ours_is_refused_rather_than_attempted() {
 }
 
 #[test]
+fn a_database_newer_than_a_build_tag_s_release_is_refused() {
+    assert_eq!(
+        taking("4.1.0", "4.0.20.3014-ls327"),
+        Some(("downgrade".to_owned(), false, true))
+    );
+}
+
+#[test]
 fn versions_that_cannot_be_ordered_are_backed_up_rather_than_assumed_safe() {
     assert_eq!(
         taking("latest", "4.0.1"),

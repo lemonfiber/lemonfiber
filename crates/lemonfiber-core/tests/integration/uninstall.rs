@@ -29,9 +29,16 @@ use lemonfiber_fixtures::pulled::Pulled;
 use lemonfiber_fixtures::support::{spoke, Recording, Reporting, Scripted, SeedFs};
 use lemonfiber_fixtures::walking::Walking;
 
-/// One image this stack declares, named once so a case does not spell the digest twice.
-const CURATOR_IMAGE: &str =
-    "lscr.io/linuxserver/sonarr@sha256:f247545d23ba8b233d6604575347e48a623fe6ad75dda02348bf81917f3b5c06";
+/// The image this stack pins the curator at, read from the carried stack so a case
+/// follows the pin rather than spelling a digest that moves with every build.
+fn curator_image() -> &'static str {
+    static PINNED: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
+        lemonfiber_fixtures::stack::pinned("sonarr")
+            .map(|service| service.reference())
+            .unwrap_or_default()
+    });
+    &PINNED
+}
 
 /// Somewhere for the backup a destructive tier takes before anything goes.
 ///
@@ -262,7 +269,7 @@ async fn a_confirmed_removal_of_the_containers_hands_the_image_to_the_engine() {
     let runner = Arc::new(Recording::answering(Ok(spoke(""))));
     let ctx =
         running(&heard, Arc::clone(&runner) as Arc<dyn Runner>).with_images(Pulled::holding(vec![
-            Pulled::image(CURATOR_IMAGE, 400, &["lemonfiber"]),
+            Pulled::image(curator_image(), 400, &["lemonfiber"]),
         ]));
     let asked = Removing::surveying(Tier::Services).confirmed(true);
 
@@ -276,11 +283,11 @@ async fn a_confirmed_removal_of_the_containers_hands_the_image_to_the_engine() {
         Ok(_) | Err(_) => Vec::new(),
     };
 
-    assert!(gone.iter().any(|name| name == CURATOR_IMAGE), "{gone:?}");
+    assert!(gone.iter().any(|name| name == curator_image()), "{gone:?}");
     let about_the_image: Vec<Vec<String>> = runner
         .seen()
         .into_iter()
-        .filter(|argv| argv.iter().any(|word| word == CURATOR_IMAGE))
+        .filter(|argv| argv.iter().any(|word| word == curator_image()))
         .collect();
     assert_eq!(
         about_the_image,
@@ -288,7 +295,7 @@ async fn a_confirmed_removal_of_the_containers_hands_the_image_to_the_engine() {
             "docker".to_owned(),
             "image".to_owned(),
             "rm".to_owned(),
-            CURATOR_IMAGE.to_owned(),
+            curator_image().to_owned(),
         ]]
     );
 }

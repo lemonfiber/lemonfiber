@@ -22,7 +22,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-use serde_yaml_ng::Value;
+use serde_norway::Value;
 
 /// The variable the compose files name the data root by.
 const DATA_ROOT: &str = "DATA_ROOT";
@@ -125,7 +125,7 @@ fn declarations(files: &[(PathBuf, String)]) -> BTreeMap<Key, Declared> {
 /// Merge keys are applied first, so a stack written with YAML anchors is read the
 /// same way Compose reads it rather than as a service with no volumes at all.
 fn services_in(text: &str) -> Option<Vec<(String, Value)>> {
-    let mut document: Value = serde_yaml_ng::from_str(text).ok()?;
+    let mut document: Value = serde_norway::from_str(text).ok()?;
     document.apply_merge().ok()?;
     let services = document.get("services")?.as_mapping()?;
     Some(
