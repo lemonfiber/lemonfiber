@@ -20,7 +20,7 @@ Thirteen claims are read from the tree, and each is a claim rather than a string
   installers   every step that downloads and runs a script pins the URL and the
                  digest, reads the digest, and checks it
   pins         every action is used at a commit SHA, and every action this repo
-                 pins is used at the commit recorded for it
+                 pins is used at the commit every other workflow here uses
   tag          every step that runs a release command reads the tag from its own
                  env, and no step pastes it into a script
   token        the jobs holding `contents: write` are exactly the jobs that
@@ -68,6 +68,9 @@ import yaml
 
 WORKFLOW = pathlib.Path(".github/workflows/release.yml")
 CARGO = pathlib.Path("Cargo.toml")
+
+# Each action cargo-dist writes, at the commit and version the other workflows pin it to.
+PINNED = pin_release_actions.pinned_in_the_tree()
 
 RELEASE_CREATE = "gh release create"
 DOWNLOADS = ("curl ", "wget ", "Invoke-WebRequest", "iwr ", "irm ")
@@ -163,21 +166,19 @@ def claim_installers(workflow: dict, _cargo: dict) -> list[str]:
 
 
 def claim_pins(workflow: dict, _cargo: dict) -> list[str]:
-    """Every action is at a commit, and every pinned one is at the recorded commit.
+    """Every action is at a commit, and every pinned one is at the commit the rest of the tree uses.
 
-    The second half is the one that was missing, and its absence is not
-    theoretical. This asked only whether each pinned action still appeared by
-    name; Dependabot moved `actions/checkout` to v7.0.1 here and everywhere else
-    in this tree, the table went on holding v6's commit, and the next
-    `just release-workflow` would have put v6 back. The result is still a SHA and
-    still pinned, so nothing about the file would have looked wrong.
+    Dependabot moves an action in every workflow at once, this one included, and
+    `just release-workflow` pins from the others. So this file holding an action
+    at a commit the rest of the tree does not use is a file the recipe did not
+    write, and the release would run code nothing else here has agreed to.
     """
     problems = []
     for job, step in steps(workflow):
         uses = step.get("uses")
         if uses and not COMMIT_SHA.match(uses):
             problems.append(f"{where(job, step)} uses {uses}, which is not a commit")
-    for ref, (sha, _) in pin_release_actions.PINNED.items():
+    for ref, (sha, _) in PINNED.items():
         action = ref.split("@")[0]
         used = {
             str(step.get("uses"))
@@ -190,9 +191,9 @@ def claim_pins(workflow: dict, _cargo: dict) -> list[str]:
             )
         elif used != {f"{action}@{sha}"}:
             problems.append(
-                f"{action} is used at {', '.join(sorted(used))} and recorded here at "
-                f"{action}@{sha}, so the next regeneration would put the recorded one "
-                "back — a bump that only moved this file is a bump that gets undone"
+                f"{action} is used at {', '.join(sorted(used))} here and at "
+                f"{action}@{sha} in every other workflow, so the release would run "
+                "an action the rest of the tree has moved on from"
             )
     return problems
 
@@ -471,14 +472,14 @@ def claim_superseded_runs_cancel(workflow: dict, _cargo: dict) -> list[str]:
 
 def unpinned(workflow_text: str) -> str:
     """One action put back on the moving tag `dist generate` reaches it by."""
-    ref, (sha, version) = next(iter(pin_release_actions.PINNED.items()))
+    ref, (sha, version) = next(iter(PINNED.items()))
     action = ref.split("@")[0]
     return workflow_text.replace(f"uses: {action}@{sha} # {version}", f"uses: {ref}")
 
 
 def bumped(workflow_text: str) -> str:
     """One action moved to another commit, the way a bump bot moves it."""
-    ref, (sha, version) = next(iter(pin_release_actions.PINNED.items()))
+    ref, (sha, version) = next(iter(PINNED.items()))
     action = ref.split("@")[0]
     return workflow_text.replace(
         f"uses: {action}@{sha} # {version}", f"uses: {action}@{'f' * 40} # {version}"
