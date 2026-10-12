@@ -31,12 +31,12 @@ PINNED = {
     "actions/attest@v4": ("1e69f48acb82d1966a394da916b4c1698aa569d6", "v4"),
     "actions/checkout@v6": ("3d3c42e5aac5ba805825da76410c181273ba90b1", "v7.0.1"),
     "actions/download-artifact@v8": (
-        "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
-        "v8",
+        "9000827ccba6bdab643e8b6fd33ac0654aef8333",
+        "v8.0.2",
     ),
     "actions/upload-artifact@v7": (
-        "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
-        "v7",
+        "cf430e030ddbb5b0abf93d22962f4752f3646cd9",
+        "v7.0.2",
     ),
 }
 

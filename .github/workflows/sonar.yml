@@ -112,7 +112,7 @@ jobs:
       # report is a few megabytes and answers what the two steps above did not ask.
       - name: Keep the report the gate read
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-report
           path: report.json
@@ -120,7 +120,7 @@ jobs:
       # The report names each file by its absolute path, which is the same path in
       # the scan job's checkout: both run in this repository's workspace.
       - name: Hand the report to the scan
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: lcov
           path: lcov.info
@@ -154,7 +154,7 @@ jobs:
           fetch-depth: 0
       # Into the runner's temporary directory, never the workspace: the artifact
       # comes from the job that ran the repository's code.
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: lcov
           path: ${{ runner.temp }}/coverage
