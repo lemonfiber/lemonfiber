@@ -1,6 +1,6 @@
 services:
   prowlarr:
-    image: lscr.io/linuxserver/prowlarr:2.6.5.5623-ls162@sha256:f2b26429893d4c4cb71941b7ee50b1bdecd9d5f9f9e02d5410615e9f4f7c8d95
+    image: lscr.io/linuxserver/prowlarr:2.6.5.5623-ls163@sha256:f9151e5bc1025c6d0a630d503210cdcb6bb55a7cc098562609d96a408d838902
     profiles:
     - search
     restart: unless-stopped
@@ -295,7 +295,7 @@ services:
     - KILL
     pids_limit: 1024
   bindery:
-    image: ghcr.io/vavallee/bindery:v1.40.0@sha256:3dc411e335c239f15f162648a5b32db1c7b5b0e32cef5e811b6efb1be963fd80
+    image: ghcr.io/vavallee/bindery:v1.41.0@sha256:28871d79c624f92acae9dac91b1a20da2d9031cf7faa1967d88cee378f360c08
     profiles:
     - books
     restart: unless-stopped
@@ -684,8 +684,8 @@ services:
       DOMAIN: home.local
       TZ: ${TZ:-Europe/Amsterdam}
     ports:
-    - ${LAN_BIND:-0.0.0.0}:80:80
-    - ${LAN_BIND:-0.0.0.0}:443:443
+    - ${LAN_BIND:-0.0.0.0}:80:8080
+    - ${LAN_BIND:-0.0.0.0}:443:8443
     volumes:
     - ./config/caddy:/config
     - ./mounts/caddy/Caddyfile:/etc/caddy/Caddyfile:ro

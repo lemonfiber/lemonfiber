@@ -197,3 +197,74 @@ fn a_service_the_host_runs_gets_no_entry() {
         );
     }
 }
+
+/// The carried stack's static Compose files, which the generated project replaces at the
+/// cutover. Read here only to hold the two to the same images and published ports while
+/// both exist.
+const STATIC: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../assets/media-stack/compose"
+);
+
+/// Every service the static files declare, with its image and published ports.
+fn static_services() -> Vec<(String, Option<String>, BTreeSet<String>)> {
+    let mut found = Vec::new();
+    for entry in fs::read_dir(STATIC).into_iter().flatten().flatten() {
+        let path = entry.path();
+        let name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or_default();
+        if name.starts_with('_') || !name.ends_with(".yml") {
+            continue;
+        }
+        let text = fs::read_to_string(&path).unwrap_or_default();
+        let document: Value = serde_norway::from_str(&text).unwrap_or_default();
+        for (service, entry) in services(&document) {
+            found.push((
+                service,
+                entry
+                    .get("image")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned),
+                published(&entry),
+            ));
+        }
+    }
+    found
+}
+
+/// The ports an entry publishes.
+fn published(entry: &Value) -> BTreeSet<String> {
+    entry
+        .get("ports")
+        .and_then(Value::as_sequence)
+        .map(|ports| {
+            ports
+                .iter()
+                .filter_map(|port| port.as_str().map(str::to_owned))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+#[test]
+fn every_static_service_is_generated_with_its_image_and_ports() {
+    let generated = services(&document(&shipped()));
+    let statics = static_services();
+    assert!(!statics.is_empty(), "the static files declare services");
+    for (service, image, ports) in statics {
+        let Some((_, entry)) = generated.iter().find(|(name, _)| *name == service) else {
+            unreachable!("{service} is in the static files and not in the generated project");
+        };
+        assert_eq!(
+            entry
+                .get("image")
+                .and_then(Value::as_str)
+                .map(str::to_owned),
+            image,
+            "{service}'s image"
+        );
+        assert_eq!(published(entry), ports, "{service}'s published ports");
+    }
+}
