@@ -315,70 +315,70 @@ jobs:
       # failed, and a target that found nothing has nothing to upload.
       - name: Upload crash artefacts (manifest_from_toml)
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: fuzz-artifacts-manifest_from_toml
           path: fuzz/artifacts/manifest_from_toml
           if-no-files-found: ignore
       - name: Upload crash artefacts (manifest_validate)
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: fuzz-artifacts-manifest_validate
           path: fuzz/artifacts/manifest_validate
           if-no-files-found: ignore
       - name: Upload crash artefacts (date_parse)
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: fuzz-artifacts-date_parse
           path: fuzz/artifacts/date_parse
           if-no-files-found: ignore
       - name: Upload crash artefacts (plugin_from_toml)
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: fuzz-artifacts-plugin_from_toml
           path: fuzz/artifacts/plugin_from_toml
           if-no-files-found: ignore
       - name: Upload crash artefacts (api_read_query)
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: fuzz-artifacts-api_read_query
           path: fuzz/artifacts/api_read_query
           if-no-files-found: ignore
       - name: Upload crash artefacts (api_action_arguments)
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: fuzz-artifacts-api_action_arguments
           path: fuzz/artifacts/api_action_arguments
           if-no-files-found: ignore
       - name: Upload crash artefacts (api_guard)
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: fuzz-artifacts-api_guard
           path: fuzz/artifacts/api_guard
           if-no-files-found: ignore
       - name: Upload crash artefacts (env_file)
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: fuzz-artifacts-env_file
           path: fuzz/artifacts/env_file
           if-no-files-found: ignore
       - name: Upload crash artefacts (compose_mounts)
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: fuzz-artifacts-compose_mounts
           path: fuzz/artifacts/compose_mounts
           if-no-files-found: ignore
       - name: Upload crash artefacts (archive_restore)
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: fuzz-artifacts-archive_restore
           path: fuzz/artifacts/archive_restore
@@ -508,7 +508,7 @@ jobs:
 
       - name: Upload crash artefacts
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: fuzz-artifacts-${{ matrix.target }}
           path: fuzz/artifacts/${{ matrix.target }}
