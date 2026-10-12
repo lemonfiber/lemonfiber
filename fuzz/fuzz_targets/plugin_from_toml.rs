@@ -31,6 +31,16 @@ fuzz_target!(|data: &[u8]| {
         assert!(is_label(manifest.entry(service).hostname));
     }
     for proof in &manifest.proofs {
-        assert!(is_route(&proof.request.path));
+        assert!(proof.request.is_some() != proof.run.is_some());
+        if let Some(request) = &proof.request {
+            assert!(is_route(&request.path));
+        }
+        if let Some(run) = &proof.run {
+            assert!((1..=lemonfiber_plugin::MOST_ARGS).contains(&run.args.len()));
+            assert!(run
+                .args
+                .iter()
+                .all(|arg| arg.len() <= lemonfiber_plugin::LONGEST_ARG && !arg.contains('\0')));
+        }
     }
 });

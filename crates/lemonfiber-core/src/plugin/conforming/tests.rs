@@ -228,3 +228,21 @@ async fn an_adapter_naming_no_upstream_or_an_unspoken_contract_is_refused_and_ju
         .await
         .is_err());
 }
+
+#[tokio::test]
+async fn a_case_recorded_as_a_run_is_unproven_naming_the_run() {
+    let mut recorded = conforming();
+    if let Some(first) = recorded.first_mut() {
+        first.1 = format!(
+            r#"{{"recorded_from": "{PINNED}", "note": "n", "run": {{"args": ["--version"]}}, "result": {{"exit": 0, "stdout_starts_with": "v1"}}}}"#
+        );
+    }
+    let read = judged(&source("as-a-run", MANIFEST, &recorded)).await;
+    assert!(!read.conforms);
+    assert!(
+        read.cases.first().is_some_and(|one| matches!(&one.verdict,
+            Verdict::Unproven { why } if why.contains("records a run, a run of --version"))),
+        "{:?}",
+        verdicts(&read)
+    );
+}

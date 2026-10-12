@@ -294,8 +294,8 @@ async fn a_proof_declared_to_fail_on_a_recording_is_held_to_its_expectation_live
     let runner = Arc::new(Recording::answering(Ok(spoke(""))));
     let ctx = proving("declared-live", runner, answering(503));
     let declaring = PROVING.replacen(
-        "expect  = { status = 200 }\n",
-        "expect  = { status = 200 }\nexpected = [{ fixture = \"fixtures/starting.json\", \
+        "expect  = { status = 200, json_array_min = 0 }\n",
+        "expect  = { status = 200, json_array_min = 0 }\nexpected = [{ fixture = \"fixtures/starting.json\", \
          verdict = \"fails\", constraint = \"status\", reason = \"Recorded while it started.\" }]\n",
         1,
     );
@@ -649,8 +649,21 @@ async fn a_proof_whose_path_is_not_a_route_on_its_service_is_never_put() {
             continue;
         };
         let now = ctx.seams.clock.now();
-        let verdict =
-            super::super::proving::answering(&ctx, &proof, "http://komga:25600", now).await;
+        let verdict = super::super::proving::answering(
+            &ctx,
+            proof
+                .request
+                .as_ref()
+                .unwrap_or(&lemonfiber_plugin::Request {
+                    method: String::new(),
+                    path: String::new(),
+                    accept: None,
+                }),
+            &proof.expect,
+            "http://komga:25600",
+            now,
+        )
+        .await;
         assert_eq!(came_to(Some(&verdict)), "unproven", "{path}");
         assert!(
             why(Some(&verdict)).contains("not a route"),

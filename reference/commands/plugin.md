@@ -19,10 +19,11 @@ Commands:
   claims            Read a plugin's source and say what its claims come to
   conform           Judge a plugin's conformance recordings against the contracts its adapters speak
   provenance        Ask each image's registry whether anybody has said it is theirs
+  record            Run each proof that runs the image's own program, and write its recording
   install           Install a plugin, recording what installing it decided
   installed         Say what is installed, and what each plugin is doing
   remove            Take a plugin off this machine, putting back everything installing it wrote
-  prove             Ask an installed plugin's adapters again whether they speak what they declare
+  prove             Ask an installed plugin's adapters again whether they speak what they declare, and run each proof it declares that runs its image's own program again
   update            Replace an installed plugin with another version of it, as one operation
   help              Print this message or the help of the given subcommand(s)
 
@@ -266,6 +267,42 @@ Options:
           Print help (see a summary with '-h')
 ```
 
+## `lemonfiber plugin record`
+
+```text
+Run each proof that runs the image's own program, and write its recording.
+
+Each runs as an install runs it: a new container from the pinned image, with no network, under the service's posture, user and memory limit, with a throwaway copy of its starting files, bounded in time and in what is read. The recording keeps the note already written in it. A recording of the same image and arguments that the run does not reproduce byte for byte is refused and left as it was, and exits non-zero. No image is pulled.
+
+Usage: lemonfiber plugin record [OPTIONS] <PATH>
+
+Arguments:
+  <PATH>
+          The plugin's source: its directory, or the `plugin.toml` inside it
+
+Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
 ## `lemonfiber plugin install`
 
 ```text
@@ -407,9 +444,9 @@ Options:
 ## `lemonfiber plugin prove`
 
 ```text
-Ask an installed plugin's adapters again whether they speak what they declare.
+Ask an installed plugin's adapters again whether they speak what they declare, and run each proof it declares that runs its image's own program again.
 
-Every answer an adapter gave outside its contract is kept against the plugin, and the plugin fills none of that capability until a proof it passes clears it. Named on its own it says what it would ask and what a pass would clear, asks nothing, and prints a name for that offer; answering with that name is the yes.
+A run proof runs with the starting files kept when the plugin was installed, and no image is pulled for it. Every answer an adapter gave outside its contract is kept against the plugin, and the plugin fills none of that capability until a proof it passes clears it. Named on its own it says what it would ask and what a pass would clear, asks nothing, and prints a name for that offer; answering with that name is the yes.
 
 Usage: lemonfiber plugin prove [OPTIONS] <PLUGIN>
 

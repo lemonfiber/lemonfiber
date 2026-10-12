@@ -134,7 +134,8 @@ pub(super) async fn install(
         // plugin rather than reading it back: the register is what layers a plugin's
         // document into the stack, and it is deliberately not written yet.
         proving::started(ctx, &would, stack, &stamp).await?;
-        proving::asked(ctx, &read.manifest, &would, stack, &mut stated).await;
+        let source = crate::plugin::root(path);
+        proving::asked(ctx, &read.manifest, &would, stack, &source, &mut stated).await;
         against = Some(proving::AGAINST);
 
         // The stack is asked only where the plugin's own proofs held. A run that has
@@ -172,6 +173,7 @@ pub(super) async fn install(
                 return Err(Box::new(unrecordable(&would.plugin, *why, &back)));
             }
             recorded = true;
+            super::kept::kept(ctx, &would, &crate::plugin::root(path));
             let _ = super::conformance::cleared(ctx, &would.plugin);
             proving::refronted(ctx, stack, proving::routes_written(&planned)).await;
         } else {
@@ -294,7 +296,16 @@ pub(super) fn settled(
     from: Option<&Fetched<'_>>,
     stamp: &str,
 ) -> (Installed, PathBuf) {
-    let mut installed = Installed::of(&read.manifest).installed(path, stamp);
+    let source = crate::plugin::root(path);
+    let mut installed = Installed::of(&read.manifest)
+        .installed(path, stamp)
+        .starting(&|service| {
+            crate::plugin::program::starting_digest(Some(crate::plugin::program::Starting {
+                root: &source,
+                service,
+            }))
+            .ok()
+        });
     installed.manifest.clone_from(&read.digest);
     let settled = writing::joined(ctx, stack, held, installed).reaching(stack);
     match from {

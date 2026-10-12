@@ -247,7 +247,7 @@ const PROVING: &str = r#"
 id      = "reachable"
 title   = "It answers on the path it says it is reached at"
 request = { method = "GET", path = "/api/health" }
-expect  = { status = 200 }
+expect  = { status = 200, json_is_absent = true }
 fixture = "fixtures/health.json"
 why     = "A reader nothing can reach is one nobody can open."
 "#;

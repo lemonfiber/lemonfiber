@@ -15,8 +15,8 @@ use std::path::Path;
 
 use lemonfiber_plugin::{Declaration, Manifest, Service};
 
-use super::super::judging::{faults, Fault};
-use super::super::recorded::{self, Recording};
+use super::super::judging::{faults, ran, Fault};
+use super::super::recorded::{self, Of, Recording};
 use super::{FailingAsDeclared, Verdict};
 
 /// Which kind of assertion a verdict is about.
@@ -59,19 +59,28 @@ pub(super) fn proved(
         .iter()
         .map(|proof| {
             let service = manifest.asks(proof.service.as_deref());
-            let asserting = Asserting {
-                at: format!("proof {}", proof.id),
-                fixture: proof.fixture.as_deref(),
-                request: &proof.request,
-                expect: &proof.expect,
-                expected: &proof.expected,
+            let verdict = match Asks::of(proof) {
+                Some(asks) => {
+                    let asserting = Asserting {
+                        at: format!("proof {}", proof.id),
+                        fixture: proof.fixture.as_deref(),
+                        asks,
+                        expect: &proof.expect,
+                        expected: &proof.expected,
+                    };
+                    assessed(&asserting, service, root, refusals)
+                }
+                None => Verdict::Unproven {
+                    why: "asks no one thing, a request or a run, so there is nothing to decide"
+                        .to_owned(),
+                },
             };
             Asserted {
                 kind: Assertion::Proof,
                 id: proof.id.clone(),
                 says: proof.title.clone(),
                 service: service.map_or_else(String::new, |service| service.id.clone()),
-                verdict: assessed(&asserting, service, root, refusals),
+                verdict,
             }
         })
         .collect()
@@ -98,7 +107,7 @@ pub(super) fn checked(
                     let asserting = Asserting {
                         at: format!("contribution {}", entry.id),
                         fixture: entry.fixture.as_deref(),
-                        request,
+                        asks: Asks::Request(request),
                         expect,
                         expected: &entry.expected,
                     };
@@ -121,6 +130,38 @@ pub(super) fn checked(
         .collect()
 }
 
+/// What an assertion puts to its service: a request, or a run of the image's own
+/// program.
+#[derive(Debug, Clone, Copy)]
+pub(in crate::plugin) enum Asks<'a> {
+    /// A request, asked of the running service.
+    Request(&'a lemonfiber_plugin::Request),
+    /// A run of the image's own program.
+    Run(&'a lemonfiber_plugin::Run),
+}
+
+impl<'a> Asks<'a> {
+    /// What a proof puts to its service, where it declares exactly one of the two.
+    pub(in crate::plugin) const fn of(proof: &'a lemonfiber_plugin::Proof) -> Option<Self> {
+        match (&proof.request, &proof.run) {
+            (Some(request), None) => Some(Self::Request(request)),
+            (None, Some(run)) => Some(Self::Run(run)),
+            _ => None,
+        }
+    }
+
+    /// As a refusal names it.
+    fn said(self) -> String {
+        match self {
+            Self::Request(request) => format!(
+                "asks {}",
+                recorded::said(&request.method, &request.path, request.accept.as_deref())
+            ),
+            Self::Run(run) => recorded::runs(&run.args),
+        }
+    }
+}
+
 /// One assertion that is not a probe, as it is run: where it was declared, what it
 /// asks, and the recordings it names.
 struct Asserting<'a> {
@@ -129,7 +170,7 @@ struct Asserting<'a> {
     /// The recording it holds itself to.
     fixture: Option<&'a str>,
     /// What it asks.
-    request: &'a lemonfiber_plugin::Request,
+    asks: Asks<'a>,
     /// What the answer must be.
     expect: &'a lemonfiber_plugin::Expect,
     /// The recordings it is declared to fail on.
@@ -155,7 +196,7 @@ fn assessed(
     if let Some(own) = own {
         verdicts.push(recorded_answer(
             Some(own),
-            one.request,
+            one.asks,
             one.expect,
             service,
             root,
@@ -168,7 +209,7 @@ fn assessed(
     match verdicts.into_iter().reduce(both) {
         Some(verdict) => verdict,
         // Names no recording at all, which the runner says in its own words.
-        None => recorded_answer(None, one.request, one.expect, service, root, refusals),
+        None => recorded_answer(None, one.asks, one.expect, service, root, refusals),
     }
 }
 
@@ -193,14 +234,7 @@ fn declared(
                 .to_owned(),
         });
     }
-    match faulted(
-        Some(named),
-        one.request,
-        one.expect,
-        service,
-        root,
-        refusals,
-    ) {
+    match faulted(Some(named), one.asks, one.expect, service, root, refusals) {
         Err(why) => Verdict::Unproven { why },
         Ok(faults) => as_declared(declaration, faults),
     }
@@ -296,13 +330,13 @@ fn both(first: Verdict, second: Verdict) -> Verdict {
 /// less than it said.
 pub(super) fn recorded_answer(
     named: Option<&str>,
-    request: &lemonfiber_plugin::Request,
+    asks: Asks<'_>,
     expect: &lemonfiber_plugin::Expect,
     service: Option<&Service>,
     root: &Path,
     refusals: &mut Vec<lemonfiber_plugin::Violation>,
 ) -> Verdict {
-    match faulted(named, request, expect, service, root, refusals) {
+    match faulted(named, asks, expect, service, root, refusals) {
         Err(why) => Verdict::Unproven { why },
         Ok(faults) if faults.is_empty() => Verdict::Passed,
         Ok(faults) => Verdict::Failed {
@@ -315,7 +349,7 @@ pub(super) fn recorded_answer(
 /// not be run against that recording at all.
 fn faulted(
     named: Option<&str>,
-    request: &lemonfiber_plugin::Request,
+    asks: Asks<'_>,
     expect: &lemonfiber_plugin::Expect,
     service: Option<&Service>,
     root: &Path,
@@ -329,7 +363,7 @@ fn faulted(
         );
     };
     let pinned = format!("{}@{}", service.image, service.digest);
-    pinned_to(named, request, expect, &pinned, root, refusals)
+    pinned_to(named, asks, expect, &pinned, root, refusals)
 }
 
 /// Every way the recording an assertion names is not what it declares, held to the one
@@ -339,7 +373,7 @@ fn faulted(
 /// what they name is the stack's `image@digest` rather than a plugin service.
 pub(in crate::plugin) fn pinned_to(
     named: Option<&str>,
-    request: &lemonfiber_plugin::Request,
+    asks: Asks<'_>,
     expect: &lemonfiber_plugin::Expect,
     pinned: &str,
     root: &Path,
@@ -359,18 +393,21 @@ pub(in crate::plugin) fn pinned_to(
         refusals.push(wrong);
         return Err(why);
     }
-    if !recorded::records(&recording, request) {
-        return Err(format!(
-            "{named} records {}, and this asks {}",
-            recorded::said(
-                &recording.request.method,
-                &recording.request.path,
-                recording.request.accept.as_deref()
-            ),
-            recorded::said(&request.method, &request.path, request.accept.as_deref())
-        ));
+    match (&recording.of, asks) {
+        (Of::Request { request, response }, Asks::Request(asked))
+            if recorded::records(request, asked) =>
+        {
+            Ok(faults(expect, response))
+        }
+        (Of::Run { run, result }, Asks::Run(asked)) if run.args == asked.args => {
+            Ok(ran(expect, result))
+        }
+        _ => Err(format!(
+            "{named} records {}, and this {}",
+            recorded::of(&recording),
+            asks.said()
+        )),
     }
-    Ok(faults(expect, &recording.response))
 }
 
 /// A recording taken from an image this manifest does not install.

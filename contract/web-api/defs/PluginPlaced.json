@@ -153,6 +153,13 @@
         "type": "string"
       }
     },
+    "starting": {
+      "description": "The digest of the starting files kept for its run proofs, where it has any.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "tag": {
       "description": "The readable name that digest went by when it was installed.",
       "type": "string"

@@ -39,6 +39,7 @@ fn placed(service: &str) -> Placed {
         asks: Vec::new(),
         reaches: None,
         asks_for: None,
+        starting: None,
     }
 }
 
@@ -52,6 +53,7 @@ fn installed(plugin: &str, services: &[&str]) -> Installed {
         services: services.iter().map(|one| placed(one)).collect(),
         provides: Vec::new(),
         contributions: Vec::new(),
+        run_proofs: Vec::new(),
         declared: crate::plugin::Declaration::default(),
         recipes: Vec::new(),
         adapters: Vec::new(),

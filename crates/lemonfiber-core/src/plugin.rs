@@ -65,8 +65,10 @@ mod reports;
 // service gives is read into the one shape a recorded answer is read into — which is
 // the whole of what keeps a contributed check from needing an interpreter of its own.
 pub(crate) mod judging;
+pub(crate) mod program;
 mod provenance;
 pub(crate) mod recorded;
+mod recording;
 // Running a recipe: each step once, in order, held to where reading it allowed.
 pub mod running;
 
@@ -78,15 +80,15 @@ use thiserror::Error;
 use crate::doctor::BUNDLED_CHECKS;
 
 pub use claimed::{
-    claimed, read, read_digested, Asserted, Assertion, Claimed, Claiming, Contributed, Evidence,
-    FailingAsDeclared, Ran, Unreadable, Verdict,
+    claimed, read, read_digested, root, Asserted, Assertion, Claimed, Claiming, Contributed,
+    Evidence, FailingAsDeclared, Ran, Unreadable, Verdict,
 };
 pub use conforming::{conformed, Conformed, Judged};
-pub(crate) use container::{holding, secrets_file, unit, variables};
+pub(crate) use container::{holding, secrets_file, unit, user_of, variables};
 pub use container::{profile, written, Holding, Reading, Variable};
 pub use declared::{Declaration, Secret};
 pub use fronting::{proxied as fronting_proxied, taken as label_taken, DASHBOARD, PROXY};
-pub use installed::{answering, spelled_alike, Asking, Installed, Placed, Reached};
+pub use installed::{answering, spelled_alike, Asking, Installed, Placed, Reached, RunProof};
 pub use joining::Joins;
 pub use lemonfiber_manifest::container::Fields;
 pub use owning::{owner, owns};
@@ -95,6 +97,7 @@ pub use placing::{documents, key_file, mount_sources, mount_tree, overlay, write
 pub use provenance::{held, vouched, Key, Provenance, Unusable, Vouch, Vouched};
 pub use recipes::{approval, approvals, Adapter, Named, Owner, Pair, Recipe, Step};
 pub use recorded::{Answer, Asked, Recording};
+pub use recording::{record, Recorded, Taken, Took};
 pub use register::{Already, Register, Unreadable as Unrecorded};
 pub use reports::{
     Fetchable, Install, Installs, Nonconforming, Removal, Reproof, Restored, Sourced, Substituted,
@@ -102,8 +105,8 @@ pub use reports::{
 };
 pub use source::{unspoken, Source, SPOKEN};
 pub use stating::{
-    asked, changes, overrides, proofs, speaking, taking, Changing, Overriding, Proving, Puts,
-    Taking,
+    asked, changes, overrides, proofs, run_proof, speaking, taking, Changing, Overriding, Proving,
+    Puts, Taking,
 };
 pub use verified::{against, Changed, Verification};
 

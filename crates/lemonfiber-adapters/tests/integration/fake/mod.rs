@@ -38,6 +38,9 @@ pub enum Reply {
     /// Held until the client hangs up, which is recorded among the routes asked for
     /// as [`HUNG_UP`] so a test can see whether the reading end ever let go.
     Quiet(Vec<(u8, String)>),
+    /// A chunked answer that never sends a chunk, held until the client hangs up: a
+    /// wait on a container that does not end.
+    Held,
 }
 
 /// What a held connection records once the client has hung up on it.
@@ -115,6 +118,9 @@ fn rendered(reply: &Reply) -> Vec<u8> {
             out.extend_from_slice(b"\r\n");
             out
         }
+        Reply::Held => b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\
+            Transfer-Encoding: chunked\r\n\r\n"
+            .to_vec(),
         Reply::Cut(stream, text) => {
             let mut out = upgraded().as_bytes().to_vec();
             // A header for twice what follows. The reading end waits for the
@@ -264,7 +270,7 @@ async fn answer(
 
                         let _ = socket.write_all(&rendered(&reply)).await;
                         let _ = socket.flush().await;
-                        if matches!(reply, Reply::Quiet(_)) {
+                        if matches!(reply, Reply::Quiet(_) | Reply::Held) {
                             let mut rest = [0_u8; 64];
                             while socket.read(&mut rest).await.is_ok_and(|read| read > 0) {}
                             let _ = asked.send(HUNG_UP.to_owned());

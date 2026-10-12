@@ -72,6 +72,7 @@ mod following;
 pub(crate) use following::diagnosed;
 // Installing from a directory: what it settles, its offer, and its writes and proofs.
 mod installing;
+pub(crate) mod kept;
 // The yes to an install, an update or a removal, and the approval of what a recipe sends.
 mod offering;
 // Where the fault lies in each refusal, as the published list gives it.

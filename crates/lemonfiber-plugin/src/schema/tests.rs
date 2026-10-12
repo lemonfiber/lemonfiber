@@ -356,7 +356,7 @@ fn reads_what_a_proof_asks_and_why_it_is_worth_asking() {
             (
                 proof.id,
                 proof.title,
-                proof.request.method,
+                proof.request.map(|request| request.method),
                 proof.fixture,
                 proof.why.contains("health probe"),
             )
@@ -366,7 +366,7 @@ fn reads_what_a_proof_asks_and_why_it_is_worth_asking() {
         Some((
             "komga.serves".to_owned(),
             "Komga answers on its declared health path".to_owned(),
-            "GET".to_owned(),
+            Some("GET".to_owned()),
             Some("fixtures/health.json".to_owned()),
             true,
         ))

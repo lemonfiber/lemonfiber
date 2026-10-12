@@ -21,6 +21,7 @@ use std::path::{Path, PathBuf};
 
 use lemonfiber::cli::Authoring;
 use lemonfiber_core::plugin::{Capabilities, Key, Ungenerated};
+use lemonfiber_core::ports::program::Program;
 use lemonfiber_core::ports::registry::Registry;
 
 use crate::exit::FAILURE;
@@ -78,7 +79,12 @@ impl Answered {
 ///
 /// The schema is always the document, because it is a thing an editor reads rather
 /// than a listing a person does. The other five have a form for each.
-pub(crate) async fn published(read: &Authoring, json: bool, asking: &dyn Registry) -> Answered {
+pub(crate) async fn published(
+    read: &Authoring,
+    json: bool,
+    asking: &dyn Registry,
+    program: &dyn Program,
+) -> Answered {
     match read {
         Authoring::Schema => document_of(lemonfiber_core::plugin::schema().as_deref()),
         Authoring::ExtensionPoints if json => {
@@ -91,6 +97,7 @@ pub(crate) async fn published(read: &Authoring, json: bool, asking: &dyn Registr
         Authoring::Claims { path } => claims(path, json),
         Authoring::Conform { path } => conform(path, json).await,
         Authoring::Provenance { path, keys } => vouched_for(path, keys, json, asking).await,
+        Authoring::Record { path } => recorded(path, json, program).await,
     }
 }
 
@@ -188,6 +195,24 @@ async fn vouched_for(path: &Path, keys: &[PathBuf], json: bool, asking: &dyn Reg
     let read = lemonfiber_core::plugin::vouched(&manifest, &held, asking).await;
     render::plugin::vouched(&read, json).map_or_else(unrenderable, |lines| {
         if read.installable {
+            Answered::shown(lines)
+        } else {
+            Answered::refused(lines)
+        }
+    })
+}
+
+/// Each run proof of one plugin, run and recorded.
+///
+/// A recording a run does not reproduce, or a run that could not be recorded, exits
+/// non-zero, which is what a plugin's CI is asking.
+async fn recorded(path: &Path, json: bool, program: &dyn Program) -> Answered {
+    let read = match lemonfiber_core::plugin::record(path, program).await {
+        Ok(read) => read,
+        Err(unreadable) => return Answered::faulted(unreadable.to_string()),
+    };
+    render::plugin::recorded(&read, json).map_or_else(unrenderable, |lines| {
+        if read.holds {
             Answered::shown(lines)
         } else {
             Answered::refused(lines)

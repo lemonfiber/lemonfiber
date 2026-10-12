@@ -75,6 +75,7 @@ fn placed() -> Placed {
         asks: Vec::new(),
         reaches: None,
         asks_for: None,
+        starting: None,
     }
 }
 
@@ -88,6 +89,7 @@ fn installed(services: Vec<Placed>) -> Installed {
         services,
         provides: Vec::new(),
         contributions: Vec::new(),
+        run_proofs: Vec::new(),
         declared: crate::plugin::Declaration::default(),
         recipes: Vec::new(),
         adapters: Vec::new(),

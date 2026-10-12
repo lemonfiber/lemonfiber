@@ -287,7 +287,9 @@ fn requests(manifest: &Manifest) -> Vec<(String, &Request)> {
         }
     }
     for proof in &manifest.proofs {
-        every.push((format!("proof {}", proof.id), &proof.request));
+        if let Some(request) = &proof.request {
+            every.push((format!("proof {}", proof.id), request));
+        }
     }
     for entry in &manifest.contributions {
         if let Some(request) = &entry.request {

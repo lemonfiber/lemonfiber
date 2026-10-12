@@ -316,6 +316,8 @@ scripts:
     python3 scripts/take_the_attestation_status.py --self-test
     python3 scripts/the_tag_a_shell_never_sees.py --sweep
     python3 scripts/pin_release_actions.py --sweep
+    python3 scripts/generated.py --self-test
+    python3 scripts/generated.py --check
 
 deny:
     cargo deny check

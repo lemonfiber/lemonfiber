@@ -335,6 +335,11 @@ pub(crate) fn carries(expect: &Expect, constraint: Constraint) -> bool {
             .body_starts_with
             .as_ref()
             .is_some_and(|front| !front.is_empty()),
+        Constraint::Exit => expect.exit.is_some(),
+        Constraint::StdoutStartsWith => expect
+            .stdout_starts_with
+            .as_ref()
+            .is_some_and(|front| !front.is_empty()),
     }
 }
 

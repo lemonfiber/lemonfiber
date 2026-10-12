@@ -72,6 +72,12 @@
       ],
       "required": false
     },
+    "run_proofs": {
+      "type": [
+        "array[ref:PluginRunProof]"
+      ],
+      "required": false
+    },
     "services": {
       "type": [
         "array[ref:PluginPlaced]"

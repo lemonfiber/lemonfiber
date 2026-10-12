@@ -74,7 +74,13 @@ fn answering(status: u16, body: &'static str) -> impl Registry {
 
 /// What one read came to, asked of a registry that offers nothing.
 async fn read(asked: Authoring, json: bool) -> Answered {
-    published(&asked, json, &answering(404, "{}")).await
+    published(
+        &asked,
+        json,
+        &answering(404, "{}"),
+        lemonfiber_fixtures::proving::Proving::unreachable().as_ref(),
+    )
+    .await
 }
 
 /// A registry that offers one signature over one payload, over no network.
@@ -297,6 +303,7 @@ async fn an_image_whose_signature_does_not_hold_stops_the_install() {
         },
         false,
         &offering(elsewhere),
+        lemonfiber_fixtures::proving::Proving::unreachable().as_ref(),
     )
     .await;
 
@@ -417,4 +424,53 @@ fn a_manifest_this_build_cannot_read_is_refused_rather_than_half_read() {
     let at = source("half", "schema_version = 1\n");
     let read = lemonfiber_core::plugin::read(Path::new(&at));
     assert!(read.is_err(), "a manifest missing everything was read");
+}
+
+/// The same manifest with one proof that runs the image's own program.
+fn running() -> String {
+    format!(
+        "{WHOLE}\n[[proof]]\nid      = \"kavita.runs\"\ntitle   = \"It starts\"\n\
+         run     = {{ args = [\"--version\"] }}\n\
+         expect  = {{ exit = 0, stdout_starts_with = \"v1\" }}\n\
+         fixture = \"recordings/kavita/runs.json\"\nwhy     = \"It starts.\"\n"
+    )
+}
+
+/// Recording writes what the run said, and a run that cannot be made fails the run.
+#[tokio::test]
+async fn recording_writes_what_the_run_said_and_fails_where_no_run_could_be_made() {
+    let at = source("record", &running());
+    let wrote = published(
+        &Authoring::Record { path: at.clone() },
+        false,
+        &answering(404, "{}"),
+        lemonfiber_fixtures::proving::Proving::exiting(0, "v1.2\n").as_ref(),
+    )
+    .await;
+    assert_eq!(wrote.code, 0, "{:?}", wrote.fault);
+    assert!(said(&wrote).contains("written"), "{}", said(&wrote));
+    assert!(
+        std::fs::read_to_string(at.join("recordings/kavita/runs.json"))
+            .is_ok_and(|text| text.contains("\"stdout_starts_with\": \"v1.2\\n\""))
+    );
+
+    let unmade = read(
+        Authoring::Record {
+            path: source("record-unmade", &running()),
+        },
+        false,
+    )
+    .await;
+    assert_eq!(unmade.code, FAILURE);
+    assert!(said(&unmade).contains("not recorded"), "{}", said(&unmade));
+
+    let nowhere = read(
+        Authoring::Record {
+            path: PathBuf::from("/lemonfiber/no/such/plugin"),
+        },
+        false,
+    )
+    .await;
+    assert_eq!(nowhere.code, FAILURE);
+    assert!(nowhere.fault.is_some());
 }

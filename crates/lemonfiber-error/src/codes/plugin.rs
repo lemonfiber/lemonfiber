@@ -447,4 +447,16 @@ codes! {
         remedy: "Install the plugin without that service's replaces, or use the first-party \
             plugin this build names for that part.",
     }
+    /// Raised when a proof an installed plugin declares, run as the image's own program,
+    /// does not hold in the doctor.
+    PROOF_RUN_FAILED = "PLUGIN-41" {
+        severity: Error,
+        status: 409,
+        since: "0.18.0",
+        meaning: "A proof an installed plugin declares ran the image's own program in a \
+            container of its own, and what it came to is not what the proof declares. The \
+            message names the proof, the plugin and each fault.",
+        remedy: "Prove the plugin again with lemonfiber plugin prove, and take what it says up \
+            with whoever published the plugin.",
+    }
 }

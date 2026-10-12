@@ -6,7 +6,8 @@
 
 use crate::error::codes::plugin::NOTHING_TO_PROVE;
 use crate::error::{Problem, Remedy, State};
-use crate::plugin::{Installed, Installs, Register, Reproof};
+use crate::plugin::program::Starting;
+use crate::plugin::{Installed, Installs, Register, Reproof, Verdict};
 
 use super::super::Ctx;
 use super::{conformance, offering, proving, Consent};
@@ -46,6 +47,7 @@ pub(crate) async fn prove(
     let proofs: Vec<_> = speaking
         .iter()
         .map(|placed| crate::plugin::speaking(&placed.service))
+        .chain(proved.run_proofs.iter().map(crate::plugin::run_proof))
         .collect();
     let mut proof = Reproof {
         plugin: plugin.to_owned(),
@@ -66,8 +68,50 @@ pub(crate) async fn prove(
     for (placed, stated) in speaking.iter().zip(proof.proofs.iter_mut()) {
         stated.came_to = Some(proving::spoken(ctx, stack, &proved, placed, deadline).await);
     }
+    let reran = proof.proofs.iter_mut().skip(speaking.len());
+    for (run, stated) in proved.run_proofs.iter().zip(reran) {
+        stated.came_to = Some(rerun(ctx, &proved, run).await);
+    }
     proof.cleared = proving::held(&proof.proofs) && conformance::cleared(ctx, plugin).is_ok();
     Ok(answering(&held, proof, offer))
+}
+
+/// What running one of `installed`'s run proofs again came to, with the starting files
+/// kept for it when it was installed.
+pub(super) async fn rerun(
+    ctx: &Ctx,
+    installed: &Installed,
+    run: &crate::plugin::RunProof,
+) -> Verdict {
+    let Some(placed) = installed
+        .services
+        .iter()
+        .find(|one| one.service == run.service)
+    else {
+        return unproven("its service is not in the record of what is installed");
+    };
+    let Some(root) = super::kept::root(ctx, &installed.plugin) else {
+        return unproven("there is nowhere configured that its starting files are kept");
+    };
+    let starting = Starting {
+        root: &root,
+        service: &run.service,
+    };
+    if placed.starting.as_deref()
+        != crate::plugin::program::starting_digest(Some(starting))
+            .ok()
+            .as_deref()
+    {
+        return unproven("the starting files kept when it was installed are not as they were then");
+    }
+    proving::running(ctx, placed, &run.run, &run.expect, &root).await
+}
+
+/// Unproven, for `why`.
+fn unproven(why: &str) -> Verdict {
+    Verdict::Unproven {
+        why: why.to_owned(),
+    }
 }
 
 /// What proving came to, beside everything installed.

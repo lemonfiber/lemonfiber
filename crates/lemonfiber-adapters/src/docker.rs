@@ -40,6 +40,7 @@ mod exec;
 mod images;
 mod mounts;
 mod presence;
+mod program;
 mod refusal;
 mod translate;
 
@@ -189,6 +190,16 @@ impl Locations for Daemon {
 
     async fn mounted(&self, container: &str) -> Result<Option<Vec<Mount>>, Failure> {
         mounts::inspected(self, container).await
+    }
+}
+
+#[async_trait]
+impl lemonfiber_ports::program::Program for Daemon {
+    async fn run(
+        &self,
+        run: &lemonfiber_ports::program::Run,
+    ) -> Result<lemonfiber_ports::program::Ran, lemonfiber_ports::program::Unran> {
+        program::ran(self, run).await
     }
 }
 

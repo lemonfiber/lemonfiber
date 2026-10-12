@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One proof that runs the image's own program, kept so the doctor and a later proof can\nrun it again without the plugin's source.",
+  "type": "object",
+  "properties": {
+    "expect": {
+      "description": "What the run must come to.",
+      "$ref": "Expect.json"
+    },
+    "proof": {
+      "description": "The proof's id.",
+      "type": "string"
+    },
+    "run": {
+      "description": "What the image's own program is handed.",
+      "$ref": "PluginRun.json"
+    },
+    "service": {
+      "description": "The service whose image it runs.",
+      "type": "string"
+    },
+    "title": {
+      "description": "What it establishes, in one line.",
+      "type": "string"
+    },
+    "why": {
+      "description": "Why it is worth asserting.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "proof",
+    "title",
+    "why",
+    "service",
+    "run",
+    "expect"
+  ]
+}

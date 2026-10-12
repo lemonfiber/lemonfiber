@@ -44,7 +44,7 @@ pub use failure::{Failure, FAILURES};
 const MANIFEST: &str = lemonfiber_manifest::assembly::ROOT;
 
 /// The version of lemonfiber running, which a stack's `min_cli_version` is held to.
-const RUNNING: &str = env!("CARGO_PKG_VERSION");
+pub(crate) const RUNNING: &str = env!("CARGO_PKG_VERSION");
 
 /// One file a stack would write: its path within the stack directory, and its
 /// content.

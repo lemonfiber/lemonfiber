@@ -147,11 +147,15 @@ pub enum Constraint {
     ContentType,
     /// What the body must begin with.
     BodyStartsWith,
+    /// The exit status a run ends with.
+    Exit,
+    /// What a run's standard output begins with.
+    StdoutStartsWith,
 }
 
 impl Constraint {
     /// Every constraint, in the order an expectation's fields are declared.
-    pub const EVERY: [Self; 9] = [
+    pub const EVERY: [Self; 11] = [
         Self::Status,
         Self::Json,
         Self::JsonHasKeys,
@@ -161,6 +165,8 @@ impl Constraint {
         Self::JsonIsAbsent,
         Self::ContentType,
         Self::BodyStartsWith,
+        Self::Exit,
+        Self::StdoutStartsWith,
     ];
 
     /// The key an expectation writes it as.
@@ -180,7 +186,21 @@ impl Constraint {
             Self::JsonIsAbsent => "json_is_absent",
             Self::ContentType => "content_type",
             Self::BodyStartsWith => "body_starts_with",
+            Self::Exit => "exit",
+            Self::StdoutStartsWith => "stdout_starts_with",
         }
+    }
+
+    /// Whether it judges a run rather than an answer to a request.
+    #[must_use]
+    pub const fn is_of_a_run(self) -> bool {
+        matches!(self, Self::Exit | Self::StdoutStartsWith)
+    }
+
+    /// Whether it says nothing beyond how the asking ended: a status or an exit status.
+    #[must_use]
+    pub const fn is_an_ending(self) -> bool {
+        matches!(self, Self::Status | Self::Exit)
     }
 
     /// Whether it constrains places within the answer rather than the answer as a whole.
