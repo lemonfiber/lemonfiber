@@ -188,7 +188,7 @@ fn narrowed(manifest: &Manifest, installed: &[Installed]) -> Vec<(String, String
         .flat_map(|one| &one.services)
         .map(|placed| (placed.service.as_str(), placed.fields.env.values()));
     let mut asks = Vec::new();
-    for (by, values) in stack.chain(plugins.map(|(by, values)| (by, values))) {
+    for (by, values) in stack.chain(plugins) {
         for value in values {
             let Value::Url(url) = value else { continue };
             if url.files.is_none() && url.native.is_none() {

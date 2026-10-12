@@ -215,7 +215,10 @@ fn static_services() -> Vec<(String, Option<String>, BTreeSet<String>)> {
             .file_name()
             .and_then(|name| name.to_str())
             .unwrap_or_default();
-        if name.starts_with('_') || !name.ends_with(".yml") {
+        let compose = path
+            .extension()
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("yml"));
+        if name.starts_with('_') || !compose {
             continue;
         }
         let text = fs::read_to_string(&path).unwrap_or_default();
