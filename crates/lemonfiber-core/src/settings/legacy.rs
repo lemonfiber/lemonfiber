@@ -13,25 +13,27 @@ pub(crate) struct Legacy {
     pub(crate) secret: bool,
 }
 
-const fn setting(key: &'static str, name: &'static str) -> Legacy {
-    Legacy {
-        key,
-        name,
-        secret: false,
-    }
+macro_rules! setting {
+    ($key:expr, $name:expr) => {
+        Legacy {
+            key: $key,
+            name: $name,
+            secret: false,
+        }
+    };
 }
 
 pub(crate) const TABLE: [Legacy; 11] = [
-    setting(VPN_PROVIDER_KEY, "gluetun:provider"),
-    setting("VPN_COUNTRIES", "gluetun:countries"),
-    setting(VPN_PORT_FORWARDING_KEY, "gluetun:port-forwarding"),
-    setting("FLARESOLVERR_LOG_LEVEL", "flaresolverr:log-level"),
-    setting("SEERR_LOG_LEVEL", "seerr:log-level"),
-    setting("RECYCLARR_CRON", "recyclarr:cron"),
-    setting("UMASK", "unpackerr:umask"),
-    setting("HOMEPAGE_ALLOWED_HOSTS", "homepage:allowed-hosts"),
-    setting(DOMAIN_KEY, DOMAIN),
-    setting(HOUSEHOLD_HOST_KEY, HOUSEHOLD_HOST_SETTING),
+    setting!(VPN_PROVIDER_KEY, "gluetun:provider"),
+    setting!("VPN_COUNTRIES", "gluetun:countries"),
+    setting!(VPN_PORT_FORWARDING_KEY, "gluetun:port-forwarding"),
+    setting!("FLARESOLVERR_LOG_LEVEL", "flaresolverr:log-level"),
+    setting!("SEERR_LOG_LEVEL", "seerr:log-level"),
+    setting!("RECYCLARR_CRON", "recyclarr:cron"),
+    setting!("UMASK", "unpackerr:umask"),
+    setting!("HOMEPAGE_ALLOWED_HOSTS", "homepage:allowed-hosts"),
+    setting!(DOMAIN_KEY, DOMAIN),
+    setting!(HOUSEHOLD_HOST_KEY, HOUSEHOLD_HOST_SETTING),
     Legacy {
         key: crate::credential::VPN_PRIVATE_KEY,
         name: "gluetun:wireguard-key",

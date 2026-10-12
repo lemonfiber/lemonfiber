@@ -458,6 +458,69 @@ async fn a_secret_is_listed_without_its_value_and_never_written_here() {
     assert!(secret.is_some_and(|one| one.held
         && one.from == Some(crate::model::SecretFrom::Recipe)
         && one.readers.len() == 1));
+    let entered = [crate::settings::Keeping {
+        name: "comics:token",
+        value: "typed-value",
+        from: crate::settings::Source::Operator,
+        at: 2,
+    }];
+    assert!(crate::settings::kept(&at, &entered, &|_| Ok(())).is_ok());
+    let again = crate::settings::run::settings(&machine.ctx, &crate::app::Settling::Read).await;
+    assert!(matches!(again, Ok(crate::app::Outcome::Settings(report))
+        if report.secrets.iter().any(|one| one.name == "comics:token"
+            && one.from == Some(crate::model::SecretFrom::Operator))));
+}
+
+#[tokio::test]
+async fn clearing_through_the_command_answers_with_the_settings() {
+    let machine = machine("cleared", running(&[]));
+    let made = agreed(&machine.ctx, MODE, Some("fast")).await;
+    assert!(made.is_ok());
+    let cleared = crate::settings::run::settings(
+        &machine.ctx,
+        &crate::app::Settling::Clear {
+            setting: MODE.to_owned(),
+            agreement: None,
+        },
+    )
+    .await;
+    assert!(matches!(cleared, Ok(crate::app::Outcome::Settings(report))
+        if report.change.as_ref().is_some_and(|change| change.value.is_none() && !change.applied)));
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn a_change_over_a_document_whose_mount_source_is_a_link_is_refused_naming_it() {
+    let machine = machine("linked", running(&[]));
+    let mut register =
+        crate::app::plugins::read(&machine.ctx).unwrap_or_else(|_| Register::empty());
+    let mut comics = installed();
+    for placed in &mut comics.services {
+        placed.fields.mount = vec![lemonfiber_manifest::container::Mount {
+            from: "Caddyfile".to_owned(),
+            to: "/etc/caddy/Caddyfile".to_owned(),
+            ro: true,
+        }];
+    }
+    register.forget("comics");
+    assert!(register.record(comics).is_ok());
+    assert!(std::fs::write(
+        machine.env.with_file_name(crate::config::paths::PLUGINS),
+        serde_json::to_string(&register).unwrap_or_default()
+    )
+    .is_ok());
+    let stack = machine.env.with_file_name("data").join("stack");
+    for service in ["komga", "komga-worker"] {
+        let tree = stack.join("mounts").join(service);
+        let _ = std::fs::create_dir_all(&tree);
+        let _ = std::os::unix::fs::symlink("/etc/hostname", tree.join("Caddyfile"));
+    }
+    let before = std::fs::read_to_string(&machine.document).ok();
+
+    let refused = asked(&machine.ctx, MODE, Some("fast"), None).await;
+
+    assert!(refused.is_err_and(|problem| problem.summary.contains("Caddyfile")));
+    assert_eq!(std::fs::read_to_string(&machine.document).ok(), before);
 }
 
 #[tokio::test]
