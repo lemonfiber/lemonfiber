@@ -70,7 +70,7 @@ jobs:
     needs: version
     permissions:
       contents: read
-    uses: lemonfiber/spec/.github/workflows/tell.yml@58d3ff792b2ba75ae67970c42fbe1bdc6d9bcff1 # v1.0.87
+    uses: lemonfiber/spec/.github/workflows/tell.yml@f368b52cac7510f5903f04d8884a27b3c33d0b11 # v1.0.92
     with:
       repos: spec
       event: release-published
