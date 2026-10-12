@@ -30,7 +30,7 @@ fn kept(ctx: &Ctx, name: &str, value: &str) {
         from: crate::settings::Source::Operator,
         at: 1,
     }];
-    assert!(crate::settings::kept(&at, &keeping, |_| Ok(())).is_ok());
+    assert!(crate::settings::kept(&at, &keeping, &|_| Ok(())).is_ok());
 }
 
 #[test]

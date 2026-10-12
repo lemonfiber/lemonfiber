@@ -26,7 +26,7 @@ fn keeping<'a>(name: &'a str, value: &'a str) -> Keeping<'a> {
 }
 
 fn kept_now(path: &Path, name: &str, value: &str) -> Result<(), Failure> {
-    kept(path, &[keeping(name, value)], |_| Ok(()))
+    kept(path, &[keeping(name, value)], &|_| Ok(()))
 }
 
 fn value(path: &Path, name: &str) -> Option<String> {
@@ -69,14 +69,14 @@ fn what_is_journalled_is_read_before_the_store_is_written() {
     let scratch = Scratch::new("secrets-journal-first");
     let path = secrets_in(&scratch);
     assert!(kept_now(&path, "komga:token", "first").is_ok());
-    let mut told = Vec::new();
-    let refused = kept(&path, &[keeping("komga:token", "second")], |replaced| {
-        told.extend(replaced.iter().cloned());
+    let told = std::cell::RefCell::new(Vec::new());
+    let refused = kept(&path, &[keeping("komga:token", "second")], &|replaced| {
+        told.borrow_mut().extend(replaced.iter().cloned());
         Err(Failure::Nowhere)
     });
     assert!(refused.is_err());
     assert_eq!(
-        told,
+        told.into_inner(),
         [("komga:token".to_owned(), Some(fingerprint("first")))]
     );
     assert_eq!(value(&path, "komga:token").as_deref(), Some("first"));
@@ -181,24 +181,14 @@ fn undoing_a_replacement_puts_the_one_earlier_value_back_while_it_matches() {
     assert!(kept_now(&path, "komga:token", "first").is_ok());
     assert!(kept_now(&path, "komga:token", "second").is_ok());
     let (first, second) = (fingerprint("first"), fingerprint("second"));
-    let undone =
-        super::secrets::reheld(
-            &path,
-            "komga:token",
-            Some(&first),
-            Some(&second),
-            |_| Ok(()),
-        );
+    let undone = super::secrets::reheld(&path, "komga:token", Some(&first), Some(&second), &|_| {
+        Ok(())
+    });
     assert!(matches!(undone, Ok(Undone::Done)));
     assert_eq!(value(&path, "komga:token").as_deref(), Some("first"));
-    let again =
-        super::secrets::reheld(
-            &path,
-            "komga:token",
-            Some(&first),
-            Some(&second),
-            |_| Ok(()),
-        );
+    let again = super::secrets::reheld(&path, "komga:token", Some(&first), Some(&second), &|_| {
+        Ok(())
+    });
     assert!(matches!(again, Ok(Undone::Done)));
     assert_eq!(value(&path, "komga:token").as_deref(), Some("first"));
 }
@@ -213,7 +203,7 @@ fn a_replacement_with_no_earlier_copy_is_left_and_said_to_be_entered_again() {
         "komga:token",
         Some(&fingerprint("first")),
         Some(&fingerprint("second")),
-        |_| Ok(()),
+        &|_| Ok(()),
     );
     assert!(matches!(undone, Ok(Undone::Unkept)));
     assert_eq!(value(&path, "komga:token").as_deref(), Some("second"));
@@ -223,7 +213,7 @@ fn a_replacement_with_no_earlier_copy_is_left_and_said_to_be_entered_again() {
         "komga:token",
         Some(&fingerprint("first")),
         Some(&fingerprint("third")),
-        |_| Ok(()),
+        &|_| Ok(()),
     );
     assert!(
         matches!(other, Ok(Undone::Unkept)),
@@ -242,7 +232,7 @@ fn a_secret_set_since_is_left_as_it_is() {
         "komga:token",
         None,
         Some(&fingerprint("ours")),
-        |_| Ok(()),
+        &|_| Ok(()),
     );
     assert!(matches!(undone, Ok(Undone::TheirsNow)));
     assert_eq!(value(&path, "komga:token").as_deref(), Some("theirs"));
@@ -277,7 +267,7 @@ fn a_setting_goes_back_only_while_it_holds_what_was_recorded() {
     let scratch = Scratch::new("settings-undo");
     let config = scratch.path().join("config");
     let path = config.join("settings.json");
-    let recorded = super::kept::changed(&path, |settings: &mut serde_json::Value| {
+    let recorded = super::kept::changed(&path, &mut |settings: &mut serde_json::Value| {
         *settings = serde_json::json!({"values": {"komga:mode": "fast"}});
         Ok(())
     });
@@ -308,4 +298,80 @@ fn forgetting_a_namespace_takes_only_what_is_in_it() {
     assert!(super::secrets::forgotten(&path, "komga").is_ok());
     assert_eq!(value(&path, "komga:token"), None);
     assert_eq!(value(&path, "komgatwo:token").as_deref(), Some("b"));
+}
+
+#[test]
+fn where_a_value_came_from_is_written_as_a_word() {
+    assert_eq!(Source::Operator.as_str(), "operator");
+    assert_eq!(Source::Recipe.as_str(), "recipe");
+}
+
+#[test]
+fn a_store_that_does_not_read_is_refused_and_left_as_it_was() {
+    let scratch = Scratch::new("secrets-unread");
+    let path = secrets_in(&scratch);
+    assert!(std::fs::create_dir_all(scratch.path().join("config")).is_ok());
+    for text in [
+        "{ not json",
+        r#"{"schema":1,"written_by":"","held":{"a:b":{"value":987654321}}}"#,
+    ] {
+        assert!(std::fs::write(&path, text).is_ok());
+        let refused = kept_now(&path, "komga:token", "t");
+        assert!(
+            matches!(&refused, Err(Failure::Unreadable { reason, .. })
+                if reason.contains("line 1") && !reason.contains("987654321")),
+            "{refused:?}"
+        );
+        assert!(matches!(
+            Secrets::at(&path),
+            Err(Failure::Unreadable { .. })
+        ));
+        assert_eq!(std::fs::read_to_string(&path).ok().as_deref(), Some(text));
+    }
+}
+
+#[test]
+fn a_store_that_is_a_directory_is_refused() {
+    let scratch = Scratch::new("secrets-directory");
+    let path = secrets_in(&scratch);
+    assert!(std::fs::create_dir_all(&path).is_ok());
+    assert!(matches!(
+        Secrets::at(&path),
+        Err(Failure::Unreadable { .. })
+    ));
+}
+
+#[test]
+fn a_hold_that_cannot_be_taken_writes_nothing() {
+    let scratch = Scratch::new("secrets-unheld");
+    let path = secrets_in(&scratch);
+    assert!(std::fs::create_dir_all(crate::config::held::beside(&path)).is_ok());
+    let refused = kept_now(&path, "komga:token", "t");
+    assert!(
+        matches!(refused, Err(Failure::NotWritten { .. })),
+        "{refused:?}"
+    );
+    assert!(!path.exists());
+}
+
+#[test]
+fn a_setting_already_back_is_done_and_left_untouched() {
+    let scratch = Scratch::new("settings-already");
+    let config = scratch.path().join("config");
+    assert!(std::fs::create_dir_all(&config).is_ok());
+    let text = r#"{"schema":1,"written_by":"","values":{"komga:mode":"slow"}}"#;
+    assert!(std::fs::write(config.join("settings.json"), text).is_ok());
+    let undone = super::undoing::resettled(
+        &config.join(".env"),
+        "komga:mode",
+        Some("slow"),
+        Some("fast"),
+    );
+    assert!(matches!(undone, Ok(Undone::Done)));
+    assert_eq!(
+        std::fs::read_to_string(config.join("settings.json"))
+            .ok()
+            .as_deref(),
+        Some(text)
+    );
 }

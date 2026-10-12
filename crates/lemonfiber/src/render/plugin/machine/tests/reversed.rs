@@ -463,4 +463,21 @@ fn every_shape_a_reversal_puts_back_says_what_it_did() {
         }),
         "made the key ha good again"
     );
+    assert_eq!(
+        undone(Action::Resettle {
+            name: "komga:mode".to_owned(),
+            value: None,
+            recorded: Some("fast".to_owned())
+        }),
+        "put the setting komga:mode back"
+    );
+    assert_eq!(
+        undone(Action::Rehold {
+            name: "komga:token".to_owned(),
+            earlier: None,
+            kept: Some("~1".to_owned()),
+            filed: None
+        }),
+        "put the secret komga:token back"
+    );
 }

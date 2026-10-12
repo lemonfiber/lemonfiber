@@ -95,3 +95,38 @@ async fn a_credential_with_nothing_recorded_says_so_rather_than_showing_an_empty
         revealed.warning
     );
 }
+
+#[tokio::test]
+async fn a_plugins_secret_the_store_holds_is_printed_and_one_it_does_not_is_not() {
+    let ctx = keeping("plugin");
+    let secret = a_value();
+    let at = crate::settings::secrets_at(&ctx).unwrap_or_default();
+    let keeping = [crate::settings::Keeping {
+        name: "comics:token",
+        value: &secret,
+        from: crate::settings::Source::Recipe,
+        at: 1,
+    }];
+    assert!(crate::settings::kept(&at, &keeping, &|_| Ok(())).is_ok());
+    let plugin = |setting: &str, state: State| Held {
+        name: "comics token".to_owned(),
+        setting: setting.to_owned(),
+        from: crate::origin::Origin::Plugin {
+            named: "comics".to_owned(),
+        },
+        state,
+        ..line(setting)
+    };
+
+    let held = reveal(&ctx, &plugin("comics:token", State::Active), true).await;
+    let absent = reveal(&ctx, &plugin("comics:other", State::Absent), true).await;
+
+    assert_eq!(held.value.as_deref(), Some(secret.as_str()));
+    assert_eq!(held.warning, REVEALED);
+    assert_eq!(absent.value, None);
+    assert!(
+        absent.warning.contains("nothing holds it yet"),
+        "{}",
+        absent.warning
+    );
+}

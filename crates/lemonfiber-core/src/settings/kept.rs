@@ -28,10 +28,10 @@ pub(super) fn read<T: DeserializeOwned + Default>(path: &Path) -> Result<T, Fail
     text_at(path)?.map_or_else(|| Ok(T::default()), |text| body(path, &text))
 }
 
-pub(super) fn changed<T, R>(
+pub(super) fn changed<T>(
     path: &Path,
-    change: impl FnOnce(&mut T) -> Result<R, Failure>,
-) -> Result<R, Failure>
+    change: &mut dyn FnMut(&mut T) -> Result<(), Failure>,
+) -> Result<(), Failure>
 where
     T: Serialize + DeserializeOwned + Default,
 {
@@ -55,20 +55,20 @@ where
         }
         None => T::default(),
     };
-    let before = serde_json::to_string(&body).map_err(|why| unwritten(path, &why))?;
-    let answer = change(&mut body)?;
-    let after = serde_json::to_string(&body).map_err(|why| unwritten(path, &why))?;
-    if before == after {
-        return Ok(answer);
+    let before = serde_json::to_string(&body).unwrap_or_default();
+    change(&mut body)?;
+    if serde_json::to_string(&body).unwrap_or_default() == before {
+        return Ok(());
     }
     let stamped = Stamped {
         schema: SCHEMA,
         written_by: RUNNING.to_owned(),
         body,
     };
-    let written = serde_json::to_string_pretty(&stamped).map_err(|why| unwritten(path, &why))?;
-    store::write(path, &written)?;
-    Ok(answer)
+    store::write(
+        path,
+        &serde_json::to_string_pretty(&stamped).unwrap_or_default(),
+    )
 }
 
 fn body<T: DeserializeOwned>(path: &Path, text: &str) -> Result<T, Failure> {
@@ -96,12 +96,5 @@ fn unread(path: &Path, why: &serde_json::Error) -> Failure {
             why.line(),
             why.column()
         ),
-    }
-}
-
-fn unwritten(path: &Path, why: &serde_json::Error) -> Failure {
-    Failure::NotWritten {
-        path: path.to_path_buf(),
-        reason: why.to_string(),
     }
 }

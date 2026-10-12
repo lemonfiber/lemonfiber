@@ -472,6 +472,17 @@ async fn a_credential_kept_for_the_plugin_goes_with_it() {
     let read = crate::config::store::read(&file).unwrap_or_default();
     assert_eq!(read.get("PLUGIN_KOMGA_KOMGA_PASSWORD"), None);
     assert_eq!(read.get("KOMGA_PASSWORD"), Some("somebody else's"));
+    for left in [
+        "secrets.json",
+        "secrets.json.lock",
+        "settings.json",
+        "settings.json.lock",
+    ] {
+        assert!(
+            !file.with_file_name(left).exists(),
+            "{left} was left behind"
+        );
+    }
 }
 
 /// And the one refusal that is not a refusal: a change that re-points where data

@@ -44,14 +44,14 @@ impl Settings {
 }
 
 pub(crate) fn marked_filed(path: &Path) -> Result<(), Failure> {
-    super::kept::changed(path, |settings: &mut Settings| {
+    super::kept::changed(path, &mut |settings: &mut Settings| {
         settings.filed = true;
         Ok(())
     })
 }
 
 pub(crate) fn forgotten(path: &Path, namespace: &str) -> Result<(), Failure> {
-    super::kept::changed(path, |settings: &mut Settings| {
+    super::kept::changed(path, &mut |settings: &mut Settings| {
         settings
             .values
             .retain(|name, _| !super::in_namespace(name, namespace));
@@ -65,7 +65,10 @@ pub(crate) fn resettled(
     value: Option<&str>,
     wrote: Option<&str>,
 ) -> Result<Undone, Failure> {
-    super::kept::changed(path, |settings: &mut Settings| {
-        Ok(settings.resettled(name, value, wrote))
-    })
+    let mut undone = Undone::Done;
+    super::kept::changed(path, &mut |settings: &mut Settings| {
+        undone = settings.resettled(name, value, wrote);
+        Ok(())
+    })?;
+    Ok(undone)
 }

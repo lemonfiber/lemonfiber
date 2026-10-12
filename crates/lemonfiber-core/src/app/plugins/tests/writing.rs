@@ -418,6 +418,37 @@ fn an_adapters_key_is_minted_once_kept_after_and_never_made_up() {
     assert!(!path.exists());
 }
 
+#[test]
+fn a_secrets_file_is_written_owner_only_and_refused_where_the_store_does_not_read() {
+    use crate::plugin::{Holding, Lands, Variable, Write};
+
+    let ctx = ctx("secrets-file");
+    let env = ctx.settings.env_file.clone().unwrap_or_default();
+    let path = env.with_file_name("env").join("komga.env");
+    let planned = vec![Write {
+        path: path.clone(),
+        lands: Lands::Secrets(vec![Variable {
+            name: "KEY".to_owned(),
+            holding: Holding::Store("komga:key".to_owned()),
+        }]),
+    }];
+    assert!(super::super::writing::carry_out(&ctx, "komga", "1", &planned).is_ok());
+    assert_eq!(std::fs::read_to_string(&path).ok().as_deref(), Some(""));
+
+    assert!(std::fs::remove_file(&path).is_ok());
+    assert!(std::fs::write(env.with_file_name("secrets.json"), "{ not json").is_ok());
+    let refused = super::super::writing::carry_out(&ctx, "komga", "2", &planned);
+    assert!(
+        refused
+            .as_ref()
+            .err()
+            .and_then(|problem| problem.detail.as_deref())
+            .is_some_and(|detail| detail.contains("is not what this store holds")),
+        "{refused:?}"
+    );
+    assert!(!path.exists());
+}
+
 /// A service replacing one the stack ships is installed only from a plugin this build
 /// embeds as first-party; any other plugin declaring one is refused before anything is
 /// written, and a plugin replacing nothing is not asked.
@@ -532,4 +563,39 @@ fn a_variable_asking_an_address_is_written_with_the_one_its_ask_settles_on() {
         document.contains("INDEXER: http://prowlarr:9696"),
         "{document}"
     );
+}
+
+#[test]
+fn a_setting_is_written_as_the_operator_recorded_it_and_as_its_default_otherwise() {
+    use lemonfiber_manifest::container::{Constant, Setting, Value};
+
+    let ctx = ctx("settled");
+    let setting = |name: &str| {
+        Value::Setting(Setting {
+            setting: name.to_owned(),
+            default: Constant::Text("slow".to_owned()),
+        })
+    };
+    let mut placed = crate::test_support::a_placed("reader", &[], None, None);
+    placed.fields.env = [
+        ("MODE".to_owned(), setting("subs:mode")),
+        ("SPEED".to_owned(), setting("subs:speed")),
+    ]
+    .into();
+    let plugin = crate::test_support::an_installed("subs", vec![placed]);
+    let env = ctx.settings.env_file.clone().unwrap_or_default();
+    assert!(std::fs::write(
+        env.with_file_name("settings.json"),
+        r#"{"schema":1,"written_by":"","values":{"subs:mode":"fast"}}"#
+    )
+    .is_ok());
+    let document = super::super::addressing::writes(&ctx, &plugin, &stack_of(&ctx))
+        .into_iter()
+        .find_map(|write| match write.lands {
+            crate::plugin::Lands::Document(text) => Some(text),
+            _ => None,
+        })
+        .unwrap_or_default();
+    assert!(document.contains("MODE: fast"), "{document}");
+    assert!(document.contains("SPEED: slow"), "{document}");
 }

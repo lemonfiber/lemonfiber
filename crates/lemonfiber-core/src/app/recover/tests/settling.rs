@@ -23,7 +23,7 @@ fn keep(secrets: &std::path::Path, value: &str) {
         from: crate::settings::Source::Recipe,
         at: 1,
     }];
-    assert!(crate::settings::kept(secrets, &keeping, |_| Ok(())).is_ok());
+    assert!(crate::settings::kept(secrets, &keeping, &|_| Ok(())).is_ok());
 }
 
 #[test]
@@ -81,4 +81,29 @@ fn a_setting_recorded_by_a_change_is_cleared_when_it_goes_back() {
     assert!(undo(&lemonfiber_adapters::Disk, &[resettle], &env, Vec::new()).is_ok());
     let left = crate::settings::Settings::at(&dir.join("settings.json")).unwrap_or_default();
     assert_eq!(left.value("komga:mode"), None);
+}
+
+#[test]
+fn a_setting_chosen_since_is_left_and_named() {
+    let dir = scratch("resettle-theirs");
+    let env = dir.join(".env");
+    assert!(std::fs::create_dir_all(&dir).is_ok());
+    assert!(std::fs::write(
+        dir.join("settings.json"),
+        r#"{"schema":1,"written_by":"","values":{"komga:mode":"theirs"}}"#
+    )
+    .is_ok());
+    let resettle = Undo {
+        target: "komga:mode".to_owned(),
+        action: Action::Resettle {
+            name: "komga:mode".to_owned(),
+            value: None,
+            recorded: Some("fast".to_owned()),
+        },
+    };
+    let carried = carrying_out(&lemonfiber_adapters::Disk, &[resettle], &env, Vec::new());
+    assert_eq!(
+        carried.map(|one| one.theirs).ok(),
+        Some(vec!["komga:mode".to_owned()])
+    );
 }

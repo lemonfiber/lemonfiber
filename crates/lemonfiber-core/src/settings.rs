@@ -42,9 +42,15 @@ pub(crate) fn secrets_at(ctx: &Ctx) -> Option<std::path::PathBuf> {
 
 pub(crate) fn forgotten(ctx: &Ctx, plugin: &Installed) {
     files::forgotten(ctx, plugin);
-    if let Some(env) = ctx.settings.env_file.as_deref() {
-        let _ = secrets::forgotten(&env.with_file_name(SECRETS), &plugin.plugin);
-        let _ = store::forgotten(&env.with_file_name(SETTINGS), &plugin.plugin);
+    let Some(env) = ctx.settings.env_file.as_deref() else {
+        return;
+    };
+    let (secrets, settings) = (env.with_file_name(SECRETS), env.with_file_name(SETTINGS));
+    if secrets.is_file() {
+        let _ = secrets::forgotten(&secrets, &plugin.plugin);
+    }
+    if settings.is_file() {
+        let _ = store::forgotten(&settings, &plugin.plugin);
     }
 }
 

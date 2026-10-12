@@ -28,10 +28,10 @@ fn filing(ctx: &Ctx) -> Result<(), Failure> {
     if Settings::at(&env.with_file_name(SETTINGS))?.is_filed() {
         return Ok(());
     }
-    let Ok(register) = crate::app::plugins::read(ctx) else {
-        return Ok(());
-    };
-    let filings = candidates(ctx, register.installed());
+    let installed = crate::app::plugins::read(ctx)
+        .map(|register| register.installed().to_vec())
+        .unwrap_or_default();
+    let filings = candidates(ctx, &installed);
     if filings.is_empty() {
         return Ok(());
     }
@@ -47,7 +47,7 @@ fn filing(ctx: &Ctx) -> Result<(), Failure> {
             at,
         })
         .collect();
-    super::secrets::filed(&env.with_file_name(SECRETS), &keeping, |absent| {
+    super::secrets::filed(&env.with_file_name(SECRETS), &keeping, &|absent| {
         let changes: Vec<Change> = absent
             .iter()
             .map(|one| change(one, &filings, &stamp))
@@ -57,8 +57,7 @@ fn filing(ctx: &Ctx) -> Result<(), Failure> {
     for filing in &filings {
         store::unset(env, &filing.key)?;
     }
-    let touched: Vec<&Installed> = register
-        .installed()
+    let touched: Vec<&Installed> = installed
         .iter()
         .filter(|one| {
             filings

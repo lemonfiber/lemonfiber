@@ -194,7 +194,9 @@ fn substituting(
     }
     crate::app::plugins::writing::overwritten(&overwrites)?;
     let plugins: Vec<&crate::plugin::Installed> = installed.installed().iter().collect();
-    crate::settings::written(ctx, &plugins).map_err(|failure| Box::new(failure.problem()))?;
+    crate::settings::written(ctx, &plugins)
+        .as_ref()
+        .map_err(crate::app::plugins::diagnosed)?;
 
     Ok(reading(true))
 }

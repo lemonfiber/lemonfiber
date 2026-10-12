@@ -169,7 +169,7 @@ fn a_value_already_held_is_never_overwritten() {
         from: crate::settings::Source::Operator,
         at: 1,
     }];
-    assert!(crate::settings::kept(&at, &keeping, |_| Ok(())).is_ok());
+    assert!(crate::settings::kept(&at, &keeping, &|_| Ok(())).is_ok());
     super::super::filing::filed(&ctx);
     assert_eq!(held(&ctx).as_deref(), Some("kept"));
     assert_eq!(line(&ctx), None);

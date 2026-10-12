@@ -404,7 +404,7 @@ fn kept(
             at,
         })
         .collect();
-    crate::settings::kept(secrets, &kept, |replaced| {
+    crate::settings::kept(secrets, &kept, &|replaced| {
         let changes: Vec<Change> = kept
             .iter()
             .zip(replaced)
@@ -425,10 +425,13 @@ fn kept(
     })
     .as_ref()
     .map_err(diagnosed)?;
-    crate::settings::written(ctx, &[would]).map_err(|failure| diagnosed(&failure))
+    crate::settings::written(ctx, &[would])
+        .as_ref()
+        .map_err(diagnosed)?;
+    Ok(())
 }
 
 /// A failure as the problem it is said as.
-fn diagnosed(failure: &impl Diagnose) -> Box<Problem> {
+pub(crate) fn diagnosed(failure: &impl Diagnose) -> Box<Problem> {
     Box::new(failure.problem())
 }

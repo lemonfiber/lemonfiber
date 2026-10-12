@@ -45,15 +45,6 @@ impl std::fmt::Debug for Secrets {
     }
 }
 
-impl std::fmt::Debug for Kept {
-    fn fmt(&self, out: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        out.debug_struct("Kept")
-            .field("from", &self.from)
-            .field("at", &self.at)
-            .finish_non_exhaustive()
-    }
-}
-
 impl Secrets {
     pub(crate) fn at(path: &Path) -> Result<Self, Failure> {
         super::kept::read(path)
@@ -112,10 +103,12 @@ pub(crate) struct Keeping<'a> {
     pub(crate) at: u64,
 }
 
+pub(crate) type Replaced = [(String, Option<String>)];
+
 pub(crate) fn kept(
     path: &Path,
     keeping: &[Keeping<'_>],
-    journalled: impl FnOnce(&[(String, Option<String>)]) -> Result<(), Failure>,
+    journalled: &dyn Fn(&Replaced) -> Result<(), Failure>,
 ) -> Result<(), Failure> {
     if let Some(spanning) = keeping.iter().find(|one| !is_one_line(one.value)) {
         return Err(Failure::SpansLines {
@@ -123,7 +116,7 @@ pub(crate) fn kept(
             key: spanning.name.to_owned(),
         });
     }
-    super::kept::changed(path, |secrets: &mut Secrets| {
+    super::kept::changed(path, &mut |secrets: &mut Secrets| {
         let replaced: Vec<(String, Option<String>)> = keeping
             .iter()
             .map(|one| (one.name.to_owned(), secrets.fingerprint(one.name)))
@@ -139,9 +132,9 @@ pub(crate) fn kept(
 pub(crate) fn filed(
     path: &Path,
     keeping: &[Keeping<'_>],
-    journalled: impl FnOnce(&[&Keeping<'_>]) -> Result<(), Failure>,
+    journalled: &dyn Fn(&[&Keeping<'_>]) -> Result<(), Failure>,
 ) -> Result<(), Failure> {
-    super::kept::changed(path, |secrets: &mut Secrets| {
+    super::kept::changed(path, &mut |secrets: &mut Secrets| {
         let absent: Vec<&Keeping<'_>> = keeping
             .iter()
             .filter(|one| secrets.value(one.name).is_none() && is_one_line(one.value))
@@ -155,7 +148,7 @@ pub(crate) fn filed(
 }
 
 pub(crate) fn forgotten(path: &Path, namespace: &str) -> Result<(), Failure> {
-    super::kept::changed(path, |secrets: &mut Secrets| {
+    super::kept::changed(path, &mut |secrets: &mut Secrets| {
         secrets
             .held
             .retain(|name, _| !super::in_namespace(name, namespace));
@@ -168,14 +161,16 @@ pub(crate) fn reheld(
     name: &str,
     previous: Option<&str>,
     wrote: Option<&str>,
-    filed: impl FnOnce(&str) -> Result<(), Failure>,
+    filed: &dyn Fn(&str) -> Result<(), Failure>,
 ) -> Result<Undone, Failure> {
-    super::kept::changed(path, |secrets: &mut Secrets| {
+    let mut undone = Undone::Done;
+    super::kept::changed(path, &mut |secrets: &mut Secrets| {
         let value = secrets.value(name).map(str::to_owned);
-        let undone = secrets.reheld(name, previous, wrote);
+        undone = secrets.reheld(name, previous, wrote);
         if let (Undone::Done, Some(value), None) = (&undone, value, previous) {
             filed(&value)?;
         }
-        Ok(undone)
-    })
+        Ok(())
+    })?;
+    Ok(undone)
 }

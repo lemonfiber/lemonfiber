@@ -127,3 +127,80 @@ fn a_setting_edited_since_is_read_off_the_settings_file() {
         "{report:?}"
     );
 }
+
+#[test]
+fn a_setting_reads_with_its_values_and_a_secret_by_its_name_alone() {
+    use crate::journal::Kind;
+    let setting = |current: Option<&str>| Kind::Setting {
+        name: "komga:mode".to_owned(),
+        previous: None,
+        current: current.map(str::to_owned),
+    };
+    let secret = |previous: Option<&str>, current: Option<&str>| Kind::Secret {
+        name: "komga:token".to_owned(),
+        from: "recipe".to_owned(),
+        previous: previous.map(str::to_owned),
+        current: current.map(str::to_owned),
+        filed: None,
+    };
+    assert_eq!(did(&setting(Some("fast"))), "set komga:mode to fast");
+    assert_eq!(did(&setting(None)), "cleared komga:mode");
+    assert_eq!(
+        did(&secret(None, Some("~1"))),
+        "kept the secret komga:token"
+    );
+    assert_eq!(
+        did(&secret(Some("~1"), Some("~2"))),
+        "replaced the secret komga:token"
+    );
+    assert_eq!(
+        did(&secret(Some("~1"), None)),
+        "forgot the secret komga:token"
+    );
+}
+
+#[test]
+fn a_setting_recorded_since_is_read_off_the_settings_store() {
+    let root = lemonfiber_fixtures::scratch::Scratch::named("history-setting").kept();
+    let _ = std::fs::remove_dir_all(&root);
+    let config = root.join("config");
+    let env = config.join(".env");
+    let ctx = crate::test_support::a_context()
+        .settings(crate::config::Settings {
+            env_file: Some(env),
+            stack_dir: Some(root.join("data").join("stack")),
+            ..crate::config::Settings::default()
+        })
+        .build();
+    let change = crate::journal::Change {
+        at: "2000".to_owned(),
+        operation: crate::settings::OPERATION.to_owned(),
+        target: "komga:mode".to_owned(),
+        kind: crate::journal::Kind::Setting {
+            name: "komga:mode".to_owned(),
+            previous: None,
+            current: Some("fast".to_owned()),
+        },
+    };
+    let _ = std::fs::create_dir_all(&config);
+    let _ = std::fs::write(
+        config.join(crate::config::paths::JOURNAL),
+        serde_json::to_string(&change).unwrap_or_default(),
+    );
+    let _ = std::fs::write(
+        config.join("settings.json"),
+        r#"{"schema":1,"written_by":"","values":{"komga:mode":"slow"}}"#,
+    );
+
+    let report = history(&ctx).unwrap_or_default();
+    let _ = std::fs::remove_dir_all(&root);
+
+    assert!(
+        report
+            .changes
+            .first()
+            .and_then(|one| one.because.as_deref())
+            .is_some_and(|because| because.contains("komga:mode now holds slow")),
+        "{report:?}"
+    );
+}

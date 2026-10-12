@@ -3,6 +3,7 @@ use std::path::Path;
 use crate::config::paths::{SECRETS, SETTINGS};
 use crate::config::store::{self, Failure};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Undone {
     Done,
     TheirsNow,
@@ -30,6 +31,6 @@ pub(crate) fn reheld(
         name,
         previous,
         wrote,
-        |value| filed.map_or(Ok(()), |key| store::set(env_file, key, value)),
+        &|value| filed.map_or(Ok(()), |key| store::set(env_file, key, value)),
     )
 }

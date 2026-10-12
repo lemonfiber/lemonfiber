@@ -124,3 +124,16 @@ fn two_different_values_are_told_apart_and_neither_is_recoverable() {
 fn the_fingerprint_of_nothing_is_still_a_fingerprint() {
     assert_eq!(fingerprint("").len(), 5);
 }
+
+#[test]
+fn a_plugins_secret_says_nothing_holds_it_or_where_a_new_one_comes_from() {
+    let absent = held(State::Absent, None);
+    assert!(absent.unheld("comics").contains("nothing holds it yet"));
+    let active = held(State::Active, None);
+    let said = active.unheld("comics");
+    assert!(
+        said.contains("comes from there rather than from lemonfiber"),
+        "{said}"
+    );
+    assert!(!said.contains("nothing holds it yet"), "{said}");
+}

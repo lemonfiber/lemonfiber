@@ -2,6 +2,7 @@
 
 use super::{asked, beside, ctx, recorded, silent, WITH_A_SECRET};
 use lemonfiber_core::app::{dispatch, Asking, Command};
+use lemonfiber_core::config::store;
 use lemonfiber_core::credential::{Rotation, State};
 use lemonfiber_fixtures::files::Files;
 
@@ -142,6 +143,31 @@ async fn a_captured_plugin_secret_is_read_from_the_secret_store() {
     .await
     .revealed;
     assert_eq!(revealed.and_then(|one| one.value).as_deref(), Some("v4lue"));
+}
+
+/// A plugin's secret that is another service's credential is never kept for it: its line
+/// says whose it is, stands as that credential stands, and carries no likeness of it.
+#[tokio::test]
+async fn a_crossing_secret_is_read_from_its_holder_and_never_kept() {
+    let env = beside(
+        "plugincrossing",
+        &WITH_A_SECRET.replace(r#""of": "komga""#, r#""of": "sonarr""#),
+    );
+    let absent = asked(&ctx(env.clone(), Files::empty(), silent()), Asking::Read).await;
+    assert!(store::set(&env, "SONARR_API_KEY", "abc").is_ok());
+
+    let inventory = asked(&ctx(env, Files::empty(), silent()), Asking::Read).await;
+
+    let line = |inventory: &lemonfiber_core::credential::Inventory| {
+        inventory
+            .held
+            .iter()
+            .find(|one| one.plugins() == Some("comics"))
+            .map(|one| (one.state, one.location.clone(), one.fingerprint.is_none()))
+    };
+    let said = "not kept — it is sonarr's, and read from there".to_owned();
+    assert_eq!(line(&absent), Some((State::Absent, said.clone(), true)));
+    assert_eq!(line(&inventory), Some((State::Active, said, true)));
 }
 
 /// A register that is there and will not read refuses the inventory rather than

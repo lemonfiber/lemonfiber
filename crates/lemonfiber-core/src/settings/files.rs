@@ -1,16 +1,15 @@
 use crate::app::Ctx;
 use crate::config::env::quoted;
-use crate::config::paths::SECRETS;
 use crate::config::store::{self, Failure};
 use crate::plugin::{Holding, Installed, Variable};
 
 use super::{Resolved, Secrets};
 
 pub(crate) fn text(ctx: &Ctx, variables: &[Variable]) -> Result<String, Failure> {
-    let secrets = match ctx.settings.env_file.as_deref() {
-        Some(env) => Secrets::at(&env.with_file_name(SECRETS))?,
-        None => Secrets::default(),
-    };
+    let secrets = super::secrets_at(ctx)
+        .map(|at| Secrets::at(&at))
+        .transpose()?
+        .unwrap_or_default();
     Ok(variables
         .iter()
         .filter_map(|variable| {
@@ -53,10 +52,9 @@ pub(crate) fn written(ctx: &Ctx, plugins: &[&Installed]) -> Result<(), Failure> 
 }
 
 pub(crate) fn forgotten(ctx: &Ctx, plugin: &Installed) {
-    let Some(files) = super::resolved::files_of(ctx) else {
-        return;
-    };
-    for placed in &plugin.services {
-        let _ = std::fs::remove_file(super::resolved::file_in(&files, &placed.service));
+    if let Some(files) = super::resolved::files_of(ctx) {
+        for placed in &plugin.services {
+            let _ = std::fs::remove_file(super::resolved::file_in(&files, &placed.service));
+        }
     }
 }

@@ -528,3 +528,6 @@ fn inverted(kind: &crate::journal::Kind) -> Option<crate::journal::Kind> {
         | Kind::KeyRevoked { .. } => None,
     }
 }
+
+#[cfg(test)]
+mod tests;
