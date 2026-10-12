@@ -113,6 +113,11 @@ impl Challenges {
         held.retain(|one| one.until > now);
         stood
     }
+
+    /// Spend every challenge standing for the device key `device`, as revoking it asks.
+    pub async fn forgotten(&self, device: &str) {
+        self.held.lock().await.retain(|one| one.device != device);
+    }
 }
 
 #[cfg(test)]

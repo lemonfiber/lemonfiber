@@ -18,6 +18,12 @@
       ],
       "required": true
     },
+    "proved_by": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "purpose": {
       "type": [
         "ref:KeyPurpose"

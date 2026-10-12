@@ -9,9 +9,9 @@
 
 use std::time::SystemTime;
 
-use minicbor::Decoder;
 use x509_parser::asn1_rs::Class;
 
+use super::cbor::Cbor;
 use super::chain::{self, Dated};
 use super::der::{self, extension, read_one, universal, within};
 use super::{Attested, Unattested};
@@ -53,11 +53,11 @@ mod at {
 }
 
 /// What an attestation object holds that verifying it reads.
-struct Object<'a> {
+struct Object {
     /// The credential certificate, then the certificates that issued it.
     chain: Vec<Vec<u8>>,
     /// The authenticator data.
-    authenticator: &'a [u8],
+    authenticator: Vec<u8>,
 }
 
 /// What `object`, an App Attest attestation object, vouches for `key` at `now`, from an
@@ -110,7 +110,7 @@ fn attested_under(
 /// `client`, the client data hash, read back to one of `roots` at `now`.
 fn verified<'a>(
     roots: &[&[u8]],
-    object: &Object<'a>,
+    object: &'a Object,
     client: &[u8],
     now: SystemTime,
 ) -> Option<&'a [u8]> {
@@ -119,7 +119,7 @@ fn verified<'a>(
     if !chain::verified(&certificates, roots, now, Dated::Every) {
         return None;
     }
-    let data = object.authenticator;
+    let data = object.authenticator.as_slice();
     let nonce = ring::digest::digest(&ring::digest::SHA256, &[data, client].concat());
     if nonced(extension(credential, NONCE)?)? != nonce.as_ref() {
         return None;
@@ -153,40 +153,45 @@ fn nonced(value: &[u8]) -> Option<&[u8]> {
     Some(universal(&octets, der::tag::OCTETS)?.data)
 }
 
-/// What the attestation object `bytes` holds, where it is one in the App Attest format.
-fn read(bytes: &[u8]) -> Option<Object<'_>> {
-    let mut decoder = Decoder::new(bytes);
+/// What the attestation object `bytes` holds, where it is one in the App Attest format:
+/// a map of `fmt`, `attStmt` and `authData`, each once and nothing else, and nothing
+/// after it.
+fn read(bytes: &[u8]) -> Option<Object> {
+    let mut cbor = Cbor::over(bytes);
     let mut format = None;
     let mut chain = None;
     let mut authenticator = None;
-    for _ in 0..decoder.map().ok()?? {
-        match decoder.str().ok()? {
-            "fmt" => once(&mut format, decoder.str().ok()?)?,
-            "attStmt" => once(&mut chain, statement(&mut decoder)?)?,
-            "authData" => once(&mut authenticator, decoder.bytes().ok()?)?,
-            _ => decoder.skip().ok()?,
+    for _ in 0..cbor.map()? {
+        match cbor.text()?.as_str() {
+            "fmt" => once(&mut format, cbor.text()?)?,
+            "attStmt" => once(&mut chain, statement(&mut cbor)?)?,
+            "authData" => once(&mut authenticator, cbor.bytes()?)?,
+            _ => return None,
         }
     }
-    (decoder.position() == bytes.len() && format == Some(FORMAT)).then_some(())?;
+    (cbor.finished() && format.as_deref() == Some(FORMAT)).then_some(())?;
     Some(Object {
         chain: chain?,
         authenticator: authenticator?,
     })
 }
 
-/// The certificates an attestation statement carries.
-fn statement(decoder: &mut Decoder<'_>) -> Option<Vec<Vec<u8>>> {
+/// The certificates an attestation statement carries: a map of `x5c` and, where Apple
+/// gives one, `receipt`, each once and nothing else.
+fn statement(cbor: &mut Cbor<'_>) -> Option<Vec<Vec<u8>>> {
     let mut chain = None;
-    for _ in 0..decoder.map().ok()?? {
-        match decoder.str().ok()? {
+    let mut receipt = None;
+    for _ in 0..cbor.map()? {
+        match cbor.text()?.as_str() {
             "x5c" => {
                 let mut certificates = Vec::new();
-                for _ in 0..decoder.array().ok()?? {
-                    certificates.push(decoder.bytes().ok()?.to_vec());
+                for _ in 0..cbor.array()? {
+                    certificates.push(cbor.bytes()?);
                 }
                 once(&mut chain, certificates)?;
             }
-            _ => decoder.skip().ok()?,
+            "receipt" => once(&mut receipt, cbor.bytes()?)?,
+            _ => return None,
         }
     }
     chain

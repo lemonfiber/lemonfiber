@@ -168,3 +168,39 @@ pub(crate) fn android(package: &str, signer: [u8; 32]) -> AppIdentity {
         certificate: crate::secret::render(&signer).into(),
     }
 }
+
+/// CBOR written by hand, so a test can write what no encoder would.
+pub(crate) mod cbor {
+    /// The head of an item of `major` type with argument `argument`.
+    fn head(major: u8, argument: usize) -> Vec<u8> {
+        let major = major << 5;
+        match u8::try_from(argument) {
+            Ok(small) if small < 0x18 => vec![major | small],
+            Ok(byte) => vec![major | 0x18, byte],
+            Err(_) => {
+                let wide = u16::try_from(argument).unwrap_or(u16::MAX);
+                [vec![major | 0x19], wide.to_be_bytes().to_vec()].concat()
+            }
+        }
+    }
+
+    /// A map of `entries` entries, which follow it.
+    pub(crate) fn map(entries: usize) -> Vec<u8> {
+        head(5, entries)
+    }
+
+    /// An array of `items` items, which follow it.
+    pub(crate) fn array(items: usize) -> Vec<u8> {
+        head(4, items)
+    }
+
+    /// A text string.
+    pub(crate) fn text(text: &str) -> Vec<u8> {
+        [head(3, text.len()), text.as_bytes().to_vec()].concat()
+    }
+
+    /// A byte string.
+    pub(crate) fn bytes(bytes: &[u8]) -> Vec<u8> {
+        [head(2, bytes.len()), bytes.to_vec()].concat()
+    }
+}

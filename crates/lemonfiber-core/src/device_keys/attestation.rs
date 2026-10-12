@@ -5,6 +5,7 @@
 
 mod android;
 mod apple;
+mod cbor;
 pub(crate) mod chain;
 mod der;
 

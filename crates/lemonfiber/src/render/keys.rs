@@ -104,6 +104,9 @@ fn one(key: &Listed) -> Lines {
         |used| format!("last used {used}"),
     );
     lines.put(format!("    minted {}, {used}", key.minted));
+    if let Some(device) = key.proved_by.as_deref() {
+        lines.put(format!("    proved by the device key {device}"));
+    }
     if let Some(revoked) = key.revoked.as_deref() {
         lines.put(format!("    revoked {revoked}"));
     }

@@ -327,3 +327,53 @@ async fn undoing_a_registration_revokes_it_and_says_which() {
     };
     assert_eq!(revoked_by(&other), None);
 }
+
+#[tokio::test]
+async fn a_restore_revokes_every_device_key_and_says_why() {
+    let (ctx, _) = a_machine("restored");
+    registered(&ctx, "pixel").await;
+    assert!(super::restored(&ctx).await.is_ok());
+    assert!(kept(&ctx).active("pixel").is_none());
+    assert!(journaled(&ctx).contains(&Kind::DeviceKeyRevoked {
+        name: "pixel".to_owned()
+    }));
+    assert!(crate::app::outbox::load(&ctx)
+        .history()
+        .into_iter()
+        .any(|alert| alert.meaning.contains("backup was restored")));
+}
+
+#[tokio::test]
+async fn a_revoked_device_keys_alert_names_the_keys_it_proved_which_stay() {
+    let (ctx, _) = a_machine("proved");
+    registered(&ctx, "pixel").await;
+    let minted = crate::keys::run::mint(
+        &ctx,
+        "ha",
+        "read",
+        "home-assistant",
+        &crate::keys::Minter::Operator,
+        Some("pixel"),
+    )
+    .await;
+    assert!(minted.is_ok());
+    assert!(revoke(&ctx, "pixel").await.is_ok());
+    let outbox = crate::app::outbox::load(&ctx);
+    let alerts = outbox.history();
+    let revoked = alerts.iter().find(|alert| {
+        alert
+            .summary
+            .contains("The device key named pixel was revoked")
+    });
+    assert!(
+        revoked.is_some_and(|alert| alert.meaning.contains("the keys ha")
+            && alert
+                .remedies
+                .iter()
+                .any(|remedy| remedy.contains("key revoke ha")))
+    );
+    let keys = crate::keys::run::at(&ctx)
+        .and_then(|path| crate::keys::Kept::at(&path).ok())
+        .unwrap_or_default();
+    assert_eq!(keys.proved_with("pixel").len(), 1);
+}

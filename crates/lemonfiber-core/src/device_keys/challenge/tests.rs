@@ -91,6 +91,28 @@ async fn asking_again_spends_the_challenge_standing_for_the_same_token_and_key()
 }
 
 #[tokio::test]
+async fn forgetting_a_device_key_spends_its_challenges_and_no_others() {
+    let challenges = Challenges::default();
+    let (Some(revoked), Some(kept)) = (
+        challenges.issued(&bytes(7), "token", "pixel", now()).await,
+        challenges.issued(&bytes(8), "token", "iphone", now()).await,
+    ) else {
+        return;
+    };
+    challenges.forgotten("pixel").await;
+    assert!(
+        !challenges
+            .spent(&revoked.challenge, "token", "pixel", now())
+            .await
+    );
+    assert!(
+        challenges
+            .spent(&kept.challenge, "token", "iphone", now())
+            .await
+    );
+}
+
+#[tokio::test]
 async fn no_challenge_is_made_from_too_few_bytes_or_none() {
     let challenges = Challenges::default();
     assert!(challenges

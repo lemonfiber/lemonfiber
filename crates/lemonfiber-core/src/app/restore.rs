@@ -185,6 +185,7 @@ pub async fn run(
         )
         .map_err(|failure| Box::new(not_repointed(&failure.problem())))?;
     }
+    crate::device_keys::run::restored(ctx).await?;
     Ok(Restoration {
         rehearsed: false,
         would,

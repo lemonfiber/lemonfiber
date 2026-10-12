@@ -98,6 +98,7 @@ fn the_keys() -> Vec<Outcome> {
         used: Some("2026-10-05T07:00:00".to_owned()),
         revoked: None,
         member_minted: false,
+        proved_by: None,
     };
     vec![
         Outcome::Minted(Minted {

@@ -175,12 +175,17 @@ async fn minted(
             return refused;
         }
     }
+    let proved_by = match &proof {
+        Some(Proof::Device(device)) => Some(device.name.clone()),
+        Some(Proof::Password(_)) | None => None,
+    };
     let asked = Asked::Mint {
         name: given.name,
         scope: given.scope,
         purpose: given.purpose,
         by: by.clone(),
         claim: given.claim,
+        proved_by,
     };
     let password = match (proof, &by) {
         (None, _) => return Refusal::NotAKeyRequest.answered(),

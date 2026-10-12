@@ -128,9 +128,12 @@ ring = "0.17"
 # inside one. Already in the tree via rcgen; its own signature checks are left off, and
 # each signature is checked with ring against the algorithms a device key accepts.
 x509-parser = "0.18"
-# Reading the CBOR an App Attest attestation object is written in. No dependencies of
-# its own with its defaults off.
-minicbor = { version = "2", default-features = false, features = ["alloc"] }
+# Reading the CBOR an App Attest attestation object is written in, one header at a
+# time, so lengths, keys and what follows the object are checked here rather than
+# taken on trust. The low-level half of ciborium, with its defaults off.
+ciborium-ll = { version = "0.2", default-features = false }
+# The trait that low half reads its bytes through, already beneath it.
+ciborium-io = { version = "0.2", default-features = false }
 # Reading a secret without echoing it needs raw-terminal control, which
 # `unsafe_code = "forbid"` rules out doing directly.
 rpassword = "7"

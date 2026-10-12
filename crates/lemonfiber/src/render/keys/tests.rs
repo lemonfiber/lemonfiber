@@ -35,6 +35,7 @@ fn a_key(name: &str, state: State, member_minted: bool) -> Listed {
         used: None,
         revoked: (state == State::Revoked).then(|| "2026-10-05T07:00:00".to_owned()),
         member_minted,
+        proved_by: None,
     }
 }
 

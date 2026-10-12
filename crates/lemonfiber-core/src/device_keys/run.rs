@@ -242,16 +242,40 @@ pub async fn password_changed(ctx: &Ctx) -> Result<(), Box<Problem>> {
 ///
 /// A [`Problem`] where the record or the journal cannot be read or written.
 pub async fn apps_removed(ctx: &Ctx, removed: &[AppIdentity]) -> Result<(), Box<Problem>> {
+    let written: Vec<String> = removed.iter().map(AppIdentity::written).collect();
+    revoked_where(
+        ctx,
+        |record| written.contains(&record.app),
+        Revoked::AppRemoved,
+    )
+    .await
+}
+
+/// Revoke every active device key, as a restore that has just landed asks.
+///
+/// # Errors
+///
+/// A [`Problem`] where the record or the journal cannot be read or written.
+pub async fn restored(ctx: &Ctx) -> Result<(), Box<Problem>> {
+    revoked_where(ctx, |_| true, Revoked::Restored).await
+}
+
+/// Revoke every active device key `revoking` picks, journaled, and tell the operator of
+/// each for `why`.
+async fn revoked_where(
+    ctx: &Ctx,
+    revoking: impl Fn(&Record) -> bool,
+    why: Revoked,
+) -> Result<(), Box<Problem>> {
     let Some(path) = at(ctx) else {
         return Ok(());
     };
-    let written: Vec<String> = removed.iter().map(AppIdentity::written).collect();
     let now = written_now(ctx);
     let gone = changed(ctx, &path, |ctx, kept| {
         let gone: Vec<Record> = kept
             .keys
             .iter()
-            .filter(|record| !record.is_revoked() && written.contains(&record.app))
+            .filter(|record| !record.is_revoked() && revoking(record))
             .cloned()
             .collect();
         for record in &gone {
@@ -261,7 +285,7 @@ pub async fn apps_removed(ctx: &Ctx, removed: &[AppIdentity]) -> Result<(), Box<
     })
     .await?;
     for record in &gone {
-        heard(ctx, record, &Heard::Revoked(Revoked::AppRemoved)).await;
+        heard(ctx, record, &Heard::Revoked(why)).await;
     }
     Ok(())
 }

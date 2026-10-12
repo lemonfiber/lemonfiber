@@ -23,6 +23,9 @@ pub(super) enum Revoked {
     PasswordChanged,
     /// The app that made it was taken off the apps this stack trusts.
     AppRemoved,
+    /// A configuration backup was restored, putting back a password and device keys
+    /// from before whatever was revoked since.
+    Restored,
 }
 
 /// What a device key's alert is about.
@@ -37,9 +40,28 @@ pub(super) enum Heard {
 }
 
 /// Tell the operator, now and in the record of alerts, what became of a device key.
+///
+/// A revoke names every key the device key proved that still stands, since those stay.
 pub(super) async fn heard(ctx: &Ctx, record: &Record, heard: &Heard) {
     let check = format!("{CHECK}{}", record.name);
-    let (summary, meaning, remedy) = said(record, heard);
+    let (summary, mut meaning, mut remedy) = said(record, heard);
+    if matches!(heard, Heard::Revoked(_)) {
+        let proved = proved(ctx, &record.name);
+        if !proved.is_empty() {
+            meaning = format!(
+                "{meaning} It proved the mint of the keys {}, which still stand.",
+                proved.join(", ")
+            );
+            remedy = format!(
+                "If those keys should go too, revoke them: {}",
+                proved
+                    .iter()
+                    .map(|name| format!("{PRODUCT} key revoke {name}"))
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            );
+        }
+    }
     let happened = match heard {
         Heard::Registered => "registered".to_owned(),
         Heard::Revoked(_) => "revoked".to_owned(),
@@ -64,6 +86,19 @@ pub(super) async fn refused(ctx: &Ctx, name: &str, why: &Problem) {
         "If nobody here asked, change the password: whoever asked knows it".to_owned(),
     )
     .await;
+}
+
+/// The names of every key the device key `device` proved that still stands.
+fn proved(ctx: &Ctx, device: &str) -> Vec<String> {
+    crate::keys::run::at(ctx)
+        .and_then(|path| crate::keys::Kept::at(&path).ok())
+        .map(|kept| {
+            kept.proved_with(device)
+                .into_iter()
+                .map(|record| record.name.clone())
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// The sentences an alert about `record` says.
@@ -93,6 +128,10 @@ fn said(record: &Record, heard: &Heard) -> (String, String, String) {
                     "The app that made it, {}, is no longer one this stack trusts.",
                     record.app
                 ),
+                Revoked::Restored => "A backup was restored, which puts back a password and \
+                     device keys from before anything revoked since, so every phone registers \
+                     again."
+                    .to_owned(),
             },
             "Register the phone's key again if it should still prove the operator".to_owned(),
         ),

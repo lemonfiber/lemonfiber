@@ -579,3 +579,42 @@ async fn settings_that_landed_but_could_not_be_re_pointed_are_reported() {
     .map(|problem| problem.code);
     assert_eq!(refusal, Some(NOT_REPOINTED));
 }
+
+#[tokio::test]
+async fn a_restore_that_lands_revokes_every_device_key() {
+    let vault = Arc::new(FakeArchive::holding(CURRENT, SCHEMA));
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("restore-device-keys").kept();
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::create_dir_all(&dir);
+    let mut ctx = a_stopped_run(&vault);
+    ctx.settings.env_file = Some(dir.join(".env"));
+    ctx.settings.stack_dir = Some(dir.join("stack"));
+    let device_keys = dir.join(crate::device_keys::FILE);
+    let seeded =
+        crate::settings::kept::changed(&device_keys, &mut |kept: &mut crate::device_keys::Kept| {
+            kept.keys.push(crate::device_keys::Record {
+                name: "pixel".to_owned(),
+                public_key: String::new(),
+                fingerprint: "ab".repeat(32),
+                backing: crate::device_keys::Backing::Tee,
+                app: String::new(),
+                registered: "2026-10-12T06:00:00Z".to_owned(),
+                under: String::new(),
+                used: None,
+                revoked: None,
+            });
+            Ok(())
+        });
+    assert!(seeded.is_ok());
+    let restoration = run(
+        &ctx,
+        &Kept::Named(KEPT.to_owned()),
+        false,
+        &Consent::Standing,
+    )
+    .await;
+    assert!(restoration.is_ok_and(|said| said.done.is_some()));
+    let kept: crate::device_keys::Kept =
+        crate::settings::kept::read(&device_keys).unwrap_or_default();
+    assert!(kept.active("pixel").is_none());
+}

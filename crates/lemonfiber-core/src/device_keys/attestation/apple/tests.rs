@@ -1,11 +1,10 @@
 use lemonfiber_fixtures::attestations::APPLE;
-use minicbor::Encoder;
 use rcgen::{BasicConstraints, CustomExtension, PublicKeyData};
 
 use super::{attested, attested_under, read, verified, NONCE, ROOTS};
 use crate::device_keys::attestation::{Attested, Unattested};
 use crate::device_keys::identity::AppIdentity;
-use crate::device_keys::testing::{arcs, at, now, pair, public, sequence, tlv, Authority};
+use crate::device_keys::testing::{arcs, at, cbor, now, pair, public, sequence, tlv, Authority};
 use crate::device_keys::{Backing, PublicKey};
 
 /// The App ID the generated attestations are made for.
@@ -109,28 +108,30 @@ impl Made {
             &credential,
             vec![CustomExtension::from_oid_content(&arcs(NONCE), extension)],
         );
-        (cbor(&[certificate, authority.der.clone()], &data), root)
+        (object(&[certificate, authority.der.clone()], &data), root)
     }
 }
 
 /// An attestation object holding `chain` and `data`.
-fn cbor(chain: &[Vec<u8>], data: &[u8]) -> Vec<u8> {
-    let mut encoder = Encoder::new(Vec::new());
-    let written = encoder
-        .map(3)
-        .and_then(|e| e.str("fmt"))
-        .and_then(|e| e.str("apple-appattest"))
-        .and_then(|e| e.str("attStmt"))
-        .and_then(|e| e.map(2))
-        .and_then(|e| e.str("x5c"))
-        .and_then(|e| e.array(2))
-        .and_then(|e| chain.iter().try_fold(e, |e, one| e.bytes(one)))
-        .and_then(|e| e.str("receipt"))
-        .and_then(|e| e.bytes(b"receipt"))
-        .and_then(|e| e.str("authData"))
-        .and_then(|e| e.bytes(data));
-    assert!(written.is_ok());
-    encoder.into_writer()
+fn object(chain: &[Vec<u8>], data: &[u8]) -> Vec<u8> {
+    let mut x5c = cbor::array(chain.len());
+    for certificate in chain {
+        x5c.extend(cbor::bytes(certificate));
+    }
+    [
+        cbor::map(3),
+        cbor::text("fmt"),
+        cbor::text("apple-appattest"),
+        cbor::text("attStmt"),
+        cbor::map(2),
+        cbor::text("x5c"),
+        x5c,
+        cbor::text("receipt"),
+        cbor::bytes(b"receipt"),
+        cbor::text("authData"),
+        cbor::bytes(data),
+    ]
+    .concat()
 }
 
 /// What `made`, for a fresh device key, attests under its own root.
@@ -209,23 +210,21 @@ fn a_generated_attestation_is_not_read_back_to_apples_root() {
 }
 
 #[test]
-fn only_an_app_attest_object_with_each_field_once_reads() {
+fn only_an_app_attest_object_with_each_field_once_and_nothing_after_it_reads() {
     assert!(read(b"").is_none());
-    assert!(read(b"\xa0").is_none());
-    let mut encoder = Encoder::new(Vec::new());
-    let twice = encoder
-        .map(2)
-        .and_then(|e| e.str("fmt"))
-        .and_then(|e| e.str("apple-appattest"))
-        .and_then(|e| e.str("fmt"))
-        .and_then(|e| e.str("apple-appattest"));
-    assert!(twice.is_ok());
-    assert!(read(&encoder.into_writer()).is_none());
-    let mut other = Encoder::new(Vec::new());
-    let packed = other
-        .map(1)
-        .and_then(|e| e.str("fmt"))
-        .and_then(|e| e.str("packed"));
-    assert!(packed.is_ok());
-    assert!(read(&other.into_writer()).is_none());
+    assert!(read(&cbor::map(0)).is_none());
+    let format = [cbor::text("fmt"), cbor::text("apple-appattest")].concat();
+    let twice = [cbor::map(2), format.clone(), format.clone()].concat();
+    assert!(read(&twice).is_none());
+    let packed = [cbor::map(1), cbor::text("fmt"), cbor::text("packed")].concat();
+    assert!(read(&packed).is_none());
+    let unknown = [cbor::map(1), cbor::text("extra"), cbor::bytes(b"x")].concat();
+    assert!(read(&unknown).is_none());
+    let whole = object(&[b"certificate".to_vec()], b"data");
+    assert!(read(&whole).is_some());
+    let mut trailing = whole.clone();
+    trailing.push(0);
+    assert!(read(&trailing).is_none());
+    let indefinite = [vec![0xbf], format, vec![0xff]].concat();
+    assert!(read(&indefinite).is_none());
 }

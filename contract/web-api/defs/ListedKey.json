@@ -15,6 +15,13 @@
       "description": "The name it was minted under.",
       "type": "string"
     },
+    "proved_by": {
+      "description": "The device key whose signature proved its mint, absent where none did.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "purpose": {
       "description": "What the minter said it is for. A declaration, not something the core verified.",
       "$ref": "KeyPurpose.json"

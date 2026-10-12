@@ -453,6 +453,7 @@ fn every_key() -> lemonfiber_core::keys::Listing {
         used: Some("2026-10-05T07:00:00".to_owned()),
         revoked: None,
         member_minted: false,
+        proved_by: Some("pixel".to_owned()),
     };
     let mut gone = listed("gone", State::Revoked);
     gone.revoked = Some("2026-10-05T08:00:00".to_owned());

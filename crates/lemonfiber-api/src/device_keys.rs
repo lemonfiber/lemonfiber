@@ -123,16 +123,17 @@ async fn registered(
     }
 }
 
-/// A device key revoked, by its name.
+/// A device key revoked, by its name, and every challenge standing for it spent.
 async fn revoked(
     State(serving): State<Serving>,
     caller: Caller,
     Path(name): Path<String>,
 ) -> Response {
-    match operator(&caller) {
-        Ok(()) => carried_out(&serving.ctx, Command::DeviceKeys(Asked::Revoke { name })).await,
-        Err(refused) => *refused,
+    if let Err(refused) = operator(&caller) {
+        return *refused;
     }
+    serving.admitting.challenges.forgotten(&name).await;
+    carried_out(&serving.ctx, Command::DeviceKeys(Asked::Revoke { name })).await
 }
 
 /// A challenge for one registered device key, bound to the token that asked.

@@ -48,6 +48,15 @@ fn signature(phone: &EcdsaKeyPair, text: &str) -> String {
 /// A machine with a password kept, its clock where the recorded chain is valid, and
 /// `phone` registered as `pixel` where one is given.
 fn a_machine(named: &str, phone: Option<&EcdsaKeyPair>) -> (axum::Router, String, PathBuf) {
+    let (router, token, env, _) = a_machine_keeping(named, phone);
+    (router, token, env)
+}
+
+/// The same machine, and where it keeps its password.
+fn a_machine_keeping(
+    named: &str,
+    phone: Option<&EcdsaKeyPair>,
+) -> (axum::Router, String, PathBuf, PathBuf) {
     let admission = keeping(&format!("device-{named}"));
     let mut ctx = world(Some(admission.clone()), not_the_token());
     ctx.seams.clock = Stopped::at(ANDROID_RSA_ROOT.at);
@@ -77,11 +86,11 @@ fn a_machine(named: &str, phone: Option<&EcdsaKeyPair>) -> (axum::Router, String
         let _ = fs::write(env.with_file_name("device-keys.json"), record.to_string());
     }
     let admitting = Arc::new(Admitting {
-        kept: Some(admission),
+        kept: Some(admission.clone()),
         ..Admitting::default()
     });
     let (router, token) = surface(ctx, &admitting);
-    (router, token.as_str().to_owned(), env)
+    (router, token.as_str().to_owned(), env, admission)
 }
 
 /// The value at `pointer` in an answer's body.
@@ -164,6 +173,13 @@ async fn a_signature_over_an_issued_challenge_mints_in_place_of_the_password_onc
     assert!(kept.contains("\"used\": \"2025-01-08"), "{kept}");
     let again = minting(&router, &token, &body.replace("\"ha\"", "\"ha2\"")).await;
     assert_eq!(code(&again), "DEVICE-10");
+    let listed = presented(router, "GET", "/api/keys", &token, Some((HERE, false))).await;
+    assert_eq!(
+        read(&listed.body, "/data/keys/0/proved_by"),
+        "pixel",
+        "{}",
+        listed.body
+    );
 }
 
 #[tokio::test]
@@ -232,6 +248,37 @@ async fn a_device_key_not_registered_is_refused_before_any_challenge_is_looked_a
     assert_eq!(code(&refused), "DEVICE-9");
     let body = proved_mint("ha", "anything", "anything");
     assert_eq!(code(&minting(&router, &token, &body).await), "DEVICE-9");
+}
+
+#[tokio::test]
+async fn a_challenge_issued_before_its_device_key_was_revoked_proves_nothing() {
+    let phone = a_phone();
+    let (router, token, _) = a_machine("revoked-between", Some(&phone));
+    let issued = challenge(&router, &token).await;
+    let revoked = presented(
+        router.clone(),
+        "DELETE",
+        "/api/device-keys/pixel",
+        &token,
+        Some((HERE, false)),
+    )
+    .await;
+    assert_eq!(revoked.status, StatusCode::OK, "{}", revoked.body);
+    let body = proved_mint("ha", &issued, &signed_for(&phone, "ha", &issued));
+    assert_eq!(code(&minting(&router, &token, &body).await), "DEVICE-9");
+}
+
+#[tokio::test]
+async fn a_password_changed_elsewhere_cuts_off_a_challenge_already_issued() {
+    let phone = a_phone();
+    let (router, token, env, admission) = a_machine_keeping("password-between", Some(&phone));
+    let issued = challenge(&router, &token).await;
+    let changed = credential::keep(&admission, &a_credential("another password, long enough"));
+    assert!(changed.is_ok());
+    let body = proved_mint("ha", &issued, &signed_for(&phone, "ha", &issued));
+    assert_eq!(code(&minting(&router, &token, &body).await), "DEVICE-9");
+    let kept = fs::read_to_string(env.with_file_name("device-keys.json")).unwrap_or_default();
+    assert!(kept.contains("\"revoked\""), "{kept}");
 }
 
 #[tokio::test]
