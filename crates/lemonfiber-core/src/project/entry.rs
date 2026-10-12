@@ -380,7 +380,7 @@ pub(crate) fn constant_text(constant: &Constant) -> String {
 }
 
 /// Every port it publishes on its interface, then an adapter's contract port.
-fn ports(unit: &Unit<'_>) -> Vec<String> {
+pub(crate) fn ports(unit: &Unit<'_>) -> Vec<String> {
     unit.published
         .iter()
         .map(|(tier, host, inside)| format!("{}:{host}:{inside}", tier.interface()))

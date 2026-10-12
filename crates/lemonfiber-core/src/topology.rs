@@ -48,6 +48,9 @@ pub const DOOR_ON_MEDIA: Ipv4Addr = Ipv4Addr::new(10, 80, 96, 18);
 /// The capability whose filler is the proxy.
 const PROXY_FRONT: &str = "proxy.front";
 
+/// The capability whose filler guards every byte the household streams.
+pub(crate) const STREAM_GUARD: &str = "stream.guard";
+
 /// One service, as its place on the project's networks needs it.
 #[derive(Debug, Clone, Copy)]
 pub struct Member<'a> {
