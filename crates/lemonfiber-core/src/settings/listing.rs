@@ -42,7 +42,7 @@ fn settings(recorded: &Recorded, readers: &Readers) -> Vec<SettingRead> {
         .collect()
 }
 
-fn secrets(
+pub(super) fn secrets(
     ctx: &Ctx,
     readers: &Readers,
     installed: &[Installed],

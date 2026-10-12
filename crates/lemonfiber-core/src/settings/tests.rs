@@ -13,6 +13,7 @@ mod changing;
 mod files;
 mod filing;
 mod own;
+mod reaching;
 mod stacked;
 
 fn secrets_in(scratch: &Scratch) -> PathBuf {

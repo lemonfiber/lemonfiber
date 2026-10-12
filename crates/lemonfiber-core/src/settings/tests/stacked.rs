@@ -1,13 +1,13 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use lemonfiber_manifest::container::{SecretOf, Value};
+use lemonfiber_manifest::container::Value;
 
 use super::changing::{agreed, journal, machine, running};
 use crate::app::Ctx;
 use crate::config::paths::{SECRETS, SETTINGS};
 use crate::config::store;
-use crate::credential::{fingerprint, Reach};
+use crate::credential::fingerprint;
 use crate::journal::Kind;
 use crate::settings::legacy;
 
@@ -16,22 +16,19 @@ fn compose_reads() -> BTreeMap<(String, String), String> {
     let mut reads = BTreeMap::new();
     for entry in std::fs::read_dir(at).into_iter().flatten().flatten() {
         let text = std::fs::read_to_string(entry.path()).unwrap_or_default();
-        let read: serde_yaml_ng::Value = serde_yaml_ng::from_str(&text).unwrap_or_default();
-        let Some(services) = read.get("services").and_then(|one| one.as_mapping()) else {
-            continue;
-        };
-        for (service, body) in services {
-            let environment = body.get("environment").and_then(|one| one.as_mapping());
-            for (variable, value) in environment.into_iter().flatten() {
-                let key = value
-                    .as_str()
-                    .and_then(|text| text.strip_prefix("${"))
-                    .and_then(|text| text.split([':', '}']).next());
-                if let (Some(service), Some(variable), Some(key)) =
-                    (service.as_str(), variable.as_str(), key)
-                {
-                    reads.insert((service.to_owned(), variable.to_owned()), key.to_owned());
-                }
+        let mut service: Option<&str> = None;
+        for line in text.lines() {
+            let indent = line.len() - line.trim_start().len();
+            let trimmed = line.trim();
+            if indent == 2 && trimmed.ends_with(':') {
+                service = trimmed.strip_suffix(':');
+                continue;
+            }
+            let read = trimmed
+                .split_once(": ${")
+                .and_then(|(variable, rest)| Some((variable, rest.split([':', '}']).next()?)));
+            if let (Some(service), Some((variable, key))) = (service, read) {
+                reads.insert((service.to_owned(), variable.to_owned()), key.to_owned());
             }
         }
     }
@@ -261,49 +258,4 @@ fn undoing_a_filed_setting_puts_its_line_back() {
     assert!(matches!(undone, Ok(super::super::undoing::Undone::Done)));
     assert_eq!(setting(&env, "gluetun:countries"), None);
     assert_eq!(line(&env, "VPN_COUNTRIES").as_deref(), Some("Belgium"));
-}
-
-#[tokio::test]
-async fn replacing_a_crossing_credential_regenerates_and_restarts_what_reads_it() {
-    let machine = machine("crossed", running(&["reader"]));
-    let mut placed = crate::test_support::a_placed("reader", &[], None, None);
-    placed.fields.env.insert(
-        "SONARR_KEY".to_owned(),
-        Value::Secret(SecretOf {
-            secret: "sonarr-key".to_owned(),
-        }),
-    );
-    let mut reader = crate::test_support::an_installed("reader", vec![placed]);
-    reader.manifest = crate::test_support::CONTRACTED_MANIFEST.to_owned();
-    reader.declared.secrets = vec![crate::plugin::Secret {
-        id: "sonarr-key".to_owned(),
-        of: "sonarr".to_owned(),
-        why: "Asks the series service".to_owned(),
-    }];
-    assert!(store::set(&machine.env, "SONARR_API_KEY", "replacement-key").is_ok());
-    let manifest = machine.ctx.stack.checked_manifest(machine.ctx.today()).ok();
-    let installed = [reader];
-    let resolved = crate::settings::Resolved::trusting(
-        &machine.ctx,
-        manifest.as_ref(),
-        &installed,
-        &crate::test_support::first_party("reader"),
-    );
-
-    let reached =
-        crate::settings::run::reached(&machine.ctx, "SONARR_API_KEY", &installed, &resolved).await;
-    let elsewhere =
-        crate::settings::run::reached(&machine.ctx, "RADARR_API_KEY", &installed, &resolved).await;
-
-    assert_eq!(reached.len(), 1);
-    assert!(reached
-        .iter()
-        .all(|one| one.consumer == "reader" && one.reach == Reach::Updated));
-    assert!(elsewhere.is_empty());
-    let file = machine.env.with_file_name("env").join("reader.env");
-    assert!(std::fs::read_to_string(file)
-        .is_ok_and(|text| text.contains("SONARR_KEY=") && text.contains("replacement-key")));
-    assert!(machine.runner.seen().iter().any(
-        |argv| argv.iter().any(|word| word == "up") && argv.iter().any(|word| word == "reader")
-    ));
 }

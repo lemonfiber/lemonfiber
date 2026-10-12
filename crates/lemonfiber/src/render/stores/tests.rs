@@ -153,3 +153,58 @@ fn a_rehearsed_clear_says_it_was_a_rehearsal_and_names_the_clear() {
         "{text}"
     );
 }
+
+#[test]
+fn every_source_of_a_secret_is_said_and_a_stack_reading_none_says_so() {
+    let secret = |name: &str, from: Option<SecretFrom>| SecretRead {
+        name: name.to_owned(),
+        whose: Owner::Namespace {
+            namespace: "reader".to_owned(),
+        },
+        readers: Vec::new(),
+        from,
+        held: false,
+    };
+    let report = SettingsReport {
+        secrets: vec![
+            secret("reader:typed", Some(SecretFrom::Operator)),
+            secret("reader:granted", Some(SecretFrom::Granted)),
+            secret("reader:none", None),
+        ],
+        ..listing()
+    };
+    let text = super::settings(&report).text();
+    assert!(
+        text.contains("  reader:typed  not held, entered by you  (reader's)"),
+        "{text}"
+    );
+    assert!(
+        text.contains("  reader:granted  not held, another service's credential, granted"),
+        "{text}"
+    );
+    assert!(
+        text.contains("  reader:none  not held  (reader's)"),
+        "{text}"
+    );
+    let empty = SettingsReport {
+        secrets: Vec::new(),
+        ..listing()
+    };
+    assert!(super::settings(&empty)
+        .text()
+        .contains("  No service reads a secret."));
+}
+
+#[test]
+fn a_set_made_says_what_it_now_holds() {
+    let report = SettingsReport {
+        change: Some(change(Some("Belgium"), true)),
+        ..listing()
+    };
+    let text = super::settings(&report).text();
+    assert!(
+        text.starts_with("gluetun:countries now holds Belgium.\n"),
+        "{text}"
+    );
+    assert!(!text.contains("--offer"), "{text}");
+}
