@@ -176,6 +176,8 @@ outcomes! {
     Wiring(crate::model::WiringReport) => WIRING,
     /// A change of which service fills a capability, and what it costs.
     Substitution(crate::model::SubstitutionReport) => SUBSTITUTION [rehearsed],
+    /// Every setting and secret the services read, and what changing a setting came to.
+    Settings(crate::model::SettingsReport) => SETTINGS [rehearsed],
     /// Everything that leaves this machine, and what refusing each of them costs.
     Outbound(crate::outbound::Leaving) => OUTBOUND,
     /// Every plugin installed on this machine, and what installing one came to.

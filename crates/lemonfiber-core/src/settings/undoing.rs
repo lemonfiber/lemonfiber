@@ -15,8 +15,15 @@ pub(crate) fn resettled(
     name: &str,
     value: Option<&str>,
     wrote: Option<&str>,
+    filed: Option<&str>,
 ) -> Result<Undone, Failure> {
-    super::store::resettled(&env_file.with_file_name(SETTINGS), name, value, wrote)
+    super::store::resettled(
+        &env_file.with_file_name(SETTINGS),
+        name,
+        value,
+        wrote,
+        &|value| filed.map_or(Ok(()), |key| store::set(env_file, key, value)),
+    )
 }
 
 pub(crate) fn reheld(

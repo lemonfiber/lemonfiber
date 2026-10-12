@@ -217,7 +217,7 @@ fn beside(kinds: &mut BTreeMap<String, Schema>) {
 /// work rather than a request, and they are the one refusal a client answers by reading
 /// again rather than by reporting a failure. The rest are each family's refusals of what
 /// a request named or how it asked, which a client branches on by code.
-pub(crate) const CORE_REFUSALS: [&[Code]; 15] = [
+pub(crate) const CORE_REFUSALS: [&[Code]; 16] = [
     &agreement::MOVED,
     &wiring::REFUSED,
     &lemonfiber_core::app::REFUSALS,
@@ -230,6 +230,7 @@ pub(crate) const CORE_REFUSALS: [&[Code]; 15] = [
     &lemonfiber_core::glossary::REFUSALS,
     &lemonfiber_core::keys::REFUSALS,
     &lemonfiber_core::screening::REFUSALS,
+    &lemonfiber_core::SETTINGS_REFUSALS,
     &lemonfiber_core::space::REFUSALS,
     &lemonfiber_core::stack::closure::REFUSALS,
     &lemonfiber_core::wishing::REFUSALS,

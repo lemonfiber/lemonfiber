@@ -45,8 +45,8 @@ pub(crate) fn nowhere_to_send() -> crate::error::Problem {
          no name on the network and has none written down",
         crate::error::Remedy::new("Record the address the household should use").with_detail(
             format!(
-                "lemonfiber config set {} <address>",
-                crate::config::HOUSEHOLD_HOST_KEY
+                "lemonfiber settings set {} <address>",
+                crate::config::HOUSEHOLD_HOST_SETTING
             ),
         ),
     )

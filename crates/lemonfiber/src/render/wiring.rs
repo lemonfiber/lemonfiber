@@ -217,7 +217,7 @@ fn answering(report: &SubstitutionReport) -> Lines {
 }
 
 /// Words an operator typed, quoted so a shell hands them back as one argument.
-fn quoted(said: &str) -> String {
+pub(super) fn quoted(said: &str) -> String {
     let mut held = String::from('"');
     for letter in said.chars() {
         if matches!(letter, '"' | '\\' | '$' | '`') {

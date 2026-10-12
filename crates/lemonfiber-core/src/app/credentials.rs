@@ -116,7 +116,12 @@ async fn replacing(
         project,
         installed,
     } = reaching;
-    let rotated = rotating::rotate(ctx, found, services, fillers, project).await;
+    let mut rotated = rotating::rotate(ctx, found, services, fillers, project).await;
+    if matches!(rotated.settled, Settled::Replaced { .. }) {
+        rotated
+            .consumers
+            .extend(crate::settings::run::crossed(ctx, &found.setting).await);
+    }
     // Read again, because a landed replacement has changed what the answer is and an
     // inventory taken before it would report the state the rotation just left behind.
     let after = reading::taken(ctx, services, fillers, project, installed).await;

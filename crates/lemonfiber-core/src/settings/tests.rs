@@ -9,8 +9,11 @@ use super::{kept, named, Secrets, Settings, Source};
 use crate::config::store::Failure;
 use crate::credential::fingerprint;
 
+mod changing;
 mod files;
 mod filing;
+mod own;
+mod stacked;
 
 fn secrets_in(scratch: &Scratch) -> PathBuf {
     scratch.path().join("config").join("secrets.json")
@@ -279,12 +282,12 @@ fn a_setting_goes_back_only_while_it_holds_what_was_recorded() {
     };
     assert_eq!(read("komga:mode").as_deref(), Some("fast"));
     let env = config.join(".env");
-    let theirs = super::undoing::resettled(&env, "komga:mode", None, Some("slow"));
+    let theirs = super::undoing::resettled(&env, "komga:mode", None, Some("slow"), None);
     assert!(matches!(theirs, Ok(Undone::TheirsNow)));
-    let undone = super::undoing::resettled(&env, "komga:mode", Some("slow"), Some("fast"));
+    let undone = super::undoing::resettled(&env, "komga:mode", Some("slow"), Some("fast"), None);
     assert!(matches!(undone, Ok(Undone::Done)));
     assert_eq!(read("komga:mode").as_deref(), Some("slow"));
-    let cleared = super::undoing::resettled(&env, "komga:mode", None, Some("slow"));
+    let cleared = super::undoing::resettled(&env, "komga:mode", None, Some("slow"), None);
     assert!(matches!(cleared, Ok(Undone::Done)));
     assert_eq!(read("komga:mode"), None);
 }
@@ -366,6 +369,7 @@ fn a_setting_already_back_is_done_and_left_untouched() {
         "komga:mode",
         Some("slow"),
         Some("fast"),
+        None,
     );
     assert!(matches!(undone, Ok(Undone::Done)));
     assert_eq!(
@@ -386,7 +390,7 @@ fn undoing_against_a_store_a_newer_build_wrote_is_refused() {
     assert!(std::fs::write(config.join("secrets.json"), newer).is_ok());
     let env = config.join(".env");
     assert!(matches!(
-        super::undoing::resettled(&env, "komga:mode", None, Some("fast")),
+        super::undoing::resettled(&env, "komga:mode", None, Some("fast"), None),
         Err(Failure::TooNew { .. })
     ));
     assert!(matches!(

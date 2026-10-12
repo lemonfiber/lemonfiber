@@ -116,7 +116,7 @@ fn a_trace_narrowed_to_one_season_searches_for_that_season() {
 /// setting would take the tunnel away.
 #[test]
 fn an_answer_over_a_read_with_no_widening_offers_none() {
-    assert!(sends("settings", &[""]).is_none());
+    assert!(sends("configuration", &[""]).is_none());
     assert!(sends("what to watch on", &[]).is_none());
 }
 

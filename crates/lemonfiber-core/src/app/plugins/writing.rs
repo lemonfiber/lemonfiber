@@ -253,8 +253,7 @@ pub(crate) fn joined(
     draft.joining(&joins(ctx, manifest, &beside))
 }
 
-/// One file a choice of filler writes over: where it is, what it holds now, and what it
-/// is to hold.
+/// One file a change writes over: where it is, what it holds now, and what it is to hold.
 pub(crate) struct Overwrite {
     /// The file.
     pub(crate) path: PathBuf,
@@ -264,32 +263,65 @@ pub(crate) struct Overwrite {
     pub(crate) text: String,
 }
 
-/// Every file making the stack's asks settle under `chosen` writes over: the Compose
-/// document of each installed plugin whose services' networks that moves, and the record
-/// of what is installed, which carries those networks.
-///
-/// Nothing where no network moves, and no document for a plugin whose document is not
-/// there to be written over — a plugin with no document is one nothing runs, and the
-/// record alone is what it is written from.
+impl Overwrite {
+    pub(crate) fn journalled(&self, operation: &str, at: &str) -> Change {
+        let path = self.path.display().to_string();
+        Change {
+            at: at.to_owned(),
+            operation: operation.to_owned(),
+            target: path.clone(),
+            kind: Kind::Rewritten {
+                path,
+                previous: self.previous.clone(),
+                written: crate::materialised::checksum(self.text.as_bytes()),
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Refusing {
+    pub(crate) moved: crate::error::Code,
+    pub(crate) unwritten: crate::error::Code,
+}
+
+pub(crate) const WIRING: Refusing = Refusing {
+    moved: crate::error::codes::wire::WIRING_MOVED,
+    unwritten: crate::error::codes::wire::CHOICE_UNWRITABLE,
+};
+
+/// Every file a change to the stack's choices or settings writes over: the Compose document
+/// of each installed plugin whose networks the choices in `chosen` move or whose text
+/// `resolved` changes, and the record of what is installed, which carries those networks.
 ///
 /// # Errors
 ///
 /// Where a mount source of a plugin whose document it writes over is reached through a
 /// link.
-pub(crate) fn rejoined(
+pub(crate) fn regenerated(
     ctx: &Ctx,
     manifest: &lemonfiber_manifest::Manifest,
     register: &crate::plugin::Register,
     chosen: &crate::wiring::Chosen,
+    resolved: &crate::settings::Resolved,
 ) -> Result<Vec<Overwrite>, Box<Problem>> {
-    let settled = crate::wiring::settle(manifest, register.installed(), chosen);
+    let installed = register.installed();
+    let now = crate::wiring::settle(
+        manifest,
+        installed,
+        &crate::app::targets::chosen_fillers(ctx),
+    );
+    let before = crate::settings::Resolved::of(ctx, Some(manifest), installed);
+    let settled = crate::wiring::settle(manifest, installed, chosen);
     let joins = crate::plugin::Joins::of(manifest, &ctx.stack.attached(), &settled);
-    let resolved = crate::settings::Resolved::of(ctx, Some(manifest), register.installed());
     let mut after = register.clone();
     let mut overwrites = Vec::new();
-    for held in register.installed() {
+    for held in installed {
         let moved = held.clone().joining(&joins);
-        if moved == *held {
+        let text = super::addressing::written(&settled, manifest, installed, resolved, &moved);
+        if moved == *held
+            && text == super::addressing::written(&now, manifest, installed, &before, held)
+        {
             continue;
         }
         if let Some(stack) = ctx.settings.stack_dir.as_deref() {
@@ -299,18 +331,14 @@ pub(crate) fn rejoined(
                 overwrites.push(Overwrite {
                     path,
                     previous,
-                    text: super::addressing::written(
-                        &settled,
-                        manifest,
-                        register.installed(),
-                        &resolved,
-                        &moved,
-                    ),
+                    text,
                 });
             }
         }
-        after.forget(&held.plugin);
-        let _ = after.record(moved);
+        if moved != *held {
+            after.forget(&held.plugin);
+            let _ = after.record(moved);
+        }
     }
     let kept = super::kept_at(ctx)
         .filter(|_| after != *register)
@@ -327,19 +355,14 @@ pub(crate) fn rejoined(
 
 /// Refuse where any file to be written over no longer holds what was read from it.
 ///
-/// What a file is to hold was worked out from what it and the record of what is
-/// installed held when they were read. A plugin installed, removed or updated since has
-/// changed one of them, and writing what was worked out would put back a plugin that has
-/// gone or drop one that has arrived.
-///
 /// # Errors
 ///
 /// Where a file holds something other than what was read, or is gone.
-pub(crate) fn unmoved(overwrites: &[Overwrite]) -> Result<(), Box<Problem>> {
+pub(crate) fn unmoved(overwrites: &[Overwrite], refusing: Refusing) -> Result<(), Box<Problem>> {
     match overwrites.iter().find(|overwrite| {
         std::fs::read_to_string(&overwrite.path).ok().as_deref() != Some(&overwrite.previous)
     }) {
-        Some(moved) => Err(Box::new(moved_since(&moved.path))),
+        Some(moved) => Err(Box::new(moved_since(&moved.path, refusing))),
         None => Ok(()),
     }
 }
@@ -350,38 +373,44 @@ pub(crate) fn unmoved(overwrites: &[Overwrite]) -> Result<(), Box<Problem>> {
 /// # Errors
 ///
 /// Where a file no longer holds what was read, or cannot be written.
-pub(crate) fn overwritten(overwrites: &[Overwrite]) -> Result<(), Box<Problem>> {
-    unmoved(overwrites)?;
+pub(crate) fn overwritten(
+    overwrites: &[Overwrite],
+    refusing: Refusing,
+) -> Result<(), Box<Problem>> {
+    unmoved(overwrites, refusing)?;
     for overwrite in overwrites {
-        unmoved(std::slice::from_ref(overwrite))?;
-        crate::config::store::write(&overwrite.path, &overwrite.text)
-            .map_err(|failure| Box::new(not_overwritten(&overwrite.path, &failure.to_string())))?;
+        unmoved(std::slice::from_ref(overwrite), refusing)?;
+        crate::config::store::write(&overwrite.path, &overwrite.text).map_err(|failure| {
+            Box::new(not_overwritten(
+                &overwrite.path,
+                refusing,
+                &failure.to_string(),
+            ))
+        })?;
     }
     Ok(())
 }
 
-/// A file a choice would write over has changed since the choice read it.
-fn moved_since(at: &Path) -> Problem {
+fn moved_since(at: &Path, refusing: Refusing) -> Problem {
     Problem::new(
-        crate::error::codes::wire::WIRING_MOVED,
-        "What is installed changed while that choice was being made",
+        refusing.moved,
+        format!("{} changed while this change was being made", at.display()),
         format!(
-            "{} no longer holds what it held when the choice was read, so nothing was changed.",
+            "{} no longer holds what it held when the change was read, so nothing was changed.",
             at.display()
         ),
-        Remedy::new("Make the choice again"),
+        Remedy::new("Make the change again"),
     )
     .in_state(State::Guided)
 }
 
-/// A file a choice writes over could not be written.
-fn not_overwritten(at: &Path, why: &str) -> Problem {
+fn not_overwritten(at: &Path, refusing: Refusing, why: &str) -> Problem {
     Problem::new(
-        crate::error::codes::wire::CHOICE_UNWRITABLE,
+        refusing.unwritten,
         format!("{} could not be written", at.display()),
-        "The choice is recorded, and the change record holds what this file held, so \
+        "The change is recorded, and the change record holds what this file held, so \
          lemonfiber history says what is there and it can be put back.",
-        Remedy::new("Check the permissions on the stack directory, then make the choice again"),
+        Remedy::new("Check the permissions on the stack directory, then make the change again"),
     )
     .in_state(State::Guided)
     .with_detail(why.to_owned())

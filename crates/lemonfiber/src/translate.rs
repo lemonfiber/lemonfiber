@@ -36,8 +36,10 @@ use lemonfiber::cli::{
 use lemonfiber_core::app::Restarting;
 
 mod people;
+mod settling;
 
 pub(crate) use people::{held, household, invitation};
+pub(crate) use settling::settings;
 
 /// What a support bundle was asked to hold, and where it goes.
 ///

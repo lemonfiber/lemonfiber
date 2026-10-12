@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "environment": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "readers": {
+      "type": [
+        "array[ref:Reader]"
+      ],
+      "required": true
+    },
+    "value": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "whose": {
+      "type": [
+        "ref:Owner"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "default": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "variable": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

@@ -123,7 +123,7 @@ fn each_typed_question_fills_the_argument_its_read_names() {
         }))
     );
     assert_eq!(
-        asking(called("one setting"), &["The Expanse"]),
+        asking(called("one configuration key"), &["The Expanse"]),
         Ok(Command::ConfigGet {
             key: "The Expanse".to_owned(),
         })
@@ -172,7 +172,7 @@ fn a_question_that_takes_a_word_is_refused_until_it_has_one() {
         "a trace with nothing typed"
     );
     assert_eq!(
-        asking(called("one setting"), &[""]),
+        asking(called("one configuration key"), &[""]),
         Err(Refusal::NoSetting.said()),
         "a setting with nothing typed"
     );
@@ -188,7 +188,10 @@ fn a_question_that_takes_a_word_is_refused_until_it_has_one() {
 /// line on the first one.
 #[test]
 fn the_listing_beside_each_narrowing_still_asks_for_everything() {
-    assert_eq!(asking(called("settings"), &[""]), Ok(Command::ConfigShow));
+    assert_eq!(
+        asking(called("configuration"), &[""]),
+        Ok(Command::ConfigShow)
+    );
     assert_eq!(
         asking(called("what was asked for"), &[""]),
         Ok(Command::Household { member: None })
@@ -263,13 +266,13 @@ fn a_listed_entry_naming_nothing_is_refused_rather_than_followed() {
 #[test]
 fn only_a_typed_question_asks_for_something_above_a_line() {
     assert_eq!(
-        called("one setting").needs.asks(0),
-        Some("Which setting, by the name it goes by")
+        called("one configuration key").needs.asks(0),
+        Some("Which configuration key, by the name it goes by")
     );
-    assert!(called("one setting").needs.asks(1).is_none());
+    assert!(called("one configuration key").needs.asks(1).is_none());
     assert!(called("what is stuck").needs.asks(0).is_none());
-    assert!(called("settings").needs.asks(0).is_none());
-    assert!(called("settings").needs.picking().is_none());
+    assert!(called("configuration").needs.asks(0).is_none());
+    assert!(called("configuration").needs.picking().is_none());
     assert!(called("where one thing is").needs.picking().is_none());
 }
 

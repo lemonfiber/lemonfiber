@@ -206,4 +206,6 @@ kinds! {
     WIRING = "wiring",
     /// A change of which service fills a capability, and what it costs.
     SUBSTITUTION = "substitution",
+    /// Every setting and secret the services read, and what changing a setting came to.
+    SETTINGS = "settings",
 }

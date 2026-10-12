@@ -144,10 +144,7 @@ fn a_refused_pairing_is_told_the_command_that_takes_its_remedy() {
             NO_CERTIFICATE,
             "`lemonfiber companion certificate --confirm`",
         ),
-        (
-            NO_ADDRESS,
-            "`lemonfiber config set HOMEPAGE_VAR_LAN_HOST <address>`",
-        ),
+        (NO_ADDRESS, "`lemonfiber settings set lan-host <address>`"),
     ] {
         let refused = Problem::new(
             code,

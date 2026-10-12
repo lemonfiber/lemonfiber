@@ -12,7 +12,7 @@
 
 use crate::model::kind::{self, Kind};
 
-use super::command::{Asking, Keeping, Linking, MigrateAction, Wishing};
+use super::command::{Asking, Keeping, Linking, MigrateAction, Settling, Wishing};
 use super::plugins;
 use super::rehearsal;
 use super::Command;
@@ -59,6 +59,7 @@ const fn read(command: &Command) -> &'static [Kind] {
         Command::SelfUpdate { .. } => &[kind::SELF_UPDATE],
         Command::Plugins(plugins::Asked::Installed) => &[kind::PLUGINS],
         Command::Wiring(Linking::Read) => &[kind::WIRING],
+        Command::Settings(Settling::Read) => &[kind::SETTINGS],
         Command::Playing { .. } => &[kind::PLAYING],
         Command::Wish(Wishing::Find { .. }) => &[kind::ASKABLE],
         _ => &[],

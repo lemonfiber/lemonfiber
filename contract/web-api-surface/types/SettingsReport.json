@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "change": {
+      "type": [
+        "anyOf(null,ref:SettingChange)"
+      ],
+      "required": false
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "secrets": {
+      "type": [
+        "array[ref:SecretRead]"
+      ],
+      "required": true
+    },
+    "settings": {
+      "type": [
+        "array[ref:SettingRead]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

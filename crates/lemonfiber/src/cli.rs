@@ -24,6 +24,7 @@ use std::path::PathBuf;
 use clap::{CommandFactory, Parser};
 
 mod request;
+mod settings;
 mod under;
 mod whom;
 mod wiring;
@@ -56,6 +57,7 @@ pub use whom::RawWhom;
 // written down is this file's business, and moving them would otherwise be a change
 // at every call site that matches on one.
 pub use request::{RawShelf, Request};
+pub use settings::SettingsCommand;
 pub use wiring::WiringCommand;
 
 /// Set up and run your media stack.

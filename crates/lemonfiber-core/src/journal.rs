@@ -201,6 +201,9 @@ pub enum Kind {
         previous: Option<String>,
         /// What it holds now, or nothing where it was cleared.
         current: Option<String>,
+        /// The environment file's setting it was moved out of, where it was.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        filed: Option<String>,
     },
     /// A secret in the secret store was kept, replaced or forgotten, recorded by
     /// fingerprints alone.
@@ -284,10 +287,12 @@ impl Change {
                 name,
                 previous,
                 current,
+                filed,
             } => Action::Resettle {
                 name: name.clone(),
                 value: previous.clone(),
                 recorded: current.clone(),
+                filed: filed.clone(),
             },
             Kind::Secret {
                 name,
@@ -432,6 +437,8 @@ pub enum Action {
         value: Option<String>,
         /// What lemonfiber recorded, which has to still be there.
         recorded: Option<String>,
+        /// The environment file's setting it goes back to, where it was moved out of one.
+        filed: Option<String>,
     },
     /// Put a secret in the secret store back to the value it held.
     Rehold {

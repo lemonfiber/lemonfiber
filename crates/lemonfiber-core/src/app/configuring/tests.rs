@@ -133,12 +133,28 @@ async fn a_declared_setting_already_holding_what_was_asked_for_is_not_a_refusal(
 }
 
 #[tokio::test]
-async fn turning_port_forwarding_off_says_what_it_costs_there_and_then() {
-    // The moment it is decided is the only moment worth saying it: afterwards
-    // the check goes quiet, deliberately, because there is nothing to fix.
-    let ctx = ctx(env_at("off", "VPN_PORT_FORWARDING=on\n"));
-    let said = consequence(&set(&ctx, Setting::to(VPN_PORT_FORWARDING_KEY, "off")).await);
-    assert_eq!(said.as_deref(), Some(crate::app::unforwarded::COST));
+async fn a_name_the_settings_command_takes_is_refused_naming_it() {
+    let path = env_at("fenced", "VPN_PORT_FORWARDING=on\n");
+    let ctx = ctx(path.clone());
+    let refused = set(&ctx, Setting::to(VPN_PORT_FORWARDING_KEY, "off"))
+        .await
+        .err();
+    assert_eq!(
+        refused.as_ref().map(|problem| problem.code.as_str()),
+        Some("SETTING-3")
+    );
+    assert!(refused.is_some_and(|problem| problem.summary
+        == "gluetun:port-forwarding is written with lemonfiber settings set"));
+    assert_eq!(
+        on_disk(&path, VPN_PORT_FORWARDING_KEY).as_deref(),
+        Some("on")
+    );
+    let core = get(&ctx, Some("LEMONFIBER_DEVICE_KEY_APPS")).await.err();
+    assert_eq!(
+        core.map(|problem| problem.summary),
+        Some("LEMONFIBER_DEVICE_KEY_APPS is written with lemonfiber settings set".to_owned())
+    );
+    assert!(get(&ctx, Some(VPN_PORT_FORWARDING_KEY)).await.is_ok());
 }
 
 #[tokio::test]
@@ -347,19 +363,16 @@ async fn reading_a_setting_is_never_a_decision() {
 async fn a_rehearsal_says_what_it_would_cost_and_writes_nothing() {
     // The review step and the rehearsal are the same thing said two ways, so the
     // one that changes nothing is the one most owed an account of what it would.
-    let path = env_at("rehearsal", "VPN_PORT_FORWARDING=on\n");
+    let path = env_at("rehearsal", "LEMONFIBER_USENET=off\n");
     let mut rehearsing = ctx(path.clone());
     rehearsing.dry_run = true;
-    let said = set(&rehearsing, Setting::to(VPN_PORT_FORWARDING_KEY, "off")).await;
+    let said = set(&rehearsing, Setting::to(crate::config::USENET_KEY, "on")).await;
 
-    assert_eq!(
-        consequence(&said).as_deref(),
-        Some(crate::app::unforwarded::COST)
-    );
+    assert!(consequence(&said).is_some_and(|said| said.contains("whether Usenet runs")));
     assert_eq!(stance(&said), Some(Stance::Pending));
     assert_eq!(
-        on_disk(&path, VPN_PORT_FORWARDING_KEY).as_deref(),
-        Some("on")
+        on_disk(&path, crate::config::USENET_KEY).as_deref(),
+        Some("off")
     );
 }
 

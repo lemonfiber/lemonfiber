@@ -54,6 +54,10 @@ impl Secrets {
         self.held.get(name).map(|kept| kept.value.as_str())
     }
 
+    pub(crate) fn source(&self, name: &str) -> Option<Source> {
+        self.held.get(name).map(|kept| kept.from)
+    }
+
     pub(crate) fn fingerprint(&self, name: &str) -> Option<String> {
         self.value(name).map(fingerprint)
     }

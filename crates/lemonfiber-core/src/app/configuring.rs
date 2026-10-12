@@ -70,6 +70,7 @@ pub(crate) async fn set(ctx: &Ctx, change: Setting) -> Result<ConfigReport, Box<
     // a key copied from a dashboard carries a trailing newline, it authenticates
     // nowhere, and the file format has no way to mean the whitespace deliberately. The
     // parser already trims the name; the value was the half still taken literally.
+    crate::settings::fences::config_takes(&change.key, true)?;
     let change = Setting {
         value: change.value.trim().to_owned(),
         ..change
@@ -86,6 +87,9 @@ pub(crate) async fn set(ctx: &Ctx, change: Setting) -> Result<ConfigReport, Box<
 /// Returns the [`Problem`] for a machine with nowhere to keep settings, or for a
 /// settings file that could not be read.
 pub(crate) async fn get(ctx: &Ctx, key: Option<&str>) -> Result<ConfigReport, Box<Problem>> {
+    if let Some(key) = key {
+        crate::settings::fences::config_takes(key, false)?;
+    }
     settings(ctx, key, None).await
 }
 
@@ -337,6 +341,11 @@ fn stated(ctx: &Ctx, review: &Review, held: &EnvFile, key: &str, value: &str) ->
     if review.stance == Stance::Unchanged {
         return None;
     }
+    consequence(ctx, held, key, value)
+}
+
+/// What changing `key` from what `held` holds to `value` costs, where it costs anything.
+pub(crate) fn consequence(ctx: &Ctx, held: &EnvFile, key: &str, value: &str) -> Option<String> {
     if key == crate::config::FRONT_DOOR_KEY {
         return Some(crate::door::KEPT.to_owned());
     }

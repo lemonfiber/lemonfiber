@@ -179,7 +179,7 @@ fn a_narrowed_diagnosis_is_widened_over_the_narrowing_it_was_asked_with() {
 /// arriving through a key that puts a box away everywhere else on this screen.
 #[test]
 fn a_yes_over_an_answer_that_carries_no_offer_puts_it_away() {
-    let mut acting = asking("settings");
+    let mut acting = asking("configuration");
     acting.came_to(Ok(Outcome::Trace(a_trace("The Expanse"))));
 
     let said = showing(&acting);

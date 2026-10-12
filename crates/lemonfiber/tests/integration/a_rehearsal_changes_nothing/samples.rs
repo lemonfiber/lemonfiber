@@ -5,7 +5,7 @@ use lemonfiber_core::app::Restarting;
 use lemonfiber_core::app::{
     plugins, AlertAction, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision, Diagnosing,
     Filling, Gathering, Inviting, Keeping, LettingGo, Linking, MigrateAction, QualityAction,
-    Removing, Restoring, Setting, SetupAction, Teardown, Tracing, Waiting,
+    Removing, Restoring, Setting, Settling, SetupAction, Teardown, Tracing, Waiting,
 };
 use lemonfiber_core::config::Protocols;
 use lemonfiber_core::doctor::Narrowing;
@@ -172,6 +172,14 @@ fn over_the_household() -> Vec<(&'static str, Command)> {
                 reason: None,
                 agreement: None,
             })),
+        ),
+        (
+            "settings",
+            Command::Settings(Settling::Set {
+                setting: "domain".to_owned(),
+                value: "home.example".to_owned(),
+                agreement: None,
+            }),
         ),
         (
             "credentials",

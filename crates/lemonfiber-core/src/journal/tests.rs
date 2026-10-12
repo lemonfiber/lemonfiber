@@ -456,6 +456,7 @@ fn undoing_a_setting_or_a_secret_puts_back_what_it_replaced_against_what_it_left
             name: "komga:mode".to_owned(),
             previous: Some("slow".to_owned()),
             current: None,
+            filed: None,
         },
     };
     assert_eq!(
@@ -464,6 +465,7 @@ fn undoing_a_setting_or_a_secret_puts_back_what_it_replaced_against_what_it_left
             name: "komga:mode".to_owned(),
             value: Some("slow".to_owned()),
             recorded: None,
+            filed: None,
         }
     );
     let secret = Change {

@@ -235,6 +235,7 @@ fn a_setting_or_a_secret_put_back_is_said_by_its_name() {
                 name: "komga:mode".to_owned(),
                 value: Some("slow".to_owned()),
                 recorded: Some("fast".to_owned()),
+                filed: None,
             },
         },
         Undo {
@@ -243,6 +244,7 @@ fn a_setting_or_a_secret_put_back_is_said_by_its_name() {
                 name: "komga:speed".to_owned(),
                 value: None,
                 recorded: Some("fast".to_owned()),
+                filed: None,
             },
         },
         Undo {

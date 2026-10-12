@@ -177,6 +177,9 @@ pub(crate) const MEDIA_SERVER_MODE_KEY: &str = "JELLYFIN_MODE";
 /// the wrong address to hand anybody.
 pub const HOUSEHOLD_HOST_KEY: &str = "HOMEPAGE_VAR_LAN_HOST";
 
+/// The setting the address the household reaches this machine at is recorded under.
+pub const HOUSEHOLD_HOST_SETTING: &str = lemonfiber_manifest::container::LAN_HOST;
+
 /// The domain the stack's proxy publishes the household's services under.
 ///
 /// The stack's, and what its proxy writes every route a plugin's household service is

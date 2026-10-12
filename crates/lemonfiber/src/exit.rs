@@ -95,6 +95,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         Outcome::Plugins(report) => installing(report),
         Outcome::Wiring(report) if report.unfilled.is_empty() => ExitCode::SUCCESS,
         Outcome::Wiring(_) => ExitCode::from(VALIDATION),
+        Outcome::Settings(report) => restarted(report),
         Outcome::Import(report) => carrying(report),
         Outcome::Seed(report) => seed_exit(report),
         // Anything left unmended is a non-zero result, and a run that only offered
@@ -283,6 +284,13 @@ pub(crate) fn shown(code: std::process::ExitCode) -> String {
 #[cfg(test)]
 pub(crate) fn success() -> String {
     shown(std::process::ExitCode::SUCCESS)
+}
+
+fn restarted(report: &lemonfiber_core::model::SettingsReport) -> ExitCode {
+    match &report.change {
+        Some(change) if change.unrestarted.is_some() => ExitCode::from(FAILURE),
+        _ => ExitCode::SUCCESS,
+    }
 }
 
 #[cfg(test)]

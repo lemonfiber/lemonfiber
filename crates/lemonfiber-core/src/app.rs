@@ -95,8 +95,8 @@ pub mod watch;
 pub use command::{
     AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
     Diagnosing, Filling, Gathering, Hostable, Inviting, Keeping, LettingGo, Linking, MigrateAction,
-    QualityAction, Removing, Restarting, Restoring, Setting, Teardown, Tracing, Viewing, Whom,
-    Wishing, HOSTABLE,
+    QualityAction, Removing, Restarting, Restoring, Setting, Settling, Teardown, Tracing, Viewing,
+    Whom, Wishing, HOSTABLE,
 };
 pub(crate) mod outcome;
 pub use answering::answered_under;
@@ -471,6 +471,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Remove { name, confirm } => removed(ctx, name, confirm).await,
         Command::Catalogue => engine::catalogue(ctx).map(Outcome::Catalogue),
         Command::Wiring(asked) => wiring::wiring(ctx, &asked),
+        Command::Settings(asked) => crate::settings::run::settings(ctx, &asked).await,
         Command::Outbound => outbound(ctx),
         Command::Provenance => engine::provenance(ctx).map(Outcome::Provenance),
         Command::QualityUpgrade { confirm } => upgraded(ctx, confirm).await,

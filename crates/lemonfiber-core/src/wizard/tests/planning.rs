@@ -440,6 +440,7 @@ fn a_written_change_is_said_plainly_enough_to_recognise() {
             name: "komga:mode".to_owned(),
             previous: None,
             current: Some("fast".to_owned()),
+            filed: None,
         })),
         "the setting komga:mode"
     );

@@ -8,11 +8,13 @@ fn putting_a_setting_or_a_secret_back_is_recorded_the_other_way_round() {
             name: "komga:mode".to_owned(),
             previous: Some("slow".to_owned()),
             current: Some("fast".to_owned()),
+            filed: None,
         }),
         Some(Kind::Setting {
             name: "komga:mode".to_owned(),
             previous: Some("fast".to_owned()),
             current: Some("slow".to_owned()),
+            filed: None,
         })
     );
     assert_eq!(
