@@ -2,10 +2,10 @@ use crate::app::Ctx;
 use crate::config::env::quoted;
 use crate::config::store;
 use crate::plugin::{Holding, Variable};
-use crate::test_support::{a_context, env_at};
+use crate::test_support::{a_context, env_without_password};
 
 fn machine(name: &str) -> Ctx {
-    let env = env_at(&format!("files-{name}"), "pw");
+    let env = env_without_password(&format!("files-{name}"));
     a_context()
         .settings(crate::config::Settings {
             env_file: Some(env.clone()),

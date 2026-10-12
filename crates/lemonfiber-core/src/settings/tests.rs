@@ -375,3 +375,35 @@ fn a_setting_already_back_is_done_and_left_untouched() {
         Some(text)
     );
 }
+
+#[test]
+fn undoing_against_a_store_a_newer_build_wrote_is_refused() {
+    let scratch = Scratch::new("undo-newer");
+    let config = scratch.path().join("config");
+    assert!(std::fs::create_dir_all(&config).is_ok());
+    let newer = r#"{"schema":1,"written_by":"99.0.0"}"#;
+    assert!(std::fs::write(config.join("settings.json"), newer).is_ok());
+    assert!(std::fs::write(config.join("secrets.json"), newer).is_ok());
+    let env = config.join(".env");
+    assert!(matches!(
+        super::undoing::resettled(&env, "komga:mode", None, Some("fast")),
+        Err(Failure::TooNew { .. })
+    ));
+    assert!(matches!(
+        super::undoing::reheld(&env, "komga:token", None, Some("~1"), None),
+        Err(Failure::TooNew { .. })
+    ));
+}
+
+#[test]
+fn forgetting_with_nowhere_to_look_touches_nothing() {
+    let ctx = crate::test_support::a_context()
+        .settings(crate::config::Settings::default())
+        .build();
+    let plugin = crate::test_support::an_installed(
+        "comics",
+        vec![crate::test_support::a_placed("komga", &[], None, None)],
+    );
+    super::forgotten(&ctx, &plugin);
+    assert_eq!(super::secrets_at(&ctx), None);
+}

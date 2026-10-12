@@ -7,7 +7,7 @@ use crate::config::store;
 use crate::credential::fingerprint;
 use crate::journal::Kind;
 use crate::plugin::{Installed, Register};
-use crate::test_support::{a_context, env_at};
+use crate::test_support::{a_context, env_without_password};
 
 fn key() -> String {
     crate::config::for_plugin("comics", "komga", crate::config::CAPTURED_SUFFIX)
@@ -55,7 +55,7 @@ fn installed() -> Vec<Installed> {
 }
 
 fn machine(name: &str, value: Option<&str>) -> Ctx {
-    let env = env_at(&format!("filing-{name}"), "pw");
+    let env = env_without_password(&format!("filing-{name}"));
     let mut register = Register::empty();
     let installing = installed();
     assert_eq!(installing.len(), 1);

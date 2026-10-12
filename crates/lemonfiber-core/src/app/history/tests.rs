@@ -204,3 +204,54 @@ fn a_setting_recorded_since_is_read_off_the_settings_store() {
         "{report:?}"
     );
 }
+
+#[test]
+fn every_kind_of_change_reads_as_what_it_did() {
+    use crate::journal::Kind;
+    let set = |key: &str, previous: Option<&str>| Kind::Set {
+        key: key.to_owned(),
+        previous: previous.map(str::to_owned),
+        current: "now".to_owned(),
+    };
+    let said: Vec<String> = [
+        Kind::Created {
+            resource: "downloadclient".to_owned(),
+            id: "1".to_owned(),
+        },
+        set("USENET_PASS", None),
+        set("USENET_PASS", Some("before")),
+        set("PORT", None),
+        set("PORT", Some("before")),
+        Kind::Made {
+            path: "/srv".to_owned(),
+        },
+        Kind::Pinned {
+            previous: "1".to_owned(),
+            current: "2".to_owned(),
+            backup: None,
+        },
+        Kind::Configured {
+            resource: "downloadclient".to_owned(),
+            id: "1".to_owned(),
+            field: "category".to_owned(),
+            previous: None,
+            current: "tv".to_owned(),
+        },
+    ]
+    .iter()
+    .map(did)
+    .collect();
+    assert_eq!(
+        said,
+        [
+            "added a downloadclient",
+            "set USENET_PASS",
+            "changed USENET_PASS, and it had a value before",
+            "set PORT to now",
+            "changed PORT from before to now",
+            "made /srv",
+            "moved from 1 to 2",
+            "set category on the service",
+        ]
+    );
+}

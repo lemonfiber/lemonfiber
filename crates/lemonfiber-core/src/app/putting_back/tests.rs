@@ -32,3 +32,51 @@ fn putting_a_setting_or_a_secret_back_is_recorded_the_other_way_round() {
         })
     );
 }
+
+#[test]
+fn every_kind_with_an_inverse_is_recorded_the_other_way_round_and_the_rest_are_not() {
+    assert_eq!(
+        inverted(&Kind::Set {
+            key: "PORT".to_owned(),
+            previous: None,
+            current: "1".to_owned(),
+        }),
+        Some(Kind::Set {
+            key: "PORT".to_owned(),
+            previous: Some("1".to_owned()),
+            current: String::new(),
+        })
+    );
+    assert_eq!(
+        inverted(&Kind::Configured {
+            resource: "downloadclient".to_owned(),
+            id: "1".to_owned(),
+            field: "category".to_owned(),
+            previous: Some("tv".to_owned()),
+            current: "series".to_owned(),
+        }),
+        Some(Kind::Configured {
+            resource: "downloadclient".to_owned(),
+            id: "1".to_owned(),
+            field: "category".to_owned(),
+            previous: Some("series".to_owned()),
+            current: "tv".to_owned(),
+        })
+    );
+    assert_eq!(
+        inverted(&Kind::KeyMinted {
+            name: "ha".to_owned(),
+            scope: "read".to_owned(),
+        }),
+        Some(Kind::KeyRevoked {
+            name: "ha".to_owned(),
+            scope: "read".to_owned(),
+        })
+    );
+    assert_eq!(
+        inverted(&Kind::Made {
+            path: "/srv".to_owned()
+        }),
+        None
+    );
+}
