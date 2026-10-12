@@ -169,6 +169,17 @@ pub(super) fn code(report: &Result<SettingsReport, Box<Problem>>) -> Option<&str
     report.as_ref().err().map(|problem| problem.code.as_str())
 }
 
+pub(super) fn blocking_the_journal(ctx: &Ctx) -> PathBuf {
+    let journal = crate::app::targets::layout(ctx)
+        .map(|paths| paths.journal())
+        .unwrap_or_default();
+    let mut name = journal.file_name().unwrap_or_default().to_os_string();
+    name.push(".writing");
+    let blocked = journal.with_file_name(name);
+    assert!(std::fs::create_dir_all(blocked.join("held")).is_ok());
+    blocked
+}
+
 fn recorded(machine: &Machine, name: &str) -> Option<String> {
     crate::settings::Settings::at(&machine.env.with_file_name(SETTINGS))
         .ok()
@@ -356,14 +367,12 @@ async fn a_document_edited_while_the_change_is_made_refuses_naming_it() {
 async fn a_change_the_journal_will_not_take_is_not_made() {
     let machine = machine("unjournalled", running(&["komga"]));
     let before = std::fs::read_to_string(&machine.document).ok();
-    let journal_at = crate::app::targets::layout(&machine.ctx)
-        .map(|paths| paths.journal())
-        .unwrap_or_default();
-    assert!(std::fs::create_dir_all(&journal_at).is_ok());
+    let blocked = blocking_the_journal(&machine.ctx);
 
     let refused = agreed(&machine.ctx, MODE, Some("fast")).await;
 
-    assert!(refused.is_err());
+    let _ = std::fs::remove_dir_all(&blocked);
+    assert_eq!(code(&refused), Some("CONFIG-2"));
     assert_eq!(recorded(&machine, MODE), None);
     assert_eq!(std::fs::read_to_string(&machine.document).ok(), before);
     assert!(upped(&machine.runner).is_empty());
@@ -589,4 +598,16 @@ async fn a_core_setting_is_recorded_in_the_store_and_read_back_as_the_cores() {
         recorded(&machine, crate::settings::own::DEVICE_KEY_APPS),
         Some(identities)
     );
+}
+
+#[tokio::test]
+async fn a_stack_that_cannot_be_read_refuses_the_listing_and_the_change() {
+    let mut machine = machine("unread-stack", running(&[]));
+    machine.ctx.stack = crate::test_support::nowhere();
+
+    let read = crate::settings::run::settings(&machine.ctx, &crate::app::Settling::Read).await;
+    let changed = asked(&machine.ctx, MODE, Some("fast"), None).await;
+
+    assert!(read.is_err());
+    assert!(changed.is_err());
 }

@@ -259,3 +259,25 @@ fn undoing_a_filed_setting_puts_its_line_back() {
     assert_eq!(setting(&env, "gluetun:countries"), None);
     assert_eq!(line(&env, "VPN_COUNTRIES").as_deref(), Some("Belgium"));
 }
+
+#[test]
+fn a_stack_value_the_journal_will_not_take_is_not_filed() {
+    for (name, key, value) in [
+        (
+            "secret",
+            crate::credential::VPN_PRIVATE_KEY,
+            "wg-private-key",
+        ),
+        ("setting", "VPN_COUNTRIES", "Belgium"),
+    ] {
+        let (ctx, env) = stacked(&format!("unjournalled-{name}"), &[(key, value)]);
+        let blocked = super::changing::blocking_the_journal(&ctx);
+
+        let filed = crate::filed_stack(&ctx);
+
+        let _ = std::fs::remove_dir_all(&blocked);
+        assert!(filed.is_err(), "{name}");
+        assert_eq!(line(&env, key).as_deref(), Some(value), "{name}");
+        assert_eq!(setting(&env, "gluetun:countries"), None, "{name}");
+    }
+}

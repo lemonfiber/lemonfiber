@@ -14,14 +14,20 @@ use crate::settings::Resolved;
 const CROSSING: &str = "SONARR_API_KEY";
 
 fn reader() -> Installed {
-    let mut placed = crate::test_support::a_placed("reader", &[], None, None);
-    placed.fields.env.insert(
-        "SONARR_KEY".to_owned(),
-        Value::Secret(SecretOf {
-            secret: "sonarr-key".to_owned(),
-        }),
+    let placed = |service: &str| {
+        let mut placed = crate::test_support::a_placed(service, &[], None, None);
+        placed.fields.env.insert(
+            "SONARR_KEY".to_owned(),
+            Value::Secret(SecretOf {
+                secret: "sonarr-key".to_owned(),
+            }),
+        );
+        placed
+    };
+    let mut reader = crate::test_support::an_installed(
+        "reader",
+        vec![placed("reader"), placed("reader-worker")],
     );
-    let mut reader = crate::test_support::an_installed("reader", vec![placed]);
     reader.manifest = crate::test_support::CONTRACTED_MANIFEST.to_owned();
     reader.declared.secrets = vec![crate::plugin::Secret {
         id: "sonarr-key".to_owned(),
@@ -62,9 +68,10 @@ fn answering(machine: &mut Machine, answer: Result<Output, Failure>) {
 }
 
 fn failed(reached: &[Propagation], saying: &str) -> bool {
-    reached.len() == 1
+    reached.len() == 2
         && reached
             .iter()
+            .filter(|one| one.consumer == "reader")
             .all(|one| matches!(&one.reach, Reach::Failed { detail } if detail.contains(saying)))
 }
 
@@ -75,10 +82,15 @@ async fn replacing_a_crossing_credential_regenerates_and_restarts_what_reads_it(
     let reached_now = reached(&machine, &installed, CROSSING).await;
     let elsewhere = reached(&machine, &installed, "RADARR_API_KEY").await;
 
-    assert_eq!(reached_now.len(), 1);
+    assert_eq!(reached_now.len(), 2);
     assert!(reached_now
         .iter()
-        .all(|one| one.consumer == "reader" && one.reach == Reach::Updated));
+        .any(|one| one.consumer == "reader" && one.reach == Reach::Updated));
+    assert!(reached_now.iter().any(|one| one.consumer == "reader-worker"
+        && one.reach
+            == Reach::Pending {
+                detail: "lemonfiber up --service reader-worker".to_owned()
+            }));
     assert!(elsewhere.is_empty());
     let file = machine.env.with_file_name("env").join("reader.env");
     assert!(std::fs::read_to_string(file)
@@ -96,7 +108,7 @@ async fn a_reader_that_is_not_running_takes_the_replacement_when_it_next_starts(
 
     assert!(reached_now.iter().all(|one| one.reach
         == Reach::Pending {
-            detail: "lemonfiber up --service reader".to_owned()
+            detail: format!("lemonfiber up --service {}", one.consumer)
         }));
     assert!(machine.runner.seen().is_empty());
 }
@@ -137,7 +149,7 @@ async fn a_secrets_file_that_cannot_be_written_is_named_and_nothing_restarts() {
 
     let reached_now = reached(&machine, &installed, CROSSING).await;
 
-    assert_eq!(reached_now.len(), 1);
+    assert_eq!(reached_now.len(), 2);
     assert!(reached_now
         .iter()
         .all(|one| matches!(one.reach, Reach::Failed { .. })));
@@ -201,4 +213,26 @@ async fn a_restart_over_a_stack_that_cannot_be_read_says_why_and_runs_nothing() 
 
     assert!(said.is_some_and(|said| !said.is_empty()));
     assert!(machine.runner.seen().is_empty());
+}
+
+#[tokio::test]
+async fn a_secret_no_installed_plugin_declares_is_read_from_the_store() {
+    let (machine, _) = crossed("store-held", running(&[]));
+    let mut readers = crate::settings::readers::Readers::default();
+    readers.secrets.insert(
+        "gluetun:wireguard-key".to_owned(),
+        vec![crate::model::Reader {
+            service: "gluetun".to_owned(),
+            variable: "WIREGUARD_PRIVATE_KEY".to_owned(),
+            default: None,
+        }],
+    );
+    let resolved = Resolved::of(&machine.ctx, None, &[]);
+
+    let listed = super::super::listing::secrets(&machine.ctx, &readers, &[], &resolved);
+
+    assert!(listed
+        .iter()
+        .all(|one| one.name == "gluetun:wireguard-key" && !one.held && one.from.is_none()));
+    assert_eq!(listed.len(), 1);
 }
