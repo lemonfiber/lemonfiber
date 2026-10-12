@@ -522,3 +522,68 @@ fn a_file_written_over_goes_back_only_while_it_is_lemonfibers() {
         .refusal
         .is_some_and(|refusal| refusal.because.contains("written since")));
 }
+
+fn settled(name: &str, previous: Option<&str>, current: Option<&str>) -> Change {
+    Change {
+        at: "1".to_owned(),
+        operation: "settings".to_owned(),
+        target: name.to_owned(),
+        kind: Kind::Setting {
+            name: name.to_owned(),
+            previous: previous.map(str::to_owned),
+            current: current.map(str::to_owned),
+        },
+    }
+}
+
+#[test]
+fn a_setting_goes_back_whole_only_while_it_holds_what_was_recorded_and_nothing_later_moved_it() {
+    let change = settled("komga:mode", Some("slow"), Some("fast"));
+    let none = |_: &str| None;
+    let fast = |name: &str| (name == "komga:mode").then(|| "fast".to_owned());
+    let edited = |name: &str| (name == "komga:mode").then(|| "medium".to_owned());
+    assert_eq!(
+        standing(&change, &[], &fast, &none).reversal,
+        Reversal::Whole
+    );
+    let drifted = standing(&change, &[], &edited, &none);
+    assert_eq!(drifted.reversal, Reversal::None);
+    assert!(drifted
+        .refusal
+        .is_some_and(|why| why.because.contains("komga:mode now holds medium")));
+    let cleared = standing(&change, &[], &none, &none);
+    assert!(cleared
+        .refusal
+        .is_some_and(|why| why.because.contains("no longer set")));
+    let later = [settled("komga:mode", Some("fast"), Some("fast"))];
+    assert_eq!(
+        standing(&change, &later, &fast, &none).reversal,
+        Reversal::None
+    );
+    let elsewhere = [settled("komga:other", None, Some("x"))];
+    assert_eq!(
+        standing(&change, &elsewhere, &fast, &none).reversal,
+        Reversal::Whole
+    );
+}
+
+#[test]
+fn a_secret_is_judged_whole_and_left_to_the_store_to_check() {
+    let change = Change {
+        at: "1".to_owned(),
+        operation: "plugin komga".to_owned(),
+        target: "komga:token".to_owned(),
+        kind: Kind::Secret {
+            name: "komga:token".to_owned(),
+            from: "recipe".to_owned(),
+            previous: None,
+            current: Some("~abcd".to_owned()),
+            filed: None,
+        },
+    };
+    let none = |_: &str| None;
+    assert_eq!(
+        standing(&change, &[], &none, &none).reversal,
+        Reversal::Whole
+    );
+}

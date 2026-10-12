@@ -163,23 +163,160 @@ async fn an_install_recipe_runs_once_the_install_holds_and_what_it_captures_is_k
         })
         .unwrap_or_default();
     assert_eq!(ran, [("adopt".to_owned(), true, vec![Came::Answered])]);
-    let kept: Vec<(String, String)> = journalled(&ctx)
+    let kept: Vec<(String, Option<String>)> = journalled(&ctx)
         .into_iter()
         .filter_map(|change| match change.kind {
-            crate::journal::Kind::Set { key, current, .. } => Some((key, current)),
+            crate::journal::Kind::Secret { name, current, .. } => Some((name, current)),
             _ => None,
         })
-        .filter(|(key, _)| key.ends_with("_SECRET"))
         .collect();
-    assert_eq!(kept.len(), 1, "{kept:?}");
-    assert!(kept
-        .iter()
-        .all(|(key, value)| key.contains("TOKEN") && value == "t0k3n"));
-    let env = ctx.settings.env_file.clone().unwrap_or_default();
-    assert!(
-        read(&env).contains("t0k3n"),
-        "the token is kept beside the settings"
+    assert_eq!(
+        kept,
+        [(
+            "komga:token".to_owned(),
+            Some(crate::credential::fingerprint("t0k3n"))
+        )]
     );
+    let env = ctx.settings.env_file.clone().unwrap_or_default();
+    assert!(!read(&env).contains("t0k3n"), "nothing goes into .env");
+    assert!(
+        !read(&env.with_file_name(crate::config::paths::JOURNAL)).contains("t0k3n"),
+        "the journal holds a fingerprint and never the value"
+    );
+    assert_eq!(secret(&ctx, "komga:token").as_deref(), Some("t0k3n"));
+}
+
+/// What the secret store holds under `name`.
+fn secret(ctx: &Ctx, name: &str) -> Option<String> {
+    crate::settings::secrets_at(ctx)
+        .and_then(|at| crate::settings::Secrets::at(&at).ok())
+        .and_then(|kept| kept.value(name).map(str::to_owned))
+}
+
+/// The reciped manifest, its service naming the captured secret, installed.
+async fn installed_naming_the_secret(ctx: &Ctx, name: &str) -> Option<Installs> {
+    let manifest = reciped().replace(
+        "config_path = \"/app/data\"\n",
+        "config_path = \"/app/data\"\n\n[service.env]\nKOMGA_TOKEN = { secret = \"token\" }\n",
+    );
+    let source = crate::plugin::Source::Path(source(name, &manifest));
+    let reading = plugins(
+        ctx,
+        &Asked::Install {
+            source: source.clone(),
+            consent: super::super::Consent::default(),
+        },
+    )
+    .await;
+    let consent = super::super::Consent {
+        agreement: reading.ok().and_then(|one| one.agreement),
+        approved: Vec::new(),
+        inputs: super::super::Inputs::of([("claim".to_owned(), "1234".to_owned())].into()),
+    };
+    report(plugins(ctx, &Asked::Install { source, consent }).await)
+}
+
+/// Where a service's secrets file is written.
+fn secrets_file(ctx: &Ctx) -> PathBuf {
+    let env = ctx.settings.env_file.clone().unwrap_or_default();
+    env.with_file_name("env").join("komga.env")
+}
+
+/// A service naming the captured secret gets its own secrets file, named in its entry,
+/// written owner-only, holding the value once the recipe has captured it.
+#[tokio::test]
+async fn a_service_naming_a_captured_secret_reads_it_from_its_own_file() {
+    let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+    let ctx = proving(
+        "secretfile",
+        runner,
+        claiming(200, r#"{"token":"t$0\"k'3n"}"#),
+    );
+    let installed = installed_naming_the_secret(&ctx, "secretfile").await;
+    let changes = installed.and_then(|one| one.install).map(|one| one.changes);
+    assert!(
+        changes.is_some_and(|changes| changes
+            .iter()
+            .any(|one| one.puts == crate::plugin::Puts::Secrets)),
+        "the account names the secrets file"
+    );
+    let file = secrets_file(&ctx);
+    let stack = ctx.settings.stack_dir.clone().unwrap_or_default();
+    let document = read(&crate::plugin::overlay(&stack, "komga"));
+    assert!(
+        document.contains(&format!("env_file:\n    - {}", file.display())),
+        "{document}"
+    );
+    assert!(!document.contains("t$0"), "{document}");
+    assert_eq!(read(&file), "KOMGA_TOKEN=\"t\\$0\\\"k'3n\"\n");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        let mode = |at: &Path| {
+            std::fs::metadata(at)
+                .map(|meta| meta.permissions().mode() & 0o777)
+                .ok()
+        };
+        assert_eq!(mode(&file), Some(0o600));
+        assert_eq!(mode(file.parent().unwrap_or(&file)), Some(0o700));
+    }
+}
+
+/// A service naming a secret nothing holds yet still has its file, empty, so Compose
+/// finds what the entry names.
+#[tokio::test]
+async fn a_secret_nothing_holds_yet_leaves_its_file_there_and_empty() {
+    let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+    let ctx = proving("emptyfile", runner, claiming(200, "{}"));
+    let manifest = PROVING.replace(
+        "config_path = \"/app/data\"\n",
+        "config_path = \"/app/data\"\n\n[service.env]\nKOMGA_KEY = { secret = \"key\" }\n",
+    )
+        + "\n[[secret]]\nid  = \"key\"\nof  = \"komga\"\nwhy = \"Signs the library in\"\n";
+    let source = crate::plugin::Source::Path(source("emptyfile", &manifest));
+    let reading = plugins(
+        &ctx,
+        &Asked::Install {
+            source: source.clone(),
+            consent: super::super::Consent::default(),
+        },
+    )
+    .await;
+    let consent = super::super::Consent {
+        agreement: reading.ok().and_then(|one| one.agreement),
+        ..super::super::Consent::default()
+    };
+    assert!(report(plugins(&ctx, &Asked::Install { source, consent }).await).is_some());
+    let file = secrets_file(&ctx);
+    let stack = ctx.settings.stack_dir.clone().unwrap_or_default();
+    let document = read(&crate::plugin::overlay(&stack, "komga"));
+    assert!(document.contains("env_file:"), "{document}");
+    assert!(file.is_file());
+    assert_eq!(read(&file), "");
+}
+
+/// Removing the plugin takes its secrets file, its secrets and its settings with it.
+#[tokio::test]
+async fn removing_a_plugin_forgets_what_the_stores_hold_for_it() {
+    let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+    let ctx = proving("forgotten", runner, claiming(200, r#"{"token":"t0k3n"}"#));
+    assert!(installed_naming_the_secret(&ctx, "forgotten")
+        .await
+        .is_some());
+    let env = ctx.settings.env_file.clone().unwrap_or_default();
+    let settings = env.with_file_name("settings.json");
+    assert!(std::fs::write(
+        &settings,
+        r#"{"schema":1,"written_by":"","values":{"komga:mode":"fast","other:mode":"slow"}}"#
+    )
+    .is_ok());
+    assert!(secrets_file(&ctx).exists());
+    assert!(report(removing(&ctx, "komga").await).is_some());
+    assert!(!secrets_file(&ctx).exists());
+    assert_eq!(secret(&ctx, "komga:token"), None);
+    let left = crate::settings::Settings::at(&settings).unwrap_or_default();
+    assert_eq!(left.value("komga:mode"), None);
+    assert_eq!(left.value("other:mode"), Some("slow"));
 }
 
 /// At a keyboard, a value a recipe asks for and was not given is asked for in the words
@@ -283,6 +420,7 @@ async fn a_recipe_that_does_not_hold_puts_the_install_back() {
     assert!(runner.ran("rm"), "its container was taken off");
     assert!(!record_of(&ctx).exists(), "nothing was recorded");
     assert!(!read(&ctx.settings.env_file.clone().unwrap_or_default()).contains("_SECRET"));
+    assert_eq!(secret(&ctx, "komga:token"), None);
 }
 
 /// One step as a failed run says it.
@@ -355,11 +493,10 @@ fn what_could_not_be_kept_is_said_with_why_beneath_it() {
 async fn what_a_recipe_captured_goes_when_the_plugin_is_removed() {
     let runner = Arc::new(Recording::answering(Ok(spoke(""))));
     let ctx = proving("taken", runner, claiming(200, r#"{"token":"t0k3n"}"#));
-    let env = ctx.settings.env_file.clone().unwrap_or_default();
     assert!(report(installed_with(&ctx, "taken", &[("claim", "1234")]).await).is_some());
-    assert!(read(&env).contains("t0k3n"));
+    assert_eq!(secret(&ctx, "komga:token").as_deref(), Some("t0k3n"));
     assert!(report(removing(&ctx, "komga").await).is_some());
-    assert!(!read(&env).contains("t0k3n"), "{}", read(&env));
+    assert_eq!(secret(&ctx, "komga:token"), None);
 }
 
 /// Only what a `[[secret]]` declares is kept.
@@ -378,10 +515,7 @@ fn only_a_declared_capture_is_kept() {
         })
         .unwrap_or_default();
     assert_eq!(kept.len(), 1, "{kept:?}");
-    assert!(
-        kept.iter().all(|one| one.ends_with("_SECRET=t")),
-        "{kept:?}"
-    );
+    assert_eq!(kept, ["komga:token=t"]);
 }
 
 /// An install asks only for what its install recipes need; a recipe run on demand is
@@ -464,12 +598,12 @@ fn a_value_nothing_asks_for_is_refused_though_nothing_is_missing() {
 async fn where_a_capture_cannot_be_kept_the_install_goes_back() {
     let runner = Arc::new(Recording::answering(Ok(spoke(""))));
     let ctx = proving("unkept", runner.clone(), claiming(200, r#"{"token":"t"}"#));
-    let env = ctx.settings.env_file.clone().unwrap_or_default();
-    let locked = unrewritable(&env);
+    let secrets = crate::settings::secrets_at(&ctx).unwrap_or_default();
+    let locked = unrewritable(&secrets);
     let problem = installed_with(&ctx, "unkept", &[("claim", "1234")])
         .await
         .err();
-    let _ = std::fs::remove_dir_all(staging_of(&env));
+    let _ = std::fs::remove_dir_all(staging_of(&secrets));
     assert!(locked);
     assert_eq!(
         problem.as_ref().map(|one| one.code.to_string()),

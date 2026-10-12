@@ -126,6 +126,18 @@ fn restoring(action: &Action) -> String {
         Action::Repin { previous, .. } => format!("the version pinned back to {previous}"),
         Action::Revoke { name } => format!("the key {name} revoked"),
         Action::Reinstate { name } => format!("the key {name} good again"),
+        Action::Resettle {
+            name,
+            value: Some(value),
+            ..
+        } => format!("{name} back to {value}"),
+        Action::Resettle { name, .. } => format!("{name} cleared, as it was"),
+        Action::Rehold {
+            name,
+            earlier: Some(_),
+            ..
+        } => format!("the secret {name} back to what it held"),
+        Action::Rehold { name, .. } => format!("the secret {name} forgotten, as it was"),
     }
 }
 

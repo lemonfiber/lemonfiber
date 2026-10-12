@@ -8,6 +8,7 @@
 //! carries.
 
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 use lemonfiber_manifest::container::{
     is_source, is_target, lies_inside, Constant, Mount, Posture, Shape, UrlOf, UserMode, Value,
@@ -68,10 +69,35 @@ const NO_NETWORK: &str = "none";
 /// The condition a service running inside its guard's network waits for.
 const HEALTHY: &str = "service_healthy";
 
+/// One variable of a service's secrets file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Variable {
+    /// The variable's name.
+    pub name: String,
+    /// Where its value is read from.
+    pub holding: Holding,
+}
+
+/// Where a secret's value is read from.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Holding {
+    /// The secret store, under this name.
+    Store(String),
+    /// The environment file, under the setting the credential's holder keeps it in.
+    Crossing(String),
+    /// Nowhere: the credential may not cross to this service.
+    Withheld,
+}
+
 /// What an entry's values are read from beyond the record.
 pub struct Reading<'a> {
     /// The operator's value for a setting, where one is recorded.
     pub setting: &'a dyn Fn(&str) -> Option<String>,
+    /// The named service's secrets file, where there is somewhere to keep one.
+    pub secrets_file: &'a dyn Fn(&str) -> Option<PathBuf>,
+    /// Where a credential the named service holds is read from for the named plugin,
+    /// where the service is not the plugin's own.
+    pub crossing: &'a dyn Fn(&str, &str) -> Option<Holding>,
     /// The address the named service's ask reaches, where something fills it.
     pub address: &'a dyn Fn(&str, &UrlOf) -> Option<String>,
     /// The service that holds the tunnel of the capability a service runs inside.
@@ -86,6 +112,8 @@ impl Reading<'_> {
     pub const fn bare() -> Reading<'static> {
         Reading {
             setting: &|_| None,
+            secrets_file: &|_| None,
+            crossing: &|_, _| None,
             address: &|_, _| None,
             guard: &|_| None,
             render_group: None,
@@ -143,6 +171,9 @@ struct Entry {
     user: Option<String>,
     /// Its environment.
     environment: BTreeMap<String, String>,
+    /// Its own secrets file, where it names a secret.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    env_file: Vec<String>,
     /// Where it is published.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     ports: Vec<String>,
@@ -211,6 +242,10 @@ fn entry(plugin: &str, placed: &Placed, reading: &Reading<'_>) -> Entry {
             )
         }),
         environment: environment(placed, reading),
+        env_file: secrets_file(placed, reading)
+            .map(|path| literal(&path.display().to_string()))
+            .into_iter()
+            .collect(),
         ports: if guard.is_some() {
             Vec::new()
         } else {
@@ -322,6 +357,49 @@ fn valued(service: &str, value: &Value, reading: &Reading<'_>) -> Option<String>
         Value::Url(url) => (reading.address)(service, url),
         Value::Secret(_) => None,
     }
+}
+
+/// The service's secrets file, where it names a secret and there is somewhere to keep one.
+pub(crate) fn secrets_file(placed: &Placed, reading: &Reading<'_>) -> Option<PathBuf> {
+    placed
+        .fields
+        .env
+        .values()
+        .any(|value| matches!(value, Value::Secret(_)))
+        .then(|| (reading.secrets_file)(&placed.service))
+        .flatten()
+}
+
+/// Every variable of the service's secrets file, each with where its value is read from.
+pub(crate) fn variables(
+    installed: &Installed,
+    placed: &Placed,
+    reading: &Reading<'_>,
+) -> Vec<Variable> {
+    placed
+        .fields
+        .env
+        .iter()
+        .filter_map(|(name, value)| match value {
+            Value::Secret(secret) => Some(Variable {
+                name: name.clone(),
+                holding: holding(installed, &secret.secret, reading),
+            }),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Where the plugin's secret `id` is read from: its holder where it is a credential that
+/// crosses, the secret store otherwise.
+fn holding(installed: &Installed, id: &str, reading: &Reading<'_>) -> Holding {
+    installed
+        .declared
+        .secrets
+        .iter()
+        .find(|secret| secret.id == id)
+        .and_then(|secret| (reading.crossing)(&installed.plugin, &secret.of))
+        .unwrap_or_else(|| Holding::Store(crate::settings::named(&installed.plugin, id)))
 }
 
 /// A constant as the text an environment variable holds.

@@ -231,6 +231,77 @@
         "does",
         "name"
       ]
+    },
+    {
+      "description": "Put a setting in the settings store back to what it held.",
+      "type": "object",
+      "properties": {
+        "does": {
+          "type": "string",
+          "const": "resettle"
+        },
+        "name": {
+          "description": "The setting's name.",
+          "type": "string"
+        },
+        "recorded": {
+          "description": "What lemonfiber recorded, which has to still be there.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "value": {
+          "description": "What to put back, or `None` to clear it.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "does",
+        "name"
+      ]
+    },
+    {
+      "description": "Put a secret in the secret store back to the value it held.",
+      "type": "object",
+      "properties": {
+        "does": {
+          "type": "string",
+          "const": "rehold"
+        },
+        "earlier": {
+          "description": "The fingerprint of the value to put back, or `None` to forget it.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "filed": {
+          "description": "The environment file's setting it goes back to, where it was moved out of one.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kept": {
+          "description": "The fingerprint of what lemonfiber kept, which has to still be there.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "description": "The secret's name.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "does",
+        "name"
+      ]
     }
   ]
 }

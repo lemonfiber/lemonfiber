@@ -372,6 +372,7 @@ const KEYS: &[&str] = &[
     "profiles",
     "restart",
     "environment",
+    "env_file",
     "ports",
     "volumes",
     "tmpfs",
@@ -583,7 +584,7 @@ fn the_reading_finds_a_key_the_permitted_set_does_not_carry() {
         "    userns_mode: host",
         "    entrypoint: /bin/sh",
         "    command: -c 'cat /etc/shadow'",
-        "    env_file: /etc/shadow",
+        "    cgroup: host",
         "    volumes_from: [door]",
     ] {
         let planted = format!("{}{reach}\n", document(placed()));

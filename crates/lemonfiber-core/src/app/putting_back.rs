@@ -338,13 +338,7 @@ fn judged(
 ) -> Result<Vec<Noted>, Box<Problem>> {
     // Read once rather than per change: the drift question asks the same file as many
     // times as there are entries otherwise.
-    let holds = |key: &str| -> Option<String> {
-        let file = ctx.settings.env_file.as_ref()?;
-        crate::config::store::read(file)
-            .ok()?
-            .get(key)
-            .map(str::to_owned)
-    };
+    let holds = crate::settings::holding(ctx);
 
     // What a file holds, for a region: whether it is still the one that was written.
     let reads = |path: &str| -> Option<String> { std::fs::read_to_string(path).ok() };
@@ -399,17 +393,18 @@ fn judged(
 
 /// What a reversal left standing, as the report says it.
 ///
-/// Five lists and four reasons, walked as one: a change only a service can undo where
+/// Six lists and five reasons, walked as one: a change only a service can undo where
 /// that service did not answer, a setting somebody has chosen since, a sealed record that
-/// would not open, and a directory still holding something this run did not put there.
-/// The middle two cannot arise on this path — the judgement above refuses a run holding
-/// either before anything is touched — but they are carried rather than dropped, because
-/// the executor can still meet one and a report that silently lost it would be the thing
-/// this field exists to prevent.
+/// would not open, a directory still holding something this run did not put there, and a
+/// secret whose earlier value was not kept. The second and third cannot arise on this
+/// path for an environment setting — the judgement above refuses a run holding either
+/// before anything is touched — but they are carried rather than dropped, because the
+/// executor can still meet one and a report that silently lost it would be the thing this
+/// field exists to prevent.
 ///
-/// The last is the one a plugin removal meets in the ordinary course of things: two
-/// plugins keep their documents in one directory, the first of them made it, and the
-/// first to leave finds the second's still inside.
+/// A directory still holding something is what a plugin removal meets in the ordinary
+/// course of things: two plugins keep their documents in one directory, the first of
+/// them made it, and the first to leave finds the second's still inside.
 fn standing_after(unreached: &[String], carried: &super::recover::Carried) -> Vec<Left> {
     [
         (unreached, "the service that made it did not answer"),
@@ -428,6 +423,11 @@ fn standing_after(unreached: &[String], carried: &super::recover::Carried) -> Ve
         (
             carried.still_holding.as_slice(),
             "it still holds something this run did not put there",
+        ),
+        (
+            carried.unkept.as_slice(),
+            "lemonfiber kept no copy of what it held before, so enter that again at the \
+             terminal if it is the one you want",
         ),
     ]
     .into_iter()
@@ -498,6 +498,28 @@ fn inverted(kind: &crate::journal::Kind) -> Option<crate::journal::Kind> {
                 scope: scope.clone(),
             })
         }
+        Kind::Setting {
+            name,
+            previous,
+            current,
+        } => Some(Kind::Setting {
+            name: name.clone(),
+            previous: current.clone(),
+            current: previous.clone(),
+        }),
+        Kind::Secret {
+            name,
+            from,
+            previous,
+            current,
+            ..
+        } => Some(Kind::Secret {
+            name: name.clone(),
+            from: from.clone(),
+            previous: current.clone(),
+            current: previous.clone(),
+            filed: None,
+        }),
         Kind::Created { .. }
         | Kind::Made { .. }
         | Kind::Region { .. }
@@ -506,3 +528,6 @@ fn inverted(kind: &crate::journal::Kind) -> Option<crate::journal::Kind> {
         | Kind::KeyRevoked { .. } => None,
     }
 }
+
+#[cfg(test)]
+mod tests;

@@ -10,9 +10,11 @@
       "type": [
         "const:\"delete\"",
         "const:\"reconfigure\"",
+        "const:\"rehold\"",
         "const:\"reinstate\"",
         "const:\"remove\"",
         "const:\"repin\"",
+        "const:\"resettle\"",
         "const:\"restore\"",
         "const:\"revoke\"",
         "const:\"rewind\"",
@@ -20,17 +22,35 @@
       ],
       "required": true
     },
+    "earlier": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "field": {
       "type": [
         "string"
       ],
       "required": true
     },
+    "filed": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "id": {
       "type": [
         "string"
       ],
       "required": true
+    },
+    "kept": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
     },
     "key": {
       "type": [
@@ -62,6 +82,12 @@
       ],
       "required": true
     },
+    "recorded": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "resource": {
       "type": [
         "string"
@@ -90,9 +116,11 @@
   "variants": [
     "\"delete\"",
     "\"reconfigure\"",
+    "\"rehold\"",
     "\"reinstate\"",
     "\"remove\"",
     "\"repin\"",
+    "\"resettle\"",
     "\"restore\"",
     "\"revoke\"",
     "\"rewind\"",

@@ -25,7 +25,7 @@ fn plain(value: &str) -> bool {
 /// The value as it is written into the file: as it is where it is plain, and otherwise in
 /// double quotes with every `\`, `"` and `$` escaped, which Compose reads back as exactly
 /// this value and expands nothing in.
-pub(super) fn written(value: &str) -> String {
+pub(crate) fn written(value: &str) -> String {
     if plain(value) {
         return value.to_owned();
     }
@@ -42,7 +42,7 @@ pub(super) fn written(value: &str) -> String {
 }
 
 /// The value a line's text after its `=` spells, as Compose reads it.
-pub(super) fn read(raw: &str) -> String {
+pub(crate) fn read(raw: &str) -> String {
     let text = raw.trim_start();
     if let Some(quote @ ('"' | '\'')) = text.chars().next() {
         return match quoted(text, quote) {

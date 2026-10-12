@@ -76,7 +76,7 @@ fn a_file_written_over_is_written_back_only_while_it_is_what_was_written() {
         Vec::new(),
     );
     assert!(
-        matches!(unreadable, Err(problem) if problem.code == super::super::NOT_REWOUND),
+        matches!(unreadable, Err(problem) if problem.code == crate::error::codes::setup::NOT_REWOUND),
         "a file that cannot be read back is one that could not be written back"
     );
 }
@@ -116,7 +116,9 @@ fn a_file_the_machine_refuses_to_write_back_stops_the_reversal() {
         locked.is_ok(),
         "the file and its directory were made unwritable"
     );
-    assert!(matches!(stopped, Err(problem) if problem.code == super::super::NOT_REWOUND));
+    assert!(
+        matches!(stopped, Err(problem) if problem.code == crate::error::codes::setup::NOT_REWOUND)
+    );
     assert_eq!(
         std::fs::read_to_string(&file).ok().as_deref(),
         Some("after\n")

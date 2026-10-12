@@ -7,6 +7,7 @@ use lemonfiber_manifest::Manifest;
 
 use super::super::Ctx;
 use crate::plugin::{Installed, Reading, Write};
+use crate::settings::Resolved;
 use crate::wiring::Wired;
 
 /// What installing `installed` writes, each variable asking for an address written with
@@ -35,7 +36,8 @@ pub(crate) fn writes(ctx: &Ctx, installed: &Installed, stack: &Path) -> Vec<Writ
             crate::wiring::settle(manifest, &beside, &crate::app::targets::chosen_fillers(ctx))
         })
         .unwrap_or_default();
-    addressed(&settled, manifest.as_ref(), &beside, |reading| {
+    let resolved = Resolved::of(ctx, manifest.as_ref(), &beside);
+    addressed(&settled, manifest.as_ref(), &beside, &resolved, |reading| {
         crate::plugin::writes(installed, stack, reading)
     })
 }
@@ -46,9 +48,10 @@ pub(crate) fn written(
     settled: &[Wired],
     manifest: &Manifest,
     installed: &[Installed],
+    resolved: &Resolved,
     one: &Installed,
 ) -> String {
-    addressed(settled, Some(manifest), installed, |reading| {
+    addressed(settled, Some(manifest), installed, resolved, |reading| {
         crate::plugin::written(one, reading)
     })
 }
@@ -58,13 +61,11 @@ fn addressed<T>(
     settled: &[Wired],
     manifest: Option<&Manifest>,
     installed: &[Installed],
+    resolved: &Resolved,
     write: impl FnOnce(&Reading<'_>) -> T,
 ) -> T {
     let address = |by: &str, url: &UrlOf| {
         manifest.and_then(|manifest| crate::wiring::address(settled, manifest, installed, by, url))
     };
-    write(&Reading {
-        address: &address,
-        ..Reading::bare()
-    })
+    resolved.reading(&address, write)
 }

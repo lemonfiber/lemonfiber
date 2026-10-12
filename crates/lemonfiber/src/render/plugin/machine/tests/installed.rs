@@ -296,10 +296,16 @@ fn a_rehearsal_names_an_adapter_services_key_file_and_nothing_of_the_key() {
         removal: None,
         installed: Vec::new(),
         install: Some(Box::new(Install {
-            changes: vec![Changing {
-                path: key.to_owned(),
-                puts: Puts::Key,
-            }],
+            changes: vec![
+                Changing {
+                    path: key.to_owned(),
+                    puts: Puts::Key,
+                },
+                Changing {
+                    path: "/home/op/.config/lemonfiber/env/komga.env".to_owned(),
+                    puts: Puts::Secrets,
+                },
+            ],
             ..install(one, false)
         })),
         update: None,
@@ -313,6 +319,10 @@ fn a_rehearsal_names_an_adapter_services_key_file_and_nothing_of_the_key() {
         .map(str::trim)
         .collect::<Vec<&str>>();
     assert_eq!(keyed, [format!("a key        {key}")], "{said}");
+    assert!(
+        said.contains("secrets file /home/op/.config/lemonfiber/env/komga.env"),
+        "{said}"
+    );
 }
 
 /// The same three, in the tense of a run that happened. A rehearsal that said

@@ -209,6 +209,10 @@ pub fn standing(
         }
     }
 
+    if let Some(refused) = resettled(change, later, holds) {
+        return refused;
+    }
+
     match &change.kind {
         // Removing what a service created is that service's own to do, and nothing here
         // asks it to: the reversal of a creation is worked out, set aside as beyond a
@@ -265,8 +269,43 @@ pub fn standing(
         | Kind::Made { .. }
         | Kind::Configured { .. }
         | Kind::KeyMinted { .. }
-        | Kind::KeyCollected { .. } => Standing::whole(),
+        | Kind::KeyCollected { .. }
+        | Kind::Setting { .. }
+        | Kind::Secret { .. } => Standing::whole(),
     }
+}
+
+fn resettled(
+    change: &Change,
+    later: &[Change],
+    holds: &dyn Fn(&str) -> Option<String>,
+) -> Option<Standing> {
+    let Kind::Setting { name, current, .. } = &change.kind else {
+        return None;
+    };
+    let now = holds(name);
+    if now != *current {
+        let holding = now.map_or_else(
+            || format!("{name} is no longer set"),
+            |now| format!("{name} now holds {now}"),
+        );
+        return Some(Standing::refused(
+            &format!(
+                "{holding}, which is not what this change left — somebody has set it since, \
+                 and putting this back would discard their edit"
+            ),
+            Some("set it yourself if the older value is the one you want"),
+        ));
+    }
+    later
+        .iter()
+        .any(|one| matches!(&one.kind, Kind::Setting { name: later, .. } if later == name))
+        .then(|| {
+            Standing::refused(
+                &format!("a later change to {name} would be undone with it"),
+                Some("put the later change back first"),
+            )
+        })
 }
 
 /// What taking a region back out comes to, given what its file holds now.

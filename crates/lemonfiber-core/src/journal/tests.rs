@@ -445,3 +445,45 @@ fn a_key_change_is_reversed_by_name() {
         }
     );
 }
+
+#[test]
+fn undoing_a_setting_or_a_secret_puts_back_what_it_replaced_against_what_it_left() {
+    let setting = Change {
+        at: "1".to_owned(),
+        operation: "settings".to_owned(),
+        target: "komga:mode".to_owned(),
+        kind: Kind::Setting {
+            name: "komga:mode".to_owned(),
+            previous: Some("slow".to_owned()),
+            current: None,
+        },
+    };
+    assert_eq!(
+        setting.undo().action,
+        Action::Resettle {
+            name: "komga:mode".to_owned(),
+            value: Some("slow".to_owned()),
+            recorded: None,
+        }
+    );
+    let secret = Change {
+        target: "komga:token".to_owned(),
+        kind: Kind::Secret {
+            name: "komga:token".to_owned(),
+            from: "recipe".to_owned(),
+            previous: None,
+            current: Some("~1".to_owned()),
+            filed: Some("PLUGIN_KOMGA_TOKEN_SECRET".to_owned()),
+        },
+        ..setting
+    };
+    assert_eq!(
+        secret.undo().action,
+        Action::Rehold {
+            name: "komga:token".to_owned(),
+            earlier: None,
+            kept: Some("~1".to_owned()),
+            filed: Some("PLUGIN_KOMGA_TOKEN_SECRET".to_owned()),
+        }
+    );
+}

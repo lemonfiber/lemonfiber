@@ -36,10 +36,20 @@ pub(crate) async fn reveal(ctx: &Ctx, held: &Held, confirmed: bool) -> Revealed 
         };
     }
     if let Some(plugin) = held.plugins() {
-        return Revealed {
-            name: held.name.clone(),
-            value: None,
-            warning: held.unheld(plugin),
+        let value = crate::settings::secrets_at(ctx)
+            .and_then(|at| crate::settings::Secrets::at(&at).ok())
+            .and_then(|kept| kept.value(&held.setting).map(str::to_owned));
+        return match value {
+            Some(value) => Revealed {
+                name: held.name.clone(),
+                value: Some(value),
+                warning: REVEALED.to_owned(),
+            },
+            None => Revealed {
+                name: held.name.clone(),
+                value: None,
+                warning: held.unheld(plugin),
+            },
         };
     }
     let recorded = if held.setting == super::declining::SETTING {

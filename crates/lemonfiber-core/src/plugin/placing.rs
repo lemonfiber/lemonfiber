@@ -80,6 +80,8 @@ pub enum Lands {
     Document(String),
     /// The key lemonfiber asks the plugin's adapter with, minted as it is written.
     Key,
+    /// A service's own secrets file, each variable's value read as it is written.
+    Secrets(Vec<super::container::Variable>),
     /// A region inside a file the stack already has, holding this.
     Region {
         /// The file beneath the stack directory, as the record of what lemonfiber
@@ -251,6 +253,12 @@ pub fn writes(installed: &Installed, stack: &Path, reading: &Reading<'_>) -> Vec
             .filter(|placed| !placed.speaks.is_empty())
             .map(|placed| Write::key(key_file(stack, &placed.service))),
     );
+    planned.extend(installed.services.iter().filter_map(|placed| {
+        super::container::secrets_file(placed, reading).map(|path| Write {
+            path,
+            lands: Lands::Secrets(super::container::variables(installed, placed, reading)),
+        })
+    }));
     planned.push(Write::file(
         overlay(stack, &installed.plugin),
         super::container::written(installed, reading),

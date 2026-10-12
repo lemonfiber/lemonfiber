@@ -226,6 +226,59 @@ fn what_was_put_back_is_said_in_the_terms_of_what_it_changed() {
     assert!(said.contains("the key ha good again"), "{said}");
 }
 
+#[test]
+fn a_setting_or_a_secret_put_back_is_said_by_its_name() {
+    let undos = vec![
+        Undo {
+            target: "komga:mode".to_owned(),
+            action: Action::Resettle {
+                name: "komga:mode".to_owned(),
+                value: Some("slow".to_owned()),
+                recorded: Some("fast".to_owned()),
+            },
+        },
+        Undo {
+            target: "komga:speed".to_owned(),
+            action: Action::Resettle {
+                name: "komga:speed".to_owned(),
+                value: None,
+                recorded: Some("fast".to_owned()),
+            },
+        },
+        Undo {
+            target: "komga:token".to_owned(),
+            action: Action::Rehold {
+                name: "komga:token".to_owned(),
+                earlier: Some("~1".to_owned()),
+                kept: Some("~2".to_owned()),
+                filed: None,
+            },
+        },
+        Undo {
+            target: "komga:key".to_owned(),
+            action: Action::Rehold {
+                name: "komga:key".to_owned(),
+                earlier: None,
+                kept: Some("~2".to_owned()),
+                filed: None,
+            },
+        },
+    ];
+
+    let said = reversed(&putting_back(undos, Vec::new())).text();
+
+    assert!(said.contains("komga:mode back to slow"), "{said}");
+    assert!(said.contains("komga:speed cleared, as it was"), "{said}");
+    assert!(
+        said.contains("the secret komga:token back to what it held"),
+        "{said}"
+    );
+    assert!(
+        said.contains("the secret komga:key forgotten, as it was"),
+        "{said}"
+    );
+}
+
 /// A reversal that was carried out, over these two lists.
 fn putting_back(reversed: Vec<Undo>, left: Vec<Left>) -> Reversal {
     Reversal {

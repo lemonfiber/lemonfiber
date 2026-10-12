@@ -147,6 +147,7 @@ fn changes(made: &[Changing], recorded: bool) -> Lines {
                 Puts::Document => "a document  ",
                 Puts::Key => "a key       ",
                 Puts::Region => "a region in ",
+                Puts::Secrets => "secrets file",
             },
             one.path
         ));
@@ -401,6 +402,8 @@ fn undone(undo: &Undo) -> String {
         Action::Reconfigure { field, .. } => format!("put {field} back on {}", undo.target),
         Action::Revoke { name } => format!("revoked the key {name}"),
         Action::Reinstate { name } => format!("made the key {name} good again"),
+        Action::Resettle { name, .. } => format!("put the setting {name} back"),
+        Action::Rehold { name, .. } => format!("put the secret {name} back"),
     }
 }
 

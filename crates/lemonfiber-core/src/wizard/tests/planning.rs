@@ -436,6 +436,24 @@ fn a_written_change_is_said_plainly_enough_to_recognise() {
         "the revoke of the key ha"
     );
     assert_eq!(
+        described(&change(Kind::Setting {
+            name: "komga:mode".to_owned(),
+            previous: None,
+            current: Some("fast".to_owned()),
+        })),
+        "the setting komga:mode"
+    );
+    assert_eq!(
+        described(&change(Kind::Secret {
+            name: "komga:token".to_owned(),
+            from: "recipe".to_owned(),
+            previous: None,
+            current: Some("~1".to_owned()),
+            filed: None,
+        })),
+        "the secret komga:token"
+    );
+    assert_eq!(
         described(&change(Kind::Region {
             path: "/srv/stack/config/caddy/Caddyfile".to_owned(),
             key: "config/caddy/Caddyfile".to_owned(),

@@ -49,6 +49,33 @@ pub const EVERY: &[Entry] = &[
         at: Paths::env_file,
     },
     Entry {
+        accessor: "settings",
+        what: "the settings you recorded for plugins",
+        why: "Each value you chose for a setting a plugin's service reads, by its name. A \
+              setting you never recorded is not here, and its service is written with the \
+              plugin's default.",
+        secret: false,
+        at: Paths::settings,
+    },
+    Entry {
+        accessor: "secrets",
+        what: "the secrets lemonfiber holds for plugins",
+        why: "Each value a plugin's recipe captured or you entered for it, by its name, with \
+              the one earlier value of each that undoing a change puts back. It is never \
+              written into the stack, and nothing records it anywhere else.",
+        secret: true,
+        at: Paths::secrets,
+    },
+    Entry {
+        accessor: "secrets_files",
+        what: "each service's own secrets file",
+        why: "One file per service that names a secret, written from the secrets above and \
+              handed to Compose for that service alone. Any run that writes the service's \
+              entry writes its file again.",
+        secret: true,
+        at: Paths::secrets_files,
+    },
+    Entry {
         accessor: "setup_progress",
         what: "setup's saved progress",
         why: "What you had answered when you last stopped part-way through setup, so leaving \

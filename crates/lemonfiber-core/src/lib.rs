@@ -126,6 +126,7 @@ pub mod seed;
 pub mod seerr;
 pub mod self_update;
 pub mod servarr;
+pub(crate) mod settings;
 pub mod space;
 pub mod spoken;
 pub mod stack;

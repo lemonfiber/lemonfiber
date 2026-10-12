@@ -169,6 +169,7 @@ pub(crate) async fn remove(
     if let Some(file) = ctx.settings.env_file.as_deref() {
         forget_credentials(ctx, file, &kept);
     }
+    crate::settings::forgotten(ctx, &going);
 
     // Its route came out of the proxy's file with everything else it wrote, and the
     // proxy only reads that file when it starts. The stack is the one the judgement

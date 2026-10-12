@@ -84,8 +84,8 @@ pub(super) async fn install(
     after
         .record(would.clone())
         .map_err(|there| Box::new(already(&there, &named)))?;
-    writing::unanswered(&would, held.installed())?;
-    writing::unshared(&would, held.installed())?;
+    super::colliding::unanswered(&would, held.installed())?;
+    super::colliding::unshared(&would, held.installed())?;
     super::replacing::unreplaced(&would, crate::plugin::first_party::EMBEDDED)?;
 
     // Where the writes land, asked for before the branch rather than inside it. What

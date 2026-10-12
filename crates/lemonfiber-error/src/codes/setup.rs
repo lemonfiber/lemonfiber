@@ -129,4 +129,15 @@ codes! {
             the message names it.",
         remedy: "Run the reversal again once the file can be written.",
     }
+    /// Raised when a reversal meets a secret whose earlier value lemonfiber kept no copy of.
+    UNKEPT = "SETUP-14" {
+        severity: Warning,
+        status: 500,
+        since: "0.18.0",
+        meaning: "Reversing a change met secrets whose earlier value lemonfiber did not keep. \
+            The secret store keeps one earlier value of each, and only while what the secret \
+            holds now is what the change left, so these were left exactly as they are and the \
+            message names them. Everything else was put back.",
+        remedy: "Enter the earlier value again at the terminal if it is the one you want.",
+    }
 }

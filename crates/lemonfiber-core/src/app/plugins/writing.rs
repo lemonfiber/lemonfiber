@@ -23,7 +23,6 @@ use crate::ports::filesystem::Lying;
 
 use super::super::Ctx;
 use super::{NOWHERE, UNWRITABLE};
-use crate::error::codes::plugin::{ANSWERED, SPELLED_ALIKE};
 
 /// Make what the install decided, journalling each write before it is made.
 ///
@@ -81,6 +80,12 @@ pub(crate) fn carry_out(
             }
             crate::plugin::Lands::Key => {
                 keyed(ctx, plugin, stamp, &journal, &write.path)?;
+                continue;
+            }
+            crate::plugin::Lands::Secrets(variables) => {
+                let text = crate::settings::text(ctx, variables)
+                    .map_err(|why| Box::new(unwritable(&write.path, &why.to_string())))?;
+                made_whole(ctx, plugin, stamp, &journal, &write.path, Some(&text))?;
                 continue;
             }
         };
@@ -279,6 +284,7 @@ pub(crate) fn rejoined(
 ) -> Result<Vec<Overwrite>, Box<Problem>> {
     let settled = crate::wiring::settle(manifest, register.installed(), chosen);
     let joins = crate::plugin::Joins::of(manifest, &ctx.stack.attached(), &settled);
+    let resolved = crate::settings::Resolved::of(ctx, Some(manifest), register.installed());
     let mut after = register.clone();
     let mut overwrites = Vec::new();
     for held in register.installed() {
@@ -297,6 +303,7 @@ pub(crate) fn rejoined(
                         &settled,
                         manifest,
                         register.installed(),
+                        &resolved,
                         &moved,
                     ),
                 });
@@ -398,7 +405,8 @@ pub(crate) fn landing(ctx: &Ctx, planned: Vec<crate::plugin::Write>) -> Vec<crat
             }
             crate::plugin::Lands::Directory { .. }
             | crate::plugin::Lands::Document(_)
-            | crate::plugin::Lands::Key => true,
+            | crate::plugin::Lands::Key
+            | crate::plugin::Lands::Secrets(_) => true,
         })
         .collect()
 }
@@ -452,69 +460,6 @@ fn made(plugin: &str, path: &Path, stamp: &str) -> Change {
         target: path.clone(),
         kind: Kind::Made { path },
     }
-}
-
-/// Refuse a plugin one of whose services would answer on a label another installed
-/// plugin's service already answers on, before anything is written.
-///
-/// # Errors
-///
-/// Where the label is taken, naming it and whose it is.
-pub(crate) fn unanswered(
-    would: &crate::plugin::Installed,
-    installed: &[crate::plugin::Installed],
-) -> Result<(), Box<Problem>> {
-    crate::plugin::label_taken(would, installed).map_or(Ok(()), |(label, plugin)| {
-        Err(Box::new(
-            Problem::new(
-                ANSWERED,
-                format!(
-                    "{} would answer on {label}, which {plugin} already does",
-                    would.plugin
-                ),
-                "Nothing was written. The stack's proxy will not start with two sites at one \
-                 address, and every household route would go down with it.",
-                Remedy::new(format!(
-                    "Give {}'s service another hostname in its manifest, or remove {plugin} first",
-                    would.plugin
-                )),
-            )
-            .in_state(State::Guided),
-        ))
-    })
-}
-
-/// Refuse a plugin one of whose services would be named as another installed plugin's
-/// service already is, before anything is written.
-///
-/// # Errors
-///
-/// Where the name is taken, naming both services and whose the other is.
-pub(crate) fn unshared(
-    would: &crate::plugin::Installed,
-    installed: &[crate::plugin::Installed],
-) -> Result<(), Box<Problem>> {
-    crate::plugin::spelled_alike(would, installed).map_or(Ok(()), |(ours, theirs, plugin)| {
-        Err(Box::new(
-            Problem::new(
-                SPELLED_ALIKE,
-                format!(
-                    "{}'s service {ours} would be named as {plugin}'s {theirs} already is",
-                    would.plugin
-                ),
-                "Nothing was written. lemonfiber writes a plugin's container under its \
-                 service's name and keeps what the service holds in settings named after it, \
-                 once case and \"-\" or \"_\" are set aside, so the two would be one container \
-                 sharing one credential.",
-                Remedy::new(format!(
-                    "Remove {plugin} first, or install a version of {} whose service is named \
-                     otherwise",
-                    would.plugin
-                )),
-            )
-            .in_state(State::Guided),
-        ))
-    })
 }
 
 /// There is nowhere on this machine to write what the install decided.
