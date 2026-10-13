@@ -30,7 +30,9 @@ Servarr = "Servarr"
 # this repository's list grows every time the stack names something, for words
 # nobody here wrote.
 ignore-hidden = false
-extend-exclude = ["assets/web", "assets/media-stack", ".git/"]
+# The generated project's golden file carries the stack's own settings verbatim, so it
+# is excluded for the same reason the stack is.
+extend-exclude = ["assets/web", "assets/media-stack", "crates/lemonfiber-core/tests/golden/project.yml", ".git/"]
 
 [default.extend-identifiers]
 # A crate name, not a misspelling of "flat". Found the moment the checker could
