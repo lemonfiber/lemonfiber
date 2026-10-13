@@ -21,3 +21,29 @@ fn every_copy_read_as_a_repository_has_the_tree_its_pin_names() {
         );
     }
 }
+
+#[test]
+fn an_installed_plugin_carries_the_tree_its_pin_names_and_an_assembled_one_none() {
+    let mut installed = 0;
+    for pinned in lemonfiber_bundled::PINNED {
+        let files: std::collections::BTreeMap<String, Vec<u8>> = pinned
+            .files
+            .iter()
+            .map(|(path, bytes)| ((*path).to_owned(), bytes.to_vec()))
+            .collect();
+        match pinned.stage {
+            Some(lemonfiber_bundled::Stage::Installed) => {
+                installed += 1;
+                assert_eq!(
+                    lemonfiber_bundle::tree_digest(pinned.copy, &files),
+                    pinned.first_party.tree,
+                    "{}",
+                    pinned.first_party.plugin
+                );
+            }
+            _ => assert!(files.is_empty(), "{}", pinned.first_party.plugin),
+        }
+        assert!(pinned.profile.is_some(), "{}", pinned.first_party.plugin);
+    }
+    assert!(installed > 0);
+}

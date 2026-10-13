@@ -23,8 +23,7 @@ use crate::plugin::{capabilities, Ungenerated};
 pub(in crate::plugin) use asserting::{pinned_to, Asks};
 pub use asserting::{Asserted, Assertion};
 
-/// The one file a plugin is described by.
-const MANIFEST: &str = "plugin.toml";
+use lemonfiber_bundle::MANIFEST;
 
 /// Why a plugin's source could not be read at all.
 ///
