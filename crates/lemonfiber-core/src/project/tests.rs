@@ -354,3 +354,38 @@ fn an_installed_guard_the_operator_chose_holds_the_services_inside_it() {
         .iter()
         .any(|written| written.contains("18995")));
 }
+
+fn solver_installed(reached: Option<u16>) -> Project {
+    let mut manifest = carried();
+    manifest
+        .services
+        .retain(|service| service.id != "flaresolverr");
+    with_url(
+        &mut manifest,
+        "prowlarr",
+        "SOLVER_URL",
+        url("indexer.proxy", None, None),
+    );
+    let mut solver = a_placed("solver", &["indexer.proxy"], None, reached);
+    solver.listens = None;
+    project(&manifest, &[an_installed("solver", vec![solver])])
+}
+
+#[test]
+fn an_address_of_a_service_with_no_port_of_its_own_inside_is_the_one_it_is_reached_on() {
+    assert_eq!(
+        environment(
+            &entry(&solver_installed(Some(18994)), "prowlarr"),
+            "SOLVER_URL"
+        ),
+        "http://solver:18994"
+    );
+}
+
+#[test]
+fn an_address_of_a_service_that_answers_on_no_port_is_written_for_none() {
+    assert_eq!(
+        environment(&entry(&solver_installed(None), "prowlarr"), "SOLVER_URL"),
+        ""
+    );
+}
