@@ -12,8 +12,29 @@ use x509_parser::prelude::X509Certificate;
 
 use crate::secret::render;
 
-/// The snapshot this build carries, as the release-time script wrote it.
-const SNAPSHOT: &str = include_str!("roots/google-status.json");
+/// Where and when the snapshot this build carries was taken, as the release-time script
+/// wrote it.
+const TAKEN: &str = include_str!("roots/google-status/taken.json");
+
+/// The snapshot's entries, one file per first character of the serial.
+const SHARDS: [&str; 16] = [
+    include_str!("roots/google-status/0.json"),
+    include_str!("roots/google-status/1.json"),
+    include_str!("roots/google-status/2.json"),
+    include_str!("roots/google-status/3.json"),
+    include_str!("roots/google-status/4.json"),
+    include_str!("roots/google-status/5.json"),
+    include_str!("roots/google-status/6.json"),
+    include_str!("roots/google-status/7.json"),
+    include_str!("roots/google-status/8.json"),
+    include_str!("roots/google-status/9.json"),
+    include_str!("roots/google-status/a.json"),
+    include_str!("roots/google-status/b.json"),
+    include_str!("roots/google-status/c.json"),
+    include_str!("roots/google-status/d.json"),
+    include_str!("roots/google-status/e.json"),
+    include_str!("roots/google-status/f.json"),
+];
 
 /// What the list says of a certificate it names.
 ///
@@ -35,30 +56,59 @@ struct Entry {
     status: Status,
 }
 
-/// A snapshot of the list.
+/// Where and when a snapshot was taken.
 #[derive(Debug, Clone, Deserialize)]
-pub(crate) struct Snapshot {
-    /// When it was taken, as every instant this product writes is.
+#[serde(deny_unknown_fields)]
+struct Taken {
+    /// Where the list was read from.
+    #[expect(
+        dead_code,
+        reason = "read so a snapshot naming no source does not read"
+    )]
+    source: String,
+    /// When it was read, as every instant this product writes is.
     fetched: String,
+}
+
+/// One shard of a snapshot's entries.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Shard {
     /// Each certificate named, by its serial number in lower-case hex or in decimal.
     entries: BTreeMap<String, Entry>,
 }
 
+/// A snapshot of the list.
+#[derive(Debug, Clone)]
+pub(crate) struct Snapshot {
+    /// When it was taken, as every instant this product writes is.
+    fetched: String,
+    /// Each certificate named, by its serial number in its normal form.
+    entries: BTreeMap<String, Entry>,
+}
+
 /// The snapshot this build carries, or nothing where it does not read.
-static CARRIED: LazyLock<Option<Snapshot>> = LazyLock::new(|| Snapshot::read(SNAPSHOT));
+static CARRIED: LazyLock<Option<Snapshot>> = LazyLock::new(|| Snapshot::read(TAKEN, &SHARDS));
 
 impl Snapshot {
-    /// The snapshot `written` holds, each serial in its normal form, or nothing where it
-    /// does not read as one.
-    pub(crate) fn read(written: &str) -> Option<Self> {
-        let read: Self = serde_json::from_str(written).ok()?;
+    /// The snapshot `taken` and `shards` hold, each serial in its normal form, or nothing
+    /// where any of them does not read, or the time it was taken is not an instant.
+    pub(crate) fn read(taken: &str, shards: &[&str]) -> Option<Self> {
+        let taken: Taken = serde_json::from_str(taken).ok()?;
+        crate::instant::read(&taken.fetched)?;
+        let mut entries = BTreeMap::new();
+        for shard in shards {
+            let shard: Shard = serde_json::from_str(shard).ok()?;
+            entries.extend(
+                shard
+                    .entries
+                    .into_iter()
+                    .map(|(serial, entry)| (normal(&serial), entry)),
+            );
+        }
         Some(Self {
-            entries: read
-                .entries
-                .into_iter()
-                .map(|(serial, entry)| (normal(&serial), entry))
-                .collect(),
-            ..read
+            fetched: taken.fetched,
+            entries,
         })
     }
 

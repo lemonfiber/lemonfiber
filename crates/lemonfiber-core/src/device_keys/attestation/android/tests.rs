@@ -112,8 +112,10 @@ fn listing(serials: &[String]) -> Snapshot {
         .iter()
         .map(|serial| (serial.clone(), serde_json::json!({ "status": "REVOKED" })))
         .collect();
-    let written = serde_json::json!({ "fetched": "2026-10-13T00:00:00Z", "entries": entries });
-    Snapshot::read(&written.to_string()).unwrap_or_else(|| unreachable!("the listing reads"))
+    let taken = serde_json::json!({ "source": "test", "fetched": "2026-10-13T00:00:00Z" });
+    let shard = serde_json::json!({ "entries": entries });
+    Snapshot::read(&taken.to_string(), &[&shard.to_string()])
+        .unwrap_or_else(|| unreachable!("the listing reads"))
 }
 
 /// The serial numbers of `der`'s certificate, in lower-case hex and in decimal.

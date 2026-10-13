@@ -6,6 +6,8 @@ list names as revoked or suspended, and it reads the list from the snapshot the
 build embeds, never from the network (C10-R34). This is the release-time step that
 moves the snapshot: it reads the list, checks its shape, and writes it with where it
 was read from and when, entries sorted one to a line so the change reads as a diff.
+The entries are written in one file per first character of the serial, sixteen in
+all, so no file outgrows the line cap as the list grows; the core reads all of them.
 
 `--self-test` checks the reading against answers it did not fetch.
 
@@ -28,8 +30,10 @@ import urllib.request
 SOURCE = "https://android.googleapis.com/attestation/status"
 SNAPSHOT = (
     pathlib.Path(__file__).resolve().parent.parent
-    / "crates/lemonfiber-core/src/device_keys/attestation/roots/google-status.json"
+    / "crates/lemonfiber-core/src/device_keys/attestation/roots/google-status"
 )
+TAKEN = "taken.json"
+SHARDS = "0123456789abcdef"
 STATUSES = {"REVOKED", "SUSPENDED"}
 SERIAL = re.compile(r"^[0-9a-f]+$")
 FEWEST = 1
@@ -52,29 +56,30 @@ def entries_of(body: str) -> dict[str, dict[str, str]]:
     return kept
 
 
-def written(entries: dict[str, dict[str, str]], fetched: str) -> str:
-    """The snapshot as the core embeds it."""
-    lines = [
-        "{",
-        f'  "source": {json.dumps(SOURCE)},',
-        f'  "fetched": {json.dumps(fetched)},',
-        '  "entries": {',
-    ]
-    serials = sorted(entries)
-    for index, serial in enumerate(serials):
-        comma = "," if index < len(serials) - 1 else ""
-        lines.append(f"    {json.dumps(serial)}: {json.dumps(entries[serial], sort_keys=True)}{comma}")
-    lines += ["  }", "}", ""]
-    return "\n".join(lines)
+def written(entries: dict[str, dict[str, str]], fetched: str) -> dict[str, str]:
+    """The snapshot as the core embeds it: where and when it was taken, and each shard."""
+    files = {TAKEN: json.dumps({"source": SOURCE, "fetched": fetched}, indent=2) + "\n"}
+    for shard in SHARDS:
+        serials = sorted(serial for serial in entries if serial.lstrip("0")[:1] == shard)
+        lines = ["{", '  "entries": {']
+        for index, serial in enumerate(serials):
+            comma = "," if index < len(serials) - 1 else ""
+            lines.append(f"    {json.dumps(serial)}: {json.dumps(entries[serial], sort_keys=True)}{comma}")
+        lines += ["  }", "}", ""]
+        files[f"{shard}.json"] = "\n".join(lines)
+    return files
 
 
 def self_test() -> int:
     good = '{"entries": {"2c8cdddfd5e03bfc": {"status": "REVOKED", "reason": "KEY_COMPROMISE"}, "17380573025504143": {"status": "SUSPENDED"}}}'
     entries = entries_of(good)
     assert entries["17380573025504143"] == {"status": "SUSPENDED", "reason": ""}
-    snapshot = json.loads(written(entries, "2026-10-13T00:00:00Z"))
-    assert snapshot["fetched"] == "2026-10-13T00:00:00Z"
-    assert list(snapshot["entries"]) == ["17380573025504143", "2c8cdddfd5e03bfc"]
+    files = written(entries, "2026-10-13T00:00:00Z")
+    assert json.loads(files[TAKEN]) == {"source": SOURCE, "fetched": "2026-10-13T00:00:00Z"}
+    assert list(json.loads(files["1.json"])["entries"]) == ["17380573025504143"]
+    assert list(json.loads(files["2.json"])["entries"]) == ["2c8cdddfd5e03bfc"]
+    assert json.loads(files["f.json"]) == {"entries": {}}
+    assert sorted(files) == sorted([TAKEN, *(f"{shard}.json" for shard in SHARDS)])
     for bad in (
         "{}",
         '{"entries": {}}',
@@ -105,8 +110,10 @@ def main(argv: list[str]) -> int:
         print(f"::error::the attestation status list could not be taken: {failure}", file=sys.stderr)
         return 1
     fetched = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-    SNAPSHOT.write_text(written(entries, fetched), encoding="utf-8")
-    print(f"took {len(entries)} entries from {SOURCE} at {fetched} into {SNAPSHOT.name}")
+    SNAPSHOT.mkdir(exist_ok=True)
+    for name, text in written(entries, fetched).items():
+        (SNAPSHOT / name).write_text(text, encoding="utf-8")
+    print(f"took {len(entries)} entries from {SOURCE} at {fetched} into {SNAPSHOT.name}/")
     return 0
 
 
