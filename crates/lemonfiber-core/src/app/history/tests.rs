@@ -63,6 +63,24 @@ fn a_device_key_reads_as_its_name() {
     );
 }
 
+/// A change to the operator's overlay reads as seen, changed or taken away.
+#[test]
+fn the_overlay_reads_as_changed_or_taken_away() {
+    let overlaid = |current: Option<&str>| crate::journal::Kind::Overlaid {
+        path: "/cfg/overlay.yml".to_owned(),
+        previous: Some("a".to_owned()),
+        current: current.map(str::to_owned),
+    };
+    assert_eq!(
+        did(&overlaid(Some("b"))),
+        "saw the overlay /cfg/overlay.yml change"
+    );
+    assert_eq!(
+        did(&overlaid(None)),
+        "saw the overlay /cfg/overlay.yml taken away"
+    );
+}
+
 /// A key is named with its scope, minted, collected or revoked.
 #[test]
 fn a_key_reads_as_its_name_and_scope() {

@@ -24,6 +24,14 @@ fn a_path_is_bound_and_a_blank_names_nothing() {
             .and_then(Storage::on_this_machine),
         Some(&PathBuf::from("/srv/media"))
     );
+    assert_eq!(
+        Storage::read("/srv/media")
+            .ok()
+            .flatten()
+            .as_ref()
+            .and_then(Storage::export),
+        None
+    );
 }
 
 #[test]

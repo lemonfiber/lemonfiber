@@ -100,6 +100,11 @@ async fn the_retired_overlay_key_is_refused_naming_the_overlays_one_place() {
             "{refused}"
         );
     }
+    let nowhere = a_context().build();
+    let refused = refusal(&nowhere, &held, crate::config::OVERLAY_KEY, "")
+        .await
+        .unwrap_or_default();
+    assert!(refused.contains("the one file overlay.yml"), "{refused}");
 }
 
 /// Where standing beside moved each service is taken only as moves that read.
@@ -112,6 +117,7 @@ async fn the_beside_moves_are_taken_only_where_each_reads() {
         refusal(&ctx, &held, key, "sonarr:8989=18989,radarr:7878=17878").await,
         None
     );
+    assert_eq!(refusal(&ctx, &held, key, "").await, None);
     for refused in ["sonarr", "sonarr:8989", "sonarr:x=1", "sonarr:1=70000"] {
         assert!(
             refusal(&ctx, &held, key, refused).await.is_some(),

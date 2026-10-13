@@ -174,3 +174,40 @@ async fn unconfirmed_or_rehearsed_nothing_is_recorded() {
     assert!(!env.exists());
     assert!(!dir.join("beside.yml").exists());
 }
+
+/// Agreed to, the moves are refused rather than half recorded where there is no layout to
+/// journal into, where the journal cannot be written, or where the settings cannot be.
+#[tokio::test]
+async fn agreed_to_but_unrecordable_the_moves_are_refused() {
+    let dir = lemonfiber_fixtures::scratch::Scratch::new("beside-unrecordable");
+    let config = dir.join("config");
+    let _ = std::fs::create_dir_all(&config);
+    let env = config.join(".env");
+    let survey = MigrationReport {
+        read: true,
+        beside: vec![moved("sonarr", 8989, 18989)],
+        ..MigrationReport::default()
+    };
+    let at = |stack_dir: Option<std::path::PathBuf>| {
+        crate::test_support::a_context()
+            .settings(crate::config::Settings {
+                env_file: Some(env.clone()),
+                stack_dir,
+                ..crate::config::Settings::default()
+            })
+            .build()
+    };
+    let placed = at(Some(dir.join("data").join("stack")));
+
+    assert!(super::stand(&at(None), &survey, true).await.is_err());
+
+    let journal = config.join("journal.jsonl");
+    assert!(std::fs::create_dir_all(&journal).is_ok());
+    assert!(super::stand(&placed, &survey, true).await.is_err());
+    assert!(std::fs::remove_dir_all(&journal).is_ok());
+
+    assert!(std::fs::write(&env, "LEMONFIBER_CONFIG_VERSION=99.0.0\n").is_ok());
+    assert!(super::stand(&placed, &survey, true).await.is_err());
+    let held = crate::config::store::read(&env).unwrap_or_default();
+    assert_eq!(held.get(crate::config::BESIDE_KEY), None);
+}

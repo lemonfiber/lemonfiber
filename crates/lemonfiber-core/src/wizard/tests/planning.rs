@@ -665,4 +665,12 @@ fn a_device_key_is_named_as_a_key_is() {
         })),
         "the revoke of the device key pixel"
     );
+    assert_eq!(
+        described(&change(Kind::Overlaid {
+            path: "/cfg/overlay.yml".to_owned(),
+            previous: None,
+            current: None,
+        })),
+        "the overlay /cfg/overlay.yml"
+    );
 }
