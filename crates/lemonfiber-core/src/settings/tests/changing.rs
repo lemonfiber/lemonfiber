@@ -611,3 +611,32 @@ async fn a_stack_that_cannot_be_read_refuses_the_listing_and_the_change() {
     assert!(read.is_err());
     assert!(changed.is_err());
 }
+
+#[tokio::test]
+async fn a_record_of_plugins_that_will_not_read_refuses_the_listing_and_the_change() {
+    let machine = machine("unread-record", running(&[]));
+    let kept = crate::app::plugins::kept_at(&machine.ctx).unwrap_or_default();
+    assert!(std::fs::write(kept, "{ not json").is_ok());
+
+    let read = crate::settings::run::settings(&machine.ctx, &crate::app::Settling::Read).await;
+    let changed = asked(&machine.ctx, MODE, Some("fast"), None).await;
+
+    assert!(matches!(read, Err(problem) if problem.code.as_str() == "PLUGIN-4"));
+    assert_eq!(code(&changed), Some("PLUGIN-4"));
+}
+
+#[tokio::test]
+async fn a_store_that_will_not_take_the_value_leaves_the_documents_as_they_were() {
+    let machine = machine("unkept", running(&["komga"]));
+    let before = std::fs::read_to_string(&machine.document).ok();
+    let offer = change(asked(&machine.ctx, MODE, Some("fast"), None).await)
+        .map(|one| one.agreement)
+        .unwrap_or_default();
+    assert!(std::fs::create_dir_all(machine.env.with_file_name(SETTINGS)).is_ok());
+
+    let refused = asked(&machine.ctx, MODE, Some("fast"), Some(&offer)).await;
+
+    assert!(refused.is_err());
+    assert_eq!(std::fs::read_to_string(&machine.document).ok(), before);
+    assert!(upped(&machine.runner).is_empty());
+}
