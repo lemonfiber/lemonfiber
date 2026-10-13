@@ -199,15 +199,31 @@ async fn found(
     let Ok(accounts) = server.household().await else {
         return Err(Box::new(crate::asking::unreachable(NOTHING_SET)));
     };
+    one_named(&accounts, name).cloned().ok_or_else(|| {
+        let there: Vec<String> = accounts.iter().map(|held| held.name.clone()).collect();
+        Box::new(crate::asking::nobody_called(name, &there))
+    })
+}
+
+/// The one account `name` names: the account called exactly that, ignoring case, or else
+/// the only account whose name holds it. A name several accounts hold names none of
+/// them, so a choice made for one person is never applied to another whose name happens
+/// to contain theirs.
+fn one_named<'a>(accounts: &'a [Member], name: &str) -> Option<&'a Member> {
     let wanted = name.trim().to_lowercase();
-    accounts
+    if let Some(exact) = accounts
         .iter()
-        .find(|account| account.name.to_lowercase().contains(&wanted))
-        .cloned()
-        .ok_or_else(|| {
-            let there: Vec<String> = accounts.iter().map(|held| held.name.clone()).collect();
-            Box::new(crate::asking::nobody_called(name, &there))
-        })
+        .find(|account| account.name.to_lowercase() == wanted)
+    {
+        return Some(exact);
+    }
+    let mut holding = accounts
+        .iter()
+        .filter(|account| account.name.to_lowercase().contains(&wanted));
+    match (holding.next(), holding.next()) {
+        (Some(only), None) => Some(only),
+        _ => None,
+    }
 }
 
 /// What a choice comes to, as the line an operator reads it back in.
