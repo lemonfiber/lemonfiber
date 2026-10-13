@@ -1,4 +1,4 @@
-use super::{host_is_here, origin_is_here, Binding, Token, TOKEN_HEADER, WIDTH};
+use super::{host_is_here, origin_is_here, Binding, Presented, Token, TOKEN_HEADER, WIDTH};
 use lemonfiber_fixtures::ports::Chance;
 
 /// The byte every test mints from, chosen because its hex is two of one digit,
@@ -186,4 +186,10 @@ fn an_encrypted_page_is_held_to_the_same_address() {
         Some("https://evil.example:8471"),
         &beyond()
     ));
+}
+
+#[test]
+fn a_credential_presented_says_nothing_it_holds() {
+    let said = format!("{:?}", Presented("a-session-token".to_owned()));
+    assert_eq!(said, "Presented");
 }

@@ -535,5 +535,5 @@ async fn a_mint_carrying_no_proof_is_refused_as_no_key_request() {
     let (router, token, _) = a_machine("unproved", None);
     let body = serde_json::json!({ "name": "ha", "scope": "read", "purpose": "other" }).to_string();
     let answer = minting(&router, &token, &body).await;
-    assert_eq!(answer.status, StatusCode::BAD_REQUEST, "{}", answer.body);
+    assert_eq!(code(&answer), "ASK-11", "{}", answer.body);
 }
