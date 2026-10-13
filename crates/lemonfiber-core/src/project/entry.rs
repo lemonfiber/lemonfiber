@@ -209,12 +209,10 @@ impl Serialize for Joined {
         }
         let mut map = serializer.serialize_map(Some(self.0.len()))?;
         for (name, address) in &self.0 {
-            map.serialize_entry(
-                name,
-                &Holds {
-                    ipv4_address: *address,
-                },
-            )?;
+            let holds = Holds {
+                ipv4_address: *address,
+            };
+            map.serialize_entry(name, &holds)?;
         }
         map.end()
     }

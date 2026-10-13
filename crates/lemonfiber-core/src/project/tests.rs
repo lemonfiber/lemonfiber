@@ -195,3 +195,119 @@ fn the_guard_and_the_proxy_hold_their_fixed_addresses_on_fixed_subnets() {
             .values()
             .any(|one| one.get("ipv4_address").is_some())));
 }
+
+fn with_url(manifest: &mut Manifest, service: &str, key: &str, url: UrlOf) {
+    if let Some(found) = manifest.services.iter_mut().find(|one| one.id == service) {
+        found.env.insert(key.to_owned(), Value::Url(url));
+    }
+}
+
+fn url(url_of: &str, files: Option<&str>, native: Option<&str>) -> UrlOf {
+    UrlOf {
+        url_of: url_of.into(),
+        files: files.map(Into::into),
+        native: native.map(Into::into),
+    }
+}
+
+#[test]
+fn an_address_for_what_the_service_asks_is_the_one_service_the_ask_reaches() {
+    let mut manifest = carried();
+    with_url(
+        &mut manifest,
+        "prowlarr",
+        "SOLVER_URL",
+        url("indexer.proxy", None, None),
+    );
+    let project = project(&manifest, &[]);
+    assert_eq!(
+        environment(&entry(&project, "prowlarr"), "SOLVER_URL"),
+        "http://flaresolverr:8191"
+    );
+}
+
+#[test]
+fn an_address_an_ask_reaches_several_services_for_is_written_for_none() {
+    let mut manifest = carried();
+    with_url(
+        &mut manifest,
+        "prowlarr",
+        "CURATOR_URL",
+        url("library.curate", None, None),
+    );
+    let project = project(&manifest, &[]);
+    assert_eq!(environment(&entry(&project, "prowlarr"), "CURATOR_URL"), "");
+}
+
+#[test]
+fn an_address_of_a_service_inside_the_guard_is_the_guards() {
+    let reader = asking(
+        "reader",
+        "TORRENT_URL",
+        url("download.torrent", None, Some("qbittorrent")),
+    );
+    let project = project(&carried(), &[an_installed("reader", vec![reader])]);
+    assert_eq!(
+        environment(&entry(&project, "reader"), "TORRENT_URL"),
+        "http://gluetun:8081"
+    );
+}
+
+#[test]
+fn an_address_narrowed_to_a_medium_never_reaches_the_asker_itself() {
+    let mut reader = asking(
+        "reader",
+        "CURATOR_URL",
+        url("library.curate", Some("tv"), None),
+    );
+    reader.provides = vec!["library.curate".into()];
+    reader.media_types = vec!["tv".into()];
+    let project = project(&carried(), &[an_installed("reader", vec![reader])]);
+    let Some(Where::On(on)) = project.topology.placed.get("reader") else {
+        unreachable!("the reader is on networks of its own");
+    };
+    assert!(!on
+        .keys()
+        .any(|network| network.contains("reader__library.curate__reader")));
+}
+
+#[test]
+fn an_adapter_filing_a_medium_is_reached_itself_where_the_ask_is_not_in_its_upstreams_api() {
+    let mut server = a_contracted_media_server(None);
+    for placed in &mut server.services {
+        placed.media_types = vec!["movies".into()];
+    }
+    let reader = asking(
+        "reader",
+        "SERVER_URL",
+        url("media.serve", Some("movies"), None),
+    );
+    let mut manifest = carried();
+    manifest
+        .services
+        .retain(|service| !service.provides.iter().any(|one| one == "media.serve"));
+    let project = project(&manifest, &[server, an_installed("reader", vec![reader])]);
+    assert_eq!(
+        environment(&entry(&project, "reader"), "SERVER_URL"),
+        "http://media-adapter:8080"
+    );
+}
+
+#[test]
+fn a_chosen_filler_is_the_one_a_service_runs_inside() {
+    let mut inside = a_placed("client", &[], None, None);
+    inside.fields.network = Some(Network {
+        via: "network.egress-guard".into(),
+    });
+    let chosen = Chosen::read(Some("network.egress-guard=gluetun"));
+    let project = generated(
+        &carried(),
+        &[an_installed("client", vec![inside])],
+        &chosen,
+        &Reading::bare(),
+    );
+    assert_eq!(
+        project.topology.placed.get("client"),
+        Some(&Where::Inside("gluetun".into()))
+    );
+}
