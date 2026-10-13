@@ -68,7 +68,7 @@ async fn ran(check: &OverlayCheck) -> Vec<Finding> {
     let at = crate::overlay::at(settings);
     let overlay = check.filesystem.read(&at).await.map(|text| Unvetted {
         overlay: at.display().to_string(),
-        services: crate::overlay::changed(&text),
+        services: crate::stack::declared::named(&text),
     });
     let mut found = vec![finding(overlay.as_ref().map_or_else(
         || Verdict::Pass {

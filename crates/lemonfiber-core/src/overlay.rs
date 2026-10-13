@@ -9,8 +9,6 @@
 
 use std::path::{Path, PathBuf};
 
-use serde_norway::Value;
-
 use crate::app::Ctx;
 use crate::config::env::EnvFile;
 use crate::config::store::Failure;
@@ -53,25 +51,8 @@ pub fn unvetted(ctx: &Ctx) -> Option<Unvetted> {
     let text = std::fs::read_to_string(&path).unwrap_or_default();
     Some(Unvetted {
         overlay: path.display().to_string(),
-        services: changed(&text),
+        services: crate::stack::declared::named(&text),
     })
-}
-
-/// Every service `text` changes, by the names its `services` map gives them.
-#[must_use]
-pub fn changed(text: &str) -> Vec<String> {
-    serde_norway::from_str::<Value>(text)
-        .ok()
-        .and_then(|document| document.get("services").cloned())
-        .and_then(|services| services.as_mapping().cloned())
-        .map(|services| {
-            services
-                .keys()
-                .filter_map(Value::as_str)
-                .map(str::to_owned)
-                .collect()
-        })
-        .unwrap_or_default()
 }
 
 /// Journal the overlay where it differs by content from what the journal last recorded

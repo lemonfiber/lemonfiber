@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use lemonfiber_fixtures::scratch::Scratch;
 
-use super::{changed, journalled, layered, unvetted, FILE};
+use super::{journalled, layered, unvetted, FILE};
 use crate::app::Ctx;
 use crate::config::env::EnvFile;
 use crate::journal::Kind;
@@ -39,16 +39,6 @@ fn overlaid(ctx: &Ctx) -> Vec<(Option<String>, Option<String>)> {
                 .collect()
         })
         .unwrap_or_default()
-}
-
-#[test]
-fn every_service_the_overlay_changes_is_named_and_nothing_else() {
-    assert_eq!(
-        changed("services:\n  sonarr:\n    ports: [\"1:2\"]\n  radarr: {}\nvolumes:\n  x: {}\n"),
-        ["sonarr", "radarr"]
-    );
-    assert!(changed("volumes:\n  x: {}\n").is_empty());
-    assert!(changed("{ not yaml").is_empty());
 }
 
 #[test]
