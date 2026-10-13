@@ -1,7 +1,7 @@
 use lemonfiber_core::keys::{Claimed, Listed, Listing, Minted, Purpose, Secret, State};
 use lemonfiber_fixtures::ports::Chance;
 
-use super::{claimed, listing, minted};
+use super::{claimed, devices, listing, minted, registered};
 
 /// A secret minted from a source a test chose.
 fn a_secret() -> Secret {
@@ -35,6 +35,7 @@ fn a_key(name: &str, state: State, member_minted: bool) -> Listed {
         used: None,
         revoked: (state == State::Revoked).then(|| "2026-10-05T07:00:00".to_owned()),
         member_minted,
+        proved_by: None,
     }
 }
 
@@ -154,4 +155,74 @@ fn a_claim_is_shown_once_as_a_link_and_a_code_with_when_it_lapses() {
     assert!(said.contains(&format!("  {link}")), "{said}");
     assert!(said.contains("The same link, for a camera:"), "{said}");
     assert!(said.contains("until 2026-10-05T06:10:00"), "{said}");
+}
+
+#[test]
+fn a_key_a_device_key_proved_names_it() {
+    let mut key = a_key("ha", State::Active, false);
+    key.proved_by = Some("pixel".to_owned());
+    let said = listing(&Listing {
+        keys: vec![key],
+        revoked: None,
+        purposes: String::new(),
+        rehearsed: false,
+    })
+    .text();
+    assert!(said.contains("proved by the device key pixel"), "{said}");
+}
+
+/// One device key as a listing shows it, revoked where `revoked`.
+fn a_device(revoked: bool) -> lemonfiber_core::device_keys::Listed {
+    lemonfiber_core::device_keys::Listed {
+        name: "pixel".to_owned(),
+        fingerprint: "ab".repeat(32),
+        backing: lemonfiber_core::device_keys::Backing::Strongbox,
+        app: "ios:ABCDE12345.app.lemon".to_owned(),
+        registered: "2026-10-13T00:00:00Z".to_owned(),
+        used: (!revoked).then(|| "2026-10-13T01:00:00Z".to_owned()),
+        revoked: revoked.then(|| "2026-10-13T02:00:00Z".to_owned()),
+    }
+}
+
+#[test]
+fn a_device_key_registered_names_its_backing_app_and_fingerprint() {
+    let said = registered(&lemonfiber_core::device_keys::Registered {
+        name: "pixel".to_owned(),
+        fingerprint: "ab".repeat(32),
+        backing: lemonfiber_core::device_keys::Backing::Tee,
+        app: "ios:ABCDE12345.app.lemon".to_owned(),
+        registered: "2026-10-13T00:00:00Z".to_owned(),
+    })
+    .text();
+    assert!(
+        said.contains("Registered the device key pixel, held in tee"),
+        "{said}"
+    );
+    assert!(said.contains(&"ab".repeat(32)), "{said}");
+}
+
+#[test]
+fn the_device_keys_are_listed_with_where_each_stands_and_what_a_revoke_did() {
+    let listed = |revoked: Option<&str>, rehearsed: bool| {
+        devices(&lemonfiber_core::device_keys::Listing {
+            keys: vec![a_device(false), a_device(true)],
+            revoked: revoked.map(str::to_owned),
+            rehearsed,
+        })
+        .text()
+    };
+    let said = listed(None, false);
+    assert!(said.contains("last used 2026-10-13T01:00:00Z"), "{said}");
+    assert!(said.contains("never used"), "{said}");
+    assert!(said.contains("revoked 2026-10-13T02:00:00Z"), "{said}");
+    assert!(said.contains("active"), "{said}");
+    assert!(listed(Some("pixel"), false).contains("Revoked the device key pixel."));
+    assert!(listed(Some("pixel"), true).contains("Revoking would refuse the device key pixel"));
+    let none = devices(&lemonfiber_core::device_keys::Listing {
+        keys: Vec::new(),
+        revoked: None,
+        rehearsed: false,
+    })
+    .text();
+    assert!(none.contains("No device key has been registered"), "{none}");
 }

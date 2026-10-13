@@ -3,6 +3,13 @@
   "description": "What versions are in play: the binary, the stack it operates, and what changed.\n\nThe changelog is here rather than behind a request of its own because it answers\nthe second half of the same question. \"Which version am I on\" is asked by\nsomebody deciding whether to move, and what they need next is what the version\nthey are on actually brought — so every surface that already reaches this read\nreaches both halves, and none of the three had to learn a new question.",
   "type": "object",
   "properties": {
+    "attestation_status": {
+      "description": "When the snapshot of Google's attestation status list this build carries was\ntaken, which an Android device key's chain is checked against; nothing where it\ndoes not read.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "binary": {
       "description": "The running binary's version.",
       "type": "string"

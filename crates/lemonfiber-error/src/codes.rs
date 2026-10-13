@@ -110,6 +110,7 @@ families! {
     config => "CONFIG": "your settings",
     cred => "CRED": "credentials a service refuses",
     decline => "DECLINE": "the service that answers an invitation's decline",
+    device => "DEVICE": "the keys a phone proves the operator with",
     diag => "DIAG": "narrowing a diagnosis",
     docker => "DOCKER": "talking to the engine",
     env => "ENV": "the container engine",

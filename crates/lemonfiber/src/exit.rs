@@ -251,6 +251,8 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::Minted(_)
         | Outcome::KeyClaim(_)
         | Outcome::Keys(_)
+        | Outcome::DeviceKey(_)
+        | Outcome::DeviceKeys(_)
         | Outcome::Outbound(_)
         | Outcome::Provenance(_)
         | Outcome::Catalogue(_)

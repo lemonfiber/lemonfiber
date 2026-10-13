@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One device key as the listing shows it.",
+  "type": "object",
+  "properties": {
+    "app": {
+      "description": "The app that made it.",
+      "type": "string"
+    },
+    "backing": {
+      "description": "Where it lives, as its attestation said.",
+      "$ref": "DeviceKeyBacking.json"
+    },
+    "fingerprint": {
+      "description": "The SHA-256 of its public half's `SubjectPublicKeyInfo`, in lower-case hex.",
+      "type": "string"
+    },
+    "name": {
+      "description": "The name it was registered under.",
+      "type": "string"
+    },
+    "registered": {
+      "description": "When it was registered.",
+      "type": "string"
+    },
+    "revoked": {
+      "description": "When it was revoked, where it has been.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "used": {
+      "description": "When it last proved a mint, where it has.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "name",
+    "fingerprint",
+    "backing",
+    "app",
+    "registered"
+  ]
+}

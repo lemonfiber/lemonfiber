@@ -482,3 +482,25 @@ fn every_shape_a_reversal_puts_back_says_what_it_did() {
         "put the secret komga:token back"
     );
 }
+
+#[test]
+fn a_device_key_put_back_is_said_by_its_name() {
+    let undone = |action: Action| {
+        super::super::undone(&Undo {
+            target: "pixel".to_owned(),
+            action,
+        })
+    };
+    assert_eq!(
+        undone(Action::RevokeDevice {
+            name: "pixel".to_owned()
+        }),
+        "revoked the device key pixel"
+    );
+    assert_eq!(
+        undone(Action::ReinstateDevice {
+            name: "pixel".to_owned()
+        }),
+        "made the device key pixel good again"
+    );
+}

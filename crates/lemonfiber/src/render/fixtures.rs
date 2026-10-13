@@ -102,6 +102,7 @@ pub(super) fn a_version() -> VersionReport {
         supported_schema: vec![1],
         stack: "1.2.3".to_owned(),
         compose: Some("2.29".to_owned()),
+        attestation_status: Some("2026-10-13T00:45:44Z".to_owned()),
         changelog: notes("0.4.0"),
     }
 }

@@ -13,6 +13,7 @@ mod what_a_choice_of_filler_means;
 mod what_a_claim_collects;
 mod what_a_claim_opens;
 mod what_a_client_is_told_it_may_do;
+mod what_a_device_key_proves;
 mod what_a_disturbing_diagnosis_means;
 mod what_a_follow_says;
 mod what_a_key_admits;

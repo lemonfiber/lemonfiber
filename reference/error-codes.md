@@ -110,6 +110,24 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | ---- | ---- | -------- | ---- | ------ | ----- | ------- |
 | `DECLINE-1` | `UNEXPLAINED` | warning | 1 | 500 | 0.17.0 | Raised when the decline service's key was used later than anything the service recorded doing with it. |
 
+## `DEVICE` — the keys a phone proves the operator with
+
+| Code | Name | Severity | Exit | Status | Since | Summary |
+| ---- | ---- | -------- | ---- | ------ | ----- | ------- |
+| `DEVICE-1` | `NOT_A_DEVICE_NAME` | error | 1 | 400 | 0.18.0 | Raised when a device key is asked for under a word that cannot name one. |
+| `DEVICE-2` | `DEVICE_NAME_TAKEN` | error | 1 | 409 | 0.18.0 | Raised when a device key is registered under a name another device key holds. |
+| `DEVICE-3` | `PUBLIC_HALF_TAKEN` | error | 1 | 409 | 0.18.0 | Raised when a device key is registered with a public half another device key holds. |
+| `DEVICE-4` | `NOT_P256` | error | 1 | 400 | 0.18.0 | Raised when the public half given is not a P-256 key. |
+| `DEVICE-5` | `NO_ATTESTATION` | error | 1 | 400 | 0.18.0 | Raised when a device key is registered with no attestation. |
+| `DEVICE-6` | `ATTESTATION_UNVERIFIED` | error | 1 | 400 | 0.18.0 | Raised when an attestation does not verify, or does not cover the public half. |
+| `DEVICE-7` | `IN_SOFTWARE` | error | 1 | 400 | 0.18.0 | Raised when an attestation places the key in software, or says it was not made in the hardware that keeps it. |
+| `DEVICE-8` | `UNTRUSTED_APP` | error | 1 | 403 | 0.18.0 | Raised when an attestation names an app this stack does not trust. |
+| `DEVICE-9` | `NOT_REGISTERED` | error | 1 | 404 | 0.18.0 | Raised when a device key named is not registered, or was revoked. |
+| `DEVICE-10` | `CHALLENGE_NOT_STANDING` | warning | 1 | 403 | 0.18.0 | Raised when a mint carries a challenge that does not stand. |
+| `DEVICE-11` | `SIGNATURE_WRONG` | error | 1 | 401 | 0.18.0 | Raised when a mint's signature does not verify against the device key. |
+| `DEVICE-12` | `NO_CHALLENGE` | error | 1 | 500 | 0.18.0 | Raised when this machine would not supply the bytes a challenge is made of. |
+| `DEVICE-13` | `ATTESTATION_REVOKED` | error | 1 | 403 | 0.18.0 | Raised when an attestation's chain carries a certificate Google lists as revoked or suspended. |
+
 ## `DIAG` — narrowing a diagnosis
 
 | Code | Name | Severity | Exit | Status | Since | Summary |

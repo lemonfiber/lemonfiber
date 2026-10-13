@@ -30,14 +30,16 @@ fn versions_name_the_binary_the_stack_and_compose() {
     let text = versions(&a_version()).text();
     assert!(text.contains("stack 1.2.3"));
     assert!(text.contains("compose 2.29"));
+    assert!(text.contains("attestation status list taken 2026-10-13T00:45:44Z"));
     // A compose that could not be reached says so rather than being left blank.
     let unreachable = VersionReport {
         compose: None,
+        attestation_status: None,
         ..a_version()
     };
-    assert!(versions(&unreachable)
-        .text()
-        .contains("compose not reachable"));
+    let text = versions(&unreachable).text();
+    assert!(text.contains("compose not reachable"));
+    assert!(text.contains("attestation status list unreadable"));
 }
 
 /// A proposal over `DATA_ROOT`, standing wherever the test needs it to.

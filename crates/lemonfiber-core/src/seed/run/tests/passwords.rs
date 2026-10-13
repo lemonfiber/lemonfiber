@@ -53,6 +53,7 @@ fn a_non_seed_outcome_carries_no_seed_report() {
         supported_schema: vec![1],
         stack: "0.1.0".to_owned(),
         compose: None,
+        attestation_status: None,
         changelog: crate::changelog::Notes::unread(),
     });
     assert!(seeded(Ok(version)).is_none());

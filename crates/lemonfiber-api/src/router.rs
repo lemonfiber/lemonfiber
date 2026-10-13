@@ -21,7 +21,7 @@ use crate::admission::Admitting;
 use crate::admission::Knocking;
 use crate::events::live::Live;
 use crate::events::Streaming;
-use crate::guard::{Arrived, Binding, Token};
+use crate::guard::{Arrived, Binding, Presented, Token, TOKEN_HEADER};
 use crate::jobs::Jobs;
 use crate::read::kept::Kept;
 use crate::refusal::Refusal;
@@ -128,6 +128,7 @@ pub fn routes(serving: Serving, streaming: Arc<Streaming>) -> Router {
         .merge(crate::setup::routes())
         .merge(crate::admission::routes())
         .merge(crate::keys::routes())
+        .merge(crate::device_keys::routes())
         .merge(crate::capabilities::routes())
         .with_state(serving.clone())
         .merge(crate::events::routes(streaming))
@@ -175,8 +176,14 @@ async fn guarded(State(serving): State<Serving>, request: Request, next: Next) -
             // asking who this is gets the answer the guard actually admitted
             // rather than a second reading that could disagree with it.
             let mut request = request;
-            if let Some(caller) = caller {
+            let presented = request
+                .headers()
+                .get(TOKEN_HEADER)
+                .and_then(|value| value.to_str().ok())
+                .map(|value| Presented(value.to_owned()));
+            if let (Some(caller), Some(presented)) = (caller, presented) {
                 request.extensions_mut().insert(caller);
+                request.extensions_mut().insert(presented);
             }
             next.run(request).await
         }

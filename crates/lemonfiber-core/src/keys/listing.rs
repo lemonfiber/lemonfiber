@@ -69,6 +69,9 @@ pub struct Listed {
     pub revoked: Option<String>,
     /// Whether a household member minted it for themselves.
     pub member_minted: bool,
+    /// The device key whose signature proved its mint, absent where none did.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proved_by: Option<String>,
 }
 
 /// Every key this machine has minted, and what became of a revoke.

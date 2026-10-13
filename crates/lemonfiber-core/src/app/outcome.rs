@@ -168,6 +168,10 @@ outcomes! {
     KeyClaim(crate::keys::Claimed) => KEY_CLAIM,
     /// Every key this machine has minted, and what became of a revoke.
     Keys(crate::keys::Listing) => KEYS [rehearsed],
+    /// A device key registered.
+    DeviceKey(crate::device_keys::Registered) => DEVICE_KEY,
+    /// Every device key this machine has registered, and what became of a revoke.
+    DeviceKeys(crate::device_keys::Listing) => DEVICE_KEYS [rehearsed],
     /// Somebody taken out of the household, or what taking them would cost.
     Removal(crate::model::HouseholdRemoval) => REMOVAL [rehearsed],
     /// What each service in this stack is for, and what became of the ones that went.

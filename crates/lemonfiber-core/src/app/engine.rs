@@ -532,6 +532,7 @@ pub(crate) async fn version(ctx: &Ctx) -> Result<VersionReport, Box<Problem>> {
         supported_schema: lemonfiber_manifest::SUPPORTED_SCHEMA_VERSIONS.to_vec(),
         stack: stack.stack_version,
         compose,
+        attestation_status: crate::device_keys::attestation::status::taken(),
         // Read from what this build carries rather than from anything outside it,
         // for the same reason the engine's absence does not fail this read: asking
         // what is in play is what an operator does when something is wrong, and an

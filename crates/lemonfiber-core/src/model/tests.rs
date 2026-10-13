@@ -23,6 +23,7 @@ fn a_version_report_serialises_field_for_field() {
         supported_schema: vec![1],
         stack: "0.1.0".to_owned(),
         compose: Some("Docker Compose version v2.32.1".to_owned()),
+        attestation_status: None,
         changelog: crate::changelog::Notes::unread(),
     };
     assert_eq!(
@@ -31,6 +32,7 @@ fn a_version_report_serialises_field_for_field() {
             r#"{"api_version":1,"kind":"version","data":{"binary":"0.1.0","#,
             r#""supported_schema":[1],"stack":"0.1.0","#,
             r#""compose":"Docker Compose version v2.32.1","#,
+            r#""attestation_status":null,"#,
             r#""changelog":{"state":"stale","running":null,"releases":[],"#,
             r#""requirements":{}}}}"#
         )
@@ -95,6 +97,7 @@ fn an_unreachable_engine_is_absent_rather_than_guessed_at() {
         supported_schema: vec![1],
         stack: "0.1.0".to_owned(),
         compose: None,
+        attestation_status: None,
         changelog: crate::changelog::Notes::unread(),
     };
     assert!(json(&Envelope::new(kind::VERSION, report)).contains(r#""compose":null"#));

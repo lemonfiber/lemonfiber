@@ -425,6 +425,7 @@ fn asking_where_something_is_is_never_a_failure_whatever_the_answer() {
             supported_schema: vec![1],
             stack: "1".to_owned(),
             compose: None,
+            attestation_status: None,
             changelog: lemonfiber_core::changelog::Notes::unread(),
         }),
         Outcome::Status(StatusReport {

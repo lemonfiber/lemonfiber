@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where a device key lives, as its attestation says.",
+  "oneOf": [
+    {
+      "description": "A separate secure chip on an Android phone, as the hardware attested.",
+      "type": "string",
+      "const": "strongbox"
+    },
+    {
+      "description": "The Secure Enclave of an iPhone: App Attest vouched that the genuine app placed\nthe key there, not that the hardware proved it.",
+      "type": "string",
+      "const": "enclave"
+    },
+    {
+      "description": "The processor's trusted environment on an Android phone, as the hardware\nattested; outside the operating system's reach, without a chip of its own.",
+      "type": "string",
+      "const": "tee"
+    }
+  ]
+}

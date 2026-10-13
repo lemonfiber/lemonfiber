@@ -94,7 +94,15 @@ fn claim_in(link: &str) -> String {
 async fn a_claim_mints_no_secret_and_links_to_the_key() {
     let machine = Machine::new("links", true);
     let (ctx, heard) = machine.at(0);
-    let claimed = mint(&ctx, "ha", "read", "home-assistant", &Minter::Operator).await;
+    let claimed = mint(
+        &ctx,
+        "ha",
+        "read",
+        "home-assistant",
+        &Minter::Operator,
+        None,
+    )
+    .await;
     assert!(claimed.is_ok(), "{claimed:?}");
     let Ok(claimed) = claimed else {
         return;
@@ -135,7 +143,7 @@ async fn a_claim_mints_no_secret_and_links_to_the_key() {
 async fn a_key_is_collected_once_and_its_secret_is_minted_then() {
     let machine = Machine::new("collects", true);
     let (ctx, _) = machine.at(0);
-    let claimed = mint(&ctx, "ha", "act", "home-assistant", &Minter::Operator).await;
+    let claimed = mint(&ctx, "ha", "act", "home-assistant", &Minter::Operator, None).await;
     let claim = claimed
         .map(|claimed| claim_in(&claimed.link))
         .unwrap_or_default();
@@ -165,7 +173,15 @@ async fn a_key_is_collected_once_and_its_secret_is_minted_then() {
 async fn collections_of_one_claim_at_once_hand_the_key_to_one() {
     let machine = Machine::new("raced", true);
     let (ctx, _) = machine.at(0);
-    let claimed = mint(&ctx, "ha", "read", "home-assistant", &Minter::Operator).await;
+    let claimed = mint(
+        &ctx,
+        "ha",
+        "read",
+        "home-assistant",
+        &Minter::Operator,
+        None,
+    )
+    .await;
     let claim = claimed
         .map(|claimed| claim_in(&claimed.link))
         .unwrap_or_default();
@@ -198,7 +214,15 @@ async fn collections_of_one_claim_at_once_hand_the_key_to_one() {
 async fn an_unknown_claim_collects_nothing() {
     let machine = Machine::new("unknown", true);
     let (ctx, _) = machine.at(0);
-    let _ = mint(&ctx, "ha", "read", "home-assistant", &Minter::Operator).await;
+    let _ = mint(
+        &ctx,
+        "ha",
+        "read",
+        "home-assistant",
+        &Minter::Operator,
+        None,
+    )
+    .await;
     let refused = collect(&ctx, &format!("lfc_{}", "0".repeat(64)), None).await;
     assert!(refused.is_err_and(|problem| problem.code == CLAIM_NOT_OPEN));
 }
@@ -207,7 +231,15 @@ async fn an_unknown_claim_collects_nothing() {
 async fn a_claim_lapses_and_its_key_is_revoked_and_told() {
     let machine = Machine::new("lapses", true);
     let (ctx, _) = machine.at(0);
-    let claimed = mint(&ctx, "ha", "read", "home-assistant", &Minter::Operator).await;
+    let claimed = mint(
+        &ctx,
+        "ha",
+        "read",
+        "home-assistant",
+        &Minter::Operator,
+        None,
+    )
+    .await;
     let claim = claimed
         .map(|claimed| claim_in(&claimed.link))
         .unwrap_or_default();
@@ -229,7 +261,15 @@ async fn a_claim_lapses_and_its_key_is_revoked_and_told() {
 async fn a_rehearsal_revokes_no_lapsed_claim() {
     let machine = Machine::new("rehearsed", true);
     let (ctx, _) = machine.at(0);
-    let _ = mint(&ctx, "ha", "read", "home-assistant", &Minter::Operator).await;
+    let _ = mint(
+        &ctx,
+        "ha",
+        "read",
+        "home-assistant",
+        &Minter::Operator,
+        None,
+    )
+    .await;
     let (mut later, _) = machine.at(3_600);
     later.dry_run = true;
     let path = at(&later).unwrap_or_default();
@@ -244,7 +284,15 @@ async fn a_rehearsal_revokes_no_lapsed_claim() {
 async fn a_claim_is_not_minted_where_no_other_machine_reaches_the_stack() {
     let machine = Machine::new("unlinkable", false);
     let (ctx, _) = machine.at(0);
-    let refused = mint(&ctx, "ha", "read", "home-assistant", &Minter::Operator).await;
+    let refused = mint(
+        &ctx,
+        "ha",
+        "read",
+        "home-assistant",
+        &Minter::Operator,
+        None,
+    )
+    .await;
     assert!(refused.is_err_and(|problem| problem.code == UNLINKABLE));
     assert!(kept(&ctx).named("ha").is_none());
 }
@@ -262,7 +310,15 @@ fn unjournalled(ctx: &Ctx) {
 async fn a_collection_the_journal_cannot_take_hands_over_nothing() {
     let machine = Machine::new("collect-unjournalled", true);
     let (ctx, _) = machine.at(0);
-    let claimed = mint(&ctx, "ha", "read", "home-assistant", &Minter::Operator).await;
+    let claimed = mint(
+        &ctx,
+        "ha",
+        "read",
+        "home-assistant",
+        &Minter::Operator,
+        None,
+    )
+    .await;
     let claim = claimed
         .map(|claimed| claim_in(&claimed.link))
         .unwrap_or_default();
@@ -279,7 +335,15 @@ async fn a_collection_the_journal_cannot_take_hands_over_nothing() {
 async fn a_lapse_the_journal_cannot_take_revokes_nothing() {
     let machine = Machine::new("lapse-unjournalled", true);
     let (ctx, _) = machine.at(0);
-    let _ = mint(&ctx, "ha", "read", "home-assistant", &Minter::Operator).await;
+    let _ = mint(
+        &ctx,
+        "ha",
+        "read",
+        "home-assistant",
+        &Minter::Operator,
+        None,
+    )
+    .await;
     let (later, heard) = machine.at(3_600);
     unjournalled(&later);
     assert!(list(&later, &Minter::Operator).await.is_err());
@@ -293,7 +357,15 @@ async fn a_lapse_the_journal_cannot_take_revokes_nothing() {
 async fn a_collection_from_an_address_nobody_could_tell_says_so() {
     let machine = Machine::new("from-nowhere", true);
     let (ctx, _) = machine.at(0);
-    let claimed = mint(&ctx, "ha", "read", "home-assistant", &Minter::Operator).await;
+    let claimed = mint(
+        &ctx,
+        "ha",
+        "read",
+        "home-assistant",
+        &Minter::Operator,
+        None,
+    )
+    .await;
     let claim = claimed
         .map(|claimed| claim_in(&claimed.link))
         .unwrap_or_default();
@@ -326,10 +398,17 @@ fn a_pairing_refused_without_a_remedy_still_says_how_to_mint_a_claim() {
 /// The claim the machine's first key, `ha`, was minted with.
 async fn minted_claim(machine: &Machine) -> String {
     let (ctx, _) = machine.at(0);
-    mint(&ctx, "ha", "read", "home-assistant", &Minter::Operator)
-        .await
-        .map(|claimed| claim_in(&claimed.link))
-        .unwrap_or_default()
+    mint(
+        &ctx,
+        "ha",
+        "read",
+        "home-assistant",
+        &Minter::Operator,
+        None,
+    )
+    .await
+    .map(|claimed| claim_in(&claimed.link))
+    .unwrap_or_default()
 }
 
 /// Something kept where the keys are staged before they are written, so no write lands.
@@ -344,13 +423,13 @@ fn unwritable(ctx: &Ctx) {
 async fn a_claim_is_refused_whatever_a_mint_of_a_secret_refuses() {
     let machine = Machine::new("claim-refusals", true);
     let (ctx, _) = machine.at(0);
-    let bad = mint(&ctx, "Not A Name", "read", "other", &Minter::Operator).await;
+    let bad = mint(&ctx, "Not A Name", "read", "other", &Minter::Operator, None).await;
     assert!(bad.is_err_and(|problem| problem.code == BAD_NAME));
     let _ = minted_claim(&machine).await;
-    let taken = mint(&ctx, "ha", "read", "other", &Minter::Operator).await;
+    let taken = mint(&ctx, "ha", "read", "other", &Minter::Operator, None).await;
     assert!(taken.is_err_and(|problem| problem.code == NAME_TAKEN));
     let starved = ctx.with_random(Arc::new(Chance::exactly(None)));
-    let refused = mint(&starved, "mcp", "read", "mcp", &Minter::Operator).await;
+    let refused = mint(&starved, "mcp", "read", "mcp", &Minter::Operator, None).await;
     assert!(refused.is_err_and(|problem| problem.code == NO_SECRET));
     assert!(kept(&starved).named("mcp").is_none());
 }

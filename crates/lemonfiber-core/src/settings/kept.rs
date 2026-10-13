@@ -24,11 +24,11 @@ struct Stamped<T> {
     body: T,
 }
 
-pub(super) fn read<T: DeserializeOwned + Default>(path: &Path) -> Result<T, Failure> {
+pub(crate) fn read<T: DeserializeOwned + Default>(path: &Path) -> Result<T, Failure> {
     text_at(path)?.map_or_else(|| Ok(T::default()), |text| body(path, &text))
 }
 
-pub(super) fn changed<T>(
+pub(crate) fn changed<T>(
     path: &Path,
     change: &mut dyn FnMut(&mut T) -> Result<(), Failure>,
 ) -> Result<(), Failure>

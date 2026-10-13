@@ -146,7 +146,7 @@ pub fn shaped(offered: &str) -> bool {
 }
 
 /// Whether two digests are the same, looked at over every byte whatever is found.
-fn same(kept: &str, offered: &str) -> bool {
+pub(crate) fn same(kept: &str, offered: &str) -> bool {
     let (kept, offered) = (kept.as_bytes(), offered.as_bytes());
     kept.len() == offered.len()
         && kept
@@ -199,6 +199,9 @@ pub struct Record {
     /// When it was revoked, where it has been.
     #[serde(default)]
     pub revoked: Option<String>,
+    /// The device key whose signature proved its mint, where one did.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proved_by: Option<String>,
 }
 
 /// What is said instead of a record: everything but the digest.
@@ -215,6 +218,7 @@ impl std::fmt::Debug for Record {
             .field("minted", &self.minted)
             .field("by", &self.by)
             .field("revoked", &self.revoked)
+            .field("proved_by", &self.proved_by)
             .field(
                 "pending",
                 &self.pending.as_ref().map(|pending| &pending.lapses),
@@ -243,6 +247,7 @@ impl Record {
             minted,
             by,
             revoked: None,
+            proved_by: None,
         }
     }
 
@@ -270,6 +275,16 @@ impl Record {
             minted,
             by,
             revoked: None,
+            proved_by: None,
+        }
+    }
+
+    /// The same key, proved by the device key `device` where one proved it.
+    #[must_use]
+    pub fn proved_by(self, device: Option<&str>) -> Self {
+        Self {
+            proved_by: device.map(str::to_owned),
+            ..self
         }
     }
 
@@ -340,6 +355,15 @@ impl Kept {
     #[must_use]
     pub fn named(&self, name: &str) -> Option<&Record> {
         self.keys.iter().find(|record| record.name == name)
+    }
+
+    /// Every active key the device key `device` proved the mint of.
+    #[must_use]
+    pub fn proved_with(&self, device: &str) -> Vec<&Record> {
+        self.keys
+            .iter()
+            .filter(|record| !record.is_revoked() && record.proved_by.as_deref() == Some(device))
+            .collect()
     }
 
     /// The key whose secret `offered` is, where it is one.

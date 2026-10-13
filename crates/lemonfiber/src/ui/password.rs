@@ -21,6 +21,8 @@ use lemonfiber_core::error::{Diagnose as _, Problem, Remedy, State};
 use lemonfiber_core::ports::random::Random;
 use lemonfiber_core::PRODUCT;
 
+use lemonfiber_core::app::Ctx;
+
 use crate::prompt::Answers;
 
 use lemonfiber_core::error::codes::admit::MISTYPED;
@@ -30,6 +32,22 @@ const ASKS: &str = "A password for the web interface:";
 
 /// What is asked above the second.
 const AGAIN: &str = "The same password again:";
+
+/// Set it, then revoke every device key registered under the one before, and say what
+/// became of it.
+///
+/// # Errors
+///
+/// The [`Problem`] [`set`] reports, or the one revoking the device keys meets.
+pub(crate) async fn asked(ctx: &Ctx, answers: &dyn Answers) -> Result<Vec<String>, Box<Problem>> {
+    let lines = set(
+        answers,
+        ctx.seams.random.as_ref(),
+        ctx.settings.admission.as_deref(),
+    )?;
+    lemonfiber_core::device_keys::run::swept(ctx).await?;
+    Ok(lines)
+}
 
 /// Set it, and say what became of it.
 ///

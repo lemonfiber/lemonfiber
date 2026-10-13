@@ -23,6 +23,10 @@ pub struct VersionReport {
     pub stack: String,
     /// What the container engine reports, when it could be asked.
     pub compose: Option<String>,
+    /// When the snapshot of Google's attestation status list this build carries was
+    /// taken, which an Android device key's chain is checked against; nothing where it
+    /// does not read.
+    pub attestation_status: Option<String>,
     /// What this build's release changed, and every release there has been.
     pub changelog: crate::changelog::Notes,
 }

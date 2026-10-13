@@ -103,6 +103,8 @@ pub struct Admitting {
     pub household: Option<Arc<dyn HouseholdAtHand>>,
     /// The keys other programs hold, read afresh whenever one is presented.
     pub keys: Keyring,
+    /// The challenges this run issued for device keys to sign.
+    pub challenges: lemonfiber_core::device_keys::Challenges,
 }
 
 /// Where the household is found, at the moment somebody is checked against it.

@@ -35,6 +35,7 @@ pub(crate) fn noted<T>(into: &std::sync::Mutex<Vec<T>>, what: T) {
     }
 }
 
+pub mod attestations;
 pub mod downloads;
 pub mod erasing;
 pub mod files;
@@ -42,6 +43,7 @@ pub mod heard;
 pub mod hosting;
 pub mod http;
 pub mod located;
+pub mod passwords;
 pub mod ports;
 pub mod program;
 pub mod pulled;

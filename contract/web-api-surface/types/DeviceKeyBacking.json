@@ -1,0 +1,8 @@
+{
+  "fields": {},
+  "variants": [
+    "\"enclave\"",
+    "\"strongbox\"",
+    "\"tee\""
+  ]
+}

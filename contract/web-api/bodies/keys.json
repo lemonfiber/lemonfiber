@@ -4,18 +4,38 @@
   "description": "What a mint is asked with.",
   "type": "object",
   "properties": {
+    "challenge": {
+      "description": "The challenge the core issued for this device key, as it was handed over.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
     "claim": {
       "description": "Whether to mint it as a claim: the reply carries the link a program collects it\nwith, once, within ten minutes, and no secret.",
       "type": "boolean",
       "default": false
+    },
+    "device": {
+      "description": "The name of the device key whose signature stands in for the password.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
     },
     "name": {
       "description": "What to call it.",
       "type": "string"
     },
     "password": {
-      "description": "The operator's password, given again.",
-      "type": "string"
+      "description": "The operator's password, given again; or, from a phone, nothing, and the three\nfields that prove the operator with a device key in its place.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
     },
     "purpose": {
       "description": "What it is for: `home-assistant`, `mcp` or `other`.",
@@ -24,13 +44,20 @@
     "scope": {
       "description": "What it admits: `read`, `act` or `member:<account>`.",
       "type": "string"
+    },
+    "signature": {
+      "description": "ECDSA P-256 over SHA-256, in DER, in base64url, of the UTF-8 lines\n`lemonfiber-mint/1`, the challenge, the name, the scope, the purpose and `claim` or\n`key`, each ended by a line feed.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
     }
   },
   "additionalProperties": false,
   "required": [
     "name",
     "scope",
-    "purpose",
-    "password"
+    "purpose"
   ]
 }

@@ -478,6 +478,17 @@ fn a_mint_goes_back_and_a_revoke_does_not() {
     assert!(revoked
         .refusal
         .is_some_and(|refusal| refusal.because.contains("never made good again")));
+    let device_revoked = standing(
+        &key(Kind::DeviceKeyRevoked {
+            name: "pixel".to_owned(),
+        }),
+        &[],
+        &holding(&[]),
+        &unread,
+    );
+    assert!(device_revoked.refusal.is_some_and(|refusal| refusal
+        .because
+        .contains("a revoked device key is never made good again")));
 }
 
 /// A plugin's document a choice of filler wrote over, holding `written` in its place.

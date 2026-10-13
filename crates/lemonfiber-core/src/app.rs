@@ -289,12 +289,12 @@ async fn bundled(
 }
 
 /// What an archive would put back, or the putting back of it.
-async fn restored(
-    ctx: &Ctx,
-    archive: crate::app::restore::Kept,
-    repoint: bool,
-    consent: crate::app::restore::Consent,
-) -> Result<Outcome, Box<Problem>> {
+async fn restored(ctx: &Ctx, restoring: Restoring) -> Result<Outcome, Box<Problem>> {
+    let Restoring {
+        archive,
+        repoint,
+        consent,
+    } = restoring;
     restore::run(ctx, &archive, repoint, &consent)
         .await
         .map(Outcome::Restore)
@@ -513,6 +513,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Bandwidth(asked) => bandwidth::shared(ctx, &asked).await,
         Command::Downloads { asked, offer } => bandwidth::pausing::paused(ctx, asked, offer).await,
         Command::Keys(asked) => crate::keys::run::asked(ctx, asked).await,
+        Command::DeviceKeys(asked) => crate::device_keys::run::asked(ctx, asked).await,
         Command::Watch { forms } => watching(ctx, &forms).await,
         // Said onto whatever the surface is listening with, which is how a walk is
         // watched rather than read afterwards.
@@ -532,11 +533,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
             dest,
         }) => bundled(ctx, wanted, write, dest).await,
         Command::Archives => archives::archives(ctx).await.map(Outcome::Archives),
-        Command::Restore(Restoring {
-            archive,
-            repoint,
-            consent,
-        }) => restored(ctx, archive, repoint, consent).await,
+        Command::Restore(restoring) => restored(ctx, restoring).await,
     }
 }
 

@@ -264,6 +264,8 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Minted(report) => keys::minted(report),
         Outcome::KeyClaim(report) => keys::claimed(report),
         Outcome::Keys(report) => keys::listing(report),
+        Outcome::DeviceKey(report) => keys::registered(report),
+        Outcome::DeviceKeys(report) => keys::devices(report),
         Outcome::Removal(report) => removal::removal(report),
         Outcome::Outbound(report) => outbound::leaving(report),
         Outcome::Plugins(report) => plugin::installs(report),
@@ -347,7 +349,7 @@ fn machine_readable(outcome: &Outcome) -> Lines {
 
 /// What versions are in play, and what the one this build is brought.
 ///
-/// The numbers first and in four lines, because somebody checking which version
+/// The numbers first and in five lines, because somebody checking which version
 /// they are on wants that answer and not a paragraph before it. What changed goes
 /// underneath, where it is the second half of the same question rather than a
 /// separate command somebody has to know exists.
@@ -359,6 +361,10 @@ fn versions(report: &VersionReport) -> Lines {
     match &report.compose {
         Some(version) => lines.put(format!("compose {version}")),
         None => lines.put("compose not reachable"),
+    }
+    match &report.attestation_status {
+        Some(taken) => lines.put(format!("attestation status list taken {taken}")),
+        None => lines.put("attestation status list unreadable: no Android device key registers"),
     }
     lines.extend(changelog::notes(&report.changelog, &report.binary));
     lines

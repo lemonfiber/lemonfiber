@@ -105,6 +105,7 @@ async fn a_key_is_minted_once_kept_as_a_digest_and_never_written_down_as_itself(
         "read",
         "home-assistant",
         &Minter::Operator,
+        None,
     )
     .await;
     let minted = match minted {
@@ -123,7 +124,7 @@ async fn a_key_is_minted_once_kept_as_a_digest_and_never_written_down_as_itself(
 #[tokio::test]
 async fn every_mint_is_journaled_as_reversible_and_heard_by_the_operator() {
     let (ctx, heard) = a_machine("heard", None);
-    let minted = mint(&ctx, "ha", "act", "home-assistant", &Minter::Operator).await;
+    let minted = mint(&ctx, "ha", "act", "home-assistant", &Minter::Operator, None).await;
     let secret = minted.map(|minted| minted.secret).ok();
     assert!(journaled(&ctx).contains(&Kind::KeyMinted {
         name: "ha".to_owned(),
@@ -152,10 +153,10 @@ async fn every_mint_is_journaled_as_reversible_and_heard_by_the_operator() {
 #[tokio::test]
 async fn a_name_another_key_holds_is_refused_naming_that_key() {
     let (ctx, _) = a_machine("taken", None);
-    assert!(mint(&ctx, "ha", "read", "other", &Minter::Operator)
+    assert!(mint(&ctx, "ha", "read", "other", &Minter::Operator, None)
         .await
         .is_ok());
-    let again = mint(&ctx, "ha", "act", "other", &Minter::Operator).await;
+    let again = mint(&ctx, "ha", "act", "other", &Minter::Operator, None).await;
     assert!(again.is_err_and(|problem| problem.code == NAME_TAKEN
         && problem.summary.contains("ha")
         && problem.meaning.contains("read")));
@@ -165,11 +166,11 @@ async fn a_name_another_key_holds_is_refused_naming_that_key() {
 #[tokio::test]
 async fn a_revoked_key_keeps_its_name() {
     let (ctx, _) = a_machine("taken-revoked", None);
-    assert!(mint(&ctx, "ha", "read", "other", &Minter::Operator)
+    assert!(mint(&ctx, "ha", "read", "other", &Minter::Operator, None)
         .await
         .is_ok());
     assert!(revoke(&ctx, "ha", &Minter::Operator).await.is_ok());
-    let again = mint(&ctx, "ha", "read", "other", &Minter::Operator).await;
+    let again = mint(&ctx, "ha", "read", "other", &Minter::Operator, None).await;
     assert!(again
         .is_err_and(|problem| problem.code == NAME_TAKEN && problem.meaning.contains("revoked")));
 }
@@ -183,7 +184,7 @@ async fn what_names_nothing_is_refused_before_anything_is_written() {
         ("ha", "read", "toaster", NOT_A_PURPOSE),
     ];
     for (name, scope, purpose, code) in cases {
-        let refused = mint(&ctx, name, scope, purpose, &Minter::Operator).await;
+        let refused = mint(&ctx, name, scope, purpose, &Minter::Operator, None).await;
         assert!(refused.is_err_and(|problem| problem.code == code), "{code}");
     }
     assert!(kept(&ctx).keys.is_empty());
@@ -194,7 +195,7 @@ async fn what_names_nothing_is_refused_before_anything_is_written() {
 async fn a_machine_that_will_not_supply_a_secret_mints_nothing() {
     let (ctx, _) = a_machine("no-secret", None);
     let ctx = ctx.with_random(Arc::new(Chance::exactly(Some(vec![1; 8]))));
-    let refused = mint(&ctx, "ha", "read", "other", &Minter::Operator).await;
+    let refused = mint(&ctx, "ha", "read", "other", &Minter::Operator, None).await;
     assert!(refused.is_err_and(|problem| problem.code == NO_SECRET));
     assert!(kept(&ctx).keys.is_empty());
 }
@@ -204,7 +205,7 @@ async fn a_damaged_record_of_keys_is_refused_and_never_written_over() {
     let (ctx, _) = a_machine("damaged", None);
     let path = at(&ctx).unwrap_or_default();
     assert!(std::fs::write(&path, "not keys").is_ok());
-    let refused = mint(&ctx, "ha", "read", "other", &Minter::Operator).await;
+    let refused = mint(&ctx, "ha", "read", "other", &Minter::Operator, None).await;
     assert!(refused.is_err_and(|problem| problem.code == UNREADABLE));
     assert_eq!(
         std::fs::read_to_string(&path).ok().as_deref(),
@@ -224,6 +225,7 @@ async fn a_member_key_is_minted_for_the_account_the_household_holds() {
         "member:Ana",
         "mcp",
         &Minter::Operator,
+        None,
     )
     .await;
     assert!(minted.is_ok_and(|minted| minted.scope == "member:ana"));
@@ -231,14 +233,14 @@ async fn a_member_key_is_minted_for_the_account_the_household_holds() {
         .named("anas-assistant")
         .is_some_and(|record| record.scope.member() == Some("9")));
 
-    let nobody = mint(&ctx, "bobs", "member:bob", "mcp", &Minter::Operator).await;
+    let nobody = mint(&ctx, "bobs", "member:bob", "mcp", &Minter::Operator, None).await;
     assert!(nobody.is_err_and(|problem| problem.code == NO_SUCH_MEMBER));
 }
 
 #[tokio::test]
 async fn a_member_key_cannot_be_minted_while_the_household_cannot_be_asked() {
     let (ctx, _) = a_machine("member-unasked", None);
-    let refused = mint(&ctx, "anas", "member:ana", "mcp", &Minter::Operator).await;
+    let refused = mint(&ctx, "anas", "member:ana", "mcp", &Minter::Operator, None).await;
     assert!(refused.is_err_and(|problem| problem.code == UNASKED));
 }
 
@@ -251,13 +253,15 @@ async fn a_member_mints_only_a_key_scoped_to_themselves() {
         id: "10".to_owned(),
     };
     for (scope, by) in [("read", &ana), ("act", &ana), ("member:ana", &someone)] {
-        let refused = mint(&ctx, "k", scope, "mcp", by).await;
+        let refused = mint(&ctx, "k", scope, "mcp", by, None).await;
         assert!(
             refused.is_err_and(|problem| problem.code == NOT_FOR_YOURSELF),
             "{scope}"
         );
     }
-    assert!(mint(&ctx, "anas", "member:ana", "mcp", &ana).await.is_ok());
+    assert!(mint(&ctx, "anas", "member:ana", "mcp", &ana, None)
+        .await
+        .is_ok());
     let listing = list(&ctx, &Minter::Operator).await;
     assert!(listing.is_ok_and(|listing| listing
         .keys
@@ -268,9 +272,11 @@ async fn a_member_mints_only_a_key_scoped_to_themselves() {
 #[tokio::test]
 async fn a_member_revokes_only_a_key_scoped_to_themselves() {
     let (ctx, _) = a_machine("member-revoke", Some(ANA));
-    assert!(mint(&ctx, "ha", "act", "home-assistant", &Minter::Operator)
-        .await
-        .is_ok());
+    assert!(
+        mint(&ctx, "ha", "act", "home-assistant", &Minter::Operator, None)
+            .await
+            .is_ok()
+    );
     let ana = Minter::Member { id: "9".to_owned() };
     // Somebody else's key is answered as no key at all, so a member learns nothing of
     // what else this machine holds.
@@ -285,7 +291,7 @@ async fn a_member_revokes_only_a_key_scoped_to_themselves() {
 #[tokio::test]
 async fn a_revoke_is_journaled_as_irreversible_heard_and_kept_in_the_listing() {
     let (ctx, heard) = a_machine("revoked", None);
-    assert!(mint(&ctx, "ha", "read", "other", &Minter::Operator)
+    assert!(mint(&ctx, "ha", "read", "other", &Minter::Operator, None)
         .await
         .is_ok());
     let revoked = revoke(&ctx, "ha", &Minter::Operator).await;
@@ -311,7 +317,7 @@ async fn a_revoke_is_journaled_as_irreversible_heard_and_kept_in_the_listing() {
 #[tokio::test]
 async fn a_rehearsed_revoke_says_what_it_would_revoke_and_revokes_nothing() {
     let (ctx, _) = a_machine("revoke-rehearsed", None);
-    assert!(mint(&ctx, "ha", "read", "other", &Minter::Operator)
+    assert!(mint(&ctx, "ha", "read", "other", &Minter::Operator, None)
         .await
         .is_ok());
     let rehearsed = revoke(&ctx.clone().rehearsing(), "ha", &Minter::Operator).await;
@@ -324,10 +330,17 @@ async fn a_rehearsed_revoke_says_what_it_would_revoke_and_revokes_nothing() {
 #[tokio::test]
 async fn the_listing_carries_no_secret_and_says_what_a_purpose_is_worth() {
     let (ctx, _) = a_machine("listed", None);
-    let secret = mint(&ctx, "ha", "read", "home-assistant", &Minter::Operator)
-        .await
-        .map(|minted| minted.secret.as_str().to_owned())
-        .unwrap_or_default();
+    let secret = mint(
+        &ctx,
+        "ha",
+        "read",
+        "home-assistant",
+        &Minter::Operator,
+        None,
+    )
+    .await
+    .map(|minted| minted.secret.as_str().to_owned())
+    .unwrap_or_default();
     let listing = list(&ctx, &Minter::Operator).await;
     let written = listing
         .as_ref()
@@ -350,7 +363,7 @@ async fn the_listing_carries_no_secret_and_says_what_a_purpose_is_worth() {
 #[tokio::test]
 async fn the_listing_says_when_each_key_was_last_used() {
     let (ctx, _) = a_machine("listed-used", None);
-    assert!(mint(&ctx, "ha", "read", "other", &Minter::Operator)
+    assert!(mint(&ctx, "ha", "read", "other", &Minter::Operator, None)
         .await
         .is_ok());
     let mut used = Used::default();
@@ -367,9 +380,11 @@ async fn the_listing_says_when_each_key_was_last_used() {
 #[tokio::test]
 async fn a_member_key_whose_account_left_is_listed_as_orphaned() {
     let (ctx, _) = a_machine("orphaned", Some(ANA));
-    assert!(mint(&ctx, "anas", "member:ana", "mcp", &Minter::Operator)
-        .await
-        .is_ok());
+    assert!(
+        mint(&ctx, "anas", "member:ana", "mcp", &Minter::Operator, None)
+            .await
+            .is_ok()
+    );
     let (gone, _) = a_machine("orphaned-later", Some("[]"));
     let moved = Kept::at(&at(&ctx).unwrap_or_default()).unwrap_or_default();
     assert!(moved.keep(&at(&gone).unwrap_or_default()).is_ok());
@@ -383,7 +398,7 @@ async fn a_member_key_whose_account_left_is_listed_as_orphaned() {
 #[tokio::test]
 async fn undoing_a_mint_revokes_the_key_and_tells_the_operator() {
     let (ctx, heard) = a_machine("undone", None);
-    assert!(mint(&ctx, "ha", "read", "other", &Minter::Operator)
+    assert!(mint(&ctx, "ha", "read", "other", &Minter::Operator, None)
         .await
         .is_ok());
     assert!(undone(&ctx, "ha").await.is_ok());
@@ -405,7 +420,7 @@ async fn undoing_a_mint_revokes_the_key_and_tells_the_operator() {
 #[tokio::test]
 async fn putting_back_the_run_that_minted_a_key_revokes_it_and_records_the_revoke() {
     let (ctx, heard) = a_machine("put-back", None);
-    assert!(mint(&ctx, "ha", "read", "other", &Minter::Operator)
+    assert!(mint(&ctx, "ha", "read", "other", &Minter::Operator, None)
         .await
         .is_ok());
     let Some(at) = crate::app::targets::layout(&ctx)
@@ -445,7 +460,9 @@ async fn a_member_revokes_a_key_of_their_own() {
     let (ctx, heard) = a_machine("member-revokes-own", Some(ANA));
     allowing_members(&ctx);
     let ana = Minter::Member { id: "9".to_owned() };
-    assert!(mint(&ctx, "anas", "member:ana", "mcp", &ana).await.is_ok());
+    assert!(mint(&ctx, "anas", "member:ana", "mcp", &ana, None)
+        .await
+        .is_ok());
     let revoked = revoke(&ctx, "anas", &ana).await;
     assert!(revoked.is_ok_and(|listing| listing.revoked.as_deref() == Some("anas")));
     assert!(heard
@@ -457,7 +474,7 @@ async fn a_member_revokes_a_key_of_their_own() {
 async fn a_machine_keeping_no_configuration_keeps_no_keys() {
     let ctx = a_context().build();
     let nowhere = crate::error::codes::config::CONFIG_NOWHERE;
-    let minted = mint(&ctx, "ha", "read", "other", &Minter::Operator).await;
+    let minted = mint(&ctx, "ha", "read", "other", &Minter::Operator, None).await;
     assert!(minted.is_err_and(|problem| problem.code == nowhere));
     assert!(list(&ctx, &Minter::Operator)
         .await
@@ -474,13 +491,13 @@ async fn a_journal_that_cannot_be_written_mints_and_revokes_nothing() {
     let (ctx, heard) = a_machine("journal-unwritten", None);
     let journal = journal_of(&ctx);
     assert!(std::fs::create_dir_all(&journal).is_ok());
-    assert!(mint(&ctx, "ha", "read", "other", &Minter::Operator)
+    assert!(mint(&ctx, "ha", "read", "other", &Minter::Operator, None)
         .await
         .is_err());
     assert!(kept(&ctx).keys.is_empty());
 
     let _ = std::fs::remove_dir_all(&journal);
-    assert!(mint(&ctx, "ha", "read", "other", &Minter::Operator)
+    assert!(mint(&ctx, "ha", "read", "other", &Minter::Operator, None)
         .await
         .is_ok());
     let _ = std::fs::remove_file(&journal);
@@ -496,7 +513,7 @@ async fn a_journal_that_cannot_be_written_mints_and_revokes_nothing() {
 async fn keys_that_cannot_be_written_are_not_put_back() {
     use std::os::unix::fs::PermissionsExt as _;
     let (ctx, _) = a_machine("keys-unwritten", None);
-    assert!(mint(&ctx, "ha", "read", "other", &Minter::Operator)
+    assert!(mint(&ctx, "ha", "read", "other", &Minter::Operator, None)
         .await
         .is_ok());
     let Some(at) = crate::app::targets::layout(&ctx)
@@ -561,7 +578,7 @@ async fn keys_that_cannot_be_kept_after_the_journal_took_the_mint_mint_nothing()
     // Where the record is written first, before it is moved into place.
     let staging = path.with_file_name("keys.json.writing");
     assert!(std::fs::create_dir_all(staging.join("taken")).is_ok());
-    let minted = mint(&ctx, "ha", "read", "other", &Minter::Operator).await;
+    let minted = mint(&ctx, "ha", "read", "other", &Minter::Operator, None).await;
     assert!(minted.is_err());
     assert!(!heard.said().iter().any(|said| said.contains("minted")));
     let _ = std::fs::remove_dir_all(&staging);
@@ -587,7 +604,7 @@ async fn a_record_of_keys_that_does_not_read_lists_and_puts_back_nothing() {
 #[tokio::test]
 async fn a_household_that_answers_nonsense_mints_no_member_key() {
     let (ctx, _) = a_machine("household-nonsense", Some("not a household"));
-    let refused = mint(&ctx, "anas", "member:ana", "mcp", &Minter::Operator).await;
+    let refused = mint(&ctx, "anas", "member:ana", "mcp", &Minter::Operator, None).await;
     assert!(refused.is_err_and(|problem| problem.code == UNASKED));
     assert!(kept(&ctx).keys.is_empty());
 }
@@ -600,7 +617,7 @@ async fn a_machine_with_nowhere_to_journal_mints_nothing() {
         ctx.settings.stack_dir = None;
         ctx
     };
-    let refused = mint(&ctx, "ha", "read", "other", &Minter::Operator).await;
+    let refused = mint(&ctx, "ha", "read", "other", &Minter::Operator, None).await;
     assert!(
         refused.is_err_and(|problem| problem.code == crate::error::codes::config::CONFIG_NOWHERE)
     );
@@ -620,16 +637,21 @@ async fn revoking_a_name_no_key_ever_held_says_so() {
 async fn a_member_mints_nothing_until_the_operator_allows_it() {
     let (ctx, heard) = a_machine("member-unallowed", Some(ANA));
     let ana = Minter::Member { id: "9".to_owned() };
-    let refused = mint(&ctx, "anas", "member:ana", "mcp", &ana).await;
+    let refused = mint(&ctx, "anas", "member:ana", "mcp", &ana, None).await;
     assert!(refused.is_err_and(|problem| problem.code == MEMBERS_MAY_NOT_MINT));
     assert!(kept(&ctx).keys.is_empty());
     assert!(heard.said().is_empty());
     // The operator mints a member's key whatever the setting says.
-    assert!(
-        mint(&ctx, "for-ana", "member:ana", "mcp", &Minter::Operator)
-            .await
-            .is_ok()
-    );
+    assert!(mint(
+        &ctx,
+        "for-ana",
+        "member:ana",
+        "mcp",
+        &Minter::Operator,
+        None
+    )
+    .await
+    .is_ok());
 }
 
 #[tokio::test]
@@ -637,12 +659,14 @@ async fn a_member_keeps_and_revokes_their_keys_after_the_setting_is_turned_off()
     let (ctx, heard) = a_machine("member-turned-off", Some(ANA));
     allowing_members(&ctx);
     let ana = Minter::Member { id: "9".to_owned() };
-    assert!(mint(&ctx, "anas", "member:ana", "mcp", &ana).await.is_ok());
+    assert!(mint(&ctx, "anas", "member:ana", "mcp", &ana, None)
+        .await
+        .is_ok());
     let Some(env) = ctx.settings.env_file.as_deref() else {
         unreachable!("a machine built here keeps its configuration somewhere")
     };
     assert!(crate::config::store::set(env, crate::config::MEMBER_KEYS_KEY, "off").is_ok());
-    let again = mint(&ctx, "anas-two", "member:ana", "mcp", &ana).await;
+    let again = mint(&ctx, "anas-two", "member:ana", "mcp", &ana, None).await;
     assert!(again.is_err_and(|problem| problem.code == MEMBERS_MAY_NOT_MINT));
     assert!(kept(&ctx)
         .named("anas")
@@ -660,16 +684,20 @@ async fn a_member_keeps_and_revokes_their_keys_after_the_setting_is_turned_off()
 async fn a_member_sees_only_their_own_keys_and_never_another_keys_name() {
     let (ctx, _) = a_machine("member-sees", Some(ANA));
     allowing_members(&ctx);
-    assert!(mint(&ctx, "ha", "act", "home-assistant", &Minter::Operator)
+    assert!(
+        mint(&ctx, "ha", "act", "home-assistant", &Minter::Operator, None)
+            .await
+            .is_ok()
+    );
+    let ana = Minter::Member { id: "9".to_owned() };
+    assert!(mint(&ctx, "anas", "member:ana", "mcp", &ana, None)
         .await
         .is_ok());
-    let ana = Minter::Member { id: "9".to_owned() };
-    assert!(mint(&ctx, "anas", "member:ana", "mcp", &ana).await.is_ok());
     let listing = list(&ctx, &ana).await;
     assert!(listing.is_ok_and(
         |listing| listing.keys.len() == 1 && listing.keys.iter().all(|key| key.name == "anas")
     ));
-    let taken = mint(&ctx, "ha", "member:ana", "mcp", &ana).await;
+    let taken = mint(&ctx, "ha", "member:ana", "mcp", &ana, None).await;
     assert!(taken.is_err_and(|problem| problem.code == NAME_TAKEN
         && !problem.meaning.contains("act")
         && !problem.meaning.contains("minted")));

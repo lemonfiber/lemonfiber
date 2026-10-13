@@ -243,7 +243,12 @@ pub(crate) async fn run(
     // keyboard is not something a task sent to another thread may hold — and the
     // loop below is spawned. So the asking finishes before the loop begins, which is
     // also the order an operator reads it in.
-    match asked.password.then(|| asking(&ctx, answers)).flatten() {
+    let refused = if asked.password {
+        asking(&ctx, answers).await
+    } else {
+        None
+    };
+    match refused {
         Some(code) => code,
         None => serving(ctx, asked, embedded, until, LOOK).await,
     }
@@ -254,12 +259,8 @@ pub(crate) async fn run(
 /// Nothing where it was set, because there is nothing to exit with yet: the surface
 /// still has to be served, and the words said here are the ones an operator reads
 /// above the announcement.
-fn asking(ctx: &Ctx, answers: &dyn crate::prompt::Answers) -> Option<ExitCode> {
-    match password::set(
-        answers,
-        ctx.seams.random.as_ref(),
-        ctx.settings.admission.as_deref(),
-    ) {
+async fn asking(ctx: &Ctx, answers: &dyn crate::prompt::Answers) -> Option<ExitCode> {
+    match password::asked(ctx, answers).await {
         Ok(lines) => {
             for line in lines {
                 say!("{line}");

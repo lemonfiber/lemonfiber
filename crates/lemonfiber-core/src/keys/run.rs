@@ -41,6 +41,9 @@ pub enum Asked {
         /// Whether to mint it as a claim, collected once by the program it is for,
         /// rather than handing over its secret now.
         claim: bool,
+        /// The device key whose signature proved the operator for this mint, where one
+        /// did rather than the password.
+        proved_by: Option<String>,
     },
     /// Collect a key minted as a claim, with that claim.
     Collect {
@@ -98,7 +101,8 @@ pub async fn asked(ctx: &Ctx, asked: Asked) -> Result<Outcome, Box<Problem>> {
             purpose,
             by,
             claim: false,
-        } => mint(ctx, &name, &scope, &purpose, &by)
+            proved_by,
+        } => mint(ctx, &name, &scope, &purpose, &by, proved_by.as_deref())
             .await
             .map(Outcome::Minted),
         Asked::Mint {
@@ -107,7 +111,8 @@ pub async fn asked(ctx: &Ctx, asked: Asked) -> Result<Outcome, Box<Problem>> {
             purpose,
             by,
             claim: true,
-        } => claimed::mint(ctx, &name, &scope, &purpose, &by)
+            proved_by,
+        } => claimed::mint(ctx, &name, &scope, &purpose, &by, proved_by.as_deref())
             .await
             .map(Outcome::KeyClaim),
         Asked::Collect { claim, from } => claimed::collect(ctx, &claim, from)
@@ -132,6 +137,7 @@ pub async fn mint(
     scope: &str,
     purpose: &str,
     by: &Minter,
+    proved_by: Option<&str>,
 ) -> Result<Minted, Box<Problem>> {
     let Prepared {
         path,
@@ -140,7 +146,8 @@ pub async fn mint(
     } = prepared(ctx, name, scope, purpose, by).await?;
     let secret = Secret::mint(ctx.seams.random.as_ref()).ok_or_else(|| Box::new(no_secret()))?;
     let now = crate::instant::written(ctx.seams.clock.now()).unwrap_or_default();
-    let record = Record::minted(name, scope, purpose, &secret, now, by.clone());
+    let record =
+        Record::minted(name, scope, purpose, &secret, now, by.clone()).proved_by(proved_by);
     let mut opened = Opened::at(ctx, &path).await?;
     let made = added(ctx, &path, &mut opened.kept, &record, by);
     opened.let_go(ctx).await;
@@ -484,6 +491,7 @@ async fn listed(ctx: &Ctx, kept: &Kept, revoked: Option<String>) -> Listing {
                 used: used.at.get(&record.name).cloned(),
                 revoked: record.revoked.clone(),
                 member_minted: matches!(record.by, Minter::Member { .. }),
+                proved_by: record.proved_by.clone(),
             })
             .collect(),
         revoked,

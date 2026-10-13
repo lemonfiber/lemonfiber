@@ -12,11 +12,13 @@
         "const:\"reconfigure\"",
         "const:\"rehold\"",
         "const:\"reinstate\"",
+        "const:\"reinstate-device\"",
         "const:\"remove\"",
         "const:\"repin\"",
         "const:\"resettle\"",
         "const:\"restore\"",
         "const:\"revoke\"",
+        "const:\"revoke-device\"",
         "const:\"rewind\"",
         "const:\"withdraw\""
       ],
@@ -118,11 +120,13 @@
     "\"reconfigure\"",
     "\"rehold\"",
     "\"reinstate\"",
+    "\"reinstate-device\"",
     "\"remove\"",
     "\"repin\"",
     "\"resettle\"",
     "\"restore\"",
     "\"revoke\"",
+    "\"revoke-device\"",
     "\"rewind\"",
     "\"withdraw\""
   ]

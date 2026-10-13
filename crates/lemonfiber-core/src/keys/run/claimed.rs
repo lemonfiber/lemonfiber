@@ -28,6 +28,7 @@ pub(super) async fn mint(
     scope: &str,
     purpose: &str,
     by: &Minter,
+    proved_by: Option<&str>,
 ) -> Result<Claimed, Box<Problem>> {
     let Prepared {
         path,
@@ -50,7 +51,8 @@ pub(super) async fn mint(
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |since| since.as_secs());
     let minted = crate::instant::written(now).unwrap_or_default();
-    let record = Record::claimed(name, scope, purpose, &claim, lapses, minted, by.clone());
+    let record = Record::claimed(name, scope, purpose, &claim, lapses, minted, by.clone())
+        .proved_by(proved_by);
     let mut opened = Opened::at(ctx, &path).await?;
     let made = added(ctx, &path, &mut opened.kept, &record, by);
     opened.let_go(ctx).await;

@@ -72,6 +72,7 @@ pub mod contained;
 pub mod credential;
 pub mod dashboard;
 pub mod decline;
+pub mod device_keys;
 pub mod docker;
 pub mod doctor;
 pub mod door;

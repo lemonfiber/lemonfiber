@@ -461,3 +461,42 @@ async fn a_member_the_household_no_longer_lists_mints_nothing() {
     assert_eq!(refused.status, StatusCode::UNAUTHORIZED, "{}", refused.body);
     assert!(!env.with_file_name("keys.json").exists());
 }
+
+#[tokio::test]
+async fn a_member_proves_nothing_with_a_device_key_and_keeps_none() {
+    let (router, member, _, _) =
+        a_member_signed_in("device-keys", true, vec![Reply::reply(200, SIGNED_IN)]).await;
+    let proved = serde_json::json!({
+        "name": "anas",
+        "scope": "member:ana",
+        "purpose": "mcp",
+        "device": "pixel",
+        "challenge": "a-challenge",
+        "signature": "c2lnbmVk",
+    })
+    .to_string();
+    let (minted, _) = sent(
+        router.clone(),
+        "POST",
+        "/api/keys",
+        &member,
+        Some((HERE, false)),
+        &proved,
+    )
+    .await;
+    assert_eq!(minted.status, StatusCode::FORBIDDEN, "{}", minted.body);
+    for (method, path) in [
+        ("GET", "/api/device-keys"),
+        ("POST", "/api/device-keys"),
+        ("DELETE", "/api/device-keys/pixel"),
+        ("POST", "/api/device-keys/pixel/challenge"),
+    ] {
+        let answer = presented(router.clone(), method, path, &member, Some((HERE, false))).await;
+        assert_eq!(
+            answer.status,
+            StatusCode::FORBIDDEN,
+            "{method} {path}: {}",
+            answer.body
+        );
+    }
+}

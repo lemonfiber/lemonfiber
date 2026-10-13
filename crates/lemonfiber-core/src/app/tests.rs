@@ -119,6 +119,7 @@ fn reported(compose: Option<&str>) -> Outcome {
         supported_schema: vec![1],
         stack: "0.1.0".to_owned(),
         compose: compose.map(str::to_owned),
+        attestation_status: crate::device_keys::attestation::status::taken(),
         changelog: crate::changelog::notes(env!("CARGO_PKG_VERSION")),
     })
 }
@@ -193,6 +194,8 @@ fn report(outcome: Result<Outcome, Box<super::Problem>>) -> Option<crate::model:
             | Outcome::Minted(_)
             | Outcome::KeyClaim(_)
             | Outcome::Keys(_)
+            | Outcome::DeviceKey(_)
+            | Outcome::DeviceKeys(_)
             | Outcome::Status(_)
             | Outcome::Doctor(_)
             | Outcome::Repair(_)
@@ -310,6 +313,8 @@ fn stated(outcome: Result<Outcome, Box<super::Problem>>) -> Option<Vec<(String, 
             | Outcome::Minted(_)
             | Outcome::KeyClaim(_)
             | Outcome::Keys(_)
+            | Outcome::DeviceKey(_)
+            | Outcome::DeviceKeys(_)
             | Outcome::Doctor(_)
             | Outcome::Repair(_)
             | Outcome::Undo(_)

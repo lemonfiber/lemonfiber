@@ -2,7 +2,7 @@ mod changing;
 pub(crate) mod fences;
 mod files;
 pub(crate) mod filing;
-mod kept;
+pub(crate) mod kept;
 pub(crate) mod legacy;
 mod listing;
 pub(crate) mod own;

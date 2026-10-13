@@ -47,6 +47,7 @@ fn the_key_commands_reach_the_core_as_the_operator_asks_them() {
             purpose: "home-assistant".to_owned(),
             by: Minter::Operator,
             claim: true,
+            proved_by: None,
         })
     );
     assert_eq!(

@@ -21,6 +21,9 @@ lemonfiber-ports = { workspace = true }
 lemonfiber-sidecar = { workspace = true }
 argon2 = { workspace = true }
 ring = { workspace = true }
+x509-parser = { workspace = true }
+ciborium-ll = { workspace = true }
+ciborium-io = { workspace = true }
 # The certificate the web surface presents to a paired phone, and reading its key back.
 rcgen = { workspace = true }
 base64 = { workspace = true }

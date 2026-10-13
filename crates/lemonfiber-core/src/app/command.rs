@@ -448,6 +448,8 @@ pub enum Command {
     },
     /// Mint, list or revoke the keys another program reaches the web surface with.
     Keys(crate::keys::run::Asked),
+    /// Register, list or revoke the keys a phone proves the operator with.
+    DeviceKeys(crate::device_keys::run::Asked),
     /// Guard the data location while the given forms run, stopping them the moment
     /// it disappears.
     ///
