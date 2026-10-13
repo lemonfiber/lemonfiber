@@ -8,6 +8,9 @@ use std::path::Path;
 
 use crate::{Refused, EXTENSION, MANIFEST};
 
+/// How many bytes of a file are hashed at a time.
+const PIECE: usize = 64 * 1024;
+
 /// The one entry in the copies directory that is not a copy: what keeps an empty
 /// directory in git.
 const KEEP: &str = ".gitkeep";
@@ -70,8 +73,28 @@ pub(crate) fn read(directory: &Path, schema: u32) -> Result<BTreeMap<String, Cop
 }
 
 /// A copy's directory, every file read and every link noted rather than followed.
-pub(crate) fn walked(root: &Path) -> Result<Copy, Refused> {
-    let mut copy = Copy::default();
+fn walked(root: &Path) -> Result<Copy, Refused> {
+    let (paths, links) = found(root)?;
+    let mut copy = Copy {
+        links,
+        ..Copy::default()
+    };
+    for path in paths {
+        if path == MANIFEST {
+            copy.manifest = Some(text(&root.join(&path))?);
+        } else {
+            let bytes = bytes(&root.join(&path))?;
+            copy.files.insert(path, bytes);
+        }
+    }
+    Ok(copy)
+}
+
+/// Every file under the directory `root` and every link there, each by its path from
+/// `root`, nothing read and no link followed.
+pub(crate) fn found(root: &Path) -> Result<(Vec<String>, Vec<String>), Refused> {
+    let mut files = Vec::new();
+    let mut links = Vec::new();
     let mut pending = vec![String::new()];
     while let Some(relative) = pending.pop() {
         let at = root.join(&relative);
@@ -84,18 +107,31 @@ pub(crate) fn walked(root: &Path) -> Result<Copy, Refused> {
                 format!("{relative}/{name}")
             };
             if kind.is_symlink() {
-                copy.links.push(path);
+                links.push(path);
             } else if kind.is_dir() {
                 pending.push(path);
-            } else if path == MANIFEST {
-                copy.manifest = Some(text(&root.join(&path))?);
             } else {
-                let bytes = bytes(&root.join(&path))?;
-                copy.files.insert(path, bytes);
+                files.push(path);
             }
         }
     }
-    Ok(copy)
+    Ok((files, links))
+}
+
+/// The SHA-256 of the file at `path` in lower-case hexadecimal, read in pieces through
+/// no link and waiting on no pipe, so no file is held whole however large.
+pub(crate) fn summed(path: &Path) -> Result<String, Refused> {
+    let mut context = ring::digest::Context::new(&ring::digest::SHA256);
+    let mut piece = vec![0_u8; PIECE];
+    let mut file = opened(path).map_err(|source| unread(path, source))?;
+    loop {
+        match file.read(&mut piece) {
+            Ok(0) => return Ok(crate::rendered(&context.finish())),
+            Ok(read) => context.update(piece.get(..read).unwrap_or_default()),
+            Err(interrupted) if interrupted.kind() == ErrorKind::Interrupted => {}
+            Err(source) => return Err(unread(path, source)),
+        }
+    }
 }
 
 /// Every entry in the directory `at`, by its name, with its kind as the entry itself
