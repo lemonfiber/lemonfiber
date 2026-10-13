@@ -739,3 +739,41 @@ async fn a_stack_that_mounts_the_location_once_says_so_beside_the_probe() {
         Some(Verdict::Pass { .. })
     ));
 }
+
+/// Data on an NFS export is the nas mode the setting says, and the checks that read a
+/// path on this machine are said not to have run rather than reported passed.
+#[tokio::test]
+async fn data_on_an_nfs_export_is_the_nas_mode_and_nothing_here_is_probed() {
+    let bench = Bench::healthy();
+    let recorded = Arc::clone(&bench.recorded);
+    let findings = StorageCheck::new(
+        Arc::new(bench),
+        Some(PathBuf::from("/data")),
+        Some(PathBuf::from("/state/storage-state.json")),
+        Environment::MacOs,
+        None,
+        None,
+        Vec::new(),
+    )
+    .on(Some(crate::config::storage::Export {
+        server: "nas.local".to_owned(),
+        path: "/volume1/media".to_owned(),
+    }))
+    .run()
+    .await;
+    assert!(matches!(
+        verdict(&findings, "storage.hardlinks"),
+        Some(Verdict::Skipped { reason })
+            if reason.contains("nfs://nas.local/volume1/media") && reason.contains("not checked here")
+    ));
+    assert!(matches!(
+        verdict(&findings, "storage.mode"),
+        Some(Verdict::Pass { note: Some(note) }) if note.starts_with("nas")
+    ));
+    let reported: Vec<&str> = findings.iter().map(|one| one.check.as_str()).collect();
+    assert_eq!(
+        reported,
+        ["storage.hardlinks", "storage.mode", "storage.single-mount"]
+    );
+    assert!(recorded.lock().map(|seen| seen.is_empty()).unwrap_or(false));
+}

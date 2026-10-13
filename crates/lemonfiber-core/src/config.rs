@@ -18,6 +18,7 @@ pub mod paths;
 pub mod reaching;
 mod reading;
 pub mod resending;
+pub mod storage;
 pub mod store;
 
 // Taken whole rather than named one by one, the way the readers below are. Every
@@ -31,7 +32,7 @@ pub use keys::*;
 // would otherwise be a change at every call site that asks.
 pub use reading::{
     data_root_from_env, exposed_from_env, front_door_from_env, household_domain_from_env,
-    household_host_from_env, indexer_from_env, ip_echo_from_env, overlay_from_env,
+    household_host_from_env, indexer_from_env, ip_echo_from_env, nfs_from_env, overlay_from_env,
     port_forward_from_env, project_from_env, provider_host_from_env, quiet_from_env, reads_as_off,
     reads_as_on, service_user_from_env, unmanaged_from_env, PortForward,
 };
@@ -147,7 +148,10 @@ pub struct Settings {
     ///
     /// Absent until then, which is why the storage checks tell an operator to
     /// run setup rather than reporting a fault about a location they never picked.
+    /// Absent too where the data is kept on an NFS export, which is no path here.
     pub data_root: Option<PathBuf>,
+    /// The NFS export the data is kept on, where `DATA_ROOT` names one.
+    pub nfs: Option<storage::Export>,
     /// Where the storage check records the last hardlink capability it saw, so a
     /// later run can notice the capability was lost.
     ///
@@ -293,6 +297,7 @@ impl Default for Settings {
             protocols: Protocols::none(),
             ip_echo: vec![DEFAULT_IP_ECHO.to_owned(), SECOND_IP_ECHO.to_owned()],
             data_root: None,
+            nfs: None,
             storage_state: None,
             service_user: None,
             port_forward: PortForward::default(),

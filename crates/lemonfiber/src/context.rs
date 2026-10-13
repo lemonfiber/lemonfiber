@@ -169,6 +169,7 @@ pub(crate) fn read_settings() -> Settings {
         protocols: Protocols::from_env(&recorded),
         ip_echo: ip_echo_from_env(&recorded),
         data_root: data_root_from_env(&recorded),
+        nfs: lemonfiber_core::config::nfs_from_env(&recorded),
         storage_state: here().map(|paths| paths.storage_state()),
         service_user: service_user_from_env(&recorded),
         port_forward: port_forward_from_env(&recorded),

@@ -1,6 +1,8 @@
 use crate::app::Ctx;
 use crate::config::paths::{SECRETS, SETTINGS};
+use crate::config::storage::{self, Storage};
 use crate::config::store::{self, Failure};
+use crate::config::{DATA_ROOT_KEY, NAS_EXPORT_KEY, NAS_HOST_KEY};
 use crate::credential::fingerprint;
 use crate::journal::{Change, Kind};
 use crate::plugin::Installed;
@@ -172,7 +174,53 @@ pub fn stack(ctx: &Ctx) -> Result<(), Failure> {
             store::unset(env, row.key)?;
         }
     }
+    nas_folded(ctx, env, &file)?;
     super::store::marked_stack_filed(&settings)
+}
+
+fn nas_folded(
+    ctx: &Ctx,
+    env: &std::path::Path,
+    file: &crate::config::env::EnvFile,
+) -> Result<(), Failure> {
+    let held = |key: &str| {
+        file.get(key)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+    };
+    let (Some(host), Some(path)) = (held(NAS_HOST_KEY), held(NAS_EXPORT_KEY)) else {
+        return Ok(());
+    };
+    let root = held(DATA_ROOT_KEY);
+    if root.is_some_and(|root| root.starts_with(storage::NFS)) {
+        return Ok(());
+    }
+    let Ok(Some(Storage::Nfs(export))) = Storage::read(&format!("{}{host}{path}", storage::NFS))
+    else {
+        return Ok(());
+    };
+    let folded = export.written();
+    let stamp = ctx.stamp();
+    let set = |key: &str, previous: Option<&str>, current: &str| Change {
+        at: stamp.clone(),
+        operation: super::OPERATION.to_owned(),
+        target: key.to_owned(),
+        kind: Kind::Set {
+            key: key.to_owned(),
+            previous: previous.map(str::to_owned),
+            current: current.to_owned(),
+        },
+    };
+    let changes = [
+        set(DATA_ROOT_KEY, root, &folded),
+        set(NAS_HOST_KEY, Some(host), ""),
+        set(NAS_EXPORT_KEY, Some(path), ""),
+    ];
+    let paths = crate::app::targets::layout(ctx).ok_or(Failure::Nowhere)?;
+    crate::app::recover::journalled(&paths.journal(), &changes, ctx.seams.random.as_ref())?;
+    store::set(env, DATA_ROOT_KEY, &folded)?;
+    store::set(env, NAS_HOST_KEY, "")?;
+    store::set(env, NAS_EXPORT_KEY, "")
 }
 
 fn filed_secret(one: &Keeping<'_>, row: Option<&Legacy>, stamp: &str) -> Change {

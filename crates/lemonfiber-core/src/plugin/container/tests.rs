@@ -276,6 +276,39 @@ fn the_library_is_mounted_only_where_the_manifest_said_it_is_wanted() {
     );
 }
 
+/// On an NFS export the library is the one volume the document declares, mounted where
+/// a path would be bound, and declared only where a service takes it.
+#[test]
+fn on_an_nfs_export_the_library_is_one_declared_volume() {
+    let export = crate::config::storage::Export {
+        server: "nas.local".to_owned(),
+        path: "/volume1/media".to_owned(),
+    };
+    let reading = Reading {
+        nfs: Some(&export),
+        ..Reading::bare()
+    };
+    let taking = written(&installed(vec![placed()]), &reading);
+    assert!(taking.contains("- data:/data"), "{taking}");
+    assert!(!taking.contains(LIBRARY), "{taking}");
+    assert!(
+        taking.contains(
+            "volumes:\n  data:\n    driver: local\n    driver_opts:\n      type: nfs\n      \
+             o: addr=nas.local,nfsvers=4,rw,hard,timeo=600,retrans=2\n      device: \
+             :/volume1/media\n"
+        ),
+        "{taking}"
+    );
+    let leaving = written(
+        &installed(vec![Placed {
+            takes_data: false,
+            ..placed()
+        }]),
+        &reading,
+    );
+    assert!(!leaving.contains("data:"), "{leaving}");
+}
+
 /// An image that keeps its configuration elsewhere gets the same one directory,
 /// mounted where it actually reads it.
 ///

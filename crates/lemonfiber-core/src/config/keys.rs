@@ -140,8 +140,15 @@ pub(crate) const UNMANAGED_KEY: &str = "LEMONFIBER_UNMANAGED";
 ///
 /// The one location the storage contract rests on: the compose driver mounts it
 /// and the storage checks probe it. It is the stack's own setting rather than
-/// one of lemonfiber's, so it carries no prefix.
+/// one of lemonfiber's, so it carries no prefix. It holds a path on this machine, or an
+/// NFS export written `nfs://<server>/<export>`.
 pub const DATA_ROOT_KEY: &str = "DATA_ROOT";
+
+/// The NFS server the retired NAS overlay mounted the data from.
+pub(crate) const NAS_HOST_KEY: &str = "NAS_HOST";
+
+/// The export on that server the retired NAS overlay mounted.
+pub(crate) const NAS_EXPORT_KEY: &str = "NAS_EXPORT";
 
 /// The user id the service containers run as.
 pub(crate) const PUID_KEY: &str = "PUID";

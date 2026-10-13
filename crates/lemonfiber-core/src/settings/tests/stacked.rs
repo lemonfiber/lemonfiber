@@ -281,3 +281,99 @@ fn a_stack_value_the_journal_will_not_take_is_not_filed() {
         assert_eq!(setting(&env, "gluetun:countries"), None, "{name}");
     }
 }
+
+#[test]
+fn the_nas_overlays_server_and_export_are_folded_into_the_data_root_once() {
+    let (ctx, env) = stacked(
+        "nas",
+        &[
+            ("DATA_ROOT", "/mnt/nas"),
+            ("NAS_HOST", "nas.local"),
+            ("NAS_EXPORT", "/volume1/media"),
+        ],
+    );
+    assert!(crate::filed_stack(&ctx).is_ok());
+
+    assert_eq!(
+        line(&env, "DATA_ROOT").as_deref(),
+        Some("nfs://nas.local/volume1/media")
+    );
+    assert_eq!(line(&env, "NAS_HOST").as_deref(), Some(""));
+    assert_eq!(line(&env, "NAS_EXPORT").as_deref(), Some(""));
+    let set: Vec<(String, Option<String>, String)> = journal(&ctx)
+        .into_iter()
+        .filter_map(|change| match change.kind {
+            Kind::Set {
+                key,
+                previous,
+                current,
+            } => Some((key, previous, current)),
+            _ => None,
+        })
+        .collect();
+    let owned = |key: &str, previous: &str, current: &str| {
+        (
+            key.to_owned(),
+            Some(previous.to_owned()),
+            current.to_owned(),
+        )
+    };
+    assert_eq!(
+        set,
+        [
+            owned("DATA_ROOT", "/mnt/nas", "nfs://nas.local/volume1/media"),
+            owned("NAS_HOST", "nas.local", ""),
+            owned("NAS_EXPORT", "/volume1/media", ""),
+        ]
+    );
+
+    assert!(store::set(&env, "NAS_HOST", "other").is_ok());
+    assert!(store::set(&env, "NAS_EXPORT", "/other").is_ok());
+    assert!(crate::filed_stack(&ctx).is_ok());
+    assert_eq!(
+        line(&env, "DATA_ROOT").as_deref(),
+        Some("nfs://nas.local/volume1/media"),
+        "a second run folds nothing"
+    );
+}
+
+#[test]
+fn nothing_is_folded_where_the_nas_keys_are_partial_refused_or_already_folded() {
+    for (name, lines) in [
+        ("partial", vec![("NAS_HOST", "nas.local")]),
+        (
+            "refused",
+            vec![("NAS_HOST", "nas,soft"), ("NAS_EXPORT", "/volume1")],
+        ),
+        (
+            "folded",
+            vec![
+                ("DATA_ROOT", "nfs://other/export"),
+                ("NAS_HOST", "nas.local"),
+                ("NAS_EXPORT", "/volume1"),
+            ],
+        ),
+    ] {
+        let (ctx, env) = stacked(&format!("unfolded-{name}"), &lines);
+        let before = line(&env, "DATA_ROOT");
+        assert!(crate::filed_stack(&ctx).is_ok(), "{name}");
+        assert_eq!(line(&env, "DATA_ROOT"), before, "{name}");
+        assert!(journal(&ctx).is_empty(), "{name}");
+    }
+}
+
+#[test]
+fn a_fold_the_journal_will_not_take_is_not_made() {
+    let (ctx, env) = stacked(
+        "nas-unjournalled",
+        &[("NAS_HOST", "nas.local"), ("NAS_EXPORT", "/volume1")],
+    );
+    let blocked = super::changing::blocking_the_journal(&ctx);
+
+    let filed = crate::filed_stack(&ctx);
+
+    let _ = std::fs::remove_dir_all(&blocked);
+    assert!(filed.is_err());
+    assert_eq!(line(&env, "DATA_ROOT"), None);
+    assert_eq!(line(&env, "NAS_HOST").as_deref(), Some("nas.local"));
+}

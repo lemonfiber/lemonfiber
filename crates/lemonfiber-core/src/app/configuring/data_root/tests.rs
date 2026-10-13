@@ -389,3 +389,23 @@ async fn what_cannot_be_resolved_is_never_taken() {
         );
     }
 }
+
+/// An NFS export is judged on its server and its export, and on nothing a path is.
+#[tokio::test]
+async fn an_nfs_export_is_judged_on_its_server_and_its_export() {
+    let (_dir, stack) = machine("data-root-nfs");
+    let ctx = linux(&stack);
+
+    assert_eq!(refusal(&ctx, "nfs://nas.local/volume1/media").await, None);
+    assert_eq!(refusal(&ctx, "nfs://192.168.1.20/").await, None);
+    let server = refusal(&ctx, "nfs://nas,soft/export")
+        .await
+        .unwrap_or_default();
+    assert!(server.contains("\"nas,soft\""), "{server}");
+    assert!(
+        server.starts_with("nfs://nas,soft/export cannot be the data root"),
+        "{server}"
+    );
+    let export = refusal(&ctx, "nfs://nas/a b").await.unwrap_or_default();
+    assert!(export.contains("\"/a b\""), "{export}");
+}

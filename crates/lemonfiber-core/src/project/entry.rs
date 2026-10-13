@@ -15,11 +15,18 @@ use lemonfiber_manifest::container::{
 use serde::ser::SerializeMap;
 use serde::Serialize;
 
+use crate::config::storage::Export;
 use crate::config::{DEFAULT_ZONE, PGID_KEY, PUID_KEY, ZONE_KEY};
 use crate::topology::Placed;
 
 /// The library, mounted exactly as every service that takes it mounts it.
 pub(crate) const LIBRARY: &str = "${DATA_ROOT:-./data}:/data";
+
+/// The volume the library is mounted from where it is kept on an NFS export.
+pub(crate) const LIBRARY_VOLUME: &str = "data";
+
+/// Where the library lands inside every container that takes it.
+const LIBRARY_TARGET: &str = "/data";
 
 /// The uid and gid Compose writes while the stack's environment file names neither.
 const OPERATOR_FALLBACK: &str = "1000";
@@ -132,6 +139,8 @@ pub struct Values<'a> {
     pub address: &'a dyn Fn(&str, &UrlOf) -> Option<String>,
     /// The group that owns the host's render devices, where the host has them.
     pub render_group: Option<u32>,
+    /// The NFS export the library is kept on, where it is kept on one.
+    pub nfs: Option<&'a Export>,
 }
 
 /// One service's entry, and the whole of what one can carry.
@@ -276,7 +285,7 @@ pub fn entry(unit: &Unit<'_>, placed: &Placed, values: &Values<'_>) -> Entry {
         } else {
             Vec::new()
         },
-        volumes: volumes(unit),
+        volumes: volumes(unit, values.nfs),
         tmpfs: tmpfs(unit).map(|path| literal(path)).collect(),
         networks: Joined(
             networks
@@ -391,11 +400,14 @@ pub(crate) fn ports(unit: &Unit<'_>) -> Vec<String> {
 
 /// The library where it asked for it, its own configuration directory, and each path
 /// mounted from its own mount tree.
-fn volumes(unit: &Unit<'_>) -> Vec<String> {
+fn volumes(unit: &Unit<'_>, nfs: Option<&Export>) -> Vec<String> {
     let service = literal(unit.id);
     let mut volumes = Vec::new();
     if unit.takes_data {
-        volumes.push(LIBRARY.to_owned());
+        volumes.push(match nfs {
+            Some(_) => format!("{LIBRARY_VOLUME}:{LIBRARY_TARGET}"),
+            None => LIBRARY.to_owned(),
+        });
     }
     volumes.push(mounted(
         &format!("./{CONFIGURATION_TREE}/{service}"),

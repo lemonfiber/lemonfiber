@@ -264,9 +264,12 @@ pub const SHOWN: &[(&str, &str)] = &[
         "DOMAIN",
         "the hostname real certificates are obtained for, which is public in the certificate",
     ),
-    ("NAS_HOST", "the machine the network mount is exported from"),
     (
-        "NAS_EXPORT",
+        super::NAS_HOST_KEY,
+        "the machine the network mount is exported from",
+    ),
+    (
+        super::NAS_EXPORT_KEY,
         "the share on that machine the data root lives on",
     ),
 ];

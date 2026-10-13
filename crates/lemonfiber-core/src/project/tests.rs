@@ -389,3 +389,56 @@ fn an_address_of_a_service_that_answers_on_no_port_is_written_for_none() {
         ""
     );
 }
+
+#[test]
+fn on_an_nfs_export_every_service_taking_data_mounts_the_one_declared_volume() {
+    let export = crate::config::storage::Export {
+        server: "192.168.1.20".to_owned(),
+        path: "/export/$media".to_owned(),
+    };
+    let reading = Reading {
+        nfs: Some(&export),
+        ..Reading::bare()
+    };
+    let manifest = carried();
+    let mounted = generated(&manifest, &[], &Chosen::read(None), &reading);
+    let document: Yaml = serde_norway::from_str(&mounted.text).unwrap_or_default();
+    let volume = document
+        .get("volumes")
+        .and_then(|volumes| volumes.get("data"))
+        .cloned()
+        .unwrap_or_default();
+    assert_eq!(text(&volume, "driver"), "local");
+    let options = volume.get("driver_opts").cloned().unwrap_or_default();
+    assert_eq!(text(&options, "type"), "nfs");
+    assert_eq!(
+        text(&options, "o"),
+        "addr=192.168.1.20,nfsvers=4,rw,hard,timeo=600,retrans=2"
+    );
+    assert_eq!(text(&options, "device"), ":/export/$$media");
+    let taking: Vec<&str> = manifest
+        .services
+        .iter()
+        .filter(|service| service.takes_data && !service.host_managed)
+        .map(|service| service.id.as_str())
+        .collect();
+    assert!(
+        !taking.is_empty(),
+        "the carried stack has services that take data"
+    );
+    for id in taking {
+        let volumes = entry(&mounted, id)
+            .get("volumes")
+            .and_then(Yaml::as_sequence)
+            .cloned()
+            .unwrap_or_default();
+        let library: Vec<&str> = volumes
+            .iter()
+            .filter_map(Yaml::as_str)
+            .filter(|volume| volume.ends_with(":/data"))
+            .collect();
+        assert_eq!(library, ["data:/data"], "{id}");
+    }
+    let bound = project(&manifest, &[]);
+    assert!(!bound.text.contains("type: nfs"), "{}", bound.text);
+}

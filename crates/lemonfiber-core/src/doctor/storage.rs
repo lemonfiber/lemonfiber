@@ -25,6 +25,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use super::{Category, Check, Finding, Verdict};
+use crate::config::storage::Export;
 use crate::error::{Problem, Remedy, State};
 use crate::platform::Environment;
 use crate::ports::filesystem::{FileSystem, Ownership, StorageFacts};
@@ -41,7 +42,7 @@ use crate::error::codes::storage::ROOT_UNWRITABLE;
 pub use space::LOW_SPACE_FLOOR;
 
 use findings::{
-    copying, linked, service_skipped, service_unverified, service_verdict, unconfirmed,
+    copying, linked, service_skipped, service_unverified, service_verdict, unconfirmed, NAS,
 };
 use space::space;
 
@@ -62,6 +63,7 @@ pub struct StorageCheck {
     service_user: Option<(u32, u32)>,
     committed: Option<u64>,
     crowded: Vec<Crowded>,
+    nfs: Option<Export>,
 }
 
 impl StorageCheck {
@@ -107,7 +109,14 @@ impl StorageCheck {
             service_user,
             committed,
             crowded,
+            nfs: None,
         }
+    }
+
+    /// The same check, over data kept on `nfs` rather than on a path here.
+    #[must_use]
+    pub fn on(self, nfs: Option<Export>) -> Self {
+        Self { nfs, ..self }
     }
 
     /// Run the probe against a resolved data root and read what it proved.
@@ -220,14 +229,15 @@ impl Check for StorageCheck {
 
 /// Whether the data location is there, writable, and on one filesystem.
 async fn ran(check: &StorageCheck) -> Vec<Finding> {
-    let mut found = match &check.root {
-        None => vec![skipped(
+    let mut found = match (&check.nfs, &check.root) {
+        (Some(export), _) => exported(export),
+        (None, None) => vec![skipped(
             "no data location is configured yet — run setup to choose one",
         )],
         // Resolved first so the probe runs against the filesystem the data
         // actually lives on: a symlinked root would otherwise be tested on the
         // filesystem holding the link, which is not the one that matters.
-        Some(root) => match check.filesystem.canonicalize(root).await {
+        (None, Some(root)) => match check.filesystem.canonicalize(root).await {
             Err(fault) => absent(root, &fault.message),
             Ok(real) => check.probe(&real).await,
         },
@@ -240,6 +250,24 @@ async fn ran(check: &StorageCheck) -> Vec<Finding> {
     // still a stack whose layout an operator can be told about.
     found.extend(mounts::findings(&check.crowded));
     found
+}
+
+/// The findings for data kept on an NFS export: the mode the setting says, and the checks
+/// that read a path on this machine said not to have run, rather than passed.
+fn exported(export: &Export) -> Vec<Finding> {
+    pair(
+        Verdict::Skipped {
+            reason: format!(
+                "the data is kept on the NFS export {}, which is no path on this machine, so \
+                 whether it can hardlink, how much room it has and whether it is there are not \
+                 checked here",
+                export.written()
+            ),
+        },
+        Verdict::Pass {
+            note: Some(NAS.to_owned()),
+        },
+    )
 }
 
 /// The findings when the data root could not be reached at all.
