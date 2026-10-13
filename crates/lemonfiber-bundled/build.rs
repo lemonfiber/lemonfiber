@@ -75,14 +75,16 @@ fn bundle(out: &Path) {
         exit(1);
     });
 
-    if let Err(unwritten) = std::fs::write(out.join("bundle.rs"), rust(&held)) {
+    let copies = catalogue.join(lemonfiber_bundle::COPIES);
+    if let Err(unwritten) = std::fs::write(out.join("bundle.rs"), rust(&held, &copies)) {
         eprintln!("error: the bundle's pins could not be written: {unwritten}");
         exit(1);
     }
 }
 
-/// `held` as the two constants `lib.rs` includes.
-fn rust(held: &[lemonfiber_bundle::Held]) -> String {
+/// `held` as the two constants `lib.rs` includes, an installed plugin's tree included
+/// from its copy under `copies`.
+fn rust(held: &[lemonfiber_bundle::Held], copies: &Path) -> String {
     let mut pinned = String::new();
     let mut first_party = String::new();
     for one in held {
@@ -95,8 +97,15 @@ fn rust(held: &[lemonfiber_bundle::Held]) -> String {
         let _ = writeln!(first_party, "    {trusted},");
         let _ = writeln!(
             pinned,
-            "    Pinned {{ first_party: {trusted}, origin: {:?}, release: {:?}, revision: {:?}, fills: &{:?}, copy: {:?} }},",
-            one.pin.origin, one.pin.release, one.pin.revision, one.pin.fills, one.copy
+            "    Pinned {{ first_party: {trusted}, origin: {:?}, release: {:?}, revision: {:?}, fills: &{:?}, copy: {:?}, stage: {}, profile: {:?}, files: &[{}] }},",
+            one.pin.origin,
+            one.pin.release,
+            one.pin.revision,
+            one.pin.fills,
+            one.copy,
+            staged(one.pin.stage),
+            one.pin.profile,
+            carried(one, copies)
         );
     }
     format!(
@@ -105,4 +114,31 @@ fn rust(held: &[lemonfiber_bundle::Held]) -> String {
          /// Every first-party plugin this build embeds, by id and manifest digest.\n\
          pub const FIRST_PARTY: &[FirstParty] = &[\n{first_party}];\n"
     )
+}
+
+/// `stage` as the Rust that names it.
+fn staged(stage: Option<lemonfiber_bundle::Stage>) -> &'static str {
+    match stage {
+        Some(lemonfiber_bundle::Stage::Assembled) => "Some(Stage::Assembled)",
+        Some(lemonfiber_bundle::Stage::Installed) => "Some(Stage::Installed)",
+        None => "None",
+    }
+}
+
+/// Each file of an installed plugin's tree as a path and its bytes included from its
+/// copy, nothing for one the stack assembles.
+fn carried(one: &lemonfiber_bundle::Held, copies: &Path) -> String {
+    if one.pin.stage != Some(lemonfiber_bundle::Stage::Installed) {
+        return String::new();
+    }
+    let mut files = String::new();
+    for path in one.tree.keys() {
+        let at = copies.join(&one.pin.id).join(path);
+        let _ = write!(
+            files,
+            "({path:?}, include_bytes!({:?})), ",
+            at.display().to_string()
+        );
+    }
+    files
 }
