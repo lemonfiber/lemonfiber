@@ -83,6 +83,7 @@ fn only_a_lifecycle_says_what_the_stack_settled_to() {
         supported_schema: Vec::new(),
         stack: String::new(),
         compose: None,
+        attestation_status: None,
         changelog: lemonfiber_core::changelog::Notes::unread(),
     };
     assert_eq!(condition(&Outcome::Version(report)), None);

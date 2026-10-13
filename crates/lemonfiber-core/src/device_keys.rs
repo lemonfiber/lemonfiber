@@ -33,9 +33,9 @@ use base64::Engine as _;
 use serde::{Deserialize, Serialize};
 
 use crate::error::codes::device::{
-    ATTESTATION_UNVERIFIED, CHALLENGE_NOT_STANDING, DEVICE_NAME_TAKEN, IN_SOFTWARE,
-    NOT_A_DEVICE_NAME, NOT_P256, NOT_REGISTERED, NO_ATTESTATION, NO_CHALLENGE, PUBLIC_HALF_TAKEN,
-    SIGNATURE_WRONG, UNTRUSTED_APP,
+    ATTESTATION_REVOKED, ATTESTATION_UNVERIFIED, CHALLENGE_NOT_STANDING, DEVICE_NAME_TAKEN,
+    IN_SOFTWARE, NOT_A_DEVICE_NAME, NOT_P256, NOT_REGISTERED, NO_ATTESTATION, NO_CHALLENGE,
+    PUBLIC_HALF_TAKEN, SIGNATURE_WRONG, UNTRUSTED_APP,
 };
 use crate::error::Code;
 
@@ -47,7 +47,7 @@ pub use public::{PublicKey, CURVE};
 
 /// Every refusal registering, listing, revoking or proving with a device key answers
 /// with, which a client names by its code.
-pub const REFUSALS: [Code; 12] = [
+pub const REFUSALS: [Code; 13] = [
     NOT_A_DEVICE_NAME,
     DEVICE_NAME_TAKEN,
     PUBLIC_HALF_TAKEN,
@@ -60,6 +60,7 @@ pub const REFUSALS: [Code; 12] = [
     CHALLENGE_NOT_STANDING,
     SIGNATURE_WRONG,
     NO_CHALLENGE,
+    ATTESTATION_REVOKED,
 ];
 
 /// The file the device keys are kept in, beside the configuration a backup carries.

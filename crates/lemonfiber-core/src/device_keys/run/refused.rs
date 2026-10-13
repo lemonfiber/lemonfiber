@@ -1,9 +1,9 @@
 //! Every refusal asking the device keys for something can meet, each in its own words.
 
 use crate::error::codes::device::{
-    ATTESTATION_UNVERIFIED, CHALLENGE_NOT_STANDING, DEVICE_NAME_TAKEN, IN_SOFTWARE,
-    NOT_A_DEVICE_NAME, NOT_P256, NOT_REGISTERED, NO_ATTESTATION, NO_CHALLENGE, PUBLIC_HALF_TAKEN,
-    SIGNATURE_WRONG, UNTRUSTED_APP,
+    ATTESTATION_REVOKED, ATTESTATION_UNVERIFIED, CHALLENGE_NOT_STANDING, DEVICE_NAME_TAKEN,
+    IN_SOFTWARE, NOT_A_DEVICE_NAME, NOT_P256, NOT_REGISTERED, NO_ATTESTATION, NO_CHALLENGE,
+    PUBLIC_HALF_TAKEN, SIGNATURE_WRONG, UNTRUSTED_APP,
 };
 use crate::error::{Diagnose, Problem, Remedy};
 use crate::PRODUCT;
@@ -109,6 +109,19 @@ pub(super) fn unproved(why: &Unattested) -> Problem {
              Enclave or the trusted environment, where the operating system cannot read it. A \
              key kept in software, or made outside the hardware and taken in, can be copied. \
              Nothing was registered.",
+            Remedy::new("Mint the key at the stack's terminal instead")
+                .with_detail(format!("{PRODUCT} key mint")),
+        ),
+        Unattested::Revoked => Problem::new(
+            ATTESTATION_REVOKED,
+            "Google has revoked what vouches for that key",
+            format!(
+                "A certificate in the chain vouching for it is one Google lists as revoked or \
+                 suspended, in the snapshot of its attestation status list this build of \
+                 {PRODUCT} carries, taken {}. A key it vouches for cannot be told from one made \
+                 outside a phone's hardware. Nothing was registered.",
+                super::super::attestation::status::taken().unwrap_or_default()
+            ),
             Remedy::new("Mint the key at the stack's terminal instead")
                 .with_detail(format!("{PRODUCT} key mint")),
         ),

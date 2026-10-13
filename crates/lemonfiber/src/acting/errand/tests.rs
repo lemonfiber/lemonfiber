@@ -454,6 +454,7 @@ fn a_version() -> lemonfiber_core::model::VersionReport {
         supported_schema: vec![1],
         stack: "1.2.3".to_owned(),
         compose: None,
+        attestation_status: None,
         changelog: lemonfiber_core::changelog::Notes::unread(),
     }
 }

@@ -1,13 +1,15 @@
 //! The platform's word on where a device key lives, and which app made it.
 //!
-//! Read against the roots this build ships and nothing else: verifying an attestation
-//! sends no request anywhere, a revocation list included.
+//! Read against the roots this build ships and the snapshot of Google's attestation
+//! status list it carries, and nothing else: verifying an attestation sends no request
+//! anywhere.
 
 mod android;
 mod apple;
 mod cbor;
 pub(crate) mod chain;
 mod der;
+pub mod status;
 
 use std::time::SystemTime;
 
@@ -62,6 +64,9 @@ pub enum Unattested {
     Unverified,
     /// It places the key in software.
     InSoftware,
+    /// Its chain carries a certificate the status list this build carries names as
+    /// revoked or suspended.
+    Revoked,
     /// It names an app this stack does not trust, as the refusal names it.
     Untrusted(String),
 }

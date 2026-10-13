@@ -204,6 +204,12 @@ extension-points:
 reference:
     cargo run --quiet --example reference -p lemonfiber
 
+# Take a fresh snapshot of Google's Android attestation status list into the tree, as
+# each release does before it is tagged (C10-R34). The one step that reads the list
+# from the network; the build embeds what this writes and fetches nothing.
+attestation-status:
+    python3 scripts/take_the_attestation_status.py
+
 # Rewrite the published code registry from the codes the crates declare, then the
 # error-code reference from that file.
 codes:
@@ -307,6 +313,7 @@ scripts:
     python3 scripts/the_templates_name_the_image.py --check
     python3 scripts/the_tag_a_shell_never_sees.py --self-test
     python3 scripts/pin_release_actions.py --self-test
+    python3 scripts/take_the_attestation_status.py --self-test
     python3 scripts/the_tag_a_shell_never_sees.py --sweep
     python3 scripts/pin_release_actions.py --sweep
 

@@ -126,6 +126,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `DEVICE-10` | `CHALLENGE_NOT_STANDING` | warning | 1 | 403 | 0.18.0 | Raised when a mint carries a challenge that does not stand. |
 | `DEVICE-11` | `SIGNATURE_WRONG` | error | 1 | 401 | 0.18.0 | Raised when a mint's signature does not verify against the device key. |
 | `DEVICE-12` | `NO_CHALLENGE` | error | 1 | 500 | 0.18.0 | Raised when this machine would not supply the bytes a challenge is made of. |
+| `DEVICE-13` | `ATTESTATION_REVOKED` | error | 1 | 403 | 0.18.0 | Raised when an attestation's chain carries a certificate Google lists as revoked or suspended. |
 
 ## `DIAG` — narrowing a diagnosis
 

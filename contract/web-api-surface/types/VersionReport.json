@@ -1,5 +1,11 @@
 {
   "fields": {
+    "attestation_status": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "binary": {
       "type": [
         "string"

@@ -4,7 +4,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use rcgen::{
     BasicConstraints, CertificateParams, CustomExtension, DistinguishedName, DnType, IsCa, Issuer,
-    KeyPair, PublicKeyData, SigningKey, PKCS_ECDSA_P256_SHA256,
+    KeyPair, PublicKeyData, SerialNumber, SigningKey, PKCS_ECDSA_P256_SHA256,
 };
 
 use super::identity::AppIdentity;
@@ -163,8 +163,20 @@ impl Authority {
         key: &impl PublicKeyData,
         extensions: Vec<CustomExtension>,
     ) -> Vec<u8> {
+        self.certify_numbered(name, key, extensions, None)
+    }
+
+    /// The same certificate, numbered `serial` where one is given.
+    pub(crate) fn certify_numbered(
+        &self,
+        name: &str,
+        key: &impl PublicKeyData,
+        extensions: Vec<CustomExtension>,
+        serial: Option<&[u8]>,
+    ) -> Vec<u8> {
         let mut params = named(name, None);
         params.custom_extensions = extensions;
+        params.serial_number = serial.map(SerialNumber::from_slice);
         params
             .signed_by(key, &self.issuer)
             .unwrap_or_else(|_| unreachable!())

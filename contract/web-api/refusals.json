@@ -144,6 +144,11 @@
     "status": 500,
     "description": "Raised when this machine would not supply the bytes a challenge is made of."
   },
+  "DEVICE-13": {
+    "name": "ATTESTATION_REVOKED",
+    "status": 403,
+    "description": "Raised when an attestation's chain carries a certificate Google lists as revoked or suspended."
+  },
   "DEVICE-2": {
     "name": "DEVICE_NAME_TAKEN",
     "status": 409,

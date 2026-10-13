@@ -121,4 +121,16 @@ codes! {
         remedy: "Try again. If it happens twice, the operating system's own random source is \
             at fault.",
     }
+    /// Raised when an attestation's chain carries a certificate Google lists as revoked or
+    /// suspended.
+    ATTESTATION_REVOKED = "DEVICE-13" {
+        severity: Error,
+        status: 403,
+        since: "0.18.0",
+        meaning: "A certificate in the chain vouching for the key is one Google lists as \
+            revoked or suspended, in the snapshot of its attestation status list this build \
+            carries. A key it vouches for cannot be told from one made outside a phone's \
+            hardware.",
+        remedy: "Mint the key at the stack's terminal instead.",
+    }
 }

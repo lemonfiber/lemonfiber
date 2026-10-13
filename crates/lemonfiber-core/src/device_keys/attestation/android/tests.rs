@@ -2,7 +2,7 @@ use lemonfiber_fixtures::attestations::{AndroidRecording, ANDROID_EC_ROOT, ANDRO
 use rcgen::{BasicConstraints, CustomExtension};
 use x509_parser::prelude::{FromDer as _, X509Certificate};
 
-use super::{attested, attested_under, KEY_DESCRIPTION};
+use super::{attested, attested_under, Snapshot, KEY_DESCRIPTION};
 use crate::device_keys::attestation::{Attested, Unattested};
 use crate::device_keys::identity::AppIdentity;
 use crate::device_keys::testing::{
@@ -96,7 +96,36 @@ fn generated(described: Vec<u8>) -> (Vec<Vec<u8>>, PublicKey, Authority) {
 /// app among `trusted`.
 fn generated_attests(described: Vec<u8>, trusted: &[AppIdentity]) -> Result<Attested, Unattested> {
     let (chain, key, root) = generated(described);
-    attested_under(&[&root.der], &chain, &key, trusted, now())
+    attested_under(
+        &[&root.der],
+        Some(&listing(&[])),
+        &chain,
+        &key,
+        trusted,
+        now(),
+    )
+}
+
+/// A status list naming `serials` as revoked.
+fn listing(serials: &[String]) -> Snapshot {
+    let entries: serde_json::Map<String, serde_json::Value> = serials
+        .iter()
+        .map(|serial| (serial.clone(), serde_json::json!({ "status": "REVOKED" })))
+        .collect();
+    let written = serde_json::json!({ "fetched": "2026-10-13T00:00:00Z", "entries": entries });
+    Snapshot::read(&written.to_string()).unwrap_or_else(|| unreachable!("the listing reads"))
+}
+
+/// The serial numbers of `der`'s certificate, in lower-case hex and in decimal.
+fn serials(der: &[u8]) -> (String, String) {
+    let Ok((_, certificate)) = X509Certificate::from_der(der) else {
+        unreachable!("a generated certificate reads");
+    };
+    let hex = crate::secret::render(certificate.raw_serial());
+    (
+        hex.trim_start_matches('0').to_owned(),
+        certificate.tbs_certificate.serial.to_string(),
+    )
 }
 
 #[test]
@@ -223,4 +252,99 @@ fn an_app_whose_package_android_would_not_allow_is_not_spelt_out() {
             "an Android app whose package name is not one Android allows".to_owned()
         ))
     );
+}
+
+#[test]
+fn a_chain_carrying_a_certificate_the_status_list_names_is_refused_whichever_form_it_names_it_in() {
+    let trusted = [android(PACKAGE, SIGNER)];
+    let (chain, key, root) = generated(key_description(TEE, TEE, &[PACKAGE], &[SIGNER]));
+    let Some(authority) = chain.get(1) else {
+        unreachable!("the generated chain holds an authority");
+    };
+    let (hex, decimal) = serials(authority);
+    let padded = format!("00{}", hex.to_ascii_uppercase());
+    for named in [hex, decimal, padded] {
+        assert_eq!(
+            attested_under(
+                &[&root.der],
+                Some(&listing(&[named])),
+                &chain,
+                &key,
+                &trusted,
+                now()
+            ),
+            Err(Unattested::Revoked)
+        );
+    }
+    let (own, _) = serials(chain.first().map_or(&[][..], Vec::as_slice));
+    assert_eq!(
+        attested_under(
+            &[&root.der],
+            Some(&listing(&[own])),
+            &chain,
+            &key,
+            &trusted,
+            now()
+        ),
+        Err(Unattested::Revoked)
+    );
+    assert!(attested_under(
+        &[&root.der],
+        Some(&listing(&["1".to_owned()])),
+        &chain,
+        &key,
+        &trusted,
+        now()
+    )
+    .is_ok());
+}
+
+#[test]
+fn with_no_status_list_to_read_nothing_is_vouched_for() {
+    let (chain, key, root) = generated(key_description(TEE, TEE, &[PACKAGE], &[SIGNER]));
+    assert_eq!(
+        attested_under(
+            &[&root.der],
+            None,
+            &chain,
+            &key,
+            &[android(PACKAGE, SIGNER)],
+            now()
+        ),
+        Err(Unattested::Unverified)
+    );
+}
+
+#[test]
+fn a_serial_written_with_a_leading_zero_byte_is_found_without_it() {
+    let trusted = [android(PACKAGE, SIGNER)];
+    let root = Authority::root("test root");
+    let authority = root.below("test authority", Some(BasicConstraints::Unconstrained));
+    let key = pair();
+    let described = key_description(TEE, TEE, &[PACKAGE], &[SIGNER]);
+    let extension = CustomExtension::from_oid_content(&arcs(KEY_DESCRIPTION), described);
+    let own = authority.certify_numbered(
+        "Android Keystore Key",
+        &key,
+        vec![extension],
+        Some(&[0x80, 0x01]),
+    );
+    let Ok((_, read)) = X509Certificate::from_der(&own) else {
+        unreachable!("a generated certificate reads");
+    };
+    assert_eq!(read.raw_serial(), [0x00, 0x80, 0x01]);
+    let chain = vec![own, authority.der.clone()];
+    for named in ["8001", "008001", "32769"] {
+        assert_eq!(
+            attested_under(
+                &[&root.der],
+                Some(&listing(&[named.to_owned()])),
+                &chain,
+                &public(&key),
+                &trusted,
+                now()
+            ),
+            Err(Unattested::Revoked)
+        );
+    }
 }

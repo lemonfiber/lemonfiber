@@ -13,6 +13,7 @@ use x509_parser::prelude::X509Certificate;
 
 use super::chain::{self, Dated};
 use super::der::{self, children, extension, read_one, universal, within};
+use super::status::{self, Snapshot};
 use super::{Attested, Unattested};
 use crate::device_keys::identity::AppIdentity;
 use crate::device_keys::{Backing, PublicKey};
@@ -89,12 +90,14 @@ pub(super) fn attested(
     trusted: &[AppIdentity],
     now: SystemTime,
 ) -> Result<Attested, Unattested> {
-    attested_under(&ROOTS, chain, key, trusted, now)
+    attested_under(&ROOTS, status::carried(), chain, key, trusted, now)
 }
 
-/// What `chain` vouches for `key` when read back to `roots`.
+/// What `chain` vouches for `key` when read back to `roots`, none of its certificates
+/// named in `listed`; nothing is vouched for where there is no list to read.
 fn attested_under(
     roots: &[&[u8]],
+    listed: Option<&Snapshot>,
     chain: &[Vec<u8>],
     key: &PublicKey,
     trusted: &[AppIdentity],
@@ -115,6 +118,11 @@ fn attested_under(
         || !chain::verified(&certificates, roots, now, Dated::ButTheKeys)
     {
         return Err(Unattested::Unverified);
+    }
+    match listed {
+        None => return Err(Unattested::Unverified),
+        Some(listed) if listed.names_any(&certificates) => return Err(Unattested::Revoked),
+        Some(_) => {}
     }
     let app = trusted
         .iter()

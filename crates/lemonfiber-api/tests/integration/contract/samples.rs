@@ -39,6 +39,7 @@ fn running() -> Vec<Outcome> {
             supported_schema: vec![1],
             stack: "0.1.0".to_owned(),
             compose: None,
+            attestation_status: Some("2026-10-13T00:45:44Z".to_owned()),
             changelog: lemonfiber_core::changelog::Notes::unread(),
         }),
         Outcome::Forms(FormsReport { forms: Vec::new() }),

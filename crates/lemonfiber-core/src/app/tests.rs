@@ -119,6 +119,7 @@ fn reported(compose: Option<&str>) -> Outcome {
         supported_schema: vec![1],
         stack: "0.1.0".to_owned(),
         compose: compose.map(str::to_owned),
+        attestation_status: crate::device_keys::attestation::status::taken(),
         changelog: crate::changelog::notes(env!("CARGO_PKG_VERSION")),
     })
 }
