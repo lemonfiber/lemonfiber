@@ -431,6 +431,7 @@ fn a_service(
         majors: Vec::new(),
         fronts: None,
         native: None,
+        replaces: None,
     }
 }
 
