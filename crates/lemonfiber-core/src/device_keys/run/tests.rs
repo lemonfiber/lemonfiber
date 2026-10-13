@@ -36,7 +36,7 @@ fn a_machine(named: &str) -> (Ctx, Arc<Heard>) {
         .build()
         .with_random(Arc::new(Chance::cycling()))
         .with_narrator(heard.clone());
-    password(&ctx, "the first password, long enough");
+    password(&ctx, &lemonfiber_fixtures::support::a_password());
     (ctx, heard)
 }
 
@@ -253,7 +253,7 @@ async fn a_rehearsed_revoke_says_what_it_would_do_and_does_nothing() {
 async fn a_changed_password_revokes_every_device_key_at_the_next_look() {
     let (ctx, _) = a_machine("password");
     registered(&ctx, "pixel").await;
-    password(&ctx, "a second password, long enough");
+    password(&ctx, &lemonfiber_fixtures::support::another_password());
     let Ok(listing) = list(&ctx).await else {
         unreachable!("the listing reads");
     };
@@ -268,7 +268,7 @@ async fn a_changed_password_revokes_every_device_key_at_the_next_look() {
 async fn setting_the_password_revokes_at_once_and_so_does_removing_it() {
     let (ctx, _) = a_machine("set");
     registered(&ctx, "pixel").await;
-    password(&ctx, "a second password, long enough");
+    password(&ctx, &lemonfiber_fixtures::support::another_password());
     assert!(swept(&ctx).await.is_ok());
     assert!(kept(&ctx).active("pixel").is_none());
     let (ctx, _) = a_machine("removed");
@@ -334,7 +334,7 @@ async fn a_journal_that_cannot_be_written_still_leaves_every_revoke_made_and_tol
 async fn a_sweep_whose_journal_cannot_be_written_revokes_every_stale_key_all_the_same() {
     let (ctx, _) = a_machine("unjournaled-sweep");
     registered(&ctx, "pixel").await;
-    password(&ctx, "a second password, long enough");
+    password(&ctx, &lemonfiber_fixtures::support::another_password());
     let journal = crate::app::targets::layout(&ctx)
         .map(|paths| paths.journal())
         .unwrap_or_default();

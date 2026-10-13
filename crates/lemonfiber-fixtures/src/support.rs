@@ -495,6 +495,13 @@ pub fn a_password() -> String {
     ('a'..='p').collect()
 }
 
+/// A second throwaway password, other than [`a_password`] and built the same way, for a
+/// test that changes the password.
+#[must_use]
+pub fn another_password() -> String {
+    ('A'..='P').collect()
+}
+
 /// The next scripted answer, or a not-found for whatever was asked.
 fn next_answer(sequenced: &Sequenced, argv: &[String]) -> Result<Output, Failure> {
     sequenced

@@ -193,10 +193,7 @@ fn an_app_the_stack_does_not_trust_is_refused_by_the_hash_of_its_id() {
     };
     let refused = attests(&made);
     let hashed = crate::secret::render(&sha(made.app_id.as_bytes()));
-    assert!(
-        matches!(&refused, Err(Unattested::Untrusted(named)) if named.contains(&hashed)),
-        "{refused:?}"
-    );
+    assert!(matches!(&refused, Err(Unattested::Untrusted(named)) if named.contains(&hashed)));
 }
 
 #[test]

@@ -284,7 +284,10 @@ async fn a_password_changed_elsewhere_cuts_off_a_challenge_already_issued() {
     let phone = a_phone();
     let (router, token, env, admission) = a_machine_keeping("password-between", Some(&phone));
     let issued = challenge(&router, &token).await;
-    let changed = credential::keep(&admission, &a_credential("another password, long enough"));
+    let changed = credential::keep(
+        &admission,
+        &a_credential(&lemonfiber_fixtures::support::another_password()),
+    );
     assert!(changed.is_ok());
     let body = proved_mint("ha", &issued, &signed_for(&phone, "ha", &issued));
     assert_eq!(code(&minting(&router, &token, &body).await), "DEVICE-9");
@@ -345,7 +348,7 @@ async fn a_registration_asks_for_the_password_and_answers_with_what_the_attestat
         "/api/device-keys",
         &token,
         Some((HERE, false)),
-        &registering("not the password at all"),
+        &registering(&lemonfiber_fixtures::support::another_password()),
     )
     .await;
     assert_eq!(wrong.status, StatusCode::UNAUTHORIZED, "{}", wrong.body);

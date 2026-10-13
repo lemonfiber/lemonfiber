@@ -594,7 +594,10 @@ fn holding_a_device_key(named: &str, root: &str, vault: &Arc<FakeArchive>) -> (C
     ctx.settings.env_file = Some(dir.join(".env"));
     ctx.settings.stack_dir = Some(dir.join("stack"));
     ctx.settings.admission = Some(dir.join("admission.json"));
-    let Ok(credential) = Credential::set("the password, long enough", &Chance::cycling()) else {
+    let Ok(credential) = Credential::set(
+        &lemonfiber_fixtures::support::a_password(),
+        &Chance::cycling(),
+    ) else {
         unreachable!("a password long enough is set");
     };
     assert!(crate::admission::keep(&dir.join("admission.json"), &credential).is_ok());
