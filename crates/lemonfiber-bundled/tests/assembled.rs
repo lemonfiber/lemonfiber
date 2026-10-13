@@ -13,8 +13,8 @@ const MEDIA_STACK: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/med
 const NOT_ASSEMBLED: [&str; 3] = ["jellyfin", "recyclarr", "request-gate"];
 
 /// Fields of a service that differ between the two, by service and field: the guarded
-/// door and the proxy run the images lemonfiber builds for them (ADR-0045), and a part
-/// released here is tagged by its release without the `v`.
+/// door and the proxy run the images lemonfiber builds for them, and a part released
+/// here is tagged by its release without the `v`.
 const DIFFERING: [(&str, &str); 7] = [
     ("caddy", "digest"),
     ("caddy", "image"),

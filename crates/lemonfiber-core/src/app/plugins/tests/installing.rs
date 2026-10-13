@@ -42,8 +42,15 @@ async fn the_install_says_what_it_recorded_and_what_it_joined() {
         ring::digest::digest(&ring::digest::SHA256, MANIFEST.as_bytes()).as_ref(),
     );
     assert_eq!(
-        shown.and_then(|one| one.installed.first().map(|kept| kept.manifest.clone())),
+        shown
+            .as_ref()
+            .and_then(|one| one.installed.first().map(|kept| kept.manifest.clone())),
         Some(digest)
+    );
+    let tree = lemonfiber_bundle::tree_of(&source("recorded-tree", MANIFEST), MANIFEST).ok();
+    assert_eq!(
+        shown.and_then(|one| one.installed.first().map(|kept| kept.tree.clone())),
+        tree
     );
 }
 

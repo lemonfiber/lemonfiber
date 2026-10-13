@@ -54,6 +54,7 @@ fn recorded(plugin: &str, reached: Option<Reached>) -> Installed {
         revision: String::new(),
         signed: String::new(),
         manifest: String::new(),
+        tree: String::new(),
         installed_at: String::new(),
     }
 }

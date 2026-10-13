@@ -359,6 +359,10 @@ pub struct Installed {
     /// The SHA-256 of the manifest it was installed from, in lower-case hexadecimal.
     #[serde(default)]
     pub manifest: String,
+    /// The digest of the plugin's tree it was installed from, `sha256:<hex>`; empty
+    /// where the tree could not be read whole, or the record predates it.
+    #[serde(default)]
+    pub tree: String,
     /// When it was installed, as the record stamps every change: whole seconds since
     /// the epoch.
     ///
@@ -412,6 +416,7 @@ impl Installed {
             revision: String::new(),
             signed: String::new(),
             manifest: String::new(),
+            tree: String::new(),
             installed_at: String::new(),
         }
     }

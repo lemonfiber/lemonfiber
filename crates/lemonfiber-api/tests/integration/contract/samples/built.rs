@@ -305,6 +305,7 @@ pub(super) fn what_is_installed() -> lemonfiber_core::plugin::Installs {
         revision: String::new(),
         signed: String::new(),
         manifest: String::new(),
+        tree: String::new(),
         installed_at: String::new(),
     };
     lemonfiber_core::plugin::Installs {

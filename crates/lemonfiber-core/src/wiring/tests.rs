@@ -594,6 +594,7 @@ fn plugin_filling(plugin: &str, service: &str, capability: &str) -> crate::plugi
         revision: String::new(),
         signed: String::new(),
         manifest: String::new(),
+        tree: String::new(),
         installed_at: String::new(),
     }
 }

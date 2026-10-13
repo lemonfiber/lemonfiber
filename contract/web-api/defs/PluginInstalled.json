@@ -100,6 +100,11 @@
       "type": "string",
       "default": ""
     },
+    "tree": {
+      "description": "The digest of the plugin's tree it was installed from, `sha256:<hex>`; empty\nwhere the tree could not be read whole, or the record predates it.",
+      "type": "string",
+      "default": ""
+    },
     "version": {
       "description": "The plugin's own content version, as it stood when it was installed.",
       "type": "string"

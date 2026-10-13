@@ -84,6 +84,12 @@
       ],
       "required": false
     },
+    "tree": {
+      "type": [
+        "string"
+      ],
+      "required": false
+    },
     "version": {
       "type": [
         "string"

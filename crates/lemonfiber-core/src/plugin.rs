@@ -78,8 +78,8 @@ use thiserror::Error;
 use crate::doctor::BUNDLED_CHECKS;
 
 pub use claimed::{
-    claimed, read, read_digested, Asserted, Assertion, Claimed, Claiming, Contributed, Evidence,
-    FailingAsDeclared, Ran, Unreadable, Verdict,
+    claimed, read, read_digested, Asserted, Assertion, Claimed, Claiming, Contributed, Digested,
+    Evidence, FailingAsDeclared, Ran, Unreadable, Verdict,
 };
 pub use conforming::{conformed, Conformed, Judged};
 pub(crate) use container::{constant_text, holding, secrets_file, variables};

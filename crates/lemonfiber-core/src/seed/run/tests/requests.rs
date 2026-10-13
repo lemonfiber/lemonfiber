@@ -412,9 +412,11 @@ async fn a_first_party_plugin_naming_the_bundled_request_adapter_is_never_asked_
     let stand_in = crate::test_support::a_placed("seerr", &[], Some(requests_api()), Some(5055));
     let mut asking = crate::test_support::an_installed("asking", vec![stand_in]);
     asking.manifest = "asking-manifest".to_owned();
+    asking.tree = crate::test_support::A_TREE.to_owned();
     let trusted = [crate::plugin::first_party::FirstParty {
         plugin: "asking",
         manifest: "asking-manifest",
+        tree: crate::test_support::A_TREE,
     }];
     let fillers = fillers_trusting(
         vec![curator("sonarr", 8989, "tv")],

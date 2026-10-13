@@ -296,6 +296,7 @@ pub(super) fn settled(
 ) -> (Installed, PathBuf) {
     let mut installed = Installed::of(&read.manifest).installed(path, stamp);
     installed.manifest.clone_from(&read.digest);
+    installed.tree.clone_from(&read.tree);
     let settled = writing::joined(ctx, stack, held, installed).reaching(stack);
     match from {
         Some(fetched) => {
@@ -318,6 +319,8 @@ pub(super) struct Accepted {
     pub(super) manifest: lemonfiber_plugin::Manifest,
     /// The SHA-256 of the bytes it was read from, in lower-case hexadecimal.
     pub(super) digest: String,
+    /// The digest of the plugin's tree read with those bytes.
+    pub(super) tree: String,
 }
 
 /// The manifest at this path, read and held to everything this build refuses, and the
@@ -334,7 +337,11 @@ pub(super) struct Accepted {
 /// Where the path holds no manifest this build can read, where the catalogue vouched
 /// for a different one, or where this build refuses it.
 pub(super) fn accepted(path: &Path, from: Option<&Fetched<'_>>) -> Result<Accepted, Box<Problem>> {
-    let (manifest, digest) = crate::plugin::read_digested(path)
+    let crate::plugin::Digested {
+        manifest,
+        digest,
+        tree,
+    } = crate::plugin::read_digested(path)
         .map_err(|unreadable| Box::new(unreadable_source(&unreadable)))?;
     if let Some(vouched) = from.and_then(|fetched| fetched.vouched) {
         if !vouched.entry.reviewed(&digest) {
@@ -344,7 +351,11 @@ pub(super) fn accepted(path: &Path, from: Option<&Fetched<'_>>) -> Result<Accept
     let mut refusals = lemonfiber_plugin::refusals(&manifest, BUNDLED_CHECKS);
     refusals.extend(lemonfiber_plugin::uninstallable(&manifest));
     if refusals.is_empty() {
-        Ok(Accepted { manifest, digest })
+        Ok(Accepted {
+            manifest,
+            digest,
+            tree,
+        })
     } else {
         Err(Box::new(refused(&manifest, &refusals)))
     }

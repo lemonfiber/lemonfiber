@@ -94,6 +94,7 @@ fn installed(services: Vec<Placed>) -> Installed {
         revision: String::new(),
         signed: String::new(),
         manifest: String::new(),
+        tree: String::new(),
         installed_at: String::new(),
     }
 }

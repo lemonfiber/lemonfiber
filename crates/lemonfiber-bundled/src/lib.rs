@@ -20,12 +20,14 @@ pub struct FirstParty {
     pub plugin: &'static str,
     /// The SHA-256 of its manifest, in lower-case hexadecimal.
     pub manifest: &'static str,
+    /// The digest of its tree, `sha256:<hex>`; empty where the bundle pins none.
+    pub tree: &'static str,
 }
 
 /// One first-party plugin as the bundle pins it, with its manifest.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Pinned {
-    /// Its id and the digest of its manifest.
+    /// Its id and the digests of its manifest and its tree.
     pub first_party: FirstParty,
     /// Its repository, as an https URL.
     pub origin: &'static str,
@@ -33,8 +35,6 @@ pub struct Pinned {
     pub release: Option<&'static str>,
     /// The commit of its repository the manifest was copied from.
     pub revision: &'static str,
-    /// The digest of its tree, where the bundle pins one.
-    pub tree: Option<&'static str>,
     /// The capabilities it fills by default.
     pub fills: &'static [&'static str],
     /// Its manifest, byte for byte.
