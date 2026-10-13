@@ -512,6 +512,14 @@ fn each_reason_an_attestation_vouches_for_nothing_is_refused_under_a_code_of_its
         super::refused::no_challenge().code,
         crate::error::codes::device::NO_CHALLENGE
     );
+    assert_eq!(
+        super::challenge_not_standing().code,
+        crate::error::codes::device::CHALLENGE_NOT_STANDING
+    );
+    assert_eq!(
+        super::signature_wrong().code,
+        crate::error::codes::device::SIGNATURE_WRONG
+    );
 }
 
 #[tokio::test]
@@ -524,6 +532,7 @@ async fn a_machine_keeping_no_configuration_registers_and_lists_no_device_key() 
         Some(super::refused::nowhere().code)
     );
     assert!(list(&ctx).await.is_err());
+    assert!(swept(&ctx).await.is_ok());
 }
 
 #[tokio::test]
@@ -597,4 +606,45 @@ async fn a_name_held_by_a_revoked_device_key_is_refused_saying_when_it_was_revok
     assert!(refused.is_err_and(
         |problem| problem.code == DEVICE_NAME_TAKEN && problem.meaning.contains("revoked")
     ));
+}
+
+#[tokio::test]
+async fn each_thing_asked_of_the_device_keys_is_carried_out() {
+    let (ctx, _) = a_machine("asked");
+    trusting(&ctx, &[recorded_app(&ctx)]);
+    let (attestation, key) = recorded();
+    let registering = super::Asked::Register {
+        name: "pixel".to_owned(),
+        public_key: key,
+        attestation: Some(attestation),
+    };
+    assert!(matches!(
+        super::asked(&ctx, registering).await,
+        Ok(crate::app::Outcome::DeviceKey(_))
+    ));
+    assert!(matches!(
+        super::asked(&ctx, super::Asked::List).await,
+        Ok(crate::app::Outcome::DeviceKeys(_))
+    ));
+    let revoking = super::Asked::Revoke {
+        name: "pixel".to_owned(),
+    };
+    assert!(matches!(
+        super::asked(&ctx, revoking).await,
+        Ok(crate::app::Outcome::DeviceKeys(_))
+    ));
+}
+
+#[tokio::test]
+async fn a_signature_a_device_key_did_not_make_is_heard() {
+    let (ctx, heard) = a_machine("misproved");
+    registered(&ctx, "pixel").await;
+    let Some(record) = kept(&ctx).active("pixel").cloned() else {
+        unreachable!("pixel was registered");
+    };
+    super::misproved(&ctx, &record).await;
+    assert!(heard
+        .said()
+        .iter()
+        .any(|said| said.contains("did not make")));
 }
