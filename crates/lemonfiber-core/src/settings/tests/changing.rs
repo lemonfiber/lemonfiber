@@ -481,8 +481,20 @@ async fn a_secret_is_listed_without_its_value_and_never_written_here() {
 }
 
 #[tokio::test]
-async fn clearing_through_the_command_answers_with_the_settings() {
+async fn setting_and_clearing_through_the_command_answers_with_the_settings() {
     let machine = machine("cleared", running(&[]));
+    let set = crate::settings::run::settings(
+        &machine.ctx,
+        &crate::app::Settling::Set {
+            setting: MODE.to_owned(),
+            value: "fast".to_owned(),
+            agreement: None,
+        },
+    )
+    .await;
+    assert!(matches!(set, Ok(crate::app::Outcome::Settings(report))
+        if report.change.as_ref().is_some_and(|change| change.value.as_deref() == Some("fast")
+            && !change.applied)));
     let made = agreed(&machine.ctx, MODE, Some("fast")).await;
     assert!(made.is_ok());
     let cleared = crate::settings::run::settings(
