@@ -70,6 +70,13 @@ fn a_machine_keeping(
         let under = credential::at(&admission)
             .map(|held| held.fingerprint())
             .unwrap_or_default();
+        let app = format!("android:app.lemonfiber.companion@{}", "5a".repeat(32));
+        let settings = serde_json::json!({
+            "schema": 1,
+            "written_by": "0.0.0",
+            "values": { lemonfiber_core::device_keys::identity::SETTING: app },
+        });
+        let _ = fs::write(env.with_file_name("settings.json"), settings.to_string());
         let record = serde_json::json!({
             "schema": 1,
             "written_by": "0.0.0",
@@ -78,12 +85,15 @@ fn a_machine_keeping(
                 "public_key": b64(&public_half(phone)),
                 "fingerprint": "f".repeat(64),
                 "backing": "strongbox",
-                "app": "android:app.lemonfiber.companion@" ,
+                "app": app,
                 "registered": "2025-01-08T00:00:00Z",
                 "under": under,
             }],
         });
-        let _ = fs::write(env.with_file_name("device-keys.json"), record.to_string());
+        let _ = fs::write(
+            env.with_file_name(lemonfiber_core::device_keys::FILE),
+            record.to_string(),
+        );
     }
     let admitting = Arc::new(Admitting {
         kept: Some(admission.clone()),
@@ -169,7 +179,8 @@ async fn a_signature_over_an_issued_challenge_mints_in_place_of_the_password_onc
     let minted = minting(&router, &token, &body).await;
     assert_eq!(minted.status, StatusCode::OK, "{}", minted.body);
     assert_eq!(read(&minted.body, "/kind"), "minted-key");
-    let kept = fs::read_to_string(env.with_file_name("device-keys.json")).unwrap_or_default();
+    let kept = fs::read_to_string(env.with_file_name(lemonfiber_core::device_keys::FILE))
+        .unwrap_or_default();
     assert!(kept.contains("\"used\": \"2025-01-08"), "{kept}");
     let again = minting(&router, &token, &body.replace("\"ha\"", "\"ha2\"")).await;
     assert_eq!(code(&again), "DEVICE-10");
@@ -277,7 +288,8 @@ async fn a_password_changed_elsewhere_cuts_off_a_challenge_already_issued() {
     assert!(changed.is_ok());
     let body = proved_mint("ha", &issued, &signed_for(&phone, "ha", &issued));
     assert_eq!(code(&minting(&router, &token, &body).await), "DEVICE-9");
-    let kept = fs::read_to_string(env.with_file_name("device-keys.json")).unwrap_or_default();
+    let kept = fs::read_to_string(env.with_file_name(lemonfiber_core::device_keys::FILE))
+        .unwrap_or_default();
     assert!(kept.contains("\"revoked\""), "{kept}");
 }
 

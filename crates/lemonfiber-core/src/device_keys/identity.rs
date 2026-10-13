@@ -8,6 +8,7 @@
 use std::borrow::Cow;
 use std::path::Path;
 
+use crate::config::store::Failure;
 use crate::settings::Settings;
 
 /// The core setting the operator's own builds are named in.
@@ -116,13 +117,19 @@ pub fn read_all(value: &str) -> (Vec<AppIdentity>, Vec<String>) {
 
 /// Every app this stack trusts now: the official ones, and the operator's own builds as
 /// the settings store at `settings` holds them.
-#[must_use]
-pub fn trusted(settings: Option<&Path>) -> Vec<AppIdentity> {
-    let added = settings
-        .and_then(|path| Settings::at(path).ok())
-        .and_then(|held| held.value(SETTING).map(|value| read_all(value).0))
+///
+/// # Errors
+///
+/// The [`Failure`] reading the settings store, where it holds something that cannot be
+/// read: which builds the operator added cannot then be said.
+pub fn trusted(settings: Option<&Path>) -> Result<Vec<AppIdentity>, Failure> {
+    let held = settings.map(Settings::at).transpose()?;
+    let added = held
+        .as_ref()
+        .and_then(|held| held.value(SETTING))
+        .map(|value| read_all(value).0)
         .unwrap_or_default();
-    OFFICIAL.iter().cloned().chain(added).collect()
+    Ok(OFFICIAL.iter().cloned().chain(added).collect())
 }
 
 /// Whether `package` is an Android package: two or more parts joined by dots, each

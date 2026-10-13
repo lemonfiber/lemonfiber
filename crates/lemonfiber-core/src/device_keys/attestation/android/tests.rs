@@ -6,7 +6,7 @@ use super::{attested, attested_under, KEY_DESCRIPTION};
 use crate::device_keys::attestation::{Attested, Unattested};
 use crate::device_keys::identity::AppIdentity;
 use crate::device_keys::testing::{
-    android, arcs, at, key_description, now, pair, public, Authority,
+    android, arcs, at, key_description, key_description_from, now, pair, public, Authority,
 };
 use crate::device_keys::{Backing, PublicKey};
 
@@ -194,5 +194,33 @@ fn a_generated_chain_is_not_read_back_to_the_roots_this_build_ships() {
     assert_eq!(
         attested(&chain, &key, &[android(PACKAGE, SIGNER)], now()),
         Err(Unattested::Unverified)
+    );
+}
+
+#[test]
+fn a_key_the_hardware_took_in_from_outside_is_refused_as_one_in_software() {
+    let trusted = [android(PACKAGE, SIGNER)];
+    for origin in [None, Some(1), Some(2), Some(4)] {
+        assert_eq!(
+            generated_attests(
+                key_description_from(origin, STRONGBOX, STRONGBOX, &[PACKAGE], &[SIGNER]),
+                &trusted
+            ),
+            Err(Unattested::InSoftware)
+        );
+    }
+}
+
+#[test]
+fn an_app_whose_package_android_would_not_allow_is_not_spelt_out() {
+    let refused = generated_attests(
+        key_description(TEE, TEE, &["com.example\n\u{1b}[31m.other"], &[SIGNER]),
+        &[android(PACKAGE, SIGNER)],
+    );
+    assert_eq!(
+        refused,
+        Err(Unattested::Untrusted(
+            "an Android app whose package name is not one Android allows".to_owned()
+        ))
     );
 }

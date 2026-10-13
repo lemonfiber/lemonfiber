@@ -67,6 +67,18 @@ pub(crate) fn key_description(
     packages: &[&str],
     signers: &[[u8; 32]],
 ) -> Vec<u8> {
+    key_description_from(Some(0), attested, held, packages, signers)
+}
+
+/// A key description as [`key_description`] writes one, its hardware saying the key came
+/// from `origin`, or saying nothing of where it came from.
+pub(crate) fn key_description_from(
+    origin: Option<u8>,
+    attested: u8,
+    held: u8,
+    packages: &[&str],
+    signers: &[[u8; 32]],
+) -> Vec<u8> {
     let infos: Vec<Vec<u8>> = packages
         .iter()
         .map(|package| sequence(&[tlv(&[0x04], package.as_bytes()), tlv(&[0x02], &[1])]))
@@ -85,7 +97,12 @@ pub(crate) fn key_description(
         tlv(&[0x04], b"challenge"),
         tlv(&[0x04], b""),
         sequence(&[tagged]),
-        sequence(&[]),
+        sequence(
+            &origin
+                .map(|origin| tlv(&[0xbf, 0x85, 0x3e], &tlv(&[0x02], &[origin])))
+                .into_iter()
+                .collect::<Vec<_>>(),
+        ),
     ])
 }
 

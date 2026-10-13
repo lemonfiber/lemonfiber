@@ -5,9 +5,7 @@ use lemonfiber_fixtures::heard::Heard;
 use lemonfiber_fixtures::ports::{Chance, Stopped};
 use x509_parser::prelude::{FromDer as _, X509Certificate};
 
-use super::{
-    apps_removed, at, list, password_changed, register, revoke, revoked_by, standing, undone, used,
-};
+use super::{at, list, register, revoke, revoked_by, standing, swept, undone, used};
 use crate::admission::Credential;
 use crate::app::Ctx;
 use crate::config::Settings;
@@ -106,6 +104,13 @@ async fn registered(ctx: &Ctx, name: &str) {
 fn kept(ctx: &Ctx) -> Kept {
     at(ctx)
         .and_then(|path| crate::settings::kept::read(&path).ok())
+        .unwrap_or_default()
+}
+
+/// The directory the machine keeps its configuration in.
+fn config(ctx: &Ctx) -> std::path::PathBuf {
+    crate::app::targets::layout(ctx)
+        .map(|paths| paths.config_dir().to_path_buf())
         .unwrap_or_default()
 }
 
@@ -264,14 +269,14 @@ async fn setting_the_password_revokes_at_once_and_so_does_removing_it() {
     let (ctx, _) = a_machine("set");
     registered(&ctx, "pixel").await;
     password(&ctx, "a second password, long enough");
-    assert!(password_changed(&ctx).await.is_ok());
+    assert!(swept(&ctx).await.is_ok());
     assert!(kept(&ctx).active("pixel").is_none());
     let (ctx, _) = a_machine("removed");
     registered(&ctx, "pixel").await;
     if let Some(path) = ctx.settings.admission.as_deref() {
         assert!(crate::admission::forget(path).is_ok());
     }
-    assert!(password_changed(&ctx).await.is_ok());
+    assert!(swept(&ctx).await.is_ok());
     assert!(kept(&ctx).active("pixel").is_none());
 }
 
@@ -279,16 +284,64 @@ async fn setting_the_password_revokes_at_once_and_so_does_removing_it() {
 async fn removing_an_app_revokes_every_device_key_it_made_and_no_other() {
     let (ctx, _) = a_machine("apps");
     registered(&ctx, "pixel").await;
-    let other = AppIdentity::read("ios:ABCDE12345.app.other");
-    assert!(apps_removed(&ctx, &other.into_iter().collect::<Vec<_>>())
-        .await
-        .is_ok());
+    let other: Vec<AppIdentity> = AppIdentity::read("ios:ABCDE12345.app.other")
+        .into_iter()
+        .collect();
+    trusting(&ctx, &[other.clone(), vec![recorded_app(&ctx)]].concat());
+    assert!(swept(&ctx).await.is_ok());
     assert!(kept(&ctx).active("pixel").is_some());
-    assert!(apps_removed(&ctx, &[recorded_app(&ctx)]).await.is_ok());
+    trusting(&ctx, &other);
+    assert!(standing(&ctx, "pixel").await.is_err());
+    assert!(kept(&ctx).active("pixel").is_none());
+    assert!(journaled(&ctx).contains(&Kind::DeviceKeyRevoked {
+        name: "pixel".to_owned()
+    }));
+    assert!(told(&ctx)
+        .iter()
+        .any(|said| said.contains("The device key named pixel was revoked")));
+}
+
+#[tokio::test]
+async fn settings_that_cannot_be_read_revoke_nothing_and_leave_nothing_standing() {
+    let (ctx, _) = a_machine("unreadable");
+    registered(&ctx, "pixel").await;
+    let settings =
+        crate::app::targets::beside_env(&ctx, crate::config::paths::SETTINGS).unwrap_or_default();
+    assert!(std::fs::write(&settings, "not a settings store").is_ok());
+    assert!(standing(&ctx, "pixel").await.is_err());
+    assert!(kept(&ctx).active("pixel").is_some());
+    assert!(revoke(&ctx, "pixel").await.is_ok());
+    assert!(kept(&ctx).active("pixel").is_none());
+}
+
+#[tokio::test]
+async fn a_journal_that_cannot_be_written_still_leaves_every_revoke_made_and_told() {
+    let (ctx, _) = a_machine("unjournaled");
+    registered(&ctx, "pixel").await;
+    let journal = crate::app::targets::layout(&ctx)
+        .map(|paths| paths.journal())
+        .unwrap_or_default();
+    assert!(std::fs::remove_file(&journal).is_ok());
+    assert!(std::fs::create_dir_all(&journal).is_ok());
+    assert!(revoke(&ctx, "pixel").await.is_err());
     assert!(kept(&ctx).active("pixel").is_none());
     assert!(told(&ctx)
         .iter()
         .any(|said| said.contains("The device key named pixel was revoked")));
+}
+
+#[tokio::test]
+async fn a_sweep_whose_journal_cannot_be_written_revokes_every_stale_key_all_the_same() {
+    let (ctx, _) = a_machine("unjournaled-sweep");
+    registered(&ctx, "pixel").await;
+    password(&ctx, "a second password, long enough");
+    let journal = crate::app::targets::layout(&ctx)
+        .map(|paths| paths.journal())
+        .unwrap_or_default();
+    assert!(std::fs::remove_file(&journal).is_ok());
+    assert!(std::fs::create_dir_all(&journal).is_ok());
+    assert!(standing(&ctx, "pixel").await.is_err());
+    assert!(kept(&ctx).active("pixel").is_none());
 }
 
 #[tokio::test]
@@ -332,7 +385,7 @@ async fn undoing_a_registration_revokes_it_and_says_which() {
 async fn a_restore_revokes_every_device_key_and_says_why() {
     let (ctx, _) = a_machine("restored");
     registered(&ctx, "pixel").await;
-    assert!(super::restored(&ctx).await.is_ok());
+    assert!(super::restored(&ctx, &config(&ctx)).await.is_ok());
     assert!(kept(&ctx).active("pixel").is_none());
     assert!(journaled(&ctx).contains(&Kind::DeviceKeyRevoked {
         name: "pixel".to_owned()

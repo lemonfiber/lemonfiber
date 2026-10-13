@@ -5,6 +5,8 @@ use x509_parser::prelude::X509Certificate;
 
 /// The universal tags an attestation's extensions are written with.
 pub(crate) mod tag {
+    /// An integer.
+    pub(crate) const INTEGER: u32 = 2;
     /// An octet string.
     pub(crate) const OCTETS: u32 = 4;
     /// An enumeration.

@@ -1,7 +1,7 @@
 use rcgen::{BasicConstraints, CustomExtension};
 
 use super::{read, verified, Dated};
-use crate::device_keys::testing::{now, pair, Authority};
+use crate::device_keys::testing::{arcs, now, pair, sequence, tlv, Authority};
 
 /// The chain `certificates`, read and checked against `roots` at the test moment.
 fn holds(certificates: &[Vec<u8>], roots: &[&[u8]]) -> bool {
@@ -110,4 +110,40 @@ fn a_certificate_carrying_a_critical_extension_nothing_here_reads_is_refused() {
     extension.set_criticality(true);
     let own = root.certify("own", &pair(), vec![extension]);
     assert!(!holds(&[own, root.der.clone()], &[&root.der]));
+}
+
+#[test]
+fn a_certificate_marking_a_constraint_nothing_here_holds_to_critical_is_refused() {
+    let root = Authority::root("root");
+    let subtree = sequence(&[tlv(&[0x82], b"example.com")]);
+    let constraints = [
+        (arcs("2.5.29.30"), sequence(&[tlv(&[0xa0], &subtree)])),
+        (arcs("2.5.29.36"), sequence(&[tlv(&[0x80], &[0])])),
+        (arcs("2.5.29.54"), tlv(&[0x02], &[0])),
+    ];
+    for (oid, content) in constraints {
+        let mut extension = CustomExtension::from_oid_content(&oid, content.clone());
+        let own = root.certify("own", &pair(), vec![extension.clone()]);
+        assert!(holds(&[own, root.der.clone()], &[&root.der]));
+        extension.set_criticality(true);
+        let own = root.certify("own", &pair(), vec![extension]);
+        assert!(!holds(&[own, root.der.clone()], &[&root.der]));
+    }
+}
+
+#[test]
+fn a_certificate_signed_under_another_algorithm_than_its_signed_part_names_is_refused() {
+    let root = Authority::root("root");
+    let own = root.certify("own", &pair(), Vec::new());
+    assert!(read(std::slice::from_ref(&own)).is_some());
+    let sha256 = [0x2a, 0x86, 0x48, 0xce, 0x3d, 0x04, 0x03, 0x02];
+    let outer = own
+        .windows(sha256.len())
+        .rposition(|window| window == sha256)
+        .map(|at| at + sha256.len() - 1);
+    let mut renamed = own;
+    if let Some(byte) = outer.and_then(|at| renamed.get_mut(at)) {
+        *byte = 0x03;
+    }
+    assert!(read(&[renamed]).is_none());
 }

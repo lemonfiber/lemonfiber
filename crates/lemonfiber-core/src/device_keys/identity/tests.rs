@@ -76,8 +76,8 @@ fn the_official_list_is_empty_until_the_first_store_release() {
 fn what_is_trusted_is_the_operators_builds_as_the_settings_store_holds_them() {
     let path = lemonfiber_fixtures::scratch::Scratch::new("trusted")
         .within(crate::config::paths::SETTINGS);
-    assert!(trusted(Some(&path)).is_empty());
-    assert!(trusted(None).is_empty());
+    assert!(trusted(Some(&path)).is_ok_and(|apps| apps.is_empty()));
+    assert!(trusted(None).is_ok_and(|apps| apps.is_empty()));
     let value = format!("ios:ABCDE12345.app.one,android:app.two@{DIGEST}");
     let written = format!(
         "{{\"schema\":1,\"written_by\":\"0.0.0\",\"values\":{{\"{SETTING}\":\"{value}\"}}}}"
@@ -85,6 +85,7 @@ fn what_is_trusted_is_the_operators_builds_as_the_settings_store_holds_them() {
     assert!(std::fs::write(&path, written).is_ok());
     assert_eq!(
         trusted(Some(&path))
+            .unwrap_or_default()
             .iter()
             .map(AppIdentity::written)
             .collect::<Vec<_>>(),
@@ -93,4 +94,6 @@ fn what_is_trusted_is_the_operators_builds_as_the_settings_store_holds_them() {
             format!("android:app.two@{DIGEST}")
         ]
     );
+    assert!(std::fs::write(&path, "not a settings store").is_ok());
+    assert!(trusted(Some(&path)).is_err());
 }

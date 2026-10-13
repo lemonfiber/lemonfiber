@@ -17,7 +17,7 @@ use x509_parser::oid_registry::{
     OID_EC_P256, OID_NIST_EC_P384, OID_PKCS1_SHA256WITHRSA, OID_PKCS1_SHA384WITHRSA,
     OID_PKCS1_SHA512WITHRSA, OID_SIG_ECDSA_WITH_SHA256, OID_SIG_ECDSA_WITH_SHA384,
 };
-use x509_parser::prelude::{ASN1Time, FromDer as _, X509Certificate};
+use x509_parser::prelude::{ASN1Time, FromDer as _, ParsedExtension, X509Certificate};
 use x509_parser::x509::SubjectPublicKeyInfo;
 
 /// The most certificates a chain may hold, its root included.
@@ -51,12 +51,36 @@ pub(crate) fn read(chain: &[Vec<u8>]) -> Option<Vec<X509Certificate<'_>>> {
         .collect()
 }
 
-/// Whether every critical extension `certificate` carries is one this reads.
+/// Whether every critical extension `certificate` carries is one this reads and holds a
+/// chain to, and the algorithm it is signed with is the one its signed part names.
+///
+/// Name, policy and any-policy constraints read but are not held to, so a certificate
+/// marking one critical is refused rather than read as though it were met.
 fn understood(certificate: &X509Certificate<'_>) -> bool {
-    certificate.extensions().iter().all(|extension| {
+    let extensions_held = certificate.extensions().iter().all(|extension| {
         let parsed = extension.parsed_extension();
-        !extension.critical || !(parsed.unsupported() || parsed.error().is_some())
-    })
+        !extension.critical
+            || !(parsed.unsupported()
+                || parsed.error().is_some()
+                || matches!(
+                    parsed,
+                    ParsedExtension::NameConstraints(_)
+                        | ParsedExtension::PolicyConstraints(_)
+                        | ParsedExtension::InhibitAnyPolicy(_)
+                ))
+    });
+    let outer = &certificate.signature_algorithm;
+    let inner = &certificate.tbs_certificate.signature;
+    let algorithm_held = outer.algorithm == inner.algorithm
+        && outer
+            .parameters
+            .as_ref()
+            .map(x509_parser::asn1_rs::Any::as_bytes)
+            == inner
+                .parameters
+                .as_ref()
+                .map(x509_parser::asn1_rs::Any::as_bytes);
+    extensions_held && algorithm_held
 }
 
 /// Whether `certificates`, the key's own first, read back to one of `roots` at `now`.

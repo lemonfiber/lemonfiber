@@ -1,8 +1,8 @@
 //! The keys a phone proves the operator with, kept as their public halves.
 //!
-//! A phone makes a P-256 key pair in its hardware, usable only after its owner's face or
-//! fingerprint, and the operator registers the public half once, with the password and
-//! the platform's attestation of where the key lives. From then on a mint asked from the
+//! A phone makes a P-256 key pair in its hardware, and the operator registers the public
+//! half once, with the password and the platform's attestation of where the key lives and
+//! which app made it. From then on a mint asked from the
 //! phone carries a signature over a challenge the core issued, in place of the password.
 //!
 //! **A device key is not a credential.** It admits no request: it proves the operator,
@@ -15,6 +15,10 @@
 //! fingerprint of the verifier the password was kept as then, and a device key whose
 //! password has since changed is revoked the next time the record is opened, so a phone
 //! that was lost is cut off by the act that ends its sessions.
+//!
+//! **A device key belongs to the app that made it.** A device key whose app this stack no
+//! longer trusts, removed from the setting or from the official list a build ships, is
+//! revoked the next time the record is opened, by whatever route the trust was withdrawn.
 
 pub mod attestation;
 pub mod challenge;

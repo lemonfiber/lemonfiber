@@ -1,7 +1,9 @@
 //! Registering, listing and revoking device keys, and what proving with one reads.
 //!
-//! **Every change is heard.** A registration and a revoke are journaled before they are
-//! made and each raises an operator alert naming the device key, as a key's mint does. A
+//! **Every change is heard.** A registration is journaled before it is made, a revoke as
+//! soon as it is, and each raises an operator alert naming the device key, as a key's mint
+//! does. A revoke is made first so a journal that cannot be written never leaves a device
+//! key standing: the revoke is kept, told, and the journal's failure answered after. A
 //! registration refused after the password proved the operator, and a signature that
 //! does not verify, are alerted too: either is somebody holding an operator session and
 //! failing to prove it with a phone.
@@ -13,6 +15,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::app::{Ctx, Outcome};
+use crate::config::store::Failure;
 use crate::error::{Diagnose, Problem};
 use crate::journal::{Change, Kind};
 use crate::keys::names_a_key;
@@ -98,8 +101,7 @@ pub async fn register(
     let Some(attestation) = attestation else {
         return Err(refused(ctx, name, no_attestation()).await);
     };
-    let settings = crate::app::targets::beside_env(ctx, crate::config::paths::SETTINGS);
-    let trusted = identity::trusted(settings.as_deref());
+    let trusted = trusted(ctx).map_err(|failure| Box::new(failure.problem()))?;
     let now = ctx.seams.clock.now();
     let attested = match attestation.verified(&key, &trusted, now) {
         Ok(attested) => attested,
@@ -161,20 +163,23 @@ pub async fn list(ctx: &Ctx) -> Result<Listing, Box<Problem>> {
 pub async fn revoke(ctx: &Ctx, name: &str) -> Result<Listing, Box<Problem>> {
     let path = at(ctx).ok_or_else(|| Box::new(nowhere()))?;
     let now = written_now(ctx);
-    let (found, kept) = changed(ctx, &path, |ctx, kept| {
+    let (found, kept, journaled) = changed(ctx, &path, |ctx, kept| {
         let found = kept
             .active(name)
             .cloned()
             .ok_or_else(|| Box::new(not_registered(name)))?;
-        if !ctx.dry_run {
-            revoked(ctx, kept, name, &now)?;
-        }
-        Ok((found, kept.clone()))
+        let journaled = if ctx.dry_run {
+            Ok(())
+        } else {
+            revoked(ctx, kept, std::slice::from_ref(&found), &now)
+        };
+        Ok((found, kept.clone(), journaled))
     })
     .await?;
     if !ctx.dry_run {
         heard(ctx, &found, &Heard::Revoked(Revoked::Asked)).await;
     }
+    journaled?;
     Ok(Listing {
         rehearsed: ctx.dry_run,
         ..listed(&kept, Some(found.name))
@@ -185,9 +190,12 @@ pub async fn revoke(ctx: &Ctx, name: &str) -> Result<Listing, Box<Problem>> {
 ///
 /// # Errors
 ///
-/// A [`Problem`] where none does, or the record cannot be read or swept.
+/// A [`Problem`] where none does, the record cannot be read or swept, or the settings
+/// naming the operator's own builds cannot be read, so whether its app is still trusted
+/// cannot be said.
 pub async fn standing(ctx: &Ctx, name: &str) -> Result<Record, Box<Problem>> {
     let path = at(ctx).ok_or_else(|| Box::new(nowhere()))?;
+    trusted(ctx).map_err(|failure| Box::new(failure.problem()))?;
     changed(ctx, &path, |_, kept| {
         kept.active(name)
             .cloned()
@@ -223,71 +231,47 @@ pub async fn misproved(ctx: &Ctx, record: &Record) {
 }
 
 /// Revoke every device key registered under a password that is no longer the one kept,
-/// as the act that changed it asks.
+/// or made by an app this stack no longer trusts, as the act that changed either asks.
 ///
 /// # Errors
 ///
 /// A [`Problem`] where the record cannot be read, swept or written.
-pub async fn password_changed(ctx: &Ctx) -> Result<(), Box<Problem>> {
+pub async fn swept(ctx: &Ctx) -> Result<(), Box<Problem>> {
     let Some(path) = at(ctx) else {
         return Ok(());
     };
     changed(ctx, &path, |_, _| Ok(())).await
 }
 
-/// Revoke every active device key made by an app among `removed`, as removing those
-/// identities from the setting asks.
+/// Revoke every active device key kept in the configuration directory `config`, as a
+/// restore into it asks, whether or not the restore went on to land. Where no record is
+/// kept there, no device key stands to revoke.
 ///
 /// # Errors
 ///
-/// A [`Problem`] where the record or the journal cannot be read or written.
-pub async fn apps_removed(ctx: &Ctx, removed: &[AppIdentity]) -> Result<(), Box<Problem>> {
-    let written: Vec<String> = removed.iter().map(AppIdentity::written).collect();
-    revoked_where(
-        ctx,
-        |record| written.contains(&record.app),
-        Revoked::AppRemoved,
-    )
-    .await
-}
-
-/// Revoke every active device key, as a restore that has just landed asks.
-///
-/// # Errors
-///
-/// A [`Problem`] where the record or the journal cannot be read or written.
-pub async fn restored(ctx: &Ctx) -> Result<(), Box<Problem>> {
-    revoked_where(ctx, |_| true, Revoked::Restored).await
-}
-
-/// Revoke every active device key `revoking` picks, journaled, and tell the operator of
-/// each for `why`.
-async fn revoked_where(
-    ctx: &Ctx,
-    revoking: impl Fn(&Record) -> bool,
-    why: Revoked,
-) -> Result<(), Box<Problem>> {
-    let Some(path) = at(ctx) else {
+/// A [`Problem`] where the record cannot be read or written, or the journal cannot be
+/// written; every device key the record holds is revoked in the second case all the same.
+pub async fn restored(ctx: &Ctx, config: &Path) -> Result<(), Box<Problem>> {
+    let path = config.join(FILE);
+    if matches!(path.try_exists(), Ok(false)) {
         return Ok(());
-    };
+    }
     let now = written_now(ctx);
-    let gone = changed(ctx, &path, |ctx, kept| {
+    let (gone, journaled) = changed(ctx, &path, |ctx, kept| {
         let gone: Vec<Record> = kept
             .keys
             .iter()
-            .filter(|record| !record.is_revoked() && revoking(record))
+            .filter(|record| !record.is_revoked())
             .cloned()
             .collect();
-        for record in &gone {
-            revoked(ctx, kept, &record.name, &now)?;
-        }
-        Ok(gone)
+        let journaled = revoked(ctx, kept, &gone, &now);
+        Ok((gone, journaled))
     })
     .await?;
     for record in &gone {
-        heard(ctx, record, &Heard::Revoked(why)).await;
+        heard(ctx, record, &Heard::Revoked(Revoked::Restored)).await;
     }
-    Ok(())
+    journaled
 }
 
 /// Revoke a device key as the reversal of the run that registered it.
@@ -323,6 +307,13 @@ pub(crate) fn revoked_by(undo: &crate::journal::Undo) -> Option<&str> {
     }
 }
 
+/// Every app this stack trusts now, or why the settings that name the operator's own
+/// builds cannot be read.
+fn trusted(ctx: &Ctx) -> Result<Vec<AppIdentity>, Failure> {
+    let settings = crate::app::targets::beside_env(ctx, crate::config::paths::SETTINGS);
+    identity::trusted(settings.as_deref())
+}
+
 /// The fingerprint of the password kept now, where one is.
 fn password(ctx: &Ctx) -> Option<String> {
     ctx.settings
@@ -333,58 +324,70 @@ fn password(ctx: &Ctx) -> Option<String> {
 }
 
 /// Make `change` to the device keys at `path`, under the hold every writer takes, once
-/// every device key registered under another password is revoked, and tell the operator
-/// of each of those after.
+/// every device key registered under another password or made by an app this stack no
+/// longer trusts is revoked, and tell the operator of each of those after.
 ///
 /// What `change` answers is answered; where it refuses, what it left is still written,
-/// so a sweep it found is kept whatever it went on to refuse.
+/// so a sweep it found is kept whatever it went on to refuse. Where the sweep's journal
+/// cannot be written, the sweep is kept and told, and `change` is not made. Where the
+/// settings naming the operator's own builds cannot be read, no device key is revoked
+/// for its app, and none is answered as standing.
 async fn changed<T>(
     ctx: &Ctx,
     path: &Path,
     mut change: impl FnMut(&Ctx, &mut Kept) -> Result<T, Box<Problem>>,
 ) -> Result<T, Box<Problem>> {
     let under = password(ctx);
+    let apps: Result<Vec<String>, Failure> =
+        trusted(ctx).map(|apps| apps.iter().map(AppIdentity::written).collect());
     let now = written_now(ctx);
     let mut swept = Vec::new();
     let mut answered = None;
     crate::settings::kept::changed(path, &mut |kept: &mut Kept| {
-        let stale: Vec<Record> = kept
+        swept = kept
             .keys
             .iter()
-            .filter(|record| {
-                !ctx.dry_run && !record.is_revoked() && Some(&record.under) != under.as_ref()
+            .filter(|record| !ctx.dry_run && !record.is_revoked())
+            .filter_map(|record| {
+                let why = if Some(&record.under) != under.as_ref() {
+                    Revoked::PasswordChanged
+                } else if apps.as_ref().is_ok_and(|apps| !apps.contains(&record.app)) {
+                    Revoked::AppRemoved
+                } else {
+                    return None;
+                };
+                Some((record.clone(), why))
             })
-            .cloned()
             .collect();
-        for record in stale {
-            if let Err(refused) = revoked(ctx, kept, &record.name, &now) {
-                answered = Some(Err(refused));
-                return Ok(());
-            }
-            swept.push(record);
-        }
-        answered = Some(change(ctx, kept));
+        let stale: Vec<Record> = swept.iter().map(|(record, _)| record.clone()).collect();
+        answered = Some(revoked(ctx, kept, &stale, &now).and_then(|()| change(ctx, kept)));
         Ok(())
     })
     .map_err(|failure| Box::new(failure.problem()))?;
-    for record in &swept {
-        heard(ctx, record, &Heard::Revoked(Revoked::PasswordChanged)).await;
+    for (record, why) in &swept {
+        heard(ctx, record, &Heard::Revoked(*why)).await;
     }
     answered.unwrap_or_else(|| Err(Box::new(nowhere())))
 }
 
-/// Journal the revoke of the active device key holding `name`, then mark it revoked at
-/// `now`.
-fn revoked(ctx: &Ctx, kept: &mut Kept, name: &str, now: &str) -> Result<(), Box<Problem>> {
-    journalled(
-        ctx,
-        name,
-        Kind::DeviceKeyRevoked {
-            name: name.to_owned(),
-        },
-    )?;
-    mark_revoked(kept, name, now);
-    Ok(())
+/// Mark every one of `records` revoked at `now`, then journal each revoke, answering the
+/// first journal entry that could not be written once every one was tried.
+fn revoked(ctx: &Ctx, kept: &mut Kept, records: &[Record], now: &str) -> Result<(), Box<Problem>> {
+    for record in records {
+        mark_revoked(kept, &record.name, now);
+    }
+    records
+        .iter()
+        .map(|record| {
+            journalled(
+                ctx,
+                &record.name,
+                Kind::DeviceKeyRevoked {
+                    name: record.name.clone(),
+                },
+            )
+        })
+        .fold(Ok(()), Result::and)
 }
 
 /// Mark the active device key holding `name` revoked at `now`.

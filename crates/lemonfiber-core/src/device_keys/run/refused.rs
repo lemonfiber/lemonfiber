@@ -104,10 +104,11 @@ pub(super) fn unproved(why: &Unattested) -> Problem {
         ),
         Unattested::InSoftware => Problem::new(
             IN_SOFTWARE,
-            "That key lives in software",
-            "A device key has to live in the phone's hardware, StrongBox, the Secure Enclave or \
-             the trusted environment, where the operating system cannot read it. Nothing was \
-             registered.",
+            "That key was not made in the phone's hardware",
+            "A device key has to be made and kept in the phone's hardware, StrongBox, the Secure \
+             Enclave or the trusted environment, where the operating system cannot read it. A \
+             key kept in software, or made outside the hardware and taken in, can be copied. \
+             Nothing was registered.",
             Remedy::new("Mint the key at the stack's terminal instead")
                 .with_detail(format!("{PRODUCT} key mint")),
         ),

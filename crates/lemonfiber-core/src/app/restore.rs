@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
-use crate::archive::Reader;
+use crate::archive::{Archiving, Reader};
 use crate::backup::{self, Compatibility, Manifest, Relocation, Scope, SCHEMA};
 use crate::config::paths::Paths;
 use crate::config::{self, store};
@@ -116,6 +116,10 @@ pub struct Restoration {
 /// stack is stopped, unpacks, and points the restored settings at this machine's
 /// data root where a re-point was accepted.
 ///
+/// Once the stack is stopped every device key is revoked, whether the unpacking then
+/// lands or fails part-way: the keys a backup brings back were registered before it,
+/// and a restore never answers while one of them could still prove the operator.
+///
 /// The fork is inside the command for the reason the reset's is: a gate in front of
 /// it would be a gate each surface kept for itself, and a surface that kept none
 /// would restore over a configuration nobody had seen.
@@ -125,7 +129,8 @@ pub struct Restoration {
 /// Returns a [`Problem`] where this run has nowhere it keeps archives, where a name
 /// names none of them, where the yes was given for a listing that has since moved
 /// on, where the stack is not confirmed stopped, where the restored settings could
-/// not be re-pointed, or for any reason [`inspect`] and [`restore`] give.
+/// not be re-pointed, where the device keys could not be revoked, or for any reason
+/// [`inspect`] and [`restore`] give.
 pub async fn run(
     ctx: &Ctx,
     archive: &Kept,
@@ -163,14 +168,33 @@ pub async fn run(
     consent.held(&would)?;
 
     quiesced::required(ctx, STILL_RUNNING, "restore").await?;
+    let landed = landed(archives, &path, &current_root, repoint).await;
+    let revoked = crate::device_keys::run::restored(ctx, archives.paths.config_dir()).await;
+    let report = landed?;
+    revoked?;
+    Ok(Restoration {
+        rehearsed: false,
+        would,
+        done: Some(report),
+    })
+}
+
+/// The archive at `path` unpacked over the files `archives` keeps, and the restored
+/// settings re-pointed at this machine's data root where the operator agreed to it.
+async fn landed(
+    archives: &Archiving,
+    path: &Path,
+    current_root: &Path,
+    repoint: bool,
+) -> Result<Report, Box<Problem>> {
     let report = restore(
-        &path,
+        path,
         &archives.paths,
         env!("CARGO_PKG_VERSION"),
         SCHEMA,
-        &current_root,
+        current_root,
         repoint,
-        vault,
+        archives.vault.as_ref(),
     )
     .await?;
 
@@ -185,12 +209,7 @@ pub async fn run(
         )
         .map_err(|failure| Box::new(not_repointed(&failure.problem())))?;
     }
-    crate::device_keys::run::restored(ctx).await?;
-    Ok(Restoration {
-        rehearsed: false,
-        would,
-        done: Some(report),
-    })
+    Ok(report)
 }
 
 /// The archive one name reaches beneath the backups directory, or nothing where it

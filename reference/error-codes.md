@@ -120,7 +120,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `DEVICE-4` | `NOT_P256` | error | 1 | 400 | 0.18.0 | Raised when the public half given is not a P-256 key. |
 | `DEVICE-5` | `NO_ATTESTATION` | error | 1 | 400 | 0.18.0 | Raised when a device key is registered with no attestation. |
 | `DEVICE-6` | `ATTESTATION_UNVERIFIED` | error | 1 | 400 | 0.18.0 | Raised when an attestation does not verify, or does not cover the public half. |
-| `DEVICE-7` | `IN_SOFTWARE` | error | 1 | 400 | 0.18.0 | Raised when an attestation places the key in software. |
+| `DEVICE-7` | `IN_SOFTWARE` | error | 1 | 400 | 0.18.0 | Raised when an attestation places the key in software, or says it was not made in the hardware that keeps it. |
 | `DEVICE-8` | `UNTRUSTED_APP` | error | 1 | 403 | 0.18.0 | Raised when an attestation names an app this stack does not trust. |
 | `DEVICE-9` | `NOT_REGISTERED` | error | 1 | 404 | 0.18.0 | Raised when a device key named is not registered, or was revoked. |
 | `DEVICE-10` | `CHALLENGE_NOT_STANDING` | warning | 1 | 403 | 0.18.0 | Raised when a mint carries a challenge that does not stand. |

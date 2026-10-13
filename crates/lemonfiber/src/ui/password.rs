@@ -45,7 +45,7 @@ pub(crate) async fn asked(ctx: &Ctx, answers: &dyn Answers) -> Result<Vec<String
         ctx.seams.random.as_ref(),
         ctx.settings.admission.as_deref(),
     )?;
-    lemonfiber_core::device_keys::run::password_changed(ctx).await?;
+    lemonfiber_core::device_keys::run::swept(ctx).await?;
     Ok(lines)
 }
 

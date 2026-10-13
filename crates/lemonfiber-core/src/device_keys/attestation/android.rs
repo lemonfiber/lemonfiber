@@ -2,8 +2,9 @@
 //! the key description the phone's secure hardware wrote.
 //!
 //! The key's certificate holds the key itself, so the public half it covers is read off
-//! it rather than out of a challenge. The description says where the key lives and which
-//! app made it, by its package and the digests of its signing certificates.
+//! it rather than out of a challenge. The description says where the key lives, that the
+//! hardware made it rather than took it in from outside, and which app made it, by its
+//! package and the digests of its signing certificates.
 
 use std::time::SystemTime;
 
@@ -29,6 +30,15 @@ const KEY_DESCRIPTION: &str = "1.3.6.1.4.1.11129.2.1.17";
 
 /// The authorization naming the app that made the key.
 const APPLICATION: u32 = 709;
+
+/// The authorization saying where the key came from.
+const ORIGIN: u32 = 702;
+
+/// What an app is called whose identity the attestation spells in a form no setting could.
+const UNSPELT: &str = "an Android app whose package name is not one Android allows";
+
+/// The origin of a key the hardware made itself.
+const GENERATED: u8 = 0;
 
 /// Where the description says something lives, in the order the format numbers them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -59,6 +69,8 @@ struct Description {
     attested: Level,
     /// Where the key lives.
     held: Level,
+    /// Whether the hardware says it made the key, rather than took it in from outside.
+    generated: bool,
     /// The packages of the app that made the key.
     packages: Vec<String>,
     /// The SHA-256 of each of that app's signing certificates, in lower-case hex.
@@ -96,6 +108,9 @@ fn attested_under(
         Level::TrustedEnvironment => Backing::Tee,
         Level::StrongBox => Backing::Strongbox,
     };
+    if !described.generated {
+        return Err(Unattested::InSoftware);
+    }
     if own.public_key().raw != key.encoded()
         || !chain::verified(&certificates, roots, now, Dated::ButTheKeys)
     {
@@ -123,15 +138,18 @@ fn made_by(described: &Description, identity: &AppIdentity) -> bool {
     }
 }
 
-/// The app the description names, as the setting would spell it.
+/// The app the description names, as the setting would spell it, or as an app whose
+/// identity cannot be spelt where its package is not one Android allows: the phone wrote
+/// it, and it reaches the operator's screen.
 fn named(described: &Description) -> String {
     let package = described.packages.first().map_or("", String::as_str);
     let signer = described.signers.first().map_or("", String::as_str);
-    AppIdentity::Android {
+    let written = AppIdentity::Android {
         package: package.to_owned().into(),
         certificate: signer.to_owned().into(),
     }
-    .written()
+    .written();
+    AppIdentity::read(&written).map_or_else(|| UNSPELT.to_owned(), |_| written)
 }
 
 /// The key description `own` carries, or nothing where it carries none that reads.
@@ -139,6 +157,13 @@ fn described(own: &X509Certificate<'_>) -> Option<Description> {
     let fields = within(extension(own, KEY_DESCRIPTION)?, der::tag::SEQUENCE)?;
     let attested = level(fields.get(1)?)?;
     let held = level(fields.get(3)?)?;
+    let hardware = universal(fields.get(7)?, der::tag::SEQUENCE)?;
+    let generated = authorization(hardware, ORIGIN)
+        .and_then(read_one)
+        .and_then(|origin| {
+            universal(&origin, der::tag::INTEGER).map(|origin| origin.data == [GENERATED])
+        })
+        .unwrap_or(false);
     let application = [fields.get(6)?, fields.get(7)?]
         .into_iter()
         .filter_map(|list| universal(list, der::tag::SEQUENCE))
@@ -156,6 +181,7 @@ fn described(own: &X509Certificate<'_>) -> Option<Description> {
     Some(Description {
         attested,
         held,
+        generated,
         packages,
         signers,
     })

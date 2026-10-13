@@ -1,15 +1,18 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use lemonfiber_fixtures::ports::Chance;
 use lemonfiber_fixtures::support::Reporting;
 
 use super::{inspect, restore, run, Consent, Kept, STILL_RUNNING};
+use crate::admission::Credential;
 use crate::app::fixtures::{keeping, paths, scratch, FakeArchive, CURRENT};
 use crate::app::Ctx;
 use crate::archive::{Archiving, Fault};
 use crate::backup::{Member, Scope, SCHEMA};
 use crate::config::paths::Paths;
 use crate::config::Settings;
+use crate::device_keys::{Backing, Kept as DeviceKeys, Record as DeviceKey};
 use crate::error::codes::restore::CORRUPT;
 use crate::error::codes::restore::INCOMPATIBLE;
 use crate::error::codes::restore::MOVED_ON;
@@ -580,41 +583,131 @@ async fn settings_that_landed_but_could_not_be_re_pointed_are_reported() {
     assert_eq!(refusal, Some(NOT_REPOINTED));
 }
 
-#[tokio::test]
-async fn a_restore_that_lands_revokes_every_device_key() {
-    let vault = Arc::new(FakeArchive::holding(CURRENT, SCHEMA));
-    let dir = lemonfiber_fixtures::scratch::Scratch::named("restore-device-keys").kept();
+/// A stopped run keeping its configuration and its archives in a directory of its own,
+/// whose library is at `root`, its password set and one device key, `pixel`,
+/// registered under that password; and where the device keys are kept.
+fn holding_a_device_key(named: &str, root: &str, vault: &Arc<FakeArchive>) -> (Ctx, PathBuf) {
+    let dir = scratch(named).kept();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
-    let mut ctx = a_stopped_run(&vault);
+    let mut ctx = rooted_at(&dir, root, vault);
     ctx.settings.env_file = Some(dir.join(".env"));
     ctx.settings.stack_dir = Some(dir.join("stack"));
-    let device_keys = dir.join(crate::device_keys::FILE);
-    let seeded =
-        crate::settings::kept::changed(&device_keys, &mut |kept: &mut crate::device_keys::Kept| {
-            kept.keys.push(crate::device_keys::Record {
-                name: "pixel".to_owned(),
-                public_key: String::new(),
-                fingerprint: "ab".repeat(32),
-                backing: crate::device_keys::Backing::Tee,
-                app: String::new(),
-                registered: "2026-10-12T06:00:00Z".to_owned(),
-                under: String::new(),
-                used: None,
-                revoked: None,
-            });
-            Ok(())
-        });
-    assert!(seeded.is_ok());
-    let restoration = run(
-        &ctx,
-        &Kept::Named(KEPT.to_owned()),
-        false,
-        &Consent::Standing,
+    ctx.settings.admission = Some(dir.join("admission.json"));
+    let Ok(credential) = Credential::set("the password, long enough", &Chance::cycling()) else {
+        unreachable!("a password long enough is set");
+    };
+    assert!(crate::admission::keep(&dir.join("admission.json"), &credential).is_ok());
+    let app = format!("android:app.lemonfiber.companion@{}", "5a".repeat(32));
+    let settings = serde_json::json!({
+        "schema": 1,
+        "written_by": "0.0.0",
+        "values": { crate::device_keys::identity::SETTING: app },
+    });
+    assert!(std::fs::write(
+        dir.join(crate::config::paths::SETTINGS),
+        settings.to_string()
     )
-    .await;
+    .is_ok());
+    let device_keys = dir.join(crate::device_keys::FILE);
+    let seeded = crate::settings::kept::changed(&device_keys, &mut |kept: &mut DeviceKeys| {
+        kept.keys.push(DeviceKey {
+            name: "pixel".to_owned(),
+            public_key: String::new(),
+            fingerprint: "ab".repeat(32),
+            backing: Backing::Tee,
+            app: app.clone(),
+            registered: "2026-10-12T06:00:00Z".to_owned(),
+            under: credential.fingerprint(),
+            used: None,
+            revoked: None,
+        });
+        Ok(())
+    });
+    assert!(seeded.is_ok());
+    (ctx, device_keys)
+}
+
+/// Whether the device key `pixel` still stands in the record at `device_keys`.
+fn pixel_stands(device_keys: &Path) -> bool {
+    crate::settings::kept::read::<DeviceKeys>(device_keys)
+        .unwrap_or_default()
+        .active("pixel")
+        .is_some()
+}
+
+/// What `ctx`'s operator was told a restore did to the device keys.
+fn told_of_the_restore(ctx: &Ctx) -> bool {
+    crate::app::outbox::load(ctx)
+        .history()
+        .into_iter()
+        .any(|alert| alert.meaning.contains("backup was restored"))
+}
+
+#[tokio::test]
+async fn a_restore_that_lands_revokes_every_device_key_and_says_why() {
+    let vault = Arc::new(FakeArchive::holding(CURRENT, SCHEMA));
+    let (ctx, device_keys) = holding_a_device_key("restore-device-keys", "/srv/media", &vault);
+    assert!(pixel_stands(&device_keys));
+    let restoration = run(&ctx, &kept(), false, &Consent::Standing).await;
     assert!(restoration.is_ok_and(|said| said.done.is_some()));
-    let kept: crate::device_keys::Kept =
-        crate::settings::kept::read(&device_keys).unwrap_or_default();
-    assert!(kept.active("pixel").is_none());
+    assert!(!pixel_stands(&device_keys));
+    assert!(told_of_the_restore(&ctx));
+}
+
+#[tokio::test]
+async fn a_restore_whose_unpacking_fails_part_way_still_revokes_every_device_key() {
+    let vault = Arc::new(FakeArchive {
+        extract: Err(Fault::new("disk full")),
+        ..FakeArchive::holding(CURRENT, SCHEMA)
+    });
+    let (ctx, device_keys) =
+        holding_a_device_key("restore-device-keys-unpacking", "/srv/media", &vault);
+    let refusal = run(&ctx, &kept(), false, &Consent::Standing)
+        .await
+        .err()
+        .map(|problem| problem.code);
+    assert_eq!(refusal, Some(NOT_RESTORED));
+    assert!(!pixel_stands(&device_keys));
+    assert!(told_of_the_restore(&ctx));
+}
+
+#[tokio::test]
+async fn a_restore_whose_settings_could_not_be_re_pointed_still_revokes_every_device_key() {
+    let vault = Arc::new(FakeArchive::holding(CURRENT, SCHEMA));
+    let (ctx, device_keys) =
+        holding_a_device_key("restore-device-keys-repoint", "/mnt/library", &vault);
+    let _ = std::fs::remove_file(device_keys.with_file_name(".env"));
+    assert!(std::fs::create_dir_all(device_keys.with_file_name(".env")).is_ok());
+    let refusal = run(&ctx, &kept(), true, &Consent::Standing)
+        .await
+        .err()
+        .map(|problem| problem.code);
+    assert_eq!(refusal, Some(NOT_REPOINTED));
+    assert!(!pixel_stands(&device_keys));
+}
+
+#[tokio::test]
+async fn a_restore_whose_device_keys_could_not_be_revoked_does_not_answer_as_landed() {
+    let vault = Arc::new(FakeArchive::holding(CURRENT, SCHEMA));
+    let (ctx, device_keys) =
+        holding_a_device_key("restore-device-keys-unwritable", "/srv/media", &vault);
+    assert!(std::fs::remove_file(&device_keys).is_ok());
+    assert!(std::fs::create_dir_all(&device_keys).is_ok());
+    let restoration = run(&ctx, &kept(), false, &Consent::Standing).await;
+    assert!(restoration.is_err());
+}
+
+#[tokio::test]
+async fn a_restore_whose_journal_cannot_be_written_still_revokes_every_device_key() {
+    let vault = Arc::new(FakeArchive::holding(CURRENT, SCHEMA));
+    let (ctx, device_keys) =
+        holding_a_device_key("restore-device-keys-journal", "/srv/media", &vault);
+    let journal = device_keys.with_file_name(crate::config::paths::JOURNAL);
+    let _ = std::fs::remove_file(&journal);
+    assert!(std::fs::create_dir_all(&journal).is_ok());
+    let restoration = run(&ctx, &kept(), false, &Consent::Standing).await;
+    assert!(restoration.is_err());
+    assert!(!pixel_stands(&device_keys));
+    assert!(told_of_the_restore(&ctx));
 }

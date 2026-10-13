@@ -58,14 +58,16 @@ codes! {
         remedy: "Make a new key pair on the phone and register it with the attestation the \
             platform gives for it.",
     }
-    /// Raised when an attestation places the key in software.
+    /// Raised when an attestation places the key in software, or says it was not made in
+    /// the hardware that keeps it.
     IN_SOFTWARE = "DEVICE-7" {
         severity: Error,
         status: 400,
         since: "0.18.0",
-        meaning: "The attestation places the key in software. A device key has to live in the \
-            phone's hardware, StrongBox, the Secure Enclave or the trusted environment, where \
-            the operating system cannot read it.",
+        meaning: "The attestation places the key in software, or says it was made outside the \
+            hardware and taken in. A device key has to be made and kept in the phone's \
+            hardware, StrongBox, the Secure Enclave or the trusted environment, where the \
+            operating system cannot read it.",
         remedy: "Make the key on a phone that holds keys in hardware, or mint the key at the \
             stack's terminal.",
     }

@@ -172,7 +172,7 @@
   "DEVICE-7": {
     "name": "IN_SOFTWARE",
     "status": 400,
-    "description": "Raised when an attestation places the key in software."
+    "description": "Raised when an attestation places the key in software, or says it was not made in the hardware that keeps it."
   },
   "DEVICE-8": {
     "name": "UNTRUSTED_APP",
