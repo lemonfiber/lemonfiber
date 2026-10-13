@@ -22,7 +22,7 @@ use crate::topology::Placed;
 pub(crate) const LIBRARY: &str = "${DATA_ROOT:-./data}:/data";
 
 /// The uid and gid Compose writes while the stack's environment file names neither.
-const OPERATOR_FALLBACK: &str = "1000";
+pub(crate) const OPERATOR_FALLBACK: &str = "1000";
 
 /// What brings a container back after it stops for any reason but being taken down.
 const RESTART: &str = "unless-stopped";
@@ -34,14 +34,14 @@ pub(crate) const HOUSEHOLD: &str = "${LAN_BIND:-0.0.0.0}";
 pub(crate) const LOOPBACK: &str = "127.0.0.1";
 
 /// What the container may not do once it has started: gain a privilege.
-const SECURITY: [&str; 1] = ["no-new-privileges:true"];
+pub(crate) const SECURITY: [&str; 1] = ["no-new-privileges:true"];
 
 /// Every kernel capability, all of which are dropped before any is given back.
-const DROPPED: [&str; 1] = ["ALL"];
+pub(crate) const DROPPED: [&str; 1] = ["ALL"];
 
 /// The capabilities a standard container is given back: what an image that starts as
 /// root needs to give its files to the operator, become them and signal its processes.
-const KEPT: [&str; 6] = [
+pub(crate) const KEPT: [&str; 6] = [
     "CHOWN",
     "DAC_OVERRIDE",
     "FOWNER",
@@ -51,7 +51,7 @@ const KEPT: [&str; 6] = [
 ];
 
 /// How many processes a container may hold at once.
-const PROCESSES: u32 = 1024;
+pub(crate) const PROCESSES: u32 = 1024;
 
 /// The network a service on no network of its own is held to: none at all.
 const NO_NETWORK: &str = "none";

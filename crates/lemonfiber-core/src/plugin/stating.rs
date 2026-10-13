@@ -194,7 +194,7 @@ pub fn proofs(manifest: &Manifest) -> Vec<Proving> {
             of: manifest
                 .asks(proof.service.as_deref())
                 .map(|service| service.id.clone()),
-            asks: format!("{} {}", proof.request.method, proof.request.path),
+            asks: asking(proof),
             why: proof.why.clone(),
             came_to: None,
         })
@@ -208,6 +208,21 @@ pub fn proofs(manifest: &Manifest) -> Vec<Proving> {
         .collect()
 }
 
+/// What a proof asks, as a statement says it: the verb and the path of a request, or what
+/// a run hands the image's own program.
+fn asking(proof: &lemonfiber_plugin::Proof) -> String {
+    proof.request.as_ref().map_or_else(
+        || {
+            proof
+                .run
+                .as_ref()
+                .map(|run| super::recorded::runs(&run.args))
+                .unwrap_or_default()
+        },
+        |request| format!("{} {}", request.method, request.path),
+    )
+}
+
 /// The proof that the adapter `service` speaks the contracts it declares, not yet asked.
 #[must_use]
 pub fn speaking(service: &str) -> Proving {
@@ -219,6 +234,19 @@ pub fn speaking(service: &str) -> Proving {
         why: "lemonfiber asks it over those contracts, so what it says it speaks has to be \
               what it answers"
             .to_owned(),
+        came_to: None,
+    }
+}
+
+/// A proof kept in the record that runs the image's own program, not yet asked.
+#[must_use]
+pub fn run_proof(proof: &super::RunProof) -> Proving {
+    Proving {
+        proof: proof.proof.clone(),
+        establishes: proof.title.clone(),
+        of: Some(proof.service.clone()),
+        asks: super::recorded::runs(&proof.run.args),
+        why: proof.why.clone(),
         came_to: None,
     }
 }

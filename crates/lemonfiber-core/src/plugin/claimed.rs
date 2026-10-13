@@ -20,7 +20,7 @@ use lemonfiber_plugin::{Claim, ClaimProbe, Manifest, Service};
 use crate::doctor::BUNDLED_CHECKS;
 use crate::filling::{fills, Claimant, Filling, Shown};
 use crate::plugin::{capabilities, Ungenerated};
-pub(in crate::plugin) use asserting::pinned_to;
+pub(in crate::plugin) use asserting::{pinned_to, Asks};
 pub use asserting::{Asserted, Assertion};
 
 /// The one file a plugin is described by.
@@ -78,7 +78,9 @@ pub enum Evidence {
 }
 
 /// What one assertion came to, whatever answered it.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
 #[serde(tag = "outcome", rename_all = "kebab-case")]
 #[schemars(rename = "PluginVerdict")]
 pub enum Verdict {
@@ -110,7 +112,9 @@ pub enum Verdict {
 }
 
 /// One recording an assertion fails on as its manifest declares.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
 #[schemars(rename = "PluginFailingAsDeclared")]
 pub struct FailingAsDeclared {
     /// The recording.
@@ -255,7 +259,7 @@ pub fn read_digested(path: &Path) -> Result<(Manifest, String), Unreadable> {
 /// The one answer to *where a plugin's manifest is*, because the two reads above
 /// would otherwise each carry their own and be free to disagree about whether a
 /// directory or the file inside it was meant.
-pub(super) fn sourced(path: &Path) -> Result<(PathBuf, Manifest), Unreadable> {
+pub(in crate::plugin) fn sourced(path: &Path) -> Result<(PathBuf, Manifest), Unreadable> {
     let (root, at) = source(path);
     if !at.is_file() {
         return Err(Unreadable::NoManifest(root));
@@ -330,6 +334,12 @@ fn installs(
             .any(|proof| matches!(proof.verdict, Verdict::Failed { .. }))
 }
 
+/// The plugin's own directory, where `path` is it or the manifest inside it.
+#[must_use]
+pub fn root(path: &Path) -> PathBuf {
+    source(path).0
+}
+
 /// The plugin's own directory and the manifest inside it.
 ///
 /// A path to either is accepted, because both are what somebody has to hand: the
@@ -397,7 +407,7 @@ fn against(
 ) -> Verdict {
     asserting::recorded_answer(
         Some(binding.fixture.as_str()),
-        &binding.request,
+        Asks::Request(&binding.request),
         &binding.expect,
         Some(service),
         root,

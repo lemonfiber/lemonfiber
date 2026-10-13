@@ -26,8 +26,10 @@ use lemonfiber_manifest::container::{Fields, Value};
 use lemonfiber_plugin::{Manifest, Service};
 use serde::{Deserialize, Serialize};
 
+mod proved;
 mod reached;
 
+pub use proved::RunProof;
 pub use reached::Reached;
 
 /// One service of an installed plugin, as it was placed.
@@ -120,6 +122,9 @@ pub struct Placed {
     /// What it asks for there, where it says.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub asks_for: Option<String>,
+    /// The digest of the starting files kept for its run proofs, where it has any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub starting: Option<String>,
 }
 
 /// Every capability a service asks for: each `[[ask]]` it makes, then each capability a
@@ -207,6 +212,7 @@ impl Placed {
             asks: asks(manifest, service),
             reaches: service.reaches.clone(),
             asks_for: service.asks_for.clone(),
+            starting: None,
         }
     }
 
@@ -292,37 +298,19 @@ pub struct Installed {
     pub description: Option<String>,
     /// What was placed, one entry per service the plugin declares.
     pub services: Vec<Placed>,
-    /// Every core capability its services fill, as the install settled them.
-    ///
-    /// Core names only. A capability of the plugin's own is namespaced, nothing asks
-    /// for it, and it is inert by design — so a removal that named one as about to go
-    /// unfilled would be warning about something nothing was reaching for.
-    ///
-    /// Kept for the question a removal has to answer before it happens: what this
-    /// machine would have nothing filling once the plugin is off it. Asking the
-    /// manifest would be asking a file that may be gone.
-    ///
-    /// Defaulted for a register written before the field existed, which reads as a
-    /// plugin that fills nothing — the answer that names no capability rather than the
-    /// one that invents one.
+    /// Every core capability its services fill, as the install settled them, core names
+    /// only, which is what a removal reads to say what would go unfilled. Defaulted for a
+    /// register written before the field existed, which reads as filling nothing.
     #[serde(default)]
     pub provides: Vec<String>,
-    /// Every row it adds to a register lemonfiber already runs, as the install
-    /// settled them.
-    ///
-    /// Kept here rather than read back off the plugin's own files, for the reason
-    /// everything else on this record is: the author's directory may be gone the
-    /// moment an install is done, and a doctor run a month later is a question about
-    /// this machine rather than about a document. This record is the one answer, so a
-    /// row that runs is a row that was declared at install and has not changed under
-    /// anybody since.
-    ///
-    /// Defaulted for a register written before this field existed, which reads as a
-    /// plugin that contributes nothing — the same answer a plugin that contributes
-    /// nothing gets, and the only one that can be given about a record that does not
-    /// say.
+    /// Every row it adds to a register lemonfiber already runs, as the install settled
+    /// them, so the doctor reads them off this record rather than off the plugin's files.
+    /// Defaulted for a register written before this field existed.
     #[serde(default)]
     pub contributions: Vec<lemonfiber_plugin::Contribution>,
+    /// Every proof it declares that runs the image's own program.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub run_proofs: Vec<RunProof>,
     /// What the plugin declared about itself: where it is published, whether it was
     /// reviewed, what it claims, what it may change, where it may reach and what it
     /// will hold.
@@ -405,6 +393,7 @@ impl Installed {
                     ..entry.clone()
                 })
                 .collect(),
+            run_proofs: proved::run_proofs(manifest),
             declared: super::declared::Declaration::of(manifest),
             recipes: super::recipes::declared(manifest),
             adapters: super::recipes::named(manifest),
@@ -515,12 +504,8 @@ fn filled(manifest: &Manifest) -> Vec<String> {
 /// address the bundled services are proved at.
 const HERE: &str = "http://127.0.0.1";
 
-/// Where each installed service answers, by the id its manifest gave it.
-///
-/// One answer to *where is this reached*, for the two callers that ask. An install asks
-/// it to put the plugin's own proofs; the diagnostics register asks it to put the rows
-/// the plugin contributed. Two answers would be two ways of reaching the same service,
-/// and the one that fell behind would be asking a port nothing is listening on.
+/// Where each installed service answers, by the id its manifest gave it: the one answer
+/// an install's proofs and the doctor's contributed rows both read.
 ///
 /// A service that publishes no port is absent rather than present with a guessed
 /// address, which is what lets a caller say *there is nowhere to ask it* instead of

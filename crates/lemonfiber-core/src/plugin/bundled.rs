@@ -18,7 +18,7 @@ use std::path::Path;
 use lemonfiber_manifest::Manifest;
 use serde::Serialize;
 
-use super::claimed::pinned_to;
+use super::claimed::{pinned_to, Asks};
 use super::Verdict;
 use lemonfiber_plugin::Violation;
 
@@ -98,7 +98,7 @@ pub fn judged(manifest: &Manifest, stack: &Path) -> Bundled {
             for probe in &claim.probes {
                 let verdict = match pinned_to(
                     Some(&probe.fixture),
-                    &probe.request,
+                    Asks::Request(&probe.request),
                     &probe.expect,
                     &pinned,
                     stack,

@@ -610,3 +610,5 @@ fn two_verdicts_about_one_assertion_come_to_one() {
     assert_eq!(both(declared("r"), Verdict::Passed), declared("r"));
     assert_eq!(both(Verdict::Passed, Verdict::Passed), Verdict::Passed);
 }
+
+mod running;

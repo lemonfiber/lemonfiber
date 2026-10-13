@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "args": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "timeout_s": {
+      "type": [
+        "integer|null/uint32"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

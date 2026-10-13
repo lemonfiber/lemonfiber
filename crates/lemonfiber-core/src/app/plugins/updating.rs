@@ -149,6 +149,7 @@ pub(crate) async fn update(
         manifest: &read.manifest,
         would: &would,
         stack,
+        source: &crate::plugin::root(path),
         stamp: &stamp,
         standing: &standing,
         before: &before,
@@ -159,7 +160,7 @@ pub(crate) async fn update(
         // Recorded last, and only here: until this lands every reader of the record
         // still sees the version being replaced, which is what keeps the machine on
         // one version or the other at every moment of the run.
-        Came::Held => match recorded(ctx, &held, &was, &would, stack, &mut account).await {
+        Came::Held => match recorded(ctx, &held, &was, &coming, &mut account).await {
             Ok(after) => return Ok(answering(after.installed().to_vec(), account, offer)),
             Err(why) => Came::Stopped(why),
         },
@@ -186,10 +187,10 @@ async fn recorded(
     ctx: &Ctx,
     held: &Register,
     was: &Installed,
-    would: &Installed,
-    stack: &Path,
+    coming: &Coming<'_>,
     account: &mut Update,
 ) -> Result<Register, String> {
+    let (would, stack) = (coming.would, coming.stack);
     let mut after = held.clone();
     after.forget(&was.plugin);
     let _ = after.record(would.clone());
@@ -200,6 +201,7 @@ async fn recorded(
         )
     })?;
     account.install.recorded = true;
+    super::kept::kept(ctx, would, coming.source);
     let _ = super::conformance::cleared(ctx, &would.plugin);
     let proxy = stack.join(crate::plugin::PROXY).display().to_string();
     let written = account
@@ -255,6 +257,8 @@ struct Coming<'a> {
     would: &'a Installed,
     /// Where the stack is.
     stack: &'a Path,
+    /// The new version's own source.
+    source: &'a Path,
     /// The stamp the whole update is journalled under.
     stamp: &'a str,
     /// The stack as it was read before anything moved.
@@ -303,6 +307,7 @@ async fn on(ctx: &Ctx, coming: &Coming<'_>, install: &mut Install) -> Came {
         coming.manifest,
         coming.would,
         coming.stack,
+        coming.source,
         &mut install.proofs,
     )
     .await;

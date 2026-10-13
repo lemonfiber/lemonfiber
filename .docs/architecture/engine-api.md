@@ -17,6 +17,22 @@ page is about the adapter: `adapters::docker::Daemon`, on `bollard`.
 | `stats` | `GET /containers/{id}/stats` | Compose has no equivalent |
 | `exec` | `POST /containers/{id}/exec` | The leak test runs the same command in two namespaces |
 | `located` | `POST /containers/create` | See below — there is no route that stats a host path |
+| `Program::run` | `POST /containers/create`, `/attach`, `/start`, `/wait`, `DELETE /containers/{id}` | A proof's container belongs to no Compose project (ADR-0048) |
+
+### A proof's container
+
+A proof that runs the image's own program is the one write here. The container is
+created from the pinned digest with no network (`NetworkMode: none` and
+`NetworkDisabled`), the service's capabilities, user, read-only root and memory limit,
+the logging driver `none`, and one bind mount: a throwaway copy of the starting files at
+the configuration path. A bind source the engine's machine does not have is refused
+rather than made. The entrypoint is the image's own and the arguments go in `Cmd`, so no
+shell is started. Standard output is read through an attach made before the start, up
+to the bound, and the rest is read away so the program never waits on it; standard
+error is never asked for. The container is removed with its volumes whatever the run
+came to, and every run first removes the proof containers an earlier run left, told by
+the label `app.lemonfiber.proof` and an age past any run's limit. An image the engine
+does not hold is a `404` at creation, reported rather than pulled.
 
 ### Asking a daemon about a path on its own machine
 

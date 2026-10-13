@@ -26,10 +26,12 @@ use lemonfiber_core::plugin::{
 // record — and because two readers in one file is two files nobody split.
 mod conformance;
 mod machine;
+mod recording;
 
 pub(crate) use conformance::conformed;
 
 pub(crate) use machine::installs;
+pub(crate) use recording::recorded;
 
 use super::Lines;
 

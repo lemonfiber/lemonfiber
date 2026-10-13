@@ -137,7 +137,16 @@ impl Asked<'_> {
             ));
         }
         let operation = self.case.operation;
-        let asked = &recording.request;
+        let recorded::Of::Request {
+            request: asked,
+            response,
+        } = &recording.of
+        else {
+            return unproven(&format!(
+                "records a run, {}, and a contract's case is asked over a request",
+                recorded::of(recording)
+            ));
+        };
         let path = operation.path();
         if asked.method != ASKED_WITH || asked.path != path || asked.accept.as_deref() != Some(JSON)
         {
@@ -148,19 +157,17 @@ impl Asked<'_> {
             ));
         }
         match self.case.expect {
-            Expect::Status(statuses) if statuses.contains(&recording.response.status) => {
-                Verdict::Passed
-            }
+            Expect::Status(statuses) if statuses.contains(&response.status) => Verdict::Passed,
             Expect::Status(statuses) => Verdict::Failed {
                 faults: vec![format!(
                     "answered {}, and a call without the key is refused with {statuses:?}",
-                    recording.response.status
+                    response.status
                 )],
             },
             Expect::Conforms => {
                 let told = Arc::new(Told::default());
                 let client = Contracted::new(
-                    Arc::new(Replayed(answered(recording))),
+                    Arc::new(Replayed(answered(response))),
                     "http://recorded",
                     &self.service.id,
                     "recorded",
@@ -196,8 +203,7 @@ fn unproven(why: &str) -> Verdict {
 }
 
 /// The recorded answer, as a transport hands it back.
-fn answered(recording: &Recording) -> Response {
-    let answer = &recording.response;
+fn answered(answer: &recorded::Answer) -> Response {
     Response {
         status: answer.status,
         headers: answer

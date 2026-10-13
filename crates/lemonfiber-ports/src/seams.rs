@@ -22,6 +22,7 @@ use crate::http::Http;
 use crate::nntp::Nntp;
 use crate::occupancy::Occupancy;
 use crate::process::Runner;
+use crate::program::Program;
 use crate::random::Random;
 use crate::resolve::Resolver;
 use crate::time::Clock;
@@ -64,4 +65,6 @@ pub struct Seams {
     pub nntp: Arc<dyn Nntp>,
     /// How a name is asked which addresses it stands for.
     pub resolver: Arc<dyn Resolver>,
+    /// How an image's own program is run once, in a container of its own.
+    pub program: Arc<dyn Program>,
 }

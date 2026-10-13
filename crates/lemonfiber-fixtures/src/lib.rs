@@ -46,6 +46,7 @@ pub mod located;
 pub mod passwords;
 pub mod ports;
 pub mod program;
+pub mod proving;
 pub mod pulled;
 pub mod scratch;
 pub mod stack;

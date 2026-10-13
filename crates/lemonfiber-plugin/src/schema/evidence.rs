@@ -50,8 +50,13 @@ pub struct Proof {
     pub id: String,
     /// What it establishes, in one line.
     pub title: String,
-    /// Method and path.
-    pub request: Request,
+    /// Method and path. Exactly one of this and `run`.
+    #[serde(default)]
+    pub request: Option<Request>,
+    /// Arguments to the image's own entrypoint, run with no network. Exactly one of this
+    /// and `request`.
+    #[serde(default)]
+    pub run: Option<Run>,
     /// What the answer must be.
     pub expect: Expect,
     /// A recorded response to run against where no instance exists.
@@ -171,6 +176,32 @@ pub struct Contribution {
     pub detail: Option<String>,
 }
 
+/// How long a run may take, in seconds.
+pub const RUN_TIMEOUT: crate::extension::Limits = crate::extension::Limits {
+    min: 1,
+    max: 120,
+    default: 30,
+};
+
+/// The most arguments a run may carry.
+pub const MOST_ARGS: usize = 64;
+
+/// The most bytes one argument of a run may hold.
+pub const LONGEST_ARG: usize = 4096;
+
+/// A run of the image's own program, as a proof declares it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(rename = "PluginRun")]
+pub struct Run {
+    /// Each argument handed to the image's entrypoint, one string each: one to 64, each at
+    /// most 4096 bytes and none holding a NUL.
+    pub args: Vec<String>,
+    /// How long the run may take, from 1 to 120 seconds. Default 30.
+    #[serde(default)]
+    pub timeout_s: Option<u32>,
+}
+
 /// What is asked, and where.
 ///
 /// Three fields and no more, and the third is the one worth explaining. A service that
@@ -252,6 +283,37 @@ pub struct Expect {
     /// What the body must begin with, where it is not JSON.
     #[serde(default)]
     pub body_starts_with: Option<String>,
+    /// The exit status a run must end with. Not sufficient alone.
+    #[serde(default)]
+    pub exit: Option<i64>,
+    /// What a run's standard output must begin with.
+    #[serde(default)]
+    pub stdout_starts_with: Option<String>,
+}
+
+impl Expect {
+    /// Every key it writes, whatever each holds, in the order the vocabulary declares them.
+    #[must_use]
+    pub fn written(&self) -> Vec<crate::vocabulary::Constraint> {
+        let present = [
+            self.status.is_some(),
+            self.json.is_some(),
+            self.json_has_keys.is_some(),
+            self.json_types.is_some(),
+            self.json_at_least.is_some(),
+            self.json_array_min.is_some(),
+            self.json_is_absent.is_some(),
+            self.content_type.is_some(),
+            self.body_starts_with.is_some(),
+            self.exit.is_some(),
+            self.stdout_starts_with.is_some(),
+        ];
+        crate::vocabulary::Constraint::EVERY
+            .into_iter()
+            .zip(present)
+            .filter_map(|(constraint, is)| is.then_some(constraint))
+            .collect()
+    }
 }
 
 /// The kind of value a key must hold.

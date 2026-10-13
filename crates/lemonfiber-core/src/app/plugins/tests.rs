@@ -77,7 +77,7 @@ id      = "answers"
 title   = "the library API answers"
 why     = "a plugin whose service does not answer is not installed"
 request = { method = "GET", path = "/api/v1/libraries" }
-expect  = { status = 200 }
+expect  = { status = 200, json_array_min = 0 }
 "#;
 
 /// The same manifest again, this time also contributing a row to the doctor's own
@@ -115,7 +115,7 @@ id      = "answers"
 title   = "the library API answers"
 why     = "a plugin whose service does not answer is not installed"
 request = { method = "GET", path = "/api/v1/libraries" }
-expect  = { status = 200 }
+expect  = { status = 200, json_array_min = 0 }
 
 [[contribution]]
 at        = "doctor.check"
@@ -532,6 +532,7 @@ mod proving;
 mod reaching;
 mod removing;
 mod reproving;
+mod running;
 mod speaking;
 mod updating;
 mod writing;

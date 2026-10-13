@@ -149,6 +149,7 @@ impl Context {
             // Never the machine's own: a name a test writes is asked of nothing real, and
             // stands where the test says it does.
             resolver: lemonfiber_fixtures::ports::Resolving::anywhere(),
+            program: lemonfiber_fixtures::proving::Proving::unreachable(),
             ..live
         };
         Ctx::new(seams, self.stack, self.settings, self.environment)

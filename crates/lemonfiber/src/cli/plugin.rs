@@ -129,9 +129,11 @@ pub enum PluginCommand {
         #[arg(long, value_name = "NAME")]
         offer: Option<String>,
     },
-    /// Ask an installed plugin's adapters again whether they speak what they declare.
+    /// Ask an installed plugin's adapters again whether they speak what they declare, and
+    /// run each proof it declares that runs its image's own program again.
     ///
-    /// Every answer an adapter gave outside its contract is kept against the plugin,
+    /// A run proof runs with the starting files kept when the plugin was installed, and
+    /// no image is pulled for it. Every answer an adapter gave outside its contract is kept against the plugin,
     /// and the plugin fills none of that capability until a proof it passes clears it.
     /// Named on its own it says what it would ask and what a pass would clear, asks
     /// nothing, and prints a name for that offer; answering with that name is the yes.
@@ -273,5 +275,17 @@ pub enum Authoring {
         /// A PEM public key to check signatures against. Repeatable.
         #[arg(long = "key", value_name = "PEM")]
         keys: Vec<PathBuf>,
+    },
+    /// Run each proof that runs the image's own program, and write its recording.
+    ///
+    /// Each runs as an install runs it: a new container from the pinned image, with no
+    /// network, under the service's posture, user and memory limit, with a throwaway copy
+    /// of its starting files, bounded in time and in what is read. The recording keeps
+    /// the note already written in it. A recording of the same image and arguments that
+    /// the run does not reproduce byte for byte is refused and left as it was, and exits
+    /// non-zero. No image is pulled.
+    Record {
+        /// The plugin's source: its directory, or the `plugin.toml` inside it.
+        path: PathBuf,
     },
 }

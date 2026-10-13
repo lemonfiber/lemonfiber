@@ -331,6 +331,7 @@ fn komga() -> lemonfiber_core::plugin::Installed {
         services: Vec::new(),
         provides: Vec::new(),
         contributions: Vec::new(),
+        run_proofs: Vec::new(),
         declared: lemonfiber_core::plugin::Declaration::default(),
         recipes: Vec::new(),
         adapters: Vec::new(),

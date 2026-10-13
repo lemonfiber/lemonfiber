@@ -12,6 +12,12 @@
       ],
       "required": false
     },
+    "exit": {
+      "type": [
+        "integer|null/int64"
+      ],
+      "required": false
+    },
     "json": {
       "type": [
         "null|object{ref:Expected}"
@@ -51,6 +57,12 @@
     "status": {
       "type": [
         "integer|null/uint16"
+      ],
+      "required": false
+    },
+    "stdout_starts_with": {
+      "type": [
+        "null|string"
       ],
       "required": false
     }

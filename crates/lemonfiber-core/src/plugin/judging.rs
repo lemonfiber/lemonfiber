@@ -18,6 +18,10 @@ use serde_json::Value;
 
 use super::recorded::Answer;
 
+mod ran;
+
+pub use ran::ran;
+
 /// The most of a value a refusal prints before it stops being readable.
 ///
 /// A refusal is read by somebody holding a manifest and a recording and deciding which
@@ -132,7 +136,7 @@ pub fn judge(expect: &Expect, answer: &Answer) -> Vec<String> {
 /// Every way this answer is not the one the expectation declared, each placed.
 #[must_use]
 pub fn faults(expect: &Expect, answer: &Answer) -> Vec<Fault> {
-    let mut faults = Vec::new();
+    let mut faults = ran::unanswerable(expect, false);
     if let Some(wanted) = expect.status {
         if answer.status != wanted {
             faults.push(Fault::whole(

@@ -228,6 +228,12 @@
           "type": ["string", "null"],
           "default": null
         },
+        "exit": {
+          "description": "The exit status a run must end with. Not sufficient alone.",
+          "type": ["integer", "null"],
+          "format": "int64",
+          "default": null
+        },
         "json": {
           "description": "Places the answer must carry, each with the exact value it must hold.",
           "type": ["object", "null"],
@@ -271,6 +277,11 @@
           "default": null,
           "maximum": 65535,
           "minimum": 0
+        },
+        "stdout_starts_with": {
+          "description": "What a run's standard output must begin with.",
+          "type": ["string", "null"],
+          "default": null
         }
       },
       "additionalProperties": false
@@ -404,7 +415,9 @@
         {"description": "The answer read as an array, with at least a given number of entries.", "type": "string", "const": "json_array_min"},
         {"description": "The answer did not parse as JSON at all.", "type": "string", "const": "json_is_absent"},
         {"description": "The content type it is served as.", "type": "string", "const": "content_type"},
-        {"description": "What the body must begin with.", "type": "string", "const": "body_starts_with"}
+        {"description": "What the body must begin with.", "type": "string", "const": "body_starts_with"},
+        {"description": "The exit status a run ends with.", "type": "string", "const": "exit"},
+        {"description": "What a run's standard output begins with.", "type": "string", "const": "stdout_starts_with"}
       ]
     },
     "PluginCriticality": {
@@ -530,6 +543,26 @@
       },
       "additionalProperties": false,
       "required": ["method", "path"]
+    },
+    "PluginRun": {
+      "description": "A run of the image's own program, as a proof declares it.",
+      "type": "object",
+      "properties": {
+        "args": {
+          "description": "Each argument handed to the image's entrypoint, one string each: one to 64, each at\nmost 4096 bytes and none holding a NUL.",
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "timeout_s": {
+          "description": "How long the run may take, from 1 to 120 seconds. Default 30.",
+          "type": ["integer", "null"],
+          "format": "uint32",
+          "default": null,
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": ["args"]
     },
     "PluginService": {
       "description": "What runs.\n\nDeclared in the stack manifest's service vocabulary, restricted to these fields.\nThe restriction is the substance of it: the set of fields *is* the set of things a\nplugin may ask for, so \"what can this plugin reach\" is answerable from the format\nrather than from the instance.",
@@ -729,7 +762,22 @@
           "default": null
         },
         "id": {"description": "Unique within the plugin. What a verdict is reported against.", "type": "string"},
-        "request": {"description": "Method and path.", "$ref": "#/$defs/PluginRequest"},
+        "request": {
+          "description": "Method and path. Exactly one of this and `run`.",
+          "anyOf": [
+            {"$ref": "#/$defs/PluginRequest"},
+            {"type": "null"}
+          ],
+          "default": null
+        },
+        "run": {
+          "description": "Arguments to the image's own entrypoint, run with no network. Exactly one of this\nand `request`.",
+          "anyOf": [
+            {"$ref": "#/$defs/PluginRun"},
+            {"type": "null"}
+          ],
+          "default": null
+        },
         "service": {
           "description": "Which of this plugin's services is asked.\n\nOptional where the plugin declares one, required where it declares more. A proof\ngates the install of every service the plugin brings, and one that did not say\nwhich it was about would be checked against whichever the reader reached first —\nincluding its digest, which is what ties a recording to the image it came out of.",
           "type": ["string", "null"],
@@ -739,7 +787,7 @@
         "why": {"description": "Why this is worth asserting. A proof nobody can justify is one nobody will\nmaintain.", "type": "string"}
       },
       "additionalProperties": false,
-      "required": ["id", "title", "request", "expect", "why"]
+      "required": ["id", "title", "expect", "why"]
     },
     "Recipe": {
       "description": "One named flow of calls.",

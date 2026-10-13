@@ -107,6 +107,12 @@
           "type": ["string", "null"],
           "default": null
         },
+        "exit": {
+          "description": "The exit status a run must end with. Not sufficient alone.",
+          "type": ["integer", "null"],
+          "format": "int64",
+          "default": null
+        },
         "json": {
           "description": "Places the answer must carry, each with the exact value it must hold.",
           "type": ["object", "null"],
@@ -150,6 +156,11 @@
           "default": null,
           "maximum": 65535,
           "minimum": 0
+        },
+        "stdout_starts_with": {
+          "description": "What a run's standard output must begin with.",
+          "type": ["string", "null"],
+          "default": null
         }
       },
       "additionalProperties": false

@@ -299,6 +299,7 @@ fn rehearsing(dir: &Path) -> (Ctx, Watched) {
             eraser: Arc::clone(&eraser) as Arc<dyn lemonfiber_core::ports::filesystem::Eraser>,
             occupancy: Walking::holding(Vec::new()),
             hosting: Arc::clone(&hosting) as Arc<dyn lemonfiber_core::ports::Host>,
+            program: lemonfiber_fixtures::proving::Proving::unreachable(),
             ..lemonfiber_adapters::live()
         },
         Source::Embedded(&STACK),

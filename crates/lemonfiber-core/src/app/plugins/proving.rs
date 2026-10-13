@@ -24,7 +24,7 @@ use std::collections::BTreeSet;
 use std::path::Path;
 use std::time::Duration;
 
-use lemonfiber_plugin::{Manifest, Proof};
+use lemonfiber_plugin::Manifest;
 
 use crate::error::{Problem, Remedy, State};
 use crate::plugin::judging::{judge, live, method};
@@ -217,6 +217,7 @@ pub(crate) async fn asked(
     manifest: &Manifest,
     installed: &Installed,
     stack: &Path,
+    source: &Path,
     stated: &mut [Proving],
 ) {
     let deadline = ctx.seams.clock.now() + ctx.patience;
@@ -225,15 +226,29 @@ pub(crate) async fn asked(
     // is a second port to be wrong about.
     let reached = crate::plugin::answering(std::slice::from_ref(installed));
     for (proof, stated) in manifest.proofs.iter().zip(stated.iter_mut()) {
+        let placed = stated
+            .of
+            .as_deref()
+            .and_then(|named| installed.services.iter().find(|one| one.service == named));
         let at = stated.of.as_deref().and_then(|named| reached.get(named));
-        stated.came_to = Some(match at {
-            None => Verdict::Unproven {
+        stated.came_to = Some(match (&proof.request, &proof.run, placed, at) {
+            (None, Some(run), Some(placed), _) => {
+                running(ctx, placed, run, &proof.expect, source).await
+            }
+            (Some(request), None, _, Some(address)) => {
+                answering(ctx, request, &proof.expect, address, deadline).await
+            }
+            (Some(_), None, _, None) => Verdict::Unproven {
                 why: format!(
                     "{} publishes no port this machine can reach, so there is nowhere to ask it",
                     stated.of.as_deref().unwrap_or("the service it names")
                 ),
             },
-            Some(address) => answering(ctx, proof, address, deadline).await,
+            _ => Verdict::Unproven {
+                why: "it does not settle one service and one asking, a request or a run, so \
+                      nothing was asked"
+                    .to_owned(),
+            },
         });
     }
     let speaking = installed
@@ -340,29 +355,30 @@ async fn held_to(
 /// something else is not proving, it is waiting for luck.
 pub(super) async fn answering(
     ctx: &Ctx,
-    proof: &Proof,
+    asked: &lemonfiber_plugin::Request,
+    expect: &lemonfiber_plugin::Expect,
     address: &str,
     deadline: std::time::SystemTime,
 ) -> Verdict {
     // The method the transport can carry, or nothing where the manifest named one it
     // cannot. Reported as unproven rather than sent as something else: a proof asked
     // with a verb nobody wrote down is a proof about a question nobody declared.
-    let Some(method) = method(&proof.request.method) else {
+    let Some(method) = method(&asked.method) else {
         return Verdict::Unproven {
             why: format!(
                 "{} is not a method lemonfiber can send, so the proof was never put",
-                proof.request.method
+                asked.method
             ),
         };
     };
     // A route on the service lemonfiber resolved, and nothing that could name another
     // host once it is joined to that address. The reader refused any other path when
     // the manifest was read; this is where the join happens, so it is asked again here.
-    if !lemonfiber_plugin::refusing::carried::is_route(&proof.request.path) {
+    if !lemonfiber_plugin::refusing::carried::is_route(&asked.path) {
         return Verdict::Unproven {
             why: format!(
                 "{} is not a route on {address}, so the proof was never put",
-                proof.request.path
+                asked.path
             ),
         };
     }
@@ -371,7 +387,7 @@ pub(super) async fn answering(
     // format rather than a convention somebody has to hold.
     let request = Request {
         method,
-        url: format!("{address}{}", proof.request.path),
+        url: format!("{address}{}", asked.path),
         headers: Vec::new(),
         body: None,
         pinned: None,
@@ -379,7 +395,7 @@ pub(super) async fn answering(
     loop {
         match ctx.seams.http.send(&request).await {
             Ok(response) => {
-                let faults = judge(&proof.expect, &live(&response));
+                let faults = judge(expect, &live(&response));
                 return if faults.is_empty() {
                     Verdict::Passed
                 } else {
@@ -397,6 +413,30 @@ pub(super) async fn answering(
             Err(_) => tokio::time::sleep(POLL).await,
         }
     }
+}
+
+/// What running the image's own program for one proof came to, with a throwaway copy of
+/// the starting files the plugin's source at `source` ships for the service.
+pub(super) async fn running(
+    ctx: &Ctx,
+    placed: &crate::plugin::Placed,
+    run: &lemonfiber_plugin::Run,
+    expect: &lemonfiber_plugin::Expect,
+    source: &Path,
+) -> Verdict {
+    let starting = crate::plugin::program::Starting {
+        root: source,
+        service: &placed.service,
+    };
+    let came = crate::plugin::program::performed(
+        ctx.seams.program.as_ref(),
+        placed,
+        run,
+        &crate::plugin::program::Operator::of(ctx),
+        Some(starting),
+    )
+    .await;
+    crate::plugin::program::verdict(&came, expect)
 }
 
 /// Whether every proof held.

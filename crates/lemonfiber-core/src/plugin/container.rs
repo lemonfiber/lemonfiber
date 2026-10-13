@@ -195,7 +195,7 @@ fn published(placed: &Placed) -> Vec<(Tier, u16, u16)> {
 }
 
 /// Who the service runs as, the declared mode or the one its kind requires.
-const fn user_of(placed: &Placed) -> UserMode {
+pub(crate) const fn user_of(placed: &Placed) -> UserMode {
     UserMode::of(
         placed.fields.user_mode,
         !placed.speaks.is_empty(),

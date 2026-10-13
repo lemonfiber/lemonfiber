@@ -33,6 +33,7 @@ pub mod headroom;
 pub mod indexer;
 pub mod narrowing;
 pub mod permissions;
+pub(crate) mod proved;
 pub mod providers;
 pub mod releases;
 pub mod seasons;

@@ -46,6 +46,16 @@
       "description": "What the body must begin with.",
       "type": "string",
       "const": "body_starts_with"
+    },
+    {
+      "description": "The exit status a run ends with.",
+      "type": "string",
+      "const": "exit"
+    },
+    {
+      "description": "What a run's standard output begins with.",
+      "type": "string",
+      "const": "stdout_starts_with"
     }
   ]
 }

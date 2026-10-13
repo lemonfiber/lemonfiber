@@ -126,6 +126,12 @@
       ],
       "required": false
     },
+    "starting": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "tag": {
       "type": [
         "string"

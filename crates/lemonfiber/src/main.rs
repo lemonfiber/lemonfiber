@@ -377,7 +377,8 @@ async fn for_an_author(read: &lemonfiber::cli::Authoring, json: bool) -> ExitCod
     let asking = lemonfiber_adapters::registry::Oci::new(std::sync::Arc::new(
         lemonfiber_adapters::http::Web::new(),
     ));
-    let answered = authoring::published(read, json, &asking).await;
+    let program = lemonfiber_adapters::Daemon::reaching(lemonfiber_adapters::docker_target());
+    let answered = authoring::published(read, json, &asking, &program).await;
     if let Some(fault) = answered.fault {
         complain!("error: {fault}");
     }

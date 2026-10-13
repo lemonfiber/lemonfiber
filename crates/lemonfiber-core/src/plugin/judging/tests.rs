@@ -1,6 +1,6 @@
 use lemonfiber_plugin::Expect;
 
-use super::super::recorded::{Answer, Recording};
+use super::super::recorded::{Answer, Of, Recording};
 use lemonfiber_plugin::vocabulary::Constraint;
 
 use super::{faults, judge, method};
@@ -17,7 +17,10 @@ fn answered(response: &str) -> Answer {
     );
     let read = serde_json::from_str::<Recording>(&text);
     assert!(read.is_ok(), "the recording does not read: {read:?}");
-    read.map(|recording| recording.response).unwrap_or_default()
+    match read.map(|recording| recording.of) {
+        Ok(Of::Request { response, .. }) => response,
+        _ => Answer::default(),
+    }
 }
 
 /// An expectation, read the way a manifest's is: through its own deserialiser.

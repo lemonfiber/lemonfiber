@@ -99,5 +99,6 @@ pub fn live_reaching(target: &lemonfiber_ports::docker::Target) -> Seams {
         random: Arc::new(Os),
         nntp: Arc::new(Dialer::new()),
         resolver: Arc::new(Lookup),
+        program: Arc::new(Daemon::reaching(target.clone())),
     }
 }

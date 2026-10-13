@@ -54,9 +54,26 @@ pub async fn diagnose(
     narrowing: &Narrowing,
     disruptive: bool,
 ) -> Result<DoctorReport, Box<Problem>> {
-    let (stack, checks) = assembled(ctx, disruptive).await?;
+    let (stack, mut checks) = assembled(ctx, disruptive).await?;
+    checks.extend(running(ctx, &stack));
     let report = examined(ctx, &stack.manifest.services, &checks, narrowing).await;
     answered(narrowing, report)
+}
+
+/// A check for every run proof an installed plugin declares, which only a diagnosis runs.
+fn running(ctx: &Ctx, stack: &Stack) -> Vec<Box<dyn Check>> {
+    let running = crate::doctor::proved::Running {
+        program: Arc::clone(&ctx.seams.program),
+        operator: crate::plugin::program::Operator::of(ctx),
+        starting: crate::app::targets::beside_env(ctx, crate::config::paths::STARTING_KEPT),
+        kept: crate::app::targets::beside_env(ctx, crate::config::paths::RUN_VERDICTS),
+        now: ctx.stamp(),
+    };
+    stack
+        .installed
+        .iter()
+        .flat_map(|installed| crate::doctor::proved::declared(installed, &running))
+        .collect()
 }
 
 /// The report, or a refusal where a named check said nothing at all.

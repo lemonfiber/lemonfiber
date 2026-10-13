@@ -338,6 +338,13 @@ impl Ctx {
         self
     }
 
+    /// The same context, running an image's own program through the given seam.
+    #[must_use]
+    pub fn with_program(mut self, program: Arc<dyn crate::ports::program::Program>) -> Self {
+        self.seams.program = program;
+        self
+    }
+
     /// The same context, asking the given seam where this machine is.
     ///
     /// Lets the address a household is handed be asserted, which the real one

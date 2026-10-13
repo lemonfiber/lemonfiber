@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A run of the image's own program, as a proof declares it.",
+  "type": "object",
+  "properties": {
+    "args": {
+      "description": "Each argument handed to the image's entrypoint, one string each: one to 64, each at\nmost 4096 bytes and none holding a NUL.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "timeout_s": {
+      "description": "How long the run may take, from 1 to 120 seconds. Default 30.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "default": null,
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "args"
+  ]
+}

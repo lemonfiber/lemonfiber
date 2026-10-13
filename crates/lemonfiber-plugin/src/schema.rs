@@ -21,7 +21,7 @@ use crate::{is_compatible, Failure, SUPPORTED_SCHEMA_VERSIONS};
 
 pub use evidence::{
     Claim, ClaimProbe, Contribution, Declaration, Declared, Expect, Expected, ExpectedKind, Proof,
-    Request,
+    Request, Run, LONGEST_ARG, MOST_ARGS, RUN_TIMEOUT,
 };
 pub use lemonfiber_manifest::container::Shape;
 pub use recipe::{

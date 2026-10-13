@@ -37,6 +37,7 @@ mod fronting;
 mod installing;
 mod leaving;
 mod naming;
+mod program;
 mod reaching;
 mod recipes;
 mod replacing;
@@ -49,7 +50,7 @@ pub use recipes::{names_a_header_by_substitution, names_a_path_not_plain, outsid
 use std::collections::BTreeSet;
 
 use crate::offering;
-use crate::schema::{Manifest, Plugin, Service};
+use crate::schema::{Contribution, Manifest, Plugin, Proof, Service};
 use crate::{claiming, Violation};
 
 /// Everything this build refuses about a manifest, in one pass.
@@ -78,6 +79,7 @@ pub fn refusals(manifest: &Manifest, occupied: &[&str]) -> Vec<Violation> {
     carried::carried(manifest, &mut found);
     evidence::asking(manifest, &mut found);
     evidence::looking(manifest, &mut found);
+    program::asked(manifest, &mut found);
     failing::declared(manifest, &mut found);
     requiring(manifest, &mut found);
     recipes::declared(manifest, &mut found);
@@ -415,16 +417,47 @@ fn declared(manifest: &Manifest) -> Vec<(String, &str)> {
             ));
         }
     }
-    for proof in &manifest.proofs {
+    proofs(&manifest.proofs, &mut every);
+    contributions(&manifest.contributions, &mut every);
+    for recipe in &manifest.recipes {
+        let at = format!("recipe {}", recipe.id);
+        every.push((format!("{at}.title"), recipe.title.as_str()));
+        every.push((format!("{at}.why"), recipe.why.as_str()));
+        inputs(&at, &recipe.inputs, &mut every);
+        steps(&at, &recipe.steps, &mut every);
+    }
+    for secret in &manifest.secrets {
+        every.push((format!("secret {}.why", secret.id), secret.why.as_str()));
+    }
+    for over in &manifest.overrides {
+        every.push((format!("override {}.why", over.id), over.why.as_str()));
+    }
+    every
+}
+
+/// What each proof says: its title, what it asks or runs, why, and what its failing
+/// declarations say.
+fn proofs<'a>(proofs: &'a [Proof], every: &mut Vec<(String, &'a str)>) {
+    for proof in proofs {
         let at = format!("proof {}", proof.id);
         every.push((format!("{at}.title"), proof.title.as_str()));
-        every.push((format!("{at}.request.path"), proof.request.path.as_str()));
+        if let Some(request) = &proof.request {
+            every.push((format!("{at}.request.path"), request.path.as_str()));
+        }
+        for arg in proof.run.iter().flat_map(|run| &run.args) {
+            every.push((format!("{at}.run.args"), arg.as_str()));
+        }
         every.push((format!("{at}.why"), proof.why.as_str()));
-        reasons(&at, &proof.expected, &mut every);
+        reasons(&at, &proof.expected, every);
     }
-    for entry in &manifest.contributions {
+}
+
+/// What each contributed check says: what its failing declarations say, its title,
+/// why, the action and detail it offers, and the path it asks.
+fn contributions<'a>(contributions: &'a [Contribution], every: &mut Vec<(String, &'a str)>) {
+    for entry in contributions {
         let at = format!("contribution {}", entry.id);
-        reasons(&at, &entry.expected, &mut every);
+        reasons(&at, &entry.expected, every);
         for (field, text) in [
             ("title", entry.title.as_deref()),
             ("why", entry.why.as_deref()),
@@ -440,20 +473,6 @@ fn declared(manifest: &Manifest) -> Vec<(String, &str)> {
             }
         }
     }
-    for recipe in &manifest.recipes {
-        let at = format!("recipe {}", recipe.id);
-        every.push((format!("{at}.title"), recipe.title.as_str()));
-        every.push((format!("{at}.why"), recipe.why.as_str()));
-        inputs(&at, &recipe.inputs, &mut every);
-        steps(&at, &recipe.steps, &mut every);
-    }
-    for secret in &manifest.secrets {
-        every.push((format!("secret {}.why", secret.id), secret.why.as_str()));
-    }
-    for over in &manifest.overrides {
-        every.push((format!("override {}.why", over.id), over.why.as_str()));
-    }
-    every
 }
 
 /// What each step of a recipe sends and captures: its path, its body, each header's
