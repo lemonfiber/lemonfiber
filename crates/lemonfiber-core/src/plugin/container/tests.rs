@@ -4,7 +4,8 @@ use std::path::PathBuf;
 use lemonfiber_plugin::{Manifest, Shape};
 
 use super::super::installed::{Installed, Placed, Reached};
-use super::{published, written, Reading, HOUSEHOLD, LIBRARY, LOOPBACK, PROFILE};
+use super::{written, Reading, LOOPBACK, PROFILE};
+use crate::project::entry::{Tier, HOUSEHOLD, LIBRARY};
 
 /// The template the generated entries extend, as the stack ships it.
 ///
@@ -644,21 +645,8 @@ fn a_second_mount_beneath_the_library_is_found_by_that_reader() {
 /// has read.
 #[test]
 fn each_tier_renders_to_its_own_interface() {
-    assert_eq!(
-        published(&Reached::Loopback {
-            port: 1,
-            group: None
-        }),
-        LOOPBACK
-    );
-    assert_eq!(
-        published(&Reached::Household {
-            port: 1,
-            hostname: "comics".to_owned(),
-            group: None
-        }),
-        HOUSEHOLD
-    );
+    assert_eq!(Tier::Loopback.interface(), LOOPBACK);
+    assert_eq!(Tier::Household.interface(), HOUSEHOLD);
     assert_ne!(LOOPBACK, HOUSEHOLD);
 }
 

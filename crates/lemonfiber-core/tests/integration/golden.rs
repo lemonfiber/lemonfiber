@@ -46,7 +46,15 @@ const ENVIRONMENTS: [Environment; 4] = [
 fn golden(form: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/golden")
-        .join(format!("up_{form}.txt"))
+        .join(golden_name(form))
+}
+
+/// What every form's golden file is named beginning with.
+const FORM_GOLDEN: &str = "up_";
+
+/// The golden file of `form`.
+fn golden_name(form: &str) -> String {
+    format!("{FORM_GOLDEN}{form}.txt")
 }
 
 #[test]
@@ -124,7 +132,7 @@ fn there_is_a_golden_file_for_every_form_and_no_others() {
     let mut expected: Vec<String> = manifest
         .forms
         .iter()
-        .map(|form| format!("up_{}.txt", form.id))
+        .map(|form| golden_name(&form.id))
         .collect();
     expected.sort();
 
@@ -134,6 +142,7 @@ fn there_is_a_golden_file_for_every_form_and_no_others() {
         .flatten()
         .flatten()
         .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .filter(|name| name.starts_with(FORM_GOLDEN))
         .collect();
     found.sort();
 

@@ -106,6 +106,7 @@ pub mod network;
 pub mod news;
 pub mod plugin;
 pub mod prerequisites;
+pub mod project;
 pub mod provider;
 pub mod prowlarr;
 pub mod qbittorrent;

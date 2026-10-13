@@ -34,6 +34,7 @@ mod lidarr;
 mod lock;
 mod logs;
 mod nntp;
+mod one_generated_project;
 mod one_host_answers_for_both;
 mod one_path_inside_and_out;
 mod one_stack_one_host;

@@ -34,6 +34,7 @@ use std::path::{Path, PathBuf};
 
 use super::container::Reading;
 use super::installed::Installed;
+use crate::project::entry::{CONFIGURATION_TREE, MOUNT_TREE};
 
 /// The directory beneath the stack where a plugin's Compose document is written.
 ///
@@ -42,17 +43,6 @@ use super::installed::Installed;
 /// own template by a relative path. A document kept anywhere else would name a
 /// template that is not there.
 pub(crate) const OVERLAYS: &str = "compose/plugins";
-
-/// The directory beneath the stack holding each service's own configuration.
-///
-/// The same one the bundled services use, and the same one the generated container
-/// mounts from — `./config/<service>` in the entry is this directory, resolved
-/// against the project directory Compose is pointed at.
-pub(super) const CONFIGURATION: &str = "config";
-
-/// Where each service's own mount tree is kept, beneath the stack directory and apart
-/// from its configuration directory.
-pub(super) const MOUNTS: &str = "mounts";
 
 /// One thing an install puts on the machine.
 ///
@@ -159,7 +149,7 @@ pub fn key_file(stack: &Path, service: &str) -> PathBuf {
 /// Where one of a plugin's services keeps the sources of its further mounts.
 #[must_use]
 pub fn mount_tree(stack: &Path, service: &str) -> PathBuf {
-    stack.join(MOUNTS).join(service)
+    stack.join(MOUNT_TREE).join(service)
 }
 
 /// Every further mount source of an installed plugin's services the model allows, each
@@ -181,7 +171,7 @@ pub fn mount_sources(installed: &Installed, stack: &Path) -> Vec<PathBuf> {
 /// Not published, unlike the document's path: nothing outside this module has had to
 /// ask yet, and a name nothing reads is one that drifts from what it describes.
 fn configuration(stack: &Path, service: &str) -> PathBuf {
-    stack.join(CONFIGURATION).join(service)
+    stack.join(CONFIGURATION_TREE).join(service)
 }
 
 /// Every Compose document the installed plugins contribute, in the order Compose
