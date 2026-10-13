@@ -47,9 +47,8 @@ pub(crate) fn unoccupied(
         settings.get(name).map(str::to_owned)
     });
     let proxy = std::fs::read_to_string(stack.join(crate::plugin::PROXY)).unwrap_or_default();
-    let trusted = crate::plugin::first_party::holds(crate::plugin::first_party::EMBEDDED, would);
-    let mut clashes = named(would, &services, trusted);
-    clashes.extend(bound(would, &ports, installed, trusted));
+    let mut clashes = named(would, &services);
+    clashes.extend(bound(would, &ports, installed));
     clashes.extend(answered(would, &proxy));
     if clashes.is_empty() {
         return Ok(());
@@ -58,15 +57,14 @@ pub(crate) fn unoccupied(
 }
 
 /// Every service of the plugin's that the stack as this machine runs it already
-/// declares by name, but the one it replaces where it is `trusted` as first-party.
-fn named(would: &Installed, services: &[Declared], trusted: bool) -> Vec<String> {
+/// declares by name.
+fn named(would: &Installed, services: &[Declared]) -> Vec<String> {
     would
         .services
         .iter()
         .filter_map(|placed| {
             services
                 .iter()
-                .filter(|held| !(trusted && replaces(placed, &held.service)))
                 .find(|held| held.service == placed.service)
                 .map(|held| {
                     format!(
@@ -80,30 +78,15 @@ fn named(would: &Installed, services: &[Declared], trusted: bool) -> Vec<String>
         .collect()
 }
 
-/// Whether `placed` declares it takes the place of the stack's `service`.
-fn replaces(placed: &crate::plugin::Placed, service: &str) -> bool {
-    placed.replaces.as_deref() == Some(service)
-}
-
-/// Every port the plugin would publish that the stack or another plugin already does,
-/// but the ones of the service it replaces where it is `trusted` as first-party.
-fn bound(
-    would: &Installed,
-    ports: &[Published],
-    installed: &[Installed],
-    trusted: bool,
-) -> Vec<String> {
+/// Every port the plugin would publish that the stack or another plugin already does.
+fn bound(would: &Installed, ports: &[Published], installed: &[Installed]) -> Vec<String> {
     let mut clashes = Vec::new();
     for (placed, port) in would
         .services
         .iter()
         .flat_map(|placed| placed.ports().map(move |port| (placed, port)))
     {
-        if let Some(held) = ports
-            .iter()
-            .filter(|held| !(trusted && replaces(placed, &held.service)))
-            .find(|held| held.port == port)
-        {
+        if let Some(held) = ports.iter().find(|held| held.port == port) {
             clashes.push(format!(
                 "service {}: port {port} is already published for {} in {}",
                 placed.service,
