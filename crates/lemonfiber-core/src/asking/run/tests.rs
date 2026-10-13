@@ -2,11 +2,11 @@ use std::sync::Arc;
 
 use lemonfiber_fixtures::http::{Answer, Fake};
 
-use super::{allowing, deciding, found, now_reads, settled, theirs, Ctx};
+use super::{allowing, deciding, found, now_reads, one_named, settled, theirs, Ctx};
 use crate::app::command::{Answer as Ruling, Chosen, Decision};
 use crate::asking::Policy;
 use crate::ports::http::Method;
-use crate::ports::service::{Asking, Quota};
+use crate::ports::service::{Asking, Member, Quota};
 use crate::test_support::{a_context, a_password, SeedFs};
 
 /// A household trusted within five a week.
@@ -151,3 +151,42 @@ fn answering(tag: &str, broken: Vec<(Option<Method>, &'static str, Answer)>) -> 
 
 mod allowances;
 mod decisions;
+
+fn called(names: &[&str]) -> Vec<Member> {
+    names
+        .iter()
+        .map(|name| Member {
+            id: format!("id-{name}"),
+            name: (*name).to_owned(),
+            ..Member::default()
+        })
+        .collect()
+}
+
+#[test]
+fn an_exact_name_is_that_account_whoever_is_listed_first() {
+    let accounts = called(&["Alexandra", "Alex"]);
+    assert_eq!(
+        one_named(&accounts, "Alex").map(|one| one.name.as_str()),
+        Some("Alex")
+    );
+    assert_eq!(
+        one_named(&accounts, " alex ").map(|one| one.name.as_str()),
+        Some("Alex")
+    );
+}
+
+#[test]
+fn a_part_of_one_name_is_that_account() {
+    let accounts = called(&["Alexandra", "Sam"]);
+    assert_eq!(
+        one_named(&accounts, "xand").map(|one| one.name.as_str()),
+        Some("Alexandra")
+    );
+}
+
+#[test]
+fn a_part_several_names_hold_names_nobody() {
+    let accounts = called(&["Alexandra", "Alexis"]);
+    assert!(one_named(&accounts, "Alex").is_none());
+}
