@@ -12,24 +12,15 @@ const MEDIA_STACK: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/med
 /// Services the media stack runs that the bundle does not assemble yet.
 const NOT_ASSEMBLED: [&str; 4] = ["decline", "jellyfin", "recyclarr", "request-gate"];
 
-/// Fields of a service that differ between the two, by service and field.
-const DIFFERING: [(&str, &str); 16] = [
-    ("bazarr", "digest"),
-    ("bazarr", "tag"),
-    ("bindery", "digest"),
-    ("bindery", "tag"),
+/// Fields of a service that differ between the two, by service and field: the guarded
+/// door and the proxy run the images lemonfiber builds for them (ADR-0045).
+const DIFFERING: [(&str, &str); 6] = [
     ("caddy", "digest"),
     ("caddy", "image"),
     ("caddy", "tag"),
     ("door", "digest"),
     ("door", "image"),
     ("door", "tag"),
-    ("prowlarr", "digest"),
-    ("prowlarr", "tag"),
-    ("qbittorrent", "digest"),
-    ("qbittorrent", "tag"),
-    ("sonarr", "digest"),
-    ("sonarr", "tag"),
 ];
 
 fn services(text: &str) -> Vec<Table> {
