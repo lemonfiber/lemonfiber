@@ -73,4 +73,31 @@ codes! {
             where you turned it off yourself. Where it could not be asked, check it is up and \
             has finished starting, then run the diagnosis again.",
     }
+    /// Raised where the operator's overlay changes services, merged over the project
+    /// lemonfiber writes and held to nothing it vets.
+    OVERLAY_UNVETTED = "CONFIG-8" {
+        severity: Warning,
+        status: 500,
+        since: "0.18.0",
+        meaning: "Your overlay is merged over the project lemonfiber writes, last, and changes \
+            the services it names. Nothing in it was held to what lemonfiber checks a \
+            service against, so what those services can reach and do is yours to vouch for. \
+            Nothing has been changed — this is the doctor reporting what it found.",
+        remedy: "Keep the overlay to what the services need, or move a change into the stack's \
+            own settings where one says it. The message names the overlay and each service \
+            it changes.",
+    }
+    /// Raised where a path is still recorded under the retired overlay setting, which is no
+    /// longer read.
+    OVERLAY_RETIRED = "CONFIG-9" {
+        severity: Warning,
+        status: 500,
+        since: "0.18.0",
+        meaning: "A Compose file is still named under LEMONFIBER_OVERLAY, which lemonfiber no \
+            longer reads: the overlay is the one file overlay.yml in its configuration \
+            directory. Whatever the named file changed is not applied.",
+        remedy: "Move the named file to overlay.yml in lemonfiber's configuration directory, \
+            then remove the LEMONFIBER_OVERLAY line from the settings file. The message names \
+            both paths.",
+    }
 }

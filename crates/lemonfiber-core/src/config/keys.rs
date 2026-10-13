@@ -94,12 +94,17 @@ pub(crate) const ZONE_KEY: &str = "TZ";
 /// wrong hour and agree with nothing.
 pub(crate) const DEFAULT_ZONE: &str = "Europe/Amsterdam";
 
-/// A Compose file layered over the stack's own.
+/// The retired setting that named a Compose file layered over the stack's own.
 ///
-/// Written by standing lemonfiber beside a setup already here: it maps each service to
-/// a port nothing else is using, so a second copy can be evaluated without moving the
-/// first out of the way.
+/// Not read: the operator's overlay is `overlay.yml` in lemonfiber's configuration
+/// directory, and a path still recorded here is named by the doctor with where to move
+/// it.
 pub(crate) const OVERLAY_KEY: &str = "LEMONFIBER_OVERLAY";
+
+/// Where standing lemonfiber beside a setup already here moved each service to listen,
+/// as `service:from=to` for each, so a second copy can be evaluated without moving the
+/// first out of the way.
+pub(crate) const BESIDE_KEY: &str = "LEMONFIBER_BESIDE";
 
 /// The Compose project lemonfiber manages.
 ///
@@ -407,7 +412,7 @@ pub const SETTINGS: &[&str] = &[
     IDEMPOTENCY_MINUTES_KEY,
     IDEMPOTENCY_KEYS_KEY,
     PROJECT_KEY,
-    OVERLAY_KEY,
+    BESIDE_KEY,
     QUIET_HOURS_KEY,
     EXPOSED_KEY,
     UNMANAGED_KEY,

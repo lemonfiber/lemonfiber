@@ -81,9 +81,9 @@ pub const SHOWN: &[(&str, &str)] = &[
          alerts that cannot wait",
     ),
     (
-        super::OVERLAY_KEY,
-        "a Compose file layered over the stack's own, which standing beside an existing \
-         setup writes so the two do not want the same ports",
+        super::BESIDE_KEY,
+        "the ports standing beside an existing setup moved each service to, so the two do \
+         not want the same ports",
     ),
     (
         super::PROJECT_KEY,

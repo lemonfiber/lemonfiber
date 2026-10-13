@@ -265,5 +265,6 @@ pub(crate) fn a_lifecycle(action: &str, plan: Plan) -> LifecycleReport {
         switched: None,
         held: None,
         offer: None,
+        unvetted: None,
     }
 }

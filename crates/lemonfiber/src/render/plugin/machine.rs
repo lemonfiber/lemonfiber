@@ -116,6 +116,7 @@ pub(crate) fn installs(report: &Installs) -> Lines {
     } else {
         lines.put(shelf(report.installed.len()));
     }
+    lines.extend(crate::render::overlay::unvetted(report.unvetted.as_ref()));
     for one in &report.installed {
         lines.spaced(format!("  {}", named(one)));
         lines.extend(listed::provenance(one, report));
@@ -406,6 +407,7 @@ fn undone(undo: &Undo) -> String {
         Action::ReinstateDevice { name } => format!("made the device key {name} good again"),
         Action::Resettle { name, .. } => format!("put the setting {name} back"),
         Action::Rehold { name, .. } => format!("put the secret {name} back"),
+        Action::Leave { path } => format!("left the overlay {path} as it is"),
     }
 }
 

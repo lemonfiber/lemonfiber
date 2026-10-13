@@ -234,6 +234,16 @@ pub enum Kind {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         filed: Option<String>,
     },
+    /// The operator's overlay was written, changed or taken away, recorded by the
+    /// fingerprint of what it held. Nothing undoes it: the file is the operator's.
+    Overlaid {
+        /// The overlay.
+        path: String,
+        /// The fingerprint of what it held before, or nothing where there was none.
+        previous: Option<String>,
+        /// The fingerprint of what it holds now, or nothing where it was taken away.
+        current: Option<String>,
+    },
 }
 
 impl Change {
@@ -322,6 +332,7 @@ impl Change {
                 kept: current.clone(),
                 filed: filed.clone(),
             },
+            Kind::Overlaid { path, .. } => Action::Leave { path: path.clone() },
         };
         Undo {
             target: self.target.clone(),
@@ -479,6 +490,14 @@ pub enum Action {
         kept: Option<String>,
         /// The environment file's setting it goes back to, where it was moved out of one.
         filed: Option<String>,
+    },
+    /// Leave the operator's overlay as it is.
+    ///
+    /// Worked out so the record of a change to it has a reversal to name, and never
+    /// carried out: lemonfiber does not write the operator's own file.
+    Leave {
+        /// The overlay.
+        path: String,
     },
 }
 

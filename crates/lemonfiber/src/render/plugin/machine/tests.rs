@@ -149,6 +149,7 @@ fn moving(recorded: bool, restored: Option<Restored>, stopped: Option<&str>) -> 
         })),
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     }
 }
 

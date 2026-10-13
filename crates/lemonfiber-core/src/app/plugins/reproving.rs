@@ -83,6 +83,7 @@ fn answering(held: &Register, proof: Reproof, offer: String) -> Installs {
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     }
 }
 

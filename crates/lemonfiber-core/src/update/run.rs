@@ -97,6 +97,10 @@ pub struct Report {
     /// the one it would move to, named so that an update carrying it back takes those
     /// steps or is refused.
     pub offer: String,
+    /// The operator's overlay and every service it changes, where there is one: merged
+    /// over the project this run would start, and held to nothing lemonfiber vets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unvetted: Option<crate::model::Unvetted>,
 }
 
 /// What the release carrying this build changed, as every update report says it.
@@ -124,6 +128,7 @@ impl Report {
             halted: None,
             changelog: brought(),
             offer: String::new(),
+            unvetted: None,
         }
     }
 }
@@ -163,7 +168,11 @@ pub(crate) async fn update(ctx: &Ctx, asked: Asked) -> Result<Report, Box<Proble
         let active = waiting(ctx, &changes).await;
         Ok(Report::proposed(changes, active, false))
     };
-    report.map(|report| Report { offer, ..report })
+    report.map(|report| Report {
+        offer,
+        unvetted: crate::overlay::unvetted(ctx),
+        ..report
+    })
 }
 
 /// The offer an update answers: each step, by the service it moves and the releases

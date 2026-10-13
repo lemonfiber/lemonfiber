@@ -396,6 +396,7 @@ fn nothing_started(reason: &str) -> LifecycleReport {
         switched: None,
         held: Some(reason.to_owned()),
         offer: None,
+        unvetted: None,
     }
 }
 

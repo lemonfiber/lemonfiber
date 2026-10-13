@@ -554,6 +554,7 @@ fn the_report_says_what_is_installed_and_what_this_run_did() {
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     };
     let done = Installs {
         nonconforming: Vec::new(),
@@ -581,6 +582,7 @@ fn the_report_says_what_is_installed_and_what_this_run_did() {
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     };
     assert!(read.install.is_none());
     assert_eq!(done.install.map(|one| one.recorded), Some(true));

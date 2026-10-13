@@ -32,6 +32,7 @@ mod keys;
 mod migration;
 mod news;
 mod outbound;
+mod overlay;
 mod playing;
 pub(crate) mod plugin;
 mod provenance;

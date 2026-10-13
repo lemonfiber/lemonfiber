@@ -94,6 +94,17 @@
           "type": "null"
         }
       ]
+    },
+    "unvetted": {
+      "description": "The operator's overlay and every service it changes, where there is one: merged\nover the project this run starts, and held to nothing lemonfiber vets.",
+      "anyOf": [
+        {
+          "$ref": "Unvetted.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
   "required": [

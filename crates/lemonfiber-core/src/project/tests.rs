@@ -442,3 +442,42 @@ fn on_an_nfs_export_every_service_taking_data_mounts_the_one_declared_volume() {
     let bound = project(&manifest, &[]);
     assert!(!bound.text.contains("type: nfs"), "{}", bound.text);
 }
+
+#[test]
+fn a_port_standing_beside_moved_is_published_where_it_was_moved_to() {
+    let manifest = carried();
+    let Some(service) = manifest
+        .services
+        .iter()
+        .find(|service| service.id == "sonarr" && service.port.is_some())
+    else {
+        unreachable!("the carried stack publishes sonarr");
+    };
+    let from = service.port.unwrap_or_default();
+    let moved = [crate::model::MovedReport {
+        service: "sonarr".to_owned(),
+        from,
+        to: 18989,
+    }];
+    let reading = Reading {
+        moved: &moved,
+        ..Reading::bare()
+    };
+    let beside = generated(&manifest, &[], &Chosen::read(None), &reading);
+    let published = ports(&entry(&beside, "sonarr"));
+    let inside = service.listens.unwrap_or(from);
+    assert!(
+        published
+            .iter()
+            .any(|port| port.ends_with(&format!(":18989:{inside}"))),
+        "{published:?}"
+    );
+    assert!(
+        !published
+            .iter()
+            .any(|port| port.ends_with(&format!(":{from}:{inside}"))),
+        "{published:?}"
+    );
+    let radarr = ports(&entry(&beside, "radarr"));
+    assert_eq!(radarr, ports(&entry(&project(&manifest, &[]), "radarr")));
+}

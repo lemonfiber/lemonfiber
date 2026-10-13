@@ -77,6 +77,12 @@
         "anyOf(null,ref:Switched)"
       ],
       "required": false
+    },
+    "unvetted": {
+      "type": [
+        "anyOf(null,ref:Unvetted)"
+      ],
+      "required": false
     }
   },
   "variants": []

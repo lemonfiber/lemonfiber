@@ -115,20 +115,6 @@ pub fn quiet_from_env(file: &env::EnvFile) -> Option<crate::alert::Quiet> {
     crate::alert::Quiet::parse(said, zone)
 }
 
-/// The Compose file layered over the stack's own, where one has been written.
-///
-/// One at most. Layering two would be two answers to where a service listens, and the
-/// last file Compose reads would quietly win.
-#[must_use]
-pub fn overlay_from_env(file: &env::EnvFile) -> Vec<PathBuf> {
-    file.get(super::OVERLAY_KEY)
-        .map(str::trim)
-        .filter(|named| !named.is_empty())
-        .map(PathBuf::from)
-        .into_iter()
-        .collect()
-}
-
 /// The Compose project lemonfiber manages.
 ///
 /// Its own unless a setup already on the machine was adopted, which is what makes

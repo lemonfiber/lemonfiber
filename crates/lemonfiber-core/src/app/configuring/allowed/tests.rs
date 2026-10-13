@@ -82,28 +82,37 @@ fn a_service_user_is_a_number_and_never_root() {
     assert!(identity("PGID", "staff").is_some());
 }
 
-/// A Compose file layered over the stack is taken from lemonfiber's own directories
-/// and nowhere else; an empty one clears it.
+/// The retired overlay key is refused whatever it names, naming the one file the overlay
+/// is read from.
 #[tokio::test]
-async fn an_overlay_is_taken_from_lemonfibers_own_directories_only() {
+async fn the_retired_overlay_key_is_refused_naming_the_overlays_one_place() {
     let ctx = ctx_in(
         Path::new("/home/op/.config/lemonfiber"),
         Path::new("/data/lf"),
     );
-    let held = EnvFile::default();
-    let key = crate::config::OVERLAY_KEY;
+    let held = EnvFile::parse("LEMONFIBER_OVERLAY=/home/op/.config/lemonfiber/beside.yml\n");
+    for value in ["/home/op/.config/lemonfiber/beside.yml", ""] {
+        let refused = refusal(&ctx, &held, crate::config::OVERLAY_KEY, value)
+            .await
+            .unwrap_or_default();
+        assert!(
+            refused.contains("/home/op/.config/lemonfiber/overlay.yml"),
+            "{refused}"
+        );
+    }
+}
 
+/// Where standing beside moved each service is taken only as moves that read.
+#[tokio::test]
+async fn the_beside_moves_are_taken_only_where_each_reads() {
+    let ctx = ctx_in(Path::new("/home/op/.config/lemonfiber"), Path::new("/data"));
+    let held = EnvFile::default();
+    let key = crate::config::BESIDE_KEY;
     assert_eq!(
-        refusal(&ctx, &held, key, "/home/op/.config/lemonfiber/beside.yml").await,
+        refusal(&ctx, &held, key, "sonarr:8989=18989,radarr:7878=17878").await,
         None
     );
-    assert_eq!(refusal(&ctx, &held, key, "/data/lf/beside.yml").await, None);
-    assert_eq!(refusal(&ctx, &held, key, "").await, None);
-    for refused in [
-        "/tmp/evil.yml",
-        "beside.yml",
-        "/home/op/.config/lemonfiber/../evil.yml",
-    ] {
+    for refused in ["sonarr", "sonarr:8989", "sonarr:x=1", "sonarr:1=70000"] {
         assert!(
             refusal(&ctx, &held, key, refused).await.is_some(),
             "{refused}"

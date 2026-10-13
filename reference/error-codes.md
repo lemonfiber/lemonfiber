@@ -95,6 +95,8 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `CONFIG-5` | `CONFIG_TOO_NEW` | error | 1 | 500 | 0.14.0 | Raised when configuration was written by a newer lemonfiber. |
 | `CONFIG-6` | `CONFIG_SPANS_LINES` | error | 1 | 500 | 0.16.0 | Raised when a setting's key or value spans more than one line. |
 | `CONFIG-7` | `AGGREGATOR_EXPOSED` | warning | 1 | 500 | 0.17.0 | Raised when the Usenet indexer aggregator answers a read of its whole configuration to a caller presenting nothing, or will not say whether it does. |
+| `CONFIG-8` | `OVERLAY_UNVETTED` | warning | 1 | 500 | 0.18.0 | Raised where the operator's overlay changes services, merged over the project lemonfiber writes and held to nothing it vets. |
+| `CONFIG-9` | `OVERLAY_RETIRED` | warning | 1 | 500 | 0.18.0 | Raised where a path is still recorded under the retired overlay setting, which is no longer read. |
 
 ## `CRED` — credentials a service refuses
 

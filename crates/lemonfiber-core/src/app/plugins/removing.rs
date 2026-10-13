@@ -221,6 +221,7 @@ fn answering(
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     }
 }
 

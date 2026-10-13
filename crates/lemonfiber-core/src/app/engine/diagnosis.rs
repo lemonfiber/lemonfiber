@@ -412,6 +412,10 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
         crate::autostart::run::load(ctx).wanted().on_boot(),
         ctx.settings.home.clone(),
     );
+    let overlay = crate::doctor::overlay::OverlayCheck::new(
+        ctx.seams.filesystem.clone(),
+        ctx.settings.env_file.clone(),
+    );
     let mut checks: Vec<Box<dyn Check>> = vec![
         Box::new(environment),
         Box::new(autostart),
@@ -431,6 +435,7 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
         Box::new(gate),
         Box::new(decline),
         Box::new(permissions),
+        Box::new(overlay),
     ];
     // Appended to the same list rather than kept in one of their own, which is the
     // whole of what *run where the bundled ones are run* means: one register, one

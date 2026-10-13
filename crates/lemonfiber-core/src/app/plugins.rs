@@ -207,7 +207,11 @@ use crate::error::codes::plugin::{NOWHERE, UNPROVED, UNWRITABLE};
 /// cannot be written. Every one of those after the first write puts the install back
 /// before it answers.
 pub(crate) async fn plugins(ctx: &Ctx, action: &Asked) -> Result<Installs, Box<Problem>> {
-    Box::pin(asked(ctx, action)).await
+    let starts = !matches!(action, Asked::Installed | Asked::Prove { .. });
+    Box::pin(asked(ctx, action)).await.map(|installs| Installs {
+        unvetted: crate::overlay::unvetted(ctx).filter(|_| starts),
+        ..installs
+    })
 }
 
 /// What is installed, or what installing, updating or removing one came to.

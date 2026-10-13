@@ -775,5 +775,5 @@ async fn data_on_an_nfs_export_is_the_nas_mode_and_nothing_here_is_probed() {
         reported,
         ["storage.hardlinks", "storage.mode", "storage.single-mount"]
     );
-    assert!(recorded.lock().map(|seen| seen.is_empty()).unwrap_or(false));
+    assert!(recorded.lock().is_ok_and(|seen| seen.is_empty()));
 }

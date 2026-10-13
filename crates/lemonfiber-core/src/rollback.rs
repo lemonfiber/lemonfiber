@@ -252,6 +252,12 @@ pub fn standing(
             written,
             ..
         } => bounded(path, owner, *written, reads),
+        Kind::Overlaid { path, .. } => Standing::refused(
+            &format!(
+                "the overlay {path} is the operator's own file, and lemonfiber does not write it"
+            ),
+            Some("edit the overlay yourself if it should hold something else"),
+        ),
         // A key is revoked because something should stop holding it, and making it good
         // again would hand back exactly what the revoke took away.
         Kind::KeyRevoked { name, .. } => Standing::refused(

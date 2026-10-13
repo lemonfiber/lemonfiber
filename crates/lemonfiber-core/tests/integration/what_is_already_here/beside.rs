@@ -25,7 +25,7 @@ async fn standing_beside_unconfirmed_says_where_it_would_listen_and_writes_nothi
 }
 
 #[tokio::test]
-async fn confirming_writes_the_layered_file_and_records_where_it_is() {
+async fn confirming_records_where_each_service_listens_and_writes_the_layered_file() {
     let env = scratch("beside-applied");
     let images = Pulled::holding(vec![Pulled::image(
         "lscr.io/linuxserver/sonarr:4.0.15",
@@ -35,6 +35,7 @@ async fn confirming_writes_the_layered_file_and_records_where_it_is() {
     let files = Arc::new(SeedFs::keyed(None, None));
     let mut ctx = over_files(somebody_elses(), images, Arc::clone(&files));
     ctx.settings.env_file = Some(env.to_path_buf());
+    ctx.settings.stack_dir = env.parent().map(|config| config.join("data").join("stack"));
 
     let found = standing(&ctx, true).await;
     assert_eq!(
@@ -46,7 +47,11 @@ async fn confirming_writes_the_layered_file_and_records_where_it_is() {
     // Where it says it wrote, and what actually went through the filesystem, are two
     // facts; a report claiming a file it never wrote is the bug worth catching.
     let recorded = std::fs::read_to_string(&env).unwrap_or_default();
-    assert!(recorded.contains("LEMONFIBER_OVERLAY="), "{recorded}");
+    assert!(
+        recorded.contains("LEMONFIBER_BESIDE=") && recorded.contains("sonarr:8989="),
+        "{recorded}"
+    );
+    assert!(!recorded.contains("LEMONFIBER_OVERLAY"), "{recorded}");
 
     let wrote = files.wrote();
     let layered = wrote

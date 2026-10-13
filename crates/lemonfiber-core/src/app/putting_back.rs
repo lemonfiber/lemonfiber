@@ -536,7 +536,8 @@ fn inverted(kind: &crate::journal::Kind) -> Option<crate::journal::Kind> {
         | Kind::Rewritten { .. }
         | Kind::Pinned { .. }
         | Kind::KeyRevoked { .. }
-        | Kind::DeviceKeyRevoked { .. } => None,
+        | Kind::DeviceKeyRevoked { .. }
+        | Kind::Overlaid { .. } => None,
     }
 }
 
