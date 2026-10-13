@@ -258,6 +258,23 @@ fn a_data_root_is_read_when_set_and_absent_when_blank() {
 }
 
 #[test]
+fn an_export_is_read_only_where_the_data_root_names_one() {
+    let export = super::nfs_from_env(&env::EnvFile::parse("DATA_ROOT=nfs://nas/media\n"));
+    assert_eq!(
+        export.map(|export| export.written()),
+        Some("nfs://nas/media".to_owned())
+    );
+    assert_eq!(
+        super::data_root_from_env(&env::EnvFile::parse("DATA_ROOT=nfs://nas/media\n")),
+        None
+    );
+    assert_eq!(
+        super::nfs_from_env(&env::EnvFile::parse("DATA_ROOT=/srv/media\n")),
+        None
+    );
+}
+
+#[test]
 fn a_service_user_is_read_only_when_both_halves_are_present_and_numeric() {
     assert_eq!(
         super::service_user_from_env(&env::EnvFile::parse("PUID=1000\nPGID=1001\n")),

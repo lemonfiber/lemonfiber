@@ -101,10 +101,13 @@ pub(super) fn working_mode(facts: &StorageFacts) -> Verdict {
     }
 }
 
+/// The mode of data kept on a network share.
+pub(super) const NAS: &str = "nas — imports copy across a network share";
+
 /// The mode a failed link puts the stack in: copy, or a network share's copy.
 pub(super) fn copy_mode(facts: &StorageFacts) -> Verdict {
     let note = if facts.kind.is_network() {
-        "nas — imports copy across a network share"
+        NAS
     } else {
         "copy — imports copy; this location cannot hardlink"
     };

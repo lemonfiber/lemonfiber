@@ -450,3 +450,18 @@ fn a_device_key_put_back_is_said_by_its_name() {
     assert!(said.contains("the device key pixel revoked"), "{said}");
     assert!(said.contains("the device key pixel good again"), "{said}");
 }
+
+#[test]
+fn the_overlay_is_said_to_be_left_as_it_is() {
+    let undos = vec![Undo {
+        target: "/cfg/overlay.yml".to_owned(),
+        action: Action::Leave {
+            path: "/cfg/overlay.yml".to_owned(),
+        },
+    }];
+    let said = reversed(&putting_back(undos, Vec::new())).text();
+    assert!(
+        said.contains("the overlay /cfg/overlay.yml left as it is"),
+        "{said}"
+    );
+}

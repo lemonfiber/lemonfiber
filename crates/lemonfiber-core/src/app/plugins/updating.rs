@@ -432,6 +432,7 @@ fn answering(installed: Vec<Installed>, update: Update, offer: String) -> Instal
         update: Some(Box::new(update)),
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     }
 }
 

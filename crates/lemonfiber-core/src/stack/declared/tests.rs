@@ -106,3 +106,15 @@ fn a_service_not_named_by_a_string_is_not_read() {
     let (services, _) = declared("services:\n  1: {}\n  b: {}\n");
     assert_eq!(services, ["b"]);
 }
+
+#[test]
+fn every_service_a_file_declares_is_named_in_order_and_nothing_else() {
+    assert_eq!(
+        super::named(
+            "services:\n  sonarr:\n    ports: [\"1:2\"]\n  radarr: {}\nvolumes:\n  x: {}\n"
+        ),
+        ["sonarr", "radarr"]
+    );
+    assert!(super::named("volumes:\n  x: {}\n").is_empty());
+    assert!(super::named("{ not yaml").is_empty());
+}

@@ -54,6 +54,12 @@
       ],
       "required": false
     },
+    "unvetted": {
+      "type": [
+        "anyOf(null,ref:Unvetted)"
+      ],
+      "required": false
+    },
     "update": {
       "type": [
         "anyOf(null,ref:PluginUpdate)"

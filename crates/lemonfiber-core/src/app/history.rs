@@ -154,6 +154,12 @@ fn did(kind: &Kind) -> String {
             ..
         } => format!("kept the secret {name}"),
         Kind::Secret { name, .. } => format!("replaced the secret {name}"),
+        Kind::Overlaid {
+            path,
+            current: None,
+            ..
+        } => format!("saw the overlay {path} taken away"),
+        Kind::Overlaid { path, .. } => format!("saw the overlay {path} change"),
     }
 }
 

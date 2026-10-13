@@ -31,6 +31,17 @@
       "items": {
         "$ref": "SettingRead.json"
       }
+    },
+    "unvetted": {
+      "description": "The operator's overlay and every service it changes, where there is one: merged\nover the project this run would start, and held to nothing lemonfiber vets.",
+      "anyOf": [
+        {
+          "$ref": "Unvetted.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
   "required": [

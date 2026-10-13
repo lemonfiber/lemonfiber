@@ -112,6 +112,7 @@ fn only_an_update_that_stopped_part_way_is_a_failure() {
             halted: None,
             changelog: lemonfiber_core::changelog::Notes::unread(),
             offer: String::new(),
+            unvetted: None,
         })))
     };
 
@@ -146,6 +147,7 @@ fn an_update_that_worked_and_left_the_stack_down_is_not_a_success() {
         halted: Some("the stack would not start again — lemonfiber up".to_owned()),
         changelog: lemonfiber_core::changelog::Notes::unread(),
         offer: String::new(),
+        unvetted: None,
     })));
 
     assert_eq!(left_down, shown(std::process::ExitCode::from(FAILURE)));
@@ -372,6 +374,7 @@ fn installed(
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     })
 }
 
@@ -422,6 +425,7 @@ fn only_a_proof_asked_again_that_did_not_hold_is_a_refusal() {
             update: None,
             substituted: Vec::new(),
             sources: Vec::new(),
+            unvetted: None,
         })
     };
     assert_eq!(shown(settled(&proved(false, false))), success());
@@ -458,6 +462,7 @@ fn a_removal_that_left_something_standing_exits_as_a_refusal() {
             update: None,
             substituted: Vec::new(),
             sources: Vec::new(),
+            unvetted: None,
         })
     };
 
@@ -533,6 +538,7 @@ fn an_update_that_did_not_hold_exits_as_a_refusal() {
             })),
             substituted: Vec::new(),
             sources: Vec::new(),
+            unvetted: None,
         })
     };
     assert_eq!(
@@ -568,6 +574,7 @@ fn reading_what_is_installed_always_succeeds() {
                 update: None,
                 substituted: Vec::new(),
                 sources: Vec::new(),
+                unvetted: None,
             }
         ))),
         success()
@@ -684,6 +691,7 @@ fn a_setting_changed_and_left_unrestarted_is_a_failure() {
                 unrestarted: unrestarted.map(str::to_owned),
             }),
             rehearsed: false,
+            unvetted: None,
         })
     };
     assert_eq!(

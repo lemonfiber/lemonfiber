@@ -24,6 +24,7 @@ fn a_proof_that_settles_no_service_is_shown_without_one() {
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     })
     .text();
     assert!(said.contains("asks GET /api/v1/libraries"), "{said}");
@@ -55,6 +56,7 @@ fn an_install_that_asked_says_what_each_proof_came_to_and_what_answered() {
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     })
     .text();
     assert!(said.contains("held"), "{said}");
@@ -114,6 +116,7 @@ fn a_proof_that_failed_says_how_and_one_that_established_nothing_says_why() {
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     })
     .text();
     assert!(
@@ -182,6 +185,7 @@ fn an_install_the_checks_were_content_with_says_so_rather_than_showing_nothing()
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     })
     .text();
     assert!(
@@ -231,6 +235,7 @@ fn a_check_the_install_made_worse_is_shown_at_both_readings() {
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     })
     .text();
     assert!(
@@ -300,6 +305,7 @@ fn a_rehearsal_says_nothing_about_the_stacks_own_checks() {
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     })
     .text();
     assert!(!said.contains("the stack's own checks"), "{said}");
@@ -322,6 +328,7 @@ fn an_install_that_would_contest_an_ask_says_so_and_one_that_would_not_is_silent
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     })
     .text();
     assert!(!quiet.contains("contested"), "{quiet}");
@@ -345,6 +352,7 @@ fn an_install_that_would_contest_an_ask_says_so_and_one_that_would_not_is_silent
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     })
     .text();
     assert!(
@@ -409,6 +417,7 @@ fn an_install_says_what_its_services_would_ask_for_and_one_asking_nothing_is_sil
             update: None,
             substituted: Vec::new(),
             sources: Vec::new(),
+            unvetted: None,
         })
         .text()
     };
@@ -478,6 +487,7 @@ fn proved_again(asked: bool, cleared: bool) -> Installs {
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     }
 }
 

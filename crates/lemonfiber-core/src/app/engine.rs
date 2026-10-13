@@ -147,6 +147,7 @@ fn compose(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Composed, Box
         &ctx.settings.unmanaged,
     )
     .map_err(|err| Box::new(err.problem()))?;
+    crate::overlay::journalled(ctx).map_err(|failure| Box::new(failure.problem()))?;
     let command = build(&plan, &ctx.settings, &stack, action, ctx.environment);
     Ok(Composed {
         manifest,
@@ -291,6 +292,7 @@ async fn readied(
         switched: None,
         held: None,
         offer: None,
+        unvetted: crate::overlay::unvetted(ctx),
     };
     Ok((manifest, command, report))
 }

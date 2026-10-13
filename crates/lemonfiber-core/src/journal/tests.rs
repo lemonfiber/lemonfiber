@@ -476,6 +476,26 @@ fn a_device_key_change_is_reversed_by_name() {
 }
 
 #[test]
+fn a_change_to_the_overlay_is_reversed_by_leaving_it() {
+    let overlaid = Change {
+        at: "1".to_owned(),
+        operation: "overlay".to_owned(),
+        target: "/cfg/overlay.yml".to_owned(),
+        kind: Kind::Overlaid {
+            path: "/cfg/overlay.yml".to_owned(),
+            previous: None,
+            current: Some("a".to_owned()),
+        },
+    };
+    assert_eq!(
+        overlaid.undo().action,
+        Action::Leave {
+            path: "/cfg/overlay.yml".to_owned()
+        }
+    );
+}
+
+#[test]
 fn undoing_a_setting_or_a_secret_puts_back_what_it_replaced_against_what_it_left() {
     let setting = Change {
         at: "1".to_owned(),

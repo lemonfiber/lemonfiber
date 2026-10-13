@@ -132,6 +132,7 @@ fn taking(
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     }
 }
 
@@ -298,6 +299,7 @@ fn an_install_that_went_back_names_what_went_and_what_stayed() {
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     })
     .text();
     assert!(
@@ -351,6 +353,7 @@ fn a_reversal_that_could_not_finish_names_what_is_still_standing() {
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     })
     .text();
     assert!(
@@ -502,5 +505,11 @@ fn a_device_key_put_back_is_said_by_its_name() {
             name: "pixel".to_owned()
         }),
         "made the device key pixel good again"
+    );
+    assert_eq!(
+        undone(Action::Leave {
+            path: "/cfg/overlay.yml".to_owned()
+        }),
+        "left the overlay /cfg/overlay.yml as it is"
     );
 }

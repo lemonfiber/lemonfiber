@@ -6,7 +6,11 @@ use super::Lines;
 
 pub(crate) fn settings(report: &SettingsReport) -> Lines {
     match &report.change {
-        Some(change) => changed(change, report.rehearsed),
+        Some(change) => {
+            let mut lines = changed(change, report.rehearsed);
+            lines.extend(super::overlay::unvetted(report.unvetted.as_ref()));
+            lines
+        }
         None => listed(report),
     }
 }

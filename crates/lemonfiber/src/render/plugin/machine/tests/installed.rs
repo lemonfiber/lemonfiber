@@ -23,6 +23,7 @@ fn a_machine_with_no_plugins_says_so_rather_than_drawing_an_empty_heading() {
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     })
     .text();
     assert_eq!(said, "No plugins are installed.");
@@ -43,6 +44,7 @@ fn the_listing_says_where_each_service_keeps_its_state_and_what_pins_it() {
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     })
     .text();
     assert!(said.contains("One plugin is installed:"), "{said}");
@@ -70,6 +72,7 @@ fn more_than_one_installed_is_counted_rather_than_listed_as_one() {
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     })
     .text();
     assert!(said.contains("2 plugins are installed:"), "{said}");
@@ -102,6 +105,7 @@ fn an_operator_surface_is_shown_as_this_machine_only_and_still_on_the_panel() {
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     })
     .text();
     assert!(said.contains("this machine only, on port 9000"), "{said}");
@@ -131,6 +135,7 @@ fn a_service_the_manifest_named_no_group_for_is_shown_without_one() {
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     })
     .text();
     assert!(said.contains("this machine only, on port 9000"), "{said}");
@@ -151,6 +156,7 @@ fn an_install_leads_with_what_it_recorded_and_says_what_it_joined() {
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     })
     .text();
     assert!(said.starts_with("Installed komga 1.2.0:"), "{said}");
@@ -180,6 +186,7 @@ fn the_install_shows_the_container_that_is_written_for_it() {
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     })
     .text();
     assert!(
@@ -214,6 +221,7 @@ fn a_rehearsal_is_shown_the_same_container_the_install_is() {
             update: None,
             substituted: Vec::new(),
             sources: Vec::new(),
+            unvetted: None,
         })
         .text()
     };
@@ -247,6 +255,7 @@ fn a_rehearsal_states_every_change_every_proof_and_every_override() {
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     })
     .text();
     assert!(
@@ -311,6 +320,7 @@ fn a_rehearsal_names_an_adapter_services_key_file_and_nothing_of_the_key() {
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     })
     .text();
     let keyed = said
@@ -346,6 +356,7 @@ fn an_install_states_the_same_three_in_the_past_tense() {
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     })
     .text();
     assert!(said.contains("What it put on this machine:"), "{said}");
@@ -375,6 +386,7 @@ fn a_plugin_that_proves_nothing_and_overrides_nothing_says_so() {
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     })
     .text();
     assert!(
@@ -448,6 +460,7 @@ fn the_listing_says_what_each_plugin_is_doing() {
             service: "komga".to_owned(),
         }],
         sources: Vec::new(),
+        unvetted: None,
     })
     .text();
     for expected in [
@@ -495,6 +508,7 @@ fn a_reviewed_plugin_says_so_and_one_row_reads_as_one() {
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     })
     .text();
     assert!(
@@ -523,6 +537,7 @@ fn a_rehearsed_install_says_it_would_and_says_nothing_was_written() {
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     })
     .text();
     assert!(said.starts_with("Would install komga 1.2.0:"), "{said}");
@@ -552,6 +567,7 @@ fn an_install_says_where_the_plugin_came_from_and_that_nobody_vouched_for_it() {
             update: None,
             substituted: Vec::new(),
             sources: Vec::new(),
+            unvetted: None,
         })
         .text();
         let header = said.lines().nth(1).unwrap_or_default();
@@ -580,6 +596,7 @@ fn a_rehearsed_install_on_an_empty_machine_still_says_none_are_installed() {
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     })
     .text();
     assert!(
@@ -605,6 +622,7 @@ fn the_printer_reaches_this_renderer_for_this_outcome() {
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     }))
     .text();
     assert!(drawn.contains("komga 1.2.0"), "{drawn}");
@@ -629,6 +647,7 @@ fn a_plugin_from_a_git_source_is_said_with_its_commit() {
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     })
     .text();
 
@@ -676,6 +695,7 @@ fn a_source_that_cannot_be_fetched_is_said_to_leave_the_plugin_unupdatable() {
             ),
             standing("calibre", lemonfiber_core::plugin::Fetchable::Reachable),
         ],
+        unvetted: None,
     })
     .text();
 

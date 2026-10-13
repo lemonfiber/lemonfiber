@@ -81,9 +81,9 @@ pub const SHOWN: &[(&str, &str)] = &[
          alerts that cannot wait",
     ),
     (
-        super::OVERLAY_KEY,
-        "a Compose file layered over the stack's own, which standing beside an existing \
-         setup writes so the two do not want the same ports",
+        super::BESIDE_KEY,
+        "the ports standing beside an existing setup moved each service to, so the two do \
+         not want the same ports",
     ),
     (
         super::PROJECT_KEY,
@@ -264,9 +264,12 @@ pub const SHOWN: &[(&str, &str)] = &[
         "DOMAIN",
         "the hostname real certificates are obtained for, which is public in the certificate",
     ),
-    ("NAS_HOST", "the machine the network mount is exported from"),
     (
-        "NAS_EXPORT",
+        super::NAS_HOST_KEY,
+        "the machine the network mount is exported from",
+    ),
+    (
+        super::NAS_EXPORT_KEY,
         "the share on that machine the data root lives on",
     ),
 ];

@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "overlay": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "services": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

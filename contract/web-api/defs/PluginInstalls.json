@@ -78,6 +78,17 @@
         "$ref": "PluginSubstituted.json"
       }
     },
+    "unvetted": {
+      "description": "The operator's overlay and every service it changes, where there is one: merged\nover the project this run would start, and held to nothing lemonfiber vets.",
+      "anyOf": [
+        {
+          "$ref": "Unvetted.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "update": {
       "description": "What this run's update came to, or nothing where it updated nothing.\n\nA third field rather than an install and a removal filled in together, for the\nreason those two are apart: an update is one operation with one account.\n\nBoxed because it carries a whole install's account beside the reversal, and\nevery other run's report would otherwise be as large as the one run that updates.",
       "anyOf": [

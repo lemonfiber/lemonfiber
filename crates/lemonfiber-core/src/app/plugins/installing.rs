@@ -211,6 +211,7 @@ pub(super) async fn install(
         substituted: Vec::new(),
         sources: Vec::new(),
         agreement: Some(offer),
+        unvetted: None,
     })
 }
 

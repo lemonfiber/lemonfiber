@@ -140,6 +140,7 @@ fn restoring(action: &Action) -> String {
             ..
         } => format!("the secret {name} back to what it held"),
         Action::Rehold { name, .. } => format!("the secret {name} forgotten, as it was"),
+        Action::Leave { path } => format!("the overlay {path} left as it is"),
     }
 }
 

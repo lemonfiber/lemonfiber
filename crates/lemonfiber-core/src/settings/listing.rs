@@ -22,6 +22,7 @@ pub(super) fn report(
     SettingsReport {
         settings: settings(&Recorded::of(ctx), &readers),
         secrets: secrets(ctx, &readers, installed, &resolved),
+        unvetted: change.as_ref().and(crate::overlay::unvetted(ctx)),
         change,
         rehearsed: ctx.dry_run,
     }

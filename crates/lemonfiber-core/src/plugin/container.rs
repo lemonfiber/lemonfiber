@@ -13,6 +13,7 @@ use lemonfiber_manifest::container::{is_target, Mount, UrlOf, UserMode, Value};
 use serde::Serialize;
 
 use super::installed::{Installed, Placed, Reached};
+use crate::config::storage::Export;
 use crate::project::entry::{self, literal, Entry, Tier, Unit, Values};
 use crate::topology;
 
@@ -63,10 +64,13 @@ pub struct Reading<'a> {
     pub guard: &'a dyn Fn(&str) -> Option<String>,
     /// The group that owns the host's render devices, where the host has them.
     pub render_group: Option<u32>,
+    /// The NFS export the library is kept on, where it is kept on one.
+    pub nfs: Option<&'a Export>,
 }
 
 impl Reading<'_> {
-    /// Nothing recorded, nothing filled, no guard and no render devices.
+    /// Nothing recorded, nothing filled, no guard, no render devices and the library on
+    /// this machine.
     #[must_use]
     pub const fn bare() -> Reading<'static> {
         Reading {
@@ -76,6 +80,7 @@ impl Reading<'_> {
             address: &|_, _| None,
             guard: &|_| None,
             render_group: None,
+            nfs: None,
         }
     }
 }
@@ -88,7 +93,9 @@ pub fn written(installed: &Installed, reading: &Reading<'_>) -> String {
         setting: &setting,
         address: reading.address,
         render_group: reading.render_group,
+        nfs: reading.nfs,
     };
+    let taken = installed.services.iter().any(|placed| placed.takes_data);
     let document = Document {
         services: Services(
             installed
@@ -106,15 +113,19 @@ pub fn written(installed: &Installed, reading: &Reading<'_>) -> String {
                 })
                 .collect(),
         ),
+        volumes: crate::project::document::library(reading.nfs, taken),
     };
     crate::project::document::yaml(&document)
 }
 
-/// The document: services, and nothing else at the top.
+/// The document: services, and the library's volume where it is kept on an NFS export.
 #[derive(Serialize)]
 struct Document<'a> {
     /// Every one of the plugin's services, by name.
     services: Services<'a>,
+    /// The library's volume, where it is kept on an NFS export and a service takes it.
+    #[serde(skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    volumes: std::collections::BTreeMap<&'static str, crate::project::document::Volume>,
 }
 
 /// Services in the order the record keeps them.

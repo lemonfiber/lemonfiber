@@ -15,6 +15,7 @@ pub(crate) struct Resolved {
     changing: Option<(String, Option<String>)>,
     files: Option<PathBuf>,
     fillers: Option<Fillers>,
+    nfs: Option<crate::config::storage::Export>,
 }
 
 impl Resolved {
@@ -37,6 +38,7 @@ impl Resolved {
             recorded: Recorded::of(ctx),
             changing: None,
             files: files_of(ctx),
+            nfs: ctx.settings.nfs.clone(),
             fillers: manifest.map(|manifest| {
                 Fillers::trusting(
                     manifest,
@@ -97,6 +99,7 @@ impl Resolved {
             secrets_file: &secrets_file,
             crossing: &crossing,
             address,
+            nfs: self.nfs.as_ref(),
             ..Reading::bare()
         })
     }

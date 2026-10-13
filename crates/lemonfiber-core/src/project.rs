@@ -15,6 +15,8 @@ use std::path::PathBuf;
 use lemonfiber_manifest::container::{UrlOf, UserMode};
 use lemonfiber_manifest::{Bind, Manifest, Service};
 
+use crate::config::storage::Export;
+use crate::model::MovedReport;
 use crate::plugin::{self, Installed};
 use crate::topology::{Placed, Topology};
 use crate::wiring::Chosen;
@@ -34,16 +36,23 @@ pub struct Reading<'a> {
     pub secrets_file: &'a dyn Fn(&str) -> Option<PathBuf>,
     /// The group that owns the host's render devices, where the host has them.
     pub render_group: Option<u32>,
+    /// The NFS export the library is kept on, where it is kept on one.
+    pub nfs: Option<&'a Export>,
+    /// Where standing beside an existing setup moved each service's published port.
+    pub moved: &'a [MovedReport],
 }
 
 impl Reading<'_> {
-    /// Nothing recorded, no secrets file and no render devices.
+    /// Nothing recorded, no secrets file, no render devices, the library on this machine
+    /// and nothing moved.
     #[must_use]
     pub const fn bare() -> Reading<'static> {
         Reading {
             setting: &|_, _| None,
             secrets_file: &|_| None,
             render_group: None,
+            nfs: None,
+            moved: &[],
         }
     }
 }
@@ -74,6 +83,7 @@ pub fn generated(
         setting: reading.setting,
         address: &address,
         render_group: reading.render_group,
+        nfs: reading.nfs,
     };
     let units: Vec<Unit<'_>> = inputs::written(manifest)
         .map(|service| stack_unit(service))
@@ -86,6 +96,7 @@ pub fn generated(
                 .iter()
                 .map(move |placed| plugin::unit(&one.plugin, placed, &legacy))
         }))
+        .map(|unit| beside(unit, reading.moved))
         .collect();
     let mut hosted: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for unit in &units {
@@ -107,14 +118,32 @@ pub fn generated(
             (id, written)
         })
         .collect();
+    let taken = units.iter().any(|unit| unit.takes_data);
     let document = Document {
         services: Services(entries),
         networks: document::networks(&topology),
+        volumes: document::library(reading.nfs, taken),
     };
     Project {
         text: document::yaml(&document),
         topology,
     }
+}
+
+/// `unit`, published where standing beside moved it rather than where it would be.
+fn beside<'a>(unit: Unit<'a>, moved: &[MovedReport]) -> Unit<'a> {
+    let published = unit
+        .published
+        .iter()
+        .map(|&(tier, host, inside)| {
+            let to = moved
+                .iter()
+                .find(|one| one.service == unit.id && one.from == host)
+                .map_or(host, |one| one.to);
+            (tier, to, inside)
+        })
+        .collect();
+    Unit { published, ..unit }
 }
 
 /// A stack service as its entry needs it.

@@ -49,6 +49,7 @@ fn ran(status: Option<i32>, rehearsed: bool) -> LifecycleReport {
         switched: None,
         held: None,
         offer: None,
+        unvetted: None,
     }
 }
 

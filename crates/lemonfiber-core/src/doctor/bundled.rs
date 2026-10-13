@@ -28,6 +28,8 @@ pub const BUNDLED_CHECKS: &[&str] = &[
     "config.credential-permissions",
     "config.download-client",
     "config.household-telling",
+    "config.overlay",
+    "config.overlay-retired",
     "credentials.",
     "credentials.indexer",
     "environment.api",
