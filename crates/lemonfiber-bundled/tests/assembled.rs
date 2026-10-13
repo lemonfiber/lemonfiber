@@ -10,14 +10,16 @@ const CATALOGUE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/plugi
 const MEDIA_STACK: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/media-stack");
 
 /// Services the media stack runs that the bundle does not assemble yet.
-const NOT_ASSEMBLED: [&str; 4] = ["decline", "jellyfin", "recyclarr", "request-gate"];
+const NOT_ASSEMBLED: [&str; 3] = ["jellyfin", "recyclarr", "request-gate"];
 
 /// Fields of a service that differ between the two, by service and field: the guarded
-/// door and the proxy run the images lemonfiber builds for them (ADR-0045).
-const DIFFERING: [(&str, &str); 6] = [
+/// door and the proxy run the images lemonfiber builds for them (ADR-0045), and a part
+/// released here is tagged by its release without the `v`.
+const DIFFERING: [(&str, &str); 7] = [
     ("caddy", "digest"),
     ("caddy", "image"),
     ("caddy", "tag"),
+    ("decline", "tag"),
     ("door", "digest"),
     ("door", "image"),
     ("door", "tag"),
