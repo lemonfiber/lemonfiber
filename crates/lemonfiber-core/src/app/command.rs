@@ -26,6 +26,7 @@ mod quality;
 mod restarting;
 mod restoring;
 mod setting;
+mod settling;
 mod teardown;
 mod tracing;
 mod uninstall;
@@ -48,6 +49,7 @@ pub use quality::QualityAction;
 pub use restarting::Restarting;
 pub use restoring::Restoring;
 pub use setting::Setting;
+pub use settling::Settling;
 pub use teardown::Teardown;
 pub use tracing::Tracing;
 pub use uninstall::Removing;
@@ -338,6 +340,8 @@ pub enum Command {
     /// service cannot do the thing, where nothing asks for it, or where it already
     /// fills it — each a change that would record something and mean nothing.
     Wiring(Linking),
+    /// Read every setting and secret the services read, or change one setting.
+    Settings(Settling),
     /// List everything that leaves this machine: what lemonfiber asks of the world
     /// on its own account, and what the stack's own services ask of it.
     ///

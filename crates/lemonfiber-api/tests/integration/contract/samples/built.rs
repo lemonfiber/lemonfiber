@@ -3,7 +3,8 @@
 use lemonfiber_core::credential::Inventory;
 use lemonfiber_core::glossary::Term;
 use lemonfiber_core::model::{
-    FrontDoorReport, SubstitutionReport, UpdateReport, WalkthroughReport, WiringReport,
+    FrontDoorReport, Owner, Reader, SecretFrom, SecretRead, SettingChange, SettingRead,
+    SettingsReport, SubstitutionReport, UpdateReport, WalkthroughReport, WiringReport,
     WizardReport,
 };
 use lemonfiber_core::stack::closure::Plan;
@@ -199,6 +200,56 @@ pub(super) fn a_substitution() -> SubstitutionReport {
         },
         applied: true,
         agreement: "1a2b3c4d-5e6f7a8b-9c0d1e2f".to_owned(),
+    }
+}
+
+/// Every setting a service reads beside a secret, and a change to one setting answered.
+pub(super) fn a_settings_report() -> SettingsReport {
+    let reader = |service: &str, variable: &str, default: Option<&str>| Reader {
+        service: service.to_owned(),
+        variable: variable.to_owned(),
+        default: default.map(str::to_owned),
+    };
+    SettingsReport {
+        settings: vec![
+            SettingRead {
+                name: "gluetun:countries".to_owned(),
+                whose: Owner::Namespace {
+                    namespace: "gluetun".to_owned(),
+                },
+                readers: vec![reader("gluetun", "SERVER_COUNTRIES", Some("Netherlands"))],
+                value: Some("Belgium".to_owned()),
+                environment: Some("VPN_COUNTRIES".to_owned()),
+            },
+            SettingRead {
+                name: "LEMONFIBER_DEVICE_KEY_APPS".to_owned(),
+                whose: Owner::Core,
+                readers: Vec::new(),
+                value: None,
+                environment: None,
+            },
+        ],
+        secrets: vec![SecretRead {
+            name: "komga:token".to_owned(),
+            whose: Owner::Namespace {
+                namespace: "komga".to_owned(),
+            },
+            readers: vec![reader("komga", "KOMGA_TOKEN", None)],
+            from: Some(SecretFrom::Recipe),
+            held: true,
+        }],
+        change: Some(SettingChange {
+            setting: "gluetun:countries".to_owned(),
+            was: Some("Netherlands".to_owned()),
+            value: Some("Belgium".to_owned()),
+            regenerates: vec!["gluetun".to_owned()],
+            restarts: vec!["gluetun".to_owned()],
+            consequence: None,
+            applied: true,
+            agreement: "1a2b3c4d-5e6f7a8b-9c0d1e2f-3a4b5c6d".to_owned(),
+            unrestarted: Some("the container engine would not recreate them".to_owned()),
+        }),
+        rehearsed: false,
     }
 }
 

@@ -121,6 +121,7 @@
     "restore": "kinds/restore.json",
     "seed": "kinds/seed.json",
     "self-update": "kinds/self-update.json",
+    "settings": "kinds/settings.json",
     "setup": "kinds/setup.json",
     "space": "kinds/space.json",
     "start": "kinds/start.json",

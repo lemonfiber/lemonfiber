@@ -392,7 +392,7 @@ pub(crate) fn variables(
 
 /// Where the plugin's secret `id` is read from: its holder where it is a credential that
 /// crosses, the secret store otherwise.
-fn holding(installed: &Installed, id: &str, reading: &Reading<'_>) -> Holding {
+pub(crate) fn holding(installed: &Installed, id: &str, reading: &Reading<'_>) -> Holding {
     installed
         .declared
         .secrets
@@ -403,7 +403,7 @@ fn holding(installed: &Installed, id: &str, reading: &Reading<'_>) -> Holding {
 }
 
 /// A constant as the text an environment variable holds.
-fn constant_text(constant: &Constant) -> String {
+pub(crate) fn constant_text(constant: &Constant) -> String {
     match constant {
         Constant::Text(text) => text.clone(),
         Constant::Number(number) => number.to_string(),

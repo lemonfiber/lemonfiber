@@ -237,7 +237,7 @@ fn a_remedy_is_said_as_the_command_that_takes_it() {
     assert!(silent.contains("`lemonfiber status`"), "{silent}");
     let nowhere = said(HandoffState::Failed, Some(HandoffRemedy::RecordAddress));
     assert!(
-        nowhere.contains("HOMEPAGE_VAR_LAN_HOST <address>"),
+        nowhere.contains("settings set lan-host <address>"),
         "{nowhere}"
     );
     let none = said(HandoffState::Connected, None);

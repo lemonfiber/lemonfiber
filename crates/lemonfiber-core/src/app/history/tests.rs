@@ -135,6 +135,7 @@ fn a_setting_reads_with_its_values_and_a_secret_by_its_name_alone() {
         name: "komga:mode".to_owned(),
         previous: None,
         current: current.map(str::to_owned),
+        filed: None,
     };
     let secret = |previous: Option<&str>, current: Option<&str>| Kind::Secret {
         name: "komga:token".to_owned(),
@@ -180,6 +181,7 @@ fn a_setting_recorded_since_is_read_off_the_settings_store() {
             name: "komga:mode".to_owned(),
             previous: None,
             current: Some("fast".to_owned()),
+            filed: None,
         },
     };
     let _ = std::fs::create_dir_all(&config);

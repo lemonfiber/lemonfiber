@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A change to one setting.",
+  "type": "object",
+  "properties": {
+    "agreement": {
+      "description": "What this reading names itself, part by part.",
+      "type": "string"
+    },
+    "applied": {
+      "description": "Whether it was written.",
+      "type": "boolean"
+    },
+    "consequence": {
+      "description": "What the change costs, where it costs anything.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "regenerates": {
+      "description": "Every service whose entry the change regenerates.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "restarts": {
+      "description": "Every running service the change restarts.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "setting": {
+      "description": "The setting.",
+      "type": "string"
+    },
+    "unrestarted": {
+      "description": "Why the services it restarts were not restarted, where they were not.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "value": {
+      "description": "What it is to hold, or nothing where it is cleared.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "was": {
+      "description": "What it holds now.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "setting",
+    "regenerates",
+    "restarts",
+    "applied",
+    "agreement"
+  ]
+}

@@ -41,6 +41,7 @@ Commands:
   news          List lemonfiber's releases, what the household has asked for, and the checks found wrong, each newest first
   catalogue     Say what each service in this stack is for, and what became of any it dropped
   wiring        Say what this stack wires to what, and how each link was settled
+  settings      List every setting and secret the stack's services read, or change one setting
   outbound      List everything that leaves this machine, and what refusing each of it costs
   provenance    Say where each service comes from: its licence, its project, and the exact version this stack pins it at
   credentials   Say which credentials this stack holds, or act on one of them
@@ -126,6 +127,7 @@ Options:
 - [`lemonfiber news`](commands/news.md)
 - [`lemonfiber catalogue`](commands/catalogue.md)
 - [`lemonfiber wiring`](commands/wiring.md)
+- [`lemonfiber settings`](commands/settings.md)
 - [`lemonfiber outbound`](commands/outbound.md)
 - [`lemonfiber provenance`](commands/provenance.md)
 - [`lemonfiber credentials`](commands/credentials.md)

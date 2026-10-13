@@ -49,6 +49,7 @@ fn diagnosis(
             | Outcome::Catalogue(_)
             | Outcome::Wiring(_)
             | Outcome::Substitution(_)
+            | Outcome::Settings(_)
             | Outcome::Outbound(_)
             | Outcome::Plugins(_)
             | Outcome::Provenance(_)

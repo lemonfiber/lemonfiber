@@ -664,3 +664,33 @@ fn a_pause_a_client_did_not_take_is_not_reported_as_a_pause() {
     assert_ne!(settled(&report(None, false)), succeeded);
     assert_eq!(settled(&report(None, true)), succeeded);
 }
+
+#[test]
+fn a_setting_changed_and_left_unrestarted_is_a_failure() {
+    let report = |unrestarted: Option<&str>| {
+        Outcome::Settings(lemonfiber_core::model::SettingsReport {
+            settings: Vec::new(),
+            secrets: Vec::new(),
+            change: Some(lemonfiber_core::model::SettingChange {
+                setting: "gluetun:countries".to_owned(),
+                was: None,
+                value: Some("Belgium".to_owned()),
+                regenerates: vec!["gluetun".to_owned()],
+                restarts: vec!["gluetun".to_owned()],
+                consequence: None,
+                applied: true,
+                agreement: String::new(),
+                unrestarted: unrestarted.map(str::to_owned),
+            }),
+            rehearsed: false,
+        })
+    };
+    assert_eq!(
+        shown(settled(&report(None))),
+        shown(std::process::ExitCode::SUCCESS)
+    );
+    assert_eq!(
+        shown(settled(&report(Some("the engine is not running")))),
+        shown(std::process::ExitCode::from(FAILURE))
+    );
+}

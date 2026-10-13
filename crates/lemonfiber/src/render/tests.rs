@@ -71,6 +71,12 @@ fn every_outcome() -> Vec<Outcome> {
     every.extend(the_migrations());
     every.extend(the_rest_of_them());
     every.extend(the_keys());
+    every.push(Outcome::Settings(lemonfiber_core::model::SettingsReport {
+        settings: Vec::new(),
+        secrets: Vec::new(),
+        change: None,
+        rehearsed: false,
+    }));
     every
 }
 

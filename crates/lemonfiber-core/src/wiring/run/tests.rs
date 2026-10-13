@@ -560,11 +560,12 @@ fn without_a_stack_directory_no_plugin_document_is_written_over() {
         .as_ref()
         .zip(read.as_ref())
         .and_then(|(manifest, register)| {
-            crate::app::plugins::writing::rejoined(
+            crate::app::plugins::writing::regenerated(
                 &ctx,
                 manifest,
                 register,
                 &crate::wiring::Chosen::read(Some("identity.source=server")),
+                &crate::settings::Resolved::of(&ctx, Some(manifest), register.installed()),
             )
             .ok()
         })
@@ -592,11 +593,12 @@ fn a_choice_over_what_was_installed_since_it_read_writes_nothing() {
         .as_ref()
         .zip(read.as_ref())
         .and_then(|(manifest, register)| {
-            crate::app::plugins::writing::rejoined(
+            crate::app::plugins::writing::regenerated(
                 &ctx,
                 manifest,
                 register,
                 &crate::wiring::Chosen::read(Some("identity.source=server")),
+                &crate::settings::Resolved::of(&ctx, Some(manifest), register.installed()),
             )
             .ok()
         })
@@ -605,7 +607,10 @@ fn a_choice_over_what_was_installed_since_it_read_writes_nothing() {
     assert!(std::fs::write(&kept, "{\"installed\":[]}\n").is_ok());
     assert!(std::fs::remove_file(&document).is_ok());
 
-    let written = crate::app::plugins::writing::overwritten(&overwrites);
+    let written = crate::app::plugins::writing::overwritten(
+        &overwrites,
+        crate::app::plugins::writing::WIRING,
+    );
 
     assert!(!overwrites.is_empty());
     assert!(written.is_err());
@@ -635,7 +640,10 @@ fn a_file_that_will_not_be_written_over_is_said_unwritten() {
     let locked = std::fs::set_permissions(&holding, std::fs::Permissions::from_mode(0o500))
         .and_then(|()| std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o400)));
 
-    let written = crate::app::plugins::writing::overwritten(&[overwrite]);
+    let written = crate::app::plugins::writing::overwritten(
+        &[overwrite],
+        crate::app::plugins::writing::WIRING,
+    );
 
     let _ = std::fs::set_permissions(&holding, std::fs::Permissions::from_mode(0o700));
     let _ = std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o600));

@@ -1,7 +1,16 @@
+mod changing;
+pub(crate) mod fences;
 mod files;
 pub(crate) mod filing;
 mod kept;
+pub(crate) mod legacy;
+mod listing;
+pub(crate) mod own;
+pub(crate) mod readers;
+mod recorded;
 mod resolved;
+mod restarting;
+pub(crate) mod run;
 mod secrets;
 mod store;
 pub(crate) mod undoing;
@@ -17,6 +26,15 @@ use crate::plugin::Installed;
 
 pub(crate) const OPERATION: &str = "settings";
 
+/// Every refusal a change to a setting answers with before it is weighed.
+pub const REFUSALS: [crate::error::Code; 5] = [
+    crate::error::codes::setting::NO_SUCH_SETTING,
+    crate::error::codes::setting::A_SECRET,
+    crate::error::codes::setting::TAKEN_ELSEWHERE,
+    crate::error::codes::setting::UNWRITABLE_VALUE,
+    crate::error::codes::setting::ALREADY_HOLDS,
+];
+
 pub(crate) fn named(namespace: &str, id: &str) -> String {
     format!(
         "{namespace}{}{id}",
@@ -26,6 +44,12 @@ pub(crate) fn named(namespace: &str, id: &str) -> String {
 
 pub(crate) fn is_named(name: &str) -> bool {
     name.contains(lemonfiber_manifest::container::NAMESPACED)
+}
+
+pub(crate) fn is_stored(name: &str) -> bool {
+    is_named(name)
+        || own::is_core(name)
+        || lemonfiber_manifest::container::PUBLISHED.contains(&name)
 }
 
 pub(crate) fn in_namespace(name: &str, namespace: &str) -> bool {

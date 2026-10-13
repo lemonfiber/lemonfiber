@@ -140,6 +140,7 @@ families! {
     restore => "RESTORE": "putting configuration back",
     seed => "SEED": "wiring the services together",
     serve => "SERVE": "the web surface",
+    setting => "SETTING": "the settings a service reads",
     setup => "SETUP": "the first run",
     space => "SPACE": "the disk, and letting a download go",
     stack => "STACK": "the stack description",

@@ -1,0 +1,59 @@
+{
+  "fields": {
+    "agreement": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "applied": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "consequence": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "regenerates": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "restarts": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "setting": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "unrestarted": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "value": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "was": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

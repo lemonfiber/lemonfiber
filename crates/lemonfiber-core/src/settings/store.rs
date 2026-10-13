@@ -12,6 +12,8 @@ pub(crate) struct Settings {
     values: BTreeMap<String, String>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     filed: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    stack_filed: bool,
 }
 
 impl Settings {
@@ -25,6 +27,10 @@ impl Settings {
 
     pub(crate) const fn is_filed(&self) -> bool {
         self.filed
+    }
+
+    pub(crate) const fn is_stack_filed(&self) -> bool {
+        self.stack_filed
     }
 
     fn resettled(&mut self, name: &str, value: Option<&str>, wrote: Option<&str>) -> Undone {
@@ -43,9 +49,47 @@ impl Settings {
     }
 }
 
+pub(crate) fn recorded(path: &Path, name: &str, value: Option<&str>) -> Result<(), Failure> {
+    super::kept::changed(path, &mut |settings: &mut Settings| {
+        match value {
+            Some(value) => settings.values.insert(name.to_owned(), value.to_owned()),
+            None => settings.values.remove(name),
+        };
+        Ok(())
+    })
+}
+
 pub(crate) fn marked_filed(path: &Path) -> Result<(), Failure> {
     super::kept::changed(path, &mut |settings: &mut Settings| {
         settings.filed = true;
+        Ok(())
+    })
+}
+
+pub(crate) type Filing<'a> = (&'a str, &'a str);
+
+pub(crate) fn filed(
+    path: &Path,
+    filing: &[Filing<'_>],
+    journalled: &dyn Fn(&[Filing<'_>]) -> Result<(), Failure>,
+) -> Result<(), Failure> {
+    super::kept::changed(path, &mut |settings: &mut Settings| {
+        let absent: Vec<Filing<'_>> = filing
+            .iter()
+            .copied()
+            .filter(|(name, _)| settings.value(name).is_none())
+            .collect();
+        journalled(&absent)?;
+        for (name, value) in absent {
+            settings.values.insert(name.to_owned(), value.to_owned());
+        }
+        Ok(())
+    })
+}
+
+pub(crate) fn marked_stack_filed(path: &Path) -> Result<(), Failure> {
+    super::kept::changed(path, &mut |settings: &mut Settings| {
+        settings.stack_filed = true;
         Ok(())
     })
 }
@@ -64,10 +108,15 @@ pub(crate) fn resettled(
     name: &str,
     value: Option<&str>,
     wrote: Option<&str>,
+    filed: &dyn Fn(&str) -> Result<(), Failure>,
 ) -> Result<Undone, Failure> {
     let mut undone = Undone::Done;
     super::kept::changed(path, &mut |settings: &mut Settings| {
+        let holds = settings.value(name).map(str::to_owned);
         undone = settings.resettled(name, value, wrote);
+        if let (Undone::Done, Some(holds), None) = (&undone, holds, value) {
+            filed(&holds)?;
+        }
         Ok(())
     })?;
     Ok(undone)

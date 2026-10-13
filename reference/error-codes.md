@@ -467,6 +467,17 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `SERVE-7` | `NO_JOB_NAME` | error | 1 | 500 | 0.17.0 | Raised when this machine will not supply the randomness a job is named with. |
 | `SERVE-8` | `UNANSWERED` | error | 1 | 500 | 0.18.0 | Raised when an action's work ended before it had an answer to give. |
 
+## `SETTING` — the settings a service reads
+
+| Code | Name | Severity | Exit | Status | Since | Summary |
+| ---- | ---- | -------- | ---- | ------ | ----- | ------- |
+| `SETTING-1` | `NO_SUCH_SETTING` | error | 5 | 404 | 0.18.0 | Raised where nothing in this stack reads a setting by the name given. |
+| `SETTING-2` | `A_SECRET` | error | 5 | 400 | 0.18.0 | Raised where the name given is a secret's, which this command never writes. |
+| `SETTING-3` | `TAKEN_ELSEWHERE` | error | 5 | 400 | 0.18.0 | Raised where the name given belongs to the other of the two commands that write settings. |
+| `SETTING-4` | `UNWRITABLE_VALUE` | error | 5 | 400 | 0.18.0 | Raised where a value cannot be written as the setting asked for. |
+| `SETTING-5` | `SETTINGS_MOVED` | error | 1 | 400 | 0.18.0 | Raised when a change answers an offer read against settings that have since moved. |
+| `SETTING-6` | `ALREADY_HOLDS` | advisory | 1 | 400 | 0.18.0 | Raised where the setting already holds what the change asks for. |
+
 ## `SETUP` — the first run
 
 | Code | Name | Severity | Exit | Status | Since | Summary |

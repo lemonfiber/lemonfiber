@@ -5,7 +5,7 @@ use super::{
 };
 use crate::app::command::{
     AlertAction, Arranged, Asking, BandwidthAsked, Chosen, Decision, Filling, Keeping, Linking,
-    MigrateAction, QualityAction, Removing, Setting,
+    MigrateAction, QualityAction, Removing, Setting, Settling,
 };
 use crate::app::engine::Waiting;
 use crate::app::plugins;
@@ -622,6 +622,22 @@ fn every_command_that_carries_both_is_split_on_which_it_is() {
                 reason: None,
                 agreement: None,
             })),
+            Rehearsal::Reports,
+        ),
+        (Command::Settings(Settling::Read), Rehearsal::Reads),
+        (
+            Command::Settings(Settling::Set {
+                setting: "domain".to_owned(),
+                value: "home.example".to_owned(),
+                agreement: None,
+            }),
+            Rehearsal::Reports,
+        ),
+        (
+            Command::Settings(Settling::Clear {
+                setting: "domain".to_owned(),
+                agreement: None,
+            }),
             Rehearsal::Reports,
         ),
     ] {

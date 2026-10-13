@@ -124,17 +124,17 @@ static AFTER: &[Question] = &[
         },
     },
     Question {
-        name: "settings",
-        about: "every setting, with credentials withheld",
+        name: "configuration",
+        about: "every configuration key, with credentials withheld",
         read: CONFIG,
         needs: Needed::Nothing,
     },
     Question {
-        name: "one setting",
-        about: "read one setting by name, withheld where the listing withholds it",
+        name: "one configuration key",
+        about: "read one configuration key by name, withheld where the listing withholds it",
         read: CONFIG,
         needs: Needed::Typed(&[Wants {
-            asks: "Which setting, by the name it goes by",
+            asks: "Which configuration key, by the name it goes by",
             narrows: Narrows::Setting,
         }]),
     },

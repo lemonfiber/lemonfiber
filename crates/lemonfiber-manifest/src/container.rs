@@ -31,8 +31,14 @@ pub const RENDER_DEVICE: &str = "/dev/dri";
 /// The variables lemonfiber writes itself, which no manifest may name.
 pub const RESERVED: [&str; 3] = ["TZ", "PUID", "PGID"];
 
+/// The core-published setting holding the operator's domain.
+pub const DOMAIN: &str = "domain";
+
+/// The core-published setting holding the address the household reaches this machine at.
+pub const LAN_HOST: &str = "lan-host";
+
 /// The settings the core publishes to every service.
-pub const PUBLISHED: [&str; 2] = ["domain", "lan-host"];
+pub const PUBLISHED: [&str; 2] = [DOMAIN, LAN_HOST];
 
 /// The egress guard's capability.
 pub const EGRESS_GUARD: &str = "network.egress-guard";

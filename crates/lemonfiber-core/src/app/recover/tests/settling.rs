@@ -76,6 +76,7 @@ fn a_setting_recorded_by_a_change_is_cleared_when_it_goes_back() {
             name: "komga:mode".to_owned(),
             value: None,
             recorded: Some("fast".to_owned()),
+            filed: None,
         },
     };
     assert!(undo(&lemonfiber_adapters::Disk, &[resettle], &env, Vec::new()).is_ok());
@@ -99,6 +100,7 @@ fn a_setting_chosen_since_is_left_and_named() {
             name: "komga:mode".to_owned(),
             value: None,
             recorded: Some("fast".to_owned()),
+            filed: None,
         },
     };
     let carried = carrying_out(&lemonfiber_adapters::Disk, &[resettle], &env, Vec::new());

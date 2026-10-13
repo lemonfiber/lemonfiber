@@ -181,7 +181,7 @@ async fn a_machine_nothing_can_address_is_told_what_to_set() {
         report.as_ref().and_then(|report| report.address.clone()),
         None
     );
-    assert!(report.is_some_and(|report| report.meaning.contains("HOMEPAGE_VAR_LAN_HOST")));
+    assert!(report.is_some_and(|report| report.meaning.contains("settings set lan-host")));
 }
 
 #[tokio::test]
@@ -428,7 +428,7 @@ async fn a_door_with_no_address_is_not_reported_as_established() {
     // And what is said still carries the one thing that fixes it.
     assert!(report
         .as_ref()
-        .is_some_and(|report| report.meaning.contains("HOMEPAGE_VAR_LAN_HOST")));
+        .is_some_and(|report| report.meaning.contains("settings set lan-host")));
 }
 
 #[test]
@@ -664,7 +664,7 @@ fn a_plugins_door_with_no_domain_has_no_address_and_says_which_setting_gives_one
             report.meaning
         );
         assert!(
-            !report.meaning.contains("HOMEPAGE_VAR_LAN_HOST"),
+            !report.meaning.contains("settings set lan-host"),
             "{}",
             report.meaning
         );

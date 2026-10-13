@@ -33,7 +33,14 @@ pub(crate) fn written(ctx: &Ctx, plugins: &[&Installed]) -> Result<(), Failure> 
         .filter(|one| plugins.iter().all(|plugin| plugin.plugin != one.plugin))
         .chain(plugins.iter().map(|plugin| (*plugin).clone()))
         .collect();
-    let resolved = Resolved::of(ctx, manifest.as_ref(), &beside);
+    written_by(ctx, plugins, &Resolved::of(ctx, manifest.as_ref(), &beside))
+}
+
+pub(crate) fn written_by(
+    ctx: &Ctx,
+    plugins: &[&Installed],
+    resolved: &Resolved,
+) -> Result<(), Failure> {
     let planned = resolved.reading(&|_, _| None, |reading| {
         plugins
             .iter()

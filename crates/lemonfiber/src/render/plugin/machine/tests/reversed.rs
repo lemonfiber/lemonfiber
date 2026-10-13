@@ -467,7 +467,8 @@ fn every_shape_a_reversal_puts_back_says_what_it_did() {
         undone(Action::Resettle {
             name: "komga:mode".to_owned(),
             value: None,
-            recorded: Some("fast".to_owned())
+            recorded: Some("fast".to_owned()),
+            filed: None,
         }),
         "put the setting komga:mode back"
     );

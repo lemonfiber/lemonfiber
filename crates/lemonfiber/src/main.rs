@@ -320,6 +320,7 @@ async fn main() -> ExitCode {
         Request::Companion(asked) => translate::paired(&asked),
         Request::Catalogue => Command::Catalogue,
         Request::Wiring { fill } => wiring(fill),
+        Request::Settings { change } => translate::settings(change),
         Request::Outbound => Command::Outbound,
         Request::Provenance => Command::Provenance,
         Request::Credentials(asked) => translate::credentials(asked),

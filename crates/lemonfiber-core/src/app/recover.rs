@@ -303,9 +303,16 @@ fn carry_out(confined: &dyn Confined, action: &Action, env_file: &Path) -> Resul
             name,
             value,
             recorded,
+            filed,
         } => settled(
             name,
-            undoing::resettled(env_file, name, value.as_deref(), recorded.as_deref()),
+            undoing::resettled(
+                env_file,
+                name,
+                value.as_deref(),
+                recorded.as_deref(),
+                filed.as_deref(),
+            ),
         ),
         Action::Rehold {
             name,

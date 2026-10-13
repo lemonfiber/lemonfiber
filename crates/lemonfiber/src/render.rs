@@ -45,6 +45,7 @@ mod self_update;
 mod space;
 pub(crate) mod stack;
 mod stored;
+mod stores;
 mod trace;
 mod uninstall;
 mod update;
@@ -270,6 +271,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Catalogue(report) => catalogue::holds(report),
         Outcome::Wiring(report) => wiring::wired(report),
         Outcome::Substitution(report) => wiring::substituted(report),
+        Outcome::Settings(report) => stores::settings(report),
         Outcome::Credentials(inventory) => credentials::listing(inventory),
         Outcome::Stored(report) => stored::kept(report),
         Outcome::SelfUpdate(report) => self_update::standing(report),

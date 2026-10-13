@@ -1,0 +1,238 @@
+use std::sync::Arc;
+
+use lemonfiber_fixtures::support::{Recording, Reporting};
+use lemonfiber_manifest::container::{SecretOf, Value};
+
+use super::changing::{agreed, code, machine, running, Machine};
+use crate::config::store;
+use crate::credential::{Propagation, Reach};
+use crate::model::SecretFrom;
+use crate::plugin::Installed;
+use crate::ports::process::{Failure, Output};
+use crate::settings::Resolved;
+
+const CROSSING: &str = "SONARR_API_KEY";
+
+fn reader() -> Installed {
+    let placed = |service: &str| {
+        let mut placed = crate::test_support::a_placed(service, &[], None, None);
+        placed.fields.env.insert(
+            "SONARR_KEY".to_owned(),
+            Value::Secret(SecretOf {
+                secret: "sonarr-key".to_owned(),
+            }),
+        );
+        placed
+    };
+    let mut reader = crate::test_support::an_installed(
+        "reader",
+        vec![placed("reader"), placed("reader-worker")],
+    );
+    reader.manifest = crate::test_support::CONTRACTED_MANIFEST.to_owned();
+    reader.declared.secrets = vec![crate::plugin::Secret {
+        id: "sonarr-key".to_owned(),
+        of: "sonarr".to_owned(),
+        why: "Asks the series service".to_owned(),
+    }];
+    reader
+}
+
+fn crossed(name: &str, engine: Reporting) -> (Machine, [Installed; 1]) {
+    let machine = machine(name, engine);
+    assert!(store::set(&machine.env, CROSSING, "replacement-key").is_ok());
+    (machine, [reader()])
+}
+
+fn trusted(machine: &Machine, installed: &[Installed]) -> Resolved {
+    let manifest = machine.ctx.stack.checked_manifest(machine.ctx.today()).ok();
+    Resolved::trusting(
+        &machine.ctx,
+        manifest.as_ref(),
+        installed,
+        &crate::test_support::first_party("reader"),
+    )
+}
+
+async fn reached(machine: &Machine, installed: &[Installed], setting: &str) -> Vec<Propagation> {
+    crate::settings::run::reached(
+        &machine.ctx,
+        setting,
+        installed,
+        &trusted(machine, installed),
+    )
+    .await
+}
+
+fn answering(machine: &mut Machine, answer: Result<Output, Failure>) {
+    machine.ctx.seams.runner = Arc::new(Recording::answering(answer));
+}
+
+fn failed(reached: &[Propagation], saying: &str) -> bool {
+    reached.len() == 2
+        && reached
+            .iter()
+            .filter(|one| one.consumer == "reader")
+            .all(|one| matches!(&one.reach, Reach::Failed { detail } if detail.contains(saying)))
+}
+
+#[tokio::test]
+async fn replacing_a_crossing_credential_regenerates_and_restarts_what_reads_it() {
+    let (machine, installed) = crossed("crossed", running(&["reader"]));
+
+    let reached_now = reached(&machine, &installed, CROSSING).await;
+    let elsewhere = reached(&machine, &installed, "RADARR_API_KEY").await;
+
+    assert_eq!(reached_now.len(), 2);
+    assert!(reached_now
+        .iter()
+        .any(|one| one.consumer == "reader" && one.reach == Reach::Updated));
+    assert!(reached_now.iter().any(|one| one.consumer == "reader-worker"
+        && one.reach
+            == Reach::Pending {
+                detail: "lemonfiber up --service reader-worker".to_owned()
+            }));
+    assert!(elsewhere.is_empty());
+    let file = machine.env.with_file_name("env").join("reader.env");
+    assert!(std::fs::read_to_string(file)
+        .is_ok_and(|text| text.contains("SONARR_KEY=") && text.contains("replacement-key")));
+    assert!(machine.runner.seen().iter().any(
+        |argv| argv.iter().any(|word| word == "up") && argv.iter().any(|word| word == "reader")
+    ));
+}
+
+#[tokio::test]
+async fn a_reader_that_is_not_running_takes_the_replacement_when_it_next_starts() {
+    let (machine, installed) = crossed("crossed-stopped", Reporting::absent());
+
+    let reached_now = reached(&machine, &installed, CROSSING).await;
+
+    assert!(reached_now.iter().all(|one| one.reach
+        == Reach::Pending {
+            detail: format!("lemonfiber up --service {}", one.consumer)
+        }));
+    assert!(machine.runner.seen().is_empty());
+}
+
+#[tokio::test]
+async fn a_reader_the_engine_would_not_recreate_is_named_as_not_reached() {
+    let (mut refused, installed) = crossed("crossed-refused", running(&["reader"]));
+    answering(
+        &mut refused,
+        Ok(Output {
+            status: Some(1),
+            stdout: String::new(),
+            stderr: "no such image".to_owned(),
+        }),
+    );
+    let (mut missing, _) = crossed("crossed-missing", running(&["reader"]));
+    answering(
+        &mut missing,
+        Err(Failure::NotFound {
+            program: "docker".to_owned(),
+        }),
+    );
+
+    assert!(failed(
+        &reached(&refused, &installed, CROSSING).await,
+        "no such image"
+    ));
+    assert!(failed(
+        &reached(&missing, &installed, CROSSING).await,
+        "docker was not found"
+    ));
+}
+
+#[tokio::test]
+async fn a_secrets_file_that_cannot_be_written_is_named_and_nothing_restarts() {
+    let (machine, installed) = crossed("crossed-unwritten", running(&["reader"]));
+    assert!(std::fs::write(machine.env.with_file_name("env"), "not a directory").is_ok());
+
+    let reached_now = reached(&machine, &installed, CROSSING).await;
+
+    assert_eq!(reached_now.len(), 2);
+    assert!(reached_now
+        .iter()
+        .all(|one| matches!(one.reach, Reach::Failed { .. })));
+    assert!(machine.runner.seen().is_empty());
+}
+
+#[tokio::test]
+async fn a_rotation_reaches_nothing_where_no_plugin_reads_it_or_the_record_will_not_read() {
+    let (machine, _) = crossed("crossed-untrusted", running(&["reader"]));
+    assert!(crate::settings::run::crossed(&machine.ctx, CROSSING)
+        .await
+        .is_empty());
+    let kept = crate::app::plugins::kept_at(&machine.ctx).unwrap_or_default();
+    assert!(std::fs::write(kept, "{ not json").is_ok());
+    assert!(crate::settings::run::crossed(&machine.ctx, CROSSING)
+        .await
+        .is_empty());
+}
+
+#[tokio::test]
+async fn a_granted_secret_is_listed_as_granted_held_where_it_may_cross_and_withheld_otherwise() {
+    let (machine, installed) = crossed("crossed-listed", running(&[]));
+    let manifest = machine.ctx.stack.checked_manifest(machine.ctx.today()).ok();
+    let readers = manifest
+        .as_ref()
+        .map(|manifest| crate::settings::readers::readers(manifest, &installed))
+        .unwrap_or_default();
+    let listed = |resolved: &Resolved| {
+        super::super::listing::secrets(&machine.ctx, &readers, &installed, resolved)
+            .into_iter()
+            .find(|one| one.name == "reader:sonarr-key")
+            .map(|one| (one.from, one.held))
+    };
+
+    let trusted_now = listed(&trusted(&machine, &installed));
+    let untrusted = listed(&Resolved::of(&machine.ctx, manifest.as_ref(), &installed));
+
+    assert_eq!(trusted_now, Some((Some(SecretFrom::Granted), true)));
+    assert_eq!(untrusted, Some((Some(SecretFrom::Granted), false)));
+}
+
+#[tokio::test]
+async fn a_change_with_nowhere_to_record_it_is_refused() {
+    let mut machine = machine("nowhere", running(&[]));
+    machine.ctx.settings.env_file = None;
+    machine.ctx.settings.stack_dir = None;
+
+    let refused = agreed(&machine.ctx, "domain", Some("home.example")).await;
+
+    assert_eq!(code(&refused), Some("CONFIG-3"));
+    assert!(crate::filed_stack(&machine.ctx).is_ok());
+}
+
+#[tokio::test]
+async fn a_restart_over_a_stack_that_cannot_be_read_says_why_and_runs_nothing() {
+    let machine = machine("unread-stack", running(&["komga"]));
+    let mut unread = machine.ctx.clone();
+    unread.stack = crate::test_support::nowhere();
+
+    let said = super::super::restarting::restarted(&unread, &["komga".to_owned()]).await;
+
+    assert!(said.is_some_and(|said| !said.is_empty()));
+    assert!(machine.runner.seen().is_empty());
+}
+
+#[tokio::test]
+async fn a_secret_no_installed_plugin_declares_is_read_from_the_store() {
+    let (machine, _) = crossed("store-held", running(&[]));
+    let mut readers = crate::settings::readers::Readers::default();
+    readers.secrets.insert(
+        "gluetun:wireguard-key".to_owned(),
+        vec![crate::model::Reader {
+            service: "gluetun".to_owned(),
+            variable: "WIREGUARD_PRIVATE_KEY".to_owned(),
+            default: None,
+        }],
+    );
+    let resolved = Resolved::of(&machine.ctx, None, &[]);
+
+    let listed = super::super::listing::secrets(&machine.ctx, &readers, &[], &resolved);
+
+    assert!(listed
+        .iter()
+        .all(|one| one.name == "gluetun:wireguard-key" && !one.held && one.from.is_none()));
+    assert_eq!(listed.len(), 1);
+}

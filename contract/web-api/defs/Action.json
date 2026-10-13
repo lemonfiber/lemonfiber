@@ -240,6 +240,13 @@
           "type": "string",
           "const": "resettle"
         },
+        "filed": {
+          "description": "The environment file's setting it goes back to, where it was moved out of one.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "name": {
           "description": "The setting's name.",
           "type": "string"

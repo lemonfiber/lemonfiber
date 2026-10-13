@@ -14,9 +14,9 @@ use lemonfiber_core::model::{
 };
 
 use built::{
-    a_credential_inventory, a_front_door, a_reckoning, a_removal, a_repair, a_setup_part_way,
-    a_shared_line, a_substitution, a_walk, a_word, an_update, manifest, plan, what_is_installed,
-    what_is_wired, what_leaves, where_this_copy_stands,
+    a_credential_inventory, a_front_door, a_reckoning, a_removal, a_repair, a_settings_report,
+    a_setup_part_way, a_shared_line, a_substitution, a_walk, a_word, an_update, manifest, plan,
+    what_is_installed, what_is_wired, what_leaves, where_this_copy_stands,
 };
 
 /// One sample of every outcome, so each kind's description can be held against
@@ -143,6 +143,7 @@ fn diagnosing() -> Vec<Outcome> {
         Outcome::Reset(ResetReport::default()),
         Outcome::Wiring(what_is_wired()),
         Outcome::Substitution(a_substitution()),
+        Outcome::Settings(a_settings_report()),
         Outcome::Catalogue(CatalogueReport {
             services: vec![CataloguedService {
                 id: "bazarr".to_owned(),

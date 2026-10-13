@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use lemonfiber_manifest::container::UrlOf;
 use lemonfiber_manifest::Manifest;
 
+use super::recorded::Recorded;
 use super::Settings;
 use crate::app::Ctx;
 use crate::config::paths::{SECRETS_FILES, SETTINGS};
@@ -10,32 +11,56 @@ use crate::plugin::{Holding, Installed, Reading};
 use crate::wiring::{crosses, Fillers};
 
 pub(crate) struct Resolved {
-    settings: Settings,
+    recorded: Recorded,
+    changing: Option<(String, Option<String>)>,
     files: Option<PathBuf>,
     fillers: Option<Fillers>,
 }
 
 impl Resolved {
     pub(crate) fn of(ctx: &Ctx, manifest: Option<&Manifest>, installed: &[Installed]) -> Self {
-        let env = ctx.settings.env_file.as_deref();
+        Self::trusting(
+            ctx,
+            manifest,
+            installed,
+            crate::plugin::first_party::EMBEDDED,
+        )
+    }
+
+    pub(crate) fn trusting(
+        ctx: &Ctx,
+        manifest: Option<&Manifest>,
+        installed: &[Installed],
+        trusted: &[crate::plugin::first_party::FirstParty],
+    ) -> Self {
         Self {
-            settings: env
-                .and_then(|file| Settings::at(&file.with_file_name(SETTINGS)).ok())
-                .unwrap_or_default(),
+            recorded: Recorded::of(ctx),
+            changing: None,
             files: files_of(ctx),
             fillers: manifest.map(|manifest| {
-                Fillers::of(
+                Fillers::trusting(
                     manifest,
                     installed,
                     &crate::app::targets::chosen_fillers(ctx),
                     None,
+                    trusted,
                 )
             }),
         }
     }
 
+    pub(crate) fn changed(self, name: &str, value: Option<&str>) -> Self {
+        Self {
+            changing: Some((name.to_owned(), value.map(str::to_owned))),
+            ..self
+        }
+    }
+
     pub(crate) fn setting(&self, name: &str) -> Option<String> {
-        self.settings.value(name).map(str::to_owned)
+        match &self.changing {
+            Some((changing, value)) if changing == name => value.clone(),
+            _ => self.recorded.value(name).map(str::to_owned),
+        }
     }
 
     pub(crate) fn secrets_file(&self, service: &str) -> Option<PathBuf> {
@@ -97,7 +122,7 @@ pub(crate) fn holding(ctx: &Ctx) -> impl Fn(&str) -> Option<String> {
         .and_then(|file| Settings::at(&file.with_file_name(SETTINGS)).ok())
         .unwrap_or_default();
     move |name: &str| {
-        if super::is_named(name) {
+        if super::is_stored(name) {
             settings.value(name).map(str::to_owned)
         } else {
             file.get(name).map(str::to_owned)

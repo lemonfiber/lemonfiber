@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One setting.",
+  "type": "object",
+  "properties": {
+    "environment": {
+      "description": "The environment file's key it is held under, where it is held there.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "name": {
+      "description": "Its name.",
+      "type": "string"
+    },
+    "readers": {
+      "description": "Each service that reads it.",
+      "type": "array",
+      "items": {
+        "$ref": "Reader.json"
+      }
+    },
+    "value": {
+      "description": "The operator's value, where one is recorded.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "whose": {
+      "description": "Whose it is.",
+      "$ref": "Owner.json"
+    }
+  },
+  "required": [
+    "name",
+    "whose",
+    "readers"
+  ]
+}

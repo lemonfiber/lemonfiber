@@ -285,6 +285,17 @@ pub enum Request {
         #[command(subcommand)]
         fill: Option<super::WiringCommand>,
     },
+    /// List every setting and secret the stack's services read, or change one setting.
+    ///
+    /// Each setting with whose it is, every service that reads it and the variable it is
+    /// read into, the default its manifest declares and your value where you recorded
+    /// one. Each secret with the services that read it, where its value came from and
+    /// whether one is held — never the value itself.
+    Settings {
+        /// Change one setting, or take your value away.
+        #[command(subcommand)]
+        change: Option<super::SettingsCommand>,
+    },
     /// List everything that leaves this machine, and what refusing each of it costs.
     ///
     /// lemonfiber's own requests first — where each goes, why, exactly what travels,

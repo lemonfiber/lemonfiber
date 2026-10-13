@@ -1,0 +1,21 @@
+{
+  "fields": {
+    "namespace": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "of": {
+      "type": [
+        "const:\"core\"",
+        "const:\"namespace\""
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"core\"",
+    "\"namespace\""
+  ]
+}

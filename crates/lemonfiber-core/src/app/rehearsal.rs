@@ -34,7 +34,7 @@ use crate::error::Problem;
 use crate::model::kind::{self, Kind};
 
 use super::command::{
-    Asking, Diagnosing, Gathering, Keeping, Linking, MigrateAction, Teardown, Tracing,
+    Asking, Diagnosing, Gathering, Keeping, Linking, MigrateAction, Settling, Teardown, Tracing,
 };
 use super::disturbance::Situation;
 use super::engine::Waiting;
@@ -225,6 +225,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Clients => reads("clients"),
         Command::Catalogue => reads("catalogue"),
         Command::Wiring(Linking::Read) => reads("wiring"),
+        Command::Settings(Settling::Read) => reads("settings"),
         Command::Outbound => reads("outbound"),
         Command::Provenance => reads("provenance"),
         Command::Stored => reads("stored"),
@@ -288,6 +289,8 @@ pub const fn asked(command: &Command) -> Asked {
         Command::ConfigSet(_) => reports("config set", &[kind::CONFIG]),
         Command::Plugins(asked) => plugin(asked),
         Command::Wiring(Linking::Fill(_)) => reports("wiring fill", &[kind::SUBSTITUTION]),
+        Command::Settings(Settling::Set { .. }) => reports("settings set", &[kind::SETTINGS]),
+        Command::Settings(Settling::Clear { .. }) => reports("settings clear", &[kind::SETTINGS]),
         Command::Quality(_) => reports("quality", &[kind::QUALITY]),
         Command::Alerts(_) => reports("alerts", &[kind::ALERTS]),
         Command::QualityMusic { .. } => reports("quality music", &[kind::MUSIC]),

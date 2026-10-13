@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Every setting and secret the stack's services read, and what changing a setting came to.",
+  "type": "object",
+  "properties": {
+    "change": {
+      "description": "The change asked for, where one was.",
+      "anyOf": [
+        {
+          "$ref": "SettingChange.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal.",
+      "type": "boolean"
+    },
+    "secrets": {
+      "description": "Every secret a service's environment names, in name order, never with its value.",
+      "type": "array",
+      "items": {
+        "$ref": "SecretRead.json"
+      }
+    },
+    "settings": {
+      "description": "Every setting, in name order.",
+      "type": "array",
+      "items": {
+        "$ref": "SettingRead.json"
+      }
+    }
+  },
+  "required": [
+    "settings",
+    "secrets",
+    "rehearsed"
+  ]
+}

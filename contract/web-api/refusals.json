@@ -624,6 +624,36 @@
     "status": 500,
     "description": "Raised when an action's work ended before it had an answer to give."
   },
+  "SETTING-1": {
+    "name": "NO_SUCH_SETTING",
+    "status": 404,
+    "description": "Raised where nothing in this stack reads a setting by the name given."
+  },
+  "SETTING-2": {
+    "name": "A_SECRET",
+    "status": 400,
+    "description": "Raised where the name given is a secret's, which this command never writes."
+  },
+  "SETTING-3": {
+    "name": "TAKEN_ELSEWHERE",
+    "status": 400,
+    "description": "Raised where the name given belongs to the other of the two commands that write settings."
+  },
+  "SETTING-4": {
+    "name": "UNWRITABLE_VALUE",
+    "status": 400,
+    "description": "Raised where a value cannot be written as the setting asked for."
+  },
+  "SETTING-5": {
+    "name": "SETTINGS_MOVED",
+    "status": 400,
+    "description": "Raised when a change answers an offer read against settings that have since moved."
+  },
+  "SETTING-6": {
+    "name": "ALREADY_HOLDS",
+    "status": 400,
+    "description": "Raised where the setting already holds what the change asks for."
+  },
   "SETUP-1": {
     "name": "NOT_REVIEWED",
     "status": 400,
