@@ -370,13 +370,37 @@ async fn changed<T>(
     path: &Path,
     mut change: impl FnMut(&Ctx, &mut Kept) -> Result<T, Box<Problem>>,
 ) -> Result<T, Box<Problem>> {
+    let mut answered = Err(Box::new(nowhere()));
+    let (swept, written) = swept_then(ctx, path, &mut |ctx, kept| answered = change(ctx, kept));
+    told(ctx, &swept).await;
+    written.and(answered)
+}
+
+/// Every device key a sweep revoked, and why.
+type Swept = Vec<(Record, Revoked)>;
+
+/// Tell the operator of every device key a sweep revoked, and why.
+async fn told(ctx: &Ctx, swept: &[(Record, Revoked)]) {
+    for (record, why) in swept {
+        heard(ctx, record, &Heard::Revoked(*why)).await;
+    }
+}
+
+/// Sweep the device keys at `path` as [`changed`] says, then hand them to `change` where
+/// the sweep could be journaled, writing whatever both left; and every device key swept,
+/// with whether the record could be read and written and the sweep journaled.
+fn swept_then(
+    ctx: &Ctx,
+    path: &Path,
+    change: &mut dyn FnMut(&Ctx, &mut Kept),
+) -> (Swept, Result<(), Box<Problem>>) {
     let under = password(ctx);
     let apps: Result<Vec<String>, Failure> =
         trusted(ctx).map(|apps| apps.iter().map(AppIdentity::written).collect());
     let now = written_now(ctx);
     let mut swept = Vec::new();
-    let mut answered = None;
-    crate::settings::kept::changed(path, &mut |kept: &mut Kept| {
+    let mut journaled = Ok(());
+    let written = crate::settings::kept::changed(path, &mut |kept: &mut Kept| {
         swept = kept
             .keys
             .iter()
@@ -393,14 +417,16 @@ async fn changed<T>(
             })
             .collect();
         let stale: Vec<Record> = swept.iter().map(|(record, _)| record.clone()).collect();
-        answered = Some(revoked(ctx, kept, &stale, &now).and_then(|()| change(ctx, kept)));
+        journaled = revoked(ctx, kept, &stale, &now);
+        if journaled.is_ok() {
+            change(ctx, kept);
+        }
         Ok(())
-    })
-    .map_err(|failure| Box::new(failure.problem()))?;
-    for (record, why) in &swept {
-        heard(ctx, record, &Heard::Revoked(*why)).await;
-    }
-    answered.unwrap_or_else(|| Err(Box::new(nowhere())))
+    });
+    let written = written
+        .map_err(|failure| Box::new(failure.problem()))
+        .and(journaled);
+    (swept, written)
 }
 
 /// Mark every one of `records` revoked at `now`, then journal each revoke, answering the

@@ -29,6 +29,7 @@ use axum::{Extension, Json, Router};
 use lemonfiber_core::app::Command;
 use lemonfiber_core::device_keys;
 use lemonfiber_core::device_keys::proof::Mint;
+use lemonfiber_core::error::Problem;
 use lemonfiber_core::keys::run::members_may_mint;
 use lemonfiber_core::keys::run::Asked;
 use lemonfiber_core::keys::Minter;
@@ -284,7 +285,7 @@ async fn proved_by_device(
     let ctx = &serving.ctx;
     let record = device_keys::run::standing(ctx, &device.name)
         .await
-        .map_err(|refused| went_wrong(&refused))?;
+        .map_err(refused)?;
     let now = ctx.seams.clock.now();
     let attempts = &serving.admitting.attempts;
     let ticket = attempts
@@ -310,7 +311,12 @@ async fn proved_by_device(
     attempts.right(&ticket, Door::Operator, now).await;
     device_keys::run::used(ctx, &device.name)
         .await
-        .map_err(|refused| went_wrong(&refused))
+        .map_err(refused)
+}
+
+/// The answer a refusal of the core's is given as.
+fn refused(problem: impl AsRef<Problem>) -> Response {
+    went_wrong(problem.as_ref())
 }
 
 /// A key minted as a claim, collected with that claim, its secret shown this once.

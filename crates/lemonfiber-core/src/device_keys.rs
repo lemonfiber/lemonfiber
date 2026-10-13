@@ -175,6 +175,7 @@ pub(crate) fn encoded(bytes: &[u8]) -> String {
 }
 
 #[cfg(test)]
+#[path = "device_keys/tests/testing.rs"]
 pub(crate) mod testing;
 
 #[cfg(test)]

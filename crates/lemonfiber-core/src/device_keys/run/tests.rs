@@ -525,3 +525,76 @@ async fn a_machine_keeping_no_configuration_registers_and_lists_no_device_key() 
     );
     assert!(list(&ctx).await.is_err());
 }
+
+#[tokio::test]
+async fn a_machine_keeping_no_device_keys_revokes_proves_and_puts_back_none() {
+    let ctx = a_context().build();
+    assert!(revoke(&ctx, "pixel").await.is_err());
+    assert!(standing(&ctx, "pixel").await.is_err());
+    assert!(used(&ctx, "pixel").await.is_err());
+    assert!(undone(&ctx, "pixel").await.is_err());
+}
+
+#[tokio::test]
+async fn a_record_that_does_not_read_lists_revokes_and_puts_back_nothing() {
+    let (ctx, _) = a_machine("unreadable-record");
+    let Some(path) = at(&ctx) else {
+        unreachable!("the machine keeps its configuration somewhere");
+    };
+    assert!(std::fs::write(&path, "not a record").is_ok());
+    assert!(list(&ctx).await.is_err());
+    assert!(revoke(&ctx, "pixel").await.is_err());
+    assert!(undone(&ctx, "pixel").await.is_err());
+    assert_eq!(
+        std::fs::read_to_string(&path).ok().as_deref(),
+        Some("not a record")
+    );
+}
+
+#[tokio::test]
+async fn putting_back_a_device_key_already_revoked_tells_nobody_again() {
+    let (ctx, heard) = a_machine("undone-twice");
+    registered(&ctx, "pixel").await;
+    assert!(revoke(&ctx, "pixel").await.is_ok());
+    let said = heard.said().len();
+    assert!(undone(&ctx, "pixel").await.is_ok());
+    assert_eq!(heard.said().len(), said);
+}
+
+#[tokio::test]
+async fn a_registration_needs_a_password_kept_settings_that_read_and_a_journal() {
+    let (attestation, key) = recorded();
+    let (ctx, _) = a_machine("no-password");
+    if let Some(path) = ctx.settings.admission.as_deref() {
+        assert!(crate::admission::forget(path).is_ok());
+    }
+    assert!(register(&ctx, "pixel", &key, Some(&attestation))
+        .await
+        .is_err());
+    let (ctx, _) = a_machine("unread-settings");
+    let settings =
+        crate::app::targets::beside_env(&ctx, crate::config::paths::SETTINGS).unwrap_or_default();
+    assert!(std::fs::write(&settings, "not a settings store").is_ok());
+    assert!(register(&ctx, "pixel", &key, Some(&attestation))
+        .await
+        .is_err());
+    let (mut ctx, _) = a_machine("no-journal");
+    trusting(&ctx, &[recorded_app(&ctx)]);
+    ctx.settings.stack_dir = None;
+    assert!(register(&ctx, "pixel", &key, Some(&attestation))
+        .await
+        .is_err());
+    assert!(kept(&ctx).named("pixel").is_none());
+}
+
+#[tokio::test]
+async fn a_name_held_by_a_revoked_device_key_is_refused_saying_when_it_was_revoked() {
+    let (ctx, _) = a_machine("name-held");
+    registered(&ctx, "pixel").await;
+    assert!(revoke(&ctx, "pixel").await.is_ok());
+    let (attestation, key) = recorded();
+    let refused = register(&ctx, "pixel", &key, Some(&attestation)).await;
+    assert!(refused.is_err_and(
+        |problem| problem.code == DEVICE_NAME_TAKEN && problem.meaning.contains("revoked")
+    ));
+}
