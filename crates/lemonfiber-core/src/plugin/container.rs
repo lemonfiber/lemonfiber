@@ -107,7 +107,7 @@ pub fn written(installed: &Installed, reading: &Reading<'_>) -> String {
                 .collect(),
         ),
     };
-    serde_norway::to_string(&document).unwrap_or_default()
+    crate::project::document::yaml(&document)
 }
 
 /// The document: services, and nothing else at the top.

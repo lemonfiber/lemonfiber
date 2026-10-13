@@ -5,7 +5,7 @@
 //! A pure function of the stack's manifest, the plugin register, the operator's filler
 //! choices and what [`Reading`] answers. Nothing here touches the disk or the engine.
 
-mod document;
+pub(crate) mod document;
 pub mod entry;
 mod inputs;
 
@@ -112,7 +112,7 @@ pub fn generated(
         networks: document::networks(&topology),
     };
     Project {
-        text: serde_norway::to_string(&document).unwrap_or_default(),
+        text: document::yaml(&document),
         topology,
     }
 }

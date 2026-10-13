@@ -15,6 +15,11 @@ const MASQUERADE: &str = "com.docker.network.bridge.enable_ip_masquerade";
 /// What that option is set to on such a network.
 const NO_MASQUERADE: &str = "false";
 
+/// `document` as the YAML Compose reads, or nothing where it cannot be written.
+pub(crate) fn yaml(document: &impl Serialize) -> String {
+    serde_norway::to_string(document).unwrap_or_default()
+}
+
 /// The document: services, then networks.
 #[derive(Serialize)]
 pub(super) struct Document {

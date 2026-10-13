@@ -143,12 +143,16 @@ fn talking_to_the_outside_world_only_happens_in_adapters() {
         // Not an adapter — YAML is a format, and reading or writing one is pure.
         // Confined for the same reason the rest are: the stack's compose files are
         // read in the stack module — what each service mounts in one file, and the
-        // names and ports they declare in another — and a plugin's is written in one,
-        // and the day something else wants either, it asks the module that already
-        // knows how.
+        // names and ports they declare in another — and every generated document is
+        // written in one, and the day something else wants either, it asks the module
+        // that already knows how.
         (
             "serde_norway",
-            &["stack/mounts.rs", "stack/declared.rs", "plugin/container"],
+            &[
+                "stack/mounts.rs",
+                "stack/declared.rs",
+                "project/document.rs",
+            ],
         ),
         // Nor is this one. Hashing a password is pure, and it is confined for a
         // sharper reason than the rest: a second place that hashed one its own way

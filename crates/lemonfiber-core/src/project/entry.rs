@@ -271,10 +271,10 @@ pub fn entry(unit: &Unit<'_>, placed: &Placed, values: &Values<'_>) -> Entry {
             .iter()
             .map(|path| literal(&path.display().to_string()))
             .collect(),
-        ports: if matches!(placed, Placed::Inside(_)) {
-            Vec::new()
-        } else {
+        ports: if matches!(placed, Placed::On(_)) {
             ports(unit)
+        } else {
+            Vec::new()
         },
         volumes: volumes(unit),
         tmpfs: tmpfs(unit).map(|path| literal(path)).collect(),
