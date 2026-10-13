@@ -82,6 +82,8 @@ pub struct Filler {
     pub fronts: Option<String>,
     /// The API it answers the stack's other services in, where it names one.
     pub native: Option<String>,
+    /// The id of the stack's service it takes the place of, where it names one.
+    pub replaces: Option<String>,
 }
 
 impl Filler {
@@ -103,6 +105,13 @@ impl Filler {
             confined_to: self.confined_to.clone(),
             kind: crate::ports::media::Kind::of_declared(&self.media_types),
         })
+    }
+
+    /// Whether it is a first-party plugin's service taking the place of the stack's
+    /// service of its own id, which keeps that service's names and links.
+    #[must_use]
+    pub fn stands_in(&self) -> bool {
+        self.first_party && self.replaces.as_deref() == Some(self.id.as_str())
     }
 
     /// Who holds what it holds, as a credential crossing to or from it is judged.
@@ -203,7 +212,13 @@ impl Fillers {
                 .iter()
                 .map(move |placed| brought(&one.plugin, placed, project, first_party))
         });
-        let services: Vec<Filler> = bundled.chain(brought).collect();
+        let mut services: Vec<Filler> = bundled.chain(brought).collect();
+        let stood_in: Vec<String> = services
+            .iter()
+            .filter(|one| one.stands_in())
+            .map(|one| one.id.clone())
+            .collect();
+        services.retain(|one| !(one.origin == Origin::Bundled && stood_in.contains(&one.id)));
         let settled = settle(manifest, installed, chosen);
         let named = settled
             .iter()
@@ -238,13 +253,13 @@ impl Fillers {
     }
 
     /// The stack's own service that `by` is linked to by name, where the stack declares
-    /// such a link and runs that service: never a plugin's, which a link by name does not
-    /// reach whatever it stands in for.
+    /// such a link and runs that service, or the first-party service that stands in for
+    /// it: never another plugin's, whatever it stands in for.
     #[must_use]
     pub fn named_by(&self, by: &str) -> Option<&Filler> {
         let (_, to) = self.named.iter().find(|(from, _)| from == by)?;
         self.service(to)
-            .filter(|filler| matches!(filler.origin, Origin::Bundled))
+            .filter(|filler| matches!(filler.origin, Origin::Bundled) || filler.stands_in())
     }
 
     /// Every ask, the stack's in the order it declares them and then each plugin's.
@@ -311,7 +326,7 @@ impl Fillers {
     #[must_use]
     pub fn setting(&self, filler: &Filler, holds: &str) -> Option<String> {
         let setting = spelled(filler, holds);
-        if !matches!(filler.origin, Origin::Plugin { .. }) {
+        if !matches!(filler.origin, Origin::Plugin { .. }) || filler.stands_in() {
             return Some(setting);
         }
         let credential = crate::config::CREDENTIAL_SUFFIXES.contains(&holds);
@@ -384,10 +399,13 @@ pub enum Holder<'a> {
 }
 
 /// The name a credential `filler` holds would be kept under, ending in `holds`, before
-/// anything is refused.
+/// anything is refused: the stack's own name for a service a first-party plugin stands
+/// in for.
 fn spelled(filler: &Filler, holds: &str) -> String {
     match &filler.origin {
-        Origin::Plugin { named } => crate::config::for_plugin(named, &filler.id, holds),
+        Origin::Plugin { named } if !filler.stands_in() => {
+            crate::config::for_plugin(named, &filler.id, holds)
+        }
         _ => crate::config::for_service(&filler.id, holds),
     }
 }
@@ -420,6 +438,7 @@ fn bundled(service: &Service, services: &[Service], project: Option<&Path>) -> F
         majors: service.majors(),
         fronts: None,
         native: None,
+        replaces: None,
     }
 }
 
@@ -451,6 +470,7 @@ fn brought(plugin: &str, placed: &Placed, project: Option<&Path>, first_party: b
         majors: lemonfiber_manifest::majors(&placed.tag),
         fronts: placed.fronts.clone(),
         native: placed.native.clone(),
+        replaces: placed.replaces.clone(),
     }
 }
 

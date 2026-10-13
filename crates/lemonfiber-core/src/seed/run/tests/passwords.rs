@@ -38,6 +38,7 @@ fn torrent_client() -> crate::wiring::Filler {
         majors: Vec::new(),
         fronts: None,
         native: None,
+        replaces: None,
     }
 }
 
