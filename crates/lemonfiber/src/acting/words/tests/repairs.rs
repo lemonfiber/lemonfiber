@@ -135,7 +135,7 @@ fn a_question_over_several_repairs_says_how_many_it_is_over() {
 /// boxes is open on it.
 #[test]
 fn no_row_runs_past_the_edge_of_a_narrow_screen() {
-    let opened = [
+    let opened = vec![
         Stage::Choosing {
             offer: &A_START,
             chooser: two(),

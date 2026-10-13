@@ -23,7 +23,7 @@ use lemonfiber_core::app::restore::Kept;
 use lemonfiber_core::app::support::Destination;
 use lemonfiber_core::app::{
     Command, Diagnosing, Gathering, Hostable, Keeping, LettingGo, Removing, Restarting, Restoring,
-    Setting, Teardown, Waiting, HOSTABLE,
+    Teardown, Waiting, HOSTABLE,
 };
 use lemonfiber_core::bundle::run::{Wanted, LINES};
 use lemonfiber_core::companion::Asked as Paired;
@@ -37,6 +37,7 @@ mod choosing;
 mod extending;
 mod household;
 mod migrating;
+mod settling;
 mod sharing;
 mod viewing;
 mod wishing;
@@ -104,6 +105,8 @@ pub const OFFERED: &[&str] = &[
     "plugin-update",
     "plugin-remove",
     "plugin-prove",
+    "settings-set",
+    "settings-clear",
 ];
 
 /// One action a key may call, as the contract publishes it.
@@ -175,34 +178,6 @@ pub const KEY_CALLABLE: &[ByAKey] = &[
 /// would see the drive vanish and have nothing to do about it. The command line
 /// refuses all four the same way.
 const NAMES_ITS_FORMS: [&str; 4] = ["switch", "restart", "pull", "watch"];
-
-/// The setting a change names, what to change it to, and whether it was agreed to.
-///
-/// Named apart from the table for the reason the household three are: both halves are
-/// required, each is refused by its own name, and a reading that can refuse belongs
-/// beside its refusals rather than inside a list of arms.
-///
-/// Unconfirmed it is the review — the difference between what the setting holds and
-/// what it would hold, and what changing it affects — for every change that costs
-/// something, so what a browser agrees to is what it was shown.
-fn setting(
-    key: Option<String>,
-    value: Option<String>,
-    confirm: bool,
-    wait: Waiting,
-) -> Result<Command, Refused> {
-    let missing = |argument: &str| Refused::Missing {
-        action: "config-set".to_owned(),
-        argument: argument.to_owned(),
-    };
-    match (key, value) {
-        (Some(key), Some(value)) => Ok(Command::ConfigSet(
-            Setting::to(&key, &value).agreed(confirm).waiting(wait),
-        )),
-        (None, _) => Err(missing("key")),
-        (_, None) => Err(missing("value")),
-    }
-}
 
 /// Which completed download to stop seeding, and the offer being answered.
 ///
@@ -288,9 +263,9 @@ pub(crate) fn carried(action: &str, given: Arguments) -> Result<Command, Refused
     if sharing::about_the_line(action) {
         return Ok(sharing::asked_for(action, given));
     }
-    // And again, three times: one field and nothing to refuse, two fields and one
-    // refusal, and a plugin or a capability's filler with a missing subject the only
-    // thing to refuse.
+    // And again, four times: one field and nothing to refuse, two fields and one
+    // refusal, and a plugin, a capability's filler or a setting with a missing subject
+    // the only thing to refuse.
     if migrating::about_a_setup_already_here(action) {
         return Ok(migrating::asked_for(action, &given));
     }
@@ -299,6 +274,9 @@ pub(crate) fn carried(action: &str, given: Arguments) -> Result<Command, Refused
     }
     if extending::about_extending(action) {
         return extending::asked_for(action, given);
+    }
+    if settling::about_settings(action) {
+        return settling::asked_for(action, given);
     }
     let needs = |argument: &str| Refused::Missing {
         action: action.to_owned(),
@@ -309,8 +287,6 @@ pub(crate) fn carried(action: &str, given: Arguments) -> Result<Command, Refused
         services,
         wait,
         service,
-        key,
-        value,
         archive,
         at,
         repoint,
@@ -347,7 +323,6 @@ pub(crate) fn carried(action: &str, given: Arguments) -> Result<Command, Refused
             offer,
         })),
         "pull" => Ok(Command::Pull { forms }),
-        "config-set" => setting(key, value, confirm, wait),
         "seed" => Ok(Command::Seed),
         "adopt" => Ok(Command::Adopt),
         "reset" => Ok(Command::Reset { confirm }),

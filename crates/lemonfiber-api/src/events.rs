@@ -15,6 +15,7 @@ pub mod dashboard;
 pub mod extending;
 pub mod live;
 pub mod saying;
+pub mod settings;
 pub mod stepping;
 pub mod theirs;
 pub mod wire;
@@ -38,6 +39,7 @@ use crate::serve::{admitted, carrying, STREAM};
 
 use self::live::{Listening, Live};
 use self::theirs::Theirs;
+use self::wire::Audience;
 
 /// Where the stream is served.
 pub const PATH: &str = "/api/events";
@@ -143,13 +145,19 @@ pub async fn stream(
     // The operator's stream carries their whole view — the dashboard, every log line
     // they follow, what setup is doing — and nothing on it is narrowed to a member. A
     // member is handed a stream of their own instead, read for them alone.
-    if let Some(source) =
-        caller.and_then(|caller| Theirs::for_member(Arc::clone(&streaming.reading), &caller))
+    if let Some(source) = caller
+        .as_ref()
+        .and_then(|caller| Theirs::for_member(Arc::clone(&streaming.reading), caller))
     {
         staying.member = Some(source.member().to_owned());
         return theirs(&streaming, source, seen.as_deref(), staying).await;
     }
-    let listening = streaming.live.listening(seen.as_deref()).await;
+    let hearing = caller.as_ref().map_or(Audience::Anyone, Audience::of);
+    let listening = streaming
+        .live
+        .listening(seen.as_deref())
+        .await
+        .heard_as(hearing);
     // Asked for after the client is listening, so the gather it prompts is one
     // this client hears — which is what replaces whatever it still holds.
     streaming.live.nudge();

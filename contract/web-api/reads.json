@@ -397,6 +397,14 @@
     "file": false
   },
   {
+    "path": "/api/settings",
+    "parameters": [],
+    "kinds": [
+      "settings"
+    ],
+    "file": false
+  },
+  {
     "path": "/api/logs",
     "parameters": [
       {

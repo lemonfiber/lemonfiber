@@ -13,7 +13,7 @@
       "name": "key",
       "type": {
         "default": null,
-        "description": "The setting to change.",
+        "description": "The configuration key to change.",
         "type": [
           "string",
           "null"
@@ -24,7 +24,7 @@
       "name": "value",
       "type": {
         "default": null,
-        "description": "What to change it to.",
+        "description": "What to change the key or the setting to, written as exactly itself.",
         "type": [
           "string",
           "null"

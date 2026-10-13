@@ -28,7 +28,12 @@ pub(crate) async fn settings(ctx: &Ctx, asked: &Settling) -> Result<Outcome, Box
     changing::changed(ctx, &asked).await.map(Outcome::Settings)
 }
 
-fn listing(ctx: &Ctx) -> Result<SettingsReport, Box<Problem>> {
+/// Every setting and secret the services read, as `lemonfiber settings` lists them.
+///
+/// # Errors
+///
+/// Where the stack's manifest or the record of what is installed cannot be read.
+pub fn listing(ctx: &Ctx) -> Result<SettingsReport, Box<Problem>> {
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())

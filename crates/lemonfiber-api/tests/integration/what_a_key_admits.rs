@@ -29,23 +29,23 @@ pub(crate) fn a_secret(byte: u8) -> Secret {
 }
 
 /// The keys one machine keeps, each with the secret a program holds for it.
-struct Keys {
+pub(crate) struct Keys {
     /// Where they are kept.
-    kept: PathBuf,
+    pub(crate) kept: PathBuf,
     /// Where their use is written.
-    used: PathBuf,
+    pub(crate) used: PathBuf,
     /// A `read` key's secret.
-    read: Secret,
+    pub(crate) read: Secret,
     /// An `act` key's secret.
-    act: Secret,
+    pub(crate) act: Secret,
     /// A revoked key's secret.
-    revoked: Secret,
+    pub(crate) revoked: Secret,
     /// A key scoped to the member the test household holds.
-    member: Secret,
+    pub(crate) member: Secret,
 }
 
 /// A machine keeping one key of each kind, and its password.
-fn keeping_keys(named: &str) -> Keys {
+pub(crate) fn keeping_keys(named: &str) -> Keys {
     let dir = a_directory(&format!("keys-{named}"));
     let _ = fs::create_dir_all(&dir);
     let record = |name: &str, scope: Scope, secret: &Secret| {

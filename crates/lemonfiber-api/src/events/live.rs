@@ -20,7 +20,7 @@ use lemonfiber_core::ports::Clock;
 use tokio::sync::{broadcast, watch, Mutex, Notify};
 
 use super::backlog::Backlog;
-use super::wire::{Event, Rendered, BEAT, BEAT_SAID};
+use super::wire::{Audience, Event, Rendered, BEAT, BEAT_SAID};
 
 /// How often the source is gathered from when nobody has asked sooner: the
 /// screen's own tick, read from it rather than restated, because it is the same
@@ -133,6 +133,7 @@ impl Live {
             missed: backlog.since(seen).into(),
             said,
             ended: self.ended.subscribe(),
+            hearing: Audience::Anyone,
         }
     }
 
@@ -196,31 +197,50 @@ pub struct Listening {
     said: broadcast::Receiver<Event>,
     /// Whether every stream has been told to end since this one opened.
     ended: watch::Receiver<u64>,
+    /// Who this client hears as, so what is said to somebody else is passed over.
+    hearing: Audience,
 }
 
 impl Listening {
+    /// The same place in the stream, heard as `audience`.
+    #[must_use]
+    pub fn heard_as(self, audience: Audience) -> Self {
+        Self {
+            hearing: audience,
+            ..self
+        }
+    }
+
     /// The next thing this client hears, or nothing where the stream has ended.
     ///
     /// A silence is broken on the beat rather than left to look like a
     /// connection that died, and the wait starts again from whatever was last
-    /// said — so a busy stream beats only when it has gone quiet.
+    /// said — so a busy stream beats only when it has gone quiet. What is said to an
+    /// audience this client is not part of is passed over.
     pub async fn next(&mut self) -> Option<String> {
-        if let Some(event) = self.missed.pop_front() {
-            return Some(event.framed());
+        while let Some(event) = self.missed.pop_front() {
+            if self.hearing.hears(event.audience()) {
+                return Some(event.framed());
+            }
         }
-        tokio::select! {
-            heard = self.said.recv() => match heard {
-                Ok(event) => Some(event.framed()),
-                // Either the stream has ended, or this client fell so far behind
-                // that what it missed is no longer here to hand over. Both end
-                // the response: it comes back saying where it got to, which the
-                // backlog can answer without guessing.
-                Err(_) => None,
-            },
-            () = tokio::time::sleep(BEAT) => Some(BEAT_SAID.to_owned()),
-            // Told to end, or the stream it belongs to is gone: either way nothing more
-            // is coming, and the response ends rather than beating on for ever.
-            _ = self.ended.changed() => None,
+        loop {
+            tokio::select! {
+                heard = self.said.recv() => match heard {
+                    Ok(event) if self.hearing.hears(event.audience()) => {
+                        return Some(event.framed());
+                    }
+                    Ok(_) => {}
+                    // Either the stream has ended, or this client fell so far behind
+                    // that what it missed is no longer here to hand over. Both end
+                    // the response: it comes back saying where it got to, which the
+                    // backlog can answer without guessing.
+                    Err(_) => return None,
+                },
+                () = tokio::time::sleep(BEAT) => return Some(BEAT_SAID.to_owned()),
+                // Told to end, or the stream it belongs to is gone: either way nothing more
+                // is coming, and the response ends rather than beating on for ever.
+                _ = self.ended.changed() => return None,
+            }
         }
     }
 }
