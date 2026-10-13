@@ -186,6 +186,24 @@ fn every_shape_this_module_prints_is_reachable() {
     render(&Outcome::Version(a_version()), false);
     render(&Outcome::Watch(a_watch()), false);
     render(
+        &Outcome::DeviceKeys(lemonfiber_core::device_keys::Listing {
+            keys: Vec::new(),
+            revoked: None,
+            rehearsed: false,
+        }),
+        false,
+    );
+    render(
+        &Outcome::DeviceKey(lemonfiber_core::device_keys::Registered {
+            name: "pixel".to_owned(),
+            fingerprint: "ab".repeat(32),
+            backing: lemonfiber_core::device_keys::Backing::Tee,
+            app: "ios:ABCDE12345.app.lemon".to_owned(),
+            registered: "2026-10-13T00:00:00Z".to_owned(),
+        }),
+        false,
+    );
+    render(
         &Outcome::Clients(lemonfiber_core::clients::guidance(None)),
         false,
     );

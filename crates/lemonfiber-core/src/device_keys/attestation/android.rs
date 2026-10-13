@@ -213,10 +213,8 @@ fn authorization<'a>(list: &Any<'a>, number: u32) -> Option<&'a [u8]> {
 /// The level one enumerated field says.
 fn level(field: &Any<'_>) -> Option<Level> {
     let value = universal(field, der::tag::ENUMERATED)?;
-    match value.data {
-        [number] => Level::numbered(u32::from(*number)),
-        _ => None,
-    }
+    let [number] = <[u8; 1]>::try_from(value.data).ok()?;
+    Level::numbered(u32::from(number))
 }
 
 /// The members of a set.

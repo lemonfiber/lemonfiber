@@ -45,6 +45,24 @@ fn a_stamp_that_is_not_seconds_is_read_as_the_epoch() {
     }
 }
 
+/// A device key is named with its backing where it was registered, and alone where revoked.
+#[test]
+fn a_device_key_reads_as_its_name() {
+    assert_eq!(
+        did(&crate::journal::Kind::DeviceKeyRegistered {
+            name: "pixel".to_owned(),
+            backing: "strongbox".to_owned(),
+        }),
+        "registered the device key pixel, held in strongbox"
+    );
+    assert_eq!(
+        did(&crate::journal::Kind::DeviceKeyRevoked {
+            name: "pixel".to_owned(),
+        }),
+        "revoked the device key pixel"
+    );
+}
+
 /// A key is named with its scope, minted, collected or revoked.
 #[test]
 fn a_key_reads_as_its_name_and_scope() {

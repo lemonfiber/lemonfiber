@@ -429,3 +429,24 @@ fn a_file_written_over_is_said_as_written_back() {
         "{said}"
     );
 }
+
+#[test]
+fn a_device_key_put_back_is_said_by_its_name() {
+    let undos = vec![
+        Undo {
+            target: "pixel".to_owned(),
+            action: Action::RevokeDevice {
+                name: "pixel".to_owned(),
+            },
+        },
+        Undo {
+            target: "pixel".to_owned(),
+            action: Action::ReinstateDevice {
+                name: "pixel".to_owned(),
+            },
+        },
+    ];
+    let said = reversed(&putting_back(undos, Vec::new())).text();
+    assert!(said.contains("the device key pixel revoked"), "{said}");
+    assert!(said.contains("the device key pixel good again"), "{said}");
+}

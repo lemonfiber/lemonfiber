@@ -13,6 +13,7 @@ use ring::signature::{
     ECDSA_P384_SHA384_ASN1, RSA_PKCS1_2048_8192_SHA256, RSA_PKCS1_2048_8192_SHA384,
     RSA_PKCS1_2048_8192_SHA512,
 };
+use x509_parser::oid_registry::Oid;
 use x509_parser::oid_registry::{
     OID_EC_P256, OID_NIST_EC_P384, OID_PKCS1_SHA256WITHRSA, OID_PKCS1_SHA384WITHRSA,
     OID_PKCS1_SHA512WITHRSA, OID_SIG_ECDSA_WITH_SHA256, OID_SIG_ECDSA_WITH_SHA384,
@@ -126,20 +127,19 @@ fn issued(below: &X509Certificate<'_>, above: &X509Certificate<'_>) -> bool {
 /// Whether `signer` is an authority that may sign certificates, with `below` authorities
 /// between it and the key's own certificate.
 fn authority(signer: &X509Certificate<'_>, below: usize) -> bool {
-    let constrained = match signer.basic_constraints() {
-        Ok(Some(constraints)) => {
-            constraints.value.ca
-                && constraints.value.path_len_constraint.is_none_or(|longest| {
+    let constrained = signer
+        .basic_constraints()
+        .ok()
+        .flatten()
+        .is_some_and(|held| {
+            held.value.ca
+                && held.value.path_len_constraint.is_none_or(|longest| {
                     usize::try_from(longest).is_ok_and(|longest| below <= longest)
                 })
-        }
-        _ => false,
-    };
-    let may_sign = match signer.key_usage() {
-        Ok(Some(usage)) => usage.value.key_cert_sign(),
-        Ok(None) => true,
-        Err(_) => false,
-    };
+        });
+    let may_sign = signer
+        .key_usage()
+        .is_ok_and(|usage| usage.is_none_or(|usage| usage.value.key_cert_sign()));
     constrained && may_sign
 }
 
@@ -176,41 +176,47 @@ fn algorithm(
     key: &SubjectPublicKeyInfo<'_>,
 ) -> Option<&'static dyn VerificationAlgorithm> {
     let named = &certificate.signature_algorithm.algorithm;
-    let curve = || {
-        key.algorithm
-            .parameters
-            .as_ref()
-            .and_then(|parameters| parameters.as_oid().ok())
-    };
-    if *named == OID_PKCS1_SHA256WITHRSA {
-        return Some(&RSA_PKCS1_2048_8192_SHA256);
-    }
-    if *named == OID_PKCS1_SHA384WITHRSA {
-        return Some(&RSA_PKCS1_2048_8192_SHA384);
-    }
-    if *named == OID_PKCS1_SHA512WITHRSA {
-        return Some(&RSA_PKCS1_2048_8192_SHA512);
-    }
-    let curve = curve()?;
-    let wide = curve == OID_NIST_EC_P384;
-    if !wide && curve != OID_EC_P256 {
-        return None;
-    }
-    if *named == OID_SIG_ECDSA_WITH_SHA256 {
-        return Some(if wide {
-            &ECDSA_P384_SHA256_ASN1
-        } else {
-            &ECDSA_P256_SHA256_ASN1
-        });
-    }
-    if *named == OID_SIG_ECDSA_WITH_SHA384 {
-        return Some(if wide {
-            &ECDSA_P384_SHA384_ASN1
-        } else {
-            &ECDSA_P256_SHA384_ASN1
-        });
-    }
-    None
+    let rsa: [(Oid<'_>, &'static dyn VerificationAlgorithm); 3] = [
+        (OID_PKCS1_SHA256WITHRSA, &RSA_PKCS1_2048_8192_SHA256),
+        (OID_PKCS1_SHA384WITHRSA, &RSA_PKCS1_2048_8192_SHA384),
+        (OID_PKCS1_SHA512WITHRSA, &RSA_PKCS1_2048_8192_SHA512),
+    ];
+    let elliptic: [(Oid<'_>, Oid<'_>, &'static dyn VerificationAlgorithm); 4] = [
+        (
+            OID_EC_P256,
+            OID_SIG_ECDSA_WITH_SHA256,
+            &ECDSA_P256_SHA256_ASN1,
+        ),
+        (
+            OID_EC_P256,
+            OID_SIG_ECDSA_WITH_SHA384,
+            &ECDSA_P256_SHA384_ASN1,
+        ),
+        (
+            OID_NIST_EC_P384,
+            OID_SIG_ECDSA_WITH_SHA256,
+            &ECDSA_P384_SHA256_ASN1,
+        ),
+        (
+            OID_NIST_EC_P384,
+            OID_SIG_ECDSA_WITH_SHA384,
+            &ECDSA_P384_SHA384_ASN1,
+        ),
+    ];
+    let curve = key
+        .algorithm
+        .parameters
+        .as_ref()
+        .and_then(|parameters| parameters.as_oid().ok());
+    rsa.into_iter()
+        .find(|(signature, _)| signature == named)
+        .map(|(_, verifying)| verifying)
+        .or_else(|| {
+            elliptic
+                .into_iter()
+                .find(|(on, signature, _)| Some(on) == curve.as_ref() && signature == named)
+                .map(|(_, _, verifying)| verifying)
+        })
 }
 
 /// `now` as a certificate writes a moment, or nothing before 1970 or past what it holds.

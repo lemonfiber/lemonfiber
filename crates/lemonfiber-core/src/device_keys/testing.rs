@@ -128,8 +128,12 @@ fn named(name: &str, ca: Option<BasicConstraints>) -> CertificateParams {
 impl Authority {
     /// A self-signed root named `name`.
     pub(crate) fn root(name: &str) -> Self {
+        Self::root_with(name, pair())
+    }
+
+    /// A self-signed root named `name`, signing with `key`.
+    pub(crate) fn root_with(name: &str, key: KeyPair) -> Self {
         let params = named(name, Some(BasicConstraints::Unconstrained));
-        let key = pair();
         let der = params
             .self_signed(&key)
             .unwrap_or_else(|_| unreachable!())

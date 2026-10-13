@@ -716,13 +716,15 @@ fn a_change_made_and_not_recorded_says_it_stands() {
 #[test]
 fn a_key_is_left_standing_and_named() {
     let env = scratch("key").join(".env");
-    for action in [
-        Action::Revoke {
-            name: "ha".to_owned(),
-        },
-        Action::Reinstate {
-            name: "ha".to_owned(),
-        },
+    let name = || "ha".to_owned();
+    for (action, named) in [
+        (Action::Revoke { name: name() }, "the key ha"),
+        (Action::Reinstate { name: name() }, "the key ha"),
+        (Action::RevokeDevice { name: name() }, "the device key ha"),
+        (
+            Action::ReinstateDevice { name: name() },
+            "the device key ha",
+        ),
     ] {
         let carried = super::carrying_out(
             &lemonfiber_adapters::Disk,
@@ -736,7 +738,7 @@ fn a_key_is_left_standing_and_named() {
         .ok();
         assert_eq!(
             carried.map(|carried| (carried.done.len(), carried.beyond_reach)),
-            Some((0, vec!["the key ha".to_owned()]))
+            Some((0, vec![named.to_owned()]))
         );
     }
 }

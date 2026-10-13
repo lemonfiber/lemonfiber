@@ -455,3 +455,73 @@ async fn changing_the_apps_names_each_identity_gained_or_lost_and_revokes_what_a
         .any(|said| said == &format!("The app {recorded} may no longer register device keys")));
     assert!(kept(&ctx).active("pixel").is_none());
 }
+
+#[tokio::test]
+async fn putting_back_the_run_that_registered_a_device_key_revokes_it_and_records_the_revoke() {
+    let (ctx, heard) = a_machine("put-back");
+    registered(&ctx, "pixel").await;
+    let Some(at) = crate::app::targets::layout(&ctx)
+        .and_then(|paths| crate::app::recover::journal_at(&paths.journal()).ok())
+        .and_then(|journal| journal.changes().last().map(|change| change.at.clone()))
+    else {
+        unreachable!("a registration is journaled")
+    };
+    let mut today = ctx.clone();
+    today.seams.clock = a_context().build().seams.clock;
+    assert!(crate::app::putting_back::undo(&today, Some(&at))
+        .await
+        .is_ok());
+    assert!(kept(&ctx).active("pixel").is_none());
+    assert!(journaled(&ctx).contains(&Kind::DeviceKeyRevoked {
+        name: "pixel".to_owned()
+    }));
+    assert!(heard
+        .said()
+        .iter()
+        .any(|said| said.contains("The device key named pixel was revoked")));
+}
+
+#[tokio::test]
+async fn a_registration_whose_journal_cannot_be_written_registers_nothing() {
+    let (ctx, _) = a_machine("unjournaled-registration");
+    trusting(&ctx, &[recorded_app(&ctx)]);
+    let journal = crate::app::targets::layout(&ctx)
+        .map(|paths| paths.journal())
+        .unwrap_or_default();
+    let _ = std::fs::remove_file(&journal);
+    assert!(std::fs::create_dir_all(&journal).is_ok());
+    let (attestation, key) = recorded();
+    assert!(register(&ctx, "pixel", &key, Some(&attestation))
+        .await
+        .is_err());
+    assert!(kept(&ctx).named("pixel").is_none());
+}
+
+#[test]
+fn each_reason_an_attestation_vouches_for_nothing_is_refused_under_a_code_of_its_own() {
+    use crate::error::codes::device::{ATTESTATION_REVOKED, ATTESTATION_UNVERIFIED, IN_SOFTWARE};
+    let unproved = |why: Unattested| super::refused::unproved(&why).code;
+    assert_eq!(unproved(Unattested::Unverified), ATTESTATION_UNVERIFIED);
+    assert_eq!(unproved(Unattested::InSoftware), IN_SOFTWARE);
+    assert_eq!(unproved(Unattested::Revoked), ATTESTATION_REVOKED);
+    assert_eq!(
+        unproved(Unattested::Untrusted("ios:ABCDE12345.app.other".to_owned())),
+        UNTRUSTED_APP
+    );
+    assert_eq!(
+        super::refused::no_challenge().code,
+        crate::error::codes::device::NO_CHALLENGE
+    );
+}
+
+#[tokio::test]
+async fn a_machine_keeping_no_configuration_registers_and_lists_no_device_key() {
+    let ctx = a_context().build();
+    let (attestation, key) = recorded();
+    let registered = register(&ctx, "pixel", &key, Some(&attestation)).await;
+    assert_eq!(
+        registered.err().map(|problem| problem.code),
+        Some(super::refused::nowhere().code)
+    );
+    assert!(list(&ctx).await.is_err());
+}

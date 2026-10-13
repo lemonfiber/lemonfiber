@@ -76,6 +76,15 @@ fn every_kind_with_an_inverse_is_recorded_the_other_way_round_and_the_rest_are_n
         })
     );
     assert_eq!(
+        inverted(&Kind::DeviceKeyRegistered {
+            name: "pixel".to_owned(),
+            backing: "tee".to_owned(),
+        }),
+        Some(Kind::DeviceKeyRevoked {
+            name: "pixel".to_owned(),
+        })
+    );
+    assert_eq!(
         inverted(&Kind::Made {
             path: "/srv".to_owned()
         }),

@@ -91,6 +91,18 @@ impl Arrived {
 /// it. There is no discovery, no file, and no default.
 pub struct Token(String);
 
+/// The credential a request was admitted with, as it carried it, which a device key's
+/// challenge is bound to.
+#[derive(Clone, PartialEq, Eq)]
+pub struct Presented(pub String);
+
+/// What is said of a credential presented: nothing it holds.
+impl std::fmt::Debug for Presented {
+    fn fmt(&self, out: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        out.write_str("Presented")
+    }
+}
+
 impl Token {
     /// Mints one, or nothing when the operating system will not say.
     ///

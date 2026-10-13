@@ -447,6 +447,35 @@ fn a_key_change_is_reversed_by_name() {
 }
 
 #[test]
+fn a_device_key_change_is_reversed_by_name() {
+    let change = |kind: Kind| Change {
+        at: "1".to_owned(),
+        operation: "device-key".to_owned(),
+        target: "pixel".to_owned(),
+        kind,
+    };
+    let registered = change(Kind::DeviceKeyRegistered {
+        name: "pixel".to_owned(),
+        backing: "tee".to_owned(),
+    });
+    let revoked = change(Kind::DeviceKeyRevoked {
+        name: "pixel".to_owned(),
+    });
+    assert_eq!(
+        registered.undo().action,
+        Action::RevokeDevice {
+            name: "pixel".to_owned()
+        }
+    );
+    assert_eq!(
+        revoked.undo().action,
+        Action::ReinstateDevice {
+            name: "pixel".to_owned()
+        }
+    );
+}
+
+#[test]
 fn undoing_a_setting_or_a_secret_puts_back_what_it_replaced_against_what_it_left() {
     let setting = Change {
         at: "1".to_owned(),

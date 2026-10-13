@@ -224,4 +224,13 @@ fn only_an_app_attest_object_with_each_field_once_and_nothing_after_it_reads() {
     assert!(read(&trailing).is_none());
     let indefinite = [vec![0xbf], format, vec![0xff]].concat();
     assert!(read(&indefinite).is_none());
+    let signed = [
+        cbor::map(1),
+        cbor::text("attStmt"),
+        cbor::map(1),
+        cbor::text("sig"),
+        cbor::bytes(b"x"),
+    ]
+    .concat();
+    assert!(read(&signed).is_none());
 }

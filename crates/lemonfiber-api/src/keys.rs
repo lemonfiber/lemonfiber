@@ -22,7 +22,7 @@
 
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
-use axum::http::HeaderMap;
+
 use axum::response::Response;
 use axum::routing::{delete, get, post};
 use axum::{Extension, Json, Router};
@@ -35,7 +35,7 @@ use lemonfiber_core::keys::Minter;
 use serde::Deserialize;
 
 use crate::admission::{Caller, Door};
-use crate::guard::Arrived;
+use crate::guard::{Arrived, Presented};
 use crate::read::{carried_out, went_wrong};
 use crate::refusal::Refusal;
 use crate::router::Serving;
@@ -146,7 +146,7 @@ async fn listed(State(serving): State<Serving>, caller: Caller) -> Response {
 async fn minted(
     State(serving): State<Serving>,
     caller: Caller,
-    headers: HeaderMap,
+    Extension(presented): Extension<Presented>,
     arrived: Option<Extension<Arrived>>,
     given: Result<Json<Minting>, JsonRejection>,
 ) -> Response {
@@ -170,7 +170,7 @@ async fn minted(
     let proof = proof(&given);
     if let (Some(Proof::Device(device)), Minter::Operator) = (&proof, &by) {
         if let Err(refused) =
-            proved_by_device(&serving, &headers, arrived.from, device, &mint).await
+            proved_by_device(&serving, &presented, arrived.from, device, &mint).await
         {
             return refused;
         }
@@ -267,7 +267,7 @@ fn proof(given: &Minting) -> Option<Proof> {
     }
 }
 
-/// Whether `device` proves the operator for `mint`, asked with the token in `headers`
+/// Whether `device` proves the operator for `mint`, asked with the credential `presented`
 /// from `from`: nothing to check further where it does, and the refusal where not.
 ///
 /// An unregistered or revoked device key is refused before the challenge is looked at,
@@ -276,7 +276,7 @@ fn proof(given: &Minting) -> Option<Proof> {
 /// that does not verify is counted as a wrong password is, and alerts the operator.
 async fn proved_by_device(
     serving: &Serving,
-    headers: &HeaderMap,
+    presented: &Presented,
     from: std::net::IpAddr,
     device: &Device,
     mint: &Mint<'_>,
@@ -285,8 +285,6 @@ async fn proved_by_device(
     let record = device_keys::run::standing(ctx, &device.name)
         .await
         .map_err(|refused| went_wrong(&refused))?;
-    let token =
-        crate::device_keys::asking(headers).ok_or_else(|| Refusal::NotAdmitted.answered())?;
     let now = ctx.seams.clock.now();
     let attempts = &serving.admitting.attempts;
     let ticket = attempts
@@ -296,7 +294,7 @@ async fn proved_by_device(
     let stood = serving
         .admitting
         .challenges
-        .spent(&device.challenge, token, &device.name, now)
+        .spent(&device.challenge, &presented.0, &device.name, now)
         .await;
     if !stood {
         attempts.forgiven(&ticket).await;

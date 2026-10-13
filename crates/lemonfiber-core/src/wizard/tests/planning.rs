@@ -435,6 +435,7 @@ fn a_written_change_is_said_plainly_enough_to_recognise() {
         })),
         "the revoke of the key ha"
     );
+
     assert_eq!(
         described(&change(Kind::Setting {
             name: "komga:mode".to_owned(),
@@ -640,5 +641,28 @@ fn a_setting_that_was_present_but_empty_is_captured_as_empty_not_absent() {
             set("LEMONFIBER_USENET", Some(""), "on"),
             set("LEMONFIBER_TORRENT", None, "on"),
         ],
+    );
+}
+
+#[test]
+fn a_device_key_is_named_as_a_key_is() {
+    let change = |kind| Change {
+        at: String::new(),
+        operation: "device-key".to_owned(),
+        target: "pixel".to_owned(),
+        kind,
+    };
+    assert_eq!(
+        described(&change(Kind::DeviceKeyRegistered {
+            name: "pixel".to_owned(),
+            backing: "tee".to_owned(),
+        })),
+        "the device key pixel"
+    );
+    assert_eq!(
+        described(&change(Kind::DeviceKeyRevoked {
+            name: "pixel".to_owned(),
+        })),
+        "the revoke of the device key pixel"
     );
 }

@@ -531,6 +531,24 @@ async fn a_run_asked_for_a_password_sets_one_and_then_serves() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// A run not asked for a password goes straight to serving.
+#[tokio::test]
+async fn a_run_not_asked_for_a_password_serves_without_asking() {
+    let answers = Script::of(&[]);
+    let code = run(
+        keeping(None),
+        Asked::default(),
+        &answers,
+        None,
+        Box::pin(std::future::ready(())),
+    )
+    .await;
+    assert_eq!(
+        crate::exit::shown(code),
+        crate::exit::shown(ExitCode::SUCCESS)
+    );
+}
+
 /// Every way of not getting a password serves nothing, because a run asked for
 /// one and given none has not been given what it asked for — and serving anyway
 /// would put the surface up under exactly the arrangement the operator was

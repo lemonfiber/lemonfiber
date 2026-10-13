@@ -1,9 +1,8 @@
-use axum::http::{HeaderMap, HeaderValue, StatusCode};
+use axum::http::StatusCode;
 use lemonfiber_core::keys::Scope;
 
-use super::{asking, operator, Registering};
+use super::{operator, Registering};
 use crate::admission::{Caller, Keyed};
-use crate::guard::TOKEN_HEADER;
 
 #[test]
 fn only_the_operator_keeps_device_keys() {
@@ -24,14 +23,6 @@ fn only_the_operator_keeps_device_keys() {
             Some(StatusCode::FORBIDDEN)
         );
     }
-}
-
-#[test]
-fn a_challenge_is_bound_to_the_token_the_request_carried() {
-    let mut headers = HeaderMap::new();
-    assert_eq!(asking(&headers), None);
-    headers.insert(TOKEN_HEADER, HeaderValue::from_static("a-token"));
-    assert_eq!(asking(&headers), Some("a-token"));
 }
 
 #[test]

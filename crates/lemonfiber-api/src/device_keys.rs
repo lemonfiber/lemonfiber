@@ -14,7 +14,7 @@
 
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
-use axum::http::{HeaderMap, StatusCode};
+use axum::http::StatusCode;
 use axum::response::Response;
 use axum::routing::{delete, get, post};
 use axum::{Extension, Json, Router};
@@ -25,7 +25,7 @@ use lemonfiber_core::model::{kind, Envelope};
 use serde::Deserialize;
 
 use crate::admission::Caller;
-use crate::guard::{Arrived, TOKEN_HEADER};
+use crate::guard::{Arrived, Presented};
 use crate::read::{carried_out, enveloped, went_wrong};
 use crate::refusal::Refusal;
 use crate::router::Serving;
@@ -140,15 +140,12 @@ async fn revoked(
 async fn challenged(
     State(serving): State<Serving>,
     caller: Caller,
-    headers: HeaderMap,
+    Extension(Presented(token)): Extension<Presented>,
     Path(name): Path<String>,
 ) -> Response {
     if let Err(refused) = operator(&caller) {
         return *refused;
     }
-    let Some(token) = asking(&headers) else {
-        return Refusal::NotAdmitted.answered();
-    };
     if let Err(refused) = run::standing(&serving.ctx, &name).await {
         return went_wrong(&refused);
     }
@@ -157,7 +154,7 @@ async fn challenged(
     let issued = serving
         .admitting
         .challenges
-        .issued(ctx.seams.random.as_ref(), token, &name, now)
+        .issued(ctx.seams.random.as_ref(), &token, &name, now)
         .await;
     let challenged = issued.and_then(|issued| {
         Some(Challenged {
@@ -172,13 +169,6 @@ async fn challenged(
         ),
         None => went_wrong(&no_challenge()),
     }
-}
-
-/// The token a request was admitted with, which a challenge is bound to.
-pub(crate) fn asking(headers: &HeaderMap) -> Option<&str> {
-    headers
-        .get(TOKEN_HEADER)
-        .and_then(|value| value.to_str().ok())
 }
 
 /// Nothing where this caller is the operator, by a session or by this run's own token,

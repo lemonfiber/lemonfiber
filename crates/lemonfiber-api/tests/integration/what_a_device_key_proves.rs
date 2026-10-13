@@ -7,8 +7,11 @@ use lemonfiber_fixtures::attestations::ANDROID_RSA_ROOT;
 use ring::rand::SystemRandom;
 use ring::signature::{EcdsaKeyPair, KeyPair as _, ECDSA_P256_SHA256_ASN1_SIGNING};
 
+use lemonfiber_api::admission::Keyring;
+use lemonfiber_core::keys::{Kept, Minter, Purpose, Record, Scope};
+
 use crate::door::*;
-use crate::what_a_key_admits::{code, presented, sent, HERE, NEXT_DOOR};
+use crate::what_a_key_admits::{a_secret, code, presented, sent, HERE, NEXT_DOOR};
 
 /// What a P-256 `SubjectPublicKeyInfo` holds ahead of its point.
 const SPKI_PREFIX: [u8; 26] = [
@@ -57,8 +60,18 @@ fn a_machine_keeping(
     named: &str,
     phone: Option<&EcdsaKeyPair>,
 ) -> (axum::Router, String, PathBuf, PathBuf) {
+    built(named, phone, not_the_token(), Keyring::default())
+}
+
+/// The same machine, its randomness drawn from `random` and its keys from `keys`.
+fn built(
+    named: &str,
+    phone: Option<&EcdsaKeyPair>,
+    random: Chance,
+    keys: Keyring,
+) -> (axum::Router, String, PathBuf, PathBuf) {
     let admission = keeping(&format!("device-{named}"));
-    let mut ctx = world(Some(admission.clone()), not_the_token());
+    let mut ctx = world(Some(admission.clone()), random);
     ctx.seams.clock = Stopped::at(ANDROID_RSA_ROOT.at);
     let env = a_directory(&format!("device-env-{named}")).join(".env");
     if let Some(dir) = env.parent() {
@@ -97,6 +110,7 @@ fn a_machine_keeping(
     }
     let admitting = Arc::new(Admitting {
         kept: Some(admission.clone()),
+        keys,
         ..Admitting::default()
     });
     let (router, token) = surface(ctx, &admitting);
@@ -418,4 +432,108 @@ async fn a_registration_from_another_machine_in_the_clear_is_refused_before_the_
     )
     .await;
     assert_eq!(code(&refused), "ADMIT-11", "{}", refused.body);
+}
+
+#[tokio::test]
+async fn a_key_is_refused_at_every_device_key_route_whatever_its_scope() {
+    let secret = a_secret(7);
+    let dir = a_directory("device-keyed");
+    let _ = fs::create_dir_all(&dir);
+    let kept = Kept {
+        keys: vec![Record::minted(
+            "actor",
+            Scope::Act,
+            Purpose::Other,
+            &secret,
+            "2026-10-05T06:00:00".to_owned(),
+            Minter::Operator,
+        )],
+    };
+    assert!(kept.keep(&dir.join("keys.json")).is_ok());
+    let keys = Keyring::at(
+        Some(dir.join("keys.json")),
+        Some(dir.join("keys-used.json")),
+    );
+    let (router, _, _, _) = built("keyed", Some(&a_phone()), not_the_token(), keys);
+    for (method, path) in [
+        ("GET", "/api/device-keys"),
+        ("POST", "/api/device-keys"),
+        ("DELETE", "/api/device-keys/pixel"),
+        ("POST", "/api/device-keys/pixel/challenge"),
+    ] {
+        let answer = presented(
+            router.clone(),
+            method,
+            path,
+            secret.as_str(),
+            Some((HERE, false)),
+        )
+        .await;
+        assert_eq!(
+            answer.status,
+            StatusCode::FORBIDDEN,
+            "{method} {path}: {}",
+            answer.body
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_registration_that_is_not_one_is_refused_and_guessing_its_password_earns_the_wait() {
+    let (router, token, _) = a_machine("misregistered", None);
+    let (unread, _) = sent(
+        router.clone(),
+        "POST",
+        "/api/device-keys",
+        &token,
+        Some((HERE, false)),
+        r#"{"name": "pixel"}"#,
+    )
+    .await;
+    assert_eq!(unread.status, StatusCode::BAD_REQUEST, "{}", unread.body);
+    let mut held = false;
+    for _ in 0..40 {
+        let (answer, _) = sent(
+            router.clone(),
+            "POST",
+            "/api/device-keys",
+            &token,
+            Some((HERE, false)),
+            &registering(&lemonfiber_fixtures::passwords::another_password()),
+        )
+        .await;
+        if answer.status == StatusCode::TOO_MANY_REQUESTS {
+            held = true;
+            break;
+        }
+    }
+    assert!(held);
+}
+
+#[tokio::test]
+async fn a_machine_that_will_not_supply_randomness_issues_no_challenge() {
+    let phone = a_phone();
+    let (router, token, _, _) = built(
+        "unrandom",
+        Some(&phone),
+        Chance::exactly(None),
+        Keyring::default(),
+    );
+    let answer = presented(
+        router,
+        "POST",
+        "/api/device-keys/pixel/challenge",
+        &token,
+        Some((HERE, false)),
+    )
+    .await;
+    assert_eq!(code(&answer), "DEVICE-12", "{}", answer.body);
+}
+
+#[tokio::test]
+async fn a_mint_carrying_no_proof_is_refused_as_no_key_request() {
+    let (router, token, _) = a_machine("unproved", None);
+    let body = serde_json::json!({ "name": "ha", "scope": "read", "purpose": "other" }).to_string();
+    let answer = minting(&router, &token, &body).await;
+    assert_eq!(answer.status, StatusCode::BAD_REQUEST, "{}", answer.body);
 }

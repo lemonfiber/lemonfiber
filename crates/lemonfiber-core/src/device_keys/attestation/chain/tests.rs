@@ -147,3 +147,25 @@ fn a_certificate_signed_under_another_algorithm_than_its_signed_part_names_is_re
     }
     assert!(read(&[renamed]).is_none());
 }
+
+#[test]
+fn no_chain_holds_before_1970_or_with_nothing_in_it() {
+    let root = Authority::root("root");
+    let chain = [root.certify("own", &pair(), Vec::new()), root.der.clone()];
+    let Some(read) = read(&chain) else {
+        unreachable!("a generated chain reads");
+    };
+    let before = std::time::UNIX_EPOCH - std::time::Duration::from_secs(1);
+    assert!(!verified(&read, &[&root.der], before, Dated::Every));
+    assert!(!verified(&[], &[&root.der], now(), Dated::Every));
+}
+
+#[test]
+fn a_certificate_signed_under_an_algorithm_this_does_not_accept_is_refused() {
+    let Ok(edwards) = rcgen::KeyPair::generate_for(&rcgen::PKCS_ED25519) else {
+        unreachable!("an Ed25519 pair is made");
+    };
+    let root = Authority::root_with("edwards root", edwards);
+    let own = root.certify("own", &pair(), Vec::new());
+    assert!(!holds(&[own, root.der.clone()], &[&root.der]));
+}
