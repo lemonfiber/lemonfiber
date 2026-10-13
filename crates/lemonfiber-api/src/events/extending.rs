@@ -92,13 +92,14 @@ impl Extending {
 pub struct Together(pub Vec<Arc<dyn Gathers>>);
 
 impl Together {
-    /// What the stream says in a run: the dashboard first, then what is installed and
-    /// what it is wired to.
+    /// What the stream says in a run: the dashboard first, then what is installed,
+    /// what it is wired to and the settings.
     #[must_use]
     pub fn in_a_run(ctx: &Arc<Ctx>) -> Self {
         Self(vec![
             Arc::new(super::dashboard::Dashboard::against(Arc::clone(ctx))),
             Arc::new(Extending::against(Arc::clone(ctx))),
+            Arc::new(super::settings::Settings::against(Arc::clone(ctx))),
         ])
     }
 }

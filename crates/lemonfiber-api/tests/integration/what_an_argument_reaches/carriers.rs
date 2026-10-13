@@ -26,6 +26,9 @@ use plugins::{
     give_plugin, give_source,
 };
 
+mod settling;
+use settling::{carries_key, carries_setting, carries_value, give_key, give_setting, give_value};
+
 mod viewing;
 
 /// One form named, which is what most of the rest are asked with.
@@ -84,11 +87,6 @@ fn carries_services(command: &Command) -> bool {
         | Command::Restart(Restarting { services, .. }) => !services.is_empty(),
         _ => false,
     }
-}
-
-/// Whether the command has the setting it was given in it.
-fn carries_setting(command: &Command) -> bool {
-    matches!(command, Command::ConfigSet { .. })
 }
 
 /// Whether the command has the quality it was given in it.
@@ -223,6 +221,7 @@ fn carries_offer(command: &Command) -> bool {
         Command::Wiring(Linking::Fill(Filling { agreement, .. })) => {
             agreement.as_deref() == Some(OFFER)
         }
+        Command::Settings(settling) => settling::agreed(settling),
         // And a plugin's install, update, removal and proof, the same way: the offer is the
         // only yes, so dropped none could act, and kept silently one would act on terms
         // nobody read.
@@ -330,14 +329,6 @@ fn give_services(given: &mut Arguments) {
 
 fn give_wait(given: &mut Arguments) {
     given.wait = Waiting::ForTheDownloads;
-}
-
-fn give_key(given: &mut Arguments) {
-    given.key = Some("DATA_ROOT".to_owned());
-}
-
-fn give_value(given: &mut Arguments) {
-    given.value = Some("/srv".to_owned());
 }
 
 fn give_preset(given: &mut Arguments) {
@@ -665,13 +656,14 @@ type Sweep = (&'static str, fn(&mut Arguments), fn(&Command) -> bool);
 /// One row per argument rather than one test per argument, because the rule is one
 /// thing: an action may accept an argument only if the command it reaches has
 /// somewhere to put it, and must refuse it by that name otherwise.
-pub(super) const SWEEPS: [Sweep; 53] = [
+pub(super) const SWEEPS: [Sweep; 54] = [
     ("forms", give_forms, carries_forms),
     ("services", give_services, carries_services),
     ("wait", give_wait, carries_wait),
     ("service", give_service, carries_service),
-    ("key", give_key, carries_setting),
-    ("value", give_value, carries_setting),
+    ("key", give_key, carries_key),
+    ("value", give_value, carries_value),
+    ("setting", give_setting, carries_setting),
     ("preset", give_preset, carries_preset),
     ("media_type", give_media_type, carries_media_type),
     ("archive", give_archive, carries_archive),

@@ -48,6 +48,7 @@ pub use naming::{A_SHELF, MOST_AT_ONCE};
 use lemonfiber_core::app::plugins::Asked as Installing;
 use lemonfiber_core::app::{
     AlertAction, Asking, BandwidthAsked, Command, Keeping, Linking, MigrateAction, QualityAction,
+    Settling,
 };
 use lemonfiber_core::doctor::{Category, Narrowing};
 use lemonfiber_core::error::Problem;
@@ -244,6 +245,12 @@ pub const PLUGINS: &str = "/api/plugins";
 /// changed and journalled, so it is asked for at the door changes are asked for.
 pub const WIRING: &str = "/api/wiring";
 
+/// Every setting and secret the services read, and no secret's value.
+///
+/// The operator's alone, and the reading half: changing one is asked for at the door
+/// changes are asked for.
+pub const SETTINGS: &str = "/api/settings";
+
 /// Which app to watch on, for each kind of device somebody in the house has.
 ///
 /// The same answer on every machine — the client landscape belongs to the
@@ -319,6 +326,7 @@ pub const OFFERED: &[&str] = &[
     UPDATE,
     PLUGINS,
     WIRING,
+    SETTINGS,
 ];
 
 /// An item's identifier, standing for whichever title a request names.
@@ -494,6 +502,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, Refusal> {
         // read is refused by the command, never answered as an empty one.
         PLUGINS => Ok(Command::Plugins(Installing::Installed)),
         WIRING => Ok(Command::Wiring(Linking::Read)),
+        SETTINGS => Ok(Command::Settings(Settling::Read)),
         _ => Err(Refusal::NoSuchRead),
     }
 }

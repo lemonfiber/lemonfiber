@@ -74,7 +74,8 @@ pub fn answered(rendered: String) -> Response<Body> {
 /// log lines, another caller's results — and none of it is narrowed to a member, so
 /// a member is refused outright rather than handed the operator's copy. A key scoped to
 /// a member is that member here as everywhere, and is refused the same way; a `read` or
-/// `act` key is admitted, since every served read and the stream are what it is for.
+/// `act` key is admitted, since the served reads and the stream are what it is for, and
+/// it passes over what the stream says to the operator alone.
 #[must_use]
 pub fn operator_only(caller: &crate::admission::Caller) -> Option<Response<Body>> {
     caller

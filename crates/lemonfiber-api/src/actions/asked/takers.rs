@@ -156,14 +156,15 @@ pub const TAKES_AGREEMENT: &[&str] = &[
 ///
 /// On a repair, a restore and a removal it sits beside a `confirm` that can stand in
 /// for it where nothing needs naming. On letting a download go, on reclaiming room, on
-/// replacing a setup, on choosing what fills a capability and on installing, updating
-/// and removing a plugin there is no `confirm` at all — see [`TAKES_AGREEMENT`], which
-/// leaves all of them out — so the name of the offer is the only way to say yes. That
-/// is the point of it there: a blanket yes to a removal would be agreement from
-/// somebody who had not read what would go, one to a replacement from somebody who had
-/// not read what would stop, one to a choice from somebody who had not read what it
-/// would leave unfilled, and one to an install from somebody who had not read what a
-/// stranger's manifest would write.
+/// replacing a setup, on choosing what fills a capability, on changing a setting and on
+/// installing, updating and removing a plugin there is no `confirm` at all — see
+/// [`TAKES_AGREEMENT`], which leaves all of them out — so the name of the offer is the
+/// only way to say yes. That is the point of it there: a blanket yes to a removal would
+/// be agreement from somebody who had not read what would go, one to a replacement from
+/// somebody who had not read what would stop, one to a choice from somebody who had not
+/// read what it would leave unfilled, one to a change of setting from somebody who had
+/// not read what it restarts, and one to an install from somebody who had not read what
+/// a stranger's manifest would write.
 ///
 /// The actions a key may call and rehearse take one too, and there it is optional: a
 /// program on a schedule calls them without one and is answered as before, and one that
@@ -186,6 +187,8 @@ pub const TAKES_CONSENT: &[&str] = &[
     "plugin-update",
     "plugin-remove",
     "plugin-prove",
+    "settings-set",
+    "settings-clear",
 ];
 
 /// The action whose command carries which completed download it is about.
@@ -323,11 +326,14 @@ pub const TAKES_SERVICE: &[&str] = &["backup", "update", "wiring-fill"];
 /// offering a reversal it has no way to carry out.
 pub const TAKES_RUN: &[&str] = &["undo"];
 
-/// The action whose command carries the setting it was given.
-///
-/// One setting is read or written by name, and no other action is about a setting
-/// at all.
-pub const TAKES_SETTING: &[&str] = &["config-set"];
+/// The action whose command carries the configuration key it was given.
+pub const TAKES_KEY: &[&str] = &["config-set"];
+
+/// The actions whose command carries the value a key or a setting is changed to.
+pub const TAKES_VALUE: &[&str] = &["config-set", "settings-set"];
+
+/// The actions whose command carries the setting it changes or puts back to its default.
+pub const TAKES_SETTING: &[&str] = &["settings-set", "settings-clear"];
 
 /// The action whose command carries the quality it was given.
 ///

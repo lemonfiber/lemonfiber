@@ -417,3 +417,49 @@ fn the_operator_searches_and_asks_for_whoever_they_name_and_a_key_does_neither()
         );
     }
 }
+
+/// The settings are the operator's alone: a member, a key scoped to one, and a `read` or
+/// an `act` key are refused the read and both changes, and the operator is given them.
+#[test]
+fn only_the_operator_reads_or_changes_the_settings() {
+    use lemonfiber_core::app::Settling;
+    use lemonfiber_core::keys::Scope;
+    let set = Settling::Set {
+        setting: "gluetun:countries".to_owned(),
+        value: "Netherlands".to_owned(),
+        agreement: None,
+    };
+    let clear = Settling::Clear {
+        setting: "gluetun:countries".to_owned(),
+        agreement: None,
+    };
+    for caller in [Caller::Machine, Caller::Operator] {
+        for door in [Door::Reading, Door::Acting] {
+            for settling in [Settling::Read, set.clone(), clear.clone()] {
+                let command = Command::Settings(settling);
+                assert_eq!(
+                    may(&caller, door, command.clone()),
+                    Permitted::This(command)
+                );
+            }
+        }
+    }
+    let member_key = key(Scope::Member {
+        id: ASKING.to_owned(),
+        name: "ana".to_owned(),
+    });
+    for caller in [member(), member_key, key(Scope::Read), key(Scope::Act)] {
+        assert_eq!(
+            may(&caller, Door::Reading, Command::Settings(Settling::Read)),
+            Permitted::Nothing,
+            "{caller:?}"
+        );
+        for settling in [set.clone(), clear.clone()] {
+            assert_ne!(
+                may(&caller, Door::Acting, Command::Settings(settling.clone())),
+                Permitted::This(Command::Settings(settling)),
+                "{caller:?}"
+            );
+        }
+    }
+}

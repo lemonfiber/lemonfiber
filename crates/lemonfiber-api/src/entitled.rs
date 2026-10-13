@@ -103,6 +103,11 @@ pub fn may(caller: &Caller, door: Door, command: Command) -> Permitted {
             (Scope::Read | Scope::Act, Door::Reading) if matches!(command, Command::Wish(_)) => {
                 Permitted::Nothing
             }
+            (Scope::Read | Scope::Act, Door::Reading)
+                if matches!(command, Command::Settings(_)) =>
+            {
+                Permitted::Nothing
+            }
             (Scope::Read | Scope::Act, Door::Reading) => Permitted::This(command),
             (Scope::Act, Door::Acting) if callable_by_a_key(&command) => Permitted::This(command),
             (scope @ (Scope::Read | Scope::Act), Door::Acting) => {

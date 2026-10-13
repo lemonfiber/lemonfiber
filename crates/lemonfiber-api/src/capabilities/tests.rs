@@ -141,7 +141,7 @@ fn a_key_is_offered_what_its_scope_admits_at_each_door() {
     };
     // Every served read, the logs and the bundle among them, and the event stream, but
     // a member's search and the poster of what it found, which are a member's own and
-    // the operator's.
+    // the operator's, and the settings, which are the operator's alone.
     let reads: Vec<String> = crate::read::table::OFFERED
         .iter()
         .chain(BESIDE.iter().map(|(read, _)| read))
@@ -149,6 +149,7 @@ fn a_key_is_offered_what_its_scope_admits_at_each_door() {
             ![
                 crate::read::table::ASKABLE,
                 crate::read::table::ASKABLE_POSTER,
+                crate::read::table::SETTINGS,
             ]
             .contains(*read)
         })
@@ -161,6 +162,10 @@ fn a_key_is_offered_what_its_scope_admits_at_each_door() {
     assert_eq!(available(&reading), sorted);
     assert_eq!(
         reading.capabilities.get(crate::read::table::ASKABLE),
+        Some(&Standing::Unpermitted)
+    );
+    assert_eq!(
+        reading.capabilities.get(crate::read::table::SETTINGS),
         Some(&Standing::Unpermitted)
     );
 

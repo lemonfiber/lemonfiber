@@ -34,6 +34,37 @@ pub enum Nature {
     Record,
 }
 
+/// Who on the shared stream may hear an event.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Audience {
+    /// Everyone the shared stream admits, a `read` or an `act` key included.
+    Anyone,
+    /// The per-run token and an operator session, and no key.
+    Operator,
+}
+
+impl Audience {
+    /// What this caller may hear on the shared stream.
+    #[must_use]
+    pub const fn of(caller: &crate::admission::Caller) -> Self {
+        match caller {
+            crate::admission::Caller::Machine | crate::admission::Caller::Operator => {
+                Self::Operator
+            }
+            crate::admission::Caller::Member(_) | crate::admission::Caller::Key(_) => Self::Anyone,
+        }
+    }
+
+    /// Whether a listener hearing as this may hear what is said to `said`.
+    #[must_use]
+    pub const fn hears(self, said: Self) -> bool {
+        matches!(
+            (self, said),
+            (Self::Operator, _) | (Self::Anyone, Self::Anyone)
+        )
+    }
+}
+
 /// An envelope rendered, before it has a place in the run.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Rendered {
@@ -43,6 +74,8 @@ pub struct Rendered {
     said: String,
     /// Whether a newer one of this kind replaces it.
     nature: Nature,
+    /// Who may hear it.
+    audience: Audience,
 }
 
 impl Rendered {
@@ -57,7 +90,17 @@ impl Rendered {
             kind: envelope.kind,
             said: envelope.to_json()?,
             nature,
+            audience: Audience::Anyone,
         })
+    }
+
+    /// The same envelope, said to the operator alone.
+    #[must_use]
+    pub fn to_the_operator(self) -> Self {
+        Self {
+            audience: Audience::Operator,
+            ..self
+        }
     }
 
     /// What the envelope calls itself.
@@ -98,6 +141,12 @@ impl Event {
     #[must_use]
     pub const fn nature(&self) -> Nature {
         self.said.nature
+    }
+
+    /// Who may hear it.
+    #[must_use]
+    pub const fn audience(&self) -> Audience {
+        self.said.audience
     }
 
     /// This event as it goes down the wire.

@@ -41,6 +41,8 @@
     "restore": "actions/restore.json",
     "search": "actions/search.json",
     "seed": "actions/seed.json",
+    "settings-clear": "actions/settings-clear.json",
+    "settings-set": "actions/settings-set.json",
     "space": "actions/space.json",
     "stop-seeding": "actions/stop-seeding.json",
     "support": "actions/support.json",
