@@ -81,7 +81,7 @@ use crate::doctor::BUNDLED_CHECKS;
 
 pub use claimed::{
     claimed, read, read_digested, root, Asserted, Assertion, Claimed, Claiming, Contributed,
-    Evidence, FailingAsDeclared, Ran, Unreadable, Verdict,
+    Digested, Evidence, FailingAsDeclared, Ran, Unreadable, Verdict,
 };
 pub use conforming::{conformed, Conformed, Judged};
 pub(crate) use container::{holding, secrets_file, unit, user_of, variables};

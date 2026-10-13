@@ -2,8 +2,12 @@
 
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
+use std::io::ErrorKind;
+use std::path::Path;
 
-use crate::{hex, DIGEST_PREFIX, MANIFEST};
+use crate::copies::{bytes, linked, walked};
+use crate::parts::declared;
+use crate::{hex, Refused, DIGEST_PREFIX, MANIFEST};
 
 /// Where a service's starting files sit in a plugin's tree.
 pub(crate) const CONFIG: &str = "config";
@@ -39,3 +43,67 @@ pub(crate) fn holds(path: &str, services: &[String], fixtures: &[String]) -> boo
             .iter()
             .any(|id| path.starts_with(&format!("{CONFIG}/{id}/")))
 }
+
+/// The digest of the tree of the plugin whose repository is checked out at `root`, read
+/// with `manifest` as its manifest's text: the manifest, each service's starting files,
+/// every fixture the manifest names and its conformance.
+///
+/// # Errors
+///
+/// [`Refused`] where a file of the tree cannot be read, or where any path of it is or
+/// passes through a symbolic link.
+pub fn of(root: &Path, manifest: &str) -> Result<String, Refused> {
+    let part = declared(manifest);
+    let mut files = BTreeMap::new();
+    let mut links = Vec::new();
+    let directories = part
+        .services
+        .iter()
+        .map(|service| format!("{CONFIG}/{}", service.id))
+        .chain([CONFORMANCE.to_owned()]);
+    for directory in directories {
+        if let Some(link) = linked(root, &directory) {
+            links.push(link);
+            continue;
+        }
+        let at = root.join(&directory);
+        if !at.is_dir() {
+            continue;
+        }
+        let copy = walked(&at)?;
+        links.extend(copy.links.iter().map(|path| format!("{directory}/{path}")));
+        files.extend(
+            copy.files
+                .into_iter()
+                .map(|(path, bytes)| (format!("{directory}/{path}"), bytes)),
+        );
+    }
+    for fixture in &part.fixtures {
+        if let Some(link) = linked(root, fixture) {
+            links.push(link);
+            continue;
+        }
+        match bytes(&root.join(fixture)) {
+            Ok(read) => {
+                files.insert(fixture.clone(), read);
+            }
+            Err(Refused::Unread { source, .. }) if source.kind() == ErrorKind::NotFound => {}
+            Err(refused) => return Err(refused),
+        }
+    }
+    if links.is_empty() {
+        Ok(digest(manifest, &files))
+    } else {
+        links.sort();
+        links.dedup();
+        Err(Refused::Rules(
+            links
+                .into_iter()
+                .map(|at| format!("{at} is a symbolic link, which nothing a tree holds may be"))
+                .collect(),
+        ))
+    }
+}
+
+#[cfg(test)]
+mod tests;

@@ -207,12 +207,16 @@ pub(crate) fn an_installed(
         revision: String::new(),
         signed: String::new(),
         manifest: String::new(),
+        tree: String::new(),
         installed_at: String::new(),
     }
 }
 
 /// The digest a contracted plugin was installed from.
 pub(crate) const CONTRACTED_MANIFEST: &str = "contracted-manifest";
+
+/// The digest of the tree a first-party plugin was installed from.
+pub(crate) const A_TREE: &str = "sha256:a-tree";
 
 /// The port a contracted plugin's service speaks on, inside its container and on the
 /// host's loopback alike.
@@ -243,6 +247,7 @@ pub(crate) fn a_contracted_media_server(native: Option<&str>) -> crate::plugin::
     upstream.native = native.map(str::to_owned);
     let mut installed = an_installed("contracted", vec![adapter, upstream]);
     installed.manifest = CONTRACTED_MANIFEST.to_owned();
+    installed.tree = crate::test_support::A_TREE.to_owned();
     installed
 }
 
@@ -257,6 +262,7 @@ pub(crate) fn contracted(
     placed.speaks = vec![format!("{capability}@1")];
     let mut installed = an_installed(plugin, vec![placed]);
     installed.manifest = CONTRACTED_MANIFEST.to_owned();
+    installed.tree = crate::test_support::A_TREE.to_owned();
     installed
 }
 
@@ -267,6 +273,7 @@ pub(crate) const fn first_party(
     [crate::plugin::first_party::FirstParty {
         plugin,
         manifest: CONTRACTED_MANIFEST,
+        tree: A_TREE,
     }]
 }
 

@@ -20,7 +20,7 @@ use lemonfiber_manifest::{Form, Profile, Removed, Wiring};
 use serde::Deserialize;
 
 pub use assembly::assembled;
-pub use tree::digest as tree_digest;
+pub use tree::{digest as tree_digest, of as tree_of};
 
 /// The bundle's file, from the root of `lemonfiber-plugins`.
 pub const FILE: &str = "bundle/bundle.toml";

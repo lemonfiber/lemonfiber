@@ -1477,6 +1477,7 @@ dependencies = [
  "include_dir",
  "jiff",
  "lemonfiber-adapters",
+ "lemonfiber-bundle",
  "lemonfiber-bundled",
  "lemonfiber-contract",
  "lemonfiber-error",

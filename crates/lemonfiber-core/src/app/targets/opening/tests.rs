@@ -23,6 +23,7 @@ const MANIFEST: &str = "intake-manifest";
 const FIRST_PARTY: [FirstParty; 1] = [FirstParty {
     plugin: "intake",
     manifest: MANIFEST,
+    tree: crate::test_support::A_TREE,
 }];
 
 /// The request service's own adapter, reading its key from the settings it writes.
@@ -41,6 +42,7 @@ fn bringing(service: &str, speaks: &[&str], api: Option<Api>) -> Installed {
     placed.speaks = speaks.iter().map(|one| (*one).to_owned()).collect();
     let mut installed = an_installed("intake", vec![placed]);
     installed.manifest = MANIFEST.to_owned();
+    installed.tree = crate::test_support::A_TREE.to_owned();
     installed
 }
 

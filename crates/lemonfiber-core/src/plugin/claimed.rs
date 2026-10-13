@@ -231,18 +231,30 @@ pub fn read(path: &Path) -> Result<Manifest, Unreadable> {
     sourced(path).map(|(_, manifest)| manifest)
 }
 
-/// The manifest at this path and the SHA-256 of the bytes it was read from, in
-/// lower-case hexadecimal.
+/// A manifest as read, with the digests first-party trust is judged by.
+#[derive(Debug)]
+pub struct Digested {
+    /// The manifest.
+    pub manifest: Manifest,
+    /// The SHA-256 of the bytes it was read from, in lower-case hexadecimal.
+    pub digest: String,
+    /// The digest of the plugin's tree read with those bytes, `sha256:<hex>`; empty
+    /// where the tree could not be read whole.
+    pub tree: String,
+}
+
+/// The manifest at this path, the SHA-256 of the bytes it was read from, in lower-case
+/// hexadecimal, and the digest of the tree beside it.
 ///
-/// One read for both, so the digest is of exactly what was parsed: a file replaced
-/// between a read that digested it and one that parsed it would be a plugin nobody
-/// digested.
+/// One read for all three, so the digests are of exactly what was parsed: a file
+/// replaced between a read that digested it and one that parsed it would be a plugin
+/// nobody digested.
 ///
 /// # Errors
 ///
 /// [`Unreadable`] where there is no manifest at the path, or where this build cannot
 /// read the one that is there.
-pub fn read_digested(path: &Path) -> Result<(Manifest, String), Unreadable> {
+pub fn read_digested(path: &Path) -> Result<Digested, Unreadable> {
     let (root, at) = source(path);
     if !at.is_file() {
         return Err(Unreadable::NoManifest(root));
@@ -251,7 +263,12 @@ pub fn read_digested(path: &Path) -> Result<(Manifest, String), Unreadable> {
     let digest = crate::secret::render(
         ring::digest::digest(&ring::digest::SHA256, text.as_bytes()).as_ref(),
     );
-    Ok((Manifest::from_toml(&text)?, digest))
+    let tree = lemonfiber_bundle::tree_of(&root, &text).unwrap_or_default();
+    Ok(Digested {
+        manifest: Manifest::from_toml(&text)?,
+        digest,
+        tree,
+    })
 }
 
 /// The plugin's root and the manifest inside it, or why neither could be had.

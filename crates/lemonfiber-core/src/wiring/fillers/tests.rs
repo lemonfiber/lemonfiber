@@ -387,9 +387,11 @@ fn a_plugins_service_holds_as_first_party_only_where_the_build_trusts_it() {
         )],
     );
     installed.manifest = "ab12".to_owned();
+    installed.tree = crate::test_support::A_TREE.to_owned();
     let trusted = [crate::plugin::first_party::FirstParty {
         plugin: "bazarr",
         manifest: "ab12",
+        tree: crate::test_support::A_TREE,
     }];
     let holder = |trusted: &[crate::plugin::first_party::FirstParty]| {
         let fillers = crate::test_support::stack()

@@ -70,7 +70,7 @@ pub(crate) fn read(directory: &Path, schema: u32) -> Result<BTreeMap<String, Cop
 }
 
 /// A copy's directory, every file read and every link noted rather than followed.
-fn walked(root: &Path) -> Result<Copy, Refused> {
+pub(crate) fn walked(root: &Path) -> Result<Copy, Refused> {
     let mut copy = Copy::default();
     let mut pending = vec![String::new()];
     while let Some(relative) = pending.pop() {

@@ -19,8 +19,8 @@ const MOST_BYTES: usize = 1024 * 1024;
 
 /// One service of a part, as its manifest declares it.
 #[derive(Debug, Default)]
-struct Declared {
-    id: String,
+pub(crate) struct Declared {
+    pub(crate) id: String,
     provides: Vec<String>,
     speaks: Vec<String>,
     replaces: Option<String>,
@@ -39,11 +39,11 @@ struct Asked {
 
 /// What the bundle reads of a part's manifest.
 #[derive(Debug, Default)]
-struct Part {
-    services: Vec<Declared>,
+pub(crate) struct Part {
+    pub(crate) services: Vec<Declared>,
     asks: Vec<Asked>,
     forms: Vec<String>,
-    fixtures: Vec<String>,
+    pub(crate) fixtures: Vec<String>,
 }
 
 /// Every rule a schema 2 `bundle` and its `copies` break, added to `broken`.
@@ -339,7 +339,7 @@ fn asker<'a>(part: &'a Part, ask: &'a Asked) -> Option<&'a str> {
 
 /// What the bundle reads of a manifest's text; nothing where it is not TOML, which the
 /// pin's digest and id have already refused.
-fn declared(manifest: &str) -> Part {
+pub(crate) fn declared(manifest: &str) -> Part {
     let Ok(table) = toml::from_str::<toml::Table>(manifest) else {
         return Part::default();
     };

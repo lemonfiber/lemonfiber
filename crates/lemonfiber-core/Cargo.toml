@@ -11,6 +11,8 @@ repository.workspace = true
 lemonfiber-contract = { workspace = true }
 # The bundled stack's manifest as one text, for the vocabulary its services publish.
 lemonfiber-bundled = { workspace = true }
+# A plugin's tree, digested as the bundle pins it, for first-party trust.
+lemonfiber-bundle = { workspace = true }
 lemonfiber-error = { workspace = true }
 lemonfiber-manifest = { workspace = true }
 # The plugin manifest types, the capability vocabulary and the extension points —

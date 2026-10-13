@@ -87,15 +87,16 @@ fn rust(held: &[lemonfiber_bundle::Held]) -> String {
     let mut first_party = String::new();
     for one in held {
         let trusted = format!(
-            "FirstParty {{ plugin: {:?}, manifest: {:?} }}",
+            "FirstParty {{ plugin: {:?}, manifest: {:?}, tree: {:?} }}",
             one.pin.id,
-            one.digest()
+            one.digest(),
+            one.pin.tree.as_deref().unwrap_or_default()
         );
         let _ = writeln!(first_party, "    {trusted},");
         let _ = writeln!(
             pinned,
-            "    Pinned {{ first_party: {trusted}, origin: {:?}, release: {:?}, revision: {:?}, tree: {:?}, fills: &{:?}, copy: {:?} }},",
-            one.pin.origin, one.pin.release, one.pin.revision, one.pin.tree, one.pin.fills, one.copy
+            "    Pinned {{ first_party: {trusted}, origin: {:?}, release: {:?}, revision: {:?}, fills: &{:?}, copy: {:?} }},",
+            one.pin.origin, one.pin.release, one.pin.revision, one.pin.fills, one.copy
         );
     }
     format!(
