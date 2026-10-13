@@ -215,3 +215,6 @@ fn listening(manifest: &Manifest, installed: &[Installed], id: &str) -> Option<u
     };
     bundled.or_else(brought).flatten()
 }
+
+#[cfg(test)]
+mod tests;
