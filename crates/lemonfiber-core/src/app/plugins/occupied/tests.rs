@@ -32,7 +32,7 @@ fn a_service_the_overlay_declares_is_refused_naming_the_file() {
         file: PathBuf::from("/srv/stack/compose.override.yml"),
     }];
 
-    let said = named(&would, &held);
+    let said = named(&would, &held, false);
 
     assert_eq!(said.len(), 1);
     assert!(
@@ -42,7 +42,8 @@ fn a_service_the_overlay_declares_is_refused_naming_the_file() {
     );
     assert!(named(
         &an_installed("tools", vec![a_placed("other", &[], None, None)]),
-        &held
+        &held,
+        false
     )
     .is_empty());
 }
@@ -57,7 +58,7 @@ fn a_port_the_stack_or_another_plugin_publishes_is_refused() {
         service: "caddy".to_owned(),
         file: PathBuf::from("compose/proxy.yml"),
     }];
-    let said = bound(&would, &stack, &[]);
+    let said = bound(&would, &stack, &[], false);
     assert!(
         said.iter()
             .any(|one| one.contains("443") && one.contains("caddy")),
@@ -66,7 +67,7 @@ fn a_port_the_stack_or_another_plugin_publishes_is_refused() {
 
     let other = an_installed("other", vec![reached("dash", 443, None)]);
     let earlier = an_installed("tools", vec![reached("web", 443, None)]);
-    let said = bound(&would, &[], &[other, earlier]);
+    let said = bound(&would, &[], &[other, earlier], false);
     assert_eq!(said.len(), 1, "{said:?}");
     assert!(
         said.iter().all(|one| one.contains("other's dash")),
@@ -74,7 +75,7 @@ fn a_port_the_stack_or_another_plugin_publishes_is_refused() {
     );
 
     let free = an_installed("tools", vec![reached("web", 25600, None)]);
-    assert!(bound(&free, &stack, &[]).is_empty());
+    assert!(bound(&free, &stack, &[], false).is_empty());
 }
 
 /// A further port the plugin publishes is held to the same as its first, against the stack
@@ -100,7 +101,7 @@ fn every_port_a_plugin_publishes_is_held_to_what_is_already_published() {
         service: "jellyfin".to_owned(),
         file: PathBuf::from("compose/media.yml"),
     }];
-    let said = bound(&would, &stack, &[]);
+    let said = bound(&would, &stack, &[], false);
     assert_eq!(said.len(), 1, "{said:?}");
     assert!(
         said.iter()
@@ -109,7 +110,7 @@ fn every_port_a_plugin_publishes_is_held_to_what_is_already_published() {
     );
 
     let other = an_installed("other", vec![further(reached("dash", 9000, None), 25600)]);
-    let said = bound(&would, &[], &[other]);
+    let said = bound(&would, &[], &[other], false);
     assert_eq!(
         said,
         ["service web: port 25600 is already published for other's dash"]
@@ -161,4 +162,41 @@ fn the_shipped_stack_holds_the_proxy_s_ports() {
         .and_then(|one| one.detail.as_deref())
         .is_some_and(|detail| detail.contains("443")));
     assert!(unoccupied(&ctx, &free, &[], &scratch).is_ok());
+}
+
+/// The stack's service a first-party plugin replaces holds nothing against it: not its
+/// name, not its port; a service it does not replace still does, and a plugin that is
+/// not first-party is held to all of them, whatever it says it replaces.
+#[test]
+fn the_stack_service_a_first_party_plugin_replaces_holds_neither_its_name_nor_its_port() {
+    let mut replacing = reached("jellyfin", 8096, None);
+    replacing.replaces = Some("jellyfin".to_owned());
+    let would = an_installed("jellyfin", vec![replacing]);
+    let held = [Declared {
+        service: "jellyfin".to_owned(),
+        file: PathBuf::from("compose/media.yml"),
+    }];
+    let stack = [
+        Published {
+            port: 8096,
+            service: "jellyfin".to_owned(),
+            file: PathBuf::from("compose/media.yml"),
+        },
+        Published {
+            port: 8096,
+            service: "door".to_owned(),
+            file: PathBuf::from("compose/door.yml"),
+        },
+    ];
+    assert!(named(&would, &held, true).is_empty());
+    let said = bound(&would, &stack, &[], true);
+    assert_eq!(said.len(), 1, "{said:?}");
+    assert!(said.iter().all(|one| one.contains("door")), "{said:?}");
+
+    assert_eq!(named(&would, &held, false).len(), 1);
+    let said = bound(&would, &stack, &[], false);
+    assert!(
+        said.iter().any(|one| one.contains("for jellyfin")),
+        "{said:?}"
+    );
 }

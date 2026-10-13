@@ -193,7 +193,11 @@ pub fn read(root: &Path) -> Result<(Bundle, Vec<Held>), Refused> {
 
 /// The SHA-256 of `bytes`, in lower-case hexadecimal.
 fn hex(bytes: &[u8]) -> String {
-    let digest = ring::digest::digest(&ring::digest::SHA256, bytes);
+    rendered(&ring::digest::digest(&ring::digest::SHA256, bytes))
+}
+
+/// `digest` in lower-case hexadecimal.
+fn rendered(digest: &ring::digest::Digest) -> String {
     let mut rendered = String::with_capacity(digest.as_ref().len() * 2);
     for byte in digest.as_ref() {
         let _ = write!(rendered, "{byte:02x}");

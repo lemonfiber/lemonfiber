@@ -3,9 +3,9 @@
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::io::ErrorKind;
-use std::path::Path;
+use std::path::{Component, Path};
 
-use crate::copies::{bytes, linked, walked};
+use crate::copies::{found, linked, summed};
 use crate::parts::declared;
 use crate::{hex, Refused, DIGEST_PREFIX, MANIFEST};
 
@@ -20,15 +20,21 @@ pub(crate) const CONFORMANCE: &str = "conformance";
 /// line feed.
 #[must_use]
 pub fn digest(manifest: &str, files: &BTreeMap<String, Vec<u8>>) -> String {
-    let mut lines: Vec<(&[u8], String)> = files
-        .iter()
-        .map(|(path, bytes)| (path.as_bytes(), hex(bytes)))
-        .collect();
-    lines.push((MANIFEST.as_bytes(), hex(manifest.as_bytes())));
-    lines.sort_by(|left, right| left.0.cmp(right.0));
+    listed(
+        manifest,
+        files
+            .iter()
+            .map(|(path, bytes)| (path.clone(), hex(bytes)))
+            .collect(),
+    )
+}
+
+/// The tree's digest from each file's SHA-256 by its path, the manifest's beside them.
+fn listed(manifest: &str, mut sums: BTreeMap<String, String>) -> String {
+    sums.insert(MANIFEST.to_owned(), hex(manifest.as_bytes()));
     let mut listing = String::new();
-    for (path, sum) in &lines {
-        let _ = writeln!(listing, "{sum}  {}", String::from_utf8_lossy(path));
+    for (path, sum) in &sums {
+        let _ = writeln!(listing, "{sum}  {path}");
     }
     format!("{DIGEST_PREFIX}{}", hex(listing.as_bytes()))
 }
@@ -46,63 +52,86 @@ pub(crate) fn holds(path: &str, services: &[String], fixtures: &[String]) -> boo
 
 /// The digest of the tree of the plugin whose repository is checked out at `root`, read
 /// with `manifest` as its manifest's text: the manifest, each service's starting files,
-/// every fixture the manifest names and its conformance.
+/// every fixture the manifest names and its conformance. Each file is hashed in pieces,
+/// never held whole.
 ///
 /// # Errors
 ///
-/// [`Refused`] where a file of the tree cannot be read, or where any path of it is or
-/// passes through a symbolic link.
+/// [`Refused`] where a file of the tree cannot be read, where any path of it is or
+/// passes through a symbolic link, or where a path the manifest names is not one inside
+/// the repository.
 pub fn of(root: &Path, manifest: &str) -> Result<String, Refused> {
     let part = declared(manifest);
-    let mut files = BTreeMap::new();
-    let mut links = Vec::new();
+    let mut sums = BTreeMap::new();
+    let mut refused = Vec::new();
     let directories = part
         .services
         .iter()
         .map(|service| format!("{CONFIG}/{}", service.id))
         .chain([CONFORMANCE.to_owned()]);
     for directory in directories {
+        if !inside(&directory) {
+            refused.push(format!("{directory} is not a path inside the repository"));
+            continue;
+        }
         if let Some(link) = linked(root, &directory) {
-            links.push(link);
+            refused.push(linking(&link));
             continue;
         }
         let at = root.join(&directory);
         if !at.is_dir() {
             continue;
         }
-        let copy = walked(&at)?;
-        links.extend(copy.links.iter().map(|path| format!("{directory}/{path}")));
-        files.extend(
-            copy.files
-                .into_iter()
-                .map(|(path, bytes)| (format!("{directory}/{path}"), bytes)),
+        let (paths, links) = found(&at)?;
+        refused.extend(
+            links
+                .iter()
+                .map(|path| linking(&format!("{directory}/{path}"))),
         );
+        for path in paths {
+            sums.insert(format!("{directory}/{path}"), summed(&at.join(&path))?);
+        }
     }
     for fixture in &part.fixtures {
-        if let Some(link) = linked(root, fixture) {
-            links.push(link);
+        if !inside(fixture) {
+            refused.push(format!("{fixture} is not a path inside the repository"));
             continue;
         }
-        match bytes(&root.join(fixture)) {
-            Ok(read) => {
-                files.insert(fixture.clone(), read);
+        if let Some(link) = linked(root, fixture) {
+            refused.push(linking(&link));
+            continue;
+        }
+        match summed(&root.join(fixture)) {
+            Ok(sum) => {
+                sums.insert(fixture.clone(), sum);
             }
             Err(Refused::Unread { source, .. }) if source.kind() == ErrorKind::NotFound => {}
-            Err(refused) => return Err(refused),
+            Err(unreadable) => return Err(unreadable),
         }
     }
-    if links.is_empty() {
-        Ok(digest(manifest, &files))
+    if refused.is_empty() {
+        Ok(listed(manifest, sums))
     } else {
-        links.sort();
-        links.dedup();
-        Err(Refused::Rules(
-            links
-                .into_iter()
-                .map(|at| format!("{at} is a symbolic link, which nothing a tree holds may be"))
-                .collect(),
-        ))
+        refused.sort();
+        refused.dedup();
+        Err(Refused::Rules(refused))
     }
+}
+
+/// Whether `relative` names a path beneath the repository's root: plain names joined by
+/// `/`, none of them empty, `.` or `..`, and no root or prefix.
+fn inside(relative: &str) -> bool {
+    relative
+        .split('/')
+        .all(|name| !name.is_empty() && name != "." && name != "..")
+        && Path::new(relative)
+            .components()
+            .all(|component| matches!(component, Component::Normal(_)))
+}
+
+/// The refusal of a link at `path`.
+fn linking(path: &str) -> String {
+    format!("{path} is a symbolic link, which nothing a tree holds may be")
 }
 
 #[cfg(test)]

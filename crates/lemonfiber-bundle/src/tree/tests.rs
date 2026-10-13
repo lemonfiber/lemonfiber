@@ -112,3 +112,47 @@ fn a_starting_file_that_cannot_be_read_is_unread() {
         Err(Refused::Unread { .. })
     ));
 }
+
+#[test]
+fn a_file_larger_than_one_piece_digests_as_its_whole_bytes() {
+    let large = "x".repeat(200 * 1024 + 7);
+    let root = repository("large", &[("config/door/large", &large)]);
+    assert_eq!(
+        of(&root, MANIFEST_TEXT).ok(),
+        Some(digest(
+            MANIFEST_TEXT,
+            &held(&[("config/door/large", &large)])
+        ))
+    );
+}
+
+#[test]
+fn a_path_the_manifest_names_outside_the_repository_is_refused_and_never_read() {
+    let root = repository("escaping", &[]);
+    let outside = root.with_file_name(format!(
+        "{}-outside.json",
+        root.file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_default()
+    ));
+    assert!(std::fs::write(&outside, "{}").is_ok());
+    let escaping = format!(
+        "[plugin]\nid = \"door\"\n\n[[service]]\nid = \"../door\"\n\n[[proof]]\nfixture = \"../{}\"\n\n[[claim]]\nfixture = \"/etc/hosts\"\n\n[[check]]\nfixture = \"recordings/./door.json\"\n",
+        outside.file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default()
+    );
+    let said = match of(&root, &escaping) {
+        Err(Refused::Rules(said)) => said,
+        other => unreachable!("expected a refusal, got {other:?}"),
+    };
+    for path in [
+        "config/../door",
+        "/etc/hosts",
+        "recordings/./door.json",
+        "../",
+    ] {
+        assert!(
+            said.iter().any(|one| one.starts_with(path)),
+            "{path} in {said:?}"
+        );
+    }
+}
