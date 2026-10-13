@@ -311,3 +311,46 @@ fn a_chosen_filler_is_the_one_a_service_runs_inside() {
         Some(&Where::Inside("gluetun".into()))
     );
 }
+
+#[test]
+fn an_adapter_inside_the_guard_has_its_contract_port_published_by_the_guard() {
+    let mut adapter = a_placed("bridge", &[], None, Some(18997));
+    adapter.reached = None;
+    adapter.speaks = vec!["media.serve@1".into()];
+    adapter.fields.network = Some(Network {
+        via: "network.egress-guard".into(),
+    });
+    let project = project(&carried(), &[an_installed("bridge", vec![adapter])]);
+    assert_eq!(
+        text(&entry(&project, "bridge"), "network_mode"),
+        "service:gluetun"
+    );
+    assert!(ports(&entry(&project, "gluetun"))
+        .iter()
+        .any(|written| written.ends_with(":18997")));
+}
+
+#[test]
+fn an_installed_guard_the_operator_chose_holds_the_services_inside_it() {
+    let guard = a_placed("tunnel", &["network.egress-guard"], None, Some(18996));
+    let mut inside = a_placed("client", &[], None, Some(18995));
+    inside.fields.network = Some(Network {
+        via: "network.egress-guard".into(),
+    });
+    let project = generated(
+        &carried(),
+        &[
+            an_installed("tunnel", vec![guard]),
+            an_installed("client", vec![inside]),
+        ],
+        &Chosen::read(Some("network.egress-guard=tunnel")),
+        &Reading::bare(),
+    );
+    assert_eq!(
+        text(&entry(&project, "client"), "network_mode"),
+        "service:tunnel"
+    );
+    assert!(ports(&entry(&project, "tunnel"))
+        .iter()
+        .any(|written| written.contains("18995")));
+}

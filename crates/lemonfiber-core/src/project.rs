@@ -9,6 +9,7 @@ mod document;
 pub mod entry;
 mod inputs;
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use lemonfiber_manifest::container::{UrlOf, UserMode};
@@ -86,7 +87,13 @@ pub fn generated(
                 .map(move |placed| plugin::unit(&one.plugin, placed, &legacy))
         }))
         .collect();
-    let mut entries: Vec<(String, _)> = units
+    let mut hosted: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for unit in &units {
+        if let Some(Placed::Inside(host)) = topology.placed.get(unit.id) {
+            hosted.entry(literal(host)).or_default().extend(ports(unit));
+        }
+    }
+    let entries: Vec<(String, _)> = units
         .iter()
         .map(|unit| {
             let placed = topology
@@ -94,17 +101,12 @@ pub fn generated(
                 .get(unit.id)
                 .cloned()
                 .unwrap_or(Placed::Nowhere);
-            (literal(unit.id), entry(unit, &placed, &values))
+            let id = literal(unit.id);
+            let mut written = entry(unit, &placed, &values);
+            written.ports.extend(hosted.remove(&id).unwrap_or_default());
+            (id, written)
         })
         .collect();
-    for unit in &units {
-        if let Some(Placed::Inside(host)) = topology.placed.get(unit.id) {
-            let hosted = ports(unit);
-            if let Some((_, written)) = entries.iter_mut().find(|(id, _)| *id == literal(host)) {
-                written.ports.extend(hosted);
-            }
-        }
-    }
     let document = Document {
         services: Services(entries),
         networks: document::networks(&topology),
