@@ -1444,6 +1444,7 @@ version = "0.17.0"
 dependencies = [
  "lemonfiber-bundle",
  "lemonfiber-manifest",
+ "toml",
 ]
 
 [[package]]
