@@ -213,7 +213,7 @@ fn static_services() -> Vec<(String, Option<String>, BTreeSet<String>)> {
         let path = entry.path();
         let name = path
             .file_name()
-            .and_then(|name| name.to_str())
+            .and_then(std::ffi::OsStr::to_str)
             .unwrap_or_default();
         let compose = path
             .extension()
