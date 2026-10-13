@@ -5,7 +5,7 @@ use lemonfiber_fixtures::heard::Heard;
 use lemonfiber_fixtures::ports::{Chance, Stopped};
 use x509_parser::prelude::{FromDer as _, X509Certificate};
 
-use super::{at, list, register, revoke, revoked_by, standing, swept, undone, used};
+use super::{apps_changed, at, list, register, revoke, revoked_by, standing, swept, undone, used};
 use crate::admission::Credential;
 use crate::app::Ctx;
 use crate::config::Settings;
@@ -36,7 +36,7 @@ fn a_machine(named: &str) -> (Ctx, Arc<Heard>) {
         .build()
         .with_random(Arc::new(Chance::cycling()))
         .with_narrator(heard.clone());
-    password(&ctx, &lemonfiber_fixtures::support::a_password());
+    password(&ctx, &lemonfiber_fixtures::passwords::a_password());
     (ctx, heard)
 }
 
@@ -253,7 +253,7 @@ async fn a_rehearsed_revoke_says_what_it_would_do_and_does_nothing() {
 async fn a_changed_password_revokes_every_device_key_at_the_next_look() {
     let (ctx, _) = a_machine("password");
     registered(&ctx, "pixel").await;
-    password(&ctx, &lemonfiber_fixtures::support::another_password());
+    password(&ctx, &lemonfiber_fixtures::passwords::another_password());
     let Ok(listing) = list(&ctx).await else {
         unreachable!("the listing reads");
     };
@@ -268,7 +268,7 @@ async fn a_changed_password_revokes_every_device_key_at_the_next_look() {
 async fn setting_the_password_revokes_at_once_and_so_does_removing_it() {
     let (ctx, _) = a_machine("set");
     registered(&ctx, "pixel").await;
-    password(&ctx, &lemonfiber_fixtures::support::another_password());
+    password(&ctx, &lemonfiber_fixtures::passwords::another_password());
     assert!(swept(&ctx).await.is_ok());
     assert!(kept(&ctx).active("pixel").is_none());
     let (ctx, _) = a_machine("removed");
@@ -334,7 +334,7 @@ async fn a_journal_that_cannot_be_written_still_leaves_every_revoke_made_and_tol
 async fn a_sweep_whose_journal_cannot_be_written_revokes_every_stale_key_all_the_same() {
     let (ctx, _) = a_machine("unjournaled-sweep");
     registered(&ctx, "pixel").await;
-    password(&ctx, &lemonfiber_fixtures::support::another_password());
+    password(&ctx, &lemonfiber_fixtures::passwords::another_password());
     let journal = crate::app::targets::layout(&ctx)
         .map(|paths| paths.journal())
         .unwrap_or_default();
@@ -429,4 +429,29 @@ async fn a_revoked_device_keys_alert_names_the_keys_it_proved_which_stay() {
         .and_then(|path| crate::keys::Kept::at(&path).ok())
         .unwrap_or_default();
     assert_eq!(keys.proved_with("pixel").len(), 1);
+}
+
+#[tokio::test]
+async fn changing_the_apps_names_each_identity_gained_or_lost_and_revokes_what_a_lost_one_made() {
+    let (ctx, _) = a_machine("apps-changed");
+    registered(&ctx, "pixel").await;
+    let recorded = recorded_app(&ctx).written();
+    let other = "ios:ABCDE12345.app.other";
+    let both = format!("{recorded},{other}");
+    assert!(apps_changed(&ctx, Some(&recorded), Some(&both))
+        .await
+        .is_ok());
+    assert!(told(&ctx)
+        .iter()
+        .any(|said| said == &format!("The app {other} may now register device keys")));
+    assert!(kept(&ctx).active("pixel").is_some());
+    trusting(
+        &ctx,
+        &AppIdentity::read(other).into_iter().collect::<Vec<_>>(),
+    );
+    assert!(apps_changed(&ctx, Some(&both), Some(other)).await.is_ok());
+    assert!(told(&ctx)
+        .iter()
+        .any(|said| said == &format!("The app {recorded} may no longer register device keys")));
+    assert!(kept(&ctx).active("pixel").is_none());
 }

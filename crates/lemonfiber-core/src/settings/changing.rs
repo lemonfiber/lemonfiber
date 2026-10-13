@@ -112,6 +112,9 @@ pub(super) async fn changed(ctx: &Ctx, asked: &Asked<'_>) -> Result<SettingsRepo
         .map_err(|failure| Box::new(failure.problem()))?;
     kept(ctx, env, asked).map_err(|failure| Box::new(failure.problem()))?;
     writing::overwritten(&overwrites, REFUSING)?;
+    if asked.setting == super::own::DEVICE_KEY_APPS {
+        crate::device_keys::run::apps_changed(ctx, was.as_deref(), asked.value).await?;
+    }
     change.applied = true;
     change.unrestarted = restarting::restarted(ctx, &change.restarts).await;
     Ok(super::listing::report(

@@ -485,22 +485,7 @@ pub fn refused(stderr: &str) -> Output {
     }
 }
 
-/// A throwaway password for a test — built from a character range rather than
-/// written as a string literal, so a hard-coded-credential scan does not read a
-/// test fixture as a real secret. Non-empty on purpose (a recorded password that
-/// read back as empty would be treated as absent), and its value is otherwise
-/// irrelevant: the fakes accept whatever is sent.
-#[must_use]
-pub fn a_password() -> String {
-    ('a'..='p').collect()
-}
-
-/// A second throwaway password, other than [`a_password`] and built the same way, for a
-/// test that changes the password.
-#[must_use]
-pub fn another_password() -> String {
-    ('A'..='P').collect()
-}
+pub use crate::passwords::a_password;
 
 /// The next scripted answer, or a not-found for whatever was asked.
 fn next_answer(sequenced: &Sequenced, argv: &[String]) -> Result<Output, Failure> {

@@ -243,6 +243,39 @@ pub async fn swept(ctx: &Ctx) -> Result<(), Box<Problem>> {
     changed(ctx, &path, |_, _| Ok(())).await
 }
 
+/// Tell the operator of every app identity the setting naming the operator's own builds
+/// gained or lost in going from `was` to `now`, then revoke every device key an app no
+/// longer trusted made, as changing the setting asks.
+///
+/// # Errors
+///
+/// A [`Problem`] where the record cannot be read, swept or written.
+pub async fn apps_changed(
+    ctx: &Ctx,
+    was: Option<&str>,
+    now: Option<&str>,
+) -> Result<(), Box<Problem>> {
+    let named = |value: Option<&str>| -> Vec<String> {
+        value
+            .map(|value| {
+                identity::read_all(value)
+                    .0
+                    .iter()
+                    .map(AppIdentity::written)
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    let (before, after) = (named(was), named(now));
+    for added in after.iter().filter(|identity| !before.contains(identity)) {
+        heard::app(ctx, added, true).await;
+    }
+    for removed in before.iter().filter(|identity| !after.contains(identity)) {
+        heard::app(ctx, removed, false).await;
+    }
+    swept(ctx).await
+}
+
 /// Revoke every active device key kept in the configuration directory `config`, as a
 /// restore into it asks, whether or not the restore went on to land. Where no record is
 /// kept there, no device key stands to revoke.

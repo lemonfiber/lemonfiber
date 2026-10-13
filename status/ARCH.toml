@@ -184,7 +184,7 @@ requirement = [
   { id = "ARCH-R259", state = "done", evidence = ["crates/lemonfiber-api/src/device_keys.rs", "crates/lemonfiber-core/src/device_keys/listing.rs", "crates/lemonfiber-api/tests/integration/what_a_device_key_proves.rs"] },
   { id = "ARCH-R260", state = "done", evidence = ["crates/lemonfiber-api/src/device_keys.rs", "crates/lemonfiber-core/src/device_keys/challenge.rs", "crates/lemonfiber-api/tests/integration/what_a_device_key_proves.rs"] },
   { id = "ARCH-R261", state = "done", evidence = ["crates/lemonfiber-api/src/keys.rs", "crates/lemonfiber-core/src/device_keys/proof.rs", "crates/lemonfiber-core/src/device_keys/proof/tests.rs", "crates/lemonfiber-api/tests/integration/what_a_device_key_proves.rs"] },
-  { id = "ARCH-R262", state = "partial", evidence = ["crates/lemonfiber-core/src/device_keys/identity.rs", "crates/lemonfiber-core/src/device_keys/identity/tests.rs"] },
+  { id = "ARCH-R262", state = "done", evidence = ["crates/lemonfiber-core/src/device_keys/identity.rs", "crates/lemonfiber-core/src/settings/own.rs", "crates/lemonfiber-core/src/settings/changing.rs", "crates/lemonfiber-core/src/device_keys/identity/tests.rs", "crates/lemonfiber-core/src/settings/tests/own.rs"] },
   { id = "ARCH-R293", state = "done", evidence = ["crates/lemonfiber-core/src/keys/listing.rs", "contract/web-api/defs/ListedKey.json", "crates/lemonfiber-api/tests/integration/what_a_device_key_proves.rs"] },
   { id = "ARCH-R294", state = "done", evidence = ["crates/lemonfiber-core/src/model/settings.rs", "crates/lemonfiber-core/src/app/engine.rs", "crates/lemonfiber/src/render.rs", "contract/web-api/defs/VersionReport.json", "contract/web-api/refusals.json"] },
 ]

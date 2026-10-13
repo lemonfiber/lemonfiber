@@ -286,7 +286,7 @@ async fn a_password_changed_elsewhere_cuts_off_a_challenge_already_issued() {
     let issued = challenge(&router, &token).await;
     let changed = credential::keep(
         &admission,
-        &a_credential(&lemonfiber_fixtures::support::another_password()),
+        &a_credential(&lemonfiber_fixtures::passwords::another_password()),
     );
     assert!(changed.is_ok());
     let body = proved_mint("ha", &issued, &signed_for(&phone, "ha", &issued));
@@ -348,7 +348,7 @@ async fn a_registration_asks_for_the_password_and_answers_with_what_the_attestat
         "/api/device-keys",
         &token,
         Some((HERE, false)),
-        &registering(&lemonfiber_fixtures::support::another_password()),
+        &registering(&lemonfiber_fixtures::passwords::another_password()),
     )
     .await;
     assert_eq!(wrong.status, StatusCode::UNAUTHORIZED, "{}", wrong.body);

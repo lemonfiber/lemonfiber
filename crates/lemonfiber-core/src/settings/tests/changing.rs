@@ -613,6 +613,30 @@ async fn a_core_setting_is_recorded_in_the_store_and_read_back_as_the_cores() {
 }
 
 #[tokio::test]
+async fn changing_the_device_key_apps_tells_the_operator_of_each_identity_gained_and_lost() {
+    let machine = machine("device-key-apps", running(&[]));
+    let identity = "ios:ABCDE12345.app.example.lemon";
+    let set = agreed(
+        &machine.ctx,
+        crate::settings::own::DEVICE_KEY_APPS,
+        Some(identity),
+    )
+    .await;
+    assert!(set.is_ok());
+    let cleared = agreed(&machine.ctx, crate::settings::own::DEVICE_KEY_APPS, None).await;
+    assert!(cleared.is_ok());
+    let told: Vec<String> = crate::app::outbox::load(&machine.ctx)
+        .history()
+        .into_iter()
+        .map(|alert| alert.summary.clone())
+        .collect();
+    assert!(told.contains(&format!("The app {identity} may now register device keys")));
+    assert!(told.contains(&format!(
+        "The app {identity} may no longer register device keys"
+    )));
+}
+
+#[tokio::test]
 async fn a_stack_that_cannot_be_read_refuses_the_listing_and_the_change() {
     let mut machine = machine("unread-stack", running(&[]));
     machine.ctx.stack = crate::test_support::nowhere();

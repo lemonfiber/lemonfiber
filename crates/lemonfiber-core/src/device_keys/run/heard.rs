@@ -1,11 +1,13 @@
 //! What the operator is told about a device key: its registration, its revoke, a
-//! registration refused and a signature that did not verify.
+//! registration refused, a signature that did not verify, and an app the operator added
+//! to or removed from the ones that may register one.
 
 use crate::alert::{Alert, Moment};
 use crate::app::Ctx;
 use crate::error::{Problem, Severity};
 use crate::PRODUCT;
 
+use super::super::identity::SETTING;
 use super::super::Record;
 
 /// What the alerts about device keys are filed under, ahead of the device key's name.
@@ -84,6 +86,37 @@ pub(super) async fn refused(ctx: &Ctx, name: &str, why: &Problem) {
             why.summary
         ),
         "If nobody here asked, change the password: whoever asked knows it".to_owned(),
+    )
+    .await;
+}
+
+/// Tell the operator that the app `identity` was added to the ones that may register a
+/// device key, where `added`, or taken off them.
+pub(super) async fn app(ctx: &Ctx, identity: &str, added: bool) {
+    let (summary, meaning) = if added {
+        (
+            format!("The app {identity} may now register device keys"),
+            "A phone running it can register a key with the operator password, and that key \
+             can then prove the operator for a mint."
+                .to_owned(),
+        )
+    } else {
+        (
+            format!("The app {identity} may no longer register device keys"),
+            "Every device key it registered was revoked.".to_owned(),
+        )
+    };
+    raised(
+        ctx,
+        &format!("{CHECK}app.{identity}"),
+        &format!(
+            "{}-{}",
+            if added { "added" } else { "removed" },
+            ctx.stamp()
+        ),
+        summary,
+        meaning,
+        format!("If nobody here changed it, look at {SETTING} in {PRODUCT} settings"),
     )
     .await;
 }

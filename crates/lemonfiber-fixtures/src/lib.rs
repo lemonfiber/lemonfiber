@@ -43,6 +43,7 @@ pub mod heard;
 pub mod hosting;
 pub mod http;
 pub mod located;
+pub mod passwords;
 pub mod ports;
 pub mod program;
 pub mod pulled;
