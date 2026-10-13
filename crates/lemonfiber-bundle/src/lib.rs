@@ -6,6 +6,7 @@
 //! not match is a build that fails rather than a plugin trusted at a manifest nobody
 //! pinned.
 
+mod assembly;
 mod copies;
 mod parts;
 mod rules;
@@ -18,6 +19,7 @@ use std::path::Path;
 use lemonfiber_manifest::{Form, Profile, Removed, Wiring};
 use serde::Deserialize;
 
+pub use assembly::assembled;
 pub use tree::digest as tree_digest;
 
 /// The bundle's file, from the root of `lemonfiber-plugins`.
