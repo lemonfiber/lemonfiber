@@ -239,7 +239,7 @@
     },
     {
       "asked": {
-        "address": "192.0.2.18"
+        "address": "127.0.0.1"
       },
       "case": "trust_only-answers",
       "expect": {

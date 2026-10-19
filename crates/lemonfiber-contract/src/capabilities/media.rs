@@ -43,8 +43,8 @@ const POSITION: u64 = 60;
 /// A term no library holds anything for.
 const TERM: &str = "conformance";
 
-/// An address from the documentation range, trusted to name the client.
-const PROXY: &str = "192.0.2.18";
+/// The loopback address, trusted to name the client.
+const PROXY: &str = "127.0.0.1";
 
 /// An origin a browser reads it from.
 const ORIGIN: &str = "https://watch.example";
