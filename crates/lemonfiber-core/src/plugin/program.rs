@@ -21,7 +21,7 @@ use crate::project::entry::{
     configuration, constant_text, DROPPED, KEPT, OPERATOR_FALLBACK, PROCESSES, SECURITY,
 };
 
-pub(crate) use throwaway::{digest as starting_digest, keep, Starting};
+pub(crate) use throwaway::{digest as starting_digest, keep, Starting, Throwaway};
 
 /// The most of a run's standard output that is read.
 pub(crate) const READ_AT_MOST: usize = 64 * 1024;
@@ -87,13 +87,32 @@ pub(crate) fn limit(run: &lemonfiber_plugin::Run) -> u32 {
         .clamp(RUN_TIMEOUT.min, RUN_TIMEOUT.max)
 }
 
-/// The container a run of `run` is made in, for the service `placed` records.
-pub(crate) fn settled(
-    placed: &Placed,
-    run: &lemonfiber_plugin::Run,
-    operator: &Operator,
-    configured: Option<&Path>,
-) -> Run {
+/// What every container lemonfiber makes for the service `placed` records holds,
+/// whatever it is made for: its environment, who it runs as, and its posture's limits.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Contained {
+    /// Its whole environment, as `NAME=value`.
+    pub(crate) env: Vec<String>,
+    /// Who it runs as, as `uid:gid`, or nothing for the image's own choice.
+    pub(crate) user: Option<String>,
+    /// What it may not gain once started.
+    pub(crate) security_opt: Vec<String>,
+    /// The kernel capabilities it starts without.
+    pub(crate) cap_drop: Vec<String>,
+    /// The kernel capabilities it is given back.
+    pub(crate) cap_add: Vec<String>,
+    /// How many processes it may hold.
+    pub(crate) pids_limit: i64,
+    /// Whether its root filesystem is read-only.
+    pub(crate) read_only: bool,
+    /// Its memory ceiling in bytes, where it has one.
+    pub(crate) memory: Option<i64>,
+}
+
+/// The container lemonfiber makes for the service `placed` records: the entry's
+/// constants, the time zone and the operator's ids as its user mode takes them, and
+/// nothing else, under its posture and memory limit.
+pub(crate) fn contained(placed: &Placed, operator: &Operator) -> Contained {
     let fields = &placed.fields;
     let user = user_of(placed);
     let mut env: Vec<String> = fields
@@ -110,9 +129,7 @@ pub(crate) fn settled(
         env.push(format!("{PGID_KEY}={}", operator.ids.1));
     }
     let confined = fields.posture == Posture::Confined;
-    Run {
-        image: format!("{}@{}", placed.image, placed.digest),
-        args: run.args.clone(),
+    Contained {
         env,
         user: (user == UserMode::Uid).then(|| format!("{}:{}", operator.ids.0, operator.ids.1)),
         security_opt: SECURITY.map(str::to_owned).to_vec(),
@@ -127,6 +144,37 @@ pub(crate) fn settled(
         memory: fields
             .mem_limit_mib
             .map(|mib| i64::from(mib).saturating_mul(MEBIBYTE)),
+    }
+}
+
+/// The container a run of `run` is made in, for the service `placed` records.
+pub(crate) fn settled(
+    placed: &Placed,
+    run: &lemonfiber_plugin::Run,
+    operator: &Operator,
+    configured: Option<&Path>,
+) -> Run {
+    let Contained {
+        env,
+        user,
+        security_opt,
+        cap_drop,
+        cap_add,
+        pids_limit,
+        read_only,
+        memory,
+    } = contained(placed, operator);
+    Run {
+        image: format!("{}@{}", placed.image, placed.digest),
+        args: run.args.clone(),
+        env,
+        user,
+        security_opt,
+        cap_drop,
+        cap_add,
+        pids_limit,
+        read_only,
+        memory,
         configuration: configured.map(|source| Configuration {
             source: source.to_path_buf(),
             target: configuration(&placed.config_path).to_owned(),
@@ -193,15 +241,20 @@ pub(crate) fn verdict(came: &Came, expect: &Expect) -> Verdict {
 /// A run's result as a recording keeps it: its output cut at a character boundary within
 /// the most a recording holds.
 pub(crate) fn recorded(result: &RunResult) -> RunResult {
-    let text = &result.stdout_starts_with;
+    RunResult {
+        exit: result.exit,
+        stdout_starts_with: cut(&result.stdout_starts_with).to_owned(),
+    }
+}
+
+/// The beginning of `text` a recording keeps: at most [`RECORDED_AT_MOST`] bytes, cut
+/// where a character ends.
+pub(crate) fn cut(text: &str) -> &str {
     let mut end = RECORDED_AT_MOST.min(text.len());
     while !text.is_char_boundary(end) {
         end = end.saturating_sub(1);
     }
-    RunResult {
-        exit: result.exit,
-        stdout_starts_with: text.get(..end).unwrap_or_default().to_owned(),
-    }
+    text.get(..end).unwrap_or_default()
 }
 
 #[cfg(test)]

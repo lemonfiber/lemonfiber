@@ -159,13 +159,13 @@ pub struct Answer {
     /// The status.
     pub status: u16,
     /// The headers an expectation may constrain; `content-type` is the one in use.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub headers: BTreeMap<String, String>,
     /// The body as it parsed, or nothing where it did not parse as JSON.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub json: Option<Value>,
     /// The beginning of a body that is not JSON.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub body_starts_with: Option<String>,
 }
 

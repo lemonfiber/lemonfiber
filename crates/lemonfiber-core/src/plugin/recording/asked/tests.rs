@@ -1,0 +1,206 @@
+use lemonfiber_fixtures::http::{Answer, Fake};
+use lemonfiber_plugin::{Manifest, Request};
+
+use super::super::first::Presented;
+use super::super::tests::asking::SERVED;
+use super::{answered, items, kept, unrecorded, Item};
+use crate::ports::http::Response;
+
+const PROVED: &str = r#"
+[[proof]]
+id      = "sonarr.answers"
+title   = "It answers"
+request = { method = "GET", path = "/api/v3/system/status", accept = "application/json" }
+expect  = { status = 401, json_is_absent = true }
+fixture = "recordings/sonarr/status.json"
+why     = "It is there."
+"#;
+
+#[test]
+fn every_request_recording_is_named_in_order_and_only_an_operators_probe_is_keyed() {
+    let text = format!("{SERVED}{PROVED}");
+    let Ok(manifest) = Manifest::from_toml(&text) else {
+        return;
+    };
+    let named: Vec<(String, Option<String>, Option<&str>, bool)> = items(&manifest)
+        .into_iter()
+        .map(|item| (item.named, item.service, item.fixture, item.keyed))
+        .collect();
+    let sonarr = Some("sonarr".to_owned());
+    assert_eq!(
+        named,
+        vec![
+            (
+                "proof sonarr.answers".to_owned(),
+                sonarr.clone(),
+                Some("recordings/sonarr/status.json"),
+                false
+            ),
+            (
+                "claim library.curate probe guarded".to_owned(),
+                sonarr.clone(),
+                Some("recordings/sonarr/library-curate-guarded.json"),
+                false
+            ),
+            (
+                "claim library.curate probe wanted".to_owned(),
+                sonarr,
+                Some("recordings/sonarr/library-curate-wanted.json"),
+                true
+            ),
+        ]
+    );
+}
+
+fn item(request: &Request, keyed: bool) -> Item<'_> {
+    Item {
+        named: "proof p".to_owned(),
+        service: Some("s".to_owned()),
+        request,
+        fixture: Some("f.json"),
+        keyed,
+    }
+}
+
+fn request(path: &str, accept: Option<&str>) -> Request {
+    Request {
+        method: "GET".to_owned(),
+        path: path.to_owned(),
+        accept: accept.map(str::to_owned),
+    }
+}
+
+#[tokio::test]
+async fn a_key_read_from_a_query_is_appended_to_the_query_and_nothing_presented_without_one() {
+    let http = Fake::always(Answer::reply(200, "{}"));
+    let held = Presented::Query("apikey", "a b&c".to_owned());
+    let queued = request("/api?mode=queue&output=json", None);
+    let _ = answered(http.as_ref(), 8, &item(&queued, true), Some(&held)).await;
+    let bare = request("/api", Some("application/json"));
+    let _ = answered(http.as_ref(), 8, &item(&bare, true), Some(&held)).await;
+    let _ = answered(http.as_ref(), 8, &item(&bare, false), None).await;
+    let asked: Vec<(String, Vec<(String, String)>)> = http
+        .requests()
+        .into_iter()
+        .map(|one| (one.url, one.headers))
+        .collect();
+    let accept = vec![("Accept".to_owned(), "application/json".to_owned())];
+    assert_eq!(
+        asked,
+        vec![
+            (
+                "http://127.0.0.1:8/api?mode=queue&output=json&apikey=a%20b%26c".to_owned(),
+                Vec::new()
+            ),
+            (
+                "http://127.0.0.1:8/api?apikey=a%20b%26c".to_owned(),
+                accept.clone()
+            ),
+            ("http://127.0.0.1:8/api".to_owned(), accept),
+        ]
+    );
+}
+
+#[tokio::test]
+async fn a_request_lemonfiber_cannot_send_as_declared_is_refused_and_never_sent() {
+    let http = Fake::always(Answer::reply(200, "{}"));
+    let odd = Request {
+        method: "BREW".to_owned(),
+        ..request("/x", None)
+    };
+    assert!(answered(http.as_ref(), 8, &item(&odd, false), None)
+        .await
+        .is_err_and(|why| why.contains("BREW")));
+    let elsewhere = request("@elsewhere.example/x", None);
+    assert!(answered(http.as_ref(), 8, &item(&elsewhere, false), None)
+        .await
+        .is_err_and(|why| why.contains("not a route")));
+    assert!(http.requests().is_empty());
+}
+
+#[test]
+fn an_answer_is_kept_as_its_status_its_content_type_and_its_parsed_body_or_its_beginning() {
+    let json = kept(&Response {
+        status: 200,
+        headers: vec![
+            ("Content-Type".to_owned(), "application/json".to_owned()),
+            ("Set-Cookie".to_owned(), "session=1".to_owned()),
+        ],
+        body: "{\"a\": 1}".to_owned(),
+    });
+    assert_eq!(json.status, 200);
+    assert_eq!(
+        json.headers.into_iter().collect::<Vec<_>>(),
+        vec![("content-type".to_owned(), "application/json".to_owned())]
+    );
+    assert_eq!(json.json, Some(serde_json::json!({"a": 1})));
+    assert_eq!(json.body_starts_with, None);
+    let text = kept(&Response {
+        status: 401,
+        headers: Vec::new(),
+        body: format!("{}é{}", "a".repeat(1023), "b".repeat(10)),
+    });
+    assert!(text.headers.is_empty());
+    assert_eq!(text.json, None);
+    assert_eq!(text.body_starts_with, Some("a".repeat(1023)));
+    let empty = kept(&Response {
+        status: 401,
+        headers: Vec::new(),
+        body: String::new(),
+    });
+    assert_eq!((empty.json, empty.body_starts_with), (None, None));
+}
+
+const CHECKED: &str = r#"
+[[contribution]]
+at       = "doctor.check"
+id       = "sonarr:answers"
+title    = "Sonarr answers"
+category = "credentials"
+request  = { method = "GET", path = "/api/v3/system/status" }
+expect   = { status = 401 }
+fixture  = "recordings/sonarr/checked.json"
+why      = "It is there."
+"#;
+
+#[test]
+fn a_contributed_check_asking_a_request_is_recorded_from_the_service_it_settles() {
+    let text = format!("{SERVED}{CHECKED}");
+    let manifest = Manifest::from_toml(&text);
+    assert!(manifest.is_ok(), "{manifest:?}");
+    let Ok(manifest) = manifest else {
+        return;
+    };
+    assert!(items(&manifest)
+        .iter()
+        .any(|item| item.named == "check sonarr:answers"
+            && item.service.as_deref() == Some("sonarr")
+            && item.fixture == Some("recordings/sonarr/checked.json")
+            && !item.keyed));
+}
+
+#[test]
+fn a_request_with_nowhere_to_write_or_no_service_to_ask_is_said_why() {
+    let asked = request("/x", None);
+    let unfixtured = Item {
+        fixture: None,
+        ..item(&asked, false)
+    };
+    assert!(unrecorded(&unfixtured).contains("names no fixture"));
+    let unsettled = Item {
+        service: None,
+        ..item(&asked, false)
+    };
+    assert!(unrecorded(&unsettled).contains("does not settle"));
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_service_that_never_answers_a_request_fails_it_at_its_limit() {
+    let asked = request("/x", None);
+    let said = answered(Fake::silent().as_ref(), 8, &item(&asked, false), None).await;
+    assert!(
+        said.as_ref()
+            .is_err_and(|why| why.contains("did not answer within 30 seconds")),
+        "{said:?}"
+    );
+}

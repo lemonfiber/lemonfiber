@@ -148,7 +148,11 @@ async fn held(ctx: &Ctx, aggregator: &Aggregator) -> State {
             ),
         };
     };
-    match aggregator.client.config(Some(admin(&password))).await {
+    match aggregator
+        .client
+        .config(Some(Credential::admin(&password)))
+        .await
+    {
         Ok(_) => refusing(aggregator, State::AlreadyWired).await,
         Err(crate::ports::service::Failure::Unauthorised { .. }) => State::Refused {
             reason: format!(
@@ -216,7 +220,7 @@ async fn turned_on(ctx: &Ctx, aggregator: &Aggregator) -> State {
             ),
         };
     }
-    match client.guard(config, admin(&password)).await {
+    match client.guard(config, Credential::admin(&password)).await {
         Ok(()) => {}
         Err(Unguarded::Untaken(failure)) => {
             if let Some(env) = ctx.settings.env_file.as_deref() {
@@ -271,7 +275,7 @@ async fn proven(aggregator: &Aggregator, password: &str, before: &[String]) -> S
             ),
         };
     }
-    let after = match client.config(Some(admin(password))).await {
+    let after = match client.config(Some(Credential::admin(password))).await {
         Ok(config) => crate::nzbhydra2::indexers(&config),
         Err(failure) => return crate::seed::unreached(&failure),
     };
@@ -299,14 +303,6 @@ async fn proven(aggregator: &Aggregator, password: &str, before: &[String]) -> S
                 lost.join(", ")
             ),
         }
-    }
-}
-
-/// The administrator lemonfiber names, holding `password`.
-fn admin(password: &str) -> Credential<'_> {
-    Credential {
-        username: crate::config::USENET_AGGREGATOR_ADMIN_USER,
-        password,
     }
 }
 

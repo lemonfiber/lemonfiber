@@ -97,7 +97,7 @@ pub use placing::{documents, key_file, mount_sources, mount_tree, overlay, write
 pub use provenance::{held, vouched, Key, Provenance, Unusable, Vouch, Vouched};
 pub use recipes::{approval, approvals, Adapter, Named, Owner, Pair, Recipe, Step};
 pub use recorded::{Answer, Asked, Recording};
-pub use recording::{record, Recorded, Taken, Took};
+pub use recording::{record, Failed, Recorded, Recorder, Taken, Took};
 pub use register::{Already, Register, Unreadable as Unrecorded};
 pub use reports::{
     Fetchable, Install, Installs, Nonconforming, Removal, Reproof, Restored, Sourced, Substituted,

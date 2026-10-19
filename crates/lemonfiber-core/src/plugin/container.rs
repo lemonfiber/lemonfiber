@@ -263,6 +263,11 @@ pub(super) fn mounts(placed: &Placed) -> impl Iterator<Item = &Mount> {
     entry::mounts(&placed.fields.mount, placed.takes_data)
 }
 
+/// Each scratch path in memory the model allows.
+pub(super) fn tmpfs(placed: &Placed) -> impl Iterator<Item = &String> {
+    entry::tmpfs(&placed.fields.tmpfs, placed.takes_data)
+}
+
 /// Whether every path the record keeps for the service is one the model allows.
 pub(super) fn sound(placed: &Placed) -> bool {
     is_target(&placed.config_path, true)

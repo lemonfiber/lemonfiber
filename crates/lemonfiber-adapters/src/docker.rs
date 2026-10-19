@@ -42,6 +42,7 @@ mod mounts;
 mod presence;
 mod program;
 mod refusal;
+mod serving;
 mod translate;
 
 use translate::{describe, sampled, split_timestamp};
@@ -200,6 +201,31 @@ impl lemonfiber_ports::program::Program for Daemon {
         run: &lemonfiber_ports::program::Run,
     ) -> Result<lemonfiber_ports::program::Ran, lemonfiber_ports::program::Unran> {
         program::ran(self, run).await
+    }
+}
+
+#[async_trait]
+impl lemonfiber_ports::serving::Serving for Daemon {
+    async fn serve(
+        &self,
+        serve: &lemonfiber_ports::serving::Serve,
+    ) -> Result<lemonfiber_ports::serving::Served, lemonfiber_ports::program::Unran> {
+        serving::served(self, serve).await
+    }
+
+    async fn standing(
+        &self,
+        served: &lemonfiber_ports::serving::Served,
+    ) -> Result<lemonfiber_ports::serving::Standing, lemonfiber_ports::program::Unran> {
+        serving::standing(self, served).await
+    }
+
+    async fn log(&self, served: &lemonfiber_ports::serving::Served, lines: usize) -> String {
+        serving::logged(self, served, lines).await
+    }
+
+    async fn removed(&self, served: &lemonfiber_ports::serving::Served) {
+        serving::removed(self, served).await;
     }
 }
 

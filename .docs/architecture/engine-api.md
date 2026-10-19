@@ -18,6 +18,7 @@ page is about the adapter: `adapters::docker::Daemon`, on `bollard`.
 | `exec` | `POST /containers/{id}/exec` | The leak test runs the same command in two namespaces |
 | `located` | `POST /containers/create` | See below — there is no route that stats a host path |
 | `Program::run` | `POST /containers/create`, `/attach`, `/start`, `/wait`, `DELETE /containers/{id}` | A proof's container belongs to no Compose project (ADR-0048) |
+| `Serving::serve`, `standing`, `log`, `removed` | `GET /info`, `POST /networks/create`, `POST /containers/create`, `/start`, `GET /containers/{id}/json`, `/logs`, `DELETE /containers/{id}`, `DELETE /networks/{name}` | A recording's container and network belong to no Compose project (ADR-0049) |
 
 ### A proof's container
 
@@ -33,6 +34,23 @@ error is never asked for. The container is removed with its volumes whatever the
 came to, and every run first removes the proof containers an earlier run left, told by
 the label `app.lemonfiber.proof` and an age past any run's limit. An image the engine
 does not hold is a `404` at creation, reported rather than pulled.
+
+### A recording's container
+
+`lemonfiber plugin record` serves each service whose requests it records in a container
+of its own, made the same way as a proof's: from the pinned digest, with the service's
+capabilities, user, read-only root and memory limit, and the entry's constants, `TZ`,
+`PUID` and `PGID` as its environment. It differs in three ways. It joins a bridge network
+made for it alone, named `lemonfiber-record-<seconds>-<process>-<count>`, which reaches
+the internet and which nothing else joins. Its `listens` port is published on
+`127.0.0.1` at a port the engine chooses, read back from the inspection. Its log is kept
+by the engine's default driver, so its last lines can be shown when it fails and a
+password it announces can be read. Its bind mounts are a throwaway copy of the starting
+files at the configuration path and, where it takes the library, a throwaway directory
+at `/data`. The container and its network are removed whatever the recording came to;
+the network goes too when the container cannot be created or started, and every
+recording first removes the networks an earlier one left, told by the label
+`app.lemonfiber.proof` and the moment in their name.
 
 ### Asking a daemon about a path on its own machine
 

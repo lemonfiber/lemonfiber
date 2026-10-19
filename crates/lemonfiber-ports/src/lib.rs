@@ -41,6 +41,7 @@ pub mod registry;
 pub mod resolve;
 pub mod seams;
 pub mod service;
+pub mod serving;
 pub mod time;
 
 pub use asking::Asking;
@@ -57,4 +58,5 @@ pub use random::Random;
 pub use resolve::Resolver;
 pub use seams::Seams;
 pub use service::Client;
+pub use serving::Serving;
 pub use time::Clock;

@@ -155,7 +155,7 @@ fn declared(
 /// the Usenet indexer aggregator is reached with the administrator lemonfiber gives it
 /// rather than with the key it writes; all of those are on the declared list instead,
 /// which is where a credential lemonfiber minted belongs.
-fn reader(kind: ApiKind) -> Option<fn(&str) -> Option<String>> {
+pub(crate) fn reader(kind: ApiKind) -> Option<fn(&str) -> Option<String>> {
     match kind {
         ApiKind::Servarr => Some(crate::servarr::api_key),
         ApiKind::Bazarr => Some(crate::bazarr::api_key),

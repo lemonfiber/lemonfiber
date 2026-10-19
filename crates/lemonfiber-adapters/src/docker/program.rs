@@ -197,7 +197,7 @@ async fn removed(docker: &Docker, id: &str) {
 }
 
 /// Remove every proof's container a run before this one left behind.
-async fn swept(docker: &Docker) {
+pub(super) async fn swept(docker: &Docker) {
     let filters = HashMap::from([("label".to_owned(), vec![PROOF_LABEL.to_owned()])]);
     let options = ListContainersOptionsBuilder::default()
         .all(true)

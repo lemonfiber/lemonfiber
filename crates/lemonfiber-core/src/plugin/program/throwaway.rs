@@ -79,14 +79,14 @@ fn hex(bytes: &[u8]) -> String {
 
 /// A copy of a service's starting files, removed when dropped.
 #[derive(Debug)]
-pub(super) struct Throwaway {
+pub(crate) struct Throwaway {
     root: PathBuf,
     copy: PathBuf,
 }
 
 impl Throwaway {
     /// A fresh copy of the files at `starting`, or an empty directory where there are none.
-    pub(super) fn of(starting: Option<Starting<'_>>) -> Result<Self, String> {
+    pub(crate) fn of(starting: Option<Starting<'_>>) -> Result<Self, String> {
         Self::beneath(&std::env::temp_dir(), starting)
     }
 
@@ -112,8 +112,48 @@ impl Throwaway {
     }
 
     /// The directory the copy is in.
-    pub(super) fn path(&self) -> &Path {
+    pub(crate) fn path(&self) -> &Path {
         &self.copy
+    }
+
+    /// A further empty directory beside the copy, open to whoever the service is, and
+    /// removed with it.
+    pub(crate) fn emptied(&self, named: &str) -> Result<PathBuf, String> {
+        let at = self.root.join(named);
+        std::fs::create_dir(&at)
+            .and_then(|()| opened(&at, 0o777))
+            .map(|()| at.clone())
+            .map_err(|why| unmade(&at, &why))
+    }
+
+    /// A file at `relative` beneath the copy, as whatever ran with it left it: read
+    /// through no link, from nothing but a file beneath the copy, and none where it is not
+    /// there yet.
+    pub(crate) fn wrote(&self, relative: &Path) -> Result<Option<Vec<u8>>, String> {
+        let named = relative.display().to_string();
+        if relative.as_os_str().is_empty()
+            || !relative
+                .components()
+                .all(|step| matches!(step, std::path::Component::Normal(_)))
+        {
+            return Err(format!("{named} is not a path beneath the starting files"));
+        }
+        let at = self.copy.join(relative);
+        let parent = at.parent().unwrap_or(&self.copy);
+        if !linkless(&self.copy, parent)? {
+            return Ok(None);
+        }
+        match std::fs::symlink_metadata(&at) {
+            Err(why) if why.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(why) => return Err(unread(&at, &why)),
+            Ok(kind) if !kind.is_file() => return Err(unkind(&named)),
+            Ok(_) => {}
+        }
+        let bytes = read(&at, &self.copy, &named, MOST_BYTES)?;
+        if bytes.len() as u64 > MOST_BYTES {
+            return Err(format!("{named} passes {MOST_BYTES} bytes"));
+        }
+        Ok(Some(bytes))
     }
 
     /// Every file written beneath the copy, every directory open to whoever the run is.

@@ -24,7 +24,7 @@ use crate::ports::media::Kind;
 use crate::ports::service::{Failure, Subtitles, Watched, Watching};
 
 /// The header the key is presented in.
-const KEY: &str = "X-API-KEY";
+pub(crate) const KEY: &str = "X-API-KEY";
 
 /// Where the whole of the settings are read and written.
 const SETTINGS: &str = "/api/system/settings";

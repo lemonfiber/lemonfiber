@@ -1,11 +1,11 @@
-//! What recording a plugin's run proofs came to, on a terminal.
+//! What taking a plugin's recordings again came to, on a terminal.
 
 use lemonfiber_core::plugin::{Recorded, Took};
 
 use super::super::Lines;
 use super::{counted, document};
 
-/// What recording a plugin's run proofs came to, in whichever form was asked.
+/// What taking a plugin's recordings again came to, in whichever form was asked.
 pub(crate) fn recorded(read: &Recorded, json: bool) -> Option<Lines> {
     if json {
         return serde_json::to_string_pretty(read)
@@ -16,44 +16,60 @@ pub(crate) fn recorded(read: &Recorded, json: bool) -> Option<Lines> {
     Some(said(read))
 }
 
-/// Each run proof and what recording it came to, and what the whole comes to.
+/// Each recording and what taking it came to, each service that failed, and what the
+/// whole comes to.
 fn said(read: &Recorded) -> Lines {
     let mut lines = Lines::default();
     lines.put(format!(
-        "{} — its run proofs, recorded by running them",
+        "{} — every recording its manifest names, taken again from its pin",
         read.id
     ));
     if !read.refusals.is_empty() {
         lines.spaced(format!(
-            "Refused, {}, so nothing was run:",
+            "Refused, {}, so nothing was taken:",
             counted(read.refusals.len(), "violation")
         ));
         for refusal in &read.refusals {
             lines.put(format!("  {} — {}", refusal.location, refusal.message));
         }
     }
-    for one in &read.runs {
+    for one in &read.recordings {
         let fixture = one.fixture.as_deref().unwrap_or("no recording");
         lines.put(format!(
-            "  {:<26} {fixture}: {}",
-            one.proof,
+            "  {:<34} {fixture}: {}",
+            one.named,
             took(&one.took)
         ));
     }
-    lines.spaced(if read.holds && read.runs.is_empty() {
-        "It declares no proof that runs its image's own program, so there is nothing to record."
+    for failed in &read.failed {
+        lines.spaced(format!(
+            "{} failed at {}: {}. None of its recordings was written.",
+            failed.service, failed.step, failed.why
+        ));
+        if !failed.log.is_empty() {
+            lines.put(format!("  The last {} lines it wrote:", failed.log.len()));
+            for line in &failed.log {
+                lines.put(format!("    {line}"));
+            }
+        }
+    }
+    lines.spaced(if read.holds && read.recordings.is_empty() {
+        "It names no recording, so there is nothing to take."
     } else if read.holds {
-        "Every run proof is recorded."
+        "Every recording is taken."
     } else {
-        "Not every run proof is recorded; a recording a run does not reproduce is refused."
+        "Not every recording is taken."
     });
     lines
 }
 
-/// What recording one proof came to, in a few words.
+/// What taking one recording came to, in a few words.
 fn took(took: &Took) -> String {
     match took {
         Took::Written => "written".to_owned(),
+        Took::Unnoted => {
+            "written with an empty note, which has to say why it is evidence".to_owned()
+        }
         Took::Reproduced => "reproduced, and left as it was".to_owned(),
         Took::Unreproduced { why } => format!("refused: {why}"),
         Took::Overran { seconds } => {
