@@ -176,7 +176,8 @@ async fn unconfirmed_or_rehearsed_nothing_is_recorded() {
 }
 
 /// Agreed to, the moves are refused rather than half recorded where there is no layout to
-/// journal into, where the journal cannot be written, or where the settings cannot be.
+/// journal into, where the journal cannot be written, or where the settings cannot be
+/// written or read.
 #[tokio::test]
 async fn agreed_to_but_unrecordable_the_moves_are_refused() {
     let dir = lemonfiber_fixtures::scratch::Scratch::new("beside-unrecordable");
@@ -210,4 +211,15 @@ async fn agreed_to_but_unrecordable_the_moves_are_refused() {
     assert!(super::stand(&placed, &survey, true).await.is_err());
     let held = crate::config::store::read(&env).unwrap_or_default();
     assert_eq!(held.get(crate::config::BESIDE_KEY), None);
+
+    let journalled = || {
+        crate::app::recover::journal_at(&journal)
+            .map(|journal| journal.changes().len())
+            .unwrap_or_default()
+    };
+    let before = journalled();
+    assert!(std::fs::remove_file(&env).is_ok());
+    assert!(std::fs::create_dir_all(&env).is_ok());
+    assert!(super::stand(&placed, &survey, true).await.is_err());
+    assert_eq!(journalled(), before, "an unreadable file journals nothing");
 }
