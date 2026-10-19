@@ -10,6 +10,7 @@ use lemonfiber_ports::serving::{Serve, Served, Serving, Standing};
 /// Serves every service the same way, and keeps what it was asked.
 pub struct Serves {
     answer: Result<Served, Unran>,
+    beside: Option<Result<Served, Unran>>,
     standing: Result<Standing, Unran>,
     log: String,
     writes: Vec<(String, String)>,
@@ -23,6 +24,7 @@ impl Serves {
     pub fn up(served: Served) -> Self {
         Self {
             answer: Ok(served),
+            beside: None,
             standing: Ok(Standing::Running),
             log: String::new(),
             writes: Vec::new(),
@@ -50,6 +52,15 @@ impl Serves {
         Self {
             answer: Err(unran),
             ..Self::on(0)
+        }
+    }
+
+    /// A container started beside another is served as `answer` instead.
+    #[must_use]
+    pub fn besides(self, answer: Result<Served, Unran>) -> Self {
+        Self {
+            beside: Some(answer),
+            ..self
         }
     }
 
@@ -145,6 +156,16 @@ fn write_into(serve: &Serve, path: &str, text: &str) {
 impl Serving for Serves {
     async fn serve(&self, serve: &Serve) -> Result<Served, Unran> {
         self.serving(serve)
+    }
+
+    async fn beside(&self, _served: &Served, serve: &Serve) -> Result<Served, Unran> {
+        match &self.beside {
+            Some(answer) => {
+                let _ = self.asked.lock().map(|mut held| held.push(serve.clone()));
+                answer.clone()
+            }
+            None => self.serving(serve),
+        }
     }
 
     async fn standing(&self, _served: &Served) -> Result<Standing, Unran> {

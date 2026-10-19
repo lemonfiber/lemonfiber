@@ -172,6 +172,15 @@ fn an_answer_is_kept_as_its_status_its_content_type_and_its_parsed_body_or_its_b
         body: String::new(),
     });
     assert_eq!((empty.json, empty.body_starts_with), (None, None));
+    let null = kept(&Response {
+        status: 200,
+        headers: Vec::new(),
+        body: "null".to_owned(),
+    });
+    assert_eq!(
+        (null.json, null.body_starts_with.as_deref()),
+        (None, Some("null"))
+    );
 }
 
 const CHECKED: &str = r#"

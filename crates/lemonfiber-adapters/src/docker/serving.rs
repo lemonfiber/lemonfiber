@@ -7,8 +7,8 @@ use std::time::SystemTime;
 
 use bollard::container::LogOutput;
 use bollard::models::{
-    ContainerCreateBody, ContainerInspectResponse, HealthStatusEnum, HostConfig, Mount, MountType,
-    NetworkCreateRequest, PortBinding, SystemInfo,
+    ContainerCreateBody, ContainerInspectResponse, EndpointSettings, HealthStatusEnum, HostConfig,
+    Mount, MountType, NetworkCreateRequest, NetworkingConfig, PortBinding, SystemInfo,
 };
 use bollard::query_parameters::{
     ListNetworksOptionsBuilder, LogsOptionsBuilder, RemoveContainerOptionsBuilder,
@@ -53,27 +53,50 @@ pub(super) async fn served(daemon: &Daemon, serve: &Serve) -> Result<Served, Unr
         })
         .await
         .map_err(|error| refused(&error))?;
-    let container = match docker.create_container(None, body(serve, &network)).await {
-        Ok(created) => created.id,
-        Err(error) => {
-            let _ = docker.remove_network(&network).await;
-            return Err(uncreated(&error, &serve.image));
-        }
-    };
-    let started = match docker.start_container(&container, None).await {
+    let started = started(docker, serve, &network, machine).await;
+    if started.is_err() {
+        let _ = docker.remove_network(&network).await;
+    }
+    started
+}
+
+/// Serve `serve` on the network `served` is on.
+pub(super) async fn beside(
+    daemon: &Daemon,
+    served: &Served,
+    serve: &Serve,
+) -> Result<Served, Unran> {
+    let docker = engine(daemon).await?;
+    started(docker, serve, &served.network, served.machine.clone()).await
+}
+
+/// One container for `serve` on `network`, started and read, or removed where it could
+/// not be.
+async fn started(
+    docker: &Docker,
+    serve: &Serve,
+    network: &str,
+    machine: Vec<String>,
+) -> Result<Served, Unran> {
+    let container = docker
+        .create_container(None, body(serve, network))
+        .await
+        .map_err(|error| uncreated(&error, &serve.image))?
+        .id;
+    let inspected = match docker.start_container(&container, None).await {
         Ok(()) => docker
             .inspect_container(&container, None)
             .await
             .map_err(|error| refused(&error)),
         Err(error) => Err(refused(&error)),
     };
-    match started {
+    match inspected {
         Ok(inspected) => Ok(Served {
             machine,
-            ..read_off(&inspected, &container, &network, serve.listens)
+            ..read_off(&inspected, &container, network, serve.listens)
         }),
         Err(unran) => {
-            gone(docker, &container, &network).await;
+            gone(docker, &container, network).await;
             Err(unran)
         }
     }
@@ -110,7 +133,7 @@ pub(super) async fn logged(daemon: &Daemon, served: &Served, lines: usize) -> St
     String::from_utf8_lossy(&text).into_owned()
 }
 
-/// Take the container and its network off the engine.
+/// Take the container off the engine, and its network once nothing else is on it.
 pub(super) async fn removed(daemon: &Daemon, served: &Served) {
     if let Ok(docker) = engine(daemon).await {
         gone(docker, &served.container, &served.network).await;
@@ -158,6 +181,15 @@ pub(super) fn body(serve: &Serve, network: &str) -> ContainerCreateBody {
         )])
     });
     ContainerCreateBody {
+        networking_config: serve.alias.as_ref().map(|alias| NetworkingConfig {
+            endpoints_config: Some(HashMap::from([(
+                network.to_owned(),
+                EndpointSettings {
+                    aliases: Some(vec![alias.clone()]),
+                    ..EndpointSettings::default()
+                },
+            )])),
+        }),
         image: Some(serve.image.clone()),
         env: Some(serve.env.clone()),
         user: serve.user.clone(),
@@ -283,7 +315,7 @@ pub(super) fn stood(inspected: &ContainerInspectResponse) -> Standing {
     }
 }
 
-/// Take a container and its network off the engine.
+/// Take a container off the engine, and its network once nothing else is on it.
 async fn gone(docker: &Docker, container: &str, network: &str) {
     let options = RemoveContainerOptionsBuilder::default()
         .force(true)

@@ -1,0 +1,770 @@
+use std::path::Path;
+use std::sync::Arc;
+
+use lemonfiber_fixtures::http::{Answer, Fake};
+use lemonfiber_fixtures::proving::Proving;
+use lemonfiber_fixtures::scratch::Scratch;
+use lemonfiber_fixtures::serving::Serves;
+use lemonfiber_fixtures::support::FixedRandom;
+use lemonfiber_plugin::Manifest;
+use serde_json::{json, Value};
+
+use super::super::asked::Item;
+use super::super::{record, Failed, Recorded, Recorder, Took};
+use super::{unfinished, Filling, Fronting, Prepared};
+use crate::plugin::installed::Installed;
+use crate::plugin::program::Throwaway;
+use crate::ports::http::{Http, Request};
+use crate::ports::program::Unran;
+use crate::ports::serving::Served;
+
+const FRONTED: &str = r#"
+schema_version = 1
+
+[plugin]
+id          = "jellyfin"
+name        = "Jellyfin"
+version     = "1.0.0"
+description = "Plays your library on TVs, phones and browsers"
+without_it  = "Files on disk, no way to watch them"
+upstream    = "https://github.com/jellyfin/jellyfin"
+license     = "GPL-2.0-only"
+forms       = ["library", "full"]
+
+[[service]]
+id          = "jellyfin"
+name        = "Jellyfin"
+image       = "docker.io/jellyfin/jellyfin"
+digest      = "sha256:aefb67e6a7ff1debdd154a78a7bbb780fd0c873d8639210a7f6a2016ad2b35db"
+tag         = "10.11.11"
+port        = 8095
+bind        = "loopback"
+health      = { kind = "http", path = "/health", timeout_s = 2 }
+criticality = "important"
+memory_mib  = 600
+reaches     = "metadata providers"
+asks_for    = "Reads artwork and descriptions for what is in your library."
+takes_data  = true
+config_path = "/config"
+listens     = 8096
+user_mode   = "uid"
+native      = "jellyfin"
+replaces    = "jellyfin"
+
+[[service]]
+id          = "jellyfin-adapter"
+name        = "Jellyfin adapter"
+image       = "ghcr.io/lemonfiber/jellyfin-adapter"
+digest      = "sha256:0352d3232d0ffe22725ebd706ed8fa92d23b20de02a076ac195971d1fc4a0c07"
+tag         = "main-31a58cdb60de"
+criticality = "important"
+reaches     = ""
+asks_for    = "Nothing beyond this machine."
+config_path = "/config"
+listens     = 8080
+health      = { kind = "http", path = "/lemonfiber/adapter/v1/ready", timeout_s = 2 }
+speaks      = ["subtitles.fetch@1"]
+fronts      = "jellyfin"
+provides    = ["subtitles.fetch"]
+
+[[proof]]
+id      = "jellyfin.identifies"
+service = "jellyfin"
+title   = "Jellyfin says which server it is to anybody"
+fixture = "fixtures/system-info-public.json"
+why     = "The adapter's readiness is this answer."
+request = { method = "GET", path = "/System/Info/Public" }
+expect  = { status = 200, json = { ProductName = "Jellyfin Server" } }
+"#;
+
+const PINNED: &str = "docker.io/jellyfin/jellyfin@sha256:aefb67e6a7ff1debdd154a78a7bbb780fd0c873d8639210a7f6a2016ad2b35db";
+const PROVED: &str = "fixtures/system-info-public.json";
+const WATCH: &str = "conformance/subtitles.fetch@1/watch-answers.json";
+const WATCHING: &str = "conformance/subtitles.fetch@1/watching-answers.json";
+const REFUSES: &str = "conformance/subtitles.fetch@1/refuses-without-the-key.json";
+const MINTED: &str = "0707070707070707070707070707070707070707070707070707070707070707";
+
+fn source(name: &str, manifest: &str) -> Scratch {
+    let at = Scratch::new(name);
+    let _ = std::fs::write(at.join("plugin.toml"), manifest);
+    at
+}
+
+fn adapter(port: Option<u16>) -> Served {
+    Served {
+        container: "9a8b7c6d5e4f3a2b1c0d".to_owned(),
+        network: "lemonfiber-record-1-1-0".to_owned(),
+        hostname: "9a8b7c6d5e4f".to_owned(),
+        addresses: vec!["17218003".to_owned()],
+        machine: vec!["recording-host".to_owned()],
+        port,
+    }
+}
+
+fn engine() -> Serves {
+    Serves::on(49153).besides(Ok(adapter(Some(49154))))
+}
+
+fn fetching(watching: Vec<Answer>, watch: Answer) -> Arc<Fake> {
+    Fake::by_path_in_turn(vec![
+        ("/health", vec![Answer::reply(200, "ok")]),
+        (
+            "/lemonfiber/adapter/v1/ready",
+            vec![Answer::reply(200, "{}")],
+        ),
+        (
+            "/System/Info/Public",
+            vec![Answer::served(
+                200,
+                "application/json",
+                "{\"ProductName\": \"Jellyfin Server\"}",
+            )],
+        ),
+        ("/watching", watching),
+        ("/watch", vec![watch]),
+    ])
+}
+
+fn answering() -> Arc<Fake> {
+    fetching(
+        vec![
+            Answer::served(401, "text/plain", "Unauthorized"),
+            Answer::served(200, "application/json", "[]"),
+        ],
+        Answer::served(200, "application/json", "null"),
+    )
+}
+
+async fn recorded(at: &Path, serving: &Serves, http: &Arc<Fake>, random: Option<u8>) -> Recorded {
+    let program = Proving::unreachable();
+    let shared = || -> Arc<dyn Http> { Arc::clone(http) as Arc<dyn Http> };
+    let read = record(
+        at,
+        Recorder {
+            program: program.as_ref(),
+            serving,
+            transport: &shared,
+            random: &FixedRandom(random.map(|byte| vec![byte; 32])),
+        },
+    )
+    .await;
+    assert!(
+        read.as_ref().is_ok_and(|read| read.refusals.is_empty()),
+        "{read:?}"
+    );
+    read.unwrap_or_else(|_| unreachable!("asserted to be read above"))
+}
+
+fn json_at(at: &Path, fixture: &str) -> Value {
+    std::fs::read_to_string(at.join(fixture))
+        .ok()
+        .and_then(|text| serde_json::from_str(&text).ok())
+        .unwrap_or_default()
+}
+
+fn posted(http: &Fake, fragment: &str) -> Vec<Request> {
+    http.requests()
+        .into_iter()
+        .filter(|request| request.url.ends_with(fragment))
+        .collect()
+}
+
+fn body(request: &Request) -> Value {
+    request
+        .body
+        .as_deref()
+        .and_then(|text| serde_json::from_str(text).ok())
+        .unwrap_or_default()
+}
+
+fn bearer(request: &Request) -> Option<&str> {
+    request
+        .headers
+        .iter()
+        .find(|(name, _)| name == "Authorization")
+        .map(|(_, value)| value.as_str())
+}
+
+fn failed_at(read: &Recorded) -> Vec<(String, String)> {
+    read.failed
+        .iter()
+        .map(|Failed { step, why, .. }| (step.clone(), why.clone()))
+        .collect()
+}
+
+#[tokio::test]
+async fn every_case_the_adapter_speaks_is_asked_of_it_beside_its_upstream_and_written() {
+    let at = source("fronted-asked", FRONTED);
+    let serving = engine();
+    let http = answering();
+    let read = recorded(&at, &serving, &http, Some(7)).await;
+    assert_eq!(failed_at(&read), Vec::new());
+    let named: Vec<(String, Took)> = read
+        .recordings
+        .iter()
+        .map(|taken| (taken.named.clone(), taken.took.clone()))
+        .collect();
+    assert_eq!(
+        named,
+        vec![
+            ("proof jellyfin.identifies".to_owned(), Took::Unnoted),
+            (
+                "conformance subtitles.fetch@1/refuses-without-the-key".to_owned(),
+                Took::Unnoted
+            ),
+            (
+                "conformance subtitles.fetch@1/watching-answers".to_owned(),
+                Took::Unnoted
+            ),
+            (
+                "conformance subtitles.fetch@1/watch-answers".to_owned(),
+                Took::Unnoted
+            ),
+        ]
+    );
+    let watch = json_at(&at, WATCH);
+    assert_eq!(watch.pointer("/recorded_from"), Some(&json!(PINNED)));
+    assert_eq!(
+        watch.pointer("/request"),
+        Some(&json!({
+            "method": "POST",
+            "path": "/lemonfiber/subtitles.fetch/v1/watch",
+            "accept": "application/json",
+        }))
+    );
+    assert_eq!(
+        watch.pointer("/response/body_starts_with"),
+        Some(&json!("null"))
+    );
+    assert_eq!(
+        json_at(&at, REFUSES).pointer("/response/status"),
+        Some(&json!(401))
+    );
+    assert_eq!(
+        json_at(&at, WATCHING).pointer("/response/json"),
+        Some(&json!([]))
+    );
+    assert_eq!(
+        json_at(&at, PROVED).pointer("/response/json/ProductName"),
+        Some(&json!("Jellyfin Server"))
+    );
+    let watching = posted(&http, "/watching");
+    let keys: Vec<Option<&str>> = watching.iter().map(bearer).collect();
+    let presented = format!("Bearer {MINTED}");
+    assert_eq!(keys, vec![None, Some(presented.as_str())]);
+    let watched = posted(&http, "/watch");
+    assert_eq!(
+        watched.first().map(body),
+        Some(json!({"watched": {
+            "api_key": MINTED,
+            "host": "conformance-curator",
+            "port": 80,
+            "which": "tv",
+        }}))
+    );
+    let served = serving.asked();
+    let aliases: Vec<Option<&str>> = served.iter().map(|one| one.alias.as_deref()).collect();
+    assert_eq!(aliases, vec![Some("jellyfin"), None]);
+    assert_eq!(
+        served.get(1).map(|one| one.image.as_str()),
+        Some("ghcr.io/lemonfiber/jellyfin-adapter@sha256:0352d3232d0ffe22725ebd706ed8fa92d23b20de02a076ac195971d1fc4a0c07")
+    );
+    let removed: Vec<String> = serving
+        .removed()
+        .into_iter()
+        .map(|one| one.container)
+        .collect();
+    assert_eq!(
+        removed,
+        vec![
+            "9a8b7c6d5e4f3a2b1c0d".to_owned(),
+            "4f1c2d3e5a6b7c8d9e0f".to_owned()
+        ]
+    );
+}
+
+#[tokio::test]
+async fn an_adapter_that_cannot_be_started_leaves_every_case_unrecorded_and_its_upstream_removed() {
+    let at = source("fronted-unstarted", FRONTED);
+    let serving = Serves::on(49153).besides(Err(Unran::Unreachable {
+        reason: "no engine".to_owned(),
+    }));
+    let read = recorded(&at, &serving, &answering(), Some(7)).await;
+    assert_eq!(
+        read.failed
+            .iter()
+            .map(|failed| failed.step.as_str())
+            .collect::<Vec<_>>(),
+        vec!["adapter's container"]
+    );
+    assert!(read.recordings.iter().all(|taken| matches!(
+        &taken.took,
+        Took::Unrecorded { why } if why == "jellyfin was not recorded: it failed at adapter's container"
+    )));
+    assert_eq!(read.recordings.len(), 4);
+    assert_eq!(serving.removed().len(), 1);
+    assert!(!at.join(WATCH).exists() && !at.join(PROVED).exists());
+}
+
+#[tokio::test(start_paused = true)]
+async fn an_adapter_never_ready_fails_at_its_health_and_both_are_removed() {
+    let at = source("fronted-unready", FRONTED);
+    let serving = engine();
+    let http = Fake::by_path(vec![
+        ("/health", Answer::reply(200, "ok")),
+        ("/ready", Answer::reply(503, "starting")),
+    ]);
+    let read = recorded(&at, &serving, &http, Some(7)).await;
+    assert_eq!(
+        failed_at(&read),
+        vec![(
+            "adapter's health".to_owned(),
+            "its health did not pass within 2 seconds".to_owned()
+        )]
+    );
+    assert_eq!(serving.removed().len(), 2);
+}
+
+#[tokio::test(start_paused = true)]
+async fn an_upstream_never_healthy_fails_at_its_health() {
+    let at = source("fronted-unhealthy", FRONTED);
+    let http = Fake::by_path(vec![("/health", Answer::reply(503, "starting"))]);
+    let read = recorded(&at, &engine(), &http, Some(7)).await;
+    assert_eq!(
+        failed_at(&read).first().map(|(step, _)| step.as_str()),
+        Some("health")
+    );
+}
+
+#[tokio::test]
+async fn an_adapter_or_upstream_publishing_no_port_cannot_be_asked() {
+    let at = source("fronted-portless-adapter", FRONTED);
+    let serving = Serves::on(49153).besides(Ok(adapter(None)));
+    let health = FRONTED.replace(
+        "health      = { kind = \"http\", path = \"/lemonfiber/adapter/v1/ready\", timeout_s = 2 }\n",
+        "",
+    );
+    let _ = std::fs::write(at.join("plugin.toml"), &health);
+    let http = Fake::always(Answer::reply(200, "{}"));
+    let read = recorded(&at, &serving, &http, Some(7)).await;
+    assert_eq!(
+        failed_at(&read),
+        vec![(
+            "adapter's health".to_owned(),
+            "it publishes no port, so nothing can ask it".to_owned()
+        )]
+    );
+    let at = source(
+        "fronted-portless-upstream",
+        &health.replacen(
+            "health      = { kind = \"http\", path = \"/health\", timeout_s = 2 }\n",
+            "",
+            1,
+        ),
+    );
+    let serving = Serves::up(Served {
+        port: None,
+        ..adapter(None)
+    })
+    .besides(Ok(adapter(Some(49154))));
+    let read = recorded(&at, &serving, &http, Some(7)).await;
+    assert_eq!(
+        failed_at(&read),
+        vec![(
+            "asking proof jellyfin.identifies".to_owned(),
+            "it publishes no port, so there is nowhere to ask it".to_owned()
+        )]
+    );
+}
+
+#[tokio::test]
+async fn an_upstream_that_cannot_be_started_starts_no_adapter() {
+    let at = source("fronted-refused", FRONTED);
+    let serving = Serves::refusing(Unran::Unreachable {
+        reason: "no engine".to_owned(),
+    });
+    let read = recorded(&at, &serving, &answering(), Some(7)).await;
+    assert_eq!(
+        failed_at(&read).first().map(|(step, _)| step.as_str()),
+        Some("container")
+    );
+    assert_eq!(serving.asked().len(), 1);
+    assert!(serving.removed().is_empty());
+}
+
+#[tokio::test]
+async fn a_case_the_adapter_does_not_answer_fails_the_service_naming_the_case() {
+    let at = source("fronted-silent", FRONTED);
+    let serving = engine().logging("adapter 9a8b7c6d5e4f gone");
+    let http = fetching(
+        vec![Answer::served(200, "application/json", "[]")],
+        Answer::Silent,
+    );
+    let read = recorded(&at, &serving, &http, Some(7)).await;
+    let failed = read.failed.first();
+    assert_eq!(
+        failed.map(|failed| failed.step.as_str()),
+        Some("conformance subtitles.fetch@1/watch-answers")
+    );
+    assert_eq!(
+        failed.map(|failed| failed.log.clone()),
+        Some(vec!["adapter <redacted> gone".to_owned()])
+    );
+    assert!(!at.join(WATCHING).exists());
+}
+
+#[tokio::test]
+async fn an_answer_still_holding_the_adapters_identity_once_scrubbed_writes_nothing() {
+    let at = source("fronted-unscrubbable", FRONTED);
+    let http = fetching(
+        vec![Answer::served(
+            200,
+            "application/json",
+            "{\"at\": 17218003}",
+        )],
+        Answer::served(200, "application/json", "null"),
+    );
+    let read = recorded(&at, &engine(), &http, Some(7)).await;
+    assert_eq!(
+        failed_at(&read).first().map(|(step, _)| step.as_str()),
+        Some("scrubbing")
+    );
+    assert!(!at.join(WATCHING).exists() && !at.join(PROVED).exists());
+}
+
+#[tokio::test]
+async fn with_no_randomness_there_is_no_key_for_the_adapter_and_nothing_is_started() {
+    let at = source("fronted-keyless", FRONTED);
+    let serving = engine();
+    let read = recorded(&at, &serving, &answering(), None).await;
+    assert_eq!(
+        failed_at(&read),
+        vec![(
+            "adapter's key".to_owned(),
+            crate::secret::NO_RANDOMNESS_FOR_PASSWORD.to_owned()
+        )]
+    );
+    assert!(serving.asked().is_empty());
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn starting_files_holding_a_link_are_refused_for_the_upstream_and_for_the_adapter() {
+    for (service, step) in [
+        ("jellyfin", "starting files"),
+        ("jellyfin-adapter", "adapter's starting files"),
+    ] {
+        let at = source("fronted-linked", FRONTED);
+        let starting = at.join("config").join(service);
+        let _ = std::fs::create_dir_all(&starting);
+        let _ = std::os::unix::fs::symlink("/etc/hosts", starting.join("hosts"));
+        let read = recorded(&at, &engine(), &answering(), Some(7)).await;
+        assert_eq!(
+            failed_at(&read).first().map(|(step, _)| step.as_str()),
+            Some(step)
+        );
+    }
+}
+
+fn recorder_with<'a>(
+    serving: &'a Serves,
+    program: &'a Proving,
+    transport: &'a (dyn Fn() -> Arc<dyn Http> + Send + Sync),
+    random: &'a FixedRandom,
+) -> Recorder<'a> {
+    Recorder {
+        program,
+        serving,
+        transport,
+        random,
+    }
+}
+
+#[test]
+fn an_item_asked_as_the_operator_is_refused_before_anything_is_made() {
+    let Ok(manifest) = Manifest::from_toml(FRONTED) else {
+        return;
+    };
+    let placements = Installed::of(&manifest).services;
+    let (Some(upstream), Some(placed), Some(service)) = (
+        placements.first(),
+        placements.get(1),
+        manifest.services.get(1),
+    ) else {
+        return;
+    };
+    let Some(request) = manifest
+        .proofs
+        .first()
+        .and_then(|proof| proof.request.as_ref())
+    else {
+        return;
+    };
+    let item = Item {
+        named: "claim library.curate probe wanted".to_owned(),
+        service: Some("jellyfin".to_owned()),
+        request,
+        fixture: Some(PROVED),
+        keyed: true,
+    };
+    let serving = engine();
+    let program = Proving::unreachable();
+    let transport = || -> Arc<dyn Http> { Fake::silent() };
+    let random = FixedRandom(Some(vec![7; 32]));
+    let at = Scratch::new("fronted-keyed");
+    let prepared = Prepared::of(
+        recorder_with(&serving, &program, &transport, &random),
+        &at,
+        upstream,
+        Fronting { service, placed },
+        &[&item],
+    );
+    assert!(prepared.is_err_and(|fault| fault.step == "first run"
+        && fault
+            .why
+            .starts_with("claim library.curate probe wanted is asked with")));
+}
+
+struct Filler {
+    serving: Serves,
+    program: Arc<Proving>,
+    random: FixedRandom,
+    held: Throwaway,
+}
+
+impl Filler {
+    fn new(random: Option<u8>) -> Option<Self> {
+        Some(Self {
+            serving: engine(),
+            program: Proving::unreachable(),
+            random: FixedRandom(random.map(|byte| vec![byte; 32])),
+            held: Throwaway::of(None).ok()?,
+        })
+    }
+
+    fn filled(&self, upstream: Option<&str>, asks: &Value) -> (Result<Value, String>, usize) {
+        if let Some(text) = upstream {
+            let _ = self.held.hold(super::UPSTREAM_FILE, text);
+        }
+        let transport = || -> Arc<dyn Http> { Fake::silent() };
+        let mut filling = Filling {
+            recorder: recorder_with(&self.serving, &self.program, &transport, &self.random),
+            held: &self.held,
+            answers: [
+                (
+                    "identity.source@1/whoever-answers".to_owned(),
+                    json!({"id": "m1", "token": "t0k3n"}),
+                ),
+                (
+                    "identity.source@1/household-answers".to_owned(),
+                    json!([{"id": 3}]),
+                ),
+            ]
+            .into_iter()
+            .collect(),
+            made: Vec::new(),
+        };
+        let filled = filling.filled(asks).map(|filled| filled.value);
+        (filled, filling.made.len())
+    }
+}
+
+#[test]
+fn every_placeholder_is_filled_wherever_it_stands_and_only_credentials_are_kept_as_made() {
+    let Some(filler) = Filler::new(Some(7)) else {
+        return;
+    };
+    let asks = json!({
+        "name": "{upstream:username}",
+        "signed": ["{identity.source@1/whoever-answers#/token}", 12, null],
+        "key": "{minted}",
+        "plain": "conformance-member",
+    });
+    assert_eq!(
+        filler.filled(Some("{\"username\": \"admin\"}"), &asks),
+        (
+            Ok(json!({
+                "name": "admin",
+                "signed": ["t0k3n", 12, null],
+                "key": MINTED,
+                "plain": "conformance-member",
+            })),
+            2
+        )
+    );
+}
+
+#[test]
+fn a_placeholder_with_nothing_to_fill_it_names_itself_and_why() {
+    let Some(filler) = Filler::new(None) else {
+        return;
+    };
+    let why = |upstream: Option<&str>, placeholder: &str| {
+        filler
+            .filled(upstream, &json!({ "x": placeholder }))
+            .0
+            .err()
+            .unwrap_or_default()
+    };
+    assert_eq!(
+        why(None, "{upstream:password}"),
+        "{upstream:password} cannot be filled: there is no upstream.json yet"
+    );
+    assert_eq!(
+        why(Some("[]"), "{upstream:password}"),
+        "{upstream:password} cannot be filled: upstream.json is not an object"
+    );
+    assert_eq!(
+        why(Some("{}"), "{upstream:password}"),
+        "{upstream:password} cannot be filled: upstream.json holds no password"
+    );
+    assert_eq!(
+        why(None, "{identity.source@1/invite-answers#/id}"),
+        "{identity.source@1/invite-answers#/id} cannot be filled: identity.source@1/invite-answers was not asked before it"
+    );
+    assert_eq!(
+        why(None, "{identity.source@1/household-answers#/0/id}"),
+        "{identity.source@1/household-answers#/0/id} cannot be filled: identity.source@1/household-answers answered no string at \"/0/id\""
+    );
+    assert_eq!(
+        why(None, "{minted}"),
+        format!(
+            "{{minted}} cannot be filled: {}",
+            crate::secret::NO_RANDOMNESS_FOR_PASSWORD
+        )
+    );
+    assert_eq!(
+        why(None, "{minted:upstream:password}"),
+        format!(
+            "{{minted:upstream:password}} cannot be filled: {}",
+            crate::secret::NO_RANDOMNESS_FOR_PASSWORD
+        )
+    );
+}
+
+fn identifying() -> String {
+    FRONTED
+        .replace(
+            "speaks      = [\"subtitles.fetch@1\"]",
+            "speaks      = [\"identity.source@1\"]",
+        )
+        .replace(
+            "provides    = [\"subtitles.fetch\"]",
+            "provides    = [\"identity.source\"]",
+        )
+}
+
+fn identity(startup: Vec<Answer>, created: Answer) -> Arc<Fake> {
+    let json = |body: &str| Answer::served(200, "application/json", body);
+    Fake::by_path_in_turn(vec![
+        ("/health", vec![Answer::reply(200, "ok")]),
+        (
+            "/lemonfiber/adapter/v1/ready",
+            vec![Answer::reply(200, "{}")],
+        ),
+        ("/System/Info/Public", vec![json("{}")]),
+        ("/startup_completed", startup),
+        ("/create_admin", vec![created]),
+        ("/household", vec![json("[{\"id\": \"m1\"}]")]),
+        (
+            "/whoever",
+            vec![json("{\"id\": \"m1\", \"token\": \"t0k3n\"}")],
+        ),
+        ("/invite", vec![json("{\"id\": \"m2\"}")]),
+        ("/lemonfiber/identity.source/v1/", vec![json("null")]),
+    ])
+}
+
+#[tokio::test]
+async fn an_adapter_speaking_identity_is_first_run_through_and_asked_with_what_it_left() {
+    let at = source("fronted-identity", &identifying());
+    let json = |body: &str| Answer::served(200, "application/json", body);
+    let http = identity(
+        vec![
+            json("false"),
+            Answer::served(401, "text/plain", "Unauthorized"),
+            json("false"),
+        ],
+        json("null"),
+    );
+    let read = recorded(&at, &engine(), &http, Some(7)).await;
+    assert_eq!(failed_at(&read), Vec::new());
+    assert_eq!(read.recordings.len(), 21);
+    let asked = |fragment: &str| posted(&http, fragment).last().map(body);
+    assert_eq!(
+        asked("/create_admin"),
+        Some(json!({"name": "admin", "password": MINTED}))
+    );
+    assert_eq!(
+        asked("/replace_admin_password"),
+        Some(json!({"replacement": MINTED}))
+    );
+    assert_eq!(
+        asked("/whoever"),
+        Some(json!({"device": "conformance-whoever", "name": "admin", "password": MINTED}))
+    );
+    assert_eq!(
+        asked("/standing"),
+        Some(json!({"signed": {"id": "m1", "token": "t0k3n"}}))
+    );
+    assert_eq!(asked("/sessions"), Some(json!({"member": "m1"})));
+    assert_eq!(
+        json_at(&at, "conformance/identity.source@1/whoever-answers.json")
+            .pointer("/response/json"),
+        Some(&json!({"id": "m1", "token": "<redacted>"}))
+    );
+}
+
+#[tokio::test]
+async fn a_first_run_that_does_not_finish_fails_the_service_at_it() {
+    let json = |body: &str| Answer::served(200, "application/json", body);
+    for (startup, created, why) in [
+        (json("true"), json("null"), "set up outside lemonfiber"),
+        (
+            json("false"),
+            Answer::served(500, "text/plain", "broken"),
+            "500 is not an answer the contract declares",
+        ),
+    ] {
+        let at = source("fronted-unfinished", &identifying());
+        let read = recorded(&at, &engine(), &identity(vec![startup], created), Some(7)).await;
+        let failed = failed_at(&read);
+        assert!(
+            matches!(failed.first(), Some((step, said)) if step == "first run" && said.contains(why)),
+            "{failed:?}"
+        );
+    }
+    assert_eq!(unfinished(crate::seed::State::Wired), "Wired");
+}
+
+#[test]
+fn a_minted_credential_is_written_into_what_the_adapter_holds_beside_its_fields() {
+    let Some(filler) = Filler::new(Some(7)) else {
+        return;
+    };
+    let _ = filler
+        .held
+        .hold(super::UPSTREAM_FILE, "{\"username\": \"admin\"}");
+    let transport = || -> Arc<dyn Http> { Fake::silent() };
+    let filling = Filling {
+        recorder: recorder_with(&filler.serving, &filler.program, &transport, &filler.random),
+        held: &filler.held,
+        answers: std::collections::BTreeMap::new(),
+        made: Vec::new(),
+    };
+    assert_eq!(filling.keep_minted(&[]), Ok(()));
+    assert_eq!(
+        filling.keep_minted(&[("password".to_owned(), "s3cret".to_owned())]),
+        Ok(())
+    );
+    let held = filler
+        .held
+        .wrote(Path::new(super::UPSTREAM_FILE))
+        .ok()
+        .flatten()
+        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok());
+    assert_eq!(
+        held,
+        Some(json!({"username": "admin", "password": "s3cret"}))
+    );
+}
