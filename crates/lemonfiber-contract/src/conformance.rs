@@ -3,10 +3,122 @@
 //! Every operation answers inside its contract, and every adapter refuses a call made
 //! without its key.
 
+use serde_json::Value;
+
 use crate::{Capability, Operation};
 
 /// The statuses an adapter refuses a call without its key with.
 const UNKEYED: &[u16] = &[401];
+
+/// The name of the case that refuses a call made without the key.
+pub const REFUSES_WITHOUT_THE_KEY: &str = "refuses-without-the-key";
+
+/// What a placeholder's text opens with.
+const OPENS: char = '{';
+
+/// What a placeholder's text closes with.
+const CLOSES: char = '}';
+
+/// The placeholder for a credential minted for the case alone.
+const MINTED: &str = "minted";
+
+/// What a placeholder naming a field of `upstream.json` begins with.
+const UPSTREAM: &str = "upstream:";
+
+/// What separates an earlier case from the pointer into its answer.
+const POINTER: char = '#';
+
+/// A string in a case's ask that is filled before the case is posted.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Placeholder {
+    /// A credential minted for this case alone.
+    Minted,
+    /// This field of the `upstream.json` the adapter holds.
+    Upstream(String),
+    /// A credential minted for this case, written to `upstream.json` as this field once
+    /// the adapter answers the case with a success.
+    MintedUpstream(String),
+    /// The string at a JSON pointer in the answer to an earlier case.
+    Answered {
+        /// The case, as `<capability>@<major>/<case>`.
+        case: String,
+        /// Where in its answer.
+        pointer: String,
+    },
+}
+
+impl Placeholder {
+    /// The string at `pointer` in the answer to `operation` of `capability`'s major.
+    #[must_use]
+    pub fn answer(capability: &str, major: u32, operation: &str, pointer: &str) -> Self {
+        Self::Answered {
+            case: format!("{capability}@{major}/{}", answers(operation)),
+            pointer: pointer.to_owned(),
+        }
+    }
+
+    /// The placeholder as an ask holds it.
+    #[must_use]
+    pub fn written(&self) -> String {
+        let inner = match self {
+            Self::Minted => MINTED.to_owned(),
+            Self::Upstream(field) => format!("{UPSTREAM}{field}"),
+            Self::MintedUpstream(field) => format!("{MINTED}:{UPSTREAM}{field}"),
+            Self::Answered { case, pointer } => format!("{case}{POINTER}{pointer}"),
+        };
+        format!("{OPENS}{inner}{CLOSES}")
+    }
+
+    /// The placeholder `text` is, where it is exactly one.
+    #[must_use]
+    pub fn read(text: &str) -> Option<Self> {
+        let inner = text.strip_prefix(OPENS)?.strip_suffix(CLOSES)?;
+        if inner.contains([OPENS, CLOSES]) {
+            return None;
+        }
+        if inner == MINTED {
+            return Some(Self::Minted);
+        }
+        if let Some(field) = inner
+            .strip_prefix(MINTED)
+            .and_then(|rest| rest.strip_prefix(':'))
+            .and_then(|rest| rest.strip_prefix(UPSTREAM))
+        {
+            return named(field).map(Self::MintedUpstream);
+        }
+        if let Some(field) = inner.strip_prefix(UPSTREAM) {
+            return named(field).map(Self::Upstream);
+        }
+        let (case, pointer) = inner.split_once(POINTER)?;
+        let (contract, name) = case.split_once('/')?;
+        let (capability, major) = contract.split_once('@')?;
+        let sound = !capability.is_empty()
+            && major.parse::<u32>().is_ok()
+            && !name.is_empty()
+            && (pointer.is_empty() || pointer.starts_with('/'));
+        sound.then(|| Self::Answered {
+            case: case.to_owned(),
+            pointer: pointer.to_owned(),
+        })
+    }
+}
+
+impl From<Placeholder> for String {
+    fn from(placeholder: Placeholder) -> Self {
+        placeholder.written()
+    }
+}
+
+/// `field`, where it names one.
+fn named(field: &str) -> Option<String> {
+    (!field.is_empty() && !field.contains(':')).then(|| field.to_owned())
+}
+
+/// The name of the case that asks `operation` under the key.
+#[must_use]
+pub fn answers(operation: &str) -> String {
+    format!("{operation}-answers")
+}
 
 /// What a case holds an answer to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -30,26 +142,30 @@ pub struct Case<'c> {
     pub expect: Expect,
     /// Whether install asks it of the running adapter as well.
     pub live: bool,
+    /// What it posts, its placeholders still to be filled.
+    pub asks: Value,
 }
 
 /// Every case of `capability`, in the order they are published.
 #[must_use]
 pub fn cases(capability: &Capability) -> Vec<Case<'_>> {
     let unkeyed = capability.operations.first().map(|operation| Case {
-        case: "refuses-without-the-key".to_owned(),
+        case: REFUSES_WITHOUT_THE_KEY.to_owned(),
         operation,
         keyed: false,
         expect: Expect::Status(UNKEYED),
         live: true,
+        asks: Value::Object(serde_json::Map::new()),
     });
     unkeyed
         .into_iter()
         .chain(capability.operations.iter().map(|operation| Case {
-            case: format!("{}-answers", operation.name),
+            case: answers(operation.name),
             operation,
             keyed: true,
             expect: Expect::Conforms,
             live: false,
+            asks: operation.asks.clone(),
         }))
         .collect()
 }

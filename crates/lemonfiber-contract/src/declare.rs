@@ -12,8 +12,10 @@
 //! | `refer name: &T as T` | `T` |
 //! | `value name: T` | `T` |
 //!
-//! An operation whose answer may be larger than [`crate::client::LARGEST`] says so after
-//! its return type, as `where largest = BYTES`.
+//! After its return type every operation says what its conformance case posts, as
+//! `where asks = Asked { … }`: a value of the request it crosses as, any string of which
+//! may be a [`crate::conformance::Placeholder`]. One whose answer may be larger than
+//! [`crate::client::LARGEST`] says so first, as `where largest = BYTES, asks = …`.
 //!
 //! The port's own type is written out, rather than derived from the mark, because the
 //! trait implementations go through `#[async_trait]`, which gives every reference in a
@@ -37,7 +39,7 @@ macro_rules! contract {
                 impl $Trait:path {
                     $(
                         $(#[$op_meta:meta])*
-                        fn $op:ident( $( $mark:ident $arg:ident : $param:ty $(as $wire:ty)? ),* $(,)? ) -> $ret:ty $(where largest = $largest:expr)?;
+                        fn $op:ident( $( $mark:ident $arg:ident : $param:ty $(as $wire:ty)? ),* $(,)? ) -> $ret:ty where $(largest = $largest:expr,)? asks = $asks:expr;
                     )*
                 }
             )*
@@ -72,6 +74,12 @@ macro_rules! contract {
                             #[doc = concat!("The port's `", stringify!($arg), "`.")]
                             pub $arg: $crate::contract!(@wire $mark $param $(, $wire)?),
                         )*
+                    }
+
+                    /// What its conformance case posts.
+                    #[must_use]
+                    pub fn asks() -> Asked {
+                        $asks
                     }
                 }
             )*)*
@@ -166,7 +174,8 @@ macro_rules! contract {
                                 MAJOR,
                                 stringify!($op),
                             )
-                            .within($crate::contract!(@largest $($largest)?)),
+                            .within($crate::contract!(@largest $($largest)?))
+                            .asking(&$op::asks()),
                         )*)*
                     ],
                 }

@@ -2,6 +2,7 @@
   "capability": "request.intake",
   "cases": [
     {
+      "asked": {},
       "case": "refuses-without-the-key",
       "expect": {
         "status": [
@@ -13,6 +14,7 @@
       "operation": "initialized"
     },
     {
+      "asked": {},
       "case": "initialized-answers",
       "expect": {
         "conforms": true
@@ -22,6 +24,18 @@
       "operation": "initialized"
     },
     {
+      "asked": {
+        "source": {
+          "at": "http://conformance-identity",
+          "credential": {
+            "user-pass": {
+              "password": "{minted}",
+              "username": "conformance"
+            }
+          },
+          "protocol": "conformance"
+        }
+      },
       "case": "configure_identity-answers",
       "expect": {
         "conforms": true
@@ -31,6 +45,7 @@
       "operation": "configure_identity"
     },
     {
+      "asked": {},
       "case": "answers-answers",
       "expect": {
         "conforms": true
@@ -40,6 +55,7 @@
       "operation": "answers"
     },
     {
+      "asked": {},
       "case": "requests-answers",
       "expect": {
         "conforms": true
@@ -49,6 +65,11 @@
       "operation": "requests"
     },
     {
+      "asked": {
+        "members": [
+          "conformance"
+        ]
+      },
       "case": "link_members-answers",
       "expect": {
         "conforms": true
@@ -58,6 +79,9 @@
       "operation": "link_members"
     },
     {
+      "asked": {
+        "media_server_id": "conformance"
+      },
       "case": "member_for-answers",
       "expect": {
         "conforms": true
@@ -67,6 +91,9 @@
       "operation": "member_for"
     },
     {
+      "asked": {
+        "media_server_id": "conformance"
+      },
       "case": "requesting-answers",
       "expect": {
         "conforms": true
@@ -76,6 +103,9 @@
       "operation": "requesting"
     },
     {
+      "asked": {
+        "id": "{request.intake@1/member_for-answers#}"
+      },
       "case": "approval_first-answers",
       "expect": {
         "conforms": true
@@ -85,6 +115,9 @@
       "operation": "approval_first"
     },
     {
+      "asked": {
+        "id": "0"
+      },
       "case": "remove_member-answers",
       "expect": {
         "conforms": true
@@ -94,6 +127,7 @@
       "operation": "remove_member"
     },
     {
+      "asked": {},
       "case": "telling-answers",
       "expect": {
         "conforms": true
@@ -103,6 +137,15 @@
       "operation": "telling"
     },
     {
+      "asked": {
+        "telling": {
+          "enabled": true,
+          "occasions": [
+            "arrived"
+          ],
+          "others": false
+        }
+      },
       "case": "tell-answers",
       "expect": {
         "conforms": true
@@ -112,15 +155,24 @@
       "operation": "tell"
     },
     {
-      "case": "fulfilment_targets-answers",
-      "expect": {
-        "conforms": true
+      "asked": {
+        "target": {
+          "at": {
+            "base": "",
+            "host": "conformance-curator",
+            "port": 80
+          },
+          "folder": "/data/conformance",
+          "key": "{minted}",
+          "kind": "tv",
+          "moved_from": null,
+          "name": "conformance",
+          "profile": {
+            "id": 1,
+            "name": "conformance"
+          }
+        }
       },
-      "keyed": true,
-      "live": false,
-      "operation": "fulfilment_targets"
-    },
-    {
       "case": "add_fulfilment_target-answers",
       "expect": {
         "conforms": true
@@ -130,6 +182,34 @@
       "operation": "add_fulfilment_target"
     },
     {
+      "asked": {},
+      "case": "fulfilment_targets-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "fulfilment_targets"
+    },
+    {
+      "asked": {
+        "at": {
+          "base": "",
+          "host": "conformance-curator",
+          "port": 80
+        },
+        "held": {
+          "at": {
+            "base": "",
+            "host": "conformance-curator",
+            "port": 80
+          },
+          "id": "{request.intake@1/fulfilment_targets-answers#/0/id}",
+          "key": "{request.intake@1/fulfilment_targets-answers#/0/key}",
+          "kind": "tv"
+        },
+        "key": "{minted}"
+      },
       "case": "move_fulfilment_target-answers",
       "expect": {
         "conforms": true
@@ -139,6 +219,15 @@
       "operation": "move_fulfilment_target"
     },
     {
+      "asked": {
+        "at": {
+          "base": "",
+          "host": "conformance-curator",
+          "port": 80
+        },
+        "key": "{minted}",
+        "kind": "tv"
+      },
       "case": "test_fulfilment_target-answers",
       "expect": {
         "conforms": true
@@ -148,6 +237,7 @@
       "operation": "test_fulfilment_target"
     },
     {
+      "asked": {},
       "case": "media_server_link-answers",
       "expect": {
         "conforms": true
@@ -157,6 +247,14 @@
       "operation": "media_server_link"
     },
     {
+      "asked": {
+        "at": {
+          "base": "",
+          "host": "conformance-curator",
+          "port": 80
+        },
+        "key": "{minted}"
+      },
       "case": "link_media_server-answers",
       "expect": {
         "conforms": true
@@ -166,6 +264,7 @@
       "operation": "link_media_server"
     },
     {
+      "asked": {},
       "case": "asking-answers",
       "expect": {
         "conforms": true
@@ -175,6 +274,15 @@
       "operation": "asking"
     },
     {
+      "asked": {
+        "asking": {
+          "approves_own": false,
+          "quota": {
+            "days": 7,
+            "requests": 5
+          }
+        }
+      },
       "case": "set_asking-answers",
       "expect": {
         "conforms": true
@@ -184,6 +292,9 @@
       "operation": "set_asking"
     },
     {
+      "asked": {
+        "id": "{request.intake@1/member_for-answers#}"
+      },
       "case": "left-answers",
       "expect": {
         "conforms": true
@@ -193,6 +304,13 @@
       "operation": "left"
     },
     {
+      "asked": {
+        "id": "{request.intake@1/member_for-answers#}",
+        "quota": {
+          "days": 7,
+          "requests": 5
+        }
+      },
       "case": "set_quota-answers",
       "expect": {
         "conforms": true
@@ -202,6 +320,10 @@
       "operation": "set_quota"
     },
     {
+      "asked": {
+        "id": "{request.intake@1/member_for-answers#}",
+        "may": false
+      },
       "case": "approves_own-answers",
       "expect": {
         "conforms": true
@@ -211,6 +333,10 @@
       "operation": "approves_own"
     },
     {
+      "asked": {
+        "approve": false,
+        "request": 0
+      },
       "case": "decide-answers",
       "expect": {
         "conforms": true
@@ -220,6 +346,9 @@
       "operation": "decide"
     },
     {
+      "asked": {
+        "id": "{request.intake@1/member_for-answers#}"
+      },
       "case": "hold_requests-answers",
       "expect": {
         "conforms": true
@@ -229,6 +358,12 @@
       "operation": "hold_requests"
     },
     {
+      "asked": {
+        "holding": {
+          "taken": 0
+        },
+        "id": "{request.intake@1/member_for-answers#}"
+      },
       "case": "release_requests-answers",
       "expect": {
         "conforms": true
@@ -238,6 +373,9 @@
       "operation": "release_requests"
     },
     {
+      "asked": {
+        "request": 0
+      },
       "case": "reachable-answers",
       "expect": {
         "conforms": true
@@ -247,6 +385,11 @@
       "operation": "reachable"
     },
     {
+      "asked": {
+        "notices": [
+          "conformance"
+        ]
+      },
       "case": "set_notices-answers",
       "expect": {
         "conforms": true
@@ -256,6 +399,13 @@
       "operation": "set_notices"
     },
     {
+      "asked": {
+        "kinds": [
+          "movies"
+        ],
+        "page": 1,
+        "term": "conformance"
+      },
       "case": "search-answers",
       "expect": {
         "conforms": true
@@ -265,6 +415,11 @@
       "operation": "search"
     },
     {
+      "asked": {
+        "id": "0",
+        "kind": "movies",
+        "region": "US"
+      },
       "case": "detail-answers",
       "expect": {
         "conforms": true
@@ -274,6 +429,14 @@
       "operation": "detail"
     },
     {
+      "asked": {
+        "member": "{request.intake@1/member_for-answers#}",
+        "wish": {
+          "id": "0",
+          "kind": "movies",
+          "seasons": []
+        }
+      },
       "case": "ask-answers",
       "expect": {
         "conforms": true

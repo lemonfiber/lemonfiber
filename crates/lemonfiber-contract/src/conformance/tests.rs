@@ -1,7 +1,9 @@
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_ports::service::Failure;
 
-use super::{cases, Expect};
+use serde_json::Value;
+
+use super::{answers, cases, Expect, Placeholder, REFUSES_WITHOUT_THE_KEY};
 use crate::Contracted;
 
 #[test]
@@ -58,4 +60,88 @@ async fn every_operation_reads_an_answer_as_the_client_does() {
         Some(operation) => assert!(operation.judged(&answering).await.is_ok()),
         None => unreachable!("media.serve signs a device out"),
     }
+}
+
+#[test]
+fn a_placeholder_is_written_as_it_is_read_back() {
+    for placeholder in [
+        Placeholder::Minted,
+        Placeholder::Upstream("password".to_owned()),
+        Placeholder::MintedUpstream("password".to_owned()),
+        Placeholder::answer("identity.source", 1, "invite", "/id"),
+        Placeholder::answer("media.serve", 1, "mint", ""),
+    ] {
+        assert_eq!(
+            Placeholder::read(&placeholder.written()),
+            Some(placeholder.clone())
+        );
+        assert_eq!(String::from(placeholder.clone()), placeholder.written());
+    }
+    assert_eq!(Placeholder::Minted.written(), "{minted}");
+    assert_eq!(
+        Placeholder::answer("identity.source", 1, "invite", "/id").written(),
+        "{identity.source@1/invite-answers#/id}"
+    );
+}
+
+#[test]
+fn a_string_that_is_not_exactly_one_placeholder_is_posted_as_written() {
+    for text in [
+        "minted",
+        "{minted",
+        "minted}",
+        "{{minted}}",
+        "{upstream:}",
+        "{upstream:a:b}",
+        "{minted:upstream:}",
+        "{minted:other}",
+        "{identity.source@1/invite-answers}",
+        "{identity.source@x/invite-answers#/id}",
+        "{@1/invite-answers#/id}",
+        "{identity.source@1/#/id}",
+        "{identity.source/invite-answers#/id}",
+        "{identity.source@1invite-answers#/id}",
+        "{identity.source@1/invite-answers#id}",
+        "conformance-member",
+    ] {
+        assert_eq!(Placeholder::read(text), None, "{text}");
+    }
+}
+
+/// Every string anywhere in `value`.
+fn strings(value: &Value) -> Vec<&str> {
+    match value {
+        Value::String(text) => vec![text.as_str()],
+        Value::Array(items) => items.iter().flat_map(strings).collect(),
+        Value::Object(members) => members.values().flat_map(strings).collect(),
+        _ => Vec::new(),
+    }
+}
+
+#[test]
+fn every_case_asks_a_body_and_names_only_cases_asked_before_it() {
+    let mut asked_before: Vec<String> = Vec::new();
+    for capability in crate::capabilities::all() {
+        for case in cases(&capability) {
+            assert!(case.asks.is_object(), "{}/{}", capability.name, case.case);
+            if case.case == REFUSES_WITHOUT_THE_KEY {
+                assert_eq!(case.asks, Value::Object(serde_json::Map::new()));
+            }
+            for text in strings(&case.asks) {
+                if let Some(Placeholder::Answered { case: named, .. }) = Placeholder::read(text) {
+                    assert!(
+                        asked_before.contains(&named),
+                        "{}/{} names {named}, which is not asked before it",
+                        capability.name,
+                        case.case
+                    );
+                }
+            }
+            asked_before.push(format!(
+                "{}@{}/{}",
+                capability.name, capability.major, case.case
+            ));
+        }
+    }
+    assert!(asked_before.contains(&format!("media.serve@1/{}", answers("mint"))));
 }

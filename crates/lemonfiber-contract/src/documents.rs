@@ -158,7 +158,8 @@ pub fn conformance(capability: &Capability) -> Value {
                 "operation": case.operation.name,
                 "keyed": case.keyed,
                 "expect": expect,
-                "live": case.live
+                "live": case.live,
+                "asked": case.asks
             })
         })
         .collect();

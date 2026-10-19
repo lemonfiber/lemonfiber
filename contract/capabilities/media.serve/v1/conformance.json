@@ -2,6 +2,7 @@
   "capability": "media.serve",
   "cases": [
     {
+      "asked": {},
       "case": "refuses-without-the-key",
       "expect": {
         "status": [
@@ -13,6 +14,10 @@
       "operation": "signed_in"
     },
     {
+      "asked": {
+        "device": "conformance-device",
+        "member": "{identity.source@1/household-answers#/0/id}"
+      },
       "case": "signed_in-answers",
       "expect": {
         "conforms": true
@@ -22,6 +27,10 @@
       "operation": "signed_in"
     },
     {
+      "asked": {
+        "id": "00000000000000000000000000000000",
+        "member": null
+      },
       "case": "title-answers",
       "expect": {
         "conforms": true
@@ -31,6 +40,10 @@
       "operation": "title"
     },
     {
+      "asked": {
+        "member": "{identity.source@1/household-answers#/0/id}",
+        "most": 10
+      },
       "case": "part_way-answers",
       "expect": {
         "conforms": true
@@ -40,6 +53,14 @@
       "operation": "part_way"
     },
     {
+      "asked": {
+        "how_far": {
+          "ended": false,
+          "position": 60
+        },
+        "id": "00000000000000000000000000000000",
+        "member": "{identity.source@1/household-answers#/0/id}"
+      },
       "case": "progressed-answers",
       "expect": {
         "conforms": true
@@ -49,6 +70,9 @@
       "operation": "progressed"
     },
     {
+      "asked": {
+        "device": "conformance-device"
+      },
       "case": "sign_out-answers",
       "expect": {
         "conforms": true
@@ -58,6 +82,11 @@
       "operation": "sign_out"
     },
     {
+      "asked": {
+        "id": "00000000000000000000000000000000",
+        "member": null,
+        "which": "poster"
+      },
       "case": "picture-answers",
       "expect": {
         "conforms": true
@@ -67,6 +96,10 @@
       "operation": "picture"
     },
     {
+      "asked": {
+        "member": null,
+        "most": 10
+      },
       "case": "holdings-answers",
       "expect": {
         "conforms": true
@@ -76,6 +109,9 @@
       "operation": "holdings"
     },
     {
+      "asked": {
+        "member": null
+      },
       "case": "playing-answers",
       "expect": {
         "conforms": true
@@ -85,6 +121,10 @@
       "operation": "playing"
     },
     {
+      "asked": {
+        "kind": "movies",
+        "term": "conformance"
+      },
       "case": "has_item-answers",
       "expect": {
         "conforms": true
@@ -94,6 +134,7 @@
       "operation": "has_item"
     },
     {
+      "asked": {},
       "case": "rescan-answers",
       "expect": {
         "conforms": true
@@ -103,6 +144,9 @@
       "operation": "rescan"
     },
     {
+      "asked": {
+        "most": 10
+      },
       "case": "series_held-answers",
       "expect": {
         "conforms": true
@@ -112,6 +156,9 @@
       "operation": "series_held"
     },
     {
+      "asked": {
+        "id": "00000000000000000000000000000000"
+      },
       "case": "refresh-answers",
       "expect": {
         "conforms": true
@@ -121,51 +168,9 @@
       "operation": "refresh"
     },
     {
-      "case": "known_proxies-answers",
-      "expect": {
-        "conforms": true
+      "asked": {
+        "app": "lemonfiber-conformance"
       },
-      "keyed": true,
-      "live": false,
-      "operation": "known_proxies"
-    },
-    {
-      "case": "trust_only-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "trust_only"
-    },
-    {
-      "case": "allowed_origins-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "allowed_origins"
-    },
-    {
-      "case": "allow_only-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "allow_only"
-    },
-    {
-      "case": "restart-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "restart"
-    },
-    {
       "case": "filed_as-answers",
       "expect": {
         "conforms": true
@@ -175,15 +180,9 @@
       "operation": "filed_as"
     },
     {
-      "case": "dated-answers",
-      "expect": {
-        "conforms": true
+      "asked": {
+        "app": "lemonfiber-conformance"
       },
-      "keyed": true,
-      "live": false,
-      "operation": "dated"
-    },
-    {
       "case": "mint-answers",
       "expect": {
         "conforms": true
@@ -193,6 +192,21 @@
       "operation": "mint"
     },
     {
+      "asked": {
+        "app": "lemonfiber-conformance"
+      },
+      "case": "dated-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "dated"
+    },
+    {
+      "asked": {
+        "key": "{media.serve@1/mint-answers#}"
+      },
       "case": "answers_to-answers",
       "expect": {
         "conforms": true
@@ -202,6 +216,9 @@
       "operation": "answers_to"
     },
     {
+      "asked": {
+        "key": "{media.serve@1/mint-answers#}"
+      },
       "case": "revoke-answers",
       "expect": {
         "conforms": true
@@ -209,6 +226,60 @@
       "keyed": true,
       "live": false,
       "operation": "revoke"
+    },
+    {
+      "asked": {},
+      "case": "known_proxies-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "known_proxies"
+    },
+    {
+      "asked": {
+        "address": "192.0.2.18"
+      },
+      "case": "trust_only-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "trust_only"
+    },
+    {
+      "asked": {},
+      "case": "allowed_origins-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "allowed_origins"
+    },
+    {
+      "asked": {
+        "origin": "https://watch.example"
+      },
+      "case": "allow_only-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "allow_only"
+    },
+    {
+      "asked": {},
+      "case": "restart-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "restart"
     }
   ],
   "major": 1

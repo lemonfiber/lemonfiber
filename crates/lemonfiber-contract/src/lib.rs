@@ -74,6 +74,8 @@ pub struct Operation {
     pub answered: schemars::Schema,
     /// The most its answer may carry, in bytes.
     pub largest: usize,
+    /// What its conformance case posts, its placeholders still to be filled.
+    pub asks: serde_json::Value,
     /// How its answer is read.
     reads: Reading,
 }
@@ -93,8 +95,16 @@ impl Operation {
             asked: schemars::schema_for!(A),
             answered: schemars::schema_for!(R),
             largest: client::LARGEST,
+            asks: serde_json::Value::Null,
             reads: read_as::<R>,
         }
+    }
+
+    /// The same operation, its conformance case posting `asks`.
+    #[must_use]
+    pub fn asking<A: serde::Serialize>(mut self, asks: &A) -> Self {
+        self.asks = serde_json::to_value(asks).unwrap_or_default();
+        self
     }
 
     /// What `client` answers this operation comes to, read as the core reads it: the

@@ -2,6 +2,7 @@
   "capability": "subtitles.fetch",
   "cases": [
     {
+      "asked": {},
       "case": "refuses-without-the-key",
       "expect": {
         "status": [
@@ -13,6 +14,9 @@
       "operation": "watching"
     },
     {
+      "asked": {
+        "which": "tv"
+      },
       "case": "watching-answers",
       "expect": {
         "conforms": true
@@ -22,6 +26,14 @@
       "operation": "watching"
     },
     {
+      "asked": {
+        "watched": {
+          "api_key": "{minted}",
+          "host": "conformance-curator",
+          "port": 80,
+          "which": "tv"
+        }
+      },
       "case": "watch-answers",
       "expect": {
         "conforms": true
