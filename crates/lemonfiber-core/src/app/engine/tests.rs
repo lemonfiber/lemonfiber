@@ -227,3 +227,33 @@ fn an_action_is_aimed_at_what_it_names_or_else_at_its_plan() {
         );
     }
 }
+
+/// A start whose change to the operator's overlay cannot be journalled starts nothing,
+/// and says why.
+#[tokio::test]
+async fn an_overlay_change_the_journal_cannot_hold_starts_nothing() {
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("overlay-unjournalled");
+    let config = dir.join("config");
+    let _ = std::fs::create_dir_all(config.join("journal.jsonl"));
+    let _ = std::fs::write(config.join("overlay.yml"), "services: {}\n");
+    let ctx = crate::test_support::a_context()
+        .settings(crate::config::Settings {
+            env_file: Some(config.join(".env")),
+            stack_dir: Some(dir.join("data").join("stack")),
+            ..crate::config::Settings::default()
+        })
+        .build();
+    let started = crate::app::dispatch(
+        crate::app::Command::Up {
+            forms: vec!["library".to_owned()],
+        },
+        &ctx,
+    )
+    .await;
+    let _ = std::fs::remove_dir_all(&dir);
+
+    let Err(problem) = started else {
+        unreachable!("a journal that cannot be written starts nothing: {started:?}");
+    };
+    assert!(problem.summary.contains("journal"), "{problem:?}");
+}

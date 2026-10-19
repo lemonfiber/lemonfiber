@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The operator's own overlay, named because nothing in it was held to the model.",
+  "type": "object",
+  "properties": {
+    "overlay": {
+      "description": "Where the overlay is.",
+      "type": "string"
+    },
+    "services": {
+      "description": "Every service it changes, by the names it gives them.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "overlay",
+    "services"
+  ]
+}

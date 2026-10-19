@@ -279,6 +279,10 @@ pub struct Installs {
     /// Said in a field of its own so that a rehearsal is never told from the real run by
     /// its wording alone.
     pub rehearsed: bool,
+    /// The operator's overlay and every service it changes, where there is one: merged
+    /// over the project this run would start, and held to nothing lemonfiber vets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unvetted: Option<crate::model::Unvetted>,
 }
 
 /// What asking an installed plugin's adapters again came to.

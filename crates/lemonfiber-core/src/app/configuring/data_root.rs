@@ -16,7 +16,9 @@
 //! - another user's home: anything beneath one of [`HOMES`] that is not in the operator's.
 //!
 //! Anything else is the operator's to choose, a pool or a share at the top of the
-//! filesystem included. A path written relative to the stack's directory has to stay
+//! filesystem included. An NFS export, written `nfs://<server>/<export>`, is no path here
+//! and is judged only on whether its server and export can be written into the mount
+//! options. A path written relative to the stack's directory has to stay
 //! inside it, and is then judged by the same rules.
 //!
 //! Judged on the path every link on the way resolves to, since a link is where the
@@ -84,6 +86,11 @@ const UNKNOWN_HOME: &str =
 
 /// Why `value` will not do as the data root, where it will not.
 pub(super) async fn refusal(ctx: &Ctx, value: &str) -> Option<String> {
+    if value.trim_start().starts_with(crate::config::storage::NFS) {
+        return crate::config::storage::Storage::read(value)
+            .err()
+            .map(|refused| format!("{value} cannot be the data root: {}", refused.said()));
+    }
     let path = Path::new(value);
     let plain = path
         .components()

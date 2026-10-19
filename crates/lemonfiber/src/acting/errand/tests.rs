@@ -269,6 +269,7 @@ fn an_update(coming: &[&str]) -> Outcome {
         halted: None,
         changelog: lemonfiber_core::changelog::Notes::unread(),
         offer: String::new(),
+        unvetted: None,
     })
 }
 

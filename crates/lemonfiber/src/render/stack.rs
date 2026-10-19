@@ -241,6 +241,7 @@ pub(crate) fn lifecycle(report: &LifecycleReport) -> Lines {
     }
     let profiles: Vec<&str> = report.plan.profiles.iter().map(String::as_str).collect();
     lines.put(format!("{}: {}", report.action, profiles.join(", ")));
+    lines.extend(super::overlay::unvetted(report.unvetted.as_ref()));
 
     // A run Compose did not carry out says so here rather than leaving the operator to
     // infer it from the settled services that are missing below. The exit status says

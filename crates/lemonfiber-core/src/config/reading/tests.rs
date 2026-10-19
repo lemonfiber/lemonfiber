@@ -47,26 +47,6 @@ fn a_blank_project_is_read_as_none_recorded() {
     assert_eq!(read, crate::PRODUCT);
 }
 
-/// Nothing layered is the ordinary stack, standing where its own file says.
-#[test]
-fn no_overlay_recorded_layers_nothing() {
-    assert!(super::overlay_from_env(&env::EnvFile::parse("")).is_empty());
-}
-
-/// Standing beside an existing setup is the only thing that writes it.
-#[test]
-fn a_recorded_overlay_is_layered_over_the_stack() {
-    let read =
-        super::overlay_from_env(&env::EnvFile::parse("LEMONFIBER_OVERLAY=/cfg/beside.yml\n"));
-    assert_eq!(read, vec![std::path::PathBuf::from("/cfg/beside.yml")]);
-}
-
-/// Blank reads as unset, the way every other recorded value does.
-#[test]
-fn a_blank_overlay_layers_nothing() {
-    assert!(super::overlay_from_env(&env::EnvFile::parse("LEMONFIBER_OVERLAY=  \n")).is_empty());
-}
-
 /// Nothing recorded is no window, and no window wakes nobody differently.
 #[test]
 fn no_quiet_hours_recorded_is_no_window() {

@@ -9,6 +9,7 @@
     "does": {
       "type": [
         "const:\"delete\"",
+        "const:\"leave\"",
         "const:\"reconfigure\"",
         "const:\"rehold\"",
         "const:\"reinstate\"",
@@ -117,6 +118,7 @@
   },
   "variants": [
     "\"delete\"",
+    "\"leave\"",
     "\"reconfigure\"",
     "\"rehold\"",
     "\"reinstate\"",

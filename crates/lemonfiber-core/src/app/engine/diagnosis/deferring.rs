@@ -99,15 +99,18 @@ pub(super) fn stored(
         async move {
             let fillers = host_fillers(&ctx, &manifest, project.as_deref());
             let committed = committed_bytes(&ctx, &fillers).await;
-            Box::new(StorageCheck::new(
-                ctx.seams.filesystem.clone(),
-                ctx.settings.data_root.clone(),
-                ctx.settings.storage_state.clone(),
-                ctx.environment,
-                ctx.settings.service_user,
-                Some(committed),
-                ctx.stack.crowded_mounts(),
-            )) as Box<dyn Check>
+            Box::new(
+                StorageCheck::new(
+                    ctx.seams.filesystem.clone(),
+                    ctx.settings.data_root.clone(),
+                    ctx.settings.storage_state.clone(),
+                    ctx.environment,
+                    ctx.settings.service_user,
+                    Some(committed),
+                    ctx.stack.crowded_mounts(),
+                )
+                .on(ctx.settings.nfs.clone()),
+            ) as Box<dyn Check>
         }
     })
 }

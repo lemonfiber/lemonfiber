@@ -65,6 +65,12 @@
         "ref:UpdateState"
       ],
       "required": true
+    },
+    "unvetted": {
+      "type": [
+        "anyOf(null,ref:Unvetted)"
+      ],
+      "required": false
     }
   },
   "variants": []

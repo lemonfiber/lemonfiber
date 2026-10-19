@@ -44,6 +44,7 @@ pub(super) fn an_update() -> lemonfiber_core::update::run::Report {
         }],
         halted: Some("sonarr did not come back".to_owned()),
         offer: String::new(),
+        unvetted: None,
     }
 }
 
@@ -250,6 +251,7 @@ pub(super) fn a_settings_report() -> SettingsReport {
             unrestarted: Some("the container engine would not recreate them".to_owned()),
         }),
         rehearsed: false,
+        unvetted: None,
     }
 }
 
@@ -355,6 +357,7 @@ pub(super) fn what_is_installed() -> lemonfiber_core::plugin::Installs {
         update: None,
         substituted: Vec::new(),
         sources: Vec::new(),
+        unvetted: None,
     }
 }
 

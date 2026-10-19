@@ -11,6 +11,10 @@ pub struct SettingsReport {
     pub change: Option<SettingChange>,
     /// Whether this was a rehearsal.
     pub rehearsed: bool,
+    /// The operator's overlay and every service it changes, where there is one: merged
+    /// over the project this run would start, and held to nothing lemonfiber vets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unvetted: Option<crate::model::Unvetted>,
 }
 
 /// One setting.

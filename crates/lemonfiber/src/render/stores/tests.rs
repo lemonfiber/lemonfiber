@@ -50,6 +50,7 @@ fn listing() -> SettingsReport {
         }],
         change: None,
         rehearsed: false,
+        unvetted: None,
     }
 }
 
@@ -207,4 +208,31 @@ fn a_set_made_says_what_it_now_holds() {
         "{text}"
     );
     assert!(!text.contains("--offer"), "{text}");
+}
+
+#[test]
+fn a_change_names_the_operators_overlay_as_unvetted_where_there_is_one() {
+    let overlay = lemonfiber_core::model::Unvetted {
+        overlay: "/home/op/.config/lemonfiber/overlay.yml".to_owned(),
+        services: vec!["gluetun".to_owned()],
+    };
+    let report = SettingsReport {
+        change: Some(change(Some("Belgium"), false)),
+        unvetted: Some(overlay.clone()),
+        ..listing()
+    };
+    let said = super::settings(&report).text();
+    assert!(
+        said.ends_with(
+            "\n\nUnvetted: your overlay /home/op/.config/lemonfiber/overlay.yml is merged over \
+             the project and changes gluetun; nothing in it is held to what lemonfiber checks."
+        ),
+        "{said}"
+    );
+    let listed = super::settings(&SettingsReport {
+        unvetted: Some(overlay),
+        ..listing()
+    })
+    .text();
+    assert!(!listed.contains("Unvetted"), "{listed}");
 }

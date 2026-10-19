@@ -76,6 +76,7 @@ fn every_outcome() -> Vec<Outcome> {
         secrets: Vec::new(),
         change: None,
         rehearsed: false,
+        unvetted: None,
     }));
     every
 }

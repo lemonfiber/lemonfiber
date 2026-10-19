@@ -94,12 +94,17 @@ pub(crate) const ZONE_KEY: &str = "TZ";
 /// wrong hour and agree with nothing.
 pub(crate) const DEFAULT_ZONE: &str = "Europe/Amsterdam";
 
-/// A Compose file layered over the stack's own.
+/// The retired setting that named a Compose file layered over the stack's own.
 ///
-/// Written by standing lemonfiber beside a setup already here: it maps each service to
-/// a port nothing else is using, so a second copy can be evaluated without moving the
-/// first out of the way.
+/// Not read: the operator's overlay is `overlay.yml` in lemonfiber's configuration
+/// directory, and a path still recorded here is named by the doctor with where to move
+/// it.
 pub(crate) const OVERLAY_KEY: &str = "LEMONFIBER_OVERLAY";
+
+/// Where standing lemonfiber beside a setup already here moved each service to listen,
+/// as `service:from=to` for each, so a second copy can be evaluated without moving the
+/// first out of the way.
+pub(crate) const BESIDE_KEY: &str = "LEMONFIBER_BESIDE";
 
 /// The Compose project lemonfiber manages.
 ///
@@ -140,8 +145,15 @@ pub(crate) const UNMANAGED_KEY: &str = "LEMONFIBER_UNMANAGED";
 ///
 /// The one location the storage contract rests on: the compose driver mounts it
 /// and the storage checks probe it. It is the stack's own setting rather than
-/// one of lemonfiber's, so it carries no prefix.
+/// one of lemonfiber's, so it carries no prefix. It holds a path on this machine, or an
+/// NFS export written `nfs://<server>/<export>`.
 pub const DATA_ROOT_KEY: &str = "DATA_ROOT";
+
+/// The NFS server the retired NAS overlay mounted the data from.
+pub(crate) const NAS_HOST_KEY: &str = "NAS_HOST";
+
+/// The export on that server the retired NAS overlay mounted.
+pub(crate) const NAS_EXPORT_KEY: &str = "NAS_EXPORT";
 
 /// The user id the service containers run as.
 pub(crate) const PUID_KEY: &str = "PUID";
@@ -400,7 +412,7 @@ pub const SETTINGS: &[&str] = &[
     IDEMPOTENCY_MINUTES_KEY,
     IDEMPOTENCY_KEYS_KEY,
     PROJECT_KEY,
-    OVERLAY_KEY,
+    BESIDE_KEY,
     QUIET_HOURS_KEY,
     EXPOSED_KEY,
     UNMANAGED_KEY,

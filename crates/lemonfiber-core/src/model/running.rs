@@ -76,6 +76,31 @@ pub struct LifecycleReport {
     /// Absent for every other action.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub offer: Option<String>,
+    /// The operator's overlay and every service it changes, where there is one: merged
+    /// over the project this run starts, and held to nothing lemonfiber vets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unvetted: Option<Unvetted>,
+}
+
+/// The operator's own overlay, named because nothing in it was held to the model.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct Unvetted {
+    /// Where the overlay is.
+    pub overlay: String,
+    /// Every service it changes, by the names it gives them.
+    pub services: Vec<String>,
+}
+
+impl Unvetted {
+    /// What the overlay changes, said in words: each service by name, or none by name.
+    #[must_use]
+    pub fn changes(&self) -> String {
+        if self.services.is_empty() {
+            "changes no service by name".to_owned()
+        } else {
+            format!("changes {}", self.services.join(", "))
+        }
+    }
 }
 
 /// What narrowing the active set moved.

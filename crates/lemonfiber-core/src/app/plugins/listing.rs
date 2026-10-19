@@ -36,6 +36,7 @@ pub fn recorded(ctx: &Ctx) -> Result<Installs, Box<Problem>> {
         removal: None,
         update: None,
         agreement: None,
+        unvetted: None,
     })
 }
 

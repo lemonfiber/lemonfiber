@@ -115,20 +115,6 @@ pub fn quiet_from_env(file: &env::EnvFile) -> Option<crate::alert::Quiet> {
     crate::alert::Quiet::parse(said, zone)
 }
 
-/// The Compose file layered over the stack's own, where one has been written.
-///
-/// One at most. Layering two would be two answers to where a service listens, and the
-/// last file Compose reads would quietly win.
-#[must_use]
-pub fn overlay_from_env(file: &env::EnvFile) -> Vec<PathBuf> {
-    file.get(super::OVERLAY_KEY)
-        .map(str::trim)
-        .filter(|named| !named.is_empty())
-        .map(PathBuf::from)
-        .into_iter()
-        .collect()
-}
-
 /// The Compose project lemonfiber manages.
 ///
 /// Its own unless a setup already on the machine was adopted, which is what makes
@@ -147,13 +133,24 @@ pub fn project_from_env(file: &env::EnvFile) -> String {
 /// Absent until setup writes it, and an empty value is read as absent rather
 /// than as the current directory — a data root of nothing is a mistake, never an
 /// intent, and probing the working directory in its place would test the wrong
-/// filesystem.
+/// filesystem. Absent too where it names an NFS export, which is no path on this machine.
 #[must_use]
 pub fn data_root_from_env(file: &env::EnvFile) -> Option<PathBuf> {
-    file.get(DATA_ROOT_KEY)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(PathBuf::from)
+    stored(file).and_then(|storage| storage.on_this_machine().cloned())
+}
+
+/// The NFS export the operator keeps the data on, where `DATA_ROOT` names one that will
+/// do.
+#[must_use]
+pub fn nfs_from_env(file: &env::EnvFile) -> Option<super::storage::Export> {
+    stored(file).and_then(|storage| storage.export().cloned())
+}
+
+/// Where `DATA_ROOT` keeps the data, where it names somewhere that will do.
+fn stored(file: &env::EnvFile) -> Option<super::storage::Storage> {
+    super::storage::Storage::read(file.get(DATA_ROOT_KEY)?)
+        .ok()
+        .flatten()
 }
 
 /// The address the operator recorded for the household's links, if they have.

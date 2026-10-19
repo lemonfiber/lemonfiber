@@ -489,6 +489,19 @@ fn a_mint_goes_back_and_a_revoke_does_not() {
     assert!(device_revoked.refusal.is_some_and(|refusal| refusal
         .because
         .contains("a revoked device key is never made good again")));
+    let overlaid = standing(
+        &key(Kind::Overlaid {
+            path: "/cfg/overlay.yml".to_owned(),
+            previous: None,
+            current: Some("a".to_owned()),
+        }),
+        &[],
+        &holding(&[]),
+        &unread,
+    );
+    assert!(overlaid.refusal.is_some_and(|refusal| refusal
+        .because
+        .contains("the overlay /cfg/overlay.yml is the operator's own file")));
 }
 
 /// A plugin's document a choice of filler wrote over, holding `written` in its place.

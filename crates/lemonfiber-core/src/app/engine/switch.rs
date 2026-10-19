@@ -132,6 +132,7 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Prob
         switched: Some(switched),
         held: None,
         offer: None,
+        unvetted: crate::overlay::unvetted(ctx),
     };
 
     if ctx.dry_run {

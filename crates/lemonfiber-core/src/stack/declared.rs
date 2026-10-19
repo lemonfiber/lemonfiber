@@ -64,6 +64,16 @@ pub fn read(
     (services, ports)
 }
 
+/// The name of every service one Compose file declares, in the order it declares them,
+/// or none where it is not a Compose file this can read.
+#[must_use]
+pub fn named(text: &str) -> Vec<String> {
+    in_file(text)
+        .into_iter()
+        .map(|(service, _)| service)
+        .collect()
+}
+
 /// The services one file declares, each with its body, or none where it is not a
 /// Compose file this can read.
 fn in_file(text: &str) -> Vec<(String, Value)> {

@@ -164,11 +164,12 @@ pub(crate) fn read_settings() -> Settings {
     Settings {
         project: lemonfiber_core::config::project_from_env(&recorded),
         quiet: lemonfiber_core::config::quiet_from_env(&recorded),
-        overlays: lemonfiber_core::config::overlay_from_env(&recorded),
+        overlays: lemonfiber_core::overlay::layered(env_file.as_deref(), &recorded),
         plugins: installed(),
         protocols: Protocols::from_env(&recorded),
         ip_echo: ip_echo_from_env(&recorded),
         data_root: data_root_from_env(&recorded),
+        nfs: lemonfiber_core::config::nfs_from_env(&recorded),
         storage_state: here().map(|paths| paths.storage_state()),
         service_user: service_user_from_env(&recorded),
         port_forward: port_forward_from_env(&recorded),
