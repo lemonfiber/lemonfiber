@@ -51,12 +51,13 @@ pub async fn stand(
         });
     }
 
-    let Some(recorded) = ctx.settings.env_file.clone() else {
+    let (Some(recorded), Some(paths)) = (
+        ctx.settings.env_file.clone(),
+        crate::app::targets::layout(ctx),
+    ) else {
         return Err(Box::new(store::Failure::Nowhere.problem()));
     };
     let path = recorded.with_file_name(FILE);
-    let paths = crate::app::targets::layout(ctx)
-        .ok_or_else(|| Box::new(store::Failure::Nowhere.problem()))?;
     let held = store::read(&recorded).map_err(|failure| Box::new(failure.problem()))?;
     let moves = written(&survey.beside);
     let change = Change {
