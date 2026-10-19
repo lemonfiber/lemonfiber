@@ -14,6 +14,23 @@ request = { method = "GET", path = "/api/v3/system/status", accept = "applicatio
 expect  = { status = 401, json_is_absent = true }
 fixture = "recordings/sonarr/status.json"
 why     = "It is there."
+
+[[contribution]]
+at       = "doctor.check"
+id       = "sonarr:answers"
+title    = "Sonarr answers"
+category = "connectivity"
+request  = { method = "GET", path = "/ping" }
+expect   = { status = 200 }
+fixture  = "recordings/sonarr/ping.json"
+why      = "It is there."
+
+[[contribution]]
+at     = "doctor.remedy"
+id     = "sonarr:restart"
+for    = "sonarr:answers"
+action = "Restart Sonarr"
+why    = "It stopped."
 "#;
 
 #[test]
@@ -44,9 +61,15 @@ fn every_request_recording_is_named_in_order_and_only_an_operators_probe_is_keye
             ),
             (
                 "claim library.curate probe wanted".to_owned(),
-                sonarr,
+                sonarr.clone(),
                 Some("recordings/sonarr/library-curate-wanted.json"),
                 true
+            ),
+            (
+                "check sonarr:answers".to_owned(),
+                sonarr,
+                Some("recordings/sonarr/ping.json"),
+                false
             ),
         ]
     );

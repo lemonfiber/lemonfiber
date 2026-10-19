@@ -448,20 +448,22 @@ async fn an_aggregator_that_will_not_take_its_authentication_fails_the_first_run
     let Some((_source, copy, placed)) = aggregating("first-unguarded") else {
         return;
     };
-    let http = Fake::by_route(vec![
-        (
-            Method::Get,
-            "/internalapi/config",
-            Answer::reply(200, "{\"auth\": {}, \"main\": {}, \"indexers\": []}"),
-        ),
-        (
-            Method::Put,
-            "/internalapi/config",
-            Answer::reply(500, "{\"message\": \"no\"}"),
-        ),
-    ]);
-    let said = first_run(&placed, &copy, &Serves::on(1), http).await;
-    assert!(said.is_err(), "{said:?}");
+    for status in [500, 400] {
+        let http = Fake::by_route(vec![
+            (
+                Method::Get,
+                "/internalapi/config",
+                Answer::reply(200, "{\"auth\": {}, \"main\": {}, \"indexers\": []}"),
+            ),
+            (
+                Method::Put,
+                "/internalapi/config",
+                Answer::reply(status, "{\"message\": \"no\"}"),
+            ),
+        ]);
+        let said = first_run(&placed, &copy, &Serves::on(1), http).await;
+        assert!(said.is_err(), "{status}: {said:?}");
+    }
 }
 
 #[tokio::test(start_paused = true)]

@@ -109,23 +109,20 @@ fn a_service_that_failed_is_said_with_its_step_why_and_the_last_lines_it_wrote()
 }
 
 #[test]
-fn a_service_that_failed_is_said_with_the_last_lines_its_container_wrote() {
+fn a_service_that_failed_before_it_wrote_anything_is_said_without_lines() {
     let failed = Recorded {
-        failed: vec![lemonfiber_core::plugin::Failed {
+        failed: vec![Failed {
             service: "sonarr".to_owned(),
-            step: "health".to_owned(),
-            why: "its health did not pass within 2 seconds".to_owned(),
-            log: vec!["starting".to_owned(), "listening".to_owned()],
+            step: "container".to_owned(),
+            why: "no engine".to_owned(),
+            log: Vec::new(),
         }],
         ..read(Vec::new(), false)
     };
     let said = shown(&failed);
-    for words in [
-        "sonarr failed at health: its health did not pass within 2 seconds. None of its recordings was written.",
-        "The last 2 lines it wrote:",
-        "    starting",
-        "    listening",
-    ] {
-        assert!(said.contains(words), "{words}: {said}");
-    }
+    assert!(
+        said.contains("sonarr failed at container: no engine. None of its recordings was written."),
+        "{said}"
+    );
+    assert!(!said.contains("lines it wrote"), "{said}");
 }

@@ -171,15 +171,13 @@ async fn recorded(
     health: Option<&lemonfiber_plugin::Health>,
     mine: &[&Item<'_>],
 ) -> Result<Vec<Took>, Failed> {
-    for item in mine {
-        if let Some(fixture) = item.fixture {
-            landing(root, fixture).map_err(|why| Failed {
-                service: placed.service.clone(),
-                step: format!("writing {fixture}"),
-                why,
-                log: Vec::new(),
-            })?;
-        }
+    for fixture in mine.iter().filter_map(|item| item.fixture) {
+        landing(root, fixture).map_err(|why| Failed {
+            service: placed.service.clone(),
+            step: format!("writing {fixture}"),
+            why,
+            log: Vec::new(),
+        })?;
     }
     let answered = answers(recorder, root, placed, health, mine).await?;
     let pinned = format!("{}@{}", placed.image, placed.digest);

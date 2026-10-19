@@ -214,6 +214,31 @@ async fn every_request_is_asked_of_one_fresh_container_after_its_first_run_and_w
 }
 
 #[tokio::test]
+async fn a_request_naming_no_fixture_is_not_asked_and_the_rest_are_taken() {
+    let at = source(
+        "asking-unfixtured",
+        &format!(
+            "{SERVED}
+[[proof]]
+id      = \"sonarr.pings\"
+title   = \"It answers\"
+request = {{ method = \"GET\", path = \"/ping\" }}
+expect  = {{ status = 200, json_is_absent = true }}
+why     = \"It is there.\"
+"
+        ),
+    );
+    let http = answering("{\"records\": [], \"totalRecords\": 0}");
+    let read = recorded(&at, &sonarr(), &http).await;
+    let took = took(read.as_ref());
+    assert!(
+        matches!(took.first(), Some(Took::Unrecorded { why }) if why.contains("names no fixture")),
+        "{took:?}"
+    );
+    assert_eq!(took.get(1..), Some(&[Took::Unnoted, Took::Unnoted][..]));
+}
+
+#[tokio::test]
 async fn recording_again_what_a_fresh_container_answers_the_same_leaves_each_as_it_was() {
     let at = source("asking-again", SERVED);
     noted(&at, GUARDED, "Refused without the key.");
