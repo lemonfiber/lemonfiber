@@ -1,26 +1,196 @@
 services:
-  prowlarr:
-    image: lscr.io/linuxserver/prowlarr:2.6.5.5623-ls163@sha256:f9151e5bc1025c6d0a630d503210cdcb6bb55a7cc098562609d96a408d838902
+  audiobookshelf:
+    image: ghcr.io/advplyr/audiobookshelf:2.37.1@sha256:581d68b2a6fc7ebf58d81c878a9f387cbbc0d88ac9d37b298b9cee10168af85b
     profiles:
-    - search
+    - media
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Europe/Amsterdam}
+    ports:
+    - ${LAN_BIND:-0.0.0.0}:13378:80
+    volumes:
+    - ${DATA_ROOT:-./data}:/data
+    - ./config/audiobookshelf:/config
+    - ./mounts/audiobookshelf/metadata:/metadata
+    networks:
+    - own__audiobookshelf
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add:
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
+    - KILL
+    pids_limit: 1024
+  bazarr:
+    image: lscr.io/linuxserver/bazarr:v1.6.2-ls367@sha256:c1673816321156b904af9b7e6415ea547ae9622e4acc375358f1e1eb9ed1e904
+    profiles:
+    - subs
     restart: unless-stopped
     environment:
       PGID: ${PGID:-1000}
       PUID: ${PUID:-1000}
       TZ: ${TZ:-Europe/Amsterdam}
     ports:
-    - 127.0.0.1:9696:9696
+    - 127.0.0.1:6767:6767
     volumes:
     - ${DATA_ROOT:-./data}:/data
-    - ./config/prowlarr:/config
+    - ./config/bazarr:/config
     networks:
+    - ask__bazarr__library.curate__bindery
+    - ask__bazarr__library.curate__lidarr
+    - ask__bazarr__library.curate__radarr
+    - ask__bazarr__library.curate__sonarr
+    - own__bazarr
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add:
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
+    - KILL
+    pids_limit: 1024
+  bindery:
+    image: ghcr.io/vavallee/bindery:v1.41.0@sha256:28871d79c624f92acae9dac91b1a20da2d9031cf7faa1967d88cee378f360c08
+    profiles:
+    - books
+    restart: unless-stopped
+    user: ${PUID:-1000}:${PGID:-1000}
+    environment:
+      BINDERY_AUDIOBOOK_DIR: /data/media/audiobooks
+      BINDERY_DOWNLOAD_DIR: /data/downloads
+      BINDERY_LIBRARY_DIR: /data/media/books
+      TZ: ${TZ:-Europe/Amsterdam}
+    ports:
+    - 127.0.0.1:8787:8787
+    volumes:
+    - ${DATA_ROOT:-./data}:/data
+    - ./config/bindery:/config
+    networks:
+    - ask__bazarr__library.curate__bindery
+    - ask__bindery__download.torrent__gluetun
+    - ask__bindery__download.usenet__sabnzbd
     - ask__bindery__indexer.search__prowlarr
-    - ask__prowlarr__indexer.proxy__flaresolverr
     - ask__prowlarr__library.curate__bindery
-    - ask__prowlarr__library.curate__lidarr
-    - ask__prowlarr__library.curate__radarr
-    - ask__prowlarr__library.curate__sonarr
-    - own__prowlarr
+    - ask__seerr__library.curate__bindery
+    - own__bindery
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add:
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
+    - KILL
+    pids_limit: 1024
+  caddy:
+    image: ghcr.io/lemonfiber/caddy:main-f90430f39aab@sha256:abf300a5a2ac443be47df8b8b1369dbfed94ffede32d97196ed8baea3503ba2d
+    profiles:
+    - proxy
+    restart: unless-stopped
+    environment:
+      DOMAIN: home.local
+      TZ: ${TZ:-Europe/Amsterdam}
+    ports:
+    - ${LAN_BIND:-0.0.0.0}:80:8080
+    - ${LAN_BIND:-0.0.0.0}:443:8443
+    volumes:
+    - ./config/caddy:/config
+    - ./mounts/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+    networks:
+    - own__caddy
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add:
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
+    - KILL
+    pids_limit: 1024
+  calibre-web-automated:
+    image: crocodilestick/calibre-web-automated:V3.1.4@sha256:577e846f104fd21453ef306eefb4a95dd95b3b9ddd2463a150944494284da0fd
+    profiles:
+    - media
+    restart: unless-stopped
+    environment:
+      PGID: ${PGID:-1000}
+      PUID: ${PUID:-1000}
+      TZ: ${TZ:-Europe/Amsterdam}
+    ports:
+    - ${LAN_BIND:-0.0.0.0}:8083:8083
+    volumes:
+    - ${DATA_ROOT:-./data}:/data
+    - ./config/calibre-web-automated:/config
+    networks:
+    - own__calibre-web-automated
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add:
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
+    - KILL
+    pids_limit: 1024
+  decline:
+    image: ghcr.io/lemonfiber/decline:0.17.0@sha256:814d551113e93135259ac8e92586938bf88c3bb03bc8ce75b8e0d7e4d14a8147
+    profiles:
+    - media
+    restart: unless-stopped
+    user: ${PUID:-1000}:${PGID:-1000}
+    environment:
+      TZ: ${TZ:-Europe/Amsterdam}
+    ports:
+    - ${LAN_BIND:-0.0.0.0}:5056:8080
+    volumes:
+    - ./config/decline:/config
+    networks:
+    - link__decline__jellyfin
+    - own__decline
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    pids_limit: 1024
+    read_only: true
+    mem_limit: 64m
+  door:
+    image: ghcr.io/lemonfiber/door:main-0c3ae0d8a425@sha256:bb78c5b83612d5ad038be38da1ceb05c541c2502cdd95720ebbb1db3e1be0a55
+    profiles:
+    - media
+    restart: unless-stopped
+    user: ${PUID:-1000}:${PGID:-1000}
+    environment:
+      TZ: ${TZ:-Europe/Amsterdam}
+    ports:
+    - ${LAN_BIND:-0.0.0.0}:8096:8096
+    - ${LAN_BIND:-0.0.0.0}:8920:8920
+    volumes:
+    - ./config/door:/etc/caddy:ro
+    tmpfs:
+    - /data
+    - /config
+    networks:
+    - link__door__jellyfin
+    - own__door
     security_opt:
     - no-new-privileges:true
     cap_drop:
@@ -48,66 +218,6 @@ services:
     networks:
     - ask__prowlarr__indexer.proxy__flaresolverr
     - own__flaresolverr
-    security_opt:
-    - no-new-privileges:true
-    cap_drop:
-    - ALL
-    cap_add:
-    - CHOWN
-    - DAC_OVERRIDE
-    - FOWNER
-    - SETGID
-    - SETUID
-    - KILL
-    pids_limit: 1024
-  nzbhydra2:
-    image: lscr.io/linuxserver/nzbhydra2:v8.9.0-ls104@sha256:3cdcea6fc97861bb30ef2551884f1c371e08a884c2f75230c7a3a2e14c5f0516
-    profiles:
-    - search
-    restart: unless-stopped
-    environment:
-      PGID: ${PGID:-1000}
-      PUID: ${PUID:-1000}
-      TZ: ${TZ:-Europe/Amsterdam}
-    ports:
-    - 127.0.0.1:5076:5076
-    volumes:
-    - ${DATA_ROOT:-./data}:/data
-    - ./config/nzbhydra2:/config
-    networks:
-    - own__nzbhydra2
-    security_opt:
-    - no-new-privileges:true
-    cap_drop:
-    - ALL
-    cap_add:
-    - CHOWN
-    - DAC_OVERRIDE
-    - FOWNER
-    - SETGID
-    - SETUID
-    - KILL
-    pids_limit: 1024
-  sabnzbd:
-    image: lscr.io/linuxserver/sabnzbd:4.5.5-ls250@sha256:374051b90f64d107f8658dcd9b9065c28826afe14562647214f45057e119fc04
-    profiles:
-    - usenet
-    restart: unless-stopped
-    environment:
-      PGID: ${PGID:-1000}
-      PUID: ${PUID:-1000}
-      TZ: ${TZ:-Europe/Amsterdam}
-    ports:
-    - 127.0.0.1:8085:8080
-    volumes:
-    - ${DATA_ROOT:-./data}:/data
-    - ./config/sabnzbd:/config
-    networks:
-    - ask__bindery__download.usenet__sabnzbd
-    - ask__lidarr__download.usenet__sabnzbd
-    - ask__radarr__download.usenet__sabnzbd
-    - ask__sonarr__download.usenet__sabnzbd
-    - own__sabnzbd
     security_opt:
     - no-new-privileges:true
     cap_drop:
@@ -158,6 +268,162 @@ services:
     devices:
     - /dev/net/tun:/dev/net/tun
     pids_limit: 1024
+  homepage:
+    image: ghcr.io/gethomepage/homepage:v1.13.2@sha256:a0b71c8e757298d02560186bab9fbe3fc2d375c523a62cc1019177b37e48aa28
+    profiles:
+    - dash
+    restart: unless-stopped
+    environment:
+      HOMEPAGE_ALLOWED_HOSTS: localhost:3000
+      HOMEPAGE_VAR_LAN_HOST: localhost
+      PGID: ${PGID:-1000}
+      PUID: ${PUID:-1000}
+      TZ: ${TZ:-Europe/Amsterdam}
+    ports:
+    - ${LAN_BIND:-0.0.0.0}:3000:3000
+    volumes:
+    - ./config/homepage:/app/config
+    networks:
+    - own__homepage
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add:
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
+    - KILL
+    pids_limit: 1024
+  lidarr:
+    image: lscr.io/linuxserver/lidarr:2.14.5.4836-ls9@sha256:5e1235d00b5d1c1f60ca0d472e554a6611aef41aa7b5b6d88260214bf4809af0
+    profiles:
+    - music
+    restart: unless-stopped
+    environment:
+      PGID: ${PGID:-1000}
+      PUID: ${PUID:-1000}
+      TZ: ${TZ:-Europe/Amsterdam}
+    ports:
+    - 127.0.0.1:8686:8686
+    volumes:
+    - ${DATA_ROOT:-./data}:/data
+    - ./config/lidarr:/config
+    networks:
+    - ask__bazarr__library.curate__lidarr
+    - ask__lidarr__download.torrent__gluetun
+    - ask__lidarr__download.usenet__sabnzbd
+    - ask__prowlarr__library.curate__lidarr
+    - ask__seerr__library.curate__lidarr
+    - ask__unpackerr__library.curate__lidarr
+    - link__unpackerr__lidarr
+    - own__lidarr
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add:
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
+    - KILL
+    pids_limit: 1024
+  navidrome:
+    image: ghcr.io/navidrome/navidrome:0.64.2@sha256:38dc2727bfcfd5ede290f8ada114fc90368146f265ae4701ddddbcbe2a44ee52
+    profiles:
+    - media
+    restart: unless-stopped
+    user: ${PUID:-1000}:${PGID:-1000}
+    environment:
+      ND_DATAFOLDER: /config
+      ND_ENABLEINSIGHTSCOLLECTOR: 'false'
+      ND_MUSICFOLDER: /data/media/music
+      TZ: ${TZ:-Europe/Amsterdam}
+    ports:
+    - ${LAN_BIND:-0.0.0.0}:4533:4533
+    volumes:
+    - ${DATA_ROOT:-./data}:/data
+    - ./config/navidrome:/config
+    networks:
+    - own__navidrome
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add:
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
+    - KILL
+    pids_limit: 1024
+  nzbhydra2:
+    image: lscr.io/linuxserver/nzbhydra2:v8.9.0-ls104@sha256:3cdcea6fc97861bb30ef2551884f1c371e08a884c2f75230c7a3a2e14c5f0516
+    profiles:
+    - search
+    restart: unless-stopped
+    environment:
+      PGID: ${PGID:-1000}
+      PUID: ${PUID:-1000}
+      TZ: ${TZ:-Europe/Amsterdam}
+    ports:
+    - 127.0.0.1:5076:5076
+    volumes:
+    - ${DATA_ROOT:-./data}:/data
+    - ./config/nzbhydra2:/config
+    networks:
+    - own__nzbhydra2
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add:
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
+    - KILL
+    pids_limit: 1024
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:2.6.5.5623-ls163@sha256:f9151e5bc1025c6d0a630d503210cdcb6bb55a7cc098562609d96a408d838902
+    profiles:
+    - search
+    restart: unless-stopped
+    environment:
+      PGID: ${PGID:-1000}
+      PUID: ${PUID:-1000}
+      TZ: ${TZ:-Europe/Amsterdam}
+    ports:
+    - 127.0.0.1:9696:9696
+    volumes:
+    - ${DATA_ROOT:-./data}:/data
+    - ./config/prowlarr:/config
+    networks:
+    - ask__bindery__indexer.search__prowlarr
+    - ask__prowlarr__indexer.proxy__flaresolverr
+    - ask__prowlarr__library.curate__bindery
+    - ask__prowlarr__library.curate__lidarr
+    - ask__prowlarr__library.curate__radarr
+    - ask__prowlarr__library.curate__sonarr
+    - own__prowlarr
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add:
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
+    - KILL
+    pids_limit: 1024
   qbittorrent:
     image: lscr.io/linuxserver/qbittorrent:5.2.4_v2.0.15-ls480@sha256:97333cc1ccf903e0bbcd8eb67e3332e4970e9c1ecabe145e499e9c0847ebcaed
     profiles:
@@ -175,42 +441,6 @@ services:
     depends_on:
       gluetun:
         condition: service_healthy
-    security_opt:
-    - no-new-privileges:true
-    cap_drop:
-    - ALL
-    cap_add:
-    - CHOWN
-    - DAC_OVERRIDE
-    - FOWNER
-    - SETGID
-    - SETUID
-    - KILL
-    pids_limit: 1024
-  sonarr:
-    image: lscr.io/linuxserver/sonarr:4.0.20.3014-ls327@sha256:dffc730adcb8b4f4342792fbb27fcad9c62fb8660523f2aeb082416980d7fe0c
-    profiles:
-    - tv
-    restart: unless-stopped
-    environment:
-      PGID: ${PGID:-1000}
-      PUID: ${PUID:-1000}
-      TZ: ${TZ:-Europe/Amsterdam}
-    ports:
-    - 127.0.0.1:8989:8989
-    volumes:
-    - ${DATA_ROOT:-./data}:/data
-    - ./config/sonarr:/config
-    networks:
-    - ask__bazarr__library.curate__sonarr
-    - ask__prowlarr__library.curate__sonarr
-    - ask__seerr__library.curate__sonarr
-    - ask__sonarr__download.torrent__gluetun
-    - ask__sonarr__download.usenet__sabnzbd
-    - ask__unpackerr__library.curate__sonarr
-    - link__recyclarr__sonarr
-    - link__unpackerr__sonarr
-    - own__sonarr
     security_opt:
     - no-new-privileges:true
     cap_drop:
@@ -259,29 +489,21 @@ services:
     - SETUID
     - KILL
     pids_limit: 1024
-  lidarr:
-    image: lscr.io/linuxserver/lidarr:2.14.5.4836-ls9@sha256:5e1235d00b5d1c1f60ca0d472e554a6611aef41aa7b5b6d88260214bf4809af0
+  recyclarr:
+    image: ghcr.io/recyclarr/recyclarr:8.7.3@sha256:9c6c74d52cfc6f740a5a3624aa83867e171bb70b90453ddb7a4048b8c80445f9
     profiles:
-    - music
+    - tuning
     restart: unless-stopped
+    user: ${PUID:-1000}:${PGID:-1000}
     environment:
-      PGID: ${PGID:-1000}
-      PUID: ${PUID:-1000}
+      CRON_SCHEDULE: '@daily'
       TZ: ${TZ:-Europe/Amsterdam}
-    ports:
-    - 127.0.0.1:8686:8686
     volumes:
-    - ${DATA_ROOT:-./data}:/data
-    - ./config/lidarr:/config
+    - ./config/recyclarr:/config
     networks:
-    - ask__bazarr__library.curate__lidarr
-    - ask__lidarr__download.torrent__gluetun
-    - ask__lidarr__download.usenet__sabnzbd
-    - ask__prowlarr__library.curate__lidarr
-    - ask__seerr__library.curate__lidarr
-    - ask__unpackerr__library.curate__lidarr
-    - link__unpackerr__lidarr
-    - own__lidarr
+    - link__recyclarr__radarr
+    - link__recyclarr__sonarr
+    - own__recyclarr
     security_opt:
     - no-new-privileges:true
     cap_drop:
@@ -294,124 +516,44 @@ services:
     - SETUID
     - KILL
     pids_limit: 1024
-  bindery:
-    image: ghcr.io/vavallee/bindery:v1.41.0@sha256:28871d79c624f92acae9dac91b1a20da2d9031cf7faa1967d88cee378f360c08
+  request-gate:
+    image: ghcr.io/lemonfiber/request-gate:main-ecbfb31fa0ff@sha256:26f6eed2aded7ca8174879ef6826893abc38076e6aa50fe6f29f50246929c845
     profiles:
-    - books
+    - media
     restart: unless-stopped
     user: ${PUID:-1000}:${PGID:-1000}
     environment:
-      BINDERY_AUDIOBOOK_DIR: /data/media/audiobooks
-      BINDERY_DOWNLOAD_DIR: /data/downloads
-      BINDERY_LIBRARY_DIR: /data/media/books
+      TZ: ${TZ:-Europe/Amsterdam}
+    volumes:
+    - ./config/request-gate:/config
+    network_mode: none
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    pids_limit: 1024
+    read_only: true
+    mem_limit: 64m
+  sabnzbd:
+    image: lscr.io/linuxserver/sabnzbd:4.5.5-ls250@sha256:374051b90f64d107f8658dcd9b9065c28826afe14562647214f45057e119fc04
+    profiles:
+    - usenet
+    restart: unless-stopped
+    environment:
+      PGID: ${PGID:-1000}
+      PUID: ${PUID:-1000}
       TZ: ${TZ:-Europe/Amsterdam}
     ports:
-    - 127.0.0.1:8787:8787
+    - 127.0.0.1:8085:8080
     volumes:
     - ${DATA_ROOT:-./data}:/data
-    - ./config/bindery:/config
+    - ./config/sabnzbd:/config
     networks:
-    - ask__bazarr__library.curate__bindery
-    - ask__bindery__download.torrent__gluetun
     - ask__bindery__download.usenet__sabnzbd
-    - ask__bindery__indexer.search__prowlarr
-    - ask__prowlarr__library.curate__bindery
-    - ask__seerr__library.curate__bindery
-    - own__bindery
-    security_opt:
-    - no-new-privileges:true
-    cap_drop:
-    - ALL
-    cap_add:
-    - CHOWN
-    - DAC_OVERRIDE
-    - FOWNER
-    - SETGID
-    - SETUID
-    - KILL
-    pids_limit: 1024
-  bazarr:
-    image: lscr.io/linuxserver/bazarr:v1.6.2-ls367@sha256:c1673816321156b904af9b7e6415ea547ae9622e4acc375358f1e1eb9ed1e904
-    profiles:
-    - subs
-    restart: unless-stopped
-    environment:
-      PGID: ${PGID:-1000}
-      PUID: ${PUID:-1000}
-      TZ: ${TZ:-Europe/Amsterdam}
-    ports:
-    - 127.0.0.1:6767:6767
-    volumes:
-    - ${DATA_ROOT:-./data}:/data
-    - ./config/bazarr:/config
-    networks:
-    - ask__bazarr__library.curate__bindery
-    - ask__bazarr__library.curate__lidarr
-    - ask__bazarr__library.curate__radarr
-    - ask__bazarr__library.curate__sonarr
-    - own__bazarr
-    security_opt:
-    - no-new-privileges:true
-    cap_drop:
-    - ALL
-    cap_add:
-    - CHOWN
-    - DAC_OVERRIDE
-    - FOWNER
-    - SETGID
-    - SETUID
-    - KILL
-    pids_limit: 1024
-  jellyfin:
-    image: jellyfin/jellyfin:10.11.11@sha256:aefb67e6a7ff1debdd154a78a7bbb780fd0c873d8639210a7f6a2016ad2b35db
-    profiles:
-    - media
-    restart: unless-stopped
-    user: ${PUID:-1000}:${PGID:-1000}
-    environment:
-      TZ: ${TZ:-Europe/Amsterdam}
-    ports:
-    - 127.0.0.1:8095:8096
-    volumes:
-    - ${DATA_ROOT:-./data}:/data
-    - ./config/jellyfin:/config
-    - ./mounts/jellyfin/cache:/cache
-    networks:
-    - ask__seerr__identity.source__jellyfin
-    - link__decline__jellyfin
-    - link__door__jellyfin
-    - own__jellyfin
-    security_opt:
-    - no-new-privileges:true
-    cap_drop:
-    - ALL
-    cap_add:
-    - CHOWN
-    - DAC_OVERRIDE
-    - FOWNER
-    - SETGID
-    - SETUID
-    - KILL
-    pids_limit: 1024
-  door:
-    image: caddy:2.11.6@sha256:3422ce6de165df66534f9b9ba50efaf457114ec961763cc52f5dbdaac2972d73
-    profiles:
-    - media
-    restart: unless-stopped
-    user: ${PUID:-1000}:${PGID:-1000}
-    environment:
-      TZ: ${TZ:-Europe/Amsterdam}
-    ports:
-    - ${LAN_BIND:-0.0.0.0}:8096:8096
-    - ${LAN_BIND:-0.0.0.0}:8920:8920
-    volumes:
-    - ./config/door:/etc/caddy:ro
-    tmpfs:
-    - /data
-    - /config
-    networks:
-    - link__door__jellyfin
-    - own__door
+    - ask__lidarr__download.usenet__sabnzbd
+    - ask__radarr__download.usenet__sabnzbd
+    - ask__sonarr__download.usenet__sabnzbd
+    - own__sabnzbd
     security_opt:
     - no-new-privileges:true
     cap_drop:
@@ -456,146 +598,30 @@ services:
     - SETUID
     - KILL
     pids_limit: 1024
-  request-gate:
-    image: ghcr.io/lemonfiber/request-gate:v0.17.0@sha256:ff9fd54257cc815be3a438900902aacf8a2c3018ef0e52693d47bb579014876d
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:4.0.20.3014-ls327@sha256:dffc730adcb8b4f4342792fbb27fcad9c62fb8660523f2aeb082416980d7fe0c
     profiles:
-    - media
-    restart: unless-stopped
-    user: ${PUID:-1000}:${PGID:-1000}
-    environment:
-      TZ: ${TZ:-Europe/Amsterdam}
-    volumes:
-    - ./config/request-gate:/config
-    network_mode: none
-    security_opt:
-    - no-new-privileges:true
-    cap_drop:
-    - ALL
-    pids_limit: 1024
-    read_only: true
-    mem_limit: 64m
-  decline:
-    image: ghcr.io/lemonfiber/decline:v0.17.0@sha256:814d551113e93135259ac8e92586938bf88c3bb03bc8ce75b8e0d7e4d14a8147
-    profiles:
-    - media
-    restart: unless-stopped
-    user: ${PUID:-1000}:${PGID:-1000}
-    environment:
-      TZ: ${TZ:-Europe/Amsterdam}
-    ports:
-    - ${LAN_BIND:-0.0.0.0}:5056:8080
-    volumes:
-    - ./config/decline:/config
-    networks:
-    - link__decline__jellyfin
-    - own__decline
-    security_opt:
-    - no-new-privileges:true
-    cap_drop:
-    - ALL
-    pids_limit: 1024
-    read_only: true
-    mem_limit: 64m
-  calibre-web-automated:
-    image: crocodilestick/calibre-web-automated:V3.1.4@sha256:577e846f104fd21453ef306eefb4a95dd95b3b9ddd2463a150944494284da0fd
-    profiles:
-    - media
+    - tv
     restart: unless-stopped
     environment:
       PGID: ${PGID:-1000}
       PUID: ${PUID:-1000}
       TZ: ${TZ:-Europe/Amsterdam}
     ports:
-    - ${LAN_BIND:-0.0.0.0}:8083:8083
+    - 127.0.0.1:8989:8989
     volumes:
     - ${DATA_ROOT:-./data}:/data
-    - ./config/calibre-web-automated:/config
+    - ./config/sonarr:/config
     networks:
-    - own__calibre-web-automated
-    security_opt:
-    - no-new-privileges:true
-    cap_drop:
-    - ALL
-    cap_add:
-    - CHOWN
-    - DAC_OVERRIDE
-    - FOWNER
-    - SETGID
-    - SETUID
-    - KILL
-    pids_limit: 1024
-  audiobookshelf:
-    image: ghcr.io/advplyr/audiobookshelf:2.37.1@sha256:581d68b2a6fc7ebf58d81c878a9f387cbbc0d88ac9d37b298b9cee10168af85b
-    profiles:
-    - media
-    restart: unless-stopped
-    environment:
-      TZ: ${TZ:-Europe/Amsterdam}
-    ports:
-    - ${LAN_BIND:-0.0.0.0}:13378:80
-    volumes:
-    - ${DATA_ROOT:-./data}:/data
-    - ./config/audiobookshelf:/config
-    - ./mounts/audiobookshelf/metadata:/metadata
-    networks:
-    - own__audiobookshelf
-    security_opt:
-    - no-new-privileges:true
-    cap_drop:
-    - ALL
-    cap_add:
-    - CHOWN
-    - DAC_OVERRIDE
-    - FOWNER
-    - SETGID
-    - SETUID
-    - KILL
-    pids_limit: 1024
-  navidrome:
-    image: ghcr.io/navidrome/navidrome:0.64.2@sha256:38dc2727bfcfd5ede290f8ada114fc90368146f265ae4701ddddbcbe2a44ee52
-    profiles:
-    - media
-    restart: unless-stopped
-    user: ${PUID:-1000}:${PGID:-1000}
-    environment:
-      ND_DATAFOLDER: /config
-      ND_ENABLEINSIGHTSCOLLECTOR: 'false'
-      ND_MUSICFOLDER: /data/media/music
-      TZ: ${TZ:-Europe/Amsterdam}
-    ports:
-    - ${LAN_BIND:-0.0.0.0}:4533:4533
-    volumes:
-    - ${DATA_ROOT:-./data}:/data
-    - ./config/navidrome:/config
-    networks:
-    - own__navidrome
-    security_opt:
-    - no-new-privileges:true
-    cap_drop:
-    - ALL
-    cap_add:
-    - CHOWN
-    - DAC_OVERRIDE
-    - FOWNER
-    - SETGID
-    - SETUID
-    - KILL
-    pids_limit: 1024
-  recyclarr:
-    image: ghcr.io/recyclarr/recyclarr:8.7.3@sha256:9c6c74d52cfc6f740a5a3624aa83867e171bb70b90453ddb7a4048b8c80445f9
-    profiles:
-    - tuning
-    restart: unless-stopped
-    user: ${PUID:-1000}:${PGID:-1000}
-    environment:
-      CRON_SCHEDULE: '@daily'
-      TZ: ${TZ:-Europe/Amsterdam}
-    volumes:
-    - ./config/recyclarr:/config
-    networks:
-    - link__recyclarr__radarr
+    - ask__bazarr__library.curate__sonarr
+    - ask__prowlarr__library.curate__sonarr
+    - ask__seerr__library.curate__sonarr
+    - ask__sonarr__download.torrent__gluetun
+    - ask__sonarr__download.usenet__sabnzbd
+    - ask__unpackerr__library.curate__sonarr
     - link__recyclarr__sonarr
-    - own__recyclarr
+    - link__unpackerr__sonarr
+    - own__sonarr
     security_opt:
     - no-new-privileges:true
     cap_drop:
@@ -646,51 +672,25 @@ services:
     - SETUID
     - KILL
     pids_limit: 1024
-  homepage:
-    image: ghcr.io/gethomepage/homepage:v1.13.2@sha256:a0b71c8e757298d02560186bab9fbe3fc2d375c523a62cc1019177b37e48aa28
+  jellyfin:
+    image: jellyfin/jellyfin:10.11.11@sha256:aefb67e6a7ff1debdd154a78a7bbb780fd0c873d8639210a7f6a2016ad2b35db
     profiles:
-    - dash
+    - media
     restart: unless-stopped
+    user: ${PUID:-1000}:${PGID:-1000}
     environment:
-      HOMEPAGE_ALLOWED_HOSTS: localhost:3000
-      HOMEPAGE_VAR_LAN_HOST: localhost
-      PGID: ${PGID:-1000}
-      PUID: ${PUID:-1000}
       TZ: ${TZ:-Europe/Amsterdam}
     ports:
-    - ${LAN_BIND:-0.0.0.0}:3000:3000
+    - 127.0.0.1:8095:8096
     volumes:
-    - ./config/homepage:/app/config
+    - ${DATA_ROOT:-./data}:/data
+    - ./config/jellyfin:/config
+    - ./mounts/jellyfin/cache:/cache
     networks:
-    - own__homepage
-    security_opt:
-    - no-new-privileges:true
-    cap_drop:
-    - ALL
-    cap_add:
-    - CHOWN
-    - DAC_OVERRIDE
-    - FOWNER
-    - SETGID
-    - SETUID
-    - KILL
-    pids_limit: 1024
-  caddy:
-    image: caddy:2.11.6@sha256:3422ce6de165df66534f9b9ba50efaf457114ec961763cc52f5dbdaac2972d73
-    profiles:
-    - proxy
-    restart: unless-stopped
-    environment:
-      DOMAIN: home.local
-      TZ: ${TZ:-Europe/Amsterdam}
-    ports:
-    - ${LAN_BIND:-0.0.0.0}:80:8080
-    - ${LAN_BIND:-0.0.0.0}:443:8443
-    volumes:
-    - ./config/caddy:/config
-    - ./mounts/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-    networks:
-    - own__caddy
+    - ask__seerr__identity.source__jellyfin
+    - link__decline__jellyfin
+    - link__door__jellyfin
+    - own__jellyfin
     security_opt:
     - no-new-privileges:true
     cap_drop:
