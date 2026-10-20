@@ -17,18 +17,72 @@ const NOT_ASSEMBLED: [&str; 1] = ["jellyfin"];
 /// Fields of a service that differ between the two, by service and field: the guarded
 /// door and the proxy run the images lemonfiber builds for them, a part released here
 /// is tagged by its release without the `v`, and the gate is pinned at a commit on its
-/// main branch past the release the media stack holds.
-const DIFFERING: [(&str, &str); 9] = [
+/// main branch past the release the media stack holds. Each part filling a capability
+/// the media stack's own service does not declare provides and claims it in its plugin;
+/// the proxy keeps its configuration read-only at `/etc/caddy` and its state beside it,
+/// as its own user; and the gate says the port it listens on.
+const DIFFERING: [(&str, &str); 28] = [
+    ("caddy", "claim"),
+    ("caddy", "config_path"),
+    ("caddy", "config_ro"),
     ("caddy", "digest"),
     ("caddy", "image"),
+    ("caddy", "mount"),
+    ("caddy", "provides"),
     ("caddy", "tag"),
+    ("caddy", "user_mode"),
+    ("decline", "claim"),
+    ("decline", "provides"),
     ("decline", "tag"),
+    ("door", "claim"),
     ("door", "digest"),
     ("door", "image"),
+    ("door", "provides"),
     ("door", "tag"),
+    ("homepage", "claim"),
+    ("homepage", "provides"),
+    ("recyclarr", "claim"),
+    ("recyclarr", "provides"),
+    ("request-gate", "claim"),
     ("request-gate", "digest"),
+    ("request-gate", "listens"),
+    ("request-gate", "provides"),
     ("request-gate", "tag"),
+    ("unpackerr", "claim"),
+    ("unpackerr", "provides"),
 ];
+
+/// The asks the embedded stack makes that the media stack does not, by asker and
+/// capability: each service given a household hostname asks the proxy, each whose
+/// dashboard panel reads it asks the dashboard, the request service asks the gate, and
+/// the gate, quality sync, decline and the guarded door ask what they act on.
+const ASKED_HERE: [(&str, &str); 21] = [
+    ("audiobookshelf", "dashboard.show"),
+    ("audiobookshelf", "proxy.front"),
+    ("bazarr", "dashboard.show"),
+    ("calibre-web-automated", "proxy.front"),
+    ("decline", "identity.source"),
+    ("door", "media.serve"),
+    ("door", "proxy.front"),
+    ("homepage", "proxy.front"),
+    ("lidarr", "dashboard.show"),
+    ("navidrome", "dashboard.show"),
+    ("prowlarr", "dashboard.show"),
+    ("qbittorrent", "dashboard.show"),
+    ("radarr", "dashboard.show"),
+    ("recyclarr", "library.curate"),
+    ("request-gate", "identity.source"),
+    ("request-gate", "library.curate"),
+    ("sabnzbd", "dashboard.show"),
+    ("seerr", "dashboard.show"),
+    ("seerr", "proxy.front"),
+    ("seerr", "request.gate"),
+    ("sonarr", "dashboard.show"),
+];
+
+/// The links by name the media stack makes that the embedded stack does not, by asker
+/// and the service named: the guarded door asks for media instead.
+const NAMED_THERE: [(&str, &str); 1] = [("door", "jellyfin")];
 
 /// Each variable a part takes from a secret it declares, as its service, the variable
 /// and the secret: the media stack's Compose files write these from its `.env` instead.
@@ -244,11 +298,46 @@ fn an_installed_part_is_embedded_as_the_media_stack_declares_it() {
 
 #[test]
 fn the_embedded_stacks_own_tables_are_the_media_stacks() {
-    for name in ["profile", "form", "removed", "wiring"] {
+    for name in ["profile", "form", "removed"] {
         assert_eq!(
             table_rows(lemonfiber_bundled::STACK, name),
             table_rows(&media_stack(), name),
             "{name}"
         );
     }
+}
+
+/// A wiring row as the end it reaches: what it asks for, or the service it names.
+fn ends(text: &str) -> BTreeSet<(String, String)> {
+    let parsed: Table = toml::from_str(text).unwrap_or_default();
+    parsed
+        .get("wiring")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|row| {
+            let by = row.get("by")?.as_str()?;
+            let end = row.get("asks").or_else(|| row.get("to"))?.as_str()?;
+            Some((by.to_owned(), end.to_owned()))
+        })
+        .collect()
+}
+
+#[test]
+fn the_embedded_stacks_wiring_is_the_media_stacks_but_where_named() {
+    let ours = ends(lemonfiber_bundled::STACK);
+    let theirs = ends(&media_stack());
+    let named = |rows: &[(&str, &str)]| -> BTreeSet<(String, String)> {
+        rows.iter()
+            .map(|(by, end)| ((*by).to_owned(), (*end).to_owned()))
+            .collect()
+    };
+    assert_eq!(
+        ours.difference(&theirs).cloned().collect::<BTreeSet<_>>(),
+        named(&ASKED_HERE)
+    );
+    assert_eq!(
+        theirs.difference(&ours).cloned().collect::<BTreeSet<_>>(),
+        named(&NAMED_THERE)
+    );
 }

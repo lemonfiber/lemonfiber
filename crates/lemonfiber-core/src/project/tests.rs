@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use lemonfiber_manifest::container::{Network, Publish, UrlOf, Value};
-use lemonfiber_manifest::{Manifest, Wiring};
+use lemonfiber_manifest::Manifest;
 use serde_norway::Value as Yaml;
 
 use super::{generated, Project, Reading};
@@ -164,23 +164,7 @@ fn a_stack_image_without_a_digest_is_written_by_its_tag() {
 
 #[test]
 fn the_guard_and_the_proxy_hold_their_fixed_addresses_on_fixed_subnets() {
-    let mut manifest = carried();
-    for (id, capability) in [("door", "stream.guard"), ("caddy", "proxy.front")] {
-        if let Some(service) = manifest.services.iter_mut().find(|one| one.id == id) {
-            service.provides.push(capability.into());
-        }
-    }
-    for capability in ["proxy.front", "media.serve"] {
-        manifest.wirings.push(Wiring {
-            by: "door".into(),
-            asks: Some(capability.into()),
-            each: false,
-            filled_by: None,
-            to: None,
-            why: None,
-        });
-    }
-    let project = project(&manifest, &[]);
+    let project = project(&carried(), &[]);
     let document: Yaml = serde_norway::from_str(&project.text).unwrap_or_default();
     let declared = document.get("networks").cloned().unwrap_or_default();
     assert!(project.text.contains(&PROXY_ON_PROXY.to_string()));
@@ -194,6 +178,30 @@ fn the_guard_and_the_proxy_hold_their_fixed_addresses_on_fixed_subnets() {
         .is_some_and(|networks| networks
             .values()
             .any(|one| one.get("ipv4_address").is_some())));
+}
+
+/// Whether any network the project declares holds fixed addresses.
+fn fixes_addresses(project: &Project) -> bool {
+    let document: Yaml = serde_norway::from_str(&project.text).unwrap_or_default();
+    document
+        .get("networks")
+        .and_then(Yaml::as_mapping)
+        .is_some_and(|networks| networks.values().any(|one| one.get("ipam").is_some()))
+}
+
+#[test]
+fn a_stack_no_one_service_guards_fixes_no_address() {
+    let mut nothing = carried();
+    for service in &mut nothing.services {
+        service.provides.retain(|named| named != "stream.guard");
+    }
+    let mut two = carried();
+    if let Some(caddy) = two.services.iter_mut().find(|one| one.id == "caddy") {
+        caddy.provides.push("stream.guard".into());
+    }
+    assert!(fixes_addresses(&project(&carried(), &[])));
+    assert!(!fixes_addresses(&project(&nothing, &[])));
+    assert!(!fixes_addresses(&project(&two, &[])));
 }
 
 fn with_url(manifest: &mut Manifest, service: &str, key: &str, url: UrlOf) {
