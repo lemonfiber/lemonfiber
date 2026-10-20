@@ -128,6 +128,17 @@ impl Serves {
         self.answer.clone()
     }
 
+    /// The answer to a container started beside another, with `serve` kept.
+    fn answered_beside(&self, serve: &Serve) -> Result<Served, Unran> {
+        match &self.beside {
+            Some(answer) => {
+                let _ = self.asked.lock().map(|mut held| held.push(serve.clone()));
+                answer.clone()
+            }
+            None => self.serving(serve),
+        }
+    }
+
     /// `served`, kept among those taken away.
     fn removing(&self, served: &Served) {
         let _ = self
@@ -159,13 +170,7 @@ impl Serving for Serves {
     }
 
     async fn beside(&self, _served: &Served, serve: &Serve) -> Result<Served, Unran> {
-        match &self.beside {
-            Some(answer) => {
-                let _ = self.asked.lock().map(|mut held| held.push(serve.clone()));
-                answer.clone()
-            }
-            None => self.serving(serve),
-        }
+        self.answered_beside(serve)
     }
 
     async fn standing(&self, _served: &Served) -> Result<Standing, Unran> {

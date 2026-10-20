@@ -11,7 +11,7 @@ use std::sync::Arc;
 use lemonfiber_contract::adapter::{
     ready_path, KEY_FILE, UPSTREAM_FILE, UPSTREAM_PASSWORD, UPSTREAM_USERNAME,
 };
-use lemonfiber_contract::conformance::{cases, Placeholder};
+use lemonfiber_contract::conformance::cases;
 use lemonfiber_contract::Contracted;
 use lemonfiber_plugin::{Health, HealthKind};
 use serde_json::Value;
@@ -28,6 +28,9 @@ use crate::plugin::program::{Operator, Starting, Throwaway};
 use crate::plugin::recorded::{Answer, Asked};
 use crate::ports::http::{Http, Method, Request, JSON};
 use crate::ports::serving::{Serve, Served};
+use filling::Filling;
+
+mod filling;
 
 /// The contract whose first run the adapter performs, as the seed performs it.
 fn identity() -> String {
@@ -320,7 +323,7 @@ impl Asking<'_> {
             upstream.push(answer);
         }
         let mut filling = Filling {
-            recorder: self.recorder,
+            random: self.recorder.random,
             held: self.held,
             answers: BTreeMap::new(),
             made,
@@ -496,125 +499,6 @@ fn unfinished(state: crate::seed::State) -> String {
         crate::seed::State::Skipped { reason } => reason,
         crate::seed::State::Failed { detail } => detail,
         other => format!("{other:?}"),
-    }
-}
-
-/// A case's ask with every placeholder in it filled.
-struct Filled {
-    /// What is posted.
-    value: Value,
-    /// Each field of `upstream.json` a credential minted for the case is written to once
-    /// the adapter answers it with a success, and that credential.
-    minted: Vec<(String, String)>,
-}
-
-/// What a placeholder is filled from.
-struct Filling<'a> {
-    recorder: Recorder<'a>,
-    held: &'a Throwaway,
-    answers: BTreeMap<String, Value>,
-    made: Vec<String>,
-}
-
-impl Filling<'_> {
-    /// `asks` with every placeholder in it filled, or why one could not be.
-    fn filled(&mut self, asks: &Value) -> Result<Filled, String> {
-        let mut minted = Vec::new();
-        let value = self.value(asks, &mut minted)?;
-        Ok(Filled { value, minted })
-    }
-
-    fn value(&mut self, asks: &Value, minted: &mut Vec<(String, String)>) -> Result<Value, String> {
-        Ok(match asks {
-            Value::String(text) => match Placeholder::read(text) {
-                Some(placeholder) => Value::String(
-                    self.placeholder(&placeholder, minted)
-                        .map_err(|why| format!("{text} cannot be filled: {why}"))?,
-                ),
-                None => asks.clone(),
-            },
-            Value::Array(items) => Value::Array(
-                items
-                    .iter()
-                    .map(|item| self.value(item, minted))
-                    .collect::<Result<_, _>>()?,
-            ),
-            Value::Object(members) => Value::Object(
-                members
-                    .iter()
-                    .map(|(name, member)| Ok((name.clone(), self.value(member, minted)?)))
-                    .collect::<Result<_, String>>()?,
-            ),
-            other => other.clone(),
-        })
-    }
-
-    /// What `placeholder` is filled with, kept among what the run made where it is a
-    /// credential minted for the case or read from an answer.
-    fn placeholder(
-        &mut self,
-        placeholder: &Placeholder,
-        minted: &mut Vec<(String, String)>,
-    ) -> Result<String, String> {
-        match placeholder {
-            Placeholder::Minted => self.minted(),
-            Placeholder::MintedUpstream(field) => {
-                let fresh = self.minted()?;
-                minted.push((field.clone(), fresh.clone()));
-                Ok(fresh)
-            }
-            Placeholder::Upstream(field) => self
-                .upstream()?
-                .get(field)
-                .and_then(Value::as_str)
-                .map(str::to_owned)
-                .ok_or_else(|| format!("{UPSTREAM_FILE} holds no {field}")),
-            Placeholder::Answered { case, pointer } => {
-                let answered = self
-                    .answers
-                    .get(case)
-                    .ok_or_else(|| format!("{case} was not asked before it"))?
-                    .pointer(pointer)
-                    .and_then(Value::as_str)
-                    .map(str::to_owned)
-                    .ok_or_else(|| format!("{case} answered no string at {pointer:?}"))?;
-                self.made.push(answered.clone());
-                Ok(answered)
-            }
-        }
-    }
-
-    /// A credential minted for one case, kept among what the run made.
-    fn minted(&mut self) -> Result<String, String> {
-        let fresh = crate::secret::generate(self.recorder.random)
-            .ok_or_else(|| crate::secret::NO_RANDOMNESS_FOR_PASSWORD.to_owned())?;
-        self.made.push(fresh.clone());
-        Ok(fresh)
-    }
-
-    /// What the adapter's `upstream.json` holds now.
-    fn upstream(&self) -> Result<serde_json::Map<String, Value>, String> {
-        let held = self
-            .held
-            .wrote(Path::new(UPSTREAM_FILE))?
-            .ok_or_else(|| format!("there is no {UPSTREAM_FILE} yet"))?;
-        match serde_json::from_slice(&held) {
-            Ok(Value::Object(fields)) => Ok(fields),
-            _ => Err(format!("{UPSTREAM_FILE} is not an object")),
-        }
-    }
-
-    /// Each minted credential written to `upstream.json` at its field.
-    fn keep_minted(&self, minted: &[(String, String)]) -> Result<(), String> {
-        if minted.is_empty() {
-            return Ok(());
-        }
-        let mut fields = self.upstream()?;
-        for (field, value) in minted {
-            fields.insert(field.clone(), Value::String(value.clone()));
-        }
-        self.held
-            .hold(UPSTREAM_FILE, &Value::Object(fields).to_string())
     }
 }
 
