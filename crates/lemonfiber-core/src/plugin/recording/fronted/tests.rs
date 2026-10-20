@@ -6,13 +6,10 @@ use lemonfiber_fixtures::proving::Proving;
 use lemonfiber_fixtures::scratch::Scratch;
 use lemonfiber_fixtures::serving::Serves;
 use lemonfiber_fixtures::support::FixedRandom;
-use lemonfiber_plugin::Manifest;
 use serde_json::{json, Value};
 
-use super::super::asked::Item;
 use super::super::{record, Failed, Recorded, Recorder, Took};
-use super::{unfinished, Filling, Fronting, Prepared};
-use crate::plugin::installed::Installed;
+use super::{unfinished, Filling};
 use crate::plugin::program::Throwaway;
 use crate::ports::http::{Http, Request};
 use crate::ports::program::Unran;
@@ -480,49 +477,52 @@ fn recorder_with<'a>(
     }
 }
 
-#[test]
-fn an_item_asked_as_the_operator_is_refused_before_anything_is_made() {
-    let Ok(manifest) = Manifest::from_toml(FRONTED) else {
-        return;
-    };
-    let placements = Installed::of(&manifest).services;
-    let (Some(upstream), Some(placed), Some(service)) = (
-        placements.first(),
-        placements.get(1),
-        manifest.services.get(1),
-    ) else {
-        return;
-    };
-    let Some(request) = manifest
-        .proofs
-        .first()
-        .and_then(|proof| proof.request.as_ref())
-    else {
-        return;
-    };
-    let item = Item {
-        named: "claim library.curate probe wanted".to_owned(),
-        service: Some("jellyfin".to_owned()),
-        request,
-        fixture: Some(PROVED),
-        keyed: true,
-    };
+const OPERATORS: &str = r#"
+[[claim]]
+capability = "media.serve"
+
+[[claim.probe]]
+id      = "guarded"
+request = { method = "GET", path = "/Items" }
+expect  = { status = 401 }
+fixture = "fixtures/items-unauthenticated.json"
+
+[[claim.probe]]
+id      = "catalogue"
+request = { method = "GET", path = "/Items" }
+expect  = { status = 200, json_has_keys = ["Items", "TotalRecordCount"] }
+fixture = "fixtures/items.json"
+"#;
+
+#[tokio::test]
+async fn a_probe_asked_as_the_operator_of_the_upstream_refuses_the_manifest_and_starts_nothing() {
+    let manifest = FRONTED.replace(
+        "user_mode   = \"uid\"\n",
+        "user_mode   = \"uid\"\nprovides    = [\"media.serve\"]\n",
+    );
+    let at = source("fronted-operator", &format!("{manifest}{OPERATORS}"));
     let serving = engine();
     let program = Proving::unreachable();
-    let transport = || -> Arc<dyn Http> { Fake::silent() };
-    let random = FixedRandom(Some(vec![7; 32]));
-    let at = Scratch::new("fronted-keyed");
-    let prepared = Prepared::of(
-        recorder_with(&serving, &program, &transport, &random),
+    let http = answering();
+    let shared = || -> Arc<dyn Http> { Arc::clone(&http) as Arc<dyn Http> };
+    let read = record(
         &at,
-        upstream,
-        Fronting { service, placed },
-        &[&item],
+        Recorder {
+            program: program.as_ref(),
+            serving: &serving,
+            transport: &shared,
+            random: &FixedRandom(Some(vec![7; 32])),
+        },
+    )
+    .await;
+    assert!(
+        read.as_ref()
+            .is_ok_and(|read| read.refusals.iter().any(|refusal| refusal.location
+                == "claim media.serve.probe catalogue"
+                && refusal.message.contains("jellyfin-adapter"))),
+        "{read:?}"
     );
-    assert!(prepared.is_err_and(|fault| fault.step == "first run"
-        && fault
-            .why
-            .starts_with("claim library.curate probe wanted is asked with")));
+    assert!(serving.asked().is_empty());
 }
 
 struct Filler {

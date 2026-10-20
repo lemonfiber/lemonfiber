@@ -124,7 +124,7 @@ pub(super) async fn answers(
         why: crate::text::plain(&fault.why),
         log: Vec::new(),
     };
-    let prepared = Prepared::of(recorder, root, upstream, adapter, items).map_err(failing)?;
+    let prepared = Prepared::of(recorder, root, upstream, adapter).map_err(failing)?;
     let serve = Serve {
         alias: Some(upstream.service.clone()),
         ..settled(upstream, &prepared.copy, prepared.data.as_deref())
@@ -214,15 +214,7 @@ impl Prepared {
         root: &Path,
         upstream: &Placed,
         adapter: Fronting<'_>,
-        items: &[&Item<'_>],
     ) -> Result<Self, Faulted> {
-        if let Some(operators) = items.iter().find(|item| item.keyed) {
-            return Err(refused("first run")(format!(
-                "{} is asked with the operator's credential, and no first run lemonfiber \
-                 performs for a service an adapter fronts leaves it holding one",
-                operators.named
-            )));
-        }
         let copy = Throwaway::of(Some(Starting {
             root,
             service: &upstream.service,
