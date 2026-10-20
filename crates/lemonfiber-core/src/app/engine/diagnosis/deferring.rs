@@ -160,8 +160,8 @@ pub(super) fn seasons(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> De
 /// it are: asking this question takes more lines than any of the checks beside it, and
 /// an assembly longer than a reader holds in one go is one somebody adds a check to
 /// twice. What it needs that a check may not reach for itself — the port a client says
-/// it is listening on, and the client it would be corrected through — is read here,
-/// because this check speaks to containers and those are a service's own business.
+/// it is listening on — is read here, because this check speaks to containers and that
+/// is a service's own business.
 async fn tunnelled(
     ctx: &Ctx,
     manifest: &lemonfiber_manifest::Manifest,
@@ -178,11 +178,6 @@ async fn tunnelled(
             listening: crate::app::forwarding::listening_port(ctx, manifest, project).await,
             port_forward: ctx.settings.port_forward.clone(),
             disruptive,
-            client: crate::app::targets::forwarded_client(
-                ctx,
-                &crate::app::targets::download_targets(ctx, &host_fillers(ctx, manifest, project))
-                    .await,
-            ),
         },
     )
 }

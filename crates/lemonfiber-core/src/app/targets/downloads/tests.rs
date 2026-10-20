@@ -7,8 +7,8 @@ use lemonfiber_contract::Contracted;
 use lemonfiber_fixtures::scratch::Scratch;
 
 use super::{
-    declared_downloads, download_targets, forwarded_client, protocol_of, read_transfers,
-    torrent_client, DownloadKind, DownloadTarget, Downloading,
+    declared_downloads, download_targets, protocol_of, read_transfers, torrent_client,
+    DownloadKind, DownloadTarget, Downloading,
 };
 use crate::config::Settings;
 use crate::dashboard::Protocol;
@@ -142,11 +142,9 @@ async fn a_plugin_torrent_client_never_gets_the_stacks_password() {
     );
 }
 
-/// The forwarded port belongs to the torrent client reached through the tunnel, so a
-/// plugin's client, which never is, is not the one read or moved for it — even where it
-/// is the only torrent client lemonfiber can authenticate to.
+/// A plugin's torrent client is a target of its own, and resolving it asks it nothing.
 #[tokio::test]
-async fn a_plugin_torrent_client_is_never_the_forwarded_one() {
+async fn a_plugins_torrent_client_is_a_target_asked_nothing_yet() {
     let fillers = beside_a_plugin_client();
     let (ctx, http) = holding("plugin-client-forwarded", true, &fillers);
     let targets = download_targets(&ctx, &fillers).await;
@@ -155,16 +153,13 @@ async fn a_plugin_torrent_client_is_never_the_forwarded_one() {
         .filter(|target| target.service == "seedbox")
         .collect();
 
-    assert!(brought.iter().all(|target| !target.tunnelled));
-    assert!(forwarded_client(&ctx, &brought).is_none());
     assert!(torrent_client(&ctx, &brought).is_some());
     assert!(http.requests().is_empty());
 }
 
-/// The stack's own torrent client goes through the tunnel and is read with the password
-/// recorded for it.
+/// The stack's own torrent client is read with the password recorded for it.
 #[tokio::test]
-async fn the_stacks_torrent_client_is_the_forwarded_one_and_holds_its_own_password() {
+async fn the_stacks_torrent_client_holds_its_own_password() {
     let fillers = beside_a_plugin_client();
     let (ctx, _) = holding("stack-client-forwarded", false, &fillers);
     let targets = download_targets(&ctx, &fillers).await;
@@ -173,8 +168,6 @@ async fn the_stacks_torrent_client_is_the_forwarded_one_and_holds_its_own_passwo
         passwords(&targets),
         vec![("http://127.0.0.1:8081".to_owned(), a_password())]
     );
-    assert!(targets.iter().all(|target| target.tunnelled));
-    assert!(forwarded_client(&ctx, &targets).is_some());
 }
 
 /// A record of what is installed that will not read narrows a host read to the stack's
@@ -218,7 +211,6 @@ fn a_usenet_client_declared_first_is_not_taken_for_the_torrent_client() {
                 base: "http://127.0.0.1:8085".to_owned(),
                 key: "usenet-key".to_owned(),
             },
-            tunnelled: true,
         },
         DownloadTarget {
             service: "torrent".to_owned(),
@@ -226,12 +218,10 @@ fn a_usenet_client_declared_first_is_not_taken_for_the_torrent_client() {
                 base: "http://127.0.0.1:8081".to_owned(),
                 password: a_password(),
             },
-            tunnelled: true,
         },
     ];
 
     assert!(torrent_client(&ctx, &targets[..1]).is_none());
-    assert!(forwarded_client(&ctx, &targets[..1]).is_none());
     assert!(torrent_client(&ctx, &targets).is_some());
 }
 
@@ -395,7 +385,6 @@ async fn a_torrent_client_speaking_its_contract_is_read_over_it_with_its_own_key
         matches!(
             targets.as_slice(),
             [one] if matches!(one.kind, DownloadKind::Over { protocol: Protocol::Torrent, .. })
-                && !one.tunnelled
         ),
         "asked over the contract, never as the bundled client with the password recorded"
     );
@@ -409,7 +398,6 @@ async fn a_torrent_client_speaking_its_contract_is_read_over_it_with_its_own_key
         None => None,
     };
     assert_eq!(seeding, Some(vec![held]));
-    assert!(forwarded_client(&ctx, &targets).is_none());
 
     let asked = to_the_fetcher(&http);
     assert_eq!(asked.len(), 2, "{asked:?}");
@@ -525,12 +513,10 @@ fn every_kind_of_client_is_asked_as_the_protocol_it_moves() {
             Protocol::Usenet,
         ),
     ];
-    let mut forwarded = Vec::new();
     for (kind, moves) in kinds {
         let target = DownloadTarget {
             service: FETCHER.to_owned(),
             kind,
-            tunnelled: true,
         };
         let asked = match target.client(&ctx) {
             Downloading::Torrent(_) => Protocol::Torrent,
@@ -539,11 +525,5 @@ fn every_kind_of_client_is_asked_as_the_protocol_it_moves() {
         assert_eq!((protocol_of(&target.kind), asked), (moves, moves));
         assert_eq!(target.torrent(&ctx).is_some(), moves == Protocol::Torrent);
         assert_eq!(target.usenet(&ctx).is_some(), moves == Protocol::Usenet);
-        forwarded.push(forwarded_client(&ctx, std::slice::from_ref(&target)).is_some());
     }
-    assert_eq!(
-        forwarded,
-        [true, false, false, false],
-        "only the bundled torrent client is offered the forwarded port"
-    );
 }

@@ -65,13 +65,3 @@ fn a_reconnect_on_a_new_port_is_caught_by_comparing_with_before() {
     assert_eq!(known(Some(51413), None).unchanged(None), Answer::Unknown);
     assert_eq!(known(None, None).unchanged(Some(51413)), Answer::Unknown);
 }
-
-#[test]
-fn a_client_already_on_the_granted_port_is_left_alone() {
-    // A write that changes nothing is still a write, and one made every run is
-    // a client restarted every run.
-    assert_eq!(known(Some(51413), Some(51413)).to_push(), None);
-    assert_eq!(known(Some(51413), Some(6881)).to_push(), Some(51413));
-    assert_eq!(known(Some(51413), None).to_push(), Some(51413));
-    assert_eq!(known(None, Some(6881)).to_push(), None, "nothing to push");
-}

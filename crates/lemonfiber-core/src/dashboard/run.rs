@@ -10,7 +10,8 @@
 //! storage volume (free space, hardlink status, projected exhaustion), each curator's
 //! queue, each download client's active transfers, and the VPN tunnel's state. The
 //! panels are read at once rather than one after another, each within a bound of
-//! its own, and the slow ones at the pace [`crate::dashboard::pace`] sets.
+//! its own, and the slow ones at the pace [`crate::dashboard::pace`] sets. At that pace
+//! it also passes the egress guard's forwarded port on, while a surface is open.
 
 mod panels;
 
@@ -20,7 +21,7 @@ use std::time::Duration;
 
 use crate::app::screen::Screen;
 use crate::app::targets::project_directory;
-use crate::app::{conditions, outbox, Ctx};
+use crate::app::{conditions, forwarding, outbox, Ctx};
 use crate::condition::Conditions;
 use crate::dashboard::pace::{Paced, Readings, HOUSEHOLD_WITHIN, PANEL_WITHIN};
 use crate::dashboard::{Hardlink, Panel, Reading, Snapshot, Telemetry};
@@ -113,18 +114,12 @@ pub async fn paced(ctx: &Ctx, previous: Option<&Gathered>) -> Gathered {
     let due = Due::at(&mut readings, now);
 
     let configured = ctx.settings.data_root.is_some();
-    // The manifest every stack-derived panel reads from, resolved once — or the one
-    // reason each reports if it cannot be read — so a stack that cannot be read
-    // leaves every panel unavailable from the one failure.
-    let manifest = ctx
-        .stack
-        .checked_manifest(ctx.today())
-        .map_err(|err| err.problem().summary);
+    let manifest = manifest_of(ctx);
     let manifest = manifest.as_ref();
     let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     let root = ctx.settings.data_root.as_deref();
 
-    let (seen, tunnel, household, named, moving, queued, asked, (space, kept, linked)) = tokio::join!(
+    let (seen, tunnel, household, named, moving, queued, asked, (space, kept, linked), forwarded) = tokio::join!(
         within(PANEL_WITHIN, observe(ctx, manifest)),
         when(due.is(Paced::Vpn), PANEL_WITHIN, vpn(ctx, manifest)),
         when(due.is(Paced::Household), HOUSEHOLD_WITHIN, waiting_on(ctx)),
@@ -140,6 +135,7 @@ pub async fn paced(ctx: &Ctx, previous: Option<&Gathered>) -> Gathered {
         ),
         within(PANEL_WITHIN, crate::bandwidth::run::pausing::standing(ctx)),
         volume(ctx, root, project.as_deref(), &due),
+        passed_on(ctx, due.is(Paced::Forwarded)),
     );
 
     let (seen, undeclared) = match seen.unwrap_or_else(|| Err(late(ENGINE))) {
@@ -167,6 +163,7 @@ pub async fn paced(ctx: &Ctx, previous: Option<&Gathered>) -> Gathered {
     // pictures of it — the last one written winning.
     let mut conditions = conditions::load(ctx);
     let found = conditions.clone();
+    observe_passed(ctx, &mut conditions, &forwarded);
     // A stack that could not be read has nothing to raise conditions about; the
     // summary then rests on the reach alone and says `unknown` rather than healthy.
     let health = summarise(
@@ -225,6 +222,31 @@ pub async fn paced(ctx: &Ctx, previous: Option<&Gathered>) -> Gathered {
         readings,
         named,
         answers,
+    }
+}
+
+/// The manifest every stack-derived panel reads from, resolved once — or the one reason
+/// each reports if it cannot be read — so a stack that cannot be read leaves every panel
+/// unavailable from the one failure.
+fn manifest_of(ctx: &Ctx) -> Result<lemonfiber_manifest::Manifest, String> {
+    ctx.stack
+        .checked_manifest(ctx.today())
+        .map_err(|err| err.problem().summary)
+}
+
+/// The forwarded port passed on, where it is due, within the bound a panel has.
+async fn passed_on(ctx: &Ctx, due: bool) -> Asked<Option<forwarding::Pass>> {
+    when(due, PANEL_WITHIN, Box::pin(forwarding::on_the_minute(ctx))).await
+}
+
+/// Raise or clear the port not passed, where it was passed on this refresh.
+fn observe_passed(
+    ctx: &Ctx,
+    conditions: &mut Conditions,
+    passed: &Asked<Option<forwarding::Pass>>,
+) {
+    if let Asked::Read(Some(pass)) = passed {
+        forwarding::observe(conditions, pass, &ctx.stamp());
     }
 }
 

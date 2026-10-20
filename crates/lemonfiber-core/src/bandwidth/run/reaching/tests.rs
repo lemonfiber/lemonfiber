@@ -125,7 +125,6 @@ fn torrent() -> DownloadTarget {
             base: "http://127.0.0.1:8081".to_owned(),
             password: a_password(),
         },
-        tunnelled: true,
     }
 }
 
@@ -137,7 +136,6 @@ fn usenet() -> DownloadTarget {
             base: "http://127.0.0.1:8080".to_owned(),
             key: "usenet-key".to_owned(),
         },
-        tunnelled: false,
     }
 }
 
@@ -431,7 +429,6 @@ fn speaking_its_contract(protocol: Protocol, uploads: bool) -> (DownloadTarget, 
             protocol,
             adapter: Contracted::new(http.clone(), "http://127.0.0.1:8080", "fetcher", "the-key"),
         },
-        tunnelled: false,
     };
     (target, http)
 }

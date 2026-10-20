@@ -15,7 +15,6 @@ use lemonfiber_core::error::Problem;
 use lemonfiber_core::ports::docker::{
     Container, Engine, ExecOutput, Failure, Health, Lifecycle, LogLine, LogQuery, Stats,
 };
-use lemonfiber_core::qbittorrent::Qbittorrent;
 use lemonfiber_manifest::Manifest;
 use tokio::sync::mpsc::Receiver;
 
@@ -375,7 +374,6 @@ pub fn asking_engine(engine: Arc<Fake>) -> Asking {
             listening: None,
             port_forward: PortForward::default(),
             disruptive: false,
-            client: None,
         },
     }
 }
@@ -404,22 +402,10 @@ impl Asking {
         self
     }
 
-    /// A download client the repair can actually move.
-    ///
-    /// Distinct from `listening`, which is a number the caller read earlier and handed
-    /// in: this is the client itself, and only a repair has any use for one. A check
-    /// that reads it reads it afresh, which is the whole reason the repair holds it.
-    #[must_use]
-    pub fn moving(mut self, client: Qbittorrent) -> Self {
-        self.asked.client = Some(client);
-        self
-    }
-
     /// A client the caller says is listening somewhere.
     ///
-    /// Where that somewhere is not the granted port, this is the one fault in the
-    /// category lemonfiber can put right itself — so it is what a repair is driven
-    /// against.
+    /// Where that somewhere is not the granted port, the check reports the client off
+    /// the forwarded port.
     #[must_use]
     pub const fn listening(mut self, port: u16) -> Self {
         self.asked.listening = Some(port);
@@ -471,20 +457,6 @@ pub fn check_with(behaviors: Vec<Behavior>, port_forward: PortForward) -> VpnChe
     asking(Fake::new(behaviors))
         .forwarding(port_forward)
         .check()
-}
-
-/// The same again, for a client the caller says is listening somewhere.
-pub fn listening_on(
-    behaviors: Vec<Behavior>,
-    port_forward: PortForward,
-    listening: Option<u16>,
-) -> VpnCheck {
-    let asking = asking(Fake::new(behaviors)).forwarding(port_forward);
-    match listening {
-        Some(port) => asking.listening(port),
-        None => asking,
-    }
-    .check()
 }
 
 /// A port-forward configuration: enabled, for the named provider.

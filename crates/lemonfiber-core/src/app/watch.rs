@@ -4,7 +4,8 @@
 //! become a different volume — a drive unplugged from under a surviving mount
 //! point — stops the services rather than letting them write a phantom library
 //! onto whatever is left. It never restarts them: whether the state that came
-//! back is trustworthy is the operator's call, not this one's.
+//! back is trustworthy is the operator's call, not this one's. While it holds, it
+//! passes the egress guard's forwarded port on each minute, as long as the stack runs.
 //!
 //! Split out of the dispatcher for cohesion — the verbs each already live in
 //! their own `app` submodule, and the watch is a self-contained feature with its
@@ -13,6 +14,7 @@
 use std::path::Path;
 use std::time::Duration;
 
+use crate::dashboard::pace::{Paced, Readings};
 use crate::error::{Problem, Remedy, State};
 use crate::model::{SupervisionReport, Vigil};
 use crate::ports::filesystem::{Presence, Volume};
@@ -73,18 +75,25 @@ fn assess(baseline: u64, current: Presence) -> Availability {
     }
 }
 
-/// Poll the data root until it is lost, and say how it was lost.
+/// Poll the data root until it is lost, and say how it was lost, passing the forwarded
+/// port on each minute while it holds.
 async fn watch_until_lost(
+    ctx: &Ctx,
     volume: &dyn Volume,
     root: &Path,
     baseline: u64,
     interval: Duration,
 ) -> Loss {
+    let mut readings = Readings::default();
     loop {
         tokio::time::sleep(interval).await;
-        match assess(baseline, volume.presence(root).await) {
-            Availability::Holding => {}
-            Availability::Lost(loss) => return loss,
+        if let Availability::Lost(loss) = assess(baseline, volume.presence(root).await) {
+            return loss;
+        }
+        let now = ctx.seams.clock.now();
+        if readings.due(Paced::Forwarded, now) {
+            readings.read(Paced::Forwarded, now);
+            super::forwarding::watched(ctx).await;
         }
     }
 }
@@ -126,7 +135,7 @@ pub async fn supervise(
         return would_watch(ctx, root, forms, interval);
     }
 
-    let loss = watch_until_lost(volume, root, baseline, interval).await;
+    let loss = watch_until_lost(ctx, volume, root, baseline, interval).await;
 
     // The stop is attempted whatever its outcome: the data root is gone either
     // way, and reporting that the services could not be stopped is more use than

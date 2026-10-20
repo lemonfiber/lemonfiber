@@ -39,6 +39,7 @@ fn torrent_client() -> crate::wiring::Filler {
         fronts: None,
         native: None,
         replaces: None,
+        via: None,
     }
 }
 

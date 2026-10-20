@@ -84,6 +84,8 @@ pub struct Filler {
     pub native: Option<String>,
     /// The id of the stack's service it takes the place of, where it names one.
     pub replaces: Option<String>,
+    /// The capability whose filler's network it runs inside, where it takes `network.via`.
+    pub via: Option<String>,
 }
 
 impl Filler {
@@ -213,6 +215,18 @@ impl Fillers {
                 .map(move |placed| brought(&one.plugin, placed, project, first_party))
         });
         let mut services: Vec<Filler> = bundled.chain(brought).collect();
+        for one in services
+            .iter_mut()
+            .filter(|one| one.origin != Origin::Bundled)
+        {
+            let guard = one
+                .via
+                .as_deref()
+                .and_then(|via| crate::project::placed_at(manifest, installed, chosen, via));
+            if let (Some(address), Some(guard)) = (one.address.as_mut(), guard) {
+                address.host = guard;
+            }
+        }
         let stood_in: Vec<String> = services
             .iter()
             .filter(|one| one.stands_in())
@@ -439,13 +453,14 @@ fn bundled(service: &Service, services: &[Service], project: Option<&Path>) -> F
         fronts: None,
         native: None,
         replaces: None,
+        via: service.network.as_ref().map(|network| network.via.clone()),
     }
 }
 
 /// One installed plugin's service, as something reaching it needs it.
 ///
-/// Reached at its own id: a plugin's service has no way to share another container's
-/// network, so there is no tunnel in front of it to be reached through.
+/// Reached at its own id until [`Fillers::trusting`] places one taking `network.via` at
+/// the service whose network it runs inside.
 fn brought(plugin: &str, placed: &Placed, project: Option<&Path>, first_party: bool) -> Filler {
     Filler {
         id: placed.service.clone(),
@@ -471,6 +486,11 @@ fn brought(plugin: &str, placed: &Placed, project: Option<&Path>, first_party: b
         fronts: placed.fronts.clone(),
         native: placed.native.clone(),
         replaces: placed.replaces.clone(),
+        via: placed
+            .fields
+            .network
+            .as_ref()
+            .map(|network| network.via.clone()),
     }
 }
 

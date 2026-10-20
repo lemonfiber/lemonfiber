@@ -188,6 +188,7 @@ fn keyed_in(file: &str, within: Option<&str>) -> crate::wiring::Filler {
         fronts: None,
         native: None,
         replaces: None,
+        via: None,
     }
 }
 

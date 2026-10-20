@@ -147,7 +147,7 @@ pub(super) fn written(manifest: &Manifest) -> impl Iterator<Item = &Service> {
 /// The one service that fills `capability`: the operator's choice where it names a
 /// service that claims it, and the only claimant otherwise. An adapter's place is its
 /// upstream's, so a capability an adapter fills is held by the service it fronts.
-fn filler(
+pub(crate) fn filler(
     manifest: &Manifest,
     installed: &[Installed],
     chosen: &Chosen,

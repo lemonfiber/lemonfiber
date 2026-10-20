@@ -123,18 +123,14 @@ pub(super) fn disagreeing(reason: String) -> Finding {
 }
 
 /// The finding for a download client listening somewhere other than the port the
-/// provider granted.
-///
-/// Offered rather than applied, because a diagnosis is only looking: an operator
-/// asking what is wrong has not asked for anything to be changed. Starting the
-/// stack applies the same fix, since by then they have asked for an action.
+/// provider granted, which the diagnosis passes to it once it has run.
 ///
 /// A warning rather than a failure — nothing is leaking and downloads still
 /// arrive. What stops is peers reaching the client, so seeding stops, which is
 /// the part noticed last and the reason this is worth saying at all.
 pub(super) fn port_mismatch(granted: u16, listening: u16) -> Finding {
     finding(
-        PORT_MISMATCH_CHECK,
+        "vpn.port-forward-client",
         "The download client listens on the forwarded port",
         Verdict::Warn(
             Problem::new(
@@ -145,22 +141,19 @@ pub(super) fn port_mismatch(granted: u16, listening: u16) -> Finding {
                 ),
                 "Downloads still arrive, so nothing looks wrong from here — but no peer can \
                  reach the client, so it cannot seed and connects to fewer sources.",
-                Remedy::new("Start the stack to move the client onto the forwarded port")
-                    .with_detail("lemonfiber up"),
+                Remedy::new(
+                    "Run the diagnosis again: it passes the forwarded port to the client \
+                     once it has run, and says what it set",
+                )
+                .with_detail("lemonfiber doctor"),
             )
             .or_try(Remedy::new(format!(
                 "Or set the client's listening port to {granted} yourself"
             )))
-            // The one finding in the tree lemonfiber can put right itself, and saying so is
-            // what makes the classification worth showing at all.
             .in_state(State::Remediable),
         ),
     )
 }
-
-/// What this finding is called, named once so the repair that answers it and the check that
-/// raises it cannot drift apart on a rename.
-pub(super) const PORT_MISMATCH_CHECK: &str = "vpn.port-forward-client";
 
 /// The findings when the engine could not be reached: the runtime checks could
 /// not run, so they are unverified rather than reported either way.

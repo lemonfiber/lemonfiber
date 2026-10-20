@@ -196,3 +196,29 @@ async fn a_refresh_that_changed_nothing_writes_nothing() {
         "the second found the same and wrote nothing"
     );
 }
+
+/// The guard is asked for its forwarded port once a minute, by the clock, whatever the
+/// screen's own tick.
+#[tokio::test]
+async fn the_forwarded_port_is_passed_on_once_a_minute() {
+    let guard = crate::test_support::AskedGuard::forwarding(None);
+    let at = |seconds: u64| {
+        a_context()
+            .engine(guard.clone())
+            .settings(Settings {
+                port_forward: forwarding(),
+                ..Settings::default()
+            })
+            .clock(lemonfiber_fixtures::ports::Stopped::into_today(seconds))
+            .build()
+            .with_patience(Duration::ZERO)
+    };
+    let every = crate::app::forwarding::EVERY.as_secs();
+
+    let first = paced(&at(1_000), None).await;
+    assert_eq!(guard.asked(), 1);
+    let second = paced(&at(1_000 + every - 1), Some(&first)).await;
+    assert_eq!(guard.asked(), 1);
+    paced(&at(1_000 + every), Some(&second)).await;
+    assert_eq!(guard.asked(), 2);
+}
