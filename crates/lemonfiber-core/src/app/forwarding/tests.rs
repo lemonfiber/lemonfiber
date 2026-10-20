@@ -307,3 +307,16 @@ async fn a_port_set_where_nothing_can_be_journalled_says_so() {
         .last()
         .is_some_and(|line| line.contains("could not be recorded")));
 }
+
+#[tokio::test]
+async fn a_diagnosis_whose_guard_cannot_tell_passes_nothing() {
+    let ctx = a_context()
+        .engine(Arc::new(Reporting::absent()))
+        .settings(Settings {
+            port_forward: forwarding(),
+            ..Settings::default()
+        })
+        .build();
+    let ran = vpn(crate::doctor::Verdict::Pass { note: None });
+    assert_eq!(diagnosed(&ctx, &[ran]).await, Some(Vec::new()));
+}

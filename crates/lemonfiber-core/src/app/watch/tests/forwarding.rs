@@ -32,3 +32,30 @@ async fn a_watch_asks_the_guard_once_a_minute_while_the_volume_holds() {
     assert!(report.is_ok_and(|report| report.reason.contains("no longer present")));
     assert_eq!(guard.ran("cat"), 2);
 }
+
+#[tokio::test(start_paused = true)]
+async fn a_watch_whose_guard_cannot_tell_goes_on_watching() {
+    let ctx = a_context()
+        .engine(std::sync::Arc::new(
+            lemonfiber_fixtures::support::Reporting::absent(),
+        ))
+        .clock(Following::started())
+        .settings(Settings {
+            data_root: Some("/data".into()),
+            port_forward: crate::config::PortForward {
+                enabled: true,
+                provider: None,
+            },
+            ..Settings::default()
+        })
+        .build();
+    let readings = vec![Presence::On(9), Presence::On(9), Presence::Gone];
+    let report = supervise(
+        &ctx,
+        &Drive::playing(readings),
+        &["dl".to_owned()],
+        Duration::from_secs(5),
+    )
+    .await;
+    assert!(report.is_ok_and(|report| report.reason.contains("no longer present")));
+}
