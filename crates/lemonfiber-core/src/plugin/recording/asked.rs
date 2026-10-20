@@ -39,7 +39,7 @@ pub(super) struct Item<'a> {
 }
 
 /// Every request recording `manifest` names: each request proof's, each claim probe's
-/// and each contributed check's, in that order.
+/// that is a request and each contributed check's, in that order.
 pub(super) fn items(manifest: &Manifest) -> Vec<Item<'_>> {
     let mut items = Vec::new();
     for proof in &manifest.proofs {
@@ -62,13 +62,15 @@ pub(super) fn items(manifest: &Manifest) -> Vec<Item<'_>> {
             .find(|service| service.provides.contains(&claim.capability))
             .map(|service| service.id.clone());
         for probe in &claim.probes {
-            items.push(Item {
-                named: format!("claim {} probe {}", claim.capability, probe.id),
-                service: service.clone(),
-                request: &probe.request,
-                fixture: Some(probe.fixture.as_str()),
-                keyed: operators(&claim.capability, &probe.id),
-            });
+            if let Some(request) = &probe.request {
+                items.push(Item {
+                    named: format!("claim {} probe {}", claim.capability, probe.id),
+                    service: service.clone(),
+                    request,
+                    fixture: Some(probe.fixture.as_str()),
+                    keyed: operators(&claim.capability, &probe.id),
+                });
+            }
         }
     }
     for check in &manifest.contributions {

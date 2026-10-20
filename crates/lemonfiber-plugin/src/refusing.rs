@@ -37,7 +37,7 @@ mod fronting;
 mod installing;
 mod leaving;
 mod naming;
-mod program;
+pub(crate) mod program;
 mod reaching;
 mod recipes;
 mod replacing;
@@ -406,10 +406,13 @@ fn declared(manifest: &Manifest) -> Vec<(String, &str)> {
     }
     for claim in &manifest.claims {
         for probe in &claim.probes {
-            every.push((
-                format!("claim {} probe {}.request.path", claim.capability, probe.id),
-                probe.request.path.as_str(),
-            ));
+            let at = format!("claim {} probe {}", claim.capability, probe.id);
+            if let Some(request) = &probe.request {
+                every.push((format!("{at}.request.path"), request.path.as_str()));
+            }
+            for arg in probe.run.iter().flat_map(|run| &run.args) {
+                every.push((format!("{at}.run.args"), arg.as_str()));
+            }
         }
     }
     proofs(&manifest.proofs, &mut every);

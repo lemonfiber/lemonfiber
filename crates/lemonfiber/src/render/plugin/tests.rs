@@ -489,6 +489,36 @@ fn a_probe_that_constrains_only_a_status_says_that_is_the_whole_of_it() {
     assert!(text.contains("and one of json, json_has_keys"), "{text}");
 }
 
+/// A probe says how it is put: a request of the running service, or a run of the
+/// image's own program answered by its exit and the start of what it prints.
+#[test]
+fn a_probe_says_whether_it_is_a_request_or_a_run_and_what_ends_it() {
+    let text = listed();
+    assert!(
+        text.contains("put as   a request of the running service"),
+        "{text}"
+    );
+    let run = lemonfiber_core::plugin::Probe {
+        id: "runs",
+        title: "Its own program runs",
+        asks: "a run of the image's own program",
+        why: "Nothing reaches it over the network.",
+        credential: lemonfiber_core::plugin::Credential::None,
+        requires: lemonfiber_core::plugin::Requirement::Run {
+            exit: &[0],
+            body: &[lemonfiber_core::plugin::Constraint::StdoutStartsWith],
+        },
+    };
+    assert_eq!(
+        super::answers(&run),
+        "exit 0, and one of stdout_starts_with"
+    );
+    assert_eq!(
+        super::put_as(run.kind()),
+        "a run of the image's own program"
+    );
+}
+
 /// Every capability the vocabulary carries reaches the listing.
 #[test]
 fn nothing_the_vocabulary_carries_is_left_out() {

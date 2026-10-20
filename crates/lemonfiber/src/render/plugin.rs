@@ -17,7 +17,7 @@
 use lemonfiber_core::filling::Filling;
 use lemonfiber_core::plugin::{
     Asserted, Capabilities, Claimed, Claiming, Credential, Evidence, FailingAsDeclared, Points,
-    Probe, Provenance, Ran, Verdict, Vouched,
+    Probe, ProbeKind, Provenance, Ran, Verdict, Vouched,
 };
 
 // The operator's half: what one machine has installed, and what installing one came
@@ -61,6 +61,7 @@ pub(crate) fn capabilities(published: &Capabilities) -> Lines {
         for probe in capability.probes {
             lines.put(format!("  probe {} — {}", probe.id, probe.title));
             lines.put(format!("    asks     {}", probe.asks));
+            lines.put(format!("    put as   {}", put_as(probe.kind())));
             lines.put(format!("    asked as {}", asked_as(probe.credential)));
             lines.put(format!("    answers  {}", answers(probe)));
         }
@@ -80,27 +81,38 @@ fn asked_as(credential: Credential) -> &'static str {
     }
 }
 
+/// How a probe is put, in the words an author would use.
+const fn put_as(kind: ProbeKind) -> &'static str {
+    match kind {
+        ProbeKind::Request => "a request of the running service",
+        ProbeKind::Run => "a run of the image's own program",
+    }
+}
+
 /// What a probe accepts as an answer.
 fn answers(probe: &Probe) -> String {
-    let statuses: Vec<String> = probe
+    let endings: Vec<String> = probe
         .requires
-        .status
+        .endings()
         .iter()
         .map(ToString::to_string)
         .collect();
-    if probe.requires.body.is_empty() {
+    let ended = match probe.kind() {
+        ProbeKind::Request => endings.join(" or "),
+        ProbeKind::Run => format!("exit {}", endings.join(" or ")),
+    };
+    let body = probe.requires.body();
+    if body.is_empty() {
         // A refusal is the one answer no port proxy can produce, which is why this
         // probe is allowed to constrain nothing but the status. Said rather than left
         // blank, so it does not read as a gap in the document.
-        return format!("{} — the status is the whole of it", statuses.join(" or "));
+        return format!("{ended} — the status is the whole of it");
     }
-    let kinds: Vec<String> = probe
-        .requires
-        .body
+    let kinds: Vec<String> = body
         .iter()
         .map(|constraint| constraint.as_str().to_owned())
         .collect();
-    format!("{}, and one of {}", statuses.join(" or "), kinds.join(", "))
+    format!("{ended}, and one of {}", kinds.join(", "))
 }
 
 /// Where a plugin may put a row, and what a row there carries.

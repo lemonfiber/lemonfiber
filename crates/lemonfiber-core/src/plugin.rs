@@ -121,8 +121,8 @@ pub use lemonfiber_plugin::extension::{
     Bounded, Closed, Limits, Occupied, Point, Published as Points, Row,
 };
 pub use lemonfiber_plugin::vocabulary::{
-    Capability, Constraint, Credential, Declared, Probe, Published as Capabilities, Removed,
-    Requirement, Unpublishable,
+    Capability, Constraint, Credential, Declared, Probe, ProbeKind, Published as Capabilities,
+    Removed, Requirement, Unpublishable,
 };
 pub use lemonfiber_plugin::{Shape, Violation};
 

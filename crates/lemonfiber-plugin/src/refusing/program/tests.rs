@@ -182,17 +182,13 @@ fn a_requests_expect_takes_neither_of_a_runs_keys() {
 }
 
 #[test]
-fn a_probe_or_a_check_declaring_a_run_is_refused_naming_it() {
-    for (before, at) in [
-        ("expect  = { status = 401 }", "claim 0.probe guarded.run"),
-        (
-            "expect    = { status = 200, json = { isClaimed = true } }",
-            ".run: this build declares no such field",
-        ),
-    ] {
-        let said = without(before, &format!("{before}\nrun = {{ args = [\"-v\"] }}"));
-        assert!(names(&said, &[at, "no such field"]), "{at}: {said:?}");
-    }
+fn a_check_declaring_a_run_is_refused_naming_it() {
+    let before = "expect    = { status = 200, json = { isClaimed = true } }";
+    let said = without(before, &format!("{before}\nrun = {{ args = [\"-v\"] }}"));
+    assert!(
+        names(&said, &[".run: this build declares no such field"]),
+        "{said:?}"
+    );
 }
 
 #[test]
@@ -250,4 +246,38 @@ fn every_key_written_is_named_in_the_order_the_vocabulary_declares() {
     };
     assert_eq!(every.written(), Constraint::EVERY.to_vec());
     assert_eq!(Expect::default().written(), Vec::<Constraint>::new());
+}
+
+#[test]
+fn a_claim_probe_that_runs_is_held_to_the_keys_a_run_answers() {
+    let ran = without(
+        r#"request = { method = "GET", path = "/api/v1/series" }
+expect  = { status = 401 }"#,
+        r#"run     = { args = ["--version"] }
+expect  = { status = 401 }"#,
+    );
+    assert!(
+        names(
+            &ran,
+            &[
+                "claim media.serve.probe guarded.expect.status",
+                "a run's expect takes only exit and stdout_starts_with"
+            ]
+        ),
+        "{ran:?}"
+    );
+    let asked = without(
+        "expect  = { status = 401 }",
+        "expect  = { status = 401, exit = 0 }",
+    );
+    assert!(
+        names(
+            &asked,
+            &[
+                "claim media.serve.probe guarded.expect.exit",
+                "a request's expect takes none of a run's keys"
+            ]
+        ),
+        "{asked:?}"
+    );
 }

@@ -282,3 +282,54 @@ async fn a_run_proof_whose_recording_holds_a_request_is_run_and_its_note_kept() 
     assert_eq!(field(&kept, "/note"), "Kept.");
     assert_eq!(field(&kept, "/run/args"), serde_json::json!(["--version"]));
 }
+
+/// A claim's probe that runs is recorded by running it, after the run proofs and under
+/// the name of the claim and the probe, from the service that provides the capability.
+#[tokio::test]
+async fn a_claim_probe_that_runs_is_recorded_by_running_it() {
+    let manifest = format!(
+        "{}\n[[claim]]\ncapability = \"quality.sync\"\n\n[[claim.probe]]\nid      = \"runs\"\n\
+         run     = {{ args = [\"--version\"] }}\nexpect  = {{ exit = 0, stdout_starts_with = \"v8.\" }}\n\
+         fixture = \"recordings/recyclarr/runs.json\"\n",
+        RUNNING.replace(
+            "posture       = \"confined\"",
+            "posture       = \"confined\"\nprovides      = [\"quality.sync\"]"
+        )
+    );
+    let read = lemonfiber_plugin::Manifest::from_toml(&manifest);
+    assert!(read.is_ok(), "the fixture reads: {read:?}");
+    let Ok(read) = read else { return };
+    let runs = super::ran::runs(&read);
+    let named: Vec<(&str, Option<&str>, Option<&str>)> = runs
+        .iter()
+        .map(|one| (one.named.as_str(), one.service, one.fixture))
+        .collect();
+    assert_eq!(
+        named,
+        vec![
+            ("proof recyclarr.runs", None, Some(FIXTURE)),
+            (
+                "claim quality.sync probe runs",
+                Some("qualitysync"),
+                Some("recordings/recyclarr/runs.json")
+            ),
+        ]
+    );
+    let at = source("record-claim-run", &manifest);
+    let program = Proving::exiting(0, "v8.7.3 (");
+    let mut took = Vec::new();
+    for running in runs {
+        took.push(super::ran::taken(&read, running, &at, program.as_ref()).await);
+    }
+    let kept: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(at.join("recordings/recyclarr/runs.json")).unwrap_or_default(),
+    )
+    .unwrap_or_default();
+    assert_eq!(
+        took.iter().map(|one| one.took.clone()).collect::<Vec<_>>(),
+        vec![Took::Unnoted, Took::Unnoted]
+    );
+    assert_eq!(field(&kept, "/recorded_from"), PINNED);
+    assert_eq!(field(&kept, "/run/args"), serde_json::json!(["--version"]));
+    assert_eq!(field(&kept, "/result/stdout_starts_with"), "v8.7.3 (");
+}

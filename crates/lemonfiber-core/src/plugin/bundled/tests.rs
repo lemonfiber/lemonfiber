@@ -275,3 +275,53 @@ fn a_probe_the_recording_answers_is_said_as_demonstrated() {
         Some("0 refused, 0 refuted, 0 unproven, 2 demonstrated")
     );
 }
+
+/// A probe bound to a run is judged against the run its recording took, and one that
+/// declares neither a request nor a run is unproven.
+#[test]
+fn a_probe_bound_to_a_run_is_judged_against_the_run_recorded() {
+    let manifest = claiming(
+        &CLAIM
+            .replace(
+                r#"id = "guarded"
+request = { method = "GET", path = "/Items" }
+expect = { status = 401 }"#,
+                r#"id = "guarded"
+run = { args = ["--version"] }
+expect = { exit = 0, stdout_starts_with = "10.11" }"#,
+            )
+            .replace(
+                r#"request = { method = "GET", path = "/Items" }
+expect = { status = 200"#,
+                "expect = { status = 200",
+            ),
+    );
+    let root = recorded("bundled-runs", &pinned(&manifest), &[]);
+    let _ = std::fs::write(
+        root.join("recordings/jellyfin/guarded.json"),
+        format!(
+            r#"{{"recorded_from":"{}","note":"its release","run":{{"args":["--version"]}},"result":{{"exit":0,"stdout_starts_with":"10.11.11\n"}}}}"#,
+            pinned(&manifest)
+        ),
+    );
+    let report = judged(&manifest, &root);
+    gone(&root);
+
+    let verdicts: Vec<(&str, &Verdict)> = report
+        .judged
+        .iter()
+        .map(|one| (one.probe.as_str(), &one.verdict))
+        .collect();
+    assert_eq!(
+        verdicts,
+        vec![
+            ("guarded", &Verdict::Passed),
+            (
+                "catalogue",
+                &Verdict::Unproven {
+                    why: crate::plugin::claimed::ASKS_NO_ONE_THING.to_owned()
+                }
+            ),
+        ]
+    );
+}

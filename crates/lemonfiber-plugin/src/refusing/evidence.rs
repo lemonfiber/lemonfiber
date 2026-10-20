@@ -158,10 +158,12 @@ fn asked(manifest: &Manifest) -> Vec<(String, &Request)> {
     let mut every = Vec::new();
     for claim in &manifest.claims {
         for binding in &claim.probes {
-            every.push((
-                format!("claim {}.probe {}", claim.capability, binding.id),
-                &binding.request,
-            ));
+            if let Some(request) = &binding.request {
+                every.push((
+                    format!("claim {}.probe {}", claim.capability, binding.id),
+                    request,
+                ));
+            }
         }
     }
     for proof in &manifest.proofs {

@@ -59,10 +59,15 @@ pub struct Capability {
     pub contract: &'static str,
     /// What must be demonstrated. At least one.
     pub probes: &'static [Probe],
+    /// Whether its contract has a filler listen for requests.
+    ///
+    /// False only where the contract says its fillers listen on nothing, which is the one
+    /// kind of capability whose probe may be a run of the claimant image's own program.
+    pub listens: bool,
 }
 
 /// One thing a claimant must demonstrate.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Probe {
     /// What a claim names to bind it.
     pub id: &'static str,
@@ -78,19 +83,105 @@ pub struct Probe {
     pub requires: Requirement,
 }
 
+impl Probe {
+    /// How it is asked.
+    #[must_use]
+    pub const fn kind(&self) -> ProbeKind {
+        self.requires.kind()
+    }
+}
+
+impl Serialize for Probe {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct as _;
+        let mut probe = serializer.serialize_struct("Probe", 7)?;
+        probe.serialize_field("id", self.id)?;
+        probe.serialize_field("kind", &self.kind())?;
+        probe.serialize_field("title", self.title)?;
+        probe.serialize_field("asks", self.asks)?;
+        probe.serialize_field("why", self.why)?;
+        probe.serialize_field("credential", &self.credential)?;
+        probe.serialize_field("requires", &self.requires)?;
+        probe.end()
+    }
+}
+
+/// How a probe is asked: a request of the running service, or a run of its image's own
+/// program.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ProbeKind {
+    /// A request, asked of the running service.
+    Request,
+    /// A run of the claimant image's own program, for a capability whose fillers listen
+    /// on nothing.
+    Run,
+}
+
+impl ProbeKind {
+    /// The field a binding of this kind asks it with.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Request => "request",
+            Self::Run => "run",
+        }
+    }
+}
+
 /// What an answer has to be.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-pub struct Requirement {
-    /// The statuses that are an acceptable answer. The claimant says which of them
-    /// this service gives.
-    pub status: &'static [u16],
-    /// The kinds of body constraint the answer must carry.
-    ///
-    /// Empty on a `guarded` probe, and that is not a weaker expectation: a refusal is
-    /// the one answer no port proxy can produce. An emptied container answers a
-    /// refused connection or a gateway error, and only an application with a protected
-    /// surface answers that it is protected — so there the status is the body's job.
-    pub body: &'static [Constraint],
+#[serde(untagged)]
+pub enum Requirement {
+    /// What answers a request.
+    Request {
+        /// The statuses that are an acceptable answer. The claimant says which of them
+        /// this service gives.
+        status: &'static [u16],
+        /// The kinds of body constraint the answer must carry.
+        ///
+        /// Empty on a `guarded` probe, and that is not a weaker expectation: a refusal is
+        /// the one answer no port proxy can produce. An emptied container answers a
+        /// refused connection or a gateway error, and only an application with a
+        /// protected surface answers that it is protected — so there the status is the
+        /// body's job.
+        body: &'static [Constraint],
+    },
+    /// What answers a run.
+    Run {
+        /// The exit statuses that are an acceptable end to the run.
+        exit: &'static [i64],
+        /// The kinds of output constraint the run must carry.
+        body: &'static [Constraint],
+    },
+}
+
+impl Requirement {
+    /// How the probe it belongs to is asked.
+    #[must_use]
+    pub const fn kind(&self) -> ProbeKind {
+        match self {
+            Self::Request { .. } => ProbeKind::Request,
+            Self::Run { .. } => ProbeKind::Run,
+        }
+    }
+
+    /// The kinds of constraint on the body or the output the answer must carry.
+    #[must_use]
+    pub const fn body(&self) -> &'static [Constraint] {
+        match self {
+            Self::Request { body, .. } | Self::Run { body, .. } => body,
+        }
+    }
+
+    /// The endings that answer it, each as a status or an exit status reads.
+    #[must_use]
+    pub fn endings(&self) -> Vec<i64> {
+        match self {
+            Self::Request { status, .. } => status.iter().copied().map(i64::from).collect(),
+            Self::Run { exit, .. } => exit.to_vec(),
+        }
+    }
 }
 
 /// Who a probe is asked as.
@@ -276,6 +367,21 @@ pub enum Unpublishable {
         /// The name it declared.
         name: String,
     },
+    /// A probe is a run where the capability's fillers listen for requests.
+    ///
+    /// A run is the evidence only where no request could reach a filler, so a run probe
+    /// anywhere else would accept a program that starts in place of a service that
+    /// answers.
+    #[error(
+        "{capability} declares the probe {probe} a run, and its fillers listen for \
+         requests; only a capability whose fillers listen on nothing is probed by a run"
+    )]
+    RunOfAListener {
+        /// The capability.
+        capability: &'static str,
+        /// The probe declared a run.
+        probe: &'static str,
+    },
 }
 
 /// Every capability this generation carries, before a stack says who declares them.
@@ -311,16 +417,37 @@ pub use lemonfiber_manifest::is_core_name;
 ///
 /// Every disagreement between the two, in one pass: a capability no bundled service
 /// declares, and a name a bundled service declares that this vocabulary does not
-/// carry. Both are named.
+/// carry. Both are named, and so is a probe declared a run for a capability whose
+/// fillers listen for requests.
 pub fn published(
     services: &[lemonfiber_manifest::Service],
 ) -> Result<Published, Vec<Unpublishable>> {
+    publishing(CARRIED, services)
+}
+
+/// [`published`], over the capabilities `carried` rather than this generation's.
+fn publishing(
+    carried: &'static [Capability],
+    services: &[lemonfiber_manifest::Service],
+) -> Result<Published, Vec<Unpublishable>> {
     let mut claimants: BTreeMap<&str, Vec<String>> = BTreeMap::new();
-    let mut wrong = Vec::new();
+    let mut wrong: Vec<Unpublishable> = carried
+        .iter()
+        .filter(|held| held.listens)
+        .flat_map(|held| {
+            held.probes
+                .iter()
+                .filter(|probe| probe.kind() == ProbeKind::Run)
+                .map(|probe| Unpublishable::RunOfAListener {
+                    capability: held.name,
+                    probe: probe.id,
+                })
+        })
+        .collect();
 
     for service in services {
         for name in &service.provides {
-            match CARRIED.iter().find(|held| held.name == name) {
+            match carried.iter().find(|held| held.name == name) {
                 Some(held) => claimants
                     .entry(held.name)
                     .or_default()
@@ -333,7 +460,7 @@ pub fn published(
         }
     }
 
-    let capabilities: Vec<Declared> = CARRIED
+    let capabilities: Vec<Declared> = carried
         .iter()
         .map(|held| Declared {
             name: held.name,

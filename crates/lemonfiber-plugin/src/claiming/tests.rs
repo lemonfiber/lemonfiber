@@ -701,7 +701,7 @@ fn every_published_capability_is_one_a_binding_could_satisfy() {
                 || held
                     .probes
                     .iter()
-                    .any(|probe| probe.requires.status.is_empty())
+                    .any(|probe| probe.requires.endings().is_empty())
         })
         .map(|held| held.name)
         .collect();
@@ -710,3 +710,5 @@ fn every_published_capability_is_one_a_binding_could_satisfy() {
         "nothing could claim: {unclaimable:?}"
     );
 }
+
+mod run;

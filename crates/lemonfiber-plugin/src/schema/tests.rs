@@ -250,13 +250,11 @@ fn a_claim_binds_each_probe_to_a_request_and_a_recording() {
                 .probes
                 .into_iter()
                 .map(|probe| {
-                    (
-                        probe.id,
-                        probe.request.method,
-                        probe.request.path,
-                        probe.expect.status,
-                        probe.fixture,
-                    )
+                    let (method, path) = probe
+                        .request
+                        .map(|request| (request.method, request.path))
+                        .unwrap_or_default();
+                    (probe.id, method, path, probe.expect.status, probe.fixture)
                 })
                 .collect();
             (claim.capability, bindings)

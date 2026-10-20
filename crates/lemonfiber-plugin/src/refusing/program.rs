@@ -1,5 +1,5 @@
-//! A proof that runs the image's own program, held to the bounds a run is given, and
-//! every expectation held to the kind of asking it judges.
+//! A proof or a claim probe that runs the image's own program, held to the bounds a run
+//! is given, and every expectation held to the kind of asking it judges.
 
 use crate::claiming::carries;
 use crate::schema::{Expect, Manifest, Proof, Run, LONGEST_ARG, MOST_ARGS, RUN_TIMEOUT};
@@ -27,6 +27,14 @@ pub(super) fn asked(manifest: &Manifest, found: &mut Vec<Violation>) {
         }
         keyed(&at, &proof.expect, proof.run.is_some(), found);
     }
+    for claim in &manifest.claims {
+        for binding in &claim.probes {
+            if binding.request.is_some() != binding.run.is_some() {
+                let at = format!("claim {}.probe {}", claim.capability, binding.id);
+                keyed(&at, &binding.expect, binding.run.is_some(), found);
+            }
+        }
+    }
     for (at, expect) in requested(manifest) {
         keyed(&at, expect, false, found);
     }
@@ -34,7 +42,7 @@ pub(super) fn asked(manifest: &Manifest, found: &mut Vec<Violation>) {
 }
 
 /// One run's arguments and time limit, against the bounds every run is held to.
-fn bounded(at: &str, run: &Run, found: &mut Vec<Violation>) {
+pub(crate) fn bounded(at: &str, run: &Run, found: &mut Vec<Violation>) {
     if run.args.is_empty() || run.args.len() > MOST_ARGS {
         found.push(Violation {
             location: format!("{at}.run.args"),
@@ -99,17 +107,10 @@ fn keyed(at: &str, expect: &Expect, of_a_run: bool, found: &mut Vec<Violation>) 
     }
 }
 
-/// Every expectation a manifest declares outside its proofs, each judging a request.
+/// Every expectation a manifest declares outside its proofs and its claims, each judging
+/// a request.
 fn requested(manifest: &Manifest) -> Vec<(String, &Expect)> {
     let mut every = Vec::new();
-    for claim in &manifest.claims {
-        for binding in &claim.probes {
-            every.push((
-                format!("claim {}.probe {}", claim.capability, binding.id),
-                &binding.expect,
-            ));
-        }
-    }
     for entry in &manifest.contributions {
         if let Some(expect) = &entry.expect {
             every.push((format!("contribution {}", entry.id), expect));

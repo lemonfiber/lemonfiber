@@ -31,7 +31,7 @@ pub(super) const CARRIED: &[Capability] = &[
                       list them to the network has stopped satisfying this whether or not it \
                       still searches.",
                 credential: Credential::None,
-                requires: Requirement {
+                requires: Requirement::Request {
                     status: &[401, 403],
                     body: &[],
                 },
@@ -43,7 +43,7 @@ pub(super) const CARRIED: &[Capability] = &[
                 why: "Searching is what this is for, and the indexers it would search are the \
                       part that can be read without asking anything of a third party.",
                 credential: Credential::Operator,
-                requires: Requirement {
+                requires: Requirement::Request {
                     status: &[200],
                     body: &[
                         Constraint::Json,
@@ -55,6 +55,7 @@ pub(super) const CARRIED: &[Capability] = &[
                 },
             },
         ],
+        listens: true,
     },
     Capability {
         name: "indexer.proxy",
@@ -72,7 +73,7 @@ pub(super) const CARRIED: &[Capability] = &[
                       instead is that the thing behind the port is this and not an empty \
                       container.",
             credential: Credential::None,
-            requires: Requirement {
+            requires: Requirement::Request {
                 status: &[200],
                 body: &[
                     Constraint::Json,
@@ -82,6 +83,7 @@ pub(super) const CARRIED: &[Capability] = &[
                 ],
             },
         }],
+        listens: true,
     },
     Capability {
         name: "download.usenet",
@@ -100,7 +102,7 @@ pub(super) const CARRIED: &[Capability] = &[
                       for it. A client that would answer that to the network has stopped \
                       satisfying this.",
                 credential: Credential::None,
-                requires: Requirement {
+                requires: Requirement::Request {
                     status: &[401, 403],
                     body: &[],
                 },
@@ -112,7 +114,7 @@ pub(super) const CARRIED: &[Capability] = &[
                 why: "Reporting where a finished download is requires having a queue to report \
                       from, and the queue is the part that can be read without starting one.",
                 credential: Credential::Operator,
-                requires: Requirement {
+                requires: Requirement::Request {
                     status: &[200],
                     body: &[
                         Constraint::Json,
@@ -124,6 +126,7 @@ pub(super) const CARRIED: &[Capability] = &[
                 },
             },
         ],
+        listens: true,
     },
     Capability {
         name: "download.torrent",
@@ -143,7 +146,7 @@ pub(super) const CARRIED: &[Capability] = &[
                       has consequences outside the household, and the client is the only thing \
                       that can refuse it.",
                 credential: Credential::None,
-                requires: Requirement {
+                requires: Requirement::Request {
                     status: &[401, 403],
                     body: &[],
                 },
@@ -155,7 +158,7 @@ pub(super) const CARRIED: &[Capability] = &[
                 why: "The same reason the Usenet client's queue is the readable half: it is what \
                       the service has to report from, and reading it starts nothing.",
                 credential: Credential::Operator,
-                requires: Requirement {
+                requires: Requirement::Request {
                     status: &[200],
                     body: &[
                         Constraint::Json,
@@ -167,6 +170,7 @@ pub(super) const CARRIED: &[Capability] = &[
                 },
             },
         ],
+        listens: true,
     },
     Capability {
         name: EGRESS_GUARD,
@@ -184,7 +188,7 @@ pub(super) const CARRIED: &[Capability] = &[
                       machine, and the failure it has is silent: a tunnel that dropped looks \
                       exactly like one that is up unless something asks.",
             credential: Credential::None,
-            requires: Requirement {
+            requires: Requirement::Request {
                 status: &[200],
                 body: &[
                     Constraint::Json,
@@ -194,6 +198,7 @@ pub(super) const CARRIED: &[Capability] = &[
                 ],
             },
         }],
+        listens: true,
     },
     Capability {
         name: "library.curate",
@@ -212,7 +217,7 @@ pub(super) const CARRIED: &[Capability] = &[
                       download anything. Its API answering the network at all is the failure; \
                       whether the list is interesting is beside the point.",
                 credential: Credential::None,
-                requires: Requirement {
+                requires: Requirement::Request {
                     status: &[401, 403],
                     body: &[],
                 },
@@ -224,7 +229,7 @@ pub(super) const CARRIED: &[Capability] = &[
                 why: "Holding a wanted list is the half of this that can be demonstrated without \
                       waiting for something to be released.",
                 credential: Credential::Operator,
-                requires: Requirement {
+                requires: Requirement::Request {
                     status: &[200],
                     body: &[
                         Constraint::Json,
@@ -236,6 +241,7 @@ pub(super) const CARRIED: &[Capability] = &[
                 },
             },
         ],
+        listens: true,
     },
     Capability {
         name: "subtitles.fetch",
@@ -252,7 +258,7 @@ pub(super) const CARRIED: &[Capability] = &[
                 why: "It holds subtitle-provider accounts and a path into the library. Neither \
                       is something the network may read.",
                 credential: Credential::None,
-                requires: Requirement {
+                requires: Requirement::Request {
                     status: &[401, 403],
                     body: &[],
                 },
@@ -264,7 +270,7 @@ pub(super) const CARRIED: &[Capability] = &[
                 why: "What it is configured to fetch, and for what, is the part that can be read \
                       without a provider being asked anything.",
                 credential: Credential::Operator,
-                requires: Requirement {
+                requires: Requirement::Request {
                     status: &[200],
                     body: &[
                         Constraint::Json,
@@ -275,6 +281,7 @@ pub(super) const CARRIED: &[Capability] = &[
                 },
             },
         ],
+        listens: true,
     },
     Capability {
         name: MEDIA_SERVE,
@@ -293,7 +300,7 @@ pub(super) const CARRIED: &[Capability] = &[
                       probe, keeps appearing green, and has published somebody's library. \
                       Nothing else would notice.",
                 credential: Credential::None,
-                requires: Requirement {
+                requires: Requirement::Request {
                     status: &[401, 403],
                     body: &[],
                 },
@@ -305,7 +312,7 @@ pub(super) const CARRIED: &[Capability] = &[
                 why: "Serving a library means having a catalogue of it. A service that refuses \
                       everybody including the operator is not serving anything.",
                 credential: Credential::Operator,
-                requires: Requirement {
+                requires: Requirement::Request {
                     status: &[200],
                     body: &[
                         Constraint::Json,
@@ -317,6 +324,7 @@ pub(super) const CARRIED: &[Capability] = &[
                 },
             },
         ],
+        listens: true,
     },
     Capability {
         name: "identity.source",
@@ -335,7 +343,7 @@ pub(super) const CARRIED: &[Capability] = &[
                       ever authenticate. What that is is the server's identity, and it is the \
                       part with nothing of the household's in it.",
                 credential: Credential::None,
-                requires: Requirement {
+                requires: Requirement::Request {
                     status: &[200],
                     body: &[
                         Constraint::Json,
@@ -352,12 +360,13 @@ pub(super) const CARRIED: &[Capability] = &[
                 why: "The line between the two probes is the whole of this capability: which \
                       server, to anybody; who is on it, to nobody.",
                 credential: Credential::None,
-                requires: Requirement {
+                requires: Requirement::Request {
                     status: &[401, 403],
                     body: &[],
                 },
             },
         ],
+        listens: true,
     },
     Capability {
         name: "request.intake",
@@ -374,7 +383,7 @@ pub(super) const CARRIED: &[Capability] = &[
                 why: "This is the one service a household member reaches without being an \
                       operator, so it has a front door that answers before anybody signs in.",
                 credential: Credential::None,
-                requires: Requirement {
+                requires: Requirement::Request {
                     status: &[200],
                     body: &[
                         Constraint::Json,
@@ -391,12 +400,13 @@ pub(super) const CARRIED: &[Capability] = &[
                 why: "What a household asked for is the household's. A request list readable by \
                       the network is a list of what everybody in the house is waiting to watch.",
                 credential: Credential::None,
-                requires: Requirement {
+                requires: Requirement::Request {
                     status: &[401, 403],
                     body: &[],
                 },
             },
         ],
+        listens: true,
     },
 ];
 

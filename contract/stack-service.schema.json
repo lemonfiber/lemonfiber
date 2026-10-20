@@ -72,16 +72,31 @@
       "required": ["capability"]
     },
     "ClaimProbe": {
-      "description": "One probe of a claimed capability, bound to a request on this plugin's service.",
+      "description": "One probe of a claimed capability, bound to a request on this plugin's service or,\nwhere the vocabulary declares the probe a run, to a run of its image's own program.",
       "type": "object",
       "properties": {
         "expect": {"description": "What the answer must be, within what the probe permits.", "$ref": "#/$defs/Expect"},
         "fixture": {"description": "The recorded response.\n\nRequired here where it is optional on a proof: a claim nobody can demonstrate\nwithout owning the service is a claim the catalogue's own checks cannot make.", "type": "string"},
         "id": {"description": "Names a probe the capability declares.", "type": "string"},
-        "request": {"description": "Method and path on this plugin's own service.", "$ref": "#/$defs/PluginRequest"}
+        "request": {
+          "description": "Method and path on this plugin's own service. Exactly one of this and `run`, and\nthis where the vocabulary declares the probe a request.",
+          "anyOf": [
+            {"$ref": "#/$defs/PluginRequest"},
+            {"type": "null"}
+          ],
+          "default": null
+        },
+        "run": {
+          "description": "Arguments to the image's own entrypoint, run with no network. Exactly one of this\nand `request`, and this where the vocabulary declares the probe a run.",
+          "anyOf": [
+            {"$ref": "#/$defs/PluginRun"},
+            {"type": "null"}
+          ],
+          "default": null
+        }
       },
       "additionalProperties": false,
-      "required": ["id", "request", "expect", "fixture"]
+      "required": ["id", "expect", "fixture"]
     },
     "Criticality": {
       "description": "How much a service's absence costs.\n\nSerialisable as well as readable, because it reaches an operator: a status\nreport that says a service is down without saying whether that matters\nleaves them to guess, and the manifest already holds the answer.",
@@ -238,6 +253,26 @@
       },
       "additionalProperties": false,
       "required": ["method", "path"]
+    },
+    "PluginRun": {
+      "description": "A run of the image's own program, as a proof declares it.",
+      "type": "object",
+      "properties": {
+        "args": {
+          "description": "Each argument handed to the image's entrypoint, one string each: one to 64, each at\nmost 4096 bytes and none holding a NUL.",
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "timeout_s": {
+          "description": "How long the run may take, from 1 to 120 seconds. Default 30.",
+          "type": ["integer", "null"],
+          "format": "uint32",
+          "default": null,
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": ["args"]
     },
     "PluginShape": {
       "description": "A privileged shape lemonfiber writes for a service.",

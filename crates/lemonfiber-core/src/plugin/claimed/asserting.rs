@@ -19,6 +19,10 @@ use super::super::judging::{faults, ran, Fault};
 use super::super::recorded::{self, Of, Recording};
 use super::{FailingAsDeclared, Verdict};
 
+/// Why an assertion declaring both a request and a run, or neither, is not decided.
+pub(in crate::plugin) const ASKS_NO_ONE_THING: &str =
+    "asks no one thing, a request or a run, so there is nothing to decide";
+
 /// Which kind of assertion a verdict is about.
 ///
 /// A probe is reported against the capability it demonstrates and is not here. These
@@ -71,8 +75,7 @@ pub(super) fn proved(
                     assessed(&asserting, service, root, refusals)
                 }
                 None => Verdict::Unproven {
-                    why: "asks no one thing, a request or a run, so there is nothing to decide"
-                        .to_owned(),
+                    why: ASKS_NO_ONE_THING.to_owned(),
                 },
             };
             Asserted {
@@ -143,7 +146,22 @@ pub(in crate::plugin) enum Asks<'a> {
 impl<'a> Asks<'a> {
     /// What a proof puts to its service, where it declares exactly one of the two.
     pub(in crate::plugin) const fn of(proof: &'a lemonfiber_plugin::Proof) -> Option<Self> {
-        match (&proof.request, &proof.run) {
+        Self::either(proof.request.as_ref(), proof.run.as_ref())
+    }
+
+    /// What a claim's probe puts to its service, where it declares exactly one of the two.
+    pub(in crate::plugin) const fn bound(
+        binding: &'a lemonfiber_plugin::ClaimProbe,
+    ) -> Option<Self> {
+        Self::either(binding.request.as_ref(), binding.run.as_ref())
+    }
+
+    /// The one of `request` and `run` that is declared, where exactly one is.
+    const fn either(
+        request: Option<&'a lemonfiber_plugin::Request>,
+        run: Option<&'a lemonfiber_plugin::Run>,
+    ) -> Option<Self> {
+        match (request, run) {
             (Some(request), None) => Some(Self::Request(request)),
             (None, Some(run)) => Some(Self::Run(run)),
             _ => None,

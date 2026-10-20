@@ -20,7 +20,7 @@ use lemonfiber_plugin::{Claim, ClaimProbe, Manifest, Service};
 use crate::doctor::BUNDLED_CHECKS;
 use crate::filling::{fills, Claimant, Filling, Shown};
 use crate::plugin::{capabilities, Ungenerated};
-pub(in crate::plugin) use asserting::{pinned_to, Asks};
+pub(in crate::plugin) use asserting::{pinned_to, Asks, ASKS_NO_ONE_THING};
 pub use asserting::{Asserted, Assertion};
 
 use lemonfiber_bundle::MANIFEST;
@@ -421,9 +421,14 @@ fn against(
     root: &Path,
     refusals: &mut Vec<lemonfiber_plugin::Violation>,
 ) -> Verdict {
+    let Some(asks) = Asks::bound(binding) else {
+        return Verdict::Unproven {
+            why: ASKS_NO_ONE_THING.to_owned(),
+        };
+    };
     asserting::recorded_answer(
         Some(binding.fixture.as_str()),
-        Asks::Request(&binding.request),
+        asks,
         &binding.expect,
         Some(service),
         root,

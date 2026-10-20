@@ -10,6 +10,7 @@
       "probes": [
         {
           "id": "guarded",
+          "kind": "request",
           "title": "An anonymous caller is refused the indexers it holds",
           "asks": "a read of the indexers configured on this service, presenting nothing",
           "why": "An indexer account is an account somebody paid for. A service that would list them to the network has stopped satisfying this whether or not it still searches.",
@@ -21,6 +22,7 @@
         },
         {
           "id": "indexers",
+          "kind": "request",
           "title": "It answers with the indexers it holds",
           "asks": "the same read, with the credential the operator holds",
           "why": "Searching is what this is for, and the indexers it would search are the part that can be read without asking anything of a third party.",
@@ -40,6 +42,7 @@
       "probes": [
         {
           "id": "identifies",
+          "kind": "request",
           "title": "It answers with its own name and version",
           "asks": "a read of the service's own state, presenting nothing",
           "why": "This is the one capability whose claimant deliberately holds no credential, so a refusal would be the wrong evidence. What it must show instead is that the thing behind the port is this and not an empty container.",
@@ -59,6 +62,7 @@
       "probes": [
         {
           "id": "guarded",
+          "kind": "request",
           "title": "An anonymous caller is refused the queue",
           "asks": "a read of the download queue, presenting nothing",
           "why": "The queue names what the household is downloading and the account paying for it. A client that would answer that to the network has stopped satisfying this.",
@@ -70,6 +74,7 @@
         },
         {
           "id": "queue",
+          "kind": "request",
           "title": "It answers with its queue",
           "asks": "the same read, with the credential the operator holds",
           "why": "Reporting where a finished download is requires having a queue to report from, and the queue is the part that can be read without starting one.",
@@ -89,6 +94,7 @@
       "probes": [
         {
           "id": "guarded",
+          "kind": "request",
           "title": "An anonymous caller is refused the queue",
           "asks": "a read of the download queue, presenting nothing",
           "why": "A torrent client's queue is the one list in this stack whose disclosure has consequences outside the household, and the client is the only thing that can refuse it.",
@@ -100,6 +106,7 @@
         },
         {
           "id": "queue",
+          "kind": "request",
           "title": "It answers with its queue",
           "asks": "the same read, with the credential the operator holds",
           "why": "The same reason the Usenet client's queue is the readable half: it is what the service has to report from, and reading it starts nothing.",
@@ -119,6 +126,7 @@
       "probes": [
         {
           "id": "identifies",
+          "kind": "request",
           "title": "It answers whether the tunnel is up",
           "asks": "a read of the tunnel's state, from inside the stack",
           "why": "This is the one service whose failure has consequences outside the machine, and the failure it has is silent: a tunnel that dropped looks exactly like one that is up unless something asks.",
@@ -138,6 +146,7 @@
       "probes": [
         {
           "id": "guarded",
+          "kind": "request",
           "title": "An anonymous caller is refused the wanted list",
           "asks": "a read of the wanted list, presenting nothing",
           "why": "A curating service holds every key the stack was given and can be made to download anything. Its API answering the network at all is the failure; whether the list is interesting is beside the point.",
@@ -149,6 +158,7 @@
         },
         {
           "id": "wanted",
+          "kind": "request",
           "title": "It answers with what it is holding",
           "asks": "the same read, with the credential the operator holds",
           "why": "Holding a wanted list is the half of this that can be demonstrated without waiting for something to be released.",
@@ -168,6 +178,7 @@
       "probes": [
         {
           "id": "guarded",
+          "kind": "request",
           "title": "An anonymous caller is refused its configuration",
           "asks": "a read of the service's own state, presenting nothing",
           "why": "It holds subtitle-provider accounts and a path into the library. Neither is something the network may read.",
@@ -179,6 +190,7 @@
         },
         {
           "id": "status",
+          "kind": "request",
           "title": "It answers with its own state",
           "asks": "the same read, with the credential the operator holds",
           "why": "What it is configured to fetch, and for what, is the part that can be read without a provider being asked anything.",
@@ -198,6 +210,7 @@
       "probes": [
         {
           "id": "guarded",
+          "kind": "request",
           "title": "An anonymous caller is refused the catalogue",
           "asks": "a read of the catalogue of what it holds, presenting nothing",
           "why": "This is the probe the whole vocabulary is for. A media server bound to the household network that stops refusing this keeps answering its health probe, keeps appearing green, and has published somebody's library. Nothing else would notice.",
@@ -209,6 +222,7 @@
         },
         {
           "id": "catalogue",
+          "kind": "request",
           "title": "It answers with the catalogue of what it holds",
           "asks": "the same read, with the credential the operator holds",
           "why": "Serving a library means having a catalogue of it. A service that refuses everybody including the operator is not serving anything.",
@@ -228,6 +242,7 @@
       "probes": [
         {
           "id": "identifies",
+          "kind": "request",
           "title": "It tells an anonymous caller which server this is",
           "asks": "a read of the public server information a client needs before it can sign in",
           "why": "Something has to be answerable before authentication, or nothing could ever authenticate. What that is is the server's identity, and it is the part with nothing of the household's in it.",
@@ -239,6 +254,7 @@
         },
         {
           "id": "guarded",
+          "kind": "request",
           "title": "An anonymous caller is refused the accounts",
           "asks": "a read of the accounts it holds, presenting nothing",
           "why": "The line between the two probes is the whole of this capability: which server, to anybody; who is on it, to nobody.",
@@ -258,6 +274,7 @@
       "probes": [
         {
           "id": "identifies",
+          "kind": "request",
           "title": "It answers with its own state",
           "asks": "a read of the service's own version and state, presenting nothing",
           "why": "This is the one service a household member reaches without being an operator, so it has a front door that answers before anybody signs in.",
@@ -269,6 +286,7 @@
         },
         {
           "id": "guarded",
+          "kind": "request",
           "title": "An anonymous caller is refused the requests",
           "asks": "a read of what has been requested, presenting nothing",
           "why": "What a household asked for is the household's. A request list readable by the network is a list of what everybody in the house is waiting to watch.",

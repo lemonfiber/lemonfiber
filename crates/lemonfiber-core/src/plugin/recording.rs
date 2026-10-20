@@ -1,10 +1,10 @@
 //! Taking every recording a manifest names again, from its pin.
 //!
-//! A run proof's by running it, bounded as every proof's run is. Every request's from one
-//! fresh container of its service, after the first run the core performs for it, asked
-//! with the credential that first run left where its probe is asked as the operator, and
-//! scrubbed of that credential and the container's identity. A service is recorded whole
-//! or not at all, and the note already at each path is kept.
+//! A run proof's or a run probe's by running it, bounded as every proof's run is. Every
+//! request's from one fresh container of its service, after the first run the core
+//! performs for it, asked with the credential that first run left where its probe is
+//! asked as the operator, and scrubbed of that credential and the container's identity.
+//! A service is recorded whole or not at all, and the note already at each path is kept.
 
 mod addressed;
 mod asked;
@@ -119,10 +119,8 @@ pub async fn record(path: &Path, recorder: Recorder<'_>) -> Result<Recorded, Unr
     let mut recordings = Vec::new();
     let mut failed = Vec::new();
     if refusals.is_empty() {
-        for proof in &manifest.proofs {
-            if let Some(run) = &proof.run {
-                recordings.push(ran::taken(&manifest, proof, run, &root, recorder.program).await);
-            }
+        for running in ran::runs(&manifest) {
+            recordings.push(ran::taken(&manifest, running, &root, recorder.program).await);
         }
         let (asked, unfailed) = asked::taken(&manifest, &root, recorder).await;
         recordings.extend(asked);
