@@ -254,14 +254,9 @@ fn has_tag(last: &str) -> bool {
 /// Every rule the service's container fields break, as the one model holds every
 /// service's.
 fn contained(manifest: &Manifest, service: &Service, found: &mut Vec<Violation>) {
-    let secrets: Vec<&str> = manifest
-        .secrets
-        .iter()
-        .map(|secret| secret.id.as_str())
-        .collect();
     found.extend(
         service
-            .container(&manifest.plugin.id, &secrets)
+            .container(&manifest.plugin.id, &manifest.secrets)
             .broken()
             .into_iter()
             .map(|(location, message)| Violation { location, message }),

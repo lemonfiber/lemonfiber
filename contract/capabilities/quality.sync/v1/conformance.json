@@ -1,0 +1,48 @@
+{
+  "capability": "quality.sync",
+  "cases": [
+    {
+      "asked": {},
+      "case": "refuses-without-the-key",
+      "expect": {
+        "status": [
+          401
+        ]
+      },
+      "keyed": false,
+      "live": true,
+      "operation": "apply"
+    },
+    {
+      "asked": {
+        "profiled": {
+          "api_key": "{minted}",
+          "host": "conformance-curator",
+          "port": 80,
+          "preset": "balanced",
+          "which": "tv"
+        }
+      },
+      "case": "apply-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "apply"
+    },
+    {
+      "asked": {
+        "which": "tv"
+      },
+      "case": "applied-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "applied"
+    }
+  ],
+  "major": 1
+}

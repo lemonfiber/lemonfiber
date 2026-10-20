@@ -216,3 +216,32 @@ fn a_word_the_plugin_leaves_out_and_an_ask_naming_no_capability_are_not_written(
     assert!(written.get("wiring").is_some());
     assert_eq!(written.get("wiring"), whole.get("wiring"));
 }
+
+#[test]
+fn an_assembled_part_keeps_every_secret_its_plugin_declares() {
+    let keyed = CURATOR.replace(
+        "[[ask]]\ncapability = \"download.usenet\"",
+        "[service.env]\nCURATOR_KEY = { secret = \"api-key\" }\n\n[[secret]]\nid  = \"api-key\"\nof  = \"curator\"\nwhy = \"Answer the stack's services\"\n\n[[ask]]\ncapability = \"download.usenet\"",
+    );
+    let Ok(text) = assembled(
+        BUNDLE,
+        &[held("curator", &keyed, Stage::Assembled)],
+        "0.18.0",
+    ) else {
+        unreachable!("the fixture assembles");
+    };
+    let Ok(manifest) = Manifest::from_toml(&text) else {
+        unreachable!("the assembly reads back");
+    };
+    let held: Vec<(&str, &str)> = manifest
+        .services
+        .iter()
+        .flat_map(|service| &service.secret)
+        .map(|secret| (secret.id.as_str(), secret.of.as_str()))
+        .collect();
+    assert_eq!(held, [("api-key", "curator")]);
+    assert!(manifest
+        .services
+        .iter()
+        .all(|service| service.container().broken().is_empty()));
+}

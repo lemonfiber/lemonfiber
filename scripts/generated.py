@@ -38,6 +38,7 @@ REGISTRY = (
             "crates/lemonfiber-plugin/src/pointing.rs",
             "crates/lemonfiber-plugin/src/vocabulary.rs",
             "crates/lemonfiber-manifest/src/container.rs",
+            "crates/lemonfiber-manifest/src/container/values.rs",
             "crates/lemonfiber-manifest/src/schema/api.rs",
             "crates/lemonfiber-core/examples/plugin_schema.rs",
             "crates/lemonfiber-core/src/plugin.rs",

@@ -246,6 +246,17 @@
         {"description": "The host's render devices and the group that owns them.", "type": "string", "const": "render"}
       ]
     },
+    "Secret": {
+      "description": "A value a service holds, declared before anything captures or enters it.",
+      "type": "object",
+      "properties": {
+        "id": {"description": "What the value is, within its namespace.", "type": "string"},
+        "of": {"description": "Whose credential it is.", "type": "string"},
+        "why": {"description": "What holding it is for.", "type": "string"}
+      },
+      "additionalProperties": false,
+      "required": ["id", "of", "why"]
+    },
     "Service": {
       "description": "One container in the stack.",
       "type": "object",
@@ -387,6 +398,12 @@
           "description": "Where this service's own requests go, in the terms an operator would\nrecognise — not in protocol names.\n\nAn empty string is an answer: this service reaches nothing. That is not the\nsame as the field being absent, which is the stack declining to say, and the\ntwo must never be read as one — an inventory of what leaves a machine that\nrendered \"we were not told\" as \"nothing leaves\" would be making a privacy\nclaim out of its own ignorance.\n\nOptional because a stack written before this existed says nothing, and a build\nthat refused such a manifest would refuse the stack it ships with. Where it is\nabsent, lemonfiber answers from what it knows about the services it ships, and\nreports that it knows nothing where it does not.",
           "type": ["string", "null"],
           "default": null
+        },
+        "secret": {
+          "description": "The values it holds, each declared by the plugin the bundle assembles it from and\nheld in its own id's namespace. A stack directory's service declares none.",
+          "type": "array",
+          "default": [],
+          "items": {"$ref": "#/$defs/Secret"}
         },
         "shape": {
           "description": "The one privileged shape lemonfiber writes for it, from a closed set.",

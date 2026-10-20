@@ -47,6 +47,7 @@
     "secret": {
       "description": "Every value it will hold.",
       "type": "array",
+      "default": [],
       "items": {"$ref": "#/$defs/Secret"}
     },
     "service": {
@@ -830,10 +831,10 @@
       "additionalProperties": false
     },
     "Secret": {
-      "description": "A value the plugin will hold.\n\nDeclared before anything can capture one, because the rule is that a secret\ncaptured but not declared fails validation — and a rule that cannot be stated for\nwant of a field is not being enforced.",
+      "description": "A value a service holds, declared before anything captures or enters it.",
       "type": "object",
       "properties": {
-        "id": {"description": "What the value is, within the plugin.", "type": "string"},
+        "id": {"description": "What the value is, within its namespace.", "type": "string"},
         "of": {"description": "Whose credential it is.", "type": "string"},
         "why": {"description": "What holding it is for.", "type": "string"}
       },

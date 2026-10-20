@@ -268,6 +268,10 @@ pub struct Service {
     /// cannot reach the first, which reads this one.
     #[serde(default)]
     pub claim: Vec<Claimed>,
+    /// The values it holds, each declared by the plugin the bundle assembles it from and
+    /// held in its own id's namespace. A stack directory's service declares none.
+    #[serde(default)]
+    pub secret: Vec<crate::container::Secret>,
     /// Same-profile dependencies only.
     #[serde(default)]
     pub depends_on: Vec<String>,

@@ -8,6 +8,8 @@ pub mod identity;
 pub mod indexer;
 pub mod library;
 pub mod media;
+pub mod proxy;
+pub mod quality;
 pub mod request;
 pub mod subtitles;
 
@@ -23,6 +25,8 @@ pub fn all() -> Vec<crate::Capability> {
         request::intake::capability(),
         identity::source::capability(),
         media::serve::capability(),
+        proxy::front::capability(),
+        quality::sync::capability(),
     ]
 }
 

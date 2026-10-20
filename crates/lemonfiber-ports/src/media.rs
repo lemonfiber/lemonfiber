@@ -11,6 +11,8 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod preset;
+
 /// The two kinds of video a household files by resolution.
 #[derive(
     Debug,
