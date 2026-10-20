@@ -17,6 +17,15 @@ const NAMED: &str = "lemonfiber-proof-";
 /// Told apart across the copies one process makes.
 static COUNTED: AtomicU64 = AtomicU64::new(0);
 
+/// Whether a directory is there, reached from a root through no link.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Reached {
+    /// It is there, every step to it a directory of its own.
+    There,
+    /// A step to it is not there.
+    Absent,
+}
+
 /// Where a service's starting files are: beneath a plugin's source, under its id.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Starting<'a> {
@@ -140,7 +149,7 @@ impl Throwaway {
         }
         let at = self.copy.join(relative);
         let parent = at.parent().unwrap_or(&self.copy);
-        if !linkless(&self.copy, parent)? {
+        if linkless(&self.copy, parent)? == Reached::Absent {
             return Ok(None);
         }
         match std::fs::symlink_metadata(&at) {
@@ -243,7 +252,7 @@ fn held(starting: Option<Starting<'_>>) -> Result<Vec<(String, Vec<u8>)>, String
         return Ok(found);
     };
     let top = starting.at();
-    if !linkless(starting.root, &top)? {
+    if linkless(starting.root, &top)? == Reached::Absent {
         return Ok(found);
     }
     let mut weight = 0_u64;
@@ -288,18 +297,18 @@ fn listed(dir: &Path) -> std::io::Result<Vec<(PathBuf, std::fs::Metadata)>> {
 
 /// Whether the directory `top` is there, every step to it from `root` a directory of its
 /// own; refused where one is a link or anything else.
-fn linkless(root: &Path, top: &Path) -> Result<bool, String> {
+fn linkless(root: &Path, top: &Path) -> Result<Reached, String> {
     let mut here = root.to_path_buf();
     for step in top.strip_prefix(root).unwrap_or(top).components() {
         here.push(step);
         match std::fs::symlink_metadata(&here) {
             Ok(kind) if kind.is_dir() => {}
             Ok(_) => return Err(unkind(&here.display().to_string())),
-            Err(why) if why.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+            Err(why) if why.kind() == std::io::ErrorKind::NotFound => return Ok(Reached::Absent),
             Err(why) => return Err(unread(&here, &why)),
         }
     }
-    Ok(true)
+    Ok(Reached::There)
 }
 
 /// The refusal of something in the starting files that is not a file or a directory.
