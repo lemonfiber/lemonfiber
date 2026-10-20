@@ -8,6 +8,7 @@
 
 mod assembly;
 mod copies;
+mod kept;
 mod parts;
 mod rules;
 mod tree;
@@ -20,6 +21,7 @@ use lemonfiber_manifest::{Form, Profile, Removed, Wiring};
 use serde::Deserialize;
 
 pub use assembly::assembled;
+pub use kept::kept;
 pub use tree::{digest as tree_digest, of as tree_of};
 
 /// The bundle's file, from the root of `lemonfiber-plugins`.

@@ -130,14 +130,22 @@ fn what_a_service_is_for_is_said_in_the_stacks_own_words() {
 
 #[test]
 fn several_services_are_said_together_in_the_order_the_stack_declares_them() {
-    let both = said(&["seerr", "jellyfin"]);
+    let declared: Vec<String> = Manifest::from_toml(STACK)
+        .map(|manifest| manifest.services.into_iter().map(|one| one.id).collect())
+        .unwrap_or_default();
+    let at = |id: &str| declared.iter().position(|one| one == id);
+    let mut asked = ["seerr", "jellyfin"];
+    asked.sort_by_key(|id| std::cmp::Reverse(at(id)));
+    let said = said(&asked);
+    let mut stacked = asked;
+    stacked.sort_by_key(|id| at(id));
     assert!(
-        both.as_ref().is_some_and(|said| {
-            said.find("jellyfin")
-                .zip(said.find("seerr"))
-                .is_some_and(|(media_server, requests)| media_server < requests)
+        said.as_ref().is_some_and(|said| {
+            said.find(stacked[0])
+                .zip(said.find(stacked[1]))
+                .is_some_and(|(first, second)| first < second)
         }),
-        "asked for in one order, reported in the stack's: {both:?}"
+        "asked for in one order, reported in the stack's: {said:?}"
     );
 }
 

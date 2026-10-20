@@ -137,7 +137,7 @@ fn asked(by: &str, ask: &Value) -> Option<Value> {
 
 /// Whether `row` is the bundle's own row for the ask `ask` makes: the same asker and
 /// capability, which the bundle settles with a choice of filler.
-fn same_ask(row: &Value, ask: &Value) -> bool {
+pub(crate) fn same_ask(row: &Value, ask: &Value) -> bool {
     ["by", "asks"]
         .iter()
         .all(|field| row.get(field).is_some() && row.get(field) == ask.get(field))

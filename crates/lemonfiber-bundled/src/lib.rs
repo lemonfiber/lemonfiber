@@ -1,16 +1,17 @@
 //! The stack and the default bundle this build embeds.
 //!
-//! `assets/media-stack` describes itself in a root and a file per service
-//!. Everything compiled against the bundled stack reads it through
-//! here, so none of it has to know the stack is written in pieces, and the build
-//! fails before any of it compiles when the files break the rules about them.
-//!
 //! `assets/plugins` is the catalogue whose `bundle/bundle.toml` pins every first-party
-//! plugin. Its pins and their manifests are compiled in from there, and the
-//! build fails when a copy is not the manifest its pin names.
+//! plugin. Its pins and their manifests are compiled in from there, and the build fails
+//! when a copy is not the manifest its pin names.
+//!
+//! The stack is the one that bundle declares: its own tables, a service for each part
+//! it assembles, and each part it installs as `assets/media-stack` declares it until
+//! the part moves. Everything compiled against the bundled stack reads it through here,
+//! and the build fails before any of it compiles when the stack is not one lemonfiber
+//! reads.
 
-/// The embedded stack's manifest: its root, then each service's file in the order
-/// `include` lists them.
+/// The embedded stack's manifest: the bundle's tables, then a service for each part, the
+/// assembled ones in the bundle's order and the installed ones after them.
 pub const STACK: &str = include_str!(concat!(env!("OUT_DIR"), "/stack.toml"));
 
 /// One first-party plugin, as the signed default bundle names it.
