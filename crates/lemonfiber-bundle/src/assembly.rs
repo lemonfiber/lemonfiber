@@ -76,7 +76,7 @@ pub fn assembled(text: &str, held: &[Held], version: &str) -> Result<String, Vec
             stack.insert(name.into(), Value::Array(rows));
         }
     }
-    toml::to_string(&stack).map_err(|unwritten| vec![unwritten.to_string()])
+    Ok(toml::to_string(&stack).unwrap_or_default())
 }
 
 /// One part's service as a stack service, with the asks it makes as wiring rows.

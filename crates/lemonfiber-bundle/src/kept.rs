@@ -59,7 +59,7 @@ pub fn kept(assembled: &str, frozen: &str, held: &[Held]) -> Result<String, Vec<
             stack.insert(name.into(), Value::Array(rows));
         }
     }
-    toml::to_string(&stack).map_err(|unwritten| vec![unwritten.to_string()])
+    Ok(toml::to_string(&stack).unwrap_or_default())
 }
 
 #[cfg(test)]

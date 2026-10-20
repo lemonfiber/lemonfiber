@@ -114,6 +114,18 @@ fn a_starting_file_that_cannot_be_read_is_unread() {
 }
 
 #[test]
+fn a_fixture_that_is_there_and_cannot_be_read_is_unread() {
+    let root = repository(
+        "fixture-directory",
+        &[("recordings/door/answers.json/x", "{}")],
+    );
+    assert!(matches!(
+        of(&root, MANIFEST_TEXT),
+        Err(Refused::Unread { .. })
+    ));
+}
+
+#[test]
 fn a_file_larger_than_one_piece_digests_as_its_whole_bytes() {
     let large = "x".repeat(200 * 1024 + 7);
     let root = repository("large", &[("config/door/large", &large)]);

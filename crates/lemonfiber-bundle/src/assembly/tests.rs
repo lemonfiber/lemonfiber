@@ -167,3 +167,52 @@ fn the_assembly_reads_back_as_a_stack_manifest() {
     };
     assert!(Manifest::from_toml(&text).is_ok_and(|manifest| manifest.services.len() == 1));
 }
+
+fn refusal(bundle: &str, copy: &str, pin: impl FnOnce(&mut Pin)) -> Vec<String> {
+    let mut part = held("curator", copy, Stage::Assembled);
+    pin(&mut part.pin);
+    assembled(bundle, &[part], "0.18.0")
+        .err()
+        .unwrap_or_default()
+}
+
+#[test]
+fn a_bundle_that_does_not_parse_is_refused() {
+    assert_eq!(refusal("= not toml", CURATOR, |_| ()).len(), 1);
+}
+
+#[test]
+fn each_part_that_cannot_be_a_stack_service_is_refused_saying_why() {
+    let unnamed = CURATOR.replace("[[service]]\nid          = \"curator\"\n", "[[service]]\n");
+    let said: Vec<(&str, bool)> = [
+        ("= not toml", "curator: "),
+        ("service = [1]\n", "curator: its service is not a table"),
+        (unnamed.as_str(), "curator: its service names no id"),
+    ]
+    .into_iter()
+    .map(|(copy, said)| {
+        let refused = refusal(BUNDLE, copy, |_| ());
+        (said, refused.iter().any(|one| one.starts_with(said)))
+    })
+    .collect();
+    assert!(said.iter().all(|(_, named)| *named), "{said:?}");
+    assert_eq!(
+        refusal(BUNDLE, CURATOR, |pin| pin.profile = None),
+        vec!["curator: its pin names no profile".to_owned()]
+    );
+}
+
+#[test]
+fn a_word_the_plugin_leaves_out_and_an_ask_naming_no_capability_are_not_written() {
+    let sparse = CURATOR
+        .replace(
+            "without_it  = \"Find and download episodes yourself\"\n",
+            "",
+        )
+        .replace("[[claim]]", "[[ask]]\neach = true\n\n[[claim]]");
+    let written = stack(&[held("curator", &sparse, Stage::Assembled)]);
+    let whole = stack(&[held("curator", CURATOR, Stage::Assembled)]);
+    assert!(only_service(&written).get("without_it").is_none());
+    assert!(written.get("wiring").is_some());
+    assert_eq!(written.get("wiring"), whole.get("wiring"));
+}

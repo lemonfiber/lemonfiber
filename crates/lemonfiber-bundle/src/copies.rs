@@ -9,7 +9,7 @@ use std::path::Path;
 use crate::{Refused, EXTENSION, MANIFEST};
 
 /// How many bytes of a file are hashed at a time.
-const PIECE: usize = 64 * 1024;
+const PIECE: u64 = 64 * 1024;
 
 /// The one entry in the copies directory that is not a copy: what keeps an empty
 /// directory in git.
@@ -121,17 +121,19 @@ pub(crate) fn found(root: &Path) -> Result<(Vec<String>, Vec<String>), Refused> 
 /// The SHA-256 of the file at `path` in lower-case hexadecimal, read in pieces through
 /// no link and waiting on no pipe, so no file is held whole however large.
 pub(crate) fn summed(path: &Path) -> Result<String, Refused> {
+    digested(path).map_err(|source| unread(path, source))
+}
+
+/// The SHA-256 of the file at `path`, read [`PIECE`] bytes at a time.
+fn digested(path: &Path) -> std::io::Result<String> {
     let mut context = ring::digest::Context::new(&ring::digest::SHA256);
-    let mut piece = vec![0_u8; PIECE];
-    let mut file = opened(path).map_err(|source| unread(path, source))?;
-    loop {
-        match file.read(&mut piece) {
-            Ok(0) => return Ok(crate::rendered(&context.finish())),
-            Ok(read) => context.update(piece.get(..read).unwrap_or_default()),
-            Err(interrupted) if interrupted.kind() == ErrorKind::Interrupted => {}
-            Err(source) => return Err(unread(path, source)),
-        }
+    let mut file = opened(path)?;
+    let mut piece = Vec::new();
+    while (&mut file).take(PIECE).read_to_end(&mut piece)? > 0 {
+        context.update(&piece);
+        piece.clear();
     }
+    Ok(crate::rendered(&context.finish()))
 }
 
 /// Every entry in the directory `at`, by its name, with its kind as the entry itself
