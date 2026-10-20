@@ -355,13 +355,9 @@ fn a_stream_guard_is_recorded_holding_a_certificate_the_core_would_write() {
         let (Some(placed), Ok(copy)) = (placed, copy) else {
             unreachable!("the fixture places a service and a copy is made");
         };
-        assert_eq!(super::served::certified(&placed, &copy), Ok(()));
-        let kept = crate::certificate::kept(copy.path());
-        assert_eq!(
-            kept.as_ref().map(Option::is_some),
-            Ok(holds),
-            "{provides}: {kept:?}"
-        );
+        assert!(super::served::certified(&placed, &copy).is_ok());
+        let held = crate::certificate::kept(copy.path()).is_ok_and(|kept| kept.is_some() == holds);
+        assert!(held, "{provides}");
     }
 }
 
@@ -389,5 +385,5 @@ fn a_certificate_that_cannot_be_written_stops_the_guard_before_it_starts() {
     let _ = std::fs::set_permissions(copy.path(), std::fs::Permissions::from_mode(0o500));
     let certified = super::served::certified(&placed, &copy);
     let _ = std::fs::set_permissions(copy.path(), std::fs::Permissions::from_mode(0o700));
-    assert!(certified.is_err(), "{certified:?}");
+    assert!(certified.is_err());
 }
