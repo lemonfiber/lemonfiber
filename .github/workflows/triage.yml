@@ -12,6 +12,6 @@ jobs:
     permissions:
       contents: read
       issues: write
-    uses: lemonfiber/spec/.github/workflows/triage.yml@ca770979e940f48a57d25cbc2d687b0d1cb58049 # v1.0.102
+    uses: lemonfiber/spec/.github/workflows/triage.yml@e745e0f7f79f5f2e76b68e560b1c28e1df956493 # v1.0.103
     secrets:
       DISCORD_MAINTAINERS_WEBHOOK: ${{ secrets.DISCORD_MAINTAINERS_WEBHOOK }}
