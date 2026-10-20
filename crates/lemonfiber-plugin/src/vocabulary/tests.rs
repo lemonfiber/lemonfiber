@@ -1,7 +1,8 @@
 use std::collections::BTreeSet;
 
 use super::{
-    carried, is_core_name, published, Constraint, Credential, Unpublishable, VOCABULARY_VERSION,
+    carried, is_core_name, published, publishing, Capability, Constraint, Credential, Probe,
+    ProbeKind, Requirement, Unpublishable, VOCABULARY_VERSION,
 };
 
 /// A stack declaring every capability this generation carries, one service each.
@@ -161,7 +162,7 @@ fn every_capability_carries_probes_that_say_what_must_be_shown() {
                         || probe.title.is_empty()
                         || probe.asks.is_empty()
                         || probe.why.is_empty()
-                        || probe.requires.status.is_empty()
+                        || probe.requires.endings().is_empty()
                 })
         })
         .map(|held| held.name)
@@ -279,8 +280,8 @@ fn a_probe_requiring_no_body_constraint_is_a_refusal() {
     let odd: Vec<&str> = carried()
         .iter()
         .flat_map(|held| held.probes)
-        .filter(|probe| probe.requires.body.is_empty())
-        .filter(|probe| probe.requires.status.iter().any(|status| *status < 400))
+        .filter(|probe| probe.kind() == ProbeKind::Request && probe.requires.body().is_empty())
+        .filter(|probe| probe.requires.endings().iter().any(|status| *status < 400))
         .map(|probe| probe.id)
         .collect();
     assert!(
@@ -344,4 +345,137 @@ fn the_published_words_are_the_ones_the_contract_uses() {
             "\"body_starts_with\"",
         ]
     );
+}
+
+/// A probe that runs the claimant image's own program and is answered by its exit and
+/// the start of what it prints.
+const RUN: Probe = Probe {
+    id: "runs",
+    title: "Its own program runs and says what it is",
+    asks: "a run of the image's own program asking which release it is",
+    why: "Nothing reaches it over the network, so its own program is what can be asked.",
+    credential: Credential::None,
+    requires: Requirement::Run {
+        exit: &[0],
+        body: &[Constraint::StdoutStartsWith],
+    },
+};
+
+/// A capability whose fillers listen on nothing, probed by a run.
+const QUIET: &[Capability] = &[Capability {
+    name: "quiet.work",
+    summary: "Works on its own schedule.",
+    contract: "Listens on nothing.",
+    probes: &[RUN],
+    listens: false,
+}];
+
+/// The same probe on a capability whose fillers listen for requests.
+const LISTENING: &[Capability] = &[Capability {
+    name: "loud.work",
+    summary: "Answers requests.",
+    contract: "Listens for requests.",
+    probes: &[RUN],
+    listens: true,
+}];
+
+/// A stack whose one service declares `name`.
+fn declaring(name: &str) -> Vec<lemonfiber_manifest::Service> {
+    services(&format!(
+        "schema_version = 1\nstack_version = \"1.0.0\"\nmin_cli_version = \"0.4.0\"\n\
+         [[profile]]\nid = \"p\"\nname = \"P\"\ndescription = \"P\"\n{}",
+        service("one", &[name])
+    ))
+}
+
+/// A run probe where a capability's fillers listen for requests fails generation, naming
+/// the capability and the probe.
+#[test]
+fn a_run_probe_where_the_fillers_listen_refuses_to_be_published() {
+    let refusal = publishing(LISTENING, &declaring("loud.work"))
+        .err()
+        .unwrap_or_default();
+    assert_eq!(
+        refusal,
+        vec![Unpublishable::RunOfAListener {
+            capability: "loud.work",
+            probe: "runs",
+        }]
+    );
+    let said: String = refusal.iter().map(ToString::to_string).collect();
+    assert!(
+        said.contains("loud.work") && said.contains("runs"),
+        "names both: {said}"
+    );
+}
+
+/// A run probe where the fillers listen on nothing is published, and the artefact says
+/// it is a run, answered by an exit status and the start of what it prints.
+#[test]
+fn a_run_probe_where_the_fillers_listen_on_nothing_is_published_as_a_run() {
+    let published = publishing(QUIET, &declaring("quiet.work"));
+    let probe = published
+        .ok()
+        .and_then(|published| serde_json::to_value(published.capabilities).ok())
+        .and_then(|capabilities| capabilities.pointer("/0/probes/0").cloned());
+    assert_eq!(
+        probe,
+        Some(serde_json::json!({
+            "id": "runs",
+            "kind": "run",
+            "title": RUN.title,
+            "asks": RUN.asks,
+            "why": RUN.why,
+            "credential": "none",
+            "requires": { "exit": [0], "body": ["stdout_starts_with"] },
+        }))
+    );
+}
+
+/// A request probe says so in the artefact, and lists the statuses that answer it.
+#[test]
+fn a_request_probe_is_published_as_a_request_with_its_statuses() {
+    let probe = carried()
+        .iter()
+        .flat_map(|held| held.probes)
+        .find(|probe| probe.kind() == ProbeKind::Request)
+        .and_then(|probe| serde_json::to_value(probe).ok());
+    let kind = probe.as_ref().and_then(|probe| probe.get("kind").cloned());
+    let statuses = probe.and_then(|probe| probe.pointer("/requires/status").cloned());
+    assert_eq!(kind, Some(serde_json::json!("request")));
+    assert!(
+        statuses.is_some_and(|statuses| statuses.is_array()),
+        "lists its statuses"
+    );
+}
+
+/// Every probe this generation declares a run belongs to a capability whose fillers
+/// listen on nothing, which is the rule generation refuses the artefact by.
+#[test]
+fn every_carried_run_probe_belongs_to_a_capability_whose_fillers_listen_on_nothing() {
+    let odd: Vec<&str> = carried()
+        .iter()
+        .filter(|held| held.listens)
+        .filter(|held| {
+            held.probes
+                .iter()
+                .any(|probe| probe.kind() == ProbeKind::Run)
+        })
+        .map(|held| held.name)
+        .collect();
+    assert!(
+        odd.is_empty(),
+        "these listen and are probed by a run: {odd:?}"
+    );
+}
+
+/// The two ways a probe is put, each spelled as the artefact and a binding spell it.
+#[test]
+fn each_kind_of_probe_is_spelled_as_a_binding_declares_it() {
+    for kind in [ProbeKind::Request, ProbeKind::Run] {
+        assert_eq!(
+            serde_json::to_string(&kind).ok(),
+            Some(format!("\"{}\"", kind.as_str()))
+        );
+    }
 }

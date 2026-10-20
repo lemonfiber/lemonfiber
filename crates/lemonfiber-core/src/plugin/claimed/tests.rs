@@ -549,3 +549,44 @@ fn the_manifest_itself_is_a_path_this_reads() {
         Some("kavita".to_owned())
     );
 }
+
+/// A probe bound to a run is judged against the run its recording took, and one bound
+/// to neither a request nor a run is unproven rather than run against anything.
+#[test]
+fn a_probe_bound_to_a_run_is_judged_against_the_run_recorded() {
+    let manifest = MANIFEST
+        .replace(
+            r#"request = { method = "GET", path = "/api/series" }
+expect  = { status = 401 }"#,
+            r#"run     = { args = ["--version"] }
+expect  = { exit = 0, stdout_starts_with = "v1." }"#,
+        )
+        .replace(
+            r#"request = { method = "GET", path = "/api/series" }
+expect  = { status = 200"#,
+            "expect  = { status = 200",
+        );
+    let ran = format!(
+        r#"{{"recorded_from": "{PINNED}", "note": "n", "run": {{"args": ["--version"]}},
+            "result": {{"exit": 0, "stdout_starts_with": "v1.0.0\n"}}}}"#
+    );
+    let at = source(
+        "runs",
+        &manifest,
+        &[
+            ("fixtures/guarded.json", ran),
+            ("fixtures/catalogue.json", catalogue()),
+        ],
+    );
+    let verdicts = core(&at).map(|(_, verdicts)| verdicts);
+    let _ = std::fs::remove_dir_all(&at);
+    assert_eq!(
+        verdicts,
+        Some(vec![
+            Verdict::Passed,
+            Verdict::Unproven {
+                why: super::ASKS_NO_ONE_THING.to_owned()
+            },
+        ])
+    );
+}

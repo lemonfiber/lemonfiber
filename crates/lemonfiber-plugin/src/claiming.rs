@@ -20,8 +20,8 @@ mod contributing;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::schema::{Claim, Expect, Manifest, Service};
-use crate::vocabulary::{self, Capability, Constraint, Probe, Removed};
+use crate::schema::{Claim, ClaimProbe, Expect, Manifest, Service};
+use crate::vocabulary::{self, Capability, Constraint, Probe, ProbeKind, Removed, Requirement};
 use crate::Violation;
 
 pub use bundled::{bundled, Bundled};
@@ -226,6 +226,7 @@ fn bound(claim: &Claim, capability: &Capability, at: &str, found: &mut Vec<Viola
             });
             continue;
         };
+        asked_as(binding, probe, &location, found);
         within(&binding.expect, probe, &location, found);
         asks_nothing_of_the_library(&binding.expect, &location, found);
     }
@@ -243,47 +244,84 @@ fn bound(claim: &Claim, capability: &Capability, at: &str, found: &mut Vec<Viola
     }
 }
 
+/// How one binding asks, against how its probe is asked.
+///
+/// Exactly one of a request and a run, and the kind the vocabulary declares the probe:
+/// a run where the capability's fillers listen on nothing, a request everywhere else. A
+/// run is held to the bounds every run is given.
+fn asked_as(binding: &ClaimProbe, probe: &Probe, at: &str, found: &mut Vec<Violation>) {
+    let kind = probe.kind();
+    let message = match (&binding.request, &binding.run) {
+        (Some(_), Some(_)) => Some(format!(
+            "declares both request and run; {} is asked as a {}, exactly one of the two",
+            probe.id,
+            kind.as_str()
+        )),
+        (None, None) => Some(format!(
+            "declares neither request nor run, so it asks nothing; {} is asked as a {}",
+            probe.id,
+            kind.as_str()
+        )),
+        (Some(_), None) if kind == ProbeKind::Run => Some(format!(
+            "declares a request, and {} is a run of the image's own program; it declares run",
+            probe.id
+        )),
+        (None, Some(_)) if kind == ProbeKind::Request => Some(format!(
+            "declares a run, and {} is a request of the running service; it declares request",
+            probe.id
+        )),
+        _ => None,
+    };
+    if let Some(message) = message {
+        found.push(Violation {
+            location: at.to_owned(),
+            message,
+        });
+    }
+    if let Some(run) = &binding.run {
+        crate::refusing::program::bounded(at, run, found);
+    }
+}
+
 /// One binding's expectation, against what its probe permits.
 ///
 /// A claim demonstrated by the wrong evidence is an undemonstrated claim, and the two
-/// ways that happens are a status the probe does not accept as an answer and a body
-/// nothing is said about.
+/// ways that happens are an ending the probe does not accept as an answer, a status or
+/// an exit status, and a body or an output nothing is said about.
 fn within(expect: &Expect, probe: &Probe, at: &str, found: &mut Vec<Violation>) {
-    let permitted = listed(probe.requires.status.iter().map(u16::to_string));
-    if !expect
-        .status
-        .is_some_and(|status| probe.requires.status.contains(&status))
-    {
+    let (key, written) = match probe.requires {
+        Requirement::Request { .. } => ("status", expect.status.map(i64::from)),
+        Requirement::Run { .. } => ("exit", expect.exit),
+    };
+    let endings = probe.requires.endings();
+    let permitted = listed(endings.iter().map(i64::to_string));
+    if !written.is_some_and(|ending| endings.contains(&ending)) {
         found.push(Violation {
             location: at.to_owned(),
-            message: match expect.status {
-                Some(status) => format!(
-                    "expects status {status}, and {} answers this probe with: {permitted}",
+            message: match written {
+                Some(ending) => format!(
+                    "expects {key} {ending}, and {} is answered with: {permitted}",
                     probe.id
                 ),
                 None => format!(
-                    "expects no status, and {} is answered by one of: {permitted}",
+                    "expects no {key}, and {} is answered by one of: {permitted}",
                     probe.id
                 ),
             },
         });
     }
 
-    if probe.requires.body.is_empty() {
+    let body = probe.requires.body();
+    if body.is_empty() {
         return;
     }
-    if !probe
-        .requires
-        .body
-        .iter()
-        .any(|constraint| carries(expect, *constraint))
-    {
+    if !body.iter().any(|constraint| carries(expect, *constraint)) {
         found.push(Violation {
             location: at.to_owned(),
             message: format!(
                 "constrains no body, and {} is shown by one of: {}",
                 probe.id,
-                listed(probe.requires.body.iter().map(|one| one.as_str()))
+                listed(body.iter().map(|one| one.as_str()))
             ),
         });
     }

@@ -25,14 +25,21 @@ pub struct Claim {
     pub probes: Vec<ClaimProbe>,
 }
 
-/// One probe of a claimed capability, bound to a request on this plugin's service.
+/// One probe of a claimed capability, bound to a request on this plugin's service or,
+/// where the vocabulary declares the probe a run, to a run of its image's own program.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ClaimProbe {
     /// Names a probe the capability declares.
     pub id: String,
-    /// Method and path on this plugin's own service.
-    pub request: Request,
+    /// Method and path on this plugin's own service. Exactly one of this and `run`, and
+    /// this where the vocabulary declares the probe a request.
+    #[serde(default)]
+    pub request: Option<Request>,
+    /// Arguments to the image's own entrypoint, run with no network. Exactly one of this
+    /// and `request`, and this where the vocabulary declares the probe a run.
+    #[serde(default)]
+    pub run: Option<Run>,
     /// What the answer must be, within what the probe permits.
     pub expect: Expect,
     /// The recorded response.

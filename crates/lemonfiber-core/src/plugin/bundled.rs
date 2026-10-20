@@ -18,7 +18,7 @@ use std::path::Path;
 use lemonfiber_manifest::Manifest;
 use serde::Serialize;
 
-use super::claimed::{pinned_to, Asks};
+use super::claimed::{pinned_to, Asks, ASKS_NO_ONE_THING};
 use super::Verdict;
 use lemonfiber_plugin::Violation;
 
@@ -96,14 +96,19 @@ pub fn judged(manifest: &Manifest, stack: &Path) -> Bundled {
         let pinned = service.reference();
         for claim in &read.claims {
             for probe in &claim.probes {
-                let verdict = match pinned_to(
-                    Some(&probe.fixture),
-                    Asks::Request(&probe.request),
-                    &probe.expect,
-                    &pinned,
-                    stack,
-                    &mut report.refused,
-                ) {
+                let judged = Asks::bound(probe)
+                    .ok_or_else(|| ASKS_NO_ONE_THING.to_owned())
+                    .and_then(|asks| {
+                        pinned_to(
+                            Some(&probe.fixture),
+                            asks,
+                            &probe.expect,
+                            &pinned,
+                            stack,
+                            &mut report.refused,
+                        )
+                    });
+                let verdict = match judged {
                     Err(why) => Verdict::Unproven { why },
                     Ok(faults) if faults.is_empty() => Verdict::Passed,
                     Ok(faults) => Verdict::Failed {

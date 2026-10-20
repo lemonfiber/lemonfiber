@@ -1,8 +1,8 @@
-//! Recording a proof that runs the image's own program, by running it.
+//! Recording a proof or a claim's probe that runs the image's own program, by running it.
 
 use std::path::Path;
 
-use lemonfiber_plugin::{Manifest, Proof, Run};
+use lemonfiber_plugin::{Manifest, Run};
 
 use super::written::{before, written};
 use super::{placed, Taken, Took};
@@ -10,18 +10,60 @@ use crate::plugin::program::{performed, recorded, Came, Operator, Starting};
 use crate::plugin::recorded::{Of, Recording, RunAsked, RunResult};
 use crate::ports::program::Program;
 
-/// One run proof, run and recorded.
+/// One run a manifest names a recording for.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct Running<'a> {
+    /// What names it.
+    pub(super) named: String,
+    /// The service whose image it runs, where the manifest names one.
+    pub(super) service: Option<&'a str>,
+    /// The run.
+    pub(super) run: &'a Run,
+    /// The recording it names.
+    pub(super) fixture: Option<&'a str>,
+}
+
+/// Every run recording `manifest` names: each run proof's, then each claim probe's that
+/// is a run, in the order the manifest declares them.
+pub(super) fn runs(manifest: &Manifest) -> Vec<Running<'_>> {
+    let mut runs: Vec<Running<'_>> = manifest
+        .proofs
+        .iter()
+        .filter_map(|proof| {
+            proof.run.as_ref().map(|run| Running {
+                named: format!("proof {}", proof.id),
+                service: proof.service.as_deref(),
+                run,
+                fixture: proof.fixture.as_deref(),
+            })
+        })
+        .collect();
+    for claim in &manifest.claims {
+        let service = manifest
+            .services
+            .iter()
+            .find(|service| service.provides.contains(&claim.capability))
+            .map(|service| service.id.as_str());
+        runs.extend(claim.probes.iter().filter_map(|probe| {
+            probe.run.as_ref().map(|run| Running {
+                named: format!("claim {} probe {}", claim.capability, probe.id),
+                service,
+                run,
+                fixture: Some(probe.fixture.as_str()),
+            })
+        }));
+    }
+    runs
+}
+
+/// One run, run and recorded.
 pub(super) async fn taken(
     manifest: &Manifest,
-    proof: &Proof,
-    run: &Run,
+    running: Running<'_>,
     root: &Path,
     program: &dyn Program,
 ) -> Taken {
-    let took = match (
-        proof.fixture.as_deref(),
-        placed(manifest, proof.service.as_deref()),
-    ) {
+    let took = match (running.fixture, placed(manifest, running.service)) {
         (Some(fixture), Some(placed)) => {
             let starting = Starting {
                 root,
@@ -30,13 +72,13 @@ pub(super) async fn taken(
             let came = performed(
                 program,
                 &placed,
-                run,
+                running.run,
                 &Operator::recording(),
                 Some(starting),
             )
             .await;
             let pinned = format!("{}@{}", placed.image, placed.digest);
-            kept(root, fixture, &pinned, run, &came)
+            kept(root, fixture, &pinned, running.run, &came)
         }
         _ => Took::Unrecorded {
             why: "names no fixture, or no one service of this plugin, so there is nowhere to \
@@ -45,8 +87,8 @@ pub(super) async fn taken(
         },
     };
     Taken {
-        named: format!("proof {}", proof.id),
-        fixture: proof.fixture.clone(),
+        named: running.named,
+        fixture: running.fixture.map(str::to_owned),
         took,
     }
 }

@@ -126,16 +126,31 @@
       "required": ["capability"]
     },
     "ClaimProbe": {
-      "description": "One probe of a claimed capability, bound to a request on this plugin's service.",
+      "description": "One probe of a claimed capability, bound to a request on this plugin's service or,\nwhere the vocabulary declares the probe a run, to a run of its image's own program.",
       "type": "object",
       "properties": {
         "expect": {"description": "What the answer must be, within what the probe permits.", "$ref": "#/$defs/Expect"},
         "fixture": {"description": "The recorded response.\n\nRequired here where it is optional on a proof: a claim nobody can demonstrate\nwithout owning the service is a claim the catalogue's own checks cannot make.", "type": "string"},
         "id": {"description": "Names a probe the capability declares.", "type": "string"},
-        "request": {"description": "Method and path on this plugin's own service.", "$ref": "#/$defs/PluginRequest"}
+        "request": {
+          "description": "Method and path on this plugin's own service. Exactly one of this and `run`, and\nthis where the vocabulary declares the probe a request.",
+          "anyOf": [
+            {"$ref": "#/$defs/PluginRequest"},
+            {"type": "null"}
+          ],
+          "default": null
+        },
+        "run": {
+          "description": "Arguments to the image's own entrypoint, run with no network. Exactly one of this\nand `request`, and this where the vocabulary declares the probe a run.",
+          "anyOf": [
+            {"$ref": "#/$defs/PluginRun"},
+            {"type": "null"}
+          ],
+          "default": null
+        }
       },
       "additionalProperties": false,
-      "required": ["id", "request", "expect", "fixture"]
+      "required": ["id", "expect", "fixture"]
     },
     "Contribution": {
       "description": "A row in a register lemonfiber already runs.\n\nThe fields beyond `at` and `id` are the row its point declares, and the point is\npublished — so the required set, the optional set, the closed sets and the bounds\nare read from `extension-points.json` rather than restated here. What this type\nfixes is that a contribution is declared in this block and nowhere else, and that\nit carries nothing outside the union of the rows the published points take.",
