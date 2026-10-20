@@ -2,6 +2,7 @@
   "capability": "library.curate",
   "cases": [
     {
+      "asked": {},
       "case": "refuses-without-the-key",
       "expect": {
         "status": [
@@ -13,6 +14,7 @@
       "operation": "identity"
     },
     {
+      "asked": {},
       "case": "identity-answers",
       "expect": {
         "conforms": true
@@ -22,6 +24,21 @@
       "operation": "identity"
     },
     {
+      "asked": {
+        "client": {
+          "category": {
+            "field": "category",
+            "value": "conformance"
+          },
+          "credential": {
+            "api-key": "{minted}"
+          },
+          "host": "conformance-download",
+          "name": "conformance",
+          "port": 80,
+          "protocol": "conformance"
+        }
+      },
       "case": "register_download_client-answers",
       "expect": {
         "conforms": true
@@ -31,51 +48,7 @@
       "operation": "register_download_client"
     },
     {
-      "case": "update_download_client-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "update_download_client"
-    },
-    {
-      "case": "set_client_field-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "set_client_field"
-    },
-    {
-      "case": "test_download_clients-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "test_download_clients"
-    },
-    {
-      "case": "register_root_folder-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "register_root_folder"
-    },
-    {
-      "case": "root_folders-answers",
-      "expect": {
-        "conforms": true
-      },
-      "keyed": true,
-      "live": false,
-      "operation": "root_folders"
-    },
-    {
+      "asked": {},
       "case": "download_clients-answers",
       "expect": {
         "conforms": true
@@ -85,6 +58,81 @@
       "operation": "download_clients"
     },
     {
+      "asked": {
+        "client": {
+          "category": {
+            "field": "category",
+            "value": "conformance"
+          },
+          "credential": {
+            "api-key": "{minted}"
+          },
+          "host": "conformance-download",
+          "name": "conformance",
+          "port": 80,
+          "protocol": "conformance"
+        },
+        "id": "{library.curate@1/download_clients-answers#/0/id}"
+      },
+      "case": "update_download_client-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "update_download_client"
+    },
+    {
+      "asked": {
+        "field": "category",
+        "id": "{library.curate@1/download_clients-answers#/0/id}",
+        "value": "conformance"
+      },
+      "case": "set_client_field-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "set_client_field"
+    },
+    {
+      "asked": {},
+      "case": "test_download_clients-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "test_download_clients"
+    },
+    {
+      "asked": {
+        "folder": {
+          "media_type": "tv",
+          "path": "/data/conformance"
+        }
+      },
+      "case": "register_root_folder-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "register_root_folder"
+    },
+    {
+      "asked": {},
+      "case": "root_folders-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "root_folders"
+    },
+    {
+      "asked": {},
       "case": "quality_profiles-answers",
       "expect": {
         "conforms": true
@@ -94,6 +142,9 @@
       "operation": "quality_profiles"
     },
     {
+      "asked": {
+        "kind": "tv"
+      },
       "case": "search_upgrades-answers",
       "expect": {
         "conforms": true
@@ -103,6 +154,7 @@
       "operation": "search_upgrades"
     },
     {
+      "asked": {},
       "case": "hardlinks-answers",
       "expect": {
         "conforms": true
@@ -112,6 +164,9 @@
       "operation": "hardlinks"
     },
     {
+      "asked": {
+        "hardlink": true
+      },
       "case": "set_hardlinks-answers",
       "expect": {
         "conforms": true
@@ -121,6 +176,9 @@
       "operation": "set_hardlinks"
     },
     {
+      "asked": {
+        "sort": "series"
+      },
       "case": "records-answers",
       "expect": {
         "conforms": true
@@ -130,6 +188,15 @@
       "operation": "records"
     },
     {
+      "asked": {
+        "item": {
+          "folder": null,
+          "name": "conformance",
+          "profile": null,
+          "rest": ""
+        },
+        "sort": "series"
+      },
       "case": "carry-answers",
       "expect": {
         "conforms": true
@@ -139,6 +206,10 @@
       "operation": "carry"
     },
     {
+      "asked": {
+        "kind": "tv",
+        "term": "conformance"
+      },
       "case": "lookup-answers",
       "expect": {
         "conforms": true
@@ -148,6 +219,9 @@
       "operation": "lookup"
     },
     {
+      "asked": {
+        "kind": "tv"
+      },
       "case": "add_plan-answers",
       "expect": {
         "conforms": true
@@ -157,6 +231,19 @@
       "operation": "add_plan"
     },
     {
+      "asked": {
+        "entry": {
+          "held_as": null,
+          "reference": 0,
+          "title": "conformance",
+          "year": null
+        },
+        "kind": "tv",
+        "plan": {
+          "quality_profile": 1,
+          "root_folder": "/data/conformance"
+        }
+      },
       "case": "add-answers",
       "expect": {
         "conforms": true
@@ -166,6 +253,7 @@
       "operation": "add"
     },
     {
+      "asked": {},
       "case": "indexer_count-answers",
       "expect": {
         "conforms": true
@@ -175,6 +263,7 @@
       "operation": "indexer_count"
     },
     {
+      "asked": {},
       "case": "queue-answers",
       "expect": {
         "conforms": true
@@ -184,6 +273,9 @@
       "operation": "queue"
     },
     {
+      "asked": {
+        "kind": "tv"
+      },
       "case": "probe_releases-answers",
       "expect": {
         "conforms": true
@@ -193,6 +285,9 @@
       "operation": "probe_releases"
     },
     {
+      "asked": {
+        "format": "lossless"
+      },
       "case": "apply_music_format-answers",
       "expect": {
         "conforms": true
@@ -202,6 +297,9 @@
       "operation": "apply_music_format"
     },
     {
+      "asked": {
+        "kind": "tv"
+      },
       "case": "library-answers",
       "expect": {
         "conforms": true
@@ -211,6 +309,10 @@
       "operation": "library"
     },
     {
+      "asked": {
+        "kind": "tv",
+        "term": "conformance"
+      },
       "case": "find_items-answers",
       "expect": {
         "conforms": true
@@ -220,6 +322,10 @@
       "operation": "find_items"
     },
     {
+      "asked": {
+        "id": 0,
+        "kind": "tv"
+      },
       "case": "item_history-answers",
       "expect": {
         "conforms": true
@@ -229,6 +335,10 @@
       "operation": "item_history"
     },
     {
+      "asked": {
+        "id": 0,
+        "kind": "tv"
+      },
       "case": "item_queue-answers",
       "expect": {
         "conforms": true
@@ -238,6 +348,11 @@
       "operation": "item_queue"
     },
     {
+      "asked": {
+        "id": 0,
+        "kind": "tv",
+        "season": null
+      },
       "case": "item_parts-answers",
       "expect": {
         "conforms": true
@@ -247,6 +362,9 @@
       "operation": "item_parts"
     },
     {
+      "asked": {
+        "kind": "tv"
+      },
       "case": "stuck_items-answers",
       "expect": {
         "conforms": true
