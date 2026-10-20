@@ -36,7 +36,7 @@ pub(super) async fn embedded(
         return Err(Box::new(crate::config::store::Failure::Nowhere.problem()));
     };
     if let Err(why) = written(&into, pinned) {
-        let _ = std::fs::remove_dir_all(&into);
+        let _ = tokio::fs::remove_dir_all(&into).await;
         return Err(Box::new(fetching::unfetched(
             pinned.origin,
             &why.to_string(),
