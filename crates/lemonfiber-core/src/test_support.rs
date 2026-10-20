@@ -326,6 +326,21 @@ pub(crate) fn stack_fillers(
         .unwrap_or_default()
 }
 
+/// `services` in the order the embedded stack declares them, where it runs every one.
+pub(crate) fn in_the_stacks_order(services: &[&str]) -> Option<Vec<String>> {
+    lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK)
+        .ok()
+        .and_then(|manifest| {
+            let ordered: Vec<String> = manifest
+                .services
+                .into_iter()
+                .map(|service| service.id)
+                .filter(|id| services.contains(&id.as_str()))
+                .collect();
+            (ordered.len() == services.len()).then_some(ordered)
+        })
+}
+
 /// A value as a contract carries it.
 pub(crate) fn json<T: serde::Serialize>(value: &T) -> String {
     serde_json::to_string(value).unwrap_or_default()

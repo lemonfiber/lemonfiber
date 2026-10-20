@@ -198,7 +198,7 @@ fn a_service_the_host_runs_gets_no_entry() {
     }
 }
 
-/// The carried stack's static Compose files, which the generated project replaces at the
+/// The media stack's static Compose files, which the generated project replaces at the
 /// cutover. Read here only to hold the two to the same images and published ports while
 /// both exist.
 const STATIC: &str = concat!(
@@ -206,8 +206,22 @@ const STATIC: &str = concat!(
     "/../../assets/media-stack/compose"
 );
 
-/// Every service the static files declare, with its image and published ports.
-fn static_services() -> Vec<(String, Option<String>, BTreeSet<String>)> {
+/// The fields of an entry held to the static files.
+const HELD: [&str; 2] = ["image", "ports"];
+
+/// Fields the generated project writes otherwise than the static files, by service and
+/// field: the guarded door and the proxy run the images lemonfiber builds for them, a
+/// part released here is tagged by its release without the `v`, and the gate is pinned
+/// at a commit on its main branch past the release the media stack holds.
+const DIFFERING: [(&str, &str); 4] = [
+    ("caddy", "image"),
+    ("decline", "image"),
+    ("door", "image"),
+    ("request-gate", "image"),
+];
+
+/// Every service the static files declare, with its entry.
+fn static_services() -> Vec<(String, Value)> {
     let mut found = Vec::new();
     for entry in fs::read_dir(STATIC).into_iter().flatten().flatten() {
         let path = entry.path();
@@ -223,51 +237,46 @@ fn static_services() -> Vec<(String, Option<String>, BTreeSet<String>)> {
         }
         let text = fs::read_to_string(&path).unwrap_or_default();
         let document: Value = serde_norway::from_str(&text).unwrap_or_default();
-        for (service, entry) in services(&document) {
-            found.push((
-                service,
-                entry
-                    .get("image")
-                    .and_then(Value::as_str)
-                    .map(str::to_owned),
-                published(&entry),
-            ));
-        }
+        found.extend(services(&document));
     }
     found
 }
 
-/// The ports an entry publishes.
-fn published(entry: &Value) -> BTreeSet<String> {
-    entry
-        .get("ports")
-        .and_then(Value::as_sequence)
-        .map(|ports| {
-            ports
-                .iter()
-                .filter_map(|port| port.as_str().map(str::to_owned))
-                .collect()
-        })
-        .unwrap_or_default()
+/// What an entry writes in `field`: its one value, or each of its list's, in any order.
+fn written(entry: &Value, field: &str) -> BTreeSet<String> {
+    match entry.get(field) {
+        Some(Value::Sequence(values)) => values
+            .iter()
+            .filter_map(|value| value.as_str().map(str::to_owned))
+            .collect(),
+        Some(value) => value.as_str().map(str::to_owned).into_iter().collect(),
+        None => BTreeSet::new(),
+    }
 }
 
 #[test]
-fn every_static_service_is_generated_with_its_image_and_ports() {
+fn every_static_service_is_generated_with_its_image_and_ports_but_those_named() {
     let generated = services(&document(&shipped()));
     let statics = static_services();
     assert!(!statics.is_empty(), "the static files declare services");
-    for (service, image, ports) in statics {
+    for (service, _) in DIFFERING {
+        assert!(
+            statics.iter().any(|(name, _)| name == service),
+            "{service} is named as differing and the static files do not declare it"
+        );
+    }
+    for (service, declared) in statics {
         let Some((_, entry)) = generated.iter().find(|(name, _)| *name == service) else {
             unreachable!("{service} is in the static files and not in the generated project");
         };
-        assert_eq!(
-            entry
-                .get("image")
-                .and_then(Value::as_str)
-                .map(str::to_owned),
-            image,
-            "{service}'s image"
-        );
-        assert_eq!(published(entry), ports, "{service}'s published ports");
+        for field in HELD {
+            assert_eq!(
+                written(entry, field) != written(&declared, field),
+                DIFFERING.contains(&(service.as_str(), field)),
+                "{service}'s {field}: {:?} generated, {:?} in the static files",
+                written(entry, field),
+                written(&declared, field)
+            );
+        }
     }
 }

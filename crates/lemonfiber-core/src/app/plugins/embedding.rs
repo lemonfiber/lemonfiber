@@ -58,9 +58,7 @@ fn written(into: &std::path::Path, pinned: &Pinned) -> std::io::Result<()> {
     std::fs::write(into.join(lemonfiber_bundle::MANIFEST), pinned.copy)?;
     for (path, bytes) in pinned.files {
         let at = into.join(path);
-        if let Some(parent) = at.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
+        std::fs::create_dir_all(at.parent().unwrap_or(into))?;
         std::fs::write(at, bytes)?;
     }
     Ok(())
