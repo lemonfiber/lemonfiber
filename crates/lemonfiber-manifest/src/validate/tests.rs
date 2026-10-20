@@ -27,7 +27,18 @@ fn the_licence_list_holds_what_the_stack_s_own_copy_holds() {
     );
 }
 
-const STACK: &str = lemonfiber_bundled::STACK;
+/// The stack this build ships.
+const SHIPPED: &str = lemonfiber_bundled::STACK;
+
+/// The manifest of the media stack the bundle replaces, which the rules are exercised
+/// on by editing it, so a change to the shipped stack moves no test written against it.
+static FIXTURE: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
+    crate::read(std::path::Path::new(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../assets/media-stack"
+    )))
+    .unwrap_or_default()
+});
 
 /// [`crate::TODAY`] as a date, which is after every date the stack records, and not
 /// the real clock.
@@ -55,8 +66,8 @@ fn messages(text: &str) -> Vec<String> {
 
 /// Replace the first occurrence of `from` with `to`.
 fn edited(from: &str, to: &str) -> String {
-    assert!(STACK.contains(from), "the fixture must contain {from:?}");
-    STACK.replacen(from, to, 1)
+    assert!(FIXTURE.contains(from), "the fixture must contain {from:?}");
+    FIXTURE.replacen(from, to, 1)
 }
 
 /// The day these tests use is after everything the stack records.
@@ -67,7 +78,7 @@ fn edited(from: &str, to: &str) -> String {
 /// clock's tests fail for a reason that has nothing to do with the stack being invalid.
 #[test]
 fn the_day_these_tests_use_is_after_everything_the_stack_records() {
-    let latest = STACK
+    let latest = FIXTURE
         .lines()
         .filter_map(|line| line.trim().strip_prefix("last_release = "))
         .map(|value| value.trim().trim_matches('"').to_owned())
@@ -86,7 +97,7 @@ fn the_day_these_tests_use_is_after_everything_the_stack_records() {
 #[test]
 fn the_stack_this_binary_ships_is_valid() {
     assert_eq!(
-        check(STACK),
+        check(SHIPPED),
         Vec::new(),
         "the committed stack has no faults"
     );
@@ -155,7 +166,7 @@ fn a_service_in_an_undeclared_profile_is_caught() {
 #[test]
 fn a_floating_tag_is_caught() {
     for floating in ["latest", "stable", "nightly", "main"] {
-        let text = STACK.replacen("tag = ", &format!("tag = \"{floating}\" # "), 1);
+        let text = FIXTURE.replacen("tag = ", &format!("tag = \"{floating}\" # "), 1);
         assert!(
             messages(&text)
                 .iter()
@@ -167,7 +178,7 @@ fn a_floating_tag_is_caught() {
 
 #[test]
 fn an_empty_tag_is_caught() {
-    let text = STACK.replacen("tag = ", "tag = \"\" # ", 1);
+    let text = FIXTURE.replacen("tag = ", "tag = \"\" # ", 1);
     assert!(
         messages(&text)
             .iter()
@@ -195,7 +206,7 @@ fn a_digest_in_another_shape_is_caught() {
         "sha256:abab",
         "md5:abababababababababababababababab",
     ] {
-        let text = STACK.replacen("digest = ", &format!("digest = \"{shape}\" # "), 1);
+        let text = FIXTURE.replacen("digest = ", &format!("digest = \"{shape}\" # "), 1);
         assert!(
             messages(&text).iter().any(|m| m.contains("is not sha256:")),
             "{shape} was accepted as a digest"
@@ -228,27 +239,46 @@ fn a_licence_outside_the_osi_list_is_caught() {
 }
 
 #[test]
-fn an_image_lemonfiber_builds_carries_lemonfiber_s_licence_and_no_other() {
-    let own = edited(
-        r#"image = "ghcr.io/flaresolverr/flaresolverr""#,
-        r#"image = "ghcr.io/lemonfiber/flaresolverr""#,
-    );
-    assert!(messages(&own)
-        .iter()
-        .any(|m| m.contains("its image is one lemonfiber builds, which carries Hippocratic-3.0")));
-
-    let licensed = STACK
+fn an_image_lemonfiber_builds_from_its_own_code_carries_lemonfiber_s_licence_and_no_other() {
+    let own = FIXTURE
         .replacen(
             r#"image = "ghcr.io/flaresolverr/flaresolverr""#,
             r#"image = "ghcr.io/lemonfiber/flaresolverr""#,
             1,
         )
-        .replacen(r#"license = "MIT""#, r#"license = "Hippocratic-3.0""#, 1);
+        .replacen(
+            r#"upstream = "https://github.com/FlareSolverr/FlareSolverr""#,
+            r#"upstream = "https://github.com/lemonfiber/flaresolverr""#,
+            1,
+        );
+    assert!(messages(&own).iter().any(|m| m.contains(
+        "its image is one lemonfiber builds from its own code, which carries Hippocratic-3.0"
+    )));
+
+    let licensed = own.replacen(r#"license = "MIT""#, r#"license = "Hippocratic-3.0""#, 1);
     assert!(
         !messages(&licensed).iter().any(|m| m.contains("licence")),
         "{:?}",
         messages(&licensed)
     );
+}
+
+#[test]
+fn an_image_lemonfiber_builds_from_someone_else_s_code_keeps_its_osi_licence() {
+    let built = edited(
+        r#"image = "ghcr.io/flaresolverr/flaresolverr""#,
+        r#"image = "ghcr.io/lemonfiber/flaresolverr""#,
+    );
+    assert!(
+        !messages(&built).iter().any(|m| m.contains("licence")),
+        "{:?}",
+        messages(&built)
+    );
+
+    let relicensed = built.replacen(r#"license = "MIT""#, r#"license = "Hippocratic-3.0""#, 1);
+    assert!(messages(&relicensed)
+        .iter()
+        .any(|m| m.contains("Hippocratic-3.0, which is not a recognised OSI identifier")));
 }
 
 #[test]
@@ -264,7 +294,7 @@ fn lemonfiber_s_licence_on_an_image_it_does_not_build_is_caught() {
 
 #[test]
 fn a_malformed_last_release_is_caught() {
-    let text = STACK.replacen("last_release = ", "last_release = \"26-07-01\" # ", 1);
+    let text = FIXTURE.replacen("last_release = ", "last_release = \"26-07-01\" # ", 1);
     assert!(messages(&text)
         .iter()
         .any(|m| m.contains("which is not YYYY-MM-DD")));
@@ -272,7 +302,7 @@ fn a_malformed_last_release_is_caught() {
 
 #[test]
 fn a_last_release_in_the_future_is_caught() {
-    let text = STACK.replacen("last_release = ", "last_release = \"2099-01-01\" # ", 1);
+    let text = FIXTURE.replacen("last_release = ", "last_release = \"2099-01-01\" # ", 1);
     assert!(messages(&text)
         .iter()
         .any(|m| m.contains("which is in the future")));
@@ -390,7 +420,7 @@ fn a_core_name_this_crate_knows_nothing_about_is_left_alone() {
 /// services declare nothing at all, which is an answer rather than an omission.
 #[test]
 fn every_capability_the_shipped_stack_declares_passes_the_shape_rule() {
-    let said = messages(STACK).join("\n");
+    let said = messages(SHIPPED).join("\n");
     assert!(!said.contains("provides"), "{said}");
 }
 
@@ -403,12 +433,12 @@ const ASKS_FOR: &str = "asks_for = ";
 
 /// The stack with the first line starting `prefix` removed from it.
 fn without(prefix: &str) -> String {
-    let at = STACK
+    let at = FIXTURE
         .lines()
         .position(|line| line.starts_with(prefix))
         .unwrap_or_default();
     assert!(at > 0, "the fixture must declare {prefix:?}");
-    STACK
+    FIXTURE
         .lines()
         .enumerate()
         .filter_map(|(number, line)| (number != at).then_some(line))
@@ -506,7 +536,7 @@ replaced_by = "bindery"
 
 /// The shipped stack with one removal appended to it.
 fn with_removal(record: &str) -> String {
-    format!("{STACK}{record}")
+    format!("{}{record}", *FIXTURE)
 }
 
 /// A record that says what went, why, and what took its place is a record with

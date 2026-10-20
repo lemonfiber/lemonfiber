@@ -1,7 +1,18 @@
 use crate::validate::tests::today;
 use crate::{validate, Manifest};
 
-const STACK: &str = lemonfiber_bundled::STACK;
+/// The stack this build ships.
+const SHIPPED: &str = lemonfiber_bundled::STACK;
+
+/// The manifest of the media stack the bundle replaces, which the rules are exercised
+/// on by editing it, so a change to the shipped stack moves no test written against it.
+static FIXTURE: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
+    crate::read(std::path::Path::new(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../assets/media-stack"
+    )))
+    .unwrap_or_default()
+});
 
 /// Everything wrong with a manifest, as one line each.
 fn messages(text: &str) -> Vec<String> {
@@ -18,8 +29,8 @@ fn messages(text: &str) -> Vec<String> {
 
 /// Whether the stack this binary carries, edited once, says what it should.
 fn fault(from: &str, to: &str, expected: &str) {
-    assert!(STACK.contains(from), "the fixture must contain {from:?}");
-    let said = messages(&STACK.replacen(from, to, 1));
+    assert!(FIXTURE.contains(from), "the fixture must contain {from:?}");
+    let said = messages(&FIXTURE.replacen(from, to, 1));
     assert!(
         said.iter().any(|message| message.contains(expected)),
         "expected {expected:?} among {said:?}"
@@ -156,7 +167,7 @@ fn the_same_ask_written_twice_is_caught() {
 /// The stack this binary ships declares links and every one of them holds.
 #[test]
 fn every_link_the_shipped_stack_declares_is_sound() {
-    assert_eq!(messages(STACK), Vec::<String>::new());
+    assert_eq!(messages(SHIPPED), Vec::<String>::new());
 }
 
 /// A stack written before this table existed is still a stack, and one that
