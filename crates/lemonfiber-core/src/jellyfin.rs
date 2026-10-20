@@ -45,7 +45,7 @@ const AUTHORIZATION: &str =
 /// **The one scheme every supported line accepts.** Measured side by side on `10.10.3`,
 /// `10.11.11` and `12.1`: `12.1` answers a sign-in carried in `X-Emby-Authorization` with
 /// `400` and a token in `X-Emby-Token` with `401`, and all three accept both in this header.
-const AUTHORIZATION_HEADER: &str = "Authorization";
+const AUTHORIZATION_HEADER: &str = crate::endpoint::AUTHORIZATION;
 
 /// The access a read carries, in the scheme [`AUTHORIZATION_HEADER`] is parsed by.
 fn carrying(token: &str) -> String {

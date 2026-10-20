@@ -286,7 +286,9 @@ pub fn entry(unit: &Unit<'_>, placed: &Placed, values: &Values<'_>) -> Entry {
             Vec::new()
         },
         volumes: volumes(unit, values.nfs),
-        tmpfs: tmpfs(unit).map(|path| literal(path)).collect(),
+        tmpfs: tmpfs(unit.tmpfs, unit.takes_data)
+            .map(|path| literal(path))
+            .collect(),
         networks: Joined(
             networks
                 .into_iter()
@@ -449,11 +451,8 @@ pub(crate) fn mounts(all: &[Mount], takes_data: bool) -> impl Iterator<Item = &M
 }
 
 /// Each scratch path in memory the model allows.
-fn tmpfs<'a>(unit: &'a Unit<'_>) -> impl Iterator<Item = &'a String> {
-    let takes_data = unit.takes_data;
-    unit.tmpfs
-        .iter()
-        .filter(move |path| is_target(path, takes_data))
+pub(crate) fn tmpfs(all: &[String], takes_data: bool) -> impl Iterator<Item = &String> {
+    all.iter().filter(move |path| is_target(path, takes_data))
 }
 
 /// One bind mount of `source` at `to`.

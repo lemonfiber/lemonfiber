@@ -29,6 +29,7 @@ use crate::app::command::Asking;
 use crate::credential::{Held, Inventory, Rotation, Settled};
 use crate::error::Diagnose;
 
+pub(crate) use reading::reader;
 pub(crate) use resetting::reset_curator;
 pub(crate) use rotating::{replace_admin_password, Replacing};
 

@@ -307,3 +307,82 @@ fn a_directory_or_file_that_cannot_be_read_is_refused_rather_than_skipped() {
         assert!(said.is_err_and(|why| why.contains("could not be read")));
     }
 }
+
+#[test]
+fn a_further_directory_beside_the_copy_is_open_to_the_service_and_goes_with_it() {
+    let source = Scratch::new("throwaway-emptied");
+    let Ok(copy) = Throwaway::of(of(&source)) else {
+        return;
+    };
+    let data = copy.emptied("data");
+    let Ok(data) = data else {
+        return;
+    };
+    assert!(data.is_dir());
+    assert!(std::fs::read_dir(&data).is_ok_and(|mut entries| entries.next().is_none()));
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        assert_eq!(
+            std::fs::metadata(&data)
+                .map(|kind| kind.permissions().mode() & 0o777)
+                .ok(),
+            Some(0o777)
+        );
+    }
+    assert!(copy.emptied("data").is_err(), "a name is made once");
+    drop(copy);
+    assert!(!data.exists());
+}
+
+#[test]
+fn what_ran_with_the_copy_left_in_it_is_read_back_from_a_file_beneath_it_alone() {
+    let source = Scratch::new("throwaway-wrote");
+    let Ok(copy) = Throwaway::of(of(&source)) else {
+        return;
+    };
+    let _ = std::fs::create_dir_all(copy.path().join("deep"));
+    let _ = std::fs::write(copy.path().join("deep/config.xml"), "<ApiKey>k</ApiKey>");
+    assert_eq!(
+        copy.wrote(Path::new("deep/config.xml")),
+        Ok(Some(b"<ApiKey>k</ApiKey>".to_vec()))
+    );
+    assert_eq!(copy.wrote(Path::new("absent.xml")), Ok(None));
+    assert_eq!(copy.wrote(Path::new("missing/absent.xml")), Ok(None));
+    for outside in ["../escape", "/etc/passwd", "", "deep/../../x"] {
+        assert!(copy.wrote(Path::new(outside)).is_err(), "{outside}");
+    }
+    let _ = std::fs::write(
+        copy.path().join("big"),
+        vec![b'x'; usize::try_from(MOST_BYTES).unwrap_or(0) + 1],
+    );
+    assert!(copy.wrote(Path::new("big")).is_err());
+    let unnameable = "n".repeat(300);
+    assert!(copy
+        .wrote(Path::new(&unnameable))
+        .is_err_and(|why| why.contains("could not be read")));
+    let _ = std::fs::create_dir_all(copy.path().join("adir"));
+    assert!(copy
+        .wrote(Path::new("adir"))
+        .is_err_and(|why| why.contains("is a link or a device")));
+}
+
+#[cfg(unix)]
+#[test]
+fn what_ran_with_the_copy_is_never_read_back_through_a_link_it_made() {
+    use std::os::unix::fs::symlink;
+    let elsewhere = Scratch::new("throwaway-wrote-elsewhere");
+    put(&elsewhere, "host.xml", b"host secret");
+    let source = Scratch::new("throwaway-wrote-linked");
+    let Ok(copy) = Throwaway::of(of(&source)) else {
+        return;
+    };
+    let _ = symlink(elsewhere.join("host.xml"), copy.path().join("named.xml"));
+    let _ = symlink(elsewhere.path(), copy.path().join("dir"));
+    assert!(copy
+        .wrote(Path::new("named.xml"))
+        .is_err_and(|why| why.contains("is a link or a device")));
+    assert!(copy
+        .wrote(Path::new("dir/host.xml"))
+        .is_err_and(|why| why.contains("is a link or a device")));
+}

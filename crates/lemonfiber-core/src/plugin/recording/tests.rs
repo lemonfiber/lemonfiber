@@ -3,9 +3,14 @@ use std::path::{Path, PathBuf};
 use lemonfiber_fixtures::proving::Proving;
 use lemonfiber_fixtures::scratch::Scratch;
 
+use lemonfiber_fixtures::http::{Answer, Fake};
+use lemonfiber_fixtures::serving::Serves;
+
 use super::super::program::tests::RUNNING;
-use super::{record, Took};
-use crate::ports::program::Unran;
+use super::{record, Recorder, Took};
+use crate::ports::program::{Program, Unran};
+
+pub(super) mod asking;
 
 const PINNED: &str = "ghcr.io/recyclarr/recyclarr@sha256:9c6c74d52cfc6f740a5a3624aa83867e171bb70b90453ddb7a4048b8c80445f9";
 const FIXTURE: &str = "recordings/recyclarr/runs-version.json";
@@ -34,8 +39,31 @@ fn held(root: &Path) -> String {
 
 fn took(read: &Result<super::Recorded, super::super::claimed::Unreadable>) -> Vec<Took> {
     read.as_ref()
-        .map(|read| read.runs.iter().map(|one| one.took.clone()).collect())
+        .map(|read| read.recordings.iter().map(|one| one.took.clone()).collect())
         .unwrap_or_default()
+}
+
+/// What a run-proved plugin is recorded with: `program`, and no engine to serve a
+/// service or transport to ask one.
+async fn ran(
+    at: &Path,
+    program: &dyn Program,
+) -> Result<super::Recorded, super::super::claimed::Unreadable> {
+    let serving = Serves::refusing(Unran::Unreachable {
+        reason: "no engine in a test".to_owned(),
+    });
+    let silent =
+        || -> std::sync::Arc<dyn crate::ports::http::Http> { Fake::always(Answer::Silent) };
+    record(
+        at,
+        Recorder {
+            program,
+            serving: &serving,
+            transport: &silent,
+            random: &lemonfiber_fixtures::support::FixedRandom(None),
+        },
+    )
+    .await
 }
 
 fn recording(from: &str, note: &str, args: &str, exit: i64, stdout: &str) -> String {
@@ -50,9 +78,12 @@ async fn a_run_is_recorded_with_the_pin_its_arguments_and_the_first_kibibyte_it_
     let at = source("record-written", RUNNING);
     let said = format!("v8.7.3 (Branch.master)\n{}", "x".repeat(2000));
     let program = Proving::exiting(0, &said);
-    let read = record(&at, program.as_ref()).await;
-    assert_eq!(took(&read), vec![Took::Written]);
-    assert!(read.is_ok_and(|read| read.holds));
+    let read = ran(&at, program.as_ref()).await;
+    assert_eq!(took(&read), vec![Took::Unnoted]);
+    assert!(
+        read.is_ok_and(|read| !read.holds),
+        "a recording with no note fails the run"
+    );
     let kept: serde_json::Value = serde_json::from_str(&held(&at)).unwrap_or_default();
     assert_eq!(field(&kept, "/recorded_from"), PINNED);
     assert_eq!(field(&kept, "/note"), "");
@@ -86,8 +117,9 @@ async fn the_authors_note_is_kept_and_a_recording_of_another_pin_is_replaced() {
             "v8.7.1",
         ),
     );
-    let read = record(&at, Proving::exiting(0, "v8.7.3 (").as_ref()).await;
+    let read = ran(&at, Proving::exiting(0, "v8.7.3 (").as_ref()).await;
     assert_eq!(took(&read), vec![Took::Written]);
+    assert!(read.is_ok_and(|read| read.holds));
     let kept: serde_json::Value = serde_json::from_str(&held(&at)).unwrap_or_default();
     assert_eq!(field(&kept, "/note"), "Why it matters.");
     assert_eq!(field(&kept, "/recorded_from"), PINNED);
@@ -99,7 +131,7 @@ async fn a_recording_the_run_reproduces_is_left_as_it_was() {
     let at = source("record-reproduced", RUNNING);
     let before = recording(PINNED, "n", "[\"--version\"]", 0, "v8.7.3 (");
     put(&at, &before);
-    let read = record(&at, Proving::exiting(0, "v8.7.3 (").as_ref()).await;
+    let read = ran(&at, Proving::exiting(0, "v8.7.3 (").as_ref()).await;
     assert_eq!(took(&read), vec![Took::Reproduced]);
     assert_eq!(held(&at), before);
 }
@@ -110,7 +142,7 @@ async fn a_recording_the_run_no_longer_reproduces_is_refused_naming_it_and_kept(
     let before = recording(PINNED, "n", "[\"--version\"]", 0, "v8.7.3 (a)");
     put(&at, &before);
     for (exit, stdout) in [(0, "v8.7.3 (b)"), (1, "v8.7.3 (a)")] {
-        let read = record(&at, Proving::exiting(exit, stdout).as_ref()).await;
+        let read = ran(&at, Proving::exiting(exit, stdout).as_ref()).await;
         assert!(
             matches!(took(&read).first(), Some(Took::Unreproduced { why }) if why.contains("evidence of nothing")),
             "{exit} {stdout}: {read:?}"
@@ -127,7 +159,7 @@ async fn an_unreproduced_recording_is_named_with_nothing_a_terminal_obeys() {
         &at,
         &recording(PINNED, "n", "[\"--version\"]", 0, "v8\\u001b[2Ja"),
     );
-    let read = record(&at, Proving::exiting(0, "v8\u{1b}[2Jb").as_ref()).await;
+    let read = ran(&at, Proving::exiting(0, "v8\u{1b}[2Jb").as_ref()).await;
     assert!(
         matches!(took(&read).first(), Some(Took::Unreproduced { why })
             if why.contains("\"v8[2Ja\"") && why.contains("\"v8[2Jb\"") && !why.contains('\u{1b}')),
@@ -139,16 +171,23 @@ async fn an_unreproduced_recording_is_named_with_nothing_a_terminal_obeys() {
 async fn a_recording_of_other_arguments_is_replaced_rather_than_refused() {
     let at = source("record-other-args", RUNNING);
     put(&at, &recording(PINNED, "n", "[\"--help\"]", 0, "usage"));
-    let read = record(&at, Proving::exiting(0, "v8.7.3 (").as_ref()).await;
+    let read = ran(&at, Proving::exiting(0, "v8.7.3 (").as_ref()).await;
     assert_eq!(took(&read), vec![Took::Written]);
+    let unnoted = source("record-reproduced-unnoted", RUNNING);
+    put(
+        &unnoted,
+        &recording(PINNED, "", "[\"--version\"]", 0, "v8.7.3 ("),
+    );
+    let read = ran(&unnoted, Proving::exiting(0, "v8.7.3 (").as_ref()).await;
+    assert_eq!(took(&read), vec![Took::Unnoted]);
 }
 
 #[tokio::test]
 async fn a_run_that_overran_or_could_not_be_made_writes_nothing() {
     let at = source("record-unmade", RUNNING);
-    let overran = record(&at, Proving::overrunning("v").as_ref()).await;
+    let overran = ran(&at, Proving::overrunning("v").as_ref()).await;
     assert_eq!(took(&overran), vec![Took::Overran { seconds: 45 }]);
-    let unmade = record(
+    let unmade = ran(
         &at,
         Proving::answering(Err(Unran::NoImage {
             image: PINNED.to_owned(),
@@ -169,7 +208,7 @@ async fn a_proof_naming_no_fixture_or_one_outside_the_source_is_not_recorded() {
         "record-no-fixture",
         &RUNNING.replace("fixture = \"recordings/recyclarr/runs-version.json\"\n", ""),
     );
-    let read = record(&none, Proving::exiting(0, "v").as_ref()).await;
+    let read = ran(&none, Proving::exiting(0, "v").as_ref()).await;
     assert!(
         matches!(took(&read).first(), Some(Took::Unrecorded { why }) if why.contains("names no fixture"))
     );
@@ -177,7 +216,7 @@ async fn a_proof_naming_no_fixture_or_one_outside_the_source_is_not_recorded() {
         "record-outside",
         &RUNNING.replace(FIXTURE, "../escaped.json"),
     );
-    let read = record(&outside, Proving::exiting(0, "v").as_ref()).await;
+    let read = ran(&outside, Proving::exiting(0, "v").as_ref()).await;
     assert!(read.as_ref().is_ok_and(|read| !read.holds), "{read:?}");
     assert!(!outside
         .path()
@@ -192,7 +231,7 @@ async fn a_recording_is_never_written_through_a_link() {
     let elsewhere = Scratch::new("record-elsewhere");
     let at = source("record-linked", RUNNING);
     let _ = std::os::unix::fs::symlink(elsewhere.path(), at.join("recordings"));
-    let read = record(&at, Proving::exiting(0, "v8.7.3 (").as_ref()).await;
+    let read = ran(&at, Proving::exiting(0, "v8.7.3 (").as_ref()).await;
     assert!(
         matches!(took(&read).first(), Some(Took::Unrecorded { why }) if why.contains("is a link"))
     );
@@ -209,30 +248,10 @@ async fn a_refused_manifest_runs_nothing() {
         ),
     );
     let program = Proving::exiting(0, "v");
-    let read = record(&at, program.as_ref()).await;
-    assert!(read.is_ok_and(|read| !read.refusals.is_empty() && read.runs.is_empty() && !read.holds));
+    let read = ran(&at, program.as_ref()).await;
+    assert!(read
+        .is_ok_and(|read| !read.refusals.is_empty() && read.recordings.is_empty() && !read.holds));
     assert!(program.asked().is_empty());
-}
-
-#[tokio::test]
-async fn a_proof_asking_a_request_is_not_run_and_a_request_recorded_at_the_name_is_replaced() {
-    let asked = format!(
-        "{RUNNING}\n[[proof]]\nid      = \"recyclarr.guarded\"\ntitle   = \"It refuses\"\n\
-         request = {{ method = \"GET\", path = \"/x\" }}\n\
-         expect  = {{ status = 401, json_is_absent = true }}\nwhy     = \"It is guarded.\"\n"
-    );
-    let at = source("record-with-a-request", &asked);
-    put(
-        &at,
-        "{\"recorded_from\": \"x@sha256:1\", \"note\": \"Kept.\", \"request\": {\"method\": \"GET\", \"path\": \"/x\"}, \"response\": {\"status\": 401}}",
-    );
-    let program = Proving::exiting(0, "v8.7.3 (");
-    let read = record(&at, program.as_ref()).await;
-    assert_eq!(took(&read), vec![Took::Written]);
-    assert_eq!(program.asked().len(), 1, "only the run proof is run");
-    let kept: serde_json::Value = serde_json::from_str(&held(&at)).unwrap_or_default();
-    assert_eq!(field(&kept, "/note"), "Kept.");
-    assert_eq!(field(&kept, "/run/args"), serde_json::json!(["--version"]));
 }
 
 #[tokio::test]
@@ -243,9 +262,23 @@ async fn a_recording_that_cannot_be_written_is_unrecorded_naming_where() {
         at.join("recordings/recyclarr"),
         "a file where a directory goes",
     );
-    let read = record(&at, Proving::exiting(0, "v8.7.3 (").as_ref()).await;
+    let read = ran(&at, Proving::exiting(0, "v8.7.3 (").as_ref()).await;
     assert!(
         matches!(took(&read).first(), Some(Took::Unrecorded { why }) if why.contains("could not be written")),
         "{read:?}"
     );
+}
+
+#[tokio::test]
+async fn a_run_proof_whose_recording_holds_a_request_is_run_and_its_note_kept() {
+    let at = source("record-over-a-request", RUNNING);
+    put(
+        &at,
+        "{\"recorded_from\": \"x@sha256:1\", \"note\": \"Kept.\", \"request\": {\"method\": \"GET\", \"path\": \"/x\"}, \"response\": {\"status\": 401}}",
+    );
+    let read = ran(&at, Proving::exiting(0, "v8.7.3 (").as_ref()).await;
+    assert_eq!(took(&read), vec![Took::Written]);
+    let kept: serde_json::Value = serde_json::from_str(&held(&at)).unwrap_or_default();
+    assert_eq!(field(&kept, "/note"), "Kept.");
+    assert_eq!(field(&kept, "/run/args"), serde_json::json!(["--version"]));
 }

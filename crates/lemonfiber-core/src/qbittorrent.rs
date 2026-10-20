@@ -30,6 +30,15 @@ pub(crate) const SERVICE: &str = "qbittorrent";
 /// signed in.
 const SIGNED_OUT: u16 = 403;
 
+/// The status the 5.x line answers a sign-in it took with, and nothing else.
+const SIGNED_IN: u16 = 204;
+
+/// The status the 5.x line answers a sign-in it refused with.
+const REFUSED: u16 = 401;
+
+/// What the 4.x line says, at `200`, to a sign-in it took.
+const TAKEN: &str = "Ok.";
+
 /// The phrase qBittorrent logs its temporary password after.
 const TEMP_MARKER: &str = "A temporary password is provided for this session:";
 
@@ -99,8 +108,10 @@ impl Qbittorrent {
     /// Authenticate, so the session cookie the transport carries lets the calls
     /// that follow through.
     ///
-    /// A wrong password is `Unauthorised`; qBittorrent says so with `Fails.` at
-    /// `200`, or with `403` once it has seen too many attempts.
+    /// A sign-in is taken where the 4.x line says `Ok.` at `200` and where the 5.x line
+    /// answers `204`. A wrong password is `Unauthorised`: the 4.x line says `Fails.` at
+    /// `200`, the 5.x line answers `401`, and both answer `403` once they have seen too
+    /// many attempts.
     async fn login(&self, password: &str) -> Result<(), Failure> {
         let request = self.post(
             "/auth/login",
@@ -110,9 +121,12 @@ impl Qbittorrent {
             ],
         );
         let response = self.endpoint.send(&request).await?;
-        if response.is_success() && response.body.trim() == "Ok." {
+        if response.status == SIGNED_IN || (response.is_success() && response.body.trim() == TAKEN)
+        {
             Ok(())
-        } else if response.status == 403 || response.body.contains("Fails") {
+        } else if [SIGNED_OUT, REFUSED].contains(&response.status)
+            || response.body.contains("Fails")
+        {
             Err(self.endpoint.unauthorised())
         } else {
             Err(self.endpoint.refused(&describe(&response)))

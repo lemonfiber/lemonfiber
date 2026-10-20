@@ -25,9 +25,6 @@ use crate::endpoint::Endpoint;
 use crate::ports::http::{Http, Method, Request};
 use crate::ports::service::{Aggregator, Aggregators, Failure, KnownAggregator};
 
-/// The header the key is presented in. A bearer token is refused.
-const KEY: &str = "X-Api-Key";
-
 /// Where the instances it pulls from are listed and added.
 const INSTANCES: &str = "/api/v1/prowlarr";
 
@@ -67,7 +64,7 @@ impl Bindery {
 
     /// A request carrying the key, and a JSON body where there is one.
     fn request(&self, method: Method, body: Option<String>) -> Request {
-        let mut headers = vec![(KEY.to_owned(), self.key.clone())];
+        let mut headers = vec![(crate::endpoint::API_KEY_HEADER.to_owned(), self.key.clone())];
         headers.extend(crate::endpoint::json_content_type(body.as_ref()));
         Request {
             method,

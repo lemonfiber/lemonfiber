@@ -135,6 +135,25 @@ async fn a_rejected_password_is_unauthorised() {
 }
 
 #[tokio::test]
+async fn the_five_line_signs_in_with_no_content_and_refuses_with_unauthorised() {
+    let signed_in = client(vec![(204, "")]);
+    assert!(matches!(
+        signed_in.transfers().await,
+        Err(Failure::Unavailable { .. })
+    ));
+    let refused = client(vec![(401, "")]);
+    assert!(matches!(
+        refused.transfers().await,
+        Err(Failure::Unauthorised { .. })
+    ));
+    let other = client(vec![(200, "")]);
+    assert!(matches!(
+        other.transfers().await,
+        Err(Failure::Refused { .. })
+    ));
+}
+
+#[tokio::test]
 async fn a_client_that_stops_answering_after_login_is_unavailable() {
     let qbit = client(vec![(200, "Ok.")]);
     assert!(matches!(

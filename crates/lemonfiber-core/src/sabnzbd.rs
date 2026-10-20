@@ -30,6 +30,9 @@ use crate::ports::service::Failure;
 /// The name the stack knows this client under, which a failure is reported against.
 pub(crate) const SERVICE: &str = "sabnzbd";
 
+/// The query field the key is presented in.
+pub(crate) const KEY_FIELD: &str = "apikey";
+
 /// The `status` a slot carries while it is the one being downloaded — the active
 /// slot, to which the queue's single speed belongs.
 const DOWNLOADING: &str = "Downloading";
@@ -80,9 +83,10 @@ impl Sabnzbd {
     ) -> Result<T, Failure> {
         let request = Request {
             method: Method::Get,
-            url: self
-                .endpoint
-                .url(&format!("/api?mode={mode}&output=json&apikey={}", self.key)),
+            url: self.endpoint.url(&format!(
+                "/api?mode={mode}&output=json&{KEY_FIELD}={}",
+                self.key
+            )),
             headers: Vec::new(),
             body: None,
             pinned: None,
@@ -104,7 +108,7 @@ impl Sabnzbd {
     /// the schedule back.
     async fn page(&self, path: &str, fields: &[(&str, &str)]) -> Result<(), Failure> {
         let mut fields = fields.to_vec();
-        fields.push(("apikey", self.key.as_str()));
+        fields.push((KEY_FIELD, self.key.as_str()));
         let request = Request {
             method: Method::Get,
             url: self.endpoint.url(&format!(

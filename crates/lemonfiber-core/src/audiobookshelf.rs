@@ -20,6 +20,30 @@ const INIT: &str = "/init";
 /// Where the server says whether it has an account yet.
 const STATUS: &str = "/status";
 
+/// Where an account signs in.
+const LOGIN: &str = "/login";
+
+/// The header that asks a sign-in to hand back its tokens in the body.
+const RETURN_TOKENS: (&str, &str) = ("x-return-tokens", "true");
+
+/// What a sign-in hands back.
+#[derive(Deserialize)]
+struct SignedIn {
+    user: Tokens,
+}
+
+/// The tokens a signed-in account holds.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Tokens {
+    #[serde(default)]
+    access_token: Option<String>,
+    #[serde(default)]
+    token: Option<String>,
+    #[serde(default)]
+    refresh_token: Option<String>,
+}
+
 /// What the status says: whether a first account has been made.
 #[derive(Deserialize)]
 struct Status {
@@ -84,5 +108,35 @@ impl Audiobookshelf {
             .send(&self.request(Method::Post, INIT, Some(body)))
             .await?;
         self.endpoint.expect_success(&response)
+    }
+
+    /// Sign in as `name`, and hand back the token a read presents as a bearer,
+    /// followed by every other token the sign-in made.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] where the server is unreachable, refuses the account, or
+    /// hands back no token.
+    pub async fn signed_in(&self, name: &str, password: &str) -> Result<Vec<String>, Failure> {
+        let body = serde_json::json!({ "username": name, "password": password }).to_string();
+        let mut request = self.request(Method::Post, LOGIN, Some(body));
+        request
+            .headers
+            .push((RETURN_TOKENS.0.to_owned(), RETURN_TOKENS.1.to_owned()));
+        let response = self.endpoint.send(&request).await?;
+        let signed: SignedIn = self
+            .endpoint
+            .decode(&response, "the sign-in could not be read")?;
+        let Tokens {
+            access_token,
+            token,
+            refresh_token,
+        } = signed.user;
+        let mut held: Vec<String> = access_token.into_iter().chain(token).collect();
+        if held.is_empty() {
+            return Err(self.endpoint.refused("the sign-in handed back no token"));
+        }
+        held.extend(refresh_token);
+        Ok(held)
     }
 }

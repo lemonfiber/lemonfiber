@@ -20,8 +20,7 @@
 use std::path::{Path, PathBuf};
 
 use lemonfiber::cli::Authoring;
-use lemonfiber_core::plugin::{Capabilities, Key, Ungenerated};
-use lemonfiber_core::ports::program::Program;
+use lemonfiber_core::plugin::{Capabilities, Key, Recorder, Ungenerated};
 use lemonfiber_core::ports::registry::Registry;
 
 use crate::exit::FAILURE;
@@ -83,7 +82,7 @@ pub(crate) async fn published(
     read: &Authoring,
     json: bool,
     asking: &dyn Registry,
-    program: &dyn Program,
+    recorder: Recorder<'_>,
 ) -> Answered {
     match read {
         Authoring::Schema => document_of(lemonfiber_core::plugin::schema().as_deref()),
@@ -97,7 +96,7 @@ pub(crate) async fn published(
         Authoring::Claims { path } => claims(path, json),
         Authoring::Conform { path } => conform(path, json).await,
         Authoring::Provenance { path, keys } => vouched_for(path, keys, json, asking).await,
-        Authoring::Record { path } => recorded(path, json, program).await,
+        Authoring::Record { path } => recorded(path, json, recorder).await,
     }
 }
 
@@ -206,8 +205,8 @@ async fn vouched_for(path: &Path, keys: &[PathBuf], json: bool, asking: &dyn Reg
 ///
 /// A recording a run does not reproduce, or a run that could not be recorded, exits
 /// non-zero, which is what a plugin's CI is asking.
-async fn recorded(path: &Path, json: bool, program: &dyn Program) -> Answered {
-    let read = match lemonfiber_core::plugin::record(path, program).await {
+async fn recorded(path: &Path, json: bool, recorder: Recorder<'_>) -> Answered {
+    let read = match lemonfiber_core::plugin::record(path, recorder).await {
         Ok(read) => read,
         Err(unreadable) => return Answered::faulted(unreadable.to_string()),
     };

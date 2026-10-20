@@ -18,6 +18,9 @@ use crate::text::fitted;
 /// it the same way, so its name is written once.
 pub(crate) const API_KEY_HEADER: &str = "X-Api-Key";
 
+/// The header a service that takes a scheme and a credential reads them from.
+pub(crate) const AUTHORIZATION: &str = "Authorization";
+
 /// The media type a JSON request declares, so a service binds the body rather
 /// than refusing it.
 use crate::ports::http::JSON;

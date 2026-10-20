@@ -374,11 +374,20 @@ async fn main() -> ExitCode {
 /// the edge's to choose, and so is writing to a stream. What to say and what to exit
 /// with is decided in [`authoring`], where a test can hold it.
 async fn for_an_author(read: &lemonfiber::cli::Authoring, json: bool) -> ExitCode {
-    let asking = lemonfiber_adapters::registry::Oci::new(std::sync::Arc::new(
-        lemonfiber_adapters::http::Web::new(),
-    ));
-    let program = lemonfiber_adapters::Daemon::reaching(lemonfiber_adapters::docker_target());
-    let answered = authoring::published(read, json, &asking, &program).await;
+    let web: std::sync::Arc<dyn lemonfiber_core::ports::http::Http> =
+        std::sync::Arc::new(lemonfiber_adapters::http::Web::new());
+    let asking = lemonfiber_adapters::registry::Oci::new(std::sync::Arc::clone(&web));
+    let engine = lemonfiber_adapters::Daemon::reaching(lemonfiber_adapters::docker_target());
+    let fresh = || -> std::sync::Arc<dyn lemonfiber_core::ports::http::Http> {
+        std::sync::Arc::new(lemonfiber_adapters::http::Web::new())
+    };
+    let recorder = lemonfiber_core::plugin::Recorder {
+        program: &engine,
+        serving: &engine,
+        transport: &fresh,
+        random: &lemonfiber_adapters::Os,
+    };
+    let answered = authoring::published(read, json, &asking, recorder).await;
     if let Some(fault) = answered.fault {
         complain!("error: {fault}");
     }

@@ -91,6 +91,7 @@ Held as `Arc<dyn …>` and faked in every test that does not want the real thing
 | `ports::random` | `Random` | The entropy a minted credential is drawn from |
 | `ports::resolve` | `Resolver` | Which addresses a name stands for, asked before a git source is fetched |
 | `ports::program` | `Program` | An image's own program, run once in a container of its own for a proof |
+| `ports::serving` | `Serving` | An image served as its service runs, on a network of its own, for its recordings |
 | `ports::time` | `Clock` | The wall clock |
 
 Each is `Send + Sync`, because a background poller owns one and the render loop

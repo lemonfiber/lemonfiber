@@ -83,6 +83,27 @@ pub struct Credential<'a> {
     pub password: &'a str,
 }
 
+impl<'a> Credential<'a> {
+    /// The administrator lemonfiber names, holding `password`.
+    #[must_use]
+    pub const fn admin(password: &'a str) -> Self {
+        Self {
+            username: crate::config::USENET_AGGREGATOR_ADMIN_USER,
+            password,
+        }
+    }
+
+    /// The `Authorization` header this credential is presented in.
+    #[must_use]
+    pub fn presented(&self) -> String {
+        let pair = format!("{}:{}", self.username, self.password);
+        format!(
+            "Basic {}",
+            base64::engine::general_purpose::STANDARD.encode(pair)
+        )
+    }
+}
+
 /// A client for one `NZBHydra2`.
 pub struct Nzbhydra2 {
     endpoint: Endpoint,
@@ -107,13 +128,9 @@ impl Nzbhydra2 {
     ) -> Request {
         let mut request = self.endpoint.json_request(method, path, body);
         if let Some(credential) = credential {
-            let pair = format!("{}:{}", credential.username, credential.password);
             request.headers.push((
-                "Authorization".to_owned(),
-                format!(
-                    "Basic {}",
-                    base64::engine::general_purpose::STANDARD.encode(pair)
-                ),
+                crate::endpoint::AUTHORIZATION.to_owned(),
+                credential.presented(),
             ));
         }
         request

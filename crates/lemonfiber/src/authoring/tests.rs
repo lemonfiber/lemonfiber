@@ -2,11 +2,13 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use lemonfiber::cli::Authoring;
-use lemonfiber_core::plugin::Ungenerated;
+use lemonfiber_core::plugin::{Recorder, Ungenerated};
+use lemonfiber_core::ports::program::{Program, Unran};
 use lemonfiber_core::ports::registry::Registry;
 use lemonfiber_fixtures::http::{Answer, Fake};
+use lemonfiber_fixtures::serving::Serves;
 
-use super::{document_of, held_keys, published, unrenderable, vocabulary, Answered};
+use super::{document_of, held_keys, unrenderable, vocabulary, Answered};
 use crate::exit::FAILURE;
 
 /// A manifest nothing refuses, pinning one image and claiming nothing.
@@ -70,6 +72,31 @@ fn answering(status: u16, body: &'static str) -> impl Registry {
     let reaching: Arc<dyn lemonfiber_core::ports::http::Http> =
         Fake::always(Answer::reply(status, body));
     lemonfiber_adapters::registry::Oci::new(reaching)
+}
+
+/// What `asked` came to, with `program` running any proof and no engine serving a service.
+async fn published(
+    asked: &Authoring,
+    json: bool,
+    registry: &dyn Registry,
+    program: &dyn Program,
+) -> Answered {
+    let serving = Serves::refusing(Unran::Unreachable {
+        reason: "no engine in a test".to_owned(),
+    });
+    let silent = || -> Arc<dyn lemonfiber_core::ports::http::Http> { Fake::always(Answer::Silent) };
+    super::published(
+        asked,
+        json,
+        registry,
+        Recorder {
+            program,
+            serving: &serving,
+            transport: &silent,
+            random: &lemonfiber_fixtures::support::FixedRandom(None),
+        },
+    )
+    .await
 }
 
 /// What one read came to, asked of a registry that offers nothing.
@@ -447,12 +474,34 @@ async fn recording_writes_what_the_run_said_and_fails_where_no_run_could_be_made
         lemonfiber_fixtures::proving::Proving::exiting(0, "v1.2\n").as_ref(),
     )
     .await;
-    assert_eq!(wrote.code, 0, "{:?}", wrote.fault);
-    assert!(said(&wrote).contains("written"), "{}", said(&wrote));
-    assert!(
-        std::fs::read_to_string(at.join("recordings/kavita/runs.json"))
-            .is_ok_and(|text| text.contains("\"stdout_starts_with\": \"v1.2\\n\""))
+    assert_eq!(
+        wrote.code, FAILURE,
+        "a recording with no note fails the run"
     );
+    assert!(
+        said(&wrote).contains("written with an empty note"),
+        "{}",
+        said(&wrote)
+    );
+    let kept = at.join("recordings/kavita/runs.json");
+    let text = std::fs::read_to_string(&kept).unwrap_or_default();
+    assert!(
+        text.contains("\"stdout_starts_with\": \"v1.2\\n\""),
+        "{text}"
+    );
+    let _ = std::fs::write(
+        &kept,
+        text.replace("\"note\": \"\"", "\"note\": \"It starts.\""),
+    );
+    let noted = published(
+        &Authoring::Record { path: at.clone() },
+        false,
+        &answering(404, "{}"),
+        lemonfiber_fixtures::proving::Proving::exiting(0, "v1.2\n").as_ref(),
+    )
+    .await;
+    assert_eq!(noted.code, 0, "{:?}", noted.fault);
+    assert!(said(&noted).contains("reproduced"), "{}", said(&noted));
 
     let unmade = read(
         Authoring::Record {

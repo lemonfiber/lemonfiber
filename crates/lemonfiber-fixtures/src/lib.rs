@@ -49,6 +49,7 @@ pub mod program;
 pub mod proving;
 pub mod pulled;
 pub mod scratch;
+pub mod serving;
 pub mod stack;
 pub mod support;
 pub mod walking;
