@@ -1,4 +1,4 @@
-use super::{manifest_into, manifest_without, manifest_written, pinned};
+use super::{carried, manifest_into, manifest_without, manifest_written, pinned};
 use crate::scratch::Scratch;
 
 #[test]
@@ -13,8 +13,37 @@ fn a_copy_reads_back_as_the_carried_stack() {
             table
         });
     assert!(read.is_some());
-    assert_eq!(read, toml::from_str(lemonfiber_bundled::STACK).ok());
+    assert_eq!(read, Some(carried()));
     let _ = std::fs::remove_dir_all(&into);
+}
+
+fn gluetun_env(stack: &toml::Table) -> toml::Table {
+    stack
+        .get("service")
+        .and_then(toml::Value::as_array)
+        .into_iter()
+        .flatten()
+        .find(|service| service.get("id").and_then(toml::Value::as_str) == Some("gluetun"))
+        .and_then(|service| service.get("env"))
+        .and_then(toml::Value::as_table)
+        .cloned()
+        .unwrap_or_default()
+}
+
+#[test]
+fn the_carried_stack_leaves_out_each_secret_and_only_the_variables_naming_one() {
+    let bundled: toml::Table = toml::from_str(lemonfiber_bundled::STACK).unwrap_or_default();
+    let mut expected = gluetun_env(&bundled);
+    assert!(expected.remove("WIREGUARD_PRIVATE_KEY").is_some());
+    assert!(!expected.is_empty());
+    let stack = carried();
+    assert_eq!(gluetun_env(&stack), expected);
+    assert!(stack
+        .get("service")
+        .and_then(toml::Value::as_array)
+        .into_iter()
+        .flatten()
+        .all(|service| service.get("secret").is_none()));
 }
 
 #[test]

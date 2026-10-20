@@ -1,11 +1,12 @@
 //! The stack this repository carries, written where a test can change it.
 //!
 //! Its manifest is the stack the bundle declares, written apart as a root and a file
-//! per service as a stack directory holds it. A test that wants its own copy writes
-//! the files, and one that wants a service gone writes the stack without that service
-//! and without every link that named it — a stack that drops a service drops
-//! what reached it, and one that kept those links would be refused for naming a
-//! service it no longer declares.
+//! per service as a stack directory holds it, and so without the secrets an assembled
+//! part declares, which a stack directory's service holds none of. A test that wants
+//! its own copy writes the files, and one that wants a service gone writes the stack
+//! without that service and without every link that named it — a stack that drops a
+//! service drops what reached it, and one that kept those links would be refused for
+//! naming a service it no longer declares.
 
 use std::path::Path;
 
@@ -23,15 +24,35 @@ pub fn pinned(id: &str) -> Option<lemonfiber_manifest::Service> {
         .find(|service| service.id == id)
 }
 
+/// The carried stack as a stack directory holds it: each service without the
+/// `[[secret]]` its part declares and without every variable naming one.
+#[must_use]
+pub fn carried() -> Table {
+    let mut stack: Table = toml::from_str(lemonfiber_bundled::STACK).unwrap_or_default();
+    stack
+        .get_mut("service")
+        .and_then(Value::as_array_mut)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_table_mut)
+        .for_each(|service| {
+            service.remove("secret");
+            if let Some(env) = service.get_mut("env").and_then(Value::as_table_mut) {
+                env.retain(|_, value| value.get("secret").is_none());
+            }
+        });
+    stack
+}
+
 /// The carried stack's manifest files written into `into`, which is made if it is not
 /// there.
 pub fn manifest_into(into: &Path) {
-    written_apart(into, lemonfiber_bundled::STACK);
+    written_apart(into, &toml::to_string(&carried()).unwrap_or_default());
 }
 
 /// The carried stack's manifest written into `into` without `service`.
 pub fn manifest_without(into: &Path, service: &str) {
-    let mut stack: Table = toml::from_str(lemonfiber_bundled::STACK).unwrap_or_default();
+    let mut stack = carried();
     let named = Value::String(service.to_owned());
     dropped(&mut stack, "service", |row| row.get("id") == Some(&named));
     dropped(&mut stack, "wiring", |row| {
