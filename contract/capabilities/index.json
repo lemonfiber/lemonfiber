@@ -682,7 +682,7 @@
         },
         {
           "path": "media.serve/v1/operations/declared.json",
-          "sha256": "6b2f00d2463f6117686811e4cf56a71e4ad7ef877a589d2c9b0c2bc00398560c"
+          "sha256": "0f58e284e7c9967adf6be335004c1185590c9b0df369334188baf9daa7a2dd2b"
         },
         {
           "path": "media.serve/v1/conformance.json",
@@ -817,11 +817,11 @@
         },
         {
           "path": "stream.guard/v1/operations/guard.json",
-          "sha256": "1b0ff0ae2d5c9b3d33a7b62fe1b9842cdff06083c49747e0035736b6d2c5fcbc"
+          "sha256": "31d2464e279e40fdacdf35435dddac0962b7b5e65ff863f6e7b4cb3362e12df5"
         },
         {
           "path": "stream.guard/v1/operations/guarding.json",
-          "sha256": "53ada79ea06572890d7cac9c7f37240eb0d67623edf8fea043137b2625dd6841"
+          "sha256": "1737489f35e83b1ee040b6e178dfddd81b8de236b240d612ac02aa17b8629797"
         },
         {
           "path": "stream.guard/v1/operations/certificate.json",

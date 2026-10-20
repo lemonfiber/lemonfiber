@@ -100,7 +100,7 @@
                       "type": "array"
                     },
                     "pattern": {
-                      "description": "The paths it covers, holding one group named `item` where the item's id sits.",
+                      "description": "The paths it covers, holding one group named `item` where the item's id sits, every\nmatch starting at the path's start.",
                       "type": "string"
                     }
                   },

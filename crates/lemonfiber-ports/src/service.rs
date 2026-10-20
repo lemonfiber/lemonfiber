@@ -56,8 +56,8 @@ pub use clients::{
     RegisteredFolder, RegisteredTarget, RootFolder, Seeded, Seeding, Transfers,
 };
 pub use declaring::{
-    Addressee, Answers, BytePath, Declared, Declaring, Held, Locations, Naming, Ports,
-    Presentation, Question, Statuses, Token, Undeclarable, BASE, ITEM, ITEM_GROUP, TOKEN,
+    joined, Addressee, Answers, BytePath, Declared, Declaring, Held, Locations, Naming, Ports,
+    Presentation, Question, Statuses, Token, Undeclarable, BASE, ITEM, TOKEN,
 };
 pub use declining::{Declinable, Declining};
 pub use extracting::{Curated, Extracting, Extraction};

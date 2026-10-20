@@ -1,10 +1,10 @@
 //! A guard enforcing a declaration exactly as the contract hands it, holding every
-//! request to the normal form `ARCH-R292` asks of every guard first, in front of a
+//! request to the normal form the contract asks of every guard first, in front of a
 //! stand-in for the media server that answers its question as Jellyfin does.
 
 use regex::Regex;
 
-use crate::ports::service::{Addressee, Declared, Held, Presentation, ITEM, TOKEN};
+use crate::ports::service::{joined, Addressee, Declared, Held, Presentation, ITEM, TOKEN};
 
 /// The item the member may see.
 pub(super) const OPEN: &str = "0123456789abcdef0123456789abcdef";
@@ -14,6 +14,9 @@ pub(super) const CLOSED: &str = "fedcba9876543210fedcba9876543210";
 
 /// The member's own token.
 pub(super) const MEMBER: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+/// Where the stand-in answers the guard's question.
+const UPSTREAM: &str = "http://jellyfin:8096";
 
 /// The characters a URL path is made of, `%` and `/` included.
 const PCHAR: &str = "^[A-Za-z0-9._~:@!$&'()*+,;=%/-]*$";
@@ -187,6 +190,8 @@ pub(super) fn passes(declared: &Declared, target: &str, headers: &[(String, Stri
     };
     let read = read_token(declared, headers).or(query_token);
     question.to == Addressee::Upstream
-        && question.path.contains(ITEM)
-        && items.iter().all(|item| may(item, read.as_deref()))
+        && items.iter().all(|item| {
+            joined(UPSTREAM, &question.path.replace(ITEM, item)).is_some()
+                && may(item, read.as_deref())
+        })
 }

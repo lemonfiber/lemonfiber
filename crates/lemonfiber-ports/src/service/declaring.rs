@@ -18,8 +18,10 @@ use super::Failure;
 use crate::http::Method;
 
 mod checked;
+mod joined;
 
 pub use checked::Undeclarable;
+pub use joined::joined;
 
 /// What a location template's host is.
 pub const BASE: &str = "{base}";
@@ -30,16 +32,14 @@ pub const ITEM: &str = "{item}";
 /// What a header template names the member's token by.
 pub const TOKEN: &str = "{token}";
 
-/// How a byte path's pattern opens the group the item's id sits in.
-pub const ITEM_GROUP: &str = "(?P<item>";
-
 /// A path the upstream serves an item's bytes under.
 #[derive(
     Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
 )]
 #[serde(deny_unknown_fields)]
 pub struct BytePath {
-    /// The paths it covers, holding one group named `item` where the item's id sits.
+    /// The paths it covers, holding one group named `item` where the item's id sits, every
+    /// match starting at the path's start.
     pub pattern: String,
     /// The shape an item's id has, matched against what the group holds; a request whose
     /// item has another shape is refused without asking anything.

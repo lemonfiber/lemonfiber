@@ -1569,11 +1569,14 @@ dependencies = [
  "base64",
  "lemonfiber-error",
  "lemonfiber-manifest",
+ "regex",
+ "regex-syntax",
  "schemars",
  "serde",
  "serde_json",
  "thiserror",
  "tokio",
+ "url",
 ]
 
 [[package]]

@@ -84,7 +84,7 @@ fn bytes_served_with_no_question_are_refused_naming_the_path() {
 
 #[test]
 fn a_byte_path_that_does_not_say_where_the_item_sits_once_is_refused() {
-    for pattern in ["^/media/([^/]+)/bytes$", "^/(?P<item>a)/(?P<item>b)$"] {
+    for pattern in ["^/media/([^/]+)/bytes$", "^/media/(?P<thing>[^/]+)/bytes$"] {
         let mut unplaced = declared();
         if let Some(path) = unplaced.bytes.first_mut() {
             pattern.clone_into(&mut path.pattern);
@@ -118,7 +118,6 @@ fn a_location_built_anywhere_but_on_the_household_address_is_refused() {
         "https://elsewhere.example/media/{item}",
         "{base}.elsewhere.example/media/{item}",
         "{base}@elsewhere.example/media/{item}",
-        "{base}",
         "/media/{item}?from={base}",
         "{base}/{base}/media/{item}",
     ] {
@@ -423,6 +422,120 @@ fn a_location_that_leaves_the_household_address_by_its_path_is_refused() {
         "{base}/media/{item}\r\n",
     ] {
         let elsewhere = with(|declared| template.clone_into(&mut declared.locations.poster));
+        assert_eq!(
+            elsewhere.checked(),
+            Err(Undeclarable::Elsewhere {
+                template: template.to_owned()
+            }),
+            "{template:?}"
+        );
+    }
+}
+
+#[test]
+fn a_pattern_that_does_not_compile_is_too_large_or_is_anchored_on_one_branch_alone_is_refused() {
+    let alternated = "^/media/(?P<item>[^/]+)/bytes$|/(?P<also>x)";
+    let lined = "(?m)^/media/(?P<item>[^/]+)/bytes$";
+    let doubled = "^/(?P<item>a)/(?P<item>b)$";
+    let unclosed = "^/media/(?P<item>[^/]+";
+    let long = format!("^/(?P<item>{})$", "a".repeat(1100));
+    let huge = "^/(?P<item>(?:[a-z]{1000}){1000})$";
+    for pattern in [alternated, lined, doubled, unclosed, long.as_str(), huge] {
+        let declared = with(|declared| {
+            if let Some(path) = declared.bytes.first_mut() {
+                pattern.clone_into(&mut path.pattern);
+            }
+        });
+        assert_eq!(
+            declared.checked(),
+            Err(Undeclarable::Unanchored {
+                pattern: pattern.to_owned()
+            }),
+            "{pattern}"
+        );
+    }
+    for shape in ["^[0-9]+$|[a-z]+", "(?m)^[0-9]+$", "^(?:[0-9]+$)?"] {
+        let declared = with(|declared| shape.clone_into(&mut declared.token.shape));
+        assert_eq!(
+            declared.checked(),
+            Err(Undeclarable::Unanchored {
+                pattern: shape.to_owned()
+            }),
+            "{shape}"
+        );
+    }
+}
+
+#[test]
+fn a_token_is_presented_only_in_a_header_a_guard_may_set() {
+    for name in ["X-Custom", "Cookie", "Referer", "X-Forwarded-Host"] {
+        let presented = with(|declared| {
+            declared.token.presented = Presentation::Header {
+                name: name.to_owned(),
+                value: "{token}".to_owned(),
+            };
+        });
+        assert_eq!(
+            presented.checked(),
+            Err(Undeclarable::Unpresentable {
+                header: name.to_owned()
+            }),
+            "{name}"
+        );
+    }
+    for name in [
+        "Authorization",
+        "authorization",
+        "X-Emby-Token",
+        "X-Api-Key",
+    ] {
+        let presented = with(|declared| {
+            declared.token.presented = Presentation::Header {
+                name: name.to_owned(),
+                value: "Scheme {token}".to_owned(),
+            };
+        });
+        assert!(presented.checked().is_ok(), "{name}");
+    }
+    let braced = with(|declared| {
+        declared.token.presented = Presentation::Header {
+            name: "Authorization".to_owned(),
+            value: "Scheme {token} {base}".to_owned(),
+        };
+    });
+    assert_eq!(
+        braced.checked(),
+        Err(Undeclarable::Unpresentable {
+            header: "Authorization".to_owned()
+        })
+    );
+}
+
+#[test]
+fn a_location_holding_any_placeholder_but_the_household_address_and_the_item_is_refused() {
+    for template in ["{base}/media/{item}/{token}", "{base}/media/{item}/{other}"] {
+        let elsewhere = with(|declared| template.clone_into(&mut declared.locations.stream));
+        assert_eq!(
+            elsewhere.checked(),
+            Err(Undeclarable::Elsewhere {
+                template: template.to_owned()
+            }),
+            "{template}"
+        );
+    }
+}
+
+#[test]
+fn a_location_another_url_reader_would_take_elsewhere_or_rewrite_is_refused() {
+    for template in [
+        "{base}/\\elsewhere.example/{item}",
+        "{base}/media/%2e%2e/{item}",
+        "{base}/media/../{item}",
+        "{base}/media/\t{item}",
+        "{base}/media/\u{ff0e}\u{ff0e}/{item}",
+        "{base}/media/{item}#x",
+    ] {
+        let elsewhere = with(|declared| template.clone_into(&mut declared.locations.backdrop));
         assert_eq!(
             elsewhere.checked(),
             Err(Undeclarable::Elsewhere {
