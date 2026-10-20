@@ -1,0 +1,47 @@
+{
+  "capability": "archive.extract",
+  "cases": [
+    {
+      "asked": {},
+      "case": "refuses-without-the-key",
+      "expect": {
+        "status": [
+          401
+        ]
+      },
+      "keyed": false,
+      "live": true,
+      "operation": "watch"
+    },
+    {
+      "asked": {
+        "curators": [
+          {
+            "address": "http://conformance-curator:80",
+            "folder": "/data/conformance",
+            "key": "{minted}",
+            "media_type": "tv"
+          }
+        ]
+      },
+      "case": "watch-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "watch"
+    },
+    {
+      "asked": {},
+      "case": "working-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "working"
+    }
+  ],
+  "major": 1
+}

@@ -12,6 +12,7 @@
 
 pub mod door;
 pub mod grants;
+pub mod guarded;
 
 use crate::app::targets::{media, Media};
 use crate::app::{Ctx, Outcome, Viewing, Whom};

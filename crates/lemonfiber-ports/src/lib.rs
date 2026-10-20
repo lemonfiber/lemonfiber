@@ -26,6 +26,7 @@
 pub mod asking;
 pub mod docker;
 pub mod filesystem;
+pub mod fingerprint;
 pub mod hosting;
 pub mod http;
 pub mod machine;
@@ -47,6 +48,7 @@ pub mod time;
 pub use asking::Asking;
 pub use docker::{Engine, Images};
 pub use filesystem::{Confined, Eraser, FileSystem, Volume};
+pub use fingerprint::fingerprint;
 pub use hosting::Host;
 pub use http::Http;
 pub use narration::Narrator;

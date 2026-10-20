@@ -9,9 +9,8 @@ use std::path::{Path, PathBuf};
 
 use crate::app::Ctx;
 use crate::certificate::{self, Kept, Unkept};
-use crate::jellyfin::pictured_at;
 use crate::model::{Episode, Held, Located, PartWay, Pinned, Season, Title};
-use crate::ports::service::{Item, ItemDetail, ItemProgress, Medium, Picture};
+use crate::ports::service::{Item, ItemDetail, ItemProgress, Locations, Medium};
 
 /// The port the guarded front door serves encrypted on.
 ///
@@ -21,10 +20,6 @@ pub const GUARDED: u16 = 8920;
 
 /// Where the door's certificate and key are kept, beneath the stack directory.
 pub const DOOR: &str = "config/door";
-
-/// The query a stream is asked for with: the item's own source, and the codecs every
-/// supported player decodes, in segments both platforms play.
-const STREAMED: &str = "VideoCodec=h264,hevc&AudioCodec=aac,mp3,ac3,eac3&SegmentContainer=mp4";
 
 /// The service the stack runs as the guarded front door, by its id.
 pub const SERVICE: &str = "door";
@@ -175,19 +170,16 @@ pub(crate) fn located(item: Item, door: &Door) -> Held {
             ..Located::default()
         },
         Door::At { base, fingerprint } => {
-            let id = &item.id;
+            let templates = crate::jellyfin::declared::declared().locations;
+            let at = |template: &str| Locations::located(template, base, &item.id);
             Located {
-                poster: item
-                    .holds
-                    .poster
-                    .then(|| format!("{base}{}", pictured_at(id, Picture::Poster))),
+                poster: item.holds.poster.then(|| at(&templates.poster)).flatten(),
                 backdrop: item
                     .holds
                     .backdrop
-                    .then(|| format!("{base}{}", pictured_at(id, Picture::Backdrop))),
-                stream_from: streams(&item).then(|| {
-                    format!("{base}/Videos/{id}/master.m3u8?MediaSourceId={id}&{STREAMED}")
-                }),
+                    .then(|| at(&templates.backdrop))
+                    .flatten(),
+                stream_from: streams(&item).then(|| at(&templates.stream)).flatten(),
                 door: Some(Pinned {
                     fingerprint: fingerprint.clone(),
                 }),

@@ -1,0 +1,231 @@
+{
+  "post": {
+    "operationId": "apply",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$defs": {
+              "Entry": {
+                "additionalProperties": false,
+                "description": "One service on the dashboard.",
+                "properties": {
+                  "check": {
+                    "description": "An address it answers without a key, asked to show whether it is up.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "description": {
+                    "description": "What it is for.",
+                    "type": "string"
+                  },
+                  "icon": {
+                    "description": "Its icon.",
+                    "type": "string"
+                  },
+                  "link": {
+                    "description": "Where a browser goes for it.",
+                    "type": "string"
+                  },
+                  "name": {
+                    "description": "What it is called.",
+                    "type": "string"
+                  },
+                  "widget": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/EntryWidget"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "What it shows beside its link."
+                  }
+                },
+                "required": [
+                  "name",
+                  "icon",
+                  "link",
+                  "description"
+                ],
+                "type": "object"
+              },
+              "EntryWidget": {
+                "description": "A widget on one entry.",
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "description": "How many of a monitor's checks are up and down, read from a status page it\npublishes to anybody.",
+                    "properties": {
+                      "status-page": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "page": {
+                            "description": "The status page's name.",
+                            "type": "string"
+                          },
+                          "url": {
+                            "description": "Where the monitor answers.",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "url",
+                          "page"
+                        ],
+                        "type": "object"
+                      }
+                    },
+                    "required": [
+                      "status-page"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              },
+              "Group": {
+                "additionalProperties": false,
+                "description": "Entries shown together under one name.",
+                "properties": {
+                  "entries": {
+                    "description": "Its entries, in the order shown.",
+                    "items": {
+                      "$ref": "#/$defs/Entry"
+                    },
+                    "type": "array"
+                  },
+                  "name": {
+                    "description": "What the group is called.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "entries"
+                ],
+                "type": "object"
+              },
+              "PageWidget": {
+                "description": "A widget along the page.",
+                "oneOf": [
+                  {
+                    "const": "resources",
+                    "description": "The machine's processor and memory use.",
+                    "type": "string"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "description": "A web search box.",
+                    "properties": {
+                      "search": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "url": {
+                            "description": "The address a search is sent to, the terms appended to it.",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "url"
+                        ],
+                        "type": "object"
+                      }
+                    },
+                    "required": [
+                      "search"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              },
+              "Panels": {
+                "additionalProperties": false,
+                "description": "Everything the dashboard shows.",
+                "properties": {
+                  "groups": {
+                    "description": "Every group, in the order shown.",
+                    "items": {
+                      "$ref": "#/$defs/Group"
+                    },
+                    "type": "array"
+                  },
+                  "widgets": {
+                    "description": "The widgets along the page, in the order shown.",
+                    "items": {
+                      "$ref": "#/$defs/PageWidget"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "groups",
+                  "widgets"
+                ],
+                "type": "object"
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "panels": {
+                "$ref": "#/$defs/Panels",
+                "description": "The port's `panels`."
+              }
+            },
+            "required": [
+              "panels"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "title": "null",
+              "type": "null"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ],
+    "x-lemonfiber-largest": 1048576
+  }
+}

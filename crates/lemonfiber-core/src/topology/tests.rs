@@ -2,10 +2,11 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::net::Ipv4Addr;
 
 use lemonfiber_contract::capabilities::media::serve::CAPABILITY as MEDIA_SERVE;
+use lemonfiber_contract::capabilities::proxy::front::CAPABILITY as PROXY_FRONT;
 
 use super::{
     derived, Block, Member, Named, Placed, Settled, Topology, DOOR_ON_MEDIA, DOOR_ON_PROXY,
-    MEDIA_SUBNET, PROXY_FRONT, PROXY_ON_PROXY, PROXY_SUBNET,
+    MEDIA_SUBNET, PROXY_ON_PROXY, PROXY_SUBNET,
 };
 
 const fn member(id: &str) -> Member<'_> {

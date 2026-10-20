@@ -17,23 +17,31 @@ mod asking;
 mod carrying;
 mod catalogue;
 mod clients;
+mod declaring;
+mod declining;
+mod extracting;
 mod failure;
 mod fetching;
 mod fronting;
+mod gating;
+mod guarding;
 mod household;
 mod metering;
 mod notices;
+mod peering;
 mod providers;
 mod proxying;
 mod quality;
 mod requests;
 mod screening;
 mod searching;
+mod showing;
 pub mod stage;
 mod subtitles;
 mod syncing;
 mod throttling;
 mod trace;
+mod tunnelling;
 mod upkeep;
 
 pub use addressing::{Address, Addressing};
@@ -47,15 +55,24 @@ pub use clients::{
     Protocol, QualityProfile, Queue, QueueDepth, Queued, Queues, RegisteredClient,
     RegisteredFolder, RegisteredTarget, RootFolder, Seeded, Seeding, Transfers,
 };
+pub use declaring::{
+    joined, Addressee, Answers, BytePath, Declared, Declaring, Held, Locations, Naming, Ports,
+    Presentation, Question, Statuses, Token, Undeclarable, BASE, ITEM, TOKEN,
+};
+pub use declining::{Declinable, Declining};
+pub use extracting::{Curated, Extracting, Extraction};
 pub use failure::{Failure, ASK_FOR_REPAIRS};
 pub use fetching::{Fetching, Pulling};
 pub use fronting::{AppKeys, Dated, Fronted};
+pub use gating::{Admitted, Gated, Gating, Target};
+pub use guarding::{Guarded, Guarding, Presented};
 pub use household::{
     Access, Allowed, Certificate, Household, Invited, Member, NamedLibrary, Playback, Session,
     Signed, Unrated,
 };
 pub use metering::{Metering, Moved};
 pub use notices::Noticing;
+pub use peering::Peering;
 pub use providers::{
     IndexerUse, Indexers, Limits, Recorded, Standing, UsenetAccount, UsenetAccounts,
 };
@@ -70,10 +87,12 @@ pub use screening::{
     Screening, SeasonDetail, PICTURE_MOST, PLAYER,
 };
 pub use searching::{Asked, Detail, Found, Page, Searching, Season, Wish};
+pub use showing::{Entry, EntryWidget, Group, PageWidget, Panels, Showing};
 pub use subtitles::{Subtitles, Watched, Watching};
 pub use syncing::{Profiled, Syncing};
 pub use throttling::{Hours, Rates, Throttled, Throttling, Wanted, Window};
 pub use trace::{FoundItem, ItemPart, Library, Pipeline, QueueItem, StuckItem, TraceEvent};
+pub use tunnelling::Tunnelling;
 pub use upkeep::{SeriesHeld, Upkeep, SERIES_MOST};
 
 /// Who a service says it is, once it answers.

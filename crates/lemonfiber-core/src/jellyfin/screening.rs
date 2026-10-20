@@ -19,7 +19,7 @@ use crate::ports::service::{
 const TICKS: u64 = 10_000_000;
 
 /// The status the server answers an item an account may not see with.
-const ABSENT: u16 = 404;
+pub(super) const ABSENT: u16 = 404;
 
 /// The statuses the server answers a device asking for a code with, where it signs no
 /// device in by code.
@@ -206,6 +206,16 @@ async fn opened(
             .refused("the media server opened a session with no token"));
     }
     Ok(Some(opened.token))
+}
+
+/// The query a stream is asked for with: the item's own source, and the codecs every
+/// supported player decodes, in segments both platforms play.
+const STREAMED: &str = "VideoCodec=h264,hevc&AudioCodec=aac,mp3,ac3,eac3&SegmentContainer=mp4";
+
+/// Where the server streams an item from, beneath its address.
+#[must_use]
+pub(crate) fn streamed_at(id: &str) -> String {
+    format!("/Videos/{id}/master.m3u8?MediaSourceId={id}&{STREAMED}")
 }
 
 /// Where the server serves one of a title's pictures, beneath its address.

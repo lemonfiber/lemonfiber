@@ -5,15 +5,16 @@
 //! is part-way and how far it got; a title's pictures; opening and closing a device's own
 //! session; whether
 //! the library holds something yet; how each series it holds is filed, and reading one
-//! item afresh; and standing behind the front door, with the keys it holds for the
-//! stack's own services.
+//! item afresh; standing behind the front door, with the keys it holds for the stack's
+//! own services; and what a guard in front of it enforces.
 
 use lemonfiber_ports::media::Kind;
 use lemonfiber_ports::service::{
-    AppKeys, Dated, Fronted, HowFar, Image, Item, ItemDetail, ItemProgress, Library, Picture,
-    Playback, Screening, SeriesHeld, Upkeep, PICTURE_MOST, SERIES_MOST,
+    AppKeys, Dated, Declared, Declaring, Fronted, HowFar, Image, Item, ItemDetail, ItemProgress,
+    Library, Picture, Playback, Screening, SeriesHeld, Upkeep, PICTURE_MOST, SERIES_MOST,
 };
 
+use super::{NOWHERE, PROXY};
 use crate::conformance::Placeholder;
 
 /// The most a picture's answer carries: its bytes written as base64, and room for the rest.
@@ -24,9 +25,6 @@ const SERIES_LINE: usize = 512;
 
 /// The most an answer of every series carries.
 const SERIES_ANSWER: usize = SERIES_MOST as usize * SERIES_LINE;
-
-/// An id no media server holds an item under.
-const NOWHERE: &str = "00000000000000000000000000000000";
 
 /// The device the conformance cases open a session for.
 const DEVICE: &str = "conformance-device";
@@ -42,9 +40,6 @@ const POSITION: u64 = 60;
 
 /// A term no library holds anything for.
 const TERM: &str = "conformance";
-
-/// The loopback address, trusted to name the client.
-const PROXY: &str = "127.0.0.1";
 
 /// An origin a browser reads it from.
 const ORIGIN: &str = "https://watch.example";
@@ -144,6 +139,10 @@ crate::contract! {
             fn allow_only(str origin: &str) -> () where asks = Asked { origin: ORIGIN.to_owned() };
             /// Start again, so it reads what was written.
             fn restart() -> () where asks = Asked {};
+        }
+        impl Declaring {
+            /// What a guard in front of it enforces, and where it serves each item.
+            fn declared() -> Declared where asks = Asked {};
         }
     }
 }

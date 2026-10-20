@@ -1,0 +1,64 @@
+{
+  "capability": "dashboard.show",
+  "cases": [
+    {
+      "asked": {},
+      "case": "refuses-without-the-key",
+      "expect": {
+        "status": [
+          401
+        ]
+      },
+      "keyed": false,
+      "live": true,
+      "operation": "apply"
+    },
+    {
+      "asked": {
+        "panels": {
+          "groups": [
+            {
+              "entries": [
+                {
+                  "check": "http://conformance-curator:80",
+                  "description": "conformance",
+                  "icon": "conformance",
+                  "link": "http://conformance-curator:80",
+                  "name": "conformance",
+                  "widget": null
+                }
+              ],
+              "name": "conformance"
+            }
+          ],
+          "widgets": [
+            "resources",
+            {
+              "search": {
+                "url": "http://conformance-search/?q="
+              }
+            }
+          ]
+        }
+      },
+      "case": "apply-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "apply"
+    },
+    {
+      "asked": {},
+      "case": "panels-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "panels"
+    }
+  ],
+  "major": 1
+}

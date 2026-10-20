@@ -1,0 +1,58 @@
+{
+  "capability": "invite.decline",
+  "cases": [
+    {
+      "asked": {},
+      "case": "refuses-without-the-key",
+      "expect": {
+        "status": [
+          401
+        ]
+      },
+      "keyed": false,
+      "live": true,
+      "operation": "hold"
+    },
+    {
+      "asked": {
+        "key": "{minted}"
+      },
+      "case": "hold-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "hold"
+    },
+    {
+      "asked": {},
+      "case": "held-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "held"
+    },
+    {
+      "asked": {
+        "invitations": [
+          {
+            "account": "00000000000000000000000000000000",
+            "lapses": 4102444800,
+            "token": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ]
+      },
+      "case": "apply_invitations-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "apply_invitations"
+    }
+  ],
+  "major": 1
+}

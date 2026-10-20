@@ -20,6 +20,9 @@ thiserror = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true, features = ["sync"] }
+regex = { workspace = true }
+regex-syntax = { workspace = true }
+url = { workspace = true }
 
 [dev-dependencies]
 # The tests round-trip a stage through its serialised form, which is the only place the

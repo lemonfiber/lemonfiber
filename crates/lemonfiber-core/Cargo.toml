@@ -65,6 +65,8 @@ tokio = { workspace = true, features = ["net", "rt-multi-thread", "test-util"] }
 # A bundled claim as the stack writes it, for the tests that judge one: the stack's own
 # reader keeps each claim as the TOML table it found.
 toml = { workspace = true }
+# The door's cases, judged by a guard matching the media server's declared patterns.
+regex = { workspace = true }
 
 [lints]
 workspace = true

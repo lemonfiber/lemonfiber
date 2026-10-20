@@ -1,0 +1,38 @@
+{
+  "capability": "network.egress-guard",
+  "cases": [
+    {
+      "asked": {},
+      "case": "refuses-without-the-key",
+      "expect": {
+        "status": [
+          401
+        ]
+      },
+      "keyed": false,
+      "live": true,
+      "operation": "up"
+    },
+    {
+      "asked": {},
+      "case": "up-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "up"
+    },
+    {
+      "asked": {},
+      "case": "forwarded-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "forwarded"
+    }
+  ],
+  "major": 1
+}

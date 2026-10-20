@@ -1,0 +1,126 @@
+{
+  "capability": "stream.guard",
+  "cases": [
+    {
+      "asked": {},
+      "case": "refuses-without-the-key",
+      "expect": {
+        "status": [
+          401
+        ]
+      },
+      "keyed": false,
+      "live": true,
+      "operation": "guard"
+    },
+    {
+      "asked": {
+        "guarded": {
+          "declared": {
+            "bytes": [
+              {
+                "exempt": [
+                  "^/items/playing/bytes$"
+                ],
+                "item": "^[0-9a-f]{32}$",
+                "naming": [
+                  {
+                    "held": "refused",
+                    "parameter": "other"
+                  },
+                  {
+                    "held": {
+                      "asked": {
+                        "shape": "^[0-9a-f]{32}$"
+                      }
+                    },
+                    "parameter": "source"
+                  }
+                ],
+                "pattern": "^/items/(?P<item>[^/]+)/bytes$"
+              }
+            ],
+            "locations": {
+              "backdrop": "{base}/items/{item}/backdrop",
+              "poster": "{base}/items/{item}/poster",
+              "stream": "{base}/items/{item}/bytes"
+            },
+            "ports": {
+              "encrypted": null,
+              "upstream": 80
+            },
+            "question": {
+              "answers": {
+                "may": [
+                  {
+                    "from": 200,
+                    "to": 299
+                  }
+                ],
+                "may_not": [
+                  {
+                    "from": 404,
+                    "to": 404
+                  }
+                ],
+                "no_session": [
+                  {
+                    "from": 401,
+                    "to": 401
+                  }
+                ],
+                "not_from_there": [
+                  {
+                    "from": 403,
+                    "to": 403
+                  }
+                ]
+              },
+              "method": "get",
+              "path": "/items/{item}",
+              "to": "upstream"
+            },
+            "refused": [
+              "^/everything/picture$"
+            ],
+            "token": {
+              "parameters": [],
+              "presented": "as-is",
+              "shape": "^[0-9a-f]{32}$"
+            }
+          },
+          "pass": "http://conformance-pass/pass",
+          "proxy": "127.0.0.1"
+        }
+      },
+      "case": "guard-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "guard"
+    },
+    {
+      "asked": {},
+      "case": "guarding-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "guarding"
+    },
+    {
+      "asked": {},
+      "case": "certificate-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "certificate"
+    }
+  ],
+  "major": 1
+}

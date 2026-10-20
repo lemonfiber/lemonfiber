@@ -1,38 +1,30 @@
 //! `request.intake`: what a request service is asked, the service the household asks for
-//! what it wants through.
+//! what it wants through; and `request.gate`: what the gate it reaches the curators and
+//! the media server through is asked.
 //!
-//! The service itself (who it signs in through, which curators it hands requests to,
-//! who it knows and what it tells them); what one member may ask for and what becomes
+//! The request service itself (who it signs in through, which curators it hands requests
+//! to, who it knows and what it tells them); what one member may ask for and what becomes
 //! of one request; where the person who made a request already hears from it; the
 //! notices everybody reads before they ask; and the titles beyond the house a member may
-//! find and ask for.
+//! find and ask for. The gate is handed every route it admits at once, each with the
+//! credential it presents and the tokens it admits, and answers each credential by its
+//! fingerprint alone.
 
 use std::collections::BTreeSet;
 
 use lemonfiber_ports::media::Kind;
 use lemonfiber_ports::service::{
-    Address, Addressing, Approving, Asked, Asking, Credential, Detail, Endpoint, FulfilmentTarget,
-    Headroom, Holding, HouseholdRequest, IdentitySource, MediaServerLink, Noticing, Occasion, Page,
-    Protocol, QualityProfile, Quota, RegisteredTarget, Requesting, Requests, Searching, Telling,
-    Wish,
+    Address, Addressing, Admitted, Approving, Asked, Asking, Credential, Detail, Endpoint,
+    FulfilmentTarget, Gated, Gating, Headroom, Holding, HouseholdRequest, IdentitySource,
+    MediaServerLink, Noticing, Occasion, Page, Protocol, QualityProfile, Quota, RegisteredTarget,
+    Requesting, Requests, Searching, Target, Telling, Wish,
 };
 
+use super::{curator_address, CURATOR, CURATOR_PORT, FOLDER, NAMED, TOKEN_HASH};
 use crate::conformance::Placeholder;
-
-/// The name the conformance cases give what they make and the member they link.
-const NAMED: &str = "conformance";
 
 /// Where the conformance cases say the identity source is reached.
 const IDENTITY_AT: &str = "http://conformance-identity";
-
-/// The host the conformance cases name a curator on.
-const CURATOR_HOST: &str = "conformance-curator";
-
-/// The port the conformance cases name a curator and the identity source on.
-const PORT: u16 = 80;
-
-/// The folder the conformance cases file into.
-const FOLDER: &str = "/data/conformance";
 
 /// The quality profile the conformance cases hand a curator.
 const PROFILE: u32 = 1;
@@ -58,8 +50,8 @@ const PAGE: u32 = 1;
 /// Where the conformance cases reach a curator or the identity source.
 fn endpoint() -> Endpoint {
     Endpoint {
-        host: CURATOR_HOST.to_owned(),
-        port: PORT,
+        host: CURATOR.to_owned(),
+        port: CURATOR_PORT,
         base: String::new(),
     }
 }
@@ -198,6 +190,39 @@ crate::contract! {
                     seasons: Vec::new(),
                 },
             };
+        }
+    }
+}
+
+/// Where the conformance cases' gate reaches the media server.
+const MEDIA_SERVER_AT: &str = "http://conformance-media-server";
+
+/// One route the conformance cases' gate admits to `target` at `address`.
+fn gated(target: Target, address: String) -> Gated {
+    Gated {
+        target,
+        address,
+        credential: Placeholder::Minted.written(),
+        tokens: vec![TOKEN_HASH.to_owned()],
+    }
+}
+
+crate::contract! {
+    /// `request.gate`: the gate the request service reaches through.
+    pub mod gate = "request.gate" @ 1 {
+        impl Gating {
+            /// Admit every route in place of the ones it admits.
+            fn admit(slice routes: &[Gated] as Gated) -> () where asks = Asked {
+                routes: vec![
+                    gated(
+                        Target::Curator { media_type: Kind::Tv.media_type().to_owned() },
+                        curator_address(),
+                    ),
+                    gated(Target::MediaServer, MEDIA_SERVER_AT.to_owned()),
+                ],
+            };
+            /// Every route it admits, each credential by its fingerprint.
+            fn admitted() -> Vec<Admitted> where asks = Asked {};
         }
     }
 }

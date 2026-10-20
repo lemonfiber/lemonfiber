@@ -1,0 +1,512 @@
+{
+  "post": {
+    "operationId": "guard",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$defs": {
+              "Addressee": {
+                "description": "Where the question is sent.",
+                "oneOf": [
+                  {
+                    "const": "upstream",
+                    "description": "The upstream itself, carrying the member's token as presented to it.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "adapter",
+                    "description": "The adapter that fills the capability for it.",
+                    "type": "string"
+                  }
+                ]
+              },
+              "Answers": {
+                "additionalProperties": false,
+                "description": "What each answer to the question means. An answer in none of them is a refusal.",
+                "properties": {
+                  "may": {
+                    "description": "The member may have the item's bytes.",
+                    "items": {
+                      "$ref": "#/$defs/Statuses"
+                    },
+                    "type": "array"
+                  },
+                  "may_not": {
+                    "description": "The member may not see the item.",
+                    "items": {
+                      "$ref": "#/$defs/Statuses"
+                    },
+                    "type": "array"
+                  },
+                  "no_session": {
+                    "description": "The token is absent, ended or wrong.",
+                    "items": {
+                      "$ref": "#/$defs/Statuses"
+                    },
+                    "type": "array"
+                  },
+                  "not_from_there": {
+                    "description": "The member may not be served from where the request came from.",
+                    "items": {
+                      "$ref": "#/$defs/Statuses"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "may",
+                  "may_not",
+                  "no_session",
+                  "not_from_there"
+                ],
+                "type": "object"
+              },
+              "BytePath": {
+                "additionalProperties": false,
+                "description": "A path the upstream serves an item's bytes under.",
+                "properties": {
+                  "exempt": {
+                    "description": "Paths the pattern covers that name no item, passed on as any other path is.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "item": {
+                    "description": "The shape an item's id has, matched against what the group holds; a request whose\nitem has another shape is refused without asking anything.",
+                    "type": "string"
+                  },
+                  "naming": {
+                    "description": "The query parameters under which the upstream serves another item than the one\nin the path, each matched without regard to case, and a parameter on the path\nwhose name holds anything but ASCII letters, digits, `_`, `-` and `.` refused.",
+                    "items": {
+                      "$ref": "#/$defs/Naming"
+                    },
+                    "type": "array"
+                  },
+                  "pattern": {
+                    "description": "The paths it covers, holding one group named `item` where the item's id sits, every\nmatch starting at the path's start.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "pattern",
+                  "item",
+                  "exempt",
+                  "naming"
+                ],
+                "type": "object"
+              },
+              "Declared": {
+                "additionalProperties": false,
+                "description": "Everything a guard in front of a media server enforces, as the media server's filler\ndeclares it.",
+                "properties": {
+                  "bytes": {
+                    "description": "Where it serves an item's bytes, the first that covers a path deciding it.",
+                    "items": {
+                      "$ref": "#/$defs/BytePath"
+                    },
+                    "type": "array"
+                  },
+                  "locations": {
+                    "$ref": "#/$defs/Locations",
+                    "description": "Where an item is found."
+                  },
+                  "ports": {
+                    "$ref": "#/$defs/Ports",
+                    "description": "The ports it listens on."
+                  },
+                  "question": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Question"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "What the guard asks before it passes a request for an item's bytes."
+                  },
+                  "refused": {
+                    "description": "Paths refused without asking anything, because no question about an item covers\nthem.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "token": {
+                    "$ref": "#/$defs/Token",
+                    "description": "How a member's token reaches the upstream."
+                  }
+                },
+                "required": [
+                  "bytes",
+                  "refused",
+                  "token",
+                  "locations",
+                  "ports"
+                ],
+                "type": "object"
+              },
+              "Guarded": {
+                "additionalProperties": false,
+                "description": "Everything a guard enforces, and nothing else.",
+                "properties": {
+                  "declared": {
+                    "$ref": "#/$defs/Declared",
+                    "description": "The media server's declaration, as its filler answered it."
+                  },
+                  "pass": {
+                    "description": "Where it asks the core whether a live-stream pass is good.",
+                    "type": "string"
+                  },
+                  "proxy": {
+                    "description": "The one address it believes when a request says which client it came from.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "declared",
+                  "proxy",
+                  "pass"
+                ],
+                "type": "object"
+              },
+              "Held": {
+                "description": "What the guard does with a request carrying a parameter that names another item.",
+                "oneOf": [
+                  {
+                    "const": "refused",
+                    "description": "Refuses it without asking anything.",
+                    "type": "string"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "description": "Asks the question about the item it names as well as the item in the path, and\nrefuses it given more than once, under another spelling, or in another shape.",
+                    "properties": {
+                      "asked": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "shape": {
+                            "description": "The shape the item it names has.",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "shape"
+                        ],
+                        "type": "object"
+                      }
+                    },
+                    "required": [
+                      "asked"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              },
+              "Locations": {
+                "additionalProperties": false,
+                "description": "Where an item is found, each a template naming the household address as `{base}` and\nthe item as `{item}`.",
+                "properties": {
+                  "backdrop": {
+                    "description": "Its backdrop.",
+                    "type": "string"
+                  },
+                  "poster": {
+                    "description": "Its poster.",
+                    "type": "string"
+                  },
+                  "stream": {
+                    "description": "Where it streams from.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "stream",
+                  "poster",
+                  "backdrop"
+                ],
+                "type": "object"
+              },
+              "Method": {
+                "description": "The method a request uses.",
+                "oneOf": [
+                  {
+                    "const": "get",
+                    "description": "Read.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "post",
+                    "description": "Write.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "put",
+                    "description": "Replace an existing resource.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "patch",
+                    "description": "Change part of an existing resource.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "delete",
+                    "description": "Take a resource away.",
+                    "type": "string"
+                  }
+                ]
+              },
+              "Naming": {
+                "additionalProperties": false,
+                "description": "A query parameter naming another item than the one in the path.",
+                "properties": {
+                  "held": {
+                    "$ref": "#/$defs/Held",
+                    "description": "What the guard does with a request carrying it."
+                  },
+                  "parameter": {
+                    "description": "The parameter's name.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "parameter",
+                  "held"
+                ],
+                "type": "object"
+              },
+              "Ports": {
+                "additionalProperties": false,
+                "description": "The ports the upstream listens on.",
+                "properties": {
+                  "encrypted": {
+                    "description": "Its own encrypted one, where a household client expects one.",
+                    "format": "uint16",
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "upstream": {
+                    "description": "Its own.",
+                    "format": "uint16",
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "upstream"
+                ],
+                "type": "object"
+              },
+              "Presentation": {
+                "description": "How a member's `Authorization: Bearer <token>` is presented to the upstream.",
+                "oneOf": [
+                  {
+                    "const": "as-is",
+                    "description": "As it came.",
+                    "type": "string"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "description": "In place of the `Authorization` header, as one header.",
+                    "properties": {
+                      "header": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "name": {
+                            "description": "The header's name.",
+                            "type": "string"
+                          },
+                          "value": {
+                            "description": "Its value, naming the token as `{token}`.",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "value"
+                        ],
+                        "type": "object"
+                      }
+                    },
+                    "required": [
+                      "header"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "description": "Taken out of the header and put in the query.",
+                    "properties": {
+                      "query": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "parameter": {
+                            "description": "The parameter's name.",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "parameter"
+                        ],
+                        "type": "object"
+                      }
+                    },
+                    "required": [
+                      "query"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              },
+              "Question": {
+                "additionalProperties": false,
+                "description": "The request the guard makes to decide a request for an item's bytes.",
+                "properties": {
+                  "answers": {
+                    "$ref": "#/$defs/Answers",
+                    "description": "What each answer means."
+                  },
+                  "method": {
+                    "$ref": "#/$defs/Method",
+                    "description": "Its method."
+                  },
+                  "path": {
+                    "description": "Its path, naming the item as `{item}`.",
+                    "type": "string"
+                  },
+                  "to": {
+                    "$ref": "#/$defs/Addressee",
+                    "description": "Where it is sent."
+                  }
+                },
+                "required": [
+                  "method",
+                  "path",
+                  "to",
+                  "answers"
+                ],
+                "type": "object"
+              },
+              "Statuses": {
+                "additionalProperties": false,
+                "description": "The statuses from `from` to `to`, both included.",
+                "properties": {
+                  "from": {
+                    "description": "The first.",
+                    "format": "uint16",
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "to": {
+                    "description": "The last.",
+                    "format": "uint16",
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "from",
+                  "to"
+                ],
+                "type": "object"
+              },
+              "Token": {
+                "additionalProperties": false,
+                "description": "A member's token, as the upstream reads it.",
+                "properties": {
+                  "parameters": {
+                    "description": "The query parameters the upstream also reads a token from, carried into the\nquestion as it came; a request carrying more than one of them, one under another\nspelling, or one in another shape is refused.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "presented": {
+                    "$ref": "#/$defs/Presentation",
+                    "description": "How a bearer token is presented."
+                  },
+                  "shape": {
+                    "description": "The shape a token has; a bearer value of any other shape is left as it came.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "presented",
+                  "shape",
+                  "parameters"
+                ],
+                "type": "object"
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "guarded": {
+                "$ref": "#/$defs/Guarded",
+                "description": "The port's `guarded`."
+              }
+            },
+            "required": [
+              "guarded"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "title": "null",
+              "type": "null"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ],
+    "x-lemonfiber-largest": 1048576
+  }
+}

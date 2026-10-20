@@ -91,6 +91,9 @@
     "/lemonfiber/download.torrent/v1/moving": {
       "$ref": "operations/moving.json"
     },
+    "/lemonfiber/download.torrent/v1/peer_port": {
+      "$ref": "operations/peer_port.json"
+    },
     "/lemonfiber/download.torrent/v1/pulling": {
       "$ref": "operations/pulling.json"
     },
@@ -102,6 +105,9 @@
     },
     "/lemonfiber/download.torrent/v1/seeding": {
       "$ref": "operations/seeding.json"
+    },
+    "/lemonfiber/download.torrent/v1/set_peer_port": {
+      "$ref": "operations/set_peer_port.json"
     },
     "/lemonfiber/download.torrent/v1/stop": {
       "$ref": "operations/stop.json"
