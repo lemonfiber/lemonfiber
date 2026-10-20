@@ -62,7 +62,10 @@ const OSI: &str = include_str!("spdx_osi.txt");
 /// Where lemonfiber publishes the images it builds from its own code, and nothing else.
 const OWN_IMAGES: &str = "ghcr.io/lemonfiber/";
 
-/// The licence lemonfiber's own code carries, and so every image it builds.
+/// Where lemonfiber's own code is published.
+const OWN_UPSTREAM: &str = "https://github.com/lemonfiber/";
+
+/// The licence lemonfiber's own code carries, and so every image it builds from it.
 const OWN_LICENCE: &str = "Hippocratic-3.0";
 
 /// The identifiers a vendored list holds, ignoring the prose it explains itself with.
@@ -415,13 +418,14 @@ fn estimated(service: &Service) -> Option<String> {
 }
 
 /// A service declares a licence anyone can look up: lemonfiber's own where lemonfiber
-/// builds its image, and an OSI one everywhere else.
+/// builds its image from its own code, and an OSI one everywhere else, an image
+/// lemonfiber builds from someone else's code included.
 fn licensed(service: &Service, osi: &BTreeSet<&str>) -> Option<String> {
-    if service.image.starts_with(OWN_IMAGES) {
+    if service.image.starts_with(OWN_IMAGES) && service.upstream.starts_with(OWN_UPSTREAM) {
         return (service.license != OWN_LICENCE).then(|| {
             format!(
-                "declares licence {}, but its image is one lemonfiber builds, which carries \
-                 {OWN_LICENCE}",
+                "declares licence {}, but its image is one lemonfiber builds from its own \
+                 code, which carries {OWN_LICENCE}",
                 service.license
             )
         });

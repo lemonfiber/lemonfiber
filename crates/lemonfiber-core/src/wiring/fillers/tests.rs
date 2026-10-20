@@ -387,9 +387,11 @@ fn a_plugins_service_holds_as_first_party_only_where_the_build_trusts_it() {
         )],
     );
     installed.manifest = "ab12".to_owned();
+    installed.tree = crate::test_support::A_TREE.to_owned();
     let trusted = [crate::plugin::first_party::FirstParty {
         plugin: "bazarr",
         manifest: "ab12",
+        tree: crate::test_support::A_TREE,
     }];
     let holder = |trusted: &[crate::plugin::first_party::FirstParty]| {
         let fillers = crate::test_support::stack()
@@ -577,4 +579,71 @@ fn a_stack_service_naming_an_upstream_fronts_nothing() {
             .map(|one| (one.brought_by(), fillers.fronted_by(one).is_some())),
         Some((None, false))
     );
+}
+
+/// The stack's jellyfin as a first-party plugin's service that replaces it, or as one
+/// that is not first-party, saying the same.
+fn a_jellyfin_standing_in(trusted: bool) -> super::Fillers {
+    let mut replacing = crate::test_support::a_placed("jellyfin", &[], None, Some(8096));
+    replacing.replaces = Some("jellyfin".to_owned());
+    let mut installed = crate::test_support::an_installed("jellyfin", vec![replacing]);
+    installed.manifest = "ab12".to_owned();
+    installed.tree = crate::test_support::A_TREE.to_owned();
+    let set = [crate::plugin::first_party::FirstParty {
+        plugin: "jellyfin",
+        manifest: "ab12",
+        tree: crate::test_support::A_TREE,
+    }];
+    let trusting: &[crate::plugin::first_party::FirstParty] = if trusted { &set } else { &[] };
+    crate::test_support::stack()
+        .manifest()
+        .map(|manifest| {
+            super::Fillers::trusting(
+                &manifest,
+                std::slice::from_ref(&installed),
+                &super::super::Chosen::default(),
+                None,
+                trusting,
+            )
+        })
+        .unwrap_or_default()
+}
+
+/// A first-party service standing in for the stack's keeps the stack's credential names
+/// and the links by name to it, and is the one service of that id the core reaches.
+#[test]
+fn a_first_party_service_standing_in_keeps_the_stacks_names_and_links() {
+    let fillers = a_jellyfin_standing_in(true);
+    let jellyfin: Vec<_> = fillers
+        .services()
+        .filter(|one| one.id == "jellyfin")
+        .collect();
+    assert_eq!(jellyfin.len(), 1);
+    assert!(jellyfin.iter().all(|one| one.stands_in()));
+    assert_eq!(
+        fillers
+            .service("jellyfin")
+            .and_then(|one| fillers.setting(one, crate::config::API_KEY_SUFFIX))
+            .as_deref(),
+        Some("JELLYFIN_API_KEY")
+    );
+    assert!(fillers
+        .named_by("decline")
+        .is_some_and(|one| one.brought_by() == Some("jellyfin")));
+}
+
+/// A service that is not first-party saying it replaces the stack's stands in for
+/// nothing: the stack's service stays, and the links by name reach it alone.
+#[test]
+fn a_service_not_first_party_stands_in_for_nothing() {
+    let fillers = a_jellyfin_standing_in(false);
+    assert!(fillers.services().all(|one| !one.stands_in()));
+    assert!(fillers
+        .named_by("decline")
+        .is_some_and(|one| one.brought_by().is_none()));
+    let plugin = fillers
+        .services()
+        .find(|one| one.brought_by() == Some("jellyfin"))
+        .and_then(|one| fillers.setting(one, crate::config::API_KEY_SUFFIX));
+    assert_ne!(plugin.as_deref(), Some("JELLYFIN_API_KEY"));
 }

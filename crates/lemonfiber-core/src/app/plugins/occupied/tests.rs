@@ -162,3 +162,24 @@ fn the_shipped_stack_holds_the_proxy_s_ports() {
         .is_some_and(|detail| detail.contains("443")));
     assert!(unoccupied(&ctx, &free, &[], &scratch).is_ok());
 }
+
+/// A first-party plugin saying it replaces the stack's service is still held to that
+/// service's name and port: the move that takes the stack's service out is not made by
+/// an install.
+#[test]
+fn a_plugin_replacing_the_stacks_service_is_held_to_its_name_and_port() {
+    let mut replacing = reached("jellyfin", 8096, None);
+    replacing.replaces = Some("jellyfin".to_owned());
+    let would = an_installed("jellyfin", vec![replacing]);
+    let held = [Declared {
+        service: "jellyfin".to_owned(),
+        file: PathBuf::from("compose/media.yml"),
+    }];
+    let stack = [Published {
+        port: 8096,
+        service: "jellyfin".to_owned(),
+        file: PathBuf::from("compose/media.yml"),
+    }];
+    assert_eq!(named(&would, &held).len(), 1);
+    assert_eq!(bound(&would, &stack, &[]).len(), 1);
+}

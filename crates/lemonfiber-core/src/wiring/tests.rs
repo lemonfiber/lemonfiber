@@ -126,19 +126,17 @@ fn an_ask_with_one_claimant_reaches_it_outright() {
 /// in the stack that reaches all of them.
 #[test]
 fn an_ask_for_every_filler_reaches_every_filler() {
+    let curators = ["sonarr", "radarr", "lidarr", "bindery"];
     let reaches = came(stack(), &Chosen::default(), "bazarr");
+    let ordered = crate::test_support::in_the_stacks_order(&curators);
+    assert!(ordered.is_some(), "the stack runs every curator");
     assert_eq!(
         reaches,
-        Some(Reaches::Asked {
+        ordered.map(|services| Reaches::Asked {
             capability: "library.curate".to_owned(),
-            services: vec![
-                "sonarr".to_owned(),
-                "radarr".to_owned(),
-                "lidarr".to_owned(),
-                "bindery".to_owned(),
-            ],
+            services,
             settled: Settled::Each,
-            origins: bundled(&["sonarr", "radarr", "lidarr", "bindery"]),
+            origins: bundled(&curators),
         })
     );
 }
@@ -596,6 +594,7 @@ fn plugin_filling(plugin: &str, service: &str, capability: &str) -> crate::plugi
         revision: String::new(),
         signed: String::new(),
         manifest: String::new(),
+        tree: String::new(),
         installed_at: String::new(),
     }
 }

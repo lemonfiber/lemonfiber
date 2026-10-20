@@ -6,7 +6,9 @@
 //! not match is a build that fails rather than a plugin trusted at a manifest nobody
 //! pinned.
 
+mod assembly;
 mod copies;
+mod kept;
 mod parts;
 mod rules;
 mod tree;
@@ -18,7 +20,9 @@ use std::path::Path;
 use lemonfiber_manifest::{Form, Profile, Removed, Wiring};
 use serde::Deserialize;
 
-pub use tree::digest as tree_digest;
+pub use assembly::assembled;
+pub use kept::kept;
+pub use tree::{digest as tree_digest, of as tree_of};
 
 /// The bundle's file, from the root of `lemonfiber-plugins`.
 pub const FILE: &str = "bundle/bundle.toml";
@@ -191,7 +195,11 @@ pub fn read(root: &Path) -> Result<(Bundle, Vec<Held>), Refused> {
 
 /// The SHA-256 of `bytes`, in lower-case hexadecimal.
 fn hex(bytes: &[u8]) -> String {
-    let digest = ring::digest::digest(&ring::digest::SHA256, bytes);
+    rendered(&ring::digest::digest(&ring::digest::SHA256, bytes))
+}
+
+/// `digest` in lower-case hexadecimal.
+fn rendered(digest: &ring::digest::Digest) -> String {
     let mut rendered = String::with_capacity(digest.as_ref().len() * 2);
     for byte in digest.as_ref() {
         let _ = write!(rendered, "{byte:02x}");

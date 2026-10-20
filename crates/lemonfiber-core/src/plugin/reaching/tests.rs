@@ -175,6 +175,7 @@ fn filler(stack: Option<&std::path::Path>) -> crate::wiring::Filler {
         majors: Vec::new(),
         fronts: None,
         native: None,
+        replaces: None,
     }
 }
 

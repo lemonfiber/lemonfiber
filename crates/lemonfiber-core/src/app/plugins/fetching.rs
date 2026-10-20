@@ -312,7 +312,7 @@ pub(super) fn checkout(ctx: &Ctx, commit: &str) -> Option<PathBuf> {
 /// One this run finds already there is removed first, and the directory is then created
 /// rather than taken over: a directory somebody else made at the name between the two
 /// is refused rather than fetched into.
-fn made_fresh(into: &Path) -> std::io::Result<()> {
+pub(super) fn made_fresh(into: &Path) -> std::io::Result<()> {
     let _ = std::fs::remove_dir_all(into);
     private_dir(into.parent().unwrap_or(into), true)?;
     private_dir(into, false)

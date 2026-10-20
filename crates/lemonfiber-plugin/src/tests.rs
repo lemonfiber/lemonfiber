@@ -30,11 +30,12 @@ fn every_manifest_the_bundle_pins_is_one_this_build_acts_on() {
         assert!(refused.is_empty(), "{id}: {refused:?}");
         for capability in pinned.fills {
             assert!(
-                manifest
-                    .services
+                manifest.services.iter().any(|service| service
+                    .speaks
                     .iter()
-                    .any(|service| service.speaks.iter().any(|spoken| spoken == capability)),
-                "{id} fills {capability} by default and no service of it speaks that"
+                    .chain(&service.provides)
+                    .any(|named| named == capability)),
+                "{id} fills {capability} by default and no service of it speaks or provides that"
             );
         }
     }

@@ -6,7 +6,7 @@
       "name": "indexer.search",
       "summary": "Runs a search across the indexers it holds and answers with what they returned.",
       "contract": "Holds the operator's indexer accounts, accepts a search on their behalf, and answers with the releases those indexers returned. The accounts it holds, and the list of indexers they belong to, are not readable without the operator's credential.",
-      "declared_by": ["prowlarr", "nzbhydra2"],
+      "declared_by": ["nzbhydra2", "prowlarr"],
       "probes": [
         {
           "id": "guarded",
@@ -134,7 +134,7 @@
       "name": "library.curate",
       "summary": "Holds a wanted list for one kind of media, asks for what is missing, and files what arrives.",
       "contract": "Holds a list of what the household wants of one kind of media, asks an indexer for what is missing, hands the result to a download client, and files what arrives under the library's own naming. The wanted list is not readable without the operator's credential.",
-      "declared_by": ["sonarr", "radarr", "lidarr", "bindery"],
+      "declared_by": ["bindery", "lidarr", "radarr", "sonarr"],
       "probes": [
         {
           "id": "guarded",
@@ -194,7 +194,7 @@
       "name": "media.serve",
       "summary": "Serves the filed library to a player, with its own catalogue of what it holds.",
       "contract": "Holds a catalogue of what is in the library and serves it to a player over HTTP. The catalogue is not readable without a credential — a library server that answers an anonymous caller is publishing the household's collection to every device on the network.",
-      "declared_by": ["jellyfin", "calibre-web-automated", "audiobookshelf", "navidrome"],
+      "declared_by": ["audiobookshelf", "calibre-web-automated", "navidrome", "jellyfin"],
       "probes": [
         {
           "id": "guarded",

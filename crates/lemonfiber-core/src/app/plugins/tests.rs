@@ -524,6 +524,7 @@ fn document(ctx: &Ctx) -> String {
 }
 
 mod cataloguing;
+mod embedding;
 mod fetching;
 mod following;
 mod fronting;

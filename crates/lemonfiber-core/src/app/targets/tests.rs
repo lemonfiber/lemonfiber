@@ -187,6 +187,7 @@ fn keyed_in(file: &str, within: Option<&str>) -> crate::wiring::Filler {
         majors: Vec::new(),
         fronts: None,
         native: None,
+        replaces: None,
     }
 }
 

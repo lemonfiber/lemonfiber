@@ -57,6 +57,8 @@ mod reproving;
 mod standing;
 // Installing from a git source: the revision resolved, the commit fetched as data.
 mod fetching;
+// Installing a plugin the bundle installs: its tree read from this build, nothing fetched.
+mod embedding;
 // Git as it is run against a stranger's repository: one configuration, one deadline.
 pub(crate) mod git;
 // Where a git source may be fetched from: over https, from a host out on the internet.
@@ -270,9 +272,10 @@ async fn sourced(
             };
             Box::pin(fetching::fetched(ctx, held, &fetching, errand, consent)).await
         }
-        crate::plugin::Source::Name(name) => {
-            Box::pin(cataloguing::resolved(ctx, held, name, errand, consent)).await
-        }
+        crate::plugin::Source::Name(name) => match embedding::pinned(name) {
+            Some(pinned) => Box::pin(embedding::embedded(ctx, held, pinned, errand, consent)).await,
+            None => Box::pin(cataloguing::resolved(ctx, held, name, errand, consent)).await,
+        },
     }
 }
 

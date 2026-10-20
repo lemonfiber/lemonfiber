@@ -59,6 +59,7 @@ fn helpers() -> Installed {
         ],
     );
     installed.manifest = MANIFEST.to_owned();
+    installed.tree = crate::test_support::A_TREE.to_owned();
     installed
 }
 
@@ -82,6 +83,7 @@ fn fillers(trusted: &[FirstParty]) -> Fillers {
 const FIRST_PARTY: [FirstParty; 1] = [FirstParty {
     plugin: PLUGIN,
     manifest: MANIFEST,
+    tree: crate::test_support::A_TREE,
 }];
 
 /// What each pairing `by` asks for comes to, by the filler and the capability.

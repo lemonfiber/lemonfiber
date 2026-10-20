@@ -129,6 +129,7 @@ fn the_git_sources_of_installed_plugins_are_where_fetching_one_goes() {
         revision: String::new(),
         signed: String::new(),
         manifest: String::new(),
+        tree: String::new(),
         installed_at: String::new(),
     };
     let installed = [

@@ -458,6 +458,7 @@ fn only_a_first_party_plugin_replaces_a_stack_service() {
     placed.replaces = Some("jellyfin".to_owned());
     let mut replacing = crate::test_support::an_installed("contracted", vec![placed]);
     replacing.manifest = crate::test_support::CONTRACTED_MANIFEST.to_owned();
+    replacing.tree = crate::test_support::A_TREE.to_owned();
     let plain = crate::test_support::an_installed(
         "contracted",
         vec![crate::test_support::a_placed(

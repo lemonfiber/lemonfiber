@@ -386,18 +386,22 @@ fn distance_counts_the_edits_between_two_names() {
 #[test]
 fn a_plan_names_the_services_the_profiles_hold() {
     let started = plan(&["library"], Protocols::none()).map(|plan| plan.services);
+    let held = crate::test_support::in_the_stacks_order(&[
+        "jellyfin",
+        "door",
+        "seerr",
+        "request-gate",
+        "decline",
+        "calibre-web-automated",
+        "audiobookshelf",
+        "navidrome",
+    ]);
+    assert!(
+        held.is_some(),
+        "the stack runs every service the profiles hold"
+    );
     assert_eq!(
-        started,
-        Some(named(&[
-            "jellyfin",
-            "door",
-            "seerr",
-            "request-gate",
-            "decline",
-            "calibre-web-automated",
-            "audiobookshelf",
-            "navidrome"
-        ])),
+        started, held,
         "the stack's own order, so the preview reads like the stack"
     );
 }

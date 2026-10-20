@@ -29,6 +29,7 @@ fn reader() -> Installed {
         vec![placed("reader"), placed("reader-worker")],
     );
     reader.manifest = crate::test_support::CONTRACTED_MANIFEST.to_owned();
+    reader.tree = crate::test_support::A_TREE.to_owned();
     reader.declared.secrets = vec![crate::plugin::Secret {
         id: "sonarr-key".to_owned(),
         of: "sonarr".to_owned(),

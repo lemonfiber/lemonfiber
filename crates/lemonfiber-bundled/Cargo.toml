@@ -21,3 +21,8 @@ lemonfiber-bundle = { workspace = true }
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+lemonfiber-manifest = { workspace = true }
+lemonfiber-bundle = { workspace = true }
+toml = { workspace = true }
