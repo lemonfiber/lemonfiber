@@ -4,10 +4,14 @@
 //! It is handed the one media server key it switches an invitation off with, answers
 //! that key by its fingerprint alone, and is handed every invitation it may act on.
 
-use lemonfiber_ports::service::{Declinable, Declining};
+use lemonfiber_ports::service::{Claimed, Declinable, Declining, Invitations};
 
-use super::{NOWHERE, TOKEN_HASH};
+use super::{NAMED, NOWHERE, TOKEN_HASH};
 use crate::conformance::Placeholder;
+
+/// When the conformance cases' invitation was issued: the start of 2026, in seconds since
+/// the Unix epoch.
+const ISSUED: u64 = 1_767_225_600;
 
 /// When the conformance cases' invitation lapses: the start of 2100, in seconds since
 /// the Unix epoch.
@@ -21,13 +25,18 @@ crate::contract! {
             fn hold(str key: &str) -> () where asks = Asked { key: Placeholder::Minted.written() };
             /// The key it holds, by its fingerprint: `~` and the low sixteen bits of the 64-bit FNV-1a hash of its bytes, as four lower-case hexadecimal digits.
             fn held() -> Option<String> where asks = Asked {};
-            /// Act on these invitations alone.
-            fn apply_invitations(slice invitations: &[Declinable] as Declinable) -> () where asks = Asked {
-                invitations: vec![Declinable {
-                    token: TOKEN_HASH.to_owned(),
-                    account: NOWHERE.to_owned(),
-                    lapses: LAPSES,
-                }],
+            /// Act on these invitations alone, telling a claimed account as the media server does.
+            fn apply_invitations(refer invitations: &Invitations as Invitations) -> () where asks = Asked {
+                invitations: Invitations {
+                    claimed: Claimed::Unknown,
+                    invitations: vec![Declinable {
+                        token: TOKEN_HASH.to_owned(),
+                        account: NOWHERE.to_owned(),
+                        name: NAMED.to_owned(),
+                        issued: ISSUED,
+                        lapses: LAPSES,
+                    }],
+                },
             };
         }
     }

@@ -197,11 +197,20 @@ crate::contract! {
 /// Where the conformance cases' gate reaches the media server.
 const MEDIA_SERVER_AT: &str = "http://conformance-media-server";
 
-/// One route the conformance cases' gate admits to `target` at `address`.
-fn gated(target: Target, address: String) -> Gated {
+/// The path segment the conformance cases' gate answers the media server's route under.
+const MEDIA_SERVER_PATH: &str = "media-server";
+
+/// The media server's major the conformance cases' gate forwards to.
+const MEDIA_SERVER_MAJOR: u32 = 10;
+
+/// One route the conformance cases' gate admits to `target` at `address`, under `path`,
+/// forwarding to `majors`.
+fn gated(target: Target, path: &str, address: String, majors: Vec<u32>) -> Gated {
     Gated {
         target,
+        path: path.to_owned(),
         address,
+        majors,
         credential: Placeholder::Minted.written(),
         tokens: vec![TOKEN_HASH.to_owned()],
     }
@@ -216,9 +225,16 @@ crate::contract! {
                 routes: vec![
                     gated(
                         Target::Curator { media_type: Kind::Tv.media_type().to_owned() },
+                        Kind::Tv.media_type(),
                         curator_address(),
+                        Vec::new(),
                     ),
-                    gated(Target::MediaServer, MEDIA_SERVER_AT.to_owned()),
+                    gated(
+                        Target::MediaServer,
+                        MEDIA_SERVER_PATH,
+                        MEDIA_SERVER_AT.to_owned(),
+                        vec![MEDIA_SERVER_MAJOR],
+                    ),
                 ],
             };
             /// Every route it admits, each credential by its fingerprint.
