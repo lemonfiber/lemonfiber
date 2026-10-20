@@ -132,10 +132,15 @@ fn answering() -> Arc<Fake> {
     )
 }
 
-async fn recorded(at: &Path, serving: &Serves, http: &Arc<Fake>, random: Option<u8>) -> Recorded {
+async fn read(
+    at: &Path,
+    serving: &Serves,
+    http: &Arc<Fake>,
+    random: Option<u8>,
+) -> Result<Recorded, super::super::Unreadable> {
     let program = Proving::unreachable();
     let shared = || -> Arc<dyn Http> { Arc::clone(http) as Arc<dyn Http> };
-    let read = record(
+    record(
         at,
         Recorder {
             program: program.as_ref(),
@@ -144,7 +149,11 @@ async fn recorded(at: &Path, serving: &Serves, http: &Arc<Fake>, random: Option<
             random: &FixedRandom(random.map(|byte| vec![byte; 32])),
         },
     )
-    .await;
+    .await
+}
+
+async fn recorded(at: &Path, serving: &Serves, http: &Arc<Fake>, random: Option<u8>) -> Recorded {
+    let read = read(at, serving, http, random).await;
     assert!(
         read.as_ref().is_ok_and(|read| read.refusals.is_empty()),
         "{read:?}"
@@ -412,7 +421,10 @@ async fn a_case_the_adapter_does_not_answer_fails_the_service_naming_the_case() 
 
 #[tokio::test]
 async fn an_answer_still_holding_the_adapters_identity_once_scrubbed_writes_nothing() {
-    let at = source("fronted-unscrubbable", FRONTED);
+    let at = source(
+        "fronted-unscrubbable",
+        &FRONTED.replace("takes_data  = true\n", ""),
+    );
     let http = fetching(
         vec![Answer::served(
             200,
@@ -427,6 +439,26 @@ async fn an_answer_still_holding_the_adapters_identity_once_scrubbed_writes_noth
         Some("scrubbing")
     );
     assert!(!at.join(WATCHING).exists() && !at.join(PROVED).exists());
+}
+
+#[tokio::test(start_paused = true)]
+async fn an_upstream_request_never_answered_fails_at_it_and_asks_the_adapter_nothing() {
+    let at = source("fronted-unanswered", FRONTED);
+    let http = Fake::by_path_in_turn(vec![
+        ("/health", vec![Answer::reply(200, "ok")]),
+        (
+            "/lemonfiber/adapter/v1/ready",
+            vec![Answer::reply(200, "{}")],
+        ),
+    ]);
+    let read = recorded(&at, &engine(), &http, Some(7)).await;
+    let failed = failed_at(&read);
+    assert!(
+        matches!(failed.first(), Some((step, why)) if step == "asking proof jellyfin.identifies"
+            && why.starts_with("it did not answer within 30 seconds")),
+        "{failed:?}"
+    );
+    assert!(posted(&http, "/watching").is_empty());
 }
 
 #[tokio::test]
@@ -502,19 +534,7 @@ async fn a_probe_asked_as_the_operator_of_the_upstream_refuses_the_manifest_and_
     );
     let at = source("fronted-operator", &format!("{manifest}{OPERATORS}"));
     let serving = engine();
-    let program = Proving::unreachable();
-    let http = answering();
-    let shared = || -> Arc<dyn Http> { Arc::clone(&http) as Arc<dyn Http> };
-    let read = record(
-        &at,
-        Recorder {
-            program: program.as_ref(),
-            serving: &serving,
-            transport: &shared,
-            random: &FixedRandom(Some(vec![7; 32])),
-        },
-    )
-    .await;
+    let read = read(&at, &serving, &answering(), Some(7)).await;
     assert!(
         read.as_ref()
             .is_ok_and(|read| read.refusals.iter().any(|refusal| refusal.location

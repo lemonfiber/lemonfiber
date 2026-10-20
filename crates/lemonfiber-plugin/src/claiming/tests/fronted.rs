@@ -1,7 +1,7 @@
 //! A claim that binds a probe asked as the operator, on a service an adapter of the same
 //! plugin fronts.
 
-use super::{against, CLAIMANT};
+use super::{against, says, CLAIMANT};
 
 const ADAPTER: &str = r#"
 [[service]]
@@ -31,4 +31,14 @@ fn a_probe_asked_as_the_operator_of_a_service_an_adapter_fronts_is_refused_namin
     );
     let elsewhere = fronted.replace("fronts      = \"komga\"", "fronts      = \"kavita\"");
     assert_eq!(against(&elsewhere), Vec::<String>::new());
+    let unprovided = fronted.replace(
+        "provides    = [\"media.serve\", \"komga:opds\"]",
+        "provides    = [\"komga:opds\"]",
+    );
+    let said = against(&unprovided);
+    assert!(
+        says(&said, &["media.serve is in no service's provides"]),
+        "{said:?}"
+    );
+    assert!(!says(&said, &["operator"]), "{said:?}");
 }
