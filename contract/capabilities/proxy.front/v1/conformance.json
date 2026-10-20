@@ -1,0 +1,59 @@
+{
+  "capability": "proxy.front",
+  "cases": [
+    {
+      "asked": {},
+      "case": "refuses-without-the-key",
+      "expect": {
+        "status": [
+          401
+        ]
+      },
+      "keyed": false,
+      "live": true,
+      "operation": "apply"
+    },
+    {
+      "asked": {
+        "table": {
+          "routes": [
+            {
+              "host": "conformance-upstream",
+              "name": "conformance.home.local",
+              "port": 80
+            }
+          ],
+          "tls": "automatic"
+        }
+      },
+      "case": "apply-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "apply"
+    },
+    {
+      "asked": {},
+      "case": "routing-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "routing"
+    },
+    {
+      "asked": {},
+      "case": "reload-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "reload"
+    }
+  ],
+  "major": 1
+}

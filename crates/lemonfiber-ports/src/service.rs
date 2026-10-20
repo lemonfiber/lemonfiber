@@ -24,12 +24,14 @@ mod household;
 mod metering;
 mod notices;
 mod providers;
+mod proxying;
 mod quality;
 mod requests;
 mod screening;
 mod searching;
 pub mod stage;
 mod subtitles;
+mod syncing;
 mod throttling;
 mod trace;
 mod upkeep;
@@ -57,6 +59,7 @@ pub use notices::Noticing;
 pub use providers::{
     IndexerUse, Indexers, Limits, Recorded, Standing, UsenetAccount, UsenetAccounts,
 };
+pub use proxying::{Proxying, Route, Routing, Tls};
 pub use quality::{MusicQuality, QualityReleases, ReleaseProbe};
 pub use requests::{
     HouseholdRequest, IdentitySource, MediaServerLink, MediaStatus, Occasion, RequestStatus,
@@ -68,6 +71,7 @@ pub use screening::{
 };
 pub use searching::{Asked, Detail, Found, Page, Searching, Season, Wish};
 pub use subtitles::{Subtitles, Watched, Watching};
+pub use syncing::{Profiled, Syncing};
 pub use throttling::{Hours, Rates, Throttled, Throttling, Wanted, Window};
 pub use trace::{FoundItem, ItemPart, Library, Pipeline, QueueItem, StuckItem, TraceEvent};
 pub use upkeep::{SeriesHeld, Upkeep, SERIES_MOST};

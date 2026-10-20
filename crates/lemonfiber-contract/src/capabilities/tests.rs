@@ -18,6 +18,8 @@ use super::identity::source;
 use super::indexer::search;
 use super::library::curate;
 use super::media::serve;
+use super::proxy::front;
+use super::quality::sync;
 use super::request::intake;
 use super::subtitles::fetch;
 use crate::{wire, Contracted};
@@ -26,6 +28,8 @@ mod identity;
 mod indexer;
 mod library;
 mod media;
+mod proxy;
+mod quality;
 mod request;
 mod subtitles;
 
@@ -201,6 +205,8 @@ impl Http for Served {
             intake::CAPABILITY => intake::dispatch(&*self.upstream, operation, body).await,
             source::CAPABILITY => source::dispatch(&*self.upstream, operation, body).await,
             serve::CAPABILITY => serve::dispatch(&*self.upstream, operation, body).await,
+            front::CAPABILITY => front::dispatch(&*self.upstream, operation, body).await,
+            sync::CAPABILITY => sync::dispatch(&*self.upstream, operation, body).await,
             _ => Err(wire::Refusal::unknown_operation(operation)),
         };
         Ok(match served {
@@ -332,6 +338,8 @@ fn every_operation_has_a_path_of_its_own_and_a_schema_each_way() {
             intake::CAPABILITY,
             source::CAPABILITY,
             serve::CAPABILITY,
+            front::CAPABILITY,
+            sync::CAPABILITY,
         ]
     );
 }

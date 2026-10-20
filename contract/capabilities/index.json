@@ -655,6 +655,64 @@
       ],
       "openapi": "media.serve/v1/openapi.json",
       "operations": 22
+    },
+    {
+      "capability": "proxy.front",
+      "conformance": "proxy.front/v1/conformance.json",
+      "files": [
+        {
+          "path": "proxy.front/v1/openapi.json",
+          "sha256": "15e5c1b35beaf9b9e4710dfee928efafaac8934b5aee13fe53544e8350d5997e"
+        },
+        {
+          "path": "proxy.front/v1/operations/apply.json",
+          "sha256": "7e74ab74a00050499cb48cb355a66ceeab6a53fb8530b14d645efe3c5e9a6feb"
+        },
+        {
+          "path": "proxy.front/v1/operations/routing.json",
+          "sha256": "31bb393acd0ccef5c2a64851628169027d55007995dd362713aa7e24444c929c"
+        },
+        {
+          "path": "proxy.front/v1/operations/reload.json",
+          "sha256": "782ac46b1c39cc6bbff98db7a8b1d781ea6fbd91f2fd67f8c18cefb6ce6c1ade"
+        },
+        {
+          "path": "proxy.front/v1/conformance.json",
+          "sha256": "55eddca781df5bfd908b886956347eb7fa4a0ea1c08c9dea3e01aa6ae7c9509c"
+        }
+      ],
+      "majors": [
+        1
+      ],
+      "openapi": "proxy.front/v1/openapi.json",
+      "operations": 3
+    },
+    {
+      "capability": "quality.sync",
+      "conformance": "quality.sync/v1/conformance.json",
+      "files": [
+        {
+          "path": "quality.sync/v1/openapi.json",
+          "sha256": "f789ab3ff08ee90688d4182ba47a6863ce4d88f4bd4a6549965f24ed07e8d491"
+        },
+        {
+          "path": "quality.sync/v1/operations/apply.json",
+          "sha256": "2f2010d4eb075f4fd5425db17f066e6132e108b0801b84d131b8b76d7285a7a3"
+        },
+        {
+          "path": "quality.sync/v1/operations/applied.json",
+          "sha256": "886f95194dc5b7ff1c519ba407ec7a2407f625a979de03a426966225bae6586e"
+        },
+        {
+          "path": "quality.sync/v1/conformance.json",
+          "sha256": "afab6d5a83121b73490dff1d5ed8874fccf1b4f0a350335cc956402534c4b764"
+        }
+      ],
+      "majors": [
+        1
+      ],
+      "openapi": "quality.sync/v1/openapi.json",
+      "operations": 2
     }
   ]
 }
