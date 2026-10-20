@@ -274,19 +274,26 @@ fn no_name_is_in_two_of_the_three_sets_called_capabilities() {
 }
 
 /// A probe asked with nothing held that required a body would be asking a question
-/// no anonymous caller can answer — and a refusal is the one thing it can.
+/// no anonymous caller can answer, and a refusal or a redirect to HTTPS is the one
+/// thing it can: neither is something a port proxy produces.
 #[test]
-fn a_probe_requiring_no_body_constraint_is_a_refusal() {
+fn a_probe_requiring_no_body_constraint_is_a_refusal_or_a_redirect() {
     let odd: Vec<&str> = carried()
         .iter()
         .flat_map(|held| held.probes)
         .filter(|probe| probe.kind() == ProbeKind::Request && probe.requires.body().is_empty())
-        .filter(|probe| probe.requires.endings().iter().any(|status| *status < 400))
+        .filter(|probe| {
+            probe
+                .requires
+                .endings()
+                .iter()
+                .any(|status| *status < 400 && !REDIRECTS.contains(status))
+        })
         .map(|probe| probe.id)
         .collect();
     assert!(
         odd.is_empty(),
-        "these constrain only a status and are not refusals: {odd:?}"
+        "these constrain only a status and are neither refusals nor redirects: {odd:?}"
     );
 }
 
@@ -346,6 +353,9 @@ fn the_published_words_are_the_ones_the_contract_uses() {
         ]
     );
 }
+
+/// The statuses a redirect to HTTPS is answered with.
+const REDIRECTS: [i64; 2] = [301, 308];
 
 /// A probe that runs the claimant image's own program and is answered by its exit and
 /// the start of what it prints.
@@ -478,4 +488,16 @@ fn each_kind_of_probe_is_spelled_as_a_binding_declares_it() {
             Some(format!("\"{}\"", kind.as_str()))
         );
     }
+}
+
+/// Quality sync is the one capability whose fillers listen on nothing, and so the one
+/// whose probe may be a run.
+#[test]
+fn quality_sync_is_the_one_capability_whose_fillers_listen_on_nothing() {
+    let quiet: Vec<&str> = carried()
+        .iter()
+        .filter(|held| !held.listens)
+        .map(|held| held.name)
+        .collect();
+    assert_eq!(quiet, vec!["quality.sync"]);
 }

@@ -7,21 +7,30 @@
 
 use std::path::Path;
 
-/// The stack this build embeds, beside the crates.
-const STACK: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/media-stack");
+use lemonfiber_core::plugin::bundled::Kept;
+
+/// The media stack the bundle keeps its installed parts from, beside the crates.
+const MEDIA: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/media-stack");
+
+/// The bundle's copy of each part, beside the crates.
+const COPIES: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../assets/plugins/bundle/plugins"
+);
 
 fn main() {
-    let stack = Path::new(STACK);
-    let manifest = match lemonfiber_manifest::read(stack)
-        .and_then(|text| lemonfiber_manifest::Manifest::from_toml(&text))
-    {
+    let manifest = match lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK) {
         Ok(manifest) => manifest,
         Err(why) => {
             eprintln!("the embedded stack could not be read: {why}");
             std::process::exit(1);
         }
     };
-    let report = lemonfiber_core::plugin::bundled::judged(&manifest, stack);
+    let kept = Kept {
+        media: Path::new(MEDIA),
+        copies: Path::new(COPIES),
+    };
+    let report = lemonfiber_core::plugin::bundled::judged(&manifest, kept);
     for said in lemonfiber_core::plugin::bundled::said(&report) {
         println!("{said}");
     }

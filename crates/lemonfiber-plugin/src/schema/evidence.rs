@@ -244,8 +244,8 @@ pub struct Request {
 /// A status is a claim about the network path rather than about the service: Docker
 /// publishes a port by putting a proxy in front of it, and that proxy accepts a
 /// connection before knowing whether anything inside is listening. So a status alone
-/// is not evidence — except for a refusal, which is the one answer no port proxy can
-/// produce.
+/// is not evidence — except for a refusal or a redirect to HTTPS, answers no port proxy
+/// produces.
 ///
 /// **A key of the four key-wise constraints is a place rather than a name.** A plain
 /// name is a top-level member, and one beginning with `/` is a JSON Pointer, extended

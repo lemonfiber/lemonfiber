@@ -49,6 +49,9 @@ pub const EGRESS_GUARD: &str = "network.egress-guard";
 /// The media server's capability.
 pub const MEDIA_SERVE: &str = "media.serve";
 
+/// The stream guard's capability, whose filler the core hands a certificate.
+pub const STREAM_GUARD: &str = "stream.guard";
+
 /// The media a service files, in the stack manifest's vocabulary.
 pub const MEDIA: [&str; 5] = ["tv", "movies", "music", "books", "comics"];
 

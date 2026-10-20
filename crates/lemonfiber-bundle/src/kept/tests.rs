@@ -144,3 +144,32 @@ fn text_that_does_not_parse_is_refused() {
     assert!(kept("not = [toml", FROZEN, &[]).is_err());
     assert!(kept(ASSEMBLED, "not = [toml", &[]).is_err());
 }
+
+#[test]
+fn a_choice_of_an_installed_parts_adapter_names_the_service_kept_in_its_place() {
+    let assembled = format!(
+        "{ASSEMBLED}\n[[wiring]]\nby = \"curator\"\nasks = \"media.serve\"\n\
+         filled_by = \"player-adapter\"\nwhy = \"w\"\n\n[[wiring]]\nby = \"curator\"\n\
+         asks = \"identity.source\"\nfilled_by = \"elsewhere\"\nwhy = \"w\"\n"
+    );
+    let mut player = held("player", Stage::Installed);
+    player.copy =
+        "[[service]]\nid = \"player\"\n\n[[service]]\nid = \"player-adapter\"\n".to_owned();
+    let Ok(text) = kept(&assembled, FROZEN, &[player]) else {
+        unreachable!("the fixture keeps");
+    };
+    let stack: Table = toml::from_str(&text).unwrap_or_default();
+    let wiring = rows(&stack, "wiring");
+    let chosen: Vec<(Option<&str>, Option<&str>)> = wiring
+        .iter()
+        .filter(|row| field(row, "filled_by").is_some())
+        .map(|row| (field(row, "asks"), field(row, "filled_by")))
+        .collect();
+    assert_eq!(
+        chosen,
+        vec![
+            (Some("media.serve"), Some("player")),
+            (Some("identity.source"), Some("elsewhere")),
+        ]
+    );
+}

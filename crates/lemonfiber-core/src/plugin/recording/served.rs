@@ -4,6 +4,7 @@
 use std::path::Path;
 use std::time::Duration;
 
+use lemonfiber_manifest::container::STREAM_GUARD;
 use lemonfiber_plugin::{Health, HealthKind};
 use tokio::time::Instant;
 
@@ -56,6 +57,7 @@ pub(super) async fn answers(
         service: &placed.service,
     }))
     .map_err(failing("starting files"))?;
+    certified(placed, &copy).map_err(failing("certificate"))?;
     let data = if placed.takes_data {
         Some(copy.emptied("data").map_err(failing("data"))?)
     } else {
@@ -95,6 +97,18 @@ pub(super) async fn answers(
     };
     recorder.serving.removed(&served).await;
     finished
+}
+
+/// A throwaway certificate and its key written into `copy` as the core writes them for a
+/// filler of a capability it hands a certificate, where `placed` provides one; nothing
+/// otherwise.
+pub(super) fn certified(placed: &Placed, copy: &Throwaway) -> Result<(), String> {
+    if !placed.provides.iter().any(|name| name == STREAM_GUARD) {
+        return Ok(());
+    }
+    crate::certificate::replaced(copy.path())
+        .map(|_| ())
+        .map_err(|unkept| unkept.to_string())
 }
 
 /// The container a service's recordings are taken from: as lemonfiber runs it, with

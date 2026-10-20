@@ -7,7 +7,9 @@ use crate::assembly::same_ask;
 use crate::{Held, Stage};
 
 /// The stack `assembled` with each part `held` installs kept as `frozen`, the stack the
-/// bundle replaces, declares it: its one service and every wiring row it asks by.
+/// bundle replaces, declares it: its one service and every wiring row it asks by. A choice
+/// of filler naming any service of an installed part's copy names that one service, which
+/// stands in for every service of the part until it moves.
 ///
 /// # Errors
 ///
@@ -27,11 +29,11 @@ pub fn kept(assembled: &str, frozen: &str, held: &[Held]) -> Result<String, Vec<
     let mut services = rows(&stack, "service");
     let mut wiring = rows(&stack, "wiring");
     let mut problems = Vec::new();
-    for id in held
+    for one in held
         .iter()
         .filter(|one| one.pin.stage == Some(Stage::Installed))
-        .map(|one| one.pin.id.as_str())
     {
+        let id = one.pin.id.as_str();
         let Some(service) = rows(&frozen, "service")
             .into_iter()
             .find(|service| service.get("id").and_then(Value::as_str) == Some(id))
@@ -42,6 +44,17 @@ pub fn kept(assembled: &str, frozen: &str, held: &[Held]) -> Result<String, Vec<
             continue;
         };
         services.push(service);
+        for named in serviced(&one.copy) {
+            for row in &mut wiring {
+                if let Some(Value::String(filler)) =
+                    row.as_table_mut().and_then(|row| row.get_mut("filled_by"))
+                {
+                    if *filler == named {
+                        id.clone_into(filler);
+                    }
+                }
+            }
+        }
         for row in rows(&frozen, "wiring")
             .into_iter()
             .filter(|row| row.get("by").and_then(Value::as_str) == Some(id))
@@ -60,6 +73,18 @@ pub fn kept(assembled: &str, frozen: &str, held: &[Held]) -> Result<String, Vec<
         }
     }
     Ok(toml::to_string(&stack).unwrap_or_default())
+}
+
+/// The id of every service the manifest `copy` declares.
+fn serviced(copy: &str) -> Vec<String> {
+    toml::from_str::<Table>(copy)
+        .ok()
+        .and_then(|manifest| manifest.get("service").and_then(Value::as_array).cloned())
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|service| service.get("id").and_then(Value::as_str))
+        .map(str::to_owned)
+        .collect()
 }
 
 #[cfg(test)]

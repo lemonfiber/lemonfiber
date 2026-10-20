@@ -26,7 +26,7 @@ const BOTH: Capability = Capability {
             id: "guarded",
             title: "An anonymous caller is refused",
             asks: "a read, presenting nothing",
-            why: "A refusal is the one answer no port proxy can produce.",
+            why: "A refusal is an answer no port proxy produces.",
             credential: Credential::None,
             requires: Requirement::Request {
                 status: &[401, 403],

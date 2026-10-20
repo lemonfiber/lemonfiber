@@ -233,12 +233,30 @@ fn a_choice_of_something_that_stopped_claiming_it_leaves_the_contest_standing() 
 /// A by-name link is shown as one, carrying the reason it is the exception.
 #[test]
 fn a_by_name_link_is_shown_as_by_name_with_its_reason() {
-    let reaches = came(stack(), &Chosen::default(), "door");
+    let reaches = came(stack(), &Chosen::default(), "unpackerr");
     assert!(
         reaches.as_ref().is_some_and(|one| matches!(
             one,
             Reaches::ByName { service, why }
-                if service == "jellyfin" && why.contains("What it guards is Jellyfin")
+                if service == "sonarr" && why.contains("what it knows is Sonarr")
+        )),
+        "{reaches:?}"
+    );
+}
+
+/// The guarded door asks for media rather than naming the media server, and the stack
+/// chooses the one whose declaration it enforces, saying why.
+#[test]
+fn the_door_asks_for_media_and_the_stack_chooses_the_media_server() {
+    let reaches = asked(stack(), &Chosen::default(), "door", "media.serve");
+    assert!(
+        reaches.as_ref().is_some_and(|one| matches!(
+            one,
+            Reaches::Asked {
+                services,
+                settled: Settled::Chosen { why: Some(why), .. },
+                ..
+            } if services == &["jellyfin".to_owned()] && why.contains("whose declaration the door enforces")
         )),
         "{reaches:?}"
     );
@@ -400,8 +418,8 @@ fn a_service_this_stack_does_not_have_is_refused_by_name() {
 #[test]
 fn a_capability_nothing_asks_for_is_refused_rather_than_recorded() {
     assert_eq!(
-        substituting(stack(), &Chosen::default(), "media.serve", "jellyfin"),
-        Some(Err(Refused::NothingAsks("media.serve".to_owned())))
+        substituting(stack(), &Chosen::default(), "subtitles.fetch", "bazarr"),
+        Some(Err(Refused::NothingAsks("subtitles.fetch".to_owned())))
     );
 }
 
@@ -491,7 +509,7 @@ fn a_stack_with_nothing_chosen_says_nothing_rather_than_an_empty_setting() {
 }
 
 /// Every link the shipped stack declares is answered, and the by-name ones are
-/// the seven the manifest says they are.
+/// the six the manifest says they are.
 #[test]
 fn every_link_the_shipped_stack_declares_is_answered() {
     let counted = stack().map(|manifest| {
@@ -506,7 +524,7 @@ fn every_link_the_shipped_stack_declares_is_answered() {
         counted.map(|(answered, _, _)| answered),
         counted.map(|(_, declared, _)| declared)
     );
-    assert_eq!(counted.map(|(_, _, by_name)| by_name), Some(7));
+    assert_eq!(counted.map(|(_, _, by_name)| by_name), Some(6));
 }
 
 /// An ask for every filler with nothing to fill it is unfilled, not "every one of

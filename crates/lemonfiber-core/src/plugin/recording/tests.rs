@@ -333,3 +333,57 @@ async fn a_claim_probe_that_runs_is_recorded_by_running_it() {
     assert_eq!(field(&kept, "/run/args"), serde_json::json!(["--version"]));
     assert_eq!(field(&kept, "/result/stdout_starts_with"), "v8.7.3 (");
 }
+
+/// A stream guard is recorded holding a throwaway certificate and its key where the core
+/// writes them for it; any other service holds none.
+#[test]
+fn a_stream_guard_is_recorded_holding_a_certificate_the_core_would_write() {
+    for (provides, holds) in [("stream.guard", true), ("media.serve", false)] {
+        let manifest = RUNNING.replace(
+            "posture       = \"confined\"",
+            &format!("posture       = \"confined\"\nprovides      = [\"{provides}\"]"),
+        );
+        let placed = lemonfiber_plugin::Manifest::from_toml(&manifest)
+            .ok()
+            .and_then(|read| {
+                crate::plugin::installed::Installed::of(&read)
+                    .services
+                    .into_iter()
+                    .next()
+            });
+        let copy = crate::plugin::program::Throwaway::of(None);
+        let (Some(placed), Ok(copy)) = (placed, copy) else {
+            unreachable!("the fixture places a service and a copy is made");
+        };
+        assert!(super::served::certified(&placed, &copy).is_ok());
+        let held = crate::certificate::kept(copy.path()).is_ok_and(|kept| kept.is_some() == holds);
+        assert!(held, "{provides}");
+    }
+}
+
+/// A guard whose certificate cannot be written into its copy is not recorded, naming why.
+#[cfg(unix)]
+#[test]
+fn a_certificate_that_cannot_be_written_stops_the_guard_before_it_starts() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let manifest = RUNNING.replace(
+        "posture       = \"confined\"",
+        "posture       = \"confined\"\nprovides      = [\"stream.guard\"]",
+    );
+    let placed = lemonfiber_plugin::Manifest::from_toml(&manifest)
+        .ok()
+        .and_then(|read| {
+            crate::plugin::installed::Installed::of(&read)
+                .services
+                .into_iter()
+                .next()
+        });
+    let copy = crate::plugin::program::Throwaway::of(None);
+    let (Some(placed), Ok(copy)) = (placed, copy) else {
+        unreachable!("the fixture places a service and a copy is made");
+    };
+    let _ = std::fs::set_permissions(copy.path(), std::fs::Permissions::from_mode(0o500));
+    let certified = super::served::certified(&placed, &copy);
+    let _ = std::fs::set_permissions(copy.path(), std::fs::Permissions::from_mode(0o700));
+    assert!(certified.is_err());
+}
