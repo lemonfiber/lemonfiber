@@ -817,11 +817,11 @@
         },
         {
           "path": "stream.guard/v1/operations/guard.json",
-          "sha256": "31d2464e279e40fdacdf35435dddac0962b7b5e65ff863f6e7b4cb3362e12df5"
+          "sha256": "781632cc4cdaad6d0794b981ce4270a6d577ffd1758628a40a4f112d00aaff1d"
         },
         {
           "path": "stream.guard/v1/operations/guarding.json",
-          "sha256": "1737489f35e83b1ee040b6e178dfddd81b8de236b240d612ac02aa17b8629797"
+          "sha256": "e0719171d34cacb6065afa2105fe3d1bf84577626563e0486df91d1bcb385e12"
         },
         {
           "path": "stream.guard/v1/operations/certificate.json",
@@ -829,7 +829,7 @@
         },
         {
           "path": "stream.guard/v1/conformance.json",
-          "sha256": "61b0845afc10e92d6106d9f14b050bb2e36b0dcedbd0affd6e662a13a1f6efda"
+          "sha256": "88ea6de580d65bc81e0c34eeea21075ddc52b09753bbb69e395c16161f76a7e8"
         }
       ],
       "majors": [
@@ -856,11 +856,11 @@
         },
         {
           "path": "invite.decline/v1/operations/apply_invitations.json",
-          "sha256": "d543e84936ea0aec32812a2170d473cc844242235f65ec894ea387b732a82a2f"
+          "sha256": "7b39358955e8a0bf4e03c14eaf945e1a82c09fd865931ef1cdd41fd595839989"
         },
         {
           "path": "invite.decline/v1/conformance.json",
-          "sha256": "a00ee349eb474e8faa575f95b986bc27f5af80f265f511bf854b2deb46d3a826"
+          "sha256": "8440b440c8c87beb74147eb35c84ac3c77faa8710730fcc92df54d36efb3ec19"
         }
       ],
       "majors": [
@@ -879,15 +879,15 @@
         },
         {
           "path": "request.gate/v1/operations/admit.json",
-          "sha256": "0e633900521a71af3df0db0f9eae6338752ff10e52613ce4219f037a944f0a57"
+          "sha256": "52da5f02d80109025582f5d993d67cd6aeb50d5b7377a20a7aceb61b8352a6fd"
         },
         {
           "path": "request.gate/v1/operations/admitted.json",
-          "sha256": "faea54b9d37ce5d3e719b54fbd7afefbcce1df8b8125576aab308d6f0f9cfbcc"
+          "sha256": "fd63084f67af530c564f944d282a36e67c692a2555caf0007d4c6634614ae43c"
         },
         {
           "path": "request.gate/v1/conformance.json",
-          "sha256": "2dfe74098c6abb61b1d01245a22c1fb999872dc7cca2abaa65aa60147fd6b7ac"
+          "sha256": "23876c31f2b98fe8d3f2be2a1c9b7ac2c11335a1d46bce68137a628b909f4e01"
         }
       ],
       "majors": [

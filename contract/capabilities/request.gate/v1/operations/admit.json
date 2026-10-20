@@ -18,6 +18,19 @@
                     "description": "The credential the gate presents to it.",
                     "type": "string"
                   },
+                  "majors": {
+                    "description": "The upstream's majors the stack supports, the only ones the gate forwards to; none\nwhere the gate knows the upstream's one supported interface itself.",
+                    "items": {
+                      "format": "uint32",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  "path": {
+                    "description": "The path segment it answers under.",
+                    "type": "string"
+                  },
                   "target": {
                     "$ref": "#/$defs/Target",
                     "description": "What it reaches."
@@ -32,7 +45,9 @@
                 },
                 "required": [
                   "target",
+                  "path",
                   "address",
+                  "majors",
                   "credential",
                   "tokens"
                 ],

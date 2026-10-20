@@ -18,6 +18,9 @@ const HEX: &str = "^[0-9a-f]{32}$";
 /// The port the conformance cases' media server listens on.
 const UPSTREAM_PORT: u16 = 80;
 
+/// Where the conformance cases' guard reaches the media server.
+const UPSTREAM: &str = "http://conformance-upstream";
+
 /// Where the conformance cases' guard asks about a pass.
 const PASS: &str = "http://conformance-pass/pass";
 
@@ -78,6 +81,8 @@ crate::contract! {
             fn guard(refer guarded: &Guarded as Guarded) -> () where asks = Asked {
                 guarded: Guarded {
                     declared: declared(),
+                    upstream: UPSTREAM.to_owned(),
+                    adapter: None,
                     proxy: PROXY.to_owned(),
                     pass: PASS.to_owned(),
                 },

@@ -2,7 +2,7 @@
 //! process and through the contract, which must answer alike and be told alike.
 
 use async_trait::async_trait;
-use lemonfiber_ports::service::{Declinable, Declining, Failure};
+use lemonfiber_ports::service::{Claimed, Declinable, Declining, Failure, Invitations};
 
 use super::{crosses_alike, decline, Upstream};
 
@@ -16,7 +16,7 @@ impl Declining for Upstream {
         self.tell("held".to_owned());
         Ok(Some(lemonfiber_ports::fingerprint("decline-key")))
     }
-    async fn apply_invitations(&self, invitations: &[Declinable]) -> Result<(), Failure> {
+    async fn apply_invitations(&self, invitations: &Invitations) -> Result<(), Failure> {
         self.tell(format!("apply_invitations {invitations:?}"));
         Ok(())
     }
@@ -24,18 +24,25 @@ impl Declining for Upstream {
 
 /// Every operation of the capability, each answer written down.
 async fn script<D: Declining>(decline: &D) -> Vec<String> {
-    let invitations = [
-        Declinable {
-            token: "ab".repeat(32),
-            account: "a7f3".to_owned(),
-            lapses: 1_800_000_000,
-        },
-        Declinable {
-            token: "cd".repeat(32),
-            account: "b8e4".to_owned(),
-            lapses: 1_800_086_400,
-        },
-    ];
+    let invitations = Invitations {
+        claimed: Claimed::HasPassword,
+        invitations: vec![
+            Declinable {
+                token: "ab".repeat(32),
+                account: "a7f3".to_owned(),
+                name: "Ana".to_owned(),
+                issued: 1_799_000_000,
+                lapses: 1_800_000_000,
+            },
+            Declinable {
+                token: "cd".repeat(32),
+                account: "b8e4".to_owned(),
+                name: "Bo".to_owned(),
+                issued: 1_799_086_400,
+                lapses: 1_800_086_400,
+            },
+        ],
+    };
     vec![
         format!("{:?}", decline.hold("decline-key").await),
         format!("{:?}", decline.held().await),

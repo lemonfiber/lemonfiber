@@ -12,7 +12,9 @@ fn curator(media_type: &str) -> Gated {
         target: Target::Curator {
             media_type: media_type.to_owned(),
         },
+        path: media_type.to_owned(),
         address: format!("http://{media_type}:80"),
+        majors: Vec::new(),
         credential: format!("{media_type}-key"),
         tokens: vec!["ab".repeat(32), "cd".repeat(32)],
     }
@@ -36,7 +38,9 @@ async fn script<G: Gating>(gate: &G) -> Vec<String> {
         curator("movies"),
         Gated {
             target: Target::MediaServer,
+            path: "media".to_owned(),
             address: "http://media:8096".to_owned(),
+            majors: vec![10, 12],
             credential: "media-key".to_owned(),
             tokens: vec!["ef".repeat(32)],
         },

@@ -13,6 +13,11 @@ use super::{Declared, Failure};
 pub struct Guarded {
     /// The media server's declaration, as its filler answered it.
     pub declared: Declared,
+    /// Where the guard reaches the media server: its scheme, host and port.
+    pub upstream: String,
+    /// Where the guard reaches the media server filler's adapter, where it speaks the
+    /// contract: its scheme, host and port.
+    pub adapter: Option<String>,
     /// The one address it believes when a request says which client it came from.
     pub proxy: String,
     /// Where it asks the core whether a live-stream pass is good.

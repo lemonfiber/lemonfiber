@@ -26,8 +26,13 @@ pub enum Target {
 pub struct Gated {
     /// What it reaches.
     pub target: Target,
+    /// The path segment it answers under.
+    pub path: String,
     /// Where the gate reaches it.
     pub address: String,
+    /// The upstream's majors the stack supports, the only ones the gate forwards to; none
+    /// where the gate knows the upstream's one supported interface itself.
+    pub majors: Vec<u32>,
     /// The credential the gate presents to it.
     pub credential: String,
     /// The SHA-256 of each token the gate admits on it, in lower-case hexadecimal.
@@ -39,7 +44,9 @@ impl std::fmt::Debug for Gated {
         formatter
             .debug_struct("Gated")
             .field("target", &self.target)
+            .field("path", &self.path)
             .field("address", &self.address)
+            .field("majors", &self.majors)
             .field("tokens", &self.tokens)
             .finish_non_exhaustive()
     }
@@ -53,8 +60,12 @@ impl std::fmt::Debug for Gated {
 pub struct Admitted {
     /// What it reaches.
     pub target: Target,
+    /// The path segment it answers under.
+    pub path: String,
     /// Where the gate reaches it.
     pub address: String,
+    /// The upstream's majors it forwards to.
+    pub majors: Vec<u32>,
     /// The credential it presents, by its fingerprint: `~` and the low sixteen bits of the 64-bit FNV-1a hash of its bytes, as four lower-case hexadecimal digits.
     pub fingerprint: String,
     /// The SHA-256 of each token it admits on it, in lower-case hexadecimal.
@@ -67,7 +78,9 @@ impl Admitted {
     pub fn of(gated: &Gated) -> Self {
         Self {
             target: gated.target.clone(),
+            path: gated.path.clone(),
             address: gated.address.clone(),
+            majors: gated.majors.clone(),
             fingerprint: crate::fingerprint(&gated.credential),
             tokens: gated.tokens.clone(),
         }

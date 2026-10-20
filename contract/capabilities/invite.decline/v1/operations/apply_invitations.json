@@ -6,6 +6,26 @@
         "application/json": {
           "schema": {
             "$defs": {
+              "Claimed": {
+                "description": "How the running media server tells a claimed account from one nobody has set a\npassword on.",
+                "oneOf": [
+                  {
+                    "const": "has-password",
+                    "description": "It says whether an account has a password, and a password change after the issue\ntime is a claim as well.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "own-writes",
+                    "description": "It does not say, so a password change after the issue time is the only claim.",
+                    "type": "string"
+                  },
+                  {
+                    "const": "unknown",
+                    "description": "Not known: nothing is removed.",
+                    "type": "string"
+                  }
+                ]
+              },
               "Declinable": {
                 "additionalProperties": false,
                 "description": "One invitation the service may decline.",
@@ -14,11 +34,21 @@
                     "description": "The media server's id for the account made for it.",
                     "type": "string"
                   },
+                  "issued": {
+                    "description": "When it was issued, in seconds since the Unix epoch.",
+                    "format": "uint64",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
                   "lapses": {
                     "description": "When it lapses, in seconds since the Unix epoch.",
                     "format": "uint64",
                     "minimum": 0,
                     "type": "integer"
+                  },
+                  "name": {
+                    "description": "The name the account was made under, which the decline page names.",
+                    "type": "string"
                   },
                   "token": {
                     "description": "The SHA-256 of its decline token, in lower-case hexadecimal.",
@@ -28,7 +58,31 @@
                 "required": [
                   "token",
                   "account",
+                  "name",
+                  "issued",
                   "lapses"
+                ],
+                "type": "object"
+              },
+              "Invitations": {
+                "additionalProperties": false,
+                "description": "Every invitation the service may act on, and how it tells a claimed account.",
+                "properties": {
+                  "claimed": {
+                    "$ref": "#/$defs/Claimed",
+                    "description": "How the running media server tells a claimed account."
+                  },
+                  "invitations": {
+                    "description": "Every invitation, open or lapsed.",
+                    "items": {
+                      "$ref": "#/$defs/Declinable"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "claimed",
+                  "invitations"
                 ],
                 "type": "object"
               }
@@ -38,11 +92,8 @@
             "description": "What the operation is asked with.",
             "properties": {
               "invitations": {
-                "description": "The port's `invitations`.",
-                "items": {
-                  "$ref": "#/$defs/Declinable"
-                },
-                "type": "array"
+                "$ref": "#/$defs/Invitations",
+                "description": "The port's `invitations`."
               }
             },
             "required": [

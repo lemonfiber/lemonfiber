@@ -6,13 +6,17 @@ fn a_route_is_answered_with_its_credential_by_fingerprint_and_never_its_value() 
         target: Target::Curator {
             media_type: "tv".to_owned(),
         },
+        path: "tv".to_owned(),
         address: "http://curator:80".to_owned(),
+        majors: Vec::new(),
         credential: "the-curators-own-key".to_owned(),
         tokens: vec!["ab".repeat(32)],
     };
     let admitted = Admitted::of(&gated);
     assert_eq!(admitted.target, gated.target);
     assert_eq!(admitted.address, gated.address);
+    assert_eq!(admitted.path, gated.path);
+    assert_eq!(admitted.majors, gated.majors);
     assert_eq!(admitted.tokens, gated.tokens);
     assert_eq!(
         admitted.fingerprint,
@@ -44,7 +48,9 @@ fn a_route_names_a_curator_by_the_media_type_it_files_and_the_media_server_by_no
 fn a_route_written_for_a_reader_withholds_its_credential() {
     let gated = Gated {
         target: Target::MediaServer,
+        path: "media".to_owned(),
         address: "http://media:80".to_owned(),
+        majors: vec![10],
         credential: "the-media-servers-key".to_owned(),
         tokens: Vec::new(),
     };

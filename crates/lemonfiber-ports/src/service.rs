@@ -59,7 +59,7 @@ pub use declaring::{
     joined, Addressee, Answers, BytePath, Declared, Declaring, Held, Locations, Naming, Ports,
     Presentation, Question, Statuses, Token, Undeclarable, BASE, ITEM, TOKEN,
 };
-pub use declining::{Declinable, Declining};
+pub use declining::{Claimed, Declinable, Declining, Invitations};
 pub use extracting::{Curated, Extracting, Extraction};
 pub use failure::{Failure, ASK_FOR_REPAIRS};
 pub use fetching::{Fetching, Pulling};

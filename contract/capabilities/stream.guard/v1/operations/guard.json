@@ -152,6 +152,13 @@
                 "additionalProperties": false,
                 "description": "Everything a guard enforces, and nothing else.",
                 "properties": {
+                  "adapter": {
+                    "description": "Where the guard reaches the media server filler's adapter, where it speaks the\ncontract: its scheme, host and port.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
                   "declared": {
                     "$ref": "#/$defs/Declared",
                     "description": "The media server's declaration, as its filler answered it."
@@ -163,10 +170,15 @@
                   "proxy": {
                     "description": "The one address it believes when a request says which client it came from.",
                     "type": "string"
+                  },
+                  "upstream": {
+                    "description": "Where the guard reaches the media server: its scheme, host and port.",
+                    "type": "string"
                   }
                 },
                 "required": [
                   "declared",
+                  "upstream",
                   "proxy",
                   "pass"
                 ],

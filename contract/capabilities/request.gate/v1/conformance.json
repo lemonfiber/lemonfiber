@@ -19,6 +19,8 @@
           {
             "address": "http://conformance-curator:80",
             "credential": "{minted}",
+            "majors": [],
+            "path": "tv",
             "target": {
               "curator": {
                 "media_type": "tv"
@@ -31,6 +33,10 @@
           {
             "address": "http://conformance-media-server",
             "credential": "{minted}",
+            "majors": [
+              10
+            ],
+            "path": "media-server",
             "target": "media-server",
             "tokens": [
               "0000000000000000000000000000000000000000000000000000000000000000"

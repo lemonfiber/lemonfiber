@@ -11,6 +11,8 @@ use super::{crosses_alike, guard, Upstream};
 fn guarded() -> Guarded {
     Guarded {
         declared: declared(),
+        upstream: "http://media:8096".to_owned(),
+        adapter: Some("http://media-adapter:8080".to_owned()),
         proxy: "10.80.96.3".to_owned(),
         pass: "http://10.80.96.1:9000/pass".to_owned(),
     }
