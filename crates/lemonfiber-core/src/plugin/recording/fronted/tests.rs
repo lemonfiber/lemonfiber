@@ -331,14 +331,17 @@ async fn an_adapter_never_ready_fails_at_its_health_and_both_are_removed() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn an_upstream_never_healthy_fails_at_its_health() {
+async fn an_upstream_never_healthy_fails_at_its_health_and_both_are_removed() {
     let at = source("fronted-unhealthy", FRONTED);
+    let serving = Serves::on(49153);
     let http = Fake::by_path(vec![("/health", Answer::reply(503, "starting"))]);
-    let read = recorded(&at, &engine(), &http, Some(7)).await;
+    let read = recorded(&at, &serving, &http, Some(7)).await;
     assert_eq!(
         failed_at(&read).first().map(|(step, _)| step.as_str()),
         Some("health")
     );
+    assert_eq!(serving.asked().len(), 2);
+    assert_eq!(serving.removed().len(), 2);
 }
 
 #[tokio::test]
