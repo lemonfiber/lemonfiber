@@ -141,3 +141,72 @@ fn what_the_stack_names_is_carried_and_its_repository_is_not() {
         "the stack's own tooling is carried"
     );
 }
+
+/// The manifest carried is the stack the bundle declares, written apart as a stack
+/// directory holds it, and read back as the same stack.
+#[test]
+fn the_carried_manifest_is_the_stack_the_bundle_declares() {
+    let root = STACK
+        .get_file("stack.toml")
+        .and_then(include_dir::File::contents_utf8)
+        .unwrap_or_default();
+    let services: std::collections::BTreeMap<String, String> = STACK
+        .get_dir("services")
+        .into_iter()
+        .flat_map(include_dir::Dir::files)
+        .filter_map(|file| {
+            let name = file.path().file_name()?.to_str()?.to_owned();
+            Some((name, file.contents_utf8()?.to_owned()))
+        })
+        .collect();
+    let Ok(joined) = lemonfiber_manifest::assemble(root, &services) else {
+        unreachable!("the carried manifest assembles");
+    };
+    let mut read_back: toml::Table = toml::from_str(&joined).unwrap_or_default();
+    read_back.remove("include");
+    let declared: toml::Table = toml::from_str(lemonfiber_bundled::STACK).unwrap_or_default();
+    assert_eq!(read_back, declared);
+}
+
+/// Every file carried beneath `under` of the stack, by its path beneath it.
+fn carried_under(under: &str) -> std::collections::BTreeSet<String> {
+    let mut carried = Vec::new();
+    if let Some(dir) = STACK.get_dir(under) {
+        every_file(dir, &mut carried);
+    }
+    carried
+        .into_iter()
+        .map(|file| file.path().to_string_lossy().replace('\\', "/"))
+        .collect()
+}
+
+/// An assembled part's starting configuration is its copy's in the bundle, file for
+/// file and byte for byte, and nothing beside it: a file a run left in the media
+/// stack's checkout, a key or an invitation among them, never travels.
+#[test]
+fn an_assembled_part_s_starting_configuration_is_its_copy_s_and_nothing_else() {
+    let copies = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../assets/plugins/bundle/plugins");
+    for pinned in lemonfiber_bundled::PINNED
+        .iter()
+        .filter(|pinned| pinned.stage == Some(lemonfiber_bundled::Stage::Assembled))
+    {
+        let id = pinned.first_party.plugin;
+        let copy = copies.join(id);
+        let mut held = Vec::new();
+        stack_files(
+            &copy,
+            std::path::Path::new(&format!("config/{id}")),
+            &mut held,
+        );
+        let held: std::collections::BTreeSet<String> = held.into_iter().collect();
+        assert_eq!(carried_under(&format!("config/{id}")), held, "{id}");
+        for file in &held {
+            assert_eq!(
+                STACK.get_file(file).map(include_dir::File::contents),
+                std::fs::read(copy.join(file)).ok().as_deref(),
+                "{file}"
+            );
+        }
+    }
+}

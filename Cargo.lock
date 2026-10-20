@@ -1343,6 +1343,8 @@ dependencies = [
  "include_dir",
  "lemonfiber-adapters",
  "lemonfiber-api",
+ "lemonfiber-bundle",
+ "lemonfiber-bundled",
  "lemonfiber-core",
  "lemonfiber-error",
  "lemonfiber-fixtures",
