@@ -56,8 +56,12 @@ pub async fn diagnose(
 ) -> Result<DoctorReport, Box<Problem>> {
     let (stack, mut checks) = assembled(ctx, disruptive).await?;
     checks.extend(running(ctx, &stack));
-    let report = examined(ctx, &stack.manifest.services, &checks, narrowing).await;
-    answered(narrowing, report)
+    let report = answered(
+        narrowing,
+        examined(ctx, &stack.manifest.services, &checks, narrowing).await,
+    )?;
+    crate::app::forwarding::after_diagnosis(ctx, &stack.manifest, &report.findings).await;
+    Ok(report)
 }
 
 /// A check for every run proof an installed plugin declares, which only a diagnosis runs.

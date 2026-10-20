@@ -18,11 +18,11 @@ mod findings;
 mod forwarding;
 mod killswitch;
 mod leak;
-mod mender;
 mod pair;
 mod port_forward;
 mod probe;
 mod reading;
+mod tunnel;
 
 use std::sync::Arc;
 
@@ -32,7 +32,6 @@ use lemonfiber_manifest::Manifest;
 use super::{Category, Check, Finding, Verdict};
 use crate::config::{PortForward, Protocols};
 use crate::ports::docker::{Container, Engine};
-use crate::qbittorrent::Qbittorrent;
 
 pub use echo::Seen;
 use findings::{
@@ -43,13 +42,13 @@ pub use forwarding::{Answer, Forwarding};
 use leak::{labelled, Reach};
 use pair::torrent_client;
 pub(crate) use pair::{resolve_pair, Pair};
-pub use port_forward::granted_port;
 use port_forward::{port_forward_offline, Grant};
 use probe::{addresses, exit_country, find, public_address, read_grant};
 
 pub use crate::error::codes::vpn::CLIENT_ISOLATED;
 pub use crate::error::codes::vpn::KILLSWITCH_LEAKS;
 pub(crate) use reading::{read_vpn, VpnReading};
+pub(crate) use tunnel::Gluetun;
 
 /// Gluetun's own record of the port its provider forwarded, written inside the
 /// container when port forwarding is on. Read from there rather than from the
@@ -72,11 +71,6 @@ pub struct VpnCheck {
     target: Target,
     port_forward: PortForward,
     disruptive: bool,
-    /// What this check can put right, where a client could be authenticated to.
-    ///
-    /// Held rather than built on demand: the correction needs credentials, and reading
-    /// those is the caller's business — this check speaks to containers.
-    mender: Option<mender::PortMender>,
 }
 
 /// What the operator asked for, and what was read on their behalf, gathered so
@@ -95,11 +89,6 @@ pub struct Asked {
     pub port_forward: PortForward,
     /// Whether the killswitch may be proven by breaking the tunnel.
     pub disruptive: bool,
-    /// The download client to move, where one could be authenticated to.
-    ///
-    /// Read by the caller for the same reason `listening` is: this check speaks to
-    /// containers, and a client's credentials are a service's own business.
-    pub client: Option<Qbittorrent>,
 }
 
 /// Whether the check applies, and against what.
@@ -136,7 +125,6 @@ impl VpnCheck {
             listening,
             port_forward,
             disruptive,
-            client,
         } = asked;
         let target = if protocols.torrent {
             // A pair that will not resolve is two different situations, and only
@@ -159,18 +147,6 @@ impl VpnCheck {
         } else {
             Target::Skip("torrent downloads are not configured".to_owned())
         };
-        // Only a resolved pair has a gateway to read a grant from, and only a stack
-        // asking for a forwarded port has one to move the client onto.
-        let mender = match (&target, port_forward.enabled) {
-            (Target::Pair(pair), true) => Some(mender::PortMender::new(
-                engine.clone(),
-                project.clone(),
-                pair.gateway.clone(),
-                pair.client.clone(),
-                client,
-            )),
-            _ => None,
-        };
         Self {
             engine,
             project,
@@ -179,7 +155,6 @@ impl VpnCheck {
             target,
             port_forward,
             disruptive,
-            mender,
         }
     }
 
@@ -223,12 +198,6 @@ impl Check for VpnCheck {
     /// anything is the only safe thing it could do at that point.
     fn budget(&self) -> std::time::Duration {
         budget_for(self.disruptive)
-    }
-
-    fn mender(&self) -> Option<&dyn crate::doctor::Mend> {
-        self.mender
-            .as_ref()
-            .map(|mender| mender as &dyn crate::doctor::Mend)
     }
 
     async fn run(&self) -> Vec<Finding> {

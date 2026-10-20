@@ -176,6 +176,7 @@ fn filler(stack: Option<&std::path::Path>) -> crate::wiring::Filler {
         fronts: None,
         native: None,
         replaces: None,
+        via: None,
     }
 }
 

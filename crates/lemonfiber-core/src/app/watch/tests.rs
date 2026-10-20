@@ -249,3 +249,5 @@ async fn services_that_cannot_be_stopped_are_reported_not_hidden() {
         .ok();
     assert_eq!(report.map(|report| report.stopped), Some(false));
 }
+
+mod forwarding;

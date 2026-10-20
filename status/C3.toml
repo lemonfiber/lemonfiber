@@ -3,7 +3,7 @@
 
 requirement = [
   { id = "C3-R1", state = "done", evidence = ["crates/lemonfiber-core/src/repair.rs"] },
-  { id = "C3-R2", state = "done", evidence = ["crates/lemonfiber-core/src/repair.rs"] },
+  { id = "C3-R2", state = "done", evidence = ["crates/lemonfiber-core/src/repair.rs", "crates/lemonfiber-core/src/app/forwarding.rs"] },
   { id = "C3-R3", state = "done", evidence = ["crates/lemonfiber-core/src/repair.rs"] },
   { id = "C3-R4", state = "done", evidence = ["crates/lemonfiber-core/src/repair.rs"] },
   { id = "C3-R5", state = "done", evidence = ["crates/lemonfiber-core/src/repair.rs"] },

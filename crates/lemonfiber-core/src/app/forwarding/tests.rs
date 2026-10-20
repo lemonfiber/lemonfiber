@@ -1,293 +1,322 @@
-use super::{push, Pushed, SETTING};
-use crate::doctor::vpn::Forwarding;
-use crate::journal::Kind;
-use crate::test_support::{a_context, nowhere};
+use std::sync::Arc;
 
-/// What is known about the port right now.
-const fn known(granted: Option<u16>, listening: Option<u16>) -> Forwarding {
-    Forwarding { granted, listening }
-}
+use lemonfiber_fixtures::http::Fake;
+use lemonfiber_fixtures::support::{Reporting, Tunnel};
 
-/// A write that succeeds, recording what it was asked for.
-async fn accepts(_port: u16) -> Result<(), String> {
-    Ok(())
-}
+use super::{after_start, pass, Asking, CameTo, Last, CHECK, RECORD};
+use crate::app::Ctx;
+use crate::config::Settings;
+use crate::journal::{Change, Kind};
+use crate::ports::docker::{Health, Lifecycle};
+use crate::test_support::{a_context, a_password, env_at};
 
-/// A write the client refuses.
-async fn refuses(_port: u16) -> Result<(), String> {
-    Err("the client is not accepting settings".to_owned())
-}
-
-#[tokio::test]
-async fn a_client_on_the_granted_port_is_left_alone() {
-    // A write that changes nothing is still a write, and one made every run is
-    // a client restarted every run.
-    let pushed = push(known(Some(51413), Some(51413)), accepts).await;
-    assert_eq!(pushed, Pushed::Unchanged);
-    assert_eq!(pushed.said(), None, "and nothing is said about it");
-}
-
-#[tokio::test]
-async fn a_port_that_changed_moves_the_client_and_is_recorded() {
-    // The fault this exists for: the tunnel reconnected on a new port, and
-    // everything looks correct while nobody outside can reach the client.
-    let pushed = push(known(Some(51999), Some(51413)), accepts).await;
-    assert_eq!(
-        pushed,
-        Pushed::Moved {
-            from: Some(51413),
-            to: 51999
-        }
-    );
-
-    let change = pushed.change("1000");
-    assert_eq!(
-        change.map(|change| (change.target, change.kind)),
-        Some((
-            "qbittorrent".to_owned(),
-            Kind::Set {
-                key: SETTING.to_owned(),
-                previous: Some("51413".to_owned()),
-                current: "51999".to_owned(),
-            }
-        )),
-        "an operator reading back why seeding stopped finds it"
-    );
-    let said = pushed.said().unwrap_or_default();
-    assert!(said.contains("51413") && said.contains("51999"), "{said}");
-}
-
-#[tokio::test]
-async fn a_client_that_never_said_which_port_it_was_on_is_still_set() {
-    // Unknown is not "already correct". Leaving it would keep it unreachable
-    // on the strength of not having been able to ask.
-    let pushed = push(known(Some(51413), None), accepts).await;
-    assert_eq!(
-        pushed,
-        Pushed::Moved {
-            from: None,
-            to: 51413
-        }
-    );
-    assert!(pushed.said().is_some_and(|said| said.contains("51413")));
-}
-
-#[tokio::test]
-async fn nothing_is_pushed_where_the_provider_granted_nothing() {
-    // There is no port to move to, and inventing one would take the client off
-    // a working default for no reason.
-    let pushed = push(known(None, Some(6881)), refuses).await;
-    assert_eq!(pushed, Pushed::Unchanged, "the write is never attempted");
-}
-
-#[tokio::test]
-async fn a_refused_write_says_so_rather_than_being_recorded_as_done() {
-    let pushed = push(known(Some(51413), Some(6881)), refuses).await;
-    assert_eq!(
-        pushed,
-        Pushed::Refused {
-            reason: "the client is not accepting settings".to_owned()
-        },
-        "the client's own words, not a paraphrase"
-    );
-    assert_eq!(pushed.change("1000"), None, "nothing happened to record");
-    assert!(pushed
-        .said()
-        .is_some_and(|said| said.contains("not accepting settings")));
-}
-
-/// A context whose stack is this repo's own and whose transport answers
-/// nothing — enough to reach the decision without a client.
-fn ctx() -> crate::app::Ctx {
-    a_context()
-        .runner(std::sync::Arc::new(crate::test_support::Scripted(Ok(
-            crate::test_support::spoke(""),
-        ))))
-        .build()
-}
-
-#[tokio::test]
-async fn a_client_lemonfiber_cannot_authenticate_to_is_left_alone() {
-    // It can be neither read nor corrected, and guessing either way would be
-    // worse than saying nothing. No password is recorded here.
-    let pushed = super::reconcile(&ctx(), Some(51413), None).await;
-    assert_eq!(pushed, Pushed::Unchanged);
-}
-
-#[tokio::test]
-async fn a_stack_that_cannot_be_read_changes_nothing() {
-    let nowhere = a_context()
-        .runner(std::sync::Arc::new(crate::test_support::Scripted(Ok(
-            crate::test_support::spoke(""),
-        ))))
-        .over(nowhere())
-        .build();
-    assert_eq!(
-        super::reconcile(&nowhere, Some(51413), None).await,
-        Pushed::Unchanged
-    );
-}
-
-/// An environment file recording a torrent client password, at a scratch path
-/// unique to the test so concurrent tests do not share one.
-fn env_at(name: &str) -> std::path::PathBuf {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("fwd-{name}")).kept();
-    let _ = std::fs::remove_dir_all(&dir);
-    let path = dir.join(".env");
-    assert!(
-        crate::config::store::set(
-            &path,
-            crate::config::TORRENT_PASSWORD_KEY,
-            &crate::test_support::a_password(),
-        )
-        .is_ok(),
-        "the scratch env file is written"
-    );
-    path
-}
-
-/// A context that can authenticate to a torrent client answering `replies`.
-/// What the torrent client answers a read with before any login, which is how a fresh
-/// client's first read goes.
 const SIGNED_OUT: (u16, &str) = (403, "Forbidden");
+const LOGGED_IN: (u16, &str) = (200, "Ok.");
+const ON_51413: (u16, &str) = (200, r#"{"listen_port":51413}"#);
+const ON_51999: (u16, &str) = (200, r#"{"listen_port":51999}"#);
+const ON_NONE: (u16, &str) = (200, r#"{"listen_port":0}"#);
+const TOOK: (u16, &str) = (200, "");
 
-fn ctx_with_client(name: &str, replies: Vec<(u16, &'static str)>) -> crate::app::Ctx {
-    let settings = crate::config::Settings {
-        env_file: Some(env_at(name)),
-        ..crate::config::Settings::default()
-    };
-    a_context()
-        .runner(std::sync::Arc::new(crate::test_support::Scripted(Ok(
-            crate::test_support::spoke(""),
-        ))))
-        .settings(settings)
+/// The stack's guard forwarding `forwarded` and its torrent client answering `replies`.
+fn holding(
+    name: &str,
+    forwarded: Option<&'static str>,
+    replies: Vec<(u16, &'static str)>,
+) -> (Ctx, Arc<Fake>) {
+    let engine = Reporting::holding(
+        &["gluetun", "qbittorrent"],
+        Lifecycle::Running,
+        Health::Healthy,
+    )
+    .with_tunnel(Tunnel {
+        gateway: "gluetun",
+        gateway_ip: None,
+        client_ip: None,
+        country: None,
+        port: forwarded,
+        second_opinion: None,
+    });
+    let http = Fake::scripted(replies);
+    let env = env_at(&format!("forwarding-{name}"), &a_password());
+    let ctx = a_context()
+        .engine(Arc::new(engine))
+        .settings(Settings {
+            env_file: Some(env.clone()),
+            stack_dir: env.parent().map(|config| config.join("data").join("stack")),
+            port_forward: forwarding(),
+            ..Settings::default()
+        })
         .build()
-        .with_http(lemonfiber_fixtures::http::Fake::scripted(replies))
+        .with_http(http.clone());
+    (ctx, http)
 }
 
-#[tokio::test]
-async fn a_client_already_on_the_granted_port_is_read_and_left() {
-    // The read refused for want of a session, the login, then the read again. No
-    // write follows, because a write that changes nothing still restarts the
-    // client's listener.
-    let ctx = ctx_with_client(
-        "already",
-        vec![SIGNED_OUT, (200, "Ok."), (200, r#"{"listen_port":51413}"#)],
-    );
-    assert_eq!(
-        super::reconcile(&ctx, Some(51413), None).await,
-        Pushed::Unchanged
-    );
-}
-
-#[tokio::test]
-async fn a_client_on_yesterdays_port_is_moved_to_the_one_granted_now() {
-    // The whole point: the tunnel reconnected on a new port and everything
-    // looks correct while nobody outside can reach the client.
-    let ctx = ctx_with_client(
-        "moved",
-        vec![
-            SIGNED_OUT,
-            (200, "Ok."),
-            (200, r#"{"listen_port":51413}"#),
-            (200, "Ok."),
-            (200, ""),
-            (200, r#"{"listen_port":51999}"#),
-        ],
-    );
-    assert_eq!(
-        super::reconcile(&ctx, Some(51999), None).await,
-        Pushed::Moved {
-            from: Some(51413),
-            to: 51999
-        }
-    );
-}
-
-#[tokio::test]
-async fn a_client_that_will_not_answer_is_still_set_rather_than_assumed_correct() {
-    // Unknown is not "already right"; leaving it would keep it unreachable on
-    // the strength of not having been able to ask.
-    let ctx = ctx_with_client(
-        "silent",
-        vec![
-            (500, "no"),
-            (200, "Ok."),
-            (200, ""),
-            (200, r#"{"listen_port":51999}"#),
-        ],
-    );
-    assert_eq!(
-        super::reconcile(&ctx, Some(51999), None).await,
-        Pushed::Moved {
-            from: None,
-            to: 51999
-        }
-    );
-}
-
-#[tokio::test]
-async fn starting_a_stack_with_no_forwarding_asked_for_changes_nothing() {
-    // Nothing was requested, so nothing was granted, and a client on its own
-    // default port is where the operator left it.
-    // Collected rather than matched: the stack this repo embeds always parses,
-    // so a fallback would be a branch no passing test can reach.
-    let ctx = ctx();
-    let manifests: Vec<_> = ctx
-        .stack
-        .checked_manifest(ctx.today())
-        .into_iter()
-        .collect();
-    for manifest in &manifests {
-        assert_eq!(super::after_start(&ctx, manifest).await, None);
+fn forwarding() -> crate::config::PortForward {
+    crate::config::PortForward {
+        enabled: true,
+        provider: None,
     }
-    assert_eq!(manifests.len(), 1, "the embedded stack parses");
+}
+
+async fn passed(ctx: &Ctx, asking: Asking) -> Option<super::Pass> {
+    let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
+    pass(ctx, &manifest, None, asking).await
+}
+
+async fn started(ctx: &Ctx) -> Option<Option<String>> {
+    let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
+    Some(after_start(ctx, &manifest).await)
+}
+
+fn last(ctx: &Ctx) -> Last {
+    crate::app::record::beside(ctx, RECORD)
+}
+
+fn journal(ctx: &Ctx) -> Vec<Change> {
+    crate::app::targets::layout(ctx)
+        .and_then(|paths| crate::app::recover::journal_at(&paths.journal()).ok())
+        .map(|journal| journal.changes().to_vec())
+        .unwrap_or_default()
+}
+
+fn remember(ctx: &Ctx, port: Option<u16>) {
+    crate::app::record::keep_beside(ctx, RECORD, &Last { port });
 }
 
 #[tokio::test]
-async fn a_client_that_refuses_the_write_says_so_in_its_own_words() {
-    // The read refused for want of a session, login, the read, login, then a
-    // refusal — reported rather than recorded as done.
-    let ctx = ctx_with_client(
-        "refusing",
-        vec![
-            SIGNED_OUT,
-            (200, "Ok."),
-            (200, r#"{"listen_port":51413}"#),
-            (200, "Ok."),
-            (403, "Forbidden"),
-        ],
+async fn a_port_that_changed_is_set_on_the_client_inside_the_guard_and_journalled() {
+    let (ctx, _) = holding(
+        "changed",
+        Some("51999"),
+        vec![SIGNED_OUT, LOGGED_IN, ON_51413, LOGGED_IN, TOOK, ON_51999],
     );
-    // Compared through what it would say, rather than asserted with a message
-    // argument: an argument only evaluates when the assertion fails, so it is a
-    // line no passing test can cover.
-    let pushed = super::reconcile(&ctx, Some(51999), None).await;
-    let said = pushed.said().unwrap_or_default();
+    remember(&ctx, Some(51413));
+    let pass = passed(&ctx, Asking::Changed).await;
+    assert_eq!(
+        pass.as_ref().map(|pass| pass.clients.clone()),
+        Some(vec![super::Client {
+            service: "qbittorrent".to_owned(),
+            came_to: CameTo::Moved {
+                from: Some(Some(51413))
+            },
+        }])
+    );
+    assert_eq!(last(&ctx), Last { port: Some(51999) });
+    let kinds: Vec<Kind> = journal(&ctx)
+        .into_iter()
+        .map(|change| change.kind)
+        .collect();
+    assert!(matches!(
+        kinds.as_slice(),
+        [Kind::Configured { field, current, .. }] if field == "peer_port" && current == "51999"
+    ));
+}
+
+#[tokio::test]
+async fn an_unchanged_answer_on_the_cadence_asks_no_client() {
+    let (ctx, http) = holding("unchanged", Some("51413"), Vec::new());
+    remember(&ctx, Some(51413));
+    let pass = passed(&ctx, Asking::Changed).await;
+    assert_eq!(
+        pass.map(|pass| (pass.answer, pass.clients.len())),
+        Some((Some(51413), 0))
+    );
+    assert!(http.requests().is_empty());
+    assert!(journal(&ctx).is_empty());
+}
+
+#[tokio::test]
+async fn forwarding_that_ended_sets_the_client_back_to_none() {
+    let (ctx, _) = holding(
+        "ended",
+        Some("0"),
+        vec![SIGNED_OUT, LOGGED_IN, ON_51413, LOGGED_IN, TOOK, ON_NONE],
+    );
+    remember(&ctx, Some(51413));
+    let said = passed(&ctx, Asking::Changed).await.map(|pass| pass.said());
+    assert_eq!(
+        said,
+        Some(vec![
+            "forwarding ended, so qbittorrent was set back to no forwarded port".to_owned()
+        ])
+    );
+    assert_eq!(last(&ctx), Last { port: None });
+}
+
+#[tokio::test]
+async fn starting_the_stack_compares_the_client_afresh_and_leaves_one_already_on_it() {
+    let (ctx, http) = holding(
+        "afresh",
+        Some("51413"),
+        vec![SIGNED_OUT, LOGGED_IN, ON_51413],
+    );
+    remember(&ctx, Some(51413));
+    assert_eq!(started(&ctx).await, Some(None));
+    assert_eq!(http.requests().len(), 3);
+    assert!(journal(&ctx).is_empty());
+}
+
+#[tokio::test]
+async fn starting_the_stack_with_nothing_ever_forwarded_leaves_the_client_alone() {
+    let (ctx, http) = holding("never", None, Vec::new());
+    assert_eq!(started(&ctx).await, Some(None));
+    assert!(http.requests().is_empty());
+}
+
+#[tokio::test]
+async fn a_port_the_client_refused_is_said_raised_and_asked_again() {
+    let (ctx, _) = holding(
+        "refused",
+        Some("51999"),
+        vec![SIGNED_OUT, LOGGED_IN, ON_51413, LOGGED_IN, SIGNED_OUT],
+    );
+    remember(&ctx, Some(51413));
+    let said = started(&ctx).await.flatten().unwrap_or_default();
     assert!(
-        said.starts_with("the forwarded port could not be pushed"),
+        said.starts_with("the forwarded port 51999 was not passed to qbittorrent"),
         "{said}"
     );
-    assert_eq!(pushed.change("1000"), None, "nothing happened to record");
+    assert!(crate::app::conditions::load(&ctx).get(CHECK).is_some());
+    assert_eq!(last(&ctx), Last { port: Some(51413) });
+    assert!(journal(&ctx).is_empty());
 }
 
 #[tokio::test]
-async fn the_clients_own_port_is_read_for_the_diagnosis() {
-    // Asked by the caller because the VPN check speaks to containers, and this
-    // is a service's own API.
-    let ctx = ctx_with_client(
-        "reading",
-        vec![SIGNED_OUT, (200, "Ok."), (200, r#"{"listen_port":51413}"#)],
+async fn a_guard_that_cannot_tell_passes_nothing() {
+    let ctx = a_context()
+        .engine(Arc::new(Reporting::absent()))
+        .settings(Settings {
+            port_forward: forwarding(),
+            ..Settings::default()
+        })
+        .build();
+    assert_eq!(passed(&ctx, Asking::Afresh).await, None);
+}
+
+#[tokio::test]
+async fn a_rehearsal_passes_nothing() {
+    let (ctx, http) = holding("rehearsed", Some("51999"), Vec::new());
+    let ctx = ctx.rehearsing();
+    assert_eq!(passed(&ctx, Asking::Afresh).await, None);
+    assert!(http.requests().is_empty());
+}
+
+#[test]
+fn putting_a_passed_port_back_is_left_to_the_service_and_never_written_here() {
+    let change = Change {
+        at: "1000".to_owned(),
+        operation: super::OPERATION.to_owned(),
+        target: "qbittorrent".to_owned(),
+        kind: Kind::Configured {
+            resource: super::RESOURCE.to_owned(),
+            id: "qbittorrent".to_owned(),
+            field: super::FIELD.to_owned(),
+            previous: Some("51413".to_owned()),
+            current: "51999".to_owned(),
+        },
+    };
+    let reversal = crate::app::putting_back::would_reverse(vec![change.undo()]);
+    assert!(reversal.reversed.is_empty());
+    assert_eq!(reversal.left.len(), 1);
+}
+
+#[test]
+fn an_entry_an_earlier_version_journalled_still_reads() {
+    let earlier = r#"{"at":"1000","operation":"vpn port forwarding","target":"qbittorrent","kind":{"action":"set","key":"qbittorrent.listen_port","previous":"51413","current":"51999"}}"#;
+    let read: Result<Change, _> = serde_json::from_str(earlier);
+    assert_eq!(
+        read.ok().map(|change| change.operation),
+        Some(super::OPERATION.to_owned())
     );
-    let manifests: Vec<_> = ctx
-        .stack
-        .checked_manifest(ctx.today())
-        .into_iter()
-        .collect();
-    for manifest in &manifests {
-        assert_eq!(
-            super::listening_port(&ctx, manifest, None).await,
-            Some(51413)
-        );
-    }
-    assert_eq!(manifests.len(), 1, "the embedded stack parses");
+}
+
+fn vpn(verdict: crate::doctor::Verdict) -> crate::doctor::Finding {
+    crate::doctor::Finding::in_category(
+        crate::doctor::Category::Vpn,
+        "vpn.tunnel",
+        "tunnel",
+        verdict,
+    )
+}
+
+async fn diagnosed(ctx: &Ctx, findings: &[crate::doctor::Finding]) -> Option<Vec<String>> {
+    let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
+    Some(super::after_diagnosis(ctx, &manifest, findings).await)
+}
+
+#[tokio::test]
+async fn a_diagnosis_whose_vpn_check_ran_sets_a_client_off_the_forwarded_port() {
+    let (ctx, _) = holding(
+        "diagnosed",
+        Some("51999"),
+        vec![SIGNED_OUT, LOGGED_IN, ON_51413, LOGGED_IN, TOOK, ON_51999],
+    );
+    remember(&ctx, Some(51999));
+    let said = diagnosed(&ctx, &[vpn(crate::doctor::Verdict::Pass { note: None })]).await;
+    assert_eq!(
+        said,
+        Some(vec![
+            "qbittorrent takes peers on the forwarded port 51999".to_owned()
+        ])
+    );
+    assert_eq!(journal(&ctx).len(), 1);
+}
+
+#[tokio::test]
+async fn a_diagnosis_whose_vpn_check_did_not_run_asks_nothing() {
+    let (ctx, http) = holding("undiagnosed", Some("51999"), Vec::new());
+    let skipped = vpn(crate::doctor::Verdict::Skipped {
+        reason: "the stack is not running".to_owned(),
+    });
+    assert_eq!(diagnosed(&ctx, &[skipped]).await, Some(Vec::new()));
+    assert!(http.requests().is_empty());
+}
+
+#[tokio::test]
+async fn a_client_that_will_not_say_its_port_is_still_set() {
+    let (ctx, _) = holding(
+        "silent",
+        Some("51999"),
+        vec![(500, "no"), LOGGED_IN, TOOK, ON_51999],
+    );
+    let pass = passed(&ctx, Asking::Afresh).await;
+    assert_eq!(
+        pass.map(|pass| pass
+            .clients
+            .into_iter()
+            .map(|one| one.came_to)
+            .collect::<Vec<_>>()),
+        Some(vec![CameTo::Moved { from: None }])
+    );
+}
+
+#[tokio::test]
+async fn a_port_set_where_nothing_can_be_journalled_says_so() {
+    let (mut ctx, _) = holding(
+        "unrecorded",
+        Some("51999"),
+        vec![SIGNED_OUT, LOGGED_IN, ON_51413, LOGGED_IN, TOOK, ON_51999],
+    );
+    ctx.settings.stack_dir = None;
+    let said = passed(&ctx, Asking::Afresh)
+        .await
+        .map(|pass| pass.said())
+        .unwrap_or_default();
+    assert_eq!(said.len(), 2);
+    assert!(said
+        .last()
+        .is_some_and(|line| line.contains("could not be recorded")));
+}
+
+#[tokio::test]
+async fn a_diagnosis_whose_guard_cannot_tell_passes_nothing() {
+    let ctx = a_context()
+        .engine(Arc::new(Reporting::absent()))
+        .settings(Settings {
+            port_forward: forwarding(),
+            ..Settings::default()
+        })
+        .build();
+    let ran = vpn(crate::doctor::Verdict::Pass { note: None });
+    assert_eq!(diagnosed(&ctx, &[ran]).await, Some(Vec::new()));
 }

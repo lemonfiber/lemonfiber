@@ -47,16 +47,12 @@ pub(crate) enum DownloadKind {
     },
 }
 
-/// A download client the host reads: which service it is, how it is asked, and whether
-/// it is the one reached through the tunnel.
+/// A download client the host reads: which service it is, and how it is asked.
 pub(crate) struct DownloadTarget {
     /// The id its container runs under.
     pub service: String,
     /// How it is asked.
     pub kind: DownloadKind,
-    /// Whether its traffic goes through the tunnel, which makes it the one client the
-    /// port the tunnel is granted belongs to.
-    pub tunnelled: bool,
 }
 
 /// A download client, as the protocol it moves.
@@ -233,7 +229,6 @@ async fn reached(
     Some(DownloadTarget {
         service: filler.id.clone(),
         kind,
-        tunnelled: tunnelled(filler),
     })
 }
 
@@ -277,16 +272,6 @@ pub(crate) async fn usenet_key(ctx: &Ctx, filler: &Filler) -> Beneath {
     }
 }
 
-/// Whether the service's traffic goes through the tunnel: it is reached at the address
-/// of the service whose network it shares rather than at its own. A plugin's service
-/// never is, since it cannot share another container's network.
-fn tunnelled(filler: &Filler) -> bool {
-    filler
-        .address
-        .as_ref()
-        .is_some_and(|at| at.host != filler.id)
-}
-
 /// The first torrent client among the targets.
 ///
 /// `None` where there is none — a client lemonfiber cannot ask is not a target at all,
@@ -296,25 +281,6 @@ pub(crate) fn torrent_client(
     targets: &[DownloadTarget],
 ) -> Option<Box<dyn torrent::Fills>> {
     targets.iter().find_map(|target| target.torrent(ctx))
-}
-
-/// The torrent client reached through the tunnel, as the bundled client holding its own
-/// password: the one whose listening port the port the tunnel is granted belongs to.
-///
-/// `None` where no torrent client goes through the tunnel. A plugin's never does, so no
-/// plugin's client is offered the forwarded port or read for it.
-pub(crate) fn forwarded_client(ctx: &Ctx, targets: &[DownloadTarget]) -> Option<Qbittorrent> {
-    targets
-        .iter()
-        .filter(|target| target.tunnelled)
-        .find_map(|target| match &target.kind {
-            DownloadKind::Torrent { base, password } => Some(Qbittorrent::authenticated(
-                ctx.seams.http.clone(),
-                base,
-                password.clone(),
-            )),
-            DownloadKind::Usenet { .. } | DownloadKind::Over { .. } => None,
-        })
 }
 
 /// One client's active downloads — nothing where it will not answer, so it is left out

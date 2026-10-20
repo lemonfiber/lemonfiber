@@ -22,6 +22,7 @@ use crate::topology::{Placed, Topology};
 use crate::wiring::Chosen;
 use document::{Document, Services};
 use entry::{configuration, entry, literal, ports, Tier, Unit, Values};
+pub(crate) use inputs::filler as placed_at;
 use inputs::Inputs;
 
 /// The file the project is written to, beneath the project directory.

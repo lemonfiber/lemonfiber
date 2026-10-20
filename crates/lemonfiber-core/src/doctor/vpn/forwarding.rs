@@ -82,18 +82,6 @@ impl Forwarding {
             _ => Answer::Unknown,
         }
     }
-
-    /// The port the client should be told to listen on, where it should be told
-    /// anything.
-    ///
-    /// Nothing where there is no grant to push, and nothing where the client is
-    /// already on it — a write that changes nothing is still a write, and one made
-    /// every run is a client restarted every run.
-    #[must_use]
-    pub(crate) fn to_push(self) -> Option<u16> {
-        let granted = self.granted?;
-        (self.listening != Some(granted)).then_some(granted)
-    }
 }
 
 #[cfg(test)]

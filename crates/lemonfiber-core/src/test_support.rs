@@ -346,4 +346,23 @@ pub(crate) fn json<T: serde::Serialize>(value: &T) -> String {
     serde_json::to_string(value).unwrap_or_default()
 }
 
+/// The stack's egress guard running healthy, its status file reading `port`.
+pub(crate) fn a_guard_forwarding(port: Option<&'static str>) -> std::sync::Arc<Reporting> {
+    std::sync::Arc::new(
+        Reporting::holding(
+            &["gluetun"],
+            crate::ports::docker::Lifecycle::Running,
+            crate::ports::docker::Health::Healthy,
+        )
+        .with_tunnel(Tunnel {
+            gateway: "gluetun",
+            gateway_ip: None,
+            client_ip: None,
+            country: None,
+            port,
+            second_opinion: None,
+        }),
+    )
+}
+
 mod tests;

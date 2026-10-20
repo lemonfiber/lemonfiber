@@ -1,174 +1,213 @@
-//! Keeping the download client on the port the provider actually granted.
+//! Passing the egress guard's forwarded port to every torrent client inside it.
 //!
-//! A tunnel that drops and comes back is commonly granted a different port. The
-//! gateway records the new one, and the download client goes on listening on
-//! yesterday's — at which point everything looks correct from inside and nobody
-//! outside can reach it. Torrents still download, so nothing announces it; only
-//! the seeding stops, which is the part an operator notices last.
-//!
-//! So the grant is compared with what the client is listening on, and a mismatch
-//! is pushed rather than merely reported: this is the one VPN fault where the fix
-//! is unambiguous, and where leaving it to be read about means it stays broken
-//! until somebody happens to look.
-//!
-//! Recorded either way. A port that changed and was re-pushed is a thing that
-//! happened to the stack, and an operator reading back why seeding stopped for an
-//! hour needs to find it.
+//! The guard's filler is asked over `network.egress-guard`, and each client is set over
+//! `download.torrent`, so the port crosses through the core and nothing is mounted into
+//! the guard or opened for it to call.
+
+mod deciding;
+mod reaching;
 
 use std::path::Path;
+use std::time::Duration;
 
-use crate::doctor::vpn::Forwarding;
-use crate::error::Diagnose;
-use crate::journal::{Change, Kind};
+use lemonfiber_contract::capabilities::download::torrent;
+use lemonfiber_manifest::Manifest;
 
-use super::targets::{download_targets, forwarded_client, host_fillers};
+use crate::condition::Conditions;
+use crate::config::store;
+use crate::doctor::{Category, Finding, Verdict};
+use crate::error::Diagnose as _;
+
+use super::targets::{host_fillers, project_directory};
 use super::Ctx;
 
-/// The operation a moved forwarded port is journalled under.
+pub use deciding::{acts, came_to, unheld, Asking, CameTo, Client, Last, Pass};
+
+/// How often the guard is asked while the stack runs.
+pub const EVERY: Duration = Duration::from_secs(60);
+
+/// The operation a passed port is journalled under.
 pub const OPERATION: &str = "vpn port forwarding";
 
-/// The setting a re-pushed port is journalled under, so a change to it reads like
-/// any other change lemonfiber made.
-pub const SETTING: &str = "qbittorrent.listen_port";
+/// The resource a passed port is journalled as.
+pub const RESOURCE: &str = "peer port";
 
-/// What one pass over the forwarded port did.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Pushed {
-    /// The client was already on the granted port, or there was nothing to push.
-    Unchanged,
-    /// The client was moved to the granted port.
-    Moved {
-        /// What it was listening on before, where that was known.
-        from: Option<u16>,
-        /// What it is listening on now.
-        to: u16,
-    },
-    /// A push was needed and could not be made.
-    Refused {
-        /// What the client said, in its own words.
-        reason: String,
-    },
-}
+/// The field of that resource a passed port sets.
+pub const FIELD: &str = "peer_port";
 
-impl Pushed {
-    /// The change this amounts to, for the journal — nothing where nothing moved.
-    #[must_use]
-    pub fn change(&self, stamp: &str) -> Option<Change> {
-        match self {
-            Self::Moved { from, to } => Some(Change {
-                at: stamp.to_owned(),
-                operation: OPERATION.to_owned(),
-                target: "qbittorrent".to_owned(),
-                kind: Kind::Set {
-                    key: SETTING.to_owned(),
-                    previous: from.map(|port| port.to_string()),
-                    current: to.to_string(),
-                },
-            }),
-            Self::Unchanged | Self::Refused { .. } => None,
-        }
-    }
+/// The check a port that was not passed is raised under.
+pub const CHECK: &str = "vpn.port-passed";
 
-    /// The line an operator reads.
-    #[must_use]
-    pub fn said(&self) -> Option<String> {
-        match self {
-            Self::Unchanged => None,
-            Self::Moved { from, to } => Some(match from {
-                Some(before) => format!(
-                    "the forwarded port changed from {before} to {to}; the download client was \
-                     moved to it"
-                ),
-                None => format!("the download client was set to listen on the forwarded port {to}"),
-            }),
-            Self::Refused { reason } => Some(format!(
-                "the forwarded port could not be pushed to the download client: {reason}"
-            )),
-        }
-    }
-}
+/// The record of the guard's last answer every client took.
+const RECORD: &str = "forwarded.json";
 
-/// Move the client onto the granted port where it is not already there.
+/// Ask the guard for its forwarded port and pass it to every torrent client inside it
+/// where `asking` says to, journalling each port set as it is set.
 ///
-/// `set` is the write itself, kept as a parameter so the decision is testable
-/// without a client: everything above this line is about *whether* to write, and
-/// this function is only about which write and what to record.
-pub async fn push<F, E>(forwarding: Forwarding, set: F) -> Pushed
-where
-    F: FnOnce(u16) -> E,
-    E: std::future::Future<Output = Result<(), String>>,
-{
-    let Some(port) = forwarding.to_push() else {
-        return Pushed::Unchanged;
-    };
-    match set(port).await {
-        Ok(()) => Pushed::Moved {
-            from: forwarding.listening,
-            to: port,
-        },
-        Err(reason) => Pushed::Refused { reason },
+/// Nothing where this is a rehearsal, no guard fills the stack's egress, or the guard
+/// cannot tell.
+pub async fn pass(
+    ctx: &Ctx,
+    manifest: &Manifest,
+    project: Option<&Path>,
+    asking: Asking,
+) -> Option<Pass> {
+    if ctx.dry_run {
+        return None;
     }
+    let fillers = host_fillers(ctx, manifest, project);
+    let answer = reaching::guard(ctx, &fillers)
+        .await?
+        .forwarded()
+        .await
+        .ok()?;
+    let mut pass = Pass {
+        answer,
+        ..Pass::default()
+    };
+    if !acts(asking, answer, super::record::beside(ctx, RECORD)) {
+        return Some(pass);
+    }
+    for inside in reaching::inside(ctx, &fillers).await {
+        let client = Client {
+            came_to: to_client(answer, inside.client.as_deref()).await,
+            service: inside.service,
+        };
+        if let Some(why) = journalled(ctx, client.change(answer, &ctx.stamp())) {
+            pass.unrecorded = Some(why);
+        }
+        pass.clients.push(client);
+    }
+    if pass.passed() {
+        super::record::keep_beside(ctx, RECORD, &Last { port: answer });
+    }
+    Some(pass)
 }
 
-/// Read the granted port and the client's own, and move the client where they
-/// differ.
-///
-/// The one VPN fault whose fix is unambiguous, so it is applied rather than
-/// reported. A client that cannot be authenticated to is left alone: it can be
-/// neither read nor corrected, and guessing would be worse than saying nothing.
-pub async fn reconcile(ctx: &Ctx, granted: Option<u16>, project: Option<&Path>) -> Pushed {
-    let Ok(manifest) = ctx.stack.checked_manifest(ctx.today()) else {
-        return Pushed::Unchanged;
+/// One pass on the minute, against the stack as it stands: what the watch and the
+/// dashboard's gather each run every [`EVERY`].
+pub async fn on_the_minute(ctx: &Ctx) -> Option<Pass> {
+    let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
+    on_disk(ctx, &manifest, Asking::Changed).await
+}
+
+/// One pass against the stack as it is written to disk.
+async fn on_disk(ctx: &Ctx, manifest: &Manifest, asking: Asking) -> Option<Pass> {
+    let project = project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+    pass(ctx, manifest, project.as_deref(), asking).await
+}
+
+/// Raise the port not passed in `conditions`, or clear it, as `pass` found it.
+pub fn observe(conditions: &mut Conditions, pass: &Pass, stamp: &str) {
+    conditions.observe(CHECK, pass.fault().as_ref(), stamp);
+}
+
+/// What passing `answer` to one client came to.
+async fn to_client(answer: Option<u16>, client: Option<&dyn torrent::Fills>) -> CameTo {
+    let Some(client) = client else {
+        return CameTo::Refused {
+            reason: "it could not be reached".to_owned(),
+        };
     };
-    let targets = download_targets(ctx, &host_fillers(ctx, &manifest, project)).await;
-    let Some(client) = forwarded_client(ctx, &targets) else {
-        return Pushed::Unchanged;
-    };
-    let forwarding = Forwarding {
-        granted,
-        listening: client.listen_port().await.ok(),
-    };
-    push(forwarding, |port| async move {
+    let holds = client.peer_port().await.map_err(|failure| said(&failure));
+    if !unheld(answer, &holds) {
+        return CameTo::Held;
+    }
+    came_to(
+        holds,
         client
-            .set_listen_port(port)
+            .set_peer_port(answer)
             .await
-            .map_err(|failure| failure.problem().summary)
-    })
-    .await
+            .map_err(|failure| said(&failure)),
+    )
 }
 
-/// What the torrent client reached through the tunnel says it is listening on, where
-/// there is one and it can be authenticated to.
+/// A service's failure, in the words it is said in.
+fn said(failure: &crate::ports::service::Failure) -> String {
+    failure.problem().summary
+}
+
+/// Journal `change` where there is one, answering why it could not be where it could not.
+fn journalled(ctx: &Ctx, change: Option<crate::journal::Change>) -> Option<String> {
+    let change = change?;
+    let written = super::targets::layout(ctx).map_or(Err(store::Failure::Nowhere), |paths| {
+        super::recover::journalled(
+            &paths.journal(),
+            std::slice::from_ref(&change),
+            ctx.seams.random.as_ref(),
+        )
+    });
+    written
+        .err()
+        .map(|failure| super::recover::unrecorded("Passing the forwarded port", &failure).summary)
+}
+
+/// Raise or clear the port not passed in the conditions kept, as `pass` found it.
+fn raised(ctx: &Ctx, pass: &Pass) {
+    let mut conditions = super::conditions::load(ctx);
+    observe(&mut conditions, pass, &ctx.stamp());
+    super::conditions::save(ctx, &conditions);
+}
+
+/// Say what `pass` came to, and raise or clear the port not passed.
+async fn told(ctx: &Ctx, pass: &Pass) -> Vec<String> {
+    raised(ctx, pass);
+    let said = pass.said();
+    for line in &said {
+        ctx.narrator.say(line).await;
+    }
+    said
+}
+
+/// The port the first torrent client inside the guard takes peers on, where it answers.
 pub(crate) async fn listening_port(
     ctx: &Ctx,
-    manifest: &lemonfiber_manifest::Manifest,
-    project: Option<&std::path::Path>,
+    manifest: &Manifest,
+    project: Option<&Path>,
 ) -> Option<u16> {
-    let targets = download_targets(ctx, &host_fillers(ctx, manifest, project)).await;
-    forwarded_client(ctx, &targets)?.listen_port().await.ok()
+    let fillers = host_fillers(ctx, manifest, project);
+    let inside = reaching::inside(ctx, &fillers).await;
+    let client = inside.iter().find_map(|one| one.client.as_deref())?;
+    client.peer_port().await.ok().flatten()
 }
 
-/// What starting the stack does about the forwarded port.
-///
-/// The tunnel has just come up, which is exactly when the provider grants a port
-/// — commonly a different one from last time. Applied here rather than offered
-/// because the operator has already asked for an action, and a client left on
-/// yesterday's port looks entirely healthy from inside while nobody outside can
-/// reach it. A diagnosis, which is only looking, offers the same fix instead of
-/// making it.
-pub(crate) async fn after_start(
+/// What starting the stack does about the forwarded port: one pass afresh, raised where a
+/// client did not take it.
+pub(crate) async fn after_start(ctx: &Ctx, manifest: &Manifest) -> Option<String> {
+    let pass = on_disk(ctx, manifest, Asking::Afresh).await?;
+    raised(ctx, &pass);
+    let said = pass.said();
+    (!said.is_empty()).then(|| said.join("; "))
+}
+
+/// What a diagnosis does about the forwarded port once its VPN check ran against a
+/// running stack: one pass afresh, said and raised where a client did not take it.
+pub(crate) async fn after_diagnosis(
     ctx: &Ctx,
-    manifest: &lemonfiber_manifest::Manifest,
-) -> Option<String> {
-    let granted = crate::doctor::vpn::granted_port(
-        ctx.seams.engine.as_ref(),
-        &ctx.settings.project,
-        manifest,
-        ctx.settings.port_forward.enabled,
-    )
-    .await;
-    let project = super::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
-    reconcile(ctx, granted, project.as_deref()).await.said()
+    manifest: &Manifest,
+    findings: &[Finding],
+) -> Vec<String> {
+    if !ran_against_a_running_stack(findings) {
+        return Vec::new();
+    }
+    match on_disk(ctx, manifest, Asking::Afresh).await {
+        Some(pass) => told(ctx, &pass).await,
+        None => Vec::new(),
+    }
+}
+
+/// Whether the VPN check found anything to say about a running stack.
+fn ran_against_a_running_stack(findings: &[Finding]) -> bool {
+    findings.iter().any(|finding| {
+        finding.category == Category::Vpn && !matches!(finding.verdict, Verdict::Skipped { .. })
+    })
+}
+
+/// The watch's own pass on the minute, said and raised.
+pub(crate) async fn watched(ctx: &Ctx) {
+    if let Some(pass) = on_the_minute(ctx).await {
+        told(ctx, &pass).await;
+    }
 }
 
 #[cfg(test)]

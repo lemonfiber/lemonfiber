@@ -2,16 +2,14 @@
 //! what a missing port can honestly be called.
 
 use super::findings::finding;
-use super::probe::{find, read_grant};
-use super::resolve_pair;
+use super::probe::read_grant;
 use super::VpnCheck;
 use super::NOT_ENABLED;
 use crate::config::PortForward;
 use crate::doctor::{Finding, Verdict};
 use crate::error::codes::vpn::NO_FORWARDED_PORT;
 use crate::error::{Problem, Remedy, State};
-use crate::ports::docker::{Container, Engine};
-use lemonfiber_manifest::Manifest;
+use crate::ports::docker::Container;
 
 /// What the gateway's forwarded-port status file amounted to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -148,36 +146,6 @@ pub(super) fn port_forward_offline(port_forward: &PortForward) -> Finding {
         }
     };
     finding("vpn.port-forward", "forwarded port", verdict)
-}
-
-/// The port the VPN provider granted, where one was granted and forwarding was
-/// asked for.
-///
-/// Read from the gateway's own status file, the same way the check and the panel
-/// read it, so nothing has a second opinion about what was granted.
-pub async fn granted_port(
-    engine: &dyn Engine,
-    project: &str,
-    manifest: &Manifest,
-    enabled: bool,
-) -> Option<u16> {
-    if !enabled {
-        return None;
-    }
-    grant_at(engine, project, &resolve_pair(manifest)?.gateway).await
-}
-
-/// What the gateway is granting, read from its own status file.
-///
-/// Apart from [`granted_port`] because the repair that moves the client already knows which
-/// gateway it is asking about and has no manifest to resolve one from — and because two
-/// readings of the same file are two chances to disagree about what was granted.
-pub(super) async fn grant_at(engine: &dyn Engine, project: &str, gateway: &str) -> Option<u16> {
-    let containers = engine.list(project).await.ok()?;
-    match read_grant(engine, find(&containers, gateway)).await {
-        Grant::Port(port) => Some(port),
-        Grant::Absent | Grant::Unreadable => None,
-    }
 }
 
 impl VpnCheck {
