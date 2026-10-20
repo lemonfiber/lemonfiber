@@ -19,6 +19,10 @@ lemonfiber-ports = { workspace = true }
 # Where a stack's manifest files are, for writing the carried stack where a test can
 # change it, and the day the tests validating it share.
 lemonfiber-manifest = { workspace = true, features = ["testing"] }
+# The stack the bundle declares, which is the stack this repository carries.
+lemonfiber-bundled = { workspace = true }
+# Editing a carried manifest's root as the table it is.
+toml = { workspace = true }
 async-trait = { workspace = true }
 tokio = { workspace = true, features = ["sync", "time"] }
 

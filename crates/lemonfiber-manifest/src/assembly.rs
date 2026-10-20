@@ -21,6 +21,9 @@ use toml::{Table, Value};
 use crate::recognising::unrecognised;
 use crate::{Failure, Manifest, Service, Violation};
 
+mod split;
+pub use split::{split, Unsplit};
+
 /// The root manifest's file name, at the top of a stack directory.
 pub const ROOT: &str = "stack.toml";
 

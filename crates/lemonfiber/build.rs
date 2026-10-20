@@ -1,12 +1,13 @@
-//! Refuse to build against a stack this binary could not operate.
+//! Refuse to build against a stack or an app this binary could not operate.
 //!
-//! The stack is embedded, so a mismatched pairing is knowable at compile time —
-//! and a build failure is the strongest available mitigation for the cost of
-//! keeping the tool and the stack in separate repositories. An incompatible
-//! pairing cannot ship, because it cannot compile.
+//! Both are embedded, so a mismatched pairing is knowable at compile time — and a
+//! build failure is the strongest available mitigation for the cost of keeping the
+//! tool, the stack and the app in separate repositories. An incompatible pairing
+//! cannot ship, because it cannot compile.
 //!
-//! The same parser the binary uses at runtime does the checking, so the two
-//! cannot disagree about what "readable" means.
+//! The stack's manifest is the one `lemonfiber-bundled` assembles from the bundle,
+//! whose build refuses one the runtime's own parser does not read; this build carries
+//! it with what runs beside it (`build/carried.rs`).
 
 use std::path::{Path, PathBuf};
 use std::process::exit;
@@ -14,8 +15,11 @@ use std::process::exit;
 #[path = "build/carried.rs"]
 mod carried;
 
-/// Where the embedded stack lives, from the workspace root.
+/// Where the media stack the bundle replaces lives, from the workspace root.
 const STACK: &str = "assets/media-stack";
+
+/// Where the catalogue holding the default bundle lives, from the workspace root.
+const CATALOGUE: &str = "assets/plugins";
 
 /// Where the embedded app lives, from the workspace root.
 const APP: &str = "assets/web";
@@ -28,42 +32,32 @@ const DECLARED: &str = "app.json";
 include!("../lemonfiber-api/src/contract/path.rs");
 
 fn main() {
-    let root = workspace_root().join(STACK);
-    let manifest = root.join(lemonfiber_manifest::assembly::ROOT);
+    let root = workspace_root();
+    let media = root.join(STACK);
+    let copies = root.join(CATALOGUE).join(lemonfiber_bundle::COPIES);
 
-    println!("cargo::rerun-if-changed={}", manifest.display());
-    println!(
-        "cargo::rerun-if-changed={}",
-        root.join(lemonfiber_manifest::assembly::SERVICES).display()
-    );
-
-    if !manifest.is_file() {
-        refuse(&[
-            &format!("the embedded stack is missing at {}", root.display()),
-            "",
-            "It is a git submodule, and a fresh clone does not populate it.",
-            "",
-            "  git submodule update --init --recursive",
-        ]);
-    }
-
-    if let Err(err) = lemonfiber_manifest::read(&root)
-        .and_then(|text| lemonfiber_manifest::Manifest::from_toml(&text))
-    {
-        refuse(&[
-            "the embedded stack cannot be read by this build",
-            "",
-            &err.to_string(),
-            "",
-            &format!("Manifest: {}", manifest.display()),
-            "The submodule and this binary are out of step; move the pin, or",
-            "teach the parser the generation the stack now declares.",
-        ]);
+    for (submodule, held) in [
+        (&media, media.join(carried::COMPOSE)),
+        (&copies, copies.clone()),
+    ] {
+        if !held.exists() {
+            refuse(&[
+                &format!(
+                    "the stack this build carries is missing at {}",
+                    submodule.display()
+                ),
+                "",
+                "It is a git submodule, and a fresh clone does not populate it.",
+                "",
+                "  git submodule update --init --recursive",
+            ]);
+        }
     }
 
     app_speaks_this_version();
     carried::stack(
-        &root,
+        &media,
+        &copies,
         &PathBuf::from(std::env::var_os("OUT_DIR").unwrap_or_default()),
     );
 }

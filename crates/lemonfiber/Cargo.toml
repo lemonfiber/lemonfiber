@@ -20,6 +20,9 @@ name = "lemonfiber"
 path = "src/main.rs"
 
 [build-dependencies]
+# The stack the bundle declares and the parts it pins, which the binary carries.
+lemonfiber-bundle = { workspace = true }
+lemonfiber-bundled = { workspace = true }
 lemonfiber-manifest = { workspace = true }
 # Reading the wire version the embedded app and the contract each declare.
 serde_json = { workspace = true }
@@ -66,6 +69,10 @@ lemonfiber-error = { workspace = true, features = ["testing"] }
 # rather than written again here.
 lemonfiber-fixtures = { workspace = true }
 lemonfiber-testing = { workspace = true }
+# The stack the bundle declares, the parts it pins and where their copies are, which
+# the carried tree is held to.
+lemonfiber-bundle = { workspace = true }
+lemonfiber-bundled = { workspace = true }
 # Reading the embedded stack's own declaration of itself. Already a build
 # dependency, and a build dependency is not on a test target's path.
 lemonfiber-manifest = { workspace = true }

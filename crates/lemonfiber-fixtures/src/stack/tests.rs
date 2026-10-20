@@ -5,19 +5,24 @@ use crate::scratch::Scratch;
 fn a_copy_reads_back_as_the_carried_stack() {
     let into = Scratch::named("fixtures-stack-copy").kept();
     manifest_into(&into);
-    let read = lemonfiber_manifest::read(&into).ok();
-    assert_eq!(
-        read,
-        lemonfiber_manifest::read(std::path::Path::new(super::CARRIED)).ok()
-    );
+    let read: Option<toml::Table> = lemonfiber_manifest::read(&into)
+        .ok()
+        .and_then(|text| toml::from_str(&text).ok())
+        .map(|mut table: toml::Table| {
+            table.remove("include");
+            table
+        });
     assert!(read.is_some());
+    assert_eq!(read, toml::from_str(lemonfiber_bundled::STACK).ok());
     let _ = std::fs::remove_dir_all(&into);
 }
 
 #[test]
 fn a_service_taken_out_takes_its_file_its_entry_and_its_links() {
     let into = Scratch::named("fixtures-stack-without").kept();
+    manifest_into(&into);
     manifest_without(&into, "decline");
+    assert!(!into.join("services/decline.toml").exists());
     let text = lemonfiber_manifest::read(&into).unwrap_or_default();
     let manifest = lemonfiber_manifest::Manifest::from_toml(&text).ok();
     assert!(manifest

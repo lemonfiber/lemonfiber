@@ -23,7 +23,8 @@ use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::ports::Stopped;
 use lemonfiber_fixtures::support::{spoke, Reporting, Scripted};
 
-/// The stack this repository carries, read from disk.
+/// The media stack the bundle replaces, read from disk: the stack directory whose
+/// compose files the carried stack runs until they are written from its manifest.
 #[must_use]
 pub fn repository_stack() -> Source {
     Source::External(Path::new(concat!(
