@@ -45,30 +45,40 @@ impl Gluetun {
 #[async_trait]
 impl Tunnelling for Gluetun {
     async fn up(&self) -> Result<bool, Failure> {
-        let containers = self
-            .engine
-            .list(&self.project)
-            .await
-            .map_err(|_| self.unavailable())?;
-        Ok(find(&containers, &self.service).is_some_and(|container| {
-            container.lifecycle == Lifecycle::Running && container.health != Health::Unhealthy
-        }))
+        up(self).await
     }
 
     async fn forwarded(&self) -> Result<Option<u16>, Failure> {
-        if !self.forwarding {
-            return Ok(None);
-        }
-        let containers = self
-            .engine
-            .list(&self.project)
-            .await
-            .map_err(|_| self.unavailable())?;
-        match read_grant(self.engine.as_ref(), find(&containers, &self.service)).await {
-            Grant::Port(port) => Ok(Some(port)),
-            Grant::Absent => Ok(None),
-            Grant::Unreadable => Err(self.unavailable()),
-        }
+        forwarded(self).await
+    }
+}
+
+/// Whether the guard's container runs and its own probe is not failing.
+async fn up(guard: &Gluetun) -> Result<bool, Failure> {
+    let containers = guard
+        .engine
+        .list(&guard.project)
+        .await
+        .map_err(|_| guard.unavailable())?;
+    Ok(find(&containers, &guard.service).is_some_and(|container| {
+        container.lifecycle == Lifecycle::Running && container.health != Health::Unhealthy
+    }))
+}
+
+/// The port in the guard's own status file, or none where it was not asked to forward.
+async fn forwarded(guard: &Gluetun) -> Result<Option<u16>, Failure> {
+    if !guard.forwarding {
+        return Ok(None);
+    }
+    let containers = guard
+        .engine
+        .list(&guard.project)
+        .await
+        .map_err(|_| guard.unavailable())?;
+    match read_grant(guard.engine.as_ref(), find(&containers, &guard.service)).await {
+        Grant::Port(port) => Ok(Some(port)),
+        Grant::Absent => Ok(None),
+        Grant::Unreadable => Err(guard.unavailable()),
     }
 }
 

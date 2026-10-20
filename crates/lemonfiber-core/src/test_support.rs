@@ -346,16 +346,10 @@ pub(crate) fn json<T: serde::Serialize>(value: &T) -> String {
     serde_json::to_string(value).unwrap_or_default()
 }
 
-/// The stack's egress guard forwarding `port`, counting every time it is asked for it.
-pub(crate) struct AskedGuard {
-    guard: Reporting,
-    asked: std::sync::atomic::AtomicUsize,
-}
-
-impl AskedGuard {
-    /// The guard running healthy, its status file reading `port`.
-    pub(crate) fn forwarding(port: Option<&'static str>) -> std::sync::Arc<Self> {
-        let guard = Reporting::holding(
+/// The stack's egress guard running healthy, its status file reading `port`.
+pub(crate) fn a_guard_forwarding(port: Option<&'static str>) -> std::sync::Arc<Reporting> {
+    std::sync::Arc::new(
+        Reporting::holding(
             &["gluetun"],
             crate::ports::docker::Lifecycle::Running,
             crate::ports::docker::Health::Healthy,
@@ -367,61 +361,8 @@ impl AskedGuard {
             country: None,
             port,
             second_opinion: None,
-        });
-        std::sync::Arc::new(Self {
-            guard,
-            asked: std::sync::atomic::AtomicUsize::new(0),
-        })
-    }
-
-    /// How many times it was asked for its forwarded port.
-    pub(crate) fn asked(&self) -> usize {
-        self.asked.load(std::sync::atomic::Ordering::Relaxed)
-    }
-}
-
-#[async_trait::async_trait]
-impl crate::ports::docker::Engine for AskedGuard {
-    async fn list(
-        &self,
-        project: &str,
-    ) -> Result<Vec<crate::ports::docker::Container>, crate::ports::docker::Failure> {
-        self.guard.list(project).await
-    }
-
-    async fn exec(
-        &self,
-        container: &str,
-        argv: &[String],
-    ) -> Result<crate::ports::docker::ExecOutput, crate::ports::docker::Failure> {
-        if argv.first().is_some_and(|word| word == "cat") {
-            self.asked
-                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        }
-        self.guard.exec(container, argv).await
-    }
-
-    async fn stats(
-        &self,
-        project: &str,
-    ) -> Result<
-        tokio::sync::mpsc::Receiver<(String, crate::ports::docker::Stats)>,
-        crate::ports::docker::Failure,
-    > {
-        self.guard.stats(project).await
-    }
-
-    async fn logs(
-        &self,
-        project: &str,
-        services: &[String],
-        query: crate::ports::docker::LogQuery,
-    ) -> Result<
-        tokio::sync::mpsc::Receiver<crate::ports::docker::LogLine>,
-        crate::ports::docker::Failure,
-    > {
-        self.guard.logs(project, services, query).await
-    }
+        }),
+    )
 }
 
 mod tests;

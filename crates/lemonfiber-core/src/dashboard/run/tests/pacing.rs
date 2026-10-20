@@ -201,7 +201,7 @@ async fn a_refresh_that_changed_nothing_writes_nothing() {
 /// screen's own tick.
 #[tokio::test]
 async fn the_forwarded_port_is_passed_on_once_a_minute() {
-    let guard = crate::test_support::AskedGuard::forwarding(None);
+    let guard = crate::test_support::a_guard_forwarding(None);
     let at = |seconds: u64| {
         a_context()
             .engine(guard.clone())
@@ -216,9 +216,9 @@ async fn the_forwarded_port_is_passed_on_once_a_minute() {
     let every = crate::app::forwarding::EVERY.as_secs();
 
     let first = paced(&at(1_000), None).await;
-    assert_eq!(guard.asked(), 1);
+    assert_eq!(guard.ran("cat"), 1);
     let second = paced(&at(1_000 + every - 1), Some(&first)).await;
-    assert_eq!(guard.asked(), 1);
+    assert_eq!(guard.ran("cat"), 1);
     paced(&at(1_000 + every), Some(&second)).await;
-    assert_eq!(guard.asked(), 2);
+    assert_eq!(guard.ran("cat"), 2);
 }

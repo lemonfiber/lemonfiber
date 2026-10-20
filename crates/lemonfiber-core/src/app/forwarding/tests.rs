@@ -271,3 +271,39 @@ async fn a_diagnosis_whose_vpn_check_did_not_run_asks_nothing() {
     assert_eq!(diagnosed(&ctx, &[skipped]).await, Some(Vec::new()));
     assert!(http.requests().is_empty());
 }
+
+#[tokio::test]
+async fn a_client_that_will_not_say_its_port_is_still_set() {
+    let (ctx, _) = holding(
+        "silent",
+        Some("51999"),
+        vec![(500, "no"), LOGGED_IN, TOOK, ON_51999],
+    );
+    let pass = passed(&ctx, Asking::Afresh).await;
+    assert_eq!(
+        pass.map(|pass| pass
+            .clients
+            .into_iter()
+            .map(|one| one.came_to)
+            .collect::<Vec<_>>()),
+        Some(vec![CameTo::Moved { from: None }])
+    );
+}
+
+#[tokio::test]
+async fn a_port_set_where_nothing_can_be_journalled_says_so() {
+    let (mut ctx, _) = holding(
+        "unrecorded",
+        Some("51999"),
+        vec![SIGNED_OUT, LOGGED_IN, ON_51413, LOGGED_IN, TOOK, ON_51999],
+    );
+    ctx.settings.stack_dir = None;
+    let said = passed(&ctx, Asking::Afresh)
+        .await
+        .map(|pass| pass.said())
+        .unwrap_or_default();
+    assert_eq!(said.len(), 2);
+    assert!(said
+        .last()
+        .is_some_and(|line| line.contains("could not be recorded")));
+}

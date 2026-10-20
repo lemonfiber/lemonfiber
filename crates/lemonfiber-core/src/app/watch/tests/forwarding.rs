@@ -5,11 +5,11 @@ use lemonfiber_fixtures::ports::Following;
 use super::{supervise, Drive};
 use crate::config::Settings;
 use crate::ports::filesystem::Presence;
-use crate::test_support::{a_context, AskedGuard};
+use crate::test_support::{a_context, a_guard_forwarding};
 
 #[tokio::test(start_paused = true)]
 async fn a_watch_asks_the_guard_once_a_minute_while_the_volume_holds() {
-    let guard = AskedGuard::forwarding(None);
+    let guard = a_guard_forwarding(None);
     let ctx = a_context()
         .engine(guard.clone())
         .clock(Following::started())
@@ -30,5 +30,5 @@ async fn a_watch_asks_the_guard_once_a_minute_while_the_volume_holds() {
     let report = supervise(&ctx, &Drive::playing(readings), &["dl".to_owned()], every).await;
 
     assert!(report.is_ok_and(|report| report.reason.contains("no longer present")));
-    assert_eq!(guard.asked(), 2);
+    assert_eq!(guard.ran("cat"), 2);
 }
