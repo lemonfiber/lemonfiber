@@ -42,3 +42,20 @@ fn a_probe_asked_as_the_operator_of_a_service_an_adapter_fronts_is_refused_namin
     );
     assert!(!says(&said, &["operator"]), "{said:?}");
 }
+
+#[test]
+fn a_claim_on_a_capability_the_vocabulary_does_not_carry_asks_nothing_of_its_probes() {
+    let said = against(
+        &CLAIMANT
+            .replacen("\n[[claim]]", &format!("{ADAPTER}\n[[claim]]"), 1)
+            .replace(
+                "capability = \"media.serve\"",
+                "capability = \"media.stream\"",
+            ),
+    );
+    assert!(
+        says(&said, &["media.stream is in no service's provides"]),
+        "{said:?}"
+    );
+    assert!(!says(&said, &["probe"]), "{said:?}");
+}
