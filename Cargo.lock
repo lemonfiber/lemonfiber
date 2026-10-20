@@ -1517,9 +1517,11 @@ name = "lemonfiber-fixtures"
 version = "0.17.0"
 dependencies = [
  "async-trait",
+ "lemonfiber-bundled",
  "lemonfiber-manifest",
  "lemonfiber-ports",
  "tokio",
+ "toml",
 ]
 
 [[package]]

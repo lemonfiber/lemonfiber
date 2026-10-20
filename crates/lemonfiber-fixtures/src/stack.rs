@@ -1,24 +1,22 @@
 //! The stack this repository carries, written where a test can change it.
 //!
-//! Its manifest is a root and a file per service. A test that wants
-//! its own copy copies the files, and one that wants a service gone removes that
-//! service's file, its `include` entry and every link that named it — a stack that
-//! drops a service drops what reached it, and one that kept those links would be
-//! refused for naming a service it no longer declares.
+//! Its manifest is the stack the bundle declares, written apart as a root and a file
+//! per service as a stack directory holds it. A test that wants its own copy writes
+//! the files, and one that wants a service gone removes that service's file, its
+//! `include` entry and every link that named it — a stack that drops a service drops
+//! what reached it, and one that kept those links would be refused for naming a
+//! service it no longer declares.
 
 use std::path::Path;
 
-use lemonfiber_manifest::assembly::{ROOT, SERVICES};
-
-/// The stack this repository carries.
-pub const CARRIED: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/media-stack");
+use lemonfiber_manifest::assembly::{split, ROOT, SERVICES};
+use toml::{Table, Value};
 
 /// The carried stack's service `id` as its manifest pins it, or nothing where the
-/// stack does not read or does not declare it.
+/// stack does not declare it.
 #[must_use]
 pub fn pinned(id: &str) -> Option<lemonfiber_manifest::Service> {
-    let text = lemonfiber_manifest::read(Path::new(CARRIED)).ok()?;
-    lemonfiber_manifest::Manifest::from_toml(&text)
+    lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK)
         .ok()?
         .services
         .into_iter()
@@ -28,15 +26,13 @@ pub fn pinned(id: &str) -> Option<lemonfiber_manifest::Service> {
 /// The carried stack's manifest files written into `into`, which is made if it is not
 /// there.
 pub fn manifest_into(into: &Path) {
-    let from = Path::new(CARRIED);
+    let Ok((root, services)) = split(lemonfiber_bundled::STACK) else {
+        return;
+    };
     let _ = std::fs::create_dir_all(into.join(SERVICES));
-    let _ = std::fs::copy(from.join(ROOT), into.join(ROOT));
-    for entry in std::fs::read_dir(from.join(SERVICES))
-        .into_iter()
-        .flatten()
-        .flatten()
-    {
-        let _ = std::fs::copy(entry.path(), into.join(SERVICES).join(entry.file_name()));
+    let _ = std::fs::write(into.join(ROOT), root);
+    for (file, text) in services {
+        let _ = std::fs::write(into.join(SERVICES).join(file), text);
     }
 }
 
@@ -44,19 +40,22 @@ pub fn manifest_into(into: &Path) {
 pub fn manifest_without(into: &Path, service: &str) {
     manifest_into(into);
     let _ = std::fs::remove_file(into.join(SERVICES).join(format!("{service}.toml")));
-    let root = std::fs::read_to_string(into.join(ROOT)).unwrap_or_default();
-    let entry = format!("\"{SERVICES}/{service}.toml\"");
-    let named = format!("\"{service}\"");
-    let listed: String = root
-        .split_inclusive('\n')
-        .filter(|line| !line.contains(&entry))
-        .collect();
-    let kept = listed
-        .split("[[wiring]]")
-        .filter(|block| !block.contains(&named))
-        .collect::<Vec<_>>()
-        .join("[[wiring]]");
-    let _ = std::fs::write(into.join(ROOT), kept);
+    let mut root: Table = std::fs::read_to_string(into.join(ROOT))
+        .ok()
+        .and_then(|text| toml::from_str(&text).ok())
+        .unwrap_or_default();
+    let entry = Value::String(format!("{SERVICES}/{service}.toml"));
+    if let Some(Value::Array(include)) = root.get_mut("include") {
+        include.retain(|listed| *listed != entry);
+    }
+    let named = Value::String(service.to_owned());
+    if let Some(Value::Array(wiring)) = root.get_mut("wiring") {
+        wiring.retain(|row| {
+            row.as_table()
+                .is_none_or(|row| !row.values().any(|value| *value == named))
+        });
+    }
+    let _ = std::fs::write(into.join(ROOT), toml::to_string(&root).unwrap_or_default());
 }
 
 /// A manifest written as one text, laid out the way a stack is written: each
