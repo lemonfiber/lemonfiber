@@ -4,11 +4,18 @@
 //! so it is deliberate rather than descriptive: a contract that reads as a summary
 //! of an implementation is one nobody can hold a second implementation to.
 //!
-//! Split from the module above it because a list of ten contracts, each with its own
+//! Split from the module above it because a list of contracts, each with its own
 //! probes, outgrew what one file may hold — not because the two are separate
 //! concerns. Nothing here decides anything; it is the table the module reads.
 
+mod configured;
+
 use lemonfiber_manifest::container::MEDIA_SERVE;
+
+use configured::{
+    ARCHIVE_EXTRACT, DASHBOARD_SHOW, INVITE_DECLINE, PROXY_FRONT, QUALITY_SYNC, REQUEST_GATE,
+    STREAM_GUARD,
+};
 
 use super::{Capability, Constraint, Credential, Probe, Removed, Requirement, EGRESS_GUARD};
 
@@ -408,6 +415,13 @@ pub(super) const CARRIED: &[Capability] = &[
         ],
         listens: true,
     },
+    PROXY_FRONT,
+    DASHBOARD_SHOW,
+    QUALITY_SYNC,
+    ARCHIVE_EXTRACT,
+    STREAM_GUARD,
+    INVITE_DECLINE,
+    REQUEST_GATE,
 ];
 
 /// Every name a published generation carried and this one does not.

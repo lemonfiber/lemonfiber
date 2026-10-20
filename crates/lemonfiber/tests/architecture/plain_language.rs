@@ -208,9 +208,12 @@ fn no_other_services_word_is_written_as_if_it_were_ours() {
 ///
 /// `DOMAIN` is the stack's own name for the setting, the kind `TZ` is: shown where it
 /// is typed, in the sentence saying what setting it gives the front door an address.
+///
+/// `HTTPS` sits beside `HTTP`, and is met with it: the proxy's contract sends a name
+/// asked for over the one to the other, and the sentence says so in those two words.
 const ORDINARY: &[&str] = &[
-    "API", "URL", "TLS", "JSON", "DNS", "IP", "UI", "HTTP", "OSI", "FAT", "SMB", "CIFS", "NFS",
-    "WSL2", "UID", "GID", "NAT", "PMP", "P2P", "GB", "MB", "CD", "TV", "MP3", "AAC", "FLAC",
+    "API", "URL", "TLS", "JSON", "DNS", "IP", "UI", "HTTP", "HTTPS", "OSI", "FAT", "SMB", "CIFS",
+    "NFS", "WSL2", "UID", "GID", "NAT", "PMP", "P2P", "GB", "MB", "CD", "TV", "MP3", "AAC", "FLAC",
     "ALAC", "YYYY", "MM", "DD", "NOT", "CPU", "UTC", "TZ", "HH", "TCP", "SSH", "DOMAIN",
 ];
 

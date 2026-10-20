@@ -141,10 +141,11 @@ pub enum Requirement {
         /// The kinds of body constraint the answer must carry.
         ///
         /// Empty on a `guarded` probe, and that is not a weaker expectation: a refusal is
-        /// the one answer no port proxy can produce. An emptied container answers a
-        /// refused connection or a gateway error, and only an application with a
-        /// protected surface answers that it is protected — so there the status is the
-        /// body's job.
+        /// an answer no port proxy can produce. An emptied container answers a refused
+        /// connection or a gateway error, and only an application with a protected
+        /// surface answers that it is protected — so there the status is the body's job.
+        /// A redirect to HTTPS is the other such answer, sent only by a server that
+        /// routes by name.
         body: &'static [Constraint],
     },
     /// What answers a run.

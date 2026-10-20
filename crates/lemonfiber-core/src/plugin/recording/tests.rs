@@ -333,3 +333,34 @@ async fn a_claim_probe_that_runs_is_recorded_by_running_it() {
     assert_eq!(field(&kept, "/run/args"), serde_json::json!(["--version"]));
     assert_eq!(field(&kept, "/result/stdout_starts_with"), "v8.7.3 (");
 }
+
+/// A stream guard is recorded holding a throwaway certificate and its key where the core
+/// writes them for it; any other service holds none.
+#[test]
+fn a_stream_guard_is_recorded_holding_a_certificate_the_core_would_write() {
+    for (provides, holds) in [("stream.guard", true), ("media.serve", false)] {
+        let manifest = RUNNING.replace(
+            "posture       = \"confined\"",
+            &format!("posture       = \"confined\"\nprovides      = [\"{provides}\"]"),
+        );
+        let placed = lemonfiber_plugin::Manifest::from_toml(&manifest)
+            .ok()
+            .and_then(|read| {
+                crate::plugin::installed::Installed::of(&read)
+                    .services
+                    .into_iter()
+                    .next()
+            });
+        let copy = crate::plugin::program::Throwaway::of(None);
+        let (Some(placed), Ok(copy)) = (placed, copy) else {
+            unreachable!("the fixture places a service and a copy is made");
+        };
+        assert_eq!(super::served::certified(&placed, &copy), Ok(()));
+        let kept = crate::certificate::kept(copy.path());
+        assert_eq!(
+            kept.as_ref().map(Option::is_some),
+            Ok(holds),
+            "{provides}: {kept:?}"
+        );
+    }
+}

@@ -103,9 +103,9 @@ fn answers(probe: &Probe) -> String {
     };
     let body = probe.requires.body();
     if body.is_empty() {
-        // A refusal is the one answer no port proxy can produce, which is why this
-        // probe is allowed to constrain nothing but the status. Said rather than left
-        // blank, so it does not read as a gap in the document.
+        // A refusal or a redirect to HTTPS is an answer no port proxy produces, which is
+        // why this probe is allowed to constrain nothing but the status. Said rather than
+        // left blank, so it does not read as a gap in the document.
         return format!("{ended} — the status is the whole of it");
     }
     let kinds: Vec<String> = body

@@ -7,19 +7,29 @@
 
 use std::path::Path;
 
-/// The stack this build embeds.
-const STACK: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/media-stack");
+use lemonfiber_core::plugin::bundled::Kept;
+
+/// The media stack the bundle keeps its installed parts from.
+const MEDIA: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/media-stack");
+
+/// The bundle's copy of each part.
+const COPIES: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../assets/plugins/bundle/plugins"
+);
 
 /// Everything the embedded stack provides is claimed, and nothing it claims is refuted by
 /// its recording or refused.
 #[test]
 fn nothing_the_embedded_stack_claims_is_refuted() {
-    let stack = Path::new(STACK);
-    let text = lemonfiber_manifest::read(stack).unwrap_or_default();
-    let manifest = lemonfiber_manifest::Manifest::from_toml(&text)
+    let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK)
         .unwrap_or_else(|why| unreachable!("the embedded stack does not read: {why}"));
+    let kept = Kept {
+        media: Path::new(MEDIA),
+        copies: Path::new(COPIES),
+    };
 
-    let report = lemonfiber_core::plugin::bundled::judged(&manifest, stack);
+    let report = lemonfiber_core::plugin::bundled::judged(&manifest, kept);
     let said = lemonfiber_core::plugin::bundled::said(&report);
 
     assert!(report.holds(), "{}", said.join("\n"));

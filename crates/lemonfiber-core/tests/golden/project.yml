@@ -13,6 +13,8 @@ services:
     - ./config/audiobookshelf:/config
     - ./mounts/audiobookshelf/metadata:/metadata
     networks:
+    - ask__audiobookshelf__dashboard.show__homepage
+    - ask__audiobookshelf__proxy.front__caddy
     - own__audiobookshelf
     security_opt:
     - no-new-privileges:true
@@ -41,6 +43,7 @@ services:
     - ${DATA_ROOT:-./data}:/data
     - ./config/bazarr:/config
     networks:
+    - ask__bazarr__dashboard.show__homepage
     - ask__bazarr__library.curate__bindery
     - ask__bazarr__library.curate__lidarr
     - ask__bazarr__library.curate__radarr
@@ -80,6 +83,8 @@ services:
     - ask__bindery__download.usenet__sabnzbd
     - ask__bindery__indexer.search__prowlarr
     - ask__prowlarr__library.curate__bindery
+    - ask__recyclarr__library.curate__bindery
+    - ask__request-gate__library.curate__bindery
     - ask__seerr__library.curate__bindery
     - own__bindery
     security_opt:
@@ -95,10 +100,11 @@ services:
     - KILL
     pids_limit: 1024
   caddy:
-    image: ghcr.io/lemonfiber/caddy:main-f90430f39aab@sha256:abf300a5a2ac443be47df8b8b1369dbfed94ffede32d97196ed8baea3503ba2d
+    image: ghcr.io/lemonfiber/caddy:main-22eef6b30f45@sha256:dd64ac74c6800d3445072406c3d2e982b530c9be5de747d05c68b50f87301b5a
     profiles:
     - proxy
     restart: unless-stopped
+    user: ${PUID:-1000}:${PGID:-1000}
     environment:
       DOMAIN: home.local
       TZ: ${TZ:-Europe/Amsterdam}
@@ -106,10 +112,17 @@ services:
     - ${LAN_BIND:-0.0.0.0}:80:8080
     - ${LAN_BIND:-0.0.0.0}:443:8443
     volumes:
-    - ./config/caddy:/config
-    - ./mounts/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+    - ./config/caddy:/etc/caddy:ro
+    - ./mounts/caddy/data:/data
+    - ./mounts/caddy/config:/config
     networks:
-    - own__caddy
+      ask__audiobookshelf__proxy.front__caddy: {}
+      ask__calibre-web-automated__proxy.front__caddy: {}
+      ask__door__proxy.front__caddy:
+        ipv4_address: 10.80.96.3
+      ask__homepage__proxy.front__caddy: {}
+      ask__seerr__proxy.front__caddy: {}
+      own__caddy: {}
     security_opt:
     - no-new-privileges:true
     cap_drop:
@@ -137,6 +150,7 @@ services:
     - ${DATA_ROOT:-./data}:/data
     - ./config/calibre-web-automated:/config
     networks:
+    - ask__calibre-web-automated__proxy.front__caddy
     - own__calibre-web-automated
     security_opt:
     - no-new-privileges:true
@@ -163,6 +177,7 @@ services:
     volumes:
     - ./config/decline:/config
     networks:
+    - ask__decline__identity.source__jellyfin
     - link__decline__jellyfin
     - own__decline
     security_opt:
@@ -189,8 +204,11 @@ services:
     - /data
     - /config
     networks:
-    - link__door__jellyfin
-    - own__door
+      ask__door__media.serve__jellyfin:
+        ipv4_address: 10.80.96.18
+      ask__door__proxy.front__caddy:
+        ipv4_address: 10.80.96.2
+      own__door: {}
     security_opt:
     - no-new-privileges:true
     cap_drop:
@@ -249,6 +267,7 @@ services:
     - ./config/gluetun:/config
     networks:
     - ask__bindery__download.torrent__gluetun
+    - ask__gluetun__dashboard.show__homepage
     - ask__lidarr__download.torrent__gluetun
     - ask__radarr__download.torrent__gluetun
     - ask__sonarr__download.torrent__gluetun
@@ -284,6 +303,17 @@ services:
     volumes:
     - ./config/homepage:/app/config
     networks:
+    - ask__audiobookshelf__dashboard.show__homepage
+    - ask__bazarr__dashboard.show__homepage
+    - ask__gluetun__dashboard.show__homepage
+    - ask__homepage__proxy.front__caddy
+    - ask__lidarr__dashboard.show__homepage
+    - ask__navidrome__dashboard.show__homepage
+    - ask__prowlarr__dashboard.show__homepage
+    - ask__radarr__dashboard.show__homepage
+    - ask__sabnzbd__dashboard.show__homepage
+    - ask__seerr__dashboard.show__homepage
+    - ask__sonarr__dashboard.show__homepage
     - own__homepage
     security_opt:
     - no-new-privileges:true
@@ -313,9 +343,12 @@ services:
     - ./config/lidarr:/config
     networks:
     - ask__bazarr__library.curate__lidarr
+    - ask__lidarr__dashboard.show__homepage
     - ask__lidarr__download.torrent__gluetun
     - ask__lidarr__download.usenet__sabnzbd
     - ask__prowlarr__library.curate__lidarr
+    - ask__recyclarr__library.curate__lidarr
+    - ask__request-gate__library.curate__lidarr
     - ask__seerr__library.curate__lidarr
     - ask__unpackerr__library.curate__lidarr
     - link__unpackerr__lidarr
@@ -349,6 +382,7 @@ services:
     - ${DATA_ROOT:-./data}:/data
     - ./config/navidrome:/config
     networks:
+    - ask__navidrome__dashboard.show__homepage
     - own__navidrome
     security_opt:
     - no-new-privileges:true
@@ -406,6 +440,7 @@ services:
     - ./config/prowlarr:/config
     networks:
     - ask__bindery__indexer.search__prowlarr
+    - ask__prowlarr__dashboard.show__homepage
     - ask__prowlarr__indexer.proxy__flaresolverr
     - ask__prowlarr__library.curate__bindery
     - ask__prowlarr__library.curate__lidarr
@@ -470,8 +505,11 @@ services:
     networks:
     - ask__bazarr__library.curate__radarr
     - ask__prowlarr__library.curate__radarr
+    - ask__radarr__dashboard.show__homepage
     - ask__radarr__download.torrent__gluetun
     - ask__radarr__download.usenet__sabnzbd
+    - ask__recyclarr__library.curate__radarr
+    - ask__request-gate__library.curate__radarr
     - ask__seerr__library.curate__radarr
     - ask__unpackerr__library.curate__radarr
     - link__recyclarr__radarr
@@ -501,6 +539,10 @@ services:
     volumes:
     - ./config/recyclarr:/config
     networks:
+    - ask__recyclarr__library.curate__bindery
+    - ask__recyclarr__library.curate__lidarr
+    - ask__recyclarr__library.curate__radarr
+    - ask__recyclarr__library.curate__sonarr
     - link__recyclarr__radarr
     - link__recyclarr__sonarr
     - own__recyclarr
@@ -517,7 +559,7 @@ services:
     - KILL
     pids_limit: 1024
   request-gate:
-    image: ghcr.io/lemonfiber/request-gate:main-ecbfb31fa0ff@sha256:26f6eed2aded7ca8174879ef6826893abc38076e6aa50fe6f29f50246929c845
+    image: ghcr.io/lemonfiber/request-gate:main-b1472d34833c@sha256:fc84286bdac98df045a6df97837ae5134ff5a5c4dc75a8875675988992cec55e
     profiles:
     - media
     restart: unless-stopped
@@ -526,7 +568,13 @@ services:
       TZ: ${TZ:-Europe/Amsterdam}
     volumes:
     - ./config/request-gate:/config
-    network_mode: none
+    networks:
+    - ask__request-gate__identity.source__jellyfin
+    - ask__request-gate__library.curate__bindery
+    - ask__request-gate__library.curate__lidarr
+    - ask__request-gate__library.curate__radarr
+    - ask__request-gate__library.curate__sonarr
+    - ask__seerr__request.gate__request-gate
     security_opt:
     - no-new-privileges:true
     cap_drop:
@@ -552,6 +600,7 @@ services:
     - ask__bindery__download.usenet__sabnzbd
     - ask__lidarr__download.usenet__sabnzbd
     - ask__radarr__download.usenet__sabnzbd
+    - ask__sabnzbd__dashboard.show__homepage
     - ask__sonarr__download.usenet__sabnzbd
     - own__sabnzbd
     security_opt:
@@ -580,11 +629,14 @@ services:
     volumes:
     - ./config/seerr:/app/config
     networks:
+    - ask__seerr__dashboard.show__homepage
     - ask__seerr__identity.source__jellyfin
     - ask__seerr__library.curate__bindery
     - ask__seerr__library.curate__lidarr
     - ask__seerr__library.curate__radarr
     - ask__seerr__library.curate__sonarr
+    - ask__seerr__proxy.front__caddy
+    - ask__seerr__request.gate__request-gate
     - own__seerr
     security_opt:
     - no-new-privileges:true
@@ -615,7 +667,10 @@ services:
     networks:
     - ask__bazarr__library.curate__sonarr
     - ask__prowlarr__library.curate__sonarr
+    - ask__recyclarr__library.curate__sonarr
+    - ask__request-gate__library.curate__sonarr
     - ask__seerr__library.curate__sonarr
+    - ask__sonarr__dashboard.show__homepage
     - ask__sonarr__download.torrent__gluetun
     - ask__sonarr__download.usenet__sabnzbd
     - ask__unpackerr__library.curate__sonarr
@@ -687,9 +742,11 @@ services:
     - ./config/jellyfin:/config
     - ./mounts/jellyfin/cache:/cache
     networks:
+    - ask__decline__identity.source__jellyfin
+    - ask__door__media.serve__jellyfin
+    - ask__request-gate__identity.source__jellyfin
     - ask__seerr__identity.source__jellyfin
     - link__decline__jellyfin
-    - link__door__jellyfin
     - own__jellyfin
     security_opt:
     - no-new-privileges:true
@@ -704,6 +761,12 @@ services:
     - KILL
     pids_limit: 1024
 networks:
+  ask__audiobookshelf__dashboard.show__homepage:
+    internal: true
+  ask__audiobookshelf__proxy.front__caddy:
+    internal: true
+  ask__bazarr__dashboard.show__homepage:
+    internal: true
   ask__bazarr__library.curate__bindery:
     internal: true
   ask__bazarr__library.curate__lidarr:
@@ -718,9 +781,35 @@ networks:
     internal: true
   ask__bindery__indexer.search__prowlarr:
     internal: true
+  ask__calibre-web-automated__proxy.front__caddy:
+    internal: true
+  ask__decline__identity.source__jellyfin:
+    internal: true
+  ask__door__media.serve__jellyfin:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.96.16/28
+        ip_range: 10.80.96.24/29
+  ask__door__proxy.front__caddy:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.96.0/28
+        ip_range: 10.80.96.8/29
+  ask__gluetun__dashboard.show__homepage:
+    internal: true
+  ask__homepage__proxy.front__caddy:
+    internal: true
+  ask__lidarr__dashboard.show__homepage:
+    internal: true
   ask__lidarr__download.torrent__gluetun:
     internal: true
   ask__lidarr__download.usenet__sabnzbd:
+    internal: true
+  ask__navidrome__dashboard.show__homepage:
+    internal: true
+  ask__prowlarr__dashboard.show__homepage:
     internal: true
   ask__prowlarr__indexer.proxy__flaresolverr:
     internal: true
@@ -732,9 +821,33 @@ networks:
     internal: true
   ask__prowlarr__library.curate__sonarr:
     internal: true
+  ask__radarr__dashboard.show__homepage:
+    internal: true
   ask__radarr__download.torrent__gluetun:
     internal: true
   ask__radarr__download.usenet__sabnzbd:
+    internal: true
+  ask__recyclarr__library.curate__bindery:
+    internal: true
+  ask__recyclarr__library.curate__lidarr:
+    internal: true
+  ask__recyclarr__library.curate__radarr:
+    internal: true
+  ask__recyclarr__library.curate__sonarr:
+    internal: true
+  ask__request-gate__identity.source__jellyfin:
+    internal: true
+  ask__request-gate__library.curate__bindery:
+    internal: true
+  ask__request-gate__library.curate__lidarr:
+    internal: true
+  ask__request-gate__library.curate__radarr:
+    internal: true
+  ask__request-gate__library.curate__sonarr:
+    internal: true
+  ask__sabnzbd__dashboard.show__homepage:
+    internal: true
+  ask__seerr__dashboard.show__homepage:
     internal: true
   ask__seerr__identity.source__jellyfin:
     internal: true
@@ -745,6 +858,12 @@ networks:
   ask__seerr__library.curate__radarr:
     internal: true
   ask__seerr__library.curate__sonarr:
+    internal: true
+  ask__seerr__proxy.front__caddy:
+    internal: true
+  ask__seerr__request.gate__request-gate:
+    internal: true
+  ask__sonarr__dashboard.show__homepage:
     internal: true
   ask__sonarr__download.torrent__gluetun:
     internal: true
@@ -757,8 +876,6 @@ networks:
   ask__unpackerr__library.curate__sonarr:
     internal: true
   link__decline__jellyfin:
-    internal: true
-  link__door__jellyfin:
     internal: true
   link__recyclarr__radarr:
     internal: true
