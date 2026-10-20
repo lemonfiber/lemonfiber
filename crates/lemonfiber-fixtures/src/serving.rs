@@ -10,7 +10,7 @@ use lemonfiber_ports::serving::{Serve, Served, Serving, Standing};
 /// Serves every service the same way, and keeps what it was asked.
 pub struct Serves {
     answer: Result<Served, Unran>,
-    standing: Standing,
+    standing: Result<Standing, Unran>,
     log: String,
     writes: Vec<(String, String)>,
     asked: Mutex<Vec<Serve>>,
@@ -23,7 +23,7 @@ impl Serves {
     pub fn up(served: Served) -> Self {
         Self {
             answer: Ok(served),
-            standing: Standing::Running,
+            standing: Ok(Standing::Running),
             log: String::new(),
             writes: Vec::new(),
             asked: Mutex::new(Vec::new()),
@@ -56,7 +56,19 @@ impl Serves {
     /// Every container stands as `standing`.
     #[must_use]
     pub fn standing(self, standing: Standing) -> Self {
-        Self { standing, ..self }
+        Self {
+            standing: Ok(standing),
+            ..self
+        }
+    }
+
+    /// The engine will not say how any container stands, for `unran`.
+    #[must_use]
+    pub fn unstanding(self, unran: Unran) -> Self {
+        Self {
+            standing: Err(unran),
+            ..self
+        }
     }
 
     /// Every container's log reads `log`.
@@ -136,7 +148,7 @@ impl Serving for Serves {
     }
 
     async fn standing(&self, _served: &Served) -> Result<Standing, Unran> {
-        Ok(self.standing)
+        self.standing.clone()
     }
 
     async fn log(&self, _served: &Served, _lines: usize) -> String {

@@ -54,13 +54,22 @@ async fn first_run(
     serving: &Serves,
     http: Arc<Fake>,
 ) -> Result<Option<Held>, String> {
+    first_run_on(placed, copy, serving, http, &served()).await
+}
+
+async fn first_run_on(
+    placed: &Placed,
+    copy: &Throwaway,
+    serving: &Serves,
+    http: Arc<Fake>,
+    served: &Served,
+) -> Result<Option<Held>, String> {
     let random = FixedRandom(Some(vec![7; 32]));
     let settled = before(placed, &random)?;
-    let served = served();
     performed(&Reaching {
         placed,
         copy,
-        served: &served,
+        served,
         serving,
         keyed: http as Arc<dyn Http>,
         random: &random,
@@ -527,5 +536,39 @@ async fn a_listening_server_that_will_not_make_the_account_or_hand_back_a_token_
     assert!(
         said.as_ref().is_err_and(|why| why.contains("no token")),
         "{said:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_service_publishing_no_port_cannot_be_first_run() {
+    let Some((_source, copy)) = copy("first-portless") else {
+        return;
+    };
+    let Some(placed) = placed(SERVARR) else {
+        return;
+    };
+    let portless = Served {
+        port: None,
+        ..served()
+    };
+    assert_eq!(
+        first_run_on(&placed, &copy, &Serves::on(1), Fake::silent(), &portless).await,
+        Err("it publishes no port, so its first run cannot reach it".to_owned())
+    );
+}
+
+#[tokio::test]
+async fn a_key_its_adapter_names_no_file_for_cannot_be_read() {
+    let Some((_source, copy)) = copy("first-pathless") else {
+        return;
+    };
+    let Some(placed) =
+        placed("api         = { kind = \"servarr\", key_source = \"config-xml\", version = 3 }")
+    else {
+        return;
+    };
+    assert_eq!(
+        first_run(&placed, &copy, &Serves::on(1), Fake::silent()).await,
+        Err("its adapter names no file its key is written to".to_owned())
     );
 }

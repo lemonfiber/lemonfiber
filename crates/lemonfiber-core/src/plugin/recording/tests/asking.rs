@@ -406,6 +406,29 @@ async fn a_service_whose_health_never_passes_fails_at_its_own_limit() {
 }
 
 #[tokio::test]
+async fn a_service_the_engine_will_not_say_the_standing_of_fails_at_its_health() {
+    let at = source("asking-unstanding", SERVED);
+    let serving = sonarr().unstanding(Unran::Unreachable {
+        reason: "the engine went away".to_owned(),
+    });
+    let read = recorded(&at, &serving, &answering("{}")).await;
+    assert!(read.is_some_and(|read| matches!(read.failed.first(),
+        Some(Failed { step, why, .. }) if step == "health" && why.contains("the engine went away"))));
+    assert_eq!(serving.removed().len(), 1);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_request_the_service_never_answers_fails_at_it() {
+    let at = source("asking-unanswered", SERVED);
+    let http = Fake::by_path(vec![("/ping", Answer::reply(200, "pong"))]);
+    let read = recorded(&at, &sonarr(), &http).await;
+    assert!(read.is_some_and(|read| matches!(read.failed.first(),
+        Some(Failed { step, why, .. }) if step == "asking claim library.curate probe guarded"
+            && why.starts_with("it did not answer within 30 seconds"))));
+    assert!(!at.join(GUARDED).exists());
+}
+
+#[tokio::test]
 async fn a_service_the_engine_cannot_serve_fails_at_its_container_and_asks_nothing() {
     let at = source("asking-unserved", SERVED);
     let serving = Serves::refusing(Unran::NoImage {

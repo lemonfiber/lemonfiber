@@ -5,7 +5,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
-use lemonfiber_manifest::{ApiKind, KeySource};
+use lemonfiber_manifest::{Api, ApiKind, KeySource};
 use tokio::time::Instant;
 
 use super::served::POLL;
@@ -54,7 +54,7 @@ pub(super) struct Before {
     /// What is added to the container's environment, as `NAME=value`.
     pub(super) env: Vec<String>,
     /// The key handed over there.
-    key: Option<String>,
+    pub(super) key: Option<String>,
 }
 
 /// What a first run reaches the served service through.
@@ -117,20 +117,10 @@ pub(super) async fn performed(reaching: &Reaching<'_>) -> Result<Option<Held>, S
         .port
         .map(|port| format!("http://{LOOPBACK}:{port}"))
         .ok_or_else(|| "it publishes no port, so its first run cannot reach it".to_owned())?;
+    if let Some(reader) = crate::app::credentials::reader(api.kind) {
+        return read(reaching, api, reader).await.map(Some);
+    }
     match api.kind {
-        ApiKind::Servarr | ApiKind::Seerr => read(reaching, |key| {
-            Presented::Header(crate::endpoint::API_KEY_HEADER, key)
-        })
-        .await
-        .map(Some),
-        ApiKind::Bazarr => read(reaching, |key| Presented::Header(crate::bazarr::KEY, key))
-            .await
-            .map(Some),
-        ApiKind::Sabnzbd => read(reaching, |key| {
-            Presented::Query(crate::sabnzbd::KEY_FIELD, key)
-        })
-        .await
-        .map(Some),
         ApiKind::Bindery => Ok(reaching.before.key.clone().map(|key| Held {
             presented: Presented::Header(crate::endpoint::API_KEY_HEADER, key.clone()),
             made: vec![key],
@@ -138,25 +128,29 @@ pub(super) async fn performed(reaching: &Reaching<'_>) -> Result<Option<Held>, S
         ApiKind::Qbittorrent => torrenting(reaching, &base).await.map(Some),
         ApiKind::Audiobookshelf => listening(reaching, &base).await.map(Some),
         ApiKind::Nzbhydra2 => aggregating(reaching, &base).await.map(Some),
-        ApiKind::Jellyfin => Err(
+        _ => Err(
             "a media server's first run is its adapter's, and no adapter fronts it here".to_owned(),
         ),
     }
 }
 
-/// The key the service wrote to the file its `api` names, read from the copy once it is
-/// there, and presented as `presented` makes it.
+/// How a key the service wrote for itself is presented by a service of `kind`.
+fn presenting(kind: ApiKind, key: String) -> Presented {
+    match kind {
+        ApiKind::Bazarr => Presented::Header(crate::bazarr::KEY, key),
+        ApiKind::Sabnzbd => Presented::Query(crate::sabnzbd::KEY_FIELD, key),
+        _ => Presented::Header(crate::endpoint::API_KEY_HEADER, key),
+    }
+}
+
+/// The key the service wrote to the file `api` names, read with `reader` from the copy
+/// once it is there, and presented as a service of its kind presents it.
 async fn read(
     reaching: &Reaching<'_>,
-    presented: impl Fn(String) -> Presented,
+    api: &Api,
+    reader: fn(&str) -> Option<String>,
 ) -> Result<Held, String> {
     let placed = reaching.placed;
-    let api = placed
-        .api
-        .as_ref()
-        .ok_or_else(|| "it names no adapter".to_owned())?;
-    let reader = crate::app::credentials::reader(api.kind)
-        .ok_or_else(|| format!("lemonfiber reads no key a {:?} service writes", api.kind))?;
     let path = api
         .path
         .as_deref()
@@ -183,9 +177,14 @@ async fn read(
         )
     })?;
     Ok(Held {
-        presented: presented(key.clone()),
+        presented: presenting(api.kind, key.clone()),
         made: vec![key],
     })
+}
+
+/// What a call the first run made came to, as its failure says it.
+fn said(failure: impl std::fmt::Display) -> String {
+    failure.to_string()
 }
 
 /// qBittorrent's first run: the temporary password it announces, replaced by one
@@ -209,7 +208,7 @@ async fn torrenting(reaching: &Reaching<'_>, base: &str) -> Result<Held, String>
     crate::qbittorrent::Qbittorrent::new(Arc::clone(&reaching.keyed), base)
         .replace_password(&announced, &password)
         .await
-        .map_err(|failure| failure.to_string())?;
+        .map_err(said)?;
     Ok(Held {
         presented: Presented::Session,
         made: vec![announced, password],
@@ -225,21 +224,17 @@ async fn listening(reaching: &Reaching<'_>, base: &str) -> Result<Held, String> 
         &reaching.placed.service,
     );
     let password = minted(reaching.random)?;
-    if client
-        .has_account()
-        .await
-        .map_err(|failure| failure.to_string())?
-    {
+    if client.has_account().await.map_err(said)? {
         return Err("it already holds an account, so it is not a fresh instance".to_owned());
     }
     client
         .create_account(crate::config::LISTENING_SERVER_USER, &password)
         .await
-        .map_err(|failure| failure.to_string())?;
+        .map_err(said)?;
     let tokens = client
         .signed_in(crate::config::LISTENING_SERVER_USER, &password)
         .await
-        .map_err(|failure| failure.to_string())?;
+        .map_err(said)?;
     let bearer = tokens.first().cloned().unwrap_or_default();
     let mut made = vec![password];
     made.extend(tokens);
@@ -255,10 +250,7 @@ async fn aggregating(reaching: &Reaching<'_>, base: &str) -> Result<Held, String
     let client = Nzbhydra2::new(Arc::clone(&reaching.keyed), base, &reaching.placed.service);
     let password = minted(reaching.random)?;
     let admin = Credential::admin(&password);
-    let config = client
-        .config(None)
-        .await
-        .map_err(|failure| failure.to_string())?;
+    let config = client.config(None).await.map_err(said)?;
     let mut made = vec![password.clone()];
     made.extend(
         config
@@ -273,10 +265,7 @@ async fn aggregating(reaching: &Reaching<'_>, base: &str) -> Result<Held, String
             crate::nzbhydra2::Unguarded::Untaken(failure)
             | crate::nzbhydra2::Unguarded::Unknown(failure) => failure.to_string(),
         })?;
-    client
-        .restart()
-        .await
-        .map_err(|failure| failure.to_string())?;
+    client.restart().await.map_err(said)?;
     until_there(|| async { Ok(client.exposed().await.ok().filter(|exposed| !exposed)) })
         .await?
         .ok_or_else(|| {

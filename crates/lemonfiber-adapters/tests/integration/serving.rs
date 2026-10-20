@@ -239,6 +239,104 @@ async fn a_container_that_will_not_start_is_refused_and_removed_with_its_network
 }
 
 #[cfg(unix)]
+fn info() -> (&'static str, fake::Reply) {
+    (
+        "/info",
+        fake::Reply::Body(
+            200,
+            r#"{"Name":"recording-host","KernelVersion":"7.0.14","OperatingSystem":"OrbStack"}"#
+                .to_owned(),
+        ),
+    )
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn a_network_the_engine_will_not_make_serves_nothing() {
+    let mut engine = fake::engine(
+        "serving-no-network",
+        vec![
+            ("/containers/json", fake::Reply::Body(200, "[]".to_owned())),
+            info(),
+            ("/networks?", fake::Reply::Body(200, "[]".to_owned())),
+            (
+                "/networks/create",
+                fake::Reply::Body(500, r#"{"message":"address pools exhausted"}"#.to_owned()),
+            ),
+        ],
+    );
+
+    let served = Daemon::at(&engine.socket).serve(&serve()).await;
+
+    assert!(
+        matches!(&served, Err(Unran::Refused { reason }) if reason.contains("address pools exhausted")),
+        "{served:?}"
+    );
+    assert!(!engine
+        .asked_for()
+        .iter()
+        .any(|path| path.contains("/containers/create")));
+    engine.stop().await;
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn a_started_container_the_engine_will_not_describe_is_refused_and_removed() {
+    let mut engine = fake::engine(
+        "serving-undescribed",
+        vec![
+            ("/containers/json", fake::Reply::Body(200, "[]".to_owned())),
+            info(),
+            (
+                "/networks/create",
+                fake::Reply::Body(201, r#"{"Id":"n1","Warning":""}"#.to_owned()),
+            ),
+            ("/networks?", fake::Reply::Body(200, "[]".to_owned())),
+            ("/networks/", fake::Reply::Body(204, String::new())),
+            (
+                "/containers/create",
+                fake::Reply::Body(201, r#"{"Id":"s1","Warnings":[]}"#.to_owned()),
+            ),
+            (
+                "/containers/s1/start",
+                fake::Reply::Body(204, String::new()),
+            ),
+            (
+                "/containers/s1/json",
+                fake::Reply::Body(500, r#"{"message":"no such container"}"#.to_owned()),
+            ),
+            ("/containers/s1?", fake::Reply::Body(204, String::new())),
+        ],
+    );
+    let daemon = Daemon::at(&engine.socket);
+
+    let served = daemon.serve(&serve()).await;
+
+    assert!(
+        matches!(&served, Err(Unran::Refused { reason }) if reason.contains("no such container")),
+        "{served:?}"
+    );
+    let somebody = lemonfiber_ports::serving::Served {
+        container: "s1".to_owned(),
+        network: "n".to_owned(),
+        hostname: "h".to_owned(),
+        addresses: Vec::new(),
+        machine: Vec::new(),
+        port: None,
+    };
+    assert!(matches!(
+        daemon.standing(&somebody).await,
+        Err(Unran::Refused { reason }) if reason.contains("no such container")
+    ));
+    let asked = engine.asked_for();
+    assert!(asked.iter().any(|path| path.starts_with("/containers/s1?")));
+    assert!(asked
+        .iter()
+        .any(|path| path.starts_with("/networks/lemonfiber-record-")));
+    engine.stop().await;
+}
+
+#[cfg(unix)]
 #[tokio::test]
 async fn an_engine_that_will_not_say_what_machine_it_runs_on_serves_nothing() {
     let mut engine = fake::engine(

@@ -43,30 +43,32 @@ pub(super) async fn answers(
     health: Option<&Health>,
     items: &[&Item<'_>],
 ) -> Result<Vec<Answer>, Failed> {
-    let failing = |step: &str, why: String| Failed {
-        service: placed.service.clone(),
-        step: step.to_owned(),
-        why: crate::text::plain(&why),
-        log: Vec::new(),
+    let failing = |step: &'static str| {
+        move |why: String| Failed {
+            service: placed.service.clone(),
+            step: step.to_owned(),
+            why: crate::text::plain(&why),
+            log: Vec::new(),
+        }
     };
     let copy = Throwaway::of(Some(Starting {
         root,
         service: &placed.service,
     }))
-    .map_err(|why| failing("starting files", why))?;
+    .map_err(failing("starting files"))?;
     let data = if placed.takes_data {
-        Some(copy.emptied("data").map_err(|why| failing("data", why))?)
+        Some(copy.emptied("data").map_err(failing("data"))?)
     } else {
         None
     };
-    let before = first::before(placed, recorder.random).map_err(|why| failing("first run", why))?;
+    let before = first::before(placed, recorder.random).map_err(failing("first run"))?;
     let mut serve = settled(placed, &copy, data.as_deref());
     serve.env.extend(before.env.iter().cloned());
     let served = recorder
         .serving
         .serve(&serve)
         .await
-        .map_err(|unran| failing("container", unran.to_string()))?;
+        .map_err(|unran| failing("container")(unran.to_string()))?;
     let mut scrub = Scrub::of(&[], Some(&served));
     let reaching = Reaching {
         placed,
@@ -170,14 +172,7 @@ async fn asked(
         ));
     }
     let mut made: Vec<String> = held.iter().flat_map(|held| held.made.clone()).collect();
-    made.extend(
-        reaching
-            .before
-            .env
-            .iter()
-            .filter_map(|pair| pair.split_once('='))
-            .map(|(_, value)| value.to_owned()),
-    );
+    made.extend(reaching.before.key.iter().cloned());
     *scrub = Scrub::of(&made, Some(served));
     let port = served.port;
     let mut answers = Vec::new();
