@@ -1,6 +1,4 @@
-use std::cell::Cell;
-
-use super::{acts, passed, Asking, CameTo, Client, Last, Pass};
+use super::{acts, came_to, unheld, Asking, CameTo, Client, Last, Pass};
 use crate::journal::{Action, Kind};
 
 const LAST: Last = Last { port: Some(51413) };
@@ -31,49 +29,34 @@ fn forwarding_that_ended_is_acted_on_and_none_ever_forwarded_is_not() {
     assert!(!acts(Asking::Afresh, None, Last::default()));
 }
 
-#[tokio::test]
-async fn a_client_already_on_the_answer_is_not_written() {
-    let wrote = Cell::new(false);
-    let came_to = passed(Some(51413), Ok(Some(51413)), |_| {
-        wrote.set(true);
-        async { Ok(()) }
-    })
-    .await;
-    assert_eq!(came_to, CameTo::Held);
-    assert!(!wrote.get());
+#[test]
+fn a_client_already_on_the_answer_is_not_written() {
+    assert!(!unheld(Some(51413), &Ok(Some(51413))));
+    assert!(!unheld(None, &Ok(None)));
 }
 
-#[tokio::test]
-async fn a_client_on_another_port_or_unread_is_set_to_the_answer() {
-    let asked = Cell::new(None);
-    let came_to = passed(Some(51999), Ok(Some(51413)), |port| {
-        asked.set(Some(port));
-        async { Ok(()) }
-    })
-    .await;
+#[test]
+fn a_client_on_another_port_or_unread_is_set_to_the_answer() {
+    assert!(unheld(Some(51999), &Ok(Some(51413))));
+    assert!(unheld(Some(51999), &Err("silent".to_owned())));
     assert_eq!(
-        came_to,
+        came_to(Ok(Some(51413)), Ok(())),
         CameTo::Moved {
             from: Some(Some(51413))
         }
     );
-    assert_eq!(asked.get(), Some(Some(51999)));
-    let unread = passed(Some(51999), Err("silent".to_owned()), |_| async { Ok(()) }).await;
-    assert_eq!(unread, CameTo::Moved { from: None });
+    assert_eq!(
+        came_to(Err("silent".to_owned()), Ok(())),
+        CameTo::Moved { from: None }
+    );
 }
 
-#[tokio::test]
-async fn forwarding_that_ended_sets_the_client_to_none() {
-    let asked = Cell::new(Some(Some(1)));
-    let came_to = passed(None, Ok(Some(51413)), |port| {
-        asked.set(Some(port));
-        async { Ok(()) }
-    })
-    .await;
-    assert_eq!(asked.get(), Some(None));
+#[test]
+fn forwarding_that_ended_sets_the_client_to_none() {
+    assert!(unheld(None, &Ok(Some(51413))));
     let pass = Pass {
         answer: None,
-        clients: vec![client("qbittorrent", came_to)],
+        clients: vec![client("qbittorrent", came_to(Ok(Some(51413)), Ok(())))],
         unrecorded: None,
     };
     assert_eq!(
@@ -82,15 +65,15 @@ async fn forwarding_that_ended_sets_the_client_to_none() {
     );
 }
 
-#[tokio::test]
-async fn a_set_refused_is_said_in_the_refusers_words_and_raised() {
-    let came_to = passed(Some(51999), Ok(Some(51413)), |_| async {
-        Err("qBittorrent answered unexpectedly".to_owned())
-    })
-    .await;
+#[test]
+fn a_set_refused_is_said_in_the_refusers_words_and_raised() {
+    let refused = came_to(
+        Ok(Some(51413)),
+        Err("qBittorrent answered unexpectedly".to_owned()),
+    );
     let pass = Pass {
         answer: Some(51999),
-        clients: vec![client("qbittorrent", came_to)],
+        clients: vec![client("qbittorrent", refused)],
         unrecorded: None,
     };
     assert!(!pass.passed());
@@ -103,8 +86,7 @@ async fn a_set_refused_is_said_in_the_refusers_words_and_raised() {
                 .to_owned()
         ]
     );
-    let fault = pass.fault();
-    assert!(fault.as_ref().is_some_and(
+    assert!(pass.fault().is_some_and(
         |fault| fault.summary.contains("51999") && fault.summary.contains("qbittorrent")
     ));
 }

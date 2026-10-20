@@ -1,7 +1,5 @@
 //! Whether a forwarded port is passed on, and what passing it came to.
 
-use std::future::Future;
-
 use serde::{Deserialize, Serialize};
 
 use crate::condition::Fault;
@@ -56,16 +54,16 @@ pub enum CameTo {
     },
 }
 
-/// Pass `answer` to a client holding `holds`, through `set`.
-pub async fn passed<F, E>(answer: Option<u16>, holds: Result<Option<u16>, String>, set: F) -> CameTo
-where
-    F: FnOnce(Option<u16>) -> E,
-    E: Future<Output = Result<(), String>>,
-{
-    if holds.as_ref().is_ok_and(|held| *held == answer) {
-        return CameTo::Held;
-    }
-    match set(answer).await {
+/// Whether a client holding `holds` is set to `answer`: wherever it is not known to hold it.
+#[must_use]
+pub fn unheld(answer: Option<u16>, holds: &Result<Option<u16>, String>) -> bool {
+    holds.as_ref().map_or(true, |held| *held != answer)
+}
+
+/// What setting a client that held `holds` came to, as `set` answered.
+#[must_use]
+pub fn came_to(holds: Result<Option<u16>, String>, set: Result<(), String>) -> CameTo {
+    match set {
         Ok(()) => CameTo::Moved { from: holds.ok() },
         Err(reason) => CameTo::Refused { reason },
     }

@@ -21,7 +21,7 @@ use crate::error::Diagnose as _;
 use super::targets::{host_fillers, project_directory};
 use super::Ctx;
 
-pub use deciding::{acts, passed, Asking, CameTo, Client, Last, Pass};
+pub use deciding::{acts, came_to, unheld, Asking, CameTo, Client, Last, Pass};
 
 /// How often the guard is asked while the stack runs.
 pub const EVERY: Duration = Duration::from_secs(60);
@@ -109,17 +109,22 @@ async fn to_client(answer: Option<u16>, client: Option<&dyn torrent::Fills>) -> 
             reason: "it could not be reached".to_owned(),
         };
     };
-    let holds = client
-        .peer_port()
-        .await
-        .map_err(|failure| failure.problem().summary);
-    passed(answer, holds, |port| async move {
+    let holds = client.peer_port().await.map_err(|failure| said(&failure));
+    if !unheld(answer, &holds) {
+        return CameTo::Held;
+    }
+    came_to(
+        holds,
         client
-            .set_peer_port(port)
+            .set_peer_port(answer)
             .await
-            .map_err(|failure| failure.problem().summary)
-    })
-    .await
+            .map_err(|failure| said(&failure)),
+    )
+}
+
+/// A service's failure, in the words it is said in.
+fn said(failure: &crate::ports::service::Failure) -> String {
+    failure.problem().summary
 }
 
 /// Journal `change` where there is one, answering why it could not be where it could not.
