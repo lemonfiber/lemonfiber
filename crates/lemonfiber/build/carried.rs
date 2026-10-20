@@ -26,7 +26,10 @@ use std::path::{Component, Path, PathBuf};
 use lemonfiber_bundled::{Stage, PINNED, STACK};
 
 /// The media stack's files carried whole, relative to its root.
-const WHOLE_FILES: [&str; 3] = ["compose.yml", ".env.example", "LICENSE"];
+const WHOLE_FILES: [&str; 3] = [COMPOSE, ".env.example", "LICENSE"];
+
+/// The media stack's compose file, relative to its root.
+pub const COMPOSE: &str = "compose.yml";
 
 /// The media stack's directories carried whole, relative to its root.
 const WHOLE_DIRECTORIES: [&str; 2] = ["compose", "stacks"];
