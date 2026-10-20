@@ -94,16 +94,19 @@ fn runtime(media: &Path, copies: &Path) -> BTreeMap<PathBuf, Carried> {
         }
     }
     let composed: Vec<PathBuf> = carried
-        .keys()
-        .filter(|relative| {
+        .iter()
+        .filter(|(relative, _)| {
             relative
                 .extension()
                 .is_some_and(|extension| COMPOSED.iter().any(|composed| extension == *composed))
         })
-        .cloned()
+        .filter_map(|(_, from)| match from {
+            Carried::File(path) => Some(path.clone()),
+            Carried::Text(_) => None,
+        })
         .collect();
     for file in composed {
-        let text = std::fs::read_to_string(media.join(&file)).unwrap_or_default();
+        let text = std::fs::read_to_string(file).unwrap_or_default();
         let named = serde_norway::from_str::<serde_norway::Value>(&text)
             .map(|document| mounted(&document))
             .unwrap_or_default();

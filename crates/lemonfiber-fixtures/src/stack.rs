@@ -2,8 +2,8 @@
 //!
 //! Its manifest is the stack the bundle declares, written apart as a root and a file
 //! per service as a stack directory holds it. A test that wants its own copy writes
-//! the files, and one that wants a service gone removes that service's file, its
-//! `include` entry and every link that named it — a stack that drops a service drops
+//! the files, and one that wants a service gone writes the stack without that service
+//! and without every link that named it — a stack that drops a service drops
 //! what reached it, and one that kept those links would be refused for naming a
 //! service it no longer declares.
 
@@ -26,36 +26,40 @@ pub fn pinned(id: &str) -> Option<lemonfiber_manifest::Service> {
 /// The carried stack's manifest files written into `into`, which is made if it is not
 /// there.
 pub fn manifest_into(into: &Path) {
-    let Ok((root, services)) = split(lemonfiber_bundled::STACK) else {
-        return;
-    };
+    written_apart(into, lemonfiber_bundled::STACK);
+}
+
+/// The carried stack's manifest written into `into` without `service`.
+pub fn manifest_without(into: &Path, service: &str) {
+    let mut stack: Table = toml::from_str(lemonfiber_bundled::STACK).unwrap_or_default();
+    let named = Value::String(service.to_owned());
+    dropped(&mut stack, "service", |row| row.get("id") == Some(&named));
+    dropped(&mut stack, "wiring", |row| {
+        row.as_table()
+            .is_some_and(|row| row.values().any(|value| *value == named))
+    });
+    written_apart(into, &toml::to_string(&stack).unwrap_or_default());
+}
+
+/// `stack` without each row of its list `list` that is `gone`.
+fn dropped(stack: &mut Table, list: &str, gone: impl Fn(&Value) -> bool) {
+    stack
+        .get_mut(list)
+        .and_then(Value::as_array_mut)
+        .into_iter()
+        .for_each(|rows| rows.retain(|row| !gone(row)));
+}
+
+/// The manifest `text` written into `into` as a root and a file per service, with no
+/// service file beside them that it does not include.
+fn written_apart(into: &Path, text: &str) {
+    let (root, services) = split(text).unwrap_or_default();
+    let _ = std::fs::remove_dir_all(into.join(SERVICES));
     let _ = std::fs::create_dir_all(into.join(SERVICES));
     let _ = std::fs::write(into.join(ROOT), root);
     for (file, text) in services {
         let _ = std::fs::write(into.join(SERVICES).join(file), text);
     }
-}
-
-/// The carried stack's manifest written into `into` without `service`.
-pub fn manifest_without(into: &Path, service: &str) {
-    manifest_into(into);
-    let _ = std::fs::remove_file(into.join(SERVICES).join(format!("{service}.toml")));
-    let mut root: Table = std::fs::read_to_string(into.join(ROOT))
-        .ok()
-        .and_then(|text| toml::from_str(&text).ok())
-        .unwrap_or_default();
-    let entry = Value::String(format!("{SERVICES}/{service}.toml"));
-    if let Some(Value::Array(include)) = root.get_mut("include") {
-        include.retain(|listed| *listed != entry);
-    }
-    let named = Value::String(service.to_owned());
-    if let Some(Value::Array(wiring)) = root.get_mut("wiring") {
-        wiring.retain(|row| {
-            row.as_table()
-                .is_none_or(|row| !row.values().any(|value| *value == named))
-        });
-    }
-    let _ = std::fs::write(into.join(ROOT), toml::to_string(&root).unwrap_or_default());
 }
 
 /// A manifest written as one text, laid out the way a stack is written: each

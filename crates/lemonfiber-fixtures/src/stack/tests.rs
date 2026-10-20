@@ -20,7 +20,9 @@ fn a_copy_reads_back_as_the_carried_stack() {
 #[test]
 fn a_service_taken_out_takes_its_file_its_entry_and_its_links() {
     let into = Scratch::named("fixtures-stack-without").kept();
+    manifest_into(&into);
     manifest_without(&into, "decline");
+    assert!(!into.join("services/decline.toml").exists());
     let text = lemonfiber_manifest::read(&into).unwrap_or_default();
     let manifest = lemonfiber_manifest::Manifest::from_toml(&text).ok();
     assert!(manifest

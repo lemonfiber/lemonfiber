@@ -186,7 +186,8 @@ fn carried_under(under: &str) -> std::collections::BTreeSet<String> {
 #[test]
 fn an_assembled_part_s_starting_configuration_is_its_copy_s_and_nothing_else() {
     let copies = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../assets/plugins/bundle/plugins");
+        .join("../../assets/plugins")
+        .join(lemonfiber_bundle::COPIES);
     for pinned in lemonfiber_bundled::PINNED
         .iter()
         .filter(|pinned| pinned.stage == Some(lemonfiber_bundled::Stage::Assembled))

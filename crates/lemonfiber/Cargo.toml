@@ -69,11 +69,12 @@ lemonfiber-error = { workspace = true, features = ["testing"] }
 # rather than written again here.
 lemonfiber-fixtures = { workspace = true }
 lemonfiber-testing = { workspace = true }
+# The stack the bundle declares, the parts it pins and where their copies are, which
+# the carried tree is held to.
+lemonfiber-bundle = { workspace = true }
+lemonfiber-bundled = { workspace = true }
 # Reading the embedded stack's own declaration of itself. Already a build
 # dependency, and a build dependency is not on a test target's path.
-# The stack the bundle declares and the parts it pins, which the carried tree is
-# held to.
-lemonfiber-bundled = { workspace = true }
 lemonfiber-manifest = { workspace = true }
 # Moving the clock a serving surface looks at the policy on, so a test proves the
 # looking rather than waiting for it. The feature is a test one and is declared here

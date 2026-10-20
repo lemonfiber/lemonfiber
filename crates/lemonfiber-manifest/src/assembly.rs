@@ -19,9 +19,9 @@ use serde::Deserialize;
 use toml::{Table, Value};
 
 use crate::recognising::unrecognised;
+use crate::{Failure, Manifest, Service, Violation};
 
 mod split;
-use crate::{Failure, Manifest, Service, Violation};
 pub use split::{split, Unsplit};
 
 /// The root manifest's file name, at the top of a stack directory.
