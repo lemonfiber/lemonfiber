@@ -17,6 +17,10 @@ const FROM_PLUGIN: [(&str, &str); 4] = [
     ("license", "license"),
 ];
 
+/// The tables of a part's manifest its stack service carries as written: its claims, and
+/// the secrets it holds in its own id's namespace.
+const FROM_MANIFEST: [&str; 2] = ["claim", "secret"];
+
 /// The field of a part's service that names the stack id it takes the place of, which a
 /// stack service does not carry.
 const REPLACES: &str = "replaces";
@@ -112,8 +116,10 @@ fn service(one: &Held) -> Result<(Table, Vec<Value>), String> {
             written.insert(to.into(), value.clone());
         }
     }
-    if let Some(claims) = manifest.get("claim") {
-        written.insert("claim".into(), claims.clone());
+    for table in FROM_MANIFEST {
+        if let Some(rows) = manifest.get(table) {
+            written.insert(table.into(), rows.clone());
+        }
     }
     let asks = manifest
         .get("ask")

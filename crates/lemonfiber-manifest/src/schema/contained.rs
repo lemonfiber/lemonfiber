@@ -19,7 +19,7 @@ impl Service {
             mounts: &self.mount,
             tmpfs: &self.tmpfs,
             env: &self.env,
-            secrets: &[],
+            secrets: &self.secret,
             user_mode: self.user_mode,
             posture: self.posture,
             mem_limit_mib: self.mem_limit_mib,

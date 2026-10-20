@@ -36,6 +36,9 @@ const INCLUDE: &str = "include";
 /// The one key a service file holds.
 const SERVICE: &str = "service";
 
+/// A service's table of the secrets it holds.
+const SECRET: &str = "secret";
+
 /// One service's file, `services/<id>.toml`: exactly one `[[service]]`, whose `id` is
 /// the name the file is filed under, and nothing else.
 #[derive(Deserialize, schemars::JsonSchema)]
@@ -124,12 +127,41 @@ pub fn assemble(root: &str, services: &BTreeMap<String, String>) -> Result<Strin
 ///
 /// # Errors
 ///
-/// [`Failure::Unreadable`] where the root or the directory cannot be read, and
-/// whatever [`assemble`] refuses.
+/// [`Failure::Unreadable`] where the root or the directory cannot be read,
+/// [`Failure::Assembly`] naming each service file that declares a secret, and whatever
+/// [`assemble`] refuses.
 pub fn read(stack: &Path) -> Result<String, Failure> {
     let at = stack.join(ROOT);
     let root = std::fs::read_to_string(&at).map_err(|why| Failure::unreadable(&at, &why))?;
-    assemble(&root, &service_files(&stack.join(SERVICES))?)
+    let files = service_files(&stack.join(SERVICES))?;
+    let secrets = declaring_secrets(&files);
+    if !secrets.is_empty() {
+        return Err(Failure::Assembly(secrets));
+    }
+    assemble(&root, &files)
+}
+
+/// Each service file in `files` that declares a secret, which a service in a stack
+/// directory holds none of.
+fn declaring_secrets(files: &BTreeMap<String, String>) -> Vec<Violation> {
+    files
+        .iter()
+        .filter(|(_, text)| {
+            toml::from_str::<Table>(text).is_ok_and(|table| {
+                table
+                    .get(SERVICE)
+                    .and_then(Value::as_array)
+                    .is_some_and(|services| services.iter().any(|one| one.get(SECRET).is_some()))
+            })
+        })
+        .map(|(file, _)| {
+            fault(
+                &file_at(file),
+                "declares a secret, and a stack directory's service holds none: a plugin declares \
+                 the secrets its service holds",
+            )
+        })
+        .collect()
 }
 
 /// Every `.toml` file in `directory`, by name, with its text. Nothing else there is

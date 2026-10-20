@@ -178,6 +178,18 @@ pub struct UrlOf {
     pub native: Option<String>,
 }
 
+/// A value a service holds, declared before anything captures or enters it.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Secret {
+    /// What the value is, within its namespace.
+    pub id: String,
+    /// Whose credential it is.
+    pub of: String,
+    /// What holding it is for.
+    pub why: String,
+}
+
 /// A secret the manifest declares.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -285,7 +297,7 @@ pub struct Container<'a> {
     /// Its environment.
     pub env: &'a BTreeMap<String, Value>,
     /// The secrets its manifest declares.
-    pub secrets: &'a [&'a str],
+    pub secrets: &'a [Secret],
     /// Who it runs as, where declared.
     pub user_mode: Option<UserMode>,
     /// How tightly it is held.
@@ -429,7 +441,7 @@ impl Container<'_> {
             Value::Url(url) => (None, narrowed(url)),
             Value::Secret(secret) => (
                 None,
-                (!self.secrets.contains(&secret.secret.as_str())).then(|| {
+                (!self.declares(&secret.secret)).then(|| {
                     format!(
                         "names secret {}, which the manifest does not declare",
                         secret.secret
@@ -450,8 +462,12 @@ impl Container<'_> {
         }
         setting
             .split_once(NAMESPACED)
-            .filter(|(_, name)| self.secrets.contains(name))
+            .filter(|(_, name)| self.declares(name))
             .map(|_| format!("names setting {setting}, which a secret it declares is also named"))
+    }
+
+    fn declares(&self, secret: &str) -> bool {
+        self.secrets.iter().any(|declared| declared.id == secret)
     }
 
     fn owns(&self, setting: &str) -> bool {

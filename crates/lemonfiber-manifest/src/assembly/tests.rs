@@ -514,3 +514,61 @@ fn a_fault_the_parser_places_nowhere_is_given_without_a_line() {
         "the claim is not a table"
     );
 }
+
+/// A whole service declaring the one secret it holds.
+fn keyed(id: &str) -> String {
+    format!(
+        "{}\n[[service.secret]]\nid = \"api-key\"\nof = \"{id}\"\nwhy = \"Dial the tunnel\"\n",
+        service(id)
+    )
+}
+
+#[test]
+fn a_stack_directory_s_service_declaring_a_secret_is_refused_by_its_file() {
+    let keyed = keyed("gluetun");
+    let qbittorrent = service("qbittorrent");
+    let dir = stack_dir(
+        "secret",
+        &[
+            ("stack.toml", ROOT.as_bytes()),
+            ("services/qbittorrent.toml", qbittorrent.as_bytes()),
+            ("services/gluetun.toml", keyed.as_bytes()),
+        ],
+    );
+    assert_eq!(
+        said(&match read(&dir) {
+            Err(Failure::Assembly(found)) => found,
+            _ => Vec::new(),
+        }),
+        [
+            "services/gluetun.toml: declares a secret, and a stack directory's service holds \
+          none: a plugin declares the secrets its service holds"
+        ]
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn an_assembled_text_s_service_may_declare_the_secrets_it_holds() {
+    let keyed = keyed("gluetun");
+    let joined = assemble(
+        ROOT,
+        &files(&[
+            ("qbittorrent.toml", &service("qbittorrent")),
+            ("gluetun.toml", &keyed),
+        ]),
+    );
+    let held: Vec<String> = joined
+        .ok()
+        .and_then(|text| Manifest::from_toml(&text).ok())
+        .map(|manifest| {
+            manifest
+                .services
+                .iter()
+                .flat_map(|one| &one.secret)
+                .map(|secret| secret.id.clone())
+                .collect()
+        })
+        .unwrap_or_default();
+    assert_eq!(held, ["api-key"]);
+}

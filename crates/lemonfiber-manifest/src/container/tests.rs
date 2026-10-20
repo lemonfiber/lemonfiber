@@ -1,9 +1,19 @@
 use std::collections::BTreeMap;
 
 use super::{is_plain, UrlOf, UserMode, Value};
-use super::{Constant, Container, Mount, Network, Posture, Publish, SecretOf, Setting, Shape};
+use super::{
+    Constant, Container, Mount, Network, Posture, Publish, Secret, SecretOf, Setting, Shape,
+};
 
 const NONE: BTreeMap<String, Value> = BTreeMap::new();
+
+static DECLARED: std::sync::LazyLock<[Secret; 1]> = std::sync::LazyLock::new(|| {
+    [Secret {
+        id: "admin-key".to_owned(),
+        of: "jellyfin".to_owned(),
+        why: "Mint keys for the stack's services".to_owned(),
+    }]
+});
 
 fn plain(env: &BTreeMap<String, Value>) -> Container<'_> {
     Container {
@@ -18,7 +28,7 @@ fn plain(env: &BTreeMap<String, Value>) -> Container<'_> {
         mounts: &[],
         tmpfs: &[],
         env,
-        secrets: &["admin-key"],
+        secrets: &*DECLARED,
         user_mode: None,
         posture: Posture::Standard,
         mem_limit_mib: None,

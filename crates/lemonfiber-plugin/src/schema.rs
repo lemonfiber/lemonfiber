@@ -23,7 +23,7 @@ pub use evidence::{
     Claim, ClaimProbe, Contribution, Declaration, Declared, Expect, Expected, ExpectedKind, Proof,
     Request, Run, LONGEST_ARG, MOST_ARGS, RUN_TIMEOUT,
 };
-pub use lemonfiber_manifest::container::Shape;
+pub use lemonfiber_manifest::container::{Secret, Shape};
 pub use recipe::{
     Capture, Condition, Input, On, Origin, Pair, Recipe, Retry, Step, StepCall, ALL_WAITING,
     CALL_DEADLINE, HEADER, LARGEST_ANSWER, LONGEST_WAIT, MOST_RETRIES, RUN,
@@ -268,7 +268,7 @@ impl Service {
     /// Its container fields, as the one model every service's are, its settings in
     /// `plugin`'s namespace and `secrets` the ones its manifest declares.
     #[must_use]
-    pub fn container<'a>(&'a self, plugin: &'a str, secrets: &'a [&'a str]) -> Container<'a> {
+    pub fn container<'a>(&'a self, plugin: &'a str, secrets: &'a [Secret]) -> Container<'a> {
         Container {
             id: &self.id,
             namespace: plugin,
@@ -396,22 +396,6 @@ impl Manifest {
             Some(named) => self.services.iter().find(|service| service.id == named),
         }
     }
-}
-
-/// A value the plugin will hold.
-///
-/// Declared before anything can capture one, because the rule is that a secret
-/// captured but not declared fails validation — and a rule that cannot be stated for
-/// want of a field is not being enforced.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct Secret {
-    /// What the value is, within the plugin.
-    pub id: String,
-    /// Whose credential it is.
-    pub of: String,
-    /// What holding it is for.
-    pub why: String,
 }
 
 /// A bundled thing the plugin will change.

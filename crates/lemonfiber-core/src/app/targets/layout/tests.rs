@@ -22,6 +22,7 @@ fn a_service(id: &str) -> lemonfiber_manifest::Service {
         media_types: Vec::new(),
         provides: Vec::new(),
         claim: Vec::new(),
+        secret: Vec::new(),
         depends_on: Vec::new(),
         grants: Vec::new(),
         host_managed: false,
