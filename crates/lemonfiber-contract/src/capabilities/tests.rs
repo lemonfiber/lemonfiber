@@ -391,3 +391,26 @@ fn every_operation_has_a_path_of_its_own_and_a_schema_each_way() {
         ]
     );
 }
+
+#[tokio::test]
+async fn every_operation_of_every_capability_refuses_a_body_that_is_not_its_request() {
+    let served = Served::default();
+    for capability in super::all() {
+        for operation in &capability.operations {
+            let request = Request {
+                method: lemonfiber_ports::http::Method::Post,
+                url: format!("http://adapter{}", operation.path()),
+                headers: Vec::new(),
+                body: Some("not a request".to_owned()),
+                pinned: None,
+            };
+            let answered = served.send(&request).await.map(|response| response.status);
+            assert_eq!(
+                answered.ok(),
+                Some(wire::Kind::NotAsked.status()),
+                "{}",
+                operation.path()
+            );
+        }
+    }
+}
