@@ -116,16 +116,18 @@ fn each_proxied_name_is_routed_to_the_service_its_stanza_names() {
 /// A port a shipped service publishes as a further port is held as its first is.
 #[test]
 fn a_further_port_a_shipped_service_publishes_is_held() {
+    let further = 8921;
     let mut shipped = declared(STACK);
-    if let Some(door) = shipped.iter_mut().find(|one| one.id == "jellyfin") {
-        door.publish = vec![lemonfiber_manifest::container::Publish {
-            port: 8920,
+    assert_eq!(publishing_in(&shipped, further), None);
+    if let Some(jellyfin) = shipped.iter_mut().find(|one| one.id == "jellyfin") {
+        jellyfin.publish = vec![lemonfiber_manifest::container::Publish {
+            port: further,
             listens: None,
         }];
     }
     assert_eq!(
-        publishing_in(&shipped, 8920).map(|held| held.id.as_str()),
+        publishing_in(&shipped, further).map(|held| held.id.as_str()),
         Some("jellyfin")
     );
-    assert_eq!(publishing_in(&shipped, 8921), None);
+    assert_eq!(publishing_in(&shipped, further + 1), None);
 }
