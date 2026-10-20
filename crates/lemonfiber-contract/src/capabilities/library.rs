@@ -15,10 +15,8 @@ use lemonfiber_ports::service::{
 };
 use lemonfiber_ports::Client;
 
+use super::{FOLDER, NAMED};
 use crate::conformance::Placeholder;
-
-/// The name the conformance cases give what they register.
-const NAMED: &str = "conformance";
 
 /// The host the conformance cases name a download client on.
 const CLIENT_HOST: &str = "conformance-download";
@@ -28,9 +26,6 @@ const CLIENT_PORT: u16 = 80;
 
 /// The field the conformance cases set on a download client.
 const FIELD: &str = "category";
-
-/// The folder the conformance cases file into.
-const FOLDER: &str = "/data/conformance";
 
 /// The quality profile the conformance cases add under.
 const PROFILE: i64 = 1;

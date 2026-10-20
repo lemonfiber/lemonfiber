@@ -22,7 +22,10 @@ pub const JSON: &str = "application/json";
 pub const PROBLEM: &str = "application/problem+json";
 
 /// The method a request uses.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
 pub enum Method {
     /// Read.
     Get,

@@ -2,11 +2,12 @@
 //! settled between them, every link by name, and the service that guards the household's
 //! streams.
 
+use lemonfiber_contract::capabilities::stream::guard;
 use lemonfiber_manifest::container::{Posture, Value};
 use lemonfiber_manifest::{Manifest, Service};
 
 use crate::plugin::{Installed, Placed};
-use crate::topology::{self, Member, Named, Settled, Topology, STREAM_GUARD};
+use crate::topology::{self, Member, Named, Settled, Topology};
 use crate::wiring::{settle, Chosen, Reaches};
 
 /// One service, as its place on the networks needs it.
@@ -130,7 +131,7 @@ pub(super) fn read(manifest: &Manifest, installed: &[Installed], chosen: &Chosen
         members,
         asks,
         links,
-        guard: fill(STREAM_GUARD),
+        guard: fill(guard::CAPABILITY),
     }
 }
 

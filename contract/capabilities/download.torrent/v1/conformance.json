@@ -128,6 +128,28 @@
       "keyed": true,
       "live": false,
       "operation": "stop_seeding"
+    },
+    {
+      "asked": {},
+      "case": "peer_port-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "peer_port"
+    },
+    {
+      "asked": {
+        "port": 51413
+      },
+      "case": "set_peer_port-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "set_peer_port"
     }
   ],
   "major": 1

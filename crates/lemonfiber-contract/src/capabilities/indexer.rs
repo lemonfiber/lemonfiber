@@ -12,10 +12,8 @@ use lemonfiber_ports::service::{
     KnownAggregator, RegisteredApplication,
 };
 
+use super::NAMED;
 use crate::conformance::Placeholder;
-
-/// The name the conformance cases register an application and an aggregator under.
-const NAMED: &str = "conformance";
 
 /// Where the conformance cases say the indexer is reached from an application.
 const INDEXER_URL: &str = "http://conformance-indexer";

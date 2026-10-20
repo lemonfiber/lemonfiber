@@ -18,6 +18,7 @@ use crate::ports::service::Failure;
 use crate::recyclarr::Kind;
 
 mod cors;
+pub(crate) mod declared;
 mod household;
 mod item;
 mod keys;
@@ -31,7 +32,7 @@ mod setup;
 mod upkeep;
 
 pub use keys::SEERR_APP;
-pub(crate) use screening::pictured_at;
+pub(crate) use screening::{pictured_at, streamed_at};
 pub use sessions::Sessions;
 
 /// The header Jellyfin identifies a client through on the sign-in that mints an access

@@ -2,12 +2,12 @@
 //!
 //! Two contracts rather than one with optional parts, because they are two capabilities
 //! the vocabulary names apart and asks for apart. They share what any download client
-//! answers, and each carries the one thing only its kind has: a Usenet client's provider
-//! accounts, a torrent client's seeding.
+//! answers, and each carries what only its kind has: a Usenet client's provider accounts,
+//! a torrent client's seeding and the port it takes peers on.
 
 use lemonfiber_ports::service::{
-    Download, Fetching, Metering, Moved, Pulling, Rates, Seeded, Seeding, Throttled, Throttling,
-    Transfers, UsenetAccount, UsenetAccounts, Wanted,
+    Download, Fetching, Metering, Moved, Peering, Pulling, Rates, Seeded, Seeding, Throttled,
+    Throttling, Transfers, UsenetAccount, UsenetAccounts, Wanted,
 };
 
 /// The rate, in bytes a second, the conformance cases hold a client to while active.
@@ -15,6 +15,9 @@ const RATE: u64 = 1_048_576;
 
 /// The month the conformance cases ask what moved in.
 const MONTH: &str = "2026-01";
+
+/// The port the conformance cases have a torrent client take peers on.
+const PEER_PORT: u16 = 51_413;
 
 /// A torrent no client holds.
 const TORRENT: &str = "conformance-torrent";
@@ -100,6 +103,12 @@ crate::contract! {
             fn seeding() -> Vec<Seeded> where asks = Asked {};
             /// Let one completed download go, with its files.
             fn stop_seeding(str name: &str) -> () where asks = Asked { name: TORRENT.to_owned() };
+        }
+        impl Peering {
+            /// The port it takes peers on, or none.
+            fn peer_port() -> Option<u16> where asks = Asked {};
+            /// Take peers on a port, or on no forwarded port.
+            fn set_peer_port(value port: Option<u16>) -> () where asks = Asked { port: Some(PEER_PORT) };
         }
     }
 }

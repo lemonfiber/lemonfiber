@@ -61,7 +61,7 @@
       "files": [
         {
           "path": "download.torrent/v1/openapi.json",
-          "sha256": "275ffc940dacb3200b083221fa8c0f0dbf85276f2ed9c6e6f2dc993d70216896"
+          "sha256": "19061add4523083626773c46109f36dcabcadb8858e59e12c38036f02a72f536"
         },
         {
           "path": "download.torrent/v1/operations/transfers.json",
@@ -104,15 +104,50 @@
           "sha256": "5f3d42d8db6a8d0bb50e4e6e0f27d7442515dc7d37e4ab22caafb18502ed2dc7"
         },
         {
+          "path": "download.torrent/v1/operations/peer_port.json",
+          "sha256": "8fa86a894eed03fa15a90dc1b6a4884c68dacd9acde62f39f112e6ad73897d0b"
+        },
+        {
+          "path": "download.torrent/v1/operations/set_peer_port.json",
+          "sha256": "6277646c3c9e40c4127014f00e5ad34c24c05eab488bd7fa8dafde601bdbc87d"
+        },
+        {
           "path": "download.torrent/v1/conformance.json",
-          "sha256": "4df7696158e7b3387b681f2579607e58aaf0c518525f6fc43d5409cca43bd6e5"
+          "sha256": "3e6b19ac75fb8b42104246f671801b8f48b97accd069f85f2166612222bc6230"
         }
       ],
       "majors": [
         1
       ],
       "openapi": "download.torrent/v1/openapi.json",
-      "operations": 10
+      "operations": 12
+    },
+    {
+      "capability": "network.egress-guard",
+      "conformance": "network.egress-guard/v1/conformance.json",
+      "files": [
+        {
+          "path": "network.egress-guard/v1/openapi.json",
+          "sha256": "445e74467e83ad0137bbe24c466290a54e12d86640cf57e4dd732fbbda1c8395"
+        },
+        {
+          "path": "network.egress-guard/v1/operations/up.json",
+          "sha256": "522cf6311715bf90d821fd4c31607cf638fa80adebcffe0cef75565f05791636"
+        },
+        {
+          "path": "network.egress-guard/v1/operations/forwarded.json",
+          "sha256": "478483a5723fc65926d01d1b675cc5dd6767c66cdd6dc99b27f5477fa16e186c"
+        },
+        {
+          "path": "network.egress-guard/v1/conformance.json",
+          "sha256": "13110f29d75021cb57a637c495eb98659dbcadb1f2862da8791d3da3c4c79d49"
+        }
+      ],
+      "majors": [
+        1
+      ],
+      "openapi": "network.egress-guard/v1/openapi.json",
+      "operations": 2
     },
     {
       "capability": "library.curate",
@@ -555,7 +590,7 @@
       "files": [
         {
           "path": "media.serve/v1/openapi.json",
-          "sha256": "3efa6acbbcd178172d02eb3311be48c5df179bcc870033a472be06ef2ec7311a"
+          "sha256": "b03be1c38fcf1bb72c1985eb4752fc74bac5f9b659ea13cb577c780972255fc2"
         },
         {
           "path": "media.serve/v1/operations/signed_in.json",
@@ -646,15 +681,19 @@
           "sha256": "350a45e3e5a87f2ec27d12c0c31943bff6a4b22322823966ad7dfd2622ffab9c"
         },
         {
+          "path": "media.serve/v1/operations/declared.json",
+          "sha256": "6b2f00d2463f6117686811e4cf56a71e4ad7ef877a589d2c9b0c2bc00398560c"
+        },
+        {
           "path": "media.serve/v1/conformance.json",
-          "sha256": "3c0a332949c09e5dba5a727f750daf36b0f4b93b1689ed452845886579caad89"
+          "sha256": "5c98e67fb61e2a38c0f59be230d5564434b038b39c20b2f8f4ebec6ffe3c42cf"
         }
       ],
       "majors": [
         1
       ],
       "openapi": "media.serve/v1/openapi.json",
-      "operations": 22
+      "operations": 23
     },
     {
       "capability": "proxy.front",
@@ -712,6 +751,149 @@
         1
       ],
       "openapi": "quality.sync/v1/openapi.json",
+      "operations": 2
+    },
+    {
+      "capability": "dashboard.show",
+      "conformance": "dashboard.show/v1/conformance.json",
+      "files": [
+        {
+          "path": "dashboard.show/v1/openapi.json",
+          "sha256": "99ab91ff55a2cf1263a89ccd5bd054be7399f4c43c89ee836740659728741b92"
+        },
+        {
+          "path": "dashboard.show/v1/operations/apply.json",
+          "sha256": "e1b89a36a8cf5500504e030b343dc83d46b0e549a5c167b6926cb6e98352ea42"
+        },
+        {
+          "path": "dashboard.show/v1/operations/panels.json",
+          "sha256": "81526a9e4b3ae77d78732731e6d40564cdb513c8bd9c8ff823b27d38c8dd3a07"
+        },
+        {
+          "path": "dashboard.show/v1/conformance.json",
+          "sha256": "4be77b3a7252fa0fc4555458cab0f571fea32a09101fecfc2b17e45f6aae97ad"
+        }
+      ],
+      "majors": [
+        1
+      ],
+      "openapi": "dashboard.show/v1/openapi.json",
+      "operations": 2
+    },
+    {
+      "capability": "archive.extract",
+      "conformance": "archive.extract/v1/conformance.json",
+      "files": [
+        {
+          "path": "archive.extract/v1/openapi.json",
+          "sha256": "ae83f298d42fe8ebc861d9e0c1ed9cd6a0888e3a650db6bd9eee6582652e9207"
+        },
+        {
+          "path": "archive.extract/v1/operations/watch.json",
+          "sha256": "fba280964445cb0f452a07ba6c772745829d09a73ff93c9fc299124a051c06aa"
+        },
+        {
+          "path": "archive.extract/v1/operations/working.json",
+          "sha256": "0753a97fe5d877293be481533cf8b4713f46b0e416d1cbfeb7d30efa48c2e800"
+        },
+        {
+          "path": "archive.extract/v1/conformance.json",
+          "sha256": "1d3babe91c29d9b183e564551de7cc0a4f608095bc99e40739751a28c4e2c904"
+        }
+      ],
+      "majors": [
+        1
+      ],
+      "openapi": "archive.extract/v1/openapi.json",
+      "operations": 2
+    },
+    {
+      "capability": "stream.guard",
+      "conformance": "stream.guard/v1/conformance.json",
+      "files": [
+        {
+          "path": "stream.guard/v1/openapi.json",
+          "sha256": "950f9034f1e76ab82beb72d2d70b173d8995e97fe9d72cfe1a0bff52ec9b29ff"
+        },
+        {
+          "path": "stream.guard/v1/operations/guard.json",
+          "sha256": "1b0ff0ae2d5c9b3d33a7b62fe1b9842cdff06083c49747e0035736b6d2c5fcbc"
+        },
+        {
+          "path": "stream.guard/v1/operations/guarding.json",
+          "sha256": "53ada79ea06572890d7cac9c7f37240eb0d67623edf8fea043137b2625dd6841"
+        },
+        {
+          "path": "stream.guard/v1/operations/certificate.json",
+          "sha256": "b73fc6fd5796690b5d72c839dea04f2bbdc7b69971bd294b085dac68f3210dce"
+        },
+        {
+          "path": "stream.guard/v1/conformance.json",
+          "sha256": "61b0845afc10e92d6106d9f14b050bb2e36b0dcedbd0affd6e662a13a1f6efda"
+        }
+      ],
+      "majors": [
+        1
+      ],
+      "openapi": "stream.guard/v1/openapi.json",
+      "operations": 3
+    },
+    {
+      "capability": "invite.decline",
+      "conformance": "invite.decline/v1/conformance.json",
+      "files": [
+        {
+          "path": "invite.decline/v1/openapi.json",
+          "sha256": "bdd2568eaef1fdef6ffb518660415568b98ec4a73ace70d87a27ba51c0b8b9ad"
+        },
+        {
+          "path": "invite.decline/v1/operations/hold.json",
+          "sha256": "d30039d06ee7f87cb83a4f1aca629ce5b0b2938873419828bb2e147884a6df80"
+        },
+        {
+          "path": "invite.decline/v1/operations/held.json",
+          "sha256": "8cd202a3e62e4795eaf9a205d916d9ec2b50db42e24b50846e12e7234b3d11ba"
+        },
+        {
+          "path": "invite.decline/v1/operations/apply_invitations.json",
+          "sha256": "d543e84936ea0aec32812a2170d473cc844242235f65ec894ea387b732a82a2f"
+        },
+        {
+          "path": "invite.decline/v1/conformance.json",
+          "sha256": "a00ee349eb474e8faa575f95b986bc27f5af80f265f511bf854b2deb46d3a826"
+        }
+      ],
+      "majors": [
+        1
+      ],
+      "openapi": "invite.decline/v1/openapi.json",
+      "operations": 3
+    },
+    {
+      "capability": "request.gate",
+      "conformance": "request.gate/v1/conformance.json",
+      "files": [
+        {
+          "path": "request.gate/v1/openapi.json",
+          "sha256": "2163c561accc79c968f6ef4761302ac2dcab6be6b0187c37cace910af2daeecf"
+        },
+        {
+          "path": "request.gate/v1/operations/admit.json",
+          "sha256": "0e633900521a71af3df0db0f9eae6338752ff10e52613ce4219f037a944f0a57"
+        },
+        {
+          "path": "request.gate/v1/operations/admitted.json",
+          "sha256": "faea54b9d37ce5d3e719b54fbd7afefbcce1df8b8125576aab308d6f0f9cfbcc"
+        },
+        {
+          "path": "request.gate/v1/conformance.json",
+          "sha256": "2dfe74098c6abb61b1d01245a22c1fb999872dc7cca2abaa65aa60147fd6b7ac"
+        }
+      ],
+      "majors": [
+        1
+      ],
+      "openapi": "request.gate/v1/openapi.json",
       "operations": 2
     }
   ]

@@ -1,0 +1,61 @@
+{
+  "capability": "request.gate",
+  "cases": [
+    {
+      "asked": {},
+      "case": "refuses-without-the-key",
+      "expect": {
+        "status": [
+          401
+        ]
+      },
+      "keyed": false,
+      "live": true,
+      "operation": "admit"
+    },
+    {
+      "asked": {
+        "routes": [
+          {
+            "address": "http://conformance-curator:80",
+            "credential": "{minted}",
+            "target": {
+              "curator": {
+                "media_type": "tv"
+              }
+            },
+            "tokens": [
+              "0000000000000000000000000000000000000000000000000000000000000000"
+            ]
+          },
+          {
+            "address": "http://conformance-media-server",
+            "credential": "{minted}",
+            "target": "media-server",
+            "tokens": [
+              "0000000000000000000000000000000000000000000000000000000000000000"
+            ]
+          }
+        ]
+      },
+      "case": "admit-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "admit"
+    },
+    {
+      "asked": {},
+      "case": "admitted-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "admitted"
+    }
+  ],
+  "major": 1
+}

@@ -5,13 +5,8 @@ use lemonfiber_ports::media::preset::Preset;
 use lemonfiber_ports::media::Kind;
 use lemonfiber_ports::service::{Profiled, Syncing};
 
+use super::{CURATOR, CURATOR_PORT};
 use crate::conformance::Placeholder;
-
-/// The host the conformance cases name a curator on.
-const CURATOR: &str = "conformance-curator";
-
-/// The port the conformance cases name a curator on.
-const CURATOR_PORT: u16 = 80;
 
 crate::contract! {
     /// `quality.sync`: a quality sync.

@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 use crate::app::Ctx;
 use crate::certificate::{self, Kept, Unkept};
-use crate::jellyfin::pictured_at;
+use crate::jellyfin::{pictured_at, streamed_at};
 use crate::model::{Episode, Held, Located, PartWay, Pinned, Season, Title};
 use crate::ports::service::{Item, ItemDetail, ItemProgress, Medium, Picture};
 
@@ -21,10 +21,6 @@ pub const GUARDED: u16 = 8920;
 
 /// Where the door's certificate and key are kept, beneath the stack directory.
 pub const DOOR: &str = "config/door";
-
-/// The query a stream is asked for with: the item's own source, and the codecs every
-/// supported player decodes, in segments both platforms play.
-const STREAMED: &str = "VideoCodec=h264,hevc&AudioCodec=aac,mp3,ac3,eac3&SegmentContainer=mp4";
 
 /// The service the stack runs as the guarded front door, by its id.
 pub const SERVICE: &str = "door";
@@ -185,9 +181,7 @@ pub(crate) fn located(item: Item, door: &Door) -> Held {
                     .holds
                     .backdrop
                     .then(|| format!("{base}{}", pictured_at(id, Picture::Backdrop))),
-                stream_from: streams(&item).then(|| {
-                    format!("{base}/Videos/{id}/master.m3u8?MediaSourceId={id}&{STREAMED}")
-                }),
+                stream_from: streams(&item).then(|| format!("{base}{}", streamed_at(id))),
                 door: Some(Pinned {
                     fingerprint: fingerprint.clone(),
                 }),

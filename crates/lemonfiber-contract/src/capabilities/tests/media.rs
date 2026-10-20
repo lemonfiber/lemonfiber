@@ -2,10 +2,13 @@
 //! through the contract, which must answer alike and be told alike.
 
 use async_trait::async_trait;
+use lemonfiber_ports::http::Method;
 use lemonfiber_ports::media::Kind;
 use lemonfiber_ports::service::{
-    AppKeys, Dated, EpisodeDetail, Failure, Fronted, Holds, HowFar, Image, Item, ItemDetail,
-    ItemProgress, Library, Medium, Picture, Playback, Screening, SeasonDetail, SeriesHeld, Upkeep,
+    Addressee, Answers, AppKeys, BytePath, Dated, Declared, Declaring, EpisodeDetail, Failure,
+    Fronted, Held, Holds, HowFar, Image, Item, ItemDetail, ItemProgress, Library, Locations,
+    Medium, Naming, Picture, Playback, Ports, Presentation, Question, Screening, SeasonDetail,
+    SeriesHeld, Statuses, Token, Upkeep,
 };
 
 use super::{crosses_alike, serve, Upstream};
@@ -172,8 +175,68 @@ impl AppKeys for Upstream {
     }
 }
 
+/// A media server's declaration, every part of it set to something recognisable.
+pub(super) fn declared() -> Declared {
+    Declared {
+        bytes: vec![BytePath {
+            pattern: "^/films/(?P<item>[^/]+)/reel$".to_owned(),
+            item: "^[a-z]{4}$".to_owned(),
+            exempt: vec!["^/films/now/reel$".to_owned()],
+            naming: vec![
+                Naming {
+                    parameter: "Instead".to_owned(),
+                    held: Held::Refused,
+                },
+                Naming {
+                    parameter: "Also".to_owned(),
+                    held: Held::Asked {
+                        shape: "^[a-z]{4}$".to_owned(),
+                    },
+                },
+            ],
+        }],
+        refused: vec!["^/posters/by-name/.*$".to_owned()],
+        question: Some(Question {
+            method: Method::Get,
+            path: "/films/{item}/may".to_owned(),
+            to: Addressee::Adapter,
+            answers: Answers {
+                may: vec![Statuses::only(204)],
+                may_not: vec![Statuses { from: 404, to: 410 }],
+                no_session: vec![Statuses::only(401), Statuses::only(419)],
+                not_from_there: Vec::new(),
+            },
+        }),
+        token: Token {
+            presented: Presentation::Query {
+                parameter: "pass".to_owned(),
+            },
+            shape: "^[A-Z]{8}$".to_owned(),
+            parameters: vec!["pass".to_owned()],
+        },
+        locations: Locations {
+            stream: "{base}/films/{item}/reel".to_owned(),
+            poster: "{base}/films/{item}/poster".to_owned(),
+            backdrop: "{base}/films/{item}/wide".to_owned(),
+        },
+        ports: Ports {
+            upstream: 8000,
+            encrypted: Some(8443),
+        },
+    }
+}
+
+#[async_trait]
+impl Declaring for Upstream {
+    async fn declared(&self) -> Result<Declared, Failure> {
+        Ok(declared())
+    }
+}
+
 /// Every operation of the capability, once, each answer written down.
-async fn script<M: Screening + Library + Upkeep + Fronted + AppKeys>(server: &M) -> Vec<String> {
+async fn script<M: Screening + Library + Upkeep + Fronted + AppKeys + Declaring>(
+    server: &M,
+) -> Vec<String> {
     let how_far = HowFar {
         position: 600,
         ended: false,
@@ -207,6 +270,7 @@ async fn script<M: Screening + Library + Upkeep + Fronted + AppKeys>(server: &M)
         format!("{:?}", server.mint("gate").await),
         format!("{:?}", server.answers_to("gate-key").await),
         format!("{:?}", server.revoke("gate-key").await),
+        format!("{:?}", server.declared().await),
     ]
 }
 

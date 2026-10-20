@@ -102,6 +102,9 @@ http-body = "1"
 # in the tree via axum; only the combinators are taken.
 tower = { version = "0.5", default-features = false }
 toml = "1.1"
+# RE2-syntax matching, in tests alone: a media server's declared patterns are what a
+# guard matches requests with, so the door's cases are judged by matching them.
+regex = { version = "1", default-features = false, features = ["std", "unicode-case", "unicode-perl"] }
 # The base64 a PEM key, a registry's signature and the companion certificate are carried in. The 0.22
 # line is the one reqwest and bollard use.
 base64 = "0.22"

@@ -9,28 +9,38 @@ use std::time::Duration;
 use async_trait::async_trait;
 use lemonfiber_ports::http::{Http, Request, Response, Unreachable};
 use lemonfiber_ports::service::{
-    Download, Failure, Fetching, Metering, Moved, Pulling, Rates, Seeded, Seeding, Throttled,
-    Throttling, Transfers, UsenetAccount, UsenetAccounts, Wanted,
+    Download, Failure, Fetching, Metering, Moved, Peering, Pulling, Rates, Seeded, Seeding,
+    Throttled, Throttling, Transfers, UsenetAccount, UsenetAccounts, Wanted,
 };
 
+use super::archive::extract;
+use super::dashboard::show;
 use super::download::{torrent, usenet};
 use super::identity::source;
 use super::indexer::search;
+use super::invite::decline;
 use super::library::curate;
 use super::media::serve;
+use super::network::egress;
 use super::proxy::front;
 use super::quality::sync;
-use super::request::intake;
+use super::request::{gate, intake};
+use super::stream::guard;
 use super::subtitles::fetch;
 use crate::{wire, Contracted};
 
+mod archive;
+mod dashboard;
 mod identity;
 mod indexer;
+mod invite;
 mod library;
 mod media;
+mod network;
 mod proxy;
 mod quality;
 mod request;
+mod stream;
 mod subtitles;
 
 /// A download client that answers every question with something recognisable.
@@ -122,6 +132,22 @@ impl Seeding for Client {
 }
 
 #[async_trait]
+impl Peering for Client {
+    async fn peer_port(&self) -> Result<Option<u16>, Failure> {
+        Ok(Some(51413))
+    }
+    async fn set_peer_port(&self, port: Option<u16>) -> Result<(), Failure> {
+        match port {
+            Some(0) => Err(Failure::Refused {
+                service: "upstream".to_owned(),
+                detail: "no client takes peers on port 0".to_owned(),
+            }),
+            Some(_) | None => Ok(()),
+        }
+    }
+}
+
+#[async_trait]
 impl UsenetAccounts for Client {
     async fn accounts(&self) -> Result<Vec<UsenetAccount>, Failure> {
         Ok(Vec::new())
@@ -198,6 +224,7 @@ impl Http for Served {
         let body = request.body.as_deref().unwrap_or_default().as_bytes();
         let served = match capability {
             torrent::CAPABILITY => torrent::dispatch(&Client, operation, body).await,
+            egress::CAPABILITY => egress::dispatch(&*self.upstream, operation, body).await,
             usenet::CAPABILITY => usenet::dispatch(&Client, operation, body).await,
             curate::CAPABILITY => curate::dispatch(&*self.upstream, operation, body).await,
             search::CAPABILITY => search::dispatch(&*self.upstream, operation, body).await,
@@ -207,6 +234,11 @@ impl Http for Served {
             serve::CAPABILITY => serve::dispatch(&*self.upstream, operation, body).await,
             front::CAPABILITY => front::dispatch(&*self.upstream, operation, body).await,
             sync::CAPABILITY => sync::dispatch(&*self.upstream, operation, body).await,
+            show::CAPABILITY => show::dispatch(&*self.upstream, operation, body).await,
+            extract::CAPABILITY => extract::dispatch(&*self.upstream, operation, body).await,
+            guard::CAPABILITY => guard::dispatch(&*self.upstream, operation, body).await,
+            decline::CAPABILITY => decline::dispatch(&*self.upstream, operation, body).await,
+            gate::CAPABILITY => gate::dispatch(&*self.upstream, operation, body).await,
             _ => Err(wire::Refusal::unknown_operation(operation)),
         };
         Ok(match served {
@@ -262,6 +294,13 @@ async fn a_torrent_client_answers_through_its_contract_as_it_answers_in_process(
     );
     assert_eq!(asked.seeding().await.ok(), Client.seeding().await.ok());
     assert_eq!(asked.stop_seeding("a film").await.ok(), Some(()));
+    assert_eq!(asked.peer_port().await.ok(), Some(Some(51413)));
+    assert_eq!(asked.set_peer_port(Some(51413)).await.ok(), Some(()));
+    assert_eq!(asked.set_peer_port(None).await.ok(), Some(()));
+    assert!(matches!(
+        asked.set_peer_port(Some(0)).await,
+        Err(Failure::Refused { .. })
+    ));
     assert!(matches!(
         asked.stop_seeding("another film").await,
         Err(Failure::Refused { detail, .. }) if detail.contains("another film")
@@ -269,14 +308,17 @@ async fn a_torrent_client_answers_through_its_contract_as_it_answers_in_process(
 }
 
 #[tokio::test]
-async fn a_usenet_client_answers_its_accounts_and_not_seeding() {
+async fn a_usenet_client_answers_its_accounts_and_not_seeding_or_a_peer_port() {
     let asked = usenet::Adapter(contracted(Served::default()));
     assert_eq!(asked.accounts().await.ok(), Some(Vec::new()));
-    let unserved = usenet::dispatch(&Client, "seeding", b"{}").await;
-    assert_eq!(
-        unserved.err().map(|refusal| refusal.kind),
-        Some(wire::Kind::UnknownOperation)
-    );
+    for operation in ["seeding", "peer_port", "set_peer_port"] {
+        let unserved = usenet::dispatch(&Client, operation, b"{}").await;
+        assert_eq!(
+            unserved.err().map(|refusal| refusal.kind),
+            Some(wire::Kind::UnknownOperation),
+            "{operation}"
+        );
+    }
 }
 
 #[tokio::test]
@@ -332,6 +374,7 @@ fn every_operation_has_a_path_of_its_own_and_a_schema_each_way() {
         [
             usenet::CAPABILITY,
             torrent::CAPABILITY,
+            egress::CAPABILITY,
             curate::CAPABILITY,
             search::CAPABILITY,
             fetch::CAPABILITY,
@@ -340,6 +383,11 @@ fn every_operation_has_a_path_of_its_own_and_a_schema_each_way() {
             serve::CAPABILITY,
             front::CAPABILITY,
             sync::CAPABILITY,
+            show::CAPABILITY,
+            extract::CAPABILITY,
+            guard::CAPABILITY,
+            decline::CAPABILITY,
+            gate::CAPABILITY,
         ]
     );
 }

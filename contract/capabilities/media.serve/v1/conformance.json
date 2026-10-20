@@ -280,6 +280,16 @@
       "keyed": true,
       "live": false,
       "operation": "restart"
+    },
+    {
+      "asked": {},
+      "case": "declared-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "declared"
     }
   ],
   "major": 1

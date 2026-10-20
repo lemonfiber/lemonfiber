@@ -8,6 +8,7 @@ use std::collections::BTreeMap;
 use std::net::Ipv4Addr;
 
 use lemonfiber_contract::capabilities::media::serve;
+use lemonfiber_contract::capabilities::proxy::front;
 
 /// A block of addresses, as its first address and its prefix length.
 pub type Block = (Ipv4Addr, u8);
@@ -44,12 +45,6 @@ const MEDIA_SUBNET: Subnet = Subnet {
 /// The door's fixed address on its ask of `media.serve`, the one proxy the media server
 /// trusts to name a client.
 pub const DOOR_ON_MEDIA: Ipv4Addr = Ipv4Addr::new(10, 80, 96, 18);
-
-/// The capability whose filler is the proxy.
-const PROXY_FRONT: &str = "proxy.front";
-
-/// The capability whose filler guards every byte the household streams.
-pub(crate) const STREAM_GUARD: &str = "stream.guard";
 
 /// One service, as its place on the project's networks needs it.
 #[derive(Debug, Clone, Copy)]
@@ -220,7 +215,7 @@ fn fixing(guard: Option<&str>, asker: &str, capability: &str) -> Option<Fixing> 
         return None;
     }
     match capability {
-        PROXY_FRONT => Some(Fixing {
+        front::CAPABILITY => Some(Fixing {
             subnet: PROXY_SUBNET,
             asker: DOOR_ON_PROXY,
             reached: Some(PROXY_ON_PROXY),

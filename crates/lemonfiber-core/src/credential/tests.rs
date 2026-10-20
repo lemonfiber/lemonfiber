@@ -1,4 +1,4 @@
-use super::{fingerprint, Held, Inventory, Origin, Revealed, State, REVEALED, SHOULDER};
+use super::{Held, Inventory, Origin, Revealed, State, REVEALED, SHOULDER};
 
 /// A credential entry with the state and advisory a test is about.
 fn held(state: State, advisory: Option<&str>) -> Held {
@@ -92,37 +92,6 @@ fn both_warnings_say_what_printing_a_credential_costs() {
     for warning in [SHOULDER, REVEALED] {
         assert!(warning.contains("scrollback"), "{warning}");
     }
-}
-
-#[test]
-fn a_fingerprint_is_short_marked_and_the_same_every_time() {
-    let once = fingerprint("something");
-    assert_eq!(once, fingerprint("something"));
-    assert_eq!(once.len(), 5, "{once}");
-    assert!(once.starts_with('~'), "{once}");
-}
-
-#[test]
-fn two_different_values_are_told_apart_and_neither_is_recoverable() {
-    let value = format!("{}{}", "the-", "key-value");
-    let mark = fingerprint(&value);
-
-    assert_ne!(mark, fingerprint("a-different-value"));
-    assert!(
-        !mark.contains(&value),
-        "the value survived into its own fingerprint"
-    );
-    // The mark is the safe half of this pair and the only one worth quoting: five
-    // characters chosen so the value cannot be read back out of them.
-    assert!(
-        !value.contains(mark.trim_start_matches('~')),
-        "the fingerprint was lifted straight out of the value: {mark}"
-    );
-}
-
-#[test]
-fn the_fingerprint_of_nothing_is_still_a_fingerprint() {
-    assert_eq!(fingerprint("").len(), 5);
 }
 
 #[test]

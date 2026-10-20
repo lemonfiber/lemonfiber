@@ -427,6 +427,7 @@ fn download_of(torrent: TorrentInfo) -> Download {
 }
 
 mod fetching;
+mod peering;
 mod throttling;
 
 async fn transfers(qbittorrent: &Qbittorrent) -> Result<Vec<Download>, Failure> {
