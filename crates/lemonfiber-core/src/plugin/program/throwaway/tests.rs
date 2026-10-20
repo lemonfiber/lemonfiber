@@ -386,3 +386,43 @@ fn what_ran_with_the_copy_is_never_read_back_through_a_link_it_made() {
         .wrote(Path::new("dir/host.xml"))
         .is_err_and(|why| why.contains("is a link or a device")));
 }
+
+#[cfg(unix)]
+#[test]
+fn a_file_held_beside_the_starting_files_is_its_owners_alone_and_replaces_a_link() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let source = Scratch::new("throwaway-held");
+    let Ok(copy) = Throwaway::of(of(&source)) else {
+        return;
+    };
+    let mode = |at: &Path| {
+        std::fs::symlink_metadata(at)
+            .map(|kind| kind.permissions().mode() & 0o777)
+            .ok()
+    };
+    let elsewhere = Scratch::new("throwaway-held-elsewhere");
+    let target = elsewhere.join("target");
+    let _ = std::fs::write(&target, "untouched");
+    let _ = std::os::unix::fs::symlink(&target, copy.path().join("lemonfiber.key"));
+    assert_eq!(copy.hold("lemonfiber.key", "k3y"), Ok(()));
+    assert_eq!(copy.hold("lemonfiber.key", "k3y-again"), Ok(()));
+    let held = copy.path().join("lemonfiber.key");
+    assert_eq!(
+        std::fs::read_to_string(&held).ok().as_deref(),
+        Some("k3y-again")
+    );
+    assert_eq!(mode(&held), Some(0o600));
+    assert_eq!(
+        std::fs::read_to_string(&target).ok().as_deref(),
+        Some("untouched")
+    );
+    assert_eq!(copy.path().parent().and_then(mode), Some(0o700));
+    let owner = std::fs::metadata(copy.path()).ok().map(|made| {
+        use std::os::unix::fs::MetadataExt as _;
+        (made.uid(), made.gid())
+    });
+    assert_eq!(copy.owner(), owner);
+    assert!(copy
+        .hold("absent/lemonfiber.key", "k3y")
+        .is_err_and(|why| why.contains("could not be made at")));
+}

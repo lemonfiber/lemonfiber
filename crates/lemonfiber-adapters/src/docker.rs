@@ -213,6 +213,14 @@ impl lemonfiber_ports::serving::Serving for Daemon {
         serving::served(self, serve).await
     }
 
+    async fn beside(
+        &self,
+        served: &lemonfiber_ports::serving::Served,
+        serve: &lemonfiber_ports::serving::Serve,
+    ) -> Result<lemonfiber_ports::serving::Served, lemonfiber_ports::program::Unran> {
+        serving::beside(self, served, serve).await
+    }
+
     async fn standing(
         &self,
         served: &lemonfiber_ports::serving::Served,

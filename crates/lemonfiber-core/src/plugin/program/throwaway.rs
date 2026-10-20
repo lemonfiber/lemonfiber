@@ -135,6 +135,33 @@ impl Throwaway {
             .map_err(|why| unmade(&at, &why))
     }
 
+    /// `text` held at `named` directly beneath the copy, readable by its owner alone,
+    /// written new in place of whatever was there and through no link.
+    pub(crate) fn hold(&self, named: &str, text: &str) -> Result<(), String> {
+        use std::io::Write as _;
+        let at = self.copy.join(named);
+        let _ = std::fs::remove_file(&at);
+        owner_only()
+            .open(&at)
+            .and_then(|mut file| file.write_all(text.as_bytes()))
+            .map_err(|why| unmade(&at, &why))
+    }
+
+    /// The uid and gid that own the copy, which is whoever made it.
+    #[cfg(unix)]
+    pub(crate) fn owner(&self) -> Option<(u32, u32)> {
+        use std::os::unix::fs::MetadataExt as _;
+        std::fs::metadata(&self.root)
+            .ok()
+            .map(|made| (made.uid(), made.gid()))
+    }
+
+    /// Nobody, where the platform names no owner.
+    #[cfg(not(unix))]
+    pub(crate) fn owner(&self) -> Option<(u32, u32)> {
+        None
+    }
+
     /// A file at `relative` beneath the copy, as whatever ran with it left it: read
     /// through no link, from nothing but a file beneath the copy, and none where it is not
     /// there yet.
@@ -227,6 +254,23 @@ fn unmade(at: &Path, why: &std::io::Error) -> String {
         "the throwaway copy of the starting files could not be made at {}: {why}",
         at.display()
     )
+}
+
+/// A file created new, never through a link, readable and writable by its owner alone.
+#[cfg(unix)]
+fn owner_only() -> std::fs::OpenOptions {
+    use std::os::unix::fs::OpenOptionsExt as _;
+    let mut options = std::fs::File::options();
+    options.write(true).create_new(true).mode(0o600);
+    options
+}
+
+/// A file created new, where the platform keeps no mode.
+#[cfg(not(unix))]
+fn owner_only() -> std::fs::OpenOptions {
+    let mut options = std::fs::File::options();
+    options.write(true).create_new(true);
+    options
 }
 
 /// `at` given `mode`, where the platform keeps one.

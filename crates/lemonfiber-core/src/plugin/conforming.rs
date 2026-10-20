@@ -22,10 +22,10 @@ use crate::doctor::BUNDLED_CHECKS;
 use crate::ports::http::{Http, Request, Response, Unreachable, JSON};
 
 /// Where a plugin's conformance recordings sit, beneath its source.
-const RECORDINGS: &str = "conformance";
+pub(crate) const RECORDINGS: &str = "conformance";
 
 /// The method every operation is asked with.
-const ASKED_WITH: &str = "POST";
+pub(crate) const ASKED_WITH: &str = "POST";
 
 /// What a plugin's recordings say about the contracts its adapters speak.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]

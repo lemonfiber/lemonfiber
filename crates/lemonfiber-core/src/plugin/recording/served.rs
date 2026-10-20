@@ -26,7 +26,7 @@ pub(super) const POLL: Duration = Duration::from_millis(500);
 const HEALTHY_WITHIN: Duration = Duration::from_secs(60);
 
 /// How many of the last lines a failed service's container wrote are shown.
-const LOG_LINES: usize = 50;
+pub(super) const LOG_LINES: usize = 50;
 
 /// The statuses an application answers a caller it will not serve, which tell it is
 /// up as surely as an answer does.
@@ -100,6 +100,17 @@ pub(super) async fn answers(
 /// The container a service's recordings are taken from: as lemonfiber runs it, with
 /// throwaway starting files and library and its one port on the loopback interface.
 pub(super) fn settled(placed: &Placed, copy: &Throwaway, data: Option<&Path>) -> Serve {
+    settled_as(placed, copy, data, &Operator::recording())
+}
+
+/// The same container, run as `operator` rather than as the entry writes it where nothing
+/// is set.
+pub(super) fn settled_as(
+    placed: &Placed,
+    copy: &Throwaway,
+    data: Option<&Path>,
+    operator: &Operator,
+) -> Serve {
     let Contained {
         env,
         user,
@@ -109,7 +120,7 @@ pub(super) fn settled(placed: &Placed, copy: &Throwaway, data: Option<&Path>) ->
         pids_limit,
         read_only,
         memory,
-    } = contained(placed, &Operator::recording());
+    } = contained(placed, operator);
     let mut binds = vec![Bound {
         source: copy.path().to_path_buf(),
         target: crate::project::entry::configuration(&placed.config_path).to_owned(),
@@ -131,11 +142,12 @@ pub(super) fn settled(placed: &Placed, copy: &Throwaway, data: Option<&Path>) ->
         binds,
         tmpfs: crate::plugin::container::tmpfs(placed).cloned().collect(),
         listens: inside(placed),
+        alias: None,
     }
 }
 
 /// The port the service answers on inside its network.
-fn inside(placed: &Placed) -> Option<u16> {
+pub(super) fn inside(placed: &Placed) -> Option<u16> {
     placed.listens.or_else(|| {
         placed
             .reached

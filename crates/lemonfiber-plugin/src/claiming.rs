@@ -21,7 +21,9 @@ mod contributing;
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::schema::{Claim, ClaimProbe, Expect, Manifest, Service};
-use crate::vocabulary::{self, Capability, Constraint, Probe, ProbeKind, Removed, Requirement};
+use crate::vocabulary::{
+    self, Capability, Constraint, Credential, Probe, ProbeKind, Removed, Requirement,
+};
 use crate::Violation;
 
 pub use bundled::{bundled, Bundled};
@@ -168,6 +170,9 @@ fn demonstrated(manifest: &Manifest, found: &mut Vec<Violation>) {
             .find(|held| held.name == claim.capability)
         {
             bound(claim, held, &at, found);
+            if let Some(service) = declared.get(claim.capability.as_str()) {
+                unheld(manifest, claim, held, service, &at, found);
+            }
         }
     }
 
@@ -180,6 +185,47 @@ fn demonstrated(manifest: &Manifest, found: &mut Vec<Violation>) {
             message: format!(
                 "{name} is declared and demonstrated by no [[claim]]; a capability is \
                  demonstrated, not asserted"
+            ),
+        });
+    }
+}
+
+/// The probes a claim binds that are asked as the operator, where the service providing
+/// its capability is one an adapter of the plugin fronts.
+///
+/// lemonfiber holds no credential for such a service but the key it mints for the
+/// adapter, so a probe asked as the operator there is asked with something nobody holds.
+/// What it would show is shown through the adapter's conformance cases.
+fn unheld(
+    manifest: &Manifest,
+    claim: &Claim,
+    capability: &Capability,
+    service: &str,
+    at: &str,
+    found: &mut Vec<Violation>,
+) {
+    let Some(adapter) = manifest
+        .services
+        .iter()
+        .find(|one| one.id != service && one.fronts.as_deref() == Some(service))
+    else {
+        return;
+    };
+    let operators = claim.probes.iter().filter(|binding| {
+        capability
+            .probes
+            .iter()
+            .any(|probe| probe.id == binding.id && probe.credential == Credential::Operator)
+    });
+    for binding in operators {
+        found.push(Violation {
+            location: format!("{at}.probe {}", binding.id),
+            message: format!(
+                "{} is asked with the operator's credential, and {service} is fronted by the \
+                 adapter {}, so lemonfiber holds no credential for {service} but the key it mints \
+                 for {}; what this probe would show is shown through {}'s conformance cases \
+                 instead",
+                binding.id, adapter.id, adapter.id, adapter.id
             ),
         });
     }

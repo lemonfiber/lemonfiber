@@ -9,6 +9,7 @@ use lemonfiber_plugin::{Manifest, Request};
 use tokio::time::Instant;
 
 use super::first::Presented;
+use super::fronted::{self, Fronting};
 use super::served::{answers, POLL};
 use super::written::{landing, written};
 use super::{Failed, Recorder, Taken, Took};
@@ -98,7 +99,8 @@ fn operators(capability: &str, probe: &str) -> bool {
         .any(|one| one.id == probe && one.credential == Credential::Operator)
 }
 
-/// Every request recording the manifest names, each service's taken whole or not at all,
+/// Every request recording the manifest names, and every conformance case of each
+/// contract an adapter of the plugin speaks, each service's taken whole or not at all;
 /// and each service that failed.
 pub(super) async fn taken(
     manifest: &Manifest,
@@ -106,22 +108,39 @@ pub(super) async fn taken(
     recorder: Recorder<'_>,
 ) -> (Vec<Taken>, Vec<Failed>) {
     let items = items(manifest);
+    let placements = Installed::of(manifest).services;
+    let pairs: Vec<(&lemonfiber_plugin::Service, &Placed)> =
+        manifest.services.iter().zip(placements.iter()).collect();
     let mut answered: BTreeMap<&str, std::vec::IntoIter<Took>> = BTreeMap::new();
+    let mut conformance = Vec::new();
     let mut failed = Vec::new();
-    for (service, placed) in manifest
-        .services
-        .iter()
-        .zip(Installed::of(manifest).services)
-    {
+    for (service, placed) in &pairs {
         let mine: Vec<&Item<'_>> = items
             .iter()
             .filter(|item| recordable(item) == Some(service.id.as_str()))
             .collect();
-        if mine.is_empty() {
+        let fronting = pairs
+            .iter()
+            .find(|(adapter, _)| {
+                adapter.fronts.as_deref() == Some(service.id.as_str()) && !adapter.speaks.is_empty()
+            })
+            .map(|(adapter, placed)| Fronting {
+                service: adapter,
+                placed,
+            });
+        if mine.is_empty() && fronting.is_none() {
             continue;
         }
-        let took = match recorded(root, recorder, &placed, service.health.as_ref(), &mine).await {
-            Ok(written) => written,
+        let ask = Service {
+            placed,
+            health: service.health.as_ref(),
+            fronting,
+        };
+        let took = match recorded(root, recorder, ask, &mine).await {
+            Ok((written, cases)) => {
+                conformance.extend(cases);
+                written
+            }
             Err(failure) => {
                 let unrecorded = Took::Unrecorded {
                     why: format!(
@@ -129,13 +148,22 @@ pub(super) async fn taken(
                         failure.service, failure.step
                     ),
                 };
+                conformance.extend(fronting.iter().flat_map(|fronting| {
+                    fronted::fixtures(fronting.service)
+                        .into_iter()
+                        .map(|(named, fixture)| Taken {
+                            named,
+                            fixture: Some(fixture),
+                            took: unrecorded.clone(),
+                        })
+                }));
                 failed.push(failure);
                 std::iter::repeat_n(unrecorded, mine.len()).collect()
             }
         };
         answered.insert(service.id.as_str(), took.into_iter());
     }
-    let taken = items
+    let mut taken: Vec<Taken> = items
         .iter()
         .map(|item| Taken {
             named: item.named.clone(),
@@ -148,6 +176,7 @@ pub(super) async fn taken(
                 }),
         })
         .collect();
+    taken.extend(conformance);
     (taken, failed)
 }
 
@@ -165,15 +194,36 @@ const fn unrecorded(item: &Item<'_>) -> &'static str {
     }
 }
 
-/// One service's request recordings, each written once every one was taken.
+/// One service whose recordings are taken together.
+#[derive(Clone, Copy)]
+struct Service<'a> {
+    /// How installing it places it.
+    placed: &'a Placed,
+    /// The health its manifest declares.
+    health: Option<&'a lemonfiber_plugin::Health>,
+    /// The adapter of the plugin that fronts it, where one does.
+    fronting: Option<Fronting<'a>>,
+}
+
+/// One service's request recordings and the conformance cases of the adapter fronting
+/// it, each written once every one was taken.
 async fn recorded(
     root: &Path,
     recorder: Recorder<'_>,
-    placed: &Placed,
-    health: Option<&lemonfiber_plugin::Health>,
+    service: Service<'_>,
     mine: &[&Item<'_>],
-) -> Result<Vec<Took>, Failed> {
-    for fixture in mine.iter().filter_map(|item| item.fixture) {
+) -> Result<(Vec<Took>, Vec<Taken>), Failed> {
+    let placed = service.placed;
+    let fixtures: Vec<String> = mine
+        .iter()
+        .filter_map(|item| item.fixture.map(str::to_owned))
+        .chain(service.fronting.iter().flat_map(|fronting| {
+            fronted::fixtures(fronting.service)
+                .into_iter()
+                .map(|(_, fixture)| fixture)
+        }))
+        .collect();
+    for fixture in &fixtures {
         landing(root, fixture).map_err(|why| Failed {
             service: placed.service.clone(),
             step: format!("writing {fixture}"),
@@ -181,16 +231,23 @@ async fn recorded(
             log: Vec::new(),
         })?;
     }
-    let answered = answers(recorder, root, placed, health, mine).await?;
+    let (answered, cases) = match service.fronting {
+        Some(fronting) => {
+            fronted::answers(recorder, root, placed, service.health, fronting, mine).await?
+        }
+        None => (
+            answers(recorder, root, placed, service.health, mine).await?,
+            Vec::new(),
+        ),
+    };
     let pinned = format!("{}@{}", placed.image, placed.digest);
-    Ok(mine
+    let took = mine
         .iter()
         .zip(answered)
         .map(|(item, response)| {
-            let fixture = item.fixture.unwrap_or_default();
             written(
                 root,
-                fixture,
+                item.fixture.unwrap_or_default(),
                 &pinned,
                 Of::Request {
                     request: Asked {
@@ -202,7 +259,27 @@ async fn recorded(
                 },
             )
         })
-        .collect())
+        .collect();
+    let cases = cases
+        .into_iter()
+        .map(|case| {
+            let fixture = case.fixture();
+            Taken {
+                named: case.named(),
+                took: written(
+                    root,
+                    &fixture,
+                    &pinned,
+                    Of::Request {
+                        request: case.asked,
+                        response: case.answer,
+                    },
+                ),
+                fixture: Some(fixture),
+            }
+        })
+        .collect();
+    Ok((took, cases))
 }
 
 /// What the served service answered `item` through `http`, on the loopback interface at
@@ -268,7 +345,9 @@ pub(super) fn kept(response: &Response) -> Answer {
         .map(|(_, value)| (CONTENT_TYPE.to_owned(), value.clone()))
         .into_iter()
         .collect();
-    let json = serde_json::from_str(&response.body).ok();
+    let json = serde_json::from_str(&response.body)
+        .ok()
+        .filter(|json: &serde_json::Value| !json.is_null());
     Answer {
         status: response.status,
         headers,

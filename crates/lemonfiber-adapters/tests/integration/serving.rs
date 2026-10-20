@@ -22,6 +22,7 @@ fn serve() -> Serve {
         binds: Vec::new(),
         tmpfs: Vec::new(),
         listens: Some(8989),
+        alias: None,
     }
 }
 
@@ -138,6 +139,87 @@ async fn a_service_is_served_on_a_network_of_its_own_read_and_removed_with_it() 
         "{asked:?}"
     );
     assert!(!asked.iter().any(|path| path.contains("/images/create")));
+    engine.stop().await;
+}
+
+fn served_on(network: &str) -> lemonfiber_ports::serving::Served {
+    lemonfiber_ports::serving::Served {
+        container: "u1".to_owned(),
+        network: network.to_owned(),
+        hostname: "u1short".to_owned(),
+        addresses: Vec::new(),
+        machine: vec!["recording-host".to_owned()],
+        port: Some(49152),
+    }
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn a_container_beside_another_joins_its_network_and_leaves_the_network_to_it() {
+    let mut engine = fake::engine(
+        "serving-beside",
+        vec![
+            (
+                "/containers/create",
+                fake::Reply::Body(201, r#"{"Id":"s1","Warnings":[]}"#.to_owned()),
+            ),
+            (
+                "/containers/s1/start",
+                fake::Reply::Body(204, String::new()),
+            ),
+            (
+                "/containers/s1/json",
+                fake::Reply::Body(200, INSPECTED.to_owned()),
+            ),
+        ],
+    );
+    let beside = Daemon::at(&engine.socket)
+        .beside(&served_on("lemonfiber-record-9-9-9"), &serve())
+        .await;
+    assert!(beside.is_ok(), "{beside:?}");
+    let Ok(beside) = beside else {
+        return;
+    };
+    assert_eq!(beside.container, "s1");
+    assert_eq!(beside.network, "lemonfiber-record-9-9-9");
+    assert_eq!(beside.machine, vec!["recording-host".to_owned()]);
+    assert_eq!(beside.port, Some(49153));
+    let asked = engine.asked_for();
+    assert!(
+        !asked
+            .iter()
+            .any(|path| path.starts_with("/networks") || path.starts_with("/info")),
+        "{asked:?}"
+    );
+    engine.stop().await;
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn a_container_beside_another_that_cannot_be_made_leaves_the_network_alone() {
+    let mut engine = fake::engine(
+        "serving-beside-no-image",
+        vec![(
+            "/containers/create",
+            fake::Reply::Body(
+                404,
+                r#"{"message":"No such image: lscr.io/linuxserver/sonarr@sha256:dffc"}"#.to_owned(),
+            ),
+        )],
+    );
+    let beside = Daemon::at(&engine.socket)
+        .beside(&served_on("lemonfiber-record-9-9-9"), &serve())
+        .await;
+    assert_eq!(
+        beside,
+        Err(Unran::NoImage {
+            image: "lscr.io/linuxserver/sonarr@sha256:dffc".to_owned()
+        })
+    );
+    assert!(!engine
+        .asked_for()
+        .iter()
+        .any(|path| path.starts_with("/networks")));
     engine.stop().await;
 }
 

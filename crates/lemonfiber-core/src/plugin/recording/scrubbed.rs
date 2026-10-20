@@ -46,6 +46,13 @@ impl Scrub {
         Self::ordered(spellings)
     }
 
+    /// The same, with every spelling of the identity of the container `served` besides.
+    pub(super) fn and_served(self, served: &Served) -> Self {
+        let mut spellings = self.spellings;
+        spellings.extend(Self::of(&[], Some(served)).spellings);
+        Self::ordered(spellings)
+    }
+
     /// The same, with every spelling of each of `more` besides.
     pub(super) fn and(self, more: &[String]) -> Self {
         let mut spellings = self.spellings;

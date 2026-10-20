@@ -39,6 +39,8 @@ pub struct Serve {
     /// The port it answers on inside its network, published on the loopback interface
     /// at a port the engine chooses.
     pub listens: Option<u16>,
+    /// The name every other container on its network reaches it by, where it has one.
+    pub alias: Option<String>,
 }
 
 /// A directory on the engine's machine, mounted at a path inside the container.
@@ -95,6 +97,14 @@ pub trait Serving: Send + Sync {
     /// left behind in any of them.
     async fn serve(&self, serve: &Serve) -> Result<Served, Unran>;
 
+    /// Create a container for `serve` on the network `served` is on, and start it.
+    ///
+    /// # Errors
+    ///
+    /// [`Unran`] where the engine cannot be reached, does not hold the image, or refuses
+    /// the container; nothing is left behind in any of the three.
+    async fn beside(&self, served: &Served, serve: &Serve) -> Result<Served, Unran>;
+
     /// How the container stands now.
     ///
     /// # Errors
@@ -106,6 +116,6 @@ pub trait Serving: Send + Sync {
     /// or nothing where the engine will not say.
     async fn log(&self, served: &Served, lines: usize) -> String;
 
-    /// Take the container and its network off the engine.
+    /// Take the container off the engine, and its network once nothing else is on it.
     async fn removed(&self, served: &Served);
 }
