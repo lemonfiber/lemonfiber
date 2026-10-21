@@ -81,8 +81,7 @@ pub struct LifecycleReport {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unvetted: Option<Unvetted>,
     /// Each part this release installs as a plugin that the stack still runs as its own
-    /// service: a move in place on offer, named by every start and taken by none
-    /// (ARCH-R299).
+    /// service: a move in place on offer, named by every start and taken by none.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub moves: Vec<crate::app::plugins::MoveOffered>,
 }

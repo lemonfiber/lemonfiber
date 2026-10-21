@@ -1,7 +1,9 @@
 use lemonfiber_bundled::{Stage, PINNED};
 use lemonfiber_manifest::Service;
 
-use super::{offered, MoveOffered};
+use super::{offered, on_offer, MoveOffered, Offering};
+use crate::config::paths::PLUGINS;
+use crate::doctor::moving::Offers;
 use crate::test_support::an_installed;
 
 /// The services of the stack this build carries.
@@ -76,4 +78,31 @@ fn a_part_the_bundle_assembles_is_never_offered_a_move() {
     assert!(offered(PINNED, &carried(), &[])
         .iter()
         .all(|one| !assembled.contains(&one.plugin.as_str())));
+}
+
+/// The offer is read from this machine's record each time it is asked: every move where
+/// nothing is recorded installed, and nothing known where the record cannot be read.
+#[tokio::test]
+async fn the_offer_is_read_from_the_machines_record_each_time_it_is_asked() {
+    let env = crate::test_support::env_without_password("moving-in-offering");
+    let ctx = crate::test_support::a_context()
+        .settings(crate::config::Settings {
+            env_file: Some(env.clone()),
+            ..crate::config::Settings::default()
+        })
+        .build();
+    let Ok(manifest) = crate::test_support::stack().manifest() else {
+        unreachable!("the carried stack has a manifest");
+    };
+    let offering = Offering::of(&ctx, &manifest);
+
+    assert_eq!(
+        offering.moves().await,
+        Ok(offered(PINNED, &manifest.services, &[]))
+    );
+
+    let _ = std::fs::create_dir_all(env.with_file_name(PLUGINS));
+    assert_eq!(offering.moves().await, Err(()));
+    assert_eq!(on_offer(&ctx, &manifest), Vec::new());
+    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 }

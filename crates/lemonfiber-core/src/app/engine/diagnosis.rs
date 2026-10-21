@@ -390,8 +390,8 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
     let guarded = guarded(ctx, &manifest.services);
     let gate = gate_record(ctx, &manifest.services, project.as_deref());
     let decline = deferring::declined(ctx, manifest, project.as_deref());
-    let moves = crate::doctor::moving::MovesCheck::new(crate::app::plugins::moving_in::on_offer(
-        ctx, manifest,
+    let moves = crate::doctor::moving::MovesCheck::new(Arc::new(
+        crate::app::plugins::moving_in::Offering::of(ctx, manifest),
     ));
     // Whether the stack would actually come back after a restart, which is a different
     // question from whether the operator asked for it to. The answer they gave is read

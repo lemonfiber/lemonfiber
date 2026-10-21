@@ -1,5 +1,7 @@
 //! Whether a part this build installs as a plugin still runs as the stack's own service,
-//! each such part a move in place on offer (ARCH-R299).
+//! each such part a move in place on offer.
+
+use std::sync::Arc;
 
 use async_trait::async_trait;
 
@@ -14,17 +16,28 @@ const CHECK: &str = "services.move-offered";
 /// The heading an operator reads this under.
 const TITLE: &str = "Parts this release runs as plugins";
 
+/// Where the moves on offer are read when the check runs.
+#[async_trait]
+pub trait Offers: Send + Sync {
+    /// Each move in place on offer, and none where none is.
+    ///
+    /// # Errors
+    ///
+    /// `()` where what is installed cannot be read.
+    async fn moves(&self) -> Result<Vec<MoveOffered>, ()>;
+}
+
 /// Names each part a move in place is on offer for.
 pub struct MovesCheck {
-    /// The moves on offer, as read when the check was built.
-    moves: Vec<MoveOffered>,
+    /// Where the moves on offer are read.
+    offers: Arc<dyn Offers>,
 }
 
 impl MovesCheck {
-    /// A check naming `moves`.
+    /// A check naming the moves `offers` has on offer when it runs.
     #[must_use]
-    pub const fn new(moves: Vec<MoveOffered>) -> Self {
-        Self { moves }
+    pub fn new(offers: Arc<dyn Offers>) -> Self {
+        Self { offers }
     }
 }
 
@@ -39,13 +52,23 @@ impl Check for MovesCheck {
             Category::Services,
             CHECK,
             TITLE,
-            verdict(&self.moves),
+            verdict(self.offers.moves().await),
         )]
     }
 }
 
-/// Pass where nothing is on offer, and a warning naming each move otherwise.
-fn verdict(moves: &[MoveOffered]) -> Verdict {
+/// Pass where nothing is on offer, a warning naming each move otherwise, and unverified
+/// where what is installed cannot be read.
+fn verdict(moves: Result<Vec<MoveOffered>, ()>) -> Verdict {
+    let Ok(moves) = moves else {
+        return Verdict::Unverified {
+            reason: "the record of what is installed could not be read, so whether a move in \
+                     place is on offer is not known"
+                .to_owned(),
+            remedy: Remedy::new("Read what is installed, which says why the record cannot be read")
+                .with_detail("lemonfiber plugin installed"),
+        };
+    };
     let Some(first) = moves.first() else {
         return Verdict::Pass { note: None };
     };
