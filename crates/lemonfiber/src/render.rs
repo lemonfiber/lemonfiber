@@ -30,6 +30,7 @@ mod hosting;
 mod invitation;
 mod keys;
 mod migration;
+mod moving;
 mod news;
 mod outbound;
 mod overlay;

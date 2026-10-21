@@ -30,6 +30,7 @@ pub(crate) fn update(report: &Report) -> Lines {
     }
     lines.extend(transfers(&report.in_flight));
     lines.extend(super::overlay::unvetted(report.unvetted.as_ref()));
+    lines.extend(super::moving::offered(&report.moves));
     if report.confirmed {
         lines.extend(carried(report));
     } else {
