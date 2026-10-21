@@ -116,6 +116,7 @@ pub(super) async fn apply(
         changelog: super::brought(),
         offer: String::new(),
         unvetted: None,
+        moves: Vec::new(),
     })
 }
 

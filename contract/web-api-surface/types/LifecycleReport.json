@@ -30,6 +30,12 @@
       ],
       "required": false
     },
+    "moves": {
+      "type": [
+        "array[ref:MoveOffered]"
+      ],
+      "required": false
+    },
     "offer": {
       "type": [
         "null|string"

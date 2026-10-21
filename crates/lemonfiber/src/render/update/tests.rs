@@ -32,6 +32,7 @@ fn report(changes: Vec<Change>, applied: Vec<Applied>, confirmed: bool) -> Repor
         changelog: crate::render::fixtures::notes("0.4.0"),
         offer: String::new(),
         unvetted: None,
+        moves: Vec::new(),
     }
 }
 

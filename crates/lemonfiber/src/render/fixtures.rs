@@ -266,5 +266,6 @@ pub(crate) fn a_lifecycle(action: &str, plan: Plan) -> LifecycleReport {
         held: None,
         offer: None,
         unvetted: None,
+        moves: Vec::new(),
     }
 }

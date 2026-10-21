@@ -113,6 +113,7 @@ fn only_an_update_that_stopped_part_way_is_a_failure() {
             changelog: lemonfiber_core::changelog::Notes::unread(),
             offer: String::new(),
             unvetted: None,
+            moves: Vec::new(),
         })))
     };
 
@@ -148,6 +149,7 @@ fn an_update_that_worked_and_left_the_stack_down_is_not_a_success() {
         changelog: lemonfiber_core::changelog::Notes::unread(),
         offer: String::new(),
         unvetted: None,
+        moves: Vec::new(),
     })));
 
     assert_eq!(left_down, shown(std::process::ExitCode::from(FAILURE)));

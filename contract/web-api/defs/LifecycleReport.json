@@ -39,6 +39,13 @@
         "null"
       ]
     },
+    "moves": {
+      "description": "Each part this release installs as a plugin that the stack still runs as its own\nservice: a move in place on offer, named by every start and taken by none\n(ARCH-R299).",
+      "type": "array",
+      "items": {
+        "$ref": "MoveOffered.json"
+      }
+    },
     "offer": {
       "description": "The offer a restart answers: the services it would restart, named so that a\nrestart carrying it back is carried out against those services or refused.\nAbsent for every other action.",
       "type": [

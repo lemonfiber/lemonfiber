@@ -31,6 +31,7 @@ pub mod guarded;
 pub mod guides;
 pub mod headroom;
 pub mod indexer;
+pub mod moving;
 pub mod narrowing;
 pub mod overlay;
 pub mod permissions;

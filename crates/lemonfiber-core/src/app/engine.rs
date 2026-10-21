@@ -293,6 +293,11 @@ async fn readied(
         held: None,
         offer: None,
         unvetted: crate::overlay::unvetted(ctx),
+        moves: if starts(action) {
+            crate::app::plugins::moving_in::on_offer(ctx, &manifest)
+        } else {
+            Vec::new()
+        },
     };
     Ok((manifest, command, report))
 }

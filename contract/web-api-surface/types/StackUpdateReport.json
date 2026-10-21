@@ -42,6 +42,12 @@
       ],
       "required": true
     },
+    "moves": {
+      "type": [
+        "array[ref:MoveOffered]"
+      ],
+      "required": false
+    },
     "offer": {
       "type": [
         "string"

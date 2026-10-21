@@ -46,6 +46,13 @@
         "type": "string"
       }
     },
+    "moves": {
+      "description": "Each part this release installs as a plugin that the stack still runs as its own\nservice: a move in place on offer, which an update never takes (ARCH-R299).",
+      "type": "array",
+      "items": {
+        "$ref": "MoveOffered.json"
+      }
+    },
     "offer": {
       "description": "The offer this answers: every step, from the release each service stands on to\nthe one it would move to, named so that an update carrying it back takes those\nsteps or is refused.",
       "type": "string"
