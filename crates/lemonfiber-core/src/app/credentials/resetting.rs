@@ -209,6 +209,12 @@ async fn copies(
             state,
         ));
     }
+    for (syncer, state) in crate::seed::run::reprofile(ctx, fillers, &target.id).await {
+        copies.push(copy(
+            format!("{syncer}, which holds {curator}'s quality profiles"),
+            state,
+        ));
+    }
     if let Some(state) =
         crate::seed::run::reroute(ctx, services, fillers, project, &target.id).await
     {

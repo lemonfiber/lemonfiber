@@ -35,6 +35,7 @@ mod keys;
 mod minted;
 mod published;
 pub(crate) use published::published_as;
+mod quality;
 mod subtitles;
 mod taken_back;
 // The request service's connection to the media server, held at the request gate's route
@@ -59,6 +60,7 @@ pub(crate) use curating::curators;
 pub(crate) use gate::reroute;
 pub(crate) use guarding::exposure;
 use identity::seed_request_identity;
+pub(crate) use quality::reprofile;
 pub(crate) use reset::reset_connections;
 pub(crate) use subtitles::rewatch;
 
@@ -250,6 +252,7 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // to look at, and a household gets subtitles for nothing — which looks exactly
     // like releases that happen to have none.
     wirings.extend(subtitles::seed_subtitles(ctx, &fillers).await);
+    wirings.extend(quality::seed_quality(ctx, &fillers).await);
 
     // Persist what this pass recorded as the baseline a later run compares against —
     // unless the record was lost and this is not an adopt pass, in which case the

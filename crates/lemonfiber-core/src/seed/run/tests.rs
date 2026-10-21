@@ -487,6 +487,7 @@ mod linking;
 mod passwords;
 mod proxies;
 mod publishing;
+mod quality;
 mod replacing;
 mod requests;
 mod subtitles;
