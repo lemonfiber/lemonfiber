@@ -1,10 +1,11 @@
 use super::{
-    at_the_door, directory, ensured, household_port, located, upstream, Door, NOT_MADE, NO_ADDRESS,
-    UNREADABLE,
+    at_the_door, directory, ensured, household_port, located, served_at, upstream, Door, NOT_MADE,
+    NO_ADDRESS, REFUSED_DECLARATION, UNDECLARED, UNREADABLE,
 };
 use crate::certificate::Unkept;
 use crate::model::Located;
 use crate::ports::service::{Holds, Item, Medium};
+use lemonfiber_fixtures::declaring::{enforceable, Declares};
 use lemonfiber_fixtures::scratch::Scratch;
 
 const ID: &str = "0123456789abcdef0123456789abcdef";
@@ -23,6 +24,7 @@ fn the_door() -> Door {
     Door::At {
         base: "https://house.local:8920".to_owned(),
         fingerprint: "ab12".to_owned(),
+        locations: lemonfiber_fixtures::declaring::enforceable().locations,
     }
 }
 
@@ -37,14 +39,16 @@ fn a_film_with_both_pictures_is_located_whole_and_pinned() {
     let at = located(held(Medium::Film, EVERYTHING), &the_door()).at;
     assert_eq!(
         at.poster.as_deref(),
-        Some("https://house.local:8920/Items/0123456789abcdef0123456789abcdef/Images/Primary")
+        Some("https://house.local:8920/media/0123456789abcdef0123456789abcdef/poster")
     );
     assert_eq!(
         at.backdrop.as_deref(),
-        Some("https://house.local:8920/Items/0123456789abcdef0123456789abcdef/Images/Backdrop")
+        Some("https://house.local:8920/media/0123456789abcdef0123456789abcdef/backdrop")
     );
-    assert!(at.stream_from.as_deref().is_some_and(|stream| stream
-        .starts_with("https://house.local:8920/Videos/0123456789abcdef0123456789abcdef/master.m3u8?MediaSourceId=0123456789abcdef0123456789abcdef&")));
+    assert_eq!(
+        at.stream_from.as_deref(),
+        Some("https://house.local:8920/media/0123456789abcdef0123456789abcdef/bytes")
+    );
     assert_eq!(
         at.door.map(|door| door.fingerprint).as_deref(),
         Some("ab12")
@@ -109,25 +113,22 @@ fn the_door_is_https_on_its_own_port_only_with_an_address_and_a_certificate() {
 
     assert_eq!(
         at_the_door(Some("http://house.local:8920".to_owned()), Ok(kept.clone())),
-        Door::At {
-            base: "https://house.local:8920".to_owned(),
-            fingerprint: fingerprint.unwrap_or_default(),
-        }
+        Ok((
+            "https://house.local:8920".to_owned(),
+            fingerprint.unwrap_or_default()
+        ))
     );
-    assert_eq!(
-        at_the_door(None, Ok(kept)),
-        Door::Unknown(NO_ADDRESS.to_owned())
-    );
+    assert_eq!(at_the_door(None, Ok(kept)), Err(NO_ADDRESS.to_owned()));
     assert_eq!(
         at_the_door(Some("http://h:8920".to_owned()), Ok(None)),
-        Door::Unknown(NOT_MADE.to_owned())
+        Err(NOT_MADE.to_owned())
     );
     assert_eq!(
         at_the_door(
             Some("http://h:8920".to_owned()),
             Err(Unkept::Unreadable("torn".to_owned()))
         ),
-        Door::Unknown(format!("{UNREADABLE} torn"))
+        Err(format!("{UNREADABLE} torn"))
     );
 }
 
@@ -177,8 +178,37 @@ async fn with_no_stack_directory_the_door_is_unknown_and_says_why() {
         .over(crate::stack::Source::Embedded(&STACKLET))
         .build();
     assert_eq!(
-        super::standing(&ctx).await,
+        super::standing(&ctx, &Declares::declaring(enforceable())).await,
         Door::Unknown(super::NO_STACK.to_owned())
+    );
+}
+
+#[tokio::test]
+async fn the_door_serves_where_the_media_server_declared_it_does() {
+    assert_eq!(
+        served_at(&Declares::declaring(enforceable())).await,
+        Ok(enforceable().locations)
+    );
+}
+
+#[tokio::test]
+async fn a_media_server_that_will_not_say_where_it_serves_locates_nothing() {
+    assert_eq!(
+        served_at(&Declares::silent()).await,
+        Err(UNDECLARED.to_owned())
+    );
+}
+
+#[tokio::test]
+async fn a_declaration_the_door_cannot_hold_a_server_to_locates_nothing() {
+    let mut elsewhere = enforceable();
+    elsewhere.locations.poster = "https://elsewhere.example/{item}".to_owned();
+    let refused = served_at(&Declares::declaring(elsewhere)).await;
+    assert!(
+        refused
+            .as_ref()
+            .is_err_and(|why| why.starts_with(REFUSED_DECLARATION)),
+        "{refused:?}"
     );
 }
 

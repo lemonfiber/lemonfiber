@@ -24,10 +24,10 @@ use super::tokens::{through_the_gate, Kept};
 use super::Ctx;
 use crate::baseline::Baseline;
 use crate::credential::{Reach, Settled};
-use crate::jellyfin::SEERR_APP;
 use crate::ports::media::Kind;
 use crate::ports::service::{RegisteredTarget, Requests};
 use crate::seed::{State, Wiring};
+use crate::seerr::SEERR_APP;
 use crate::wiring::{Filler, Fillers};
 
 /// The stack's own request service among `fillers`, the one that ran before the gate,

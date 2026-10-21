@@ -48,6 +48,8 @@ pub(crate) struct Pairing {
     pub protocol: Protocol,
     /// Where the services beside it reach that API.
     pub at: Address,
+    /// The majors of that API the stack supports.
+    pub majors: Vec<u32>,
 }
 
 /// The service filling the identity source, as everything that reaches it needs it.
@@ -112,6 +114,7 @@ impl MediaServer {
             let pairing = Pairing {
                 protocol: Protocol(ApiKind::Jellyfin.name().to_owned()),
                 at: network.clone(),
+                majors: filler.majors.clone(),
             };
             (Reach::Bundled(ApiKind::Jellyfin), Some(pairing))
         } else {
@@ -149,13 +152,20 @@ impl MediaServer {
     }
 
     /// The kind of route the request gate answers for it, where the gate speaks the API
-    /// it answers in: only this build's adapter's.
+    /// other services sign the household in through it in.
     #[must_use]
-    pub(crate) const fn gate_kind(&self) -> Option<Kind> {
-        match self.reach {
-            Reach::Bundled(ApiKind::Jellyfin) => Some(Kind::Jellyfin),
-            Reach::Bundled(_) | Reach::Over => None,
-        }
+    pub(crate) fn gate_kind(&self) -> Option<Kind> {
+        self.gated().map(|(kind, _)| kind)
+    }
+
+    /// The kind of route the request gate answers for it and where that route reaches,
+    /// where the gate speaks the API other services sign the household in through it in.
+    #[must_use]
+    pub(crate) fn gated(&self) -> Option<(Kind, &Pairing)> {
+        self.pairing
+            .as_ref()
+            .filter(|pairing| pairing.protocol.0 == ApiKind::Jellyfin.name())
+            .map(|pairing| (Kind::Jellyfin, pairing))
     }
 
     /// Whether a rehearsal stands where the identity step mints this server's
@@ -297,6 +307,7 @@ fn upstream_pairing(fillers: &Fillers, filler: &Filler) -> Option<Pairing> {
     Some(Pairing {
         protocol: Protocol(upstream.native.clone()?),
         at: upstream.address.clone()?,
+        majors: upstream.majors.clone(),
     })
 }
 

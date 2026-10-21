@@ -127,7 +127,7 @@ async fn title(ctx: &Ctx, whose: &Whom, id: &str) -> Result<TitleReport, Box<Pro
         .await
         .map_err(|_| unanswered())?
         .ok_or_else(|| refused(NOT_ON_THEIR_SHELF, "That title is not on this shelf"))?;
-    let door = door::standing(ctx).await;
+    let door = door::standing(ctx, server.serve.as_ref()).await;
     let (member, id) = member.map_or_else(Default::default, |member| (member.name, member.id));
     Ok(TitleReport {
         member,
@@ -191,7 +191,7 @@ async fn part_way(ctx: &Ctx, whose: &Whom, most: u32) -> Result<PartWayReport, B
             ..PartWayReport::default()
         });
     };
-    let door = door::standing(ctx).await;
+    let door = door::standing(ctx, server.serve.as_ref()).await;
     Ok(PartWayReport {
         member: member.name,
         id: member.id,

@@ -45,7 +45,7 @@ pub(crate) async fn held(ctx: &Ctx, whose: &Whom, most: u32) -> Result<HeldRepor
         ));
     };
 
-    let door = crate::screening::door::standing(ctx).await;
+    let door = crate::screening::door::standing(ctx, server.serve.as_ref()).await;
     let Whom::Named(member) = whose else {
         return Ok(shelved(
             server.serve.holdings(None, most).await,

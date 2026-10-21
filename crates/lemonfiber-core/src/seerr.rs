@@ -18,6 +18,10 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde::Deserialize;
 
+/// What Seerr files the key it mints for itself under in the media server, on the
+/// sign-in that sets it up without the request gate in front of the media server.
+pub(crate) const SEERR_APP: &str = "Seerr";
+
 mod addressing;
 mod asking;
 mod linking;
