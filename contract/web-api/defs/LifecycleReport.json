@@ -40,7 +40,7 @@
       ]
     },
     "moves": {
-      "description": "Each part this release installs as a plugin that the stack still runs as its own\nservice: a move in place on offer, named by every start and taken by none\n(ARCH-R299).",
+      "description": "Each part this release installs as a plugin that the stack still runs as its own\nservice: a move in place on offer, named by every start and taken by none.",
       "type": "array",
       "items": {
         "$ref": "MoveOffered.json"
