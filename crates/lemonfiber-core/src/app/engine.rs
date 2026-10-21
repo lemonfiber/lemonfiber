@@ -148,13 +148,9 @@ fn compose(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Composed, Box
         &ctx.settings.unmanaged,
     )
     .map_err(|err| Box::new(err.problem()))?;
-    let prepared = super::project::prepared(ctx, &manifest, &plan.services, starts(action))?;
+    let prepared = super::project::prepared(ctx, &manifest, &plan, starts(action))?;
     edits.extend(prepared.edits);
     plan.profiles.extend(prepared.hosting);
-    if starts(action) && !ctx.dry_run {
-        super::project::started(ctx, &plan.profiles)
-            .map_err(|failure| Box::new(failure.problem()))?;
-    }
     let project = prepared.project;
     crate::overlay::journalled(ctx).map_err(|failure| Box::new(failure.problem()))?;
     let command = build(&plan, &ctx.settings, &stack, action, ctx.environment);

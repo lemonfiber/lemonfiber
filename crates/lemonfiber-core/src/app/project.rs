@@ -119,9 +119,10 @@ pub(crate) struct Prepared {
 }
 
 /// Generate the project for `manifest` and what is installed here, and write it as a
-/// lifecycle command does: previewed by a rehearsal, and otherwise written with each
-/// service's secrets file, the stack's own Compose files retired and, where `starting`,
-/// each service's state moved into its mount tree.
+/// lifecycle command running `plan` does: previewed by a rehearsal, and otherwise written
+/// with each service's secrets file and the stack's own Compose files retired and, where
+/// `starting`, with the profiles of the start beside it and each service's state moved
+/// into its mount tree.
 ///
 /// # Errors
 ///
@@ -130,7 +131,7 @@ pub(crate) struct Prepared {
 pub(crate) fn prepared(
     ctx: &Ctx,
     manifest: &Manifest,
-    services: &[String],
+    plan: &crate::stack::closure::Plan,
     starting: bool,
 ) -> Result<Prepared, Box<Problem>> {
     let register = super::plugins::read(ctx)?;
@@ -146,7 +147,10 @@ pub(crate) fn prepared(
     } else {
         Pass::Write
     };
-    let edits = materialised(ctx, &project.text, pass)
+    let hosting = hosting(manifest, installed, &project, &plan.services);
+    let profiles: Option<BTreeSet<String>> =
+        starting.then(|| plan.profiles.iter().chain(&hosting).cloned().collect());
+    let edits = materialised_with(ctx, &project.text, pass, profiles.as_ref())
         .map_err(|failure| Box::new(failure.problem()))?
         .into_iter()
         .collect();
@@ -157,7 +161,6 @@ pub(crate) fn prepared(
             moved(ctx, manifest)?;
         }
     }
-    let hosting = hosting(manifest, installed, &project, services);
     Ok(Prepared {
         project,
         edits,
@@ -227,15 +230,6 @@ fn held_as(ctx: &Ctx, name: &str) -> Option<String> {
     )
     .ok()
     .flatten()
-}
-
-/// Write beside the project the profiles a start of `profiles` runs, and every plugin's.
-///
-/// # Errors
-///
-/// Where there is no project directory, or the file cannot be read or written.
-pub(crate) fn started(ctx: &Ctx, profiles: &BTreeSet<String>) -> Result<(), Failure> {
-    profiled::started(ctx, profiles, &held(ctx).unwrap_or_default())
 }
 
 /// The record of what lemonfiber last wrote, beside the settings.
@@ -341,9 +335,27 @@ pub(crate) fn materialised(
     text: &str,
     pass: Pass,
 ) -> Result<Option<StackEdit>, Failure> {
+    materialised_with(ctx, text, pass, None)
+}
+
+/// The same, with the profiles of a start written beside it where `started` names them,
+/// and those of the last start kept otherwise.
+///
+/// # Errors
+///
+/// Where there is no project directory, or the project cannot be read or written.
+pub(crate) fn materialised_with(
+    ctx: &Ctx,
+    text: &str,
+    pass: Pass,
+    started: Option<&BTreeSet<String>>,
+) -> Result<Option<StackEdit>, Failure> {
     let edit = materialised_as(ctx, FILE, text, pass)?;
     if pass != Pass::Preview {
-        profiled::kept(ctx, text)?;
+        started.map_or_else(
+            || profiled::kept(ctx, text),
+            |profiles| profiled::started(ctx, profiles, text),
+        )?;
     }
     Ok(edit)
 }

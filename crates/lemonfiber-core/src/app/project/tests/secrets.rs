@@ -81,7 +81,12 @@ fn the_operators_values_are_written_in_and_no_secret_reaches_the_project_or_its_
         .unwrap_or_default();
 
     let written = super::super::materialised(&ctx, &text, super::super::Pass::Write);
-    let started = super::super::started(&ctx, &["media".to_owned()].into_iter().collect());
+    let started = super::super::materialised_with(
+        &ctx,
+        &super::super::held(&ctx).unwrap_or_default(),
+        super::super::Pass::Write,
+        Some(&["media".to_owned()].into_iter().collect()),
+    );
 
     assert!(
         written.is_ok() && started.is_ok(),

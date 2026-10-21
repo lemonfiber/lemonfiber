@@ -20,7 +20,12 @@ fn a_start_names_its_profiles_and_a_later_write_keeps_them_beside_every_plugins(
         "COMPOSE_PROFILES=plugin-komga\nCOMPOSE_FILE=compose.generated.yml\n"
     );
 
-    let started = super::super::started(&ctx, &["media".to_owned()].into_iter().collect());
+    let started = super::super::materialised_with(
+        &ctx,
+        &super::super::held(&ctx).unwrap_or_default(),
+        super::super::Pass::Write,
+        Some(&["media".to_owned()].into_iter().collect()),
+    );
     assert!(started.is_ok(), "{started:?}");
     assert_eq!(
         beside(&project),
@@ -41,7 +46,12 @@ fn a_profiles_file_somebody_edited_is_kept() {
     assert!(super::super::kept(&ctx, HOLDING).is_ok());
     assert!(std::fs::write(project.join(".env"), "COMPOSE_PROFILES=mine\n").is_ok());
 
-    let started = super::super::started(&ctx, &["media".to_owned()].into_iter().collect());
+    let started = super::super::materialised_with(
+        &ctx,
+        &super::super::held(&ctx).unwrap_or_default(),
+        super::super::Pass::Write,
+        Some(&["media".to_owned()].into_iter().collect()),
+    );
 
     assert!(started.is_ok(), "{started:?}");
     assert_eq!(beside(&project), "COMPOSE_PROFILES=mine\n");

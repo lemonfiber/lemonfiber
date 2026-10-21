@@ -31,9 +31,18 @@ fn secrets_blocked(ctx: &Ctx) {
     }
 }
 
-/// Prepare the project for a start, as a start does.
+/// Prepare the project for a run that starts nothing, as a teardown does.
 fn preparing(ctx: &Ctx) -> bool {
-    manifest().is_some_and(|manifest| super::super::prepared(ctx, &manifest, &[], false).is_ok())
+    let plan = crate::stack::closure::Plan {
+        forms: Vec::new(),
+        profiles: std::collections::BTreeSet::new(),
+        services: Vec::new(),
+        dropped: Vec::new(),
+        filtered: Vec::new(),
+        footprint: crate::stack::closure::Footprint::default(),
+        running: crate::stack::closure::Running::Unasked,
+    };
+    manifest().is_some_and(|manifest| super::super::prepared(ctx, &manifest, &plan, false).is_ok())
 }
 
 /// Write the project as a change to what is installed does.
@@ -44,7 +53,7 @@ fn rewriting(ctx: &Ctx) -> bool {
 }
 
 #[test]
-fn a_start_whose_project_cannot_be_written_is_refused() {
+fn a_run_whose_project_cannot_be_written_is_refused() {
     let (ctx, project) = machine("unwritable-start");
     blocked(&project.join(crate::project::FILE));
 
@@ -52,7 +61,7 @@ fn a_start_whose_project_cannot_be_written_is_refused() {
 }
 
 #[test]
-fn a_start_whose_secrets_cannot_be_written_is_refused() {
+fn a_run_whose_secrets_cannot_be_written_is_refused() {
     let (ctx, _) = machine("unfiled-start");
     secrets_blocked(&ctx);
 
