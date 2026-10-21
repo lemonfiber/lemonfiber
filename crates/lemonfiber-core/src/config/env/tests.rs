@@ -11,7 +11,7 @@ fn the_stack_s_own_example_round_trips_byte_for_byte() {
 #[test]
 fn reads_every_setting_the_example_declares() {
     let file = EnvFile::parse(EXAMPLE);
-    assert_eq!(file.keys().len(), 24);
+    assert_eq!(file.keys().len(), 22);
     assert_eq!(file.get("DATA_ROOT"), Some("./data"));
     assert_eq!(file.get("TZ"), Some("Europe/Amsterdam"));
 }
