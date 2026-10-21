@@ -6,7 +6,7 @@ use lemonfiber_sidecar::decline::{Lapse, Lapses, Outcome, Refusal, Refusals, Tok
 
 use super::{Decline, DeclineKeyCheck, KeyDates, MARGIN, UNEXPLAINED};
 use crate::config::store;
-use crate::doctor::{Check, Verdict};
+use crate::doctor::{Category, Check, Verdict};
 use crate::ports::service::Dated;
 
 /// 2026-10-05T00:00:00Z, in seconds since the Unix epoch.
@@ -108,6 +108,8 @@ async fn a_stack_without_the_decline_service_has_no_key_to_account_for() {
     let check = DeclineKeyCheck::new(files(), None);
 
     let found = check.run().await;
+
+    assert_eq!(check.category(), Category::Services);
 
     assert!(matches!(
         found.first().map(|one| &one.verdict),

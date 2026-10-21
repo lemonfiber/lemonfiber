@@ -1,6 +1,6 @@
 use super::{
-    at_the_door, directory, ensured, household_port, located, served_at, upstream, Door, NOT_MADE,
-    NO_ADDRESS, REFUSED_DECLARATION, UNDECLARED, UNREADABLE,
+    at_the_door, directory, ensured, household_port, located, served_at, upstream, Door, GUARDED,
+    NOT_MADE, NO_ADDRESS, REFUSED_DECLARATION, UNDECLARED, UNREADABLE,
 };
 use crate::certificate::Unkept;
 use crate::model::Located;
@@ -9,6 +9,9 @@ use lemonfiber_fixtures::declaring::{enforceable, Declares};
 use lemonfiber_fixtures::scratch::Scratch;
 
 const ID: &str = "0123456789abcdef0123456789abcdef";
+
+static STACKLET: include_dir::Dir<'_> =
+    include_dir::include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/stacklet");
 
 fn held(medium: Medium, holds: Holds) -> Item {
     Item {
@@ -24,7 +27,7 @@ fn the_door() -> Door {
     Door::At {
         base: "https://house.local:8920".to_owned(),
         fingerprint: "ab12".to_owned(),
-        locations: lemonfiber_fixtures::declaring::enforceable().locations,
+        locations: enforceable().locations,
     }
 }
 
@@ -172,14 +175,50 @@ fn the_household_reaches_the_media_server_at_the_doors_port_where_there_is_one()
 /// rather than locating anything.
 #[tokio::test]
 async fn with_no_stack_directory_the_door_is_unknown_and_says_why() {
-    static STACKLET: include_dir::Dir<'_> =
-        include_dir::include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/stacklet");
     let ctx = crate::test_support::a_context()
         .over(crate::stack::Source::Embedded(&STACKLET))
         .build();
     assert_eq!(
         super::standing(&ctx, &Declares::declaring(enforceable())).await,
         Door::Unknown(super::NO_STACK.to_owned())
+    );
+}
+
+/// A door with an address and a certificate locates titles where the media server behind
+/// it declared it serves them; without an address, or a declaration, it locates nothing
+/// and says why.
+#[tokio::test]
+async fn a_standing_door_locates_where_the_server_behind_it_declared() {
+    const HOUSEHOLD_HOST: &str = "192.168.1.20";
+    let project = Scratch::new("door-standing");
+    let fingerprint = ensured(project.path()).map(|kept| kept.fingerprint).ok();
+    let standing_at = |household_host: Option<&str>| {
+        crate::test_support::a_context()
+            .over(crate::stack::Source::Embedded(&STACKLET))
+            .settings(crate::config::Settings {
+                stack_dir: Some(project.path().to_path_buf()),
+                household_host: household_host.map(str::to_owned),
+                ..crate::config::Settings::default()
+            })
+            .build()
+    };
+    let addressed = standing_at(Some(HOUSEHOLD_HOST));
+
+    assert_eq!(
+        super::standing(&addressed, &Declares::declaring(enforceable())).await,
+        Door::At {
+            base: format!("https://{HOUSEHOLD_HOST}:{GUARDED}"),
+            fingerprint: fingerprint.unwrap_or_default(),
+            locations: enforceable().locations,
+        }
+    );
+    assert_eq!(
+        super::standing(&addressed, &Declares::silent()).await,
+        Door::Unknown(UNDECLARED.to_owned())
+    );
+    assert_eq!(
+        super::standing(&standing_at(None), &Declares::declaring(enforceable())).await,
+        Door::Unknown(NO_ADDRESS.to_owned())
     );
 }
 
