@@ -93,6 +93,15 @@ pub(crate) async fn asked(
     }
 }
 
+/// Whether the service filling `invite.decline` may be handed a key the media server
+/// `server` holds: the key administers the whole server, so it crosses only where any of
+/// that server's credentials may.
+pub(crate) fn may_hold(fillers: &Fillers, server: &crate::wiring::Filler) -> bool {
+    fillers
+        .filling(decline::CAPABILITY)
+        .is_some_and(|(filler, _)| crate::wiring::crosses(server.holder(), filler.holder()))
+}
+
 /// Where one of the files the core and the decline service hand each other lives: the
 /// service's configuration directory, under the project root the stack's config volumes
 /// are mounted from.

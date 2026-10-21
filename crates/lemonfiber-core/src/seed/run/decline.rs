@@ -74,6 +74,16 @@ pub(super) async fn seed_decline_key(
             },
         ));
     };
+    if !declining::may_hold(fillers, &server.filler) {
+        return Some(settled(
+            server,
+            State::Skipped {
+                reason: "the service filling invite.decline is not one the media server's key \
+                         may be handed to, so it is handed none"
+                    .to_owned(),
+            },
+        ));
+    }
     let Some(decline) = declining::asked(ctx, fillers, project).await else {
         return Some(settled(
             server,
