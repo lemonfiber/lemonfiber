@@ -8,12 +8,17 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
-use lemonfiber_sidecar::decline::{File, Invitation, Lapses, Outcome, Refusals, Table, TokenHash};
+use lemonfiber_contract::capabilities::invite::decline;
+use lemonfiber_sidecar::decline::{File, Lapses, Outcome, Refusals, TokenHash};
 
+use crate::app::targets::{spoken, Spoken};
 use crate::app::Ctx;
 use crate::invitation::Offers;
-use crate::ports::service::Member;
+use crate::origin::Origin;
+use crate::ports::service::{Claimed, Declinable, Declining, Invitations, Member};
+use crate::wiring::Fillers;
 
 /// The decline service's id in the stack manifest.
 pub(crate) const SERVICE: &str = "decline";
@@ -37,23 +42,23 @@ pub(super) fn minted(ctx: &Ctx) -> Option<String> {
         .map(|bytes| crate::secret::render(&bytes))
 }
 
-/// The table the decline service reads, from the offers still out.
+/// The invitations the decline service may act on, from the offers still out.
 ///
-/// An offer is in it where it carries a token and its account is still an unclaimed
+/// An offer is in them where it carries a token and its account is still an unclaimed
 /// member of the household: a claimed account is no invitation, and one that is gone
 /// has nothing to decline.
-pub(super) fn table(offers: &Offers, household: &[Member]) -> Table {
-    Table::of(
+pub(super) fn invitations(offers: &Offers, household: &[Member]) -> Invitations {
+    Invitations {
         // The pinned media server says whether an account has a password.
-        lemonfiber_sidecar::decline::Claimed::HasPassword,
-        offers
+        claimed: Claimed::HasPassword,
+        invitations: offers
             .iter()
             .filter_map(|(id, offer)| {
                 let member = household
                     .iter()
                     .find(|member| &member.id == id && !member.claimed)?;
-                Some(Invitation {
-                    token: offer.decline.clone()?,
+                Some(Declinable {
+                    token: offer.decline.as_ref()?.as_str().to_owned(),
                     account: id.clone(),
                     name: member.name.clone(),
                     issued: seconds(&offer.offered)?,
@@ -61,7 +66,40 @@ pub(super) fn table(offers: &Offers, household: &[Member]) -> Table {
                 })
             })
             .collect(),
-    )
+    }
+}
+
+/// The decline service as the core asks it: over `invite.decline` where the service
+/// filling it speaks it, and through the files it reads where it is the stack's own or a
+/// first-party service standing in for it.
+///
+/// Nothing where nothing fills it, or where it speaks the contract and cannot be asked
+/// over it.
+pub(crate) async fn asked(
+    ctx: &Ctx,
+    fillers: &Fillers,
+    project: &Path,
+) -> Option<Arc<dyn Declining>> {
+    let (filler, _) = fillers.filling(decline::CAPABILITY)?;
+    match spoken(ctx, filler, decline::CAPABILITY, decline::MAJOR).await {
+        Spoken::Over(adapter) => Some(Arc::new(decline::Adapter(adapter))),
+        Spoken::Unanswered => None,
+        Spoken::Not => (filler.origin == Origin::Bundled || filler.stands_in()).then(|| {
+            Arc::new(configured::Configured::at(
+                project,
+                ctx.seams.filesystem.clone(),
+            )) as Arc<dyn Declining>
+        }),
+    }
+}
+
+/// Whether the service filling `invite.decline` may be handed a key the media server
+/// `server` holds: the key administers the whole server, so it crosses only where any of
+/// that server's credentials may.
+pub(crate) fn may_hold(fillers: &Fillers, server: &crate::wiring::Filler) -> bool {
+    fillers
+        .filling(decline::CAPABILITY)
+        .is_some_and(|(filler, _)| crate::wiring::crosses(server.holder(), filler.holder()))
 }
 
 /// Where one of the files the core and the decline service hand each other lives: the
@@ -163,13 +201,19 @@ pub(super) async fn address(
 /// out without a decline address rather than with one that declines nothing.
 pub(super) async fn issued(
     ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
+    manifest: &lemonfiber_manifest::Manifest,
     household: &[Member],
     member: &Member,
 ) -> Option<String> {
-    let service = service(services)?;
+    let service = service(&manifest.services)?;
     let project =
         crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref())?;
+    let declining = asked(
+        ctx,
+        &crate::app::targets::fillers_here(ctx, manifest),
+        &project,
+    )
+    .await?;
     let token = minted(ctx)?;
     let offers: Offers = crate::app::record::beside(ctx, crate::invitation::RECORD);
     let offers = with_token(offers, &member.id, &token)?;
@@ -182,11 +226,10 @@ pub(super) async fn issued(
     if !household.iter().any(|held| held.id == member.id) {
         household.push(member.clone());
     }
-    crate::config::store::write(
-        &path(&project, File::Table),
-        &table(&offers, &household).written(),
-    )
-    .ok()?;
+    declining
+        .apply_invitations(&invitations(&offers, &household))
+        .await
+        .ok()?;
     address(ctx, service, &token).await
 }
 
@@ -195,6 +238,8 @@ pub(super) fn seconds(moment: &str) -> Option<u64> {
     let at: jiff::Timestamp = moment.parse().ok()?;
     u64::try_from(at.as_second()).ok()
 }
+
+mod configured;
 
 #[cfg(test)]
 mod tests;

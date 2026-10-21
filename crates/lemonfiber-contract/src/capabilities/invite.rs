@@ -23,7 +23,7 @@ crate::contract! {
         impl Declining {
             /// Switch an invitation off with this key from now on.
             fn hold(str key: &str) -> () where asks = Asked { key: Placeholder::Minted.written() };
-            /// The key it holds, by its fingerprint: `~` and the low sixteen bits of the 64-bit FNV-1a hash of its bytes, as four lower-case hexadecimal digits.
+            /// The key it holds, by the SHA-256 of its bytes in lower-case hexadecimal: never the key itself.
             fn held() -> Option<String> where asks = Asked {};
             /// Act on these invitations alone, telling a claimed account as the media server does.
             fn apply_invitations(refer invitations: &Invitations as Invitations) -> () where asks = Asked {

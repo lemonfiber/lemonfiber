@@ -2,7 +2,7 @@ use std::path::Path;
 
 use lemonfiber_sidecar::decline::TokenHash;
 
-use super::{path, table, with_token};
+use super::{invitations, path, with_token};
 use crate::invitation::{Offer, Offers};
 use crate::ports::service::Member;
 
@@ -25,7 +25,7 @@ fn offer(decline: Option<&str>) -> Offer {
 }
 
 #[test]
-fn the_table_holds_each_unclaimed_offer_that_carries_a_token() {
+fn the_invitations_hold_each_unclaimed_offer_that_carries_a_token() {
     let offers: Offers = [
         ("9".to_owned(), offer(Some("ana-token"))),
         ("10".to_owned(), offer(None)),
@@ -40,10 +40,13 @@ fn the_table_holds_each_unclaimed_offer_that_carries_a_token() {
         member("11", "bo", true),
     ];
 
-    let table = table(&offers, &household);
+    let held = invitations(&offers, &household);
 
-    assert_eq!(table.invitations.len(), 1);
-    let ana = table.find(&TokenHash::of("ana-token"));
+    assert_eq!(held.invitations.len(), 1);
+    let ana = held
+        .invitations
+        .iter()
+        .find(|one| one.token == TokenHash::of("ana-token").as_str());
     assert_eq!(
         ana.map(|one| (one.account.as_str(), one.name.as_str())),
         Some(("9", "ana"))
@@ -60,7 +63,7 @@ fn an_offer_whose_dates_cannot_be_read_is_left_out() {
     unreadable.offered = "yesterday".to_owned();
     let offers: Offers = [("9".to_owned(), unreadable)].into_iter().collect();
 
-    assert!(table(&offers, &[member("9", "ana", false)])
+    assert!(invitations(&offers, &[member("9", "ana", false)])
         .invitations
         .is_empty());
 }
@@ -237,4 +240,105 @@ async fn without_a_stack_on_disk_nobody_is_declined() {
         .over(crate::stack::Source::Embedded(&STACKLET))
         .build();
     assert!(super::declined(&unwritten, &offers).await.is_empty());
+}
+
+/// The plugin that fills the decline service in the tests that ask it.
+const THEIRS: &str = "their-decline";
+
+/// The decline service filled by [`THEIRS`] alone, speaking its contract where `speaks`,
+/// written at `project` and trusted as first-party.
+fn filled_by_theirs(project: &Path, speaks: bool) -> crate::wiring::Fillers {
+    use crate::test_support::{a_placed, an_installed, contracted, CONTRACTED_PORT};
+    let installed = if speaks {
+        contracted(THEIRS, THEIRS, super::decline::CAPABILITY)
+    } else {
+        an_installed(
+            THEIRS,
+            vec![a_placed(
+                THEIRS,
+                &[super::decline::CAPABILITY],
+                None,
+                Some(CONTRACTED_PORT),
+            )],
+        )
+    };
+    crate::test_support::stack_fillers(
+        Vec::new(),
+        &[installed],
+        Some(project),
+        &crate::test_support::first_party(THEIRS),
+    )
+}
+
+/// A context reaching [`THEIRS`] holding its key where `keyed`, over a stack written to
+/// `project`, answering every call over `http`.
+fn reaching_theirs(
+    project: &Path,
+    keyed: bool,
+    http: std::sync::Arc<lemonfiber_fixtures::http::Fake>,
+) -> crate::app::Ctx {
+    crate::test_support::contracted_context(project, THEIRS, keyed)
+        .settings(crate::config::Settings {
+            env_file: Some(project.join(".env")),
+            stack_dir: Some(project.to_path_buf()),
+            ..crate::config::Settings::default()
+        })
+        .build()
+        .with_http(http)
+}
+
+/// A decline service that speaks its contract is asked over it.
+#[tokio::test]
+async fn a_decline_service_speaking_its_contract_is_asked_over_it() {
+    use lemonfiber_fixtures::http::{Answer, Fake};
+    let project = lemonfiber_fixtures::scratch::Scratch::new("decline-asked-over");
+    let http = Fake::always(Answer::reply(200, "null"));
+    let ctx = reaching_theirs(&project, true, http.clone());
+
+    let asked = super::asked(&ctx, &filled_by_theirs(&project, true), &project).await;
+    let held = match asked {
+        Some(decline) => decline.held().await.ok(),
+        None => None,
+    };
+
+    assert_eq!(held, Some(None));
+    assert_eq!(
+        http.request().map(|request| request.url),
+        Some(format!(
+            "http://127.0.0.1:{}/lemonfiber/invite.decline/v1/held",
+            crate::test_support::CONTRACTED_PORT
+        ))
+    );
+}
+
+/// A decline service that speaks its contract and cannot be reached over it is not
+/// asked at all, never through the files its own service reads.
+#[tokio::test]
+async fn a_decline_service_that_cannot_be_reached_over_its_contract_is_not_asked() {
+    use lemonfiber_fixtures::http::{Answer, Fake};
+    let project = lemonfiber_fixtures::scratch::Scratch::new("decline-asked-unanswered");
+    let http = Fake::always(Answer::reply(200, "null"));
+    let ctx = reaching_theirs(&project, false, http.clone());
+
+    assert!(
+        super::asked(&ctx, &filled_by_theirs(&project, true), &project)
+            .await
+            .is_none()
+    );
+    assert!(http.request().is_none());
+}
+
+/// A plugin filling the decline service that neither speaks its contract nor stands in
+/// for the stack's own is asked nothing.
+#[tokio::test]
+async fn a_plugin_that_neither_speaks_the_contract_nor_stands_in_is_not_asked() {
+    use lemonfiber_fixtures::http::{Answer, Fake};
+    let project = lemonfiber_fixtures::scratch::Scratch::new("decline-asked-unspoken");
+    let ctx = reaching_theirs(&project, true, Fake::always(Answer::reply(200, "null")));
+
+    assert!(
+        super::asked(&ctx, &filled_by_theirs(&project, false), &project)
+            .await
+            .is_none()
+    );
 }

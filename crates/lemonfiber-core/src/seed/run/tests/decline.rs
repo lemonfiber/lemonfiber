@@ -11,7 +11,10 @@ const APP: &str = crate::app_keys::DECLINE_APP;
 fn stack(declining: bool) -> Vec<lemonfiber_manifest::Service> {
     let mut services = vec![media_server_svc(), requests_svc()];
     if declining {
-        services.push(manifest_service("decline", None, Some(5056)));
+        let mut decline = manifest_service("decline", None, Some(5056));
+        decline.provides =
+            vec![lemonfiber_contract::capabilities::invite::decline::CAPABILITY.to_owned()];
+        services.push(decline);
     }
     services
 }
@@ -182,6 +185,152 @@ async fn a_key_the_media_server_dropped_is_replaced() {
     assert_eq!(state, Some(State::Wired));
     assert_eq!(held(&at).as_deref(), Some("fresh"));
     assert_eq!(revoked, vec!["stray".to_owned()]);
+}
+
+/// What the service holds is told by its hash: two keys whose short fingerprints match are
+/// still two keys, and only the one it holds is kept.
+#[tokio::test]
+async fn a_key_is_told_from_one_sharing_its_short_fingerprint() {
+    const HELD: &str = "000000000000031d";
+    const TWIN: &str = "00000000000008d8";
+    assert_eq!(
+        crate::ports::fingerprint(HELD),
+        crate::ports::fingerprint(TWIN)
+    );
+    let http = serving(&[&[TWIN, HELD]], 204);
+    let (ctx, at) = decline_ctx("decline-key-twins", true, Some(HELD), http.clone());
+
+    let (state, revoked) = seeded(&ctx, &http, true, &at).await;
+
+    assert_eq!(state, Some(State::Wired));
+    assert_eq!(held(&at).as_deref(), Some(HELD));
+    assert_eq!(revoked, vec![TWIN.to_owned()]);
+}
+
+/// A plugin nobody vouches for filling `invite.decline` is handed no media server key:
+/// the key administers the whole server, so nothing is minted for it.
+#[tokio::test]
+async fn a_stranger_filling_decline_is_handed_no_key() {
+    let http = serving(&[&[]], 204);
+    let (ctx, at) = decline_ctx("decline-key-stranger", true, None, http.clone());
+    let services = vec![
+        media_server_svc(),
+        requests_svc(),
+        manifest_service("decline", None, Some(5056)),
+    ];
+    let stranger = crate::test_support::an_installed(
+        "their-decline",
+        vec![crate::test_support::a_placed(
+            "their-decline",
+            &[lemonfiber_contract::capabilities::invite::decline::CAPABILITY],
+            None,
+            Some(5057),
+        )],
+    );
+    let fillers = super::fillers_beside(services.clone(), &[stranger], &at);
+
+    let wiring =
+        super::super::decline::seed_decline_key(&ctx, &services, &fillers, Some(&at)).await;
+
+    assert!(
+        matches!(
+            wiring.map(|one| one.state),
+            Some(State::Skipped { reason }) if reason.contains("may be handed to")
+        ),
+        "a stranger was not refused the key as a stranger"
+    );
+    assert!(
+        http.requests()
+            .iter()
+            .all(|asked| !(asked.method == Method::Post && asked.url.ends_with("/Auth/Keys"))),
+        "a key was minted for a stranger"
+    );
+    assert_eq!(held(&at), None);
+}
+
+/// The media server's key crosses to the stack's own decline service and to a first-party
+/// one, and never to a stranger's.
+#[test]
+fn the_media_servers_key_crosses_only_where_any_of_its_credentials_may() {
+    use crate::app::invite::declining::may_hold;
+    use crate::test_support::{a_placed, an_installed, first_party};
+
+    let at = std::path::Path::new("/stack");
+    let without = vec![media_server_svc(), requests_svc()];
+    let holds = |fillers: &crate::wiring::Fillers| {
+        fillers
+            .service(&media_server_svc().id)
+            .is_some_and(|server| may_hold(fillers, server))
+    };
+
+    assert!(holds(&super::fillers_at(stack(true), at)));
+
+    let stranger = an_installed(
+        "their-decline",
+        vec![a_placed(
+            "their-decline",
+            &[lemonfiber_contract::capabilities::invite::decline::CAPABILITY],
+            None,
+            Some(5057),
+        )],
+    );
+    assert!(!holds(&super::fillers_trusting(
+        without.clone(),
+        std::slice::from_ref(&stranger),
+        at,
+        &[]
+    )));
+
+    let mut vouched = stranger;
+    vouched.manifest = crate::test_support::CONTRACTED_MANIFEST.to_owned();
+    vouched.tree = crate::test_support::A_TREE.to_owned();
+    assert!(holds(&super::fillers_trusting(
+        without,
+        &[vouched],
+        at,
+        &first_party("their-decline")
+    )));
+}
+
+/// A first-party decline service that speaks its contract but cannot be asked over it is
+/// handed no key, and nothing is minted for it.
+#[tokio::test]
+async fn a_decline_service_that_cannot_be_asked_is_handed_no_key() {
+    let http = serving(&[&[]], 204);
+    let (ctx, at) = decline_ctx("decline-key-unasked", true, None, http.clone());
+    let services = vec![
+        media_server_svc(),
+        requests_svc(),
+        manifest_service("decline", None, Some(5056)),
+    ];
+    let theirs = crate::test_support::contracted(
+        "their-decline",
+        "their-decline",
+        lemonfiber_contract::capabilities::invite::decline::CAPABILITY,
+    );
+    let fillers = super::fillers_trusting(
+        services.clone(),
+        &[theirs],
+        &at,
+        &crate::test_support::first_party("their-decline"),
+    );
+
+    let wiring =
+        super::super::decline::seed_decline_key(&ctx, &services, &fillers, Some(&at)).await;
+
+    assert!(
+        matches!(
+            wiring.map(|one| one.state),
+            Some(State::Skipped { reason }) if reason.contains("cannot be asked over its contract")
+        ),
+        "a decline service that cannot be asked was not said to be"
+    );
+    assert!(
+        http.requests()
+            .iter()
+            .all(|asked| !(asked.method == Method::Post && asked.url.ends_with("/Auth/Keys"))),
+        "a key was minted for a service that cannot be asked"
+    );
 }
 
 /// A stack that no longer runs the service has every key filed under its name revoked.
