@@ -62,7 +62,7 @@ services:
     - KILL
     pids_limit: 1024
   bindery:
-    image: ghcr.io/vavallee/bindery:v1.41.0@sha256:28871d79c624f92acae9dac91b1a20da2d9031cf7faa1967d88cee378f360c08
+    image: ghcr.io/vavallee/bindery:v1.43.1@sha256:27109c963f91a27f08d8825b406b2b5a5c59aed080bd9f3a7e585e235673d489
     profiles:
     - books
     restart: unless-stopped
@@ -307,6 +307,7 @@ services:
     - ask__bazarr__dashboard.show__homepage
     - ask__gluetun__dashboard.show__homepage
     - ask__homepage__proxy.front__caddy
+    - ask__jellyfin__dashboard.show__homepage
     - ask__lidarr__dashboard.show__homepage
     - ask__navidrome__dashboard.show__homepage
     - ask__prowlarr__dashboard.show__homepage
@@ -425,7 +426,7 @@ services:
     - KILL
     pids_limit: 1024
   prowlarr:
-    image: lscr.io/linuxserver/prowlarr:2.6.5.5623-ls163@sha256:f9151e5bc1025c6d0a630d503210cdcb6bb55a7cc098562609d96a408d838902
+    image: lscr.io/linuxserver/prowlarr:2.6.5.5623-ls164@sha256:4e992f9b9229bc8c97c666b10b042a7360bce1d99b196e8aa29fd9805849cbf1
     profiles:
     - search
     restart: unless-stopped
@@ -744,6 +745,7 @@ services:
     networks:
     - ask__decline__identity.source__jellyfin
     - ask__door__media.serve__jellyfin
+    - ask__jellyfin__dashboard.show__homepage
     - ask__request-gate__identity.source__jellyfin
     - ask__seerr__identity.source__jellyfin
     - link__decline__jellyfin
@@ -800,6 +802,8 @@ networks:
   ask__gluetun__dashboard.show__homepage:
     internal: true
   ask__homepage__proxy.front__caddy:
+    internal: true
+  ask__jellyfin__dashboard.show__homepage:
     internal: true
   ask__lidarr__dashboard.show__homepage:
     internal: true

@@ -63,7 +63,7 @@ fn headers(presents: &str) -> Vec<(String, String)> {
 #[test]
 fn a_guard_enforcing_the_declaration_answers_every_case_of_the_door_as_the_door_does() {
     let cases: Vec<Case> = serde_json::from_str(include_str!("door.json")).unwrap_or_default();
-    assert_eq!(cases.len(), 87);
+    assert_eq!(cases.len(), 91);
     let declared = declared();
     let differing: Vec<&str> = cases
         .iter()
@@ -111,5 +111,33 @@ fn a_byte_route_naming_an_id_with_more_before_or_after_it_is_refused() {
     for path in &declared.bytes {
         assert!(!matching(&path.item, &format!("x{OPEN}")));
         assert!(!matching(&path.item, &format!("{OPEN}x")));
+    }
+}
+
+#[test]
+fn a_trickplay_tile_asks_about_the_source_it_names_under_every_spelling_jellyfin_reads() {
+    let declared = declared();
+    let session = headers("authorization");
+    for (query, passing) in [
+        ("?MediaSourceId={open}", true),
+        ("", true),
+        ("?MediaSourceId={closed}", false),
+        ("?mediasourceid={closed}", false),
+        ("?MEDIASOURCEID={closed}", false),
+        ("?mediasourceid={open}", false),
+        ("?MediaSourceId={open}&MediaSourceId={closed}", false),
+        ("?MediaSourceId={open}&MediaSourceId={open}", false),
+        ("?MediaSource%49d={closed}", false),
+        ("?MediaSourceId={closed_upper}", false),
+        ("?itemId={closed}", false),
+        ("?ITEMID={closed}", false),
+        ("?LiveStreamId=planted", false),
+    ] {
+        let path = format!("/Videos/{{open}}/Trickplay/320/0.jpg{query}");
+        assert_eq!(
+            passes(&declared, &target(&path), &session),
+            passing,
+            "{path}"
+        );
     }
 }

@@ -264,14 +264,6 @@ pub const SHOWN: &[(&str, &str)] = &[
         "DOMAIN",
         "the hostname real certificates are obtained for, which is public in the certificate",
     ),
-    (
-        super::NAS_HOST_KEY,
-        "the machine the network mount is exported from",
-    ),
-    (
-        super::NAS_EXPORT_KEY,
-        "the share on that machine the data root lives on",
-    ),
 ];
 
 /// Whether a setting's value is displayed as it was written.
