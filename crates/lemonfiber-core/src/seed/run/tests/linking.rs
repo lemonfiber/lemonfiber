@@ -1,7 +1,7 @@
 //! The request service pointed at the media server through the request gate, and handed the
 //! token it reaches the media server with after its setup.
 
-use lemonfiber_sidecar::gate::{Accepted, File, Tokens, PORT};
+use lemonfiber_sidecar::gate::{Accepted, File, Kind, Tokens, PORT};
 use lemonfiber_sidecar::TokenHash;
 
 use super::*;
@@ -15,7 +15,7 @@ fn minted() -> String {
 fn stack(gating: bool) -> Vec<lemonfiber_manifest::Service> {
     let mut services = vec![media_server_svc(), requests_svc()];
     if gating {
-        services.push(manifest_service("request-gate", None, Some(PORT)));
+        services.push(request_gate());
     }
     services
 }
@@ -33,11 +33,16 @@ fn accepting(tokens: &[&str]) -> Tokens {
     }])
 }
 
-/// A stack directory where the gate accepts `accepted` on the media server's route.
+/// The key the gate presents on its media server route, filed under its name there.
+const GATES_KEY: &str = "gates-key";
+
+/// A stack directory where the gate routes to the media server under [`GATES_KEY`] and
+/// accepts `accepted` there.
 fn project(name: &str, accepted: &[&str]) -> std::path::PathBuf {
     let at = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
     let _ = std::fs::remove_dir_all(&at);
     let _ = std::fs::create_dir_all(&at);
+    routed(&at, &[("jellyfin", Kind::Jellyfin, GATES_KEY)]);
     if !accepted.is_empty() {
         let _ = store::write(&tokens_file(&at), &accepting(accepted).written());
     }
@@ -81,6 +86,17 @@ fn serving(initialised: &[bool], linked: &str, relinked: u16) -> Arc<Fake> {
             vec![Answer::reply(200, r#"{"StartupWizardCompleted":true}"#)],
         ),
         (Method::Post, "/auth/jellyfin", vec![Answer::reply(200, "")]),
+        (
+            Method::Get,
+            "/Auth/Keys",
+            vec![Answer::reply(
+                200,
+                serde_json::json!({ "Items": [
+                    { "AppName": crate::app_keys::GATE_APP, "AccessToken": GATES_KEY }
+                ] })
+                .to_string(),
+            )],
+        ),
         (
             Method::Post,
             "/settings/initialize",
@@ -152,11 +168,13 @@ async fn seeded_with(
     services: &[lemonfiber_manifest::Service],
     project: &std::path::Path,
 ) -> Vec<Wiring> {
-    let server = served(services);
+    let fillers = fillers_at(services.to_vec(), project);
+    let server = crate::app::targets::MediaServer::of(&fillers);
     let admin = super::super::identity::seed_media_server_admin(ctx, server.as_ref()).await;
     super::super::seed_request_identity(
         ctx,
         services,
+        &fillers,
         &crate::baseline::Baseline::new(),
         server.as_ref(),
         admin,
@@ -365,10 +383,8 @@ async fn a_link_that_cannot_be_made_fails() {
         other => format!("{other:?}"),
     };
     assert!(
-        detail.starts_with(&format!(
-            "the tokens could not be written to {}",
-            tokens_file(&at).display()
-        )),
+        detail.starts_with("the tokens could not be handed to the request gate: ")
+            && detail.contains(&tokens_file(&at).display().to_string()),
         "{detail}"
     );
     assert!(!http
@@ -392,10 +408,13 @@ async fn an_old_token_that_cannot_be_retired_is_said() {
         Some(recorded_admin("linking-unretired")),
     )
     .with_http(http.clone())
-    .with_filesystem(lemonfiber_fixtures::files::Files::at(vec![(
-        tokens_file(&at),
-        &both,
-    )]));
+    .with_filesystem(lemonfiber_fixtures::files::Files::at(vec![
+        (tokens_file(&at), &both),
+        (
+            crate::app::gating::path(&at, File::Upstreams),
+            &admitting(&[("jellyfin", Kind::Jellyfin, GATES_KEY)]),
+        ),
+    ]));
 
     let wirings = seeded_with(&ctx, &stack(true), &at).await;
 
@@ -404,7 +423,7 @@ async fn an_old_token_that_cannot_be_retired_is_said() {
         other => format!("{other:?}"),
     };
     assert!(
-        detail.starts_with("the tokens could not be written to "),
+        detail.starts_with("the tokens could not be handed to the request gate: "),
         "{detail}"
     );
 }

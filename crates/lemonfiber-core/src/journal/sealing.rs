@@ -43,7 +43,6 @@
 //! put back: it is a reversal that quietly writes a line of ciphertext into the
 //! environment file and reports the setting restored.
 
-use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 use chacha20poly1305::aead::{Aead as _, KeyInit as _};
@@ -128,7 +127,7 @@ impl Seal {
         let Some((bytes, key)) = made else {
             return Self { key: None };
         };
-        if store::write(&beside(journal), &hex(&bytes)).is_err() {
+        if store::write(&beside(journal), &crate::secret::render(&bytes)).is_err() {
             return Self { key: None };
         }
         Self { key: Some(key) }
@@ -179,7 +178,11 @@ impl Seal {
         let sealed = XChaCha20Poly1305::new(key)
             .encrypt(&nonce, clear.as_bytes())
             .ok()?;
-        Some(format!("{MARKER}{}{}", hex(&drawn), hex(&sealed)))
+        Some(format!(
+            "{MARKER}{}{}",
+            crate::secret::render(&drawn),
+            crate::secret::render(&sealed)
+        ))
     }
 
     /// One value opened, or nothing where it is not sealed, not sealed under this key,
@@ -242,16 +245,6 @@ pub fn is_sealed(value: &str) -> bool {
 /// Where the key for the journal at `journal` lives.
 fn beside(journal: &Path) -> PathBuf {
     journal.with_file_name(KEY_FILE)
-}
-
-/// The bytes as hexadecimal, which is what a JSON string carries without escaping.
-fn hex(bytes: &[u8]) -> String {
-    bytes.iter().fold(String::new(), |mut written, byte| {
-        // Writing into a `String` cannot fail — its `fmt::Write` is infallible — so
-        // there is no error here to report and none to invent a branch for.
-        let _ = write!(written, "{byte:02x}");
-        written
-    })
 }
 
 /// The bytes a run of hexadecimal stands for, or nothing where it is not one.

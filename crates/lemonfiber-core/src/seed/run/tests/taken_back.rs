@@ -3,7 +3,7 @@
 
 use async_trait::async_trait;
 use lemonfiber_ports::filesystem::{Fault, FileSystem, Identity, Ownership, StorageFacts};
-use lemonfiber_sidecar::gate::{Accepted, Tokens, PORT};
+use lemonfiber_sidecar::gate::{Accepted, Kind, Tokens, PORT};
 use lemonfiber_sidecar::TokenHash;
 
 use super::*;
@@ -30,7 +30,7 @@ fn gated() -> Vec<lemonfiber_manifest::Service> {
         curator("lidarr", 8686, "music"),
         media_server_svc(),
         requests_with_settings(),
-        manifest_service("request-gate", None, Some(PORT)),
+        request_gate(),
     ]
 }
 
@@ -70,6 +70,12 @@ impl FileSystem for Taking {
 
     async fn read(&self, path: &std::path::Path) -> Option<String> {
         let name = path.to_string_lossy();
+        if name.ends_with("upstreams.json") {
+            return Some(admitting(&[
+                ("sonarr", Kind::Sonarr, "old-sonarr-key"),
+                ("jellyfin", Kind::Jellyfin, "gates-key"),
+            ]));
+        }
         if name.ends_with("tokens.json") {
             return Some(
                 Tokens::of(vec![

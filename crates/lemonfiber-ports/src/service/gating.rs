@@ -52,7 +52,7 @@ impl std::fmt::Debug for Gated {
     }
 }
 
-/// One route the gate admits, as it answers it: its credential by fingerprint alone.
+/// One route the gate admits, as it answers it: its credential by its SHA-256 alone.
 #[derive(
     Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
 )]
@@ -66,8 +66,8 @@ pub struct Admitted {
     pub address: String,
     /// The upstream's majors it forwards to.
     pub majors: Vec<u32>,
-    /// The credential it presents, by its fingerprint: `~` and the low sixteen bits of the 64-bit FNV-1a hash of its bytes, as four lower-case hexadecimal digits.
-    pub fingerprint: String,
+    /// The SHA-256 of the credential it presents, in lower-case hexadecimal.
+    pub credential: String,
     /// The SHA-256 of each token it admits on it, in lower-case hexadecimal.
     pub tokens: Vec<String>,
 }
@@ -81,7 +81,7 @@ impl Admitted {
             path: gated.path.clone(),
             address: gated.address.clone(),
             majors: gated.majors.clone(),
-            fingerprint: crate::fingerprint(&gated.credential),
+            credential: crate::digest::sha256(&gated.credential),
             tokens: gated.tokens.clone(),
         }
     }

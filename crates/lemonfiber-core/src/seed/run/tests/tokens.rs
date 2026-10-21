@@ -1,7 +1,7 @@
 //! The request gate's tokens: the request service reaches each curator through the gate,
 //! under a token the gate accepts as a hash and lemonfiber keeps no copy of.
 
-use lemonfiber_sidecar::gate::{Accepted, File, Tokens, PORT};
+use lemonfiber_sidecar::gate::{Accepted, File, Kind, Tokens, PORT};
 use lemonfiber_sidecar::TokenHash;
 
 use super::*;
@@ -15,7 +15,7 @@ fn minted() -> String {
 fn stack(gating: bool) -> Vec<lemonfiber_manifest::Service> {
     let mut services = vec![curator("sonarr", 8989, "tv"), requests_svc()];
     if gating {
-        services.push(manifest_service("request-gate", None, Some(PORT)));
+        services.push(request_gate());
     }
     services
 }
@@ -29,6 +29,7 @@ fn project(name: &str, accepted: &[&str]) -> std::path::PathBuf {
         &at.join("config/sonarr/config.xml"),
         "<Config><ApiKey>sonarr-own-key</ApiKey></Config>",
     );
+    routed(&at, &[("sonarr", Kind::Sonarr, "sonarr-own-key")]);
     if !accepted.is_empty() {
         let _ = store::write(&tokens_file(&at), &accepting(accepted).written());
     }
@@ -322,10 +323,8 @@ async fn tokens_that_cannot_be_written_are_given_to_nobody() {
         })
         .unwrap_or_default();
     assert!(
-        detail.starts_with(&format!(
-            "the tokens could not be written to {}",
-            tokens_file(&at).display()
-        )),
+        detail.starts_with("the tokens could not be handed to the request gate: ")
+            && detail.contains(&tokens_file(&at).display().to_string()),
         "{detail}"
     );
     assert!(!http
@@ -350,6 +349,10 @@ async fn an_old_token_that_cannot_be_retired_is_said() {
                 "<Config><ApiKey>sonarr-own-key</ApiKey></Config>",
             ),
             (tokens_file(&at), &both),
+            (
+                crate::app::gating::path(&at, File::Upstreams),
+                &admitting(&[("sonarr", Kind::Sonarr, "sonarr-own-key")]),
+            ),
         ]));
 
     let wirings = super::super::seed_fulfilment_targets(
@@ -394,4 +397,30 @@ async fn without_randomness_no_token_is_minted() {
         }]
     );
     assert_eq!(accepted(&at), None);
+}
+
+/// A route whose credential the gate presents is not the one lemonfiber knows the curator
+/// by is never handed back to the gate with lemonfiber's: its tokens are left as they are,
+/// and nothing is given to the request service.
+#[tokio::test]
+async fn a_route_presenting_a_credential_lemonfiber_does_not_know_is_not_handed_back() {
+    let at = project("tokens-unvouched", &[]);
+    routed(&at, &[("sonarr", Kind::Sonarr, "a-key-nobody-wrote")]);
+    let http = serving(&["[]"], 201, 200);
+
+    let wirings = seeded(&stack(true), &at, &http, true, false).await;
+
+    assert_eq!(
+        wirings.first().map(|one| &one.state),
+        Some(&State::Failed {
+            detail: "the tokens could not be handed to the request gate: lemonfiber does not \
+                     hold the credential it presents on its route sonarr"
+                .to_owned(),
+        })
+    );
+    assert_eq!(accepted(&at), None);
+    assert!(!http
+        .requests()
+        .iter()
+        .any(|asked| asked.method != Method::Get));
 }

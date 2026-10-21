@@ -15,7 +15,6 @@
 use std::path::Path;
 
 use lemonfiber_manifest::Service;
-use lemonfiber_sidecar::gate::{File, Kind, Upstreams};
 
 use crate::ports::media;
 
@@ -23,7 +22,7 @@ use super::rotating::{said, unproven, would_rotate};
 use crate::app::gating;
 use crate::app::Ctx;
 use crate::credential::{fingerprint, Held, Origin, Propagation, Reach, Rotation, State};
-use crate::ports::service::{MediaServerLink, RegisteredTarget, Requests};
+use crate::ports::service::{MediaServerLink, RegisteredTarget, Requests, Target};
 use crate::seed::run::tokens::{through_the_gate, Kept, Presented};
 
 /// What each token is recorded as, before the route it is accepted on.
@@ -53,14 +52,14 @@ pub(super) fn is_token(held: &Held) -> bool {
     held.setting.starts_with(SETTING)
 }
 
-/// One route the gate answers, as its routes file names it.
+/// One route the gate answers, as it admits it.
 struct Route {
     /// Its path segment.
     id: String,
     /// What the household calls the service behind it.
     name: String,
     /// What it reaches.
-    kind: Kind,
+    target: Target,
 }
 
 /// A token's line in the inventory, for each route the gate answers.
@@ -76,7 +75,10 @@ pub(super) async fn held(
     ) else {
         return Vec::new();
     };
-    let routes = routes(ctx, services, project).await;
+    let Some(kept) = Kept::read(ctx, fillers, project).await else {
+        return Vec::new();
+    };
+    let routes = routes(&kept, services);
     if routes.is_empty() {
         return Vec::new();
     }
@@ -85,11 +87,10 @@ pub(super) async fn held(
     };
     let targets = requests.fulfilment_targets().await.ok();
     let link = requests.media_server_link().await.ok();
-    let kept = Kept::read(ctx, project).await;
     routes
         .iter()
         .map(|route| {
-            let found = match gating::fetching(route.kind) {
+            let found = match gating::fetched(&route.target) {
                 None => link.as_ref().map(|link| linked(link, route)),
                 Some(kind) => targets
                     .as_deref()
@@ -116,7 +117,7 @@ enum Found {
 }
 
 /// The line for `route`, from what the request service was `found` holding there.
-fn line(route: &Route, found: Found, kept: &Kept) -> Held {
+fn line(route: &Route, found: Found, kept: &Kept<'_>) -> Held {
     let (state, token, advisory) = match found {
         Found::Unread => (State::Stale, None, Some(UNREAD.to_owned())),
         Found::Unheld => (State::Absent, None, Some(not_handed(&name(route)))),
@@ -159,8 +160,10 @@ pub(super) async fn rotate(
     else {
         return unproven(held, &not_handed(&held.name));
     };
-    let Some(route) = routes(ctx, services, project)
-        .await
+    let Some(kept) = Kept::read(ctx, fillers, project).await else {
+        return unproven(held, &not_handed(&held.name));
+    };
+    let Some(route) = routes(&kept, services)
         .into_iter()
         .find(|route| route.id == id)
     else {
@@ -178,25 +181,24 @@ pub(super) async fn rotate(
     let Some(requests) = crate::app::targets::requests_as_owner(ctx, filler).await else {
         return unproven(held, &not_handed(&held.name));
     };
-    let kept = Kept::read(ctx, project).await;
     let presented = [Presented {
         route: route.id.clone(),
         token: token.clone(),
     }];
-    let beside = match kept.beside(&presented) {
+    let beside = match kept.beside(&presented).await {
         Ok(beside) => beside,
-        Err(reason) => return unproven(held, &kept.unwritten(&reason)),
+        Err(reason) => return unproven(held, &Kept::unwritten(&reason)),
     };
-    let proven = match gating::fetching(route.kind) {
+    let proven = match gating::fetched(&route.target) {
         None => relinked(requests.as_ref(), &route, &token).await,
         Some(kind) => retargeted(requests.as_ref(), &route, &token, kind).await,
     };
     if let Err(detail) = proven {
-        let _ = kept.restore();
+        let _ = kept.restore().await;
         return unproven(held, &detail);
     }
-    if let Err(reason) = kept.only(&beside, &presented, &[true]) {
-        return unproven(held, &kept.unwritten(&reason));
+    if let Err(reason) = kept.only(&beside, &presented, &[true]).await {
+        return unproven(held, &Kept::unwritten(&reason));
     }
     Rotation::landed(
         &held.name,
@@ -323,29 +325,17 @@ fn consumer(route: &Route) -> String {
     )
 }
 
-/// The routes the gate's routes file under `project` names, each with the name of the
-/// service it reaches.
-async fn routes(ctx: &Ctx, services: &[Service], project: &Path) -> Vec<Route> {
-    let path = gating::path(project, File::Upstreams);
-    let Some(upstreams) = crate::app::targets::read_owned(
-        ctx.seams.filesystem.as_ref(),
-        &path,
-        crate::within::directory_of(&path),
-    )
-    .await
-    .and_then(|text| Upstreams::read(&text).ok()) else {
-        return Vec::new();
-    };
-    upstreams
-        .upstreams
-        .into_iter()
-        .map(|upstream| Route {
+/// Every route the gate admits, each named as the household calls the service behind it.
+fn routes(kept: &Kept<'_>, services: &[Service]) -> Vec<Route> {
+    kept.admitted()
+        .iter()
+        .map(|route| Route {
             name: services
                 .iter()
-                .find(|service| service.id == upstream.route)
-                .map_or_else(|| upstream.route.clone(), |service| service.name.clone()),
-            id: upstream.route,
-            kind: upstream.kind,
+                .find(|service| service.id == route.path)
+                .map_or_else(|| route.path.clone(), |service| service.name.clone()),
+            id: route.path.clone(),
+            target: route.target.clone(),
         })
         .collect()
 }

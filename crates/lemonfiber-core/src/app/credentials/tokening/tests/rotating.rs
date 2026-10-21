@@ -48,6 +48,17 @@ async fn a_third_party_request_service_is_never_handed_a_token() {
     assert_eq!(http.requests().len(), asked_before);
 }
 
+/// `installed`, its services asking every curator, as a request service does.
+fn asking_curators(mut installed: crate::plugin::Installed) -> crate::plugin::Installed {
+    for placed in &mut installed.services {
+        placed.asks = vec![crate::plugin::Asking {
+            capability: "library.curate".to_owned(),
+            each: true,
+        }];
+    }
+    installed
+}
+
 /// A stack directory whose gate accepts `held` on the curator's route, and a context over
 /// `http` reaching a first-party plugin's request service speaking `request.intake` in
 /// place of the stack's own, holding its key where `keyed`; with the stack's services and
@@ -68,7 +79,10 @@ fn beside_contracted_requests(
         crate::test_support::CONTRACTED_REQUESTS,
         keyed,
     )
-    .settings(Settings::default())
+    .settings(Settings {
+        env_file: Some(at.join(".env")),
+        ..Settings::default()
+    })
     .build()
     .with_http(http.clone())
     .with_random(Arc::new(lemonfiber_fixtures::support::FixedRandom(Some(
@@ -84,11 +98,11 @@ fn beside_contracted_requests(
             manifest.services = services.clone();
             crate::wiring::Fillers::trusting(
                 &manifest,
-                &[crate::test_support::contracted(
+                &[asking_curators(crate::test_support::contracted(
                     "intake",
                     crate::test_support::CONTRACTED_REQUESTS,
                     "request.intake",
-                )],
+                ))],
                 &crate::wiring::Chosen::default(),
                 Some(&at),
                 &crate::test_support::first_party("intake"),
@@ -129,6 +143,11 @@ async fn a_first_party_request_service_is_handed_a_token_over_the_contract() {
         ("/v1/fulfilment_targets", vec![Answer::reply(200, target)]),
         ("/v1/move_fulfilment_target", vec![Answer::reply(204, "")]),
         ("/v1/test_fulfilment_target", vec![Answer::reply(204, "")]),
+        (
+            "/Users/AuthenticateByName",
+            vec![Answer::reply(200, r#"{"AccessToken":"session"}"#)],
+        ),
+        ("/Auth/Keys", vec![Answer::reply(200, gate_keys())]),
     ]);
     let (ctx, at, services, fillers) =
         beside_contracted_requests("tokens-first-party", true, &http);
@@ -465,6 +484,10 @@ async fn an_old_token_the_gate_cannot_be_told_to_drop_is_said() {
     let ctx = ctx.with_filesystem(lemonfiber_fixtures::files::Files::at(vec![
         (tokens_file(&at), &both),
         (crate::app::gating::path(&at, File::Upstreams), &routes_text),
+        (
+            at.join("config/sonarr/config.xml"),
+            "<Config><ApiKey>sonarrs</ApiKey></Config>",
+        ),
     ]));
     let line = named(
         &held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at)).await,
@@ -481,8 +504,9 @@ async fn an_old_token_the_gate_cannot_be_told_to_drop_is_said() {
     .await;
 
     assert!(
-        unproven(&rotation.settled)
-            .is_some_and(|said| said.starts_with("the tokens could not be written")),
+        unproven(&rotation.settled).is_some_and(
+            |said| said.starts_with("the tokens could not be handed to the request gate")
+        ),
         "{rotation:?}"
     );
 }

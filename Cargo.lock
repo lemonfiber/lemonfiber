@@ -1572,6 +1572,7 @@ dependencies = [
  "lemonfiber-manifest",
  "regex",
  "regex-syntax",
+ "ring",
  "schemars",
  "serde",
  "serde_json",

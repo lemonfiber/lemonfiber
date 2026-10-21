@@ -72,6 +72,7 @@ pub(super) async fn seed_media_server_admin(
 pub(super) async fn seed_request_identity(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
+    fillers: &crate::wiring::Fillers,
     expected: &crate::baseline::Baseline,
     server: Option<&MediaServer>,
     admin: Option<Admin>,
@@ -132,8 +133,15 @@ pub(super) async fn seed_request_identity(
             Some(super::linking::would_link(&requests, server))
         }
         (Some(project), crate::seed::State::Wired | crate::seed::State::AlreadyWired) => Some(
-            super::linking::seed_media_server_link(ctx, owner.as_ref(), &requests, server, project)
-                .await,
+            Box::pin(super::linking::seed_media_server_link(
+                ctx,
+                fillers,
+                owner.as_ref(),
+                &requests,
+                server,
+                project,
+            ))
+            .await,
         ),
         _ => None,
     };

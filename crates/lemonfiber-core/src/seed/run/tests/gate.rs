@@ -19,11 +19,7 @@ fn stack(gating: bool) -> Vec<lemonfiber_manifest::Service> {
         curator("lidarr", 8686, "music"),
     ];
     if gating {
-        services.push(manifest_service(
-            "request-gate",
-            None,
-            Some(lemonfiber_sidecar::gate::PORT),
-        ));
+        services.push(request_gate());
     }
     services
 }
@@ -176,7 +172,7 @@ async fn seeded(
         .filter(|asked| asked.method == Method::Delete)
         .filter_map(|asked| asked.url.rsplit('/').next().map(str::to_owned))
         .collect();
-    (wiring.map(|one| one.state), revoked)
+    (wiring.into_iter().next().map(|one| one.state), revoked)
 }
 
 /// Both curators, with the keys they wrote.
@@ -410,7 +406,7 @@ async fn without_a_media_server_the_curators_are_still_routed() {
     let services = vec![
         requests_svc(),
         curator("sonarr", 8989, "tv"),
-        manifest_service("request-gate", None, Some(lemonfiber_sidecar::gate::PORT)),
+        request_gate(),
     ];
 
     let wiring = super::super::gate::seed_gate_routes(
@@ -424,7 +420,10 @@ async fn without_a_media_server_the_curators_are_still_routed() {
 
     let mut expected = holding(&curators, "").upstreams;
     expected.retain(|route| route.kind != Kind::Jellyfin);
-    assert_eq!(wiring.map(|one| one.state), Some(State::Wired));
+    assert_eq!(
+        wiring.into_iter().next().map(|one| one.state),
+        Some(State::Wired)
+    );
     assert_eq!(routes(&project), Some(Upstreams::of(expected)));
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
@@ -439,6 +438,8 @@ async fn curators_seeded(
 ) -> Option<State> {
     super::super::gate::seed_gate_routes(ctx, services, fillers, served(services).as_ref(), project)
         .await
+        .into_iter()
+        .next()
         .map(|one| one.state)
 }
 
@@ -459,7 +460,7 @@ async fn the_curators_routes_alone_are_rehearsed_held_and_reported() {
     let services = vec![
         requests_svc(),
         curator("sonarr", 8989, "tv"),
-        manifest_service("request-gate", None, Some(lemonfiber_sidecar::gate::PORT)),
+        request_gate(),
     ];
     let fillers = fillers_at(services.clone(), &project);
     let mut expected = holding(&curators, "").upstreams;
@@ -502,7 +503,7 @@ async fn the_curators_routes_alone_are_rehearsed_held_and_reported() {
     let failed = curators_seeded(&ctx, &services, &fillers, Some(&project)).await;
     assert!(
         matches!(&failed, Some(State::Failed { detail })
-            if detail.starts_with("the routes could not be written to ")),
+            if detail.starts_with("the routes could not be handed to the request gate: ")),
         "{failed:?}"
     );
     assert!(http.requests().is_empty(), "{:?}", http.requests());
@@ -525,7 +526,7 @@ async fn without_a_stack_directory_nothing_is_minted() {
     .await;
 
     assert_eq!(
-        wiring.map(|one| one.state),
+        wiring.into_iter().next().map(|one| one.state),
         Some(State::Skipped {
             reason: "there is no stack directory to hand the request gate its routes in".to_owned(),
         })
@@ -603,9 +604,9 @@ async fn a_key_whose_routes_cannot_be_written_is_revoked_again() {
         state,
         Some(State::Failed {
             detail: format!(
-                "the routes could not be written to {}, so the new key was revoked again: {}",
-                routes_file(&at).display(),
-                unwritable(&at)
+                "the routes could not be handed to the request gate, so the new key was \
+                 revoked again: {}",
+                refused(&at)
             ),
         })
     );
@@ -644,9 +645,8 @@ async fn routes_that_cannot_be_updated_are_said() {
         state,
         Some(State::Failed {
             detail: format!(
-                "the routes could not be written to {}: {}",
-                routes_file(&at).display(),
-                unwritable(&at)
+                "the routes could not be handed to the request gate: {}",
+                refused(&at)
             ),
         })
     );
@@ -659,10 +659,255 @@ fn blocked(project: &std::path::Path) {
     let _ = std::fs::create_dir_all(routes_file(project).join("blocked"));
 }
 
+/// What the gate says where its routes file cannot be written under a blocked `project`.
+fn refused(project: &std::path::Path) -> String {
+    format!(
+        "request-gate answered unexpectedly: {}",
+        unwritable(project)
+    )
+}
+
 /// What writing the routes file under a blocked `project` fails with.
 fn unwritable(project: &std::path::Path) -> String {
     store::write(&routes_file(project), "")
         .err()
         .map(|failure| failure.to_string())
         .unwrap_or_default()
+}
+
+/// A plugin `gater` whose service stands in for the stack's gate over `request.gate`.
+fn gate_plugin() -> crate::plugin::Installed {
+    let mut installed = crate::test_support::contracted(
+        "gater",
+        crate::app::gating::SERVICE,
+        lemonfiber_contract::capabilities::request::gate::CAPABILITY,
+    );
+    for placed in &mut installed.services {
+        placed.replaces = Some(crate::app::gating::SERVICE.to_owned());
+    }
+    installed
+}
+
+/// [`gate_plugin`] beside the request service and both curators, trusting `trusted` as
+/// first-party.
+fn contracted_gate(
+    project: &std::path::Path,
+    trusted: &[crate::plugin::first_party::FirstParty],
+) -> crate::wiring::Fillers {
+    fillers_trusting(
+        vec![
+            requests_svc(),
+            curator("sonarr", 8989, "tv"),
+            curator("radarr", 7878, "movies"),
+        ],
+        &[gate_plugin()],
+        project,
+        trusted,
+    )
+}
+
+/// The path and credential of every route each `admit` the gate was told carried.
+fn admitted_routes(http: &Fake) -> Vec<(String, String)> {
+    http.requests()
+        .iter()
+        .filter(|one| one.url.ends_with("/admit"))
+        .filter_map(|one| serde_json::from_str::<Admitting>(one.body.as_deref()?).ok())
+        .flat_map(|admitting| admitting.routes)
+        .map(|route| (route.path, route.credential))
+        .collect()
+}
+
+/// A gate answering it admits nothing and taking every route it is handed.
+fn admitting_nothing() -> Arc<Fake> {
+    Fake::by_path(vec![
+        (
+            "/lemonfiber/request.gate/v1/admitted",
+            Answer::reply(200, "[]"),
+        ),
+        ("/lemonfiber/request.gate/v1/admit", Answer::reply(204, "")),
+    ])
+}
+
+/// The stack the contracted gate stands in for: it still names its own gate.
+fn standing_in() -> Vec<lemonfiber_manifest::Service> {
+    vec![
+        requests_svc(),
+        curator("sonarr", 8989, "tv"),
+        curator("radarr", 7878, "movies"),
+        request_gate(),
+    ]
+}
+
+#[tokio::test]
+async fn a_first_party_gate_speaking_the_contract_is_handed_its_routes_over_it() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("gate-contracted");
+    let http = admitting_nothing();
+    let ctx = contracted_ctx(&project, crate::app::gating::SERVICE, true, http.clone());
+    let fillers = contracted_gate(&project, &crate::test_support::first_party("gater"));
+
+    let wirings =
+        super::super::gate::seed_gate_routes(&ctx, &standing_in(), &fillers, None, Some(&project))
+            .await;
+
+    assert_eq!(
+        wirings.iter().map(|one| &one.state).collect::<Vec<_>>(),
+        vec![&State::Wired]
+    );
+    assert!(http.requests().iter().all(|one| one
+        .url
+        .starts_with("http://127.0.0.1:8080/lemonfiber/request.gate/v1/")));
+    assert_eq!(
+        admitted_routes(&http),
+        vec![
+            ("sonarr".to_owned(), "the-key".to_owned()),
+            ("radarr".to_owned(), "the-key".to_owned()),
+        ]
+    );
+    assert_eq!(routes(&project), None);
+}
+
+/// A curator a third-party plugin brought is not routed through a first-party gate: its
+/// key may not be handed to another plugin's service.
+#[tokio::test]
+async fn a_third_party_curators_key_is_never_handed_to_the_gate() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("gate-stranger-curator");
+    let http = admitting_nothing();
+    let ctx = contracted_ctx(&project, crate::app::gating::SERVICE, true, http.clone());
+    let mut stranger = crate::test_support::a_placed(
+        "kept",
+        &["library.curate"],
+        Some(curator_api(Some("/config/config.xml"))),
+        Some(8990),
+    );
+    stranger.media_types = vec!["movies".to_owned()];
+    let fillers = fillers_trusting(
+        vec![requests_svc(), curator("sonarr", 8989, "tv")],
+        &[
+            gate_plugin(),
+            crate::test_support::an_installed("kept", vec![stranger]),
+        ],
+        &project,
+        &crate::test_support::first_party("gater"),
+    );
+
+    let _ =
+        super::super::gate::seed_gate_routes(&ctx, &standing_in(), &fillers, None, Some(&project))
+            .await;
+
+    assert_eq!(
+        admitted_routes(&http),
+        vec![("sonarr".to_owned(), "the-key".to_owned())]
+    );
+}
+
+/// What one `admit` carried.
+#[derive(serde::Deserialize)]
+struct Admitting {
+    /// Every route, credentials and all.
+    routes: Vec<crate::ports::service::Gated>,
+}
+
+#[tokio::test]
+async fn a_gate_that_cannot_be_asked_over_its_contract_is_handed_nothing() {
+    for (tag, trusted, keyed) in [
+        ("untrusted", &[][..], true),
+        (
+            "unkeyed",
+            &crate::test_support::first_party("gater")[..],
+            false,
+        ),
+    ] {
+        let project = lemonfiber_fixtures::scratch::Scratch::new(&format!("gate-unasked-{tag}"));
+        let http = Fake::always(Answer::reply(200, "[]"));
+        let ctx = contracted_ctx(&project, crate::app::gating::SERVICE, keyed, http.clone());
+        let fillers = contracted_gate(&project, trusted);
+
+        let wirings = super::super::gate::seed_gate_routes(
+            &ctx,
+            &standing_in(),
+            &fillers,
+            None,
+            Some(&project),
+        )
+        .await;
+
+        assert!(
+            wirings
+                .iter()
+                .all(|one| matches!(one.state, State::Skipped { .. })),
+            "{tag}: {wirings:?}"
+        );
+        assert!(http.requests().is_empty(), "{tag}: {:?}", http.requests());
+        assert_eq!(routes(&project), None, "{tag}");
+    }
+}
+
+/// The key the gate holds is told by its SHA-256, so a second key filed under its name
+/// that shares its short fingerprint is not taken for it.
+#[test]
+fn the_key_the_gate_holds_is_told_from_one_sharing_its_short_fingerprint() {
+    const HELD: &str = "000000000000031d";
+    const TWIN: &str = "00000000000008d8";
+    assert_eq!(
+        crate::ports::fingerprint(HELD),
+        crate::ports::fingerprint(TWIN)
+    );
+    let admitted = [crate::ports::service::Admitted::of(
+        &crate::ports::service::Gated {
+            target: crate::ports::service::Target::MediaServer,
+            path: "jellyfin".to_owned(),
+            address: "http://jellyfin:8096".to_owned(),
+            majors: Vec::new(),
+            credential: HELD.to_owned(),
+            tokens: Vec::new(),
+        },
+    )];
+
+    assert_eq!(
+        super::super::gate::held(&admitted, &[TWIN.to_owned(), HELD.to_owned()]),
+        Some(HELD.to_owned())
+    );
+    assert_eq!(
+        super::super::gate::held(&admitted, &[TWIN.to_owned()]),
+        None
+    );
+}
+
+/// A gate the media server's key may not be handed to is given no route to the server,
+/// and every key filed under its name there is revoked, since nothing holds it.
+#[tokio::test]
+async fn a_gate_the_media_servers_key_may_not_reach_holds_none() {
+    let http = serving(&[&["stale"]], 204, 204);
+    let (ctx, at) = gate_ctx("gate-withheld", true, CURATORS, None, http.clone());
+    let mut services = stack(false);
+    services.retain(|service| service.id != crate::app::gating::SERVICE);
+    let fillers = fillers_trusting(
+        services,
+        &[crate::test_support::contracted(
+            "stranger",
+            crate::app::gating::SERVICE,
+            lemonfiber_contract::capabilities::request::gate::CAPABILITY,
+        )],
+        &at,
+        &[],
+    );
+    let server = crate::app::targets::MediaServer::of(&fillers);
+
+    let wirings = super::super::gate::seed_gate_routes(
+        &ctx,
+        &stack(true),
+        &fillers,
+        server.as_ref(),
+        Some(&at),
+    )
+    .await;
+
+    let revoked: Vec<String> = http
+        .requests()
+        .into_iter()
+        .filter(|asked| asked.method == Method::Delete)
+        .filter_map(|asked| asked.url.rsplit('/').next().map(str::to_owned))
+        .collect();
+    assert_eq!(revoked, vec!["stale".to_owned()], "{wirings:?}");
+    assert_eq!(routes(&at), None);
 }
