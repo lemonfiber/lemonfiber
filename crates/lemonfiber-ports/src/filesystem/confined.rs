@@ -32,6 +32,17 @@ pub trait Confined: Send + Sync {
     /// Whether `path` lies beneath `within` with no link at any step on the way, itself
     /// included, whatever it is.
     fn lies(&self, path: &Path, within: &Path) -> Lying;
+
+    /// Move `from` to `to`, both beneath `within` with no link at any step on the way to
+    /// either, the two themselves included, making the directories missing above `to` the
+    /// same way, and never over anything already at `to`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`Fault`] where a link, a path leading outside `within`, nothing at `from`
+    /// or something already at `to` is met, or where the move itself fails; nothing is
+    /// moved.
+    fn moved(&self, from: &Path, to: &Path, within: &Path) -> Result<(), Fault>;
 }
 
 /// Where a path somebody else's container can write lies.

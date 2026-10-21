@@ -91,6 +91,13 @@
       ],
       "format": "int32"
     },
+    "swept": {
+      "description": "Every network the engine holds for the project that the project no longer\ndeclares, by the engine's name: disconnected and taken away before a start, or\nnamed and left by a rehearsal. Empty for every other action.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "switched": {
       "description": "What narrowing moved, where the command was a switch. Absent for every\nother action, which is what tells a reader that nothing was left running\non purpose.",
       "anyOf": [

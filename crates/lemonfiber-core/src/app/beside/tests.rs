@@ -1,4 +1,4 @@
-use super::{blocked, layered};
+use super::blocked;
 use crate::model::{MigrationReport, MovedReport, OccupantReport, StandingReport};
 
 fn moved(service: &str, from: u16, to: u16) -> MovedReport {
@@ -7,32 +7,6 @@ fn moved(service: &str, from: u16, to: u16) -> MovedReport {
         from,
         to,
     }
-}
-
-/// The host port moves and the container port does not: what a service listens on
-/// inside itself is the image's business, and rewriting it would break the service
-/// rather than move it.
-#[test]
-fn only_the_host_side_of_a_port_is_moved() {
-    let written = layered(&[moved("sonarr", 8989, 8990)]);
-    assert!(written.contains("\"8990:8989\""), "{written}");
-}
-
-/// Every service that moved, under the one key Compose merges by.
-#[test]
-fn each_service_that_moved_is_named_under_services() {
-    let written = layered(&[moved("sonarr", 8989, 8990), moved("radarr", 7878, 7879)]);
-    assert!(written.starts_with("services:\n"), "{written}");
-    assert!(written.contains("  sonarr:\n"), "{written}");
-    assert!(written.contains("  radarr:\n"), "{written}");
-}
-
-/// Nothing but ports, so the overlay cannot go stale against the stack's own file.
-#[test]
-fn nothing_but_ports_is_restated() {
-    let written = layered(&[moved("sonarr", 8989, 8990)]);
-    assert!(!written.contains("image"), "{written}");
-    assert!(!written.contains("volumes"), "{written}");
 }
 
 /// A machine it could not read is one whose free ports it would be guessing at.
@@ -105,9 +79,9 @@ fn the_moves_read_back_as_they_were_written() {
 }
 
 /// Agreed to, the moves are recorded as a setting, journalled so they can be put back,
-/// and layered over the stack while the setting holds them.
+/// and no Compose file of lemonfiber's own is written for them.
 #[tokio::test]
-async fn agreed_to_the_moves_are_recorded_journalled_and_layered() {
+async fn agreed_to_the_moves_are_recorded_and_journalled() {
     let dir = lemonfiber_fixtures::scratch::Scratch::new("beside-recorded");
     let config = dir.join("config");
     let _ = std::fs::create_dir_all(&config);
@@ -125,7 +99,7 @@ async fn agreed_to_the_moves_are_recorded_journalled_and_layered() {
         ..MigrationReport::default()
     };
 
-    let stood = super::stand(&ctx, &survey, true).await;
+    let stood = super::stand(&ctx, &survey, true);
 
     assert!(stood.is_ok(), "{stood:?}");
     let held = crate::config::store::read(&env).unwrap_or_default();
@@ -146,7 +120,8 @@ async fn agreed_to_the_moves_are_recorded_journalled_and_layered() {
             current: "sonarr:8989=18989".to_owned(),
         }
     ));
-    assert_eq!(super::layer(&env, &held), Some(config.join("beside.yml")));
+    assert!(!config.join("beside.yml").exists());
+    assert!(stood.is_ok_and(|report| report.written == Some(env.display().to_string())));
     assert!(held.get(crate::config::OVERLAY_KEY).is_none());
 }
 
@@ -167,9 +142,9 @@ async fn unconfirmed_or_rehearsed_nothing_is_recorded() {
         beside: vec![moved("sonarr", 8989, 18989)],
         ..MigrationReport::default()
     };
-    let stood = super::stand(&ctx, &survey, false).await;
+    let stood = super::stand(&ctx, &survey, false);
     assert!(stood.is_ok_and(|report| report.written.is_none()));
-    let rehearsed = super::stand(&ctx.clone().rehearsing(), &survey, true).await;
+    let rehearsed = super::stand(&ctx.clone().rehearsing(), &survey, true);
     assert!(rehearsed.is_ok_and(|report| report.written.is_none()));
     assert!(!env.exists());
     assert!(!dir.join("beside.yml").exists());
@@ -200,15 +175,15 @@ async fn agreed_to_but_unrecordable_the_moves_are_refused() {
     };
     let placed = at(Some(dir.join("data").join("stack")));
 
-    assert!(super::stand(&at(None), &survey, true).await.is_err());
+    assert!(super::stand(&at(None), &survey, true).is_err());
 
     let journal = config.join("journal.jsonl");
     assert!(std::fs::create_dir_all(&journal).is_ok());
-    assert!(super::stand(&placed, &survey, true).await.is_err());
+    assert!(super::stand(&placed, &survey, true).is_err());
     assert!(std::fs::remove_dir_all(&journal).is_ok());
 
     assert!(std::fs::write(&env, "LEMONFIBER_CONFIG_VERSION=99.0.0\n").is_ok());
-    assert!(super::stand(&placed, &survey, true).await.is_err());
+    assert!(super::stand(&placed, &survey, true).is_err());
     let held = crate::config::store::read(&env).unwrap_or_default();
     assert_eq!(held.get(crate::config::BESIDE_KEY), None);
 
@@ -220,6 +195,6 @@ async fn agreed_to_but_unrecordable_the_moves_are_refused() {
     let before = journalled();
     assert!(std::fs::remove_file(&env).is_ok());
     assert!(std::fs::create_dir_all(&env).is_ok());
-    assert!(super::stand(&placed, &survey, true).await.is_err());
+    assert!(super::stand(&placed, &survey, true).is_err());
     assert_eq!(journalled(), before, "an unreadable file journals nothing");
 }

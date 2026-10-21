@@ -438,6 +438,7 @@ fn every_shape_a_reversal_puts_back_says_what_it_did() {
         }),
         "wrote /stack/compose/plugins/komga.yml back as it was"
     );
+
     assert_eq!(
         undone(Action::Repin {
             previous: "1.0.0".to_owned(),
@@ -511,5 +512,30 @@ fn a_device_key_put_back_is_said_by_its_name() {
             path: "/cfg/overlay.yml".to_owned()
         }),
         "left the overlay /cfg/overlay.yml as it is"
+    );
+}
+
+/// State moved back out of a mount tree, and a volume's copy kept, say what was done.
+#[test]
+fn a_move_put_back_and_a_copy_kept_say_what_was_done() {
+    let undone = |action: Action| {
+        super::super::undone(&Undo {
+            target: "komga".to_owned(),
+            action,
+        })
+    };
+    assert_eq!(
+        undone(Action::MoveBack {
+            from: "/stack/config/komga/cache".to_owned(),
+            to: "/stack/mounts/komga/cache".to_owned(),
+        }),
+        "moved /stack/config/komga/cache back"
+    );
+    assert_eq!(
+        undone(Action::KeepCopy {
+            volume: "lemonfiber_komga_cache".to_owned(),
+            to: "/stack/mounts/komga/cache".to_owned(),
+        }),
+        "kept /stack/mounts/komga/cache"
     );
 }

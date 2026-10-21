@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use super::{answered, bound, named, occupied, unoccupied};
 use crate::plugin::{Placed, Reached};
-use crate::stack::declared::{Declared, Published};
+use crate::project::overlay::{Declared, Published};
 use crate::test_support::{a_context, a_placed, an_installed};
 
 /// A service published on `port`, proxied at `label` where one is given.

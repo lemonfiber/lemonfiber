@@ -107,7 +107,7 @@ async fn settings(
     // operator is shown is the difference between this file and the one proposed, and a
     // file read afterwards is already the answer to the question.
     let held = match store::read(path) {
-        Ok(file) => file,
+        Ok(file) => crate::settings::legacy::listed(path, file),
         Err(err) => return Err(Box::new(err.problem())),
     };
 
@@ -217,6 +217,27 @@ async fn applying(
     let consequence = stated(ctx, &review, &held, key, value);
     let mut file = held;
     if review.writes() {
+        if let Some(change) = crate::settings::legacy::entering(
+            path,
+            key,
+            value,
+            crate::settings::OPERATION,
+            &ctx.stamp(),
+        ) {
+            let journal = path.with_file_name(crate::config::paths::JOURNAL);
+            super::recover::journalled(&journal, &[change], ctx.seams.random.as_ref())
+                .and_then(|()| {
+                    crate::settings::legacy::entered(path, key, value, ctx.seconds())
+                        .unwrap_or(Ok(()))
+                })
+                .map_err(|err| Box::new(err.problem()))?;
+            file.set(key, value);
+            return Ok(Proposal {
+                review,
+                consequence,
+                file,
+            });
+        }
         if let Err(err) = store::set(path, key, value) {
             return Err(Box::new(err.problem()));
         }

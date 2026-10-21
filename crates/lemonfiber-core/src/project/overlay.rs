@@ -1,9 +1,9 @@
-//! What a stack's Compose files declare: the services, and the host ports they publish.
+//! What the operator's overlay declares: the services, the host ports they publish, the
+//! networks, and the mounts that split the data location.
 //!
-//! Read off the files as Compose reads them, across every file at once, because what an
-//! operator runs is the stack and whatever they layered over it, and a service declared
-//! in their overlay is as much a service as one the stack ships. Nothing here decides
-//! what to do about any of it; it answers what is there.
+//! The overlay is the one Compose file lemonfiber reads, merged over the project it
+//! generates, so a service declared there is as much a service as one the stack runs.
+//! Nothing here decides what to do about any of it; it answers what is there.
 //!
 //! **A port is the host side of a mapping**, which is the side two services cannot
 //! share. The address in front of it is not compared: one service on every interface
@@ -34,7 +34,113 @@ pub struct Published {
     pub file: PathBuf,
 }
 
-/// Every service and every published host port these files declare.
+/// One service that would see more than one mount of the data location.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Crowded {
+    /// The service.
+    pub service: String,
+    /// The mounts of the data location it would get, as written.
+    pub mounts: Vec<String>,
+}
+
+impl std::fmt::Display for Crowded {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            formatter,
+            "service {} mounts {} paths beneath the data root ({}); a bind mount is a \
+             filesystem boundary inside the container, so anything imported across one is \
+             copied rather than hardlinked — mount the data root once instead",
+            self.service,
+            self.mounts.len(),
+            self.mounts.join(", ")
+        )
+    }
+}
+
+/// Every service the project `text` runs with the overlays `over` merged after it that
+/// would see the data location through more than one mount.
+///
+/// The data location is what the project mounts at `library`. An overlay's mount is
+/// merged as Compose merges it, replacing the project's at the same target, and its
+/// source is read with `variable` answering a variable it starts with.
+#[must_use]
+pub fn crowded(
+    text: &str,
+    over: &[String],
+    library: &str,
+    variable: &dyn Fn(&str) -> Option<String>,
+) -> Vec<Crowded> {
+    let project = in_file(text);
+    let Some(root) = project
+        .iter()
+        .flat_map(|(_, body)| volumes_of(body))
+        .find(|(_, target)| target == library)
+        .map(|(source, _)| source)
+    else {
+        return Vec::new();
+    };
+    let mut merged: std::collections::BTreeMap<String, Vec<(String, String)>> =
+        std::collections::BTreeMap::new();
+    for (service, body) in project
+        .into_iter()
+        .chain(over.iter().flat_map(|one| in_file(one)))
+    {
+        let held = merged.entry(service).or_default();
+        for (source, target) in volumes_of(&body) {
+            let source = expanded(&source, variable);
+            held.retain(|(_, already)| *already != target);
+            held.push((source, target));
+        }
+    }
+    merged
+        .into_iter()
+        .filter_map(|(service, volumes)| {
+            let mounts: Vec<String> = volumes
+                .into_iter()
+                .filter(|(source, _)| {
+                    source == &root
+                        || source
+                            .strip_prefix(root.as_str())
+                            .is_some_and(|rest| rest.starts_with('/'))
+                })
+                .map(|(source, target)| format!("{source}:{target}"))
+                .collect();
+            (mounts.len() > 1).then_some(Crowded { service, mounts })
+        })
+        .collect()
+}
+
+/// Every mount a service's body declares, as its source and target, in either syntax.
+fn volumes_of(body: &Value) -> Vec<(String, String)> {
+    body.get("volumes")
+        .and_then(Value::as_sequence)
+        .into_iter()
+        .flatten()
+        .filter_map(|volume| match volume {
+            Value::String(short) => {
+                let parts = split(short);
+                Some(((*parts.first()?).to_owned(), (*parts.get(1)?).to_owned()))
+            }
+            long => Some((
+                long.get("source")?.as_str()?.to_owned(),
+                long.get("target")?.as_str()?.to_owned(),
+            )),
+        })
+        .collect()
+}
+
+/// `source` with a variable it starts with replaced by what it is set to.
+fn expanded(source: &str, variable: &dyn Fn(&str) -> Option<String>) -> String {
+    match source
+        .strip_prefix("${")
+        .and_then(|rest| rest.split_once('}'))
+    {
+        Some((inner, rest)) => format!("{}{rest}", resolve(&format!("${{{inner}}}"), variable)),
+        None => source.to_owned(),
+    }
+}
+
+/// Every service and every published host port these Compose files declare.
 ///
 /// `variable` answers what a `${NAME}` in a port is set to, where it is set at all; a
 /// port still unresolved after that, and after its own default, says nothing about any
@@ -72,6 +178,26 @@ pub fn named(text: &str) -> Vec<String> {
         .into_iter()
         .map(|(service, _)| service)
         .collect()
+}
+
+/// The name of every network one Compose file declares, or none where it is not a
+/// Compose file this can read.
+#[must_use]
+pub fn networks(text: &str) -> Vec<String> {
+    serde_norway::from_str::<Value>(text)
+        .ok()
+        .and_then(|document| {
+            document
+                .get("networks")
+                .and_then(Value::as_mapping)
+                .map(|declared| {
+                    declared
+                        .keys()
+                        .filter_map(|name| name.as_str().map(str::to_owned))
+                        .collect()
+                })
+        })
+        .unwrap_or_default()
 }
 
 /// The services one file declares, each with its body, or none where it is not a
@@ -201,21 +327,6 @@ fn resolve(value: &str, variable: &dyn Fn(&str) -> Option<String>) -> String {
         .filter(|set| !set.is_empty())
         .or_else(|| fallback.map(str::to_owned))
         .unwrap_or_default()
-}
-
-/// The fixed address one service is given on one network, as a Compose file declares
-/// it, or nothing where the file gives it none.
-#[must_use]
-pub fn fixed_address(text: &str, service: &str, network: &str) -> Option<String> {
-    let document: Value = serde_norway::from_str(text).ok()?;
-    document
-        .get("services")?
-        .get(service)?
-        .get("networks")?
-        .get(network)?
-        .get("ipv4_address")?
-        .as_str()
-        .map(str::to_owned)
 }
 
 #[cfg(test)]

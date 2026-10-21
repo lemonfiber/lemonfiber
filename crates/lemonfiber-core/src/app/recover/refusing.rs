@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use crate::config::store;
 use crate::error::codes::setup::{
-    NEEDS_SERVICE, NOT_OPENED, NOT_PUT_BACK, NOT_REMOVED, NOT_REWOUND, NOT_WITHDRAWN,
-    STILL_HOLDING, UNKEPT,
+    NEEDS_SERVICE, NOT_MOVED_BACK, NOT_OPENED, NOT_PUT_BACK, NOT_REMOVED, NOT_REWOUND,
+    NOT_WITHDRAWN, STILL_HOLDING, UNKEPT,
 };
 use crate::error::{Diagnose as _, Problem, Remedy};
 
@@ -27,6 +27,13 @@ pub(super) enum Fault {
         /// The operating system's own words.
         reason: String,
     },
+    /// A service's state could not be moved back.
+    NotMovedBack {
+        /// Where it is still.
+        path: PathBuf,
+        /// Why, in the operating system's words or lemonfiber's.
+        reason: String,
+    },
     /// A directory could not be removed.
     NotRemoved {
         /// The directory left in place.
@@ -46,6 +53,16 @@ impl Fault {
                 "A directory from the interrupted setup could not be removed",
                 "The rest of the setup was reversed; this one directory is still there. It holds nothing.",
                 Remedy::new("Remove it by hand, or leave it where it is"),
+            )
+            .with_detail(format!("{}: {reason}", path.display())),
+            Self::NotMovedBack { path, reason } => Problem::new(
+                NOT_MOVED_BACK,
+                "A service's state lemonfiber moved could not be moved back",
+                "Everything before it was put back; this is still where lemonfiber moved it.",
+                Remedy::new(
+                    "Run it again once both places are directories of the project's own, \
+                     reached through no link, that lemonfiber can write",
+                ),
             )
             .with_detail(format!("{}: {reason}", path.display())),
             Self::NotRewound { path, reason } => Problem::new(

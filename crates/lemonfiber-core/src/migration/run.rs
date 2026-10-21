@@ -51,9 +51,9 @@ async fn acting(ctx: &Ctx, mode: Mode, confirmed: bool) -> Result<Outcome, Box<P
         Mode::Import => crate::app::import::carry(ctx, &found.survey, &found.running, confirmed)
             .await
             .map(Outcome::Import),
-        Mode::Beside => crate::app::beside::stand(ctx, &found.survey, confirmed)
-            .await
-            .map(Outcome::Beside),
+        Mode::Beside => {
+            crate::app::beside::stand(ctx, &found.survey, confirmed).map(Outcome::Beside)
+        }
         // A confirmation is no yes to a replacement, so asked this way it only reads.
         Mode::Replace => replacing(ctx, &found, None).await.map(Outcome::Replacement),
     }

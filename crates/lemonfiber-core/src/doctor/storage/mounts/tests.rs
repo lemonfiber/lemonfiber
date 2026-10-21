@@ -1,6 +1,6 @@
 use super::{findings, CHECK};
 use crate::doctor::{Finding, Verdict};
-use crate::stack::mounts::Crowded;
+use crate::project::overlay::Crowded;
 
 /// A service that would see the given mounts beneath the data location.
 fn crowding(service: &str, mounts: &[&str]) -> Crowded {
@@ -14,10 +14,7 @@ fn crowding(service: &str, mounts: &[&str]) -> Crowded {
 fn curator() -> Crowded {
     crowding(
         "sonarr",
-        &[
-            "${DATA_ROOT}/downloads:/downloads",
-            "${DATA_ROOT}/media:/media",
-        ],
+        &["/srv/media/downloads:/downloads", "/srv/media/media:/media"],
     )
 }
 
@@ -60,11 +57,8 @@ fn the_mounts_it_found_are_shown_rather_than_counted() {
     // A count is not something an operator can act on. The entries are what they
     // will go and edit, so the finding carries them.
     let words = said(&findings(&[curator()]));
-    assert!(
-        words.contains("${DATA_ROOT}/downloads:/downloads"),
-        "{words}"
-    );
-    assert!(words.contains("${DATA_ROOT}/media:/media"), "{words}");
+    assert!(words.contains("/srv/media/downloads:/downloads"), "{words}");
+    assert!(words.contains("/srv/media/media:/media"), "{words}");
 }
 
 #[test]
@@ -87,7 +81,7 @@ fn each_service_is_reported_as_its_own() {
     // finding is attributed so the report reads as being about that service.
     let found = findings(&[
         curator(),
-        crowding("radarr", &["${DATA_ROOT}/a:/a", "${DATA_ROOT}/b:/b"]),
+        crowding("radarr", &["/srv/media/a:/a", "/srv/media/b:/b"]),
     ]);
     let about: Vec<Option<String>> = found
         .iter()

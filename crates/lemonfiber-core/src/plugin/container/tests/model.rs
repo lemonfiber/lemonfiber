@@ -6,8 +6,9 @@ use lemonfiber_manifest::container::{
 };
 
 use super::super::super::installed::{Installed, Placed};
-use super::super::{variables, written, Holding, Reading, Variable};
-use super::{document, installed, placed};
+use super::super::{variables, Holding, Reading as Secrets, Variable};
+use super::{document, installed, placed, written};
+use crate::project::Reading;
 
 fn with(fields: Fields) -> Placed {
     Placed { fields, ..placed() }
@@ -56,10 +57,7 @@ fn further_ports_are_published_on_the_tier_to_where_the_container_listens() {
     }));
     assert_eq!(
         strings(&entry, "ports"),
-        [
-            "${LAN_BIND:-0.0.0.0}:25600:8080",
-            "${LAN_BIND:-0.0.0.0}:8920:8920"
-        ]
+        ["0.0.0.0:25600:8080", "0.0.0.0:8920:8920"]
     );
 }
 
@@ -85,7 +83,7 @@ fn further_mounts_come_from_the_mount_tree_and_the_configuration_may_be_read_onl
     assert_eq!(
         strings(&entry, "volumes"),
         [
-            "${DATA_ROOT:-./data}:/data",
+            "./data:/data",
             "./config/komga:/config:ro",
             "./mounts/komga/cache:/cache",
             "./mounts/komga/Caddyfile:/etc/caddy/Caddyfile:ro",
@@ -133,22 +131,22 @@ fn each_variable_is_written_as_its_kind_and_none_is_substituted() {
             }),
         ),
     ]);
-    let setting = |name: &str| (name == "komga:mode").then(|| "fast".to_owned());
-    let address = |_: &str, asked: &UrlOf| {
-        (asked.url_of == "indexer.search").then(|| "http://prowlarr:9696".to_owned())
-    };
+    let setting = |_: &str, name: &str| (name == "komga:mode").then(|| "fast".to_owned());
     let reading = Reading {
         setting: &setting,
-        address: &address,
         ..Reading::bare()
     };
-    let document = written(
-        &installed(vec![with(Fields {
+    let asking = Placed {
+        asks: vec![crate::plugin::Asking {
+            capability: "indexer.search".to_owned(),
+            each: false,
+        }],
+        ..with(Fields {
             env,
             ..Fields::default()
-        })]),
-        &reading,
-    );
+        })
+    };
+    let document = written(&installed(vec![asking]), &reading);
     let entry = entry_of(&document);
     let environment = |name: &str| text(&entry, &["environment", name]);
     assert_eq!(environment("PRICE").as_deref(), Some("$$5"));
@@ -162,10 +160,7 @@ fn each_variable_is_written_as_its_kind_and_none_is_substituted() {
     );
     assert_eq!(environment("UNFILLED"), None);
     assert_eq!(environment("KEY"), None);
-    assert_eq!(
-        environment("TZ").as_deref(),
-        Some("${TZ:-Europe/Amsterdam}")
-    );
+    assert_eq!(environment("TZ").as_deref(), Some("Europe/Amsterdam"));
 }
 
 #[test]
@@ -176,11 +171,11 @@ fn an_image_that_drops_to_the_operators_pair_is_told_it() {
     })));
     assert_eq!(
         text(&entry, &["environment", "PUID"]).as_deref(),
-        Some("${PUID:-1000}")
+        Some("1000")
     );
     assert_eq!(
         text(&entry, &["environment", "PGID"]).as_deref(),
-        Some("${PGID:-1000}")
+        Some("1000")
     );
     assert_eq!(text(&entry, &["user"]), None);
 }
@@ -195,10 +190,7 @@ fn a_confined_service_is_read_only_holds_no_capability_and_runs_as_the_operator(
     assert_eq!(text(&entry, &["read_only"]).as_deref(), Some("true"));
     assert!(strings(&entry, "cap_add").is_empty());
     assert_eq!(strings(&entry, "cap_drop"), ["ALL"]);
-    assert_eq!(
-        text(&entry, &["user"]).as_deref(),
-        Some("${PUID:-1000}:${PGID:-1000}")
-    );
+    assert_eq!(text(&entry, &["user"]).as_deref(), Some("1000:1000"));
     assert_eq!(text(&entry, &["mem_limit"]).as_deref(), Some("64m"));
 }
 
@@ -228,13 +220,7 @@ fn a_service_inside_its_guards_network_has_none_of_its_own_and_waits_for_it() {
         }),
         ..Fields::default()
     });
-    let guard =
-        |capability: &str| (capability == "network.egress-guard").then(|| "gluetun".to_owned());
-    let guarded = Reading {
-        guard: &guard,
-        ..Reading::bare()
-    };
-    let entry = entry_of(&written(&installed(vec![inside.clone()]), &guarded));
+    let entry = entry_of(&document(inside));
     assert_eq!(
         text(&entry, &["network_mode"]).as_deref(),
         Some("service:gluetun")
@@ -244,9 +230,6 @@ fn a_service_inside_its_guards_network_has_none_of_its_own_and_waits_for_it() {
         Some("service_healthy")
     );
     assert!(strings(&entry, "ports").is_empty());
-    let unguarded = entry_of(&document(inside));
-    assert_eq!(text(&unguarded, &["network_mode"]).as_deref(), Some("none"));
-    assert!(strings(&unguarded, "ports").is_empty());
 }
 
 #[test]
@@ -275,7 +258,7 @@ fn a_record_whose_paths_the_model_refuses_writes_none_of_them() {
     assert_eq!(
         strings(&entry, "volumes"),
         [
-            "${DATA_ROOT:-./data}:/data",
+            "./data:/data",
             "./config/komga:/config",
             "./mounts/komga/outer:/outer",
         ]
@@ -299,15 +282,15 @@ fn a_record_naming_lemonfibers_own_variables_does_not_override_them() {
     })));
     assert_eq!(
         text(&entry, &["environment", "TZ"]).as_deref(),
-        Some("${TZ:-Europe/Amsterdam}")
+        Some("Europe/Amsterdam")
     );
     assert_eq!(
         text(&entry, &["environment", "PUID"]).as_deref(),
-        Some("${PUID:-1000}")
+        Some("1000")
     );
     assert_eq!(
         text(&entry, &["environment", "PGID"]).as_deref(),
-        Some("${PGID:-1000}")
+        Some("1000")
     );
 }
 
@@ -320,14 +303,16 @@ const SECRETS_ENTRY: &str = "services:\n  \
          restart: unless-stopped\n    \
          environment:\n      \
          MODE: fast$$1\n      \
-         TZ: ${TZ:-Europe/Amsterdam}\n    \
+         TZ: Europe/Amsterdam\n    \
          env_file:\n    \
          - /home/op/.config/lemonfiber/env/komga.env\n    \
          ports:\n    \
-         - ${LAN_BIND:-0.0.0.0}:25600:25600\n    \
+         - 0.0.0.0:25600:25600\n    \
          volumes:\n    \
-         - ${DATA_ROOT:-./data}:/data\n    \
+         - ./data:/data\n    \
          - ./config/komga:/config\n    \
+         networks:\n    \
+         - own__komga\n    \
          security_opt:\n    \
          - no-new-privileges:true\n    \
          cap_drop:\n    \
@@ -364,7 +349,7 @@ fn naming_a_secret() -> Placed {
 
 #[test]
 fn a_service_naming_a_secret_reads_its_own_file_and_a_recorded_setting_is_written() {
-    let setting = |name: &str| (name == "komga:mode").then(|| "fast$1".to_owned());
+    let setting = |_: &str, name: &str| (name == "komga:mode").then(|| "fast$1".to_owned());
     let file = |service: &str| {
         Some(std::path::PathBuf::from(format!(
             "/home/op/.config/lemonfiber/env/{service}.env"
@@ -414,9 +399,9 @@ fn a_secret_is_read_from_the_store_unless_its_holder_lets_it_cross() {
         (plugin == "komga" && of == "sonarr")
             .then(|| Holding::Crossing("SONARR_API_KEY".to_owned()))
     };
-    let reading = Reading {
+    let reading = Secrets {
         crossing: &crossing,
-        ..Reading::bare()
+        ..Secrets::bare()
     };
     let placed = naming_a_secret();
     assert_eq!(

@@ -24,16 +24,13 @@ pub mod catalogue;
 mod claimed;
 mod compact;
 mod conforming;
-// The container written from a record, rather than anything read out of a manifest.
-// Beside the record because it is the derivation the record deliberately does not
-// hold: a copy of one is free to disagree with it, so there is one of each and this
-// is the one that derives.
+// A record's services as the generated project writes them, rather than anything read
+// out of a manifest.
 mod container;
 mod declared;
 pub mod first_party;
 mod fronting;
 mod installed;
-mod joining;
 // Whose a journalled change is. Apart from the fronting whose region markers carry the
 // same name: those say where a plugin's wiring sits, and this says what leaves the
 // machine with the plugin.
@@ -84,16 +81,14 @@ pub use claimed::{
     Digested, Evidence, FailingAsDeclared, Ran, Unreadable, Verdict,
 };
 pub use conforming::{conformed, Conformed, Judged};
-pub(crate) use container::{holding, secrets_file, unit, user_of, variables};
-pub use container::{profile, written, Holding, Reading, Variable};
+pub(crate) use container::{holding, is_a_plugins, secrets_file, unit, user_of, variables};
+pub use container::{profile, Holding, Reading, Variable};
 pub use declared::{Declaration, Secret};
 pub use fronting::{proxied as fronting_proxied, taken as label_taken, DASHBOARD, PROXY};
 pub use installed::{answering, spelled_alike, Asking, Installed, Placed, Reached, RunProof};
-pub use joining::Joins;
 pub use lemonfiber_manifest::container::Fields;
-pub use owning::{owner, owns};
-pub(crate) use placing::OVERLAYS;
-pub use placing::{documents, key_file, mount_sources, mount_tree, overlay, writes, Lands, Write};
+pub use owning::{owned_by, owner, owns};
+pub use placing::{key_file, mount_sources, mount_tree, writes, Lands, Write};
 pub use provenance::{held, vouched, Key, Provenance, Unusable, Vouch, Vouched};
 pub use recipes::{approval, approvals, Adapter, Named, Owner, Pair, Recipe, Step};
 pub use recorded::{Answer, Asked, Recording};

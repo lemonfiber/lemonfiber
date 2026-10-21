@@ -408,7 +408,8 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
     let overlay = crate::doctor::overlay::OverlayCheck::new(
         ctx.seams.filesystem.clone(),
         ctx.settings.env_file.clone(),
-    );
+    )
+    .beside(crate::app::project::directory(ctx));
     let mut checks: Vec<Box<dyn Check>> = vec![
         Box::new(environment),
         Box::new(autostart),

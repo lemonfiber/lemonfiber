@@ -243,7 +243,7 @@ fn an_unconfirmed_reset_that_found_edits_asks_to_be_confirmed() {
     let pending = ResetReport {
         rehearsed: false,
         reverted: vec![StackEdit {
-            path: "compose.yml".to_owned(),
+            path: "compose.generated.yml".to_owned(),
             diff: String::new(),
         }],
         reverted_connections: Vec::new(),

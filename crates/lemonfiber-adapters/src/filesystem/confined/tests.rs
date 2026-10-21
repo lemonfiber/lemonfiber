@@ -187,5 +187,11 @@ fn a_mount_source_lies_beneath_only_through_no_link() {
             Lying::Escaped
         );
         assert_eq!(Disk.lies(&owned.join("pointer"), &owned), Lying::Escaped);
+        assert_eq!(
+            Disk.lies(&owned.join("x".repeat(300)), &owned),
+            Lying::Escaped,
+            "a name nothing can be looked up by is not one that lies plainly beneath"
+        );
     }
+    assert_eq!(Disk.lies(&owned, &owned), Lying::Plain);
 }

@@ -63,7 +63,7 @@ pub(crate) async fn reached(
     resolved: &Resolved,
 ) -> Vec<Propagation> {
     let crossing = Holding::Crossing(setting.to_owned());
-    let reading: Vec<(&Installed, String)> = resolved.reading(&|_, _| None, |reading| {
+    let reading: Vec<(&Installed, String)> = resolved.reading(|reading| {
         installed
             .iter()
             .flat_map(|one| {

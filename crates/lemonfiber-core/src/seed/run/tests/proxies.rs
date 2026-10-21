@@ -6,22 +6,6 @@ use super::*;
 /// The door's address on the network it reaches the media server on.
 const DOOR: &str = "10.80.96.18";
 
-/// A stack directory whose compose file fixes the door's address, or fixes none.
-fn project(name: &str, door: bool) -> std::path::PathBuf {
-    let at = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
-    let _ = std::fs::remove_dir_all(&at);
-    let _ = std::fs::create_dir_all(at.join("compose"));
-    if door {
-        let _ = std::fs::write(
-            at.join("compose/media.yml"),
-            format!(
-                "services:\n  door:\n    networks:\n      door-upstream:\n        ipv4_address: {DOOR}\n"
-            ),
-        );
-    }
-    at
-}
-
 /// A context with the media server's administrator recorded where `administered` says.
 fn proxies_ctx(name: &str, administered: bool, http: Arc<Fake>) -> Ctx {
     let at = lemonfiber_fixtures::scratch::Scratch::named(&format!("{name}-env")).kept();
@@ -69,10 +53,9 @@ const NOBODY: &str = r#"{"KnownProxies":[]}"#;
 const THE_DOOR: &str = r#"{"KnownProxies":["10.80.96.18"]}"#;
 
 /// The one wiring this pass reports, and whether it asked for a restart.
-async fn seeded(ctx: &Ctx, http: &Fake, project: &std::path::Path) -> (Option<State>, bool) {
+async fn seeded(ctx: &Ctx, http: &Fake, door: Option<String>) -> (Option<State>, bool) {
     let stack = vec![media_server_svc()];
-    let wiring =
-        super::super::proxies::seed_proxies(ctx, Some(project), served(&stack).as_ref()).await;
+    let wiring = super::super::proxies::seed_proxies(ctx, door, served(&stack).as_ref()).await;
     let restarted = http
         .requests()
         .iter()
@@ -85,7 +68,7 @@ async fn seeded(ctx: &Ctx, http: &Fake, project: &std::path::Path) -> (Option<St
 async fn a_server_trusting_nobody_trusts_the_door_and_starts_again() {
     let http = serving(NOBODY, THE_DOOR);
     let ctx = proxies_ctx("proxies-nobody", true, http.clone());
-    let (state, restarted) = seeded(&ctx, &http, &project("proxies-nobody", true)).await;
+    let (state, restarted) = seeded(&ctx, &http, Some(DOOR.to_owned())).await;
     assert_eq!(state, Some(State::Wired));
     assert!(restarted);
 }
@@ -95,7 +78,7 @@ async fn a_server_trusting_nobody_trusts_the_door_and_starts_again() {
 async fn a_server_already_trusting_the_door_is_left_running() {
     let http = serving(THE_DOOR, THE_DOOR);
     let ctx = proxies_ctx("proxies-already", true, http.clone());
-    let (state, restarted) = seeded(&ctx, &http, &project("proxies-already", true)).await;
+    let (state, restarted) = seeded(&ctx, &http, Some(DOOR.to_owned())).await;
     assert_eq!(state, Some(State::AlreadyWired));
     assert!(!restarted);
 }
@@ -106,14 +89,14 @@ async fn a_rehearsal_says_what_it_would_trust_and_writes_nothing() {
     let http = serving(NOBODY, THE_DOOR);
     let mut ctx = proxies_ctx("proxies-rehearsed", true, http.clone());
     ctx.dry_run = true;
-    let (state, restarted) = seeded(&ctx, &http, &project("proxies-rehearsed", true)).await;
+    let (state, restarted) = seeded(&ctx, &http, Some(DOOR.to_owned())).await;
     assert!(matches!(state, Some(State::WouldWire { ours: Some(ours), .. }) if ours == DOOR));
     assert!(!restarted);
 
     let unset = proxies_ctx("proxies-rehearsed-unset", false, serving(NOBODY, NOBODY));
     let mut unset = unset;
     unset.dry_run = true;
-    let (state, _) = seeded(&unset, &http, &project("proxies-rehearsed-unset", true)).await;
+    let (state, _) = seeded(&unset, &http, Some(DOOR.to_owned())).await;
     assert!(matches!(state, Some(State::WouldWire { yours: None, .. })));
 }
 
@@ -122,10 +105,10 @@ async fn a_rehearsal_says_what_it_would_trust_and_writes_nothing() {
 async fn no_door_and_no_administrator_hold_nothing() {
     let http = serving(NOBODY, THE_DOOR);
     let ctx = proxies_ctx("proxies-no-door", true, http.clone());
-    let (state, _) = seeded(&ctx, &http, &project("proxies-no-door", false)).await;
+    let (state, _) = seeded(&ctx, &http, None).await;
     assert_eq!(state, None);
     let ctx = proxies_ctx("proxies-no-admin", false, http.clone());
-    let (state, _) = seeded(&ctx, &http, &project("proxies-no-admin", true)).await;
+    let (state, _) = seeded(&ctx, &http, Some(DOOR.to_owned())).await;
     assert_eq!(state, None);
 }
 
@@ -143,7 +126,7 @@ async fn a_server_that_will_not_answer_is_unreached() {
         ),
     ]);
     let ctx = proxies_ctx("proxies-unreached", true, http.clone());
-    let (state, _) = seeded(&ctx, &http, &project("proxies-unreached", true)).await;
+    let (state, _) = seeded(&ctx, &http, Some(DOOR.to_owned())).await;
     assert!(state.is_some_and(|state| !matches!(state, State::Wired | State::AlreadyWired)));
 }
 
@@ -176,7 +159,7 @@ async fn a_server_that_does_not_come_back_is_unreached() {
         ("/System/Restart", vec![Answer::reply(204, "")]),
     ]);
     let ctx = proxies_ctx("proxies-gone", true, http.clone());
-    let (state, restarted) = seeded(&ctx, &http, &project("proxies-gone", true)).await;
+    let (state, restarted) = seeded(&ctx, &http, Some(DOOR.to_owned())).await;
     assert!(restarted);
     assert!(state.is_some_and(|state| !matches!(state, State::Wired | State::AlreadyWired)));
 }

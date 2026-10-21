@@ -10,6 +10,8 @@
 //! resolves somewhere else, or names another file, and either is refused — so there is no
 //! moment between a look and a use for it to change under.
 //!
+//! A move is made the same way: every step to either end is reached through no link.
+//!
 //! Synchronous, because the stack's own files are written out by code with nothing to
 //! await; the asynchronous read runs the same function on a thread that may block.
 
@@ -31,6 +33,10 @@ impl Confined for Disk {
 
     fn lies(&self, path: &Path, within: &Path) -> Lying {
         lies(path, within)
+    }
+
+    fn moved(&self, from: &Path, to: &Path, within: &Path) -> Result<(), Fault> {
+        moving::moved(from, to, within)
     }
 }
 
@@ -133,32 +139,35 @@ pub(super) fn make(path: &Path, within: &Path) -> Result<(), Fault> {
     Ok(())
 }
 
-/// Where `path` lies beneath `within`: each step opened through the handle of the one
-/// above it, never through a link and never waiting on what it opens.
+/// Where `path` lies beneath `within`: each directory on the way opened through the handle
+/// of the one above it, never through a link and never waiting on what it opens, and the
+/// last step only looked at, so a pipe or a device put there is never opened.
 #[cfg(unix)]
 pub(super) fn lies(path: &Path, within: &Path) -> Lying {
-    use rustix::fs::{openat, Mode, OFlags, CWD};
-    let Ok(names) = steps(path, within) else {
+    use rustix::fs::{openat, statat, AtFlags, FileType, Mode, OFlags, CWD};
+    let Ok(mut names) = steps(path, within) else {
         return Lying::Escaped;
     };
-    let opening = OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NONBLOCK;
-    let Ok(mut here) = openat(CWD, within, opening | OFlags::DIRECTORY, Mode::empty()) else {
+    let opening = OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NONBLOCK | OFlags::DIRECTORY;
+    let Ok(mut here) = openat(CWD, within, opening, Mode::empty()) else {
         return Lying::Absent;
     };
-    let last = names.len().saturating_sub(1);
-    for (at, name) in names.into_iter().enumerate() {
-        let flags = if at == last {
-            opening | OFlags::NOFOLLOW
-        } else {
-            opening | OFlags::NOFOLLOW | OFlags::DIRECTORY
-        };
-        match openat(&here, name, flags, Mode::empty()) {
+    let Some(last) = names.pop() else {
+        return Lying::Plain;
+    };
+    for name in names {
+        match openat(&here, name, opening | OFlags::NOFOLLOW, Mode::empty()) {
             Ok(opened) => here = opened,
             Err(rustix::io::Errno::NOENT) => return Lying::Absent,
             Err(_) => return Lying::Escaped,
         }
     }
-    Lying::Plain
+    match statat(&here, last, AtFlags::SYMLINK_NOFOLLOW) {
+        Ok(found) if FileType::from_raw_mode(found.st_mode) == FileType::Symlink => Lying::Escaped,
+        Ok(_) => Lying::Plain,
+        Err(rustix::io::Errno::NOENT) => Lying::Absent,
+        Err(_) => Lying::Escaped,
+    }
 }
 
 /// Where `path` lies beneath `within`, each step looked at and refused where it is a link.
@@ -295,6 +304,11 @@ fn same_file(one: &std::fs::Metadata, other: &std::fs::Metadata) -> bool {
         && one.file_index() == other.file_index()
         && one.file_index().is_some()
 }
+
+mod moving;
+mod unpacking;
+
+pub(crate) use unpacking::{unpacked, UNPACKED_AT_MOST};
 
 #[cfg(test)]
 mod tests;

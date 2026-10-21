@@ -5,12 +5,12 @@
 
 use super::Ctx;
 use crate::error::{Diagnose, Problem};
-use crate::model::{LifecycleReport, StackEdit, VersionReport};
+use crate::model::{LifecycleReport, StackEdit};
 use crate::stack::closure::{everything, resolve, Plan};
 use crate::stack::compose::{build, Action};
 
 mod declared;
-pub(crate) use declared::{catalogue, forms, provenance};
+pub(crate) use declared::{catalogue, forms, provenance, version};
 mod diagnosis;
 mod fetching;
 mod grounded;
@@ -83,6 +83,8 @@ struct Composed {
     stack: std::path::PathBuf,
     /// Stack files the operator had edited, preserved rather than overwritten.
     stack_edits: Vec<StackEdit>,
+    /// The project the command runs.
+    project: crate::project::Project,
 }
 
 /// Whether an action should carry the quality choice into the materialised stack.
@@ -108,7 +110,7 @@ fn compose(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Composed, Box
     if fetching::refused(ctx, action) {
         return Err(Box::new(fetching::refusal()));
     }
-    let (manifest, plan) = resolved(ctx, forms)?;
+    let (manifest, mut plan) = resolved(ctx, forms)?;
     let record = ctx
         .settings
         .env_file
@@ -137,7 +139,7 @@ fn compose(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Composed, Box
     } else {
         super::materialise::materialise
     };
-    let (stack, edits) = written(
+    let (stack, mut edits) = written(
         ctx.seams.confined.as_ref(),
         ctx.stack,
         ctx.settings.stack_dir.as_deref(),
@@ -146,6 +148,14 @@ fn compose(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Composed, Box
         &ctx.settings.unmanaged,
     )
     .map_err(|err| Box::new(err.problem()))?;
+    let prepared = super::project::prepared(ctx, &manifest, &plan.services, starts(action))?;
+    edits.extend(prepared.edits);
+    plan.profiles.extend(prepared.hosting);
+    if starts(action) && !ctx.dry_run {
+        super::project::started(ctx, &plan.profiles)
+            .map_err(|failure| Box::new(failure.problem()))?;
+    }
+    let project = prepared.project;
     crate::overlay::journalled(ctx).map_err(|failure| Box::new(failure.problem()))?;
     let command = build(&plan, &ctx.settings, &stack, action, ctx.environment);
     Ok(Composed {
@@ -154,6 +164,7 @@ fn compose(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Composed, Box
         command,
         stack,
         stack_edits: edits,
+        project,
     })
 }
 
@@ -240,11 +251,7 @@ pub(crate) fn addressed(action: &Action, plan: &Plan) -> Vec<String> {
 /// it goes — and the two must not be able to disagree about which services a form
 /// holds, what would be left out, or whether stopping is even allowed. Running the
 /// command is the only part that differs, so it is the only part that is not here.
-async fn readied(
-    ctx: &Ctx,
-    forms: &[String],
-    action: &Action,
-) -> Result<(lemonfiber_manifest::Manifest, Vec<String>, LifecycleReport), Box<Problem>> {
+async fn readied(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Readied, Box<Problem>> {
     // Asked first, and of every action rather than only of a teardown: a stack
     // brought up against a machine that has not got its location comes up empty, and
     // one stopped there stops something that was never started. Before the stack is
@@ -257,6 +264,7 @@ async fn readied(
         plan,
         command,
         stack_edits,
+        project,
         ..
     } = compose(ctx, forms, action)?;
 
@@ -271,10 +279,18 @@ async fn readied(
     // and a pre-flight before one would be a question about a machine nobody is
     // about to bind on. A rehearsal asks it too, and that is most of the point: what
     // a start would run into is exactly what a rehearsal is for.
-    let port_conflicts = if starts(action) {
-        super::preflight::conflicting_ports(ctx, &manifest, &plan.services).await
+    let (port_conflicts, sweep, copies) = if starts(action) {
+        (
+            super::preflight::conflicting_ports(ctx, &manifest, &plan.services).await,
+            super::project::swept(ctx, &project.topology).await,
+            super::project::copies(ctx, &manifest).await,
+        )
     } else {
-        Vec::new()
+        (
+            Vec::new(),
+            super::project::Sweep::default(),
+            super::project::Copies::default(),
+        )
     };
 
     let report = LifecycleReport {
@@ -297,8 +313,29 @@ async fn readied(
         } else {
             Vec::new()
         },
+        swept: sweep.networks.clone(),
     };
-    Ok((manifest, command, report))
+    Ok(Readied {
+        manifest,
+        command,
+        report,
+        sweep,
+        copies,
+    })
+}
+
+/// What a lifecycle command settled before anything runs.
+struct Readied {
+    /// The stack's manifest.
+    manifest: lemonfiber_manifest::Manifest,
+    /// The command to spawn.
+    command: Vec<String>,
+    /// The report it fills in.
+    report: LifecycleReport,
+    /// The networks a start takes away before it runs.
+    sweep: super::project::Sweep,
+    /// The volumes a start copies before it runs.
+    copies: super::project::Copies,
 }
 
 /// Resolve forms, build the command, and run it unless this is a rehearsal.
@@ -321,7 +358,13 @@ async fn worked(
     action: &Action,
     offer: Option<&str>,
 ) -> Result<LifecycleReport, Box<Problem>> {
-    let (manifest, command, mut report) = readied(ctx, forms, action).await?;
+    let Readied {
+        manifest,
+        command,
+        mut report,
+        sweep,
+        copies,
+    } = readied(ctx, forms, action).await?;
     offered::answered(action, &mut report, offer)?;
 
     // A rehearsal stops here deliberately: it has already done everything except
@@ -336,6 +379,8 @@ async fn worked(
     // the stack would then look entirely healthy while filing a second library onto
     // the system disk. The streamed start asks the same thing at the same point.
     grounded::grounded(ctx, action).await?;
+    sweep.taken_away(ctx).await;
+    copies.made(ctx).await?;
 
     // One credential has to exist before the service that uses it has ever run: the
     // book curator takes a key from its environment on its first start and generates its
@@ -434,41 +479,6 @@ pub(super) fn resolved(
     }
     .map_err(|err| Box::new(err.problem()))?;
     Ok((manifest, plan))
-}
-
-/// The binary's version, and the engine's where it answers.
-///
-/// An unreachable engine is reported as absent rather than as a failure: asking
-/// what versions are in play is exactly what an operator does when something is
-/// wrong, so it must still answer when the engine is down.
-pub(crate) async fn version(ctx: &Ctx) -> Result<VersionReport, Box<Problem>> {
-    let argv = ["docker", "compose", "version", "--short"].map(str::to_owned);
-    let compose = match ctx.seams.runner.run(&argv).await {
-        Ok(output) if output.succeeded() => Some(output.stdout.trim().to_owned()),
-        Ok(_) | Err(_) => None,
-    };
-
-    // The stack is the one thing here that can genuinely be wrong: an
-    // unreadable directory is the operator's own `--stack-dir`, and they need
-    // to hear about it rather than see a version report with a hole in it.
-    let stack = ctx
-        .stack
-        .checked_manifest(ctx.today())
-        .map_err(|err| Box::new(err.problem()))?;
-
-    let binary = env!("CARGO_PKG_VERSION").to_owned();
-    Ok(VersionReport {
-        supported_schema: lemonfiber_manifest::SUPPORTED_SCHEMA_VERSIONS.to_vec(),
-        stack: stack.stack_version,
-        compose,
-        attestation_status: crate::device_keys::attestation::status::taken(),
-        // Read from what this build carries rather than from anything outside it,
-        // for the same reason the engine's absence does not fail this read: asking
-        // what is in play is what an operator does when something is wrong, and an
-        // answer that needed a network would be missing exactly then.
-        changelog: crate::changelog::notes(&binary),
-        binary,
-    })
 }
 
 #[cfg(test)]

@@ -530,8 +530,13 @@ fn inverted(kind: &crate::journal::Kind) -> Option<crate::journal::Kind> {
             current: previous.clone(),
             filed: None,
         }),
+        Kind::Moved { from, to } => Some(Kind::Moved {
+            from: to.clone(),
+            to: from.clone(),
+        }),
         Kind::Created { .. }
         | Kind::Made { .. }
+        | Kind::Copied { .. }
         | Kind::Region { .. }
         | Kind::Rewritten { .. }
         | Kind::Pinned { .. }

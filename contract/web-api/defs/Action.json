@@ -139,6 +139,52 @@
       ]
     },
     {
+      "description": "Move a service's state back to where it was.\n\nOnly where nothing has taken its old place, and only from where it was moved to.",
+      "type": "object",
+      "properties": {
+        "does": {
+          "type": "string",
+          "const": "move-back"
+        },
+        "from": {
+          "description": "Where it goes back to.",
+          "type": "string"
+        },
+        "to": {
+          "description": "Where it is now.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "does",
+        "from",
+        "to"
+      ]
+    },
+    {
+      "description": "Keep the copy of a volume where it is: the volume was never changed, so nothing\nis put back.",
+      "type": "object",
+      "properties": {
+        "does": {
+          "type": "string",
+          "const": "keep-copy"
+        },
+        "to": {
+          "description": "Where the copy is.",
+          "type": "string"
+        },
+        "volume": {
+          "description": "The volume it was copied from.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "does",
+        "volume",
+        "to"
+      ]
+    },
+    {
       "description": "Pin a service back to the version it was standing on.\n\nThe one reversal nothing in this product carries out. Which version runs is\ndecided by the materialised stack and by what Compose was told to start, and\na reversal of settings and files reaches neither — so this is worked out,\nreported, and left for the operator rather than attempted.",
       "type": "object",
       "properties": {

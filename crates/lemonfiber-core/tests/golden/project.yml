@@ -1,3 +1,4 @@
+name: lemonfiber
 services:
   audiobookshelf:
     image: ghcr.io/advplyr/audiobookshelf:2.37.1@sha256:581d68b2a6fc7ebf58d81c878a9f387cbbc0d88ac9d37b298b9cee10168af85b
@@ -5,11 +6,11 @@ services:
     - media
     restart: unless-stopped
     environment:
-      TZ: ${TZ:-Europe/Amsterdam}
+      TZ: Europe/Amsterdam
     ports:
-    - ${LAN_BIND:-0.0.0.0}:13378:80
+    - 0.0.0.0:13378:80
     volumes:
-    - ${DATA_ROOT:-./data}:/data
+    - ./data:/data
     - ./config/audiobookshelf:/config
     - ./mounts/audiobookshelf/metadata:/metadata
     networks:
@@ -34,13 +35,13 @@ services:
     - subs
     restart: unless-stopped
     environment:
-      PGID: ${PGID:-1000}
-      PUID: ${PUID:-1000}
-      TZ: ${TZ:-Europe/Amsterdam}
+      PGID: '1000'
+      PUID: '1000'
+      TZ: Europe/Amsterdam
     ports:
     - 127.0.0.1:6767:6767
     volumes:
-    - ${DATA_ROOT:-./data}:/data
+    - ./data:/data
     - ./config/bazarr:/config
     networks:
     - ask__bazarr__dashboard.show__homepage
@@ -66,16 +67,16 @@ services:
     profiles:
     - books
     restart: unless-stopped
-    user: ${PUID:-1000}:${PGID:-1000}
+    user: 1000:1000
     environment:
       BINDERY_AUDIOBOOK_DIR: /data/media/audiobooks
       BINDERY_DOWNLOAD_DIR: /data/downloads
       BINDERY_LIBRARY_DIR: /data/media/books
-      TZ: ${TZ:-Europe/Amsterdam}
+      TZ: Europe/Amsterdam
     ports:
     - 127.0.0.1:8787:8787
     volumes:
-    - ${DATA_ROOT:-./data}:/data
+    - ./data:/data
     - ./config/bindery:/config
     networks:
     - ask__bazarr__library.curate__bindery
@@ -104,13 +105,13 @@ services:
     profiles:
     - proxy
     restart: unless-stopped
-    user: ${PUID:-1000}:${PGID:-1000}
+    user: 1000:1000
     environment:
       DOMAIN: home.local
-      TZ: ${TZ:-Europe/Amsterdam}
+      TZ: Europe/Amsterdam
     ports:
-    - ${LAN_BIND:-0.0.0.0}:80:8080
-    - ${LAN_BIND:-0.0.0.0}:443:8443
+    - 0.0.0.0:80:8080
+    - 0.0.0.0:443:8443
     volumes:
     - ./config/caddy:/etc/caddy:ro
     - ./mounts/caddy/data:/data
@@ -141,13 +142,13 @@ services:
     - media
     restart: unless-stopped
     environment:
-      PGID: ${PGID:-1000}
-      PUID: ${PUID:-1000}
-      TZ: ${TZ:-Europe/Amsterdam}
+      PGID: '1000'
+      PUID: '1000'
+      TZ: Europe/Amsterdam
     ports:
-    - ${LAN_BIND:-0.0.0.0}:8083:8083
+    - 0.0.0.0:8083:8083
     volumes:
-    - ${DATA_ROOT:-./data}:/data
+    - ./data:/data
     - ./config/calibre-web-automated:/config
     networks:
     - ask__calibre-web-automated__proxy.front__caddy
@@ -169,11 +170,11 @@ services:
     profiles:
     - media
     restart: unless-stopped
-    user: ${PUID:-1000}:${PGID:-1000}
+    user: 1000:1000
     environment:
-      TZ: ${TZ:-Europe/Amsterdam}
+      TZ: Europe/Amsterdam
     ports:
-    - ${LAN_BIND:-0.0.0.0}:5056:8080
+    - 0.0.0.0:5056:8080
     volumes:
     - ./config/decline:/config
     networks:
@@ -192,12 +193,12 @@ services:
     profiles:
     - media
     restart: unless-stopped
-    user: ${PUID:-1000}:${PGID:-1000}
+    user: 1000:1000
     environment:
-      TZ: ${TZ:-Europe/Amsterdam}
+      TZ: Europe/Amsterdam
     ports:
-    - ${LAN_BIND:-0.0.0.0}:8096:8096
-    - ${LAN_BIND:-0.0.0.0}:8920:8920
+    - 0.0.0.0:8096:8096
+    - 0.0.0.0:8920:8920
     volumes:
     - ./config/door:/etc/caddy:ro
     tmpfs:
@@ -228,7 +229,7 @@ services:
     restart: unless-stopped
     environment:
       LOG_LEVEL: info
-      TZ: ${TZ:-Europe/Amsterdam}
+      TZ: Europe/Amsterdam
     ports:
     - 127.0.0.1:8191:8191
     volumes:
@@ -256,7 +257,7 @@ services:
     environment:
       PORT_FORWARD_ONLY: off
       SERVER_COUNTRIES: Netherlands
-      TZ: ${TZ:-Europe/Amsterdam}
+      TZ: Europe/Amsterdam
       VPN_PORT_FORWARDING: off
       VPN_PORT_FORWARDING_PROVIDER: ''
       VPN_SERVICE_PROVIDER: ''
@@ -295,11 +296,11 @@ services:
     environment:
       HOMEPAGE_ALLOWED_HOSTS: localhost:3000
       HOMEPAGE_VAR_LAN_HOST: localhost
-      PGID: ${PGID:-1000}
-      PUID: ${PUID:-1000}
-      TZ: ${TZ:-Europe/Amsterdam}
+      PGID: '1000'
+      PUID: '1000'
+      TZ: Europe/Amsterdam
     ports:
-    - ${LAN_BIND:-0.0.0.0}:3000:3000
+    - 0.0.0.0:3000:3000
     volumes:
     - ./config/homepage:/app/config
     networks:
@@ -334,13 +335,13 @@ services:
     - music
     restart: unless-stopped
     environment:
-      PGID: ${PGID:-1000}
-      PUID: ${PUID:-1000}
-      TZ: ${TZ:-Europe/Amsterdam}
+      PGID: '1000'
+      PUID: '1000'
+      TZ: Europe/Amsterdam
     ports:
     - 127.0.0.1:8686:8686
     volumes:
-    - ${DATA_ROOT:-./data}:/data
+    - ./data:/data
     - ./config/lidarr:/config
     networks:
     - ask__bazarr__library.curate__lidarr
@@ -371,16 +372,16 @@ services:
     profiles:
     - media
     restart: unless-stopped
-    user: ${PUID:-1000}:${PGID:-1000}
+    user: 1000:1000
     environment:
       ND_DATAFOLDER: /config
       ND_ENABLEINSIGHTSCOLLECTOR: 'false'
       ND_MUSICFOLDER: /data/media/music
-      TZ: ${TZ:-Europe/Amsterdam}
+      TZ: Europe/Amsterdam
     ports:
-    - ${LAN_BIND:-0.0.0.0}:4533:4533
+    - 0.0.0.0:4533:4533
     volumes:
-    - ${DATA_ROOT:-./data}:/data
+    - ./data:/data
     - ./config/navidrome:/config
     networks:
     - ask__navidrome__dashboard.show__homepage
@@ -403,13 +404,13 @@ services:
     - search
     restart: unless-stopped
     environment:
-      PGID: ${PGID:-1000}
-      PUID: ${PUID:-1000}
-      TZ: ${TZ:-Europe/Amsterdam}
+      PGID: '1000'
+      PUID: '1000'
+      TZ: Europe/Amsterdam
     ports:
     - 127.0.0.1:5076:5076
     volumes:
-    - ${DATA_ROOT:-./data}:/data
+    - ./data:/data
     - ./config/nzbhydra2:/config
     networks:
     - own__nzbhydra2
@@ -431,13 +432,13 @@ services:
     - search
     restart: unless-stopped
     environment:
-      PGID: ${PGID:-1000}
-      PUID: ${PUID:-1000}
-      TZ: ${TZ:-Europe/Amsterdam}
+      PGID: '1000'
+      PUID: '1000'
+      TZ: Europe/Amsterdam
     ports:
     - 127.0.0.1:9696:9696
     volumes:
-    - ${DATA_ROOT:-./data}:/data
+    - ./data:/data
     - ./config/prowlarr:/config
     networks:
     - ask__bindery__indexer.search__prowlarr
@@ -466,12 +467,12 @@ services:
     - torrent
     restart: unless-stopped
     environment:
-      PGID: ${PGID:-1000}
-      PUID: ${PUID:-1000}
-      TZ: ${TZ:-Europe/Amsterdam}
+      PGID: '1000'
+      PUID: '1000'
+      TZ: Europe/Amsterdam
       WEBUI_PORT: '8081'
     volumes:
-    - ${DATA_ROOT:-./data}:/data
+    - ./data:/data
     - ./config/qbittorrent:/config
     network_mode: service:gluetun
     depends_on:
@@ -495,13 +496,13 @@ services:
     - movies
     restart: unless-stopped
     environment:
-      PGID: ${PGID:-1000}
-      PUID: ${PUID:-1000}
-      TZ: ${TZ:-Europe/Amsterdam}
+      PGID: '1000'
+      PUID: '1000'
+      TZ: Europe/Amsterdam
     ports:
     - 127.0.0.1:7878:7878
     volumes:
-    - ${DATA_ROOT:-./data}:/data
+    - ./data:/data
     - ./config/radarr:/config
     networks:
     - ask__bazarr__library.curate__radarr
@@ -533,10 +534,10 @@ services:
     profiles:
     - tuning
     restart: unless-stopped
-    user: ${PUID:-1000}:${PGID:-1000}
+    user: 1000:1000
     environment:
       CRON_SCHEDULE: '@daily'
-      TZ: ${TZ:-Europe/Amsterdam}
+      TZ: Europe/Amsterdam
     volumes:
     - ./config/recyclarr:/config
     networks:
@@ -564,9 +565,9 @@ services:
     profiles:
     - media
     restart: unless-stopped
-    user: ${PUID:-1000}:${PGID:-1000}
+    user: 1000:1000
     environment:
-      TZ: ${TZ:-Europe/Amsterdam}
+      TZ: Europe/Amsterdam
     volumes:
     - ./config/request-gate:/config
     networks:
@@ -589,13 +590,13 @@ services:
     - usenet
     restart: unless-stopped
     environment:
-      PGID: ${PGID:-1000}
-      PUID: ${PUID:-1000}
-      TZ: ${TZ:-Europe/Amsterdam}
+      PGID: '1000'
+      PUID: '1000'
+      TZ: Europe/Amsterdam
     ports:
     - 127.0.0.1:8085:8080
     volumes:
-    - ${DATA_ROOT:-./data}:/data
+    - ./data:/data
     - ./config/sabnzbd:/config
     networks:
     - ask__bindery__download.usenet__sabnzbd
@@ -621,12 +622,12 @@ services:
     profiles:
     - media
     restart: unless-stopped
-    user: ${PUID:-1000}:${PGID:-1000}
+    user: 1000:1000
     environment:
       LOG_LEVEL: info
-      TZ: ${TZ:-Europe/Amsterdam}
+      TZ: Europe/Amsterdam
     ports:
-    - ${LAN_BIND:-0.0.0.0}:5055:5055
+    - 0.0.0.0:5055:5055
     volumes:
     - ./config/seerr:/app/config
     networks:
@@ -657,13 +658,13 @@ services:
     - tv
     restart: unless-stopped
     environment:
-      PGID: ${PGID:-1000}
-      PUID: ${PUID:-1000}
-      TZ: ${TZ:-Europe/Amsterdam}
+      PGID: '1000'
+      PUID: '1000'
+      TZ: Europe/Amsterdam
     ports:
     - 127.0.0.1:8989:8989
     volumes:
-    - ${DATA_ROOT:-./data}:/data
+    - ./data:/data
     - ./config/sonarr:/config
     networks:
     - ask__bazarr__library.curate__sonarr
@@ -696,9 +697,9 @@ services:
     - tuning
     restart: unless-stopped
     environment:
-      PGID: ${PGID:-1000}
-      PUID: ${PUID:-1000}
-      TZ: ${TZ:-Europe/Amsterdam}
+      PGID: '1000'
+      PUID: '1000'
+      TZ: Europe/Amsterdam
       UMASK: '002'
       UN_LIDARR_0_URL: http://lidarr:8686
       UN_RADARR_0_URL: http://radarr:7878
@@ -706,7 +707,7 @@ services:
       UN_WEBSERVER_LISTEN_ADDR: 0.0.0.0:5656
       UN_WEBSERVER_METRICS: 'true'
     volumes:
-    - ${DATA_ROOT:-./data}:/data
+    - ./data:/data
     - ./config/unpackerr:/config
     networks:
     - ask__unpackerr__library.curate__lidarr
@@ -733,13 +734,13 @@ services:
     profiles:
     - media
     restart: unless-stopped
-    user: ${PUID:-1000}:${PGID:-1000}
+    user: 1000:1000
     environment:
-      TZ: ${TZ:-Europe/Amsterdam}
+      TZ: Europe/Amsterdam
     ports:
     - 127.0.0.1:8095:8096
     volumes:
-    - ${DATA_ROOT:-./data}:/data
+    - ./data:/data
     - ./config/jellyfin:/config
     - ./mounts/jellyfin/cache:/cache
     networks:
@@ -762,155 +763,3 @@ services:
     - SETUID
     - KILL
     pids_limit: 1024
-networks:
-  ask__audiobookshelf__dashboard.show__homepage:
-    internal: true
-  ask__audiobookshelf__proxy.front__caddy:
-    internal: true
-  ask__bazarr__dashboard.show__homepage:
-    internal: true
-  ask__bazarr__library.curate__bindery:
-    internal: true
-  ask__bazarr__library.curate__lidarr:
-    internal: true
-  ask__bazarr__library.curate__radarr:
-    internal: true
-  ask__bazarr__library.curate__sonarr:
-    internal: true
-  ask__bindery__download.torrent__gluetun:
-    internal: true
-  ask__bindery__download.usenet__sabnzbd:
-    internal: true
-  ask__bindery__indexer.search__prowlarr:
-    internal: true
-  ask__calibre-web-automated__proxy.front__caddy:
-    internal: true
-  ask__decline__identity.source__jellyfin:
-    internal: true
-  ask__door__media.serve__jellyfin:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.96.16/28
-        ip_range: 10.80.96.24/29
-  ask__door__proxy.front__caddy:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.96.0/28
-        ip_range: 10.80.96.8/29
-  ask__gluetun__dashboard.show__homepage:
-    internal: true
-  ask__homepage__proxy.front__caddy:
-    internal: true
-  ask__jellyfin__dashboard.show__homepage:
-    internal: true
-  ask__lidarr__dashboard.show__homepage:
-    internal: true
-  ask__lidarr__download.torrent__gluetun:
-    internal: true
-  ask__lidarr__download.usenet__sabnzbd:
-    internal: true
-  ask__navidrome__dashboard.show__homepage:
-    internal: true
-  ask__prowlarr__dashboard.show__homepage:
-    internal: true
-  ask__prowlarr__indexer.proxy__flaresolverr:
-    internal: true
-  ask__prowlarr__library.curate__bindery:
-    internal: true
-  ask__prowlarr__library.curate__lidarr:
-    internal: true
-  ask__prowlarr__library.curate__radarr:
-    internal: true
-  ask__prowlarr__library.curate__sonarr:
-    internal: true
-  ask__radarr__dashboard.show__homepage:
-    internal: true
-  ask__radarr__download.torrent__gluetun:
-    internal: true
-  ask__radarr__download.usenet__sabnzbd:
-    internal: true
-  ask__recyclarr__library.curate__bindery:
-    internal: true
-  ask__recyclarr__library.curate__lidarr:
-    internal: true
-  ask__recyclarr__library.curate__radarr:
-    internal: true
-  ask__recyclarr__library.curate__sonarr:
-    internal: true
-  ask__request-gate__identity.source__jellyfin:
-    internal: true
-  ask__request-gate__library.curate__bindery:
-    internal: true
-  ask__request-gate__library.curate__lidarr:
-    internal: true
-  ask__request-gate__library.curate__radarr:
-    internal: true
-  ask__request-gate__library.curate__sonarr:
-    internal: true
-  ask__sabnzbd__dashboard.show__homepage:
-    internal: true
-  ask__seerr__dashboard.show__homepage:
-    internal: true
-  ask__seerr__identity.source__jellyfin:
-    internal: true
-  ask__seerr__library.curate__bindery:
-    internal: true
-  ask__seerr__library.curate__lidarr:
-    internal: true
-  ask__seerr__library.curate__radarr:
-    internal: true
-  ask__seerr__library.curate__sonarr:
-    internal: true
-  ask__seerr__proxy.front__caddy:
-    internal: true
-  ask__seerr__request.gate__request-gate:
-    internal: true
-  ask__sonarr__dashboard.show__homepage:
-    internal: true
-  ask__sonarr__download.torrent__gluetun:
-    internal: true
-  ask__sonarr__download.usenet__sabnzbd:
-    internal: true
-  ask__unpackerr__library.curate__lidarr:
-    internal: true
-  ask__unpackerr__library.curate__radarr:
-    internal: true
-  ask__unpackerr__library.curate__sonarr:
-    internal: true
-  link__decline__jellyfin:
-    internal: true
-  link__recyclarr__radarr:
-    internal: true
-  link__recyclarr__sonarr:
-    internal: true
-  link__unpackerr__lidarr:
-    internal: true
-  link__unpackerr__radarr:
-    internal: true
-  link__unpackerr__sonarr:
-    internal: true
-  own__audiobookshelf: {}
-  own__bazarr: {}
-  own__bindery: {}
-  own__caddy: {}
-  own__calibre-web-automated: {}
-  own__decline:
-    driver_opts:
-      com.docker.network.bridge.enable_ip_masquerade: 'false'
-  own__door: {}
-  own__flaresolverr: {}
-  own__gluetun: {}
-  own__homepage: {}
-  own__jellyfin: {}
-  own__lidarr: {}
-  own__navidrome: {}
-  own__nzbhydra2: {}
-  own__prowlarr: {}
-  own__radarr: {}
-  own__recyclarr: {}
-  own__sabnzbd: {}
-  own__seerr: {}
-  own__sonarr: {}
-  own__unpackerr: {}

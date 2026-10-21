@@ -86,7 +86,8 @@ mod occupied;
 // Which plugins may move one of the stack's own services in place.
 mod replacing;
 // Installing what the record already holds: an update, or a second source for one name.
-mod addressing;
+mod planned;
+pub(crate) use planned::beside;
 mod colliding;
 mod twice;
 mod updating;
@@ -325,14 +326,19 @@ async fn reversing(
         .await
         .unwrap_or_default();
     if !off {
-        back.left.push(super::putting_back::Left {
-            target: would.plugin.clone(),
-            because: "its container could not be taken off the machine, so it may still be \
-                      running with nothing in the stack describing it"
-                .to_owned(),
-        });
+        back.left.push(still_running(&would.plugin));
     }
     back
+}
+
+/// What a reversal leaves standing where `plugin`'s container would not come off.
+fn still_running(plugin: &str) -> super::putting_back::Left {
+    super::putting_back::Left {
+        target: plugin.to_owned(),
+        because: "its container could not be taken off the machine, so it may still be \
+                  running with nothing in the stack describing it"
+            .to_owned(),
+    }
 }
 
 /// What the machine holds now, read off what the putting back actually did.

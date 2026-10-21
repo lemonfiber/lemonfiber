@@ -39,7 +39,7 @@ futures-util = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-# Confined to `stack/mounts.rs`.
+# Confined to `project/overlay.rs` and `project/document.rs`.
 serde_norway = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }

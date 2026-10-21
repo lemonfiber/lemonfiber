@@ -2,10 +2,10 @@
 //!
 //! The probe beside this one creates a file under the data location, links it, and
 //! reads back how many names point at the one file. That is proof, and it is proof
-//! about the host. Inside a container the data location is whatever the compose files
-//! mounted there, and a bind mount *is* a filesystem boundary — so a stack that mounts
-//! the downloads at one path and the library at another has put them on opposite sides
-//! of one, where nothing can be linked. The probe passes, every import copies, and the
+//! about the host. Inside a container the data location is whatever the project and the
+//! operator's overlay mounted there, and a bind mount *is* a filesystem boundary — so an
+//! overlay that mounts the downloads at one path and the library at another has put them
+//! on opposite sides of one, where nothing can be linked. The probe passes, every import copies, and the
 //! two facts never meet unless something says so.
 //!
 //! Which is why it is reported here rather than left to a check of its own: an operator
@@ -13,11 +13,10 @@
 //! told is the half that decides whether an import takes milliseconds or minutes. Both
 //! halves arrive together, under the one heading they are both about.
 //!
-//! It reports and never refuses. The stack lemonfiber ships is held to the rule before
-//! anything runs — one that broke it would be a broken build, and nobody using it could
-//! do a thing about that — but a stack directory the operator pointed lemonfiber at is
-//! theirs, they laid it out, and a rule of lemonfiber's is guidance there. Refusing to
-//! operate it would make this tool the thing standing between an operator and their own
+//! It reports and never refuses. The project lemonfiber writes mounts the data location
+//! once for every service — the model has no way to write a second — but the overlay is
+//! the operator's, they wrote it, and a rule of lemonfiber's is guidance there. Refusing
+//! to run it would make this tool the thing standing between an operator and their own
 //! system over a cost that is theirs to carry.
 //!
 //! So what is owed is the consequence, in the terms they will feel it in — the same
@@ -28,7 +27,7 @@
 
 use super::{finding, Finding, Problem, Remedy, State, Verdict};
 use crate::error::codes::storage::SPLIT_MOUNTS;
-use crate::stack::mounts::Crowded;
+use crate::project::overlay::Crowded;
 use crate::storage::COPY_CONSEQUENCE;
 
 /// The name these findings are given.
@@ -37,11 +36,11 @@ const CHECK: &str = "storage.single-mount";
 /// What they are called on a report.
 const TITLE: &str = "One mount beneath the data location";
 
-/// What the stack's own compose files give each service beneath the data location.
+/// What the project and the overlay give each service beneath the data location.
 ///
 /// One finding per crowded service rather than one for the stack, because the cost
-/// lands per service: a fork that splits the mounts for the television library and not
-/// for the film one is a fork where half the imports are instant. They share a name, so
+/// lands per service: an overlay that splits the mounts for the television library and
+/// not for the film one is one where half the imports are instant. They share a name, so
 /// answering the choice answers it for the layout rather than service by service —
 /// which is how the layout was decided in the first place.
 pub(super) fn findings(crowded: &[Crowded]) -> Vec<Finding> {
@@ -61,17 +60,17 @@ fn split(crowded: &Crowded) -> Finding {
             crowded.service
         ),
         format!(
-            "This stack gives {} {} separate mounts beneath the data location, and inside the \
+            "Your overlay gives {} {} separate mounts beneath the data location, and inside the \
              container each of those is its own filesystem. A file moved from one to another \
              cannot be linked between them. {COPY_CONSEQUENCE}",
             crowded.service,
             crowded.mounts.len()
         ),
         Remedy::new(
-            "Mount the data location once and keep the downloads and the library as \
-             directories beneath it",
+            "Take the mounts below out of your overlay and keep the downloads and the library \
+             as directories beneath the data location, which the project mounts once at /data",
         )
-        .with_detail("one volume entry, ${DATA_ROOT}:/data, in place of the ones below"),
+        .with_detail(crate::overlay::FILE),
     )
     .or_try(
         Remedy::new(
@@ -94,15 +93,15 @@ fn split(crowded: &Crowded) -> Finding {
 /// as well.
 ///
 /// Said as what the files hold rather than as a property of every service, because that
-/// is what was read. A compose file this could not parse contributes nothing, so a
-/// claim about services would be a claim about services it may never have seen.
+/// is what was read. An overlay this could not parse contributes nothing, so a claim
+/// about services would be a claim about services it may never have seen.
 fn kept() -> Finding {
     finding(
         CHECK,
         TITLE,
         Verdict::Pass {
             note: Some(
-                "nothing in this stack's compose files gives a service two mounts beneath the \
+                "neither the project nor your overlay gives a service two mounts beneath the \
                  data location, so imports inside the containers link rather than copy"
                     .to_owned(),
             ),

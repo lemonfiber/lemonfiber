@@ -416,6 +416,7 @@ async fn an_update_refuses_before_anything_moves_for_what_it_cannot_read() {
 
     let mut stackless = ctx;
     stackless.settings.stack_dir = None;
+    stackless.stack = crate::test_support::embedded();
     assert_eq!(
         refusal(updating(&stackless, &source("update-refusals-next", &next())).await),
         "PLUGIN-6"

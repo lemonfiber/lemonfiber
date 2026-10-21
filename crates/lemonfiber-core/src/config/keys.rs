@@ -84,14 +84,13 @@ pub(crate) const QUIET_HOURS_KEY: &str = "LEMONFIBER_QUIET_HOURS";
 /// The zone the stack runs in.
 ///
 /// Not lemonfiber's own setting — it is the stack's, handed to every container by the
-/// compose file, and read here so a window means the same hour inside and out.
+/// project, and read here so a window means the same hour inside and out.
 pub(crate) const ZONE_KEY: &str = "TZ";
 
-/// The zone the stack's compose file falls back to when nothing names one.
+/// The zone the project hands every container when nothing names one.
 ///
-/// Kept the same as `_common.yml`'s `${TZ:-Europe/Amsterdam}` deliberately: a window
-/// read in a different zone from the containers it is about would be quiet at the
-/// wrong hour and agree with nothing.
+/// The one the quiet window is read in too: a window read in a different zone from the
+/// containers it is about would be quiet at the wrong hour and agree with nothing.
 pub(crate) const DEFAULT_ZONE: &str = "Europe/Amsterdam";
 
 /// The retired setting that named a Compose file layered over the stack's own.
@@ -161,6 +160,9 @@ pub(crate) const PUID_KEY: &str = "PUID";
 /// The group id the service containers run as.
 pub(crate) const PGID_KEY: &str = "PGID";
 
+/// The interface the household tier is published on.
+pub(crate) const LAN_BIND_KEY: &str = "LAN_BIND";
+
 /// The VPN provider the tunnel connects through.
 ///
 /// Read by the port-forward check for one purpose: to name a provider's known
@@ -198,6 +200,10 @@ pub const HOUSEHOLD_HOST_SETTING: &str = lemonfiber_manifest::container::LAN_HOS
 /// reached at in front of — so what the household is handed for one is that route, at
 /// that domain.
 pub(crate) const DOMAIN_KEY: &str = "DOMAIN";
+
+/// The group that owns the host's render devices, which a service of the render shape
+/// is added to.
+pub(crate) const RENDER_GROUP_KEY: &str = "RENDER_GID";
 
 /// The service the operator chose to send the household to, by the id the stack
 /// declares it under.

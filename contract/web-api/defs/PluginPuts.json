@@ -8,7 +8,7 @@
       "const": "directory"
     },
     {
-      "description": "A document written, which is the container lemonfiber derives for the plugin.",
+      "description": "The project written again, holding the container lemonfiber derives for the\nplugin.",
       "type": "string",
       "const": "document"
     },

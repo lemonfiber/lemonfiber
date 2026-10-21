@@ -526,7 +526,13 @@ async fn seed_media_server(
     // Which address the media server believes about the client: the door's alone. Last,
     // because a change to it is read only when the server starts again, and everything
     // above talks to the server.
-    wirings.extend(proxies::seed_proxies(ctx, project, server).await);
+    let door = ctx
+        .stack
+        .checked_manifest(ctx.today())
+        .ok()
+        .and_then(|manifest| crate::app::project::topology(ctx, &manifest).ok())
+        .and_then(|topology| crate::screening::door::upstream(&topology));
+    wirings.extend(proxies::seed_proxies(ctx, door, server).await);
     wirings
 }
 

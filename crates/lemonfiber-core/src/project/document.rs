@@ -21,14 +21,50 @@ pub(crate) fn yaml(document: &impl Serialize) -> String {
     serde_norway::to_string(document).unwrap_or_default()
 }
 
+/// Every profile a service of the document `text` sits in.
+pub(crate) fn profiles(text: &str) -> std::collections::BTreeSet<String> {
+    let document: serde_norway::Value = serde_norway::from_str(text).unwrap_or_default();
+    document
+        .get("services")
+        .and_then(serde_norway::Value::as_mapping)
+        .into_iter()
+        .flat_map(serde_norway::Mapping::values)
+        .filter_map(|entry| entry.get("profiles")?.as_sequence())
+        .flatten()
+        .filter_map(|profile| profile.as_str().map(str::to_owned))
+        .collect()
+}
+
+/// The services named in `names` of the document `text`, as the document writes them,
+/// under its own `services` heading.
+pub(crate) fn sliced(text: &str, names: &[&str]) -> String {
+    let document: serde_norway::Value = serde_norway::from_str(text).unwrap_or_default();
+    let services: serde_norway::Mapping = document
+        .get("services")
+        .and_then(serde_norway::Value::as_mapping)
+        .map(|services| {
+            services
+                .iter()
+                .filter(|(name, _)| name.as_str().is_some_and(|name| names.contains(&name)))
+                .map(|(name, entry)| (name.clone(), entry.clone()))
+                .collect()
+        })
+        .unwrap_or_default();
+    let mut sliced = serde_norway::Mapping::new();
+    sliced.insert("services".into(), services.into());
+    yaml(&sliced)
+}
+
 /// The options every NFS library volume is mounted with, after the server's address:
 /// version 4, read and write, and blocking until a dropped server returns rather than
 /// handing a service a short read it would record as a corrupt import.
 const NFS_OPTIONS: &str = "nfsvers=4,rw,hard,timeo=600,retrans=2";
 
-/// The document: services, then networks, then the library's volume.
+/// The document: its name, services, then networks, then the library's volume.
 #[derive(Serialize)]
 pub(super) struct Document {
+    /// The project's name.
+    pub(super) name: String,
     /// Every service, in the order written.
     pub(super) services: Services,
     /// Every network, by name.
@@ -99,7 +135,7 @@ pub(super) struct Declared {
     /// The bridge's options, where it routes off the host without translating.
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     driver_opts: BTreeMap<&'static str, &'static str>,
-    /// Its addressing, where it carries a fixed address.
+    /// Its addressing.
     #[serde(skip_serializing_if = "Option::is_none")]
     ipam: Option<Ipam>,
 }
@@ -111,13 +147,14 @@ struct Ipam {
     config: [Pool; 1],
 }
 
-/// The subnet, and the part of it the engine hands out.
+/// The subnet, and the part of it the engine hands out where that is not all of it.
 #[derive(Serialize)]
 struct Pool {
     /// The whole subnet.
     subnet: String,
     /// The part the engine hands out, which holds no fixed address.
-    ip_range: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ip_range: Option<String>,
 }
 
 /// Every network `topology` declares, as the document writes it.
@@ -138,10 +175,12 @@ fn declared(network: &Network) -> Declared {
         } else {
             std::iter::once((MASQUERADE, NO_MASQUERADE)).collect()
         },
-        ipam: network.fixed.map(|fixed| Ipam {
+        ipam: network.subnet.map(|(first, prefix)| Ipam {
             config: [Pool {
-                subnet: format!("{}/{}", fixed.whole.0, fixed.whole.1),
-                ip_range: format!("{}/{}", fixed.handed_out.0, fixed.handed_out.1),
+                subnet: format!("{first}/{prefix}"),
+                ip_range: network
+                    .fixed
+                    .map(|fixed| format!("{}/{}", fixed.handed_out.0, fixed.handed_out.1)),
             }],
         }),
     }

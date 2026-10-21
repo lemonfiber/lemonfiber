@@ -214,9 +214,12 @@ pub const SHOWN: &[(&str, &str)] = &[
         super::PGID_KEY,
         "the group id everything under the data root is owned by",
     ),
-    ("TZ", "schedules and log timestamps are read in this zone"),
     (
-        "LAN_BIND",
+        super::ZONE_KEY,
+        "schedules and log timestamps are read in this zone",
+    ),
+    (
+        super::LAN_BIND_KEY,
         "the address the household tier is published on, which an operator narrows by hand",
     ),
     (

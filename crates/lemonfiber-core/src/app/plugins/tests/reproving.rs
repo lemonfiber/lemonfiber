@@ -122,6 +122,7 @@ async fn proving_with_an_unreadable_record_or_no_stack_is_refused() {
     let held = kept_against("reprove-stackless", r#"["media.serve@1"]"#).await;
     let mut stackless = held.clone();
     stackless.settings.stack_dir = None;
+    stackless.stack = crate::test_support::embedded();
     assert_eq!(
         refusal(
             answered(

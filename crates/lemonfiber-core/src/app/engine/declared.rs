@@ -1,9 +1,9 @@
-//! What the stack declares, read back as it declares it: its forms, where each service
-//! comes from, and what each is for.
+//! What the stack declares and which versions are in play, read without acting on
+//! anything: the forms, where each service comes from, what each is for, and the versions.
 
 use super::Ctx;
 use crate::error::{Diagnose, Problem};
-use crate::model::{CatalogueReport, FormReport, FormsReport, ProvenanceReport};
+use crate::model::{CatalogueReport, FormReport, FormsReport, ProvenanceReport, VersionReport};
 
 /// Every form the stack declares, in its own words.
 ///
@@ -80,4 +80,39 @@ pub(crate) fn catalogue(ctx: &Ctx) -> Result<CatalogueReport, Box<Problem>> {
         .map_err(|err| Box::new(err.problem()))?;
 
     Ok(CatalogueReport::of(&manifest))
+}
+
+/// The binary's version, and the engine's where it answers.
+///
+/// An unreachable engine is reported as absent rather than as a failure: asking
+/// what versions are in play is exactly what an operator does when something is
+/// wrong, so it must still answer when the engine is down.
+pub(crate) async fn version(ctx: &Ctx) -> Result<VersionReport, Box<Problem>> {
+    let argv = ["docker", "compose", "version", "--short"].map(str::to_owned);
+    let compose = match ctx.seams.runner.run(&argv).await {
+        Ok(output) if output.succeeded() => Some(output.stdout.trim().to_owned()),
+        Ok(_) | Err(_) => None,
+    };
+
+    // The stack is the one thing here that can genuinely be wrong: an
+    // unreadable directory is the operator's own `--stack-dir`, and they need
+    // to hear about it rather than see a version report with a hole in it.
+    let stack = ctx
+        .stack
+        .checked_manifest(ctx.today())
+        .map_err(|err| Box::new(err.problem()))?;
+
+    let binary = env!("CARGO_PKG_VERSION").to_owned();
+    Ok(VersionReport {
+        supported_schema: lemonfiber_manifest::SUPPORTED_SCHEMA_VERSIONS.to_vec(),
+        stack: stack.stack_version,
+        compose,
+        attestation_status: crate::device_keys::attestation::status::taken(),
+        // Read from what this build carries rather than from anything outside it,
+        // for the same reason the engine's absence does not fail this read: asking
+        // what is in play is what an operator does when something is wrong, and an
+        // answer that needed a network would be missing exactly then.
+        changelog: crate::changelog::notes(&binary),
+        binary,
+    })
 }

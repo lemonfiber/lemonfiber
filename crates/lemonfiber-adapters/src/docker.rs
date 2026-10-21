@@ -39,11 +39,13 @@ pub mod context;
 mod exec;
 mod images;
 mod mounts;
+mod networks;
 mod presence;
 mod program;
 mod refusal;
 mod serving;
 mod translate;
+mod volumes;
 
 use translate::{describe, sampled, split_timestamp};
 
@@ -129,10 +131,12 @@ impl Daemon {
                 // decode. See the client library's note in
                 // `.docs/architecture/engine-api.md` on what it does with the
                 // answer today.
-                docker
-                    .negotiate_version()
-                    .await
-                    .map_err(|error| refusal::classify(target, &wording(&error)))
+                match tokio::time::timeout(ANSWERS, docker.negotiate_version()).await {
+                    Ok(answered) => {
+                        answered.map_err(|error| refusal::classify(target, &wording(&error)))
+                    }
+                    Err(_) => Err(refusal::classify(target, &unanswered())),
+                }
             })
             .await
     }
@@ -256,6 +260,19 @@ impl Images for Daemon {
 /// How long a request may take before the engine counts as unreachable.
 const TIMEOUT: u64 = 30;
 
+/// How long the engine has to say which version it speaks before it counts as not
+/// there: a running daemon answers at once, and a socket that accepts and never
+/// answers would otherwise hold every caller for the whole request timeout.
+const ANSWERS: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// What an engine that never said which version it speaks is reported as.
+fn unanswered() -> String {
+    format!(
+        "the container engine did not answer within {} seconds",
+        ANSWERS.as_secs()
+    )
+}
+
 /// Build a client for wherever this run's engine is.
 ///
 /// One arm per transport, and the endpoint handed over whole: the client library
@@ -284,6 +301,7 @@ fn connect(target: &Target) -> Result<Docker, Failure> {
         // above has taken the two endpoints that have no transport.
         Reach::Local | Reach::Beyond(_) | Reach::Missing(_) => {
             Docker::connect_with_local_defaults()
+                .map(|docker| docker.with_timeout(std::time::Duration::from_secs(TIMEOUT)))
         }
     };
     built.map_err(|error| refusal::classify(target, &wording(&error)))

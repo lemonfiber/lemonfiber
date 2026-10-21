@@ -75,6 +75,7 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Prob
         command,
         stack,
         stack_edits,
+        project,
     } = compose(ctx, forms, &Action::Up)?;
 
     // Surveyed across every profile the stack declares rather than across the new
@@ -117,6 +118,8 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Prob
     // up rather than asking for it.
     let port_conflicts =
         crate::app::preflight::conflicting_ports(ctx, &manifest, &switched.started).await;
+    let sweep = crate::app::project::swept(ctx, &project.topology).await;
+    let copies = crate::app::project::copies(ctx, &manifest).await;
 
     let mut report = LifecycleReport {
         action: SWITCH.to_owned(),
@@ -134,6 +137,7 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Prob
         offer: None,
         unvetted: crate::overlay::unvetted(ctx),
         moves: Vec::new(),
+        swept: sweep.networks.clone(),
     };
 
     if ctx.dry_run {
@@ -154,6 +158,8 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Prob
         }
     }
 
+    sweep.taken_away(ctx).await;
+    copies.made(ctx).await?;
     halted::before(ctx, &Action::Up, &report.plan.services);
     let started = ctx
         .seams

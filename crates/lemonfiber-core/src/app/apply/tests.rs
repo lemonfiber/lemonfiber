@@ -388,10 +388,10 @@ fn a_second_apply_leaves_a_stack_file_the_operator_edited_exactly_as_they_set_it
     )
     .is_ok());
 
-    let compose = paths.stack().join("compose.yml");
-    let theirs = "services:\n  sonarr:\n    image: an-image-of-my-own\n";
+    let edited = paths.stack().join("config/homepage/settings.yaml");
+    let theirs = "title: a dashboard of my own\n";
     assert!(
-        std::fs::write(&compose, theirs).is_ok(),
+        std::fs::write(&edited, theirs).is_ok(),
         "the operator's edit"
     );
 
@@ -403,7 +403,7 @@ fn a_second_apply_leaves_a_stack_file_the_operator_edited_exactly_as_they_set_it
     .is_ok());
 
     assert_eq!(
-        std::fs::read_to_string(&compose).unwrap_or_default(),
+        std::fs::read_to_string(&edited).unwrap_or_default(),
         theirs,
         "a second apply wrote over a file the operator had changed by hand"
     );
@@ -430,7 +430,10 @@ fn an_apply_records_the_checksums_of_what_it_wrote() {
     .is_ok());
 
     let recorded = std::fs::read_to_string(paths.materialised()).unwrap_or_default();
-    assert!(recorded.contains("compose.yml"), "{recorded}");
+    assert!(
+        recorded.contains("config/homepage/settings.yaml"),
+        "{recorded}"
+    );
     assert!(recorded.contains("stack.toml"), "{recorded}");
 }
 

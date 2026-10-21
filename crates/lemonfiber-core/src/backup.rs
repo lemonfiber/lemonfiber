@@ -282,7 +282,7 @@ mod area {
     pub const CONFIG: &str = "config";
     /// The per-service configuration directories the containers mount.
     pub const SERVICES: &str = "services";
-    /// The materialised compose files.
+    /// The materialised stack: the project and every service's starting files.
     pub const STACK: &str = "stack";
     /// The trees of a setup lemonfiber does not manage, captured before a takeover.
     ///

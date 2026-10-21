@@ -8,11 +8,12 @@
 pub(crate) mod document;
 pub mod entry;
 mod inputs;
+pub mod overlay;
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use lemonfiber_manifest::container::{UrlOf, UserMode};
+use lemonfiber_manifest::container::{UrlOf, UserMode, Value};
 use lemonfiber_manifest::{Bind, Manifest, Service};
 
 use crate::config::storage::Export;
@@ -23,6 +24,7 @@ use crate::wiring::Chosen;
 use document::{Document, Services};
 use entry::{configuration, entry, literal, ports, Tier, Unit, Values};
 pub(crate) use inputs::filler as placed_at;
+pub(crate) use inputs::written;
 use inputs::Inputs;
 
 /// The file the project is written to, beneath the project directory.
@@ -41,11 +43,17 @@ pub struct Reading<'a> {
     pub nfs: Option<&'a Export>,
     /// Where standing beside an existing setup moved each service's published port.
     pub moved: &'a [MovedReport],
+    /// The project's name, which Compose labels everything it makes for it with.
+    pub name: &'a str,
+    /// The operator's value for a variable of their environment file, where one is
+    /// written: who the services run as, the time zone, where the library is kept and
+    /// the interface the household tier is published on. Never a secret.
+    pub operator: &'a dyn Fn(&str) -> Option<String>,
 }
 
 impl Reading<'_> {
-    /// Nothing recorded, no secrets file, no render devices, the library on this machine
-    /// and nothing moved.
+    /// Nothing recorded, no secrets file, no render devices, the library on this machine,
+    /// nothing moved and the project named for the product.
     #[must_use]
     pub const fn bare() -> Reading<'static> {
         Reading {
@@ -54,6 +62,8 @@ impl Reading<'_> {
             render_group: None,
             nfs: None,
             moved: &[],
+            name: crate::PRODUCT,
+            operator: &|_| None,
         }
     }
 }
@@ -85,24 +95,28 @@ pub fn generated(
         address: &address,
         render_group: reading.render_group,
         nfs: reading.nfs,
+        operator: reading.operator,
     };
     let units: Vec<Unit<'_>> = inputs::written(manifest)
-        .map(|service| stack_unit(service))
+        .map(|service| stack_unit(service, reading))
         .chain(installed.iter().flat_map(|one| {
-            let legacy = plugin::Reading {
+            let secrets = plugin::Reading {
                 secrets_file: reading.secrets_file,
                 ..plugin::Reading::bare()
             };
             one.services
                 .iter()
-                .map(move |placed| plugin::unit(&one.plugin, placed, &legacy))
+                .map(move |placed| plugin::unit(&one.plugin, placed, &secrets))
         }))
         .map(|unit| beside(unit, reading.moved))
         .collect();
     let mut hosted: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for unit in &units {
         if let Some(Placed::Inside(host)) = topology.placed.get(unit.id) {
-            hosted.entry(literal(host)).or_default().extend(ports(unit));
+            hosted
+                .entry(literal(host))
+                .or_default()
+                .extend(ports(unit, &values));
         }
     }
     let entries: Vec<(String, _)> = units
@@ -121,6 +135,7 @@ pub fn generated(
         .collect();
     let taken = units.iter().any(|unit| unit.takes_data);
     let document = Document {
+        name: literal(reading.name),
         services: Services(entries),
         networks: document::networks(&topology),
         volumes: document::library(reading.nfs, taken),
@@ -128,6 +143,77 @@ pub fn generated(
     Project {
         text: document::yaml(&document),
         topology,
+    }
+}
+
+/// The entries the project writes for `installed`'s services beside the stack this build
+/// carries, with every value read as `reading` answers it: what installing it adds to the
+/// project.
+#[must_use]
+pub fn entries(installed: &Installed, reading: &Reading<'_>) -> String {
+    let ours: Vec<&str> = installed
+        .services
+        .iter()
+        .map(|placed| placed.service.as_str())
+        .collect();
+    Manifest::from_toml(lemonfiber_bundled::STACK)
+        .map(|manifest| {
+            let project = generated(
+                &manifest,
+                std::slice::from_ref(installed),
+                &Chosen::read(None),
+                reading,
+            );
+            document::sliced(&project.text, &ours)
+        })
+        .unwrap_or_default()
+}
+
+/// The networks `manifest`'s services and `installed`'s are placed on, wired as `chosen`
+/// settles them.
+#[must_use]
+pub fn topology(manifest: &Manifest, installed: &[Installed], chosen: &Chosen) -> Topology {
+    inputs::read(manifest, installed, chosen).topology()
+}
+
+/// The profiles of the services that `services` run inside, which have to be active for
+/// Compose to start them: the one exception to a service starting only with its own.
+#[must_use]
+pub fn hosting(
+    manifest: &Manifest,
+    installed: &[Installed],
+    topology: &Topology,
+    services: &[String],
+) -> std::collections::BTreeSet<String> {
+    services
+        .iter()
+        .filter_map(|service| match topology.placed.get(service) {
+            Some(Placed::Inside(host)) => Some(host),
+            _ => None,
+        })
+        .filter_map(|host| {
+            manifest
+                .services
+                .iter()
+                .find(|service| &service.id == host)
+                .map(|service| service.profile.clone())
+                .or_else(|| {
+                    installed
+                        .iter()
+                        .find(|one| one.services.iter().any(|placed| &placed.service == host))
+                        .map(|one| plugin::profile(&one.plugin))
+                })
+        })
+        .collect()
+}
+
+/// Whether a journalled change is a write of the project.
+pub(crate) fn is_written(change: &crate::journal::Change) -> bool {
+    match &change.kind {
+        crate::journal::Kind::Rewritten { path, .. } | crate::journal::Kind::Made { path } => {
+            std::path::Path::new(path).file_name() == Some(std::ffi::OsStr::new(FILE))
+        }
+        _ => false,
     }
 }
 
@@ -147,17 +233,10 @@ fn beside<'a>(unit: Unit<'a>, moved: &[MovedReport]) -> Unit<'a> {
     Unit { published, ..unit }
 }
 
-/// A stack service as its entry needs it.
-fn stack_unit(service: &Service) -> Unit<'_> {
-    let image = match &service.digest {
-        Some(digest) => format!(
-            "{}:{}@{}",
-            literal(&service.image),
-            literal(&service.tag),
-            literal(digest)
-        ),
-        None => format!("{}:{}", literal(&service.image), literal(&service.tag)),
-    };
+/// A stack service as its entry needs it, with its own secrets file where it names a
+/// secret.
+fn stack_unit<'a>(service: &'a Service, reading: &Reading<'_>) -> Unit<'a> {
+    let image = literal(&reference(service));
     let tier = match service.bind {
         Some(Bind::Lan) => Tier::Household,
         Some(Bind::Loopback) | None => Tier::Loopback,
@@ -190,8 +269,23 @@ fn stack_unit(service: &Service) -> Unit<'_> {
         posture: service.posture,
         mem_limit_mib: service.mem_limit_mib,
         shape: service.shape,
-        secrets_file: None,
+        secrets_file: names_a_secret(&service.env)
+            .then(|| (reading.secrets_file)(&service.id))
+            .flatten(),
     }
+}
+
+/// The image `service` runs, by its digest where it pins one.
+pub(crate) fn reference(service: &Service) -> String {
+    match &service.digest {
+        Some(digest) => format!("{}:{}@{digest}", service.image, service.tag),
+        None => format!("{}:{}", service.image, service.tag),
+    }
+}
+
+/// Whether an environment names a secret, which is written to the service's own file.
+pub(crate) fn names_a_secret(env: &BTreeMap<String, Value>) -> bool {
+    env.values().any(|value| matches!(value, Value::Secret(_)))
 }
 
 /// The address `service`'s ask for `url` reaches, where it settles on one service: the

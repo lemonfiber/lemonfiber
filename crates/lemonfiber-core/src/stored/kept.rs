@@ -263,8 +263,9 @@ pub const EVERY: &[Entry] = &[
     Entry {
         accessor: "stack",
         what: "the materialised stack",
-        why: "The compose files Compose is pointed at, written out of the stack description this \
-              build carries. Any run that starts something writes them again from scratch.",
+        why: "The project Compose is pointed at and every service's starting files, written \
+              out of the stack description this build carries. Any run that starts something \
+              writes them again.",
         secret: false,
         at: Paths::stack,
     },

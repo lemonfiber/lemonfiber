@@ -6,8 +6,6 @@
 //! household's own network. The server reads the list when it starts, so a pass that
 //! changes it starts the server again.
 
-use std::path::Path;
-
 use super::Ctx;
 use crate::app::targets::MediaServer;
 use crate::ports::service::{Failure, Fronted};
@@ -21,15 +19,14 @@ fn connection(server: &MediaServer) -> String {
     )
 }
 
-/// Hold the media server to trusting the door alone, where the stack runs a door in front
-/// of a media server lemonfiber set up.
+/// Hold the media server to trusting the door alone, at `door`, where the project fixes
+/// the door's address in front of a media server lemonfiber set up.
 pub(super) async fn seed_proxies(
     ctx: &Ctx,
-    project: Option<&Path>,
+    door: Option<String>,
     server: Option<&MediaServer>,
 ) -> Option<Wiring> {
-    let server = server?;
-    let door = crate::screening::door::upstream(project?)?;
+    let (server, door) = (server?, door?);
     let Some(client) = server.administering(ctx).await else {
         return ctx.dry_run.then(|| {
             Wiring::settled(

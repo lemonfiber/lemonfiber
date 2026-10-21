@@ -280,6 +280,8 @@ pub fn standing(
         // reversed by something this product actually does.
         Kind::Set { .. }
         | Kind::Made { .. }
+        | Kind::Moved { .. }
+        | Kind::Copied { .. }
         | Kind::Configured { .. }
         | Kind::KeyMinted { .. }
         | Kind::KeyCollected { .. }

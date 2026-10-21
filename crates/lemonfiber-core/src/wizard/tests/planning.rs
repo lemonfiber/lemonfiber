@@ -674,3 +674,27 @@ fn a_device_key_is_named_as_a_key_is() {
         "the overlay /cfg/overlay.yml"
     );
 }
+
+#[test]
+fn a_move_and_a_copy_are_said_plainly_enough_to_recognise() {
+    let change = |kind| Change {
+        at: String::new(),
+        operation: "project".to_owned(),
+        target: "the mount tree".to_owned(),
+        kind,
+    };
+    assert_eq!(
+        described(&change(Kind::Moved {
+            from: "/stack/config/jellyfin/cache".to_owned(),
+            to: "/stack/mounts/jellyfin/cache".to_owned(),
+        })),
+        "the move of /stack/config/jellyfin/cache"
+    );
+    assert_eq!(
+        described(&change(Kind::Copied {
+            volume: "lemonfiber_caddy_data".to_owned(),
+            to: "/stack/mounts/caddy/data".to_owned(),
+        })),
+        "the copy of the volume lemonfiber_caddy_data"
+    );
+}

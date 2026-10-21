@@ -9,7 +9,9 @@
     "does": {
       "type": [
         "const:\"delete\"",
+        "const:\"keep-copy\"",
         "const:\"leave\"",
+        "const:\"move-back\"",
         "const:\"reconfigure\"",
         "const:\"rehold\"",
         "const:\"reinstate\"",
@@ -42,6 +44,12 @@
         "null|string"
       ],
       "required": false
+    },
+    "from": {
+      "type": [
+        "string"
+      ],
+      "required": true
     },
     "id": {
       "type": [
@@ -97,11 +105,23 @@
       ],
       "required": true
     },
+    "to": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
     "value": {
       "type": [
         "null|string"
       ],
       "required": false
+    },
+    "volume": {
+      "type": [
+        "string"
+      ],
+      "required": true
     },
     "written": {
       "type": [
@@ -118,7 +138,9 @@
   },
   "variants": [
     "\"delete\"",
+    "\"keep-copy\"",
     "\"leave\"",
+    "\"move-back\"",
     "\"reconfigure\"",
     "\"rehold\"",
     "\"reinstate\"",

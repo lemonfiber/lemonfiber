@@ -1,17 +1,11 @@
 use std::collections::BTreeSet;
-use std::path::PathBuf;
 
 use lemonfiber_plugin::{Manifest, Shape};
 
 use super::super::installed::{Installed, Placed, Reached};
-use super::{written, Reading, LOOPBACK, PROFILE};
+use super::{LOOPBACK, PROFILE};
 use crate::project::entry::{Tier, HOUSEHOLD, LIBRARY};
-
-/// The template the generated entries extend, as the stack ships it.
-///
-/// The file itself rather than a copy of it, so the mount reading below follows
-/// the same `extends` a container engine would follow on the operator's machine.
-const COMMON: &str = include_str!("../../../../../assets/media-stack/compose/_common.yml");
+use crate::project::Reading;
 
 /// The digest the fixtures pin, written once so the entry and the manifest below
 /// cannot pin different things while claiming to describe one install.
@@ -26,12 +20,14 @@ const HOUSEHOLD_ENTRY: &str = "services:\n  \
          - plugin-komga\n    \
          restart: unless-stopped\n    \
          environment:\n      \
-         TZ: ${TZ:-Europe/Amsterdam}\n    \
+         TZ: Europe/Amsterdam\n    \
          ports:\n    \
-         - ${LAN_BIND:-0.0.0.0}:25600:25600\n    \
+         - 0.0.0.0:25600:25600\n    \
          volumes:\n    \
-         - ${DATA_ROOT:-./data}:/data\n    \
+         - ./data:/data\n    \
          - ./config/komga:/config\n    \
+         networks:\n    \
+         - own__komga\n    \
          security_opt:\n    \
          - no-new-privileges:true\n    \
          cap_drop:\n    \
@@ -100,6 +96,11 @@ fn installed(services: Vec<Placed>) -> Installed {
         tree: String::new(),
         installed_at: String::new(),
     }
+}
+
+/// The entries the project writes for `installed`'s services, read as `reading` answers.
+fn written(installed: &Installed, reading: &Reading<'_>) -> String {
+    crate::project::entries(installed, reading)
 }
 
 /// The document written for one placed service.
@@ -249,11 +250,7 @@ fn an_adapter_runs_as_the_operator_and_nothing_else_is_given_a_user() {
         .and_then(|entry| entry.get("user"))
         .and_then(serde_norway::Value::as_str)
         .map(str::to_owned);
-    assert_eq!(
-        user.as_deref(),
-        Some("${PUID:-1000}:${PGID:-1000}"),
-        "got: {adapter}"
-    );
+    assert_eq!(user.as_deref(), Some("1000:1000"), "got: {adapter}");
     let mut carried = keys(&adapter);
     assert!(carried.remove("user"), "got: {adapter}");
     let permitted: BTreeSet<String> = KEYS.iter().map(|&key| key.to_owned()).collect();
@@ -279,10 +276,10 @@ fn the_library_is_mounted_only_where_the_manifest_said_it_is_wanted() {
     );
 }
 
-/// On an NFS export the library is the one volume the document declares, mounted where
-/// a path would be bound, and declared only where a service takes it.
+/// On an NFS export a service taking the library mounts the project's one declared
+/// volume where a path would be bound, and a service leaving it mounts nothing of it.
 #[test]
-fn on_an_nfs_export_the_library_is_one_declared_volume() {
+fn on_an_nfs_export_the_library_is_the_one_declared_volume() {
     let export = crate::config::storage::Export {
         server: "nas.local".to_owned(),
         path: "/volume1/media".to_owned(),
@@ -292,16 +289,7 @@ fn on_an_nfs_export_the_library_is_one_declared_volume() {
         ..Reading::bare()
     };
     let taking = written(&installed(vec![placed()]), &reading);
-    assert!(taking.contains("- data:/data"), "{taking}");
-    assert!(!taking.contains(LIBRARY), "{taking}");
-    assert!(
-        taking.contains(
-            "volumes:\n  data:\n    driver: local\n    driver_opts:\n      type: nfs\n      \
-             o: addr=nas.local,nfsvers=4,rw,hard,timeo=600,retrans=2\n      device: \
-             :/volume1/media\n"
-        ),
-        "{taking}"
-    );
+    assert_eq!(beneath_the_library(&taking), ["data:/data"], "{taking}");
     let leaving = written(
         &installed(vec![Placed {
             takes_data: false,
@@ -309,7 +297,7 @@ fn on_an_nfs_export_the_library_is_one_declared_volume() {
         }]),
         &reading,
     );
-    assert!(!leaving.contains("data:"), "{leaving}");
+    assert!(beneath_the_library(&leaving).is_empty(), "{leaving}");
 }
 
 /// An image that keeps its configuration elsewhere gets the same one directory,
@@ -632,46 +620,26 @@ fn the_reading_finds_a_key_the_permitted_set_does_not_carry() {
     }
 }
 
-/// What the stack's own mount reader makes of a generated document.
-///
-/// A second reader written here would answer about a slightly different set of
-/// declarations than the one the shipped stack is checked with, and the two
-/// would drift without either being wrong. The template is given alongside,
-/// because a service's mounts are what it declares plus whatever it extends.
-fn crowded(document: &str) -> Vec<String> {
-    crate::stack::mounts::crowded(&[
-        (PathBuf::from("compose/_common.yml"), COMMON.to_owned()),
-        (PathBuf::from("compose/plugins.yml"), document.to_owned()),
-    ])
-    .into_iter()
-    .map(|one| one.service)
-    .collect()
+/// The mounts of `document`'s one service whose target is the library or beneath it.
+fn beneath_the_library(document: &str) -> Vec<String> {
+    mounts(document)
+        .into_iter()
+        .filter(|mount| mount.ends_with(":/data") || mount.contains(":/data/"))
+        .collect()
 }
 
-/// Every shape of generated entry sees one mount beneath the library.
+/// Every shape of generated entry mounts the library once at most, so moving a file
+/// between a download folder and a library folder stays a rename on one filesystem.
 #[test]
 fn a_generated_entry_sees_one_mount_beneath_the_library() {
     for entry in shapes() {
-        let found = crowded(&entry);
-        assert!(
-            found.is_empty(),
-            "{found:?} sees more than one mount beneath the library in {entry}"
-        );
+        let found = beneath_the_library(&entry);
+        assert!(found.len() <= 1, "{found:?} beneath the library in {entry}");
     }
-}
-
-/// And that reader is shown refusing a second mount beneath the library.
-///
-/// Planted on the generated entry rather than on a document written for the
-/// occasion, so what is refused is this generator's own output with one line
-/// added — which is the shape the rule exists to catch.
-#[test]
-fn a_second_mount_beneath_the_library_is_found_by_that_reader() {
-    let planted = document(placed()).replace(
-        "    - ./config/komga:/config\n",
-        "    - ${DATA_ROOT:-./data}/comics:/comics\n    - ./config/komga:/config\n",
+    assert_eq!(
+        beneath_the_library(&document(placed())),
+        [format!("{LIBRARY}:/data")]
     );
-    assert_eq!(crowded(&planted), vec!["komga".to_owned()]);
 }
 
 /// Both tiers render to an interface, and to different ones.
@@ -681,8 +649,8 @@ fn a_second_mount_beneath_the_library_is_found_by_that_reader() {
 /// has read.
 #[test]
 fn each_tier_renders_to_its_own_interface() {
-    assert_eq!(Tier::Loopback.interface(), LOOPBACK);
-    assert_eq!(Tier::Household.interface(), HOUSEHOLD);
+    assert_eq!(Tier::Loopback.interface(HOUSEHOLD), LOOPBACK);
+    assert_eq!(Tier::Household.interface(HOUSEHOLD), HOUSEHOLD);
     assert_ne!(LOOPBACK, HOUSEHOLD);
 }
 
@@ -704,7 +672,10 @@ fn a_value_carrying_a_line_break_stays_one_value() {
     assert!(keys(&entry).is_subset(&permitted), "got: {entry}");
     assert_eq!(
         mounts(&entry),
-        vec![LIBRARY.to_owned(), "./config/komga:/config".to_owned()],
+        vec![
+            format!("{LIBRARY}:/data"),
+            "./config/komga:/config".to_owned()
+        ],
         "got: {entry}"
     );
     let read = serde_norway::from_str::<serde_norway::Value>(&entry).ok();

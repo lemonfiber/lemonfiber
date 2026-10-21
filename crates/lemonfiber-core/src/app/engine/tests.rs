@@ -265,3 +265,5 @@ async fn an_overlay_change_the_journal_cannot_hold_starts_nothing() {
     };
     assert!(problem.summary.contains("journal"), "{problem:?}");
 }
+
+mod sweeping;

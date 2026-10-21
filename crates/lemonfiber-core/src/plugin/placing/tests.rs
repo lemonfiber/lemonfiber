@@ -1,11 +1,29 @@
 use std::path::{Path, PathBuf};
 
-use super::{configuration, documents, key_file, overlay, writes, Lands, Reading, Write};
+use super::{configuration, key_file, Lands, Reading, Write};
 use crate::plugin::installed::{Installed, Placed, Reached};
 
 /// The stack directory these are written beneath.
 fn stack() -> &'static Path {
     Path::new("/opt/lemonfiber/stack")
+}
+
+/// The project an install writes, as the caller generated it.
+const GENERATED: &str = "services:\n  komga: {}\n";
+
+/// Where the project is kept beneath the stack directory.
+fn project_at() -> PathBuf {
+    stack().join(crate::project::FILE)
+}
+
+/// Everything installing `installed` writes, with the generated project among it.
+fn writes(installed: &Installed, stack: &Path, reading: &Reading<'_>) -> Vec<Write> {
+    super::writes(
+        installed,
+        stack,
+        reading,
+        Some(Write::project(project_at(), None, GENERATED.to_owned())),
+    )
 }
 
 /// One placed service, as a record holds one.
@@ -67,31 +85,6 @@ fn installed(plugin: &str, services: &[&str]) -> Installed {
 }
 
 #[test]
-fn a_plugin_s_document_is_written_beneath_the_stack_where_compose_reads_it() {
-    assert_eq!(
-        overlay(stack(), "komga"),
-        PathBuf::from("/opt/lemonfiber/stack/compose/plugins/komga.yml")
-    );
-}
-
-/// The document extends the stack's own template by a relative path, so it has to
-/// sit where that path resolves. A document written outside the stack would name a
-/// template that is not there, and Compose would refuse the whole project — every
-/// bundled service with it.
-#[test]
-fn the_document_sits_where_the_template_it_extends_resolves() {
-    let at = overlay(stack(), "komga");
-    let template = at
-        .parent()
-        .and_then(Path::parent)
-        .map(|inner| inner.join("_common.yml"));
-    assert_eq!(
-        template,
-        Some(PathBuf::from("/opt/lemonfiber/stack/compose/_common.yml"))
-    );
-}
-
-#[test]
 fn a_service_keeps_its_configuration_where_the_bundled_ones_keep_theirs() {
     assert_eq!(
         configuration(stack(), "komga"),
@@ -99,10 +92,10 @@ fn a_service_keeps_its_configuration_where_the_bundled_ones_keep_theirs() {
     );
 }
 
-/// What the one document in a plan holds.
+/// What the project in a plan is to hold.
 fn document(planned: &[Write]) -> Option<String> {
     planned.iter().find_map(|one| match &one.lands {
-        Lands::Document(content) => Some(content.clone()),
+        Lands::Document { text, .. } => Some(text.clone()),
         Lands::Directory { .. } | Lands::Key | Lands::Region { .. } | Lands::Secrets(_) => None,
     })
 }
@@ -113,7 +106,9 @@ fn regions(planned: &[Write]) -> Vec<(String, String)> {
         .iter()
         .filter_map(|one| match &one.lands {
             Lands::Region { key, owner, .. } => Some((key.clone(), owner.clone())),
-            Lands::Directory { .. } | Lands::Document(_) | Lands::Key | Lands::Secrets(_) => None,
+            Lands::Directory { .. } | Lands::Document { .. } | Lands::Key | Lands::Secrets(_) => {
+                None
+            }
         })
         .collect()
 }
@@ -171,7 +166,7 @@ fn a_plugin_whose_services_nothing_reaches_writes_into_neither() {
 }
 
 #[test]
-fn installing_writes_a_directory_for_each_service_and_one_document_for_the_plugin() {
+fn installing_writes_a_directory_for_each_service_and_the_project() {
     let planned = writes(
         &installed("komga", &["komga", "komga-worker"]),
         stack(),
@@ -183,7 +178,7 @@ fn installing_writes_a_directory_for_each_service_and_one_document_for_the_plugi
         vec![
             PathBuf::from("/opt/lemonfiber/stack/config/komga"),
             PathBuf::from("/opt/lemonfiber/stack/config/komga-worker"),
-            PathBuf::from("/opt/lemonfiber/stack/compose/plugins/komga.yml"),
+            PathBuf::from("/opt/lemonfiber/stack/compose.generated.yml"),
             PathBuf::from("/opt/lemonfiber/stack/config/caddy/Caddyfile"),
             PathBuf::from("/opt/lemonfiber/stack/config/homepage/services.yaml"),
         ]
@@ -200,7 +195,7 @@ fn the_directories_a_document_mounts_are_written_before_the_document() {
     let document = planned.iter().position(|one| !one.is_directory());
     let first = document
         .and_then(|at| planned.get(at))
-        .map(|one| matches!(one.lands, Lands::Document(_)));
+        .map(|one| matches!(one.lands, Lands::Document { .. }));
     assert_eq!(
         first,
         Some(true),
@@ -213,81 +208,16 @@ fn the_directories_a_document_mounts_are_written_before_the_document() {
 }
 
 #[test]
-fn a_directory_carries_no_content_and_the_document_carries_the_container() {
+fn a_directory_carries_no_content_and_the_project_carries_what_was_generated() {
     let planned = writes(&installed("komga", &["komga"]), stack(), &Reading::bare());
     assert_eq!(
         planned.len(),
         4,
-        "one household service is one directory, one document, and a region in each \
-         of the proxy and the dashboard"
+        "one household service is one directory, the project, and a region in each of the \
+         proxy and the dashboard"
     );
     assert_eq!(planned.first().map(super::Write::is_directory), Some(true));
-    assert_eq!(
-        document(&planned),
-        Some(crate::plugin::container::written(
-            &installed("komga", &["komga"]),
-            &crate::plugin::Reading::bare()
-        ))
-    );
-}
-
-/// The content is the container derivation rather than a second rendering of it.
-/// Two renderings are free to disagree, and the one on disk is the one Compose
-/// reads — so a plugin could be shown one entry and run another.
-#[test]
-fn what_is_written_is_the_container_the_record_derives_and_not_a_copy_of_it() {
-    let one = installed("komga", &["komga"]);
-    let planned = writes(&one, stack(), &Reading::bare());
-    let written = document(&planned).unwrap_or_default();
-    assert!(written.starts_with("services:\n"));
-    assert!(written.contains("profiles:\n    - plugin-komga\n"));
-}
-
-/// Two plugins never write the same document. The name is the plugin's id, which
-/// the register already refuses to hold twice, so this is that rule showing up
-/// where it matters rather than a second one.
-#[test]
-fn two_plugins_write_two_documents() {
-    assert_ne!(overlay(stack(), "komga"), overlay(stack(), "kavita"));
-}
-
-#[test]
-fn a_machine_with_nothing_installed_layers_no_documents() {
-    assert!(documents(&[], stack()).is_empty());
-}
-
-/// The document is joined against whichever directory the invocation calls the
-/// project root, so an operator's own stack gets documents inside it rather than
-/// inside the one lemonfiber would have materialised.
-#[test]
-fn a_document_is_joined_against_the_root_it_is_given() {
-    let theirs = Path::new("/srv/their-own-stack");
-    assert_eq!(
-        documents(&["komga".to_owned()], theirs),
-        vec![PathBuf::from(
-            "/srv/their-own-stack/compose/plugins/komga.yml"
-        )]
-    );
-}
-
-/// One document per installed plugin, in the register's own order, and each one
-/// exactly where that plugin's install wrote it.
-#[test]
-fn every_installed_plugin_contributes_the_document_its_install_wrote() {
-    let held = ["komga".to_owned(), "kavita".to_owned()];
-    assert_eq!(
-        documents(&held, stack()),
-        vec![overlay(stack(), "komga"), overlay(stack(), "kavita")]
-    );
-}
-
-/// The register says what is layered, so a document nobody installed is not. A
-/// listing of the directory would run it; this cannot.
-#[test]
-fn a_document_no_plugin_is_registered_for_is_not_layered() {
-    let layered = documents(&["komga".to_owned()], stack());
-    assert!(!layered.contains(&overlay(stack(), "dropped-in-by-hand")));
-    assert_eq!(layered.len(), 1);
+    assert_eq!(document(&planned).as_deref(), Some(GENERATED));
 }
 
 /// An adapter service is given its key after the directories and before the document
@@ -316,7 +246,7 @@ fn an_adapter_service_is_keyed_before_the_document_that_starts_it() {
         key.first().cloned().unwrap_or_default()
     );
     assert!(at(|one| matches!(one, Lands::Directory { .. })) < at(|one| *one == Lands::Key));
-    assert!(at(|one| *one == Lands::Key) < at(|one| matches!(one, Lands::Document(_))));
+    assert!(at(|one| *one == Lands::Key) < at(|one| matches!(one, Lands::Document { .. })));
 }
 
 #[test]
@@ -341,9 +271,7 @@ fn a_service_with_further_mounts_gets_its_mount_tree_and_each_writable_source_be
     let paths: Vec<PathBuf> = planned.iter().map(|one| one.path.clone()).collect();
     let tree = PathBuf::from("/opt/lemonfiber/stack/mounts/komga");
     let at = |path: &PathBuf| paths.iter().position(|one| one == path);
-    let document = at(&PathBuf::from(
-        "/opt/lemonfiber/stack/compose/plugins/komga.yml",
-    ));
+    let document = at(&project_at());
     assert!(at(&tree) < at(&tree.join("cache")));
     assert!(at(&tree.join("cache")) < document);
     assert_eq!(at(&tree.join("Caddyfile")), None);
@@ -438,6 +366,6 @@ fn a_service_naming_a_secret_has_its_file_written_before_the_document_naming_it(
     );
     assert!(
         at(|lands| matches!(lands, Lands::Secrets(_)))
-            < at(|lands| matches!(lands, Lands::Document(_)))
+            < at(|lands| matches!(lands, Lands::Document { .. }))
     );
 }

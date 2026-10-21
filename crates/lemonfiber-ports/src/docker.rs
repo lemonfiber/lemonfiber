@@ -19,9 +19,11 @@ use lemonfiber_error::codes::docker::{
 };
 use lemonfiber_error::{Diagnose, Problem, Remedy, State};
 
+mod held;
 mod locations;
 mod target;
 
+pub use held::{EngineVolumes, Image, Images, Network, Networks};
 pub use locations::{Locations, Mount, Presence};
 pub use target::{chosen, Choice, Origin, Reach, Target, DEFAULT_CONTEXT};
 
@@ -422,49 +424,6 @@ impl Diagnose for Failure {
             Self::Unanswered { host, reason } => silent(host, reason),
         }
     }
-}
-
-/// One image this machine has pulled, and what is standing on it.
-///
-/// The projects travel with it because whether an image may be removed is not a
-/// property of the image: one that another Compose project's container is built on
-/// belongs to that project as much as to this one, and nothing downstream can
-/// establish that from a name and a size.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Image {
-    /// Every name it answers to: its tags, its digests, and each name a container
-    /// was started from it by.
-    ///
-    /// All three, because an image pulled by digest carries no tag — the version it
-    /// was pinned at survives only in the name its container was started from.
-    /// Empty for an image nothing names any more, which is still an image taking up
-    /// room and so still worth reporting.
-    pub tags: Vec<String>,
-    /// What it occupies, as the engine reports its size.
-    pub bytes: u64,
-    /// The Compose projects whose containers are built on it.
-    ///
-    /// A container the engine reports under no Compose project contributes an empty
-    /// entry, because for the purposes of removal "something outside Compose is
-    /// standing on this" is the same answer as "another project is".
-    pub projects: Vec<String>,
-}
-
-/// Listing the images an engine has pulled, and who is standing on each.
-///
-/// A trait of its own rather than another method on [`Engine`], for the reason the
-/// volume watch and the eraser are apart from the filesystem: the one command that
-/// asks needs nothing else of an engine, and every other implementation of the wider
-/// trait — five of them are test fakes — would gain a method it never calls.
-#[async_trait]
-pub trait Images: Send + Sync {
-    /// Every image on this machine, with the projects holding containers on it.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Failure::Unreachable`] when the engine cannot be reached, which the
-    /// caller reports as an unknown rather than as no images.
-    async fn images(&self) -> Result<Vec<Image>, Failure>;
 }
 
 /// Reads container state, resource use, logs, and runs commands inside them.

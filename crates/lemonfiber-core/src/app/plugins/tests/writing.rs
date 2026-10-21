@@ -3,10 +3,9 @@
 use super::*;
 
 /// The install puts the plugin's own wiring where the stack reads it: a
-/// configuration directory for the service, and one Compose document naming the
-/// container lemonfiber writes.
+/// configuration directory for the service, and its entry in the project.
 #[tokio::test]
-async fn installing_writes_the_service_s_directory_and_the_document_that_mounts_it() {
+async fn installing_writes_the_service_s_directory_and_the_entry_that_mounts_it() {
     let ctx = ctx("writes");
     assert_eq!(
         counted(installing(&ctx, &source("writes", MANIFEST)).await),
@@ -15,7 +14,7 @@ async fn installing_writes_the_service_s_directory_and_the_document_that_mounts_
 
     let stack = stack_of(&ctx);
     assert!(stack.join("config/komga").is_dir());
-    assert!(stack.join("compose/plugins/komga.yml").is_file());
+    assert!(!document(&ctx).is_empty());
 }
 
 /// What lands on disk is the container the record derives, not a second rendering
@@ -27,12 +26,11 @@ async fn the_document_on_disk_is_the_container_the_record_derives() {
     let shown = report(installing(&ctx, &source("derives", MANIFEST)).await);
     let recorded = shown
         .and_then(|one| one.install)
-        .map(|one| crate::plugin::written(&one.would, &crate::plugin::Reading::bare()))
+        .map(|one| crate::project::entries(&one.would, &crate::project::Reading::bare()))
         .unwrap_or_default();
 
-    let written = std::fs::read_to_string(stack_of(&ctx).join("compose/plugins/komga.yml"))
-        .unwrap_or_default();
-    assert_eq!(written, recorded);
+    let written = document(&ctx);
+    assert_eq!(written, entry_in(&recorded));
     assert!(written.contains("profiles:\n    - plugin-komga\n"));
 }
 
@@ -58,10 +56,10 @@ async fn every_write_is_journalled_under_the_plugin_s_own_name_as_one_run() {
 }
 
 /// Both writes are on the record, and the directory is recorded before the
-/// document that mounts it — so a reversal walking backwards removes the document
+/// project that mounts it — so a reversal walking backwards removes the project
 /// first and never a directory something still names.
 #[tokio::test]
-async fn the_directory_is_journalled_before_the_document_that_mounts_it() {
+async fn the_directory_is_journalled_before_the_project_that_mounts_it() {
     let ctx = ctx("ordered");
     assert_eq!(
         counted(installing(&ctx, &source("ordered", MANIFEST)).await),
@@ -72,7 +70,7 @@ async fn the_directory_is_journalled_before_the_document_that_mounts_it() {
     let directory = made.iter().position(|path| path.ends_with("config/komga"));
     let document = made
         .iter()
-        .position(|path| path.ends_with("compose/plugins/komga.yml"));
+        .position(|path| path.ends_with(crate::project::FILE));
     assert!(
         directory.is_some() && document.is_some(),
         "both are recorded"
@@ -105,7 +103,7 @@ async fn a_plugin_s_changes_are_in_the_history_named_as_the_plugin() {
     assert!(shown
         .changes
         .iter()
-        .any(|one| one.did.starts_with("made ") && one.did.ends_with("komga.yml")));
+        .any(|one| one.did.starts_with("made ") && one.did.ends_with(crate::project::FILE)));
 }
 
 /// A plugin's changes are classified by the rollback layer like any other change,
@@ -128,7 +126,7 @@ async fn what_an_install_journalled_is_judged_by_the_rollback_layer_like_anythin
 }
 
 /// A rehearsal settles everything and leaves the machine exactly as it was — no
-/// directory, no document, and nothing on the record to put back.
+/// directory, no project, and nothing on the record to put back.
 #[tokio::test]
 async fn a_rehearsed_install_writes_no_wiring_and_journals_nothing() {
     let ctx = rehearsing("rehearsed-wiring");
@@ -137,7 +135,7 @@ async fn a_rehearsed_install_writes_no_wiring_and_journals_nothing() {
 
     let stack = stack_of(&ctx);
     assert!(!stack.join("config/komga").exists());
-    assert!(!stack.join("compose/plugins/komga.yml").exists());
+    assert!(!stack.join(crate::project::FILE).exists());
     assert!(journalled(&ctx).is_empty());
 }
 
@@ -160,9 +158,7 @@ async fn a_directory_that_was_already_there_is_used_and_not_recorded() {
         !made.iter().any(|path| Path::new(path) == existing),
         "a directory the install found is not one it made"
     );
-    assert!(made
-        .iter()
-        .any(|path| path.ends_with("compose/plugins/komga.yml")));
+    assert!(made.iter().any(|path| path.ends_with(crate::project::FILE)));
 }
 
 /// Shown refusing before it is relied on. With the recording taken out, the run
@@ -227,71 +223,48 @@ async fn a_write_that_cannot_land_stops_the_install_and_leaves_what_it_wrote_on_
         "PLUGIN-7"
     );
     assert!(
-        !stack_of(&ctx).join("compose/plugins/komga.yml").exists(),
-        "the document is not written once a write ahead of it failed"
+        !project_of(&ctx).exists(),
+        "the project is not written once a write ahead of it failed"
     );
 }
 
-/// The directory a document is written into is made on the way to writing it, so
-/// a stack where that cannot happen stops the install in the same words a
-/// service's own directory does. Driven through a file standing where the
-/// document's directory has to go, which is the one arrangement that fails the
-/// making without failing anything before it.
+/// A project that cannot be written where its directory is fine is the install's own
+/// refusal rather than the settings store's.
 #[tokio::test]
-async fn a_document_whose_directory_cannot_be_made_stops_the_install() {
-    let ctx = ctx("no-room");
-    let overlays = stack_of(&ctx).join("compose");
-    let _ = overlays.parent().map(std::fs::create_dir_all);
-    assert!(std::fs::write(&overlays, "not a directory").is_ok());
+async fn a_project_that_will_not_take_the_write_is_refused_as_the_install_s_own() {
+    let ctx = ctx("unwritable-project");
+    // A directory where the project has to go, so the write into it cannot succeed.
+    assert!(std::fs::create_dir_all(project_of(&ctx)).is_ok());
 
     assert_eq!(
-        refusal(installing(&ctx, &source("no-room", MANIFEST)).await),
+        refusal(installing(&ctx, &source("unwritable-project", MANIFEST)).await),
         "PLUGIN-7"
     );
 }
 
-/// And a document that cannot be written where its directory is fine is the same
-/// refusal rather than the settings store's. The writer is shared with the
-/// settings file, and its own failure says *your settings could not be saved* —
-/// which about a plugin's Compose document names the wrong file and offers the
-/// wrong remedy.
+/// A project lemonfiber has no record of writing is somebody's, so an install that would
+/// write it again is refused, naming it, with nothing written and nothing recorded.
 #[tokio::test]
-async fn a_document_that_will_not_take_the_write_is_refused_as_the_install_s_own() {
-    let ctx = ctx("unwritable-document");
-    let document = stack_of(&ctx).join("compose/plugins/komga.yml");
-    // A directory where the document has to go: its own directory is made, and
-    // the write into it cannot succeed.
-    assert!(std::fs::create_dir_all(&document).is_ok());
-
-    assert_eq!(
-        refusal(installing(&ctx, &source("unwritable-document", MANIFEST)).await),
-        "PLUGIN-7"
-    );
-}
-
-/// A leftover document is overwritten rather than recorded. It is derived from
-/// the record and holds nothing an earlier run is owed, so recording it as made
-/// would be the one journal entry that removes a file this run did not create.
-#[tokio::test]
-async fn a_leftover_document_is_overwritten_and_not_recorded_as_made() {
+async fn a_project_nobody_recorded_refuses_the_install_naming_it() {
     let ctx = ctx("leftover");
-    let document = stack_of(&ctx).join("compose/plugins/komga.yml");
-    let _ = document.parent().map(std::fs::create_dir_all);
-    assert!(std::fs::write(&document, "services: {}\n").is_ok());
+    let project = project_of(&ctx);
+    assert!(std::fs::write(&project, "services: {}\n").is_ok());
 
-    assert_eq!(
-        counted(installing(&ctx, &source("leftover", MANIFEST)).await),
-        Some(1)
-    );
-    assert!(std::fs::read_to_string(&document)
-        .unwrap_or_default()
-        .contains("profiles:\n    - plugin-komga\n"));
+    let refused = installing(&ctx, &source("leftover", MANIFEST)).await.err();
+
     assert!(
-        !made_paths(&ctx)
-            .iter()
-            .any(|path| Path::new(path) == document),
-        "a document this run found is not one it made"
+        refused
+            .as_ref()
+            .is_some_and(|problem| problem.code.as_str() == "STACK-11"
+                && problem.summary.contains(&project.display().to_string())),
+        "{refused:?}"
     );
+    assert_eq!(
+        std::fs::read_to_string(&project).ok().as_deref(),
+        Some("services: {}\n")
+    );
+    assert!(journalled(&ctx).is_empty());
+    assert_eq!(counted(reading(&ctx).await), Some(0));
 }
 
 /// The register is written last, and a run that cannot write it puts the whole
@@ -321,13 +294,13 @@ async fn a_register_that_cannot_be_written_puts_the_whole_install_back() {
         "what it left is read off the reversal: {said}"
     );
     assert!(
-        !stack_of(&ctx).join("compose/plugins/komga.yml").exists(),
-        "the document it wrote is gone again"
+        !project_of(&ctx).exists(),
+        "the project it wrote is gone again"
     );
     assert!(
         made_paths(&ctx)
             .iter()
-            .any(|path| path.ends_with("compose/plugins/komga.yml")),
+            .any(|path| path.ends_with(crate::project::FILE)),
         "and the change record still says it was there, so the run can be read"
     );
 
@@ -553,10 +526,11 @@ fn a_variable_asking_an_address_is_written_with_the_one_its_ask_settles_on() {
     )]
     .into();
     let plugin = crate::test_support::an_installed("subs", vec![placed]);
-    let document = super::super::addressing::writes(&ctx, &plugin, &stack_of(&ctx))
+    let document = super::super::planned::writes(&ctx, &plugin, &stack_of(&ctx))
+        .unwrap_or_default()
         .into_iter()
         .find_map(|write| match write.lands {
-            crate::plugin::Lands::Document(text) => Some(text),
+            crate::plugin::Lands::Document { text, .. } => Some(text),
             _ => None,
         })
         .unwrap_or_default();
@@ -590,10 +564,11 @@ fn a_setting_is_written_as_the_operator_recorded_it_and_as_its_default_otherwise
         r#"{"schema":1,"written_by":"","values":{"subs:mode":"fast"}}"#
     )
     .is_ok());
-    let document = super::super::addressing::writes(&ctx, &plugin, &stack_of(&ctx))
+    let document = super::super::planned::writes(&ctx, &plugin, &stack_of(&ctx))
+        .unwrap_or_default()
         .into_iter()
         .find_map(|write| match write.lands {
-            crate::plugin::Lands::Document(text) => Some(text),
+            crate::plugin::Lands::Document { text, .. } => Some(text),
             _ => None,
         })
         .unwrap_or_default();

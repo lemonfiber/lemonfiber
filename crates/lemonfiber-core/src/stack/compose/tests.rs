@@ -48,7 +48,7 @@ fn a_run_aimed_elsewhere_names_the_machine_ahead_of_the_subcommand() {
             "docker --host ssh://media@nas.local compose ",
             "--project-name lemonfiber ",
             "--project-directory /opt/lemonfiber/stack ",
-            "--file /opt/lemonfiber/stack/compose.yml ",
+            "--file /opt/lemonfiber/stack/compose.generated.yml ",
             "--profile media up --detach"
         ))
     );
@@ -61,7 +61,7 @@ fn starts_a_form_detached_with_its_profiles() {
         Some(concat!(
             "docker compose --project-name lemonfiber ",
             "--project-directory /opt/lemonfiber/stack ",
-            "--file /opt/lemonfiber/stack/compose.yml ",
+            "--file /opt/lemonfiber/stack/compose.generated.yml ",
             "--profile media up --detach"
         ))
     );
@@ -148,79 +148,57 @@ fn an_environment_file_is_passed_when_one_has_been_written() {
     );
 }
 
+/// The operator's own overlay is merged last, over the project lemonfiber generates, so
+/// it wins every key it writes.
 #[test]
-fn overlays_are_layered_after_the_stack_s_own_file() {
+fn the_operators_overlay_is_layered_after_the_generated_project() {
     let settings = Settings {
-        overlays: vec![PathBuf::from(
-            "/opt/lemonfiber/stack/stacks/compose.storage.nas.yml",
-        )],
+        overlays: vec![PathBuf::from("/home/op/.config/lemonfiber/overlay.yml")],
         ..Settings::default()
     };
     assert_eq!(
         line(&["library"], &Action::Up, &settings)
             .as_deref()
             .map(|command| command.contains(concat!(
-                "--file /opt/lemonfiber/stack/compose.yml ",
-                "--file /opt/lemonfiber/stack/stacks/compose.storage.nas.yml"
+                "--file /opt/lemonfiber/stack/compose.generated.yml ",
+                "--file /home/op/.config/lemonfiber/overlay.yml"
             ))),
         Some(true)
     );
 }
 
-/// An installed plugin's document is layered, and before the operator's own
-/// overlay: Compose takes the later file as the one that wins, and a stranger's
-/// plugin is not entitled to override a choice the operator made.
+/// The project is read from the directory this invocation calls the project root, so a
+/// stack of the operator's own is run from the project written inside it.
 #[test]
-fn an_installed_plugin_s_document_is_layered_before_the_operator_s_own() {
-    let settings = Settings {
-        overlays: vec![PathBuf::from(
-            "/opt/lemonfiber/stack/stacks/compose.storage.nas.yml",
-        )],
-        plugins: vec!["komga".to_owned()],
-        ..Settings::default()
-    };
-    assert_eq!(
-        line(&["library"], &Action::Up, &settings)
-            .as_deref()
-            .map(|command| command.contains(concat!(
-                "--file /opt/lemonfiber/stack/compose/plugins/komga.yml ",
-                "--file /opt/lemonfiber/stack/stacks/compose.storage.nas.yml"
-            ))),
-        Some(true)
-    );
-}
-
-/// The document is joined against the directory this invocation calls the project
-/// root, so an operator's own stack gets the document inside it rather than inside
-/// the one lemonfiber would have materialised.
-#[test]
-fn a_plugin_s_document_is_joined_against_the_root_the_invocation_names() {
-    let settings = Settings {
-        plugins: vec!["komga".to_owned()],
-        ..Settings::default()
-    };
+fn the_project_is_read_from_the_root_the_invocation_names() {
     let theirs = Path::new("/srv/their-own-stack");
-    let command = plan(&["library"])
-        .map(|plan| build(&plan, &settings, theirs, &Action::Up, Environment::MacOs).join(" "));
+    let command = plan(&["library"]).map(|plan| {
+        build(
+            &plan,
+            &Settings::default(),
+            theirs,
+            &Action::Up,
+            Environment::MacOs,
+        )
+        .join(" ")
+    });
     assert_eq!(
-        command
-            .as_deref()
-            .map(|line| line.contains("--file /srv/their-own-stack/compose/plugins/komga.yml")),
+        command.as_deref().map(|line| line.contains(concat!(
+            "--project-directory /srv/their-own-stack ",
+            "--file /srv/their-own-stack/compose.generated.yml"
+        ))),
         Some(true)
     );
 }
 
-/// A machine with nothing installed layers nothing, so the invocation a stack
-/// without plugins produces is the one it always produced.
+/// One project, and the overlay where there is one: no file of the stack's own and no
+/// document per plugin is ever handed to Compose.
 #[test]
-fn a_machine_with_no_plugins_layers_no_extra_documents() {
-    let settings = Settings::default();
-    assert_eq!(
-        line(&["library"], &Action::Up, &settings)
-            .as_deref()
-            .map(|command| command.contains("compose/plugins/")),
-        Some(false)
-    );
+fn no_static_compose_file_is_handed_to_compose() {
+    let said = line(&["library"], &Action::Up, &Settings::default()).unwrap_or_default();
+    assert_eq!(said.matches("--file ").count(), 1, "{said}");
+    assert!(!said.contains("compose.yml"), "{said}");
+    assert!(!said.contains("compose/"), "{said}");
 }
 
 /// What an action is called is what a report says it did, and every one of them

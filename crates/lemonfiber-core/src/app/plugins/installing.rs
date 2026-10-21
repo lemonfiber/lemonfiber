@@ -71,15 +71,7 @@ pub(super) async fn install(
     // was fetched, rather than from the checkout it was read out of.
     let stamp = ctx.stamp();
     let stack_manifest = writing::stack_manifest(ctx)?;
-    let (would, named) = settled(
-        ctx,
-        &stack_manifest,
-        held.installed(),
-        &read,
-        path,
-        from,
-        &stamp,
-    );
+    let (would, named) = settled(&stack_manifest, &read, path, from, &stamp);
     let mut after = held.clone();
     after
         .record(would.clone())
@@ -92,13 +84,10 @@ pub(super) async fn install(
     // a rehearsal has to state is where every change goes, and a path is a fact about
     // this machine — so a machine with nowhere to put them has nothing for a
     // rehearsal to state and nothing for an install to do.
-    let stack = ctx
-        .settings
-        .stack_dir
-        .as_deref()
+    let stack = &super::super::project::directory(ctx)
         .ok_or_else(|| Box::new(nowhere_to_write(&would.plugin)))?;
     super::occupied::unoccupied(ctx, &would, held.installed(), stack)?;
-    let planned = writing::landing(ctx, super::addressing::writes(ctx, &would, stack));
+    let planned = writing::landing(ctx, super::planned::writes(ctx, &would, stack)?);
     let wiring = standing::standing(ctx, &stack_manifest, &held, &would);
     let changes = crate::plugin::changes(&planned);
     let offer = offering::installing(&read.digest, &would, &changes, &wiring);
@@ -283,15 +272,11 @@ async fn followed(
 /// name in a refusal.
 ///
 /// A plugin fetched from a git source is recorded as coming from that source, at the
-/// one commit that was fetched, rather than from the checkout it was read out of. Each
-/// of its services joins the networks of what it is settled in for beside `held`, the
-/// plugins already installed, and every recipe call
-/// to one of the stack's services is given the adapter it reaches through, which only
-/// the stack can say.
+/// one commit that was fetched, rather than from the checkout it was read out of, and
+/// every recipe call to one of the stack's services is given the adapter it reaches
+/// through, which only the stack can say.
 pub(super) fn settled(
-    ctx: &Ctx,
     stack: &lemonfiber_manifest::Manifest,
-    held: &[Installed],
     read: &Accepted,
     path: &Path,
     from: Option<&Fetched<'_>>,
@@ -309,7 +294,7 @@ pub(super) fn settled(
         });
     installed.manifest.clone_from(&read.digest);
     installed.tree.clone_from(&read.tree);
-    let settled = writing::joined(ctx, stack, held, installed).reaching(stack);
+    let settled = installed.reaching(stack);
     match from {
         Some(fetched) => {
             let fetched_at = settled.fetched(fetched.url, fetched.commit);

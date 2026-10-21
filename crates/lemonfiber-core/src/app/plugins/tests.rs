@@ -210,9 +210,9 @@ fn why(verdict: Option<&Verdict>) -> String {
     }
 }
 
-/// Where a context writes the stack, which is what the install puts wiring under.
+/// The project directory a context runs, which is what the install puts wiring under.
 fn stack_of(ctx: &Ctx) -> PathBuf {
-    ctx.settings.stack_dir.clone().unwrap_or_default()
+    crate::app::project::directory(ctx).unwrap_or_default()
 }
 
 /// The same, rehearsing rather than writing.
@@ -443,15 +443,11 @@ fn journalled(ctx: &Ctx) -> Vec<Change> {
         .to_vec()
 }
 
-/// The paths a run journalled, in the order it recorded them.
-///
-/// Read off each change's target rather than out of its kind. The target of a
-/// change an install writes *is* the path, and that these are paths lemonfiber
-/// made is asserted where an operator would see it — in the history below, which
-/// renders the kind rather than being told it.
+/// The paths a run journalled as made, in the order it recorded them.
 fn made_paths(ctx: &Ctx) -> Vec<String> {
     journalled(ctx)
         .into_iter()
+        .filter(|change| matches!(change.kind, crate::journal::Kind::Made { .. }))
         .map(|change| change.target)
         .collect()
 }
@@ -518,9 +514,25 @@ async fn on(ctx: &Ctx) -> Option<String> {
     report(reading(ctx).await).and_then(|one| one.installed.first().map(|one| one.version.clone()))
 }
 
-/// The plugin's Compose document, as the stack holds it now.
+/// Where the project is kept.
+fn project_of(ctx: &Ctx) -> PathBuf {
+    stack_of(ctx).join(crate::project::FILE)
+}
+
+/// The plugin's entry in the project as it stands, or nothing where it holds none.
 fn document(ctx: &Ctx) -> String {
-    std::fs::read_to_string(stack_of(ctx).join("compose/plugins/komga.yml")).unwrap_or_default()
+    entry_in(&std::fs::read_to_string(project_of(ctx)).unwrap_or_default())
+}
+
+/// The plugin's entry in the project `text`, under the project's own heading.
+fn entry_in(text: &str) -> String {
+    let sliced = crate::project::document::sliced(text, &["komga"]);
+    let held = sliced.contains("\n  komga:\n");
+    if held {
+        sliced
+    } else {
+        String::new()
+    }
 }
 
 mod cataloguing;
@@ -531,6 +543,7 @@ mod fronting;
 mod installing;
 mod proving;
 mod reaching;
+mod regenerating;
 mod removing;
 mod reproving;
 mod running;

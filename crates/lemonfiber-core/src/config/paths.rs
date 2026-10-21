@@ -306,8 +306,8 @@ impl Paths {
         self.config.join(SECRETS_FILES)
     }
 
-    /// The materialised stack — compose files written where Compose can read
-    /// them.
+    /// The materialised stack: the project and every service's starting files, written
+    /// where Compose reads them.
     #[must_use]
     pub fn stack(&self) -> PathBuf {
         self.data.join("stack")

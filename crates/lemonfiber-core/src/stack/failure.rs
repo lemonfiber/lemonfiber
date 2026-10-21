@@ -105,7 +105,7 @@ impl Diagnose for Failure {
             Self::Unreadable { path, reason } => Problem::new(
                 STACK_UNREADABLE,
                 format!("No stack was found at {}", path.display()),
-                "A stack directory holds a stack.toml beside its compose files. Without one there is nothing describing what would be started.",
+                "A stack directory holds a stack.toml describing its services. Without one there is nothing describing what would be started.",
                 Remedy::new("Point at a directory containing stack.toml")
                     .with_detail("lemonfiber --stack-dir <path>"),
             )

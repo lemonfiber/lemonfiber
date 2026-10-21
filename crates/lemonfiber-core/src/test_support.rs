@@ -366,3 +366,11 @@ pub(crate) fn a_guard_forwarding(port: Option<&'static str>) -> std::sync::Arc<R
 }
 
 mod tests;
+
+/// The repository's media stack carried inside the build, as a machine that has chosen
+/// no stack directory yet holds it.
+pub(crate) fn embedded() -> crate::stack::Source {
+    static STACK: include_dir::Dir<'_> =
+        include_dir::include_dir!("$CARGO_MANIFEST_DIR/../../assets/media-stack");
+    crate::stack::Source::Embedded(&STACK)
+}

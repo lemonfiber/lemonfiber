@@ -146,15 +146,38 @@ const REFUSES: &[(&str, &str)] = &[
 /// block each such address lies in, and why none of those is one this product listens
 /// on or connects to.
 ///
-/// Every address written here is one a container of the generated project holds on a
-/// network with no route off the host, and one the core hands to another service as
-/// the proxy it trusts. An address in a listed file outside its block, or one not
-/// written as four numbers, is held to the policy like any other.
-const ASSIGNS: &[(&str, (Ipv4Addr, u8), &str)] = &[(
-    "crates/lemonfiber-core/src/topology.rs",
-    (Ipv4Addr::new(10, 80, 96, 0), 24),
-    "the subnets and the fixed addresses the guarded door and the proxy hold on the \
-     networks of the door's asks, which the media server and the door are told to trust",
+/// Every address written here lies in a subnet of the generated project's own networks,
+/// which the engine routes nowhere it would not route a network it drew itself, and
+/// the fixed ones are what the core hands to another service as the proxy it trusts.
+/// An address in a listed file outside its block, or one not written as four numbers,
+/// is held to the policy like any other.
+const ASSIGNS: &[(&str, (Ipv4Addr, u8), &str)] = &[
+    (
+        "crates/lemonfiber-core/src/topology.rs",
+        (Ipv4Addr::new(10, 80, 96, 0), 24),
+        "the subnets and the fixed addresses the guarded door and the proxy hold on the \
+         networks of the door's asks, which the media server and the door are told to trust",
+    ),
+    (
+        "crates/lemonfiber-core/src/topology/subnets.rs",
+        (Ipv4Addr::new(10, 80, 0, 0), 16),
+        "the range every network of the project is given its subnet from, so the engine \
+         draws none from its own pools",
+    ),
+];
+
+/// The files that write the interface the generated project publishes the household
+/// tier on while the operator has narrowed it to none, that address, and why.
+///
+/// The policy's tier written into the project rather than bound here: the engine
+/// publishes on it, and the operator narrows it with `LAN_BIND`. An address arriving
+/// here is a second interface the project publishes on, which is the moment to ask
+/// what would then be reachable from where.
+const PUBLISHES: &[(&str, &str, &str)] = &[(
+    "crates/lemonfiber-core/src/project/entry.rs",
+    "0.0.0.0",
+    "every interface, which is the household tier the policy names, published by the \
+     engine until LAN_BIND narrows it",
 )];
 
 /// The addresses beyond this machine that the policy names, and what each is for.
@@ -403,6 +426,7 @@ fn every_address_beyond_this_machine_is_one_the_policy_names() {
         .iter()
         .map(|(file, _)| *file)
         .chain(ASSIGNS.iter().map(|(file, _, _)| *file))
+        .chain(PUBLISHES.iter().map(|(file, _, _)| *file))
         .filter(|file| !found.iter().any(|address| address.file == *file))
         .collect();
     assert!(
@@ -418,6 +442,11 @@ fn every_address_beyond_this_machine_is_one_the_policy_names() {
             !ASSIGNS
                 .iter()
                 .any(|(file, block, _)| *file == address.file && within(address.address, *block))
+        })
+        .filter(|address| {
+            !PUBLISHES
+                .iter()
+                .any(|(file, written, _)| *file == address.file && *written == address.written)
         })
         .filter(|address| !declared.contains(address.written.as_str()) || address.file != DECIDES)
         .map(|address| {

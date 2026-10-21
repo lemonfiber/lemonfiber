@@ -37,7 +37,7 @@ fn main() {
     let copies = root.join(CATALOGUE).join(lemonfiber_bundle::COPIES);
 
     for (submodule, held) in [
-        (&media, media.join(carried::COMPOSE)),
+        (&media, media.join(carried::LICENCE)),
         (&copies, copies.clone()),
     ] {
         if !held.exists() {

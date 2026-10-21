@@ -83,8 +83,8 @@ fn the_surface_builds_every_engine_seam_from_the_one_answer() {
     );
     assert_eq!(
         adapters.matches("Daemon::reaching(target.clone())").count(),
-        4,
-        "the engine, the image listing, the location seam and the program a proof runs are \
-         each built from the target `live_reaching` is handed"
+        6,
+        "the engine, the image, network and volume seams, the location seam and the program \
+         a proof runs are each built from the target `live_reaching` is handed"
     );
 }

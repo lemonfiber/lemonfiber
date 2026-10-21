@@ -372,5 +372,7 @@ pub(super) fn identity_of(meta: &std::fs::Metadata) -> Identity {
 
 mod confined;
 
+pub(crate) use confined::{unpacked, UNPACKED_AT_MOST};
+
 #[cfg(test)]
 mod tests;

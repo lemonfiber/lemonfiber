@@ -90,7 +90,7 @@ fn a_run_says_where_the_backup_went_and_what_each_service_came_to() {
     let mut carried = report(vec![taken], applied, true);
     carried.halted = Some("sonarr did not come back".to_owned());
     carried.stack_edits = vec![StackEdit {
-        path: "compose.yml".to_owned(),
+        path: "compose.generated.yml".to_owned(),
         diff: "-yours".to_owned(),
     }];
     let said = update(&carried).text();
@@ -98,7 +98,7 @@ fn a_run_says_where_the_backup_went_and_what_each_service_came_to() {
     assert!(said.contains("started and did not come back"), "{said}");
     assert!(said.contains("not reached"), "{said}");
     assert!(said.contains("sonarr did not come back"), "{said}");
-    assert!(said.contains("compose.yml is yours"), "{said}");
+    assert!(said.contains("compose.generated.yml is yours"), "{said}");
 }
 
 #[test]

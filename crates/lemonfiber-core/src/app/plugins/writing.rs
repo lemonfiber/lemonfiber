@@ -74,8 +74,21 @@ pub(crate) fn carry_out(
                 made_whole(ctx, plugin, stamp, &journal, &write.path, None)?;
                 continue;
             }
-            crate::plugin::Lands::Document(content) => {
-                made_whole(ctx, plugin, stamp, &journal, &write.path, Some(content))?;
+            crate::plugin::Lands::Document { previous, text } => {
+                crate::app::recover::journalled(
+                    &journal,
+                    &[super::super::project::change(
+                        &write.path,
+                        previous.clone(),
+                        text,
+                        &crate::plugin::owner(plugin),
+                        stamp,
+                    )],
+                    ctx.seams.random.as_ref(),
+                )
+                .map_err(|failure| Box::new(failure.problem()))?;
+                super::super::project::kept(ctx, text)
+                    .map_err(|failure| Box::new(unwritable(&write.path, &failure.to_string())))?;
                 continue;
             }
             crate::plugin::Lands::Key => {
@@ -132,7 +145,7 @@ pub(crate) fn unlinked(ctx: &Ctx, installed: &Installed, stack: &Path) -> Result
         .map_or(Ok(()), |source| Err(Box::new(unwritable(&source, LINKED))))
 }
 
-/// Make one directory, or write one whole document holding `content`, journalling
+/// Make one directory, or write one whole file holding `content`, journalling
 /// every path it brings into being first.
 fn made_whole(
     ctx: &Ctx,
@@ -160,7 +173,7 @@ fn made_whole(
         // is no second answer here to where a document's directory comes from. Its
         // failure is reported as this install's own: the writer is shared with the
         // settings file and says *your settings could not be saved*, which about a
-        // plugin's Compose document names the wrong file and offers the wrong remedy.
+        // plugin's file names the wrong file and offers the wrong remedy.
         Some(content) => crate::config::store::write(path, content)
             .map_err(|failure| Box::new(unwritable(path, &failure.to_string()))),
     }
@@ -216,46 +229,10 @@ pub(crate) fn stack_manifest(ctx: &Ctx) -> Result<lemonfiber_manifest::Manifest,
         .map_err(|err| Box::new(err.problem()))
 }
 
-/// The stack's services as what a plugin's service could stand in for, with the networks
-/// its compose files put each on, and what each ask is settled to reach with `installed`
-/// beside the stack under the choices made on this machine.
-fn joins(
-    ctx: &Ctx,
-    manifest: &lemonfiber_manifest::Manifest,
-    installed: &[Installed],
-) -> crate::plugin::Joins {
-    crate::plugin::Joins::of(
-        manifest,
-        &ctx.stack.attached(),
-        &crate::wiring::settle(
-            manifest,
-            installed,
-            &crate::app::targets::chosen_fillers(ctx),
-        ),
-    )
-}
-
-/// `draft` joining the networks it is settled into with the plugins already installed
-/// beside it, in place of any version of it among them: what an install or an update
-/// writes.
-pub(crate) fn joined(
-    ctx: &Ctx,
-    manifest: &lemonfiber_manifest::Manifest,
-    held: &[Installed],
-    draft: Installed,
-) -> Installed {
-    let beside: Vec<Installed> = held
-        .iter()
-        .filter(|one| one.plugin != draft.plugin)
-        .cloned()
-        .chain(std::iter::once(draft.clone()))
-        .collect();
-    draft.joining(&joins(ctx, manifest, &beside))
-}
-
-/// One file a change writes over: where it is, what it holds now, and what it is to hold.
+/// The project a change writes over: where it is, what it holds now, and what it is to
+/// hold.
 pub(crate) struct Overwrite {
-    /// The file.
+    /// The project.
     pub(crate) path: PathBuf,
     /// What it holds now, which a reversal writes back.
     pub(crate) previous: String,
@@ -265,17 +242,13 @@ pub(crate) struct Overwrite {
 
 impl Overwrite {
     pub(crate) fn journalled(&self, operation: &str, at: &str) -> Change {
-        let path = self.path.display().to_string();
-        Change {
-            at: at.to_owned(),
-            operation: operation.to_owned(),
-            target: path.clone(),
-            kind: Kind::Rewritten {
-                path,
-                previous: self.previous.clone(),
-                written: crate::materialised::checksum(self.text.as_bytes()),
-            },
-        }
+        super::super::project::change(
+            &self.path,
+            Some(self.previous.clone()),
+            &self.text,
+            operation,
+            at,
+        )
     }
 }
 
@@ -290,14 +263,14 @@ pub(crate) const WIRING: Refusing = Refusing {
     unwritten: crate::error::codes::wire::CHOICE_UNWRITABLE,
 };
 
-/// Every file a change to the stack's choices or settings writes over: the Compose document
-/// of each installed plugin whose networks the choices in `chosen` move or whose text
-/// `resolved` changes, and the record of what is installed, which carries those networks.
+/// The project a change to the stack's choices or settings writes over, where the
+/// choices in `chosen` and the values `resolved` answers change it: nothing where they
+/// do not, or where there is no project yet for the next start to write.
 ///
 /// # Errors
 ///
-/// Where a mount source of a plugin whose document it writes over is reached through a
-/// link.
+/// Where the project on disk was edited since lemonfiber last wrote it, or a mount source
+/// of a plugin's service it mounts is reached through a link.
 pub(crate) fn regenerated(
     ctx: &Ctx,
     manifest: &lemonfiber_manifest::Manifest,
@@ -305,52 +278,26 @@ pub(crate) fn regenerated(
     chosen: &crate::wiring::Chosen,
     resolved: &crate::settings::Resolved,
 ) -> Result<Vec<Overwrite>, Box<Problem>> {
-    let installed = register.installed();
-    let now = crate::wiring::settle(
-        manifest,
-        installed,
-        &crate::app::targets::chosen_fillers(ctx),
-    );
-    let before = crate::settings::Resolved::of(ctx, Some(manifest), installed);
-    let settled = crate::wiring::settle(manifest, installed, chosen);
-    let joins = crate::plugin::Joins::of(manifest, &ctx.stack.attached(), &settled);
-    let mut after = register.clone();
-    let mut overwrites = Vec::new();
-    for held in installed {
-        let moved = held.clone().joining(&joins);
-        let text = super::addressing::written(&settled, manifest, installed, resolved, &moved);
-        if moved == *held
-            && text == super::addressing::written(&now, manifest, installed, &before, held)
-        {
-            continue;
-        }
-        if let Some(stack) = ctx.settings.stack_dir.as_deref() {
-            let path = crate::plugin::overlay(stack, &held.plugin);
-            if let Ok(previous) = std::fs::read_to_string(&path) {
-                unlinked(ctx, &moved, stack)?;
-                overwrites.push(Overwrite {
-                    path,
-                    previous,
-                    text,
-                });
-            }
-        }
-        if moved != *held {
-            after.forget(&held.plugin);
-            let _ = after.record(moved);
-        }
+    let text =
+        super::super::project::generated(manifest, register.installed(), chosen, resolved).text;
+    let (Some(directory), Some(previous)) = (
+        super::super::project::directory(ctx),
+        super::super::project::held(ctx),
+    ) else {
+        return Ok(Vec::new());
+    };
+    if previous == text {
+        return Ok(Vec::new());
     }
-    let kept = super::kept_at(ctx)
-        .filter(|_| after != *register)
-        .and_then(|path| Some((std::fs::read_to_string(&path).ok()?, path)));
-    if let Some((previous, path)) = kept {
-        overwrites.push(Overwrite {
-            path,
-            previous,
-            text: serde_json::to_string(&after).unwrap_or_default(),
-        });
+    super::super::project::unedited(ctx)?;
+    for held in register.installed() {
+        unlinked(ctx, held, &directory)?;
     }
-    Ok(overwrites)
+    Ok(vec![Overwrite {
+        path: directory.join(crate::project::FILE),
+        previous,
+        text,
+    }])
 }
 
 /// Refuse where any file to be written over no longer holds what was read from it.
@@ -374,13 +321,14 @@ pub(crate) fn unmoved(overwrites: &[Overwrite], refusing: Refusing) -> Result<()
 ///
 /// Where a file no longer holds what was read, or cannot be written.
 pub(crate) fn overwritten(
+    ctx: &Ctx,
     overwrites: &[Overwrite],
     refusing: Refusing,
 ) -> Result<(), Box<Problem>> {
     unmoved(overwrites, refusing)?;
     for overwrite in overwrites {
         unmoved(std::slice::from_ref(overwrite), refusing)?;
-        crate::config::store::write(&overwrite.path, &overwrite.text).map_err(|failure| {
+        super::super::project::kept(ctx, &overwrite.text).map_err(|failure| {
             Box::new(not_overwritten(
                 &overwrite.path,
                 refusing,
@@ -433,7 +381,7 @@ pub(crate) fn landing(ctx: &Ctx, planned: Vec<crate::plugin::Write>) -> Vec<crat
                 write.path.is_file() && !crate::unmanaged::covers(&ctx.settings.unmanaged, key)
             }
             crate::plugin::Lands::Directory { .. }
-            | crate::plugin::Lands::Document(_)
+            | crate::plugin::Lands::Document { .. }
             | crate::plugin::Lands::Key
             | crate::plugin::Lands::Secrets(_) => true,
         })
@@ -444,11 +392,11 @@ pub(crate) fn landing(ctx: &Ctx, planned: Vec<crate::plugin::Write>) -> Vec<crat
 ///
 /// A directory that is already there yields nothing, which is what keeps a reversal
 /// from removing something the install found rather than made. A file's missing
-/// parent directories are always included — a document written into a directory
+/// parent directories are always included — a file written into a directory
 /// lemonfiber had to make is two things to put back, not one.
 ///
-/// **A document that is already there is overwritten and not recorded, and that is
-/// deliberate.** Its path is the plugin's own id and an install over a registered
+/// **A file that is already there is overwritten and not recorded, and that is
+/// deliberate.** Its path is the plugin's own and an install over a registered
 /// plugin is refused before reaching here, so the only way to meet one is the
 /// leftover of an install or a removal that did not finish. It holds nothing but what
 /// this build derives from the record, so there is no earlier content a reversal

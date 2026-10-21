@@ -40,21 +40,15 @@ pub fn household_port(manifest: &lemonfiber_manifest::Manifest, own: u16) -> u16
         .unwrap_or(own)
 }
 
-/// The stack's compose file that declares the door, beneath the stack directory.
-const COMPOSE: &str = "compose/media.yml";
-
-/// The network the door reaches the media server on.
-const UPSTREAM: &str = "door-upstream";
-
-/// The address the door reaches the media server from, as the stack's compose file fixes
-/// it, or nothing where the stack declares no door or fixes no address for it.
+/// The address the door reaches the media server from, as the project's networks fix
+/// it, or nothing where nothing guards the household's streams in front of a media
+/// server.
 ///
-/// Read from the file rather than written down here, so the address the media server is
-/// told to trust is the one the door is given, on the day either moves.
+/// Derived from the networks rather than written down here, so the address the media
+/// server is told to trust is the one the door is given, on the day either moves.
 #[must_use]
-pub fn upstream(project: &Path) -> Option<String> {
-    let text = std::fs::read_to_string(project.join(COMPOSE)).ok()?;
-    crate::stack::declared::fixed_address(&text, SERVICE, UPSTREAM)
+pub fn upstream(topology: &crate::topology::Topology) -> Option<String> {
+    topology.guard_on_media().map(|address| address.to_string())
 }
 
 /// The door as a location is built against: its address and the certificate it

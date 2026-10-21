@@ -1,25 +1,28 @@
 //! What a plugin would take that something on this machine already holds.
 //!
 //! The manifest is held to the stack this build ships before anything here runs. What
-//! that cannot see is this machine: the overlay the operator layered over the stack,
-//! the stack they forked and pointed lemonfiber at, the sites they added to the proxy
-//! by hand, and the ports other plugins already publish. Each is a collision of the
-//! same kind, and each lands the same way — a service Compose merges into the
-//! operator's own and runs with whatever that one holds, a port two services cannot
-//! both bind, a site the proxy will not start beside a second one at its address.
+//! that cannot see is this machine: the stack it runs, the overlay the operator merged
+//! over it, the sites they added to the proxy by hand, and the ports other plugins
+//! already publish. Each is a collision of the same kind, and each lands the same way —
+//! a service Compose merges into the operator's own and runs with whatever that one
+//! holds, a port two services cannot both bind, a site the proxy will not start beside a
+//! second one at its address.
 //!
 //! **Refused, never renamed or narrowed**, for the reason the manifest's own refusals
 //! are: a plugin installed under a name or a port its manifest does not carry is a
 //! plugin nothing it declares is about any more. And refused with every clash at once,
 //! so an operator does not find them one install at a time.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+use lemonfiber_manifest::Manifest;
 
 use crate::app::Ctx;
 use crate::error::codes::plugin::OCCUPIED;
 use crate::error::{Problem, Remedy, State};
+use crate::model::MovedReport;
 use crate::plugin::Installed;
-use crate::stack::declared::{self, Declared, Published};
+use crate::project::overlay::{self, Declared, Published};
 
 /// Refuse a plugin any of whose services would take a name, a port or a label that the
 /// stack as this machine runs it, another installed plugin, or the live proxy already
@@ -30,7 +33,8 @@ use crate::stack::declared::{self, Declared, Published};
 ///
 /// # Errors
 ///
-/// Where anything is taken, naming each clash and what holds it.
+/// Where the stack's manifest cannot be read, or anything is taken, naming each clash
+/// and what holds it.
 pub(crate) fn unoccupied(
     ctx: &Ctx,
     would: &Installed,
@@ -43,9 +47,18 @@ pub(crate) fn unoccupied(
         .as_deref()
         .and_then(|file| crate::config::store::read(file).ok())
         .unwrap_or_default();
-    let (services, ports) = declared::read(&ctx.stack.run_from(&ctx.settings.overlays), &|name| {
-        settings.get(name).map(str::to_owned)
-    });
+    let manifest = super::writing::stack_manifest(ctx)?;
+    let (mut services, mut ports) = run(&manifest, &crate::app::beside::moved(&settings));
+    let overlays: Vec<(PathBuf, String)> = ctx
+        .settings
+        .overlays
+        .iter()
+        .filter_map(|path| Some((path.clone(), std::fs::read_to_string(path).ok()?)))
+        .collect();
+    let (theirs, their_ports) =
+        overlay::read(&overlays, &|name| settings.get(name).map(str::to_owned));
+    services.extend(theirs);
+    ports.extend(their_ports);
     let proxy = std::fs::read_to_string(stack.join(crate::plugin::PROXY)).unwrap_or_default();
     let mut clashes = named(would, &services);
     clashes.extend(bound(would, &ports, installed));
@@ -54,6 +67,35 @@ pub(crate) fn unoccupied(
         return Ok(());
     }
     Err(Box::new(occupied(&would.plugin, &clashes)))
+}
+
+/// Every service the stack runs, and every host port its project publishes for it,
+/// where standing beside moved it to where `moved` says.
+fn run(manifest: &Manifest, moved: &[MovedReport]) -> (Vec<Declared>, Vec<Published>) {
+    let file = PathBuf::from(lemonfiber_manifest::assembly::ROOT);
+    let mut services = Vec::new();
+    let mut ports = Vec::new();
+    for service in crate::project::written(manifest) {
+        services.push(Declared {
+            service: service.id.clone(),
+            file: file.clone(),
+        });
+        let published = service
+            .port
+            .into_iter()
+            .chain(service.publish.iter().map(|further| further.port));
+        for port in published {
+            ports.push(Published {
+                port: moved
+                    .iter()
+                    .find(|one| one.service == service.id && one.from == port)
+                    .map_or(port, |one| one.to),
+                service: service.id.clone(),
+                file: file.clone(),
+            });
+        }
+    }
+    (services, ports)
 }
 
 /// Every service of the plugin's that the stack as this machine runs it already

@@ -100,4 +100,17 @@ codes! {
             then remove the LEMONFIBER_OVERLAY line from the settings file. The message names \
             both paths.",
     }
+    /// Raised where the project directory still holds a Compose file of the stack's own
+    /// that lemonfiber no longer reads.
+    COMPOSE_RETIRED = "CONFIG-10" {
+        severity: Warning,
+        status: 500,
+        since: "0.18.0",
+        meaning: "lemonfiber runs the one project it generates from the stack's manifest and \
+            reads none of the stack's own Compose files. A file named here is one somebody \
+            changed, or one a stack of its own still carries, and whatever it says is not \
+            applied.",
+        remedy: "Move whatever the file changed into overlay.yml in lemonfiber's configuration \
+            directory, then delete the file. The message names each one.",
+    }
 }

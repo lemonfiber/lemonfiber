@@ -2,7 +2,7 @@
 # status_check.py and the release gate.
 
 requirement = [
-  { id = "F1-R1", state = "partial" },
+  { id = "F1-R1", state = "done", evidence = ["crates/lemonfiber-core/src/app/project/profiled.rs", "crates/lemonfiber-core/src/project/entry.rs", "crates/lemonfiber-core/tests/integration/plain_compose.rs"] },
   { id = "F1-R2", state = "done", evidence = ["crates/lemonfiber-core/src/app/rehearsal.rs", "crates/lemonfiber-core/src/app.rs", "crates/lemonfiber-core/src/seed.rs", "crates/lemonfiber-core/src/repair/run.rs", "crates/lemonfiber/tests/integration/a_rehearsal_changes_nothing.rs"] },
   { id = "F1-R3", state = "done", evidence = ["crates/lemonfiber-core/src/stack.rs"] },
   { id = "F1-R4", state = "done", evidence = ["crates/lemonfiber-core/src/materialised.rs", "crates/lemonfiber-core/src/app/apply.rs", "crates/lemonfiber-core/src/config/store.rs", "crates/lemonfiber-core/src/reconfigure/review.rs"] },
@@ -14,6 +14,6 @@ requirement = [
   { id = "F1-R10", state = "done", evidence = ["crates/lemonfiber-core/src/docker.rs", "crates/lemonfiber-core/tests/integration/a_service_this_build_has_never_heard_of.rs"] },
   { id = "F1-R11", state = "done", evidence = ["crates/lemonfiber-core/src/outbound/theirs.rs", "crates/lemonfiber-core/src/app/targets/curators.rs", "crates/lemonfiber-core/src/unsupported.rs"] },
   { id = "F1-R12", state = "partial", evidence = ["crates/lemonfiber/src/render/plugin.rs", "crates/lemonfiber-core/src/model.rs", "contract/web-api-surface/index.json", "crates/lemonfiber-api/src/contract/stability.rs"] },
-  { id = "F1-R13", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/storage/mounts.rs", "crates/lemonfiber-core/src/stack.rs", "crates/lemonfiber-core/src/stack/mounts.rs", "crates/lemonfiber-core/src/doctor/acknowledged.rs", "crates/lemonfiber-core/tests/fixtures/split-mounts"] },
+  { id = "F1-R13", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/storage/mounts.rs", "crates/lemonfiber-core/src/stack.rs", "crates/lemonfiber-core/src/project/overlay.rs", "crates/lemonfiber-core/src/doctor/acknowledged.rs", "crates/lemonfiber-core/src/project/overlay/tests.rs"] },
   { id = "F1-R14", state = "done", evidence = ["crates/lemonfiber-core/src/migration/standing.rs", "crates/lemonfiber-core/src/app/preflight.rs", "crates/lemonfiber-core/src/network.rs"] },
 ]

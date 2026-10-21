@@ -91,3 +91,17 @@ fn every_kind_with_an_inverse_is_recorded_the_other_way_round_and_the_rest_are_n
         None
     );
 }
+
+#[test]
+fn moving_state_back_is_recorded_as_the_move_the_other_way() {
+    assert_eq!(
+        inverted(&Kind::Moved {
+            from: "/stack/config/jellyfin/cache".to_owned(),
+            to: "/stack/mounts/jellyfin/cache".to_owned(),
+        }),
+        Some(Kind::Moved {
+            from: "/stack/mounts/jellyfin/cache".to_owned(),
+            to: "/stack/config/jellyfin/cache".to_owned(),
+        })
+    );
+}

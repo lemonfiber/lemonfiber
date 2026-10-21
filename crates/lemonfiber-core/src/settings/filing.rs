@@ -17,6 +17,19 @@ struct Filing {
     value: String,
 }
 
+/// File what the operator's environment file and the stack's hold into the stores, saying
+/// so where the stack's could not be filed yet.
+pub(crate) async fn everything(ctx: &Ctx) {
+    filed(ctx);
+    if let Err(failure) = stack(ctx) {
+        ctx.narrator
+            .say(&format!(
+                "the stack's settings could not be moved into lemonfiber's own stores yet: {failure}"
+            ))
+            .await;
+    }
+}
+
 pub(crate) fn filed(ctx: &Ctx) {
     if ctx.dry_run {
         return;

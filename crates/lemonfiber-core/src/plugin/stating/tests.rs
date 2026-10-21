@@ -75,6 +75,11 @@ fn planned() -> Vec<crate::plugin::Write> {
                 &Installed::of(&read),
                 stack(),
                 &crate::plugin::Reading::bare(),
+                Some(crate::plugin::Write::project(
+                    stack().join(crate::project::FILE),
+                    None,
+                    String::new(),
+                )),
             )
         })
         .unwrap_or_default()
@@ -95,7 +100,7 @@ fn every_write_is_stated_as_a_path_and_what_goes_at_it() {
                 puts: Puts::Directory,
             },
             Changing {
-                path: "/opt/lemonfiber/stack/compose/plugins/komga.yml".to_owned(),
+                path: "/opt/lemonfiber/stack/compose.generated.yml".to_owned(),
                 puts: Puts::Document,
             },
             Changing {
@@ -126,6 +131,11 @@ fn an_adapter_service_states_its_key_by_path() {
                 &Installed::of(&read),
                 stack(),
                 &crate::plugin::Reading::bare(),
+                Some(crate::plugin::Write::project(
+                    stack().join(crate::project::FILE),
+                    None,
+                    String::new(),
+                )),
             )
         })
         .unwrap_or_default();

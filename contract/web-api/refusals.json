@@ -769,6 +769,11 @@
     "status": 500,
     "description": "Raised when a manifest's files are not laid out as the contract says."
   },
+  "STACK-11": {
+    "name": "PROJECT_EDITED",
+    "status": 409,
+    "description": "Raised when a change would write over a generated project the operator has edited."
+  },
   "STACK-2": {
     "name": "STACK_UNUSABLE",
     "status": 500,

@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use crate::docker::{Engine, Images, Locations};
+use crate::docker::{Engine, EngineVolumes, Images, Locations, Networks};
 use crate::filesystem::{Confined, Eraser, Volume};
 use crate::hosting::Host;
 use crate::http::Http;
@@ -43,6 +43,12 @@ pub struct Seams {
     pub http: Arc<dyn Http>,
     /// How the engine is asked what it has pulled.
     pub images: Arc<dyn Images>,
+    /// How the engine is asked which networks the project holds, and told to take one
+    /// away.
+    pub networks: Arc<dyn Networks>,
+    /// How the engine is asked which volumes it keeps for a service, and how one is
+    /// copied out.
+    pub engine_volumes: Arc<dyn EngineVolumes>,
     /// How the engine is asked whether a path is on the machine it runs on.
     ///
     /// Apart from the engine for the reason the image listing is: one guard asks it

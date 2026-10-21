@@ -27,6 +27,25 @@ fn a_file_written_over_reads_as_which_file_it_was() {
     );
 }
 
+/// State moved into a mount tree, and a volume copied into one, read as what they were.
+#[test]
+fn a_move_and_a_copy_read_as_where_each_went() {
+    assert_eq!(
+        did(&crate::journal::Kind::Moved {
+            from: "/stack/config/jellyfin/cache".to_owned(),
+            to: "/stack/mounts/jellyfin/cache".to_owned(),
+        }),
+        "moved /stack/config/jellyfin/cache to /stack/mounts/jellyfin/cache"
+    );
+    assert_eq!(
+        did(&crate::journal::Kind::Copied {
+            volume: "lemonfiber_caddy_data".to_owned(),
+            to: "/stack/mounts/caddy/data".to_owned(),
+        }),
+        "copied the volume lemonfiber_caddy_data to /stack/mounts/caddy/data"
+    );
+}
+
 /// Every stamp this build writes goes out as it was written.
 #[test]
 fn a_stamp_of_seconds_goes_out_as_written() {

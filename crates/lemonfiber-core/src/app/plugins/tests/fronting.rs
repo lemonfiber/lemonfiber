@@ -12,12 +12,11 @@ async fn removing_a_plugin_puts_back_what_installing_it_wrote() {
         counted(installing(&ctx, &source("removing", PROVING)).await),
         Some(1)
     );
-    let document = stack_of(&ctx).join("compose/plugins/komga.yml");
-    assert!(document.is_file(), "it was installed");
+    assert!(!document(&ctx).is_empty(), "it was installed");
 
     let gone = removal(removing(&ctx, "komga").await);
     assert_eq!(gone.as_ref().map(|one| one.removed), Some(true));
-    assert!(!document.exists(), "the document it wrote is gone");
+    assert!(document(&ctx).is_empty(), "its entry left the project");
     assert!(
         !stack_of(&ctx).join("config/komga").exists(),
         "and so is the directory"
