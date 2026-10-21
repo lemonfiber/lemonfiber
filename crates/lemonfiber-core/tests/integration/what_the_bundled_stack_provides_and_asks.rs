@@ -84,6 +84,7 @@ fn every_service_whose_panel_reads_it_asks_the_dashboard() {
         once(&[
             "audiobookshelf",
             "bazarr",
+            "jellyfin",
             "lidarr",
             "navidrome",
             "prowlarr",

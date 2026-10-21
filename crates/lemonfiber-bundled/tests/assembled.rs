@@ -21,7 +21,7 @@ const NOT_ASSEMBLED: [&str; 1] = ["jellyfin"];
 /// the media stack's own service does not declare provides and claims it in its plugin;
 /// the proxy keeps its configuration read-only at `/etc/caddy` and its state beside it,
 /// as its own user; and the gate says the port it listens on.
-const DIFFERING: [(&str, &str); 28] = [
+const DIFFERING: [(&str, &str); 26] = [
     ("caddy", "claim"),
     ("caddy", "config_path"),
     ("caddy", "config_ro"),
@@ -39,8 +39,6 @@ const DIFFERING: [(&str, &str); 28] = [
     ("door", "image"),
     ("door", "provides"),
     ("door", "tag"),
-    ("homepage", "claim"),
-    ("homepage", "provides"),
     ("recyclarr", "claim"),
     ("recyclarr", "provides"),
     ("request-gate", "claim"),

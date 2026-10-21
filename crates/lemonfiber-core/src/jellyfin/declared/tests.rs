@@ -28,7 +28,7 @@ fn every_byte_route_is_matched_at_the_root_and_under_both_prefixes_without_regar
     assert_eq!(
         patterns,
         [
-            "(?i)^(?:/emby|/mediabrowser)?/Videos/(?P<item>[^/]+)/Trickplay/[^/]+/tiles\\.m3u8/?$",
+            "(?i)^(?:/emby|/mediabrowser)?/Videos/(?P<item>[^/]+)/Trickplay(?:/|$)",
             "(?i)^(?:/emby|/mediabrowser)?/(?:Videos|Audio|LiveTv/LiveStreamFiles|LiveTv/LiveRecordings)/(?P<item>[^/]+)(?:/|$)",
             "(?i)^(?:/emby|/mediabrowser)?/Items/(?P<item>[^/]+)/(?:Images|Download|File)(?:/|$)",
         ]
@@ -62,7 +62,7 @@ fn only_the_two_routes_under_videos_that_name_no_item_pass_unasked() {
 }
 
 #[test]
-fn every_byte_route_refuses_another_item_and_a_trickplay_playlist_asks_about_its_source() {
+fn every_byte_route_refuses_another_item_and_every_trickplay_route_asks_about_its_source() {
     let naming: Vec<Vec<(String, Held)>> = declared()
         .bytes
         .into_iter()

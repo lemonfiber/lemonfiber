@@ -4,8 +4,8 @@
 //! about the item first, as the member's own token sees it. It refuses outright what no
 //! question about an item covers: a picture found by a name and the splash screen. On a
 //! byte route it refuses a query's `itemId` and `LiveStreamId`, under which Jellyfin
-//! serves another item than the path's, and on a trickplay playlist it asks about the
-//! item `MediaSourceId` names as well. Jellyfin serves every route at its root and under
+//! serves another item than the path's, and on a trickplay playlist or tile it asks about
+//! the item `MediaSourceId` names as well. Jellyfin serves every route at its root and under
 //! `/emby` and `/mediabrowser` alike.
 
 use async_trait::async_trait;
@@ -103,7 +103,7 @@ pub(crate) fn declared() -> Declared {
     Declared {
         bytes: vec![
             byte_path(
-                &format!("Videos/{ITEM_SEGMENT}/Trickplay/[^/]+/tiles\\.m3u8/?$"),
+                &format!("Videos/{ITEM_SEGMENT}/Trickplay(?:/|$)"),
                 Vec::new(),
                 trickplay,
             ),
