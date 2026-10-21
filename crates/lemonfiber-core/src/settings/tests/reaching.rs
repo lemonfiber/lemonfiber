@@ -38,6 +38,28 @@ fn reader() -> Installed {
     reader
 }
 
+/// The reader, under the name of a plugin the machine trusts, so its files are written.
+fn trusted_reader() -> Installed {
+    let mut embedded = reader();
+    if let Some(trusted) = crate::plugin::first_party::EMBEDDED.first() {
+        trusted.plugin.clone_into(&mut embedded.plugin);
+        trusted.manifest.clone_into(&mut embedded.manifest);
+        trusted.tree.clone_into(&mut embedded.tree);
+    }
+    embedded
+}
+
+/// `installed` recorded as the one plugin installed on `machine`.
+fn registered(machine: &Machine, installed: Installed) {
+    let mut register = crate::plugin::Register::empty();
+    assert!(register.record(installed).is_ok());
+    assert!(std::fs::write(
+        machine.env.with_file_name(crate::config::paths::PLUGINS),
+        serde_json::to_string(&register).unwrap_or_default()
+    )
+    .is_ok());
+}
+
 fn crossed(name: &str, engine: Reporting) -> (Machine, [Installed; 1]) {
     let machine = machine(name, engine);
     assert!(store::set(&machine.env, CROSSING, "replacement-key").is_ok());
@@ -243,19 +265,7 @@ async fn a_secret_no_installed_plugin_declares_is_read_from_the_store() {
 #[tokio::test]
 async fn a_crossing_key_set_by_hand_rewrites_every_file_that_reads_it() {
     let machine = machine("set-by-hand", Reporting::absent());
-    let mut embedded = reader();
-    if let Some(trusted) = crate::plugin::first_party::EMBEDDED.first() {
-        trusted.plugin.clone_into(&mut embedded.plugin);
-        trusted.manifest.clone_into(&mut embedded.manifest);
-        trusted.tree.clone_into(&mut embedded.tree);
-    }
-    let mut register = crate::plugin::Register::empty();
-    assert!(register.record(embedded).is_ok());
-    assert!(std::fs::write(
-        machine.env.with_file_name(crate::config::paths::PLUGINS),
-        serde_json::to_string(&register).unwrap_or_default()
-    )
-    .is_ok());
+    registered(&machine, trusted_reader());
     let file = machine.env.with_file_name("env").join("reader.env");
     assert!(store::write(&file, "SONARR_KEY=the-replaced-key\n").is_ok());
 
@@ -283,15 +293,10 @@ async fn a_secret_put_back_by_an_undo_reaches_every_file_that_reads_it() {
             secret: "token".to_owned(),
         }),
     );
-    let mut register = crate::plugin::Register::empty();
-    assert!(register
-        .record(crate::test_support::an_installed("komga", vec![holder]))
-        .is_ok());
-    assert!(std::fs::write(
-        machine.env.with_file_name(crate::config::paths::PLUGINS),
-        serde_json::to_string(&register).unwrap_or_default()
-    )
-    .is_ok());
+    registered(
+        &machine,
+        crate::test_support::an_installed("komga", vec![holder]),
+    );
     let secrets = crate::settings::secrets_at(&machine.ctx).unwrap_or_default();
     let keeping = [crate::settings::Keeping {
         name: "komga:token",
@@ -334,15 +339,10 @@ async fn an_entered_secret_and_its_undo_each_reach_the_file_that_reads_it() {
             secret: "wireguard-key".to_owned(),
         }),
     );
-    let mut register = crate::plugin::Register::empty();
-    assert!(register
-        .record(crate::test_support::an_installed("gluetun", vec![holder]))
-        .is_ok());
-    assert!(std::fs::write(
-        machine.env.with_file_name(crate::config::paths::PLUGINS),
-        serde_json::to_string(&register).unwrap_or_default()
-    )
-    .is_ok());
+    registered(
+        &machine,
+        crate::test_support::an_installed("gluetun", vec![holder]),
+    );
     let file = machine.env.with_file_name("env").join("holder.env");
     let holds = |value: &str| {
         std::fs::read_to_string(&file).is_ok_and(|text| text == format!("WG={value}\n"))
@@ -374,4 +374,32 @@ async fn an_entered_secret_and_its_undo_each_reach_the_file_that_reads_it() {
 
     assert!(undone.is_ok(), "{undone:?}");
     assert!(holds("recipe-key"));
+}
+
+/// A crossing key an undo puts back is written into every file that reads it, so no reader
+/// keeps the value the undone change gave it.
+#[tokio::test]
+async fn a_crossing_key_put_back_by_an_undo_reaches_every_file_that_reads_it() {
+    let machine = machine("restored", Reporting::absent());
+    registered(&machine, trusted_reader());
+    assert!(store::set(&machine.env, CROSSING, "put-back").is_ok());
+    let file = machine.env.with_file_name("env").join("reader.env");
+    assert!(store::write(&file, "SONARR_KEY=undone\n").is_ok());
+    let carried = crate::app::recover::Carried {
+        done: vec![crate::journal::Undo {
+            target: CROSSING.to_owned(),
+            action: crate::journal::Action::Restore {
+                key: CROSSING.to_owned(),
+                value: Some("put-back".to_owned()),
+                wrote: "undone".to_owned(),
+            },
+        }],
+        ..crate::app::recover::Carried::default()
+    };
+
+    let reheld = crate::app::recover::reheld(&machine.ctx, &carried);
+
+    assert!(reheld.is_ok(), "{reheld:?}");
+    assert!(std::fs::read_to_string(&file)
+        .is_ok_and(|text| text.contains("SONARR_KEY=put-back") && !text.contains("undone")));
 }

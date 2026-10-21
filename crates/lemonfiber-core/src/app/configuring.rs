@@ -243,11 +243,11 @@ async fn applying(
             return Err(Box::new(err.problem()));
         }
         file.set(key, value);
-        reread(ctx, key)?;
         // Recorded as what lemonfiber last wrote here, so the next change can tell an
         // operator's edit from lemonfiber's own value rather than overwriting one
         // without saying so.
         super::reconfiguring::record(ctx, key, value);
+        reread(ctx, key)?;
     }
     Ok(Proposal {
         review,

@@ -140,7 +140,16 @@ pub fn undo(
     env_file: &Path,
     already: Vec<String>,
 ) -> Result<(), Box<Problem>> {
-    let carried = carrying_out(confined, undos, env_file, already)?;
+    refused_over(&carrying_out(confined, undos, env_file, already)?)
+}
+
+/// What a reversal came to, refused over the first change it left standing.
+///
+/// # Errors
+///
+/// Returns the [`Problem`] naming the changes of the first kind left standing: the
+/// unopened, the operator's, the still holding, the unkept, then the beyond reach.
+pub(crate) fn refused_over(carried: &Carried) -> Result<(), Box<Problem>> {
     if !carried.unread.is_empty() {
         return Err(Box::new(not_opened(&carried.unread)));
     }
@@ -227,18 +236,19 @@ pub(crate) fn carrying_out(
     Ok(carried)
 }
 
-/// Every secrets file that reads a secret `carried` put back, written again with the
-/// value it holds now.
+/// Every secrets file that reads a secret or setting `carried` put back, written again
+/// with the value it holds now.
 ///
 /// # Errors
 ///
 /// Returns a [`Problem`] for a store that cannot be read or a file that cannot be written.
-pub(crate) fn reheld(ctx: &super::Ctx, carried: &Carried) -> Result<(), Box<Problem>> {
-    for name in carried.done.iter().filter_map(|undo| match &undo.action {
-        Action::Rehold { name, .. } => Some(name),
+pub(crate) fn reheld(ctx: &Ctx, carried: &Carried) -> Result<(), Box<Problem>> {
+    for holding in carried.done.iter().filter_map(|undo| match &undo.action {
+        Action::Rehold { name, .. } => Some(crate::plugin::Holding::Store(name.clone())),
+        Action::Restore { key, .. } => Some(crate::settings::files::holding_of(key)),
         _ => None,
     }) {
-        crate::settings::files::reread_now(ctx, &crate::plugin::Holding::Store(name.clone()))
+        crate::settings::files::reread_now(ctx, &holding)
             .map_err(|err| Box::new(crate::error::Diagnose::problem(&err)))?;
     }
     Ok(())
