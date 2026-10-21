@@ -270,6 +270,7 @@ fn an_update(coming: &[&str]) -> Outcome {
         changelog: lemonfiber_core::changelog::Notes::unread(),
         offer: String::new(),
         unvetted: None,
+        moves: Vec::new(),
     })
 }
 

@@ -59,6 +59,8 @@ mod standing;
 mod fetching;
 // Installing a plugin the bundle installs: its tree read from this build, nothing fetched.
 mod embedding;
+// The parts the bundle installs that this stack still runs as its own service.
+pub(crate) mod moving_in;
 // Git as it is run against a stranger's repository: one configuration, one deadline.
 pub(crate) mod git;
 // Where a git source may be fetched from: over https, from a host out on the internet.
@@ -91,6 +93,7 @@ mod updating;
 pub(crate) mod writing;
 
 pub use listing::{installed, recorded};
+pub use moving_in::MoveOffered;
 pub use offering::{Consent, Inputs};
 pub use refusals::REFUSALS;
 

@@ -397,6 +397,7 @@ fn nothing_started(reason: &str) -> LifecycleReport {
         held: Some(reason.to_owned()),
         offer: None,
         unvetted: None,
+        moves: Vec::new(),
     }
 }
 

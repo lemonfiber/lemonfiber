@@ -101,6 +101,10 @@ pub struct Report {
     /// over the project this run would start, and held to nothing lemonfiber vets.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unvetted: Option<crate::model::Unvetted>,
+    /// Each part this release installs as a plugin that the stack still runs as its own
+    /// service: a move in place on offer, which an update never takes.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub moves: Vec<crate::app::plugins::MoveOffered>,
 }
 
 /// What the release carrying this build changed, as every update report says it.
@@ -129,6 +133,7 @@ impl Report {
             changelog: brought(),
             offer: String::new(),
             unvetted: None,
+            moves: Vec::new(),
         }
     }
 }
@@ -171,6 +176,7 @@ pub(crate) async fn update(ctx: &Ctx, asked: Asked) -> Result<Report, Box<Proble
     report.map(|report| Report {
         offer,
         unvetted: crate::overlay::unvetted(ctx),
+        moves: crate::app::plugins::moving_in::on_offer(ctx, &manifest),
         ..report
     })
 }

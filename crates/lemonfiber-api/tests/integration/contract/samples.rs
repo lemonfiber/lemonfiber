@@ -66,6 +66,7 @@ fn running() -> Vec<Outcome> {
             held: None,
             offer: None,
             unvetted: None,
+            moves: Vec::new(),
         }),
         Outcome::Config(ConfigReport {
             settings: Vec::new(),

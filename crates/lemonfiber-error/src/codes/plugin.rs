@@ -459,4 +459,17 @@ codes! {
         remedy: "Prove the plugin again with lemonfiber plugin prove, and take what it says up \
             with whoever published the plugin.",
     }
+    /// Raised when a part this build installs as a plugin still runs as the stack's own
+    /// service, so moving it in place is on offer.
+    MOVE_OFFERED = "PLUGIN-42" {
+        severity: Warning,
+        status: 409,
+        since: "0.18.0",
+        meaning: "This release runs a part of the stack as a plugin, and this machine still runs \
+            it as the stack's own service. Moving it in place keeps its container name, its \
+            configuration, its data and its credentials; until then it keeps running as it \
+            is.",
+        remedy: "Read the move with lemonfiber plugin install and the part's name, and answer \
+            the name it prints.",
+    }
 }
