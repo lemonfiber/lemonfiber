@@ -524,22 +524,30 @@ async fn an_install_whose_source_was_rewritten_after_the_reading_is_refused() {
     assert_eq!(made_paths(&ctx), Vec::<String>::new());
 }
 
-/// A service published on a port a forked stack's Compose files publish is refused
-/// before anything is written, naming what holds it: no service the stack declares
-/// publishes the port, and the stack's Compose files are where it is read from.
+/// A service published on a port a forked stack's own service publishes is refused
+/// before anything is written, naming what holds it.
 #[tokio::test]
-async fn a_port_the_stacks_compose_files_publish_is_refused_before_anything_is_written() {
+async fn a_port_the_stacks_model_publishes_is_refused_before_anything_is_written() {
     let mut ctx = ctx("occupied-port");
     let fork = lemonfiber_fixtures::scratch::Scratch::named("occupied-port-fork").kept();
     let _ = std::fs::remove_dir_all(&fork);
-    lemonfiber_fixtures::stack::manifest_into(&fork);
-    assert!(std::fs::create_dir_all(fork.join("compose")).is_ok());
-    assert!(std::fs::write(
-        fork.join("compose/theirs.yml"),
-        "services:\n  theirs:\n    image: theirs\n    ports: [\"25600:80\"]\n",
-    )
-    .is_ok());
+    let mut stack = lemonfiber_fixtures::stack::carried();
+    stack
+        .get_mut("service")
+        .and_then(toml::Value::as_array_mut)
+        .into_iter()
+        .flatten()
+        .filter_map(toml::Value::as_table_mut)
+        .filter(|service| service.get("id").and_then(toml::Value::as_str) == Some("homepage"))
+        .for_each(|service| {
+            service.insert("port".to_owned(), toml::Value::Integer(25600));
+        });
+    lemonfiber_fixtures::stack::manifest_written(
+        &fork,
+        &toml::to_string(&stack).unwrap_or_default(),
+    );
     ctx.stack = crate::stack::Source::External(Box::leak(fork.into_boxed_path()));
+    let before = std::fs::read_to_string(project_of(&ctx)).ok();
 
     let refused = installing(&ctx, &source("occupied-port", MANIFEST))
         .await
@@ -552,9 +560,9 @@ async fn a_port_the_stacks_compose_files_publish_is_refused_before_anything_is_w
     assert!(refused
         .as_ref()
         .and_then(|one| one.detail.as_deref())
-        .is_some_and(|detail| detail.contains("25600") && detail.contains("theirs")));
+        .is_some_and(|detail| detail.contains("25600") && detail.contains("homepage")));
     assert_eq!(counted(reading(&ctx).await), Some(0));
-    assert!(!stack_of(&ctx).join("compose/plugins/komga.yml").exists());
+    assert_eq!(std::fs::read_to_string(project_of(&ctx)).ok(), before);
 }
 
 /// A port the overlay publishes through a setting is read as the setting says, so a

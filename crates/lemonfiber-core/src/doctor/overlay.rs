@@ -1,10 +1,12 @@
-//! The operator's overlay, named as unvetted, and the retired setting that once named one.
+//! The operator's overlay, named as unvetted, the retired setting that once named one,
+//! and the stack's own Compose files still in the project directory.
 //!
 //! The overlay is the operator taking responsibility for their own machine, so it is not
 //! a fault. It is named with every service it changes because nothing in it was held to
 //! the model, and a reader of a diagnosis is owed the list of what that covers. A path
-//! still recorded under `LEMONFIBER_OVERLAY` is not read at all, so whatever it changed
-//! is not applied, and the diagnosis says where to move it.
+//! still recorded under `LEMONFIBER_OVERLAY` is not read at all, and neither is a
+//! Compose file of the stack's own beside the project, so whatever either changed is not
+//! applied, and the diagnosis says where to move it.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -14,7 +16,7 @@ use async_trait::async_trait;
 use super::{Category, Check, Finding, Verdict};
 use crate::config::env::EnvFile;
 use crate::config::OVERLAY_KEY;
-use crate::error::codes::config::{OVERLAY_RETIRED, OVERLAY_UNVETTED};
+use crate::error::codes::config::{COMPOSE_RETIRED, OVERLAY_RETIRED, OVERLAY_UNVETTED};
 use crate::error::{Problem, Remedy};
 use crate::model::Unvetted;
 use crate::ports::filesystem::FileSystem;
@@ -25,12 +27,17 @@ const CHECK: &str = "config.overlay";
 /// The name the retired setting's finding is given.
 const RETIRED: &str = "config.overlay-retired";
 
+/// The name the stack's own Compose files' finding is given.
+const STATIC: &str = "config.compose-retired";
+
 /// The overlay as it stands, and a path still recorded under the retired setting.
 pub struct OverlayCheck {
     /// What the overlay and the settings are read through.
     filesystem: Arc<dyn FileSystem>,
     /// lemonfiber's own settings, beside which the overlay is kept, where there are any.
     settings: Option<PathBuf>,
+    /// The directory the project is kept in, where there is one.
+    project: Option<PathBuf>,
 }
 
 impl OverlayCheck {
@@ -41,7 +48,15 @@ impl OverlayCheck {
         Self {
             filesystem,
             settings,
+            project: None,
         }
+    }
+
+    /// The same check, looking for the stack's own Compose files beside the project in
+    /// `project`.
+    #[must_use]
+    pub fn beside(self, project: Option<PathBuf>) -> Self {
+        Self { project, ..self }
     }
 }
 
@@ -68,7 +83,7 @@ async fn ran(check: &OverlayCheck) -> Vec<Finding> {
     let at = crate::overlay::at(settings);
     let overlay = check.filesystem.read(&at).await.map(|text| Unvetted {
         overlay: at.display().to_string(),
-        services: crate::stack::declared::named(&text),
+        services: crate::project::overlay::named(&text),
     });
     let mut found = vec![finding(overlay.as_ref().map_or_else(
         || Verdict::Pass {
@@ -95,7 +110,37 @@ async fn ran(check: &OverlayCheck) -> Vec<Finding> {
                 )
             }),
     );
+    let lying = check
+        .project
+        .as_deref()
+        .map(crate::app::project::still_there)
+        .unwrap_or_default();
+    if !lying.is_empty() {
+        found.push(Finding::in_category(
+            Category::Config,
+            STATIC,
+            "The stack's own Compose files",
+            unread(&lying, &at.display().to_string()),
+        ));
+    }
     found
+}
+
+/// The stack's own Compose files still beside the project, which nothing reads.
+fn unread(files: &[PathBuf], at: &str) -> Verdict {
+    let named: Vec<String> = files.iter().map(|one| one.display().to_string()).collect();
+    Verdict::Warn(
+        Problem::new(
+            COMPOSE_RETIRED,
+            "Compose files beside the project are not read",
+            "lemonfiber runs the project it generates and merges only your overlay over it, so \
+             whatever these files change is not applied.",
+            Remedy::new(format!(
+                "Move whatever they change into {at}, then delete them"
+            )),
+        )
+        .with_detail(named.join("\n")),
+    )
 }
 
 /// The overlay's own finding.

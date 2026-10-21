@@ -1,0 +1,389 @@
+networks:
+  ask__audiobookshelf__dashboard.show__homepage:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.1.48/29
+  ask__audiobookshelf__proxy.front__caddy:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.116.200/29
+  ask__bazarr__dashboard.show__homepage:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.34.184/29
+  ask__bazarr__library.curate__bindery:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.1.64/29
+  ask__bazarr__library.curate__lidarr:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.110.104/29
+  ask__bazarr__library.curate__radarr:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.49.152/29
+  ask__bazarr__library.curate__sonarr:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.126.208/29
+  ask__bindery__download.torrent__gluetun:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.245.104/29
+  ask__bindery__download.usenet__sabnzbd:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.43.88/29
+  ask__bindery__indexer.search__prowlarr:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.111.216/29
+  ask__calibre-web-automated__proxy.front__caddy:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.160.240/29
+  ask__decline__identity.source__jellyfin:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.34.80/29
+  ask__door__media.serve__jellyfin:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.96.16/28
+        ip_range: 10.80.96.24/29
+  ask__door__proxy.front__caddy:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.96.0/28
+        ip_range: 10.80.96.8/29
+  ask__gluetun__dashboard.show__homepage:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.42.216/29
+  ask__homepage__proxy.front__caddy:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.162.192/29
+  ask__jellyfin__dashboard.show__homepage:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.1.144/29
+  ask__lidarr__dashboard.show__homepage:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.221.24/29
+  ask__lidarr__download.torrent__gluetun:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.98.32/29
+  ask__lidarr__download.usenet__sabnzbd:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.240.192/29
+  ask__navidrome__dashboard.show__homepage:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.179.144/29
+  ask__prowlarr__dashboard.show__homepage:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.204.64/29
+  ask__prowlarr__indexer.proxy__flaresolverr:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.52.184/29
+  ask__prowlarr__library.curate__bindery:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.204.200/29
+  ask__prowlarr__library.curate__lidarr:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.131.176/29
+  ask__prowlarr__library.curate__radarr:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.206.192/29
+  ask__prowlarr__library.curate__sonarr:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.56.104/29
+  ask__radarr__dashboard.show__homepage:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.232.136/29
+  ask__radarr__download.torrent__gluetun:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.119.16/29
+  ask__radarr__download.usenet__sabnzbd:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.40.176/29
+  ask__recyclarr__library.curate__bindery:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.148.120/29
+  ask__recyclarr__library.curate__lidarr:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.25.32/29
+  ask__recyclarr__library.curate__radarr:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.245.80/29
+  ask__recyclarr__library.curate__sonarr:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.163.120/29
+  ask__request-gate__identity.source__jellyfin:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.80.136/29
+  ask__request-gate__library.curate__bindery:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.116.8/29
+  ask__request-gate__library.curate__lidarr:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.190.240/29
+  ask__request-gate__library.curate__radarr:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.53.0/29
+  ask__request-gate__library.curate__sonarr:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.140.168/29
+  ask__sabnzbd__dashboard.show__homepage:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.134.56/29
+  ask__seerr__dashboard.show__homepage:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.234.0/29
+  ask__seerr__identity.source__jellyfin:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.89.8/29
+  ask__seerr__library.curate__bindery:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.61.136/29
+  ask__seerr__library.curate__lidarr:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.95.112/29
+  ask__seerr__library.curate__radarr:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.156.128/29
+  ask__seerr__library.curate__sonarr:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.8.40/29
+  ask__seerr__proxy.front__caddy:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.131.152/29
+  ask__seerr__request.gate__request-gate:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.70.208/29
+  ask__sonarr__dashboard.show__homepage:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.92.32/29
+  ask__sonarr__download.torrent__gluetun:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.6.104/29
+  ask__sonarr__download.usenet__sabnzbd:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.220.88/29
+  ask__unpackerr__library.curate__lidarr:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.216.160/29
+  ask__unpackerr__library.curate__radarr:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.191.208/29
+  ask__unpackerr__library.curate__sonarr:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.69.248/29
+  link__decline__jellyfin:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.94.96/29
+  link__recyclarr__radarr:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.122.96/29
+  link__recyclarr__sonarr:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.23.72/29
+  link__unpackerr__lidarr:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.218.80/29
+  link__unpackerr__radarr:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.144.160/29
+  link__unpackerr__sonarr:
+    internal: true
+    ipam:
+      config:
+      - subnet: 10.80.79.136/29
+  own__audiobookshelf:
+    ipam:
+      config:
+      - subnet: 10.80.183.64/29
+  own__bazarr:
+    ipam:
+      config:
+      - subnet: 10.80.6.136/29
+  own__bindery:
+    ipam:
+      config:
+      - subnet: 10.80.138.64/29
+  own__caddy:
+    ipam:
+      config:
+      - subnet: 10.80.28.192/29
+  own__calibre-web-automated:
+    ipam:
+      config:
+      - subnet: 10.80.252.40/29
+  own__decline:
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: 'false'
+    ipam:
+      config:
+      - subnet: 10.80.240.8/29
+  own__door:
+    ipam:
+      config:
+      - subnet: 10.80.25.136/29
+  own__flaresolverr:
+    ipam:
+      config:
+      - subnet: 10.80.12.176/29
+  own__gluetun:
+    ipam:
+      config:
+      - subnet: 10.80.82.152/29
+  own__homepage:
+    ipam:
+      config:
+      - subnet: 10.80.205.104/29
+  own__jellyfin:
+    ipam:
+      config:
+      - subnet: 10.80.157.160/29
+  own__lidarr:
+    ipam:
+      config:
+      - subnet: 10.80.251.104/29
+  own__navidrome:
+    ipam:
+      config:
+      - subnet: 10.80.227.48/29
+  own__nzbhydra2:
+    ipam:
+      config:
+      - subnet: 10.80.32.248/29
+  own__prowlarr:
+    ipam:
+      config:
+      - subnet: 10.80.153.144/29
+  own__radarr:
+    ipam:
+      config:
+      - subnet: 10.80.206.152/29
+  own__recyclarr:
+    ipam:
+      config:
+      - subnet: 10.80.60.176/29
+  own__sabnzbd:
+    ipam:
+      config:
+      - subnet: 10.80.220.96/29
+  own__seerr:
+    ipam:
+      config:
+      - subnet: 10.80.143.32/29
+  own__sonarr:
+    ipam:
+      config:
+      - subnet: 10.80.211.208/29
+  own__unpackerr:
+    ipam:
+      config:
+      - subnet: 10.80.245.240/29

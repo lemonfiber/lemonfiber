@@ -23,13 +23,12 @@ use crate::ports::docker::Target;
 use crate::ports::process::Failure;
 use crate::ports::Runner;
 
-/// The oldest Compose that can run the stack.
+/// The oldest Compose lemonfiber drives the stack with.
 ///
 /// The driver speaks to the v2 plugin — `docker compose`, one word apart from
 /// the end-of-life `docker-compose` v1, which is a different program with
-/// different profile semantics. Within v2, the stack's `compose.yml` assembles
-/// its fragments with a top-level `include:`, which Compose reads from 2.20. An
-/// older v2 would pass a floor of 2.0 here and then refuse the very first `up`.
+/// different profile semantics. Within v2, 2.20 is the oldest release lemonfiber
+/// supports, and an older one is refused here rather than at the first `up`.
 const MINIMUM_COMPOSE: (u32, u32, u32) = (2, 20, 0);
 
 /// Whether the machine has an engine to run the stack, and a Compose new enough
@@ -314,7 +313,7 @@ fn compose_outdated(found: &str) -> Problem {
     Problem::new(
         COMPOSE_UNUSABLE,
         format!("Docker Compose {found} is too old to drive this stack"),
-        "The stack's compose file assembles its parts with include:, which older Compose plugins do not read, so nothing in it could be started.",
+        "lemonfiber drives the stack with Docker Compose 2.20 or newer, and does not run an older plugin.",
         Remedy::new(format!("Update the Docker Compose plugin to {major}.{minor}.{patch} or newer"))
             .with_detail("https://docs.docker.com/compose/install/"),
     )

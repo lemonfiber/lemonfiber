@@ -25,7 +25,7 @@ async fn standing_beside_unconfirmed_says_where_it_would_listen_and_writes_nothi
 }
 
 #[tokio::test]
-async fn confirming_records_where_each_service_listens_and_writes_the_layered_file() {
+async fn confirming_records_where_each_service_listens_in_the_settings_and_nothing_else() {
     let env = scratch("beside-applied");
     let images = Pulled::holding(vec![Pulled::image(
         "lscr.io/linuxserver/sonarr:4.0.15",
@@ -44,22 +44,19 @@ async fn confirming_records_where_each_service_listens_and_writes_the_layered_fi
         "{found:?}"
     );
 
-    // Where it says it wrote, and what actually went through the filesystem, are two
+    // Where it says it recorded, and what actually went through the filesystem, are two
     // facts; a report claiming a file it never wrote is the bug worth catching.
+    assert_eq!(
+        found.and_then(|read| read.written),
+        Some(env.display().to_string())
+    );
     let recorded = std::fs::read_to_string(&env).unwrap_or_default();
     assert!(
         recorded.contains("LEMONFIBER_BESIDE=") && recorded.contains("sonarr:8989="),
         "{recorded}"
     );
     assert!(!recorded.contains("LEMONFIBER_OVERLAY"), "{recorded}");
-
-    let wrote = files.wrote();
-    let layered = wrote
-        .first()
-        .map(|(_, contents)| contents.clone())
-        .unwrap_or_default();
-    assert!(layered.starts_with("services:"), "{layered}");
-    assert!(layered.contains("sonarr:"), "{layered}");
+    assert!(files.wrote().is_empty(), "the project carries the moves");
 }
 
 /// A machine it could not read is one whose free ports it would be guessing at.

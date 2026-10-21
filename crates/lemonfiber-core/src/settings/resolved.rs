@@ -1,6 +1,5 @@
 use std::path::{Path, PathBuf};
 
-use lemonfiber_manifest::container::UrlOf;
 use lemonfiber_manifest::Manifest;
 
 use super::recorded::Recorded;
@@ -16,6 +15,9 @@ pub(crate) struct Resolved {
     files: Option<PathBuf>,
     fillers: Option<Fillers>,
     nfs: Option<crate::config::storage::Export>,
+    render_group: Option<u32>,
+    moved: Vec<crate::model::MovedReport>,
+    name: String,
 }
 
 impl Resolved {
@@ -34,9 +36,15 @@ impl Resolved {
         installed: &[Installed],
         trusted: &[crate::plugin::first_party::FirstParty],
     ) -> Self {
+        let recorded = Recorded::of(ctx);
         Self {
-            recorded: Recorded::of(ctx),
+            render_group: recorded
+                .line(crate::config::RENDER_GROUP_KEY)
+                .and_then(|group| group.trim().parse().ok()),
+            moved: crate::app::beside::moved(recorded.env()),
+            recorded,
             changing: None,
+            name: ctx.settings.project.clone(),
             files: files_of(ctx),
             nfs: ctx.settings.nfs.clone(),
             fillers: manifest.map(|manifest| {
@@ -86,24 +94,45 @@ impl Resolved {
         )
     }
 
-    pub(crate) fn reading<T>(
-        &self,
-        address: &dyn Fn(&str, &UrlOf) -> Option<String>,
-        write: impl FnOnce(&Reading<'_>) -> T,
-    ) -> T {
-        let setting = |name: &str| self.setting(name);
+    pub(crate) fn reading<T>(&self, write: impl FnOnce(&Reading<'_>) -> T) -> T {
         let secrets_file = |service: &str| self.secrets_file(service);
         let crossing = |plugin: &str, of: &str| self.crossing(plugin, of);
         write(&Reading {
-            setting: &setting,
             secrets_file: &secrets_file,
             crossing: &crossing,
-            address,
+        })
+    }
+
+    pub(crate) fn project<T>(&self, write: impl FnOnce(&crate::project::Reading<'_>) -> T) -> T {
+        let setting = |_: &str, name: &str| self.setting(name);
+        let secrets_file = |service: &str| self.secrets_file(service);
+        let operator = |key: &str| {
+            OPERATOR_KEYS
+                .contains(&key)
+                .then(|| self.recorded.line(key).map(str::to_owned))
+                .flatten()
+        };
+        write(&crate::project::Reading {
+            setting: &setting,
+            secrets_file: &secrets_file,
+            render_group: self.render_group,
             nfs: self.nfs.as_ref(),
-            ..Reading::bare()
+            moved: &self.moved,
+            name: &self.name,
+            operator: &operator,
         })
     }
 }
+
+/// The variables of the operator's environment file the project is written with: none of
+/// them a secret.
+const OPERATOR_KEYS: [&str; 5] = [
+    crate::config::PUID_KEY,
+    crate::config::PGID_KEY,
+    crate::config::ZONE_KEY,
+    crate::config::DATA_ROOT_KEY,
+    crate::config::LAN_BIND_KEY,
+];
 
 pub(super) fn files_of(ctx: &Ctx) -> Option<PathBuf> {
     ctx.settings

@@ -127,10 +127,11 @@ pub(super) fn providing(
 /// the raw free space.
 ///
 /// The mounts are read here rather than inside the check, for the reason every other
-/// reading is: a check holds the seam it looks through, and the stack's own files are
-/// not reached through one. What the storage check does with them is report the half
-/// of the hardlink question its probe cannot see — a fork that splits the data
-/// location between two mounts, where imports copy however well the host links.
+/// reading is: a check holds the seam it looks through, and the project and the
+/// operator's overlay are not reached through one. What the storage check does with them
+/// is report the half of the hardlink question its probe cannot see — an overlay that
+/// splits the data location between two mounts, where imports copy however well the
+/// host links.
 pub(super) fn stored(
     ctx: &Ctx,
     manifest: &lemonfiber_manifest::Manifest,
@@ -151,7 +152,7 @@ pub(super) fn stored(
                     ctx.environment,
                     ctx.settings.service_user,
                     Some(committed),
-                    ctx.stack.crowded_mounts(),
+                    crate::app::project::crowded(&ctx),
                 )
                 .on(ctx.settings.nfs.clone()),
             ) as Box<dyn Check>

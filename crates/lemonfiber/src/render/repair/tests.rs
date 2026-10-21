@@ -227,6 +227,37 @@ fn what_was_put_back_is_said_in_the_terms_of_what_it_changed() {
 }
 
 #[test]
+fn a_move_put_back_and_a_copy_kept_are_said_as_what_became_of_each() {
+    let undos = vec![
+        Undo {
+            target: "jellyfin".to_owned(),
+            action: Action::MoveBack {
+                from: "/stack/config/jellyfin/cache".to_owned(),
+                to: "/stack/mounts/jellyfin/cache".to_owned(),
+            },
+        },
+        Undo {
+            target: "caddy".to_owned(),
+            action: Action::KeepCopy {
+                volume: "lemonfiber_caddy_data".to_owned(),
+                to: "/stack/mounts/caddy/data".to_owned(),
+            },
+        },
+    ];
+
+    let said = reversed(&putting_back(undos, Vec::new())).text();
+
+    assert!(
+        said.contains("/stack/config/jellyfin/cache moved back"),
+        "{said}"
+    );
+    assert!(
+        said.contains("/stack/mounts/caddy/data kept; the volume it came from is as it was"),
+        "{said}"
+    );
+}
+
+#[test]
 fn a_setting_or_a_secret_put_back_is_said_by_its_name() {
     let undos = vec![
         Undo {

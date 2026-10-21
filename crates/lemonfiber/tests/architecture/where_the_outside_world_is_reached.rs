@@ -124,6 +124,8 @@ fn talking_to_the_outside_world_only_happens_in_adapters() {
                 "lemonfiber-adapters/src/docker/exec.rs",
                 "lemonfiber-adapters/src/docker/translate.rs",
                 "lemonfiber-adapters/src/docker/images.rs",
+                "lemonfiber-adapters/src/docker/networks.rs",
+                "lemonfiber-adapters/src/docker/volumes.rs",
                 "lemonfiber-adapters/src/docker/presence.rs",
                 "lemonfiber-adapters/src/docker/mounts.rs",
                 "lemonfiber-adapters/src/docker/program.rs",
@@ -143,18 +145,12 @@ fn talking_to_the_outside_world_only_happens_in_adapters() {
         ),
         ("webpki_roots", &["lemonfiber-adapters/src/nntp.rs"]),
         // Not an adapter — YAML is a format, and reading or writing one is pure.
-        // Confined for the same reason the rest are: the stack's compose files are
-        // read in the stack module — what each service mounts in one file, and the
-        // names and ports they declare in another — and every generated document is
-        // written in one, and the day something else wants either, it asks the module
-        // that already knows how.
+        // Confined for the same reason the rest are: the operator's overlay is read in
+        // one file and every generated document is written in another, and the day
+        // something else wants either, it asks the module that already knows how.
         (
             "serde_norway",
-            &[
-                "stack/mounts.rs",
-                "stack/declared.rs",
-                "project/document.rs",
-            ],
+            &["project/overlay.rs", "project/document.rs"],
         ),
         // Nor is this one. Hashing a password is pure, and it is confined for a
         // sharper reason than the rest: a second place that hashed one its own way

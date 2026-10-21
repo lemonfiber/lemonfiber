@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use lemonfiber_manifest::container::Value;
@@ -11,115 +11,92 @@ use crate::credential::fingerprint;
 use crate::journal::Kind;
 use crate::settings::legacy;
 
-fn compose_reads() -> BTreeMap<(String, String), String> {
-    let at = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/media-stack/compose");
-    let mut reads = BTreeMap::new();
-    for entry in std::fs::read_dir(at).into_iter().flatten().flatten() {
-        let text = std::fs::read_to_string(entry.path()).unwrap_or_default();
-        let mut service: Option<&str> = None;
-        for line in text.lines() {
-            let indent = line.len() - line.trim_start().len();
-            let trimmed = line.trim();
-            if indent == 2 && trimmed.ends_with(':') {
-                service = trimmed.strip_suffix(':');
-                continue;
-            }
-            let read = trimmed
-                .split_once(": ${")
-                .and_then(|(variable, rest)| Some((variable, rest.split([':', '}']).next()?)));
-            if let (Some(service), Some((variable, key))) = (service, read) {
-                reads.insert((service.to_owned(), variable.to_owned()), key.to_owned());
-            }
-        }
-    }
-    reads
+/// Every key the template an operator's environment file was made from names.
+fn template_keys() -> BTreeSet<String> {
+    let at = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/media-stack/.env.example");
+    std::fs::read_to_string(at)
+        .unwrap_or_default()
+        .lines()
+        .filter_map(|line| line.trim_start_matches(['#', ' ']).split_once('='))
+        .map(|(key, _)| key.trim().to_owned())
+        .collect()
 }
 
 #[test]
-fn each_setting_is_held_under_the_key_static_compose_reads_it_from() {
-    let manifest = crate::test_support::a_context()
-        .build()
-        .stack
-        .checked_manifest(crate::test_support::a_context().build().today());
-    let reads = compose_reads();
-    let mut checked = 0;
-    for service in manifest
+fn each_legacy_setting_is_filed_from_a_key_the_template_names_for_a_setting_the_stack_reads() {
+    let ctx = crate::test_support::a_context().build();
+    let manifest = ctx.stack.checked_manifest(ctx.today());
+    let read: BTreeSet<String> = manifest
         .iter()
         .flat_map(|manifest| manifest.services.iter())
-    {
-        for (variable, value) in &service.env {
-            let Value::Setting(setting) = value else {
-                continue;
-            };
-            let read = reads.get(&(service.id.clone(), variable.clone()));
-            assert_eq!(
-                legacy::setting_key(&setting.setting),
-                read.map(String::as_str),
-                "{} reads {variable} from {read:?}",
-                service.id
-            );
-            checked += 1;
-        }
+        .flat_map(|service| service.env.values())
+        .filter_map(|value| match value {
+            Value::Setting(setting) => Some(setting.setting.clone()),
+            _ => None,
+        })
+        .collect();
+    let template = template_keys();
+    for row in &legacy::TABLE {
+        assert!(
+            template.contains(row.key),
+            "{} is not in the template",
+            row.key
+        );
+        assert!(
+            row.secret || read.contains(row.name),
+            "{} is read by no service",
+            row.name
+        );
     }
-    let settings = legacy::TABLE.iter().filter(|row| !row.secret).count();
-    assert!(checked >= settings, "{checked} of {settings}");
-    let named: std::collections::BTreeSet<&str> =
-        legacy::TABLE.iter().map(|row| row.name).collect();
-    let keyed: std::collections::BTreeSet<&str> = legacy::TABLE.iter().map(|row| row.key).collect();
+    let named: BTreeSet<&str> = legacy::TABLE.iter().map(|row| row.name).collect();
+    let keyed: BTreeSet<&str> = legacy::TABLE.iter().map(|row| row.key).collect();
     assert_eq!(named.len(), legacy::TABLE.len());
     assert_eq!(keyed.len(), legacy::TABLE.len());
 }
 
 #[tokio::test]
-async fn every_legacy_setting_round_trips_through_its_environment_key() {
+async fn every_legacy_setting_is_recorded_in_the_store_and_never_in_the_environment_file() {
     let machine = machine("legacy", running(&[]));
     for row in legacy::TABLE.iter().filter(|row| !row.secret) {
         let value = format!("value-of-{}", row.key.to_lowercase());
 
         let made = agreed(&machine.ctx, row.name, Some(&value)).await;
 
-        let held = store::read(&machine.env).ok();
         assert_eq!(
-            held.as_ref().and_then(|file| file.get(row.key)),
-            Some(value.as_str()),
-            "{}",
-            row.name
+            setting(&machine.env, row.name).as_deref(),
+            Some(value.as_str())
         );
+        assert_eq!(line(&machine.env, row.key), None, "{}", row.name);
         let read = made
             .ok()
             .and_then(|report| report.settings.into_iter().find(|one| one.name == row.name));
         assert!(
-            read.as_ref()
-                .is_some_and(|one| one.value.as_deref() == Some(value.as_str())
-                    && one.environment.as_deref() == Some(row.key)
-                    && !one.readers.is_empty()),
+            read.as_ref().is_some_and(
+                |one| one.value.as_deref() == Some(value.as_str()) && !one.readers.is_empty()
+            ),
             "{read:?}"
         );
-        assert!(journal(&machine.ctx).last().is_some_and(|last| last.kind
-            == Kind::Set {
-                key: row.key.to_owned(),
-                previous: None,
-                current: value.clone(),
-            }));
+        assert!(journal(&machine.ctx)
+            .iter()
+            .rev()
+            .find(|change| matches!(change.kind, Kind::Setting { .. }))
+            .is_some_and(|last| last.kind
+                == Kind::Setting {
+                    name: row.name.to_owned(),
+                    previous: None,
+                    current: Some(value.clone()),
+                    filed: None,
+                }));
 
         let cleared = agreed(&machine.ctx, row.name, None).await;
 
-        assert_eq!(
-            store::read(&machine.env)
-                .ok()
-                .and_then(|file| file.get(row.key).map(str::to_owned))
-                .as_deref(),
-            Some("")
-        );
+        assert_eq!(setting(&machine.env, row.name), None);
+        assert_eq!(line(&machine.env, row.key), None, "{}", row.name);
         assert!(cleared.ok().is_some_and(|report| report
             .settings
             .iter()
             .any(|one| one.name == row.name && one.value.is_none())));
     }
-    assert!(
-        crate::settings::Settings::at(&machine.env.with_file_name(SETTINGS))
-            .is_ok_and(|settings| settings.value("gluetun:countries").is_none())
-    );
 }
 
 fn stacked(name: &str, lines: &[(&str, &str)]) -> (Ctx, PathBuf) {
@@ -376,4 +353,18 @@ fn a_fold_the_journal_will_not_take_is_not_made() {
     assert!(filed.is_err());
     assert_eq!(line(&env, "DATA_ROOT"), None);
     assert_eq!(line(&env, "NAS_HOST").as_deref(), Some("nas.local"));
+}
+
+#[test]
+fn stores_that_cannot_be_read_leave_the_file_as_it_is() {
+    let (_, env) = stacked("unread-stores", &[("VPN_COUNTRIES", "Sweden")]);
+    assert!(std::fs::write(env.with_file_name(SETTINGS), "not a store").is_ok());
+    assert!(std::fs::write(env.with_file_name(SECRETS), "not a store").is_ok());
+    let file = store::read(&env).unwrap_or_default();
+
+    let overlaid = legacy::overlaid(&env, file.clone());
+    let listed = legacy::listed(&env, file);
+
+    assert_eq!(overlaid.get("VPN_COUNTRIES"), Some("Sweden"));
+    assert_eq!(listed.get("VPN_COUNTRIES"), Some("Sweden"));
 }

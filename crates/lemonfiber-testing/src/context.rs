@@ -11,27 +11,63 @@
 //! builds a real one to chain from.
 
 use std::path::Path;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::platform::Environment;
-use lemonfiber_core::ports::docker::{Engine, Images};
+use lemonfiber_core::ports::docker::{Engine, EngineVolumes, Images, Networks};
+use lemonfiber_core::ports::http::Http;
 use lemonfiber_core::ports::process::Runner;
 use lemonfiber_core::ports::{Clock, FileSystem};
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::ports::Stopped;
+use lemonfiber_fixtures::scratch::Scratch;
 use lemonfiber_fixtures::support::{spoke, Reporting, Scripted};
 
-/// The media stack the bundle replaces, read from disk: the stack directory whose
-/// compose files the carried stack runs until they are written from its manifest.
+/// The media stack this repository carries, read from disk.
+const REPOSITORY_STACK: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/media-stack");
+
+/// What of the repository's media stack a run reads: its manifest, the file describing
+/// each service, the settings it declares it reads, and the starting files of every
+/// service's configuration.
+const CARRIED: [&str; 4] = ["stack.toml", "services", ".env.example", "config"];
+
+/// The media stack this repository carries, copied into a directory of its own, so a run
+/// that writes the project beside it never writes into the repository. Held one level
+/// down, so what a test puts beside the stack stays the test's own too.
 #[must_use]
 pub fn repository_stack() -> Source {
-    Source::External(Path::new(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../assets/media-stack"
-    )))
+    static NEXT: AtomicUsize = AtomicUsize::new(0);
+    let copy = Scratch::new(&format!(
+        "repository-stack-{}",
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ))
+    .kept()
+    .join("stack");
+    let _ = std::fs::create_dir_all(&copy);
+    for name in CARRIED {
+        copied(&Path::new(REPOSITORY_STACK).join(name), &copy.join(name));
+    }
+    Source::External(Box::leak(copy.into_boxed_path()))
 }
+
+/// Copy the file or the tree at `from` to `to`, links left behind.
+fn copied(from: &Path, to: &Path) {
+    let kind = std::fs::symlink_metadata(from).map(|found| found.file_type());
+    if kind.as_ref().is_ok_and(std::fs::FileType::is_dir) {
+        let _ = std::fs::create_dir_all(to);
+        for entry in std::fs::read_dir(from).into_iter().flatten().flatten() {
+            copied(&entry.path(), &to.join(entry.file_name()));
+        }
+    } else if kind.is_ok_and(|kind| kind.is_file()) {
+        let _ = std::fs::copy(from, to);
+    }
+}
+
+/// What the engine a test leaves unnamed says when asked for its images.
+const NO_ENGINE: &str = "no container engine is asked in a test";
 
 /// A stack source pointing nowhere, for the tests about what happens when it does.
 #[must_use]
@@ -46,13 +82,18 @@ pub struct Context {
     clock: Arc<dyn Clock>,
     filesystem: Arc<dyn FileSystem>,
     images: Option<Arc<dyn Images>>,
+    networks: Option<Arc<dyn Networks>>,
+    engine_volumes: Option<Arc<dyn EngineVolumes>>,
+    http: Option<Arc<dyn Http>>,
     stack: Source,
     settings: Settings,
     environment: Environment,
 }
 
 /// A world that answers from scripts: programs succeed and say nothing, no containers
-/// are running, the clock is stopped at today, and the filesystem is the real one.
+/// are running, the clock is stopped at today, and the filesystem is the real one. The
+/// engine's images, networks and volumes and every service are fakes, so a daemon down or
+/// wedged on the machine running the tests changes nothing.
 #[must_use]
 pub fn a_context() -> Context {
     Context {
@@ -61,20 +102,29 @@ pub fn a_context() -> Context {
         clock: Stopped::today(),
         filesystem: Arc::new(lemonfiber_adapters::Disk),
         images: None,
+        networks: None,
+        engine_volumes: None,
+        http: None,
         stack: repository_stack(),
         settings: Settings::default(),
         environment: Environment::MacOs,
     }
 }
 
-/// A world that is this machine: programs run, the engine is the local one, and the
-/// clock and the filesystem are real.
+/// A world that is this machine: programs run, the engine, its images and networks are
+/// the local ones, services are reached over the network, and the clock and the
+/// filesystem are real.
 #[must_use]
 pub fn a_live_context() -> Context {
+    let live = lemonfiber_adapters::live();
     Context {
         runner: Arc::new(lemonfiber_adapters::Local),
         engine: Arc::new(lemonfiber_adapters::Daemon::local()),
         clock: Arc::new(lemonfiber_adapters::System),
+        images: Some(live.images),
+        networks: Some(live.networks),
+        engine_volumes: Some(live.engine_volumes),
+        http: Some(live.http),
         ..a_context()
     }
 }
@@ -116,6 +166,22 @@ impl Context {
         self
     }
 
+    /// The networks the engine says the project holds, where a start would otherwise
+    /// sweep a real daemon's.
+    #[must_use]
+    pub fn networks(mut self, networks: Arc<dyn Networks>) -> Self {
+        self.networks = Some(networks);
+        self
+    }
+
+    /// The volumes the engine says it keeps, where a start would otherwise ask the real
+    /// one.
+    #[must_use]
+    pub fn engine_volumes(mut self, engine_volumes: Arc<dyn EngineVolumes>) -> Self {
+        self.engine_volumes = Some(engine_volumes);
+        self
+    }
+
     /// The stack it reads.
     #[must_use]
     pub fn over(mut self, stack: Source) -> Self {
@@ -146,9 +212,18 @@ impl Context {
             engine: self.engine,
             clock: self.clock,
             filesystem: self.filesystem,
-            images: self.images.unwrap_or(live.images),
-            // Never the machine's own: a name a test writes is asked of nothing real, and
-            // stands where the test says it does.
+            images: self
+                .images
+                .unwrap_or_else(|| lemonfiber_fixtures::pulled::Pulled::unreachable(NO_ENGINE)),
+            networks: self
+                .networks
+                .unwrap_or_else(|| lemonfiber_fixtures::networked::Networked::none()),
+            engine_volumes: self
+                .engine_volumes
+                .unwrap_or_else(|| lemonfiber_fixtures::volumed::Volumed::none()),
+            http: self
+                .http
+                .unwrap_or_else(|| lemonfiber_fixtures::http::Fake::silent()),
             resolver: lemonfiber_fixtures::ports::Resolving::anywhere(),
             program: lemonfiber_fixtures::proving::Proving::unreachable(),
             ..live

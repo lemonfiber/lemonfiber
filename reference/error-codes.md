@@ -97,6 +97,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `CONFIG-7` | `AGGREGATOR_EXPOSED` | warning | 1 | 500 | 0.17.0 | Raised when the Usenet indexer aggregator answers a read of its whole configuration to a caller presenting nothing, or will not say whether it does. |
 | `CONFIG-8` | `OVERLAY_UNVETTED` | warning | 1 | 500 | 0.18.0 | Raised where the operator's overlay changes services, merged over the project lemonfiber writes and held to nothing it vets. |
 | `CONFIG-9` | `OVERLAY_RETIRED` | warning | 1 | 500 | 0.18.0 | Raised where a path is still recorded under the retired overlay setting, which is no longer read. |
+| `CONFIG-10` | `COMPOSE_RETIRED` | warning | 1 | 500 | 0.18.0 | Raised where the project directory still holds a Compose file of the stack's own that lemonfiber no longer reads. |
 
 ## `CRED` — credentials a service refuses
 
@@ -518,6 +519,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `SETUP-12` | `NOT_WITHDRAWN` | error | 1 | 500 | 0.16.0 | Raised when a region a reversal would take out of a stack file cannot be. |
 | `SETUP-13` | `NOT_REWOUND` | error | 1 | 500 | 0.17.0 | Raised when a file a reversal would write back to what it held cannot be. |
 | `SETUP-14` | `UNKEPT` | warning | 1 | 500 | 0.18.0 | Raised when a reversal meets a secret whose earlier value lemonfiber kept no copy of. |
+| `SETUP-15` | `NOT_MOVED_BACK` | error | 1 | 500 | 0.18.0 | Raised when a service's state lemonfiber moved could not be moved back. |
 
 ## `SPACE` — the disk, and letting a download go
 
@@ -545,6 +547,8 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `STACK-8` | `STACK_UNRECOGNISED` | error | 5 | 500 | 0.14.0 | Raised when a manifest declares names this build does not know. |
 | `STACK-9` | `STACK_NEEDS_NEWER` | error | 1 | 500 | 0.17.0 | Raised when a stack names a newer lemonfiber than the one running. |
 | `STACK-10` | `STACK_UNASSEMBLED` | error | 5 | 500 | 0.18.0 | Raised when a manifest's files are not laid out as the contract says. |
+| `STACK-11` | `PROJECT_EDITED` | error | 1 | 409 | 0.18.0 | Raised when a change would write over a generated project the operator has edited. |
+| `STACK-12` | `VOLUME_NOT_COPIED` | error | 1 | 500 | 0.18.0 | Raised when a service's state kept in a volume could not be copied into its mount tree before the service first starts from there. |
 
 ## `STORAGE` — the data location
 

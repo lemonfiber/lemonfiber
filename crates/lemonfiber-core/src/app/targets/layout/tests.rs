@@ -65,27 +65,27 @@ fn a_path_under_the_usual_mount_reads_from_the_services_own_directory() {
     );
 }
 
-/// The request service mounts its config beneath its application directory.
-///
-/// Not every service uses the same mount, and a path naming one this does not know
-/// resolves to nothing rather than to a wrong file — which is why the list of
-/// mounts is the first thing to check when a credential cannot be found.
+/// A service that keeps its configuration elsewhere has its file read beneath the
+/// directory its manifest mounts it at.
 #[test]
 fn a_path_under_the_application_mount_reads_from_the_same_place() {
     let project = std::path::Path::new("/opt/lemonfiber/stack");
     assert_eq!(
         config_path(
             project,
-            &a_service("seerr"),
+            &lemonfiber_manifest::Service {
+                config_path: Some("/app/config".to_owned()),
+                ..a_service("seerr")
+            },
             Some("/app/config/settings.json")
         ),
         Some(project.join("config/seerr/settings.json"))
     );
 }
 
-/// A path naming no mount this knows, and no path at all, both resolve to nothing.
+/// A path outside the configuration directory, and no path at all, both resolve to nothing.
 #[test]
-fn a_path_outside_every_known_mount_resolves_to_nothing() {
+fn a_path_outside_the_configuration_directory_resolves_to_nothing() {
     let project = std::path::Path::new("/opt/lemonfiber/stack");
     assert_eq!(
         config_path(project, &a_service("odd"), Some("/etc/odd/settings.json")),

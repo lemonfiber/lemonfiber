@@ -27,7 +27,7 @@ pub(crate) async fn reset(ctx: &Ctx, confirm: bool) -> Result<ResetReport, Box<P
     let record = super::targets::beside_env(ctx, "materialised.json");
     let into = ctx.settings.stack_dir.as_deref();
 
-    let reverted = if confirm {
+    let mut reverted = if confirm {
         super::materialise::reset_stack(
             ctx.seams.confined.as_ref(),
             ctx.stack,
@@ -48,6 +48,20 @@ pub(crate) async fn reset(ctx: &Ctx, confirm: bool) -> Result<ResetReport, Box<P
         )
     }
     .map_err(|failure| Box::new(failure.problem()))?;
+    let manifest = ctx
+        .stack
+        .checked_manifest(ctx.today())
+        .map_err(|failure| Box::new(failure.problem()))?;
+    let project = super::project::current(ctx, &manifest)?;
+    let pass = if confirm {
+        super::project::Pass::Reset
+    } else {
+        super::project::Pass::Preview
+    };
+    reverted.extend(
+        super::project::materialised(ctx, &project.text, pass)
+            .map_err(|failure| Box::new(failure.problem()))?,
+    );
 
     // The connections a drifted service value reverts — the download-client categories the
     // operator changed. Read-only unless confirmed, so a preview lists them without writing.

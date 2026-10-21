@@ -137,6 +137,13 @@ fn substituting(
             &standing,
         )));
     }
+    let overwrites = crate::app::plugins::writing::regenerated(
+        ctx,
+        &manifest,
+        &installed,
+        &crate::wiring::Chosen::read(Some(&substitution.setting)),
+        &crate::settings::Resolved::of(ctx, Some(&manifest), installed.installed()),
+    )?;
     if ctx.dry_run {
         return Ok(reading(false));
     }
@@ -172,16 +179,6 @@ fn substituting(
         ));
         writes.push((super::FILLS_WHY_KEY, reasons.as_deref().unwrap_or_default()));
     }
-    // What the choice moves goes with it: each plugin whose service it settles in for a
-    // stack service, or out of one, joins what that settles, so its document and the
-    // record it is written from are rewritten in the same journalled change.
-    let overwrites = crate::app::plugins::writing::regenerated(
-        ctx,
-        &manifest,
-        &installed,
-        &crate::wiring::Chosen::read(Some(&substitution.setting)),
-        &crate::settings::Resolved::of(ctx, Some(&manifest), installed.installed()),
-    )?;
     crate::app::plugins::writing::unmoved(&overwrites, crate::app::plugins::writing::WIRING)?;
     changes.extend(
         overwrites
@@ -193,9 +190,12 @@ fn substituting(
     for (key, value) in writes {
         kept(path, key, value)?;
     }
-    crate::app::plugins::writing::overwritten(&overwrites, crate::app::plugins::writing::WIRING)?;
-    let plugins: Vec<&crate::plugin::Installed> = installed.installed().iter().collect();
-    crate::settings::written(ctx, &plugins)
+    crate::app::plugins::writing::overwritten(
+        ctx,
+        &overwrites,
+        crate::app::plugins::writing::WIRING,
+    )?;
+    crate::app::project::secrets_written(ctx, &manifest, installed.installed())
         .as_ref()
         .map_err(crate::app::plugins::diagnosed)?;
 

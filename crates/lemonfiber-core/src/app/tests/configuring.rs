@@ -203,6 +203,24 @@ async fn showing_settings_withholds_credentials() {
     let _ = std::fs::remove_dir_all(path.parent().unwrap_or(std::path::Path::new("/")));
 }
 
+/// A key kept as a secret whose change cannot be journalled is not kept.
+#[tokio::test]
+async fn a_secret_whose_change_cannot_be_journalled_is_refused() {
+    let path = config_scratch("unjournalled-secret");
+    let ctx = with_config(&path);
+    let _ = std::fs::create_dir_all(path.with_file_name(crate::config::paths::JOURNAL));
+
+    let refused = dispatch(
+        Command::ConfigSet(Setting::to("WIREGUARD_PRIVATE_KEY", "abc123").agreed(true)),
+        &ctx,
+    )
+    .await;
+
+    assert!(refused.is_err());
+    assert!(!std::fs::read_to_string(&*path).is_ok_and(|held| held.contains("abc123")));
+    let _ = std::fs::remove_dir_all(path.parent().unwrap_or(std::path::Path::new("/")));
+}
+
 #[tokio::test]
 async fn a_configuration_answer_serialises_under_its_own_kind() {
     let path = config_scratch("envelope");

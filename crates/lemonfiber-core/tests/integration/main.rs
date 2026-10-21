@@ -40,6 +40,7 @@ mod one_path_inside_and_out;
 mod one_stack_one_host;
 mod one_way_in_and_it_is_the_media_server;
 mod outbound;
+mod plain_compose;
 mod provenance;
 mod providers;
 mod prowlarr;

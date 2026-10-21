@@ -1,21 +1,12 @@
-//! The Compose entry lemonfiber writes for each of a plugin's services, from the one
-//! typed service model its install record keeps, and nothing else.
-//!
-//! A function of the record and of what [`Reading`] answers: the operator's settings,
-//! the addresses asks reach, the egress guard a service runs inside and the host's
-//! render group. Every value a manifest supplied is written so Compose substitutes
-//! nothing in it; the variables this writes itself are the only substitutions an entry
-//! carries.
+//! One of a plugin's services as the generated project writes it, from the one typed
+//! service model its install record keeps, and the secrets file its entry names.
 
 use std::path::PathBuf;
 
-use lemonfiber_manifest::container::{is_target, Mount, UrlOf, UserMode, Value};
-use serde::Serialize;
+use lemonfiber_manifest::container::{is_target, Mount, UserMode, Value};
 
 use super::installed::{Installed, Placed, Reached};
-use crate::config::storage::Export;
-use crate::project::entry::{self, literal, Entry, Tier, Unit, Values};
-use crate::topology;
+use crate::project::entry::{self, literal, Tier, Unit};
 
 /// The word in front of a plugin's id, which is the profile its services sit in.
 const PROFILE: &str = "plugin-";
@@ -24,6 +15,11 @@ const PROFILE: &str = "plugin-";
 #[must_use]
 pub fn profile(plugin: &str) -> String {
     format!("{PROFILE}{plugin}")
+}
+
+/// Whether `profile` is the one a plugin's services sit in.
+pub(crate) fn is_a_plugins(profile: &str) -> bool {
+    profile.starts_with(PROFILE)
 }
 
 /// The interface an operator surface or an adapter's contracts are published on.
@@ -49,91 +45,23 @@ pub enum Holding {
     Withheld,
 }
 
-/// What an entry's values are read from beyond the record.
+/// Where a plugin's secrets are read from.
 pub struct Reading<'a> {
-    /// The operator's value for a setting, where one is recorded.
-    pub setting: &'a dyn Fn(&str) -> Option<String>,
     /// The named service's secrets file, where there is somewhere to keep one.
     pub secrets_file: &'a dyn Fn(&str) -> Option<PathBuf>,
     /// Where a credential the named service holds is read from for the named plugin,
     /// where the service is not the plugin's own.
     pub crossing: &'a dyn Fn(&str, &str) -> Option<Holding>,
-    /// The address the named service's ask reaches, where something fills it.
-    pub address: &'a dyn Fn(&str, &UrlOf) -> Option<String>,
-    /// The service that holds the tunnel of the capability a service runs inside.
-    pub guard: &'a dyn Fn(&str) -> Option<String>,
-    /// The group that owns the host's render devices, where the host has them.
-    pub render_group: Option<u32>,
-    /// The NFS export the library is kept on, where it is kept on one.
-    pub nfs: Option<&'a Export>,
 }
 
 impl Reading<'_> {
-    /// Nothing recorded, nothing filled, no guard, no render devices and the library on
-    /// this machine.
+    /// No secrets file and nothing crossing.
     #[must_use]
     pub const fn bare() -> Reading<'static> {
         Reading {
-            setting: &|_| None,
             secrets_file: &|_| None,
             crossing: &|_, _| None,
-            address: &|_, _| None,
-            guard: &|_| None,
-            render_group: None,
-            nfs: None,
         }
-    }
-}
-
-/// The Compose document lemonfiber writes for an installed plugin.
-#[must_use]
-pub fn written(installed: &Installed, reading: &Reading<'_>) -> String {
-    let setting = |_: &str, key: &str| (reading.setting)(key);
-    let values = Values {
-        setting: &setting,
-        address: reading.address,
-        render_group: reading.render_group,
-        nfs: reading.nfs,
-    };
-    let taken = installed.services.iter().any(|placed| placed.takes_data);
-    let document = Document {
-        services: Services(
-            installed
-                .services
-                .iter()
-                .map(|placed| {
-                    (
-                        placed.service.as_str(),
-                        entry::entry(
-                            &unit(&installed.plugin, placed, reading),
-                            &standing(placed, reading),
-                            &values,
-                        ),
-                    )
-                })
-                .collect(),
-        ),
-        volumes: crate::project::document::library(reading.nfs, taken),
-    };
-    crate::project::document::yaml(&document)
-}
-
-/// The document: services, and the library's volume where it is kept on an NFS export.
-#[derive(Serialize)]
-struct Document<'a> {
-    /// Every one of the plugin's services, by name.
-    services: Services<'a>,
-    /// The library's volume, where it is kept on an NFS export and a service takes it.
-    #[serde(skip_serializing_if = "std::collections::BTreeMap::is_empty")]
-    volumes: std::collections::BTreeMap<&'static str, crate::project::document::Volume>,
-}
-
-/// Services in the order the record keeps them.
-struct Services<'a>(Vec<(&'a str, Entry)>);
-
-impl Serialize for Services<'_> {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.collect_map(self.0.iter().map(|(name, entry)| (name, entry)))
     }
 }
 
@@ -158,28 +86,6 @@ pub(crate) fn unit<'a>(plugin: &str, placed: &'a Placed, reading: &Reading<'_>) 
         mem_limit_mib: fields.mem_limit_mib,
         shape: placed.shape,
         secrets_file: secrets_file(placed, reading),
-    }
-}
-
-/// Where a plugin's service stands in its own document: inside its guard where it takes
-/// one, on no network where nothing fills that guard, and on the stack's networks it was
-/// installed beside otherwise.
-fn standing(placed: &Placed, reading: &Reading<'_>) -> topology::Placed {
-    match placed
-        .fields
-        .network
-        .as_ref()
-        .map(|network| (reading.guard)(&network.via))
-    {
-        Some(Some(service)) => topology::Placed::Inside(service),
-        Some(None) => topology::Placed::Nowhere,
-        None => topology::Placed::On(
-            placed
-                .networks
-                .iter()
-                .map(|name| (name.clone(), None))
-                .collect(),
-        ),
     }
 }
 
@@ -216,11 +122,7 @@ pub(crate) const fn user_of(placed: &Placed) -> UserMode {
 
 /// The service's secrets file, where it names a secret and there is somewhere to keep one.
 pub(crate) fn secrets_file(placed: &Placed, reading: &Reading<'_>) -> Option<PathBuf> {
-    placed
-        .fields
-        .env
-        .values()
-        .any(|value| matches!(value, Value::Secret(_)))
+    crate::project::names_a_secret(&placed.fields.env)
         .then(|| (reading.secrets_file)(&placed.service))
         .flatten()
 }

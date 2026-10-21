@@ -185,8 +185,8 @@ async fn run_with_split_mounts(bench: Bench) -> Vec<Finding> {
         vec![Crowded {
             service: "sonarr".to_owned(),
             mounts: vec![
-                "${DATA_ROOT}/downloads:/downloads".to_owned(),
-                "${DATA_ROOT}/media:/media".to_owned(),
+                "/srv/media/downloads:/downloads".to_owned(),
+                "/srv/media/media:/media".to_owned(),
             ],
         }],
     )

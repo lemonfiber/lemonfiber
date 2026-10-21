@@ -11,12 +11,6 @@ use crate::test_support::frozen_day as today;
 /// the real thing rather than against a fixture that could drift from it.
 static EMBEDDED: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../assets/media-stack");
 
-/// A stack whose compose file splits the data root, read as the stack lemonfiber
-/// ships. The same directory is read as an operator's own below, which is the
-/// pairing the two tests about it exist for: one set of bytes, two answers, and
-/// the difference is whose stack it is.
-static SPLIT_MOUNTS: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/split-mounts");
-
 /// A directory that is certainly not a stack.
 ///
 /// `adapters` because the crate cannot compile without it. The previous choice was a
@@ -107,14 +101,6 @@ fn an_embedded_stack_is_written_where_compose_can_read_it() {
 
     assert_eq!(written.ok().as_deref(), Some(dir.path()));
     assert!(dir.join("stack.toml").is_file(), "the manifest is written");
-    assert!(
-        dir.join("compose.yml").is_file(),
-        "so are the compose files"
-    );
-    assert!(
-        dir.join("compose").join("tv.yml").is_file(),
-        "including the fragments, which the root file includes by path"
-    );
 
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -405,130 +391,6 @@ api = { kind = \"plex\", key_source = \"config-xml\" }
         detail.contains("jellyfin") && detail.contains("plex"),
         "the operator was not told which name, or where: {detail}"
     );
-}
-
-#[test]
-fn the_stack_we_ship_obeys_its_own_single_mount_rule() {
-    // The rule is invisible to every probe — from the host the data root is
-    // one filesystem and links work perfectly — so the only thing that can
-    // hold the shipped stack to it is this.
-    assert_eq!(refusal(Source::Embedded(&EMBEDDED)), "");
-    assert!(
-        Source::Embedded(&EMBEDDED).crowded_mounts().is_empty(),
-        "and the reading the refusal is built from agrees"
-    );
-}
-
-/// The fixture above, read the way an operator's own stack directory is read.
-fn forked() -> Source {
-    Source::External(Path::new(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/tests/fixtures/split-mounts"
-    )))
-}
-
-#[test]
-fn a_shipped_stack_that_splits_the_data_root_is_refused() {
-    // Two mounts beneath the data root put the download and the library on
-    // opposite sides of a filesystem boundary inside the container, and every
-    // import silently becomes a copy. In the stack this binary carries, that is
-    // the binary being wrong about its own contents: nobody chose it, and nobody
-    // running it could put it right.
-    //
-    // Asserted on what the operator is actually shown, rather than on the shape
-    // of the error behind it.
-    let said = refusal(Source::Embedded(&SPLIT_MOUNTS));
-    assert!(said.contains("sonarr"), "{said}");
-    assert!(said.contains("copied rather than hardlinked"), "{said}");
-}
-
-#[test]
-fn the_same_stack_as_an_operator_s_own_is_reported_rather_than_refused() {
-    // The same bytes, read as a directory the operator pointed at. A rule of
-    // lemonfiber's is guidance over somebody else's stack: refusing to operate it
-    // would put this tool between an operator and their own system over a cost
-    // that is theirs to carry, so what it costs is reported and the stack runs.
-    // Read once rather than inside the message an assertion would only format on
-    // its way to failing: a call in there is a line no passing run enters.
-    let refused = refusal(forked());
-    assert!(
-        forked().checked_manifest(today()).is_ok(),
-        "a fork was refused over a rule of ours: {refused}"
-    );
-
-    let found = forked().crowded_mounts();
-    assert_eq!(
-        found
-            .iter()
-            .map(|one| one.service.as_str())
-            .collect::<Vec<_>>(),
-        vec!["sonarr"],
-        "the reading itself still happens, and still names the service"
-    );
-    let said = found.first().map(ToString::to_string).unwrap_or_default();
-    assert!(said.contains("copied rather than hardlinked"), "{said}");
-}
-
-#[test]
-fn a_link_back_to_an_ancestor_is_not_walked_into() {
-    // A stack directory is the operator's own, and a link inside it is theirs
-    // to make. Following one back to an ancestor would walk for ever, on every
-    // command — so the entry's own type decides, and a link is not a directory.
-    let dir = lemonfiber_fixtures::scratch::Scratch::named("loop");
-    let _ = std::fs::remove_dir_all(&dir);
-    let inner = dir.join("compose");
-    assert!(std::fs::create_dir_all(&inner).is_ok());
-    assert!(std::fs::write(inner.join("tv.yml"), "services: {}\n").is_ok());
-    // Where the platform makes one cheaply. Its absence changes no branch: the
-    // walk reads the entry's type either way.
-    #[cfg(unix)]
-    let _ = std::os::unix::fs::symlink(&dir, inner.join("back"));
-
-    let read = super::on_disk(&dir);
-    assert_eq!(read.len(), 1, "the real file, once: {read:?}");
-    let _ = std::fs::remove_dir_all(&dir);
-}
-
-#[test]
-fn a_directory_that_cannot_be_read_contributes_nothing_rather_than_stopping() {
-    // Whether this is a stack at all is the manifest's business, and it has
-    // already been read by the time this runs. A path that is not a directory
-    // to walk simply has no compose files in it.
-    assert!(super::on_disk(Path::new("/lemonfiber-no-such-directory")).is_empty());
-}
-
-/// What an operator's stack is run from is its own files and the overlay over it, and
-/// never the documents lemonfiber writes for its plugins.
-#[test]
-fn a_stack_is_run_from_its_own_files_and_the_overlay_and_not_the_plugins() {
-    let dir = written("run-from", "");
-    for (path, text) in [
-        ("compose.yml", "services:\n  theirs: {}\n"),
-        ("compose/plugins/komga.yml", "services:\n  komga: {}\n"),
-    ] {
-        let at = dir.join(path);
-        assert!(at
-            .parent()
-            .is_some_and(|up| std::fs::create_dir_all(up).is_ok()));
-        assert!(std::fs::write(&at, text).is_ok());
-    }
-    let overlay = dir.with_extension("override.yml");
-    assert!(std::fs::write(&overlay, "services:\n  watchtower: {}\n").is_ok());
-
-    let read: Vec<String> = Source::External(dir)
-        .run_from(&[overlay.clone(), dir.join("no-such-overlay.yml")])
-        .into_iter()
-        .map(|(_, text)| text)
-        .collect();
-
-    assert_eq!(
-        read,
-        [
-            "services:\n  theirs: {}\n".to_owned(),
-            "services:\n  watchtower: {}\n".to_owned()
-        ]
-    );
-    assert!(!Source::Embedded(&EMBEDDED).run_from(&[]).is_empty());
 }
 
 /// A stack whose files are not laid out as the contract says is refused for that,

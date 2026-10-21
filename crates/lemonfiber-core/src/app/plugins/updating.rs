@@ -56,20 +56,9 @@ pub(crate) async fn update(
     // so the record of the new version says it was installed at that moment.
     let stamp = ctx.stamp();
     let stack_manifest = super::writing::stack_manifest(ctx)?;
-    let (would, _) = super::installing::settled(
-        ctx,
-        &stack_manifest,
-        held.installed(),
-        &read,
-        path,
-        from,
-        &stamp,
-    );
+    let (would, _) = super::installing::settled(&stack_manifest, &read, path, from, &stamp);
     let was = installed_as(&held, &would.plugin)?;
-    let stack = ctx
-        .settings
-        .stack_dir
-        .as_deref()
+    let stack = &super::super::project::directory(ctx)
         .ok_or_else(|| Box::new(nowhere_to_write(&would.plugin)))?;
     let mut without = held.clone();
     without.forget(&was.plugin);
@@ -77,14 +66,16 @@ pub(crate) async fn update(
     unheld(ctx, &would, without.installed(), stack)?;
     let changes = crate::plugin::changes(&super::writing::landing(
         ctx,
-        super::addressing::writes(ctx, &would, stack),
+        super::planned::writes(ctx, &would, stack)?,
     ));
     let offer = super::offering::updating(&read.digest, &was, &would, &changes, &wiring);
     let (acting, taking) =
         super::offering::answered(ctx, consent, &would, &offer, &super::offering::UPDATING)?;
     let mut account = started(&was, &would, &read.manifest, changes, wiring, taking);
     let at = crate::plugin::owner(&was.plugin);
-    let whose = |change: &crate::journal::Change| crate::plugin::owns(&was.plugin, change);
+    let whose = |change: &crate::journal::Change| {
+        crate::plugin::owns(&was.plugin, change) && !super::super::project::holds(ctx, change)
+    };
 
     // A reading and a rehearsal ask the reversal what it would put back, which judges it
     // whole and touches nothing.
@@ -290,12 +281,11 @@ enum Came {
 /// reading taken before anything moved. It carries out no reversal of its own; the
 /// caller decides what a failure puts back, because on an update that is two things.
 async fn on(ctx: &Ctx, coming: &Coming<'_>, install: &mut Install) -> Came {
-    let planned = super::writing::landing(
-        ctx,
-        super::addressing::writes(ctx, coming.would, coming.stack),
-    );
-    let put = super::writing::unlinked(ctx, coming.would, coming.stack)
-        .and_then(|()| carry_out(ctx, &coming.would.plugin, coming.stamp, &planned));
+    let put = super::planned::writes(ctx, coming.would, coming.stack).and_then(|planned| {
+        let planned = super::writing::landing(ctx, planned);
+        super::writing::unlinked(ctx, coming.would, coming.stack)
+            .and_then(|()| carry_out(ctx, &coming.would.plugin, coming.stamp, &planned))
+    });
     if let Err(why) = put {
         return Came::Stopped(why.detail.unwrap_or(why.summary));
     }
@@ -404,13 +394,16 @@ pub(super) fn brought_back(
 /// document is one Compose has no description of.
 async fn restored(ctx: &Ctx, was: &Installed, stack: &Path, stamp: &str) -> Restored {
     let placed = super::writing::unlinked(ctx, was, stack).is_ok()
-        && carry_out(
-            ctx,
-            &was.plugin,
-            stamp,
-            &super::writing::landing(ctx, super::addressing::writes(ctx, was, stack)),
-        )
-        .is_ok();
+        && super::planned::writes(ctx, was, stack)
+            .and_then(|planned| {
+                carry_out(
+                    ctx,
+                    &was.plugin,
+                    stamp,
+                    &super::writing::landing(ctx, planned),
+                )
+            })
+            .is_ok();
     let running = placed && proving::up(ctx, was, stack).await.is_none();
     Restored {
         version: was.version.clone(),

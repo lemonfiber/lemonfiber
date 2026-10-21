@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use crate::config::store;
 use crate::error::Problem;
 use crate::journal::{is_sealed, Action, Undo};
-use crate::ports::filesystem::Confined;
+use crate::ports::filesystem::{Confined, Lying};
 use crate::ports::service::Client as _;
 use crate::repair;
 use crate::settings::undoing;
@@ -253,6 +253,8 @@ fn carry_out(confined: &dyn Confined, action: &Action, env_file: &Path) -> Resul
     match action {
         Action::Restore { key, value, wrote } => put_back(env_file, key, value.as_deref(), wrote),
         Action::Delete { path } => remove(Path::new(path)),
+        Action::MoveBack { from, to } => moved_back(confined, Path::new(from), Path::new(to)),
+        Action::KeepCopy { .. } => Ok(Step::Done),
         Action::Withdraw {
             path,
             key,
@@ -281,7 +283,7 @@ fn carry_out(confined: &dyn Confined, action: &Action, env_file: &Path) -> Resul
             path,
             previous,
             written,
-        } => rewind(Path::new(path), previous, *written),
+        } => rewind(Path::new(path), previous, *written, env_file),
         // Both need the service that made the change: one to delete what it created, the
         // other to put a field of it back. Neither is something the host can do, and a
         // reversal that took the second for an ordinary setting would write the field's
@@ -350,7 +352,7 @@ fn settled(name: &str, undone: Result<undoing::Undone, store::Failure>) -> Resul
 /// asking twice harmless; one that is gone is done too, since writing it back would bring
 /// back a file something has since removed. Anything else was written by another hand
 /// after this change, and is left exactly as it is.
-fn rewind(path: &Path, previous: &str, written: u32) -> Result<Step, Fault> {
+fn rewind(path: &Path, previous: &str, written: u32, env_file: &Path) -> Result<Step, Fault> {
     let holds = match std::fs::read_to_string(path) {
         Ok(holds) => holds,
         Err(why) if why.kind() == std::io::ErrorKind::NotFound => return Ok(Step::Done),
@@ -367,12 +369,17 @@ fn rewind(path: &Path, previous: &str, written: u32) -> Result<Step, Fault> {
     if super::bounded::written(&holds) != written {
         return Ok(Step::TheirsNow(path.display().to_string()));
     }
-    store::write(path, previous)
-        .map(|()| Step::Done)
-        .map_err(|failure| Fault::NotRewound {
-            path: path.to_path_buf(),
-            reason: failure.to_string(),
-        })
+    store::write(path, previous).map_err(|failure| Fault::NotRewound {
+        path: path.to_path_buf(),
+        reason: failure.to_string(),
+    })?;
+    if path.file_name() == Some(std::ffi::OsStr::new(crate::project::FILE)) {
+        let record = super::bounded::record_beside(env_file);
+        let mut kept: crate::materialised::Materialised = super::record::kept(Some(&record));
+        kept.record(crate::project::FILE, super::bounded::written(previous));
+        let _ = super::record::keep(Some(&record), &kept);
+    }
+    Ok(Step::Done)
 }
 
 /// Put one setting back to `value`, where the change being reversed is still the
@@ -415,6 +422,36 @@ fn put_back(env_file: &Path, key: &str, value: Option<&str>, wrote: &str) -> Res
     }
 }
 
+/// Move what was moved from `from` to `to` back, never through a link and never over
+/// something that has taken its old place since.
+///
+/// The two are read from the journal, so they are held to the shape a move has before
+/// anything is touched: the same service and name in the configuration tree and the mount
+/// tree of one project directory, with every step to either end beneath it reached
+/// through no link.
+fn moved_back(confined: &dyn Confined, from: &Path, to: &Path) -> Result<Step, Fault> {
+    let refused = |reason: &str| Fault::NotMovedBack {
+        path: to.to_path_buf(),
+        reason: reason.to_owned(),
+    };
+    let Some(within) = crate::app::project::moved_beneath(from, to) else {
+        return Err(refused(
+            "the journal names a pair that is not a service's state moved into its mount tree",
+        ));
+    };
+    match (confined.lies(from, &within), confined.lies(to, &within)) {
+        (Lying::Escaped, _) | (_, Lying::Escaped) => Err(refused(
+            "a link stands on the way to one end, and lemonfiber never moves through one",
+        )),
+        (Lying::Plain, Lying::Plain) => Ok(Step::StillHolding(from.display().to_string())),
+        (_, Lying::Absent) => Ok(Step::Done),
+        (Lying::Absent, Lying::Plain) => confined
+            .moved(to, from, &within)
+            .map(|()| Step::Done)
+            .map_err(|fault| refused(&fault.message)),
+    }
+}
+
 /// Remove a directory apply made, treating one already gone as already undone.
 ///
 /// Only ever an empty directory — apply records a directory the moment it makes
@@ -424,9 +461,9 @@ fn put_back(env_file: &Path, key: &str, value: Option<&str>, wrote: &str) -> Res
 /// unmade is not there, and needs nothing done.
 fn remove(path: &Path) -> Result<Step, Fault> {
     // A directory or a file, because both are things lemonfiber makes: an apply makes
-    // the data root, and an install writes a plugin's Compose document. `remove_dir`
-    // on a file refuses with *not a directory*, which would read to an operator as a
-    // reversal that could not carry on rather than as a file that is still there.
+    // the data root, and an install writes the project. `remove_dir` on a file refuses
+    // with *not a directory*, which would read to an operator as a reversal that could
+    // not carry on rather than as a file that is still there.
     let taken = if path.is_dir() {
         std::fs::remove_dir(path)
     } else {

@@ -17,6 +17,7 @@ async fn a_rehearsed_removal_with_nowhere_to_look_is_refused_as_the_real_one_is(
     );
     let mut nowhere = ctx;
     nowhere.settings.stack_dir = None;
+    nowhere.stack = crate::test_support::embedded();
     nowhere.dry_run = true;
     assert_eq!(refusal(removing(&nowhere, "komga").await), "UNDO-4");
 }
@@ -161,12 +162,11 @@ async fn removing_one_of_two_leaves_the_record_holding_the_other() {
 
     let gone = removal(removing(&ctx, "komga").await);
     assert!(gone.as_ref().is_some_and(|one| one.removed));
+    assert!(document(&ctx).is_empty(), "its entry left the project");
     assert!(
-        gone.is_some_and(|one| one.went_back.left.iter().any(|left| left
-            .because
-            .contains("still holds something this run did not put there"))),
-        "the directory the two share is named and left, rather than taken with the \
-             other's document in it or stopping the reversal over it"
+        std::fs::read_to_string(project_of(&ctx))
+            .is_ok_and(|project| project.contains("\n  kavita:\n")),
+        "and the other's stayed in it"
     );
     assert_eq!(
         counted(reading(&ctx).await),
@@ -193,8 +193,6 @@ async fn a_removal_on_an_unreadable_stack_is_refused_before_it_takes_anything() 
         counted(installing(&ctx, &source("unreadable-stack", PROVING)).await),
         Some(1)
     );
-    let document = stack_of(&ctx).join("compose/plugins/komga.yml");
-
     let blind = a_context()
         .over(crate::test_support::nowhere())
         .settings(ctx.settings.clone())
@@ -203,7 +201,7 @@ async fn a_removal_on_an_unreadable_stack_is_refused_before_it_takes_anything() 
         refusal(removing(&blind, "komga").await),
         crate::error::codes::stack::STACK_UNREADABLE.to_string()
     );
-    assert!(document.is_file(), "and nothing of its was taken");
+    assert!(!document(&ctx).is_empty(), "and nothing of its was taken");
 }
 
 /// A rehearsal says what would go back and touches none of it. A removal an
@@ -217,8 +215,6 @@ async fn rehearsing_a_removal_says_what_would_go_back_and_takes_nothing() {
         counted(installing(&ctx, &source("rehearsed-removal", PROVING)).await),
         Some(1)
     );
-    let document = stack_of(&ctx).join("compose/plugins/komga.yml");
-
     let mut rehearsing = ctx;
     rehearsing.dry_run = true;
     let gone = removal(removing(&rehearsing, "komga").await);
@@ -228,7 +224,7 @@ async fn rehearsing_a_removal_says_what_would_go_back_and_takes_nothing() {
         gone.is_some_and(|one| one.went_back.rehearsed && !one.went_back.reversed.is_empty()),
         "it names what would go back"
     );
-    assert!(document.is_file(), "and none of it went");
+    assert!(!document(&rehearsing).is_empty(), "and none of it went");
     assert!(
         !runner.ran("rm"),
         "nothing was taken off the machine either"
@@ -311,6 +307,7 @@ async fn a_removal_with_nowhere_to_look_for_the_record_is_refused_by_the_layer_t
 
     let mut nowhere = ctx;
     nowhere.settings.stack_dir = None;
+    nowhere.stack = crate::test_support::embedded();
 
     assert_eq!(
         refusal(removing(&nowhere, "komga").await),
@@ -438,6 +435,59 @@ async fn a_path_made_under_the_bare_id_goes_back_with_the_plugin() {
 
     assert!(gone.is_some_and(|one| one.removed), "it is removed");
     assert!(!made.exists(), "what it made under its bare id is gone");
+}
+
+/// A directory a plugin made on the way to where the project is kept is the project's,
+/// and stays when the plugin goes.
+#[tokio::test]
+async fn the_directories_the_project_lies_in_stay_when_the_plugin_that_made_them_goes() {
+    let ctx = proving(
+        "project-lies",
+        Arc::new(Recording::answering(Ok(spoke("")))),
+        answering(200),
+    );
+    assert_eq!(
+        counted(installing(&ctx, &source("project-lies", PROVING)).await),
+        Some(1)
+    );
+    let Some(project) = crate::app::project::directory(&ctx) else {
+        unreachable!("the machine keeps a project")
+    };
+    let _ = std::fs::create_dir_all(&project);
+    journal_a_made(&ctx, "komga", &project);
+    journal_a_made(&ctx, "komga", project.parent().unwrap_or(&project));
+
+    let gone = removal(removing(&ctx, "komga").await);
+
+    assert!(
+        gone.is_some_and(|one| one.removed && one.went_back.left.is_empty()),
+        "it is removed, and nothing is left that it was asked to put back"
+    );
+    assert!(project.is_dir(), "the project's directory is still there");
+}
+
+/// A project the operator edited since lemonfiber wrote it is not written over by a
+/// removal, which says so.
+#[tokio::test]
+async fn a_removal_over_an_edited_project_is_refused_naming_it() {
+    let ctx = proving(
+        "removal-edited",
+        Arc::new(Recording::answering(Ok(spoke("")))),
+        answering(200),
+    );
+    assert_eq!(
+        counted(installing(&ctx, &source("removal-edited", PROVING)).await),
+        Some(1)
+    );
+    let project = crate::app::project::path(&ctx).unwrap_or_default();
+    assert!(std::fs::write(&project, "services: {}\n# mine\n").is_ok());
+
+    let refused = removing(&ctx, "komga").await;
+
+    assert!(
+        refused.is_err_and(|problem| problem.code == crate::error::codes::stack::PROJECT_EDITED),
+        "refused, naming the edit"
+    );
 }
 
 /// What the environment file holds for `key`.
@@ -632,6 +682,7 @@ async fn a_removal_answering_a_reading_that_moved_takes_nothing_away() {
 fn a_removal_with_nowhere_to_look_is_not_admitted() {
     let mut nowhere = ctx("not-admitted");
     nowhere.settings.stack_dir = None;
+    nowhere.stack = crate::test_support::embedded();
     let whose = |change: &crate::journal::Change| crate::plugin::owns("komga", change);
     let admitted =
         crate::app::putting_back::admitted(&nowhere, &crate::plugin::owner("komga"), &whose);

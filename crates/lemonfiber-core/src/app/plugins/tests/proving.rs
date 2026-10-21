@@ -134,10 +134,7 @@ async fn a_plugin_that_holds_its_own_proofs_and_breaks_the_stack_is_still_put_ba
             .is_some(),
         "and the install went back"
     );
-    assert!(
-        !stack_of(&ctx).join("compose/plugins/komga.yml").exists(),
-        "so what it wrote is gone again"
-    );
+    assert!(!project_of(&ctx).exists(), "so what it wrote is gone again");
 }
 
 /// A check that could no longer be told either way is reported and the install
@@ -326,8 +323,8 @@ async fn a_proof_the_service_refuses_puts_the_whole_install_back() {
 
     assert!(runner.ran("rm"), "its container came off the machine");
     assert!(
-        !stack_of(&ctx).join("compose/plugins/komga.yml").exists(),
-        "and the document it wrote is gone"
+        !project_of(&ctx).exists(),
+        "and the project it wrote is gone"
     );
     assert_eq!(
         counted(reading(&ctx).await),
@@ -355,7 +352,7 @@ async fn what_a_failed_install_put_back_is_reported_as_the_reversal_it_was() {
     assert!(put_back
         .reversed
         .iter()
-        .any(|undo| undo.target.ends_with("komga.yml")));
+        .any(|undo| undo.target.ends_with(crate::project::FILE)));
 }
 
 /// A service that never answers is unproven rather than refuted, and the install
@@ -536,28 +533,30 @@ async fn a_container_that_would_not_come_off_is_named_as_still_standing() {
     );
 }
 
-/// An install that found everything it would write already there journals nothing
-/// of its own, so a reversal has no run of its stamp to put back. That is the true
-/// answer rather than a second failure: those files belong to the run that wrote
-/// them and are on the record under it.
+/// An install that found its directory already there puts back only what it wrote: the
+/// directory belongs to whoever made it, and stays.
 #[tokio::test]
-async fn an_install_that_wrote_nothing_has_nothing_of_its_own_to_put_back() {
+async fn an_install_over_a_directory_already_there_puts_back_only_what_it_wrote() {
     let ctx = proving(
         "leftovers",
         Arc::new(Recording::answering(Ok(spoke("")))),
         answering(503),
     );
-    let stack = stack_of(&ctx);
-    assert!(std::fs::create_dir_all(stack.join("config/komga")).is_ok());
-    assert!(std::fs::create_dir_all(stack.join("compose/plugins")).is_ok());
-    assert!(std::fs::write(stack.join("compose/plugins/komga.yml"), "services: {}\n").is_ok());
+    let existing = stack_of(&ctx).join("config/komga");
+    assert!(std::fs::create_dir_all(&existing).is_ok());
 
     let put_back = report(installing(&ctx, &source("leftovers", PROVING)).await)
         .and_then(|one| one.install)
         .and_then(|one| one.reversed)
         .unwrap_or_default();
-    assert!(put_back.reversed.is_empty());
+
+    assert!(put_back
+        .reversed
+        .iter()
+        .all(|undo| Path::new(&undo.target) != existing));
     assert!(put_back.left.is_empty());
+    assert!(existing.is_dir());
+    assert!(!project_of(&ctx).exists());
 }
 
 /// A rehearsal asks nothing, so it states the proofs with no verdict against them
@@ -596,6 +595,7 @@ async fn a_machine_with_no_stack_directory_refuses_the_install_naming_it() {
             stack_dir: None,
             ..crate::config::Settings::default()
         })
+        .over(crate::test_support::embedded())
         .build();
     assert_eq!(
         refusal(installing(&ctx, &source("no-stack", MANIFEST)).await),
@@ -618,6 +618,7 @@ async fn a_rehearsal_is_refused_wherever_the_install_would_be() {
             stack_dir: None,
             ..crate::config::Settings::default()
         })
+        .over(crate::test_support::embedded())
         .build();
     ctx.dry_run = true;
     assert_eq!(

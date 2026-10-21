@@ -71,6 +71,7 @@ pub(crate) mod outbox;
 pub(crate) mod playing;
 pub mod plugins;
 pub(crate) mod preflight;
+pub(crate) mod project;
 pub mod putting_back;
 pub(crate) mod quiesced;
 pub(crate) mod reconfiguring;
@@ -121,9 +122,14 @@ use self_update::standing as stands;
 // are the names the rest of the crate and the binary reach it by.
 pub use watch::{supervise, WATCH};
 
-/// Every refusal a run working on the stack's containers answers with before it acts,
-/// which a client names by its code.
-pub const REFUSALS: [Code; 2] = [ALREADY_WORKING, REGISTRY_REFUSED];
+/// Every refusal a run working on the stack answers with before it acts, which a client
+/// names by its code: another run holding it, a registry refusing it, and a project the
+/// operator edited that the run would write again.
+pub const REFUSALS: [Code; 3] = [
+    ALREADY_WORKING,
+    REGISTRY_REFUSED,
+    crate::error::codes::stack::PROJECT_EDITED,
+];
 
 /// Ask the engine to act on a set of services, which five commands do identically.
 ///
@@ -352,7 +358,7 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
     // stopped part-way left its replacement beside it, and which of the two the
     // service takes is settled here so every command after it signs in with that one.
     credentials::pending::settled(ctx).await;
-    crate::settings::filing::filed(ctx);
+    crate::settings::filing::everything(ctx).await;
     routed(rehearsal::carried(command, ctx), ctx)
         .await
         .map(|outcome| {

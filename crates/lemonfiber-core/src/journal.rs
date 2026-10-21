@@ -17,6 +17,7 @@
 
 mod keeping;
 pub mod sealing;
+mod undoing;
 
 use serde::{Deserialize, Serialize};
 
@@ -29,8 +30,10 @@ pub use sealing::{is_sealed, Seal, KEY_FILE};
 /// plugin's bare id, and whether such an entry is the plugin's is asked by whether that
 /// id is one of these. An operation missing here is one a plugin of the same name
 /// could take changes from on its way out.
-pub const OPERATIONS: [&str; 8] = [
+pub const OPERATIONS: [&str; 10] = [
     crate::wizard::APPLY,
+    crate::app::project::OPERATION,
+    crate::overlay::OPERATION,
     crate::seed::OPERATION,
     crate::repair::OPERATION,
     crate::wiring::OPERATION,
@@ -108,8 +111,8 @@ pub enum Kind {
         /// The checksum of what was written between the markers.
         written: u32,
     },
-    /// A file lemonfiber owns the whole of was written over: a plugin's Compose document,
-    /// or the record of what is installed. Undoing writes back what it held before.
+    /// A file lemonfiber owns the whole of was written over: the project, or the record of
+    /// what is installed. Undoing writes back what it held before.
     ///
     /// Only while the file still holds what was written, kept here as a checksum, so a
     /// file somebody has written since is told apart from the one this change left.
@@ -120,6 +123,22 @@ pub enum Kind {
         previous: String,
         /// The checksum of what was written in its place.
         written: u32,
+    },
+    /// A service's state was moved from one path to another, beneath the project
+    /// directory. Undoing moves it back, only where nothing has taken its old place.
+    Moved {
+        /// Where it was.
+        from: String,
+        /// Where it is now.
+        to: String,
+    },
+    /// The state a service kept in a volume the engine holds was copied into its mount
+    /// tree. The volume was never changed, so undoing it puts nothing back.
+    Copied {
+        /// The volume, by the engine's name.
+        volume: String,
+        /// Where the copy is.
+        to: String,
     },
     /// A service was moved from one pinned version to another.
     ///
@@ -246,101 +265,6 @@ pub enum Kind {
     },
 }
 
-impl Change {
-    /// The action that reverses this change.
-    #[must_use]
-    pub fn undo(&self) -> Undo {
-        let action = match &self.kind {
-            Kind::Created { resource, id } => Action::Remove {
-                resource: resource.clone(),
-                id: id.clone(),
-            },
-            Kind::Set {
-                key,
-                previous,
-                current,
-            } => Action::Restore {
-                key: key.clone(),
-                value: previous.clone(),
-                wrote: current.clone(),
-            },
-            Kind::Made { path } => Action::Delete { path: path.clone() },
-            Kind::Region {
-                path,
-                key,
-                owner,
-                written,
-            } => Action::Withdraw {
-                path: path.clone(),
-                key: key.clone(),
-                owner: owner.clone(),
-                written: *written,
-            },
-            Kind::Rewritten {
-                path,
-                previous,
-                written,
-            } => Action::Rewind {
-                path: path.clone(),
-                previous: previous.clone(),
-                written: *written,
-            },
-            Kind::Pinned {
-                previous, current, ..
-            } => Action::Repin {
-                previous: previous.clone(),
-                current: current.clone(),
-            },
-            Kind::Configured {
-                resource,
-                id,
-                field,
-                previous,
-                ..
-            } => Action::Reconfigure {
-                resource: resource.clone(),
-                id: id.clone(),
-                field: field.clone(),
-                value: previous.clone(),
-            },
-            Kind::KeyMinted { name, .. } | Kind::KeyCollected { name, .. } => {
-                Action::Revoke { name: name.clone() }
-            }
-            Kind::KeyRevoked { name, .. } => Action::Reinstate { name: name.clone() },
-            Kind::DeviceKeyRegistered { name, .. } => Action::RevokeDevice { name: name.clone() },
-            Kind::DeviceKeyRevoked { name } => Action::ReinstateDevice { name: name.clone() },
-            Kind::Setting {
-                name,
-                previous,
-                current,
-                filed,
-            } => Action::Resettle {
-                name: name.clone(),
-                value: previous.clone(),
-                recorded: current.clone(),
-                filed: filed.clone(),
-            },
-            Kind::Secret {
-                name,
-                previous,
-                current,
-                filed,
-                ..
-            } => Action::Rehold {
-                name: name.clone(),
-                earlier: previous.clone(),
-                kept: current.clone(),
-                filed: filed.clone(),
-            },
-            Kind::Overlaid { path, .. } => Action::Leave { path: path.clone() },
-        };
-        Undo {
-            target: self.target.clone(),
-            action,
-        }
-    }
-}
-
 /// A single reversal, for the surface to carry out.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Undo {
@@ -412,6 +336,23 @@ pub enum Action {
         /// The checksum of what lemonfiber wrote, which has to still be what is there
         /// for writing the old text back to be undoing lemonfiber's own work.
         written: u32,
+    },
+    /// Move a service's state back to where it was.
+    ///
+    /// Only where nothing has taken its old place, and only from where it was moved to.
+    MoveBack {
+        /// Where it goes back to.
+        from: String,
+        /// Where it is now.
+        to: String,
+    },
+    /// Keep the copy of a volume where it is: the volume was never changed, so nothing
+    /// is put back.
+    KeepCopy {
+        /// The volume it was copied from.
+        volume: String,
+        /// Where the copy is.
+        to: String,
     },
     /// Pin a service back to the version it was standing on.
     ///

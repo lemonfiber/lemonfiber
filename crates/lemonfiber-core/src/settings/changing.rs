@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use crate::app::plugins::writing;
 use crate::app::Ctx;
 use crate::config::paths::SETTINGS;
@@ -102,7 +100,7 @@ pub(super) async fn changed(ctx: &Ctx, asked: &Asked<'_>) -> Result<SettingsRepo
     };
     writing::unmoved(&overwrites, REFUSING)?;
     let stamp = ctx.stamp();
-    let mut changes = vec![journalled(env, asked, was.as_deref(), &stamp)];
+    let mut changes = vec![journalled(asked, was.as_deref(), &stamp)];
     changes.extend(
         overwrites
             .iter()
@@ -110,8 +108,9 @@ pub(super) async fn changed(ctx: &Ctx, asked: &Asked<'_>) -> Result<SettingsRepo
     );
     crate::app::recover::journalled(&paths.journal(), &changes, ctx.seams.random.as_ref())
         .map_err(|failure| Box::new(failure.problem()))?;
-    kept(ctx, env, asked).map_err(|failure| Box::new(failure.problem()))?;
-    writing::overwritten(&overwrites, REFUSING)?;
+    super::store::recorded(&env.with_file_name(SETTINGS), asked.setting, asked.value)
+        .map_err(|failure| Box::new(failure.problem()))?;
+    writing::overwritten(ctx, &overwrites, REFUSING)?;
     if asked.setting == super::own::DEVICE_KEY_APPS {
         crate::device_keys::run::apps_changed(ctx, was.as_deref(), asked.value).await?;
     }
@@ -135,38 +134,18 @@ fn named(ctx: &Ctx, setting: &str, readers: &Readers) -> Result<(), Box<Problem>
     fences::settings_takes(setting, readers.settings.contains_key(setting))
 }
 
-fn journalled(env: &Path, asked: &Asked<'_>, was: Option<&str>, stamp: &str) -> Change {
-    let kind = match legacy::setting_key(asked.setting) {
-        Some(key) => Kind::Set {
-            key: key.to_owned(),
-            previous: crate::config::store::read(env)
-                .ok()
-                .and_then(|file| file.get(key).map(str::to_owned)),
-            current: asked.value.unwrap_or_default().to_owned(),
-        },
-        None => Kind::Setting {
+fn journalled(asked: &Asked<'_>, was: Option<&str>, stamp: &str) -> Change {
+    Change {
+        at: stamp.to_owned(),
+        operation: super::OPERATION.to_owned(),
+        target: asked.setting.to_owned(),
+        kind: Kind::Setting {
             name: asked.setting.to_owned(),
             previous: was.map(str::to_owned),
             current: asked.value.map(str::to_owned),
             filed: None,
         },
-    };
-    Change {
-        at: stamp.to_owned(),
-        operation: super::OPERATION.to_owned(),
-        target: asked.setting.to_owned(),
-        kind,
     }
-}
-
-fn kept(ctx: &Ctx, env: &Path, asked: &Asked<'_>) -> Result<(), crate::config::store::Failure> {
-    let Some(key) = legacy::setting_key(asked.setting) else {
-        return super::store::recorded(&env.with_file_name(SETTINGS), asked.setting, asked.value);
-    };
-    let value = asked.value.unwrap_or_default();
-    crate::config::store::set(env, key, value)?;
-    crate::app::reconfiguring::record(ctx, key, value);
-    Ok(())
 }
 
 fn consequence(ctx: &Ctx, asked: &Asked<'_>) -> Option<String> {
@@ -175,7 +154,11 @@ fn consequence(ctx: &Ctx, asked: &Asked<'_>) -> Option<String> {
         .settings
         .env_file
         .as_deref()
-        .and_then(|env| crate::config::store::read(env).ok())
+        .and_then(|env| {
+            crate::config::store::read(env)
+                .ok()
+                .map(|file| legacy::overlaid(env, file))
+        })
         .unwrap_or_default();
     crate::app::configuring::consequence(ctx, &held, key, asked.value.unwrap_or_default())
 }

@@ -25,34 +25,25 @@ pub(crate) fn project_directory(stack: &Source, stack_dir: Option<&Path>) -> Opt
     }
 }
 
-/// Where a service's configuration is mounted inside its own container.
-///
-/// `/config` for almost everything the stack runs, and `/app/config` for the request
-/// service, which puts its own beneath its application directory. Tried in order, and
-/// the longer one cannot be first: a path under `/config` never begins with the other,
-/// but the reverse is not something to rely on.
-const CONFIG_MOUNTS: [&str; 2] = ["/config/", "/app/config/"];
-
-/// The host path a service's config file is read from, per the stack's bind-mount
-/// convention: a service's config mount is `config/<id>` under the project root, so
-/// its `api.path` of `<mount>/<inside>` is read from there. Nothing where the api
-/// names no such path — the one place the convention is spelled, for every service
-/// whose credential is read from disk.
-///
-/// The mount is not the same for every service, which is why it is a list rather than
-/// one prefix. Reading a path that names a mount not here would silently resolve to
-/// nothing, so a service whose credential cannot be found is worth checking against
-/// this before anything else.
+/// The host path a service's config file is read from: its configuration directory
+/// is `config/<id>` under the project root, mounted where its manifest says, so its
+/// `api.path` beneath that mount is read from there. Nothing where the api names no
+/// path beneath it — the one place the convention is spelled, for every service whose
+/// credential is read from disk.
 pub(crate) fn config_path(
     project: &Path,
     service: &lemonfiber_manifest::Service,
     api_path: Option<&str>,
 ) -> Option<PathBuf> {
-    let path = api_path?;
-    let inside = CONFIG_MOUNTS
-        .iter()
-        .find_map(|mount| path.strip_prefix(mount))?;
+    let inside = beneath(service.container().configuration(), api_path?)?;
     Some(service_config_dir(project, &service.id).join(inside))
+}
+
+/// Where `path` lies beneath the configuration directory mounted at `mount`, where it
+/// is one or more plain names below it.
+fn beneath<'a>(mount: &str, path: &'a str) -> Option<&'a Path> {
+    let inside = Path::new(path.strip_prefix(mount)?.strip_prefix('/')?);
+    plain(inside).then_some(inside)
 }
 
 /// The directory on this machine one of the stack's own services owns: its configuration
@@ -111,13 +102,8 @@ pub(crate) fn plugin_config_path(
     project: &Path,
     placed: &crate::plugin::Placed,
 ) -> Option<PathBuf> {
-    let path = placed.api.as_ref()?.path.as_deref()?;
-    let inside = Path::new(
-        path.strip_prefix(placed.config_path.as_str())?
-            .strip_prefix('/')?,
-    );
-    let directory = plugin_config_dir(project, placed)?;
-    plain(inside).then(|| directory.join(inside))
+    let inside = beneath(&placed.config_path, placed.api.as_ref()?.path.as_deref()?)?;
+    Some(plugin_config_dir(project, placed)?.join(inside))
 }
 
 /// The directory on this machine an installed plugin's service owns: its configuration

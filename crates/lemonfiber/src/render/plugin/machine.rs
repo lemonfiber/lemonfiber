@@ -394,6 +394,8 @@ fn undone(undo: &Undo) -> String {
         Action::Delete { path } => format!("removed {path}"),
         Action::Withdraw { owner, path, .. } => format!("took {owner}'s region out of {path}"),
         Action::Rewind { path, .. } => format!("wrote {path} back as it was"),
+        Action::MoveBack { from, .. } => format!("moved {from} back"),
+        Action::KeepCopy { to, .. } => format!("kept {to}"),
         // Every other shape is a change a plugin install never makes: it writes files
         // and regions and nothing else. Named rather than left to a wildcard so the day
         // one of them can appear here, somebody has to say what it reads as.
@@ -454,7 +456,7 @@ fn container(one: &Installed) -> Lines {
     let mut lines = Lines::default();
     lines.spaced("    The container lemonfiber writes for it, from that and from nothing else:");
     for line in
-        lemonfiber_core::plugin::written(one, &lemonfiber_core::plugin::Reading::bare()).lines()
+        lemonfiber_core::project::entries(one, &lemonfiber_core::project::Reading::bare()).lines()
     {
         lines.put(format!("      {line}"));
     }

@@ -136,22 +136,38 @@ fn the_door_is_https_on_its_own_port_only_with_an_address_and_a_certificate() {
 }
 
 #[test]
-fn the_doors_upstream_address_is_read_from_the_compose_file_that_fixes_it() {
-    let dir = Scratch::named("door-upstream").kept();
-    let _ = std::fs::remove_dir_all(&dir);
-    let _ = std::fs::create_dir_all(dir.join("compose"));
+fn the_doors_upstream_address_is_the_one_the_projects_networks_fix_for_it() {
+    let unguarded = crate::topology::Topology::default();
+    assert_eq!(upstream(&unguarded), None);
+    let guarded = crate::topology::derived(
+        &[
+            crate::topology::Member {
+                id: "door",
+                confined: false,
+                publishes: true,
+                inside: None,
+                fronts: None,
+            },
+            crate::topology::Member {
+                id: "jellyfin",
+                confined: false,
+                publishes: true,
+                inside: None,
+                fronts: None,
+            },
+        ],
+        &[crate::topology::Settled {
+            asker: "door",
+            capability: "media.serve",
+            reached: "jellyfin",
+        }],
+        &[],
+        Some("door"),
+    );
     assert_eq!(
-        upstream(&dir),
-        None,
-        "a stack with no compose file has a door"
+        upstream(&guarded),
+        Some(crate::topology::DOOR_ON_MEDIA.to_string())
     );
-    let _ = std::fs::write(
-        dir.join("compose/media.yml"),
-        "services:\n  door:\n    networks:\n      door:\n        ipv4_address: 10.80.96.2\n      door-upstream:\n        ipv4_address: 10.80.96.18\n",
-    );
-    assert_eq!(upstream(&dir).as_deref(), Some("10.80.96.18"));
-    let _ = std::fs::write(dir.join("compose/media.yml"), "services:\n  jellyfin: {}\n");
-    assert_eq!(upstream(&dir), None);
 }
 
 #[test]

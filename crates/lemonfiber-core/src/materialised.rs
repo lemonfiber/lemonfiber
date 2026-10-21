@@ -110,6 +110,17 @@ impl Materialised {
         self.files.get(path).copied()
     }
 
+    /// Every file lemonfiber has a checksum for.
+    pub fn paths(&self) -> impl Iterator<Item = &str> {
+        self.files.keys().map(String::as_str)
+    }
+
+    /// Forget a file lemonfiber no longer writes.
+    pub fn forget(&mut self, path: &str) {
+        self.files.remove(path);
+        self.seen.remove(path);
+    }
+
     /// Record how a file stands once lemonfiber wrote it or found it current.
     pub fn saw(&mut self, path: &str, seen: Option<Seen>) {
         match seen {

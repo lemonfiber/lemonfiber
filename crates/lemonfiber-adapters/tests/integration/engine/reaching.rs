@@ -288,3 +288,40 @@ async fn a_machine_that_never_answered_describes_no_container() {
         "{refused:?}"
     );
 }
+
+/// How long an engine that never answers may hold a caller: the version question's own
+/// bound, with room for the machine running the test.
+#[cfg(unix)]
+const AT_ONCE: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// An engine whose socket takes the connection and never answers is reported not there
+/// once the version question has gone unanswered, rather than holding the caller for the
+/// whole request timeout.
+#[cfg(unix)]
+#[tokio::test]
+async fn an_engine_that_takes_the_connection_and_never_answers_is_not_there_at_once() {
+    use lemonfiber_ports::docker::Images as _;
+
+    let socket =
+        std::path::PathBuf::from(format!("/tmp/lf-{}-silent-engine.sock", std::process::id()));
+    let _ = std::fs::remove_file(&socket);
+    let Ok(listener) = std::os::unix::net::UnixListener::bind(&socket) else {
+        unreachable!("a socket of the test's own binds at {}", socket.display());
+    };
+    std::thread::spawn(move || {
+        let mut held = Vec::new();
+        for taken in listener.incoming() {
+            held.push(taken);
+        }
+    });
+    let started = std::time::Instant::now();
+
+    let asked = Daemon::at(&socket).images().await;
+    let _ = std::fs::remove_file(&socket);
+
+    assert!(
+        matches!(asked, Err(Failure::Unreachable { .. })),
+        "{asked:?}"
+    );
+    assert!(started.elapsed() < AT_ONCE, "{:?}", started.elapsed());
+}

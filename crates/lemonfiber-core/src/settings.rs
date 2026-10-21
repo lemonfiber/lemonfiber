@@ -1,6 +1,6 @@
 mod changing;
 pub(crate) mod fences;
-mod files;
+pub(crate) mod files;
 pub(crate) mod filing;
 pub(crate) mod kept;
 pub(crate) mod legacy;

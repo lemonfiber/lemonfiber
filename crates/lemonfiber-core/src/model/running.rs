@@ -84,6 +84,11 @@ pub struct LifecycleReport {
     /// service: a move in place on offer, named by every start and taken by none.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub moves: Vec<crate::app::plugins::MoveOffered>,
+    /// Every network the engine holds for the project that the project no longer
+    /// declares, by the engine's name: disconnected and taken away before a start, or
+    /// named and left by a rehearsal. Empty for every other action.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub swept: Vec<String>,
 }
 
 /// The operator's own overlay, named because nothing in it was held to the model.

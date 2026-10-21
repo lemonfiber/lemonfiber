@@ -27,6 +27,7 @@ const LISTING: &str = concat!(
     r#""State":"exited","Status":"Exited (137) 2 hours ago"}]"#
 );
 
+mod holding;
 mod listing;
 mod reaching;
 mod streaming;

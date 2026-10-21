@@ -39,7 +39,7 @@ pub(super) fn an_update() -> lemonfiber_core::update::run::Report {
         changelog: lemonfiber_core::changelog::Notes::unread(),
         backup: Some("/home/op/.local/share/lemonfiber/backups/one.tar.gz".to_owned()),
         stack_edits: vec![lemonfiber_core::model::StackEdit {
-            path: "compose.yml".to_owned(),
+            path: "compose.generated.yml".to_owned(),
             diff: "-yours\n+ours".to_owned(),
         }],
         halted: Some("sonarr did not come back".to_owned()),

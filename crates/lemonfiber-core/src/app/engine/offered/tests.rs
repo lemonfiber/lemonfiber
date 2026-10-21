@@ -33,6 +33,7 @@ fn report(services: &[&str]) -> LifecycleReport {
         offer: None,
         unvetted: None,
         moves: Vec::new(),
+        swept: Vec::new(),
     }
 }
 

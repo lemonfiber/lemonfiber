@@ -137,7 +137,7 @@ pub(super) fn read(manifest: &Manifest, installed: &[Installed], chosen: &Chosen
 
 /// Every stack service the project writes an entry for: all but those the host's own
 /// service manager runs.
-pub(super) fn written(manifest: &Manifest) -> impl Iterator<Item = &Service> {
+pub(crate) fn written(manifest: &Manifest) -> impl Iterator<Item = &Service> {
     manifest
         .services
         .iter()

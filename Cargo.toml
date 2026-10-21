@@ -152,9 +152,8 @@ rustls-pki-types = "1"
 # decided the way the compiler decides it.
 rustc_lexer = { package = "ra-ap-rustc_lexer", version = "0.174" }
 serde_json = "1"
-# Compose files are YAML, and the single-mount rule can only be read from them. A
-# parser rather than line-matching, because anchors, merge keys and both volume
-# syntaxes have to read the way Compose reads them.
+# Compose files are YAML: the project lemonfiber generates is written with it, and the
+# operator's overlay is read with it, anchors and merge keys the way Compose reads them.
 serde_norway = "0.9"
 # The syntax tree the architecture checks read the code as, on the line the
 # workspace's proc macros already build on.

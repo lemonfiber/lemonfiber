@@ -122,15 +122,8 @@ pub struct Settings {
     pub quiet: Option<crate::alert::Quiet>,
     /// The environment file handed to Compose, where one has been written.
     pub env_file: Option<PathBuf>,
-    /// Compose files layered over the stack's own, such as a storage overlay.
+    /// The operator's own Compose files, layered over the project lemonfiber generates.
     pub overlays: Vec<PathBuf>,
-    /// The plugins this machine has installed, by id.
-    ///
-    /// Ids rather than paths, because where a plugin's document lives is a function
-    /// of the directory Compose is pointed at — and that is settled per invocation,
-    /// by whether the stack is the embedded one or one the operator named. A resolved
-    /// path here would be right for one of those and quietly wrong for the other.
-    pub plugins: Vec<String>,
     /// Where an embedded stack is written so Compose can read it.
     ///
     /// Absent until setup has chosen a location, which is why an operator who
@@ -292,7 +285,6 @@ impl Default for Settings {
             quiet: None,
             env_file: None,
             overlays: Vec::new(),
-            plugins: Vec::new(),
             stack_dir: None,
             protocols: Protocols::none(),
             ip_echo: vec![DEFAULT_IP_ECHO.to_owned(), SECOND_IP_ECHO.to_owned()],

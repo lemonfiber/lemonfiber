@@ -31,51 +31,63 @@ fn ctx(into: Option<PathBuf>, env: Option<PathBuf>) -> Ctx {
         .build()
 }
 
+/// A context operating the stack this build carries, materialised under `into`.
+fn carried(into: &Path, env: &Path) -> Ctx {
+    a_context()
+        .over(crate::test_support::embedded())
+        .settings(Settings {
+            stack_dir: Some(into.to_path_buf()),
+            env_file: Some(env.to_path_buf()),
+            ..Settings::default()
+        })
+        .environment(Environment::LinuxNative)
+        .build()
+}
+
+/// What the operator wrote over the project.
+const EDITED: &str = "services:\n  sonarr:\n    image: my-own\n";
+
 #[tokio::test]
 async fn a_confirmed_reset_reverts_an_edited_file_to_lemonfibers() {
     let (into, env) = scratch("confirm");
-    // Materialise, then the operator edits a file.
-    let _ = reset(&ctx(Some(into.to_path_buf()), Some(env.clone())), true).await;
-    let edited = "services:\n  sonarr:\n    image: my-own\n";
-    let _ = std::fs::write(into.join("compose.yaml"), edited);
+    let _ = reset(&carried(&into, &env), true).await;
+    let project = into.join(crate::project::FILE);
+    let _ = std::fs::write(&project, EDITED);
 
-    let report = reset(&ctx(Some(into.to_path_buf()), Some(env)), true)
-        .await
-        .unwrap_or_default();
+    let report = reset(&carried(&into, &env), true).await.unwrap_or_default();
+
     assert!(report.confirmed);
     assert!(
         report
             .reverted
             .iter()
-            .any(|edit| edit.path == "compose.yaml"),
+            .any(|edit| edit.path == crate::project::FILE),
         "the reverted edit is named"
     );
-    // The edit is gone — the file is lemonfiber's own again.
-    assert_ne!(
-        std::fs::read_to_string(into.join("compose.yaml")).unwrap_or_default(),
-        edited
-    );
+    let written = std::fs::read_to_string(&project).unwrap_or_default();
+    assert_ne!(written, EDITED);
+    assert!(written.contains("\n  sonarr:\n"), "{written}");
 }
 
 #[tokio::test]
 async fn an_unconfirmed_reset_previews_and_writes_nothing() {
     let (into, env) = scratch("preview");
-    let _ = reset(&ctx(Some(into.to_path_buf()), Some(env.clone())), true).await;
-    let edited = "services:\n  sonarr:\n    image: my-own\n";
-    let _ = std::fs::write(into.join("compose.yaml"), edited);
+    let _ = reset(&carried(&into, &env), true).await;
+    let project = into.join(crate::project::FILE);
+    let _ = std::fs::write(&project, EDITED);
 
-    let report = reset(&ctx(Some(into.to_path_buf()), Some(env)), false)
+    let report = reset(&carried(&into, &env), false)
         .await
         .unwrap_or_default();
+
     assert!(!report.confirmed);
     assert!(report
         .reverted
         .iter()
-        .any(|edit| edit.path == "compose.yaml"));
-    // The preview touched nothing.
+        .any(|edit| edit.path == crate::project::FILE));
     assert_eq!(
-        std::fs::read_to_string(into.join("compose.yaml")).unwrap_or_default(),
-        edited
+        std::fs::read_to_string(&project).unwrap_or_default(),
+        EDITED
     );
 }
 
@@ -94,4 +106,26 @@ async fn a_reset_over_an_unreadable_choice_is_an_error() {
     assert!(reset(&ctx(Some(into.to_path_buf()), Some(env)), true)
         .await
         .is_err());
+}
+
+#[tokio::test]
+async fn a_reset_over_a_stack_that_does_not_pass_its_checks_is_an_error() {
+    let (into, env) = scratch("unchecked");
+
+    let refused = reset(&ctx(Some(into.to_path_buf()), Some(env)), true)
+        .await
+        .err();
+
+    assert!(
+        refused.is_some_and(|problem| problem.code.as_str().starts_with("STACK-")),
+        "refused by the stack's own checks"
+    );
+}
+
+#[tokio::test]
+async fn a_reset_whose_project_cannot_be_written_is_an_error() {
+    let (into, env) = scratch("unwritable-project");
+    let _ = std::fs::create_dir_all(into.join(crate::project::FILE));
+
+    assert!(reset(&carried(&into, &env), true).await.is_err());
 }

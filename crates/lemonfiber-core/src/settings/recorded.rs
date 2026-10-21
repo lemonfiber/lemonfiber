@@ -24,10 +24,16 @@ impl Recorded {
     }
 
     pub(crate) fn value(&self, name: &str) -> Option<&str> {
-        if legacy::setting_key(name).is_some() {
-            legacy::value(&self.env, name)
-        } else {
-            self.settings.value(name)
-        }
+        self.settings
+            .value(name)
+            .or_else(|| legacy::value(&self.env, name))
+    }
+
+    pub(crate) const fn env(&self) -> &EnvFile {
+        &self.env
+    }
+
+    pub(crate) fn line(&self, key: &str) -> Option<&str> {
+        self.env.get(key)
     }
 }

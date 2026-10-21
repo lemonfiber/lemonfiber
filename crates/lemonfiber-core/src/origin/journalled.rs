@@ -12,10 +12,11 @@
 //! the tests, the same shape an install writes. The day recipes apply, these answers
 //! appear with no change here.
 //!
-//! **Which operations are plugins is read from the journal too.** An install records
-//! the Compose document it writes for the plugin at a path named after it, under an
-//! operation that is the plugin's own — so an operation that made its plugin's document
-//! is that plugin's. A name list kept here would drift from the operations lemonfiber
+//! **Which operations are plugins is read from the journal too.** Every change an
+//! install makes is journalled under the plugin's own operation, which names it. A
+//! journal can also hold a plugin's writes under its bare id, and such an operation is
+//! the plugin's where it made the Compose document a plugin's was kept in, at a path
+//! named after it. A name list kept here would drift from the operations lemonfiber
 //! actually runs.
 
 use std::collections::BTreeMap;
@@ -172,22 +173,32 @@ fn wrote(
     Origin::Operator
 }
 
-/// Every operation in the journal that is a plugin's, with the plugin it is: one that
-/// recorded making that plugin's own Compose document.
+/// Where a plugin's own Compose document was kept beneath the stack directory, which a
+/// journal holding a plugin's writes under its bare id names.
+const DOCUMENTS: &str = "compose/plugins";
+
+/// Every operation in the journal that is a plugin's, with the plugin it is.
 fn plugins(changes: &[Change]) -> BTreeMap<String, String> {
     changes
         .iter()
         .filter_map(|change| {
-            let Kind::Made { path } = &change.kind else {
-                return None;
-            };
-            let path = Path::new(path);
-            let plugin = path.file_stem()?.to_str()?;
-            let document = Path::new(crate::plugin::OVERLAYS).join(format!("{plugin}.yml"));
-            (path.ends_with(document) && crate::plugin::owns(plugin, change))
-                .then(|| (change.operation.clone(), plugin.to_owned()))
+            let plugin = crate::plugin::owned_by(&change.operation)
+                .map(str::to_owned)
+                .or_else(|| documented(change))?;
+            crate::plugin::owns(&plugin, change).then(|| (change.operation.clone(), plugin))
         })
         .collect()
+}
+
+/// The plugin whose Compose document `change` made, where it made one.
+fn documented(change: &Change) -> Option<String> {
+    let Kind::Made { path } = &change.kind else {
+        return None;
+    };
+    let path = Path::new(path);
+    let plugin = path.file_stem()?.to_str()?;
+    path.ends_with(Path::new(DOCUMENTS).join(format!("{plugin}.yml")))
+        .then(|| plugin.to_owned())
 }
 
 #[cfg(test)]

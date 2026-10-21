@@ -11,12 +11,10 @@
 //! [`crate::journal::Kind::Made`], which the rollback layer already classifies as
 //! reversible in full and already undoes by removing exactly the path that was made.
 //!
-//! **One file per plugin rather than one file for all of them.** A single shared
-//! document would be rewritten by every install and every removal, which makes each
-//! of those a change to a file that already existed — and the honest journal entry
-//! for that is not `Made`. Per plugin, an install creates exactly one document and a
-//! removal removes exactly the one it created, so what the record says and what the
-//! reversal does are the same sentence.
+//! **The project is the one file every plugin shares.** Its entries are written into the
+//! project lemonfiber generates for the whole stack, so an install writes the project
+//! over and journals what it held before ([`crate::journal::Kind::Rewritten`]), or makes
+//! it where there was none.
 //!
 //! **The exception is the stack's own wiring.** The proxy reads one file and the
 //! dashboard another, and a plugin's service is reachable through the first and
@@ -35,14 +33,6 @@ use std::path::{Path, PathBuf};
 use super::container::Reading;
 use super::installed::Installed;
 use crate::project::entry::{CONFIGURATION_TREE, MOUNT_TREE};
-
-/// The directory beneath the stack where a plugin's Compose document is written.
-///
-/// Inside the stack directory because Compose resolves `extends.file` against the
-/// document that declares it, and the entry lemonfiber writes extends the stack's
-/// own template by a relative path. A document kept anywhere else would name a
-/// template that is not there.
-pub(crate) const OVERLAYS: &str = "compose/plugins";
 
 /// One thing an install puts on the machine.
 ///
@@ -66,8 +56,13 @@ pub enum Lands {
         /// The stack directory it lies beneath.
         beneath: PathBuf,
     },
-    /// A file written whole, holding this.
-    Document(String),
+    /// The generated project, written whole with the plugin's entries in it.
+    Document {
+        /// What the project held before, where there was one.
+        previous: Option<String>,
+        /// What it is to hold.
+        text: String,
+    },
     /// The key lemonfiber asks the plugin's adapter with, minted as it is written.
     Key,
     /// A service's own secrets file, each variable's value read as it is written.
@@ -95,11 +90,12 @@ impl Write {
         }
     }
 
-    /// A file the install writes, and what it holds.
-    const fn file(path: PathBuf, content: String) -> Self {
+    /// The generated project at `path`, holding `previous` now and `text` once written.
+    #[must_use]
+    pub const fn project(path: PathBuf, previous: Option<String>, text: String) -> Self {
         Self {
             path,
-            lands: Lands::Document(content),
+            lands: Lands::Document { previous, text },
         }
     }
 
@@ -128,15 +124,6 @@ impl Write {
     pub const fn is_directory(&self) -> bool {
         matches!(self.lands, Lands::Directory { .. })
     }
-}
-
-/// Where a plugin's Compose document is written, beneath the stack directory.
-///
-/// Public because the settings have to layer it on every invocation, and a caller
-/// that rebuilt the path itself would be a second answer to where it is.
-#[must_use]
-pub fn overlay(stack: &Path, plugin: &str) -> PathBuf {
-    stack.join(OVERLAYS).join(format!("{plugin}.yml"))
 }
 
 /// Where the key lemonfiber asks a plugin's adapter service with is kept: in that
@@ -174,50 +161,27 @@ fn configuration(stack: &Path, service: &str) -> PathBuf {
     stack.join(CONFIGURATION_TREE).join(service)
 }
 
-/// Every Compose document the installed plugins contribute, in the order Compose
-/// reads them.
-///
-/// Read off the register rather than by listing the directory the documents sit in.
-/// A listing would run whatever it found there, which turns a file somebody dropped
-/// in by hand into a service in the stack — and the register is the only thing that
-/// says what this machine agreed to install.
-///
-/// A plugin whose document has gone missing is named anyway rather than skipped.
-/// Compose refuses a file it cannot read, which is the honest outcome: the register
-/// says the plugin is installed, and a run that quietly started the stack without it
-/// would be answering for a stack the operator does not have.
-///
-/// Named by id and joined here rather than carried as resolved paths, because where
-/// a document lives depends on which directory this invocation calls the project
-/// root — and a path settled anywhere else would be right for the embedded stack and
-/// quietly wrong for one the operator named.
-///
-/// In the register's own order, which is the plugins' ids — so the invocation is the
-/// same twice and a cached Compose project does not churn for no reason.
-#[must_use]
-pub fn documents(installed: &[String], stack: &Path) -> Vec<PathBuf> {
-    installed
-        .iter()
-        .map(|plugin| overlay(stack, plugin))
-        .collect()
-}
-
 /// Everything installing this plugin writes, in the order it is written.
 ///
 /// Ordered, and the order is load-bearing twice over. The configuration directories
-/// come first because the Compose document mounts them, so a stop between the two
-/// leaves directories nothing references rather than an entry mounting a directory
-/// that is not there. And within the directories a parent comes before its child, so
-/// a reversal walking the record backwards removes the child first.
+/// come first because the project mounts them, so a stop between the two leaves
+/// directories nothing references rather than an entry mounting a directory that is not
+/// there. And within the directories a parent comes before its child, so a reversal
+/// walking the record backwards removes the child first.
 ///
-/// The document comes after them for the same reason the applied marker is last in an
-/// apply: it is the write that makes the rest take effect, so a run that stopped short
-/// of it has changed nothing Compose will read. The proxy's region and the dashboard's
+/// `project`, where the project changes, comes after them for the same reason the applied
+/// marker is last in an apply: it is the write that makes the rest take effect, so a run
+/// that stopped short of it has changed nothing Compose will read. The proxy's region and the dashboard's
 /// follow it, because a route to a service that is not declared is a route to nothing.
 /// Each is planned only where it would hold something, so a plugin whose services
 /// nothing reaches writes into neither.
 #[must_use]
-pub fn writes(installed: &Installed, stack: &Path, reading: &Reading<'_>) -> Vec<Write> {
+pub fn writes(
+    installed: &Installed,
+    stack: &Path,
+    reading: &Reading<'_>,
+    project: Option<Write>,
+) -> Vec<Write> {
     let mut planned: Vec<Write> = installed
         .services
         .iter()
@@ -249,10 +213,7 @@ pub fn writes(installed: &Installed, stack: &Path, reading: &Reading<'_>) -> Vec
             lands: Lands::Secrets(super::container::variables(installed, placed, reading)),
         })
     }));
-    planned.push(Write::file(
-        overlay(stack, &installed.plugin),
-        super::container::written(installed, reading),
-    ));
+    planned.extend(project);
     let owner = super::owning::owner(&installed.plugin);
     for (key, body) in [
         (super::fronting::PROXY, super::fronting::proxied(installed)),

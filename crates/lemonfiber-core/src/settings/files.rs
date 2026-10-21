@@ -41,7 +41,7 @@ pub(crate) fn written_by(
     plugins: &[&Installed],
     resolved: &Resolved,
 ) -> Result<(), Failure> {
-    let planned = resolved.reading(&|_, _| None, |reading| {
+    let planned = resolved.reading(|reading| {
         plugins
             .iter()
             .flat_map(|plugin| {

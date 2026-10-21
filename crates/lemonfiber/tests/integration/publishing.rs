@@ -1,23 +1,15 @@
 //! Which interface the stack this binary carries publishes each port on.
 //!
-//! Read from the embedded copy — the same `STACK` the binary writes to an
-//! operator's disk — rather than from the checked-out submodule. The embedded copy
-//! is the artifact: those are the bytes a machine ends up running, and the
-//! directory beside them belongs to another repository that a clone need not have
-//! populated at all. The bytes are fixed into this test binary when it is
-//! compiled, and `build.rs` refuses to produce a build without them, so there is
-//! no arrangement in which this reads an empty directory and finds nothing to
-//! object to.
-//!
-//! The stack's own repository checks this too, against the same manifest. It
-//! checks it on its own pull requests, which is not the moment a stack arrives
-//! here — moving the submodule pin brings in a whole stack and runs none of that
-//! repository's gates. This one runs wherever this binary is built.
+//! Read from the project generated from the embedded copy — the same `STACK` the binary
+//! runs — rather than from the checked-out submodule. Those are the entries a machine
+//! ends up running, and the directory beside them belongs to another repository that a
+//! clone need not have populated at all. The bytes are fixed into this test binary when
+//! it is compiled, and `build.rs` refuses to produce a build without them, so there is
+//! no arrangement in which this reads nothing and finds nothing to object to.
 
 use std::collections::BTreeSet;
 use std::net::IpAddr;
 
-use include_dir::Dir;
 use lemonfiber::carried::STACK;
 use lemonfiber_core::config::env::EnvFile;
 use lemonfiber_manifest::{Bind, Service};
@@ -25,15 +17,16 @@ use lemonfiber_manifest::{Bind, Service};
 /// The address a service reachable only from the host machine is published on.
 const LOOPBACK: &str = "127.0.0.1";
 
-/// The one setting that decides which interface the household tier is published on.
+/// An address the operator narrowed the household tier to, which no mapping writes
+/// unless the one setting brought it there.
 ///
-/// A knob rather than an address, because the stack has no way to learn which of a
-/// host's addresses is the LAN one: that varies by machine, changes with DHCP, and is
-/// different again on a laptop that moves. So the default is every interface and the
-/// operator is told so, which is the honest half of the trade — and this is the word
-/// every household mapping has to be written through, so narrowing it narrows all of
+/// The setting is a knob rather than an address, because the stack has no way to learn
+/// which of a host's addresses is the LAN one: that varies by machine, changes with
+/// DHCP, and is different again on a laptop that moves. So the default is every
+/// interface and the operator is told so, which is the honest half of the trade — and
+/// every household mapping has to be written from it, so narrowing it narrows all of
 /// them at once.
-const LAN_BIND: &str = "${LAN_BIND";
+const NARROWED: &str = "192.0.2.7";
 
 /// The file the stack ships its settings in, which an operator's own starts from.
 const SETTINGS_FILE: &str = ".env.example";
@@ -91,7 +84,7 @@ const HOUSEHOLD: &[(&str, &str)] = &[
 ];
 
 /// One published port: which service publishes it, on what address, and where
-/// that was written.
+/// that is written.
 struct Publication {
     /// The Compose service carrying the `ports:` entry.
     service: String,
@@ -103,86 +96,39 @@ struct Publication {
     file: String,
 }
 
-/// Every port the embedded stack publishes.
-fn publications() -> Vec<Publication> {
-    let mut yaml = Vec::new();
-    collect(&STACK, &mut yaml);
+/// Every port the project generated from the embedded stack publishes, where the
+/// operator's environment file holds `operator`.
+fn publications(operator: &dyn Fn(&str) -> Option<String>) -> Vec<Publication> {
+    let document = generated_reading(operator);
     let mut found = Vec::new();
-    for (file, text) in yaml {
-        found.append(&mut published_in(&file, &text));
+    let services = document
+        .get("services")
+        .and_then(serde_norway::Value::as_mapping)
+        .into_iter()
+        .flatten();
+    for (service, entry) in services {
+        let ports = entry
+            .get("ports")
+            .and_then(serde_norway::Value::as_sequence)
+            .into_iter()
+            .flatten()
+            .filter_map(serde_norway::Value::as_str);
+        found.extend(
+            ports
+                .filter_map(mapping)
+                .map(|(port, address)| Publication {
+                    service: service.as_str().unwrap_or_default().to_owned(),
+                    port,
+                    address,
+                    file: lemonfiber_core::project::FILE.to_owned(),
+                }),
+        );
     }
     assert!(
         !found.is_empty(),
         "the embedded stack publishes no ports at all, which means this is reading the wrong thing"
     );
     found
-}
-
-/// Every YAML file in the embedded stack, with its path.
-fn collect(dir: &Dir<'_>, into: &mut Vec<(String, String)>) {
-    for file in dir.files() {
-        let path = file.path();
-        let yaml = path.extension().is_some_and(|kind| {
-            kind.eq_ignore_ascii_case("yml") || kind.eq_ignore_ascii_case("yaml")
-        });
-        if !yaml {
-            continue;
-        }
-        if let Some(text) = file.contents_utf8() {
-            into.push((path.to_string_lossy().replace('\\', "/"), text.to_owned()));
-        }
-    }
-    for child in dir.dirs() {
-        collect(child, into);
-    }
-}
-
-/// The ports one Compose file publishes.
-///
-/// Read as text rather than as YAML, because what is being checked is a string an
-/// author typed — `127.0.0.1:8989:8989` — and a parser would hand back the same
-/// string having also brought in a dependency. Commented-out lines are skipped:
-/// a mapping nobody applies is not a mapping.
-fn published_in(file: &str, text: &str) -> Vec<Publication> {
-    let mut found = Vec::new();
-    let mut service = String::new();
-    let mut listing = false;
-    for line in text.lines() {
-        let trimmed = line.trim_start();
-        if trimmed.is_empty() || trimmed.starts_with('#') {
-            continue;
-        }
-        let indent = line.len() - trimmed.len();
-        if indent == 0 {
-            service.clear();
-            listing = false;
-            continue;
-        }
-        if indent == 2 && trimmed.ends_with(':') {
-            trimmed.trim_end_matches(':').clone_into(&mut service);
-            listing = false;
-            continue;
-        }
-        listing = trimmed.starts_with("ports:") || (listing && trimmed.starts_with('-'));
-        if !listing {
-            continue;
-        }
-        found.extend(mappings(trimmed).map(|(port, address)| Publication {
-            service: service.clone(),
-            port,
-            address,
-            file: file.to_owned(),
-        }));
-    }
-    found
-}
-
-/// The port mappings written on one line of a `ports:` entry.
-///
-/// Every double-quoted run on the line, which is how a mapping is always written
-/// here — the surrounding YAML is flow or block sequence syntax either way.
-fn mappings(line: &str) -> impl Iterator<Item = (u16, String)> + '_ {
-    line.split('"').skip(1).step_by(2).filter_map(mapping)
 }
 
 /// The host port and address one mapping publishes on.
@@ -213,27 +159,43 @@ fn numeric(word: &str) -> bool {
     !word.is_empty() && word.chars().all(|digit| digit.is_ascii_digit())
 }
 
-/// The address a mapping written through the knob falls back to.
-///
-/// `${LAN_BIND:-0.0.0.0}` is Compose's own form for *this unless the operator's file
-/// says otherwise*, and what follows `:-` is the unless. A mapping written through
-/// the knob with no fallback at all has none: Compose expands an unset variable to
-/// nothing, which happens to publish on every interface, and a default arrived at by
-/// an expansion nobody wrote down is not one anybody argued for.
-fn falls_back_to(address: &str) -> Option<&str> {
-    address
-        .strip_prefix(LAN_BIND)?
-        .strip_suffix('}')?
-        .strip_prefix(":-")
-}
-
-/// The manifest the embedded stack declares itself with: its root and every service's
-/// file, read the way the binary reads them.
-fn declared() -> Vec<Service> {
+/// The manifest the embedded stack declares itself with, read the way the binary reads
+/// it.
+fn manifest() -> lemonfiber_manifest::Manifest {
     let Ok(manifest) = lemonfiber_core::stack::Source::Embedded(&STACK).manifest() else {
         unreachable!("the build refuses to produce this binary against a manifest it cannot read")
     };
-    manifest.services
+    manifest
+}
+
+/// The project generated from the embedded stack, as Compose would read it.
+pub(super) fn generated() -> serde_norway::Value {
+    generated_reading(&|_| None)
+}
+
+/// The project generated from the embedded stack, where the operator's environment file
+/// holds `operator`.
+fn generated_reading(operator: &dyn Fn(&str) -> Option<String>) -> serde_norway::Value {
+    let project = lemonfiber_core::project::generated(
+        &manifest(),
+        &[],
+        &lemonfiber_core::wiring::Chosen::read(None),
+        &lemonfiber_core::project::Reading {
+            operator,
+            ..lemonfiber_core::project::Reading::bare()
+        },
+    );
+    serde_norway::from_str(&project.text).unwrap_or_default()
+}
+
+/// What an operator's environment file holds where they narrowed the household tier.
+fn narrowed(key: &str) -> Option<String> {
+    (key == SETTING).then(|| NARROWED.to_owned())
+}
+
+/// Every service the embedded stack declares.
+fn declared() -> Vec<Service> {
+    manifest().services
 }
 
 /// The services the manifest says the household reaches.
@@ -255,7 +217,7 @@ fn household_in(services: &[Service]) -> BTreeSet<&str> {
 #[test]
 fn nothing_is_published_beyond_loopback_without_a_declared_reason() {
     let household: BTreeSet<&str> = HOUSEHOLD.iter().map(|(id, _)| *id).collect();
-    let beyond: Vec<String> = publications()
+    let beyond: Vec<String> = publications(&|_| None)
         .into_iter()
         .filter(|published| published.address != LOOPBACK)
         .filter(|published| !household.contains(published.service.as_str()))
@@ -284,7 +246,7 @@ fn nothing_is_published_beyond_loopback_without_a_declared_reason() {
 /// the tunnel it borrows one from.
 #[test]
 fn every_service_the_stack_calls_admin_is_published_on_loopback() {
-    let published = publications();
+    let published = publications(&|_| None);
     let mut wrong: Vec<String> = Vec::new();
     for service in declared() {
         let Some(port) = service.port else { continue };
@@ -358,8 +320,7 @@ fn every_household_service_says_why_it_is_one() {
 /// service quietly pinned to loopback is a library nobody can watch, and it would pass
 /// every check on this page that only looks for things reaching too far.
 ///
-/// Held through the knob rather than through the address it defaults to, because what
-/// makes this configurable is that every one of them is written the same way: a
+/// Held by narrowing the knob and finding every one of them moved with it, because a
 /// mapping that spelled an address out would be one the operator's own setting does
 /// not reach.
 #[test]
@@ -370,7 +331,7 @@ fn every_household_service_is_published_through_the_one_setting_that_narrows_the
         !household.is_empty(),
         "the manifest calls no service a household one, so this checks nothing"
     );
-    let published = publications();
+    let published = publications(&narrowed);
     let mut wrong: Vec<String> = Vec::new();
     for service in &services {
         let Some(port) = service.port else { continue };
@@ -389,7 +350,7 @@ fn every_household_service_is_published_through_the_one_setting_that_narrows_the
         );
         wrong.extend(
             mapped
-                .filter(|found| !found.address.starts_with(LAN_BIND))
+                .filter(|found| found.address != NARROWED)
                 .map(|found| format!("{}: {} on {:?}", found.file, service.id, found.address)),
         );
     }
@@ -410,9 +371,9 @@ fn every_household_service_is_published_through_the_one_setting_that_narrows_the
 /// the requirement rather than an implementation detail of it.
 ///
 /// Both places the default is written are read, because either one alone would be a
-/// default the other could contradict: the fallback inside each mapping, which is what
-/// applies where the operator's file names nothing, and the value the stack's own
-/// settings file ships, which is what that file starts from.
+/// default the other could contradict: the address each mapping is written with where
+/// the operator's file names nothing, and the value the stack's own settings file
+/// ships, which is what that file starts from.
 #[test]
 fn the_one_setting_that_narrows_the_household_tier_reaches_the_network_until_it_is_narrowed() {
     let services = declared();
@@ -422,14 +383,13 @@ fn the_one_setting_that_narrows_the_household_tier_reaches_the_network_until_it_
         .filter(|service| household.contains(service.id.as_str()))
         .filter_map(|service| service.port)
         .collect();
-    let mut defaults: Vec<(String, String)> = publications()
+    let mut defaults: Vec<(String, String)> = publications(&|_| None)
         .into_iter()
         .filter(|published| ports.contains(&published.port))
         .map(|published| {
-            let written = falls_back_to(&published.address).unwrap_or_default();
             (
                 format!("{}: {}", published.file, published.address),
-                written.to_owned(),
+                published.address,
             )
         })
         .collect();

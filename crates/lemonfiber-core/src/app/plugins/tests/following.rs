@@ -241,8 +241,8 @@ async fn a_service_naming_a_captured_secret_reads_it_from_its_own_file() {
         "the account names the secrets file"
     );
     let file = secrets_file(&ctx);
-    let stack = ctx.settings.stack_dir.clone().unwrap_or_default();
-    let document = read(&crate::plugin::overlay(&stack, "komga"));
+    let stack = stack_of(&ctx);
+    let document = read(&stack.join(crate::project::FILE));
     assert!(
         document.contains(&format!("env_file:\n    - {}", file.display())),
         "{document}"
@@ -288,8 +288,8 @@ async fn a_secret_nothing_holds_yet_leaves_its_file_there_and_empty() {
     };
     assert!(report(plugins(&ctx, &Asked::Install { source, consent }).await).is_some());
     let file = secrets_file(&ctx);
-    let stack = ctx.settings.stack_dir.clone().unwrap_or_default();
-    let document = read(&crate::plugin::overlay(&stack, "komga"));
+    let stack = stack_of(&ctx);
+    let document = read(&stack.join(crate::project::FILE));
     assert!(document.contains("env_file:"), "{document}");
     assert!(file.is_file());
     assert_eq!(read(&file), "");
@@ -705,12 +705,13 @@ async fn an_update_runs_the_new_versions_recipes_and_reports_them() {
 #[tokio::test]
 async fn an_update_whose_recipe_does_not_hold_puts_the_old_version_back() {
     let runner = Arc::new(Recording::answering(Ok(spoke(""))));
-    let ctx = proving("update-unheld", runner, claiming(500, "{}"))
+    let mut ctx = proving("update-unheld", runner, claiming(500, "{}"))
         .with_asking(Typing::answering("1234"));
     assert_eq!(
         counted(installing(&ctx, &source("update-unheld", PROVING)).await),
         Some(1)
     );
+    ctx.seams.clock = lemonfiber_fixtures::ports::Stopped::into_today(60);
     let problem = updating(&ctx, &source("update-unheld-next", &with_recipe(&next())))
         .await
         .err();

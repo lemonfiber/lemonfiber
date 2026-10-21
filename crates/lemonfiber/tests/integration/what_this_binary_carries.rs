@@ -83,53 +83,50 @@ fn every_file<'a>(dir: &'a include_dir::Dir<'a>, into: &mut Vec<&'a include_dir:
     }
 }
 
-/// What the carried manifest and compose files say, with their comments left out.
-fn what_the_stack_says() -> String {
-    let mut said = String::new();
-    let mut carried = Vec::new();
-    every_file(&STACK, &mut carried);
-    for file in carried.into_iter().filter(|file| {
-        let name = file.path().to_string_lossy();
-        name == "stack.toml" || name.ends_with(".yml")
-    }) {
-        for line in file.contents_utf8().unwrap_or_default().lines() {
-            if line.trim_start().starts_with('#') {
-                continue;
-            }
-            said.push_str(line.split(" #").next().unwrap_or_default());
-            said.push('\n');
-        }
-    }
-    said
+/// Every path beneath the stack directory a service of the generated project mounts.
+fn mounted_from_the_stack() -> Vec<String> {
+    let document = super::publishing::generated();
+    document
+        .get("services")
+        .and_then(serde_norway::Value::as_mapping)
+        .into_iter()
+        .flatten()
+        .filter_map(|(_, entry)| entry.get("volumes")?.as_sequence())
+        .flatten()
+        .filter_map(serde_norway::Value::as_str)
+        .filter_map(|volume| volume.strip_prefix("./")?.split(':').next())
+        .map(str::to_owned)
+        .collect()
 }
 
-/// Every file the stack's own manifest and compose files name is carried, and the
-/// repository the stack is published from is not.
+/// Every path beneath the stack directory the generated project mounts is carried
+/// wherever the stack's repository or a part's copy holds it, and the repository itself
+/// is not.
 ///
-/// The carried set is chosen at build time from what those files reference. This
-/// reads them another way — any mention of a file's path outside a comment — so a
-/// reference the choosing misses is a file this fails on rather than a mount that
-/// comes up empty on an operator's machine.
+/// The carried set is chosen at build time from the manifest and the parts' trees.
+/// This reads the project those are run as instead, so a mount the choosing misses is
+/// a path this fails on rather than a mount that comes up empty on an operator's
+/// machine.
 #[test]
-fn what_the_stack_names_is_carried_and_its_repository_is_not() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/media-stack");
-    let mut files = Vec::new();
-    stack_files(&root, std::path::Path::new(""), &mut files);
-    let said = what_the_stack_says();
-    let named: Vec<&String> = files
-        .iter()
-        .filter(|file| said.contains(file.as_str()))
-        .collect();
+fn what_the_project_mounts_is_carried_and_the_stack_s_repository_is_not() {
+    let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
+    let copies = assets.join("plugins").join(lemonfiber_bundle::COPIES);
+    let held = |path: &str| {
+        assets.join("media-stack").join(path).exists()
+            || path
+                .split('/')
+                .nth(1)
+                .is_some_and(|id| copies.join(id).join(path).exists())
+    };
+    let mounted = mounted_from_the_stack();
     assert!(
-        named
-            .iter()
-            .any(|file| file.as_str() == "scripts/push-port.sh"),
-        "the mention reader found the one script a service mounts"
+        mounted.iter().any(|path| path == "config/caddy"),
+        "the generated project mounts no starting configuration, so this reads the wrong thing"
     );
-    for file in named {
+    for path in mounted.iter().filter(|path| held(path)) {
         assert!(
-            STACK.get_file(file).is_some(),
-            "{file} is named by the stack and not carried"
+            STACK.get_dir(path).is_some() || STACK.get_file(path).is_some(),
+            "{path} is mounted by the project and not carried"
         );
     }
     assert!(

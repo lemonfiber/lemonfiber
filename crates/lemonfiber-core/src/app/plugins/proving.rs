@@ -47,11 +47,10 @@ const POLL: Duration = Duration::from_millis(500);
 /// Start the plugin's own services, and nothing else of the stack.
 ///
 /// A plan of its own rather than a form's: what has to come up is the profile this
-/// plugin's container was written into and the services in it, and starting a form
-/// would start whatever else that form carries. The settings are the machine's with
-/// this plugin added, because the document that declares the service is layered off
-/// the register and the register does not hold it yet — it is written last, once the
-/// proofs have held.
+/// plugin's services were written into, the profile of any service they run inside, and
+/// the services themselves, and starting a form would start whatever else that form
+/// carries. The project already declares them: it is written before the register is,
+/// which happens last, once the proofs have held.
 ///
 /// # Errors
 ///
@@ -136,11 +135,11 @@ pub(crate) async fn removed(ctx: &Ctx, installed: &Installed, stack: &Path) -> b
 /// verb and in nothing else — and an invocation built twice is an invocation that can
 /// name a different project on the way out than it did on the way in.
 fn invocation(ctx: &Ctx, installed: &Installed, stack: &Path, action: &Action) -> Vec<String> {
-    let mut settings = ctx.settings.clone();
-    settings.plugins.push(installed.plugin.clone());
     let plan = Plan {
         forms: Vec::new(),
-        profiles: std::iter::once(crate::plugin::profile(&installed.plugin)).collect(),
+        profiles: std::iter::once(crate::plugin::profile(&installed.plugin))
+            .chain(super::super::project::hosting_with(ctx, installed))
+            .collect(),
         services: installed
             .services
             .iter()
@@ -151,7 +150,7 @@ fn invocation(ctx: &Ctx, installed: &Installed, stack: &Path, action: &Action) -
         footprint: crate::stack::closure::Footprint::default(),
         running: crate::stack::closure::Running::Unasked,
     };
-    build(&plan, &settings, stack, action, ctx.environment)
+    build(&plan, &ctx.settings, stack, action, ctx.environment)
 }
 
 /// The stack's proxy, as its Compose service and the profile that runs it.

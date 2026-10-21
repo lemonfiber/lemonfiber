@@ -53,15 +53,16 @@ spend a contract change on.
 ```
 docker compose --project-name lemonfiber \
   --project-directory /opt/lemonfiber/stack \
-  --file /opt/lemonfiber/stack/compose.yml \
+  --file /opt/lemonfiber/stack/compose.generated.yml \
   --profile media up --detach
 ```
 
-The stack's fragments carry `project_directory: .` deliberately: without it a
-fragment's relative paths resolve against `compose/` rather than the project
-root, and `./config/sonarr` silently becomes `compose/config/sonarr`. Passing
-the file without also naming the directory reintroduces exactly that, from a
-different direction.
+The generated project mounts each service's paths relative to the project
+directory — `./config/sonarr`, `./mounts/caddy/data` — and an operator's overlay
+is a second `--file` that can live anywhere. Compose resolves every relative path
+against the project directory, which it otherwise takes from the first file's
+location; naming it keeps the project's paths and an overlay's resolving against
+the stack, wherever the overlay is kept.
 
 `--project-name` is not cosmetic either — it is what Compose stamps on every
 container as a label, and those labels are how the Engine API reads are

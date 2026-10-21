@@ -10,11 +10,8 @@
 //! - **Each part's starting configuration:** an assembled part's from its copy in the
 //!   bundle, which holds its tree and nothing beside it; an installed part's from the
 //!   media stack, which declares it until it moves.
-//! - **What the media stack runs it with:** its compose files and every fragment, the
-//!   stack variants, the settings file the configuration surface reads and the licence
-//!   it is published under, until the compose files are written from the manifest.
-//! - **What a compose file names:** a file on the host a service mounts, or reads its
-//!   environment from, wherever it lives.
+//! - **What the media stack publishes beside it:** the settings file the configuration
+//!   surface reads and the licence it is published under.
 //! - **What a claim names:** every recording the manifest's claims are proven against,
 //!   from the part's copy where it holds it. A recording a claim names and nothing
 //!   holds refuses the build, because a claim nothing can prove is a stack that
@@ -25,23 +22,14 @@ use std::path::{Component, Path, PathBuf};
 
 use lemonfiber_bundled::{Stage, PINNED, STACK};
 
+/// The licence the media stack is published under, relative to its root.
+pub const LICENCE: &str = "LICENSE";
+
 /// The media stack's files carried whole, relative to its root.
-const WHOLE_FILES: [&str; 3] = [COMPOSE, ".env.example", "LICENSE"];
-
-/// The media stack's compose file, relative to its root.
-pub const COMPOSE: &str = "compose.yml";
-
-/// The media stack's directories carried whole, relative to its root.
-const WHOLE_DIRECTORIES: [&str; 2] = ["compose", "stacks"];
+const WHOLE_FILES: [&str; 2] = [".env.example", LICENCE];
 
 /// Where a part's starting configuration is, relative to a stack's root or its copy's.
 const CONFIG: &str = "config";
-
-/// What a reference to a file beside the compose file starts with.
-const BESIDE: &str = "./";
-
-/// The extensions a compose file is written with.
-const COMPOSED: [&str; 2] = ["yml", "yaml"];
 
 /// Where a carried file's bytes come from.
 enum Carried {
@@ -85,43 +73,12 @@ fn runtime(media: &Path, copies: &Path) -> BTreeMap<PathBuf, Carried> {
             carried.insert(relative.clone(), Carried::File(media.join(relative)));
         }
     }
-    for directory in WHOLE_DIRECTORIES {
-        from(media, Path::new(directory), &mut carried);
-    }
     for pinned in PINNED {
         let id = pinned.first_party.plugin;
         let starting = Path::new(CONFIG).join(id);
         match pinned.stage {
             Some(Stage::Assembled) => from(&copies.join(id), &starting, &mut carried),
             _ => from(media, &starting, &mut carried),
-        }
-    }
-    let composed: Vec<PathBuf> = carried
-        .iter()
-        .filter(|(relative, _)| {
-            relative
-                .extension()
-                .is_some_and(|extension| COMPOSED.iter().any(|composed| extension == *composed))
-        })
-        .filter_map(|(_, from)| match from {
-            Carried::File(path) => Some(path.clone()),
-            Carried::Text(_) => None,
-        })
-        .collect();
-    for file in composed {
-        let text = std::fs::read_to_string(file).unwrap_or_default();
-        let named = serde_norway::from_str::<serde_norway::Value>(&text)
-            .map(|document| mounted(&document))
-            .unwrap_or_default();
-        for relative in named
-            .iter()
-            .filter_map(|source| source.strip_prefix(BESIDE))
-            .map(PathBuf::from)
-            .filter(|relative| beneath(relative) && media.join(relative).is_file())
-        {
-            carried
-                .entry(relative.clone())
-                .or_insert_with(|| Carried::File(media.join(relative)));
         }
     }
     carried.extend(proven(media, copies));
@@ -169,46 +126,6 @@ fn from(root: &Path, directory: &Path, into: &mut BTreeMap<PathBuf, Carried>) {
             }
             _ => {}
         }
-    }
-}
-
-/// Every host path a compose document names for a service to mount or read: each
-/// volume's source, in either of the two ways Compose takes one, and each
-/// environment file.
-fn mounted(document: &serde_norway::Value) -> Vec<String> {
-    let mut named = Vec::new();
-    let Some(services) = document
-        .get("services")
-        .and_then(serde_norway::Value::as_mapping)
-    else {
-        return named;
-    };
-    for service in services.values() {
-        for volume in listed(service.get("volumes")) {
-            match volume {
-                serde_norway::Value::String(short) => {
-                    named.extend(short.split(':').next().map(str::to_owned));
-                }
-                long => named.extend(
-                    long.get("source")
-                        .and_then(|source| source.as_str())
-                        .map(str::to_owned),
-                ),
-            }
-        }
-        for file in listed(service.get("env_file")) {
-            named.extend(file.as_str().map(str::to_owned));
-        }
-    }
-    named
-}
-
-/// A field Compose takes as one value or as a list of them, as a list.
-fn listed(field: Option<&serde_norway::Value>) -> Vec<&serde_norway::Value> {
-    match field {
-        Some(serde_norway::Value::Sequence(each)) => each.iter().collect(),
-        Some(one) => vec![one],
-        None => Vec::new(),
     }
 }
 

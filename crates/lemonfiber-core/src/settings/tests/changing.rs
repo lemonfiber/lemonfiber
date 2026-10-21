@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use lemonfiber_fixtures::support::{Recording, Reporting};
@@ -7,7 +7,6 @@ use lemonfiber_plugin::Manifest;
 use super::super::changing::{changed, Asked, REFUSING};
 use crate::app::Ctx;
 use crate::config::paths::SETTINGS;
-use crate::config::store;
 use crate::error::Problem;
 use crate::journal::{Change, Kind};
 use crate::model::{SettingChange, SettingsReport};
@@ -94,12 +93,6 @@ pub(super) fn machine(name: &str, engine: Reporting) -> Machine {
         serde_json::to_string(&register).unwrap_or_default()
     )
     .is_ok());
-    let document = crate::plugin::overlay(&stack, "comics");
-    assert!(store::write(
-        &document,
-        &crate::plugin::written(&comics, &crate::plugin::Reading::bare())
-    )
-    .is_ok());
     let runner = Arc::new(Recording::answering(Ok(Output {
         status: Some(0),
         stdout: String::new(),
@@ -114,6 +107,15 @@ pub(super) fn machine(name: &str, engine: Reporting) -> Machine {
             ..crate::config::Settings::default()
         })
         .build();
+    let generated = ctx
+        .stack
+        .checked_manifest(ctx.today())
+        .ok()
+        .and_then(|manifest| crate::app::project::current(&ctx, &manifest).ok())
+        .map(|project| project.text)
+        .unwrap_or_default();
+    assert!(crate::app::project::kept(&ctx, &generated).is_ok());
+    let document = crate::app::project::path(&ctx).unwrap_or_default();
     Machine {
         ctx,
         runner,
@@ -348,7 +350,7 @@ async fn a_document_edited_while_the_change_is_made_refuses_naming_it() {
         .unwrap_or_default();
     assert!(std::fs::write(&machine.document, "edited by hand\n").is_ok());
 
-    let written = crate::app::plugins::writing::overwritten(&overwrites, REFUSING);
+    let written = crate::app::plugins::writing::overwritten(&machine.ctx, &overwrites, REFUSING);
 
     assert_eq!(overwrites.len(), 1);
     assert!(
@@ -530,7 +532,11 @@ async fn a_change_over_a_document_whose_mount_source_is_a_link_is_refused_naming
         serde_json::to_string(&register).unwrap_or_default()
     )
     .is_ok());
-    let stack = machine.env.with_file_name("data").join("stack");
+    let stack = machine
+        .document
+        .parent()
+        .map(Path::to_path_buf)
+        .unwrap_or_default();
     for service in ["komga", "komga-worker"] {
         let tree = stack.join("mounts").join(service);
         let _ = std::fs::create_dir_all(&tree);

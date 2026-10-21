@@ -4,7 +4,6 @@ use lemonfiber_fixtures::scratch::Scratch;
 
 use super::{journalled, layered, unvetted, FILE};
 use crate::app::Ctx;
-use crate::config::env::EnvFile;
 use crate::journal::Kind;
 use crate::test_support::a_context;
 
@@ -93,25 +92,18 @@ fn a_rehearsal_journals_nothing_of_the_overlay() {
 }
 
 #[test]
-fn the_beside_moves_are_layered_first_and_the_operators_overlay_last() {
+fn only_the_operators_overlay_is_layered_and_nothing_of_lemonfibers_own() {
     let (_dir, ctx, overlay) = machine("layered");
     let env = ctx.settings.env_file.clone().unwrap_or_default();
-    let beside = env.with_file_name("beside.yml");
-    let none = EnvFile::parse("");
-    let moves = EnvFile::parse("LEMONFIBER_BESIDE=sonarr:8989=18989\n");
-    let retired = EnvFile::parse(&format!("LEMONFIBER_OVERLAY={}\n", beside.display()));
-    assert!(layered(Some(&env), &none).is_empty());
-    assert!(layered(None, &moves).is_empty());
+    assert!(layered(Some(&env)).is_empty());
+    assert!(layered(None).is_empty());
 
-    assert!(std::fs::write(&beside, "services: {}\n").is_ok());
-    assert!(layered(Some(&env), &none).is_empty(), "no moves recorded");
+    assert!(std::fs::write(env.with_file_name("beside.yml"), "services: {}\n").is_ok());
     assert!(
-        layered(Some(&env), &retired).is_empty(),
-        "the retired key is not read"
+        layered(Some(&env)).is_empty(),
+        "standing beside writes no overlay"
     );
-    assert_eq!(layered(Some(&env), &moves), std::slice::from_ref(&beside));
 
     assert!(std::fs::write(&overlay, "services: {}\n").is_ok());
-    assert_eq!(layered(Some(&env), &moves), [beside, overlay.clone()]);
-    assert_eq!(layered(Some(&env), &none), [overlay]);
+    assert_eq!(layered(Some(&env)), [overlay]);
 }

@@ -139,6 +139,8 @@ pub fn described(change: &Change) -> String {
     match &change.kind {
         Kind::Set { key, .. } => format!("the setting {key}"),
         Kind::Made { path } => format!("the directory {path}"),
+        Kind::Moved { from, .. } => format!("the move of {from}"),
+        Kind::Copied { volume, .. } => format!("the copy of the volume {volume}"),
         // Written by a plugin's install rather than a first run, and named for the same
         // reason the service's own field below is.
         Kind::Region { owner, path, .. } => format!("{owner}'s region in {path}"),

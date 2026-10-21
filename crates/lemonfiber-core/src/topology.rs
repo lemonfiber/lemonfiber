@@ -10,6 +10,10 @@ use std::net::Ipv4Addr;
 use lemonfiber_contract::capabilities::media::serve;
 use lemonfiber_contract::capabilities::proxy::front;
 
+mod subnets;
+
+pub use subnets::{PREFIX, RANGE};
+
 /// A block of addresses, as its first address and its prefix length.
 pub type Block = (Ipv4Addr, u8);
 
@@ -30,7 +34,7 @@ const PROXY_SUBNET: Subnet = Subnet {
 };
 
 /// The door's fixed address on its ask of `proxy.front`, the one the proxy reaches.
-const DOOR_ON_PROXY: Ipv4Addr = Ipv4Addr::new(10, 80, 96, 2);
+pub const DOOR_ON_PROXY: Ipv4Addr = Ipv4Addr::new(10, 80, 96, 2);
 
 /// The proxy's fixed address there, the one proxy the door trusts to name a client.
 pub const PROXY_ON_PROXY: Ipv4Addr = Ipv4Addr::new(10, 80, 96, 3);
@@ -90,6 +94,8 @@ pub struct Network {
     pub masquerade: bool,
     /// Its fixed subnet, where it carries a fixed address.
     pub fixed: Option<Subnet>,
+    /// Its subnet, which the engine draws from none of its own pools.
+    pub subnet: Option<Block>,
 }
 
 /// Where one service is.
@@ -110,6 +116,21 @@ pub struct Topology {
     pub networks: BTreeMap<String, Network>,
     /// Every service's place, by id.
     pub placed: BTreeMap<String, Placed>,
+}
+
+impl Topology {
+    /// The address the guard holds on the network of its ask of `media.serve`, the one
+    /// proxy the media server trusts to name a client, where something guards the
+    /// household's streams there.
+    #[must_use]
+    pub fn guard_on_media(&self) -> Option<Ipv4Addr> {
+        self.placed
+            .values()
+            .any(|placed| {
+                matches!(placed, Placed::On(on) if on.values().any(|held| *held == Some(DOOR_ON_MEDIA)))
+            })
+            .then_some(DOOR_ON_MEDIA)
+    }
 }
 
 /// The networks `members` need for `asks` and `links`, `guard` being the service that
@@ -145,6 +166,7 @@ pub fn derived(
                     internal: false,
                     masquerade: !member.confined,
                     fixed: None,
+                    subnet: None,
                 },
             );
             join(&name, member.id, None);
@@ -194,6 +216,7 @@ pub fn derived(
             }
         }
     }
+    subnets::assigned(&mut networks);
     Topology { networks, placed }
 }
 
@@ -235,6 +258,7 @@ const fn internal(fixed: Option<Subnet>) -> Network {
         internal: true,
         masquerade: false,
         fixed,
+        subnet: None,
     }
 }
 

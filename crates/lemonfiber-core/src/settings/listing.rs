@@ -85,9 +85,7 @@ fn holding(name: &str, installed: &[Installed], resolved: &Resolved) -> Holding 
     name.split_once(NAMESPACED)
         .and_then(|(namespace, id)| {
             let one = installed.iter().find(|one| one.plugin == namespace)?;
-            Some(resolved.reading(&|_, _| None, |reading| {
-                crate::plugin::holding(one, id, reading)
-            }))
+            Some(resolved.reading(|reading| crate::plugin::holding(one, id, reading)))
         })
         .unwrap_or_else(|| Holding::Store(name.to_owned()))
 }

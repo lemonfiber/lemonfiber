@@ -26,7 +26,7 @@
       "$ref": "Stance.json"
     },
     "written": {
-      "description": "Where the Compose file that says so was written.",
+      "description": "The settings file the moves were recorded in.",
       "type": [
         "string",
         "null"

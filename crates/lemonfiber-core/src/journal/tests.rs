@@ -130,6 +130,43 @@ fn undoing_a_rewritten_file_puts_back_what_it_held() {
     );
 }
 
+/// State moved into a mount tree goes back where it was; a volume copied out is kept,
+/// since the volume it came from was never touched.
+#[test]
+fn undoing_a_move_moves_it_back_and_undoing_a_copy_keeps_it() {
+    let at = |kind: Kind| Change {
+        at: "t".to_owned(),
+        operation: "project".to_owned(),
+        target: "/srv/stack/mounts/jellyfin/cache".to_owned(),
+        kind,
+    };
+
+    assert_eq!(
+        at(Kind::Moved {
+            from: "/srv/stack/config/jellyfin/cache".to_owned(),
+            to: "/srv/stack/mounts/jellyfin/cache".to_owned(),
+        })
+        .undo()
+        .action,
+        Action::MoveBack {
+            from: "/srv/stack/config/jellyfin/cache".to_owned(),
+            to: "/srv/stack/mounts/jellyfin/cache".to_owned(),
+        }
+    );
+    assert_eq!(
+        at(Kind::Copied {
+            volume: "lemonfiber_jellyfin_cache".to_owned(),
+            to: "/srv/stack/mounts/jellyfin/cache".to_owned(),
+        })
+        .undo()
+        .action,
+        Action::KeepCopy {
+            volume: "lemonfiber_jellyfin_cache".to_owned(),
+            to: "/srv/stack/mounts/jellyfin/cache".to_owned(),
+        }
+    );
+}
+
 #[test]
 fn undoing_a_made_path_removes_exactly_it() {
     assert_eq!(

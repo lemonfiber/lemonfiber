@@ -93,7 +93,7 @@ impl Register {
 
     /// Whether every value the record carries is one this build would have written.
     ///
-    /// Each of them is written again, into a Compose document, a proxy stanza and a
+    /// Each of them is written again, into the project, a proxy stanza and a
     /// dashboard entry, every time the plugin's files are derived — and the reader
     /// that held them to the format ran once, on a manifest, long before. So a record
     /// is held on the way in to the same definitions the reader used: a service name

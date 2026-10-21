@@ -103,13 +103,6 @@ doc = false
 bench = false
 
 [[bin]]
-name = "compose_mounts"
-path = "fuzz_targets/compose_mounts.rs"
-test = false
-doc = false
-bench = false
-
-[[bin]]
 name = "archive_restore"
 path = "fuzz_targets/archive_restore.rs"
 test = false

@@ -33,7 +33,8 @@ pub enum Puts {
     /// A directory brought into being, which is where one service keeps its own
     /// configuration.
     Directory,
-    /// A document written, which is the container lemonfiber derives for the plugin.
+    /// The project written again, holding the container lemonfiber derives for the
+    /// plugin.
     Document,
     /// The key lemonfiber asks one of the plugin's adapters with, minted as it is
     /// written and never shown.
@@ -169,7 +170,7 @@ pub fn changes(planned: &[Write]) -> Vec<Changing> {
             path: write.path.display().to_string(),
             puts: match write.lands {
                 Lands::Directory { .. } => Puts::Directory,
-                Lands::Document(_) => Puts::Document,
+                Lands::Document { .. } => Puts::Document,
                 Lands::Key => Puts::Key,
                 Lands::Region { .. } => Puts::Region,
                 Lands::Secrets(_) => Puts::Secrets,

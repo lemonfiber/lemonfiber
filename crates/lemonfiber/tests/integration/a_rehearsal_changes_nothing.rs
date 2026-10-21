@@ -296,6 +296,7 @@ fn rehearsing(dir: &Path) -> (Ctx, Watched) {
             filesystem: Arc::new(lemonfiber_adapters::Disk),
             http: Arc::clone(&http) as Arc<dyn lemonfiber_core::ports::Http>,
             images: Pulled::holding(Vec::new()),
+            networks: lemonfiber_fixtures::networked::Networked::none(),
             eraser: Arc::clone(&eraser) as Arc<dyn lemonfiber_core::ports::filesystem::Eraser>,
             occupancy: Walking::holding(Vec::new()),
             hosting: Arc::clone(&hosting) as Arc<dyn lemonfiber_core::ports::Host>,

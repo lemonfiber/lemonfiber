@@ -18,7 +18,17 @@ use crate::journal::{Change, Kind};
 /// lemonfiber's own begins with.
 #[must_use]
 pub fn owner(plugin: &str) -> String {
-    format!("plugin {plugin}")
+    format!("{OWNER}{plugin}")
+}
+
+/// The word in front of a plugin's id that makes the operation its changes are
+/// journalled under.
+const OWNER: &str = "plugin ";
+
+/// The plugin an operation is the owner of, where it is a plugin's.
+#[must_use]
+pub fn owned_by(operation: &str) -> Option<&str> {
+    operation.strip_prefix(OWNER)
 }
 
 /// Whether `change` is one of the plugin's own.

@@ -16,26 +16,27 @@ use serde::ser::SerializeMap;
 use serde::Serialize;
 
 use crate::config::storage::Export;
-use crate::config::{DEFAULT_ZONE, PGID_KEY, PUID_KEY, ZONE_KEY};
+use crate::config::{DATA_ROOT_KEY, DEFAULT_ZONE, LAN_BIND_KEY, PGID_KEY, PUID_KEY, ZONE_KEY};
 use crate::topology::Placed;
 
-/// The library, mounted exactly as every service that takes it mounts it.
-pub(crate) const LIBRARY: &str = "${DATA_ROOT:-./data}:/data";
+/// Where the library is kept while the operator's environment file names nowhere.
+pub(crate) const LIBRARY: &str = "./data";
 
 /// The volume the library is mounted from where it is kept on an NFS export.
 pub(crate) const LIBRARY_VOLUME: &str = "data";
 
 /// Where the library lands inside every container that takes it.
-const LIBRARY_TARGET: &str = "/data";
+pub(crate) const LIBRARY_TARGET: &str = "/data";
 
-/// The uid and gid Compose writes while the stack's environment file names neither.
+/// The uid and gid written while the operator's environment file names neither.
 pub(crate) const OPERATOR_FALLBACK: &str = "1000";
 
 /// What brings a container back after it stops for any reason but being taken down.
 const RESTART: &str = "unless-stopped";
 
-/// The interface a household port is published on.
-pub(crate) const HOUSEHOLD: &str = "${LAN_BIND:-0.0.0.0}";
+/// The interface a household port is published on while the operator's environment file
+/// narrows it to none.
+pub(crate) const HOUSEHOLD: &str = "0.0.0.0";
 
 /// The interface an operator surface or an adapter's contracts are published on.
 pub(crate) const LOOPBACK: &str = "127.0.0.1";
@@ -84,11 +85,11 @@ pub enum Tier {
 }
 
 impl Tier {
-    /// The interface written in front of the port.
-    pub(crate) const fn interface(self) -> &'static str {
+    /// The interface written in front of the port, where the household's is `household`.
+    pub(crate) const fn interface(self, household: &str) -> &str {
         match self {
             Self::Loopback => LOOPBACK,
-            Self::Household => HOUSEHOLD,
+            Self::Household => household,
         }
     }
 }
@@ -141,6 +142,9 @@ pub struct Values<'a> {
     pub render_group: Option<u32>,
     /// The NFS export the library is kept on, where it is kept on one.
     pub nfs: Option<&'a Export>,
+    /// The operator's value for a variable of their environment file, where one is
+    /// written.
+    pub operator: &'a dyn Fn(&str) -> Option<String>,
 }
 
 /// One service's entry, and the whole of what one can carry.
@@ -270,8 +274,8 @@ pub fn entry(unit: &Unit<'_>, placed: &Placed, values: &Values<'_>) -> Entry {
         user: (unit.user == UserMode::Uid).then(|| {
             format!(
                 "{}:{}",
-                variable(PUID_KEY, OPERATOR_FALLBACK),
-                variable(PGID_KEY, OPERATOR_FALLBACK)
+                operated(values, PUID_KEY, OPERATOR_FALLBACK),
+                operated(values, PGID_KEY, OPERATOR_FALLBACK)
             )
         }),
         environment: environment(unit, values),
@@ -281,11 +285,11 @@ pub fn entry(unit: &Unit<'_>, placed: &Placed, values: &Values<'_>) -> Entry {
             .map(|path| literal(&path.display().to_string()))
             .collect(),
         ports: if matches!(placed, Placed::On(_)) {
-            ports(unit)
+            ports(unit, values)
         } else {
             Vec::new()
         },
-        volumes: volumes(unit, values.nfs),
+        volumes: volumes(unit, values),
         tmpfs: tmpfs(unit.tmpfs, unit.takes_data)
             .map(|path| literal(path))
             .collect(),
@@ -351,19 +355,27 @@ fn environment(unit: &Unit<'_>, values: &Values<'_>) -> BTreeMap<String, String>
             Some((name.clone(), literal(&text)))
         })
         .collect();
-    written.insert(ZONE_KEY.to_owned(), variable(ZONE_KEY, DEFAULT_ZONE));
+    written.insert(
+        ZONE_KEY.to_owned(),
+        operated(values, ZONE_KEY, DEFAULT_ZONE),
+    );
     if unit.user == UserMode::PuidEnv {
         for key in [PUID_KEY, PGID_KEY] {
-            written.insert(key.to_owned(), variable(key, OPERATOR_FALLBACK));
+            written.insert(key.to_owned(), operated(values, key, OPERATOR_FALLBACK));
         }
     }
     written
 }
 
-/// A variable of the stack's environment file, with what Compose writes while it names
-/// none.
-fn variable(key: &str, fallback: &str) -> String {
-    format!("${{{key}:-{fallback}}}")
+/// The operator's value for `key`, or `fallback` while their environment file names
+/// none, as the document writes it.
+fn operated(values: &Values<'_>, key: &str, fallback: &str) -> String {
+    literal(
+        &(values.operator)(key)
+            .map(|value| value.trim().to_owned())
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| fallback.to_owned()),
+    )
 }
 
 /// What one variable is written as, or nothing where it has no value to write.
@@ -389,10 +401,11 @@ pub(crate) fn constant_text(constant: &Constant) -> String {
 }
 
 /// Every port it publishes on its interface, then an adapter's contract port.
-pub(crate) fn ports(unit: &Unit<'_>) -> Vec<String> {
+pub(crate) fn ports(unit: &Unit<'_>, values: &Values<'_>) -> Vec<String> {
+    let household = operated(values, LAN_BIND_KEY, HOUSEHOLD);
     unit.published
         .iter()
-        .map(|(tier, host, inside)| format!("{}:{host}:{inside}", tier.interface()))
+        .map(|(tier, host, inside)| format!("{}:{host}:{inside}", tier.interface(&household)))
         .chain(
             unit.contract
                 .map(|listens| format!("{LOOPBACK}::{listens}")),
@@ -402,14 +415,15 @@ pub(crate) fn ports(unit: &Unit<'_>) -> Vec<String> {
 
 /// The library where it asked for it, its own configuration directory, and each path
 /// mounted from its own mount tree.
-fn volumes(unit: &Unit<'_>, nfs: Option<&Export>) -> Vec<String> {
+fn volumes(unit: &Unit<'_>, values: &Values<'_>) -> Vec<String> {
     let service = literal(unit.id);
     let mut volumes = Vec::new();
     if unit.takes_data {
-        volumes.push(match nfs {
-            Some(_) => format!("{LIBRARY_VOLUME}:{LIBRARY_TARGET}"),
-            None => LIBRARY.to_owned(),
-        });
+        let from = match values.nfs {
+            Some(_) => LIBRARY_VOLUME.to_owned(),
+            None => operated(values, DATA_ROOT_KEY, LIBRARY),
+        };
+        volumes.push(format!("{from}:{LIBRARY_TARGET}"));
     }
     volumes.push(mounted(
         &format!("./{CONFIGURATION_TREE}/{service}"),

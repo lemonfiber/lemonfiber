@@ -140,4 +140,14 @@ codes! {
             message names them. Everything else was put back.",
         remedy: "Enter the earlier value again at the terminal if it is the one you want.",
     }
+    /// Raised when a service's state lemonfiber moved could not be moved back.
+    NOT_MOVED_BACK = "SETUP-15" {
+        severity: Error,
+        status: 500,
+        since: "0.18.0",
+        meaning: "A service's state lemonfiber moved could not be moved back to where it was. \
+            Everything before it was put back; this one is still where lemonfiber moved it, \
+            and the message names both places.",
+        remedy: "Run the reversal again once both places can be written.",
+    }
 }

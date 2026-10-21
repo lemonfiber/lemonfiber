@@ -6,7 +6,7 @@ codes! {
         leaves: Validation,
         since: "0.1.0",
         meaning: "No readable manifest was found where a stack was expected. A stack directory \
-            holds a stack.toml beside its compose files.",
+            holds a stack.toml describing its services.",
         remedy: "Point at a directory containing stack.toml, with lemonfiber --stack-dir \
             <path>.",
     }
@@ -101,5 +101,30 @@ codes! {
             started. A stack that keeps every service in stack.toml itself is refused this \
             way.",
         remedy: "Fix the files named under the message. All of them were found in one pass.",
+    }
+    /// Raised when a change would write over a generated project the operator has edited.
+    PROJECT_EDITED = "STACK-11" {
+        severity: Error,
+        status: 409,
+        since: "0.18.0",
+        meaning: "The project lemonfiber generates no longer holds what lemonfiber last wrote \
+            there: somebody edited it. A change that has to write the project again would \
+            discard that edit, so nothing was changed. The message names the file.",
+        remedy: "Move the edit into overlay.yml in lemonfiber's configuration directory, which \
+            is merged over the project and kept, then run lemonfiber reset to put the project \
+            back and make the change again.",
+    }
+    /// Raised when a service's state kept in a volume could not be copied into its mount
+    /// tree before the service first starts from there.
+    VOLUME_NOT_COPIED = "STACK-12" {
+        severity: Error,
+        status: 500,
+        since: "0.18.0",
+        meaning: "A service kept its state in a volume the container engine holds, and from \
+            now on it keeps it in its own directory. The state could not be copied there, so \
+            nothing was started: starting it now would start it on nothing and its old state \
+            would never be read again. The volume is as it was.",
+        remedy: "Check the container engine is running and the project directory can be \
+            written, then start again. The message names the volume and the directory.",
     }
 }

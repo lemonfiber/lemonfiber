@@ -391,18 +391,22 @@ fn household_changing(completed: bool, signed_in: bool, admitted: u16, changed: 
     ])
 }
 
-/// The request service, declaring the settings file it writes its key to.
+/// The request service, keeping its configuration beneath its application directory and
+/// declaring the settings file there it writes its key to.
 fn requests_with_settings() -> lemonfiber_manifest::Service {
-    requesting(manifest_service(
-        "seerr",
-        Some(lemonfiber_manifest::Api {
-            kind: lemonfiber_manifest::ApiKind::Seerr,
-            key_source: lemonfiber_manifest::KeySource::ConfigJson,
-            path: Some("/app/config/settings.json".to_owned()),
-            version: None,
-        }),
-        Some(5055),
-    ))
+    lemonfiber_manifest::Service {
+        config_path: Some("/app/config".to_owned()),
+        ..requesting(manifest_service(
+            "seerr",
+            Some(lemonfiber_manifest::Api {
+                kind: lemonfiber_manifest::ApiKind::Seerr,
+                key_source: lemonfiber_manifest::KeySource::ConfigJson,
+                path: Some("/app/config/settings.json".to_owned()),
+                version: None,
+            }),
+            Some(5055),
+        ))
+    }
 }
 
 /// The book curator, as a manifest service whose key lemonfiber mints for it.

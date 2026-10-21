@@ -153,7 +153,7 @@ pub struct AdoptReport {
 pub struct BesideReport {
     /// Where each service would listen instead, lowest original port first.
     pub ports: Vec<MovedReport>,
-    /// Where the Compose file that says so was written.
+    /// The settings file the moves were recorded in.
     pub written: Option<String>,
     /// Where the act stands.
     pub stance: Stance,

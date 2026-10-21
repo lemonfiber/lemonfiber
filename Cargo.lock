@@ -1409,6 +1409,7 @@ dependencies = [
  "rustls-pki-types",
  "serde_json",
  "sysinfo",
+ "tar",
  "tokio",
  "tokio-rustls",
  "tokio-stream",

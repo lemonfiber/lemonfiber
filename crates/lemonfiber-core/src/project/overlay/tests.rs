@@ -118,3 +118,67 @@ fn every_service_a_file_declares_is_named_in_order_and_nothing_else() {
     assert!(super::named("volumes:\n  x: {}\n").is_empty());
     assert!(super::named("{ not yaml").is_empty());
 }
+
+/// A project whose two services each mount the library once, at `/srv/media`.
+const LIBRARY: &str = "services:\n  sonarr:\n    volumes:\n    - /srv/media:/data\n    - ./config/sonarr:/config\n  radarr:\n    volumes:\n    - /srv/media:/data\n";
+
+/// What the operator's environment file names.
+fn variable(name: &str) -> Option<String> {
+    (name == "DATA_ROOT").then(|| "/srv/media".to_owned())
+}
+
+#[test]
+fn a_project_alone_crowds_nothing() {
+    assert!(super::crowded(LIBRARY, &[], "/data", &variable).is_empty());
+}
+
+#[test]
+fn an_overlay_mounting_the_library_again_crowds_that_service_alone() {
+    let overlay = "services:\n  sonarr:\n    volumes:\n    - ${DATA_ROOT}/downloads:/downloads\n    - type: bind\n      source: /srv/media/films\n      target: /films\n".to_owned();
+
+    let crowded = super::crowded(LIBRARY, &[overlay], "/data", &variable);
+
+    assert_eq!(
+        crowded,
+        [super::Crowded {
+            service: "sonarr".to_owned(),
+            mounts: vec![
+                "/srv/media:/data".to_owned(),
+                "/srv/media/downloads:/downloads".to_owned(),
+                "/srv/media/films:/films".to_owned(),
+            ],
+        }]
+    );
+}
+
+#[test]
+fn an_overlay_replacing_the_library_at_its_target_and_mounting_elsewhere_crowds_nothing() {
+    let overlay =
+        "services:\n  radarr:\n    volumes:\n    - /mnt/other:/data\n    - /srv/media-old:/old\n"
+            .to_owned();
+
+    assert!(super::crowded(LIBRARY, &[overlay], "/data", &variable).is_empty());
+}
+
+#[test]
+fn a_project_mounting_no_library_crowds_nothing_whatever_the_overlay_mounts() {
+    let overlay =
+        "services:\n  sonarr:\n    volumes:\n    - /srv/a:/a\n    - /srv/a/b:/b\n".to_owned();
+
+    assert!(super::crowded("services:\n  sonarr: {}\n", &[overlay], "/data", &variable).is_empty());
+}
+
+#[test]
+fn a_crowded_service_says_how_many_mounts_it_would_see_and_which() {
+    let crowded = super::Crowded {
+        service: "sonarr".to_owned(),
+        mounts: vec![
+            "/srv/media:/data".to_owned(),
+            "/srv/media/tv:/tv".to_owned(),
+        ],
+    };
+
+    assert!(crowded.to_string().starts_with(
+        "service sonarr mounts 2 paths beneath the data root (/srv/media:/data, /srv/media/tv:/tv);"
+    ));
+}

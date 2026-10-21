@@ -100,3 +100,30 @@ async fn a_path_under_the_retired_setting_is_named_with_where_to_move_it() {
     });
     assert!(moved, "{:?}", said.remedies);
 }
+
+#[tokio::test]
+async fn a_compose_file_of_the_stacks_own_beside_the_project_is_named_unread() {
+    let (dir, settings) = machine("compose-retired");
+    let project = dir.join("stack");
+    assert!(std::fs::create_dir_all(project.join("compose")).is_ok());
+    assert!(std::fs::write(project.join("compose/media.yml"), "services: {}\n").is_ok());
+    assert!(std::fs::write(project.join("compose/notes.txt"), "kept\n").is_ok());
+
+    let named = OverlayCheck::new(Arc::new(lemonfiber_adapters::Disk), Some(settings.clone()))
+        .beside(Some(project.clone()))
+        .run()
+        .await;
+
+    let said = problem(&named, "config.compose-retired");
+    assert_eq!(said.code.as_str(), "CONFIG-10");
+    let detail = said.detail.as_deref().unwrap_or_default();
+    assert!(detail.contains("compose/media.yml"), "{detail}");
+    assert!(!detail.contains("notes.txt"), "{detail}");
+
+    let _ = std::fs::remove_file(project.join("compose/media.yml"));
+    let none = OverlayCheck::new(Arc::new(lemonfiber_adapters::Disk), Some(settings))
+        .beside(Some(project))
+        .run()
+        .await;
+    assert!(none.iter().all(|one| one.check != "config.compose-retired"));
+}

@@ -461,3 +461,12 @@ async fn a_baseline_whose_file_cannot_be_read_is_a_loss() {
     assert_eq!(report.assessment, crate::seed::Assessment::Unassessable);
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 }
+
+#[tokio::test]
+async fn a_reset_over_a_stack_that_cannot_be_read_puts_back_nothing() {
+    let ctx = crate::test_support::a_context()
+        .over(crate::test_support::nowhere())
+        .build();
+
+    assert!(super::super::reset_connections(&ctx, true).await.is_empty());
+}

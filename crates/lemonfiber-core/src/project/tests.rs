@@ -128,6 +128,60 @@ fn an_address_in_the_upstreams_own_api_reaches_the_upstream_an_adapter_fronts() 
 }
 
 #[test]
+fn a_service_inside_the_egress_guard_activates_the_guards_profile_and_no_other() {
+    let mut inside = a_placed("client", &[], None, None);
+    inside.fields.network = Some(Network {
+        via: "network.egress-guard".into(),
+    });
+    let manifest = carried();
+    let installed = [an_installed("client", vec![inside])];
+    let topology = project(&manifest, &installed).topology;
+    let guard: std::collections::BTreeSet<String> = manifest
+        .services
+        .iter()
+        .filter(|service| service.id == "gluetun")
+        .map(|service| service.profile.clone())
+        .collect();
+
+    let hosting =
+        |service: &str| super::hosting(&manifest, &installed, &topology, &[service.to_owned()]);
+
+    assert!(!guard.is_empty());
+    assert_eq!(hosting("client"), guard);
+    assert!(hosting("gluetun").is_empty());
+}
+
+#[test]
+fn a_service_inside_a_plugins_egress_guard_activates_that_plugins_profile() {
+    let mut inside = a_placed("client", &[], None, None);
+    inside.fields.network = Some(Network {
+        via: "network.egress-guard".into(),
+    });
+    let mut manifest = carried();
+    manifest.services.retain(|service| {
+        !service
+            .provides
+            .iter()
+            .any(|one| one == "network.egress-guard")
+    });
+    let installed = [
+        an_installed(
+            "tunnel",
+            vec![a_placed("tunnel", &["network.egress-guard"], None, None)],
+        ),
+        an_installed("client", vec![inside]),
+    ];
+    let topology = project(&manifest, &installed).topology;
+
+    let hosting = super::hosting(&manifest, &installed, &topology, &["client".to_owned()]);
+
+    assert_eq!(
+        hosting,
+        std::iter::once(crate::plugin::profile("tunnel")).collect()
+    );
+}
+
+#[test]
 fn a_service_inside_the_egress_guard_has_no_network_and_its_ports_are_the_guards() {
     let mut inside = a_placed("client", &[], None, Some(18999));
     inside.fields.network = Some(Network {
@@ -168,9 +222,13 @@ fn the_guard_and_the_proxy_hold_their_fixed_addresses_on_fixed_subnets() {
     let document: Yaml = serde_norway::from_str(&project.text).unwrap_or_default();
     let declared = document.get("networks").cloned().unwrap_or_default();
     assert!(project.text.contains(&PROXY_ON_PROXY.to_string()));
-    assert!(declared
-        .as_mapping()
-        .is_some_and(|networks| networks.values().any(|one| one.get("ipam").is_some())));
+    assert!(declared.as_mapping().is_some_and(|networks| {
+        networks.values().any(|one| {
+            one.get("ipam")
+                .and_then(|ipam| ipam.get("config")?.get(0)?.get("ip_range"))
+                .is_some()
+        })
+    }));
     let caddy = entry(&project, "caddy");
     assert!(caddy
         .get("networks")
@@ -186,7 +244,13 @@ fn fixes_addresses(project: &Project) -> bool {
     document
         .get("networks")
         .and_then(Yaml::as_mapping)
-        .is_some_and(|networks| networks.values().any(|one| one.get("ipam").is_some()))
+        .is_some_and(|networks| {
+            networks.values().any(|one| {
+                one.get("ipam")
+                    .and_then(|ipam| ipam.get("config")?.get(0)?.get("ip_range"))
+                    .is_some()
+            })
+        })
 }
 
 #[test]

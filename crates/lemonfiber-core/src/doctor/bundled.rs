@@ -25,6 +25,7 @@
 /// to take.
 pub const BUNDLED_CHECKS: &[&str] = &[
     "config.aggregator-guarded",
+    "config.compose-retired",
     "config.credential-permissions",
     "config.download-client",
     "config.household-telling",

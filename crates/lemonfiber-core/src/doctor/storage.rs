@@ -29,7 +29,7 @@ use crate::config::storage::Export;
 use crate::error::{Problem, Remedy, State};
 use crate::platform::Environment;
 use crate::ports::filesystem::{FileSystem, Ownership, StorageFacts};
-use crate::stack::mounts::Crowded;
+use crate::project::overlay::Crowded;
 use crate::storage::{self, Linked};
 
 mod findings;
@@ -85,12 +85,12 @@ impl StorageCheck {
     /// "no projection at all" case a caller with no clients to read passes, and
     /// guards the raw free space exactly as a zero would.
     ///
-    /// `crowded` is what reading the stack's own compose files found: the services
-    /// that would see more than one mount beneath the data location. It arrives read
-    /// rather than read here, because the files are the stack's business and this
-    /// check's seam is the filesystem — but it is reported here, because it answers
-    /// the same question the probe does and a separate heading would let an operator
-    /// read one half without the other.
+    /// `crowded` is what reading the project with the operator's overlay merged over it
+    /// found: the services that would see more than one mount beneath the data location.
+    /// It arrives read rather than read here, because the files are the project's
+    /// business and this check's seam is the filesystem — but it is reported here,
+    /// because it answers the same question the probe does and a separate heading would
+    /// let an operator read one half without the other.
     #[must_use]
     pub fn new(
         filesystem: Arc<dyn FileSystem>,

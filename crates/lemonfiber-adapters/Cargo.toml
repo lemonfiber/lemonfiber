@@ -35,6 +35,9 @@ rustls-pki-types = { workspace = true }
 tokio-rustls = { workspace = true }
 webpki-roots = { workspace = true }
 sysinfo = { workspace = true }
+# What the engine hands over when a volume is copied out; confined to the filesystem
+# module, which writes it.
+tar = { workspace = true }
 tokio = { workspace = true, features = ["net"] }
 tokio-stream = { workspace = true }
 

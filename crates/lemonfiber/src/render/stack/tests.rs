@@ -11,7 +11,7 @@ fn a_reset_names_every_change_it_would_revert() {
     let report = ResetReport {
         rehearsed: false,
         reverted: vec![StackEdit {
-            path: "compose.yml".to_owned(),
+            path: "compose.generated.yml".to_owned(),
             diff: "-yours\n+ours\n".to_owned(),
         }],
         reverted_connections: vec!["sonarr → sabnzbd".to_owned()],
@@ -20,7 +20,7 @@ fn a_reset_names_every_change_it_would_revert() {
     let text = reset(&report).text();
     assert!(text.contains("would revert these 2 change(s)"));
     assert!(text.contains("· sonarr → sabnzbd"));
-    assert!(text.contains("compose.yml"));
+    assert!(text.contains("compose.generated.yml"));
     assert!(text.contains("-yours"));
     // Confirmed, it reports what it did rather than what it would do.
     let done = ResetReport {
@@ -46,7 +46,7 @@ fn a_lifecycle_report_names_the_command_the_drops_and_the_edits_it_kept() {
         services: vec![service("sonarr", State::Healthy, None)],
         condition: Some(Condition::Active),
         stack_edits: vec![StackEdit {
-            path: "compose.yml".to_owned(),
+            path: "compose.generated.yml".to_owned(),
             diff: "-a\n+b\n".to_owned(),
         }],
         ..a_lifecycle(
@@ -67,7 +67,7 @@ fn a_lifecycle_report_names_the_command_the_drops_and_the_edits_it_kept() {
     assert!(text.contains("left out: usenet — no Usenet provider is configured"));
     assert!(text.contains("everything is up"));
     assert!(text.contains("sonarr"));
-    assert!(text.contains("kept compose.yml as it is on disk"));
+    assert!(text.contains("kept compose.generated.yml as it is on disk"));
     assert!(text.contains("-a"));
 }
 

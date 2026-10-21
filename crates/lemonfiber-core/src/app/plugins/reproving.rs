@@ -59,10 +59,7 @@ pub(crate) async fn prove(
     if !acting {
         return Ok(answering(&held, proof, offer));
     }
-    let stack = ctx
-        .settings
-        .stack_dir
-        .as_deref()
+    let stack = &super::super::project::directory(ctx)
         .ok_or_else(|| Box::new(super::writing::nowhere_to_write(plugin)))?;
     let deadline = ctx.seams.clock.now() + ctx.patience;
     for (placed, stated) in speaking.iter().zip(proof.proofs.iter_mut()) {

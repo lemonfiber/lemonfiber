@@ -10,7 +10,6 @@
 use std::path::{Path, PathBuf};
 
 use crate::app::Ctx;
-use crate::config::env::EnvFile;
 use crate::config::store::Failure;
 use crate::journal::{Change, Kind};
 use crate::model::Unvetted;
@@ -33,15 +32,11 @@ pub fn written(env_file: Option<&Path>) -> Option<PathBuf> {
     env_file.map(at).filter(|path| path.is_file())
 }
 
-/// Every Compose file layered over the stack, in the order Compose reads them: the moves
-/// standing beside an existing setup recorded, then the operator's overlay, last.
+/// Every Compose file layered over the generated project: the operator's overlay,
+/// where they have written one.
 #[must_use]
-pub fn layered(env_file: Option<&Path>, held: &EnvFile) -> Vec<PathBuf> {
-    env_file
-        .and_then(|env| crate::app::beside::layer(env, held))
-        .into_iter()
-        .chain(written(env_file))
-        .collect()
+pub fn layered(env_file: Option<&Path>) -> Vec<PathBuf> {
+    written(env_file).into_iter().collect()
 }
 
 /// The overlay and every service it changes, where there is one.
@@ -51,7 +46,7 @@ pub fn unvetted(ctx: &Ctx) -> Option<Unvetted> {
     let text = std::fs::read_to_string(&path).unwrap_or_default();
     Some(Unvetted {
         overlay: path.display().to_string(),
-        services: crate::stack::declared::named(&text),
+        services: crate::project::overlay::named(&text),
     })
 }
 

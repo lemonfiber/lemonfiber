@@ -46,7 +46,7 @@ pub mod serving;
 pub mod time;
 
 pub use asking::Asking;
-pub use docker::{Engine, Images};
+pub use docker::{Engine, EngineVolumes, Images, Networks};
 pub use filesystem::{Confined, Eraser, FileSystem, Volume};
 pub use fingerprint::fingerprint;
 pub use hosting::Host;

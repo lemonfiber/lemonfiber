@@ -17,15 +17,16 @@
 //! operator their files.
 //!
 //! **The containers come off first**, for the reason an install's own reversal takes
-//! them off first: nothing on disk records that a container is running, and a document
-//! removed out from under one leaves something Compose will never be asked about again.
+//! them off first: nothing on disk records that a container is running, and a service
+//! the project no longer declares is one Compose will never be asked about again. So the
+//! project is written without the plugin only once its containers are off and its files
+//! are back, and it is generated afresh rather than put back, since whatever changed it
+//! since the install is still in force.
 
 use std::collections::BTreeSet;
 
 use crate::error::{Diagnose, Problem, Remedy, State};
 use crate::plugin::{Installed, Register, Removal, Unfilled};
-use crate::stack::closure::Plan;
-use crate::stack::compose::{build, Action};
 
 use super::super::Ctx;
 use crate::error::codes::plugin::NOTHING_TO_REMOVE;
@@ -77,7 +78,9 @@ pub(crate) async fn remove(
     // What leaves with the plugin, asked for by the same two answers on every call
     // below: the name the reversal goes by, and which journalled changes are its own.
     let at = crate::plugin::owner(&going.plugin);
-    let whose = |change: &crate::journal::Change| crate::plugin::owns(&going.plugin, change);
+    let whose = |change: &crate::journal::Change| {
+        crate::plugin::owns(&going.plugin, change) && !super::super::project::holds(ctx, change)
+    };
 
     // What stops, named before anything does. A reading carries it in its report,
     // which is read before the real run is asked for; a real run says it aloud as well,
@@ -118,23 +121,20 @@ pub(crate) async fn remove(
     // container when it heard that would leave a plugin the register still calls
     // installed with nothing of it running — the one state this verb must not leave.
     super::super::putting_back::admitted(ctx, &at, &whose)?;
+    super::super::project::unedited(ctx)?;
     ctx.narrator
         .say(&interrupting(&going.plugin, &interrupts))
         .await;
 
     // Off the machine before the files that describe it go back.
-    let stayed = !taken_off(ctx, &going.plugin, &interrupts).await;
+    let directory = super::super::project::directory(ctx).unwrap_or_default();
+    let stayed = !super::proving::removed(ctx, &going, &directory).await;
 
     // Carried out through the one call the rehearsal asked, so what goes back is the
     // same machinery reporting rather than a second description of it.
     let mut went_back = super::super::putting_back::everything(ctx, &at, &whose).await?;
     if stayed {
-        went_back.left.push(super::super::putting_back::Left {
-            target: going.plugin.clone(),
-            because: "its container could not be taken off the machine, so it may still be \
-                      running with nothing in the stack describing it"
-                .to_owned(),
-        });
+        went_back.left.push(super::still_running(&going.plugin));
     }
 
     // Written last, the way an install writes it last. Until this lands the plugin is
@@ -161,23 +161,30 @@ pub(crate) async fn remove(
     if after.installed().is_empty() {
         let _ = at.map(std::fs::remove_file);
     }
+    super::super::project::rewritten(
+        ctx,
+        &stack,
+        after.installed(),
+        &crate::plugin::owner(&going.plugin),
+        &ctx.stamp(),
+    )?;
 
     // The credentials lemonfiber minted for its services and kept beside the settings,
     // which no journal entry covers because seeding keeps them rather than an install.
     // They go with the plugin: a later plugin is somebody else, and the next service to
     // take one of these ids would otherwise be handed this one's password.
-    if let Some(file) = ctx.settings.env_file.as_deref() {
-        forget_credentials(ctx, file, &kept);
-    }
+    ctx.settings
+        .env_file
+        .iter()
+        .for_each(|file| forget_credentials(ctx, file, &kept));
     crate::settings::forgotten(ctx, &going);
     super::kept::forgotten(ctx, &going.plugin);
 
     // Its route came out of the proxy's file with everything else it wrote, and the
     // proxy only reads that file when it starts. The stack is the one the judgement
     // above already needed the layout of, so it is there.
-    let stack = ctx.settings.stack_dir.clone().unwrap_or_default();
     let routed = super::proving::routes_withdrawn(&went_back);
-    super::proving::refronted(ctx, &stack, routed).await;
+    super::proving::refronted(ctx, &directory, routed).await;
 
     Ok(answering(
         after.installed().to_vec(),
@@ -224,38 +231,6 @@ fn answering(
         sources: Vec::new(),
         unvetted: None,
     }
-}
-
-/// Take the plugin's containers back off the machine.
-///
-/// Answers whether it could rather than failing, for the reason the install's own
-/// reversal does: a removal that stopped at its first difficulty would leave more
-/// behind than one that carried on and said what it could not do.
-async fn taken_off(ctx: &Ctx, plugin: &str, services: &[String]) -> bool {
-    // There is always a stack by here: the judgement asked first needs the layout, and a
-    // machine without a stack has none, so it has already refused. An empty path on the
-    // impossible branch keeps this free of a line no test can reach — and were it ever
-    // reached, it would ask the engine about nothing and report the container standing.
-    let stack = ctx.settings.stack_dir.clone().unwrap_or_default();
-    let mut settings = ctx.settings.clone();
-    settings.plugins.push(plugin.to_owned());
-    let plan = Plan {
-        forms: Vec::new(),
-        profiles: std::iter::once(crate::plugin::profile(plugin)).collect(),
-        services: services.to_vec(),
-        dropped: Vec::new(),
-        filtered: Vec::new(),
-        footprint: crate::stack::closure::Footprint::default(),
-        running: crate::stack::closure::Running::Unasked,
-    };
-    let command = build(
-        &plan,
-        &settings,
-        &stack,
-        &Action::Remove(services.to_vec()),
-        ctx.environment,
-    );
-    matches!(ctx.seams.runner.run(&command).await, Ok(output) if output.succeeded())
 }
 
 /// The sentence said before a removal stops anything.

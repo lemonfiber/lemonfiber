@@ -7,12 +7,7 @@
 //! Where each service listens instead is recorded as one of lemonfiber's own settings,
 //! journalled so it can be put back, and the generator writes each service's published
 //! port from it. Unconfirmed it says what it would record and records nothing, so what
-//! an operator agrees to is what they were shown. The same moves are also written as a
-//! Compose file of lemonfiber's own beside the settings, layered over the stack's own
-//! Compose files while the setting holds them.
-
-use std::fmt::Write as _;
-use std::path::{Path, PathBuf};
+//! an operator agrees to is what they were shown.
 
 use crate::config::env::EnvFile;
 use crate::config::{store, BESIDE_KEY};
@@ -23,9 +18,6 @@ use crate::reconfigure::Stance;
 
 use super::Ctx;
 
-/// The name the layered file is written under, beside the configuration it belongs to.
-const FILE: &str = "beside.yml";
-
 /// The operation recording the moves is journalled under.
 const OPERATION: &str = "beside";
 
@@ -34,7 +26,7 @@ const OPERATION: &str = "beside";
 /// # Errors
 ///
 /// Where there is nowhere configured to write to, or the file cannot be written.
-pub async fn stand(
+pub fn stand(
     ctx: &Ctx,
     survey: &MigrationReport,
     confirmed: bool,
@@ -57,7 +49,6 @@ pub async fn stand(
     ) else {
         return Err(Box::new(store::Failure::Nowhere.problem()));
     };
-    let path = recorded.with_file_name(FILE);
     let held = store::read(&recorded).map_err(|failure| Box::new(failure.problem()))?;
     let moves = written(&survey.beside);
     let change = Change {
@@ -73,14 +64,10 @@ pub async fn stand(
     crate::app::recover::journalled(&paths.journal(), &[change], ctx.seams.random.as_ref())
         .map_err(|failure| Box::new(failure.problem()))?;
     store::set(&recorded, BESIDE_KEY, &moves).map_err(|failure| Box::new(failure.problem()))?;
-    ctx.seams
-        .filesystem
-        .write(&path, &layered(&survey.beside))
-        .await;
 
     Ok(BesideReport {
         ports: survey.beside.clone(),
-        written: Some(path.display().to_string()),
+        written: Some(recorded.display().to_string()),
         stance: Stance::Applied,
         ..BesideReport::default()
     })
@@ -157,31 +144,6 @@ pub fn read(value: &str) -> Option<Vec<MovedReport>> {
             })
         })
         .collect()
-}
-
-/// The Compose file the moves `held` records are layered over the stack with, where it
-/// records any and the file is there.
-#[must_use]
-pub fn layer(env_file: &Path, held: &EnvFile) -> Option<PathBuf> {
-    let path = env_file.with_file_name(FILE);
-    (!moved(held).is_empty() && path.is_file()).then_some(path)
-}
-
-/// The Compose file that says where each service listens instead.
-///
-/// Only the ports. Everything else about a service is the stack's own file's business,
-/// and an overlay that restated any of it would be a second answer to a question already
-/// answered — one that goes stale the moment the stack's own file changes.
-fn layered(moved: &[MovedReport]) -> String {
-    let mut written = String::from("services:\n");
-    for one in moved {
-        let _ = write!(
-            written,
-            "  {}:\n    ports:\n      - \"{}:{}\"\n",
-            one.service, one.to, one.from
-        );
-    }
-    written
 }
 
 #[cfg(test)]

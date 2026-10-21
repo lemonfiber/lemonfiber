@@ -64,25 +64,38 @@ fn joined(entry: &Value) -> Vec<String> {
     }
 }
 
-fn golden() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden/project.yml")
+/// The golden files the project is held to, each with the part of it it holds: its name
+/// and services, then its networks and volumes, apart so that neither file grows past
+/// what one is allowed.
+fn golden(project: &Project) -> [(PathBuf, String); 2] {
+    let at = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden");
+    let (services, networks) = project.text.split_at(
+        project
+            .text
+            .find("\nnetworks:")
+            .map_or(project.text.len(), |at| at + 1),
+    );
+    [
+        (at.join("project.yml"), services.to_owned()),
+        (at.join("project.networks.yml"), networks.to_owned()),
+    ]
 }
 
 #[test]
 fn the_carried_stack_generates_its_golden_project() {
-    let project = shipped();
-    let path = golden();
-    if std::env::var_os("LEMONFIBER_BLESS_GOLDEN").is_some() {
-        let _ = fs::write(&path, &project.text);
-        return;
+    for (path, text) in golden(&shipped()) {
+        if std::env::var_os("LEMONFIBER_BLESS_GOLDEN").is_some() {
+            let _ = fs::write(&path, &text);
+            continue;
+        }
+        let recorded = fs::read_to_string(&path).unwrap_or_default();
+        assert_eq!(
+            recorded,
+            text,
+            "the generated project moved; if intended, bless {} and read the diff",
+            path.display()
+        );
     }
-    let recorded = fs::read_to_string(&path).unwrap_or_default();
-    assert_eq!(
-        recorded,
-        project.text,
-        "the generated project moved; if intended, bless {} and read the diff",
-        path.display()
-    );
 }
 
 #[test]
@@ -160,6 +173,60 @@ fn within(address: Ipv4Addr, (first, prefix): (Ipv4Addr, u8)) -> bool {
     u32::from(address) & mask == u32::from(first) & mask
 }
 
+/// The networks a default Docker install draws from its own pools: sixteen `/16`s of
+/// `172.16.0.0/12` and sixteen `/20`s of `192.168.0.0/16`, less the one its own bridge
+/// holds.
+const DEFAULT_POOLS: usize = 31;
+
+/// Every network the document declares, with the subnet it names where it names one.
+fn declared_subnets(document: &Value) -> Vec<(String, Option<(Ipv4Addr, u8)>)> {
+    document
+        .get("networks")
+        .and_then(Value::as_mapping)
+        .into_iter()
+        .flatten()
+        .map(|(name, declared)| {
+            let subnet = declared
+                .get("ipam")
+                .and_then(|ipam| ipam.get("config")?.get(0)?.get("subnet")?.as_str())
+                .and_then(|subnet| {
+                    let (first, prefix) = subnet.split_once('/')?;
+                    Some((first.parse().ok()?, prefix.parse().ok()?))
+                });
+            (name.as_str().unwrap_or_default().to_owned(), subnet)
+        })
+        .collect()
+}
+
+#[test]
+fn the_engine_draws_no_network_from_its_own_pools_and_no_two_subnets_meet() {
+    let declared = declared_subnets(&document(&shipped()));
+    let drawn: Vec<&String> = declared
+        .iter()
+        .filter(|(_, subnet)| subnet.is_none())
+        .map(|(name, _)| name)
+        .collect();
+
+    assert!(
+        declared.len() > DEFAULT_POOLS,
+        "the stack asks for more networks than a default install's pools hold, which is why each names its subnet"
+    );
+    assert!(drawn.is_empty(), "drawn from the engine's pools: {drawn:?}");
+    let subnets: Vec<(Ipv4Addr, u8)> = declared.iter().filter_map(|(_, subnet)| *subnet).collect();
+    for (at, subnet) in subnets.iter().enumerate() {
+        assert!(
+            within(subnet.0, lemonfiber_core::topology::RANGE),
+            "{subnet:?} outside the range lemonfiber holds"
+        );
+        for other in subnets.iter().skip(at + 1) {
+            assert!(
+                !within(other.0, *subnet) && !within(subnet.0, *other),
+                "{subnet:?} meets {other:?}"
+            );
+        }
+    }
+}
+
 #[test]
 fn no_service_mounts_the_library_twice() {
     for (name, entry) in services(&document(&shipped())) {
@@ -198,85 +265,34 @@ fn a_service_the_host_runs_gets_no_entry() {
     }
 }
 
-/// The media stack's static Compose files, which the generated project replaces at the
-/// cutover. Read here only to hold the two to the same images and published ports while
-/// both exist.
-const STATIC: &str = concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../../assets/media-stack/compose"
-);
-
-/// The fields of an entry held to the static files.
-const HELD: [&str; 2] = ["image", "ports"];
-
-/// Fields the generated project writes otherwise than the static files, by service and
-/// field: the guarded door and the proxy run the images lemonfiber builds for them, a
-/// part released here is tagged by its release without the `v`, and the gate is pinned
-/// at a commit on its main branch past the release the media stack holds.
-const DIFFERING: [(&str, &str); 4] = [
-    ("caddy", "image"),
-    ("decline", "image"),
-    ("door", "image"),
-    ("request-gate", "image"),
-];
-
-/// Every service the static files declare, with its entry.
-fn static_services() -> Vec<(String, Value)> {
-    let mut found = Vec::new();
-    for entry in fs::read_dir(STATIC).into_iter().flatten().flatten() {
-        let path = entry.path();
-        let name = path
-            .file_name()
-            .and_then(std::ffi::OsStr::to_str)
-            .unwrap_or_default();
-        let compose = path
-            .extension()
-            .is_some_and(|extension| extension.eq_ignore_ascii_case("yml"));
-        if name.starts_with('_') || !compose {
-            continue;
-        }
-        let text = fs::read_to_string(&path).unwrap_or_default();
-        let document: Value = serde_norway::from_str(&text).unwrap_or_default();
-        found.extend(services(&document));
-    }
-    found
-}
-
-/// What an entry writes in `field`: its one value, or each of its list's, in any order.
-fn written(entry: &Value, field: &str) -> BTreeSet<String> {
-    match entry.get(field) {
-        Some(Value::Sequence(values)) => values
-            .iter()
-            .filter_map(|value| value.as_str().map(str::to_owned))
-            .collect(),
-        Some(value) => value.as_str().map(str::to_owned).into_iter().collect(),
-        None => BTreeSet::new(),
+/// The fixed addresses `service` holds in the shipped project, in any order.
+fn fixed(project: &Project, service: &str) -> BTreeSet<Ipv4Addr> {
+    match project.topology.placed.get(service) {
+        Some(Placed::On(on)) => on.values().flatten().copied().collect(),
+        _ => BTreeSet::new(),
     }
 }
+
+/// The door's own configuration, as the bundle carries it.
+const DOOR_CADDYFILE: &str =
+    include_str!("../../../../assets/plugins/bundle/plugins/door/config/door/Caddyfile");
 
 #[test]
-fn every_static_service_is_generated_with_its_image_and_ports_but_those_named() {
-    let generated = services(&document(&shipped()));
-    let statics = static_services();
-    assert!(!statics.is_empty(), "the static files declare services");
-    for (service, _) in DIFFERING {
-        assert!(
-            statics.iter().any(|(name, _)| name == service),
-            "{service} is named as differing and the static files do not declare it"
-        );
-    }
-    for (service, declared) in statics {
-        let Some((_, entry)) = generated.iter().find(|(name, _)| *name == service) else {
-            unreachable!("{service} is in the static files and not in the generated project");
-        };
-        for field in HELD {
-            assert_eq!(
-                written(entry, field) != written(&declared, field),
-                DIFFERING.contains(&(service.as_str(), field)),
-                "{service}'s {field}: {:?} generated, {:?} in the static files",
-                written(entry, field),
-                written(&declared, field)
-            );
-        }
-    }
+fn the_door_and_the_proxy_hold_the_addresses_each_side_trusts() {
+    let project = shipped();
+    assert_eq!(
+        fixed(&project, "door"),
+        BTreeSet::from([
+            lemonfiber_core::topology::DOOR_ON_PROXY,
+            lemonfiber_core::topology::DOOR_ON_MEDIA
+        ])
+    );
+    assert_eq!(
+        fixed(&project, "caddy"),
+        BTreeSet::from([lemonfiber_core::topology::PROXY_ON_PROXY])
+    );
+    assert!(DOOR_CADDYFILE.contains(&format!(
+        "trusted_proxies static {}\n",
+        lemonfiber_core::topology::PROXY_ON_PROXY
+    )));
 }

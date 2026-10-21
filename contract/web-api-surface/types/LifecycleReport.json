@@ -78,6 +78,12 @@
       ],
       "required": false
     },
+    "swept": {
+      "type": [
+        "array[string]"
+      ],
+      "required": false
+    },
     "switched": {
       "type": [
         "anyOf(null,ref:Switched)"
