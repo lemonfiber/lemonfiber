@@ -65,6 +65,9 @@ pub(crate) async fn reset(ctx: &Ctx, confirm: bool) -> Result<ResetReport, Box<P
     );
     if confirm {
         super::project::overlaid(ctx)?;
+        let register = super::plugins::read(ctx)?;
+        super::project::secrets_written(ctx, &manifest, register.installed())
+            .map_err(|failure| Box::new(failure.problem()))?;
     }
 
     // The connections a drifted service value reverts — the download-client categories the

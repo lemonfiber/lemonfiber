@@ -167,3 +167,16 @@ async fn a_reset_over_a_refused_data_root_is_refused_and_writes_nothing() {
     assert_eq!(refused, Some(crate::error::codes::storage::ROOT_REFUSED));
     assert!(!into.join(crate::project::FILE).exists());
 }
+
+/// A previewed reset writes no secrets file.
+#[tokio::test]
+async fn a_previewed_reset_writes_no_secrets_file() {
+    let (into, env) = scratch("unfiled");
+    let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
+
+    assert!(reset(&carried(&into, &env), false).await.is_ok());
+
+    assert!(!env
+        .with_file_name(crate::config::paths::SECRETS_FILES)
+        .exists());
+}
