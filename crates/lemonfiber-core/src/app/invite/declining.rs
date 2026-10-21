@@ -8,7 +8,6 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
-
 use std::sync::Arc;
 
 use lemonfiber_contract::capabilities::invite::decline;
@@ -73,6 +72,7 @@ pub(super) fn invitations(offers: &Offers, household: &[Member]) -> Invitations 
 /// The decline service as the core asks it: over `invite.decline` where the service
 /// filling it speaks it, and through the files it reads where it is the stack's own or a
 /// first-party service standing in for it.
+///
 /// Nothing where nothing fills it, or where it speaks the contract and cannot be asked
 /// over it.
 pub(crate) async fn asked(

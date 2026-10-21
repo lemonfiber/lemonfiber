@@ -82,3 +82,21 @@ async fn the_invitations_applied_are_the_table_the_service_reads() {
         Some(lemonfiber_sidecar::decline::Claimed::OwnWrites)
     );
 }
+
+/// Each way the core says a claim is told is the way the table the service reads tells it.
+#[test]
+fn each_way_a_claim_is_told_is_the_tables() {
+    use lemonfiber_sidecar::decline::Claimed as Telling;
+
+    for (said, told) in [
+        (Claimed::HasPassword, Telling::HasPassword),
+        (Claimed::OwnWrites, Telling::OwnWrites),
+        (Claimed::Unknown, Telling::Unknown),
+    ] {
+        let invitations = Invitations {
+            claimed: said,
+            invitations: Vec::new(),
+        };
+        assert_eq!(super::table(&invitations).claimed, told);
+    }
+}

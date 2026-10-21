@@ -292,6 +292,47 @@ fn the_media_servers_key_crosses_only_where_any_of_its_credentials_may() {
     )));
 }
 
+/// A first-party decline service that speaks its contract but cannot be asked over it is
+/// handed no key, and nothing is minted for it.
+#[tokio::test]
+async fn a_decline_service_that_cannot_be_asked_is_handed_no_key() {
+    let http = serving(&[&[]], 204);
+    let (ctx, at) = decline_ctx("decline-key-unasked", true, None, http.clone());
+    let services = vec![
+        media_server_svc(),
+        requests_svc(),
+        manifest_service("decline", None, Some(5056)),
+    ];
+    let theirs = crate::test_support::contracted(
+        "their-decline",
+        "their-decline",
+        lemonfiber_contract::capabilities::invite::decline::CAPABILITY,
+    );
+    let fillers = super::fillers_trusting(
+        services.clone(),
+        &[theirs],
+        &at,
+        &crate::test_support::first_party("their-decline"),
+    );
+
+    let wiring =
+        super::super::decline::seed_decline_key(&ctx, &services, &fillers, Some(&at)).await;
+
+    assert!(
+        matches!(
+            wiring.map(|one| one.state),
+            Some(State::Skipped { reason }) if reason.contains("cannot be asked over its contract")
+        ),
+        "a decline service that cannot be asked was not said to be"
+    );
+    assert!(
+        http.requests()
+            .iter()
+            .all(|asked| !(asked.method == Method::Post && asked.url.ends_with("/Auth/Keys"))),
+        "a key was minted for a service that cannot be asked"
+    );
+}
+
 /// A stack that no longer runs the service has every key filed under its name revoked.
 #[tokio::test]
 async fn removing_the_service_revokes_its_key() {
