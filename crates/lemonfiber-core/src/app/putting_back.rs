@@ -241,6 +241,7 @@ async fn carried_out(
         &paths.env_file(),
         Vec::new(),
     )?;
+    super::recover::reheld(ctx, &carried)?;
 
     // The account rather than the instruction, which is the division `told` exists to
     // make: what a reversal is carried out *with* holds the values it puts back, and

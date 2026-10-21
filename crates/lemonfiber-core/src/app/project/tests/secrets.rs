@@ -124,3 +124,48 @@ fn the_render_group_the_operator_recorded_is_what_the_project_is_written_with() 
 
     assert_eq!(group, Some(44));
 }
+
+/// A key the operator replaces is written into the file that reads it, and into no other.
+#[test]
+fn a_replaced_key_is_written_into_every_file_that_reads_it() {
+    const REPLACED: &str = "a-replacement-wireguard-key";
+    let (ctx, _) = machine("secrets-replaced");
+    let env = ctx.settings.env_file.clone().unwrap_or_default();
+    let entered = |key: &str| {
+        crate::settings::legacy::entered(&env, crate::credential::VPN_PRIVATE_KEY, key, 0)
+            .is_some_and(|kept| kept.is_ok())
+    };
+    assert!(entered(KEY));
+    let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK).ok();
+    let resolved = crate::settings::Resolved::of(&ctx, manifest.as_ref(), &[]);
+    let file = resolved.secrets_file("gluetun").unwrap_or_default();
+    assert!(manifest
+        .as_ref()
+        .is_some_and(|manifest| super::super::secrets_written(&ctx, manifest, &[]).is_ok()));
+    assert!(entered(REPLACED));
+
+    let unread = crate::settings::files::reread(
+        &ctx,
+        manifest.as_ref(),
+        &[],
+        &resolved,
+        &crate::plugin::Holding::Crossing("NOTHING_READS_THIS_KEY".to_owned()),
+    );
+    let still = std::fs::read_to_string(&file).unwrap_or_default();
+    let reread = crate::settings::files::reread(
+        &ctx,
+        manifest.as_ref(),
+        &[],
+        &resolved,
+        &crate::settings::files::holding_of(crate::credential::VPN_PRIVATE_KEY),
+    );
+
+    assert_eq!(unread.ok(), Some(Vec::new()));
+    assert!(
+        still.contains(&format!("WIREGUARD_PRIVATE_KEY={KEY}")),
+        "{still}"
+    );
+    assert_eq!(reread.ok(), Some(vec!["gluetun".to_owned()]));
+    assert!(std::fs::read_to_string(&file)
+        .is_ok_and(|held| held.contains(&format!("WIREGUARD_PRIVATE_KEY={REPLACED}"))));
+}

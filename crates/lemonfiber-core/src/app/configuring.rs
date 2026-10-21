@@ -232,6 +232,7 @@ async fn applying(
                 })
                 .map_err(|err| Box::new(err.problem()))?;
             file.set(key, value);
+            reread(ctx, key)?;
             return Ok(Proposal {
                 review,
                 consequence,
@@ -242,6 +243,7 @@ async fn applying(
             return Err(Box::new(err.problem()));
         }
         file.set(key, value);
+        reread(ctx, key)?;
         // Recorded as what lemonfiber last wrote here, so the next change can tell an
         // operator's edit from lemonfiber's own value rather than overwriting one
         // without saying so.
@@ -252,6 +254,18 @@ async fn applying(
         consequence,
         file,
     })
+}
+
+/// Every secrets file that reads `key`, written again with its new value.
+///
+/// # Errors
+///
+/// Returns the [`Problem`] for a store that cannot be read or a file that cannot be
+/// written.
+fn reread(ctx: &Ctx, key: &str) -> Result<(), Box<Problem>> {
+    crate::settings::files::reread_now(ctx, &crate::settings::files::holding_of(key))
+        .map(drop)
+        .map_err(|err| Box::new(err.problem()))
 }
 
 /// Where the proposal stands once everything that could stop it has been asked.

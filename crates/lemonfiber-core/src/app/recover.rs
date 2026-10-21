@@ -227,6 +227,23 @@ pub(crate) fn carrying_out(
     Ok(carried)
 }
 
+/// Every secrets file that reads a secret `carried` put back, written again with the
+/// value it holds now.
+///
+/// # Errors
+///
+/// Returns a [`Problem`] for a store that cannot be read or a file that cannot be written.
+pub(crate) fn reheld(ctx: &super::Ctx, carried: &Carried) -> Result<(), Box<Problem>> {
+    for name in carried.done.iter().filter_map(|undo| match &undo.action {
+        Action::Rehold { name, .. } => Some(name),
+        _ => None,
+    }) {
+        crate::settings::files::reread_now(ctx, &crate::plugin::Holding::Store(name.clone()))
+            .map_err(|err| Box::new(crate::error::Diagnose::problem(&err)))?;
+    }
+    Ok(())
+}
+
 /// What one undo amounted to: carried out, beyond a filesystem-and-config
 /// reversal's reach, or the operator's to keep.
 enum Step {

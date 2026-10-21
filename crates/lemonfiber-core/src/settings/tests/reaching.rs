@@ -237,3 +237,141 @@ async fn a_secret_no_installed_plugin_declares_is_read_from_the_store() {
         .all(|one| one.name == "gluetun:wireguard-key" && !one.held && one.from.is_none()));
     assert_eq!(listed.len(), 1);
 }
+
+/// A crossing key the operator sets by hand is written into every file that reads it at
+/// once, as a rotation's is, so no reader keeps the value it replaced.
+#[tokio::test]
+async fn a_crossing_key_set_by_hand_rewrites_every_file_that_reads_it() {
+    let machine = machine("set-by-hand", Reporting::absent());
+    let mut embedded = reader();
+    if let Some(trusted) = crate::plugin::first_party::EMBEDDED.first() {
+        trusted.plugin.clone_into(&mut embedded.plugin);
+        trusted.manifest.clone_into(&mut embedded.manifest);
+        trusted.tree.clone_into(&mut embedded.tree);
+    }
+    let mut register = crate::plugin::Register::empty();
+    assert!(register.record(embedded).is_ok());
+    assert!(std::fs::write(
+        machine.env.with_file_name(crate::config::paths::PLUGINS),
+        serde_json::to_string(&register).unwrap_or_default()
+    )
+    .is_ok());
+    let file = machine.env.with_file_name("env").join("reader.env");
+    assert!(store::write(&file, "SONARR_KEY=the-replaced-key\n").is_ok());
+
+    let set = crate::app::configuring::set(
+        &machine.ctx,
+        crate::app::Setting::to(CROSSING, "set-by-hand"),
+    )
+    .await;
+
+    assert!(set.is_ok(), "{set:?}");
+    assert!(std::fs::read_to_string(&file).is_ok_and(
+        |text| !text.contains("the-replaced-key") && text.contains("SONARR_KEY=set-by-hand")
+    ));
+}
+
+/// A secret an undo puts back is written into every file that reads it, so no reader keeps
+/// the value the undone change gave it.
+#[tokio::test]
+async fn a_secret_put_back_by_an_undo_reaches_every_file_that_reads_it() {
+    let machine = machine("reheld", Reporting::absent());
+    let mut holder = crate::test_support::a_placed("holder", &[], None, None);
+    holder.fields.env.insert(
+        "TOKEN".to_owned(),
+        Value::Secret(SecretOf {
+            secret: "token".to_owned(),
+        }),
+    );
+    let mut register = crate::plugin::Register::empty();
+    assert!(register
+        .record(crate::test_support::an_installed("komga", vec![holder]))
+        .is_ok());
+    assert!(std::fs::write(
+        machine.env.with_file_name(crate::config::paths::PLUGINS),
+        serde_json::to_string(&register).unwrap_or_default()
+    )
+    .is_ok());
+    let secrets = crate::settings::secrets_at(&machine.ctx).unwrap_or_default();
+    let keeping = [crate::settings::Keeping {
+        name: "komga:token",
+        value: "put-back",
+        from: crate::settings::Source::Recipe,
+        at: 1,
+    }];
+    assert!(crate::settings::kept(&secrets, &keeping, &|_| Ok(())).is_ok());
+    let file = machine.env.with_file_name("env").join("holder.env");
+    assert!(store::write(&file, "TOKEN=undone\n").is_ok());
+    let carried = crate::app::recover::Carried {
+        done: vec![crate::journal::Undo {
+            target: "komga:token".to_owned(),
+            action: crate::journal::Action::Rehold {
+                name: "komga:token".to_owned(),
+                earlier: None,
+                kept: None,
+                filed: None,
+            },
+        }],
+        ..crate::app::recover::Carried::default()
+    };
+
+    let reheld = crate::app::recover::reheld(&machine.ctx, &carried);
+
+    assert!(reheld.is_ok(), "{reheld:?}");
+    assert!(std::fs::read_to_string(&file)
+        .is_ok_and(|text| text.contains("TOKEN=put-back") && !text.contains("undone")));
+}
+
+/// A secret the operator enters by hand is written into the file that reads it at once,
+/// and putting the change back writes the earlier one in again.
+#[tokio::test]
+async fn an_entered_secret_and_its_undo_each_reach_the_file_that_reads_it() {
+    let machine = machine("entered", Reporting::absent());
+    let mut holder = crate::test_support::a_placed("holder", &[], None, None);
+    holder.fields.env.insert(
+        "WG".to_owned(),
+        Value::Secret(SecretOf {
+            secret: "wireguard-key".to_owned(),
+        }),
+    );
+    let mut register = crate::plugin::Register::empty();
+    assert!(register
+        .record(crate::test_support::an_installed("gluetun", vec![holder]))
+        .is_ok());
+    assert!(std::fs::write(
+        machine.env.with_file_name(crate::config::paths::PLUGINS),
+        serde_json::to_string(&register).unwrap_or_default()
+    )
+    .is_ok());
+    let file = machine.env.with_file_name("env").join("holder.env");
+    let holds = |value: &str| {
+        std::fs::read_to_string(&file).is_ok_and(|text| text == format!("WG={value}\n"))
+    };
+    let entered = |value: &'static str| {
+        crate::app::configuring::set(
+            &machine.ctx,
+            crate::app::Setting::to(crate::credential::VPN_PRIVATE_KEY, value),
+        )
+    };
+
+    let secrets = crate::settings::secrets_at(&machine.ctx).unwrap_or_default();
+    let recipe = [crate::settings::Keeping {
+        name: "gluetun:wireguard-key",
+        value: "recipe-key",
+        from: crate::settings::Source::Recipe,
+        at: 1,
+    }];
+    assert!(crate::settings::kept(&secrets, &recipe, &|_| Ok(())).is_ok());
+
+    assert!(entered("entered-key").await.is_ok());
+    assert!(holds("entered-key"));
+    let last =
+        crate::app::recover::journal_at(&machine.env.with_file_name(crate::config::paths::JOURNAL))
+            .ok()
+            .and_then(|journal| journal.changes().last().map(|change| change.at.clone()))
+            .unwrap_or_default();
+    let undone = crate::app::putting_back::undo(&machine.ctx, Some(&last)).await;
+
+    assert!(undone.is_ok(), "{undone:?}");
+    assert!(holds("recipe-key"));
+}
