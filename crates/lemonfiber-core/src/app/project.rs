@@ -4,6 +4,7 @@
 //! merged over it and nothing else.
 
 mod copying;
+mod mounting;
 mod moving;
 mod profiled;
 mod retiring;
@@ -121,9 +122,9 @@ pub(crate) struct Prepared {
 /// Generate the project for `manifest` and what is installed here, and write it as a
 /// lifecycle command running `plan` does: previewed by a rehearsal, and otherwise written
 /// with each service's secrets file and the stack's own Compose files retired and, where
-/// `starting`, with the profiles of the start beside it and each service's state moved
-/// into its mount tree. Where `DATA_ROOT` is refused, a start is refused and anything
-/// else leaves the project on disk as it stands.
+/// `starting`, with the profiles of the start beside it, each service's state moved
+/// into its mount tree and each mount source not there yet made. Where `DATA_ROOT` is
+/// refused, a start is refused and anything else leaves the project on disk as it stands.
 ///
 /// # Errors
 ///
@@ -171,6 +172,7 @@ pub(crate) fn prepared(
         secrets_written(ctx, manifest, installed).map_err(|failure| Box::new(failure.problem()))?;
         if starting {
             moved(ctx, manifest)?;
+            mounting::made(ctx, manifest)?;
         }
     }
     Ok(Prepared {

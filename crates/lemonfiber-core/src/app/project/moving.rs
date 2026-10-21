@@ -112,7 +112,7 @@ pub(crate) fn beneath(from: &Path, to: &Path) -> Option<PathBuf> {
 }
 
 /// Every directory above `path` that is not there yet, parent before child.
-fn missing(path: &Path) -> Vec<PathBuf> {
+pub(super) fn missing(path: &Path) -> Vec<PathBuf> {
     let mut made: Vec<PathBuf> = path
         .ancestors()
         .skip(1)
@@ -124,12 +124,12 @@ fn missing(path: &Path) -> Vec<PathBuf> {
 }
 
 /// A path as the journal names it.
-fn shown(path: &Path) -> String {
+pub(super) fn shown(path: &Path) -> String {
     path.display().to_string()
 }
 
 /// One entry of the move about `target`, journalled under the project's own operation.
-fn change(stamp: &str, kind: Kind, target: &Path) -> Change {
+pub(super) fn change(stamp: &str, kind: Kind, target: &Path) -> Change {
     Change {
         at: stamp.to_owned(),
         operation: super::OPERATION.to_owned(),
