@@ -11,7 +11,10 @@ const APP: &str = crate::app_keys::DECLINE_APP;
 fn stack(declining: bool) -> Vec<lemonfiber_manifest::Service> {
     let mut services = vec![media_server_svc(), requests_svc()];
     if declining {
-        services.push(manifest_service("decline", None, Some(5056)));
+        let mut decline = manifest_service("decline", None, Some(5056));
+        decline.provides =
+            vec![lemonfiber_contract::capabilities::invite::decline::CAPABILITY.to_owned()];
+        services.push(decline);
     }
     services
 }
@@ -182,6 +185,26 @@ async fn a_key_the_media_server_dropped_is_replaced() {
     assert_eq!(state, Some(State::Wired));
     assert_eq!(held(&at).as_deref(), Some("fresh"));
     assert_eq!(revoked, vec!["stray".to_owned()]);
+}
+
+/// What the service holds is told by its hash: two keys whose short fingerprints match are
+/// still two keys, and only the one it holds is kept.
+#[tokio::test]
+async fn a_key_is_told_from_one_sharing_its_short_fingerprint() {
+    const HELD: &str = "000000000000031d";
+    const TWIN: &str = "00000000000008d8";
+    assert_eq!(
+        crate::ports::fingerprint(HELD),
+        crate::ports::fingerprint(TWIN)
+    );
+    let http = serving(&[&[TWIN, HELD]], 204);
+    let (ctx, at) = decline_ctx("decline-key-twins", true, Some(HELD), http.clone());
+
+    let (state, revoked) = seeded(&ctx, &http, true, &at).await;
+
+    assert_eq!(state, Some(State::Wired));
+    assert_eq!(held(&at).as_deref(), Some(HELD));
+    assert_eq!(revoked, vec![TWIN.to_owned()]);
 }
 
 /// A stack that no longer runs the service has every key filed under its name revoked.

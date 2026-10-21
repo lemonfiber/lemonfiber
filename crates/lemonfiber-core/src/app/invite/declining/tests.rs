@@ -2,7 +2,7 @@ use std::path::Path;
 
 use lemonfiber_sidecar::decline::TokenHash;
 
-use super::{path, table, with_token};
+use super::{invitations, path, with_token};
 use crate::invitation::{Offer, Offers};
 use crate::ports::service::Member;
 
@@ -25,7 +25,7 @@ fn offer(decline: Option<&str>) -> Offer {
 }
 
 #[test]
-fn the_table_holds_each_unclaimed_offer_that_carries_a_token() {
+fn the_invitations_hold_each_unclaimed_offer_that_carries_a_token() {
     let offers: Offers = [
         ("9".to_owned(), offer(Some("ana-token"))),
         ("10".to_owned(), offer(None)),
@@ -40,10 +40,13 @@ fn the_table_holds_each_unclaimed_offer_that_carries_a_token() {
         member("11", "bo", true),
     ];
 
-    let table = table(&offers, &household);
+    let held = invitations(&offers, &household);
 
-    assert_eq!(table.invitations.len(), 1);
-    let ana = table.find(&TokenHash::of("ana-token"));
+    assert_eq!(held.invitations.len(), 1);
+    let ana = held
+        .invitations
+        .iter()
+        .find(|one| one.token == TokenHash::of("ana-token").as_str());
     assert_eq!(
         ana.map(|one| (one.account.as_str(), one.name.as_str())),
         Some(("9", "ana"))
@@ -60,7 +63,7 @@ fn an_offer_whose_dates_cannot_be_read_is_left_out() {
     unreadable.offered = "yesterday".to_owned();
     let offers: Offers = [("9".to_owned(), unreadable)].into_iter().collect();
 
-    assert!(table(&offers, &[member("9", "ana", false)])
+    assert!(invitations(&offers, &[member("9", "ana", false)])
         .invitations
         .is_empty());
 }

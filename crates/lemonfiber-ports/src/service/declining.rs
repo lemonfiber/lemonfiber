@@ -61,7 +61,8 @@ pub trait Declining: Send + Sync {
     /// Returns [`Failure`] where it is unreachable or refuses.
     async fn hold(&self, key: &str) -> Result<(), Failure>;
 
-    /// The key it holds, by its [`crate::fingerprint()`], or nothing where it holds none.
+    /// The key it holds, by the SHA-256 of its bytes in lower-case hexadecimal, or nothing
+    /// where it holds none.
     ///
     /// # Errors
     ///

@@ -25,6 +25,13 @@ impl TokenHash {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    /// A hash as it was written down, read back: what another side of the wire hands over
+    /// in place of the token.
+    #[must_use]
+    pub fn written(hash: &str) -> Self {
+        Self(hash.to_owned())
+    }
 }
 
 /// `bytes` in lowercase hexadecimal.

@@ -149,7 +149,7 @@ pub(crate) async fn offer(
     let decline = if standing == InvitationStanding::Joined {
         None
     } else {
-        declining::issued(ctx, &manifest.services, &held.household, &member).await
+        declining::issued(ctx, &manifest, &held.household, &member).await
     };
 
     let joining = joining::joining(ctx, &member, standing).await;

@@ -15,13 +15,13 @@
 
 use std::path::Path;
 
-use lemonfiber_sidecar::decline::{File, Key};
+use lemonfiber_sidecar::decline::Key;
 
 use super::Ctx;
 use crate::app::invite::declining;
 use crate::app::targets::MediaServer;
 use crate::app_keys::DECLINE_APP;
-use crate::ports::service::AppKeys;
+use crate::ports::service::{AppKeys, Declining};
 use crate::seed::{State, Wiring};
 
 /// What the report calls this connection, for the media server `server`.
@@ -74,25 +74,40 @@ pub(super) async fn seed_decline_key(
             },
         ));
     };
-    let path = declining::path(project, File::Key);
-    let held = crate::app::targets::read_owned(
-        ctx.seams.filesystem.as_ref(),
-        &path,
-        crate::within::directory_of(&path),
-    )
-    .await
-    .and_then(|text| Key::read(&text).ok())
-    .filter(|key| filed.iter().any(|one| one == key.reveal()));
+    let Some(decline) = declining::asked(ctx, fillers, project).await else {
+        return Some(settled(
+            server,
+            State::Skipped {
+                reason: "the decline service cannot be asked over its contract, so it is \
+                         handed no key"
+                    .to_owned(),
+            },
+        ));
+    };
+    let held = decline
+        .held()
+        .await
+        .ok()
+        .flatten()
+        .and_then(|hash| named_by(&filed, &hash));
     let state = match held {
-        Some(key) => kept(ctx, client.as_ref(), &filed, key.reveal()).await,
+        Some(key) => kept(ctx, client.as_ref(), &filed, &key).await,
         None if ctx.dry_run => return Some(would_mint(server)),
-        None => minted(client.as_ref(), &filed, &path).await,
+        None => minted(client.as_ref(), &filed, decline.as_ref()).await,
     };
     Some(settled(server, state))
 }
 
-/// The key the file holds is one the media server holds: revoke whatever else is filed
-/// beside it.
+/// The key filed under the service's name whose SHA-256 is `hash`, where one is.
+fn named_by(filed: &[String], hash: &str) -> Option<String> {
+    filed
+        .iter()
+        .find(|one| Key::read(one).is_ok_and(|key| key.fingerprint() == hash))
+        .cloned()
+}
+
+/// The key the service holds is one the media server holds: revoke whatever else is
+/// filed beside it.
 async fn kept(ctx: &Ctx, client: &dyn AppKeys, filed: &[String], key: &str) -> State {
     let others: Vec<&String> = filed.iter().filter(|one| *one != key).collect();
     if others.is_empty() {
@@ -107,23 +122,20 @@ async fn kept(ctx: &Ctx, client: &dyn AppKeys, filed: &[String], key: &str) -> S
     super::minted::revoking(client, others).await
 }
 
-/// Mint a key, write it where the service reads it, and only then revoke what it replaces.
+/// Mint a key, hand it to the decline service, and only then revoke what it replaces.
 ///
-/// A key that could not be written is revoked again at once: one nothing holds is not
+/// A key the service would not take is revoked again at once: one nothing holds is not
 /// left on the server for the next run to find.
-async fn minted(client: &dyn AppKeys, filed: &[String], path: &Path) -> State {
+async fn minted(client: &dyn AppKeys, filed: &[String], decline: &dyn Declining) -> State {
     let key = match super::minted::mint(client, DECLINE_APP).await {
         Ok(key) => key,
         Err(state) => return state,
     };
-    // One word, which is what minting it settled, so it reads as a key.
-    let written = Key::read(&key).map(|key| key.written()).unwrap_or_default();
-    if let Err(failure) = crate::config::store::write(path, &written) {
+    if let Err(failure) = decline.hold(&key).await {
         let _ = client.revoke(&key).await;
         return State::Failed {
             detail: format!(
-                "the key could not be written to {}, so it was revoked again: {failure}",
-                path.display()
+                "the decline service would not take the key, so it was revoked again: {failure}"
             ),
         };
     }
