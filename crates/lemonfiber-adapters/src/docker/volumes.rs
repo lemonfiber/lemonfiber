@@ -138,13 +138,14 @@ async fn archived(daemon: &Daemon, docker: &Docker, id: &str) -> Result<Vec<u8>,
     let mut archive = Vec::new();
     while let Some(chunk) = chunks.next().await {
         archive.extend_from_slice(&chunk.map_err(|error| daemon.refused(&error))?);
-        bounded(
-            archive.len(),
-            crate::filesystem::UNPACKED_AT_MOST.saturating_mul(2),
-        )?;
+        bounded(archive.len(), ARCHIVED_AT_MOST)?;
     }
     Ok(archive)
 }
+
+/// The most an archive of a volume may hold before it is refused: room for the headers
+/// and padding beside everything lemonfiber unpacks.
+const ARCHIVED_AT_MOST: u64 = crate::filesystem::UNPACKED_AT_MOST.saturating_mul(2);
 
 /// Refuse an archive of `held` bytes where it is more than `at_most`.
 fn bounded(held: usize, at_most: u64) -> Result<(), Failure> {

@@ -43,6 +43,33 @@ async fn a_key_the_service_adopts_is_minted_before_it_starts() {
     );
 }
 
+/// A key that cannot be minted is not recorded, and the start goes on: the connection
+/// that needs it reports its absence.
+#[tokio::test]
+async fn a_key_that_cannot_be_minted_is_left_unrecorded() {
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("unminted");
+    let _ = std::fs::create_dir_all(&dir);
+    let env = dir.join(".env");
+    let _ = std::fs::write(&env, "DATA_ROOT=/tmp\n");
+    let ctx = crate::test_support::a_context()
+        .settings(crate::config::Settings {
+            env_file: Some(env.clone()),
+            ..crate::config::Settings::default()
+        })
+        .build()
+        .with_random(std::sync::Arc::new(
+            lemonfiber_fixtures::support::FixedRandom(None),
+        ));
+
+    let written = Manifest::from_toml(STACK).ok().map(|manifest| {
+        super::mint_adopted_secrets(&ctx, &manifest);
+        std::fs::read_to_string(&env).unwrap_or_default()
+    });
+    let _ = std::fs::remove_dir_all(&dir);
+
+    assert_eq!(written.as_deref(), Some("DATA_ROOT=/tmp\n"));
+}
+
 /// Both ways of starting mint the key, because there are two.
 ///
 /// A start can be waited on or streamed, and the streamed one is what the command

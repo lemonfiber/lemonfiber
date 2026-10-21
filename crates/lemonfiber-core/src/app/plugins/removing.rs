@@ -173,9 +173,10 @@ pub(crate) async fn remove(
     // which no journal entry covers because seeding keeps them rather than an install.
     // They go with the plugin: a later plugin is somebody else, and the next service to
     // take one of these ids would otherwise be handed this one's password.
-    if let Some(file) = ctx.settings.env_file.as_deref() {
-        forget_credentials(ctx, file, &kept);
-    }
+    ctx.settings
+        .env_file
+        .iter()
+        .for_each(|file| forget_credentials(ctx, file, &kept));
     crate::settings::forgotten(ctx, &going);
     super::kept::forgotten(ctx, &going.plugin);
 

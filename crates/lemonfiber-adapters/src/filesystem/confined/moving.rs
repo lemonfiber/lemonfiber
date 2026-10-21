@@ -45,7 +45,7 @@ fn moving(from: &Path, to: &Path, within: &Path, meanwhile: &dyn Fn()) -> Result
         .map_err(unmoved)?;
     (unplain(&checked).is_none() && same(&looked, &checked))
         .then_some(())
-        .ok_or_else(|| refused(from, to, REPLACED))?;
+        .ok_or(refused(from, to, REPLACED))?;
     let target = walked(&root, &to_above, true).map_err(unmoved)?;
     meanwhile();
     renameat_with(&source, from_name, &target, to_name, RenameFlags::NOREPLACE).map_err(

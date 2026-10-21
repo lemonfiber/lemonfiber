@@ -167,3 +167,18 @@ fn a_project_mounting_no_library_crowds_nothing_whatever_the_overlay_mounts() {
 
     assert!(super::crowded("services:\n  sonarr: {}\n", &[overlay], "/data", &variable).is_empty());
 }
+
+#[test]
+fn a_crowded_service_says_how_many_mounts_it_would_see_and_which() {
+    let crowded = super::Crowded {
+        service: "sonarr".to_owned(),
+        mounts: vec![
+            "/srv/media:/data".to_owned(),
+            "/srv/media/tv:/tv".to_owned(),
+        ],
+    };
+
+    assert!(crowded.to_string().starts_with(
+        "service sonarr mounts 2 paths beneath the data root (/srv/media:/data, /srv/media/tv:/tv);"
+    ));
+}

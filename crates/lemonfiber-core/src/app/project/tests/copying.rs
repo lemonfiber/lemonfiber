@@ -120,3 +120,35 @@ async fn nothing_is_copied_through_a_link_standing_where_the_mount_goes() {
     assert!(volumes.handed_over().is_empty());
     assert!(std::fs::read_dir(&elsewhere).is_ok_and(|entries| entries.count() == 0));
 }
+
+#[tokio::test]
+async fn a_copy_whose_journal_cannot_be_written_is_not_made() {
+    let (mut ctx, project) = machine("unjournalled-copy");
+    let _ = std::fs::remove_dir_all(project.join("config").join("jellyfin").join("cache"));
+    let volumes = Volumed::holding(&[(VOLUME, &[("kept", "state")])]);
+    ctx.seams.engine_volumes = volumes.clone() as Arc<_>;
+    let journal = crate::app::targets::layout(&ctx)
+        .map(|paths| paths.journal())
+        .unwrap_or_default();
+    let _ = std::fs::create_dir_all(&journal);
+
+    assert!(copying(&ctx).await.is_err());
+    assert!(volumes.handed_over().is_empty(), "nothing copied");
+}
+
+#[tokio::test]
+async fn a_copy_that_cannot_be_written_into_its_mount_stops_the_start_naming_it() {
+    let (mut ctx, project) = machine("unwritten-copy");
+    let _ = std::fs::remove_dir_all(project.join("config").join("jellyfin").join("cache"));
+    ctx.seams.engine_volumes =
+        Volumed::holding(&[(VOLUME, &[("kept", "state"), ("kept/deeper", "state")])]) as Arc<_>;
+
+    let refused = copying(&ctx).await.err();
+
+    assert!(
+        refused.is_some_and(
+            |problem| problem.code.as_str() == "STACK-12" && problem.summary.contains(VOLUME)
+        ),
+        "named and refused"
+    );
+}

@@ -31,7 +31,7 @@ pub(crate) fn writes(
         &crate::app::targets::chosen_fillers(ctx),
         &resolved,
     );
-    let at = super::super::project::path(ctx).unwrap_or_else(|| stack.join(crate::project::FILE));
+    let at = stack.join(crate::project::FILE);
     let previous = super::super::project::held(ctx);
     let project = (previous.as_deref() != Some(project.text.as_str()))
         .then(|| Write::project(at, previous, project.text));

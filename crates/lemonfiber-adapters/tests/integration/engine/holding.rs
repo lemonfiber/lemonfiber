@@ -101,7 +101,26 @@ async fn a_network_the_engine_will_not_let_go_of_is_said_to_be_refused() {
         )],
     );
 
+    let kept = fake::engine(
+        "network-kept",
+        vec![
+            ("disconnect", fake::Reply::Body(200, String::new())),
+            (
+                "DELETE /",
+                fake::Reply::Body(500, r#"{"message":"in use"}"#.to_owned()),
+            ),
+            (
+                "networks/lemonfiber_old",
+                fake::Reply::Body(200, HELD.to_owned()),
+            ),
+        ],
+    );
+
     assert!(Daemon::at(&refusing.socket)
+        .removed("lemonfiber_old")
+        .await
+        .is_err());
+    assert!(Daemon::at(&kept.socket)
         .removed("lemonfiber_old")
         .await
         .is_err());
@@ -114,6 +133,7 @@ async fn a_network_the_engine_will_not_let_go_of_is_said_to_be_refused() {
         .await
         .is_err());
     refusing.stop().await;
+    kept.stop().await;
     unknown.stop().await;
 }
 
@@ -272,5 +292,83 @@ async fn an_archive_that_cannot_be_written_where_it_goes_is_refused() {
         .await;
 
     assert!(copied.is_err());
+    engine.stop().await;
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn an_image_that_cannot_be_pulled_is_refused_without_a_second_container() {
+    let dir = Scratch::new("engine-unpulled");
+    let within = dir.join("stack");
+    let _ = std::fs::create_dir_all(&within);
+    let mut engine = fake::engine(
+        "unpulled",
+        vec![
+            (
+                "containers/create",
+                fake::Reply::Body(404, r#"{"message":"No such image"}"#.to_owned()),
+            ),
+            (
+                "images/create",
+                fake::Reply::Body(500, r#"{"message":"registry down"}"#.to_owned()),
+            ),
+        ],
+    );
+
+    let copied = Daemon::at(&engine.socket)
+        .copied(
+            "lemonfiber_caddy_data",
+            "caddy:2",
+            &within.join("data"),
+            &within,
+        )
+        .await;
+
+    assert!(
+        matches!(copied, Err(Failure::Unreachable { .. })),
+        "{copied:?}"
+    );
+    let asked = engine.asked_for();
+    assert_eq!(
+        asked
+            .iter()
+            .filter(|path| path.contains("containers/create"))
+            .count(),
+        1,
+        "{asked:?}"
+    );
+    engine.stop().await;
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn an_archive_cut_off_half_way_is_refused_and_its_container_removed() {
+    let dir = Scratch::new("engine-cut");
+    let within = dir.join("stack");
+    let into = within.join("mounts").join("caddy").join("data");
+    let _ = std::fs::create_dir_all(&within);
+    let mut engine = fake::engine(
+        "cut",
+        vec![
+            ("/archive", fake::Reply::Short(archived())),
+            (
+                "containers/create",
+                fake::Reply::Body(201, r#"{"Id":"c1","Warnings":[]}"#.to_owned()),
+            ),
+            ("containers/c1", fake::Reply::Body(204, String::new())),
+        ],
+    );
+
+    let copied = Daemon::at(&engine.socket)
+        .copied("lemonfiber_caddy_data", "caddy:2", &into, &within)
+        .await;
+
+    assert!(copied.is_err(), "{copied:?}");
+    assert!(!into.join("kept.db").exists());
+    let asked = engine.asked_for();
+    assert!(
+        asked.iter().any(|path| path.contains("containers/c1?")),
+        "removed: {asked:?}"
+    );
     engine.stop().await;
 }

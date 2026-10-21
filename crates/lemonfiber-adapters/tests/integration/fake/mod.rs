@@ -41,6 +41,9 @@ pub enum Reply {
     /// A chunked answer that never sends a chunk, held until the client hangs up: a
     /// wait on a container that does not end.
     Held,
+    /// A body promising twice what it sends before the connection ends: an archive cut
+    /// off half way.
+    Short(String),
 }
 
 /// What a held connection records once the client has hung up on it.
@@ -118,6 +121,16 @@ fn rendered(reply: &Reply) -> Vec<u8> {
             out.extend_from_slice(b"\r\n");
             out
         }
+        Reply::Short(body) => {
+            let head = format!(
+                "HTTP/1.1 200 X\r\nContent-Type: application/x-tar\r\n\
+                 Content-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len().saturating_mul(2)
+            );
+            let mut out = head.into_bytes();
+            out.extend_from_slice(body.as_bytes());
+            out
+        }
         Reply::Held => b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\
             Transfer-Encoding: chunked\r\n\r\n"
             .to_vec(),
@@ -135,13 +148,13 @@ fn rendered(reply: &Reply) -> Vec<u8> {
     }
 }
 
-/// Read one request, far enough to know what was asked for.
+/// Read one request, far enough to know what was asked for: its method and its path.
 ///
 /// Bodies are read and discarded rather than ignored: a server that answers
 /// before the client has finished sending leaves the client writing into a
 /// closed socket, which surfaces as a transport error in a test that was
 /// about something else entirely.
-async fn request(socket: &mut UnixStream) -> Option<String> {
+async fn request(socket: &mut UnixStream) -> Option<(String, String)> {
     let mut received = Vec::new();
     let mut byte = [0_u8; 1];
     while !received.ends_with(b"\r\n\r\n") && socket.read(&mut byte).await.ok()? != 0 {
@@ -164,10 +177,10 @@ async fn request(socket: &mut UnixStream) -> Option<String> {
         socket.read_exact(&mut body).await.ok()?;
     }
 
-    head.lines()
-        .next()
-        .and_then(|line| line.split_whitespace().nth(1))
-        .map(ToOwned::to_owned)
+    let mut said = head.lines().next()?.split_whitespace();
+    let method = said.next()?.to_owned();
+    let path = said.next()?.to_owned();
+    Some((method, path))
 }
 
 /// An engine listening on a socket of its own.
@@ -209,7 +222,8 @@ impl Drop for Engine {
     }
 }
 
-/// Start an engine answering `routes`, matched as substrings of the path.
+/// Start an engine answering `routes`, each matched as a substring of the path, or of the
+/// method and the path with a space between them where a route names a method.
 ///
 /// The version route is always present, because the adapter settles the API
 /// version before it asks anything else and every test would otherwise have
@@ -256,12 +270,13 @@ async fn answer(
                 let table = table.clone();
                 let asked = asked.clone();
                 tokio::spawn(async move {
-                    if let Some(path) = request(&mut socket).await {
+                    if let Some((method, path)) = request(&mut socket).await {
                         let _ = asked.send(path.clone());
+                        let line = format!("{method} {path}");
 
                         let found = table
                             .iter()
-                            .find(|(route, _)| path.contains(route.as_str()))
+                            .find(|(route, _)| line.contains(route.as_str()))
                             .map(|(_, reply)| reply.clone());
                         let reply = found.unwrap_or(Reply::Body(
                             404,

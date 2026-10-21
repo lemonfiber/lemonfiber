@@ -126,9 +126,10 @@ impl Volumed {
                 .and_then(|()| std::fs::write(&at, text))
                 .map_err(|why| failed(why.to_string()))?;
         }
-        if let Ok(mut copied) = self.copied.lock() {
-            copied.push((name.to_owned(), image.to_owned()));
-        }
+        let _ = self
+            .copied
+            .lock()
+            .map(|mut copied| copied.push((name.to_owned(), image.to_owned())));
         Ok(())
     }
 }

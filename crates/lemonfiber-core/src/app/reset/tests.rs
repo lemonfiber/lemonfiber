@@ -107,3 +107,25 @@ async fn a_reset_over_an_unreadable_choice_is_an_error() {
         .await
         .is_err());
 }
+
+#[tokio::test]
+async fn a_reset_over_a_stack_that_does_not_pass_its_checks_is_an_error() {
+    let (into, env) = scratch("unchecked");
+
+    let refused = reset(&ctx(Some(into.to_path_buf()), Some(env)), true)
+        .await
+        .err();
+
+    assert!(
+        refused.is_some_and(|problem| problem.code.as_str().starts_with("STACK-")),
+        "refused by the stack's own checks"
+    );
+}
+
+#[tokio::test]
+async fn a_reset_whose_project_cannot_be_written_is_an_error() {
+    let (into, env) = scratch("unwritable-project");
+    let _ = std::fs::create_dir_all(into.join(crate::project::FILE));
+
+    assert!(reset(&carried(&into, &env), true).await.is_err());
+}

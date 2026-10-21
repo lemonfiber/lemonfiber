@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use super::{answered, bound, named, occupied, unoccupied};
+use super::{answered, bound, named, occupied, run, unoccupied};
 use crate::plugin::{Placed, Reached};
 use crate::project::overlay::{Declared, Published};
 use crate::test_support::{a_context, a_placed, an_installed};
@@ -182,4 +182,26 @@ fn a_plugin_replacing_the_stacks_service_is_held_to_its_name_and_port() {
     }];
     assert_eq!(named(&would, &held).len(), 1);
     assert_eq!(bound(&would, &stack, &[]).len(), 1);
+}
+
+/// A port standing beside moved a lemonfiber service off is held where it moved to, and
+/// the port it left is free.
+#[test]
+fn a_port_standing_beside_moved_is_held_where_it_moved_to() {
+    let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK);
+    let moved = [crate::model::MovedReport {
+        service: "sonarr".to_owned(),
+        from: 8989,
+        to: 18989,
+    }];
+
+    let ports: Vec<(String, u16)> = manifest
+        .map(|manifest| run(&manifest, &moved).1)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|published| (published.service, published.port))
+        .collect();
+
+    assert!(ports.contains(&("sonarr".to_owned(), 18989)), "{ports:?}");
+    assert!(!ports.contains(&("sonarr".to_owned(), 8989)), "{ports:?}");
 }

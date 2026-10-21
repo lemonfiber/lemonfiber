@@ -463,3 +463,6 @@ fn unwritable(at: &Path, why: &str) -> Problem {
     .in_state(State::Guided)
     .with_detail(why.to_owned())
 }
+
+#[cfg(test)]
+mod tests;

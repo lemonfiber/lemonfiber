@@ -61,3 +61,23 @@ async fn a_removal_takes_the_containers_off_before_the_project_forgets_them() {
     );
     assert!(document(&ctx).is_empty(), "and then forgot it");
 }
+
+/// A removal whose project cannot be written once the plugin is off says so, rather than
+/// reporting a machine whose project still declares what was taken away.
+#[tokio::test]
+async fn a_removal_whose_project_cannot_be_written_is_refused() {
+    let ctx = proving(
+        "rewrite-blocked",
+        Arc::new(Recording::answering(Ok(spoke("")))),
+        answering(200),
+    );
+    assert_eq!(
+        counted(installing(&ctx, &source("rewrite-blocked", PROVING)).await),
+        Some(1)
+    );
+    let project = project_of(&ctx);
+    let _ = std::fs::remove_file(&project);
+    let _ = std::fs::create_dir_all(&project);
+
+    assert!(removing(&ctx, "komga").await.is_err());
+}

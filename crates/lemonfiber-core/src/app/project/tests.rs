@@ -117,6 +117,21 @@ fn a_rehearsal_moves_nothing() {
     assert!(journal(&ctx).is_empty());
 }
 
+#[test]
+fn nothing_is_moved_where_the_move_cannot_be_journalled() {
+    let (ctx, project) = machine("unjournalled-move");
+    let journal = crate::app::targets::layout(&ctx)
+        .map(|paths| paths.journal())
+        .unwrap_or_default();
+    let _ = std::fs::create_dir_all(&journal);
+    let (from, to) = cache(&project);
+
+    assert!(moving(&ctx).is_err());
+
+    assert!(from.is_dir());
+    assert!(!to.exists());
+}
+
 #[cfg(unix)]
 mod links {
     use std::os::unix::fs::symlink;
@@ -162,5 +177,6 @@ mod links {
 
 mod copying;
 mod profiled;
+mod refused;
 mod retiring;
 mod secrets;

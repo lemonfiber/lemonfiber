@@ -101,23 +101,19 @@ fn file(
     contents: &[u8],
 ) -> Result<(), Fault> {
     use rustix::fs::{openat, OFlags};
+    use std::io::Write as _;
     let names = [above, &[last]].concat();
-    let names = names.as_slice();
     let here = walked(root, above, PERMITTED)?;
-    let opened = openat(
+    openat(
         &here,
         last,
         OFlags::RDWR | OFlags::CREATE | OFlags::EXCL | OFlags::NOFOLLOW | OFlags::CLOEXEC,
         permitted(mode),
     )
-    .map_err(|error| unwritten(root, names, &error.to_string()))?;
-    rustix::io::write(&opened, contents)
-        .map_err(|error| unwritten(root, names, &error.to_string()))
-        .and_then(|wrote| {
-            (wrote == contents.len())
-                .then_some(())
-                .ok_or_else(|| unwritten(root, names, "it was written short"))
-        })
+    .map(std::fs::File::from)
+    .map_err(std::io::Error::from)
+    .and_then(|mut opened| opened.write_all(contents))
+    .map_err(|error| unwritten(root, &names, &error.to_string()))
 }
 
 /// The directory `names` lead to beneath `root`, each step made where it is missing and

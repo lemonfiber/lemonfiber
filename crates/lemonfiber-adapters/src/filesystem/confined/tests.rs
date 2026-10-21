@@ -170,6 +170,7 @@ fn a_mount_source_lies_beneath_only_through_no_link() {
         Disk.lies(&owned.join("missing").join("x"), &owned),
         Lying::Absent
     );
+    assert_eq!(Disk.lies(&owned.join("absent.yml"), &owned), Lying::Absent);
     let unmade = owned.join("unmade");
     assert_eq!(Disk.lies(&unmade.join("x"), &unmade), Lying::Absent);
     assert_eq!(Disk.lies(&operator, &owned), Lying::Escaped);

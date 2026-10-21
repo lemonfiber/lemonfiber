@@ -149,3 +149,27 @@ async fn a_network_that_will_not_go_is_said_and_the_start_goes_on() {
         .iter()
         .any(|said| said.contains(STALE) && said.contains("could not be taken away")));
 }
+
+#[tokio::test]
+async fn a_start_whose_profiles_cannot_be_written_beside_the_project_brings_nothing_up() {
+    let networks = Networked::holding(&HELD);
+    let runner = Arc::new(Watching {
+        networks: networks.clone(),
+        at_up: Mutex::new(None),
+    });
+    let (_dir, ctx) = machine("unprofiled", &networks, runner.clone());
+    let project = crate::app::project::directory(&ctx).unwrap_or_default();
+    let _ = std::fs::create_dir_all(&project);
+    let _ = std::fs::remove_file(project.join(".env"));
+    let _ = std::fs::create_dir_all(project.join(".env"));
+
+    assert!(started(&ctx).await.is_none());
+    assert!(
+        runner
+            .at_up
+            .lock()
+            .ok()
+            .is_some_and(|at_up| at_up.is_none()),
+        "Compose was not asked to bring anything up"
+    );
+}

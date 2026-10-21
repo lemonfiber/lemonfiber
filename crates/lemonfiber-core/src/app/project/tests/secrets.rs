@@ -107,3 +107,15 @@ fn the_operators_values_are_written_in_and_no_secret_reaches_the_project_or_its_
         "no secret is written in"
     );
 }
+
+#[test]
+fn the_render_group_the_operator_recorded_is_what_the_project_is_written_with() {
+    let (ctx, _) = machine("render-group");
+    let env = ctx.settings.env_file.clone().unwrap_or_default();
+    assert!(crate::config::store::set(&env, crate::config::RENDER_GROUP_KEY, " 44 ").is_ok());
+
+    let group =
+        crate::settings::Resolved::of(&ctx, None, &[]).project(|reading| reading.render_group);
+
+    assert_eq!(group, Some(44));
+}
