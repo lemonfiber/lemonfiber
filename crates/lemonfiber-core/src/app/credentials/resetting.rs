@@ -196,25 +196,25 @@ async fn copies(
     target: &Target,
 ) -> Vec<Propagation> {
     let curator = target.name.as_str();
+    let held = [
+        (
+            crate::seed::run::resync_application(ctx, fillers, &target.id).await,
+            format!("supplies {curator} with indexers"),
+        ),
+        (
+            crate::seed::run::rewatch(ctx, fillers, &target.id).await,
+            format!("finds subtitles for {curator}"),
+        ),
+        (
+            crate::seed::run::reprofile(ctx, fillers, &target.id).await,
+            format!("holds {curator}'s quality profiles"),
+        ),
+    ];
     let mut copies = Vec::new();
-    for (aggregator, state) in crate::seed::run::resync_application(ctx, fillers, &target.id).await
-    {
-        copies.push(copy(
-            format!("{aggregator}, which supplies {curator} with indexers"),
-            state,
-        ));
-    }
-    for (finder, state) in crate::seed::run::rewatch(ctx, fillers, &target.id).await {
-        copies.push(copy(
-            format!("{finder}, which finds subtitles for {curator}"),
-            state,
-        ));
-    }
-    for (syncer, state) in crate::seed::run::reprofile(ctx, fillers, &target.id).await {
-        copies.push(copy(
-            format!("{syncer}, which holds {curator}'s quality profiles"),
-            state,
-        ));
+    for (holders, what) in held {
+        for (holder, state) in holders {
+            copies.push(copy(format!("{holder}, which {what}"), state));
+        }
     }
     if let Some(state) =
         crate::seed::run::reroute(ctx, services, fillers, project, &target.id).await
