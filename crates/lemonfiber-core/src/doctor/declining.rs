@@ -17,7 +17,7 @@ use super::{Category, Check, Finding, Verdict};
 use crate::error::codes::decline::UNEXPLAINED;
 use crate::error::{Problem, Remedy};
 use crate::ports::filesystem::{Beneath, FileSystem};
-use crate::ports::service::{AppKeys as _, Dated};
+use crate::ports::service::{AppKeys, Dated};
 
 /// The name this check and anything answering it share.
 const CHECK: &str = "services.decline-key";
@@ -45,10 +45,14 @@ pub trait KeyDates: Send + Sync {
     async fn decline_keys(&self) -> Result<Vec<Dated>, ()>;
 }
 
+/// A media server's keys, dated by whichever server fills the decline service's link.
+pub struct Dating(pub Arc<dyn AppKeys>);
+
 #[async_trait]
-impl KeyDates for crate::jellyfin::Jellyfin {
+impl KeyDates for Dating {
     async fn decline_keys(&self) -> Result<Vec<Dated>, ()> {
-        self.dated(crate::app_keys::DECLINE_APP)
+        self.0
+            .dated(crate::app_keys::DECLINE_APP)
             .await
             .map_err(|_| ())
     }

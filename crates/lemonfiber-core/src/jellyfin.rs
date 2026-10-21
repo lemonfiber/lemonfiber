@@ -31,7 +31,6 @@ mod sessions;
 mod setup;
 mod upkeep;
 
-pub use keys::SEERR_APP;
 pub(crate) use screening::{pictured_at, streamed_at};
 pub use sessions::Sessions;
 
@@ -158,16 +157,6 @@ impl Jellyfin {
             &token,
         );
         self.endpoint.send(&carried(&request, &token)).await
-    }
-
-    /// Whether Jellyfin signs the household admin in with the password this client holds.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Failure::Unauthorised`] where Jellyfin refuses the password, and the
-    /// failure itself where it will not answer.
-    pub async fn accepts(&self) -> Result<(), Failure> {
-        self.sign_in().await.map(|_| ())
     }
 
     /// Sign in as the household admin and return the access token the reads carry.

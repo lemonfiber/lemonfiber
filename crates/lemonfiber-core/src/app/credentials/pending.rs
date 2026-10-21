@@ -14,7 +14,7 @@
 
 use lemonfiber_manifest::ApiKind;
 
-use crate::app::targets::{hosted, record_secret, recorded_secret, service_addr};
+use crate::app::targets::{hosted, record_secret, recorded_secret, service_addr, MediaServer};
 use crate::app::Ctx;
 use crate::config;
 use crate::ports::service::Failure;
@@ -22,17 +22,20 @@ use crate::ports::service::Failure;
 /// What a replacement's name ends in, after the name of the credential it replaces.
 const PENDING: &str = "_PENDING";
 
-/// A credential lemonfiber mints and replaces itself, and where the service it opens
-/// is asked whether it takes one.
+/// A credential lemonfiber mints and replaces itself, and the service it opens.
 struct Minted {
     /// The setting it is kept under.
     setting: String,
-    /// Which kind of service it opens.
-    kind: ApiKind,
-    /// Where the host reaches that service.
-    loopback: String,
-    /// The service's id.
-    id: String,
+    /// What it opens.
+    opens: Opens,
+}
+
+/// The service a minted credential opens, as it is asked whether it takes one.
+enum Opens {
+    /// The stack's torrent client's web UI, where the host reaches it.
+    Torrent(String),
+    /// Whatever media server fills the identity source.
+    Media(Box<MediaServer>),
 }
 
 /// The name a replacement for `setting` is kept under until the service has taken it.
@@ -110,17 +113,28 @@ pub(crate) async fn settled(ctx: &Ctx) {
         minted(ctx, &manifest)
     };
     for minted in asked {
-        let Some(replacement) = recorded_secret(ctx, &pending(&minted.setting)) else {
-            continue;
-        };
-        let current = recorded_secret(ctx, &minted.setting).unwrap_or_default();
-        match taken(ctx, &minted, &current).await {
-            Some(true) => forgotten(ctx, &minted.setting),
-            Some(false) if taken(ctx, &minted, &replacement).await == Some(true) => {
-                let _ = promoted(ctx, &minted.setting, &replacement);
-            }
-            Some(false) | None => {}
+        settle(ctx, &minted).await;
+    }
+}
+
+/// Settle one minted credential: the one in force stays where the service takes it, and
+/// the replacement moves into place, and to the server's adapter where it has one, where
+/// the service takes that instead.
+async fn settle(ctx: &Ctx, minted: &Minted) {
+    let Some(replacement) = recorded_secret(ctx, &pending(&minted.setting)) else {
+        return;
+    };
+    let current = recorded_secret(ctx, &minted.setting).unwrap_or_default();
+    match taken(ctx, minted, &current).await {
+        Some(true) => forgotten(ctx, &minted.setting),
+        Some(false) if taken(ctx, minted, &replacement).await == Some(true) => {
+            let _ =
+                promoted(ctx, &minted.setting, &replacement).and_then(|()| match &minted.opens {
+                    Opens::Media(server) => server.hand_upstream_if_contracted(&replacement),
+                    Opens::Torrent(_) => Ok(()),
+                });
         }
+        Some(false) | None => {}
     }
 }
 
@@ -130,15 +144,11 @@ pub(crate) async fn settled(ctx: &Ctx) {
 fn minted(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> Vec<Minted> {
     let torrent = service_addr(&manifest.services, ApiKind::Qbittorrent).map(|addr| Minted {
         setting: config::TORRENT_PASSWORD_KEY.to_owned(),
-        kind: ApiKind::Qbittorrent,
-        loopback: addr.loopback,
-        id: addr.id,
+        opens: Opens::Torrent(addr.loopback),
     });
     let media = hosted(ctx, manifest).map(|server| Minted {
-        kind: ApiKind::Jellyfin,
-        loopback: server.loopback.clone(),
-        id: server.id().to_owned(),
-        setting: server.setting,
+        setting: server.setting.clone(),
+        opens: Opens::Media(Box::new(server)),
     });
     torrent.into_iter().chain(media).collect()
 }
@@ -146,24 +156,27 @@ fn minted(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) -> Vec<Minted> {
 /// Whether the service signs in with `password`: yes, no, or nothing where it would
 /// not say.
 async fn taken(ctx: &Ctx, minted: &Minted, password: &str) -> Option<bool> {
-    let answer = if minted.kind == ApiKind::Qbittorrent {
-        crate::qbittorrent::Qbittorrent::new(ctx.seams.http.clone(), &minted.loopback)
-            .accepts(password)
-            .await
-    } else {
-        crate::jellyfin::Jellyfin::authenticated(
-            ctx.seams.http.clone(),
-            &minted.loopback,
-            &minted.id,
-            config::MEDIA_SERVER_ADMIN_USER,
-            password,
-        )
-        .accepts()
-        .await
-    };
-    match answer {
-        Ok(()) => Some(true),
-        Err(Failure::Unauthorised { .. }) => Some(false),
-        Err(_) => None,
+    match &minted.opens {
+        Opens::Torrent(loopback) => {
+            match crate::qbittorrent::Qbittorrent::new(ctx.seams.http.clone(), loopback)
+                .accepts(password)
+                .await
+            {
+                Ok(()) => Some(true),
+                Err(Failure::Unauthorised { .. }) => Some(false),
+                Err(_) => None,
+            }
+        }
+        Opens::Media(server) => {
+            let source = Box::pin(server.setting_up(ctx)).await?;
+            source
+                .whoever(config::MEDIA_SERVER_ADMIN_USER, password, crate::PRODUCT)
+                .await
+                .ok()
+                .map(|signed| signed.is_some())
+        }
     }
 }
+
+#[cfg(test)]
+mod tests;

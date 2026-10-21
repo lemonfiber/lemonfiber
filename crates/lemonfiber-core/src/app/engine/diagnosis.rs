@@ -16,7 +16,6 @@ mod deferring;
 use crate::doctor::autostart::AutostartCheck;
 use crate::doctor::bindings::BindingsCheck;
 use crate::doctor::credentials::CredentialsCheck;
-use crate::doctor::declining::{Decline, DeclineKeyCheck};
 use crate::doctor::environment::EnvironmentCheck;
 use crate::doctor::gating::{Gate, GateRecordCheck};
 use crate::doctor::guarded::GuardedCheck;
@@ -241,31 +240,6 @@ fn gate_record(
     GateRecordCheck::new(ctx.seams.filesystem.clone(), gate)
 }
 
-/// Whether the decline service's key was used for anything the service did not
-/// record, where the stack runs one: its two records, and the media server that dates
-/// the key.
-fn decline_key(
-    ctx: &Ctx,
-    services: &[lemonfiber_manifest::Service],
-    fillers: &crate::wiring::Fillers,
-    project: Option<&std::path::Path>,
-) -> DeclineKeyCheck {
-    use lemonfiber_sidecar::decline::File;
-    let decline = project
-        .filter(|_| crate::app::invite::declining::service(services).is_some())
-        .map(|project| Decline {
-            refusals: crate::app::invite::declining::path(project, File::Refusals),
-            lapses: crate::app::invite::declining::path(project, File::Lapses),
-            keys: crate::app::targets::declined_server(fillers)
-                .and_then(|server| server.administered(ctx))
-                .map(|server| {
-                    Arc::new(server.remembering(Arc::clone(&ctx.sessions)))
-                        as Arc<dyn crate::doctor::declining::KeyDates>
-                }),
-        });
-    DeclineKeyCheck::new(ctx.seams.filesystem.clone(), decline)
-}
-
 /// Whether the stack's Usenet indexer aggregator keeps its configuration to itself, asked
 /// of the one the stack ships where this machine can reach it.
 fn guarded(ctx: &Ctx, services: &[lemonfiber_manifest::Service]) -> GuardedCheck {
@@ -415,12 +389,7 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
     let telling = deferring::telling(ctx, manifest);
     let guarded = guarded(ctx, &manifest.services);
     let gate = gate_record(ctx, &manifest.services, project.as_deref());
-    let decline = decline_key(
-        ctx,
-        &manifest.services,
-        &crate::app::targets::fillers_here(ctx, manifest),
-        project.as_deref(),
-    );
+    let decline = deferring::declined(ctx, manifest, project.as_deref());
     // Whether the stack would actually come back after a restart, which is a different
     // question from whether the operator asked for it to. The answer they gave is read
     // here rather than inside the check, for the reason every other reading is: a check

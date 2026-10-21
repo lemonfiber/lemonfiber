@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use crate::app::Ctx;
 use crate::certificate::{self, Kept, Unkept};
 use crate::model::{Episode, Held, Located, PartWay, Pinned, Season, Title};
-use crate::ports::service::{Item, ItemDetail, ItemProgress, Locations, Medium};
+use crate::ports::service::{Declaring, Item, ItemDetail, ItemProgress, Locations, Medium};
 
 /// The port the guarded front door serves encrypted on.
 ///
@@ -67,6 +67,8 @@ pub(crate) enum Door {
         base: String,
         /// SHA-256 over the door's certificate, lower-case hex.
         fingerprint: String,
+        /// Where the media server behind the door serves each item, as it declared it.
+        locations: Locations,
     },
     /// Why nothing can be located at the door.
     Unknown(String),
@@ -106,35 +108,63 @@ pub(crate) fn made_before_start(ctx: &Ctx, manifest: &lemonfiber_manifest::Manif
     }
 }
 
-/// The door as this machine stands now.
-pub(crate) async fn standing(ctx: &Ctx) -> Door {
+/// The door as this machine stands now, in front of `server`.
+pub(crate) async fn standing(ctx: &Ctx, server: &dyn Declaring) -> Door {
     let project =
         crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     let Some(project) = project else {
         return Door::Unknown(NO_STACK.to_owned());
     };
     let at = crate::app::invite::household_address(ctx, GUARDED).await;
-    at_the_door(
+    let (base, fingerprint) = match at_the_door(
         at.map(|address| address.url),
         certificate::kept(&directory(&project)),
-    )
-}
-
-/// The door from its address and what is kept for its certificate.
-fn at_the_door(url: Option<String>, kept: Result<Option<Kept>, Unkept>) -> Door {
-    let fingerprint = match kept {
-        Ok(Some(kept)) => kept.fingerprint,
-        Ok(None) => return Door::Unknown(NOT_MADE.to_owned()),
-        Err(why) => return Door::Unknown(format!("{UNREADABLE} {why}")),
+    ) {
+        Ok(door) => door,
+        Err(why) => return Door::Unknown(why),
     };
-    match url {
-        Some(url) => Door::At {
-            base: url.replacen("http://", "https://", 1),
+    match served_at(server).await {
+        Ok(locations) => Door::At {
+            base,
             fingerprint,
+            locations,
         },
-        None => Door::Unknown(NO_ADDRESS.to_owned()),
+        Err(why) => Door::Unknown(why),
     }
 }
+
+/// The door's address and its certificate's fingerprint, from its address and what is
+/// kept for its certificate, or why there is neither.
+fn at_the_door(
+    url: Option<String>,
+    kept: Result<Option<Kept>, Unkept>,
+) -> Result<(String, String), String> {
+    let fingerprint = match kept {
+        Ok(Some(kept)) => kept.fingerprint,
+        Ok(None) => return Err(NOT_MADE.to_owned()),
+        Err(why) => return Err(format!("{UNREADABLE} {why}")),
+    };
+    url.map(|url| (url.replacen("http://", "https://", 1), fingerprint))
+        .ok_or_else(|| NO_ADDRESS.to_owned())
+}
+
+/// Where `server` serves each item, from its declaration once that is checked.
+async fn served_at(server: &dyn Declaring) -> Result<Locations, String> {
+    let declared = server.declared().await.map_err(|_| UNDECLARED.to_owned())?;
+    declared
+        .checked()
+        .map(|declared| declared.locations)
+        .map_err(|why| format!("{REFUSED_DECLARATION} {why}"))
+}
+
+/// Said where the media server would not say where it serves each item.
+const UNDECLARED: &str = "The media server would not say where it serves each title, so \
+                          nothing can be located at the front door.";
+
+/// Said before the reason the media server's declaration was refused.
+const REFUSED_DECLARATION: &str = "The media server declared where it serves each title in a \
+                                   way the front door cannot hold it to, so nothing is \
+                                   located there:";
 
 /// Said where there is no stack directory, so nothing is kept for the door.
 const NO_STACK: &str = "There is no stack directory, so the front door has no certificate to \
@@ -169,8 +199,11 @@ pub(crate) fn located(item: Item, door: &Door) -> Held {
             unlocated: Some(why.clone()),
             ..Located::default()
         },
-        Door::At { base, fingerprint } => {
-            let templates = crate::jellyfin::declared::declared().locations;
+        Door::At {
+            base,
+            fingerprint,
+            locations: templates,
+        } => {
             let at = |template: &str| Locations::located(template, base, &item.id);
             Located {
                 poster: item.holds.poster.then(|| at(&templates.poster)).flatten(),

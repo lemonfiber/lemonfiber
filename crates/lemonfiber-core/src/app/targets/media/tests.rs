@@ -179,10 +179,35 @@ fn a_stack_asking_for_no_identity_still_has_its_media_server() {
     assert_eq!(MediaServer::of(&contested), None);
 }
 
+/// A contracted media server whose upstream answers in the API the request gate speaks is
+/// routed to at that upstream, forwarding to the upstream's majors, never at its adapter.
+#[test]
+fn the_gate_routes_to_a_contracted_servers_upstream_where_it_speaks_its_api() {
+    let chosen = Chosen::read(Some("identity.source=media-adapter"));
+    let fillers = shipped(
+        &[a_contracted_media_server(Some(ApiKind::Jellyfin.name()))],
+        &chosen,
+        |_| (),
+    );
+    let server = MediaServer::of(&fillers);
+
+    assert_eq!(
+        server
+            .as_ref()
+            .and_then(MediaServer::gated)
+            .map(|(kind, pairing)| (kind, pairing.at.url(), pairing.majors.clone())),
+        Some((
+            lemonfiber_sidecar::gate::Kind::Jellyfin,
+            format!("http://{MEDIA_UPSTREAM}:9000"),
+            vec![1]
+        ))
+    );
+}
+
 /// A contracted media server is spoken to over its contracts alone, and another service
 /// signs the household in through the upstream its adapter fronts, in the API that
-/// upstream names; the request gate, which speaks only this build's adapter's API,
-/// answers no route for it.
+/// upstream names; the request gate, which speaks no API of that name, answers no route
+/// for it.
 #[test]
 fn a_contracted_server_is_reached_over_its_contracts_and_paired_at_its_upstream() {
     let chosen = Chosen::read(Some("identity.source=media-adapter"));
@@ -206,6 +231,7 @@ fn a_contracted_server_is_reached_over_its_contracts_and_paired_at_its_upstream(
                 host: MEDIA_UPSTREAM.to_owned(),
                 port: 9000
             },
+            majors: vec![1],
         })
     );
     assert_eq!(server.as_ref().and_then(MediaServer::gate_kind), None);

@@ -168,6 +168,7 @@ fn each_location_built_from_its_template_is_where_the_door_locates_the_item() {
     let door = Door::At {
         base: DOOR.to_owned(),
         fingerprint: "ab12".to_owned(),
+        locations: declared().locations,
     };
     let at = located(item, &door).at;
     let built = |template: &str| Some(template.replace(BASE, DOOR).replace(ITEM, ID));

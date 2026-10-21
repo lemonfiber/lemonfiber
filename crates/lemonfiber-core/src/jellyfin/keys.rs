@@ -17,10 +17,6 @@ use crate::ports::service::{Dated, Failure};
 
 use super::{carrying, Jellyfin, AUTHORIZATION_HEADER};
 
-/// What the request service files the key it mints for itself under, on the sign-in
-/// that sets it up without the request gate in front of the media server.
-pub const SEERR_APP: &str = "Seerr";
-
 /// Where the keys are listed, minted and revoked.
 const KEYS: &str = "/Auth/Keys";
 

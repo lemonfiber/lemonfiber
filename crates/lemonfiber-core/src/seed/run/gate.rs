@@ -19,7 +19,7 @@ use lemonfiber_sidecar::gate::{Credential, File, Kind, Upstream, Upstreams};
 use super::minted;
 use super::Ctx;
 use crate::app::gating;
-use crate::app::targets::MediaServer;
+use crate::app::targets::{MediaServer, Pairing};
 use crate::app_keys::GATE_APP;
 use crate::ports::service::AppKeys;
 use crate::seed::{State, Wiring};
@@ -37,10 +37,15 @@ pub(super) async fn seed_gate_routes(
     server: Option<&MediaServer>,
     project: Option<&Path>,
 ) -> Option<Wiring> {
-    let routed = server.and_then(|server| server.gate_kind().map(|kind| (server, kind)));
+    let routed = server.and_then(|server| server.gated().map(|gated| (server, gated)));
     match routed {
-        Some((server, kind)) => {
-            with_the_media_server(ctx, services, fillers, server, kind, project).await
+        Some((server, (kind, pairing))) => {
+            let gated = Gated {
+                server,
+                kind,
+                pairing,
+            };
+            with_the_media_server(ctx, services, fillers, &gated, project).await
         }
         None => curators_alone(ctx, services, fillers, project).await,
     }
@@ -81,16 +86,16 @@ async fn curators_alone(
     Some(settled(state))
 }
 
-/// The gate's routes with one for the media server, a route of `kind`, under a key minted
+/// The gate's routes with one for the media server, as `gated` reaches it, under a key minted
 /// for the gate alone and filed under its name.
 async fn with_the_media_server(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
     fillers: &crate::wiring::Fillers,
-    server: &MediaServer,
-    kind: Kind,
+    gated: &Gated<'_>,
     project: Option<&Path>,
 ) -> Option<Wiring> {
+    let server = gated.server;
     let gating = gating::service(services).is_some();
     // Minted with the administrator's session, which lemonfiber holds only on a server
     // it set up; a rehearsal before the first run finds none recorded yet.
@@ -126,20 +131,20 @@ async fn with_the_media_server(
         .filter(|key| filed.contains(key));
     let state = match held {
         Some(key) => {
-            let wanted = Upstreams::of(with(&routes, to_media(server, kind, &key)));
+            let wanted = Upstreams::of(with(&routes, to_media(gated, &key)));
             let others: Vec<&String> = filed.iter().filter(|one| **one != key).collect();
             kept(ctx, client, current.as_ref(), &wanted, others, &path).await
         }
         None if ctx.dry_run => State::WouldWire {
             yours: Some(listed(current.as_ref())),
-            ours: Some(named(&with(&routes, to_media(server, kind, "")))),
+            ours: Some(named(&with(&routes, to_media(gated, "")))),
         },
         None => {
             let key = match minted::mint(client, GATE_APP).await {
                 Ok(key) => key,
                 Err(state) => return Some(settled(state)),
             };
-            let wanted = Upstreams::of(with(&routes, to_media(server, kind, &key)));
+            let wanted = Upstreams::of(with(&routes, to_media(gated, &key)));
             if let Err(failure) = crate::config::store::write(&path, &wanted.written()) {
                 let _ = client.revoke(&key).await;
                 return Some(settled(State::Failed {
@@ -261,15 +266,24 @@ async fn curator_routes(ctx: &Ctx, fillers: &crate::wiring::Fillers) -> Vec<Upst
     routes
 }
 
-/// The route to the media server, a route of `kind` at its address on the stack's
-/// network, forwarding to the lines its image runs and presenting `key`.
-fn to_media(server: &MediaServer, kind: Kind, key: &str) -> Upstream {
+/// The media server as the gate routes to it: the route's kind and where the API it speaks
+/// is answered.
+struct Gated<'a> {
+    server: &'a MediaServer,
+    kind: Kind,
+    pairing: &'a Pairing,
+}
+
+/// The route to the media server, named by its id, reaching the API other services sign
+/// the household in through it in, forwarding to the majors of it the stack supports and
+/// presenting `key`.
+fn to_media(gated: &Gated<'_>, key: &str) -> Upstream {
     Upstream {
-        route: server.id().to_owned(),
-        kind,
-        address: server.network.url(),
+        route: gated.server.id().to_owned(),
+        kind: gated.kind,
+        address: gated.pairing.at.url(),
         credential: Credential::new(key),
-        majors: server.filler.majors.clone(),
+        majors: gated.pairing.majors.clone(),
     }
 }
 
