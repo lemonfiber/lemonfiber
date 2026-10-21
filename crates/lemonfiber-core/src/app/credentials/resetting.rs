@@ -8,10 +8,11 @@
 //! is said as exactly that, with the command that finishes the job once it does.
 //!
 //! What reads the key is reached in the same run rather than left to the next seeding: The
-//! indexer aggregator's application, the subtitle finder and the request gate's route each
-//! hold a copy, and a copy left behind is one that stops working the moment the reset
-//! lands. The indexer aggregator keeps the republishing rotation: it files no media, and
-//! every curator reads its key, which is a different list of consumers.
+//! indexer aggregator's application, the subtitle finder, a quality sync speaking its
+//! contract and the request gate's route each hold a copy, and a copy left behind is one
+//! that stops working the moment the reset lands. The indexer aggregator keeps the
+//! republishing rotation: it files no media, and every curator reads its key, which is a
+//! different list of consumers.
 
 use std::path::Path;
 use std::time::Duration;
@@ -184,9 +185,9 @@ async fn written_after(
 
 /// Every other service holding a copy of the curator's key, each given the new one.
 ///
-/// Only the copies this stack has: no indexer aggregator, no subtitle finder, or no gate in
-/// front of the request service is a consumer that is not there rather than one left
-/// behind.
+/// Only the copies this stack has: no indexer aggregator, no subtitle finder, no quality
+/// sync, or no gate in front of the request service is a consumer that is not there rather
+/// than one left behind.
 async fn copies(
     ctx: &Ctx,
     services: &[Service],
@@ -195,19 +196,25 @@ async fn copies(
     target: &Target,
 ) -> Vec<Propagation> {
     let curator = target.name.as_str();
+    let held = [
+        (
+            crate::seed::run::resync_application(ctx, fillers, &target.id).await,
+            format!("supplies {curator} with indexers"),
+        ),
+        (
+            crate::seed::run::rewatch(ctx, fillers, &target.id).await,
+            format!("finds subtitles for {curator}"),
+        ),
+        (
+            crate::seed::run::reprofile(ctx, fillers, &target.id).await,
+            format!("holds {curator}'s quality profiles"),
+        ),
+    ];
     let mut copies = Vec::new();
-    for (aggregator, state) in crate::seed::run::resync_application(ctx, fillers, &target.id).await
-    {
-        copies.push(copy(
-            format!("{aggregator}, which supplies {curator} with indexers"),
-            state,
-        ));
-    }
-    for (finder, state) in crate::seed::run::rewatch(ctx, fillers, &target.id).await {
-        copies.push(copy(
-            format!("{finder}, which finds subtitles for {curator}"),
-            state,
-        ));
+    for (holders, what) in held {
+        for (holder, state) in holders {
+            copies.push(copy(format!("{holder}, which {what}"), state));
+        }
     }
     if let Some(state) =
         crate::seed::run::reroute(ctx, services, fillers, project, &target.id).await

@@ -15,6 +15,7 @@
 //! could not tell a filler nothing reaches from one lemonfiber forgot.
 
 use lemonfiber_contract::capabilities::indexer::search;
+use lemonfiber_contract::capabilities::quality::sync;
 use lemonfiber_contract::capabilities::request::intake;
 use lemonfiber_contract::capabilities::subtitles::fetch;
 use lemonfiber_manifest::ApiKind;
@@ -30,8 +31,8 @@ const USENET: &str = "download.usenet";
 /// Torrent downloading, which a media-filing curator asks for.
 const TORRENT: &str = "download.torrent";
 
-/// Curating a library, which the indexer, the request service and the subtitle finder
-/// each ask of every service that does it.
+/// Curating a library, which the indexer, the request service, the subtitle finder and the
+/// quality sync each ask of every service that does it.
 const CURATES: &str = "library.curate";
 
 /// Searching across indexers, which the book curator asks of the service it pulls from.
@@ -51,10 +52,11 @@ pub(super) const MUSIC: &str = ApplicationKind::Music.media_type();
 const ANSWERED: [&str; 4] = [USENET, TORRENT, CURATES, SEARCHES];
 
 /// Every contract an asker is paired by, as capability and major.
-const CONTRACTED: [(&str, u32); 3] = [
+const CONTRACTED: [(&str, u32); 4] = [
     (fetch::CAPABILITY, fetch::MAJOR),
     (search::CAPABILITY, search::MAJOR),
     (intake::CAPABILITY, intake::MAJOR),
+    (sync::CAPABILITY, sync::MAJOR),
 ];
 
 /// An asker, as the table pairs it.
@@ -91,6 +93,9 @@ pub(super) enum Connection {
     },
     /// The filler, watched by the subtitle finder as this kind.
     Subtitles(Kind),
+    /// The filler, whose quality profiles the quality sync holds to the preset chosen for
+    /// this kind.
+    Quality(Kind),
     /// The filler, told to the asker as an aggregator it pulls indexers from, with the
     /// filler's own key to read it with.
     Aggregator,
@@ -193,6 +198,9 @@ fn connection(
             ApiKind::Servarr,
         ) => Kind::of_declared(media)
             .map(Connection::Subtitles)
+            .ok_or(Unmade::Files),
+        (Asking::Over(sync::CAPABILITY), CURATES, ApiKind::Servarr) => Kind::of_declared(media)
+            .map(Connection::Quality)
             .ok_or(Unmade::Files),
         (Asking::Bundled(ApiKind::Bindery), SEARCHES, ApiKind::Servarr) => {
             Ok(Connection::Aggregator)
