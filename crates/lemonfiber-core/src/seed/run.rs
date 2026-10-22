@@ -17,6 +17,7 @@ mod applications;
 mod baseline;
 mod clients;
 mod curating;
+mod extraction;
 mod filing;
 // What one service asking for what another fills comes to, by what each speaks.
 mod connecting;
@@ -202,7 +203,11 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
 
     // Where each download client files each category's completed downloads: the one
     // folder per category both clients share, so the extractor watches one per curator.
-    wirings.extend(filing::seed_completed_folders(ctx, &fillers, &mut baseline).await);
+    let (filed, completed) = filing::seed_completed_folders(ctx, &fillers, &mut baseline).await;
+    wirings.extend(filed);
+    // The extractor, told every curator whose completed downloads it unpacks, with the
+    // folder each one's downloads land in as the clients read it back.
+    wirings.extend(extraction::seed_extraction(ctx, &fillers, &completed).await);
 
     // The indexer's app sync: register each curator it asks for back into it, so it
     // pushes them its indexers. A curator it has no application for is not left out:

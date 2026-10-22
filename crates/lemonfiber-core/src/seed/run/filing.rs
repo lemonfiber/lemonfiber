@@ -57,15 +57,20 @@ fn categories(fillers: &Fillers) -> BTreeMap<String, BTreeSet<String>> {
     wanted
 }
 
+/// Every folder a category's completed downloads land in, as the clients read it back.
+pub(super) type Completed = BTreeMap<String, BTreeSet<String>>;
+
 /// Tell every download client a curator hands downloads to where each of its categories
-/// completes, and say how each stands.
+/// completes, and say how each stands, with every folder each category completes into
+/// as the clients read it back.
 pub(super) async fn seed_completed_folders(
     ctx: &Ctx,
     fillers: &Fillers,
     baseline: &mut Baseline,
-) -> Vec<Wiring> {
+) -> (Vec<Wiring>, Completed) {
     let wanted = categories(fillers);
     let mut wirings = Vec::new();
+    let mut held = Completed::new();
     for target in crate::app::targets::download_targets(ctx, fillers).await {
         let Some(categories) = wanted.get(&target.service) else {
             continue;
@@ -74,23 +79,31 @@ pub(super) async fn seed_completed_folders(
             .service(&target.service)
             .map_or(target.service.as_str(), |filler| filler.name.as_str());
         let client = target.client(ctx);
-        let state = filed(ctx, client.filing(), &target.service, categories, baseline).await;
+        let (state, now) = filed(ctx, client.filing(), &target.service, categories, baseline).await;
+        for category in categories {
+            if let Some(folder) = now.get(category) {
+                held.entry(category.clone())
+                    .or_default()
+                    .insert(folder.clone());
+            }
+        }
         wirings.push(Wiring::settled(format!("{name} completed folders"), state));
     }
-    wirings
+    (wirings, held)
 }
 
-/// What became of filing `categories` on one client recorded under `id`.
+/// What became of filing `categories` on one client recorded under `id`, and what it
+/// files each category under afterwards, as it reads it back.
 async fn filed(
     ctx: &Ctx,
     client: &dyn crate::ports::service::Filing,
     id: &str,
     categories: &BTreeSet<String>,
     baseline: &mut Baseline,
-) -> State {
+) -> (State, BTreeMap<String, String>) {
     let held = match client.filed().await {
         Ok(held) => by_category(held),
-        Err(failure) => return crate::seed::unreached(&failure),
+        Err(failure) => return (crate::seed::unreached(&failure), BTreeMap::new()),
     };
     let mut owed = Vec::new();
     let mut drifted = false;
@@ -110,14 +123,15 @@ async fn filed(
     }
     if owed.is_empty() {
         record(ctx, baseline, id, categories, &held);
-        return if drifted {
+        let state = if drifted {
             State::Drifted
         } else {
             State::AlreadyWired
         };
+        return (state, held);
     }
     if ctx.dry_run {
-        return State::WouldWire {
+        let state = State::WouldWire {
             yours: Some(described(owed.iter().map(|one| {
                 (
                     one.category.as_str(),
@@ -129,39 +143,40 @@ async fn filed(
                     .map(|one| (one.category.as_str(), one.folder.as_str())),
             )),
         };
+        return (state, held);
     }
     if let Err(failure) = client.file_under(&owed).await {
-        return State::Failed {
+        let state = State::Failed {
             detail: format!("the completed folders could not be set: {failure}"),
         };
+        return (state, held);
     }
     let now = match client.filed().await {
         Ok(now) => by_category(now),
         Err(failure) => {
-            return State::Failed {
+            let state = State::Failed {
                 detail: format!("the completed folders could not be read back: {failure}"),
-            }
+            };
+            return (state, BTreeMap::new());
         }
     };
     record(ctx, baseline, id, categories, &now);
-    if let Some(missed) = owed
+    let state = match owed
         .iter()
         .find(|one| now.get(&one.category) != Some(&one.folder))
     {
-        return State::Failed {
+        Some(missed) => State::Failed {
             detail: format!(
                 "{} was set to complete into {} and the client files it under {}",
                 missed.category,
                 missed.folder,
                 now.get(&missed.category).map_or("nothing", String::as_str)
             ),
-        };
-    }
-    if drifted {
-        State::Drifted
-    } else {
-        State::Wired
-    }
+        },
+        None if drifted => State::Drifted,
+        None => State::Wired,
+    };
+    (state, now)
 }
 
 /// Record every category the client now files where lemonfiber files it.

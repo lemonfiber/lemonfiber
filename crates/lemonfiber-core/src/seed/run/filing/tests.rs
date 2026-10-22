@@ -117,7 +117,8 @@ async fn a_client_holding_its_own_defaults_is_told_the_shared_folders_and_they_a
         &tv_and_movies(),
         &mut baseline,
     )
-    .await;
+    .await
+    .0;
 
     assert_eq!(state, State::Wired);
     assert_eq!(client.holds("tv"), Some(completed("tv")));
@@ -139,7 +140,8 @@ async fn a_client_already_filing_both_is_told_nothing() {
         &tv_and_movies(),
         &mut Baseline::new(),
     )
-    .await;
+    .await
+    .0;
 
     assert_eq!(state, State::AlreadyWired);
     assert!(client.told().is_empty());
@@ -157,7 +159,8 @@ async fn a_folder_the_operator_moved_after_lemonfiber_filed_it_is_kept_as_drift(
         &tv_and_movies(),
         &mut baseline,
     )
-    .await;
+    .await
+    .0;
 
     assert_eq!(state, State::Drifted);
     assert!(client.told().is_empty());
@@ -179,7 +182,8 @@ async fn a_category_gone_from_the_client_is_filed_again() {
         &tv_and_movies(),
         &mut filed_before("tv"),
     )
-    .await;
+    .await
+    .0;
 
     assert_eq!(state, State::Wired);
     assert_eq!(
@@ -203,7 +207,8 @@ async fn a_rehearsal_says_what_it_would_file_and_files_nothing() {
         &tv_and_movies(),
         &mut baseline,
     )
-    .await;
+    .await
+    .0;
 
     assert_eq!(
         state,
@@ -237,7 +242,8 @@ async fn a_client_that_refuses_is_said_and_nothing_is_recorded() {
         &tv_and_movies(),
         &mut baseline,
     )
-    .await;
+    .await
+    .0;
 
     assert!(
         matches!(&state, State::Failed { detail } if detail.contains("could not be set")),
@@ -260,7 +266,8 @@ async fn a_client_that_takes_a_folder_and_files_elsewhere_is_said_as_that() {
         &tv_and_movies(),
         &mut Baseline::new(),
     )
-    .await;
+    .await
+    .0;
 
     assert!(
         matches!(&state, State::Failed { detail }
@@ -283,7 +290,8 @@ async fn a_client_that_will_not_say_what_it_files_is_told_nothing() {
         &tv_and_movies(),
         &mut Baseline::new(),
     )
-    .await;
+    .await
+    .0;
 
     assert!(
         !matches!(state, State::Wired | State::AlreadyWired),
@@ -393,7 +401,8 @@ async fn the_stacks_torrent_client_is_told_and_read_back_through_its_adapter() {
         .with_http(http.clone());
     let mut baseline = Baseline::new();
 
-    let wirings = super::seed_completed_folders(&ctx, &fillers, &mut baseline).await;
+    let (wirings, completed_now) =
+        super::seed_completed_folders(&ctx, &fillers, &mut baseline).await;
 
     let torrent = wirings
         .iter()
@@ -410,4 +419,7 @@ async fn the_stacks_torrent_client_is_told_and_read_back_through_its_adapter() {
         .requests()
         .iter()
         .any(|asked| asked.url.ends_with("/torrents/createCategory")));
+    assert!(handed.iter().all(|category| completed_now
+        .get(category)
+        .is_some_and(|folders| folders.contains(&completed(category)))));
 }
