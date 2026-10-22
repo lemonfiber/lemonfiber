@@ -570,3 +570,34 @@ fn a_stack_service_moved_in_place_is_left_out_and_its_stand_in_written() {
     );
     assert_eq!(project.text.matches("\n  jellyfin:\n").count(), 1);
 }
+
+/// A plugin service the household reaches at a hostname shares a network with the proxy
+/// that routes the hostname to it, and one reached only on the loopback interface does not.
+#[test]
+fn a_plugin_service_the_household_reaches_shares_a_network_with_the_proxy() {
+    let mut household = a_placed("shelf", &[], None, Some(13378));
+    household.reached = Some(crate::plugin::Reached::Household {
+        port: 13378,
+        hostname: "shelf".to_owned(),
+        group: None,
+    });
+    let loopback = a_placed("panel", &[], None, Some(13379));
+    let project = project(
+        &carried(),
+        &[an_installed("shelf", vec![household, loopback])],
+    );
+
+    let networks = |id: &str| match project.topology.placed.get(id) {
+        Some(Where::On(networks)) => networks.keys().cloned().collect::<Vec<_>>(),
+        _ => Vec::new(),
+    };
+    let proxy = networks("caddy");
+    assert!(
+        networks("shelf").iter().any(|one| proxy.contains(one)),
+        "{proxy:?}"
+    );
+    assert!(
+        !networks("panel").iter().any(|one| proxy.contains(one)),
+        "{proxy:?}"
+    );
+}
