@@ -6,7 +6,7 @@
       "files": [
         {
           "path": "download.usenet/v1/openapi.json",
-          "sha256": "62c10343b46b32a944b6168ef85512c9de58c877109c0155962b8afb16ff2c40"
+          "sha256": "f0143da73cd4917b2e2998cf38fba663d8897da02babc3ac335fc8ed43484d23"
         },
         {
           "path": "download.usenet/v1/operations/transfers.json",
@@ -41,19 +41,27 @@
           "sha256": "e7d963e70fa99b977ffb5840369a0b97ab3f2aff1ef33487d86bde5549b4f0cf"
         },
         {
+          "path": "download.usenet/v1/operations/filed.json",
+          "sha256": "d093f9016e1ba27e34e86b74e16288cdf51ab75bc6b2cebb519f55b28f712de7"
+        },
+        {
+          "path": "download.usenet/v1/operations/file_under.json",
+          "sha256": "434c6c5c5f5e8d815bdc7b21499142785d59fbbe3f951317a63aa784c35e283b"
+        },
+        {
           "path": "download.usenet/v1/operations/accounts.json",
           "sha256": "43c269e616d65a27fb75da5d8c5792c1d7a402270c4a3f8d07078066ac6cd9f7"
         },
         {
           "path": "download.usenet/v1/conformance.json",
-          "sha256": "7ec0d5547be78bdbfd07e0017b9a7b71cf89c5bb722c847e19660ceeb0a3a70d"
+          "sha256": "5382595cadd9fa30008cda1f636c74d050070f510eeaf437e4b0983d555ee035"
         }
       ],
       "majors": [
         1
       ],
       "openapi": "download.usenet/v1/openapi.json",
-      "operations": 9
+      "operations": 11
     },
     {
       "capability": "download.torrent",
@@ -61,7 +69,7 @@
       "files": [
         {
           "path": "download.torrent/v1/openapi.json",
-          "sha256": "19061add4523083626773c46109f36dcabcadb8858e59e12c38036f02a72f536"
+          "sha256": "2586f80a083937f524f5c5b8bf6cb56907f0ec966a1780d4427332a772f4ee98"
         },
         {
           "path": "download.torrent/v1/operations/transfers.json",
@@ -104,6 +112,14 @@
           "sha256": "5f3d42d8db6a8d0bb50e4e6e0f27d7442515dc7d37e4ab22caafb18502ed2dc7"
         },
         {
+          "path": "download.torrent/v1/operations/filed.json",
+          "sha256": "d093f9016e1ba27e34e86b74e16288cdf51ab75bc6b2cebb519f55b28f712de7"
+        },
+        {
+          "path": "download.torrent/v1/operations/file_under.json",
+          "sha256": "434c6c5c5f5e8d815bdc7b21499142785d59fbbe3f951317a63aa784c35e283b"
+        },
+        {
           "path": "download.torrent/v1/operations/peer_port.json",
           "sha256": "8fa86a894eed03fa15a90dc1b6a4884c68dacd9acde62f39f112e6ad73897d0b"
         },
@@ -113,14 +129,14 @@
         },
         {
           "path": "download.torrent/v1/conformance.json",
-          "sha256": "3e6b19ac75fb8b42104246f671801b8f48b97accd069f85f2166612222bc6230"
+          "sha256": "6d089c4b0151c8288d9c9f14f89f8aa0d9863831f7876395422280f8b3d7fe6a"
         }
       ],
       "majors": [
         1
       ],
       "openapi": "download.torrent/v1/openapi.json",
-      "operations": 12
+      "operations": 14
     },
     {
       "capability": "network.egress-guard",

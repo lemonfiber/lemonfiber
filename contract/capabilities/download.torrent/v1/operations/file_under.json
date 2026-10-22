@@ -1,0 +1,93 @@
+{
+  "post": {
+    "operationId": "file_under",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$defs": {
+              "Filed": {
+                "additionalProperties": false,
+                "description": "One category a download client files completed downloads under, and the folder they\ncomplete into.",
+                "properties": {
+                  "category": {
+                    "description": "The category, as a curator names it on a download it hands the client.",
+                    "type": "string"
+                  },
+                  "folder": {
+                    "description": "The folder a completed download of that category lands in, as the client's\ncontainer sees it.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "category",
+                  "folder"
+                ],
+                "type": "object"
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "folders": {
+                "description": "The port's `folders`.",
+                "items": {
+                  "$ref": "#/$defs/Filed"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "folders"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "title": "null",
+              "type": "null"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ],
+    "x-lemonfiber-largest": 1048576
+  }
+}

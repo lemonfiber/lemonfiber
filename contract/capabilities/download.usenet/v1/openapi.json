@@ -88,6 +88,12 @@
     "/lemonfiber/download.usenet/v1/accounts": {
       "$ref": "operations/accounts.json"
     },
+    "/lemonfiber/download.usenet/v1/file_under": {
+      "$ref": "operations/file_under.json"
+    },
+    "/lemonfiber/download.usenet/v1/filed": {
+      "$ref": "operations/filed.json"
+    },
     "/lemonfiber/download.usenet/v1/moved": {
       "$ref": "operations/moved.json"
     },

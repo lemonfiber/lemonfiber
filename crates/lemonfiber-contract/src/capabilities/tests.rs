@@ -9,8 +9,8 @@ use std::time::Duration;
 use async_trait::async_trait;
 use lemonfiber_ports::http::{Http, Request, Response, Unreachable};
 use lemonfiber_ports::service::{
-    Download, Failure, Fetching, Metering, Moved, Peering, Pulling, Rates, Seeded, Seeding,
-    Throttled, Throttling, Transfers, UsenetAccount, UsenetAccounts, Wanted,
+    Download, Failure, Fetching, Filed, Filing, Metering, Moved, Peering, Pulling, Rates, Seeded,
+    Seeding, Throttled, Throttling, Transfers, UsenetAccount, UsenetAccounts, Wanted,
 };
 
 use super::archive::extract;
@@ -143,6 +143,25 @@ impl Peering for Client {
                 detail: "no client takes peers on port 0".to_owned(),
             }),
             Some(_) | None => Ok(()),
+        }
+    }
+}
+
+#[async_trait]
+impl Filing for Client {
+    async fn filed(&self) -> Result<Vec<Filed>, Failure> {
+        Ok(vec![Filed {
+            category: "tv".to_owned(),
+            folder: "/data/downloads/complete/tv".to_owned(),
+        }])
+    }
+    async fn file_under(&self, folders: &[Filed]) -> Result<(), Failure> {
+        match folders.iter().find(|one| one.folder.is_empty()) {
+            Some(unfiled) => Err(Failure::Refused {
+                service: "upstream".to_owned(),
+                detail: format!("{} names no folder", unfiled.category),
+            }),
+            None => Ok(()),
         }
     }
 }
@@ -294,6 +313,8 @@ async fn a_torrent_client_answers_through_its_contract_as_it_answers_in_process(
     );
     assert_eq!(asked.seeding().await.ok(), Client.seeding().await.ok());
     assert_eq!(asked.stop_seeding("a film").await.ok(), Some(()));
+    assert_eq!(asked.filed().await.ok(), Client.filed().await.ok());
+    assert_eq!(asked.file_under(&tv_filed()).await.ok(), Some(()));
     assert_eq!(asked.peer_port().await.ok(), Some(Some(51413)));
     assert_eq!(asked.set_peer_port(Some(51413)).await.ok(), Some(()));
     assert_eq!(asked.set_peer_port(None).await.ok(), Some(()));
@@ -307,10 +328,29 @@ async fn a_torrent_client_answers_through_its_contract_as_it_answers_in_process(
     ));
 }
 
+/// Television filed under the one completed folder both clients share.
+fn tv_filed() -> Vec<Filed> {
+    vec![Filed {
+        category: "tv".to_owned(),
+        folder: "/data/downloads/complete/tv".to_owned(),
+    }]
+}
+
 #[tokio::test]
 async fn a_usenet_client_answers_its_accounts_and_not_seeding_or_a_peer_port() {
     let asked = usenet::Adapter(contracted(Served::default()));
     assert_eq!(asked.accounts().await.ok(), Some(Vec::new()));
+    assert_eq!(asked.filed().await.ok(), Client.filed().await.ok());
+    assert_eq!(asked.file_under(&tv_filed()).await.ok(), Some(()));
+    assert!(matches!(
+        asked
+            .file_under(&[Filed {
+                category: "tv".to_owned(),
+                folder: String::new(),
+            }])
+            .await,
+        Err(Failure::Refused { detail, .. }) if detail.contains("tv")
+    ));
     for operation in ["seeding", "peer_port", "set_peer_port"] {
         let unserved = usenet::dispatch(&Client, operation, b"{}").await;
         assert_eq!(
