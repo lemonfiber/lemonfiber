@@ -1,7 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
+use lemonfiber_fixtures::http::{Answer, Fake};
 
 use super::{categories, completed, field, filed};
 use crate::baseline::Baseline;
@@ -13,14 +14,16 @@ use crate::test_support::a_context;
 const CLIENT: &str = "sabnzbd";
 
 /// A client holding each category's folder in memory, answering a write with `refusing`
-/// where it is set, and filing nothing it is told where `ignoring`.
+/// where it is set, filing nothing it is told where `ignoring`, and answering only as many
+/// reads as `answering` says where it says.
 #[derive(Default)]
 struct Holding {
     held: Mutex<BTreeMap<String, String>>,
     told: Mutex<Vec<Filed>>,
+    reads: Mutex<usize>,
     refusing: bool,
     ignoring: bool,
-    unread: bool,
+    answering: Option<usize>,
 }
 
 impl Holding {
@@ -53,7 +56,15 @@ impl Holding {
 #[async_trait]
 impl Filing for Holding {
     async fn filed(&self) -> Result<Vec<Filed>, Failure> {
-        if self.unread {
+        let read = self
+            .reads
+            .lock()
+            .map(|mut reads| {
+                *reads += 1;
+                *reads
+            })
+            .unwrap_or_default();
+        if self.answering.is_some_and(|answered| read > answered) {
             return Err(Failure::Unavailable {
                 service: CLIENT.to_owned(),
             });
@@ -103,6 +114,34 @@ fn filed_before(category: &str) -> Baseline {
     let mut baseline = Baseline::new();
     baseline.record(CLIENT, &field(category), &completed(category), "earlier");
     baseline
+}
+
+/// The shipped stack's services.
+fn shipped_services() -> Vec<lemonfiber_manifest::Service> {
+    let Ok(manifest) = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK) else {
+        unreachable!("the shipped stack reads")
+    };
+    manifest.services
+}
+
+/// What `services` come to, asked for as the shipped stack asks.
+fn shipped(services: Vec<lemonfiber_manifest::Service>) -> crate::wiring::Fillers {
+    crate::test_support::stack_fillers(services, &[], None, crate::plugin::first_party::EMBEDDED)
+}
+
+/// A context reaching the shipped stack's torrent client with its password recorded,
+/// over `http`.
+fn reaching_the_torrent_client(name: &str, http: Arc<Fake>) -> crate::app::Ctx {
+    a_context()
+        .settings(crate::config::Settings {
+            env_file: Some(crate::test_support::env_at(
+                name,
+                &crate::test_support::a_password(),
+            )),
+            ..crate::config::Settings::default()
+        })
+        .build()
+        .with_http(http)
 }
 
 #[tokio::test]
@@ -279,7 +318,7 @@ async fn a_client_that_takes_a_folder_and_files_elsewhere_is_said_as_that() {
 #[tokio::test]
 async fn a_client_that_will_not_say_what_it_files_is_told_nothing() {
     let client = Holding {
-        unread: true,
+        answering: Some(0),
         ..Holding::default()
     };
 
@@ -300,17 +339,64 @@ async fn a_client_that_will_not_say_what_it_files_is_told_nothing() {
     assert!(client.told().is_empty());
 }
 
+#[tokio::test]
+async fn a_client_that_files_and_then_will_not_say_where_is_said_and_nothing_is_recorded() {
+    let client = Holding {
+        answering: Some(1),
+        ..Holding::with(&[("tv", "/data/downloads/usenet/complete/tv")])
+    };
+    let mut baseline = Baseline::new();
+
+    let (state, now) = filed(
+        &a_context().build(),
+        &client,
+        CLIENT,
+        &tv_and_movies(),
+        &mut baseline,
+    )
+    .await;
+
+    assert!(
+        matches!(&state, State::Failed { detail } if detail.contains("could not be read back")),
+        "{state:?}"
+    );
+    assert!(now.is_empty(), "{now:?}");
+    assert!(baseline.expected(CLIENT, &field("movies")).is_none());
+}
+
+#[tokio::test]
+async fn a_moved_folder_stays_drift_while_a_missing_one_is_filed_beside_it() {
+    let client = Holding::with(&[("tv", "/data/elsewhere")]);
+    let mut baseline = filed_before("tv");
+
+    let state = filed(
+        &a_context().build(),
+        &client,
+        CLIENT,
+        &tv_and_movies(),
+        &mut baseline,
+    )
+    .await
+    .0;
+
+    assert_eq!(state, State::Drifted);
+    assert_eq!(
+        client.told(),
+        [Filed {
+            category: "movies".to_owned(),
+            folder: completed("movies"),
+        }]
+    );
+    assert_eq!(client.holds("tv").as_deref(), Some("/data/elsewhere"));
+    assert_eq!(
+        baseline.expected(CLIENT, &field("movies")),
+        Some(completed("movies").as_str())
+    );
+}
+
 #[test]
 fn each_client_a_curator_hands_downloads_to_is_given_that_curators_category() {
-    let Ok(manifest) = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK) else {
-        unreachable!("the shipped stack reads")
-    };
-    let fillers = crate::test_support::stack_fillers(
-        manifest.services,
-        &[],
-        None,
-        crate::plugin::first_party::EMBEDDED,
-    );
+    let fillers = shipped(shipped_services());
 
     let wanted = categories(&fillers);
 
@@ -336,17 +422,7 @@ fn a_category_completes_into_the_one_folder_both_clients_share() {
 /// switched over.
 #[tokio::test]
 async fn the_stacks_torrent_client_is_told_and_read_back_through_its_adapter() {
-    use lemonfiber_fixtures::http::{Answer, Fake};
-
-    let Ok(manifest) = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK) else {
-        unreachable!("the shipped stack reads")
-    };
-    let fillers = crate::test_support::stack_fillers(
-        manifest.services,
-        &[],
-        None,
-        crate::plugin::first_party::EMBEDDED,
-    );
+    let fillers = shipped(shipped_services());
     let wanted = categories(&fillers);
     let Some((client, handed)) = wanted.iter().find(|(id, _)| {
         fillers
@@ -389,16 +465,7 @@ async fn the_stacks_torrent_client_is_told_and_read_back_through_its_adapter() {
         ("Category", vec![Answer::reply(200, "")]),
         ("app/setPreferences", vec![Answer::reply(200, "")]),
     ]);
-    let ctx = a_context()
-        .settings(crate::config::Settings {
-            env_file: Some(crate::test_support::env_at(
-                "filing-torrent",
-                &crate::test_support::a_password(),
-            )),
-            ..crate::config::Settings::default()
-        })
-        .build()
-        .with_http(http.clone());
+    let ctx = reaching_the_torrent_client("filing-torrent", http.clone());
     let mut baseline = Baseline::new();
 
     let (wirings, completed_now) =
@@ -422,4 +489,25 @@ async fn the_stacks_torrent_client_is_told_and_read_back_through_its_adapter() {
     assert!(handed.iter().all(|category| completed_now
         .get(category)
         .is_some_and(|folders| folders.contains(&completed(category)))));
+}
+
+#[tokio::test]
+async fn a_client_no_curator_hands_a_category_is_told_nothing() {
+    let mut services = shipped_services();
+    for service in &mut services {
+        if !service.media_types.is_empty() {
+            service.media_types = vec!["books".to_owned()];
+        }
+    }
+    let fillers = shipped(services);
+    let http = Fake::always(Answer::reply(200, "{}"));
+    let ctx = reaching_the_torrent_client("filing-uncategorised", http.clone());
+
+    let (wirings, completed_now) =
+        super::seed_completed_folders(&ctx, &fillers, &mut Baseline::new()).await;
+
+    assert!(categories(&fillers).is_empty());
+    assert!(wirings.is_empty(), "{wirings:?}");
+    assert!(completed_now.is_empty(), "{completed_now:?}");
+    assert!(http.requests().is_empty(), "{:?}", http.requests());
 }

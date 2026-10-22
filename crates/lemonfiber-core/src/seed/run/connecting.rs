@@ -102,7 +102,12 @@ pub(super) enum Connection {
     /// filler's own key to read it with.
     Aggregator,
     /// The filler, whose completed downloads the extractor unpacks and hands back to it.
-    Extraction,
+    Extraction {
+        /// The media it files.
+        media: String,
+        /// The category its downloads are filed under.
+        category: String,
+    },
 }
 
 impl Connection {
@@ -209,13 +214,15 @@ fn connection(
         (Asking::Bundled(ApiKind::Bindery), SEARCHES, ApiKind::Servarr) => {
             Ok(Connection::Aggregator)
         }
-        (Asking::Over(extract::CAPABILITY), CURATES, ApiKind::Servarr) => {
-            if media.is_empty() {
-                Err(Unmade::Files)
-            } else {
-                Ok(Connection::Extraction)
-            }
-        }
+        (Asking::Over(extract::CAPABILITY), CURATES, ApiKind::Servarr) => media
+            .first()
+            .and_then(|kind| {
+                super::clients::category_for(kind).map(|category| Connection::Extraction {
+                    media: kind.clone(),
+                    category: category.value,
+                })
+            })
+            .ok_or(Unmade::Files),
         _ => Err(Unmade::Unpaired),
     }
 }

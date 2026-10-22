@@ -85,27 +85,31 @@ impl Filing for Sabnzbd {
     }
 
     async fn file_under(&self, folders: &[Filed]) -> Result<(), Failure> {
-        for one in folders {
-            let mode = format!(
-                "set_config&{}",
-                form_encoded(&[
-                    ("section", "categories"),
-                    ("keyword", &one.category),
-                    ("dir", &one.folder),
-                ])
-            );
-            let answered: Answered = self
-                .read(&mode, "a category's completed folder could not be set")
-                .await?;
-            if answered.status == Some(false) {
-                return Err(self.endpoint.refused(&format!(
-                    "the client would not file {} under {}",
-                    one.category, one.folder
-                )));
-            }
-        }
-        Ok(())
+        file_under(self, folders).await
     }
+}
+
+async fn file_under(sabnzbd: &Sabnzbd, folders: &[Filed]) -> Result<(), Failure> {
+    for one in folders {
+        let mode = format!(
+            "set_config&{}",
+            form_encoded(&[
+                ("section", "categories"),
+                ("keyword", &one.category),
+                ("dir", &one.folder),
+            ])
+        );
+        let answered: Answered = sabnzbd
+            .read(&mode, "a category's completed folder could not be set")
+            .await?;
+        if answered.status == Some(false) {
+            return Err(sabnzbd.endpoint.refused(&format!(
+                "the client would not file {} under {}",
+                one.category, one.folder
+            )));
+        }
+    }
+    Ok(())
 }
 
 /// Where `category` files its completed downloads, below the client's completed folder

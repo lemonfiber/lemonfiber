@@ -16,7 +16,6 @@
 
 use lemonfiber_contract::capabilities::archive::extract;
 
-use super::clients::category_for;
 use super::connecting::{pairings, Cleared, Connection};
 use super::filing::{completed, Completed};
 use super::Ctx;
@@ -30,34 +29,35 @@ use crate::wiring::{Address, Filler, Fillers};
 struct Holding<'a> {
     /// The extractor.
     asker: Cleared<'a>,
-    /// Each curator, and where the extractor reaches it.
-    curators: Vec<(&'a Filler, &'a Address)>,
+    /// Each curator, where the extractor reaches it, the media it files and the category
+    /// its downloads are filed under.
+    curators: Vec<(&'a Filler, &'a Address, String, String)>,
 }
 
 /// Every extractor and the curators lemonfiber hands it.
 fn holding(fillers: &Fillers) -> Vec<Holding<'_>> {
     let mut found: Vec<Holding<'_>> = Vec::new();
     for pairing in pairings(fillers) {
-        let Ok((Connection::Extraction, at, asker)) = pairing.made else {
+        let Ok((Connection::Extraction { media, category }, at, asker)) = pairing.made else {
             continue;
         };
+        let curator = (pairing.filler, at, media, category);
         match found.iter_mut().find(|one| one.asker.id == asker.id) {
-            Some(one) => one.curators.push((pairing.filler, at)),
+            Some(one) => one.curators.push(curator),
             None => found.push(Holding {
                 asker,
-                curators: vec![(pairing.filler, at)],
+                curators: vec![curator],
             }),
         }
     }
     found
 }
 
-/// The folder a curator filing `media` has its completed downloads land in, as the
+/// The folder a curator's downloads filed under `category` complete into, as the
 /// clients read it back in `held`.
-fn folder(media: &str, held: &Completed) -> String {
-    let category = category_for(media).map_or_else(|| media.to_owned(), |category| category.value);
-    let shared = completed(&category);
-    match held.get(&category) {
+fn folder(category: &str, held: &Completed) -> String {
+    let shared = completed(category);
+    match held.get(category) {
         Some(folders) if !folders.contains(&shared) => folders.first().cloned().unwrap_or(shared),
         _ => shared,
     }
@@ -76,16 +76,13 @@ pub(super) async fn seed_extraction(ctx: &Ctx, fillers: &Fillers, held: &Complet
         };
         let mut curated = Vec::new();
         let mut withheld = None;
-        for (curator, at) in &holding.curators {
-            let Some(media) = curator.media_types.first() else {
-                continue;
-            };
+        for (curator, at, media, category) in &holding.curators {
             match super::keys::curator_key(ctx, curator).await {
                 Beneath::Read(key) => curated.push(Curated {
                     media_type: media.clone(),
                     address: at.url(),
                     key,
-                    folder: folder(media, held),
+                    folder: folder(category, held),
                 }),
                 Beneath::Absent => {
                     withheld = Some(super::skipped(connection.clone(), &curator.name));

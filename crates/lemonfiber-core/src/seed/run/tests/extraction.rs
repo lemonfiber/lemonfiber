@@ -244,3 +244,81 @@ async fn a_curator_whose_key_is_not_written_yet_holds_the_whole_watch_back() {
     );
     assert!(watched(&http).is_empty());
 }
+
+#[tokio::test]
+async fn an_extractor_lemonfiber_cannot_reach_over_its_contract_is_told_nothing() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("extract-unreached");
+    let http = watching(Answer::reply(204, ""));
+    let ctx = contracted_ctx(&project, "extractor", false, http.clone());
+
+    let wirings = super::super::extraction::seed_extraction(
+        &ctx,
+        &an_extractor(&project, true),
+        &BTreeMap::new(),
+    )
+    .await;
+
+    assert!(wirings.is_empty(), "{wirings:?}");
+    assert!(http.requests().is_empty());
+}
+
+#[tokio::test]
+async fn a_curator_whose_key_file_leads_away_is_refused_and_nobody_is_handed() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("extract-leading-away");
+    let http = watching(Answer::reply(204, ""));
+    let ctx = contracted_ctx(&project, "extractor", true, http.clone()).with_filesystem(Arc::new(
+        SeedFs::keyed(Some("<Config><ApiKey>the-key</ApiKey></Config>"), None)
+            .leading_away(vec!["config/radarr/"]),
+    ));
+
+    let wirings = super::super::extraction::seed_extraction(
+        &ctx,
+        &an_extractor(&project, true),
+        &BTreeMap::new(),
+    )
+    .await;
+
+    assert!(
+        matches!(
+            wirings.as_slice(),
+            [one] if matches!(&one.state, crate::seed::State::Refused { reason }
+                if reason.starts_with("radarr"))
+        ),
+        "{wirings:?}"
+    );
+    assert!(watched(&http).is_empty());
+}
+
+#[tokio::test]
+async fn a_curator_filing_media_no_category_is_filed_under_is_not_handed() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("extract-uncategorised");
+    let http = watching(Answer::reply(204, ""));
+    let ctx = contracted_ctx(&project, "extractor", true, http.clone());
+    let fillers = fillers_trusting(
+        vec![
+            curator("sonarr", 8989, "tv"),
+            curator("readarr", 8787, "books"),
+        ],
+        &[the_extractor(true)],
+        &project,
+        &first_party("unpacked"),
+    );
+
+    let wirings = super::super::extraction::seed_extraction(&ctx, &fillers, &BTreeMap::new()).await;
+
+    assert_eq!(
+        wirings
+            .iter()
+            .map(|wiring| &wiring.state)
+            .collect::<Vec<_>>(),
+        [&crate::seed::State::Wired],
+        "{wirings:?}"
+    );
+    assert_eq!(
+        watched(&http),
+        [vec![(
+            "tv".to_owned(),
+            "/data/downloads/complete/tv".to_owned()
+        )]]
+    );
+}

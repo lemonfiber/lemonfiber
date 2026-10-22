@@ -46,36 +46,40 @@ impl Filing for Qbittorrent {
     }
 
     async fn file_under(&self, folders: &[Filed]) -> Result<(), Failure> {
-        let held = self.categories().await?;
-        for one in folders {
-            let path = if held.contains_key(&one.category) {
-                "/torrents/editCategory"
-            } else {
-                "/torrents/createCategory"
-            };
-            let request = self.post(
-                path,
-                &[
-                    ("category", one.category.as_str()),
-                    ("savePath", one.folder.as_str()),
-                ],
-            );
-            let response = self.endpoint.send(&request).await?;
-            self.endpoint.expect_success(&response).map_err(|_| {
-                self.endpoint.refused(&format!(
-                    "the client would not file {} under {}",
-                    one.category, one.folder
-                ))
-            })?;
-        }
-        if self.saving().await?.auto_tmm_enabled {
-            return Ok(());
-        }
-        let managed = serde_json::json!({ "auto_tmm_enabled": true }).to_string();
-        let request = self.post("/app/setPreferences", &[("json", &managed)]);
-        let response = self.endpoint.send(&request).await?;
-        self.endpoint.expect_success(&response)
+        file_under(self, folders).await
     }
+}
+
+async fn file_under(client: &Qbittorrent, folders: &[Filed]) -> Result<(), Failure> {
+    let held = client.categories().await?;
+    for one in folders {
+        let path = if held.contains_key(&one.category) {
+            "/torrents/editCategory"
+        } else {
+            "/torrents/createCategory"
+        };
+        let request = client.post(
+            path,
+            &[
+                ("category", one.category.as_str()),
+                ("savePath", one.folder.as_str()),
+            ],
+        );
+        let response = client.endpoint.send(&request).await?;
+        client.endpoint.expect_success(&response).map_err(|_| {
+            client.endpoint.refused(&format!(
+                "the client would not file {} under {}",
+                one.category, one.folder
+            ))
+        })?;
+    }
+    if client.saving().await?.auto_tmm_enabled {
+        return Ok(());
+    }
+    let managed = serde_json::json!({ "auto_tmm_enabled": true }).to_string();
+    let request = client.post("/app/setPreferences", &[("json", &managed)]);
+    let response = client.endpoint.send(&request).await?;
+    client.endpoint.expect_success(&response)
 }
 
 impl Qbittorrent {
