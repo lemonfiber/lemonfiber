@@ -553,3 +553,20 @@ fn a_port_standing_beside_moved_is_published_where_it_was_moved_to() {
     let radarr = ports(&entry(&beside, "radarr"));
     assert_eq!(radarr, ports(&entry(&project(&manifest, &[]), "radarr")));
 }
+
+/// A stack service a first-party plugin's service has moved in place of is left out of
+/// the project, and the plugin's service is written under its id.
+#[test]
+fn a_stack_service_moved_in_place_is_left_out_and_its_stand_in_written() {
+    let mut moved = a_placed("jellyfin", &["media.serve"], None, Some(8096));
+    moved.replaces = Some("jellyfin".to_owned());
+    moved.image = "ghcr.io/lemonfiber/plugin-jellyfin".to_owned();
+    let project = project(&carried(), &[an_installed("jellyfin", vec![moved])]);
+    assert!(
+        text(&entry(&project, "jellyfin"), "image")
+            .starts_with("ghcr.io/lemonfiber/plugin-jellyfin"),
+        "{}",
+        project.text
+    );
+    assert_eq!(project.text.matches("\n  jellyfin:\n").count(), 1);
+}

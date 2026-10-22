@@ -67,7 +67,7 @@ fn pending(
     manifest: &Manifest,
     carried: &Dir<'_>,
 ) -> Vec<(PathBuf, PathBuf)> {
-    crate::project::written(manifest)
+    crate::project::declared(manifest)
         .flat_map(|service| {
             mounts(&service.mount, service.takes_data).map(move |mount| {
                 let starting = Path::new(CONFIGURATION_TREE)

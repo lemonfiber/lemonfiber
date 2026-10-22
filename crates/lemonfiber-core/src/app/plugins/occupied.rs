@@ -48,7 +48,8 @@ pub(crate) fn unoccupied(
         .and_then(|file| crate::config::store::read(file).ok())
         .unwrap_or_default();
     let manifest = super::writing::stack_manifest(ctx)?;
-    let (mut services, mut ports) = run(&manifest, &crate::app::beside::moved(&settings));
+    let (mut services, mut ports) =
+        run(&manifest, installed, &crate::app::beside::moved(&settings));
     let overlays: Vec<(PathBuf, String)> = ctx
         .settings
         .overlays
@@ -69,13 +70,17 @@ pub(crate) fn unoccupied(
     Err(Box::new(occupied(&would.plugin, &clashes)))
 }
 
-/// Every service the stack runs, and every host port its project publishes for it,
-/// where standing beside moved it to where `moved` says.
-fn run(manifest: &Manifest, moved: &[MovedReport]) -> (Vec<Declared>, Vec<Published>) {
+/// Every service the stack runs but one of `installed` stands in for, and every host port
+/// its project publishes for it, where standing beside moved it to where `moved` says.
+fn run(
+    manifest: &Manifest,
+    installed: &[Installed],
+    moved: &[MovedReport],
+) -> (Vec<Declared>, Vec<Published>) {
     let file = PathBuf::from(lemonfiber_manifest::assembly::ROOT);
     let mut services = Vec::new();
     let mut ports = Vec::new();
-    for service in crate::project::written(manifest) {
+    for service in crate::project::written(manifest, installed) {
         services.push(Declared {
             service: service.id.clone(),
             file: file.clone(),
