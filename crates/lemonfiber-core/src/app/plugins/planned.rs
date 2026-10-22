@@ -14,13 +14,14 @@ use crate::settings::Resolved;
 ///
 /// # Errors
 ///
-/// Where the stack's manifest or the record of what is installed cannot be read, or the
-/// project was edited since lemonfiber last wrote it.
+/// Where `DATA_ROOT` is refused, the stack's manifest or the record of what is installed
+/// cannot be read, or the project was edited since lemonfiber last wrote it.
 pub(crate) fn writes(
     ctx: &Ctx,
     installed: &Installed,
     stack: &Path,
 ) -> Result<Vec<Write>, Box<Problem>> {
+    super::super::project::rooted(ctx)?;
     super::super::project::unedited(ctx)?;
     let manifest = super::writing::stack_manifest(ctx)?;
     let beside = beside(&super::read(ctx)?, installed);
