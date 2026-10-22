@@ -15,6 +15,7 @@ use lemonfiber_core::app::Ctx;
 use lemonfiber_core::plugin::{Installed, Register};
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
 use lemonfiber_core::ports::filesystem::{Beneath, Confined, Fault, Lying};
+use lemonfiber_core::ports::http::Request;
 use lemonfiber_core::ports::service::{Access, Certificate, Invited, Member, NamedLibrary};
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::http::Answer;
@@ -282,4 +283,33 @@ pub fn asking(mut ctx: Ctx) -> Ctx {
     ctx.seams.engine = Arc::new(running());
     ctx.seams.confined = Keyed::over(Arc::clone(&ctx.seams.confined));
     ctx
+}
+
+/// `ctx` with its media server moved into its plugin wherever its stack is written:
+/// [`moved_in`], and [`ADAPTER`]'s key held wherever its configuration directory is. The
+/// engine stays `ctx`'s own, which says [`ADAPTER`] runs where it holds [`running`].
+#[must_use]
+pub fn keyed_in(mut ctx: Ctx) -> Ctx {
+    ctx.seams.confined = Keyed::over(Arc::clone(&ctx.seams.confined));
+    moved_in(&ctx);
+    ctx
+}
+
+/// What `operation` of `identity.source` was asked in `sent`, in order.
+#[must_use]
+pub fn asked(sent: &[Request], operation: &str) -> Vec<serde_json::Value> {
+    let at = identity(operation);
+    sent.iter()
+        .filter(|request| request.url.ends_with(at))
+        .filter_map(|request| serde_json::from_str(request.body.as_deref()?).ok())
+        .collect()
+}
+
+/// The accounts `operation` of `identity.source` was asked about in `sent`, in order.
+#[must_use]
+pub fn asked_about(sent: &[Request], operation: &str) -> Vec<String> {
+    asked(sent, operation)
+        .iter()
+        .filter_map(|asked| asked.get("id")?.as_str().map(str::to_owned))
+        .collect()
 }

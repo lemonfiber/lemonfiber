@@ -18,11 +18,11 @@ use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Inviting, Outcome}
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::{InvitationStanding, MemberStanding};
-use lemonfiber_core::ports::http::{Method, Request};
+use lemonfiber_core::ports::http::Request;
+use lemonfiber_core::ports::service::{Invited, Member};
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::ports::{stamp, DAY, HOUR};
-use lemonfiber_fixtures::support::Reporting;
-use lemonfiber_ports::docker::{Health, Lifecycle};
+use lemonfiber_testing::media;
 
 /// The household.
 ///
@@ -33,50 +33,60 @@ use lemonfiber_ports::docker::{Health, Lifecycle};
 ///   watched on this account.
 /// - `ed` was offered yesterday and has not claimed it yet.
 /// - `fay` is a member with a password.
-fn household() -> String {
-    format!(
-        r#"[
-    {{"Id":"1","Name":"owner","HasPassword":true,"Policy":{{"IsAdministrator":true}}}},
-    {{"Id":"9","Name":"ana","HasPassword":false,"LastActivityDate":"2026-03-01T10:00:00.0000000Z",
-     "Policy":{{"IsDisabled":true}}}},
-    {{"Id":"7","Name":"bo","HasPassword":false}},
-    {{"Id":"5","Name":"cy","HasPassword":false,"LastActivityDate":"2025-12-01T10:00:00.0000000Z"}},
-    {{"Id":"11","Name":"ed","HasPassword":false}},
-    {{"Id":"12","Name":"fay","HasPassword":true,"LastActivityDate":"{}.0000000Z"}}
-]"#,
-        stamp(-2 * DAY + 10 * HOUR)
-    )
+fn household() -> Vec<Member> {
+    let mut owner = media::member("1", "owner", true);
+    owner.access.administrator = true;
+    owner.last_seen = None;
+    let mut ana = media::member("9", "ana", false);
+    ana.access.disabled = true;
+    ana.last_seen = Some("2026-03-01T10:00:00Z".to_owned());
+    let mut cy = media::member("5", "cy", false);
+    cy.last_seen = Some("2025-12-01T10:00:00Z".to_owned());
+    let mut fay = media::member("12", "fay", true);
+    fay.last_seen = Some(format!("{}Z", stamp(-2 * DAY + 10 * HOUR)));
+    vec![
+        owner,
+        ana,
+        media::member("7", "bo", false),
+        cy,
+        media::member("11", "ed", false),
+        fay,
+    ]
 }
 
-/// What the media server recorded: the old offers in January, and `ed`'s yesterday.
+/// When the media server says each invitation was made: the old offers in January, and
+/// `ed`'s yesterday.
 ///
 /// January is long past the window, and yesterday is inside it.
-fn recorded() -> String {
-    format!(
-        r#"{{"Items":[
-    {{"Type":"UserCreated","Date":"2026-01-04T09:00:00.0000000Z","UserId":"7"}},
-    {{"Type":"UserPasswordChanged","Date":"2026-01-04T09:00:00.0000000Z","UserId":"5"}},
-    {{"Type":"UserCreated","Date":"{}.0000000Z","UserId":"11"}}
-]}}"#,
-        stamp(-DAY + 10 * HOUR)
-    )
+fn recorded() -> Vec<Invited> {
+    let january = "2026-01-04T09:00:00Z";
+    vec![
+        Invited {
+            member: "7".to_owned(),
+            at: january.to_owned(),
+        },
+        Invited {
+            member: "5".to_owned(),
+            at: january.to_owned(),
+        },
+        Invited {
+            member: "11".to_owned(),
+            at: format!("{}Z", stamp(-DAY + 10 * HOUR)),
+        },
+    ]
 }
-
-/// An account as the media server answers a read of it, for a policy to be written over.
-const ACCOUNT: &str = r#"{"Id":"0","Policy":{"IsDisabled":false,"EnableAllFolders":true}}"#;
 
 /// How the writes that can fail are answered, each on its own.
 #[derive(Clone)]
 struct Answers {
-    /// The policy written on the account a new offer makes.
+    /// Putting an account where its person can claim it: the new offer's, or `fay`'s
+    /// after a reset.
     readying: Answer,
-    /// Taking that account back.
+    /// Taking an account back.
     taking_back: Answer,
     /// Narrowing `ed`, whose offer still stands.
     narrowing: Answer,
-    /// Switching `fay` back on after a reset.
-    switching_on: Answer,
-    /// What the media server recorded happening.
+    /// When the media server says each invitation was made.
     recorded: Answer,
 }
 
@@ -84,11 +94,10 @@ impl Answers {
     /// Every write accepted.
     fn accepted() -> Self {
         Self {
-            readying: Answer::reply(204, ""),
-            taking_back: Answer::reply(204, ""),
-            narrowing: Answer::reply(204, ""),
-            switching_on: Answer::reply(204, ""),
-            recorded: Answer::reply(200, recorded()),
+            readying: media::taken(),
+            taking_back: media::taken(),
+            narrowing: media::taken(),
+            recorded: media::answered(&recorded()),
         }
     }
 }
@@ -96,49 +105,33 @@ impl Answers {
 /// A media server holding [`household`], answering the writes that can fail with `answers`
 /// and every other write with a yes.
 fn a_server(answers: Answers) -> Arc<Fake> {
-    let yes = Answer::reply(204, "");
-    let account = Answer::reply(200, ACCOUNT);
-    Fake::by_route(vec![
-        (
-            Method::Post,
-            "/Users/AuthenticateByName",
-            Answer::reply(200, r#"{"AccessToken":"token"}"#),
-        ),
-        (Method::Get, "/System/ActivityLog", answers.recorded),
-        (
-            Method::Post,
-            "/Users/New",
-            Answer::reply(200, r#"{"Id":"4","Name":"dee","HasPassword":false}"#),
-        ),
-        (Method::Post, "/Users/4/Policy", answers.readying),
-        (Method::Delete, "/Users/4", answers.taking_back),
-        (Method::Post, "/Users/11/Policy", answers.narrowing),
-        (Method::Post, "/Users/12/Policy", answers.switching_on),
-        (Method::Post, "/Policy", yes.clone()),
-        (Method::Post, "/Password", yes.clone()),
-        (Method::Delete, "/Users/", yes),
-        (Method::Get, "/Users/", account),
-        (Method::Get, "/Users", Answer::reply(200, household())),
-        (Method::Get, "", Answer::Silent),
-        (Method::Post, "", Answer::Silent),
-    ])
+    let mut dee = media::member("4", "dee", false);
+    dee.last_seen = None;
+    let mut routes = vec![
+        (media::identity("when_invited"), vec![answers.recorded]),
+        (media::identity("claimable"), vec![answers.readying]),
+        (media::identity("withdraw"), vec![answers.taking_back]),
+        (media::identity("allow"), vec![answers.narrowing]),
+        (media::identity("invite"), vec![media::answered(&dee)]),
+    ];
+    routes.extend(media::household(&household(), &dee, &recorded()));
+    Fake::by_path_in_turn(routes)
 }
 
-/// A context over the shipped stack, on the test clock, with the media server up.
+/// A context over the shipped stack, on the test clock, with the media server moved into
+/// its plugin and up.
 fn context(env: &std::path::Path, http: Arc<Fake>) -> Ctx {
-    lemonfiber_testing::a_context()
-        .engine(Arc::new(Reporting::holding(
-            &["jellyfin"],
-            Lifecycle::Running,
-            Health::Healthy,
-        )))
-        .settings(Settings {
-            env_file: Some(env.to_path_buf()),
-            household_host: Some("192.168.1.20".to_owned()),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(http)
+    media::keyed_in(
+        lemonfiber_testing::a_context()
+            .engine(Arc::new(media::running()))
+            .settings(Settings {
+                env_file: Some(env.to_path_buf()),
+                household_host: Some("192.168.1.20".to_owned()),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http),
+    )
 }
 
 /// What one run answered, and everything it sent.
@@ -160,31 +153,29 @@ impl Ran {
             .map(|problem| problem.code.as_str())
     }
 
-    /// The accounts it asked to have removed.
-    fn deleted(&self) -> Vec<&str> {
-        self.sent
-            .iter()
-            .filter(|request| request.method == Method::Delete)
-            .filter_map(|request| request.url.rsplit('/').next())
-            .collect()
+    /// The accounts it asked to have taken back.
+    fn deleted(&self) -> Vec<String> {
+        media::asked_about(&self.sent, "withdraw")
     }
 
-    /// The policies written on one account, as the objects they were sent as.
-    fn policies(&self, id: &str) -> Vec<serde_json::Value> {
-        let path = format!("/Users/{id}/Policy");
-        self.sent
-            .iter()
-            .filter(|request| request.url.ends_with(&path))
-            .filter_map(|request| request.body.as_deref())
-            .filter_map(|body| serde_json::from_str(body).ok())
-            .collect()
+    /// The accounts it asked to have switched off.
+    fn suspended(&self) -> Vec<String> {
+        media::asked_about(&self.sent, "suspend")
+    }
+
+    /// The accounts it asked to have put where their person can claim them.
+    fn readied(&self) -> Vec<String> {
+        media::asked_about(&self.sent, "claimable")
+    }
+
+    /// The accounts it asked to have narrowed.
+    fn narrowed(&self) -> Vec<String> {
+        media::asked_about(&self.sent, "allow")
     }
 
     /// Whether a password was taken off anybody.
     fn reset_anybody(&self) -> bool {
-        self.sent
-            .iter()
-            .any(|request| request.url.ends_with("/Password"))
+        !media::asked(&self.sent, "unclaim").is_empty()
     }
 }
 
@@ -255,7 +246,7 @@ async fn the_administrator_is_not_offered() {
 
     assert_eq!(ran.refusal(), Some("INVITE-11"));
     assert!(
-        ran.policies("1").is_empty() && ran.deleted().is_empty(),
+        !ran.readied().contains(&"1".to_owned()) && !ran.deleted().contains(&"1".to_owned()),
         "the administrator's account was written on: {:?}",
         ran.sent
     );
@@ -283,17 +274,13 @@ async fn a_reset_nobody_claimed_again_is_switched_off_and_kept() {
         "a member somebody has watched on was removed"
     );
     assert_eq!(
-        ran.policies("5")
-            .first()
-            .and_then(|policy| policy.get("IsDisabled").cloned()),
-        Some(serde_json::json!(true)),
+        ran.suspended(),
+        ["5"],
         "the reset nobody claimed again was left claimable"
     );
     assert_eq!(
-        ran.policies("4")
-            .first()
-            .and_then(|policy| policy.get("LoginAttemptsBeforeLockout").cloned()),
-        Some(serde_json::json!(5)),
+        ran.readied(),
+        ["4"],
         "the new account was left open to guessing without end"
     );
     assert!(ran.kept.contains(r#""4""#), "{}", ran.kept);
@@ -315,13 +302,11 @@ async fn a_switched_off_account_offered_again_is_switched_back_on() {
         invitation(&ran).map(|made| made.standing),
         Some(InvitationStanding::Reset)
     );
-    let written = ran.policies("9");
     assert_eq!(
-        written
-            .first()
-            .and_then(|policy| policy.get("IsDisabled").cloned()),
-        Some(serde_json::json!(false)),
-        "the account was offered and left switched off: {written:?}"
+        ran.readied(),
+        ["9"],
+        "the account was offered and left switched off: {:?}",
+        ran.sent
     );
     assert!(ran.kept.contains(r#""9""#), "{}", ran.kept);
 }
@@ -339,9 +324,13 @@ async fn a_new_account_whose_offer_cannot_be_written_down_is_taken_back() {
     .await;
 
     assert_eq!(ran.refusal(), Some("INVITE-9"));
-    assert!(ran.deleted().contains(&"4"), "{:?}", ran.deleted());
     assert!(
-        ran.policies("4").is_empty(),
+        ran.deleted().contains(&"4".to_owned()),
+        "{:?}",
+        ran.deleted()
+    );
+    assert!(
+        ran.readied().is_empty(),
         "an account nothing dates was readied anyway"
     );
 }
@@ -353,7 +342,7 @@ async fn a_new_account_the_server_will_not_ready_is_taken_back() {
         "unready",
         inviting("dee", Allowance::default()),
         a_server(Answers {
-            readying: Answer::reply(500, ""),
+            readying: media::refusing(),
             ..Answers::accepted()
         }),
         nothing,
@@ -361,7 +350,11 @@ async fn a_new_account_the_server_will_not_ready_is_taken_back() {
     .await;
 
     assert_eq!(ran.refusal(), Some("INVITE-10"));
-    assert!(ran.deleted().contains(&"4"), "{:?}", ran.deleted());
+    assert!(
+        ran.deleted().contains(&"4".to_owned()),
+        "{:?}",
+        ran.deleted()
+    );
 }
 
 /// An account that could not be taken back either is named, with what it is.
@@ -377,8 +370,8 @@ async fn an_account_that_could_not_be_taken_back_is_named() {
             },
         ),
         a_server(Answers {
-            readying: Answer::reply(500, ""),
-            taking_back: Answer::reply(500, ""),
+            readying: media::refusing(),
+            taking_back: media::refusing(),
             ..Answers::accepted()
         }),
         nothing,
@@ -413,7 +406,7 @@ async fn an_offer_still_standing_keeps_what_it_had_when_it_cannot_be_narrowed() 
             },
         ),
         a_server(Answers {
-            narrowing: Answer::reply(500, ""),
+            narrowing: media::refusing(),
             ..Answers::accepted()
         }),
         nothing,
@@ -427,8 +420,9 @@ async fn an_offer_still_standing_keeps_what_it_had_when_it_cannot_be_narrowed() 
         .unwrap_or_else(|| unreachable!("a refused policy refuses the offer"));
     assert_eq!(problem.code.as_str(), "INVITE-8");
     assert!(problem.meaning.contains("still there"), "{problem:?}");
+    assert_eq!(ran.narrowed(), ["11"]);
     assert!(
-        !ran.deleted().contains(&"11"),
+        !ran.deleted().contains(&"11".to_owned()),
         "an account that was already here was taken away"
     );
 }
@@ -459,7 +453,7 @@ async fn a_reset_the_server_will_not_switch_on_says_so() {
             name: "fay".to_owned(),
         },
         a_server(Answers {
-            switching_on: Answer::reply(500, ""),
+            readying: media::refusing(),
             ..Answers::accepted()
         }),
         nothing,
@@ -483,16 +477,26 @@ async fn a_reset_switches_the_account_back_on() {
     )
     .await;
 
-    let written = ran.policies("12");
-    let first = written.first().cloned().unwrap_or_default();
-    assert_eq!(first.get("IsDisabled"), Some(&serde_json::json!(false)));
+    let written: Vec<(&str, String)> = ran
+        .sent
+        .iter()
+        .filter_map(|request| {
+            ["unclaim", "claimable"]
+                .into_iter()
+                .find(|operation| request.url.ends_with(media::identity(operation)))
+                .zip(
+                    serde_json::from_str::<serde_json::Value>(request.body.as_deref()?)
+                        .ok()?
+                        .get("id")?
+                        .as_str()
+                        .map(str::to_owned),
+                )
+        })
+        .collect();
     assert_eq!(
-        first.get("InvalidLoginAttemptCount"),
-        Some(&serde_json::json!(0))
-    );
-    assert_eq!(
-        first.get("LoginAttemptsBeforeLockout"),
-        Some(&serde_json::json!(5))
+        written,
+        [("unclaim", "12".to_owned()), ("claimable", "12".to_owned())],
+        "the account was not switched back on after its password came off"
     );
     assert!(ran.kept.contains(r#""12""#), "{}", ran.kept);
 }
@@ -546,7 +550,7 @@ async fn an_unread_record_calls_nothing_run_out() {
     let (stood, findings) = standings(
         "standings-unread",
         Answers {
-            recorded: Answer::reply(500, ""),
+            recorded: media::refusing(),
             ..Answers::accepted()
         },
     )
@@ -580,15 +584,8 @@ async fn reading_the_household_takes_back_what_has_run_out() {
     .await;
 
     assert_eq!(ran.deleted(), ["7"], "{:?}", ran.deleted());
-    let switched_off = ran.policies("5");
-    assert_eq!(
-        switched_off
-            .first()
-            .and_then(|policy| policy.get("IsDisabled")),
-        Some(&serde_json::json!(true)),
-        "{switched_off:?}"
-    );
-    assert!(ran.policies("11").is_empty() && ran.policies("9").is_empty());
+    assert_eq!(ran.suspended(), ["5"], "{:?}", ran.sent);
+    assert!(ran.readied().is_empty() && ran.narrowed().is_empty());
 }
 
 /// A rehearsed read takes nothing back.
@@ -606,10 +603,11 @@ async fn a_rehearsed_read_takes_nothing_back() {
     }
 
     assert!(said.is_ok(), "{said:?}");
+    let sent = http.requests();
     assert!(
-        http.requests()
+        ["withdraw", "suspend", "claimable", "allow"]
             .iter()
-            .all(|request| request.method != Method::Delete && !request.url.ends_with("/Policy")),
+            .all(|operation| media::asked(&sent, operation).is_empty()),
         "a rehearsal took something back"
     );
 }
@@ -617,28 +615,13 @@ async fn a_rehearsed_read_takes_nothing_back() {
 /// What could not be taken back is said, because it can still be claimed.
 #[tokio::test]
 async fn an_invitation_that_could_not_be_taken_back_is_said() {
-    let http = Fake::by_route(vec![
-        (
-            Method::Post,
-            "/Users/AuthenticateByName",
-            Answer::reply(200, r#"{"AccessToken":"token"}"#),
-        ),
-        (
-            Method::Get,
-            "/System/ActivityLog",
-            Answer::reply(200, recorded()),
-        ),
-        (Method::Delete, "/Users/", Answer::reply(500, "")),
-        (Method::Get, "/Users/", Answer::reply(200, ACCOUNT)),
-        (Method::Post, "/Policy", Answer::reply(204, "")),
-        (Method::Get, "/Users", Answer::reply(200, household())),
-        (Method::Get, "", Answer::Silent),
-        (Method::Post, "", Answer::Silent),
-    ]);
     let ran = running(
         "read-cannot-take-back",
         Command::Household { member: None },
-        http,
+        a_server(Answers {
+            taking_back: media::refusing(),
+            ..Answers::accepted()
+        }),
         nothing,
     )
     .await;
