@@ -536,3 +536,37 @@ async fn an_update_onto_a_port_another_plugin_holds_is_refused() {
         .and_then(|one| one.detail.as_deref())
         .is_some_and(|detail| detail.contains("kavita")));
 }
+
+/// An update to a version naming an in-process adapter is refused as the install would
+/// be, naming the field, and the installed version stays on.
+#[tokio::test]
+async fn an_update_to_a_version_naming_an_in_process_adapter_is_refused() {
+    let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+    let ctx = proving("update-in-process", runner.clone(), answering(200));
+    assert_eq!(
+        counted(installing(&ctx, &source("update-in-process", PROVING)).await),
+        Some(1)
+    );
+    let before = runner.seen().len();
+    let adapted = next().replace(
+        r#"config_path = "/app/data""#,
+        "config_path = \"/app/data\"\napi         = { kind = \"servarr\", key_source = \
+         \"config-xml\", path = \"/app/data/config.xml\", version = 3 }",
+    );
+    assert_ne!(adapted, next());
+
+    let refused = updating(&ctx, &source("update-in-process-next", &adapted))
+        .await
+        .err()
+        .map(|problem| (problem.code.to_string(), problem.detail.unwrap_or_default()))
+        .unwrap_or_default();
+
+    assert_eq!(refused.0, "PLUGIN-3");
+    assert!(refused.1.contains("service komga.api"), "{}", refused.1);
+    assert_eq!(
+        runner.seen().len(),
+        before,
+        "nothing was asked of the engine"
+    );
+    assert_eq!(on(&ctx).await.as_deref(), Some("1.2.0"));
+}

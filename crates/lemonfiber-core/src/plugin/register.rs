@@ -84,10 +84,17 @@ impl Register {
         if text.trim().is_empty() {
             return Ok(Self::empty());
         }
-        let read: Self =
+        let mut read: Self =
             serde_json::from_str(text).map_err(|why| Unreadable::Damaged(why.to_string()))?;
         read.once_each()?;
         read.as_written()?;
+        for placed in read
+            .installed
+            .iter_mut()
+            .flat_map(|one| one.services.iter_mut())
+        {
+            placed.api = None;
+        }
         Ok(read)
     }
 

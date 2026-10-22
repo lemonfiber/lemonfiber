@@ -287,12 +287,12 @@ async fn the_command_answers_with_the_reading() {
     );
 }
 
-/// **A plugin's media server is asked, at its own address, with its own password.**
-/// Where a plugin fills the household's identity, what is playing is read from that
-/// server through the same lookup every other read of the household takes, so a stack
-/// whose media server is a stand-in answers rather than reading as a quiet house.
+/// **A plugin's media server is never asked through an adapter of lemonfiber's.** An
+/// older record naming the Jellyfin adapter for an installed plugin's server is read as
+/// naming none, so a plugin speaking no contract is not asked at all: what is playing is
+/// unread rather than read through an adapter only an assembled part is reached by.
 #[tokio::test]
-async fn a_plugin_standing_in_for_the_media_server_is_the_one_asked() {
+async fn a_plugin_server_an_older_record_names_an_adapter_for_is_never_asked() {
     let mut placed = crate::test_support::a_placed(
         "emby",
         &["identity.source", "media.serve"],
@@ -330,19 +330,10 @@ async fn a_plugin_standing_in_for_the_media_server_is_the_one_asked() {
 
     let report = playing(&context, None).await.unwrap_or_default();
 
-    assert!(report.available, "{report:?}");
-    assert_eq!(watching(&report), vec!["Ada".to_owned(), "Bram".to_owned()]);
-    let asked: Vec<String> = transport
-        .requests()
-        .into_iter()
-        .map(|one| one.url)
-        .collect();
+    assert!(!report.available, "{report:?}");
     assert!(
-        asked.iter().any(|url| url.contains(":8920/Sessions")),
-        "the plugin's server was not the one asked: {asked:?}"
-    );
-    assert!(
-        !asked.iter().any(|url| url.contains(":8096/")),
-        "the stack's own media server was asked: {asked:?}"
+        transport.requests().is_empty(),
+        "a server was asked: {:?}",
+        transport.requests()
     );
 }

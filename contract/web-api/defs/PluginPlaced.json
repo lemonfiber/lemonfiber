@@ -4,7 +4,7 @@
   "type": "object",
   "properties": {
     "api": {
-      "description": "The adapter lemonfiber reaches it through, where the plugin named one.\n\nDefaulted for a record written before this was kept, which reads as naming\nnone: a service operated generically, as it was when installed.",
+      "description": "The adapter of lemonfiber's its manifest names, which only a part the bundle\nassembles is reached through. A record read from the register holds none, whatever\nan older one carried: an installed plugin is reached over the contracts it speaks.",
       "anyOf": [
         {
           "$ref": "Api.json"
