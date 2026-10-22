@@ -5,12 +5,11 @@ use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 use super::{a_device, an_item, lapsed, picture, viewed, Pictured, PICTURE_MOST};
 use crate::app::{Ctx, Outcome, Viewing, Whom};
 use crate::error::codes::play;
-use crate::ports::http::Method;
-use crate::ports::service::{HowFar, Picture};
-use crate::test_support::{a_context, a_password, SeedFs};
-
-/// A curator config carrying a readable key, so the stack resolves its targets.
-const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+use crate::ports::service::{
+    EpisodeDetail, Holds, HowFar, Image, Item, ItemDetail, ItemProgress, Medium, Picture,
+    SeasonDetail, Session, PLAYER,
+};
+use crate::test_support::{a_context, media, moved_household};
 
 /// A title on the shelf, by an identifier shaped like the server's.
 const FILM: &str = "0123456789abcdef0123456789abcdef";
@@ -24,60 +23,71 @@ fn session() -> String {
     "fe".repeat(16)
 }
 
-/// The media server's answer to a device trading its secret, opening `token`.
-fn opened(token: &str) -> String {
-    format!(r#"{{"AccessToken":"{token}"}}"#)
-}
-
-/// The accounts the media server holds.
-const ACCOUNTS: &str = r#"[{"Id":"a7f3","Name":"Ada","HasPassword":true,
-    "Policy":{"EnableAllFolders":true}}]"#;
-
-/// The media server, answering each call by what it asks for.
+/// The media server, answering each operation by what it asks for, holding Ada.
 fn server(routes: Vec<(&'static str, Answer)>) -> Arc<Transport> {
-    let mut answered = vec![(
-        "/Users/AuthenticateByName",
-        Answer::reply(200, r#"{"AccessToken":"token"}"#),
-    )];
-    answered.extend(routes);
-    answered.push(("/Users", Answer::reply(200, ACCOUNTS)));
-    answered.push(("", Answer::reply(200, "[]")));
+    let mut answered = routes;
+    answered.push((
+        media::identity("household"),
+        media::answered(&[media::member("a7f3", "Ada", true)]),
+    ));
     Transport::by_path(answered)
 }
 
-/// A context whose media server can be reached, kept apart from every other case.
+/// A context whose media server has moved into its plugin, kept apart from every other
+/// case.
 fn ctx_over(transport: Arc<Transport>, tag: &str) -> Ctx {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("screening-{tag}")).kept();
-    let _ = std::fs::remove_dir_all(&dir);
-    let _ = std::fs::create_dir_all(&dir);
-    let mut context = a_context()
-        .build()
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
-        .with_http(transport);
-    context.settings.env_file = Some(dir.join(".env"));
-    let _ = crate::app::targets::record_secret(
-        &context,
-        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
-        &a_password(),
-    );
-    context
+    moved_household(&format!("screening-{tag}"), transport)
 }
 
-/// What the media server was asked, after signing in, as method and path.
-fn asked(transport: &Transport) -> Vec<(Method, String)> {
+/// What the media server was asked, as each operation and what it was asked with.
+fn asked(transport: &Transport) -> Vec<(String, serde_json::Value)> {
     transport
         .requests()
         .into_iter()
-        .filter(|request| !request.url.ends_with("/Users/AuthenticateByName"))
         .map(|request| {
-            let path = request
+            let operation = request
                 .url
-                .split_once("://")
-                .and_then(|(_, rest)| rest.find('/').map(|at| rest[at..].to_owned()))
+                .rsplit('/')
+                .next()
+                .unwrap_or_default()
+                .to_owned();
+            let with = request
+                .body
+                .as_deref()
+                .and_then(|body| serde_json::from_str(body).ok())
                 .unwrap_or_default();
-            (request.method, path)
+            (operation, with)
         })
         .collect()
+}
+
+/// A title called `title` under `id`, holding no picture and nothing to play.
+fn called(id: &str, title: &str, medium: Medium) -> Item {
+    Item {
+        id: id.to_owned(),
+        title: title.to_owned(),
+        year: None,
+        medium,
+        holds: Holds::default(),
+    }
+}
+
+/// `item` as the media server details it, with `seasons`.
+fn detailed(item: Item, seasons: Vec<SeasonDetail>) -> ItemDetail {
+    ItemDetail {
+        item,
+        overview: None,
+        minutes: None,
+        genres: Vec::new(),
+        certificate: None,
+        released: None,
+        seasons,
+    }
+}
+
+/// The film on the shelf, as the media server details it for a member.
+fn on_the_shelf() -> Option<ItemDetail> {
+    Some(detailed(called(FILM, "Heat", Medium::Film), Vec::new()))
 }
 
 fn code(outcome: Result<Outcome, Box<crate::error::Problem>>) -> Option<String> {
@@ -118,9 +128,10 @@ async fn a_title_named_by_something_else_is_refused_before_anything_is_asked() {
 
 #[tokio::test]
 async fn a_title_is_read_as_the_member_and_says_why_it_is_not_located() {
-    let film = r#"{"Id":"0123456789abcdef0123456789abcdef","Name":"Heat","Type":"Movie",
-        "IsFolder":false}"#;
-    let transport = server(vec![("/Items/", Answer::reply(200, film))]);
+    let transport = server(vec![(
+        media::serve("title"),
+        media::answered(&on_the_shelf()),
+    )]);
     let ctx = ctx_over(Arc::clone(&transport), "title");
     let read = viewed(
         &ctx,
@@ -145,12 +156,18 @@ async fn a_title_is_read_as_the_member_and_says_why_it_is_not_located() {
         .map(|title| title.held.at)
         .unwrap_or_default();
     assert!(at.unlocated.is_some() && at.stream_from.is_none(), "{at:?}");
-    assert!(asked(&transport).contains(&(Method::Get, format!("/Items/{FILM}?userId=a7f3"))));
+    assert!(asked(&transport).contains(&(
+        "title".to_owned(),
+        serde_json::json!({ "member": "a7f3", "id": FILM })
+    )));
 }
 
 #[tokio::test]
 async fn a_title_off_the_shelf_and_a_stranger_are_refused_by_name() {
-    let transport = server(vec![("/Items/", Answer::reply(404, ""))]);
+    let transport = server(vec![(
+        media::serve("title"),
+        media::answered(&None::<ItemDetail>),
+    )]);
     let ctx = ctx_over(transport, "off-the-shelf");
     let off = viewed(
         &ctx,
@@ -214,10 +231,13 @@ async fn nobody_and_nothing_to_play_from_are_refused() {
 
 #[tokio::test]
 async fn part_way_is_located_and_a_server_that_will_not_say_is_unread() {
-    let resume = r#"{"Items":[{"Id":"e2","Name":"The Detail","Type":"Episode",
-        "RunTimeTicks":36000000000,"UserData":{"PlaybackPositionTicks":12000000000}}]}"#;
+    let resume = vec![ItemProgress {
+        item: called("e2", "The Detail", Medium::Episode),
+        position: 1200,
+        length: Some(3600),
+    }];
     let ctx = ctx_over(
-        server(vec![("/UserItems/Resume", Answer::reply(200, resume))]),
+        server(vec![(media::serve("part_way"), media::answered(&resume))]),
         "part-way",
     );
     let read = viewed(
@@ -238,7 +258,7 @@ async fn part_way_is_located_and_a_server_that_will_not_say_is_unread() {
     assert!(first.is_some_and(|one| one.held.at.unlocated.is_some()));
 
     let ctx = ctx_over(
-        server(vec![("/UserItems/Resume", Answer::reply(500, ""))]),
+        server(vec![(media::serve("part_way"), media::unavailable())]),
         "part-way-unread",
     );
     let read = viewed(
@@ -253,19 +273,9 @@ async fn part_way_is_located_and_a_server_that_will_not_say_is_unread() {
         if !report.available && report.findings.len() == 1));
 }
 
-/// The media server, signing a device in by code as it does when it is asked.
-fn signing_in(opened: String) -> Arc<Transport> {
-    server(vec![
-        (
-            "/QuickConnect/Initiate",
-            Answer::reply(200, r#"{"Code":"123456","Secret":"the-secret"}"#),
-        ),
-        ("/QuickConnect/Authorize", Answer::reply(200, "true")),
-        (
-            "/Users/AuthenticateWithQuickConnect",
-            Answer::reply(200, opened),
-        ),
-    ])
+/// The media server, signing a device in and answering `token` for its session.
+fn signing_in(token: Option<String>) -> Arc<Transport> {
+    server(vec![(media::serve("signed_in"), media::answered(&token))])
 }
 
 /// A grant for Ada's phone.
@@ -289,7 +299,7 @@ fn a_device_is_eight_to_sixty_four_letters_digits_and_dashes() {
 #[tokio::test]
 async fn a_grant_opens_the_device_session_as_the_member_and_answers_its_token() {
     let session = session();
-    let transport = signing_in(opened(&session));
+    let transport = signing_in(Some(session.clone()));
     let ctx = ctx_over(Arc::clone(&transport), "grant");
     let granted = viewed(&ctx, for_the_phone()).await;
     let report = match granted {
@@ -306,31 +316,14 @@ async fn a_grant_opens_the_device_session_as_the_member_and_answers_its_token() 
     );
     assert!(!format!("{report:?}").contains(&session));
     assert!(asked(&transport).contains(&(
-        Method::Post,
-        "/QuickConnect/Authorize?code=123456&userId=a7f3".to_owned()
+        "signed_in".to_owned(),
+        serde_json::json!({ "member": "a7f3", "device": PHONE })
     )));
-    let as_the_phone = transport
-        .requests()
-        .into_iter()
-        .filter(|request| {
-            request.url.ends_with("/QuickConnect/Initiate")
-                || request.url.ends_with("/Users/AuthenticateWithQuickConnect")
-        })
-        .filter(|request| {
-            request.headers.iter().any(|(name, value)| {
-                name == "Authorization"
-                    && value.contains(r#"Client="lemonfiber-player""#)
-                    && value.contains(r#"DeviceId="a-phone-0123""#)
-                    && !value.contains("Token=")
-            })
-        })
-        .count();
-    assert_eq!(as_the_phone, 2);
 }
 
 #[tokio::test]
 async fn a_rehearsed_grant_opens_nothing_and_answers_no_token() {
-    let transport = signing_in(opened(&session()));
+    let transport = signing_in(Some(session()));
     let mut rehearsing = ctx_over(Arc::clone(&transport), "grant-rehearsed");
     rehearsing.dry_run = true;
     let rehearsed = viewed(&rehearsing, for_the_phone()).await;
@@ -338,12 +331,12 @@ async fn a_rehearsed_grant_opens_nothing_and_answers_no_token() {
         if !report.granted && report.rehearsed && report.token.is_none()));
     assert!(!asked(&transport)
         .iter()
-        .any(|(method, _)| *method == Method::Post));
+        .any(|(operation, _)| operation == "signed_in"));
 }
 
 #[tokio::test]
 async fn a_device_named_by_something_else_is_refused_before_anything_is_asked() {
-    let transport = signing_in("{}".to_owned());
+    let transport = signing_in(None);
     let ctx = ctx_over(Arc::clone(&transport), "grant-not-a-device");
     let refused = viewed(
         &ctx,
@@ -359,36 +352,24 @@ async fn a_device_named_by_something_else_is_refused_before_anything_is_asked() 
 
 #[tokio::test]
 async fn a_server_that_signs_no_device_in_by_code_is_said() {
-    let ctx = ctx_over(
-        server(vec![("/QuickConnect/Initiate", Answer::reply(401, ""))]),
-        "grant-off",
-    );
+    let ctx = ctx_over(signing_in(None), "grant-off");
     let refused = viewed(&ctx, for_the_phone()).await;
     assert_eq!(code(refused).as_deref(), Some("PLAY-8"));
 }
 
 #[tokio::test]
-async fn a_code_left_unauthorised_or_a_session_without_a_token_is_unanswered() {
-    let unauthorised = ctx_over(
-        server(vec![
-            (
-                "/QuickConnect/Initiate",
-                Answer::reply(200, r#"{"Code":"123456","Secret":"the-secret"}"#),
-            ),
-            ("/QuickConnect/Authorize", Answer::reply(200, "false")),
-        ]),
-        "grant-unauthorised",
+async fn a_server_that_will_not_sign_the_device_in_is_unanswered() {
+    let refusing = ctx_over(
+        server(vec![(media::serve("signed_in"), media::unavailable())]),
+        "grant-unanswered",
     );
-    let refused = viewed(&unauthorised, for_the_phone()).await;
-    assert_eq!(code(refused).as_deref(), Some("PLAY-5"));
-    let empty = ctx_over(signing_in(opened("")), "grant-empty");
-    let refused = viewed(&empty, for_the_phone()).await;
+    let refused = viewed(&refusing, for_the_phone()).await;
     assert_eq!(code(refused).as_deref(), Some("PLAY-5"));
 }
 
 #[tokio::test]
 async fn progress_is_handed_to_the_server_and_a_silent_server_is_said() {
-    let transport = server(vec![("/UserItems/", Answer::reply(200, "{}"))]);
+    let transport = server(vec![(media::serve("progressed"), media::taken())]);
     let ctx = ctx_over(Arc::clone(&transport), "watched");
     let went = HowFar {
         position: 90,
@@ -405,12 +386,16 @@ async fn progress_is_handed_to_the_server_and_a_silent_server_is_said() {
     .await;
     assert!(matches!(recorded, Ok(Outcome::Watched(report)) if report.position == 90));
     assert!(asked(&transport).contains(&(
-        Method::Post,
-        format!("/UserItems/{FILM}/UserData?userId=a7f3")
+        "progressed".to_owned(),
+        serde_json::json!({
+            "member": "a7f3",
+            "id": FILM,
+            "how_far": { "position": 90, "ended": false }
+        })
     )));
 
     let ctx = ctx_over(
-        server(vec![("/UserItems/", Answer::reply(500, ""))]),
+        server(vec![(media::serve("progressed"), media::unavailable())]),
         "watched-silent",
     );
     let silent = viewed(
@@ -427,13 +412,20 @@ async fn progress_is_handed_to_the_server_and_a_silent_server_is_said() {
 
 #[tokio::test]
 async fn a_lapsed_grant_signs_out_only_the_devices_it_granted() {
-    let sessions = r#"[
-        {"UserId":"a7f3","DeviceId":"phone","DeviceName":"Phone","Client":"lemonfiber-player"},
-        {"UserId":"a7f3","DeviceId":"web-1","DeviceName":"lemonfiber","Client":"lemonfiber"},
-        {"UserId":"a7f3","DeviceId":"tv","DeviceName":"TV","Client":"Jellyfin Android TV"}]"#;
+    let device = |id: &str, name: &str, client: &str| Session {
+        device_id: id.to_owned(),
+        device: name.to_owned(),
+        client: client.to_owned(),
+        last_seen: None,
+    };
+    let sessions = vec![
+        device("phone", "Phone", PLAYER),
+        device("web-1", "lemonfiber", "lemonfiber"),
+        device("tv", "TV", "Jellyfin Android TV"),
+    ];
     let transport = server(vec![
-        ("/Sessions", Answer::reply(200, sessions)),
-        ("/Devices", Answer::reply(204, "")),
+        (media::identity("sessions"), media::answered(&sessions)),
+        (media::serve("sign_out"), media::taken()),
     ]);
     let ctx = ctx_over(Arc::clone(&transport), "lapsed");
     let kept = crate::app::targets::beside_env(&ctx, "grants.json");
@@ -441,12 +433,12 @@ async fn a_lapsed_grant_signs_out_only_the_devices_it_granted() {
         let _ = std::fs::write(kept, r#"{"a7f3":"2020-01-01"}"#);
     }
     lapsed(&ctx).await;
-    let deleted: Vec<String> = asked(&transport)
+    let signed_out: Vec<serde_json::Value> = asked(&transport)
         .into_iter()
-        .filter(|(method, _)| *method == Method::Delete)
-        .map(|(_, path)| path)
+        .filter(|(operation, _)| operation == "sign_out")
+        .map(|(_, with)| with)
         .collect();
-    assert_eq!(deleted, vec!["/Devices?id=phone".to_owned()]);
+    assert_eq!(signed_out, vec![serde_json::json!({ "device": "phone" })]);
     let left = kept.and_then(|kept| std::fs::read_to_string(kept).ok());
     assert_eq!(left.as_deref().map(str::trim), Some("{}"));
 }
@@ -455,7 +447,7 @@ async fn a_lapsed_grant_signs_out_only_the_devices_it_granted() {
 /// again rather than forgetting a session that may still be open.
 #[tokio::test]
 async fn a_lapsed_grant_the_server_will_not_list_is_kept() {
-    let transport = server(vec![("/Sessions", Answer::reply(500, ""))]);
+    let transport = server(vec![(media::identity("sessions"), media::unavailable())]);
     let ctx = ctx_over(Arc::clone(&transport), "lapsed-unlisted");
     let kept = crate::app::targets::beside_env(&ctx, "grants.json");
     let lapsed_on = r#"{"a7f3":"2020-01-01"}"#;
@@ -465,7 +457,7 @@ async fn a_lapsed_grant_the_server_will_not_list_is_kept() {
     lapsed(&ctx).await;
     assert!(!asked(&transport)
         .iter()
-        .any(|(method, _)| *method == Method::Delete));
+        .any(|(operation, _)| operation == "sign_out"));
     let left = kept.and_then(|kept| std::fs::read_to_string(kept).ok());
     assert_eq!(left.as_deref(), Some(lapsed_on));
 }
@@ -475,7 +467,7 @@ async fn a_lapsed_grant_the_server_will_not_list_is_kept() {
 #[tokio::test]
 async fn a_stranger_and_a_silent_title_are_refused_by_name() {
     let ctx = ctx_over(
-        server(vec![("/Items/", Answer::reply(500, ""))]),
+        server(vec![(media::serve("title"), media::unavailable())]),
         "title-silent",
     );
     let for_whom = |member: Whom| Viewing::Title {
@@ -554,7 +546,7 @@ async fn a_stack_that_cannot_be_read_is_said_rather_than_taken_for_no_server() {
 /// A rehearsal records no progress and renews no grant.
 #[tokio::test]
 async fn a_rehearsal_records_no_progress_and_renews_no_grant() {
-    let transport = server(vec![("/UserItems/", Answer::reply(200, "{}"))]);
+    let transport = server(vec![(media::serve("progressed"), media::taken())]);
     let mut ctx = ctx_over(Arc::clone(&transport), "watched-rehearsed");
     ctx.dry_run = true;
     let rehearsed = viewed(
@@ -572,7 +564,7 @@ async fn a_rehearsal_records_no_progress_and_renews_no_grant() {
     assert!(matches!(rehearsed, Ok(Outcome::Watched(report)) if report.rehearsed && report.ended));
     assert!(!asked(&transport)
         .iter()
-        .any(|(method, _)| *method == Method::Post));
+        .any(|(operation, _)| operation == "progressed"));
     super::spoke(&ctx, "a7f3");
     let kept = crate::app::targets::beside_env(&ctx, "grants.json");
     assert!(kept.is_some_and(|kept| !kept.exists()));
@@ -581,13 +573,7 @@ async fn a_rehearsal_records_no_progress_and_renews_no_grant() {
 /// A household the server will not list is said as the server not answering.
 #[tokio::test]
 async fn a_household_the_server_will_not_list_is_unanswered() {
-    let transport = Transport::by_path(vec![
-        (
-            "/Users/AuthenticateByName",
-            Answer::reply(200, r#"{"AccessToken":"token"}"#),
-        ),
-        ("/Users", Answer::reply(500, "")),
-    ]);
+    let transport = Transport::by_path(vec![(media::identity("household"), media::unavailable())]);
     let ctx = ctx_over(transport, "household-silent");
     let refused = viewed(&ctx, for_the_phone()).await;
     assert_eq!(code(refused).as_deref(), Some("PLAY-5"));
@@ -597,17 +583,25 @@ async fn a_household_the_server_will_not_list_is_unanswered() {
 /// door like the series itself.
 #[tokio::test]
 async fn every_episode_of_a_series_is_located_like_the_series() {
-    let series = r#"{"Id":"0123456789abcdef0123456789abcdef","Name":"Fargo","Type":"Series",
-        "IsFolder":true}"#;
-    let seasons = r#"{"Items":[{"Id":"s1","Name":"Season 1","Type":"Season","IndexNumber":1}]}"#;
-    let episodes = r#"{"Items":[{"Id":"e1","Name":"Pilot","Type":"Episode","IndexNumber":1,
-        "SeasonId":"s1"}]}"#;
+    let series = detailed(
+        called(FILM, "Fargo", Medium::Series),
+        vec![SeasonDetail {
+            id: "s1".to_owned(),
+            name: "Season 1".to_owned(),
+            number: Some(1),
+            episodes: vec![EpisodeDetail {
+                item: called("e1", "Pilot", Medium::Episode),
+                number: Some(1),
+                overview: None,
+                minutes: None,
+            }],
+        }],
+    );
     let ctx = ctx_over(
-        server(vec![
-            ("/Seasons", Answer::reply(200, seasons)),
-            ("/Episodes", Answer::reply(200, episodes)),
-            ("/Items/", Answer::reply(200, series)),
-        ]),
+        server(vec![(
+            media::serve("title"),
+            media::answered(&Some(series)),
+        )]),
         "series",
     );
     let read = viewed(
@@ -633,14 +627,18 @@ async fn every_episode_of_a_series_is_located_like_the_series() {
         .all(|episode| episode.held.at.unlocated.is_some()));
 }
 
-/// The film on the shelf, as the media server answers it for a member.
-const ON_THE_SHELF: &str = r#"{"Id":"0123456789abcdef0123456789abcdef","Name":"Heat",
-    "Type":"Movie","IsFolder":false}"#;
+/// A picture of `media_type` holding `bytes`, as the media server answers one.
+fn a_picture(media_type: &str, bytes: &[u8]) -> Answer {
+    media::answered(&Some(Image {
+        media_type: media_type.to_owned(),
+        bytes: bytes.to_vec(),
+    }))
+}
 
-/// A picture asked for as Ada, with the media server answering the picture `answer`
-/// and the title `title`, and the code it was refused with.
-async fn pictured(tag: &str, answer: Answer, title: Answer) -> Result<Pictured, String> {
-    let transport = server(vec![("/Images/", answer), ("/Items/", title)]);
+/// A backdrop asked for as Ada, with the media server answering `answer`, and the code it
+/// was refused with.
+async fn pictured(tag: &str, answer: Answer) -> Result<Pictured, String> {
+    let transport = server(vec![(media::serve("picture"), answer)]);
     let ctx = ctx_over(transport, &format!("picture-{tag}"));
     picture(
         &ctx,
@@ -653,14 +651,11 @@ async fn pictured(tag: &str, answer: Answer, title: Answer) -> Result<Pictured, 
 }
 
 #[tokio::test]
-async fn a_picture_is_asked_after_the_title_as_the_member_and_passed_on_as_a_raster() {
-    let transport = server(vec![
-        (
-            "/Images/",
-            Answer::served(200, "IMAGE/JPEG; q=1", "the-backdrop"),
-        ),
-        ("/Items/", Answer::reply(200, ON_THE_SHELF)),
-    ]);
+async fn a_picture_is_asked_as_the_member_and_passed_on_as_a_raster() {
+    let transport = server(vec![(
+        media::serve("picture"),
+        a_picture("IMAGE/JPEG; q=1", b"the-backdrop"),
+    )]);
     let ctx = ctx_over(Arc::clone(&transport), "picture");
     let shown = picture(
         &ctx,
@@ -676,37 +671,25 @@ async fn a_picture_is_asked_after_the_title_as_the_member_and_passed_on_as_a_ras
             bytes: b"the-backdrop".to_vec(),
         })
     );
-    let asked = asked(&transport);
-    let title = asked
-        .iter()
-        .position(|one| one.1 == format!("/Items/{FILM}?userId=a7f3"));
-    let image = asked
-        .iter()
-        .position(|one| one.1 == format!("/Items/{FILM}/Images/Backdrop"));
-    assert!(title.is_some() && title < image, "{asked:?}");
+    assert!(asked(&transport).contains(&(
+        "picture".to_owned(),
+        serde_json::json!({ "member": "a7f3", "id": FILM, "which": "backdrop" })
+    )));
 }
 
 #[tokio::test]
 async fn a_picture_off_the_shelf_missing_or_not_a_raster_is_absent() {
-    let jpeg = || Answer::served(200, "image/jpeg", "x");
-    let on_the_shelf = || Answer::reply(200, ON_THE_SHELF);
-    for (tag, answer, title) in [
-        ("off-the-shelf", jpeg(), Answer::reply(404, "")),
-        ("missing", Answer::reply(404, ""), on_the_shelf()),
-        (
-            "vector",
-            Answer::served(200, "image/svg+xml", "<svg/>"),
-            on_the_shelf(),
-        ),
-        ("untyped", Answer::reply(200, "x"), on_the_shelf()),
+    for (tag, answer) in [
+        ("none", media::answered(&None::<Image>)),
+        ("vector", a_picture("image/svg+xml", b"<svg/>")),
+        ("untyped", a_picture("", b"x")),
         (
             "oversized",
-            Answer::served(200, "image/png", "x".repeat(PICTURE_MOST + 1)),
-            on_the_shelf(),
+            a_picture("image/png", &vec![b'x'; PICTURE_MOST + 1]),
         ),
     ] {
         assert_eq!(
-            pictured(tag, answer, title).await.err().as_deref(),
+            pictured(tag, answer).await.err().as_deref(),
             Some("PLAY-9"),
             "{tag}"
         );
@@ -717,13 +700,10 @@ async fn a_picture_off_the_shelf_missing_or_not_a_raster_is_absent() {
 async fn a_picture_the_server_will_not_answer_is_unanswered_and_a_bad_id_is_never_asked() {
     for (tag, answer) in [
         ("silent", Answer::Silent),
-        ("failing", Answer::reply(500, "")),
+        ("failing", media::unavailable()),
     ] {
         assert_eq!(
-            pictured(tag, answer, Answer::reply(200, ON_THE_SHELF))
-                .await
-                .err()
-                .as_deref(),
+            pictured(tag, answer).await.err().as_deref(),
             Some("PLAY-5"),
             "{tag}"
         );
@@ -743,10 +723,10 @@ async fn a_picture_the_server_will_not_answer_is_unanswered_and_a_bad_id_is_neve
 
 #[tokio::test]
 async fn the_households_defaults_are_shown_a_picture_without_naming_a_member() {
-    let transport = server(vec![
-        ("/Images/", Answer::served(200, "image/png", "the-poster")),
-        ("/Items/", Answer::reply(200, ON_THE_SHELF)),
-    ]);
+    let transport = server(vec![(
+        media::serve("picture"),
+        a_picture("image/png", b"the-poster"),
+    )]);
     let ctx = ctx_over(Arc::clone(&transport), "picture-defaults");
     let shown = picture(&ctx, &Whom::Defaults, FILM, Picture::Poster).await;
     assert_eq!(
@@ -758,9 +738,9 @@ async fn the_households_defaults_are_shown_a_picture_without_naming_a_member() {
     );
     assert_eq!(
         asked(&transport),
-        vec![
-            (Method::Get, format!("/Items/{FILM}")),
-            (Method::Get, format!("/Items/{FILM}/Images/Primary")),
-        ]
+        vec![(
+            "picture".to_owned(),
+            serde_json::json!({ "member": null, "id": FILM, "which": "poster" })
+        )]
     );
 }

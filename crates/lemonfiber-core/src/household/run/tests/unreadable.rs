@@ -137,7 +137,7 @@ async fn with_nothing_to_ask_the_request_service_with_the_requests_are_what_is_l
 async fn a_media_server_that_will_not_say_who_is_here_is_unavailable_not_empty() {
     let context = ctx_with(
         &Fake {
-            accounts: "not json",
+            accounts: "not json".to_owned(),
             ..Fake::default()
         },
         "unreadable-accounts",
@@ -165,7 +165,7 @@ async fn a_media_server_that_will_not_say_who_is_here_is_unavailable_not_empty()
 async fn libraries_that_will_not_read_cost_their_names_and_not_the_access() {
     let context = ctx_with(
         &Fake {
-            folders: "not json",
+            folders: "not json".to_owned(),
             ..Fake::default()
         },
         "unnamed-libraries",
@@ -212,10 +212,9 @@ async fn an_unreadable_library_costs_names_not_the_view() {
 }
 
 #[tokio::test]
-async fn a_stack_with_no_recorded_password_has_nothing_to_ask_with() {
-    // No env file, so no recorded media-server password — there is no account to
-    // sign in as, which is said rather than shown as a household that asked for
-    // nothing.
+async fn a_media_server_that_has_not_moved_has_nothing_to_ask() {
+    // Nothing moved in, so the media server speaks no contract and cannot be asked,
+    // which is said rather than shown as a household that asked for nothing.
     let context = a_context()
         .build()
         .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
@@ -235,7 +234,7 @@ async fn a_stack_with_no_recorded_password_has_nothing_to_ask_with() {
         report
             .findings
             .iter()
-            .any(|finding| finding.contains("no recorded")),
+            .any(|finding| finding.contains("cannot be asked over its contracts")),
         "{report:?}"
     );
 }
@@ -249,9 +248,8 @@ async fn a_stack_with_no_recorded_password_has_nothing_to_ask_with() {
 async fn ratings_that_will_not_read_cost_the_certificates_and_not_the_limit() {
     let context = ctx_with(
         &Fake {
-            ratings: "not json",
-            accounts: r#"[{"Id":"a1","Name":"Alex","HasPassword":true,
-                "Policy":{"EnableAllFolders":true,"MaxParentalRating":12}}]"#,
+            ratings: "not json".to_owned(),
+            accounts: json(&[alex(Some(12), Unrated::LetThrough)]),
             ..Fake::default()
         },
         "unreadable-ratings",
@@ -276,18 +274,12 @@ async fn ratings_that_will_not_read_cost_the_certificates_and_not_the_limit() {
     assert_eq!(rated.allows, vec!["12A".to_owned()], "{rated:?}");
 }
 
-/// An account holding unrated content back reads as one that does.
-///
-/// The server keeps it as a list of kinds and what a household means by it is all
-/// of them or none, so a list with anything in it is the one answer that question
-/// has — and a member missing half the library is either this or a defect.
+/// An account the server says holds unrated content back reads as one that does.
 #[tokio::test]
 async fn an_account_that_holds_unrated_content_back_reads_as_one_that_does() {
     let context = ctx_with(
         &Fake {
-            accounts: r#"[{"Id":"a1","Name":"Alex","HasPassword":true,
-                "Policy":{"EnableAllFolders":true,"MaxParentalRating":12,
-                "BlockUnratedItems":["Movie","Series"]}}]"#,
+            accounts: json(&[alex(Some(12), Unrated::HeldBack)]),
             ..Fake::default()
         },
         "unrated-held",

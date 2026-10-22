@@ -9,17 +9,8 @@ use crate::test_support::{beside_contracted_requests, CONTRACTED_REQUESTS_AT};
 fn over_the_contract() -> Arc<Transport> {
     Transport::by_path(vec![
         (
-            "/Users/AuthenticateByName",
-            Answer::reply(200, r#"{"AccessToken":"token"}"#),
-        ),
-        (
-            "/Users",
-            Answer::reply(
-                200,
-                r#"[{"Id":"a1","Name":"Alex","HasPassword":true,
-                    "Policy":{"EnableAllFolders":true},
-                    "LastActivityDate":"2026-08-30T10:00:00Z"}]"#,
-            ),
+            crate::test_support::media::identity("household"),
+            Answer::reply(200, Fake::default().accounts),
         ),
         (
             "/lemonfiber/request.intake/v1/answers",
@@ -83,7 +74,7 @@ async fn a_request_service_speaking_the_contract_without_its_key_is_asked_nothin
         !transport
             .requests()
             .iter()
-            .any(|one| one.url.contains(":8080/") || one.url.contains("/api/v1/")),
+            .any(|one| one.url.contains("/request.intake/") || one.url.contains("/api/v1/")),
         "{:?}",
         transport.requests()
     );

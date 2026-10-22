@@ -7,7 +7,7 @@ use crate::app::command::{Answer as Ruling, Chosen, Decision};
 use crate::asking::Policy;
 use crate::ports::http::Method;
 use crate::ports::service::{Asking, Member, Quota};
-use crate::test_support::{a_context, a_password, SeedFs};
+use crate::test_support::{a_context, a_password, media, SeedFs};
 
 /// A household trusted within five a week.
 const FIVE_A_WEEK: Quota = Quota {
@@ -18,10 +18,13 @@ const FIVE_A_WEEK: Quota = Quota {
 /// A curator config that opens a target, carrying a readable key.
 const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
 
-/// The two accounts the media server holds — one ordinary, one nobody by that
-/// name, so the forgiving match has something to be forgiving about.
-const ACCOUNTS: &str = r#"[{"Id":"a1","Name":"Alex","HasPassword":true,
-    "Policy":{"EnableAllFolders":true},"LastActivityDate":"2026-08-30T10:00:00Z"}]"#;
+/// The one account the media server holds, so the forgiving match has a name to be
+/// forgiving about.
+fn accounts() -> Vec<Member> {
+    let mut alex = media::member("a1", "Alex", true);
+    alex.last_seen = Some("2026-08-30T10:00:00Z".to_owned());
+    vec![alex]
+}
 
 /// Where the member who asked already hears from the request service.
 ///
@@ -68,24 +71,13 @@ fn refusing(tag: &str, broken: Vec<(Method, &'static str)>) -> Ctx {
 fn answering(tag: &str, broken: Vec<(Option<Method>, &'static str, Answer)>) -> Ctx {
     let mut routes = broken;
     routes.extend(vec![
-        // Ahead of `/Users`, whose text it contains: a route matched by prefix
-        // would answer the sign-in with the list of accounts.
         (
             None,
-            "/Users/AuthenticateByName",
-            Answer::reply(200, r#"{"AccessToken":"token"}"#),
+            media::identity("household"),
+            media::answered(&accounts()),
         ),
-        (
-            None,
-            "/Library/MediaFolders",
-            Answer::reply(200, r#"{"Items":[]}"#),
-        ),
-        (
-            None,
-            "/Localization/ParentalRatings",
-            Answer::reply(200, "[]"),
-        ),
-        (None, "/Users", Answer::reply(200, ACCOUNTS)),
+        (None, media::identity("libraries"), Answer::reply(200, "[]")),
+        (None, media::identity("ratings"), Answer::reply(200, "[]")),
         (None, "/auth/me", Answer::reply(200, "{}")),
         (
             None,
@@ -146,7 +138,7 @@ fn answering(tag: &str, broken: Vec<(Option<Method>, &'static str, Answer)>) -> 
         crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         &a_password(),
     );
-    context
+    media::reaching(context)
 }
 
 mod allowances;

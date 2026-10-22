@@ -146,6 +146,24 @@ pub fn answered<T: serde::Serialize>(value: &T) -> Answer {
     Answer::reply(200, serde_json::to_string(value).unwrap_or_default())
 }
 
+/// What the media server answers a call it refuses for `kind`, as the contract declares a
+/// refusal.
+#[must_use]
+pub fn refused(kind: lemonfiber_contract::wire::Kind) -> Answer {
+    let refusal = lemonfiber_contract::wire::Refusal::new(kind, "refused in a test");
+    Answer::served(
+        kind.status(),
+        lemonfiber_contract::wire::PROBLEM,
+        serde_json::to_string(&refusal).unwrap_or_default(),
+    )
+}
+
+/// What the media server answers a call while its upstream is not answering.
+#[must_use]
+pub fn unavailable() -> Answer {
+    refused(lemonfiber_contract::wire::Kind::Unavailable)
+}
+
 /// What the media server answers a write it took.
 #[must_use]
 pub fn taken() -> Answer {
