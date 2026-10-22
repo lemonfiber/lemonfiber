@@ -123,12 +123,14 @@ use self_update::standing as stands;
 pub use watch::{supervise, WATCH};
 
 /// Every refusal a run working on the stack answers with before it acts, which a client
-/// names by its code: another run holding it, a registry refusing it, and a project the
-/// operator edited that the run would write again.
-pub const REFUSALS: [Code; 3] = [
+/// names by its code: another run holding it, a registry refusing it, a project the
+/// operator edited that the run would write again, and a data location the project
+/// cannot be written from.
+pub const REFUSALS: [Code; 4] = [
     ALREADY_WORKING,
     REGISTRY_REFUSED,
     crate::error::codes::stack::PROJECT_EDITED,
+    crate::error::codes::storage::ROOT_REFUSED,
 ];
 
 /// Ask the engine to act on a set of services, which five commands do identically.
