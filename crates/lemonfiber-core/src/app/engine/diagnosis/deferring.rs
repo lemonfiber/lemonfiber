@@ -154,7 +154,8 @@ pub(super) fn stored(
                     Some(committed),
                     crate::app::project::crowded(&ctx),
                 )
-                .on(ctx.settings.nfs.clone()),
+                .on(ctx.settings.nfs.clone())
+                .refusing(crate::app::project::refused_root(&ctx)),
             ) as Box<dyn Check>
         }
     })

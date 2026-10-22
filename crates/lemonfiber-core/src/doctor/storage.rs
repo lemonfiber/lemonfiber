@@ -64,6 +64,7 @@ pub struct StorageCheck {
     committed: Option<u64>,
     crowded: Vec<Crowded>,
     nfs: Option<Export>,
+    refused: Option<Problem>,
 }
 
 impl StorageCheck {
@@ -110,6 +111,7 @@ impl StorageCheck {
             committed,
             crowded,
             nfs: None,
+            refused: None,
         }
     }
 
@@ -117,6 +119,12 @@ impl StorageCheck {
     #[must_use]
     pub fn on(self, nfs: Option<Export>) -> Self {
         Self { nfs, ..self }
+    }
+
+    /// The same check, where the data root the setting names is refused for `refused`.
+    #[must_use]
+    pub fn refusing(self, refused: Option<Problem>) -> Self {
+        Self { refused, ..self }
     }
 
     /// Run the probe against a resolved data root and read what it proved.
@@ -229,15 +237,22 @@ impl Check for StorageCheck {
 
 /// Whether the data location is there, writable, and on one filesystem.
 async fn ran(check: &StorageCheck) -> Vec<Finding> {
-    let mut found = match (&check.nfs, &check.root) {
-        (Some(export), _) => exported(export),
-        (None, None) => vec![skipped(
+    let mut found = match (&check.refused, &check.nfs, &check.root) {
+        (Some(refused), _, _) => pair(
+            Verdict::Fail(refused.clone()),
+            Verdict::Skipped {
+                reason: "the data root DATA_ROOT names is refused, so no mode was derived"
+                    .to_owned(),
+            },
+        ),
+        (None, Some(export), _) => exported(export),
+        (None, None, None) => vec![skipped(
             "no data location is configured yet — run setup to choose one",
         )],
         // Resolved first so the probe runs against the filesystem the data
         // actually lives on: a symlinked root would otherwise be tested on the
         // filesystem holding the link, which is not the one that matters.
-        (None, Some(root)) => match check.filesystem.canonicalize(root).await {
+        (None, None, Some(root)) => match check.filesystem.canonicalize(root).await {
             Err(fault) => absent(root, &fault.message),
             Ok(real) => check.probe(&real).await,
         },

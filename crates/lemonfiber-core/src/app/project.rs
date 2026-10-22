@@ -122,12 +122,13 @@ pub(crate) struct Prepared {
 /// lifecycle command running `plan` does: previewed by a rehearsal, and otherwise written
 /// with each service's secrets file and the stack's own Compose files retired and, where
 /// `starting`, with the profiles of the start beside it and each service's state moved
-/// into its mount tree.
+/// into its mount tree. Where `DATA_ROOT` is refused, a start is refused and anything
+/// else leaves the project on disk as it stands.
 ///
 /// # Errors
 ///
-/// Where the register cannot be read, or the project, a secrets file or the journal
-/// cannot be written.
+/// Where the register cannot be read, the project, a secrets file or the journal cannot
+/// be written, or a start is asked over a refused `DATA_ROOT`.
 pub(crate) fn prepared(
     ctx: &Ctx,
     manifest: &Manifest,
@@ -148,6 +149,17 @@ pub(crate) fn prepared(
         Pass::Write
     };
     let hosting = hosting(manifest, installed, &project, &plan.services);
+    if let Err(refused) = rooted(ctx) {
+        return if starting {
+            Err(refused)
+        } else {
+            Ok(Prepared {
+                project,
+                edits: Vec::new(),
+                hosting,
+            })
+        };
+    }
     let profiles: Option<BTreeSet<String>> =
         starting.then(|| plan.profiles.iter().chain(&hosting).cloned().collect());
     let edits = materialised_with(ctx, &project.text, pass, profiles.as_ref())
@@ -238,6 +250,24 @@ fn record_path(ctx: &Ctx) -> Option<PathBuf> {
         .env_file
         .as_deref()
         .map(super::bounded::record_beside)
+}
+
+/// Refuse where `DATA_ROOT` names a data root no project may be written from.
+///
+/// # Errors
+///
+/// Naming the value and why, where it is refused.
+pub(crate) fn rooted(ctx: &Ctx) -> Result<(), Box<Problem>> {
+    refused_root(ctx).map_or(Ok(()), |refused| Err(Box::new(refused)))
+}
+
+/// Why the data root `DATA_ROOT` names is refused, where it is.
+pub(crate) fn refused_root(ctx: &Ctx) -> Option<Problem> {
+    ctx.settings
+        .env_file
+        .as_deref()
+        .and_then(|file| crate::config::store::read(file).ok())
+        .and_then(|file| crate::config::data_root_refused(&file))
 }
 
 /// Refuse where the project on disk is not what lemonfiber last wrote there. A machine
@@ -433,6 +463,7 @@ pub(crate) fn rewritten(
     if previous.as_deref() == Some(text.as_str()) {
         return Ok(());
     }
+    rooted(ctx)?;
     unedited(ctx)?;
     let paths = super::targets::layout(ctx)
         .ok_or_else(|| Box::new(crate::config::store::Failure::Nowhere.problem()))?;

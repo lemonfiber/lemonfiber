@@ -146,6 +146,15 @@ pub fn nfs_from_env(file: &env::EnvFile) -> Option<super::storage::Export> {
     stored(file).and_then(|storage| storage.export().cloned())
 }
 
+/// Why `DATA_ROOT` is refused, where it names an NFS export that will not do.
+#[must_use]
+pub fn data_root_refused(file: &env::EnvFile) -> Option<crate::error::Problem> {
+    let written = file.get(DATA_ROOT_KEY)?;
+    super::storage::Storage::read(written)
+        .err()
+        .map(|refused| refused.problem(written.trim()))
+}
+
 /// Where `DATA_ROOT` keeps the data, where it names somewhere that will do.
 fn stored(file: &env::EnvFile) -> Option<super::storage::Storage> {
     super::storage::Storage::read(file.get(DATA_ROOT_KEY)?)

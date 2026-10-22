@@ -282,3 +282,23 @@ fn a_choice_over_a_plugin_whose_mount_source_is_a_link_writes_nothing() {
     );
     assert_eq!(read(&project), before);
 }
+
+/// A choice over a data root the setting names that is refused writes no project from it,
+/// and is refused naming it.
+#[test]
+fn a_choice_over_a_refused_data_root_is_refused_naming_it() {
+    let (ctx, _) = ctx("rooted");
+    let project = a_plugin_media_server(&ctx);
+    let before = read(&project);
+    let env = ctx.settings.env_file.clone().unwrap_or_default();
+    assert!(
+        crate::config::store::set(&env, crate::config::DATA_ROOT_KEY, "nfs://nas local/x").is_ok()
+    );
+
+    let refused = regenerated(&ctx, "identity.source=server")
+        .err()
+        .map(|problem| problem.code);
+
+    assert_eq!(refused, Some(crate::error::codes::storage::ROOT_REFUSED));
+    assert_eq!(read(&project), before);
+}

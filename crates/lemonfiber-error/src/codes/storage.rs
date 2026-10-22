@@ -84,4 +84,17 @@ codes! {
             disk.",
         remedy: "Restore the location's hardlink support, then run the storage check again.",
     }
+    /// Raised where `DATA_ROOT` names an NFS export lemonfiber cannot write into the mount
+    /// options, so no project is written from it.
+    ROOT_REFUSED = "STORAGE-9" {
+        severity: Error,
+        status: 409,
+        since: "0.18.0",
+        meaning: "DATA_ROOT names an NFS export whose server is not a host name or an address, \
+            or whose export is not an absolute path free of characters that would change the \
+            mount options. Written as it stands it would mount something other than what it \
+            says, so the project is not written from it.",
+        remedy: "Set DATA_ROOT to an absolute path or to nfs://<server>/<export> with lemonfiber \
+            config set DATA_ROOT, which checks it before it is kept.",
+    }
 }

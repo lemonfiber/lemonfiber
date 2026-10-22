@@ -149,3 +149,21 @@ async fn a_confirmed_reset_journals_the_overlay_and_a_preview_does_not() {
         [(None, Some(crate::credential::fingerprint(EDITED)))]
     );
 }
+
+/// A reset over a data root the setting names that is refused writes nothing and is
+/// refused naming it.
+#[tokio::test]
+async fn a_reset_over_a_refused_data_root_is_refused_and_writes_nothing() {
+    let (into, env) = scratch("reset-rooted");
+    assert!(
+        crate::config::store::set(&env, crate::config::DATA_ROOT_KEY, "nfs://nas local/x").is_ok()
+    );
+
+    let refused = reset(&carried(&into, &env), true)
+        .await
+        .err()
+        .map(|problem| problem.code);
+
+    assert_eq!(refused, Some(crate::error::codes::storage::ROOT_REFUSED));
+    assert!(!into.join(crate::project::FILE).exists());
+}

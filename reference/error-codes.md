@@ -562,6 +562,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `STORAGE-6` | `SERVICE_DENIED` | error | 1 | 500 | 0.2.0 | Raised when the operator owns the data root but the services cannot write it. |
 | `STORAGE-7` | `SPLIT_MOUNTS` | warning | 1 | 500 | 0.15.0 | Raised where a service would see more than one mount beneath the data location, so anything imported between them is copied rather than linked. |
 | `STORAGE-8` | `COPYING_SINCE_DEGRADED` | warning | 1 | 500 | 0.18.0 | Raised where a location that stopped hardlinking leaves the stack copying in a mode it was not set up for. |
+| `STORAGE-9` | `ROOT_REFUSED` | error | 1 | 409 | 0.18.0 | Raised where `DATA_ROOT` names an NFS export lemonfiber cannot write into the mount options, so no project is written from it. |
 
 ## `TELLING` — what the household is told about
 
