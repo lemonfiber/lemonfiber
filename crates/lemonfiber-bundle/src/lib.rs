@@ -169,6 +169,10 @@ pub fn read(root: &Path) -> Result<(Bundle, Vec<Held>), Refused> {
         return Err(Refused::Rules(linked.into_iter().collect()));
     }
     let text = copies::text(&root.join(FILE))?;
+    let unpinned = rules::unpinned(&toml::from_str(&text)?);
+    if !unpinned.is_empty() {
+        return Err(Refused::Rules(unpinned));
+    }
     let bundle: Bundle = toml::from_str(&text)?;
     let copies = copies::read(&root.join(COPIES), bundle.schema)?;
     let mut broken = rules::broken(&bundle, &copies);

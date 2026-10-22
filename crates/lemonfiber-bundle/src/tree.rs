@@ -15,6 +15,9 @@ pub(crate) const CONFIG: &str = "config";
 /// Where a plugin's conformance recordings sit in its tree.
 pub(crate) const CONFORMANCE: &str = "conformance";
 
+/// Where an assembled part's claims keep their fixtures, beneath a folder of its id.
+pub(crate) const RECORDINGS: &str = "recordings";
+
 /// The tree's digest, `sha256:<hex>`: the SHA-256 of one line per file, sorted by its
 /// path's bytes, each the file's SHA-256 in lower-case hex, two spaces, its path and a
 /// line feed.

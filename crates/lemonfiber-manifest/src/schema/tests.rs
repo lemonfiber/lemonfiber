@@ -372,3 +372,22 @@ fn each_adapter_is_named_as_the_manifest_writes_it() {
         );
     }
 }
+
+/// Networks are derived, never declared: a service naming a network, a subnet or an
+/// address is unparsable, and so is a `network` saying more than whose it runs inside.
+#[test]
+fn a_service_naming_a_network_a_subnet_or_an_address_is_refused() {
+    for field in [
+        r#"networks = ["media"]"#,
+        r#"subnet = "10.80.0.0/24""#,
+        r#"ipv4_address = "10.80.0.5""#,
+        r#"ip_range = "10.80.0.128/25""#,
+        r#"network = { via = "network.egress-guard", subnet = "10.80.0.0/24" }"#,
+    ] {
+        assert!(parse(&format!("{MINIMAL}{field}\n")).is_none(), "{field}");
+    }
+    assert!(parse(&format!(
+        "{MINIMAL}network = {{ via = \"network.egress-guard\" }}\n"
+    ))
+    .is_some());
+}

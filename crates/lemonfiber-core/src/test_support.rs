@@ -418,6 +418,41 @@ pub(crate) fn a_guard_forwarding(port: Option<&'static str>) -> std::sync::Arc<R
 
 mod tests;
 
+/// The stack this build carries, assembled from its bundle and written apart as the
+/// binary embeds it.
+pub(crate) fn carried_stack() -> crate::stack::Source {
+    use include_dir::{Dir, DirEntry, File};
+    let leaked = |text: String| -> &'static str { Box::leak(text.into_boxed_str()) };
+    let (root, files) =
+        lemonfiber_manifest::assembly::split(lemonfiber_bundled::STACK).unwrap_or_default();
+    let services: Vec<DirEntry<'static>> = files
+        .into_iter()
+        .map(|(file, text)| {
+            DirEntry::File(File::new(
+                leaked(format!(
+                    "{}/{file}",
+                    lemonfiber_manifest::assembly::SERVICES
+                )),
+                leaked(text).as_bytes(),
+            ))
+        })
+        .collect();
+    let entries: Vec<DirEntry<'static>> = vec![
+        DirEntry::File(File::new(
+            lemonfiber_manifest::assembly::ROOT,
+            leaked(root).as_bytes(),
+        )),
+        DirEntry::Dir(Dir::new(
+            lemonfiber_manifest::assembly::SERVICES,
+            Box::leak(services.into_boxed_slice()),
+        )),
+    ];
+    crate::stack::Source::Embedded(Box::leak(Box::new(Dir::new(
+        "",
+        Box::leak(entries.into_boxed_slice()),
+    ))))
+}
+
 /// The repository's media stack carried inside the build, as a machine that has chosen
 /// no stack directory yet holds it.
 pub(crate) fn embedded() -> crate::stack::Source {

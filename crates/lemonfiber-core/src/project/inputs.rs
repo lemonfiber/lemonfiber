@@ -2,11 +2,12 @@
 //! settled between them, every link by name, and the service that guards the household's
 //! streams.
 
+use lemonfiber_contract::capabilities::proxy::front;
 use lemonfiber_contract::capabilities::stream::guard;
 use lemonfiber_manifest::container::{Posture, Value};
 use lemonfiber_manifest::{Manifest, Service};
 
-use crate::plugin::{Installed, Placed};
+use crate::plugin::{Installed, Placed, Reached};
 use crate::topology::{self, Member, Named, Settled, Topology};
 use crate::wiring::{settle, Chosen, Reaches};
 
@@ -127,12 +128,33 @@ pub(super) fn read(manifest: &Manifest, installed: &[Installed], chosen: &Chosen
         }
     }
     asks.extend(narrowed(manifest, installed));
+    asks.extend(fronted(installed, fill(front::CAPABILITY)));
     Inputs {
         members,
         asks,
         links,
         guard: fill(guard::CAPABILITY),
     }
+}
+
+/// The ask of `proxy.front` each plugin service the household reaches at a hostname makes
+/// of `proxy`, the service that fills it.
+fn fronted(installed: &[Installed], proxy: Option<String>) -> Vec<(String, String, String)> {
+    let Some(proxy) = proxy else {
+        return Vec::new();
+    };
+    installed
+        .iter()
+        .flat_map(|one| &one.services)
+        .filter(|placed| matches!(placed.reached, Some(Reached::Household { .. })))
+        .map(|placed| {
+            (
+                placed.service.clone(),
+                front::CAPABILITY.to_owned(),
+                proxy.clone(),
+            )
+        })
+        .collect()
 }
 
 /// Every stack service lemonfiber runs: all but those the host's own service manager

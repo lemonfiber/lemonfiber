@@ -670,4 +670,5 @@ fn a_choice_needs_an_ask_made_once_by_a_known_asker() {
     }
 }
 
+mod assembled;
 mod reading;

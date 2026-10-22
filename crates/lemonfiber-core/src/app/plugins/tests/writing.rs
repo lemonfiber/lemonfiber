@@ -22,7 +22,8 @@ async fn installing_writes_the_service_s_directory_and_the_entry_that_mounts_it(
 /// one on disk — so a plugin could be shown one entry and run another.
 #[tokio::test]
 async fn the_document_on_disk_is_the_container_the_record_derives() {
-    let ctx = ctx("derives");
+    let mut ctx = ctx("derives");
+    ctx.stack = crate::test_support::carried_stack();
     let shown = report(installing(&ctx, &source("derives", MANIFEST)).await);
     let recorded = shown
         .and_then(|one| one.install)

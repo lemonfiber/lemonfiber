@@ -6,9 +6,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use lemonfiber_manifest::Date;
 use toml::Value;
 
+use crate::assembly::STACK_TABLES;
 use crate::copies::Copy;
 use crate::rules::{is_id, manifested};
-use crate::tree::{self, CONFIG};
+use crate::tree::{self, CONFIG, RECORDINGS};
 use crate::{Bundle, Pin, Stage, MANIFEST};
 
 /// How many starting files one service may ship.
@@ -44,6 +45,7 @@ pub(crate) struct Part {
     asks: Vec<Asked>,
     forms: Vec<String>,
     pub(crate) fixtures: Vec<String>,
+    tables: Vec<&'static str>,
 }
 
 /// Every rule a schema 2 `bundle` and its `copies` break, added to `broken`.
@@ -92,6 +94,11 @@ fn copied(pin: &Pin, copy: Option<&Copy>, broken: &mut Vec<String>) -> Option<Pa
     };
     manifested(pin, manifest, &format!("{id}/{MANIFEST}"), broken);
     let part = declared(manifest);
+    for table in &part.tables {
+        broken.push(format!(
+            "{id}/{MANIFEST} declares [[{table}]], which only the bundle declares"
+        ));
+    }
     let services: Vec<String> = part.services.iter().map(|one| one.id.clone()).collect();
     for path in copy.files.keys() {
         if !tree::holds(path, &services, &part.fixtures) {
@@ -152,6 +159,23 @@ fn staged(pin: &Pin, part: &Part, bundle: &Bundle, broken: &mut Vec<String>) {
                 broken.push(format!(
                     "plugin {id} is assembled and so declares exactly one service, speaking no \
                      contract"
+                ));
+            }
+            if part.services.iter().any(|one| one.id != *id) {
+                broken.push(format!(
+                    "plugin {id} is assembled and so its service.id is {id}, the id of the \
+                     service it takes the place of"
+                ));
+            }
+            let recorded = format!("{RECORDINGS}/{id}/");
+            for fixture in part
+                .fixtures
+                .iter()
+                .filter(|fixture| !fixture.starts_with(&recorded))
+            {
+                broken.push(format!(
+                    "plugin {id} is assembled and so its claim.probe.fixture {fixture} lies \
+                     under {recorded}"
                 ));
             }
         }
@@ -388,6 +412,10 @@ pub(crate) fn declared(manifest: &str) -> Part {
         asks,
         forms: words(table.get("plugin").and_then(|plugin| plugin.get("forms"))),
         fixtures,
+        tables: STACK_TABLES
+            .into_iter()
+            .filter(|name| table.contains_key(*name))
+            .collect(),
     }
 }
 

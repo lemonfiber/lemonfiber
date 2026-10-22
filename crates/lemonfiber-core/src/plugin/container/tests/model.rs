@@ -312,6 +312,7 @@ const SECRETS_ENTRY: &str = "services:\n  \
          - ./data:/data\n    \
          - ./config/komga:/config\n    \
          networks:\n    \
+         - ask__komga__proxy.front__caddy\n    \
          - own__komga\n    \
          security_opt:\n    \
          - no-new-privileges:true\n    \

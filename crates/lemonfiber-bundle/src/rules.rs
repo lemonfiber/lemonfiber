@@ -17,6 +17,33 @@ const DIGEST_DIGITS: usize = 64;
 /// How many numbers a release is written in.
 const RELEASE_PARTS: usize = 3;
 
+/// The fields every `[[plugin]]` names, whatever the schema.
+const PINNED: [&str; 5] = ["id", "origin", "revision", "manifest", "fills"];
+
+/// Each field of [`PINNED`] a `[[plugin]]` of the bundle file's `table` leaves out, named
+/// with the plugin, or with its place where it names no id.
+pub(crate) fn unpinned(table: &toml::Table) -> Vec<String> {
+    let plugins = table
+        .get("plugin")
+        .and_then(toml::Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or_default();
+    plugins
+        .iter()
+        .enumerate()
+        .flat_map(|(at, plugin)| {
+            let named = plugin.get("id").and_then(toml::Value::as_str).map_or_else(
+                || format!("[[plugin]] {}", at + 1),
+                |id| format!("plugin {id}"),
+            );
+            PINNED
+                .into_iter()
+                .filter(|field| plugin.get(field).is_none())
+                .map(move |field| format!("{named}.{field} is missing, which every pin names"))
+        })
+        .collect()
+}
+
 /// Every rule `bundle` and the `copies` beside it break.
 pub(crate) fn broken(bundle: &Bundle, copies: &BTreeMap<String, Copy>) -> Vec<String> {
     let mut broken = Vec::new();
