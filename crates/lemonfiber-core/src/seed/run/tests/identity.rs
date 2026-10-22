@@ -20,6 +20,21 @@ async fn identity_beside(
     installed: &[crate::plugin::Installed],
     expected: &crate::baseline::Baseline,
 ) -> (Vec<Wiring>, crate::baseline::Baseline) {
+    let (wirings, records, _) = identity_in(ctx, services, installed, expected).await;
+    (wirings, records)
+}
+
+/// The same, with the stack's directory handed back, for what was written in it.
+async fn identity_in(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    installed: &[crate::plugin::Installed],
+    expected: &crate::baseline::Baseline,
+) -> (
+    Vec<Wiring>,
+    crate::baseline::Baseline,
+    lemonfiber_fixtures::scratch::Scratch,
+) {
     static BUILT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
     let own = media_server_svc().id;
     let installed: Vec<crate::plugin::Installed> = services
@@ -37,7 +52,7 @@ async fn identity_beside(
     let fillers = fillers_beside(services.to_vec(), &installed, &project);
     let server = crate::app::targets::MediaServer::of(&fillers);
     let admin = super::super::identity::seed_media_server_admin(ctx, server.as_ref()).await;
-    super::super::seed_request_identity(
+    let (wirings, records) = super::super::seed_request_identity(
         ctx,
         services,
         &fillers,
@@ -46,7 +61,8 @@ async fn identity_beside(
         admin,
         None,
     )
-    .await
+    .await;
+    (wirings, records, project)
 }
 
 #[tokio::test]
@@ -143,6 +159,44 @@ async fn identity_leaves_an_already_set_up_household_alone() {
         Some(&crate::seed::State::AlreadyWired)
     );
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+}
+
+/// A password recorded on an earlier run is handed to the moved server's adapter, which has
+/// never held it, and a rehearsal hands it nothing.
+#[tokio::test]
+async fn a_recorded_password_is_handed_to_the_adapter_and_a_rehearsal_hands_nothing() {
+    for rehearsing in [false, true] {
+        let env = config_scratch(&format!("jellyfin-handed-{rehearsing}"));
+        if let Some(parent) = env.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = store::set(
+            &env,
+            crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
+            "minted-earlier",
+        );
+        let mut ctx = seed_ctx(None, true, Vec::new(), None, Some(env.to_path_buf()))
+            .with_http(household(true, true));
+        ctx.dry_run = rehearsing;
+
+        let (_, _, project) = identity_in(
+            &ctx,
+            &[media_server_svc(), requests_svc()],
+            &[],
+            &crate::baseline::Baseline::new(),
+        )
+        .await;
+        let handed = crate::plugin::key_file(&project, crate::test_support::media::ADAPTER)
+            .with_file_name(lemonfiber_contract::adapter::UPSTREAM_FILE);
+        let held = std::fs::read_to_string(&handed).unwrap_or_default();
+
+        assert_eq!(
+            held.contains("minted-earlier"),
+            !rehearsing,
+            "rehearsing: {rehearsing}"
+        );
+        let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    }
 }
 
 #[tokio::test]
