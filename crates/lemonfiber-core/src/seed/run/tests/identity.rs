@@ -36,6 +36,22 @@ async fn identity_in(
     lemonfiber_fixtures::scratch::Scratch,
 ) {
     static BUILT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let nth = BUILT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let project = lemonfiber_fixtures::scratch::Scratch::new(&format!("identity-stack-{nth}"));
+    let key = crate::plugin::key_file(&project, crate::test_support::media::ADAPTER);
+    let _ = std::fs::create_dir_all(key.parent().unwrap_or(&project));
+    let (wirings, records) = identity_at(ctx, services, installed, expected, &project).await;
+    (wirings, records, project)
+}
+
+/// The same, with the stack written to `project`.
+async fn identity_at(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    installed: &[crate::plugin::Installed],
+    expected: &crate::baseline::Baseline,
+    project: &std::path::Path,
+) -> (Vec<Wiring>, crate::baseline::Baseline) {
     let own = media_server_svc().id;
     let installed: Vec<crate::plugin::Installed> = services
         .iter()
@@ -45,14 +61,10 @@ async fn identity_in(
         .into_iter()
         .chain(installed.iter().cloned())
         .collect();
-    let nth = BUILT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let project = lemonfiber_fixtures::scratch::Scratch::new(&format!("identity-stack-{nth}"));
-    let key = crate::plugin::key_file(&project, crate::test_support::media::ADAPTER);
-    let _ = std::fs::create_dir_all(key.parent().unwrap_or(&project));
-    let fillers = fillers_beside(services.to_vec(), &installed, &project);
+    let fillers = fillers_beside(services.to_vec(), &installed, project);
     let server = crate::app::targets::MediaServer::of(&fillers);
     let admin = super::super::identity::seed_media_server_admin(ctx, server.as_ref()).await;
-    let (wirings, records) = super::super::seed_request_identity(
+    super::super::seed_request_identity(
         ctx,
         services,
         &fillers,
@@ -61,8 +73,7 @@ async fn identity_in(
         admin,
         None,
     )
-    .await;
-    (wirings, records, project)
+    .await
 }
 
 #[tokio::test]
@@ -197,6 +208,47 @@ async fn a_recorded_password_is_handed_to_the_adapter_and_a_rehearsal_hands_noth
         );
         let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     }
+}
+
+/// A recorded password the moved server's adapter cannot be handed fails the identity
+/// step, naming the server and why.
+#[tokio::test]
+async fn a_recorded_password_the_adapter_cannot_be_handed_fails_the_identity() {
+    let env = config_scratch("jellyfin-unhanded");
+    if let Some(parent) = env.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let _ = store::set(
+        &env,
+        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
+        "minted-earlier",
+    );
+    let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.to_path_buf()))
+        .with_http(household(true, true));
+    let project = lemonfiber_fixtures::scratch::Scratch::new("identity-stack-unhanded");
+    let _ = std::fs::create_dir_all(
+        crate::plugin::key_file(&project, crate::test_support::media::ADAPTER)
+            .with_file_name(lemonfiber_contract::adapter::UPSTREAM_FILE),
+    );
+
+    let (wirings, _) = identity_at(
+        &ctx,
+        &[media_server_svc(), requests_svc()],
+        &[],
+        &crate::baseline::Baseline::new(),
+        &project,
+    )
+    .await;
+    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+
+    assert!(
+        matches!(
+            wirings.first().map(|one| &one.state),
+            Some(crate::seed::State::Failed { detail })
+                if detail.starts_with("Jellyfin could not be handed its administrator's password: ")
+        ),
+        "{wirings:?}"
+    );
 }
 
 #[tokio::test]
@@ -337,6 +389,12 @@ async fn a_password_change_refused_after_setup_is_said(tag: &str, changed: Answe
     );
     assert!(
         changed.is_some_and(|one| format!("{one:?}").contains("still opens Jellyfin")),
+        "{changed:?}"
+    );
+    assert!(
+        changed.is_some_and(
+            |one| format!("{one:?}").contains("Run lemonfiber credentials rotate jellyfin.")
+        ),
         "{changed:?}"
     );
     assert!(written.contains("JELLYFIN_ADMIN_PASSWORD="), "{written}");

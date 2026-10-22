@@ -197,6 +197,49 @@ async fn a_machine_with_no_address_makes_no_account_and_says_so() {
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 }
 
+/// A media server whose adapter holds no key to be asked with makes no account, and says
+/// so as the administrator not being set up.
+#[tokio::test]
+async fn a_server_that_cannot_be_asked_makes_no_account_and_says_so() {
+    let env = recorded_admin("unkeyed");
+    let http = Fake::silent();
+    let recorded = std::sync::Arc::clone(&http);
+    let ctx = media::reaching(
+        a_context()
+            .settings(Settings {
+                env_file: Some(env.clone()),
+                household_host: Some("192.168.1.20".to_owned()),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http),
+    );
+    let _ = std::fs::remove_file(media::key_at(&ctx).unwrap_or_default());
+
+    let made = dispatch(
+        Command::Invite(Inviting {
+            name: "ana".to_owned(),
+            allowance: Allowance::default(),
+            confirm: true,
+        }),
+        &ctx,
+    )
+    .await;
+    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+
+    assert!(
+        made.as_ref()
+            .err()
+            .is_some_and(|problem| problem.code.as_str() == "INVITE-2"),
+        "{made:?}"
+    );
+    let asked = recorded.requests();
+    assert!(
+        asked.is_empty(),
+        "a server that cannot be asked was asked: {asked:?}"
+    );
+}
+
 /// Offer an account on a stack answering with `http`, and hand back both.
 async fn offering(
     env: &std::path::Path,

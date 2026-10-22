@@ -323,3 +323,7 @@ pub fn asked_about(sent: &[Request], operation: &str) -> Vec<String> {
         .filter_map(|asked| asked.get("id")?.as_str().map(str::to_owned))
         .collect()
 }
+
+#[cfg(test)]
+#[path = "media/tests.rs"]
+mod tests;

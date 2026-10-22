@@ -276,6 +276,49 @@ async fn a_key_that_would_not_be_revoked_is_not_forgotten() {
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 }
 
+/// A media server filing no key under lemonfiber's name is asked to revoke nothing, and
+/// the key published for the dashboard is forgotten all the same.
+#[tokio::test]
+async fn a_server_filing_no_key_of_ours_revokes_nothing_and_forgets_the_published_one() {
+    let env = recorded_admin("unfiled");
+    let _ = store::set(
+        &env,
+        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
+        "minted-earlier",
+    );
+    let _ = store::set(&env, "JELLYFIN_API_KEY", "jellyfin-key");
+    let http = Fake::by_path(vec![
+        (
+            media::serve("filed_as"),
+            media::answered(&Vec::<String>::new()),
+        ),
+        (media::serve("revoke"), media::taken()),
+    ]);
+    let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+        .with_http(http.clone())
+        .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
+
+    let _ = super::super::published::publish_keys(
+        &ctx,
+        &[media_server_svc()],
+        &super::moved_fillers(vec![media_server_svc()]),
+        Some(std::path::Path::new("/opt/lemonfiber/stack")),
+        &Held::default(),
+    )
+    .await;
+
+    let written = std::fs::read_to_string(&env).unwrap_or_default();
+    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    assert!(
+        media::served(&http.requests(), "revoke").is_empty(),
+        "a key was revoked on a server filing none of ours"
+    );
+    assert!(
+        !written.contains("JELLYFIN_API_KEY"),
+        "a key nothing reads is still held: {written}"
+    );
+}
+
 /// A rehearsal of a stack whose services have written no key names nothing, in the
 /// same words a real run uses for it.
 ///

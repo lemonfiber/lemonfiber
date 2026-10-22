@@ -301,6 +301,24 @@ async fn an_engine_that_cannot_say_what_runs_leaves_asking_not_working() {
     assert!(!asked_for(&transport, "/api/v1/search"));
 }
 
+/// An engine gone once the media server is reached cannot say which curators run, so no
+/// kind is offered to search and nothing is searched.
+#[tokio::test]
+async fn an_engine_gone_once_the_server_is_reached_offers_no_kind_to_search() {
+    let transport = house(Vec::new());
+    let ctx = ctx_engine(
+        Arc::clone(&transport),
+        "engine-gone",
+        Reporting::holding(&["sonarr", "radarr"], Lifecycle::Running, Health::Healthy)
+            .leaving_after(1),
+    );
+
+    let refused = found(&ctx, "Ada", "harbour", None).await;
+
+    assert_eq!(code(&refused).as_deref(), Some("WISH-4"));
+    assert!(!asked_for(&transport, "/api/v1/search"));
+}
+
 #[test]
 fn every_refusal_is_a_code_the_registry_declares_with_a_household_remedy() {
     for code in REFUSALS {

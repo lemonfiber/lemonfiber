@@ -20,5 +20,8 @@ lemonfiber-plugin = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 
+[dev-dependencies]
+include_dir = { workspace = true }
+
 [lints]
 workspace = true
