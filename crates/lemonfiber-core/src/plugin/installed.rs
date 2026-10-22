@@ -73,10 +73,9 @@ pub struct Placed {
     /// says beside it.
     #[serde(default)]
     pub description: String,
-    /// The adapter lemonfiber reaches it through, where the plugin named one.
-    ///
-    /// Defaulted for a record written before this was kept, which reads as naming
-    /// none: a service operated generically, as it was when installed.
+    /// The adapter of lemonfiber's its manifest names, which only a part the bundle
+    /// assembles is reached through. A record read from the register holds none, whatever
+    /// an older one carried: an installed plugin is reached over the contracts it speaks.
     #[serde(default)]
     pub api: Option<lemonfiber_manifest::Api>,
     /// The port it answers on inside the stack's network, where it declared one.

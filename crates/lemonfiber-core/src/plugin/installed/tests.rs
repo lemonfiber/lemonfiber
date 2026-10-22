@@ -728,3 +728,32 @@ fn the_shape_a_service_took_is_kept_and_a_record_without_one_reads_as_none() {
         None
     );
 }
+
+/// An adapter an older record carries for an installed plugin's service is read back as
+/// none, so the service is never reached through an adapter of lemonfiber's.
+#[test]
+fn an_adapter_an_older_record_carries_is_read_back_as_none() {
+    let mut register = Register::empty();
+    let named = installed(|manifest| {
+        set(manifest, |service| {
+            service.api = Some(lemonfiber_manifest::Api {
+                kind: lemonfiber_manifest::ApiKind::Sabnzbd,
+                key_source: lemonfiber_manifest::KeySource::ConfigIni,
+                path: Some("/config/sabnzbd.ini".to_owned()),
+                version: None,
+            });
+        });
+    });
+    assert_eq!(named.map(|one| register.record(one)), Some(Ok(())));
+    let text = register.to_json().unwrap_or_default();
+    assert!(text.contains("\"sabnzbd\""), "{text}");
+
+    let read = Register::parse(&text);
+
+    assert!(read.is_ok(), "{read:?}");
+    assert!(read
+        .iter()
+        .flat_map(Register::installed)
+        .flat_map(|one| &one.services)
+        .all(|placed| placed.api.is_none()));
+}
