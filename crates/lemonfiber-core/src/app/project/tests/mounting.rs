@@ -1,7 +1,7 @@
 //! A stack service's further mount source, made as the operator before a start where
 //! nothing stands there, so the engine never makes it as root.
 
-use super::{journal, machine, manifest, plan};
+use super::{journal, machine, manifest, preparing};
 use crate::app::Ctx;
 use crate::journal::Kind;
 
@@ -19,13 +19,6 @@ fn making_beside(
     manifest().map_or(Ok(()), |manifest| {
         super::super::mounting::made(ctx, &manifest, installed)
     })
-}
-
-/// Prepare the project of the stack this build carries for a run, starting where
-/// `starting`.
-fn preparing(ctx: &Ctx, starting: bool) -> bool {
-    manifest()
-        .is_some_and(|manifest| super::super::prepared(ctx, &manifest, &plan(), starting).is_ok())
 }
 
 /// Where the media server's cache is mounted from.

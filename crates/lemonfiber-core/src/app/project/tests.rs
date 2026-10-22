@@ -49,6 +49,12 @@ fn plan() -> crate::stack::closure::Plan {
     }
 }
 
+/// Prepare the project of the stack this build carries for a run, starting where
+/// `starting`.
+fn preparing(ctx: &Ctx, starting: bool) -> bool {
+    manifest().is_some_and(|manifest| super::prepared(ctx, &manifest, &plan(), starting).is_ok())
+}
+
 /// Move what the machine's stack keeps in its configuration tree into its mount tree.
 fn moving(ctx: &Ctx) -> Result<(), Box<crate::error::Problem>> {
     let manifest = ctx
@@ -145,6 +151,21 @@ fn nothing_is_moved_where_the_move_cannot_be_journalled() {
     let (from, to) = cache(&project);
 
     assert!(moving(&ctx).is_err());
+
+    assert!(from.is_dir());
+    assert!(!to.exists());
+}
+
+#[test]
+fn a_start_whose_move_cannot_be_journalled_is_refused() {
+    let (ctx, project) = machine("unjournalled-start");
+    let journal = crate::app::targets::layout(&ctx)
+        .map(|paths| paths.journal())
+        .unwrap_or_default();
+    let _ = std::fs::create_dir_all(&journal);
+    let (from, to) = cache(&project);
+
+    assert!(!preparing(&ctx, true));
 
     assert!(from.is_dir());
     assert!(!to.exists());
