@@ -183,8 +183,8 @@ directions, on a token nobody re-authenticated**:
 | `Younger Film (2002)` | `PG` | `R` | member gets `200` | member gets `404` |
 | `Grown Film (2004)` | `R` | `PG` | member gets `404` | member gets `200` |
 
-The refresh was `POST /Library/Refresh` — the same call
-[`jellyfin/library.rs`](../../crates/lemonfiber-core/src/jellyfin/library.rs) already
+The refresh was `POST /Library/Refresh` — the same call the Jellyfin plugin's
+[`library.rs`](https://github.com/lemonfiber/plugin-jellyfin/blob/main/src/jellyfin/library.rs)
 sends — and on `10.10.3` it took about a second.
 
 **On `10.11.11` a library scan does not re-read a changed `.nfo` at all.** The same
