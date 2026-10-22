@@ -399,7 +399,26 @@ fn an_adapter_inside_the_guard_has_its_contract_port_published_by_the_guard() {
     );
     assert!(ports(&entry(&project, "gluetun"))
         .iter()
-        .any(|written| written.ends_with(":18997")));
+        .any(|written| *written == format!("{}::18997", super::entry::LOOPBACK)));
+}
+
+/// The core reaches an adapter at its contract port published on the loopback interface,
+/// at a host port the engine chooses, and the adapter publishes nothing beyond it.
+#[test]
+fn an_adapters_contract_port_is_published_on_loopback_alone() {
+    let project = project(&carried(), &[a_contracted_media_server(Some("jellyfin"))]);
+    let published = ports(&entry(&project, "media-adapter"));
+    let loopback = super::entry::LOOPBACK;
+    assert!(
+        published.contains(&format!("{loopback}::8080")),
+        "{published:?}"
+    );
+    assert!(
+        published
+            .iter()
+            .all(|written| written.starts_with(&format!("{loopback}:"))),
+        "{published:?}"
+    );
 }
 
 #[test]
