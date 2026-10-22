@@ -588,6 +588,7 @@ fn plugin_filling(plugin: &str, service: &str, capability: &str) -> crate::plugi
             provides: vec![capability.to_owned()],
             name: "Komga".to_owned(),
             description: "Reads comics".to_owned(),
+            icon: None,
             api: None,
             listens: None,
             media_types: Vec::new(),

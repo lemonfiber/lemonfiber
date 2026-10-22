@@ -347,6 +347,32 @@ fn a_loopback_service_keeps_the_dashboard_group_and_the_tier_its_link_is_built_f
     assert_eq!(one.as_ref().map(Reached::hostname), Some(None));
 }
 
+#[test]
+fn a_service_shows_the_dashboard_line_and_icon_its_wiring_names_or_its_own() {
+    let named = installed(|manifest| {
+        for wiring in &mut manifest.wirings {
+            wiring.dashboard_description = Some("Comics".to_owned());
+            wiring.dashboard_icon = Some("mdi-book-open".to_owned());
+        }
+    });
+    let one = placed(named.as_ref(), "komga");
+    assert_eq!(
+        one.as_ref().map(|one| one.description.as_str()),
+        Some("Comics")
+    );
+    assert_eq!(
+        one.as_ref().map(Placed::icon).as_deref(),
+        Some("mdi-book-open")
+    );
+
+    let own = placed(whole().as_ref(), "komga");
+    assert_eq!(
+        own.as_ref().map(|one| one.description.as_str()),
+        Some("Reads your comics on any browser")
+    );
+    assert_eq!(own.as_ref().map(Placed::icon).as_deref(), Some("komga.png"));
+}
+
 /// The three readings are the facts the arms carry, so a caller need not write
 /// the match itself and get one arm of it wrong.
 #[test]
@@ -596,7 +622,7 @@ fn the_report_says_what_is_installed_and_what_this_run_did() {
 /// that otherwise reads back whole.
 #[test]
 fn a_record_carrying_a_value_this_build_would_not_have_written_is_refused() {
-    let altered: [(&str, Alter); 17] = [
+    let altered: [(&str, Alter); 18] = [
         ("an empty plugin id", |one| one.plugin = String::new()),
         ("a plugin id with a separator", |one| {
             one.plugin = "../x".to_owned();
@@ -666,6 +692,11 @@ fn a_record_carrying_a_value_this_build_would_not_have_written_is_refused() {
                 if let Some(Reached::Household { group, .. }) = &mut placed.reached {
                     *group = Some("{{KEY}}".to_owned());
                 }
+            });
+        }),
+        ("an icon the page would fetch from elsewhere", |one| {
+            each(one, |placed| {
+                placed.icon = Some("https://example.com/komga.png".to_owned());
             });
         }),
         ("nothing altered", |_| ()),

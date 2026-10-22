@@ -144,6 +144,7 @@ pub(crate) fn a_placed(
         provides: provides.iter().map(|one| (*one).to_owned()).collect(),
         name: format!("{service} the stand-in"),
         description: "Stands in for a bundled service".to_owned(),
+        icon: None,
         api,
         listens,
         media_types: Vec::new(),

@@ -44,6 +44,15 @@ const REFERENCE: usize = 255;
 /// The longest a registry port may be written.
 const PORT: usize = 5;
 
+/// The longest line a dashboard entry shows beside it, in characters.
+const DASHBOARD_DESCRIPTION: usize = 60;
+
+/// The file types the dashboard's icon set ships its icons as.
+const ICON_FILES: [&str; 3] = [".png", ".svg", ".webp"];
+
+/// The prefixes naming an icon from the dashboard's icon sets rather than a file.
+const ICON_SETS: [&str; 2] = ["mdi-", "si-"];
+
 /// Whether `text` is a plugin id: lowercase letters, digits and hyphens, and at
 /// least one of them.
 ///
@@ -72,6 +81,24 @@ pub fn is_label(text: &str) -> bool {
         && text.chars().all(|letter| letters(letter) || letter == '-')
         && text.starts_with(letters)
         && text.ends_with(letters)
+}
+
+/// Whether `text` names an icon from the dashboard's own icon set: lowercase letters,
+/// digits, `.` and `-`, and a file name of one of its types or a name from one of its
+/// sets.
+///
+/// Never an address, which its alphabet already keeps out: the page fetches nothing
+/// a plugin points it at.
+#[must_use]
+pub fn is_icon(text: &str) -> bool {
+    text.chars().all(|letter| {
+        letter.is_ascii_lowercase() || letter.is_ascii_digit() || letter == '.' || letter == '-'
+    }) && (ICON_FILES
+        .iter()
+        .any(|kind| text.len() > kind.len() && text.ends_with(kind))
+        || ICON_SETS
+            .iter()
+            .any(|set| text.len() > set.len() && text.starts_with(set)))
 }
 
 /// Whether `text` is a registry path as a registry reads one, with no tag and no
@@ -245,6 +272,34 @@ pub(super) fn carried(manifest: &Manifest, found: &mut Vec<Violation>) {
         }
         if let Some(group) = &wiring.dashboard_group {
             prose(&format!("{location}.dashboard_group"), group, found);
+        }
+        if let Some(description) = &wiring.dashboard_description {
+            let at = format!("{location}.dashboard_description");
+            if description.chars().count() > DASHBOARD_DESCRIPTION
+                || description.contains(['\n', '\r'])
+            {
+                found.push(Violation {
+                    location: at.clone(),
+                    message: format!(
+                        "is not one line of at most {DASHBOARD_DESCRIPTION} characters; it is \
+                         the line beside the service's entry on the dashboard"
+                    ),
+                });
+            }
+            prose(&at, description, found);
+        }
+        if let Some(icon) = &wiring.dashboard_icon {
+            if !is_icon(icon) {
+                found.push(Violation {
+                    location: format!("{location}.dashboard_icon"),
+                    message: format!(
+                        "{icon} is not an icon from the dashboard's own set: a file name \
+                         ending .png, .svg or .webp, or an mdi- or si- name, of lowercase \
+                         letters, digits, \".\" and \"-\"; never an address, because the page \
+                         fetches nothing a plugin points it at"
+                    ),
+                });
+            }
         }
     }
     for (at, request) in requests(manifest) {

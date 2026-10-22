@@ -398,6 +398,11 @@ fn declared(manifest: &Manifest) -> Vec<(String, &str)> {
         for (field, text) in [
             ("hostname", wiring.hostname.as_deref()),
             ("dashboard_group", wiring.dashboard_group.as_deref()),
+            (
+                "dashboard_description",
+                wiring.dashboard_description.as_deref(),
+            ),
+            ("dashboard_icon", wiring.dashboard_icon.as_deref()),
         ] {
             if let Some(text) = text {
                 every.push((format!("{at}.{field}"), text));

@@ -145,7 +145,7 @@ fn entry(placed: &Placed, reached: &Reached) -> String {
     format!(
         "    - {}:\n        icon: {}\n        href: {}\n        description: {}\n",
         quoted(name),
-        quoted(&format!("{}.png", placed.service)),
+        quoted(&placed.icon()),
         quoted(&href),
         quoted(&placed.description),
     )

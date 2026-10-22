@@ -110,7 +110,7 @@ impl Register {
     /// than acted on.
     fn as_written(&self) -> Result<(), Unreadable> {
         use lemonfiber_plugin::refusing::carried::{
-            is_digest, is_label, is_plugin_id, is_reference, substituted,
+            is_digest, is_icon, is_label, is_plugin_id, is_reference, substituted,
         };
         let refused = |what: String| {
             Err(Unreadable::Damaged(format!(
@@ -133,6 +133,7 @@ impl Register {
                     && is_digest(&placed.digest)
                     && super::container::sound(placed)
                     && hostname.is_none_or(is_label)
+                    && placed.icon.as_deref().is_none_or(is_icon)
                     && [
                         Some(placed.name.as_str()),
                         Some(placed.description.as_str()),

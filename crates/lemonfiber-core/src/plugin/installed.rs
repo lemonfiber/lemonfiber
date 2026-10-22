@@ -69,10 +69,13 @@ pub struct Placed {
     /// a record written before this was kept lists it by its id.
     #[serde(default)]
     pub name: String,
-    /// What the plugin says it does for the operator, which is what its dashboard entry
-    /// says beside it.
+    /// The line its dashboard entry shows beside it: the one its wiring names, or what
+    /// the plugin says it does for the operator.
     #[serde(default)]
     pub description: String,
+    /// The icon its dashboard entry shows, where its wiring names one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
     /// The adapter of lemonfiber's its manifest names, which only a part the bundle
     /// assembles is reached through. A record read from the register holds none, whatever
     /// an older one carried: an installed plugin is reached over the contracts it speaks.
@@ -167,6 +170,7 @@ pub struct Asking {
 impl Placed {
     /// One service, as installing it settles it.
     fn of(manifest: &Manifest, service: &Service) -> Self {
+        let entry = manifest.entry(service);
         Self {
             fields: Fields {
                 publish: service.publish.clone(),
@@ -185,7 +189,7 @@ impl Placed {
             tag: service.tag.clone(),
             config_path: service.configuration().to_owned(),
             takes_data: service.takes_data,
-            reached: Reached::of(service, manifest.entry(service)),
+            reached: Reached::of(service, entry),
             provides: service
                 .provides
                 .iter()
@@ -193,7 +197,8 @@ impl Placed {
                 .cloned()
                 .collect(),
             name: service.name.clone(),
-            description: manifest.plugin.description.clone(),
+            description: entry.description.to_owned(),
+            icon: entry.icon.map(str::to_owned),
             api: service.api.clone(),
             listens: service.listens,
             media_types: service.media_types.clone(),
@@ -219,6 +224,14 @@ impl Placed {
         } else {
             &self.name
         }
+    }
+
+    /// The icon its dashboard entry shows: the one its wiring named, or its id's.
+    #[must_use]
+    pub fn icon(&self) -> String {
+        self.icon
+            .clone()
+            .unwrap_or_else(|| format!("{}.png", self.service))
     }
 
     /// The port this machine reaches the service on, where it publishes one.

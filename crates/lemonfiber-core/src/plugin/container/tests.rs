@@ -60,6 +60,7 @@ fn placed() -> Placed {
         provides: Vec::new(),
         name: "Komga".to_owned(),
         description: "Reads comics".to_owned(),
+        icon: None,
         api: None,
         listens: None,
         media_types: Vec::new(),

@@ -158,10 +158,79 @@ fn dashboard_prose_the_dashboard_would_expand_is_refused() {
             "dashboard_group = \"{{HOMEPAGE_FILE_KEY}}\"",
             "wiring #1.dashboard_group",
         ),
+        (
+            "dashboard_group = \"Library\"",
+            "dashboard_group = \"Library\"\ndashboard_description = \"{{HOMEPAGE_VAR_KEY}}\"",
+            "wiring #1.dashboard_description",
+        ),
     ];
     for (before, after, at) in cases {
         let said = without(before, after);
         assert!(names(&said, &[at, "never expanded"]), "{at}: {said:?}");
+    }
+}
+
+/// The fixture's wiring, naming its dashboard line or icon as `named`.
+fn wired(named: &str) -> Vec<String> {
+    without(
+        "dashboard_group = \"Library\"",
+        &format!("dashboard_group = \"Library\"\n{named}"),
+    )
+}
+
+#[test]
+fn a_dashboard_line_and_icon_from_the_dashboards_own_set_are_refused_nothing() {
+    for named in [
+        "dashboard_description = \"Comics\"",
+        &format!("dashboard_description = {}", toml(&"é".repeat(60))),
+        "dashboard_icon = \"komga.png\"",
+        "dashboard_icon = \"komga.svg\"",
+        "dashboard_icon = \"komga-dark.webp\"",
+        "dashboard_icon = \"mdi-book-open\"",
+        "dashboard_icon = \"si-jellyfin\"",
+    ] {
+        assert_eq!(wired(named), Vec::<String>::new(), "{named}");
+    }
+}
+
+#[test]
+fn a_dashboard_line_longer_than_one_short_line_is_refused() {
+    for line in [
+        "a".repeat(61),
+        "Comics\nand more".to_owned(),
+        "Comics\r".to_owned(),
+    ] {
+        let said = wired(&format!("dashboard_description = {}", toml(&line)));
+        assert!(
+            names(
+                &said,
+                &["wiring #1.dashboard_description", "at most 60 characters"]
+            ),
+            "{line:?}: {said:?}"
+        );
+    }
+}
+
+#[test]
+fn a_dashboard_icon_outside_the_dashboards_own_set_is_refused() {
+    for icon in [
+        "https://example.com/komga.png",
+        "//example.com/komga.png",
+        "/icons/komga.png",
+        "Komga.png",
+        "komga.gif",
+        "komga",
+        ".png",
+        "mdi-",
+        "si-",
+        "komga png",
+        "",
+    ] {
+        let said = wired(&format!("dashboard_icon = {}", toml(icon)));
+        assert!(
+            names(&said, &["wiring #1.dashboard_icon", "never an address"]),
+            "{icon:?}: {said:?}"
+        );
     }
 }
 

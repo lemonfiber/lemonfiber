@@ -15,6 +15,7 @@ fn placed(service: &str, reached: Option<Reached>) -> Placed {
         provides: Vec::new(),
         name: "Komga".to_owned(),
         description: "Reads comics: in a browser".to_owned(),
+        icon: None,
         api: None,
         listens: None,
         media_types: Vec::new(),
@@ -113,6 +114,16 @@ fn a_household_service_is_listed_linking_to_the_household_address() {
          \"http://{{HOMEPAGE_VAR_LAN_HOST}}:25600\"\n        description: \"Reads comics: in \
          a browser\"\n"
     );
+}
+
+#[test]
+fn a_service_whose_wiring_named_an_icon_is_listed_with_it() {
+    let mut named = placed("komga", Some(household(None)));
+    named.icon = Some("mdi-book-open".to_owned());
+
+    let said = listed(&installed(vec![named]));
+
+    assert!(said.contains("icon: \"mdi-book-open\"\n"), "{said}");
 }
 
 #[test]

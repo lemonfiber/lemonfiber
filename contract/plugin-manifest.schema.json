@@ -1026,8 +1026,18 @@
       "description": "How the stack's own services reach a plugin's service.\n\nThe tier governs, not the plugin. Only a `lan` service is proxied, because the\nbundled policy is that an admin surface does not get a hostname — and a plugin\nthat could publish its own address could put an admin surface on the household\nnetwork without touching anything the web-security checks inspect.",
       "type": "object",
       "properties": {
+        "dashboard_description": {
+          "description": "The line beside its entry on the bundled dashboard. Defaults to the plugin's\ndescription.",
+          "type": ["string", "null"],
+          "default": null
+        },
         "dashboard_group": {
           "description": "Which group on the bundled dashboard it appears under. Defaults to the group\nthe stack uses for its tier.",
+          "type": ["string", "null"],
+          "default": null
+        },
+        "dashboard_icon": {
+          "description": "The icon its entry on the bundled dashboard shows, named from the dashboard's own\nicon set. Defaults to the service's id with `.png` after it.",
           "type": ["string", "null"],
           "default": null
         },
