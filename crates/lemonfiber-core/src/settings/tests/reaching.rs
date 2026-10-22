@@ -38,6 +38,28 @@ fn reader() -> Installed {
     reader
 }
 
+/// The reader, under the name of a plugin the machine trusts, so its files are written.
+fn trusted_reader() -> Installed {
+    let mut embedded = reader();
+    if let Some(trusted) = crate::plugin::first_party::EMBEDDED.first() {
+        trusted.plugin.clone_into(&mut embedded.plugin);
+        trusted.manifest.clone_into(&mut embedded.manifest);
+        trusted.tree.clone_into(&mut embedded.tree);
+    }
+    embedded
+}
+
+/// `installed` recorded as the one plugin installed on `machine`.
+fn registered(machine: &Machine, installed: Installed) {
+    let mut register = crate::plugin::Register::empty();
+    assert!(register.record(installed).is_ok());
+    assert!(std::fs::write(
+        machine.env.with_file_name(crate::config::paths::PLUGINS),
+        serde_json::to_string(&register).unwrap_or_default()
+    )
+    .is_ok());
+}
+
 fn crossed(name: &str, engine: Reporting) -> (Machine, [Installed; 1]) {
     let machine = machine(name, engine);
     assert!(store::set(&machine.env, CROSSING, "replacement-key").is_ok());
@@ -146,7 +168,7 @@ async fn a_reader_the_engine_would_not_recreate_is_named_as_not_reached() {
 #[tokio::test]
 async fn a_secrets_file_that_cannot_be_written_is_named_and_nothing_restarts() {
     let (machine, installed) = crossed("crossed-unwritten", running(&["reader"]));
-    assert!(std::fs::write(machine.env.with_file_name("env"), "not a directory").is_ok());
+    unwritable_files(&machine);
 
     let reached_now = reached(&machine, &installed, CROSSING).await;
 
@@ -236,4 +258,204 @@ async fn a_secret_no_installed_plugin_declares_is_read_from_the_store() {
         .iter()
         .all(|one| one.name == "gluetun:wireguard-key" && !one.held && one.from.is_none()));
     assert_eq!(listed.len(), 1);
+}
+
+/// A crossing key the operator sets by hand is written into every file that reads it at
+/// once, as a rotation's is, so no reader keeps the value it replaced.
+#[tokio::test]
+async fn a_crossing_key_set_by_hand_rewrites_every_file_that_reads_it() {
+    let machine = machine("set-by-hand", Reporting::absent());
+    registered(&machine, trusted_reader());
+    let file = machine.env.with_file_name("env").join("reader.env");
+    assert!(store::write(&file, "SONARR_KEY=the-replaced-key\n").is_ok());
+
+    let set = crate::app::configuring::set(
+        &machine.ctx,
+        crate::app::Setting::to(CROSSING, "set-by-hand"),
+    )
+    .await;
+
+    assert!(set.is_ok(), "{set:?}");
+    assert!(std::fs::read_to_string(&file).is_ok_and(
+        |text| !text.contains("the-replaced-key") && text.contains("SONARR_KEY=set-by-hand")
+    ));
+}
+
+/// A secret an undo puts back is written into every file that reads it, so no reader keeps
+/// the value the undone change gave it.
+#[tokio::test]
+async fn a_secret_put_back_by_an_undo_reaches_every_file_that_reads_it() {
+    let machine = machine("reheld", Reporting::absent());
+    let mut holder = crate::test_support::a_placed("holder", &[], None, None);
+    holder.fields.env.insert(
+        "TOKEN".to_owned(),
+        Value::Secret(SecretOf {
+            secret: "token".to_owned(),
+        }),
+    );
+    registered(
+        &machine,
+        crate::test_support::an_installed("komga", vec![holder]),
+    );
+    let secrets = crate::settings::secrets_at(&machine.ctx).unwrap_or_default();
+    let keeping = [crate::settings::Keeping {
+        name: "komga:token",
+        value: "put-back",
+        from: crate::settings::Source::Recipe,
+        at: 1,
+    }];
+    assert!(crate::settings::kept(&secrets, &keeping, &|_| Ok(())).is_ok());
+    let file = machine.env.with_file_name("env").join("holder.env");
+    assert!(store::write(&file, "TOKEN=undone\n").is_ok());
+    let carried = crate::app::recover::Carried {
+        done: vec![crate::journal::Undo {
+            target: "komga:token".to_owned(),
+            action: crate::journal::Action::Rehold {
+                name: "komga:token".to_owned(),
+                earlier: None,
+                kept: None,
+                filed: None,
+            },
+        }],
+        ..crate::app::recover::Carried::default()
+    };
+
+    let reheld = crate::app::recover::reheld(&machine.ctx, &carried);
+
+    assert!(reheld.is_ok(), "{reheld:?}");
+    assert!(std::fs::read_to_string(&file)
+        .is_ok_and(|text| text.contains("TOKEN=put-back") && !text.contains("undone")));
+}
+
+/// A secret the operator enters by hand is written into the file that reads it at once,
+/// and putting the change back writes the earlier one in again.
+#[tokio::test]
+async fn an_entered_secret_and_its_undo_each_reach_the_file_that_reads_it() {
+    let machine = machine("entered", Reporting::absent());
+    let mut holder = crate::test_support::a_placed("holder", &[], None, None);
+    holder.fields.env.insert(
+        "WG".to_owned(),
+        Value::Secret(SecretOf {
+            secret: "wireguard-key".to_owned(),
+        }),
+    );
+    registered(
+        &machine,
+        crate::test_support::an_installed("gluetun", vec![holder]),
+    );
+    let file = machine.env.with_file_name("env").join("holder.env");
+    let holds = |value: &str| {
+        std::fs::read_to_string(&file).is_ok_and(|text| text == format!("WG={value}\n"))
+    };
+    let entered = |value: &'static str| {
+        crate::app::configuring::set(
+            &machine.ctx,
+            crate::app::Setting::to(crate::credential::VPN_PRIVATE_KEY, value),
+        )
+    };
+
+    let secrets = crate::settings::secrets_at(&machine.ctx).unwrap_or_default();
+    let recipe = [crate::settings::Keeping {
+        name: "gluetun:wireguard-key",
+        value: "recipe-key",
+        from: crate::settings::Source::Recipe,
+        at: 1,
+    }];
+    assert!(crate::settings::kept(&secrets, &recipe, &|_| Ok(())).is_ok());
+
+    assert!(entered("entered-key").await.is_ok());
+    assert!(holds("entered-key"));
+    let last =
+        crate::app::recover::journal_at(&machine.env.with_file_name(crate::config::paths::JOURNAL))
+            .ok()
+            .and_then(|journal| journal.changes().last().map(|change| change.at.clone()))
+            .unwrap_or_default();
+    let undone = crate::app::putting_back::undo(&machine.ctx, Some(&last)).await;
+
+    assert!(undone.is_ok(), "{undone:?}");
+    assert!(holds("recipe-key"));
+}
+
+/// A crossing key an undo puts back is written into every file that reads it, so no reader
+/// keeps the value the undone change gave it.
+#[tokio::test]
+async fn a_crossing_key_put_back_by_an_undo_reaches_every_file_that_reads_it() {
+    let machine = machine("restored", Reporting::absent());
+    registered(&machine, trusted_reader());
+    assert!(store::set(&machine.env, CROSSING, "put-back").is_ok());
+    let file = machine.env.with_file_name("env").join("reader.env");
+    assert!(store::write(&file, "SONARR_KEY=undone\n").is_ok());
+    let carried = crate::app::recover::Carried {
+        done: vec![crate::journal::Undo {
+            target: CROSSING.to_owned(),
+            action: crate::journal::Action::Restore {
+                key: CROSSING.to_owned(),
+                value: Some("put-back".to_owned()),
+                wrote: "undone".to_owned(),
+            },
+        }],
+        ..crate::app::recover::Carried::default()
+    };
+
+    let reheld = crate::app::recover::reheld(&machine.ctx, &carried);
+
+    assert!(reheld.is_ok(), "{reheld:?}");
+    assert!(std::fs::read_to_string(&file)
+        .is_ok_and(|text| text.contains("SONARR_KEY=put-back") && !text.contains("undone")));
+}
+
+/// Where the files that read them live, under `machine`, made a file so none can be written.
+fn unwritable_files(machine: &Machine) {
+    assert!(std::fs::write(machine.env.with_file_name("env"), "not a directory").is_ok());
+}
+
+/// Whether `refused` says a file reading the changed value could not be written, and that
+/// the value changed all the same.
+fn refused_as_unreached(refused: Option<Box<crate::error::Problem>>) -> bool {
+    refused.is_some_and(|problem| {
+        problem.code == crate::error::codes::config::CONFIG_NOT_WRITTEN
+            && problem.meaning == crate::settings::files::UNREACHED
+    })
+}
+
+/// A crossing key set by hand that cannot reach a file that reads it is refused, saying
+/// why, rather than reported set while a reader keeps the value it replaced.
+#[tokio::test]
+async fn a_crossing_key_set_by_hand_that_cannot_reach_its_reader_is_refused() {
+    let machine = machine("set-unwritten", Reporting::absent());
+    registered(&machine, trusted_reader());
+    unwritable_files(&machine);
+
+    let set = crate::app::configuring::set(
+        &machine.ctx,
+        crate::app::Setting::to(CROSSING, "set-by-hand"),
+    )
+    .await;
+
+    assert!(refused_as_unreached(set.err()));
+}
+
+/// A crossing key an undo puts back that cannot reach a file that reads it is refused,
+/// saying why.
+#[tokio::test]
+async fn a_crossing_key_put_back_that_cannot_reach_its_reader_is_refused() {
+    let machine = machine("restored-unwritten", Reporting::absent());
+    registered(&machine, trusted_reader());
+    assert!(store::set(&machine.env, CROSSING, "put-back").is_ok());
+    unwritable_files(&machine);
+    let carried = crate::app::recover::Carried {
+        done: vec![crate::journal::Undo {
+            target: CROSSING.to_owned(),
+            action: crate::journal::Action::Restore {
+                key: CROSSING.to_owned(),
+                value: Some("put-back".to_owned()),
+                wrote: "undone".to_owned(),
+            },
+        }],
+        ..crate::app::recover::Carried::default()
+    };
+
+    let reheld = crate::app::recover::reheld(&machine.ctx, &carried);
+
+    assert!(refused_as_unreached(reheld.err()));
 }

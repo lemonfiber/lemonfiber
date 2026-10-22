@@ -281,12 +281,14 @@ pub async fn retract(ctx: &Ctx, paths: &Paths) -> Result<Vec<Undo>, Box<Problem>
     let reached =
         crate::app::recover::reconfigured(ctx, &undos, &manifest.services, project.as_deref())
             .await;
-    crate::app::recover::undo(
+    let carried = crate::app::recover::carrying_out(
         ctx.seams.confined.as_ref(),
         &reached.left,
         &paths.env_file(),
         reached.unreached,
     )?;
+    crate::app::recover::reheld(ctx, &carried)?;
+    crate::app::recover::refused_over(&carried)?;
     Ok(undos.into_iter().map(told).collect())
 }
 

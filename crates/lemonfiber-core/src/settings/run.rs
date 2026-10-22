@@ -63,28 +63,20 @@ pub(crate) async fn reached(
     resolved: &Resolved,
 ) -> Vec<Propagation> {
     let crossing = Holding::Crossing(setting.to_owned());
-    let reading: Vec<(&Installed, String)> = resolved.reading(|reading| {
-        installed
-            .iter()
-            .flat_map(|one| {
-                one.services
-                    .iter()
-                    .filter(|placed| {
-                        crate::plugin::variables(one, placed, reading)
-                            .iter()
-                            .any(|variable| variable.holding == crossing)
-                    })
-                    .map(move |placed| (one, placed.service.clone()))
-            })
-            .collect()
-    });
-    if reading.is_empty() {
+    let manifest = ctx.stack.checked_manifest(ctx.today()).ok();
+    let services: Vec<String> = super::files::every_file(manifest.as_ref(), installed, resolved)
+        .into_iter()
+        .filter(|(_, _, variables)| {
+            variables
+                .iter()
+                .any(|variable| variable.holding == crossing)
+        })
+        .map(|(service, _, _)| service)
+        .collect();
+    if services.is_empty() {
         return Vec::new();
     }
-    let mut touched: Vec<&Installed> = reading.iter().map(|(one, _)| *one).collect();
-    touched.dedup_by(|one, other| one.plugin == other.plugin);
-    let services: Vec<String> = reading.into_iter().map(|(_, service)| service).collect();
-    let unwritten = super::files::written_by(ctx, &touched, resolved)
+    let unwritten = super::files::reread(ctx, manifest.as_ref(), installed, resolved, &crossing)
         .err()
         .map(|why| why.to_string());
     let running = restarting::running(ctx, &services).await;
