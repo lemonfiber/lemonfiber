@@ -8,7 +8,7 @@
 //! notices everybody reads before they ask; and the titles beyond the house a member may
 //! find and ask for. The gate is handed every route it admits at once, each with the
 //! credential it presents and the tokens it admits, and answers each credential by its
-//! fingerprint alone.
+//! SHA-256 alone.
 
 use std::collections::BTreeSet;
 
@@ -237,7 +237,7 @@ crate::contract! {
                     ),
                 ],
             };
-            /// Every route it admits, each credential by its fingerprint.
+            /// Every route it admits, each credential by its SHA-256.
             fn admitted() -> Vec<Admitted> where asks = Asked {};
         }
     }

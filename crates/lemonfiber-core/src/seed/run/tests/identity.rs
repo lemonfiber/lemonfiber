@@ -22,7 +22,16 @@ async fn identity_beside(
     let fillers = fillers_beside(services.to_vec(), installed, stack_root());
     let server = crate::app::targets::MediaServer::of(&fillers);
     let admin = super::super::identity::seed_media_server_admin(ctx, server.as_ref()).await;
-    super::super::seed_request_identity(ctx, services, expected, server.as_ref(), admin, None).await
+    super::super::seed_request_identity(
+        ctx,
+        services,
+        &fillers,
+        expected,
+        server.as_ref(),
+        admin,
+        None,
+    )
+    .await
 }
 
 #[tokio::test]
@@ -493,6 +502,7 @@ async fn identity_over(
     super::super::seed_request_identity(
         ctx,
         &[media_server_svc()],
+        fillers,
         &crate::baseline::Baseline::new(),
         server.as_ref(),
         admin,

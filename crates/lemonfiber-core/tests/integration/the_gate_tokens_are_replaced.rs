@@ -41,6 +41,12 @@ async fn a_gate_token_is_listed_unprinted_and_replaced() {
         .written(),
     );
     let _ = std::fs::write(gate.join("tokens.json"), accepting(&["held"]));
+    let curator = stack.join("config/sonarr");
+    let _ = std::fs::create_dir_all(&curator);
+    let _ = std::fs::write(
+        curator.join("config.xml"),
+        "<Config><ApiKey>sonarrs</ApiKey></Config>",
+    );
     let held =
         r#"[{"id":1,"hostname":"request-gate","port":5057,"baseUrl":"/sonarr","apiKey":"held"}]"#;
     let http = Fake::by_route_in_turn(vec![

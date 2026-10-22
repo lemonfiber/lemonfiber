@@ -512,7 +512,12 @@ async fn seed_media_server(
     wirings.extend(decline::seed_decline_key(ctx, services, fillers, project).await);
 
     // The request gate's routes, with the same session.
-    wirings.extend(gate::seed_gate_routes(ctx, services, fillers, server, project).await);
+    wirings.extend(
+        Box::pin(gate::seed_gate_routes(
+            ctx, services, fillers, server, project,
+        ))
+        .await,
+    );
 
     // The second half: the request service pointed at the media server, through the
     // gate where the stack runs one, whose routes the step above wrote.
@@ -522,7 +527,7 @@ async fn seed_media_server(
     // pass that asked it for anything first would report a fresh stack as broken and
     // then, in the same run, fix what it had just reported.
     let (identity_wirings, identity_records) =
-        seed_request_identity(ctx, services, baseline, server, admin, project).await;
+        seed_request_identity(ctx, services, fillers, baseline, server, admin, project).await;
     baseline.merge(&identity_records);
     wirings.extend(identity_wirings);
 

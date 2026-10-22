@@ -24,6 +24,7 @@
 //! rather than `docker::DockerApi`. See `.docs/architecture/ports-and-adapters.md`.
 
 pub mod asking;
+pub mod digest;
 pub mod docker;
 pub mod filesystem;
 pub mod fingerprint;

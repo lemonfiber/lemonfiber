@@ -202,22 +202,27 @@ async fn still_direct(
     project: &Path,
     server: Option<(&str, &str)>,
 ) -> Result<Vec<String>, crate::ports::service::Failure> {
-    let kept = Kept::read(ctx, project).await;
+    let kept = Kept::read(ctx, fillers, project).await;
     let mut direct = Vec::new();
     if let Some((route, name)) = server {
         let link = requests.media_server_link().await?;
-        if link.at != through_the_gate(route) || !kept.accepts(route, &link.key) {
+        if link.at != through_the_gate(route) || !accepted(kept.as_ref(), route, &link.key) {
             direct.push(name.to_owned());
         }
     }
     let held = requests.fulfilment_targets().await?;
     for fulfils in fulfilling(fillers) {
         let host = &fulfils.at.host;
-        if !gated_target(requests, &held, &kept, host, fulfils.kind).await {
+        if !gated_target(requests, &held, kept.as_ref(), host, fulfils.kind).await {
             direct.push(fulfils.filler.name.clone());
         }
     }
     Ok(direct)
+}
+
+/// Whether the gate admits `token` on `route`: never where it cannot be asked.
+fn accepted(kept: Option<&Kept<'_>>, route: &str, token: &str) -> bool {
+    kept.is_some_and(|kept| kept.accepts(route, token))
 }
 
 /// Whether the request service holds the curator reached at `host` at the gate, under a
@@ -225,7 +230,7 @@ async fn still_direct(
 async fn gated_target(
     requests: &dyn Requests,
     held: &[RegisteredTarget],
-    kept: &Kept,
+    kept: Option<&Kept<'_>>,
     host: &str,
     kind: Kind,
 ) -> bool {
@@ -233,7 +238,7 @@ async fn gated_target(
     let Some(one) = held.iter().find(|one| one.at == at && one.kind == kind) else {
         return false;
     };
-    kept.accepts(host, &one.key)
+    accepted(kept, host, &one.key)
         && requests
             .test_fulfilment_target(kind, &one.at, &one.key)
             .await

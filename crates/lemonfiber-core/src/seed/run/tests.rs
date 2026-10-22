@@ -168,6 +168,45 @@ fn download_client_wirings(report: &crate::seed::Report) -> Vec<&crate::seed::Wi
         .collect()
 }
 
+/// The gate's routes file admitting one route to each of `routes`, named by the curator's
+/// id or the media server's, presenting the credential beside it.
+fn admitting(routes: &[(&str, lemonfiber_sidecar::gate::Kind, &str)]) -> String {
+    lemonfiber_sidecar::gate::Upstreams::of(
+        routes
+            .iter()
+            .map(
+                |(route, kind, credential)| lemonfiber_sidecar::gate::Upstream {
+                    route: (*route).to_owned(),
+                    kind: *kind,
+                    address: format!("http://{route}:80"),
+                    credential: lemonfiber_sidecar::gate::Credential::new(*credential),
+                    majors: Vec::new(),
+                },
+            )
+            .collect(),
+    )
+    .written()
+}
+
+/// The gate under `project` admitting `routes`, as [`admitting`] writes them.
+fn routed(project: &std::path::Path, routes: &[(&str, lemonfiber_sidecar::gate::Kind, &str)]) {
+    let _ = store::write(
+        &crate::app::gating::path(project, lemonfiber_sidecar::gate::File::Upstreams),
+        &admitting(routes),
+    );
+}
+
+/// The stack's request gate, filling `request.gate`.
+fn request_gate() -> lemonfiber_manifest::Service {
+    let mut gate = manifest_service(
+        crate::app::gating::SERVICE,
+        None,
+        Some(lemonfiber_sidecar::gate::PORT),
+    );
+    gate.provides = vec![lemonfiber_contract::capabilities::request::gate::CAPABILITY.to_owned()];
+    gate
+}
+
 // ---- Indexer app sync: each media-filing curator registered back. ----
 
 /// A media-filing curator as a manifest service, with the media that makes it
@@ -481,6 +520,7 @@ mod applications;
 mod asking;
 mod baseline;
 mod claiming;
+mod contracted_gate;
 mod cors;
 mod curating;
 mod decline;

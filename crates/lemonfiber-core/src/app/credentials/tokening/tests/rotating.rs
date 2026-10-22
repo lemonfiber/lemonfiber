@@ -48,6 +48,17 @@ async fn a_third_party_request_service_is_never_handed_a_token() {
     assert_eq!(http.requests().len(), asked_before);
 }
 
+/// `installed`, its services asking every curator, as a request service does.
+fn asking_curators(mut installed: crate::plugin::Installed) -> crate::plugin::Installed {
+    for placed in &mut installed.services {
+        placed.asks = vec![crate::plugin::Asking {
+            capability: "library.curate".to_owned(),
+            each: true,
+        }];
+    }
+    installed
+}
+
 /// A stack directory whose gate accepts `held` on the curator's route, and a context over
 /// `http` reaching a first-party plugin's request service speaking `request.intake` in
 /// place of the stack's own, holding its key where `keyed`; with the stack's services and
@@ -68,7 +79,10 @@ fn beside_contracted_requests(
         crate::test_support::CONTRACTED_REQUESTS,
         keyed,
     )
-    .settings(Settings::default())
+    .settings(Settings {
+        env_file: Some(at.join(".env")),
+        ..Settings::default()
+    })
     .build()
     .with_http(http.clone())
     .with_random(Arc::new(lemonfiber_fixtures::support::FixedRandom(Some(
@@ -84,11 +98,11 @@ fn beside_contracted_requests(
             manifest.services = services.clone();
             crate::wiring::Fillers::trusting(
                 &manifest,
-                &[crate::test_support::contracted(
+                &[asking_curators(crate::test_support::contracted(
                     "intake",
                     crate::test_support::CONTRACTED_REQUESTS,
                     "request.intake",
-                )],
+                ))],
                 &crate::wiring::Chosen::default(),
                 Some(&at),
                 &crate::test_support::first_party("intake"),
@@ -113,6 +127,19 @@ fn curator_line() -> Held {
     }
 }
 
+/// What a rotation of the curator's token says where the token is not handed over yet.
+fn not_handed_yet() -> String {
+    format!("{CURATOR_LINE} is not handed to the request service yet. Run lemonfiber seed.")
+}
+
+/// What a rotation the request service stopped with `said` says.
+fn not_proven(said: &str) -> String {
+    format!(
+        "the replacement could not be proven: {said}. Nothing was written; the existing \
+         credential is the one still in force."
+    )
+}
+
 /// **A first-party request service speaking `request.intake` is handed the new token over
 /// it**, which the trust gate lets the stack's curator's token cross to, and the stack's
 /// own request service's API is never asked.
@@ -129,6 +156,11 @@ async fn a_first_party_request_service_is_handed_a_token_over_the_contract() {
         ("/v1/fulfilment_targets", vec![Answer::reply(200, target)]),
         ("/v1/move_fulfilment_target", vec![Answer::reply(204, "")]),
         ("/v1/test_fulfilment_target", vec![Answer::reply(204, "")]),
+        (
+            "/Users/AuthenticateByName",
+            vec![Answer::reply(200, r#"{"AccessToken":"session"}"#)],
+        ),
+        ("/Auth/Keys", vec![Answer::reply(200, gate_keys())]),
     ]);
     let (ctx, at, services, fillers) =
         beside_contracted_requests("tokens-first-party", true, &http);
@@ -384,15 +416,27 @@ async fn a_rotation_that_cannot_start_changes_nothing() {
     assert_eq!(accepted(&at), Some(accepting(&["held"], &[])));
 }
 
+/// A rotation the request service refuses to move, holds no target for, or whose tokens
+/// cannot be written stops, saying which.
 #[tokio::test]
 async fn a_rotation_the_service_or_the_file_stops_is_unproven() {
+    let unwritten = |at: &Path| {
+        format!(
+            "the tokens could not be handed to the request gate: request-gate answered \
+             unexpectedly: {}",
+            store::write(&tokens_file(at), "")
+                .err()
+                .map(|failure| failure.to_string())
+                .unwrap_or_default()
+        )
+    };
     for (name, moved, unheld, blocked) in [
         ("tokens-rotate-unmoved", 500, false, false),
         ("tokens-rotate-untargeted", 200, true, false),
         ("tokens-rotate-unwritable", 200, false, true),
     ] {
         let http = if unheld {
-            Fake::by_route_in_turn(vec![
+            beside_the_gates_key(vec![
                 (
                     Method::Get,
                     "/settings/radarr",
@@ -408,17 +452,6 @@ async fn a_rotation_the_service_or_the_file_stops_is_unproven() {
             serving("held", "linked", moved, &[200], 200)
         };
         let (ctx, at) = scene(name, true, &accepting(&["held"], &[]), http, true);
-        let line = Held {
-            name: CURATOR_LINE.to_owned(),
-            setting: "request-gate/tokens.json#sonarr".to_owned(),
-            consumers: Vec::new(),
-            location: String::new(),
-            origin: crate::credential::Origin::Lemonfiber,
-            from: crate::origin::Origin::Bundled,
-            state: State::Active,
-            fingerprint: None,
-            advisory: None,
-        };
         let ctx = if blocked {
             let held_text = accepting(&["held"], &[]).written();
             let routes_text = routes().written();
@@ -427,23 +460,35 @@ async fn a_rotation_the_service_or_the_file_stops_is_unproven() {
             ctx.with_filesystem(lemonfiber_fixtures::files::Files::at(vec![
                 (tokens_file(&at), &held_text),
                 (crate::app::gating::path(&at, File::Upstreams), &routes_text),
+                (
+                    at.join("config/sonarr/config.xml"),
+                    "<Config><ApiKey>sonarrs</ApiKey></Config>",
+                ),
             ]))
         } else {
             ctx
         };
+        let expected = if blocked {
+            unwritten(&at)
+        } else if unheld {
+            not_handed_yet()
+        } else {
+            not_proven("seerr answered unexpectedly: HTTP 500")
+        };
 
         let rotation = rotate(
             &ctx,
-            &line,
+            &curator_line(),
             &stack(true),
             &fillers(true, Some(&at)),
             Some(&at),
         )
         .await;
 
-        assert!(
-            unproven(&rotation.settled).is_some(),
-            "{name}: {rotation:?}"
+        assert_eq!(
+            unproven(&rotation.settled),
+            Some(expected.as_str()),
+            "{name}"
         );
     }
 }
@@ -465,6 +510,10 @@ async fn an_old_token_the_gate_cannot_be_told_to_drop_is_said() {
     let ctx = ctx.with_filesystem(lemonfiber_fixtures::files::Files::at(vec![
         (tokens_file(&at), &both),
         (crate::app::gating::path(&at, File::Upstreams), &routes_text),
+        (
+            at.join("config/sonarr/config.xml"),
+            "<Config><ApiKey>sonarrs</ApiKey></Config>",
+        ),
     ]));
     let line = named(
         &held(&ctx, &stack(true), &fillers(true, Some(&at)), Some(&at)).await,
@@ -481,15 +530,18 @@ async fn an_old_token_the_gate_cannot_be_told_to_drop_is_said() {
     .await;
 
     assert!(
-        unproven(&rotation.settled)
-            .is_some_and(|said| said.starts_with("the tokens could not be written")),
+        unproven(&rotation.settled).is_some_and(
+            |said| said.starts_with("the tokens could not be handed to the request gate")
+        ),
         "{rotation:?}"
     );
 }
 
+/// A request service that stops answering once the gate holds the new token beside the
+/// old leaves the gate accepting the old one alone again.
 #[tokio::test]
 async fn a_request_service_that_stops_answering_mid_rotation_changes_nothing() {
-    let http = Fake::by_route_in_turn(vec![(
+    let http = beside_the_gates_key(vec![(
         Method::Get,
         "/settings/sonarr",
         vec![Answer::Silent],
@@ -501,27 +553,57 @@ async fn a_request_service_that_stops_answering_mid_rotation_changes_nothing() {
         http,
         true,
     );
-    let line = Held {
-        name: CURATOR_LINE.to_owned(),
-        setting: "request-gate/tokens.json#sonarr".to_owned(),
-        consumers: Vec::new(),
-        location: String::new(),
-        origin: crate::credential::Origin::Lemonfiber,
-        from: crate::origin::Origin::Bundled,
-        state: State::Active,
-        fingerprint: None,
-        advisory: None,
-    };
 
     let rotation = rotate(
         &ctx,
-        &line,
+        &curator_line(),
         &stack(true),
         &fillers(true, Some(&at)),
         Some(&at),
     )
     .await;
 
-    assert!(unproven(&rotation.settled).is_some(), "{rotation:?}");
+    assert_eq!(
+        unproven(&rotation.settled),
+        Some(not_proven("seerr is not answering").as_str())
+    );
     assert_eq!(accepted(&at), Some(accepting(&["held"], &[])));
+}
+
+/// **A gate speaking `request.gate` that cannot be asked over it is handed no token.**
+/// Untrusted or holding no key, a rotation stops before anything is minted, and the
+/// request service is asked nothing.
+#[tokio::test]
+async fn a_gate_that_cannot_be_asked_over_its_contract_is_handed_no_token() {
+    for (tag, trusted, keyed) in crate::test_support::unaskable_gates() {
+        let http = Fake::always(Answer::reply(200, "[]"));
+        let name = format!("tokens-rotate-unasked-{tag}");
+        let (_, at) = scene(&name, true, &accepting(&["held"], &[]), http.clone(), true);
+        let ctx = crate::test_support::contracted_context(&at, crate::app::gating::SERVICE, keyed)
+            .settings(Settings {
+                env_file: Some(at.join(".env")),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http.clone())
+            .with_random(Arc::new(lemonfiber_fixtures::support::FixedRandom(Some(
+                vec![0xab; crate::secret::SECRET_BYTES],
+            ))));
+        let fillers = crate::test_support::stack_fillers(
+            stack(false),
+            &[crate::test_support::a_contracted_gate()],
+            Some(&at),
+            trusted,
+        );
+
+        let rotation = rotate(&ctx, &curator_line(), &stack(true), &fillers, Some(&at)).await;
+
+        assert_eq!(
+            unproven(&rotation.settled),
+            Some(not_handed_yet().as_str()),
+            "{tag}"
+        );
+        assert_eq!(accepted(&at), Some(accepting(&["held"], &[])), "{tag}");
+        assert!(http.requests().is_empty(), "{tag}: {:?}", http.requests());
+    }
 }

@@ -110,6 +110,7 @@ fn stack(gating: bool) -> Vec<lemonfiber_manifest::Service> {
         8096,
     );
     media_server.provides = vec!["media.serve".to_owned(), "identity.source".to_owned()];
+    media_server.listens = Some(8096);
     let mut requests = service(
         "seerr",
         "Seerr",
@@ -117,13 +118,21 @@ fn stack(gating: bool) -> Vec<lemonfiber_manifest::Service> {
         5055,
     );
     requests.provides = vec!["request.intake".to_owned()];
-    let mut services = vec![
-        media_server,
-        requests,
-        service("sonarr", "Sonarr", None, 8989),
-    ];
+    let mut curator = service("sonarr", "Sonarr", None, 8989);
+    curator.api = Some(lemonfiber_manifest::Api {
+        kind: lemonfiber_manifest::ApiKind::Servarr,
+        key_source: lemonfiber_manifest::KeySource::ConfigXml,
+        path: Some("/config/config.xml".to_owned()),
+        version: Some(3),
+    });
+    curator.media_types = vec!["tv".to_owned()];
+    curator.listens = Some(8989);
+    curator.provides = vec!["library.curate".to_owned()];
+    let mut services = vec![media_server, requests, curator];
     if gating {
-        services.push(service("request-gate", "Request gate", None, PORT));
+        let mut gate = service("request-gate", "Request gate", None, PORT);
+        gate.provides = vec!["request.gate".to_owned()];
+        services.push(gate);
     }
     services
 }
@@ -187,8 +196,21 @@ fn scene(
         );
     }
     let _ = store::write(&tokens_file(&at), &accepted.written());
+    let _ = store::write(
+        &at.join("config/sonarr/config.xml"),
+        "<Config><ApiKey>sonarrs</ApiKey></Config>",
+    );
+    let env = at.join(".env");
+    let _ = store::set(
+        &env,
+        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
+        "minted-earlier",
+    );
     let ctx = a_context()
-        .settings(Settings::default())
+        .settings(Settings {
+            env_file: Some(env),
+            ..Settings::default()
+        })
         .build()
         .with_http(http)
         .with_random(Arc::new(lemonfiber_fixtures::support::FixedRandom(
@@ -222,7 +244,7 @@ fn serving(
         "ip": "request-gate", "port": PORT, "urlBase": "/jellyfin", "apiKey": media_server,
     })
     .to_string();
-    Fake::by_route_in_turn(vec![
+    beside_the_gates_key(vec![
         (
             Method::Get,
             "/settings/radarr",
@@ -257,6 +279,33 @@ fn serving(
             vec![Answer::reply(linked, "")],
         ),
     ])
+}
+
+/// A household answering the media server's sign-in and its key list, through which a
+/// rotation finds the key the gate presents on its route there, and then `routes`.
+fn beside_the_gates_key(routes: Vec<(Method, &'static str, Vec<Answer>)>) -> Arc<Fake> {
+    let mut answering = vec![
+        (
+            Method::Post,
+            "/Users/AuthenticateByName",
+            vec![Answer::reply(200, r#"{"AccessToken":"session"}"#)],
+        ),
+        (
+            Method::Get,
+            "/Auth/Keys",
+            vec![Answer::reply(200, gate_keys())],
+        ),
+    ];
+    answering.extend(routes);
+    Fake::by_route_in_turn(answering)
+}
+
+/// The media server's key list, holding the key the gate presents on its route there.
+fn gate_keys() -> String {
+    serde_json::json!({ "Items": [
+        { "AppName": crate::app_keys::GATE_APP, "AccessToken": "gates" }
+    ] })
+    .to_string()
 }
 
 /// The line named `name`, or an empty one the assertions after it then fail on.

@@ -20,6 +20,7 @@ use crate::wiring::Filler;
 /// route to it, under a token the gate accepts there.
 pub(super) async fn seed_media_server_link(
     ctx: &Ctx,
+    fillers: &crate::wiring::Fillers,
     requests: &dyn Requests,
     asker: &Filler,
     server: &MediaServer,
@@ -32,7 +33,11 @@ pub(super) async fn seed_media_server_link(
         Ok(link) => link,
         Err(failure) => return rests(crate::seed::unreached(&failure)),
     };
-    let kept = Kept::read(ctx, project).await;
+    let Some(kept) = Kept::read(ctx, fillers, project).await else {
+        return rests(State::Failed {
+            detail: super::tokens::UNASKED.to_owned(),
+        });
+    };
     if link.at == at && kept.accepts(route, &link.key) {
         return rests(State::AlreadyWired);
     }
@@ -53,11 +58,11 @@ pub(super) async fn seed_media_server_link(
         route: route.to_owned(),
         token: token.clone(),
     }];
-    let beside = match kept.beside(&presented) {
+    let beside = match kept.beside(&presented).await {
         Ok(beside) => beside,
         Err(reason) => {
             return rests(State::Failed {
-                detail: kept.unwritten(&reason),
+                detail: Kept::unwritten(&reason),
             })
         }
     };
@@ -70,10 +75,10 @@ pub(super) async fn seed_media_server_link(
             ),
         });
     }
-    match kept.only(&beside, &presented, &[true]) {
+    match kept.only(&beside, &presented, &[true]).await {
         Ok(()) => rests(State::Wired),
         Err(reason) => rests(State::Failed {
-            detail: kept.unwritten(&reason),
+            detail: Kept::unwritten(&reason),
         }),
     }
 }

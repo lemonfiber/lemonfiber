@@ -156,7 +156,7 @@ pub(super) async fn seed_fulfilment_targets(
 ) -> Vec<Wiring> {
     let mut wirings = Vec::new();
     for (asker, curators) in by_asker(fulfilling(fillers)) {
-        wirings.extend(handed(ctx, services, asker, &curators, project).await);
+        wirings.extend(handed(ctx, services, fillers, asker, &curators, project).await);
     }
     wirings
 }
@@ -180,6 +180,7 @@ fn by_asker(curators: Vec<Fulfils<'_>>) -> Vec<(Cleared<'_>, Vec<Fulfils<'_>>)> 
 async fn handed(
     ctx: &Ctx,
     services: &[Service],
+    fillers: &Fillers,
     asker: Cleared<'_>,
     curators: &[Fulfils<'_>],
     project: Option<&Path>,
@@ -193,7 +194,7 @@ async fn handed(
     }
     let requests = requests.as_ref();
     let mut wirings = match project.filter(|_| crate::app::gating::service(services).is_some()) {
-        Some(project) => through_the_gate(ctx, requests, wanted, project).await,
+        Some(project) => Box::pin(through_the_gate(ctx, fillers, requests, wanted, project)).await,
         None => wired(ctx, requests, &wanted).await,
     };
     wirings.extend(refused);
@@ -211,11 +212,24 @@ async fn wired(ctx: &Ctx, requests: &dyn Requests, wanted: &[FulfilmentTarget]) 
 /// route that the gate accepts.
 async fn through_the_gate(
     ctx: &Ctx,
+    fillers: &Fillers,
     requests: &dyn Requests,
     wanted: Vec<FulfilmentTarget>,
     project: &Path,
 ) -> Vec<Wiring> {
-    let kept = super::tokens::Kept::read(ctx, project).await;
+    let Some(kept) = super::tokens::Kept::read(ctx, fillers, project).await else {
+        return wanted
+            .iter()
+            .map(|target| {
+                Wiring::settled(
+                    crate::seed::described_target(target),
+                    State::Failed {
+                        detail: super::tokens::UNASKED.to_owned(),
+                    },
+                )
+            })
+            .collect();
+    };
     let held = requests.fulfilment_targets().await.unwrap_or_default();
     let (gated, mut wirings) = kept.targets(ctx, wanted, &held);
     if ctx.dry_run {
@@ -224,10 +238,10 @@ async fn through_the_gate(
     }
     let presented: Vec<super::tokens::Presented> =
         gated.iter().map(super::tokens::Presented::by).collect();
-    let beside = match kept.beside(&presented) {
+    let beside = match kept.beside(&presented).await {
         Ok(beside) => beside,
         Err(reason) => {
-            let detail = kept.unwritten(&reason);
+            let detail = super::tokens::Kept::unwritten(&reason);
             wirings.extend(gated.iter().map(|target| {
                 Wiring::settled(
                     crate::seed::described_target(target),
@@ -247,11 +261,11 @@ async fn through_the_gate(
     wirings.extend(told);
     // The old tokens stay accepted beside the new where this cannot be written, which
     // keeps every call working and is said rather than called done.
-    if let Err(reason) = kept.only(&beside, &presented, &holding) {
+    if let Err(reason) = kept.only(&beside, &presented, &holding).await {
         wirings.push(Wiring::settled(
             TOKENS.to_owned(),
             State::Failed {
-                detail: kept.unwritten(&reason),
+                detail: super::tokens::Kept::unwritten(&reason),
             },
         ));
     }

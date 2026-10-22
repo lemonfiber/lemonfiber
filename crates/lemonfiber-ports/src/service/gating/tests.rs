@@ -1,7 +1,7 @@
 use super::{Admitted, Gated, Target};
 
 #[test]
-fn a_route_is_answered_with_its_credential_by_fingerprint_and_never_its_value() {
+fn a_route_is_answered_with_its_credential_by_its_sha_256_and_never_its_value() {
     let gated = Gated {
         target: Target::Curator {
             media_type: "tv".to_owned(),
@@ -19,8 +19,8 @@ fn a_route_is_answered_with_its_credential_by_fingerprint_and_never_its_value() 
     assert_eq!(admitted.majors, gated.majors);
     assert_eq!(admitted.tokens, gated.tokens);
     assert_eq!(
-        admitted.fingerprint,
-        crate::fingerprint("the-curators-own-key")
+        admitted.credential,
+        crate::digest::sha256("the-curators-own-key")
     );
     let answered = serde_json::to_string(&admitted).unwrap_or_default();
     assert!(!answered.contains("the-curators-own-key"), "{answered}");

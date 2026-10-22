@@ -6,15 +6,26 @@
 //! hash the gate is handed beside the old one before the request service is, so no
 //! call fails in between, and alone once the request service holds the new one.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::sync::Arc;
 
-use lemonfiber_sidecar::gate::{Accepted, File, Tokens, PORT};
-use lemonfiber_sidecar::TokenHash;
+use lemonfiber_sidecar::gate::PORT;
 
 use super::Ctx;
 use crate::app::gating;
-use crate::ports::service::{Endpoint, FulfilmentTarget, RegisteredTarget};
+use crate::app::targets::MediaServer;
+use crate::app_keys::GATE_APP;
+use crate::ports::digest::sha256;
+use crate::ports::service::{
+    Admitted, Endpoint, FulfilmentTarget, Gated, Gating, RegisteredTarget,
+};
 use crate::seed::{State, Wiring};
+use crate::wiring::Fillers;
+
+/// What is said where the request gate cannot be asked.
+pub(crate) const UNASKED: &str = "the request gate is not one the stack's credentials may be \
+                                  handed to, or cannot be asked over its contract, so no token \
+                                  was handed to it";
 
 /// Where the request service reaches `route` through the gate.
 pub(crate) fn through_the_gate(route: &str) -> Endpoint {
@@ -25,26 +36,49 @@ pub(crate) fn through_the_gate(route: &str) -> Endpoint {
     }
 }
 
-/// The tokens the gate accepts now, and where they are kept.
-pub(crate) struct Kept {
-    path: PathBuf,
-    accepted: Tokens,
+/// The routes the gate admits now, with the tokens it admits on each.
+///
+/// Handing it tokens hands it every route again, each with the credential it presents
+/// there, so those are found only when tokens are handed over: reading what it admits
+/// asks nothing of any other service.
+pub(crate) struct Kept<'a> {
+    ctx: &'a Ctx,
+    fillers: &'a Fillers,
+    gate: Arc<dyn Gating>,
+    accepted: Vec<Admitted>,
 }
 
-impl Kept {
-    /// What the gate under `project` accepts: nothing, where its file is missing or
-    /// unreadable, which every token then fails and is replaced.
-    pub(crate) async fn read(ctx: &Ctx, project: &Path) -> Self {
-        let path = gating::path(project, File::Tokens);
-        let accepted = crate::app::targets::read_owned(
-            ctx.seams.filesystem.as_ref(),
-            &path,
-            crate::within::directory_of(&path),
-        )
-        .await
-        .and_then(|text| Tokens::read(&text).ok())
-        .unwrap_or_else(|| Tokens::of(Vec::new()));
-        Self { path, accepted }
+impl<'a> Kept<'a> {
+    /// What the gate under `project` admits now: nothing, where it cannot say, which every
+    /// token then fails and is replaced. Nothing at all where the gate cannot be asked.
+    pub(crate) async fn read(
+        ctx: &'a Ctx,
+        fillers: &'a Fillers,
+        project: &Path,
+    ) -> Option<Kept<'a>> {
+        let gate = gating::asked(ctx, fillers, project).await?;
+        let accepted = gate.admitted().await.unwrap_or_default();
+        Some(Self {
+            ctx,
+            fillers,
+            gate,
+            accepted,
+        })
+    }
+
+    /// Every credential lemonfiber knows a route of the gate's presents: each curator's own
+    /// key, and the media server key filed under the gate's name that it presents.
+    async fn credentials(&self) -> Vec<(String, String)> {
+        let mut credentials: Vec<(String, String)> =
+            super::gate::curator_routes(self.ctx, self.fillers)
+                .await
+                .into_iter()
+                .map(|route| (route.path, route.credential))
+                .collect();
+        if let Some(server) = MediaServer::of(self.fillers) {
+            credentials.extend(media_credential(self.ctx, &server, &self.accepted).await);
+        }
+        credentials
     }
 
     /// Each of `wanted` reached through the gate, presenting the token the request
@@ -87,84 +121,125 @@ impl Kept {
         (gated, refused)
     }
 
-    /// Hand the gate every token `presented` on its route beside what it accepts now,
-    /// so the request service may be given them without a call failing in between.
+    /// Hand the gate every token `presented` on its route beside what it admits now, so
+    /// the request service may be given them without a call failing in between.
     ///
     /// # Errors
     ///
-    /// The reason the file could not be written.
-    pub(crate) fn beside(&self, presented: &[Presented]) -> Result<Tokens, String> {
-        let mut routes = self.accepted.routes.clone();
+    /// Why the gate could not be handed them.
+    pub(crate) async fn beside(&self, presented: &[Presented]) -> Result<Vec<Admitted>, String> {
+        let mut beside = self.accepted.clone();
         for one in presented {
-            let hash = TokenHash::of(&one.token);
-            match routes.iter_mut().find(|held| held.route == one.route) {
-                Some(held) if held.tokens.contains(&hash) => {}
-                Some(held) => held.tokens.push(hash),
-                None => routes.push(Accepted {
-                    route: one.route.clone(),
-                    tokens: vec![hash],
-                }),
+            let hash = sha256(&one.token);
+            let route = beside
+                .iter_mut()
+                .find(|held| held.path == one.route)
+                .ok_or_else(|| format!("it admits no route {}", one.route))?;
+            if !route.tokens.contains(&hash) {
+                route.tokens.push(hash);
             }
         }
-        let beside = Tokens::of(routes);
         if beside != self.accepted {
-            self.write(&beside)?;
+            self.admit(&beside).await?;
         }
         Ok(beside)
     }
 
-    /// Leave the gate accepting on each route of `presented` only the token the request
+    /// Leave the gate admitting on each route of `presented` only the token the request
     /// service now holds, where `held` says it holds it; every other route as it was.
     ///
     /// # Errors
     ///
-    /// The reason the file could not be written.
-    pub(crate) fn only(
+    /// Why the gate could not be handed them.
+    pub(crate) async fn only(
         &self,
-        beside: &Tokens,
+        beside: &[Admitted],
         presented: &[Presented],
         held: &[bool],
     ) -> Result<(), String> {
-        let mut routes = beside.routes.clone();
+        let mut only = beside.to_vec();
         for (one, _) in presented.iter().zip(held).filter(|(_, held)| **held) {
-            if let Some(kept) = routes.iter_mut().find(|kept| kept.route == one.route) {
-                kept.tokens = vec![TokenHash::of(&one.token)];
+            for kept in only.iter_mut().filter(|kept| kept.path == one.route) {
+                kept.tokens = vec![sha256(&one.token)];
             }
         }
-        let only = Tokens::of(routes);
-        if only == *beside {
+        if only == beside {
             return Ok(());
         }
-        self.write(&only)
+        self.admit(&only).await
     }
 
-    /// Whether the gate accepts `token` on `route` now.
+    /// Every route the gate admits now.
+    pub(crate) fn admitted(&self) -> &[Admitted] {
+        &self.accepted
+    }
+
+    /// Whether the gate admits `token` on `route` now.
     pub(crate) fn accepts(&self, route: &str, token: &str) -> bool {
-        self.accepted.accepts(route, token)
+        let hash = sha256(token);
+        self.accepted
+            .iter()
+            .any(|held| held.path == route && held.tokens.contains(&hash))
     }
 
-    /// Leave the gate accepting what it accepted when this was read: a replacement
-    /// that did not land is taken back out of the file.
+    /// Leave the gate admitting what it admitted when this was read: a replacement that
+    /// did not land is taken back out.
     ///
     /// # Errors
     ///
-    /// The reason the file could not be written.
-    pub(crate) fn restore(&self) -> Result<(), String> {
-        self.write(&self.accepted)
+    /// Why the gate could not be handed them.
+    pub(crate) async fn restore(&self) -> Result<(), String> {
+        self.admit(&self.accepted).await
     }
 
     /// Why the tokens could not be handed to the gate, for the report.
-    pub(crate) fn unwritten(&self, reason: &str) -> String {
-        format!(
-            "the tokens could not be written to {}: {reason}",
-            self.path.display()
-        )
+    pub(crate) fn unwritten(reason: &str) -> String {
+        format!("the tokens could not be handed to the request gate: {reason}")
     }
 
-    fn write(&self, tokens: &Tokens) -> Result<(), String> {
-        crate::config::store::write(&self.path, &tokens.written())
+    /// Hand the gate `routes`, each presenting the credential lemonfiber knows it does.
+    async fn admit(&self, routes: &[Admitted]) -> Result<(), String> {
+        let credentials = self.credentials().await;
+        let gated = routes
+            .iter()
+            .map(|route| {
+                let credential = credentials
+                    .iter()
+                    .find(|(path, value)| *path == route.path && sha256(value) == route.credential)
+                    .map(|(_, value)| value.clone())
+                    .ok_or_else(|| {
+                        format!(
+                            "lemonfiber does not hold the credential it presents on its route {}",
+                            route.path
+                        )
+                    })?;
+                Ok(Gated {
+                    target: route.target.clone(),
+                    path: route.path.clone(),
+                    address: route.address.clone(),
+                    majors: route.majors.clone(),
+                    credential,
+                    tokens: route.tokens.clone(),
+                })
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+        self.gate
+            .admit(&gated)
+            .await
             .map_err(|failure| failure.to_string())
     }
+}
+
+/// The key the gate presents on its route to `server`, where it presents one filed under
+/// its name there.
+async fn media_credential(
+    ctx: &Ctx,
+    server: &MediaServer,
+    accepted: &[Admitted],
+) -> Option<(String, String)> {
+    let client = server.administering(ctx).await?;
+    let filed = client.filed_as(GATE_APP).await.ok()?;
+    super::gate::held(accepted, &filed).map(|key| (server.id().to_owned(), key))
 }
 
 /// A token the request service is to present on a route.
