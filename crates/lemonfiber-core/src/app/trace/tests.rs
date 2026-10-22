@@ -8,7 +8,6 @@ use super::{
 };
 use crate::doctor::{Category, Finding, Verdict};
 use crate::error::{Problem, Remedy};
-use crate::jellyfin::Jellyfin;
 use crate::ports::service::{ItemPart, QueueItem, TraceEvent};
 use crate::recyclarr::Kind;
 use crate::test_support::{a_context, a_password, nowhere, SeedFs};

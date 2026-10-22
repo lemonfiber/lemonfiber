@@ -32,15 +32,26 @@ fn ctx_with_media_server(fake: &Fake, tag: &str) -> Ctx {
     context
 }
 
-/// A media server reading client over a transport, for the library-presence reads.
-fn media_server(fake: &Fake) -> Jellyfin {
-    Jellyfin::authenticated(
-        fake.transport(),
-        "http://127.0.0.1:8096",
-        "jellyfin",
-        crate::config::MEDIA_SERVER_ADMIN_USER,
-        a_password(),
-    )
+/// A library answering every question about what it holds with whether it holds it, or
+/// as one that cannot be reached where nothing is said.
+struct Holding(Option<bool>);
+
+#[async_trait::async_trait]
+impl crate::ports::service::Library for Holding {
+    async fn has_item(
+        &self,
+        _kind: Kind,
+        _term: &str,
+    ) -> Result<bool, crate::ports::service::Failure> {
+        self.0
+            .ok_or_else(|| crate::ports::service::Failure::Unavailable {
+                service: "jellyfin".to_owned(),
+            })
+    }
+
+    async fn rescan(&self) -> Result<(), crate::ports::service::Failure> {
+        Ok(())
+    }
 }
 
 #[tokio::test]
@@ -134,21 +145,7 @@ async fn tracing_a_matched_item_present_in_the_library_reports_available() {
 async fn a_media_server_with_nothing_reads_as_absent() {
     // The sign-in is accepted and the library answers, holding nothing: a confirmed
     // absence, not an unknown.
-    let presence = library_presence(
-        Some(&media_server(&Fake {
-            library: "",
-            history: "",
-            queue: "",
-            episodes: NO_EPISODES,
-            sign_in: SIGNED_IN,
-            media_server_library: NO_ITEM,
-            wanted: "",
-            releases: "",
-        })),
-        Kind::Tv,
-        "The Expanse",
-    )
-    .await;
+    let presence = library_presence(Some(&Holding(Some(false))), Kind::Tv, "The Expanse").await;
     assert_eq!(presence, Some(Presence::Absent));
 }
 
@@ -156,12 +153,7 @@ async fn a_media_server_with_nothing_reads_as_absent() {
 async fn a_media_server_that_will_not_answer_leaves_presence_unknown() {
     // The sign-in comes back as something that is not a session: the read failed, so
     // presence is unknown — never inferred as absent.
-    let presence = library_presence(
-        Some(&media_server(&Fake::curator("", "", ""))),
-        Kind::Movies,
-        "The Expanse",
-    )
-    .await;
+    let presence = library_presence(Some(&Holding(None)), Kind::Movies, "The Expanse").await;
     assert_eq!(presence, None);
 }
 

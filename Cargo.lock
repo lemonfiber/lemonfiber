@@ -1595,8 +1595,11 @@ name = "lemonfiber-testing"
 version = "0.17.0"
 dependencies = [
  "lemonfiber-adapters",
+ "lemonfiber-bundled",
+ "lemonfiber-contract",
  "lemonfiber-core",
  "lemonfiber-fixtures",
+ "lemonfiber-plugin",
 ]
 
 [[package]]

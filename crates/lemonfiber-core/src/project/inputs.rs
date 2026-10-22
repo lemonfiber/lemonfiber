@@ -172,12 +172,15 @@ pub(crate) fn written<'a>(
     manifest: &'a Manifest,
     installed: &'a [Installed],
 ) -> impl Iterator<Item = &'a Service> {
-    declared(manifest).filter(move |service| {
-        !installed
-            .iter()
-            .flat_map(|one| &one.services)
-            .any(|placed| placed.replaces.as_deref() == Some(service.id.as_str()))
-    })
+    declared(manifest).filter(move |service| !moved_in_place(installed, &service.id))
+}
+
+/// Whether one of `installed` has moved in place of the stack's service `service`.
+pub(crate) fn moved_in_place(installed: &[Installed], service: &str) -> bool {
+    installed
+        .iter()
+        .flat_map(|one| &one.services)
+        .any(|placed| placed.replaces.as_deref() == Some(service))
 }
 
 /// The one service that fills `capability`: the operator's choice where it names a

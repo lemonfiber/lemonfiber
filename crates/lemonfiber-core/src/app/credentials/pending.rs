@@ -130,7 +130,7 @@ async fn settle(ctx: &Ctx, minted: &Minted) {
         Some(false) if taken(ctx, minted, &replacement).await == Some(true) => {
             let _ =
                 promoted(ctx, &minted.setting, &replacement).and_then(|()| match &minted.opens {
-                    Opens::Media(server) => server.hand_upstream_if_contracted(&replacement),
+                    Opens::Media(server) => server.hand_upstream(&replacement),
                     Opens::Torrent(_) => Ok(()),
                 });
         }

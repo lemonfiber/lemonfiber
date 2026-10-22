@@ -85,7 +85,6 @@ pub mod health;
 pub mod household;
 pub mod instant;
 pub mod invitation;
-pub mod jellyfin;
 pub mod journal;
 pub mod keys;
 pub mod lidarr;

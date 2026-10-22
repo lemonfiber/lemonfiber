@@ -1,10 +1,8 @@
-use lemonfiber_manifest::{Api, ApiKind, KeySource, Manifest};
+use lemonfiber_manifest::{ApiKind, Manifest};
 
 use super::MediaServer;
 use crate::plugin::Installed;
-use crate::test_support::{
-    a_contracted_media_server, a_placed, an_installed, MEDIA_ADAPTER, MEDIA_UPSTREAM,
-};
+use crate::test_support::{a_contracted_media_server, a_placed, an_installed, MEDIA_UPSTREAM};
 use crate::wiring::{Address, Chosen, Fillers};
 
 /// The shipped stack, changed by `changing`, with `installed` beside it and `chosen` as the
@@ -23,44 +21,26 @@ fn shipped(
         .unwrap_or_default()
 }
 
-/// An adapter of `kind`, reading nothing from disk.
-const fn speaking(kind: ApiKind) -> Api {
-    Api {
-        kind,
-        key_source: KeySource::Generated,
-        path: None,
-        version: None,
-    }
+/// The stack with its media server moved into its plugin.
+fn moved() -> Vec<Installed> {
+    crate::test_support::media::moved().into_iter().collect()
 }
 
-/// A media server a plugin brought, serving the household's identity.
-fn a_plugin_server() -> Installed {
-    let mut placed = a_placed(
-        "emby",
-        &["identity.source"],
-        Some(speaking(ApiKind::Jellyfin)),
-        Some(8920),
-    );
-    placed.tag = "4.9.1".to_owned();
-    an_installed("emby-server", vec![placed])
-}
-
-/// The stack's own media server fills the identity ask: reached at its id on the port it
-/// listens on, its administrator's password kept under the stack's own setting, asked
-/// for by the stack's request service.
+/// A moved server is asked at its adapter and served under the stack's names: its id,
+/// the port it publishes, the setting its administrator's password was kept under before
+/// the move, and the request service that asked for it.
 #[test]
-fn the_stacks_media_server_is_the_one_its_request_service_asks_for() {
-    let fillers = shipped(&[], &Chosen::default(), |_| ());
+fn a_moved_server_is_asked_at_its_adapter_and_kept_under_the_stacks_names() {
+    let fillers = shipped(&moved(), &Chosen::default(), |_| ());
     let server = MediaServer::of(&fillers);
 
     assert_eq!(server.as_ref().map(MediaServer::id), Some("jellyfin"));
+    assert_eq!(server.as_ref().map(MediaServer::name), Some("Jellyfin"));
     assert_eq!(
-        server.as_ref().map(|one| one.network.clone()),
-        Some(Address {
-            host: "jellyfin".to_owned(),
-            port: 8096
-        })
+        server.as_ref().map(|one| one.filler.id.as_str()),
+        Some(crate::test_support::media::ADAPTER)
     );
+    assert_eq!(server.as_ref().map(|one| one.port), Some(8095));
     assert_eq!(
         server.as_ref().map(|one| one.setting.as_str()),
         Some(crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY)
@@ -69,88 +49,102 @@ fn the_stacks_media_server_is_the_one_its_request_service_asks_for() {
         server.as_ref().and_then(crate::test_support::asker),
         Some("seerr")
     );
-    assert_eq!(server.as_ref().and_then(MediaServer::brought_by), None);
+    assert_eq!(
+        server.as_ref().and_then(MediaServer::brought_by),
+        Some(crate::test_support::media::PLUGIN)
+    );
+    assert_eq!(
+        server
+            .as_ref()
+            .and_then(MediaServer::gated)
+            .map(|(kind, pairing)| (kind, pairing.at.url())),
+        Some((
+            lemonfiber_sidecar::gate::Kind::Jellyfin,
+            "http://jellyfin:8096".to_owned()
+        ))
+    );
 }
 
-/// A plugin's server chosen in its place is reached on its own terms: at its own id and
-/// port, on the lines its own tag runs, with an administrator's password kept under a
-/// setting that names the plugin and its service rather than under the stack's.
+/// A third party's server chosen in the stack's place is served on its own terms: at its
+/// upstream's id and port, its administrator's password kept under a setting that names
+/// the plugin and that upstream rather than under the stack's.
 #[test]
-fn a_plugin_server_standing_in_holds_an_administrators_password_of_its_own() {
-    let chosen = Chosen::read(Some("identity.source=emby"));
-    let fillers = shipped(&[a_plugin_server()], &chosen, |_| ());
+fn a_plugin_server_chosen_in_its_place_holds_an_administrators_password_of_its_own() {
+    let chosen = Chosen::read(Some("identity.source=media-adapter"));
+    let fillers = shipped(&[a_contracted_media_server(None)], &chosen, |_| ());
     let server = MediaServer::of(&fillers);
 
-    assert_eq!(server.as_ref().map(MediaServer::id), Some("emby"));
-    assert_eq!(
-        server.as_ref().map(|one| one.network.url()),
-        Some("http://emby:8920".to_owned())
-    );
-    assert_eq!(
-        server.as_ref().map(|one| one.filler.majors.clone()),
-        Some(vec![4])
-    );
+    assert_eq!(server.as_ref().map(MediaServer::id), Some(MEDIA_UPSTREAM));
+    assert_eq!(server.as_ref().map(|one| one.port), Some(9000));
     assert_eq!(
         server.as_ref().map(|one| one.setting.as_str()),
-        Some("PLUGIN_EMBY__SERVER_EMBY_ADMIN_PASSWORD")
+        Some("PLUGIN_CONTRACTED_MEDIA__UPSTREAM_ADMIN_PASSWORD")
     );
     assert_eq!(
         server.as_ref().and_then(MediaServer::brought_by),
-        Some("emby-server")
+        Some("contracted")
     );
 }
 
 /// Nothing is a media server where nothing fills the ask, where the ask stands contested,
-/// where its filler speaks no media server's adapter, or where it says nowhere it listens.
+/// where its filler speaks no contract, or where the server it serves publishes no port.
 #[test]
 fn an_unsettled_or_unspoken_identity_ask_has_no_media_server() {
-    let unfilled = shipped(&[], &Chosen::default(), |manifest| {
-        for service in &mut manifest.services {
-            service
+    let mut unfilled = moved();
+    for one in &mut unfilled {
+        for placed in &mut one.services {
+            placed
                 .provides
                 .retain(|provided| provided != super::IDENTITY);
         }
-    });
-    assert_eq!(MediaServer::of(&unfilled), None);
+    }
+    assert_eq!(
+        MediaServer::of(&shipped(&unfilled, &Chosen::default(), |_| ())),
+        None
+    );
 
-    let contested = shipped(&[a_plugin_server()], &Chosen::default(), |_| ());
-    assert_eq!(MediaServer::of(&contested), None);
+    let mut both = moved();
+    both.push(a_contracted_media_server(None));
+    assert_eq!(
+        MediaServer::of(&shipped(&both, &Chosen::default(), |_| ())),
+        None
+    );
 
-    let unspoken = shipped(&[], &Chosen::default(), |manifest| {
-        for service in &mut manifest.services {
-            if service.id == "jellyfin" {
-                service.api = Some(speaking(ApiKind::Seerr));
-            }
+    let mut unspoken = moved();
+    for one in &mut unspoken {
+        for placed in &mut one.services {
+            placed.speaks.clear();
         }
-    });
-    assert_eq!(MediaServer::of(&unspoken), None);
+    }
+    assert_eq!(
+        MediaServer::of(&shipped(&unspoken, &Chosen::default(), |_| ())),
+        None
+    );
 
-    let unlistening = shipped(&[], &Chosen::default(), |manifest| {
-        for service in &mut manifest.services {
-            if service.id == "jellyfin" {
-                service.listens = None;
-            }
+    let mut unpublished = moved();
+    for one in &mut unpublished {
+        for placed in &mut one.services {
+            placed.reached = None;
         }
-    });
-    assert_eq!(MediaServer::of(&unlistening), None);
+    }
+    assert_eq!(
+        MediaServer::of(&shipped(&unpublished, &Chosen::default(), |_| ())),
+        None
+    );
 }
 
 /// **A plugin is never the request service the administrator's password is handed to.**
 /// A plugin's service running under the id the stack's request service asks under, on a
-/// stack whose own request service is gone, is not taken for it: the stack's media
-/// server is still found, and nothing is named to sign in to it with its password.
+/// stack whose own request service is gone, is not taken for it: the media server is
+/// still found, and nothing is named to sign in to it with its password.
 #[test]
 fn a_plugin_under_the_request_services_id_is_never_the_one_asking() {
-    let impostor = an_installed(
+    let mut installed = moved();
+    installed.push(an_installed(
         "impostor",
-        vec![a_placed(
-            "seerr",
-            &["request.intake"],
-            Some(speaking(ApiKind::Seerr)),
-            Some(5999),
-        )],
-    );
-    let fillers = shipped(&[impostor], &Chosen::default(), |manifest| {
+        vec![a_placed("seerr", &["request.intake"], None, Some(5999))],
+    ));
+    let fillers = shipped(&installed, &Chosen::default(), |manifest| {
         manifest.services.retain(|service| service.id != "seerr");
     });
     let server = MediaServer::of(&fillers);
@@ -169,14 +163,18 @@ fn a_stack_asking_for_no_identity_still_has_its_media_server() {
             .wirings
             .retain(|wiring| wiring.asks.as_deref() != Some(super::IDENTITY));
     };
-    let fillers = shipped(&[], &Chosen::default(), unasked);
+    let fillers = shipped(&moved(), &Chosen::default(), unasked);
     let server = MediaServer::of(&fillers);
 
     assert_eq!(server.as_ref().map(MediaServer::id), Some("jellyfin"));
     assert_eq!(server.as_ref().and_then(crate::test_support::asker), None);
 
-    let contested = shipped(&[a_plugin_server()], &Chosen::default(), unasked);
-    assert_eq!(MediaServer::of(&contested), None);
+    let mut both = moved();
+    both.push(a_contracted_media_server(None));
+    assert_eq!(
+        MediaServer::of(&shipped(&both, &Chosen::default(), unasked)),
+        None
+    );
 }
 
 /// A contracted media server whose upstream answers in the API the request gate speaks is
@@ -218,11 +216,7 @@ fn a_contracted_server_is_reached_over_its_contracts_and_paired_at_its_upstream(
     );
     let server = MediaServer::of(&fillers);
 
-    assert_eq!(server.as_ref().map(MediaServer::id), Some(MEDIA_ADAPTER));
-    assert_eq!(
-        server.as_ref().map(|one| one.reach),
-        Some(super::Reach::Over)
-    );
+    assert_eq!(server.as_ref().map(MediaServer::id), Some(MEDIA_UPSTREAM));
     assert_eq!(
         server.as_ref().and_then(|one| one.pairing.clone()),
         Some(super::Pairing {
@@ -235,12 +229,6 @@ fn a_contracted_server_is_reached_over_its_contracts_and_paired_at_its_upstream(
         })
     );
     assert_eq!(server.as_ref().and_then(MediaServer::gate_kind), None);
-    assert!(server.as_ref().is_some_and(|one| one
-        .signed_in(
-            &crate::test_support::a_context().build(),
-            crate::test_support::a_password()
-        )
-        .is_none()));
 }
 
 /// An upstream that names no native API leaves the contracted server unpaired: there is
@@ -251,39 +239,22 @@ fn a_contracted_server_whose_upstream_names_no_api_is_unpaired() {
     let fillers = shipped(&[a_contracted_media_server(None)], &chosen, |_| ());
     let server = MediaServer::of(&fillers);
 
-    assert_eq!(
-        server.as_ref().map(|one| one.reach),
-        Some(super::Reach::Over)
-    );
     assert_eq!(server.as_ref().and_then(|one| one.pairing.clone()), None);
 }
 
-/// The stack's own server is reached through this build's adapter, paired at its own
-/// address in that adapter's API, and the gate answers a route for it.
+/// The stack's own server, which speaks no contract, is no media server lemonfiber can
+/// reach: nothing is set up, identified or administered on it until it is moved onto its
+/// plugin.
 #[test]
-fn the_stacks_server_is_reached_through_the_adapter_and_paired_at_itself() {
+fn the_stacks_own_server_speaking_no_contract_is_no_media_server() {
     let fillers = shipped(&[], &Chosen::default(), |_| ());
-    let server = MediaServer::of(&fillers);
 
-    assert_eq!(
-        server.as_ref().map(|one| one.reach),
-        Some(super::Reach::Bundled(ApiKind::Jellyfin))
-    );
-    assert_eq!(
-        server
-            .as_ref()
-            .and_then(|one| one.pairing.as_ref())
-            .map(|pairing| (pairing.protocol.0.as_str(), pairing.at.url())),
-        Some(("jellyfin", "http://jellyfin:8096".to_owned()))
-    );
-    assert_eq!(
-        server.as_ref().and_then(MediaServer::gate_kind),
-        Some(lemonfiber_sidecar::gate::Kind::Jellyfin)
-    );
+    assert_eq!(MediaServer::of(&fillers), None);
 }
 
 /// An adapter naming a service outside its own plugin as the upstream it fronts is paired
-/// nowhere: the administrator's password is never pointed at another's service.
+/// nowhere and serves as itself: the administrator's password is never pointed at, or
+/// kept for, another's service.
 #[test]
 fn a_contracted_server_fronting_another_plugins_service_is_unpaired() {
     let mut installed = a_contracted_media_server(Some("upstream"));
@@ -307,16 +278,15 @@ fn a_contracted_server_fronting_another_plugins_service_is_unpaired() {
             .map(|one| (one.brought_by(), one.native.as_deref())),
         Some((Some("other"), Some("upstream")))
     );
-    assert_eq!(server.as_ref().map(MediaServer::id), Some(MEDIA_ADAPTER));
     assert_eq!(
-        server.as_ref().map(|one| one.reach),
-        Some(super::Reach::Over)
+        server.as_ref().map(MediaServer::id),
+        Some(crate::test_support::MEDIA_ADAPTER)
     );
     assert_eq!(server.and_then(|one| one.pairing), None);
 }
 
-/// A contracted media server that cannot be asked over its contracts is asked nothing
-/// any other way: not set up, identified or administered through this build's adapter.
+/// A contracted media server that cannot be asked over its contracts is asked nothing:
+/// not set up, identified or administered.
 #[tokio::test]
 async fn a_contracted_server_unanswered_over_its_contracts_is_asked_nothing() {
     let chosen = Chosen::read(Some("identity.source=media-adapter"));
@@ -333,25 +303,20 @@ async fn a_contracted_server_unanswered_over_its_contracts_is_asked_nothing() {
         .with_http(http.clone());
     let server = MediaServer::of(&fillers);
 
-    assert_eq!(
-        server.as_ref().map(|one| one.reach),
-        Some(super::Reach::Over)
-    );
     if let Some(server) = server.as_ref() {
         assert!(server.setting_up(&ctx).await.is_none());
         assert!(server.identifying(&ctx).await.is_none());
         assert!(server.administering(&ctx).await.is_none());
-        assert!(server.administered(&ctx).is_none());
     }
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
 
 /// Recording a contracted server's administrator's password also writes it where the
-/// server's adapter reads its upstream's credential, readable by the operator alone; the
-/// stack's own server is handed nothing beside its setting, and a credential that cannot
-/// be written is refused.
+/// server's adapter reads its upstream's credential, readable by the operator alone; an
+/// adapter with no configuration on this machine, or one whose credential cannot be
+/// written, is refused.
 #[test]
-fn a_contracted_servers_password_is_handed_to_its_adapter_and_the_stacks_is_not() {
+fn a_contracted_servers_password_is_handed_to_its_adapter() {
     use std::os::unix::fs::PermissionsExt as _;
 
     let env = crate::test_support::env_without_password("hand-upstream");
@@ -377,10 +342,6 @@ fn a_contracted_servers_password_is_handed_to_its_adapter_and_the_stacks_is_not(
         )),
         "contracted",
     );
-    let stacks = place(
-        MediaServer::of(&shipped(&[], &Chosen::default(), |_| ())),
-        "stacks",
-    );
     let unplaced = MediaServer::of(&shipped(
         &[a_contracted_media_server(Some("upstream"))],
         &Chosen::read(Some("identity.source=media-adapter")),
@@ -399,9 +360,6 @@ fn a_contracted_servers_password_is_handed_to_its_adapter_and_the_stacks_is_not(
     let handed = contracted
         .as_ref()
         .map(|server| server.record_password(&ctx, &password));
-    let kept = stacks
-        .as_ref()
-        .map(|server| server.record_password(&ctx, &password));
     let nowhere = unplaced
         .as_ref()
         .map(|server| server.record_password(&ctx, &password));
@@ -416,7 +374,6 @@ fn a_contracted_servers_password_is_handed_to_its_adapter_and_the_stacks_is_not(
         .and_then(|bytes| serde_json::from_slice(&bytes).ok())
         .unwrap_or_default();
     let mode = std::fs::metadata(&upstream).map(|meta| meta.permissions().mode() & 0o777);
-    let stacks_written = scratch.join("stacks").exists();
     let _ = std::fs::remove_dir_all(&scratch);
 
     assert_eq!(handed, Some(Ok(())));
@@ -433,8 +390,6 @@ fn a_contracted_servers_password_is_handed_to_its_adapter_and_the_stacks_is_not(
         Some(password.as_str())
     );
     assert_eq!(mode.ok(), Some(0o600));
-    assert_eq!(kept, Some(Ok(())));
-    assert!(!stacks_written);
     assert!(nowhere.is_some_and(|recorded| recorded.is_err()));
     assert!(unwritten.is_some_and(|recorded| recorded.is_err()));
 }

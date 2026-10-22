@@ -15,6 +15,10 @@ pub mod context;
 
 pub(crate) use context::{a_context, nowhere, repository_stack as stack};
 
+/// The media server moved into its plugin, the same file the testing crate is built from.
+#[path = "../../lemonfiber-testing/src/media.rs"]
+pub mod media;
+
 /// The day the fixture clock is stopped on, as the manifest's date rules read it.
 ///
 /// One day for every test that validates the real manifest, read from the same

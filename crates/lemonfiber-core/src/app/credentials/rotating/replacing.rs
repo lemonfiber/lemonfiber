@@ -7,8 +7,8 @@ use std::sync::Arc;
 use lemonfiber_contract::capabilities::identity::source;
 
 use super::super::pending::{forgotten, kept, pending, promoted};
-use super::{said, unrecorded, Replaced, Replacing, NO_ADMINISTRATOR_HELD};
-use crate::app::targets::{record_secret, MediaServer, Reach as Spoken};
+use super::{said, unrecorded, Replaced, Replacing};
+use crate::app::targets::{record_secret, MediaServer};
 use crate::app::Ctx;
 use crate::ports::service::Failure;
 
@@ -37,7 +37,7 @@ pub(crate) async fn replace_admin_password(
     }
     match client.replace_admin_password(&replacement).await {
         Ok(()) => promoted(ctx, setting, &replacement)
-            .and_then(|()| server.hand_upstream_if_contracted(&replacement))
+            .and_then(|()| server.hand_upstream(&replacement))
             .map(|()| Replaced::Done)
             .map_err(Replacing::Unkept),
         Err(Failure::Unauthorised { .. }) => {
@@ -51,19 +51,12 @@ pub(crate) async fn replace_admin_password(
     }
 }
 
-/// The media server as its administrator's password is changed on it: over
-/// `identity.source` where it speaks it, otherwise through this build's adapter signed in
-/// with the password lemonfiber recorded for it.
+/// The media server as its administrator's password is changed on it, over
+/// `identity.source`.
 async fn asked(ctx: &Ctx, server: &MediaServer) -> Result<Arc<dyn source::Fills>, Replacing> {
-    match server.reach {
-        Spoken::Over => Box::pin(server.setting_up(ctx))
-            .await
-            .ok_or_else(|| Replacing::Unproven(UNASKED_OVER_ITS_CONTRACTS.to_owned())),
-        Spoken::Bundled(_) => server
-            .administered(ctx)
-            .map(|client| Arc::new(client) as Arc<dyn source::Fills>)
-            .ok_or_else(|| Replacing::Unproven(NO_ADMINISTRATOR_HELD.to_owned())),
-    }
+    Box::pin(server.setting_up(ctx))
+        .await
+        .ok_or_else(|| Replacing::Unproven(UNASKED_OVER_ITS_CONTRACTS.to_owned()))
 }
 
 /// What is said where no randomness was available to mint a replacement.

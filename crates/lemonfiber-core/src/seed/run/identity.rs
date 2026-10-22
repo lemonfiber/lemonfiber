@@ -58,11 +58,37 @@ pub(super) async fn seed_media_server_admin(
         ctx.dry_run,
         &keep,
     )
-    .await;
+    .await
+    .and_then(|password| handed(ctx, server, recorded.as_deref(), password));
     Some(Admin {
         administered,
         requests,
     })
+}
+
+/// `password`, once the server's adapter holds it.
+///
+/// One recorded on an earlier run is handed to the adapter again, so an adapter that has
+/// never held it, as one moved in place has not, signs in with the password in force. One
+/// minted on this run was handed over as it was recorded, and a rehearsal writes nothing.
+fn handed(
+    ctx: &Ctx,
+    server: &MediaServer,
+    recorded: Option<&str>,
+    password: String,
+) -> Result<String, crate::seed::State> {
+    if ctx.dry_run || recorded != Some(password.as_str()) {
+        return Ok(password);
+    }
+    server
+        .hand_upstream(&password)
+        .map(|()| password)
+        .map_err(|why| crate::seed::State::Failed {
+            detail: format!(
+                "{} could not be handed its administrator's password: {why}",
+                server.name()
+            ),
+        })
 }
 
 /// The second half: the request service signed in through the media server — at the

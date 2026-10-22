@@ -26,11 +26,12 @@ use super::filled::{spoken, Spoken};
 use super::layout::{project_directory, read_owned, service_config_dir};
 
 /// The server the decline service acts on: the stack's own service its link by name
-/// reaches, rather than whatever serves identity, where that is one lemonfiber speaks to
-/// as a media server.
+/// reaches, or the first-party service standing in for it, rather than whatever serves
+/// identity, asked through the adapter of its own plugin that fronts it where one does,
+/// and where that is one lemonfiber speaks to as a media server.
 pub(crate) fn declined_server(fillers: &Fillers) -> Option<super::MediaServer> {
-    let filler = fillers.named_by(crate::app::invite::declining::SERVICE)?;
-    super::MediaServer::at(fillers, filler)
+    let named = fillers.named_by(crate::app::invite::declining::SERVICE)?;
+    super::MediaServer::at(fillers, fillers.fronting(named).unwrap_or(named))
 }
 
 /// One curator a read can be made against: the service it files, a client already carrying
