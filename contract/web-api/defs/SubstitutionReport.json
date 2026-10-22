@@ -18,6 +18,17 @@
     "substitution": {
       "description": "The change itself, and what it would leave with nothing filling it.",
       "$ref": "Substitution.json"
+    },
+    "unvetted": {
+      "description": "The operator's overlay and every service it changes, where there is one: merged\nover the project this choice would write, and held to nothing lemonfiber vets.",
+      "anyOf": [
+        {
+          "$ref": "Unvetted.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
   "required": [

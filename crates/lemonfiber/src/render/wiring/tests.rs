@@ -223,6 +223,7 @@ fn a_stack_that_declares_no_wiring_says_so_rather_than_showing_an_empty_list() {
 fn substituting(applied: bool, leaves: Vec<Unfilled>) -> SubstitutionReport {
     SubstitutionReport {
         rehearsed: false,
+        unvetted: None,
         substitution: Substitution {
             capability: "indexer.search".to_owned(),
             was: Some("prowlarr".to_owned()),
@@ -316,4 +317,25 @@ fn what_a_substitution_would_leave_unfilled_is_said_in_the_conditional() {
 
     let done = substituted(&substituting(true, leaves)).text();
     assert!(done.contains("This left nothing filling:"), "{done}");
+}
+
+/// A choice merged under the operator's overlay names it as unvetted, with every service
+/// it changes.
+#[test]
+fn a_choice_under_an_overlay_names_it_as_unvetted() {
+    let report = SubstitutionReport {
+        unvetted: Some(lemonfiber_core::model::Unvetted {
+            overlay: "/srv/lemonfiber/overlay.yml".to_owned(),
+            services: vec!["jellyfin".to_owned()],
+        }),
+        ..substituting(false, Vec::new())
+    };
+    let said = substituted(&report).text();
+    assert!(
+        said.contains("Unvetted: your overlay /srv/lemonfiber/overlay.yml"),
+        "{said}"
+    );
+    assert!(!substituted(&substituting(false, Vec::new()))
+        .text()
+        .contains("Unvetted"));
 }

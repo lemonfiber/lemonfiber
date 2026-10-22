@@ -120,11 +120,13 @@ fn substituting(
     substitution.why = reason.map(str::to_owned);
 
     let standing = offer(&substitution);
+    let unvetted = crate::overlay::unvetted(ctx);
     let reading = |applied| SubstitutionReport {
         rehearsed: false,
         substitution: substitution.clone(),
         applied,
         agreement: standing.clone(),
+        unvetted: unvetted.clone(),
     };
     let Some(answered) = filling.agreement.as_deref() else {
         return Ok(reading(false));

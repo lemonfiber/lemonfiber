@@ -191,6 +191,7 @@ pub(super) fn what_is_wired() -> WiringReport {
 pub(super) fn a_substitution() -> SubstitutionReport {
     SubstitutionReport {
         rehearsed: false,
+        unvetted: None,
         substitution: Substitution {
             capability: "indexer.search".to_owned(),
             was: Some("prowlarr".to_owned()),
