@@ -1,19 +1,31 @@
 //! A stack service's further mount source, made as the operator before a start where
 //! nothing stands there, so the engine never makes it as root.
 
-use lemonfiber_manifest::Manifest;
-
-use super::{journal, machine};
+use super::{journal, machine, manifest, plan};
 use crate::app::Ctx;
 use crate::journal::Kind;
 
 /// Make the mount sources of the stack this build carries, as a start does.
 fn making(ctx: &Ctx) -> Result<(), Box<crate::error::Problem>> {
-    Manifest::from_toml(lemonfiber_bundled::STACK)
-        .ok()
-        .map_or(Ok(()), |manifest| {
-            super::super::mounting::made(ctx, &manifest)
-        })
+    making_beside(ctx, &[])
+}
+
+/// Make the mount sources of the stack this build carries beside `installed`, as a start
+/// does.
+fn making_beside(
+    ctx: &Ctx,
+    installed: &[crate::plugin::Installed],
+) -> Result<(), Box<crate::error::Problem>> {
+    manifest().map_or(Ok(()), |manifest| {
+        super::super::mounting::made(ctx, &manifest, installed)
+    })
+}
+
+/// Prepare the project of the stack this build carries for a run, starting where
+/// `starting`.
+fn preparing(ctx: &Ctx, starting: bool) -> bool {
+    manifest()
+        .is_some_and(|manifest| super::super::prepared(ctx, &manifest, &plan(), starting).is_ok())
 }
 
 /// Where the media server's cache is mounted from.
@@ -59,6 +71,19 @@ fn a_mount_source_not_there_is_made_and_journalled_parent_first() {
 }
 
 #[test]
+fn a_start_makes_each_mount_source_and_a_run_starting_nothing_makes_none() {
+    let (ctx, project) = machine("mount-started");
+    let _ = std::fs::remove_dir_all(project.join("config").join("jellyfin").join("cache"));
+
+    assert!(preparing(&ctx, false));
+    let before = cache(&project).exists();
+    assert!(preparing(&ctx, true));
+
+    assert!(!before);
+    assert!(cache(&project).is_dir());
+}
+
+#[test]
 fn a_stack_directory_the_operator_named_gets_its_mount_sources_too() {
     let (mut ctx, _) = machine("mount-named");
     ctx.stack = crate::test_support::stack();
@@ -67,6 +92,20 @@ fn a_stack_directory_the_operator_named_gets_its_mount_sources_too() {
     assert!(making(&ctx).is_ok());
 
     assert!(cache(&ours).is_dir());
+}
+
+#[test]
+fn a_stack_service_moved_in_place_gets_no_mount_source_of_the_stack() {
+    let (ctx, project) = machine("mount-moved");
+    let _ = std::fs::remove_dir_all(project.join("config").join("jellyfin").join("cache"));
+    let mut moved = crate::test_support::a_placed("jellyfin", &[], None, None);
+    moved.replaces = Some("jellyfin".to_owned());
+    let installed = [crate::test_support::an_installed("jellyfin", vec![moved])];
+
+    assert!(making_beside(&ctx, &installed).is_ok());
+
+    assert!(!cache(&project).exists());
+    assert!(!made(&ctx).contains(&cache(&project).display().to_string()));
 }
 
 #[test]

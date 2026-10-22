@@ -15,17 +15,22 @@ use super::super::Ctx;
 use super::moving::{change, missing, shown};
 use crate::error::{Diagnose, Problem};
 use crate::journal::Kind;
+use crate::plugin::Installed;
 use crate::ports::filesystem::Lying;
 use crate::project::entry::{mounts, MOUNT_TREE};
 use crate::stack::Failure;
 
-/// Make every stack service's further mount source that is not there yet, journalling
-/// each directory it makes first.
+/// Make every further mount source not there yet of each stack service the project
+/// writes beside `installed`, journalling each directory it makes first.
 ///
 /// # Errors
 ///
 /// Where the journal cannot be written, or a directory cannot be made.
-pub(crate) fn made(ctx: &Ctx, manifest: &Manifest) -> Result<(), Box<Problem>> {
+pub(crate) fn made(
+    ctx: &Ctx,
+    manifest: &Manifest,
+    installed: &[Installed],
+) -> Result<(), Box<Problem>> {
     let (false, Some(directory), Some(paths)) = (
         ctx.dry_run,
         super::directory(ctx),
@@ -34,7 +39,7 @@ pub(crate) fn made(ctx: &Ctx, manifest: &Manifest) -> Result<(), Box<Problem>> {
         return Ok(());
     };
     let stamp = ctx.stamp();
-    for source in absent(ctx, &directory, manifest) {
+    for source in absent(ctx, &directory, manifest, installed) {
         let changes: Vec<_> = missing(&source)
             .into_iter()
             .chain(std::iter::once(source.clone()))
@@ -55,10 +60,15 @@ pub(crate) fn made(ctx: &Ctx, manifest: &Manifest) -> Result<(), Box<Problem>> {
     Ok(())
 }
 
-/// Every further mount source of the stack's services beneath `directory` that is not
-/// there, reached through no link.
-fn absent(ctx: &Ctx, directory: &Path, manifest: &Manifest) -> Vec<PathBuf> {
-    crate::project::written(manifest)
+/// Every further mount source beneath `directory` of the stack services the project
+/// writes beside `installed` that is not there, reached through no link.
+fn absent(
+    ctx: &Ctx,
+    directory: &Path,
+    manifest: &Manifest,
+    installed: &[Installed],
+) -> Vec<PathBuf> {
+    crate::project::written(manifest, installed)
         .flat_map(|service| {
             mounts(&service.mount, service.takes_data).map(move |mount| {
                 directory

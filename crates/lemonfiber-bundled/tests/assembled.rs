@@ -1,7 +1,7 @@
 //! The stack the bundle assembles, held to the media stack it replaces: every service
 //! the same in every field, but for the differences named here until each is levelled,
 //! and for the secrets a part declares and the variables naming them, which the media
-//! stack's Compose files write from its `.env`.
+//! stack's own services do not declare.
 
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -19,15 +19,11 @@ const NOT_ASSEMBLED: [&str; 1] = ["jellyfin"];
 /// is tagged by its release without the `v`, and the gate is pinned at a commit on its
 /// main branch past the release the media stack holds. Each part filling a capability
 /// the media stack's own service does not declare provides and claims it in its plugin;
-/// the proxy keeps its configuration read-only at `/etc/caddy` and its state beside it,
-/// as its own user; and the gate says the port it listens on.
-const DIFFERING: [(&str, &str); 26] = [
+/// the proxy runs as its own user; and the gate says the port it listens on.
+const DIFFERING: [(&str, &str); 23] = [
     ("caddy", "claim"),
-    ("caddy", "config_path"),
-    ("caddy", "config_ro"),
     ("caddy", "digest"),
     ("caddy", "image"),
-    ("caddy", "mount"),
     ("caddy", "provides"),
     ("caddy", "tag"),
     ("caddy", "user_mode"),
@@ -83,7 +79,7 @@ const ASKED_HERE: [(&str, &str); 21] = [
 const NAMED_THERE: [(&str, &str); 1] = [("door", "jellyfin")];
 
 /// Each variable a part takes from a secret it declares, as its service, the variable
-/// and the secret: the media stack's Compose files write these from its `.env` instead.
+/// and the secret: the media stack's own services declare none of them.
 const FROM_SECRETS: [(&str, &str, &str); 7] = [
     ("bindery", "BINDERY_API_KEY", "api-key"),
     ("gluetun", "WIREGUARD_PRIVATE_KEY", "wireguard-key"),

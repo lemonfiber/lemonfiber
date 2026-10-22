@@ -26,10 +26,13 @@ fn fillers(installed: &[crate::plugin::Installed]) -> Fillers {
         .unwrap_or_default()
 }
 
-fn ctx() -> crate::app::Ctx {
+fn ctx(name: &str) -> crate::app::Ctx {
     a_context()
         .settings(crate::config::Settings {
-            env_file: Some(env_at("forwarding-reaching", &a_password())),
+            env_file: Some(env_at(
+                &format!("forwarding-reaching-{name}"),
+                &a_password(),
+            )),
             ..crate::config::Settings::default()
         })
         .build()
@@ -41,7 +44,7 @@ async fn only_torrent_fillers_taking_the_guard_are_inside_it() {
         an_installed("deluge", vec![torrent("deluge", true)]),
         an_installed("seedbox", vec![torrent("seedbox", false)]),
     ];
-    let ctx = ctx();
+    let ctx = ctx("only");
     let found: Vec<(String, bool)> = inside(&ctx, &fillers(&installed))
         .await
         .into_iter()
@@ -65,7 +68,7 @@ async fn a_torrent_adapter_is_inside_the_guard_its_upstream_takes() {
         via: GUARD.to_owned(),
     });
     let installed = [an_installed("fronted", vec![adapter, upstream])];
-    let ctx = ctx();
+    let ctx = ctx("adapter");
     let found: Vec<String> = inside(&ctx, &fillers(&installed))
         .await
         .into_iter()
@@ -76,7 +79,7 @@ async fn a_torrent_adapter_is_inside_the_guard_its_upstream_takes() {
 
 #[tokio::test]
 async fn the_stacks_own_guard_is_asked_in_process_and_a_strangers_uncontracted_one_not_at_all() {
-    let ctx = ctx();
+    let ctx = ctx("own");
     assert!(guard(&ctx, &fillers(&[])).await.is_some());
 
     let stranger = [an_installed(

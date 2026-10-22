@@ -172,7 +172,7 @@ pub(crate) fn prepared(
         secrets_written(ctx, manifest, installed).map_err(|failure| Box::new(failure.problem()))?;
         if starting {
             moved(ctx, manifest)?;
-            mounting::made(ctx, manifest)?;
+            mounting::made(ctx, manifest, installed)?;
         }
     }
     Ok(Prepared {

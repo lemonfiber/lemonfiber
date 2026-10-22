@@ -44,6 +44,20 @@ fn carried(into: &Path, env: &Path) -> Ctx {
         .build()
 }
 
+/// A context operating the stack this build assembles from its bundle, materialised under
+/// `into`.
+fn bundled(into: &Path, env: &Path) -> Ctx {
+    a_context()
+        .over(crate::test_support::carried_stack())
+        .settings(Settings {
+            stack_dir: Some(into.to_path_buf()),
+            env_file: Some(env.to_path_buf()),
+            ..Settings::default()
+        })
+        .environment(Environment::LinuxNative)
+        .build()
+}
+
 /// What the operator wrote over the project.
 const EDITED: &str = "services:\n  sonarr:\n    image: my-own\n";
 
@@ -168,15 +182,19 @@ async fn a_reset_over_a_refused_data_root_is_refused_and_writes_nothing() {
     assert!(!into.join(crate::project::FILE).exists());
 }
 
-/// A previewed reset writes no secrets file.
+/// A confirmed reset writes each secrets file the project names, and a preview none.
 #[tokio::test]
-async fn a_previewed_reset_writes_no_secrets_file() {
+async fn a_confirmed_reset_writes_each_secrets_file_and_a_preview_none() {
     let (into, env) = scratch("unfiled");
     let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
-
-    assert!(reset(&carried(&into, &env), false).await.is_ok());
-
-    assert!(!env
+    let guard = env
         .with_file_name(crate::config::paths::SECRETS_FILES)
-        .exists());
+        .join("gluetun.env");
+
+    assert!(reset(&bundled(&into, &env), false).await.is_ok());
+    let previewed = guard.exists();
+    assert!(reset(&bundled(&into, &env), true).await.is_ok());
+
+    assert!(!previewed);
+    assert!(guard.is_file());
 }

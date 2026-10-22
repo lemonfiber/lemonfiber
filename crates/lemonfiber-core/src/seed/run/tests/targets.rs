@@ -180,10 +180,10 @@ fn password_of(held: &Held, service: &super::super::clients::Holder) -> Option<S
     }
 }
 
-/// The bundled torrent client's password is recorded where the tunnel's forwarded-port
-/// push reads it, as it always was.
+/// The bundled torrent client's password is recorded under the setting its credential is
+/// listed and rotated by.
 #[test]
-fn the_bundled_torrent_clients_password_setting_is_the_one_the_tunnel_reads() {
+fn the_bundled_torrent_clients_password_setting_is_the_one_its_credential_names() {
     let fillers = shipped_fillers(None);
     let setting = fillers
         .service("qbittorrent")

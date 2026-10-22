@@ -1,32 +1,12 @@
 //! A data root the setting names that is refused: no project is written from it, a start
 //! over it is refused naming it, and a run that starts nothing still goes ahead.
 
-use lemonfiber_manifest::Manifest;
-
-use super::machine;
+use super::{machine, manifest, plan};
 use crate::app::Ctx;
 use crate::error::codes::storage::ROOT_REFUSED;
 
 /// An NFS export whose server is no host name.
 const REFUSED: &str = "nfs://nas local/volume1";
-
-/// The manifest of the stack this build carries.
-fn manifest() -> Option<Manifest> {
-    Manifest::from_toml(lemonfiber_bundled::STACK).ok()
-}
-
-/// A plan starting nothing in particular.
-fn plan() -> crate::stack::closure::Plan {
-    crate::stack::closure::Plan {
-        forms: Vec::new(),
-        profiles: std::collections::BTreeSet::new(),
-        services: Vec::new(),
-        dropped: Vec::new(),
-        filtered: Vec::new(),
-        footprint: crate::stack::closure::Footprint::default(),
-        running: crate::stack::closure::Running::Unasked,
-    }
-}
 
 /// What preparing the project for a run, starting where `starting`, came to.
 fn preparing(ctx: &Ctx, starting: bool) -> Result<(), String> {

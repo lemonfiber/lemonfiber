@@ -245,15 +245,23 @@ async fn an_answered_change_is_one_journalled_run_written_after_its_record() {
     let stamps: std::collections::BTreeSet<&str> =
         changes.iter().map(|one| one.at.as_str()).collect();
     assert_eq!(stamps.len(), 1);
-    assert!(changes.iter().all(|one| one.operation == "settings"));
-    assert!(changes.iter().any(|one| one.kind
+    let (run, started): (Vec<&Change>, Vec<&Change>) =
+        changes.iter().partition(|one| one.operation == "settings");
+    assert!(
+        started
+            .iter()
+            .all(|one| one.operation == crate::app::project::OPERATION
+                && matches!(one.kind, Kind::Made { .. })),
+        "{started:?}"
+    );
+    assert!(run.iter().any(|one| one.kind
         == Kind::Setting {
             name: MODE.to_owned(),
             previous: None,
             current: Some("fast".to_owned()),
             filed: None,
         }));
-    assert!(changes.iter().any(|one| matches!(&one.kind,
+    assert!(run.iter().any(|one| matches!(&one.kind,
         Kind::Rewritten { path, previous, .. }
             if *path == machine.document.display().to_string() && *previous == before)));
 }

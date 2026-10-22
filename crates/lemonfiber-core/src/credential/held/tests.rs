@@ -22,9 +22,9 @@ fn no_two_entries_are_recorded_under_the_same_setting() {
 }
 
 /// The consumer this list exists for: a rotation reaching the torrent client alone leaves
-/// the tunnel unable to apply the port it was granted.
+/// every library service registered in it signing in with the password it replaced.
 #[test]
-fn the_torrent_password_names_the_port_push_as_well_as_the_client() {
+fn the_torrent_password_names_each_registration_as_well_as_the_client() {
     let consumers: Vec<&str> = TORRENT_CLIENT
         .consumers
         .iter()
@@ -32,7 +32,11 @@ fn the_torrent_password_names_the_port_push_as_well_as_the_client() {
         .collect();
     let consumers = consumers.join("; ");
 
-    assert!(consumers.contains("forwarded-port push"), "{consumers}");
+    assert!(
+        consumers.contains("download-client registration"),
+        "{consumers}"
+    );
+    assert!(consumers.contains("port forwarding"), "{consumers}");
     assert!(consumers.contains("web UI"), "{consumers}");
     assert!(TORRENT_CLIENT.consumers.len() >= 3, "{consumers}");
 }

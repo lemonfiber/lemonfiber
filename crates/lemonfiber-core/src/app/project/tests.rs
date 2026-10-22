@@ -31,6 +31,24 @@ fn machine(name: &str) -> (Ctx, PathBuf) {
     (ctx, project)
 }
 
+/// The manifest of the stack this build carries.
+fn manifest() -> Option<lemonfiber_manifest::Manifest> {
+    lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK).ok()
+}
+
+/// A plan starting nothing in particular.
+fn plan() -> crate::stack::closure::Plan {
+    crate::stack::closure::Plan {
+        forms: Vec::new(),
+        profiles: std::collections::BTreeSet::new(),
+        services: Vec::new(),
+        dropped: Vec::new(),
+        filtered: Vec::new(),
+        footprint: crate::stack::closure::Footprint::default(),
+        running: crate::stack::closure::Running::Unasked,
+    }
+}
+
 /// Move what the machine's stack keeps in its configuration tree into its mount tree.
 fn moving(ctx: &Ctx) -> Result<(), Box<crate::error::Problem>> {
     let manifest = ctx

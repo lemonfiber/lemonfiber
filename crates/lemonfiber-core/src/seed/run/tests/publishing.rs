@@ -204,8 +204,6 @@ async fn every_service_with_a_key_is_published_not_only_the_ones_that_file_media
         &services,
         &super::fillers_of(services.clone()),
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
-        // The torrent client's password is in hand, which is what its account name is
-        // published to pair with.
         &Held::from(std::collections::BTreeMap::from([(
             "qbittorrent".to_owned(),
             Credential::UserPass {
@@ -223,13 +221,16 @@ async fn every_service_with_a_key_is_published_not_only_the_ones_that_file_media
         "PROWLARR_API_KEY=the-key",
         "BAZARR_API_KEY=finder-key",
         "SEERR_API_KEY=request-key",
-        "QBITTORRENT_USERNAME=admin",
     ] {
         assert!(
             written.contains(expected),
             "{expected} was not published: {written}"
         );
     }
+    assert!(
+        !written.contains("QBITTORRENT_USERNAME"),
+        "the torrent client's account is published for nothing to read: {written}"
+    );
     for retired in ["JELLYFIN_API_KEY", "AUDIOBOOKSHELF_API_KEY"] {
         assert!(
             !written.contains(retired),
