@@ -8,6 +8,7 @@ use lemonfiber_sidecar::TokenHash;
 
 use super::*;
 use crate::baseline::Baseline;
+use crate::test_support::media;
 
 /// What the report calls this connection.
 const HELD: &str = "The credentials the request service held";
@@ -152,20 +153,27 @@ fn link_at(host: &str, port: u16, base: &str) -> String {
     .to_string()
 }
 
-/// The keys the media server lists, with the request service's own under its name
-/// where `minted`.
-fn keys(minted: bool) -> String {
-    let items: Vec<serde_json::Value> = minted
-        .then(|| serde_json::json!({ "AppName": "Seerr", "AccessToken": "seerr-minted" }))
-        .into_iter()
-        .collect();
-    serde_json::json!({ "Items": items }).to_string()
+/// The keys the media server files under the request service's name: its own where
+/// `minted`.
+fn keys(minted: bool) -> Answer {
+    let filed: Vec<&str> = minted.then_some(MINTED).into_iter().collect();
+    media::answered(&filed)
 }
 
+/// The media server key the request service minted itself.
+const MINTED: &str = "seerr-minted";
+
 /// A household whose request service holds the curator as `listed_curator`, passes its own
-/// test of it with `tested`, and whose media server lists `keys` and answers a revoke with
-/// `revoked`; the curator answers a reset with `reset`.
-fn household(listed_curator: &str, tested: u16, keys: &str, revoked: u16, reset: u16) -> Arc<Fake> {
+/// test of it with `tested`, and whose media server answers what it files under the
+/// request service's name with `keys` and a revoke with `revoked`; the curator answers a
+/// reset with `reset`.
+fn household(
+    listed_curator: &str,
+    tested: u16,
+    keys: Answer,
+    revoked: Answer,
+    reset: u16,
+) -> Arc<Fake> {
     linked_household(&linked(), listed_curator, 200, tested, keys, revoked, reset)
 }
 
@@ -176,8 +184,8 @@ fn linked_household(
     listed_curator: &str,
     listed: u16,
     tested: u16,
-    keys: &str,
-    revoked: u16,
+    keys: Answer,
+    revoked: Answer,
     reset: u16,
 ) -> Arc<Fake> {
     let leaked = |text: &str| -> &'static str { Box::leak(text.to_owned().into_boxed_str()) };
@@ -202,25 +210,8 @@ fn linked_household(
             "/settings/jellyfin",
             vec![Answer::reply(200, leaked(link))],
         ),
-        (
-            Method::Post,
-            "/Users/AuthenticateByName",
-            vec![Answer::reply(
-                200,
-                r#"{"AccessToken":"token","User":{"Id":"admin-id"}}"#,
-            )],
-        ),
-        (
-            Method::Get,
-            "/Auth/Keys",
-            vec![Answer::reply(200, leaked(keys))],
-        ),
-        (
-            Method::Delete,
-            "/Auth/Keys/",
-            vec![Answer::reply(revoked, "")],
-        ),
-        (Method::Post, "/Auth/Keys", vec![Answer::reply(204, "")]),
+        (Method::Post, media::serve("filed_as"), vec![keys]),
+        (Method::Post, media::serve("revoke"), vec![revoked]),
         (Method::Post, "/command", vec![Answer::reply(reset, "{}")]),
         (
             Method::Get,
@@ -256,17 +247,36 @@ fn owing() -> Baseline {
     baseline
 }
 
-/// This step over `ctx`, and the baseline it left.
+/// This step over `ctx`, with the media server moved into its plugin, and the baseline it
+/// left.
 async fn taken(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
+    project: &std::path::Path,
+    baseline: Baseline,
+) -> (Option<State>, Baseline) {
+    taken_among(
+        ctx,
+        services,
+        &moved_at(services.to_vec(), project),
+        project,
+        baseline,
+    )
+    .await
+}
+
+/// This step over `ctx` among `fillers`, and the baseline it left.
+async fn taken_among(
+    ctx: &Ctx,
+    services: &[lemonfiber_manifest::Service],
+    fillers: &crate::wiring::Fillers,
     project: &std::path::Path,
     mut baseline: Baseline,
 ) -> (Option<State>, Baseline) {
     let wiring = super::super::taken_back::seed_taken_back(
         ctx,
         services,
-        &fillers_at(services.to_vec(), project),
+        fillers,
         Some(project),
         &mut baseline,
     )
@@ -280,28 +290,34 @@ async fn taken(
     )
 }
 
+/// Whether `asked` asks the media server to revoke `key`.
+fn revoking(asked: &lemonfiber_ports::http::Request, key: &str) -> bool {
+    asked.url.ends_with(media::serve("revoke"))
+        && asked.body.as_deref() == Some(serde_json::json!({ "key": key }).to_string().as_str())
+}
+
 #[tokio::test]
 async fn a_key_held_at_the_curators_own_address_is_owed_and_one_at_the_gate_is_not() {
-    let direct = household(&curator_direct(), 200, &keys(false), 204, 201);
+    let direct = household(&curator_direct(), 200, keys(false), media::taken(), 201);
     let (ctx, project) = taking("noted", &direct, false);
     let mut noted = Baseline::new();
     super::super::taken_back::note_held(
         &ctx,
         &gated(),
-        &fillers_at(gated(), &project),
+        &moved_at(gated(), &project),
         Some(&project),
         &mut noted,
     )
     .await;
     assert_eq!(noted.expected("seerr", OWED_CURATOR), Some("owed"));
 
-    let through = household(&curator_gated(), 200, &keys(false), 204, 201);
+    let through = household(&curator_gated(), 200, keys(false), media::taken(), 201);
     let (ctx, project) = taking("not-noted", &through, false);
     let mut clean = Baseline::new();
     super::super::taken_back::note_held(
         &ctx,
         &gated(),
-        &fillers_at(gated(), &project),
+        &moved_at(gated(), &project),
         Some(&project),
         &mut clean,
     )
@@ -317,7 +333,7 @@ async fn a_key_held_at_the_curators_own_address_is_owed_and_one_at_the_gate_is_n
     super::super::taken_back::note_held(
         &ctx,
         &ungated,
-        &fillers_at(ungated.clone(), &project),
+        &moved_at(ungated.clone(), &project),
         Some(&project),
         &mut none,
     )
@@ -333,7 +349,7 @@ async fn a_request_service_that_will_not_say_what_it_holds_owes_nothing_yet() {
     super::super::taken_back::note_held(
         &ctx,
         &gated(),
-        &fillers_at(gated(), &project),
+        &moved_at(gated(), &project),
         Some(&project),
         &mut noted,
     )
@@ -346,7 +362,7 @@ async fn a_request_service_that_will_not_say_what_it_holds_owes_nothing_yet() {
 /// and nothing recorded under its id is taken back.
 #[tokio::test]
 async fn a_plugins_request_service_owes_nothing_and_is_asked_nothing() {
-    let http = household(&curator_direct(), 200, &keys(true), 204, 201);
+    let http = household(&curator_direct(), 200, keys(true), media::taken(), 201);
     let (ctx, project) = taking("plugin", &http, false);
     let services: Vec<_> = gated()
         .into_iter()
@@ -393,7 +409,7 @@ async fn a_plugins_request_service_owes_nothing_and_is_asked_nothing() {
 
 #[tokio::test]
 async fn nothing_owed_and_nothing_minted_is_not_a_connection() {
-    let http = household(&curator_gated(), 200, &keys(false), 204, 201);
+    let http = household(&curator_gated(), 200, keys(false), media::taken(), 201);
     let (ctx, project) = taking("nothing", &http, false);
     let (state, _) = taken(&ctx, &gated(), &project, Baseline::new()).await;
     assert_eq!(state, None);
@@ -401,7 +417,7 @@ async fn nothing_owed_and_nothing_minted_is_not_a_connection() {
 
 #[tokio::test]
 async fn a_rehearsal_counts_what_is_held_and_replaces_nothing() {
-    let http = household(&curator_gated(), 200, &keys(true), 204, 201);
+    let http = household(&curator_gated(), 200, keys(true), media::taken(), 201);
     let (ctx, project) = taking("rehearsed", &http, true);
     let (state, baseline) = taken(&ctx, &gated(), &project, owing()).await;
     assert_eq!(
@@ -417,7 +433,7 @@ async fn a_rehearsal_counts_what_is_held_and_replaces_nothing() {
 
 #[tokio::test]
 async fn one_held_credential_is_counted_as_one() {
-    let http = household(&curator_gated(), 200, &keys(true), 204, 201);
+    let http = household(&curator_gated(), 200, keys(true), media::taken(), 201);
     let (ctx, project) = taking("rehearsed-one", &http, true);
     let (state, _) = taken(&ctx, &gated(), &project, Baseline::new()).await;
     assert_eq!(
@@ -431,7 +447,7 @@ async fn one_held_credential_is_counted_as_one() {
 
 #[tokio::test]
 async fn a_target_still_reached_directly_holds_everything_back() {
-    let http = household(&curator_direct(), 200, &keys(true), 204, 201);
+    let http = household(&curator_direct(), 200, keys(true), media::taken(), 201);
     let (ctx, project) = taking("still-direct", &http, false);
     let (state, baseline) = taken(&ctx, &gated(), &project, owing()).await;
     assert_eq!(
@@ -445,15 +461,12 @@ async fn a_target_still_reached_directly_holds_everything_back() {
     );
     assert_eq!(baseline.expected("seerr", OWED_CURATOR), Some("owed"));
     assert!(!http.asked_for("/command"));
-    assert!(!http
-        .requests()
-        .iter()
-        .any(|asked| asked.method == Method::Delete));
+    assert!(!http.requests().iter().any(|asked| revoking(asked, MINTED)));
 }
 
 #[tokio::test]
 async fn a_target_at_the_gate_that_fails_its_test_is_still_direct() {
-    let http = household(&curator_gated(), 500, &keys(false), 204, 201);
+    let http = household(&curator_gated(), 500, keys(false), media::taken(), 201);
     let (ctx, project) = taking("untested", &http, false);
     let (state, _) = taken(&ctx, &gated(), &project, owing()).await;
     assert!(
@@ -464,21 +477,11 @@ async fn a_target_at_the_gate_that_fails_its_test_is_still_direct() {
 
 #[tokio::test]
 async fn a_request_service_that_does_not_answer_is_left_for_a_later_run() {
-    let http = Fake::by_route_in_turn(vec![
-        (
-            Method::Post,
-            "/Users/AuthenticateByName",
-            vec![Answer::reply(
-                200,
-                r#"{"AccessToken":"token","User":{"Id":"admin-id"}}"#,
-            )],
-        ),
-        (
-            Method::Get,
-            "/Auth/Keys",
-            vec![Answer::reply(200, r#"{"Items":[]}"#)],
-        ),
-    ]);
+    let http = Fake::by_route_in_turn(vec![(
+        Method::Post,
+        media::serve("filed_as"),
+        vec![keys(false)],
+    )]);
     let (ctx, project) = taking("unread", &http, false);
     let (state, baseline) = taken(&ctx, &gated(), &project, owing()).await;
     assert!(matches!(state, Some(State::Skipped { .. })), "{state:?}");
@@ -487,20 +490,16 @@ async fn a_request_service_that_does_not_answer_is_left_for_a_later_run() {
 
 #[tokio::test]
 async fn the_request_services_own_media_server_key_is_revoked() {
-    let http = household(&curator_gated(), 200, &keys(true), 204, 201);
+    let http = household(&curator_gated(), 200, keys(true), media::taken(), 201);
     let (ctx, project) = taking("revoked", &http, false);
     let (state, _) = taken(&ctx, &gated(), &project, Baseline::new()).await;
     assert_eq!(state, Some(State::Wired));
-    assert!(http
-        .requests()
-        .iter()
-        .any(|asked| asked.method == Method::Delete
-            && asked.url.ends_with("/Auth/Keys/seerr-minted")));
+    assert!(http.requests().iter().any(|asked| revoking(asked, MINTED)));
 }
 
 #[tokio::test]
 async fn a_refused_revoke_is_said_and_left_for_the_next_run() {
-    let http = household(&curator_gated(), 200, &keys(true), 500, 201);
+    let http = household(&curator_gated(), 200, keys(true), media::refusing(), 201);
     let (ctx, project) = taking("unrevoked", &http, false);
     let (state, _) = taken(&ctx, &gated(), &project, Baseline::new()).await;
     assert!(
@@ -513,7 +512,7 @@ async fn a_refused_revoke_is_said_and_left_for_the_next_run() {
 
 #[tokio::test]
 async fn a_refused_reset_is_said_and_stays_owed() {
-    let http = household(&curator_gated(), 200, &keys(false), 204, 500);
+    let http = household(&curator_gated(), 200, keys(false), media::taken(), 500);
     let (ctx, project) = taking("refused", &http, false);
     let (state, baseline) = taken(&ctx, &gated(), &project, owing()).await;
     assert!(
@@ -526,7 +525,7 @@ async fn a_refused_reset_is_said_and_stays_owed() {
 
 #[tokio::test]
 async fn a_landed_reset_is_no_longer_owed() {
-    let http = household(&curator_gated(), 200, &keys(false), 204, 201);
+    let http = household(&curator_gated(), 200, keys(false), media::taken(), 201);
     let (ctx, project) = taking("landed", &http, false);
     let (state, baseline) = taken(&ctx, &gated(), &project, owing()).await;
     assert_eq!(baseline.expected("seerr", OWED_CURATOR), None, "{state:?}");
@@ -539,7 +538,7 @@ async fn a_landed_reset_is_no_longer_owed() {
 
 #[tokio::test]
 async fn an_owed_key_of_a_curator_the_stack_no_longer_runs_is_forgotten() {
-    let http = household(&curator_gated(), 200, &keys(false), 204, 201);
+    let http = household(&curator_gated(), 200, keys(false), media::taken(), 201);
     let (ctx, project) = taking("gone", &http, false);
     let mut baseline = owing();
     baseline.record("seerr", "held-key:radarr", "owed", "1");
@@ -558,8 +557,8 @@ async fn a_media_server_link_not_at_the_gate_holds_everything_back() {
         &curator_gated(),
         200,
         200,
-        &keys(true),
-        204,
+        keys(true),
+        media::taken(),
         201,
     );
     let (ctx, project) = taking("link-direct", &http, false);
@@ -572,7 +571,7 @@ async fn a_media_server_link_not_at_the_gate_holds_everything_back() {
 
 #[tokio::test]
 async fn targets_that_cannot_be_listed_leave_everything_for_a_later_run() {
-    let http = linked_household(&linked(), "[]", 500, 200, &keys(false), 204, 201);
+    let http = linked_household(&linked(), "[]", 500, 200, keys(false), media::taken(), 201);
     let (ctx, project) = taking("unlisted", &http, false);
     let (state, baseline) = taken(&ctx, &gated(), &project, owing()).await;
     assert!(
@@ -583,24 +582,8 @@ async fn targets_that_cannot_be_listed_leave_everything_for_a_later_run() {
 }
 
 #[tokio::test]
-async fn without_the_administrators_password_only_the_curator_keys_are_taken_back() {
-    let http = household(&curator_direct(), 200, &keys(true), 204, 201);
-    let (mut ctx, project) = taking("no-admin", &http, false);
-    ctx.settings.env_file = None;
-    let (state, _) = taken(&ctx, &gated(), &project, owing()).await;
-    assert!(
-        matches!(&state, Some(State::Skipped { reason }) if reason.starts_with("Seerr still reaches sonarr")),
-        "{state:?}"
-    );
-    assert!(!http
-        .requests()
-        .iter()
-        .any(|asked| asked.url.contains("/Auth/Keys")));
-}
-
-#[tokio::test]
 async fn a_stack_without_the_request_service_or_the_media_server_has_nothing_to_take_back() {
-    let http = household(&curator_gated(), 200, &keys(true), 204, 201);
+    let http = household(&curator_gated(), 200, keys(true), media::taken(), 201);
     let (ctx, project) = taking("no-seerr", &http, false);
     let without = |id: &str| -> Vec<_> {
         gated()
@@ -610,22 +593,33 @@ async fn a_stack_without_the_request_service_or_the_media_server_has_nothing_to_
     };
     let (state, _) = taken(&ctx, &without("seerr"), &project, owing()).await;
     assert_eq!(state, None);
-    let (state, _) = taken(&ctx, &without("jellyfin"), &project, Baseline::new()).await;
+    let serverless = without("jellyfin");
+    let (state, _) = taken_among(
+        &ctx,
+        &serverless,
+        &fillers_at(serverless.clone(), &project),
+        &project,
+        Baseline::new(),
+    )
+    .await;
     assert_eq!(state, None);
 }
 
+/// A media server that cannot be asked over its contracts revokes nothing, and the curator
+/// keys are replaced all the same.
 #[tokio::test]
-async fn without_the_administrators_password_the_curator_keys_are_still_replaced() {
-    let http = household(&curator_gated(), 200, &keys(true), 204, 201);
-    let (mut ctx, project) = taking("no-admin-landed", &http, false);
-    // A settings file to record the replaced key in, holding no administrator password.
-    let env = config_scratch("taken-no-admin-landed");
-    ctx.settings.env_file = Some(env.to_path_buf());
-    let (state, baseline) = taken(&ctx, &gated(), &project, owing()).await;
+async fn a_media_server_that_cannot_be_asked_leaves_the_curator_keys_still_replaced() {
+    let http = household(&curator_gated(), 200, keys(true), media::taken(), 201);
+    let (ctx, project) = taking("unasked-server", &http, false);
+    let (state, baseline) = taken_among(
+        &ctx,
+        &gated(),
+        &fillers_at(gated(), &project),
+        &project,
+        owing(),
+    )
+    .await;
     assert_eq!(baseline.expected("seerr", OWED_CURATOR), None, "{state:?}");
     assert!(http.asked_for("/command"));
-    assert!(!http
-        .requests()
-        .iter()
-        .any(|asked| asked.method == Method::Delete));
+    assert!(!http.requests().iter().any(|asked| revoking(asked, MINTED)));
 }

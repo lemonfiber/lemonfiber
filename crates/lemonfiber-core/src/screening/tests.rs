@@ -86,8 +86,8 @@ fn detailed(item: Item, seasons: Vec<SeasonDetail>) -> ItemDetail {
 }
 
 /// The film on the shelf, as the media server details it for a member.
-fn on_the_shelf() -> Option<ItemDetail> {
-    Some(detailed(called(FILM, "Heat", Medium::Film), Vec::new()))
+fn on_the_shelf() -> ItemDetail {
+    detailed(called(FILM, "Heat", Medium::Film), Vec::new())
 }
 
 fn code(outcome: Result<Outcome, Box<crate::error::Problem>>) -> Option<String> {
@@ -274,7 +274,7 @@ async fn part_way_is_located_and_a_server_that_will_not_say_is_unread() {
 }
 
 /// The media server, signing a device in and answering `token` for its session.
-fn signing_in(token: Option<String>) -> Arc<Transport> {
+fn signing_in(token: Option<&str>) -> Arc<Transport> {
     server(vec![(media::serve("signed_in"), media::answered(&token))])
 }
 
@@ -299,7 +299,7 @@ fn a_device_is_eight_to_sixty_four_letters_digits_and_dashes() {
 #[tokio::test]
 async fn a_grant_opens_the_device_session_as_the_member_and_answers_its_token() {
     let session = session();
-    let transport = signing_in(Some(session.clone()));
+    let transport = signing_in(Some(&session));
     let ctx = ctx_over(Arc::clone(&transport), "grant");
     let granted = viewed(&ctx, for_the_phone()).await;
     let report = match granted {
@@ -323,7 +323,7 @@ async fn a_grant_opens_the_device_session_as_the_member_and_answers_its_token() 
 
 #[tokio::test]
 async fn a_rehearsed_grant_opens_nothing_and_answers_no_token() {
-    let transport = signing_in(Some(session()));
+    let transport = signing_in(Some(&session()));
     let mut rehearsing = ctx_over(Arc::clone(&transport), "grant-rehearsed");
     rehearsing.dry_run = true;
     let rehearsed = viewed(&rehearsing, for_the_phone()).await;

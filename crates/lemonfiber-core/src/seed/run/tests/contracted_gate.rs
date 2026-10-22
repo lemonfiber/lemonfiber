@@ -242,11 +242,22 @@ async fn without_a_gate_to_ask_the_media_server_link_is_handed_no_token() {
             ),
         )]);
         let ctx = contracted_ctx(&project, SERVICE, keyed, http.clone());
+        let trusting: Vec<_> = trusted
+            .iter()
+            .chain(
+                crate::plugin::first_party::EMBEDDED
+                    .iter()
+                    .filter(|one| one.plugin == crate::test_support::media::PLUGIN),
+            )
+            .copied()
+            .collect();
         let fillers = fillers_trusting(
             vec![media_server_svc(), requests_svc()],
-            &[a_contracted_gate()],
+            &std::iter::once(a_contracted_gate())
+                .chain(crate::test_support::media::moved())
+                .collect::<Vec<_>>(),
             &project,
-            trusted,
+            &trusting,
         );
 
         assert_eq!(

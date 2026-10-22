@@ -20,6 +20,7 @@ async fn identity_beside(
     installed: &[crate::plugin::Installed],
     expected: &crate::baseline::Baseline,
 ) -> (Vec<Wiring>, crate::baseline::Baseline) {
+    static BUILT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
     let own = media_server_svc().id;
     let installed: Vec<crate::plugin::Installed> = services
         .iter()
@@ -29,7 +30,6 @@ async fn identity_beside(
         .into_iter()
         .chain(installed.iter().cloned())
         .collect();
-    static BUILT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
     let nth = BUILT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let project = lemonfiber_fixtures::scratch::Scratch::new(&format!("identity-stack-{nth}"));
     let key = crate::plugin::key_file(&project, crate::test_support::media::ADAPTER);

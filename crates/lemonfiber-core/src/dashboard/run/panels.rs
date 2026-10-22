@@ -31,7 +31,7 @@ use crate::app::targets::{
 /// than emptying the screen: a request service that is down is a thing to say, not a
 /// household that has asked for nothing.
 pub(super) async fn waiting_on(ctx: &Ctx) -> Panel<crate::model::HouseholdReport> {
-    match crate::household::run::household(ctx, None).await {
+    match Box::pin(crate::household::run::household(ctx, None)).await {
         Ok(report) => Panel::Ready(report),
         Err(problem) => Panel::unavailable(problem.summary.clone()),
     }
