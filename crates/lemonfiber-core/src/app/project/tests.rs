@@ -157,6 +157,20 @@ fn nothing_is_moved_where_the_move_cannot_be_journalled() {
 }
 
 #[test]
+fn an_overlay_that_cannot_be_journalled_is_refused() {
+    let (ctx, _) = machine("overlay-unjournalled");
+    let overlay = crate::overlay::at(ctx.settings.env_file.as_deref().unwrap_or(Path::new("")));
+    let _ = std::fs::create_dir_all(overlay.parent().unwrap_or(Path::new("")));
+    let _ = std::fs::write(&overlay, "services: {}\n");
+    let journal = crate::app::targets::layout(&ctx)
+        .map(|paths| paths.journal())
+        .unwrap_or_default();
+    let _ = std::fs::create_dir_all(&journal);
+
+    assert!(super::overlaid(&ctx).is_err());
+}
+
+#[test]
 fn a_start_whose_move_cannot_be_journalled_is_refused() {
     let (ctx, project) = machine("unjournalled-start");
     let journal = crate::app::targets::layout(&ctx)
