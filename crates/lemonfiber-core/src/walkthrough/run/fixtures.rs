@@ -2,8 +2,7 @@
 //!
 //! One transport answering every service the walk touches, because the walk touches all
 //! of them in one run: a curator's catalogue, its root folders and profiles, the add, the
-//! release probe, the history and the queue, and a media server's sign-in, library and
-//! rescan. Splitting that across a fake each would mean a test setting up six things to
+//! release probe, the history and the queue, and a media server's library and rescan. Splitting that across a fake each would mean a test setting up six things to
 //! say one.
 
 use std::sync::Arc;
@@ -11,7 +10,7 @@ use std::sync::Arc;
 use crate::app::Ctx;
 use crate::config::Settings;
 use crate::ports::http::Method;
-use crate::test_support::{a_context, a_password, Reporting, SeedFs};
+use crate::test_support::{a_context, media, Reporting, SeedFs};
 use crate::walkthrough::{Line, Narrator};
 use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
@@ -40,10 +39,8 @@ pub(super) struct Fake {
     pub history: &'static str,
     /// The item's queue.
     pub queue: &'static str,
-    /// The media server's sign-in.
-    pub sign_in: &'static str,
-    /// The media server's library.
-    pub library: &'static str,
+    /// What the media server answers asked whether its library holds the item.
+    pub holds: &'static str,
     /// What the download client says it is moving.
     pub transfers: &'static str,
     /// A path fragment every request to which fails, for the refusal paths.
@@ -84,10 +81,9 @@ pub(super) const CARRYING_IT: &str = r#"{"queue":{"kbpersec":"13672","slots":[{"
 /// The Usenet client's configuration that opens a download-client target, carrying a key.
 pub(super) const USENET_KEYED: &str = "[misc]\napi_key = the-key\n";
 
-/// A media server sign-in that hands back a token, and a library holding the item.
-pub(super) const SIGNED_IN: &str = r#"{"AccessToken":"token"}"#;
-pub(super) const HAS_ITEM: &str = r#"{"Items":[{"Name":"Sintel"}]}"#;
-pub(super) const NO_ITEMS: &str = r#"{"Items":[]}"#;
+/// A media server library holding the item, and one that does not.
+pub(super) const HAS_ITEM: &str = "true";
+pub(super) const NO_ITEMS: &str = "false";
 
 impl Default for Fake {
     /// A stack where everything works and the item lands: the happy path, which each
@@ -103,8 +99,7 @@ impl Default for Fake {
             releases: A_RELEASE,
             history: IMPORTED,
             queue: r#"{"records":[],"totalRecords":0}"#,
-            sign_in: SIGNED_IN,
-            library: HAS_ITEM,
+            holds: HAS_ITEM,
             transfers: NOTHING_MOVING,
             refuses: "\u{0}",
             refuses_writes: false,
@@ -136,9 +131,8 @@ impl Fake {
             [
                 ("echo.example", EGRESS),
                 ("mode=queue", self.transfers),
-                ("/AuthenticateByName", self.sign_in),
-                ("/Library/Refresh", "{}"),
-                ("/Items", self.library),
+                (media::serve("has_item"), self.holds),
+                (media::serve("rescan"), "null"),
                 ("lookup", self.lookup),
                 ("/rootfolder", self.folders),
                 ("/qualityprofile", self.profiles),
@@ -183,8 +177,8 @@ impl Narrator for Listening {
 }
 
 /// A stack over the real manifest, a filesystem that opens the curators, and a transport
-/// answering as `fake` says — with no media server credential, so the library stage is
-/// simply unreachable.
+/// answering as `fake` says — with its media server not moved into its plugin, so the
+/// library stage is simply unreachable.
 pub(super) fn ctx_with(fake: &Fake) -> Ctx {
     a_context()
         .settings(over_usenet())
@@ -196,15 +190,15 @@ pub(super) fn ctx_with(fake: &Fake) -> Ctx {
         .with_patience(std::time::Duration::ZERO)
 }
 
-/// The same, reachable media server and all — the admin password recorded under a scratch
-/// environment file this context alone holds.
+/// The same, reachable media server and all — moved into its plugin, recorded beside a
+/// scratch environment file this context alone holds.
 ///
 /// Counted rather than named by the test that asked, because a name is an agreement the
 /// next test has to keep and cannot be made to. Two contexts under one name share one
-/// file, and recording the password rewrites that file in place: the write truncates
-/// before it writes, so a walk reading the credential in that gap finds none, opens no
-/// media server, and stops at [`crate::walkthrough::Reason::NoMediaServer`] on a stack
-/// that has one. Counting leaves nothing to agree about.
+/// register, and recording the move rewrites it in place: the write truncates before it
+/// writes, so a walk reading the register in that gap finds no plugin, opens no media
+/// server, and stops at [`crate::walkthrough::Reason::NoMediaServer`] on a stack that has
+/// one. Counting leaves nothing to agree about.
 pub(super) fn ctx_watching(fake: &Fake) -> Ctx {
     static BUILT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
     let nth = BUILT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -212,12 +206,7 @@ pub(super) fn ctx_watching(fake: &Fake) -> Ctx {
     let _ = std::fs::create_dir_all(&dir);
     let mut ctx = ctx_with(fake);
     ctx.settings.env_file = Some(dir.join(".env"));
-    let _ = crate::app::targets::record_secret(
-        &ctx,
-        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
-        &a_password(),
-    );
-    ctx
+    media::reaching(ctx)
 }
 
 /// Settings that acquire content over usenet — a configured stack with no tunnel to
