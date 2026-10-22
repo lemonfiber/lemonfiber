@@ -3,29 +3,26 @@
 //!
 //! An account made open and narrowed afterwards is open for as long as it takes anybody
 //! to remember, and the person most likely to be given a limit has already been handed
-//! the address. So the choice travels with the invitation, and what this file holds is
-//! the four things that makes true.
+//! the address. So the choice travels with the invitation: the account is readied to be
+//! claimed with what was chosen, in the one call that readies it, and what this file
+//! holds is the three things that makes true.
 //!
-//! **It is sent whole, or the media server undoes the household's own settings.** Driven
-//! against `jellyfin/jellyfin:10.10.3`: `POST /Users/{id}/Policy` answers `400` to a body
-//! naming only what changed, and *accepts* one carrying the two fields it calls required
-//! and nothing else — putting every other field back to its own default. So the account's
-//! whole policy is read first and posted back with what was chosen written over it, and
-//! this file asserts what was sent rather than that something was.
-//!
-//! **Nothing is written where nothing was chosen**, and that holds field by field. An
+//! **Nothing is chosen where nothing was chosen**, and that holds field by field. An
 //! offer that named neither says nothing about access at all; one that named only an age
-//! limit said nothing about libraries. A value written for what nobody mentioned would
+//! limit says nothing about libraries. A value sent for what nobody mentioned would
 //! widen an account back to every library on its way to narrowing what may be watched on
 //! it, behind the household's back.
+//!
+//! **Content nobody rated is held back from anybody narrowed**, unless the operator says
+//! otherwise.
 //!
 //! **A refusal never costs an account.** A library nobody holds is settled before the
 //! account is made, so what the operator gets is the refusal rather than an open account
 //! and a message about it.
 //!
 //! Driven through `dispatch` rather than asserted about the source, for the reason the
-//! invitation's other guards are: a sweep for the words the code uses would pass a policy
-//! sent under a different spelling.
+//! invitation's other guards are: a sweep for the words the code uses would pass an
+//! allowance sent under a different spelling.
 
 use std::sync::Arc;
 
@@ -33,143 +30,110 @@ use crate::common::household::recorded_admin;
 use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Inviting, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::ports::http::Request;
+use lemonfiber_core::ports::service::{Certificate, Member, NamedLibrary};
 use lemonfiber_fixtures::http::{Answer, Fake};
-use lemonfiber_fixtures::support::Reporting;
-use lemonfiber_ports::docker::{Health, Lifecycle};
+use lemonfiber_testing::media;
 
-/// Where what an account may watch is written.
-const POLICY: &str = "/Users/9/Policy";
-
-/// Where the account it is written on is read from first.
-const ONE_ACCOUNT: &str = "/Users/9";
-
-/// Where an account is asked for.
-const NEW_ACCOUNT: &str = "/Users/New";
-
-/// Where the media server's own certificates are read.
-const RATINGS: &str = "/Localization/ParentalRatings";
-
-/// What the media server answers there, in one country.
-///
-/// The shape the pinned image answers with, including the row that carries no age at
-/// all — its name for content it has no rating for, which is not a certificate.
-const CERTIFICATES: &str = r#"[
-    {"Name":"Unrated"},
-    {"Name":"U","Value":0},
-    {"Name":"12A","Value":12},
-    {"Name":"15","Value":15},
-    {"Name":"18","Value":18}
-]"#;
-
-/// The library list the media server holds, as it names them.
-const LIBRARIES: &str = r#"{"Items":[
-    {"Id":"db4c17","Name":"Films"},
-    {"Id":"a656b9","Name":"Shows"}
-]}"#;
-
-/// An account as it opens, with a policy carrying a field this product neither reads
-/// nor writes.
-///
-/// `EnableMediaPlayback` stands for every setting an operator may have changed in the
-/// media server's own screens. It is here so that a write which sent only the fields
-/// this product knows about fails visibly, which against the real server is the failure
-/// that would go unnoticed.
-const AS_IT_OPENS: &str = r#"{
-    "Id":"9","Name":"ana","HasPassword":false,
-    "Policy":{
-        "EnableAllFolders":true,
-        "EnabledFolders":[],
-        "IsAdministrator":false,
-        "IsDisabled":false,
-        "EnableMediaPlayback":false,
-        "AuthenticationProviderId":"Default",
-        "PasswordResetProviderId":"Default"
-    }
-}"#;
-
-/// A media server that signs in, holds nobody, names two libraries and takes a policy.
-///
-/// The routes are ordered narrowest first, because the fake answers with the first whose
-/// fragment the URL contains — so `/Users/9/Policy` has to sit above `/Users/9`, which
-/// has to sit above `/Users`.
-fn a_server_holding_nobody(policy: &'static str) -> Arc<Fake> {
-    a_server(
-        policy,
-        Answer::reply(200, LIBRARIES),
-        Answer::reply(204, ""),
-    )
+/// The certificates the media server's rating table names, in one country.
+fn certificates() -> Vec<Certificate> {
+    [("U", 0), ("12A", 12), ("15", 15), ("18", 18)]
+        .into_iter()
+        .map(|(name, age)| Certificate {
+            name: name.to_owned(),
+            age,
+        })
+        .collect()
 }
 
-/// The same, with what its library list and its policy endpoint answer chosen.
+/// The libraries the media server holds, as it names them.
+fn libraries() -> Vec<NamedLibrary> {
+    [("db4c17", "Films"), ("a656b9", "Shows")]
+        .into_iter()
+        .map(|(id, name)| NamedLibrary {
+            id: id.to_owned(),
+            name: name.to_owned(),
+        })
+        .collect()
+}
+
+/// The account an invitation makes for Ana.
+fn ana() -> Member {
+    media::member("9", "ana", false)
+}
+
+/// What the account was readied to be claimed with, each time it was.
+fn readied(sent: &[Request]) -> Vec<serde_json::Value> {
+    media::asked(sent, "claimable")
+        .into_iter()
+        .filter_map(|asked| asked.get("allowed").cloned())
+        .collect()
+}
+
+/// Whether an account was asked for.
+fn made_an_account(sent: &[Request]) -> bool {
+    !media::asked(sent, "invite").is_empty()
+}
+
+/// A media server holding nobody, naming two libraries and readying the account it makes.
+fn a_server_holding_nobody() -> Arc<Fake> {
+    a_server(media::answered(&libraries()), media::taken())
+}
+
+/// The same, with what its library list and the readying of the account answer chosen.
 ///
 /// Both are the two ways this errand can fail against a server that is otherwise
 /// working, and each has a different account of what is now true — so each is driven
 /// rather than reasoned about.
-fn a_server(policy: &'static str, libraries: Answer, written: Answer) -> Arc<Fake> {
-    let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
-    Fake::by_path_in_turn(vec![
-        (
-            "/Users/AuthenticateByName",
-            vec![
-                signed_in.clone(),
-                signed_in.clone(),
-                signed_in.clone(),
-                signed_in.clone(),
-                signed_in.clone(),
-                signed_in,
-            ],
-        ),
+fn a_server(libraries: Answer, readying: Answer) -> Arc<Fake> {
+    let mut routes = vec![
         ("/auth/me", vec![Answer::reply(200, "{}")]),
         ("/user/import-from-jellyfin", vec![Answer::reply(201, "{}")]),
         // The request service holds no account for anybody, which is nothing to hold
         // rather than a failure to hold something.
         ("/user/jellyfin/", vec![Answer::reply(404, "")]),
-        (RATINGS, vec![Answer::reply(200, CERTIFICATES)]),
-        (
-            "/System/ActivityLog",
-            vec![Answer::reply(200, r#"{"Items":[]}"#)],
-        ),
-        ("/Library/MediaFolders", vec![libraries]),
-        (POLICY, vec![written]),
-        (
-            NEW_ACCOUNT,
-            vec![Answer::reply(
-                200,
-                r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
-            )],
-        ),
-        (ONE_ACCOUNT, vec![Answer::reply(200, policy)]),
-        ("/Users", vec![Answer::reply(200, "[]")]),
-    ])
+    ];
+    routes.extend(the_media_server(libraries, readying));
+    Fake::by_path_in_turn(routes)
 }
 
-/// A context over the shipped stack, with the media server up and a password recorded.
+/// The media server's half: holding nobody, answering its library list with
+/// `libraries`, readying the account it makes for Ana with `readying`, and naming
+/// [`certificates`].
+fn the_media_server(libraries: Answer, readying: Answer) -> Vec<(&'static str, Vec<Answer>)> {
+    let mut routes = vec![
+        (media::identity("libraries"), vec![libraries]),
+        (
+            media::identity("ratings"),
+            vec![media::answered(&certificates())],
+        ),
+        (media::identity("claimable"), vec![readying]),
+    ];
+    routes.extend(media::household(&[], &ana(), &[]));
+    routes
+}
+
+/// A context over the shipped stack, with the media server moved into its plugin and up,
+/// and a password recorded.
 fn context(env: &std::path::Path, http: Arc<Fake>) -> Ctx {
-    lemonfiber_testing::a_context()
-        .over(crate::common::household::set_up_beside(env))
-        .engine(Arc::new(Reporting::holding(
-            &["jellyfin"],
-            Lifecycle::Running,
-            Health::Healthy,
-        )))
-        .clock(Arc::new(lemonfiber_adapters::System))
-        .settings(Settings {
-            env_file: Some(env.to_path_buf()),
-            household_host: Some("192.168.1.20".to_owned()),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(http)
+    media::keyed_in(
+        lemonfiber_testing::a_context()
+            .over(crate::common::household::set_up_beside(env))
+            .engine(Arc::new(media::running()))
+            .clock(Arc::new(lemonfiber_adapters::System))
+            .settings(Settings {
+                env_file: Some(env.to_path_buf()),
+                household_host: Some("192.168.1.20".to_owned()),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http),
+    )
 }
 
 /// Offer somebody an account with what they may watch, and hand back everything that
 /// was sent doing it.
-async fn offering(
-    scratch: &str,
-    policy: &'static str,
-    allowance: Allowance,
-) -> (Vec<Request>, Option<Outcome>) {
-    driving(scratch, a_server_holding_nobody(policy), allowance).await
+async fn offering(scratch: &str, allowance: Allowance) -> (Vec<Request>, Option<Outcome>) {
+    driving(scratch, a_server_holding_nobody(), allowance).await
 }
 
 /// The same, against a server built for this run.
@@ -206,19 +170,7 @@ const PERMISSIONS: &str = "/user/4/settings/permissions";
 
 /// A stack whose request service holds an account that approves its own requests.
 fn a_stack_where_requests_arrive_unseen() -> Arc<Fake> {
-    let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
-    Fake::by_path_in_turn(vec![
-        (
-            "/Users/AuthenticateByName",
-            vec![
-                signed_in.clone(),
-                signed_in.clone(),
-                signed_in.clone(),
-                signed_in.clone(),
-                signed_in.clone(),
-                signed_in,
-            ],
-        ),
+    let mut routes = vec![
         ("/auth/me", vec![Answer::reply(200, "{}")]),
         ("/user/import-from-jellyfin", vec![Answer::reply(201, "{}")]),
         (
@@ -229,23 +181,12 @@ fn a_stack_where_requests_arrive_unseen() -> Arc<Fake> {
             ],
         ),
         ("/user/jellyfin/", vec![Answer::reply(200, APPROVES_OWN)]),
-        (RATINGS, vec![Answer::reply(200, CERTIFICATES)]),
-        (
-            "/System/ActivityLog",
-            vec![Answer::reply(200, r#"{"Items":[]}"#)],
-        ),
-        ("/Library/MediaFolders", vec![Answer::reply(200, LIBRARIES)]),
-        (POLICY, vec![Answer::reply(204, "")]),
-        (
-            NEW_ACCOUNT,
-            vec![Answer::reply(
-                200,
-                r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
-            )],
-        ),
-        (ONE_ACCOUNT, vec![Answer::reply(200, AS_IT_OPENS)]),
-        ("/Users", vec![Answer::reply(200, "[]")]),
-    ])
+    ];
+    routes.extend(the_media_server(
+        media::answered(&libraries()),
+        media::taken(),
+    ));
+    Fake::by_path_in_turn(routes)
 }
 
 /// What an invitation says about a member being narrowed, for one stack.

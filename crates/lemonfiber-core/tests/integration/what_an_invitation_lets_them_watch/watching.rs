@@ -1,68 +1,19 @@
-//! The libraries and the age limit written onto the account.
+//! The libraries and the age limit the account is readied with.
 
-use super::{a_server, driving, offering, AS_IT_OPENS, LIBRARIES, NEW_ACCOUNT, POLICY};
+use super::{a_server, libraries, made_an_account, offering, readied};
 use lemonfiber_core::app::Allowance;
-use lemonfiber_core::ports::http::Request;
 use lemonfiber_core::ports::service::Unrated;
-use lemonfiber_fixtures::http::Answer;
+use lemonfiber_testing::media;
 
-/// The kinds of unrated thing the media server holds back, all of them.
+/// An age limit reaches the media server as the number chosen, in the one call that
+/// readies the account — with nothing said about the libraries it opens.
 ///
-/// What a household means by holding back what has no rating is all of them: a policy
-/// naming some would hold back an unrated film and let an unrated series through.
-fn every_unrated_kind() -> serde_json::Value {
-    serde_json::json!([
-        "Movie",
-        "Trailer",
-        "Series",
-        "Music",
-        "Book",
-        "LiveTvChannel",
-        "LiveTvProgram",
-        "ChannelContent",
-        "Other"
-    ])
-}
-
-/// The same account after somebody narrowed it to one library.
-///
-/// The case an age limit must not widen: the household chose this, and setting how far
-/// up the ratings the account goes says nothing about it.
-const ALREADY_NARROWED: &str = r#"{
-    "Id":"9","Name":"ana","HasPassword":false,
-    "Policy":{
-        "EnableAllFolders":false,
-        "EnabledFolders":["a656b9"],
-        "IsAdministrator":false,
-        "IsDisabled":false,
-        "EnableMediaPlayback":false,
-        "AuthenticationProviderId":"Default",
-        "PasswordResetProviderId":"Default"
-    }
-}"#;
-
-/// What was posted to the policy endpoint, as the objects it was sent as.
-fn policies(sent: &[Request]) -> Vec<serde_json::Value> {
-    sent.iter()
-        .filter(|request| request.url.contains(POLICY))
-        .filter_map(|request| request.body.as_deref())
-        .filter_map(|body| serde_json::from_str(body).ok())
-        .collect()
-}
-
-/// An age limit reaches the media server as the number it keeps, on the policy the
-/// account already had — with every field this product does not know about carried
-/// back untouched.
-///
-/// The whole object is asserted rather than the three keys, because a body carrying
-/// only what changed is exactly what the real server accepts and then defaults the rest
-/// of: a test that looked only at `MaxParentalRating` would pass on the write that
-/// silently switches somebody's playback off.
+/// The whole allowance is asserted rather than the limit, because one carrying a value
+/// for what nobody chose is exactly the write that quietly changes somebody's account.
 #[tokio::test]
-async fn an_age_limit_is_written_onto_the_policy_the_account_already_had() {
+async fn an_age_limit_is_the_allowance_the_account_is_readied_with() {
     let (sent, made) = offering(
         "age-limit",
-        AS_IT_OPENS,
         Allowance {
             libraries: Vec::new(),
             age_limit: Some(13),
@@ -73,22 +24,14 @@ async fn an_age_limit_is_written_onto_the_policy_the_account_already_had() {
 
     assert!(made.is_some(), "the invitation itself was refused");
     assert_eq!(
-        policies(&sent),
+        readied(&sent),
         vec![serde_json::json!({
-            "EnableAllFolders": true,
-            "EnabledFolders": [],
-            "MaxParentalRating": 13,
-            "BlockUnratedItems": every_unrated_kind(),
-            "IsAdministrator": false,
-            "IsDisabled": false,
-            "InvalidLoginAttemptCount": 0,
-            "LoginAttemptsBeforeLockout": 5,
-            "EnableMediaPlayback": false,
-            "AuthenticationProviderId": "Default",
-            "PasswordResetProviderId": "Default"
+            "libraries": null,
+            "age_limit": 13,
+            "unrated": "held-back"
         })],
-        "an empty list means no policy was written at all; two means the account was \
-         readied and narrowed in separate writes"
+        "an empty list means the account was never readied; two means it was readied and \
+         narrowed in separate writes"
     );
 }
 
@@ -98,7 +41,6 @@ async fn an_age_limit_is_written_onto_the_policy_the_account_already_had() {
 async fn named_libraries_reach_the_server_as_the_identifiers_it_holds_them_by() {
     let (sent, made) = offering(
         "libraries",
-        AS_IT_OPENS,
         Allowance {
             // Typed as the operator might, in the other case, because a library refused
             // for its capitalisation is somebody refused for their shift key.
@@ -110,92 +52,38 @@ async fn named_libraries_reach_the_server_as_the_identifiers_it_holds_them_by() 
     .await;
 
     assert!(made.is_some(), "the invitation itself was refused");
-    let written = policies(&sent);
+    let written = readied(&sent);
     let first = written.first().cloned().unwrap_or_default();
 
     assert_eq!(
-        first.get("EnabledFolders"),
+        first.get("libraries"),
         Some(&serde_json::json!(["db4c17"])),
         "{written:?}"
     );
     assert_eq!(
-        first.get("EnableAllFolders"),
-        Some(&serde_json::json!(false)),
-        "naming a library left the account open to every one: {written:?}"
-    );
-    assert_eq!(
-        first.get("MaxParentalRating"),
-        None,
-        "an invitation that named only libraries wrote an age limit as well: {written:?}"
+        first.get("age_limit"),
+        Some(&serde_json::Value::Null),
+        "an invitation that named only libraries set an age limit as well: {written:?}"
     );
 }
 
-/// An offer that chooses neither writes nothing about what the account may watch.
+/// An offer that chooses neither says nothing about what the account may watch.
 ///
-/// What it does write is the account readied to be claimed: switched on, no wrong
-/// passwords counted, and a limit on them. Every key about access travels back as the
-/// server sent it, so the account opens exactly what the server made it open.
+/// The account is still readied to be claimed, with an allowance that leaves every
+/// question about access as the server made it.
 #[tokio::test]
-async fn an_invitation_that_chooses_nothing_writes_nothing_about_access() {
-    let (sent, made) = offering("chooses-nothing", AS_IT_OPENS, Allowance::default()).await;
+async fn an_invitation_that_chooses_nothing_says_nothing_about_access() {
+    let (sent, made) = offering("chooses-nothing", Allowance::default()).await;
 
     assert!(made.is_some(), "the invitation itself was refused");
     assert_eq!(
-        policies(&sent),
+        readied(&sent),
         vec![serde_json::json!({
-            "EnableAllFolders": true,
-            "EnabledFolders": [],
-            "IsAdministrator": false,
-            "IsDisabled": false,
-            "InvalidLoginAttemptCount": 0,
-            "LoginAttemptsBeforeLockout": 5,
-            "EnableMediaPlayback": false,
-            "AuthenticationProviderId": "Default",
-            "PasswordResetProviderId": "Default"
+            "libraries": null,
+            "age_limit": null,
+            "unrated": null
         })],
         "an invitation that chose nothing changed what the account may watch"
-    );
-}
-
-/// An age limit alone leaves the libraries an account already opens exactly as they
-/// are.
-///
-/// The case a filled-in default would break, and it breaks silently: an operator setting
-/// a limit on a narrowed account would have widened it back to every library, and the
-/// only way to find out is to read the account afterwards. Held on an account that is
-/// already narrowed, because on a fresh one every value is the default and a write that
-/// overwrote everything would look identical.
-#[tokio::test]
-async fn an_age_limit_alone_does_not_widen_the_libraries() {
-    let (sent, made) = offering(
-        "narrowed",
-        ALREADY_NARROWED,
-        Allowance {
-            libraries: Vec::new(),
-            age_limit: Some(15),
-            unrated: None,
-        },
-    )
-    .await;
-
-    assert!(made.is_some(), "the invitation itself was refused");
-    let written = policies(&sent);
-    let first = written.first().cloned().unwrap_or_default();
-
-    assert_eq!(
-        first.get("MaxParentalRating"),
-        Some(&serde_json::json!(15)),
-        "{written:?}"
-    );
-    assert_eq!(
-        first.get("EnableAllFolders"),
-        Some(&serde_json::json!(false)),
-        "an age limit widened an account back to every library: {written:?}"
-    );
-    assert_eq!(
-        first.get("EnabledFolders"),
-        Some(&serde_json::json!(["a656b9"])),
-        "an age limit changed which libraries the account opens: {written:?}"
     );
 }
 
@@ -208,7 +96,6 @@ async fn an_age_limit_alone_does_not_widen_the_libraries() {
 async fn a_library_nobody_holds_costs_no_account() {
     let (sent, made) = offering(
         "bad-library",
-        AS_IT_OPENS,
         Allowance {
             libraries: vec!["Musicals".to_owned()],
             age_limit: None,
@@ -219,7 +106,7 @@ async fn a_library_nobody_holds_costs_no_account() {
 
     assert!(made.is_none(), "a library nobody holds was accepted");
     assert!(
-        !sent.iter().any(|request| request.url.contains(NEW_ACCOUNT)),
+        !made_an_account(&sent),
         "an account was made before the library was refused"
     );
 }
@@ -232,9 +119,9 @@ async fn a_library_nobody_holds_costs_no_account() {
 /// nobody could ask — and the account would have been made either way.
 #[tokio::test]
 async fn a_library_list_that_will_not_answer_costs_no_account() {
-    let (sent, made) = driving(
+    let (sent, made) = super::driving(
         "unreadable-libraries",
-        a_server(AS_IT_OPENS, Answer::reply(500, ""), Answer::reply(204, "")),
+        a_server(media::refusing(), media::taken()),
         Allowance {
             libraries: vec!["Films".to_owned()],
             age_limit: None,
@@ -245,26 +132,23 @@ async fn a_library_list_that_will_not_answer_costs_no_account() {
 
     assert!(made.is_none(), "an unreadable library list was accepted");
     assert!(
-        !sent.iter().any(|request| request.url.contains(NEW_ACCOUNT)),
+        !made_an_account(&sent),
         "an account was made before the library list was read"
     );
 }
 
-/// A policy the media server will not take costs the account, rather than leaving it open.
+/// An account the media server will not ready costs the account, rather than leaving it
+/// open.
 ///
 /// The one refusal that comes after the account is made, because it is the one thing
 /// that cannot be settled before there is an account to write on. An account the server
 /// made is open to every library and bounded by nothing, so it is taken back rather than
 /// left standing for somebody to find.
 #[tokio::test]
-async fn a_policy_the_server_will_not_take_costs_the_account() {
-    let (sent, made) = driving(
-        "refused-policy",
-        a_server(
-            AS_IT_OPENS,
-            Answer::reply(200, LIBRARIES),
-            Answer::reply(500, ""),
-        ),
+async fn an_account_the_server_will_not_ready_is_taken_back() {
+    let (sent, made) = super::driving(
+        "refused-readying",
+        a_server(media::answered(&libraries()), media::refusing()),
         Allowance {
             libraries: Vec::new(),
             age_limit: Some(12),
@@ -275,18 +159,16 @@ async fn a_policy_the_server_will_not_take_costs_the_account() {
 
     assert!(
         made.is_none(),
-        "a policy the server refused was reported as set"
+        "an allowance the server refused was reported as set"
     );
     assert!(
-        sent.iter().any(|request| request.url.contains(NEW_ACCOUNT)),
+        made_an_account(&sent),
         "the account this refusal is about was never made"
     );
-    assert!(
-        sent.iter().any(|request| {
-            request.method == lemonfiber_core::ports::http::Method::Delete
-                && request.url.ends_with("/Users/9")
-        }),
-        "an account left open by a refused policy was not taken back"
+    assert_eq!(
+        media::asked_about(&sent, "withdraw"),
+        ["9"],
+        "an account left open by a refused allowance was not taken back"
     );
 }
 
@@ -301,7 +183,6 @@ async fn a_policy_the_server_will_not_take_costs_the_account() {
 async fn unrated_content_is_held_back_from_anybody_being_narrowed() {
     let (sent, made) = offering(
         "unrated-default",
-        AS_IT_OPENS,
         Allowance {
             libraries: vec!["Films".to_owned()],
             age_limit: None,
@@ -311,17 +192,16 @@ async fn unrated_content_is_held_back_from_anybody_being_narrowed() {
     .await;
 
     assert!(made.is_some(), "the invitation itself was refused");
-    let written = policies(&sent);
-    let first = written.first().cloned().unwrap_or_default();
+    let written = readied(&sent);
 
     assert_eq!(
-        first.get("BlockUnratedItems"),
-        Some(&every_unrated_kind()),
+        written.first().and_then(|allowed| allowed.get("unrated")),
+        Some(&serde_json::json!(Unrated::HeldBack)),
         "somebody being narrowed was left able to watch what nobody rated: {written:?}"
     );
 }
 
-/// An operator who says so lets it through, and what is written says nothing else.
+/// An operator who says so lets it through.
 ///
 /// The point of the choice being a choice: some households keep home video and
 /// recordings that carry no rating and are perfectly fine, and holding those back is a
@@ -330,7 +210,6 @@ async fn unrated_content_is_held_back_from_anybody_being_narrowed() {
 async fn an_operator_who_says_so_lets_unrated_content_through() {
     let (sent, made) = offering(
         "unrated-allowed",
-        AS_IT_OPENS,
         Allowance {
             libraries: Vec::new(),
             age_limit: Some(12),
@@ -340,37 +219,13 @@ async fn an_operator_who_says_so_lets_unrated_content_through() {
     .await;
 
     assert!(made.is_some(), "the invitation itself was refused");
-    let written = policies(&sent);
-    let first = written.first().cloned().unwrap_or_default();
-
     assert_eq!(
-        first.get("BlockUnratedItems"),
-        Some(&serde_json::json!([])),
-        "the operator's own answer was overruled: {written:?}"
-    );
-    assert_eq!(
-        first.get("MaxParentalRating"),
-        Some(&serde_json::json!(12)),
-        "{written:?}"
-    );
-}
-
-/// An offer that narrows nothing writes nothing about unrated content either.
-///
-/// Field by field, the same rule the libraries and the limit are held to: naming
-/// neither is saying nothing, and a value written for what nobody mentioned would take
-/// a household's own answer away behind their back.
-#[tokio::test]
-async fn an_offer_that_narrows_nothing_says_nothing_about_unrated_content() {
-    let (sent, made) = offering("unrated-untouched", AS_IT_OPENS, Allowance::default()).await;
-
-    assert!(made.is_some(), "the invitation itself was refused");
-    let written = policies(&sent);
-    assert!(
-        !written.is_empty()
-            && written
-                .iter()
-                .all(|policy| policy.get("BlockUnratedItems").is_none()),
-        "an invitation that chose nothing wrote what becomes of unrated content: {written:?}"
+        readied(&sent),
+        vec![serde_json::json!({
+            "libraries": null,
+            "age_limit": 12,
+            "unrated": Unrated::LetThrough
+        })],
+        "the operator's own answer was overruled"
     );
 }
