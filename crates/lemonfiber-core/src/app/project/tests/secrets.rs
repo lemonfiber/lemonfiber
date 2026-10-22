@@ -169,3 +169,32 @@ fn a_replaced_key_is_written_into_every_file_that_reads_it() {
     assert!(std::fs::read_to_string(&file)
         .is_ok_and(|held| held.contains(&format!("WIREGUARD_PRIVATE_KEY={REPLACED}"))));
 }
+
+/// A stack service an installed first-party service stands in for gets no secrets file of
+/// the stack's: the stand-in's own declaration is the only one that writes its file.
+#[test]
+fn a_stack_service_moved_in_place_is_no_longer_written_a_secrets_file() {
+    let (ctx, _project) = machine("secrets-moved");
+    let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK);
+    let mut moved = crate::test_support::a_placed("gluetun", &[], None, None);
+    moved.replaces = Some("gluetun".to_owned());
+    let installed = [crate::test_support::an_installed("gluetun", vec![moved])];
+
+    let filed = |installed: &[crate::plugin::Installed]| -> Vec<String> {
+        manifest
+            .as_ref()
+            .ok()
+            .map(|manifest| {
+                let resolved = crate::settings::Resolved::of(&ctx, Some(manifest), installed);
+                crate::settings::files::every_file(Some(manifest), installed, &resolved)
+                    .into_iter()
+                    .filter(|(_, _, variables)| !variables.is_empty())
+                    .map(|(service, _, _)| service)
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+
+    assert!(filed(&[]).contains(&"gluetun".to_owned()));
+    assert!(!filed(&installed).contains(&"gluetun".to_owned()));
+}

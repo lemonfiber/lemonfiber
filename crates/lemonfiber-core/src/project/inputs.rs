@@ -70,7 +70,7 @@ impl Inputs {
 /// come to.
 pub(super) fn read(manifest: &Manifest, installed: &[Installed], chosen: &Chosen) -> Inputs {
     let fill = |capability: &str| filler(manifest, installed, chosen, capability);
-    let mut members: Vec<Standing> = written(manifest)
+    let mut members: Vec<Standing> = written(manifest, installed)
         .map(|service| Standing {
             id: service.id.clone(),
             confined: service.posture == Posture::Confined,
@@ -135,13 +135,27 @@ pub(super) fn read(manifest: &Manifest, installed: &[Installed], chosen: &Chosen
     }
 }
 
-/// Every stack service the project writes an entry for: all but those the host's own
-/// service manager runs.
-pub(crate) fn written(manifest: &Manifest) -> impl Iterator<Item = &Service> {
+/// Every stack service lemonfiber runs: all but those the host's own service manager
+/// runs.
+pub(crate) fn declared(manifest: &Manifest) -> impl Iterator<Item = &Service> {
     manifest
         .services
         .iter()
         .filter(|service| !service.host_managed)
+}
+
+/// Every stack service the project writes an entry for: each lemonfiber runs but one an
+/// installed service has moved in place of.
+pub(crate) fn written<'a>(
+    manifest: &'a Manifest,
+    installed: &'a [Installed],
+) -> impl Iterator<Item = &'a Service> {
+    declared(manifest).filter(move |service| {
+        !installed
+            .iter()
+            .flat_map(|one| &one.services)
+            .any(|placed| placed.replaces.as_deref() == Some(service.id.as_str()))
+    })
 }
 
 /// The one service that fills `capability`: the operator's choice where it names a
@@ -153,7 +167,7 @@ pub(crate) fn filler(
     chosen: &Chosen,
     capability: &str,
 ) -> Option<String> {
-    let claimants: Vec<(String, Option<String>)> = written(manifest)
+    let claimants: Vec<(String, Option<String>)> = written(manifest, installed)
         .filter(|service| claims(&service.provides, capability))
         .map(|service| (service.id.clone(), None))
         .chain(
@@ -183,7 +197,8 @@ fn claims(provides: &[String], capability: &str) -> bool {
 /// which reaches every claimant filing it, and one narrowed to an API, which reaches the
 /// upstream an adapter claiming it fronts.
 fn narrowed(manifest: &Manifest, installed: &[Installed]) -> Vec<(String, String, String)> {
-    let stack = written(manifest).map(|service| (service.id.as_str(), service.env.values()));
+    let stack =
+        written(manifest, installed).map(|service| (service.id.as_str(), service.env.values()));
     let plugins = installed
         .iter()
         .flat_map(|one| &one.services)
@@ -223,7 +238,7 @@ pub(super) fn reaching(
     native: bool,
 ) -> Vec<String> {
     let files_it = |media: &[String]| files.is_none_or(|medium| media.iter().any(|m| m == medium));
-    written(manifest)
+    written(manifest, installed)
         .filter(|service| claims(&service.provides, capability) && files_it(&service.media_types))
         .map(|service| service.id.clone())
         .chain(

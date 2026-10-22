@@ -54,7 +54,7 @@ pub(crate) async fn pending(ctx: &Ctx, manifest: &Manifest) -> Copies {
         within,
         ..Copies::default()
     };
-    for service in crate::project::written(manifest) {
+    for service in crate::project::declared(manifest) {
         for mount in mounts(&service.mount, service.takes_data) {
             let to = copies
                 .within

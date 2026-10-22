@@ -24,8 +24,8 @@ use crate::wiring::Chosen;
 use document::{Document, Services};
 use entry::{configuration, entry, literal, ports, Tier, Unit, Values};
 pub(crate) use inputs::filler as placed_at;
-pub(crate) use inputs::written;
 use inputs::Inputs;
+pub(crate) use inputs::{declared, written};
 
 /// The file the project is written to, beneath the project directory.
 pub const FILE: &str = "compose.generated.yml";
@@ -97,7 +97,7 @@ pub fn generated(
         nfs: reading.nfs,
         operator: reading.operator,
     };
-    let units: Vec<Unit<'_>> = inputs::written(manifest)
+    let units: Vec<Unit<'_>> = inputs::written(manifest, installed)
         .map(|service| stack_unit(service, reading))
         .chain(installed.iter().flat_map(|one| {
             let secrets = plugin::Reading {

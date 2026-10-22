@@ -82,7 +82,7 @@ pub(crate) fn every_file(
 ) -> Vec<(String, PathBuf, Vec<Variable>)> {
     let mut files: Vec<(String, PathBuf, Vec<Variable>)> = manifest
         .into_iter()
-        .flat_map(crate::project::written)
+        .flat_map(|manifest| crate::project::written(manifest, installed))
         .filter(|service| crate::project::names_a_secret(&service.env))
         .filter_map(|service| {
             resolved

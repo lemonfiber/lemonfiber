@@ -196,7 +196,7 @@ fn a_port_standing_beside_moved_is_held_where_it_moved_to() {
     }];
 
     let ports: Vec<(String, u16)> = manifest
-        .map(|manifest| run(&manifest, &moved).1)
+        .map(|manifest| run(&manifest, &[], &moved).1)
         .unwrap_or_default()
         .into_iter()
         .map(|published| (published.service, published.port))
@@ -204,4 +204,28 @@ fn a_port_standing_beside_moved_is_held_where_it_moved_to() {
 
     assert!(ports.contains(&("sonarr".to_owned(), 18989)), "{ports:?}");
     assert!(!ports.contains(&("sonarr".to_owned(), 8989)), "{ports:?}");
+}
+
+/// A stack service an installed first-party service stands in for holds no name and no
+/// port of its own: what it held is the stand-in's.
+#[test]
+fn a_stack_service_moved_in_place_holds_nothing_of_its_own() {
+    let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK);
+    let mut moved = crate::test_support::a_placed("jellyfin", &["media.serve"], None, Some(8096));
+    moved.replaces = Some("jellyfin".to_owned());
+    let installed = [crate::test_support::an_installed("jellyfin", vec![moved])];
+
+    let (services, ports) = manifest
+        .map(|manifest| run(&manifest, &installed, &[]))
+        .unwrap_or_default();
+
+    assert!(!services.is_empty());
+    assert!(
+        services.iter().all(|one| one.service != "jellyfin"),
+        "{services:?}"
+    );
+    assert!(
+        ports.iter().all(|one| one.service != "jellyfin"),
+        "{ports:?}"
+    );
 }
