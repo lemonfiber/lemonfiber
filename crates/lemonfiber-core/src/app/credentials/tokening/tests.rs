@@ -87,15 +87,19 @@ fn fillers_from(
     fillers_beside(services, &[], project)
 }
 
-/// The same, with `installed` beside the stack.
+/// The same, with `installed` beside the stack and the media server moved into its plugin.
 fn fillers_beside(
     services: Vec<lemonfiber_manifest::Service>,
     installed: &[crate::plugin::Installed],
     project: Option<&std::path::Path>,
 ) -> crate::wiring::Fillers {
+    let installed: Vec<_> = crate::test_support::media::moved()
+        .into_iter()
+        .chain(installed.iter().cloned())
+        .collect();
     crate::test_support::stack_fillers(
         services,
-        installed,
+        &installed,
         project,
         crate::plugin::first_party::EMBEDDED,
     )
@@ -206,7 +210,11 @@ fn scene(
         crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         "minted-earlier",
     );
+    let keyed = crate::plugin::key_file(&at, crate::test_support::media::ADAPTER);
+    let _ = std::fs::create_dir_all(keyed.parent().unwrap_or(&at));
+    let _ = std::fs::write(&keyed, crate::test_support::media::KEY);
     let ctx = a_context()
+        .engine(Arc::new(crate::test_support::media::running()))
         .settings(Settings {
             env_file: Some(env),
             ..Settings::default()
@@ -281,31 +289,16 @@ fn serving(
     ])
 }
 
-/// A household answering the media server's sign-in and its key list, through which a
-/// rotation finds the key the gate presents on its route there, and then `routes`.
+/// A household answering the media server's keys filed under the gate's name, through
+/// which a rotation finds the key the gate presents on its route there, and then `routes`.
 fn beside_the_gates_key(routes: Vec<(Method, &'static str, Vec<Answer>)>) -> Arc<Fake> {
-    let mut answering = vec![
-        (
-            Method::Post,
-            "/Users/AuthenticateByName",
-            vec![Answer::reply(200, r#"{"AccessToken":"session"}"#)],
-        ),
-        (
-            Method::Get,
-            "/Auth/Keys",
-            vec![Answer::reply(200, gate_keys())],
-        ),
-    ];
+    let mut answering = vec![(
+        Method::Post,
+        crate::test_support::media::serve("filed_as"),
+        vec![Answer::reply(200, crate::test_support::json(&["gates"]))],
+    )];
     answering.extend(routes);
     Fake::by_route_in_turn(answering)
-}
-
-/// The media server's key list, holding the key the gate presents on its route there.
-fn gate_keys() -> String {
-    serde_json::json!({ "Items": [
-        { "AppName": crate::app_keys::GATE_APP, "AccessToken": "gates" }
-    ] })
-    .to_string()
 }
 
 /// The line named `name`, or an empty one the assertions after it then fail on.

@@ -1600,6 +1600,8 @@ dependencies = [
  "lemonfiber-core",
  "lemonfiber-fixtures",
  "lemonfiber-plugin",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

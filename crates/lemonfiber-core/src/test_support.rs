@@ -380,7 +380,8 @@ pub(crate) const fn first_party(
 }
 
 /// A context reaching `service` on loopback [`CONTRACTED_PORT`], holding its key in
-/// `project` where `keyed`.
+/// `project` where `keyed`, beside the media server's adapter running where a moved server
+/// is reached.
 pub(crate) fn contracted_context(
     project: &std::path::Path,
     service: &str,
@@ -396,7 +397,8 @@ pub(crate) fn contracted_context(
         crate::ports::docker::Lifecycle::Running,
         crate::ports::docker::Health::Healthy,
     )
-    .publishing(&[(service, "127.0.0.1", CONTRACTED_PORT)]);
+    .publishing(&[(service, "127.0.0.1", CONTRACTED_PORT)])
+    .alongside(media::running());
     a_context().engine(std::sync::Arc::new(engine))
 }
 

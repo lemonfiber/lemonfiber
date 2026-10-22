@@ -17,6 +17,8 @@ lemonfiber-contract = { workspace = true }
 lemonfiber-core = { workspace = true }
 lemonfiber-fixtures = { workspace = true }
 lemonfiber-plugin = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 
 [lints]
 workspace = true
