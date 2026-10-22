@@ -542,6 +542,7 @@ mod decline;
 mod gate;
 mod guarding;
 mod identity;
+mod intake;
 mod linking;
 mod passwords;
 mod proxies;
