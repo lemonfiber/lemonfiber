@@ -32,10 +32,12 @@ pub(crate) fn service(
 
 /// The request gate as the core asks it: over `request.gate` where its filler speaks the
 /// contract, otherwise the stack's own gate told through its files under `project`. Nothing
-/// where nothing fills the capability, or its filler speaks the contract and cannot be asked
-/// over it.
+/// where nothing fills the capability, its filler is not one the stack's credentials may be
+/// handed to, or it speaks the contract and cannot be asked over it.
 pub(crate) async fn asked(ctx: &Ctx, fillers: &Fillers, project: &Path) -> Option<Arc<dyn Gating>> {
-    let (filler, _) = fillers.filling(gate::CAPABILITY)?;
+    let (filler, _) = fillers.filling(gate::CAPABILITY).filter(|(filler, _)| {
+        crate::wiring::crosses(crate::wiring::Holder::Stack, filler.holder())
+    })?;
     match spoken(ctx, filler, gate::CAPABILITY, gate::MAJOR).await {
         Spoken::Over(adapter) => Some(Arc::new(gate::Adapter(adapter))),
         Spoken::Unanswered => None,

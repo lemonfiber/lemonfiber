@@ -520,6 +520,7 @@ mod applications;
 mod asking;
 mod baseline;
 mod claiming;
+mod contracted_gate;
 mod cors;
 mod curating;
 mod decline;

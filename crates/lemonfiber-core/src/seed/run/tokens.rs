@@ -22,9 +22,10 @@ use crate::ports::service::{
 use crate::seed::{State, Wiring};
 use crate::wiring::Fillers;
 
-/// What is said where the request gate cannot be asked over its contract.
-pub(crate) const UNASKED: &str =
-    "the request gate cannot be asked over its contract, so no token was handed to it";
+/// What is said where the request gate cannot be asked.
+pub(crate) const UNASKED: &str = "the request gate is not one the stack's credentials may be \
+                                  handed to, or cannot be asked over its contract, so no token \
+                                  was handed to it";
 
 /// Where the request service reaches `route` through the gate.
 pub(crate) fn through_the_gate(route: &str) -> Endpoint {

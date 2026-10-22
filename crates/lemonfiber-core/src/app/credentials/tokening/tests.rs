@@ -244,17 +244,7 @@ fn serving(
         "ip": "request-gate", "port": PORT, "urlBase": "/jellyfin", "apiKey": media_server,
     })
     .to_string();
-    Fake::by_route_in_turn(vec![
-        (
-            Method::Post,
-            "/Users/AuthenticateByName",
-            vec![Answer::reply(200, r#"{"AccessToken":"session"}"#)],
-        ),
-        (
-            Method::Get,
-            "/Auth/Keys",
-            vec![Answer::reply(200, gate_keys())],
-        ),
+    beside_the_gates_key(vec![
         (
             Method::Get,
             "/settings/radarr",
@@ -289,6 +279,25 @@ fn serving(
             vec![Answer::reply(linked, "")],
         ),
     ])
+}
+
+/// A household answering the media server's sign-in and its key list, through which a
+/// rotation finds the key the gate presents on its route there, and then `routes`.
+fn beside_the_gates_key(routes: Vec<(Method, &'static str, Vec<Answer>)>) -> Arc<Fake> {
+    let mut answering = vec![
+        (
+            Method::Post,
+            "/Users/AuthenticateByName",
+            vec![Answer::reply(200, r#"{"AccessToken":"session"}"#)],
+        ),
+        (
+            Method::Get,
+            "/Auth/Keys",
+            vec![Answer::reply(200, gate_keys())],
+        ),
+    ];
+    answering.extend(routes);
+    Fake::by_route_in_turn(answering)
 }
 
 /// The media server's key list, holding the key the gate presents on its route there.
