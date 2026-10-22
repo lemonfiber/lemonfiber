@@ -10,12 +10,12 @@ use crate::common::household::recorded_admin;
 use lemonfiber_core::app::{dispatch, Command, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::model::{HouseholdReport, MemberStanding};
-use lemonfiber_core::ports::http::{Method, Request};
+use lemonfiber_core::ports::http::Request;
+use lemonfiber_core::ports::service::Member;
 use lemonfiber_core::stack::Source;
-use lemonfiber_fixtures::http::{Answer, Fake};
-use lemonfiber_fixtures::support::Reporting;
-use lemonfiber_ports::docker::{Health, Lifecycle};
+use lemonfiber_fixtures::http::Fake;
 use lemonfiber_sidecar::decline::{Lapse, Lapses, Left, Outcome as Lapsed, TokenHash};
+use lemonfiber_testing::media;
 
 /// The shipped stack, which runs the decline service, under a scratch directory of its
 /// own.
@@ -26,35 +26,28 @@ fn stack_with_decline(tag: &str) -> PathBuf {
 }
 
 /// A media server holding the owner and `others`, taking every write.
-fn holding(others: &str) -> Arc<Fake> {
-    let household = format!(
-        r#"[{{"Id":"1","Name":"owner","HasPassword":true,"Policy":{{"IsAdministrator":true}}}}{others}]"#
-    );
-    Fake::by_route(vec![
-        (
-            Method::Post,
-            "/Users/AuthenticateByName",
-            Answer::reply(200, r#"{"AccessToken":"token"}"#),
-        ),
-        (
-            Method::Get,
-            "/System/ActivityLog",
-            Answer::reply(200, r#"{"Items":[]}"#),
-        ),
-        (
-            Method::Get,
-            "/Users/9",
-            Answer::reply(200, r#"{"Id":"9","Policy":{"IsDisabled":false}}"#),
-        ),
-        (
-            Method::Get,
-            "/Users",
-            Answer::reply(200, Box::leak(household.into_boxed_str())),
-        ),
-        (Method::Post, "", Answer::reply(204, "")),
-        (Method::Delete, "", Answer::reply(204, "")),
-        (Method::Get, "", Answer::Silent),
-    ])
+fn holding(others: &[Member]) -> Arc<Fake> {
+    let mut owner = media::member("1", "owner", true);
+    owner.access.administrator = true;
+    let household: Vec<Member> = std::iter::once(owner.clone())
+        .chain(others.iter().cloned())
+        .collect();
+    Fake::by_path_in_turn(media::household(&household, &owner, &[]))
+}
+
+/// Ana's account: unclaimed, last seen in March, and switched off where `disabled`.
+fn ana_seen(disabled: bool) -> Member {
+    let mut ana = media::member("9", "ana", false);
+    ana.last_seen = Some("2026-03-01T10:00:00Z".to_owned());
+    ana.access.disabled = disabled;
+    ana
+}
+
+/// Whether `sent` wrote anything about Ana's account.
+fn wrote_on_ana(sent: &[Request]) -> bool {
+    ["withdraw", "suspend", "claimable", "allow", "unclaim"]
+        .iter()
+        .any(|operation| media::asked_about(sent, operation).contains(&"9".to_owned()))
 }
 
 /// `hours` from now, as the core records a moment.
@@ -96,26 +89,24 @@ struct Read {
     record: String,
 }
 
-async fn read(tag: &str, others: &str, lapsed: Option<Lapsed>) -> Read {
+async fn read(tag: &str, others: &[Member], lapsed: Option<Lapsed>) -> Read {
     let env = recorded_admin(&format!("lapsed-{tag}"));
     let stack: &'static Path = Box::leak(stack_with_decline(tag).into_boxed_path());
     offered_and_lapsed(&env, stack, lapsed);
     let http = holding(others);
-    let ctx = lemonfiber_testing::a_context()
-        .over(Source::External(stack))
-        .engine(Arc::new(Reporting::holding(
-            &["jellyfin"],
-            Lifecycle::Running,
-            Health::Healthy,
-        )))
-        .clock(Arc::new(lemonfiber_adapters::System))
-        .settings(Settings {
-            env_file: Some(env.clone()),
-            household_host: Some("192.168.1.20".to_owned()),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(http.clone());
+    let ctx = media::keyed_in(
+        lemonfiber_testing::a_context()
+            .over(Source::External(stack))
+            .engine(Arc::new(media::running()))
+            .clock(Arc::new(lemonfiber_adapters::System))
+            .settings(Settings {
+                env_file: Some(env.clone()),
+                household_host: Some("192.168.1.20".to_owned()),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http.clone()),
+    );
 
     let said = dispatch(Command::Household { member: None }, &ctx).await;
     let record =
@@ -144,23 +135,17 @@ fn ana(report: Option<&HouseholdReport>) -> Option<MemberStanding> {
 /// account the operator suspended, and nothing more is written to it.
 #[tokio::test]
 async fn a_reset_switched_off_at_its_lapse_stands_as_expired() {
-    let ana_switched_off = r#",{"Id":"9","Name":"ana","HasPassword":false,
-        "LastActivityDate":"2026-03-01T10:00:00.0000000Z","Policy":{"IsDisabled":true}}"#;
-
-    let read = read("switched-off", ana_switched_off, Some(Lapsed::SwitchedOff)).await;
+    let read = read("switched-off", &[ana_seen(true)], Some(Lapsed::SwitchedOff)).await;
 
     assert_eq!(ana(read.report.as_ref()), Some(MemberStanding::Expired));
-    assert!(!read
-        .sent
-        .iter()
-        .any(|request| request.url.contains("/Users/9")));
+    assert!(!wrote_on_ana(&read.sent));
 }
 
 /// An account the decline service removed at its lapse is still listed, as expired, and
 /// nothing is said about it having gone; the offer is kept for the next read.
 #[tokio::test]
 async fn an_account_removed_at_its_lapse_is_listed_as_expired_and_not_as_missing() {
-    let read = read("removed", "", Some(Lapsed::Removed)).await;
+    let read = read("removed", &[], Some(Lapsed::Removed)).await;
 
     assert_eq!(ana(read.report.as_ref()), Some(MemberStanding::Expired));
     let findings = read
@@ -179,7 +164,7 @@ async fn an_account_removed_at_its_lapse_is_listed_as_expired_and_not_as_missing
 #[tokio::test]
 async fn an_account_gone_with_no_lapse_recorded_is_not_listed() {
     for lapsed in [None, Some(Lapsed::Left(Left::Gone))] {
-        let read = read("vanished", "", lapsed).await;
+        let read = read("vanished", &[], lapsed).await;
 
         assert_eq!(ana(read.report.as_ref()), None);
         assert!(!read.record.contains(r#""9""#), "{}", read.record);
@@ -187,22 +172,13 @@ async fn an_account_gone_with_no_lapse_recorded_is_not_listed() {
 }
 
 /// The core's own sweep reads somebody having been in an account the way the decline
-/// service does: a sign-in alone, with no activity since, is enough to switch the
-/// account off and keep it rather than remove it.
+/// service does: an account the media server has seen anybody in is switched off and
+/// kept rather than removed.
 #[tokio::test]
-async fn an_account_somebody_only_signed_in_to_is_switched_off_by_the_sweep_not_removed() {
-    let ana_signed_in_once = r#",{"Id":"9","Name":"ana","HasPassword":false,
-        "LastLoginDate":"2026-03-01T10:00:00.0000000Z","Policy":{"IsDisabled":false}}"#;
+async fn an_account_somebody_has_been_in_is_switched_off_by_the_sweep_not_removed() {
+    let read = read("signed-in-once", &[ana_seen(false)], None).await;
 
-    let read = read("signed-in-once", ana_signed_in_once, None).await;
-
-    assert!(!read
-        .sent
-        .iter()
-        .any(|request| request.method == Method::Delete && request.url.contains("/Users/9")));
-    assert!(read
-        .sent
-        .iter()
-        .any(|request| request.method == Method::Post && request.url.contains("/Users/9/Policy")));
+    assert!(media::asked_about(&read.sent, "withdraw").is_empty());
+    assert_eq!(media::asked_about(&read.sent, "suspend"), ["9"]);
     assert_eq!(ana(read.report.as_ref()), Some(MemberStanding::Expired));
 }

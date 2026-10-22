@@ -22,83 +22,72 @@ use crate::common::household::recorded_admin;
 use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Inviting, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::model::{Invitation, InvitationStanding};
-use lemonfiber_core::ports::http::{Method, Request};
+use lemonfiber_core::ports::http::Request;
+use lemonfiber_core::ports::service::{Invited, Member};
 use lemonfiber_fixtures::http::{Answer, Fake};
-use lemonfiber_fixtures::support::Reporting;
-use lemonfiber_ports::docker::{Health, Lifecycle};
+use lemonfiber_testing::media;
 
 /// The household: the owner, and two invitations nobody ever claimed.
 ///
-/// Neither has a `LastActivityDate`, which is what makes them offers nobody took up
-/// rather than accounts somebody has been in.
-const HOUSEHOLD: &str = r#"[
-    {"Id":"1","Name":"owner","HasPassword":true,"Policy":{"IsAdministrator":true}},
-    {"Id":"9","Name":"Ana","HasPassword":false},
-    {"Id":"7","Name":"bo","HasPassword":false}
-]"#;
+/// Neither has been seen, which is what makes them offers nobody took up rather than
+/// accounts somebody has been in.
+fn household() -> Vec<Member> {
+    let mut owner = media::member("1", "owner", true);
+    owner.access.administrator = true;
+    vec![
+        owner,
+        media::member("9", "Ana", false),
+        media::member("7", "bo", false),
+    ]
+}
 
 /// Both were made in January, and the clock below is stopped in October — so both are
 /// long past the window, and the sweep is about to take them.
-const RECORDED: &str = r#"{"Items":[
-    {"Type":"UserCreated","Date":"2026-01-04T09:00:00.0000000Z","UserId":"9"},
-    {"Type":"UserCreated","Date":"2026-01-04T09:00:00.0000000Z","UserId":"7"}
-]}"#;
-
-/// Where Ana's account is readied to be claimed again.
-const READY: &str = "/Users/9/Policy";
-
-/// Ana's account, as the media server answers a read of it.
-const ANA: &str = r#"{"Id":"9","Name":"Ana","HasPassword":false,"Policy":{"IsDisabled":false}}"#;
-
-/// Where a second account under the same name would be asked for.
-const NEW_ACCOUNT: &str = "/Users/New";
+fn recorded() -> Vec<Invited> {
+    ["9", "7"]
+        .into_iter()
+        .map(|member| Invited {
+            member: member.to_owned(),
+            at: "2026-01-04T09:00:00Z".to_owned(),
+        })
+        .collect()
+}
 
 /// A media server holding both expired invitations, answering the readying with `ready`.
 fn a_server(ready: Answer) -> Arc<Fake> {
-    let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
-    Fake::by_path_in_turn(vec![
-        (
-            "/Users/AuthenticateByName",
-            vec![signed_in.clone(), signed_in.clone(), signed_in],
-        ),
+    let mut routes = vec![
         ("/auth/jellyfin", vec![Answer::reply(200, "{}")]),
         ("/user/import-from-jellyfin", vec![Answer::reply(201, "{}")]),
-        ("/System/ActivityLog", vec![Answer::reply(200, RECORDED)]),
-        (READY, vec![ready]),
-        ("/Users/9", vec![Answer::reply(200, ANA)]),
-        (
-            NEW_ACCOUNT,
-            vec![Answer::reply(
-                200,
-                r#"{"Id":"4","Name":"Ana","HasPassword":false}"#,
-            )],
-        ),
-        ("/Users", vec![Answer::reply(200, HOUSEHOLD)]),
-    ])
+        (media::identity("claimable"), vec![ready]),
+    ];
+    routes.extend(media::household(
+        &household(),
+        &media::member("4", "Ana", false),
+        &recorded(),
+    ));
+    Fake::by_path_in_turn(routes)
 }
 
 /// Everything answering, and the readying accepted.
 fn answering() -> Arc<Fake> {
-    a_server(Answer::reply(204, ""))
+    a_server(media::taken())
 }
 
 /// A context over the shipped stack, on a clock stopped well past both invitations.
 fn context(env: &std::path::Path, http: Arc<Fake>, rehearsing: bool) -> Ctx {
     // Stopped, because everything here turns on a window. Against the real clock the
     // dates above would drift out of the arrangement they were chosen for.
-    let ctx = lemonfiber_testing::a_context()
-        .engine(Arc::new(Reporting::holding(
-            &["jellyfin"],
-            Lifecycle::Running,
-            Health::Healthy,
-        )))
-        .settings(Settings {
-            env_file: Some(env.to_path_buf()),
-            household_host: Some("192.168.1.20".to_owned()),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(http);
+    let ctx = media::keyed_in(
+        lemonfiber_testing::a_context()
+            .engine(Arc::new(media::running()))
+            .settings(Settings {
+                env_file: Some(env.to_path_buf()),
+                household_host: Some("192.168.1.20".to_owned()),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http),
+    );
     if rehearsing {
         ctx.rehearsing()
     } else {
@@ -117,27 +106,19 @@ struct Ran {
 }
 
 impl Ran {
-    /// The accounts this run asked to have removed.
-    fn deleted(&self) -> Vec<&str> {
-        self.sent
-            .iter()
-            .filter(|request| request.method == Method::Delete)
-            .filter_map(|request| request.url.rsplit('/').next())
-            .collect()
+    /// The accounts this run asked to have taken back.
+    fn deleted(&self) -> Vec<String> {
+        media::asked_about(&self.sent, "withdraw")
     }
 
     /// Whether a second account was asked for.
     fn made_another_account(&self) -> bool {
-        self.sent
-            .iter()
-            .any(|request| request.url.contains(NEW_ACCOUNT))
+        !media::asked(&self.sent, "invite").is_empty()
     }
 
-    /// Whether the account was readied to be claimed again.
+    /// Whether Ana's account was readied to be claimed again.
     fn readied(&self) -> bool {
-        self.sent
-            .iter()
-            .any(|request| request.method == Method::Post && request.url.contains(READY))
+        media::asked_about(&self.sent, "claimable").contains(&"9".to_owned())
     }
 }
 
@@ -190,7 +171,7 @@ async fn an_invitation_that_ran_out_is_offered_again_on_the_same_account() {
     let ran = offering("renewed", "ana", answering(), false).await;
 
     assert!(
-        !ran.deleted().contains(&"9"),
+        !ran.deleted().contains(&"9".to_owned()),
         "the account the invitation was for was removed and then rebuilt, so everything \
          hanging off its identifier now points at somebody who does not exist: {:?}",
         ran.deleted()
@@ -289,11 +270,11 @@ async fn an_invitation_that_cannot_be_dated_again_is_refused() {
 /// somebody cannot sign in at.
 #[tokio::test]
 async fn an_account_the_server_will_not_ready_is_refused() {
-    let ran = offering("unready", "ana", a_server(Answer::reply(403, "")), false).await;
+    let ran = offering("unready", "ana", a_server(media::refusing()), false).await;
 
     assert_eq!(ran.refusal, Some("INVITE-10".to_owned()));
     assert!(
-        !ran.deleted().contains(&"9"),
+        !ran.deleted().contains(&"9".to_owned()),
         "an account that was already hers was taken away because it could not be readied"
     );
 }

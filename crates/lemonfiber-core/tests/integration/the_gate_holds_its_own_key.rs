@@ -8,12 +8,10 @@ use std::sync::Arc;
 use crate::common::household::recorded_admin;
 use lemonfiber_core::app::{dispatch, Command, Outcome};
 use lemonfiber_core::config::Settings;
-use lemonfiber_core::ports::http::Method;
 use lemonfiber_core::stack::Source;
-use lemonfiber_fixtures::http::{Answer, Fake};
-use lemonfiber_fixtures::support::Reporting;
-use lemonfiber_ports::docker::{Health, Lifecycle};
+use lemonfiber_fixtures::http::Fake;
 use lemonfiber_sidecar::gate::{Credential, Kind, Upstream, Upstreams};
+use lemonfiber_testing::media;
 
 /// The gate's routes, with the media server's presenting `key`.
 fn routes(key: &str) -> String {
@@ -35,52 +33,31 @@ async fn the_gate_key_is_listed_shown_and_replaced() {
     let routes_file = stack.join("config/request-gate/upstreams.json");
     let _ = std::fs::create_dir_all(stack.join("config/request-gate"));
     let _ = std::fs::write(&routes_file, routes("old"));
-    let listed = |keys: &[&str]| {
-        let items: Vec<serde_json::Value> = keys
-            .iter()
-            .map(|key| serde_json::json!({ "AppName": "lemonfiber-request-gate", "AccessToken": key }))
-            .collect();
-        Answer::reply(
-            200,
-            Box::leak(
-                serde_json::json!({ "Items": items })
-                    .to_string()
-                    .into_boxed_str(),
-            ),
-        )
-    };
-    let http = Fake::by_route_in_turn(vec![
+    let filed = |keys: &[&str]| media::answered(&keys);
+    let http = Fake::by_path_in_turn(vec![
         (
-            Method::Post,
-            "/Users/AuthenticateByName",
-            vec![Answer::reply(200, r#"{"AccessToken":"token"}"#)],
-        ),
-        (
-            Method::Get,
-            "/Auth/Keys",
+            media::serve("filed_as"),
             vec![
-                listed(&["old"]),
-                listed(&["old", "fresh"]),
-                listed(&["old", "fresh"]),
+                filed(&["old"]),
+                filed(&["old", "fresh"]),
+                filed(&["old", "fresh"]),
             ],
         ),
-        (Method::Post, "/Auth/Keys", vec![Answer::reply(204, "")]),
-        (Method::Delete, "/Auth/Keys/", vec![Answer::reply(204, "")]),
-        (Method::Get, "/System/Info", vec![Answer::reply(200, "{}")]),
+        (media::serve("mint"), vec![media::answered(&"fresh")]),
+        (media::serve("answers_to"), vec![media::taken()]),
+        (media::serve("revoke"), vec![media::taken()]),
     ]);
-    let ctx = lemonfiber_testing::a_context()
-        .over(Source::External(stack))
-        .engine(Arc::new(Reporting::holding(
-            &["jellyfin"],
-            Lifecycle::Running,
-            Health::Healthy,
-        )))
-        .settings(Settings {
-            env_file: Some(env.clone()),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(http.clone());
+    let ctx = media::keyed_in(
+        lemonfiber_testing::a_context()
+            .over(Source::External(stack))
+            .engine(Arc::new(media::running()))
+            .settings(Settings {
+                env_file: Some(env.clone()),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http.clone()),
+    );
     let asked = |asking| dispatch(Command::Credentials(asking), &ctx);
 
     let shown = match asked(lemonfiber_core::app::Asking::Reveal {
@@ -113,8 +90,8 @@ async fn the_gate_key_is_listed_shown_and_replaced() {
         "{rotated:?}"
     );
     assert_eq!(held_now, routes("fresh"));
-    assert!(http
-        .requests()
-        .iter()
-        .any(|asked| asked.method == Method::Delete && asked.url.ends_with("/Auth/Keys/old")));
+    assert!(http.requests().iter().any(|asked| {
+        asked.url.ends_with(media::serve("revoke"))
+            && asked.body.as_deref() == Some(r#"{"key":"old"}"#)
+    }));
 }

@@ -1,12 +1,16 @@
 //! Seeing a credential once, and replacing one.
 
 use super::{asked, ctx, env_at, recorded, sealed, silent, the_torrent_password, Sealing};
+use lemonfiber_contract::wire::Kind;
 use lemonfiber_core::app::Asking;
+use lemonfiber_core::app::Ctx;
 use lemonfiber_core::config::{MEDIA_SERVER_ADMIN_PASSWORD_KEY, TORRENT_PASSWORD_KEY};
 use lemonfiber_core::credential::Rotation;
+use lemonfiber_core::ports::http::Http;
 use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::support::FixedRandom;
+use lemonfiber_testing::media;
 use std::sync::Arc;
 
 /// The heart of it: a replacement the service refuses leaves the credential that was
@@ -280,26 +284,15 @@ async fn a_rehearsed_rotation_mints_nothing_and_asks_the_client_for_nothing() {
     );
 }
 
-/// A media server whose administrator signs in with `before`, whose password change
-/// answers `changed`, and whose sign-in with the replacement answers `after`.
-fn administered(before: u16, changed: u16, after: u16) -> Arc<Fake> {
-    administered_by(
-        before,
-        Answer::reply(changed, ""),
-        Answer::reply(after, r#"{"AccessToken":"token","User":{"Id":"admin-id"}}"#),
-    )
+/// A media server, moved into its plugin, answering the change of its administrator's
+/// password with `changed`.
+fn administered(changed: Answer) -> Arc<Fake> {
+    Fake::by_path(vec![(media::identity("replace_admin_password"), changed)])
 }
 
-/// The same, with the password change and the sign-in after it answered as given.
-fn administered_by(before: u16, changed: Answer, after: Answer) -> Arc<Fake> {
-    let session = r#"{"AccessToken":"token","User":{"Id":"admin-id"}}"#;
-    Fake::by_path_in_turn(vec![
-        (
-            "/Users/AuthenticateByName",
-            vec![Answer::reply(before, session), after],
-        ),
-        ("/Users/admin-id/Password", vec![changed]),
-    ])
+/// A context over `env` asking the media server moved into its plugin over `http`.
+fn moved(env: std::path::PathBuf, http: Arc<dyn Http>) -> Ctx {
+    media::reaching(ctx(env, Files::empty(), http))
 }
 
 /// The administrator's password the run records, built as the others are.
@@ -315,7 +308,7 @@ async fn administrator_rotated(
 ) -> (String, Option<String>, Arc<Fake>) {
     let password = the_administrator_password();
     let env = env_at(name, &[(MEDIA_SERVER_ADMIN_PASSWORD_KEY, &password)]);
-    let mut ctx = ctx(env.clone(), Files::empty(), http.clone());
+    let mut ctx = moved(env.clone(), http.clone());
     ctx.dry_run = rehearsing;
     let inventory = asked(
         &ctx,
@@ -328,24 +321,24 @@ async fn administrator_rotated(
     (said, recorded(&env, MEDIA_SERVER_ADMIN_PASSWORD_KEY), http)
 }
 
-/// A replacement the media server takes and signs in with is recorded; the old password is
-/// gone.
+/// A replacement the media server takes is recorded; the old password is gone.
 #[tokio::test]
-async fn the_administrator_password_is_replaced_once_the_media_server_signs_in_with_it() {
+async fn the_administrator_password_is_replaced_once_the_media_server_takes_it() {
     let (said, recorded, http) =
-        administrator_rotated("admin-landed", administered(200, 204, 200), false).await;
+        administrator_rotated("admin-landed", administered(media::taken()), false).await;
 
     assert!(said.starts_with("Some(Replaced"), "{said}");
-    assert!(recorded.is_some_and(|now| now != the_administrator_password()));
-    let changed = http
-        .requests()
-        .into_iter()
-        .find(|asked| asked.url.ends_with("/Users/admin-id/Password"))
-        .and_then(|asked| asked.body)
-        .unwrap_or_default();
-    assert!(
-        changed.contains("CurrentPw") && changed.contains("NewPw"),
-        "the change was not asked for"
+    assert!(recorded
+        .as_ref()
+        .is_some_and(|now| *now != the_administrator_password()));
+    let changed = media::asked(&http.requests(), "replace_admin_password");
+    assert_eq!(
+        changed
+            .iter()
+            .map(|asked| asked.get("replacement").and_then(|one| one.as_str()))
+            .collect::<Vec<_>>(),
+        [recorded.as_deref()],
+        "the change was not asked for with the replacement recorded"
     );
 }
 
@@ -354,25 +347,24 @@ async fn the_administrator_password_is_replaced_once_the_media_server_signs_in_w
 #[tokio::test]
 async fn a_replacement_the_media_server_will_not_take_leaves_the_recorded_password() {
     for (name, http, settled) in [
-        ("admin-refused", administered(401, 204, 200), "Some(Refused"),
+        (
+            "admin-refused",
+            administered(media::refused(Kind::Unauthorised)),
+            "Some(Refused",
+        ),
         (
             "admin-unchanged",
-            administered(200, 500, 200),
+            administered(media::refusing()),
             "Some(Unproven",
         ),
         (
-            "admin-unproven",
-            administered(200, 204, 401),
+            "admin-unavailable",
+            administered(media::unavailable()),
             "Some(Unproven",
         ),
         (
             "admin-unreached",
-            administered_by(200, Answer::Silent, Answer::reply(200, "{}")),
-            "Some(Unproven",
-        ),
-        (
-            "admin-unanswered",
-            administered_by(200, Answer::reply(204, ""), Answer::reply(500, "")),
+            administered(Answer::Silent),
             "Some(Unproven",
         ),
     ] {
@@ -389,13 +381,21 @@ async fn a_replacement_the_media_server_will_not_take_leaves_the_recorded_passwo
 #[tokio::test]
 async fn an_unproven_replacement_is_kept_beside_the_password_and_a_refused_one_is_not() {
     for (name, http, kept) in [
-        ("admin-pending-unproven", administered(200, 204, 401), true),
-        ("admin-pending-refused", administered(401, 204, 200), false),
+        (
+            "admin-pending-unproven",
+            administered(media::refusing()),
+            true,
+        ),
+        (
+            "admin-pending-refused",
+            administered(media::refused(Kind::Unauthorised)),
+            false,
+        ),
     ] {
         let password = the_administrator_password();
         let env = env_at(name, &[(MEDIA_SERVER_ADMIN_PASSWORD_KEY, &password)]);
         let _ = asked(
-            &ctx(env.clone(), Files::empty(), http),
+            &moved(env.clone(), http),
             Asking::Rotate {
                 credential: "jellyfin".to_owned(),
             },
@@ -452,7 +452,7 @@ async fn a_replacement_that_cannot_be_recorded_is_never_set() {
 #[tokio::test]
 async fn a_rehearsed_administrator_rotation_asks_the_media_server_nothing() {
     let (said, recorded, http) =
-        administrator_rotated("admin-rehearsed", administered(200, 204, 200), true).await;
+        administrator_rotated("admin-rehearsed", administered(media::taken()), true).await;
 
     assert!(said.starts_with("Some(Rehearsed"), "{said}");
     assert_eq!(recorded, Some(the_administrator_password()));
@@ -463,10 +463,10 @@ async fn a_rehearsed_administrator_rotation_asks_the_media_server_nothing() {
 /// server.
 #[tokio::test]
 async fn without_a_password_or_randomness_the_administrator_is_left_alone() {
-    let http = administered(200, 204, 200);
+    let http = administered(media::taken());
     let env = env_at("admin-unrecorded", &[]);
     let unrecorded = asked(
-        &ctx(env, Files::empty(), http.clone()),
+        &moved(env, http.clone()),
         Asking::Rotate {
             credential: "jellyfin".to_owned(),
         },
@@ -481,7 +481,7 @@ async fn without_a_password_or_randomness_the_administrator_is_left_alone() {
         &[(MEDIA_SERVER_ADMIN_PASSWORD_KEY, &password)],
     );
     let unrandom = asked(
-        &ctx(env.clone(), Files::empty(), http.clone()).with_random(Arc::new(FixedRandom(None))),
+        &moved(env.clone(), http.clone()).with_random(Arc::new(FixedRandom(None))),
         Asking::Rotate {
             credential: "jellyfin".to_owned(),
         },
@@ -505,13 +505,13 @@ async fn an_administrator_replacement_that_cannot_be_recorded_is_never_set() {
         &[(MEDIA_SERVER_ADMIN_PASSWORD_KEY, &password)],
     );
     sealed(&env);
-    let http = administered(200, 204, 200);
+    let http = administered(media::taken());
 
     let (said, _, _) = rotated_over(&env, "jellyfin", http.clone()).await;
 
     assert!(said.contains("could not be recorded"), "{said}");
     assert!(
-        !http.asked_for("/Password"),
+        !http.asked_for(media::identity("replace_admin_password")),
         "a password was set that nothing recorded"
     );
     assert_eq!(
@@ -544,8 +544,8 @@ async fn a_replacement_taken_and_not_moved_into_place_stays_pending() {
             MEDIA_SERVER_ADMIN_PASSWORD_KEY,
             administrator,
             "jellyfin",
-            administered(200, 204, 200),
-            "/Users/admin-id/Password",
+            administered(media::taken()),
+            media::identity("replace_admin_password"),
         ),
     ] {
         let env = env_at(name, &[(setting, &password)]);
@@ -556,7 +556,7 @@ async fn a_replacement_taken_and_not_moved_into_place_stays_pending() {
         });
 
         let inventory = asked(
-            &ctx(env.clone(), Files::empty(), http),
+            &moved(env.clone(), http),
             Asking::Rotate {
                 credential: credential.to_owned(),
             },
@@ -584,7 +584,7 @@ async fn rotated_over(
     http: Arc<Fake>,
 ) -> (String, Option<String>, Arc<Fake>) {
     let inventory = asked(
-        &ctx(env.to_path_buf(), Files::empty(), http.clone()),
+        &moved(env.to_path_buf(), http.clone()),
         Asking::Rotate {
             credential: credential.to_owned(),
         },
@@ -603,7 +603,7 @@ async fn with_no_media_server_the_administrator_password_is_left_alone() {
         "admin-no-server",
         &[(MEDIA_SERVER_ADMIN_PASSWORD_KEY, &password)],
     );
-    let http = administered(200, 204, 200);
+    let http = administered(media::taken());
     let ctx = lemonfiber_testing::a_context()
         .over(crate::common::household::stack_without(
             "jellyfin",
