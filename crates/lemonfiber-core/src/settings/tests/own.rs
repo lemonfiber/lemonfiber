@@ -1,4 +1,6 @@
-use crate::settings::own::{is_configs, is_core, refusal, DEVICE_KEY_APPS};
+use crate::settings::own::{
+    is_configs, is_core, refusal, DASHBOARD_SEARCH, DEFAULT_SEARCH, DEVICE_KEY_APPS,
+};
 
 fn fingerprint() -> String {
     "0f".repeat(32)
@@ -53,4 +55,69 @@ fn an_identity_in_neither_form_is_refused_naming_it() {
     assert!(refusal(DEVICE_KEY_APPS, "ios:ABCDE12345.ok,")
         .is_some_and(|said| said.contains("an empty entry")));
     assert_eq!(refusal("gluetun:countries", "windows:anything"), None);
+}
+
+#[test]
+fn the_dashboards_search_address_is_a_core_setting() {
+    assert!(is_core(DASHBOARD_SEARCH));
+    assert!(!is_configs(DASHBOARD_SEARCH));
+}
+
+#[test]
+fn an_absolute_web_address_is_taken_for_the_dashboards_search() {
+    for value in [
+        DEFAULT_SEARCH,
+        "https://www.ecosia.org/search?q=",
+        "http://search.home.arpa/?q=",
+    ] {
+        assert_eq!(refusal(DASHBOARD_SEARCH, value), None, "{value}");
+    }
+}
+
+#[test]
+fn anything_but_an_absolute_web_address_is_refused_naming_the_setting() {
+    for value in [
+        "",
+        "duckduckgo.com/?q=",
+        "/search?q=",
+        "ftp://example.com/?q=",
+        "javascript:alert(1)",
+        "https:///?q=",
+        "https://example.com/?q= more",
+    ] {
+        assert!(
+            refusal(DASHBOARD_SEARCH, value).is_some_and(|said| said.starts_with(DASHBOARD_SEARCH)),
+            "{value:?}"
+        );
+    }
+}
+
+#[test]
+fn the_dashboards_search_address_is_the_one_recorded_or_the_default_and_a_bad_one_is_refused() {
+    let scratch = lemonfiber_fixtures::scratch::Scratch::new("dashboard-search");
+    let env = scratch.path().join(".env");
+    let _ = std::fs::write(&env, "");
+    let ctx = crate::test_support::a_context()
+        .settings(crate::config::Settings {
+            env_file: Some(env.clone()),
+            ..crate::config::Settings::default()
+        })
+        .build();
+    let settings = env.with_file_name(crate::config::paths::SETTINGS);
+    let record = |value: &str| {
+        crate::settings::store::recorded(&settings, DASHBOARD_SEARCH, Some(value)).is_ok()
+    };
+
+    assert_eq!(
+        crate::settings::dashboard_search(&ctx),
+        Ok(DEFAULT_SEARCH.to_owned())
+    );
+    assert!(record("https://www.ecosia.org/search?q="));
+    assert_eq!(
+        crate::settings::dashboard_search(&ctx),
+        Ok("https://www.ecosia.org/search?q=".to_owned())
+    );
+    assert!(record("ecosia.org/search?q="));
+    assert!(crate::settings::dashboard_search(&ctx)
+        .is_err_and(|said| said.starts_with(DASHBOARD_SEARCH)));
 }

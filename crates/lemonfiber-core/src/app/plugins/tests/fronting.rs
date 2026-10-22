@@ -48,7 +48,7 @@ const SHIPPED_DASHBOARD: &str = "- Watch:\n    - Jellyfin:\n        href: http:/
 /// where each file is.
 fn fronted(ctx: &Ctx) -> (PathBuf, PathBuf) {
     let proxy = stack_of(ctx).join(crate::plugin::PROXY);
-    let dashboard = stack_of(ctx).join(crate::plugin::DASHBOARD);
+    let dashboard = stack_of(ctx).join("config/homepage/services.yaml");
     for (at, holds) in [(&proxy, SHIPPED_PROXY), (&dashboard, SHIPPED_DASHBOARD)] {
         let _ = at.parent().map(std::fs::create_dir_all);
         let _ = std::fs::write(at, holds);
@@ -56,11 +56,11 @@ fn fronted(ctx: &Ctx) -> (PathBuf, PathBuf) {
     (proxy, dashboard)
 }
 
-/// A household service is reachable through the stack's proxy and listed on its
-/// dashboard once installed, the proxy is told to read its file again, and removing
-/// the plugin gives back both files exactly as they were.
+/// A household service is reachable through the stack's proxy once installed, the proxy
+/// is told to read its file again, and removing the plugin gives back the file exactly as
+/// it was. The dashboard is not written into: its entry is the panel list's.
 #[tokio::test]
-async fn a_household_service_is_put_on_the_proxy_and_the_dashboard_and_taken_off_again() {
+async fn a_household_service_is_put_on_the_proxy_and_taken_off_again() {
     let runner = Arc::new(Recording::answering(Ok(spoke(""))));
     let ctx = proving("fronting", runner.clone(), answering(200));
     let (proxy, dashboard) = fronted(&ctx);
@@ -68,8 +68,7 @@ async fn a_household_service_is_put_on_the_proxy_and_the_dashboard_and_taken_off
     let installed = report(installing(&ctx, &source("fronting", PROVING)).await);
 
     assert!(read(&proxy).contains("komga.{$DOMAIN:home.local} {\n\treverse_proxy komga:25600\n}"));
-    let listed = read(&dashboard);
-    assert!(listed.contains("- \"Komga\":"), "{listed}");
+    assert_eq!(read(&dashboard), SHIPPED_DASHBOARD);
     assert!(
         runner.ran("restart"),
         "the proxy was told to read its file again"
@@ -82,8 +81,8 @@ async fn a_household_service_is_put_on_the_proxy_and_the_dashboard_and_taken_off
         puts.iter()
             .filter(|one| **one == crate::plugin::Puts::Region)
             .count(),
-        2,
-        "the account names both regions: {puts:?}"
+        1,
+        "the account names the proxy's region: {puts:?}"
     );
 
     let gone = removal(removing(&ctx, "komga").await);
@@ -139,10 +138,10 @@ async fn no_region_is_written_where_there_is_no_file_or_the_area_is_unmanaged() 
             .all(|one| one.puts != crate::plugin::Puts::Region)));
 }
 
-/// An operator surface is listed and given no route, so the proxy is left exactly
-/// as it was and is not restarted for it.
+/// An operator surface is given no route, so the proxy is left exactly as it was and is
+/// not restarted for it.
 #[tokio::test]
-async fn an_operator_surface_is_listed_and_the_proxy_is_left_alone() {
+async fn an_operator_surface_is_given_no_route_and_the_proxy_is_left_alone() {
     let runner = Arc::new(Recording::answering(Ok(spoke(""))));
     let ctx = proving("loopback", runner.clone(), answering(200));
     let (proxy, dashboard) = fronted(&ctx);
@@ -151,8 +150,7 @@ async fn an_operator_surface_is_listed_and_the_proxy_is_left_alone() {
     let _ = installing(&ctx, &source("loopback", &loopback)).await;
 
     assert_eq!(read(&proxy), SHIPPED_PROXY);
-    let listed = read(&dashboard);
-    assert!(listed.contains("http://localhost:25600"), "{listed}");
+    assert_eq!(read(&dashboard), SHIPPED_DASHBOARD);
     assert!(!runner.ran("restart"), "nothing about the proxy changed");
 }
 

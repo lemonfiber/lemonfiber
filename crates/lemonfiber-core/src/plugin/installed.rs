@@ -76,6 +76,9 @@ pub struct Placed {
     /// The icon its dashboard entry shows, where its wiring names one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
+    /// The path it answers over HTTP to say it is up, where its health is asked that way.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub health: Option<String>,
     /// Whether its wiring hid it from the dashboard.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub hidden: bool,
@@ -203,6 +206,11 @@ impl Placed {
             description: entry.description.to_owned(),
             icon: entry.icon.map(str::to_owned),
             hidden: entry.hidden,
+            health: service
+                .health
+                .as_ref()
+                .filter(|health| health.kind == lemonfiber_plugin::HealthKind::Http)
+                .and_then(|health| health.path.clone()),
             api: service.api.clone(),
             listens: service.listens,
             media_types: service.media_types.clone(),

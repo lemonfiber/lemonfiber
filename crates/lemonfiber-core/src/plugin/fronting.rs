@@ -1,45 +1,25 @@
-//! The proxy stanza and the dashboard entry a plugin's service gets.
+//! The proxy stanza a plugin's service gets.
 //!
-//! The bundled stack puts a household service behind its proxy and every service on
-//! its dashboard. A plugin's service gets the same on the same terms, and gets it
-//! written *for* it: what goes in each is derived here from what the install
-//! recorded, which is what the manifest declared (the service's id and port, the tier
-//! that decides whether it is reachable at all, and the description beside it). There
-//! is no field a plugin could put a line of proxy or dashboard configuration in, so
-//! nothing here reads one.
+//! The bundled stack puts a household service behind its proxy. A plugin's service gets
+//! the same on the same terms, and gets it written *for* it: what goes in the stanza is
+//! derived here from what the install recorded, which is what the manifest declared (the
+//! service's id and port, and the tier that decides whether it is reachable at all).
+//! There is no field a plugin could put a line of proxy configuration in, so nothing here
+//! reads one. Its dashboard entry is the panel list's, applied to the dashboard by
+//! [`crate::app::showing`].
 //!
-//! **The tier decides the route and nothing else.** A household service gets a
-//! stanza and an entry linking to the household address. An operator surface gets an
-//! entry linking to this machine and no stanza, which is the bundled policy holding:
-//! an admin surface does not get a name on the household network. The record cannot
-//! carry a hostname for one in the first place, so there is nothing here to refuse.
-//!
-//! **A link, not a widget.** An entry is an icon, a link and a description. A widget
-//! reads a service's API with a credential, which is a recipe's to capture, and this
-//! build runs none.
+//! **The tier decides the route.** A household service gets a stanza; an operator
+//! surface gets none, which is the bundled policy holding: an admin surface does not get
+//! a name on the household network. The record cannot carry a hostname for one in the
+//! first place, so there is nothing here to refuse.
 //!
 //! Nothing here touches a disk. It answers with text, and where that text goes, and
 //! who owns the region it goes in, is [`super::placing`]'s.
 
-use std::fmt::Write as _;
-
-use super::installed::{Installed, Placed, Reached};
+use super::installed::{Installed, Reached};
 
 /// The proxy's configuration, beneath the stack directory.
 pub const PROXY: &str = "config/caddy/Caddyfile";
-
-/// The dashboard's list of services, beneath the stack directory.
-pub const DASHBOARD: &str = "config/homepage/services.yaml";
-
-/// The group a household service is listed under where its manifest named none.
-///
-/// The stack's own answer, read off the dashboard it ships: the group its household
-/// library services are in.
-const HOUSEHOLD_GROUP: &str = "Library";
-
-/// The group an operator surface is listed under where its manifest named none: the
-/// group the shipped dashboard keeps the stack's own automation in.
-const OPERATOR_GROUP: &str = "Automation";
 
 /// The proxy stanza for every one of the plugin's services the household reaches.
 ///
@@ -90,73 +70,6 @@ pub fn taken(would: &Installed, installed: &[Installed]) -> Option<(String, Stri
                 .find(|label| wanted.contains(label))
                 .map(|label| (label, other.plugin.clone()))
         })
-}
-
-/// The dashboard entries for every one of the plugin's services that listens, under
-/// the group each belongs to.
-///
-/// Empty where nothing listens. Grouped in the order the groups first appear, so the
-/// entry is the same twice and a rewrite for no reason is no change at all. Every
-/// name and every value is written as a quoted string, because a plugin's name or
-/// description is prose from its author and a colon in it must not become YAML.
-#[must_use]
-pub fn listed(installed: &Installed) -> String {
-    let mut groups: Vec<(String, Vec<String>)> = Vec::new();
-    for placed in &installed.services {
-        let Some(reached) = &placed.reached else {
-            continue;
-        };
-        let group = reached
-            .group()
-            .map_or_else(|| default_group(reached).to_owned(), str::to_owned);
-        let entry = entry(placed, reached);
-        match groups.iter_mut().find(|(named, _)| *named == group) {
-            Some((_, entries)) => entries.push(entry),
-            None => groups.push((group, vec![entry])),
-        }
-    }
-    groups
-        .into_iter()
-        .fold(String::new(), |mut text, (group, entries)| {
-            let _ = write!(text, "- {}:\n{}", quoted(&group), entries.concat());
-            text
-        })
-}
-
-/// The group a service is listed under where its manifest named none.
-const fn default_group(reached: &Reached) -> &'static str {
-    match reached {
-        Reached::Household { .. } => HOUSEHOLD_GROUP,
-        Reached::Loopback { .. } => OPERATOR_GROUP,
-    }
-}
-
-/// One service's entry: its icon, where the link goes, and what it is for.
-///
-/// The link is rendered from the tier exactly as the stack's own are: the household
-/// address for a household service, and this machine for an operator surface, whose
-/// port is published nowhere else.
-fn entry(placed: &Placed, reached: &Reached) -> String {
-    let href = match reached {
-        Reached::Household { port, .. } => format!("http://{{{{HOMEPAGE_VAR_LAN_HOST}}}}:{port}"),
-        Reached::Loopback { port, .. } => format!("http://localhost:{port}"),
-    };
-    let name = placed.called();
-    format!(
-        "    - {}:\n        icon: {}\n        href: {}\n        description: {}\n",
-        quoted(name),
-        quoted(&placed.icon()),
-        quoted(&href),
-        quoted(&placed.description),
-    )
-}
-
-/// A string as YAML reads it back unchanged, whatever it holds.
-///
-/// A JSON string is a YAML double-quoted scalar, escaping included, so the one
-/// serialiser that is already here says it without a second one.
-fn quoted(text: &str) -> String {
-    serde_json::to_string(text).unwrap_or_default()
 }
 
 #[cfg(test)]

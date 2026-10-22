@@ -85,6 +85,7 @@ pub(crate) mod reset;
 pub mod restore;
 pub(crate) mod screen;
 pub mod setup;
+pub(crate) mod showing;
 pub mod support;
 pub mod switched;
 pub(crate) mod targets;

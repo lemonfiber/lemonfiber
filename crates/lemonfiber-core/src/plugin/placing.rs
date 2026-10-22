@@ -16,13 +16,12 @@
 //! over and journals what it held before ([`crate::journal::Kind::Rewritten`]), or makes
 //! it where there was none.
 //!
-//! **The exception is the stack's own wiring.** The proxy reads one file and the
-//! dashboard another, and a plugin's service is reachable through the first and
-//! listed on the second only if it is written *into* them. So those two writes are a
-//! region each, marked out inside the file and owned by the plugin
-//! ([`crate::region`]), and journalled as [`crate::journal::Kind::Region`]: the
-//! reversal takes out exactly the region, and refuses where somebody has edited it.
-//! What goes in them is [`super::fronting`]'s to say.
+//! **The exception is the stack's own proxy.** It reads one file, and a plugin's service
+//! is reachable through it only if it is written *into* that file. So that write is a
+//! region, marked out inside the file and owned by the plugin ([`crate::region`]), and
+//! journalled as [`crate::journal::Kind::Region`]: the reversal takes out exactly the
+//! region, and refuses where somebody has edited it. What goes in it is
+//! [`super::fronting`]'s to say.
 //!
 //! Nothing here touches a disk. It is given a record and a stack directory and
 //! answers with a list, so every arrangement can be put in front of a test without
@@ -171,10 +170,10 @@ fn configuration(stack: &Path, service: &str) -> PathBuf {
 ///
 /// `project`, where the project changes, comes after them for the same reason the applied
 /// marker is last in an apply: it is the write that makes the rest take effect, so a run
-/// that stopped short of it has changed nothing Compose will read. The proxy's region and the dashboard's
-/// follow it, because a route to a service that is not declared is a route to nothing.
-/// Each is planned only where it would hold something, so a plugin whose services
-/// nothing reaches writes into neither.
+/// that stopped short of it has changed nothing Compose will read. The proxy's region
+/// follows it, because a route to a service that is not declared is a route to nothing,
+/// and is planned only where it would hold something, so a plugin whose services the
+/// household does not reach writes none.
 #[must_use]
 pub fn writes(
     installed: &Installed,
@@ -214,17 +213,14 @@ pub fn writes(
         })
     }));
     planned.extend(project);
-    let owner = super::owning::owner(&installed.plugin);
-    for (key, body) in [
-        (super::fronting::PROXY, super::fronting::proxied(installed)),
-        (
-            super::fronting::DASHBOARD,
-            super::fronting::listed(installed),
-        ),
-    ] {
-        if !body.is_empty() {
-            planned.push(Write::region(stack, key, owner.clone(), body));
-        }
+    let body = super::fronting::proxied(installed);
+    if !body.is_empty() {
+        planned.push(Write::region(
+            stack,
+            super::fronting::PROXY,
+            super::owning::owner(&installed.plugin),
+            body,
+        ));
     }
     planned
 }

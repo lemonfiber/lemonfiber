@@ -62,6 +62,7 @@ fn placed() -> Placed {
         description: "Reads comics".to_owned(),
         icon: None,
         hidden: false,
+        health: None,
         api: None,
         listens: None,
         media_types: Vec::new(),

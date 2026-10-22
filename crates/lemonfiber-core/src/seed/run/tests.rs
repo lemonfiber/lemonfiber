@@ -552,6 +552,7 @@ mod publishing;
 mod quality;
 mod replacing;
 mod requests;
+mod showing;
 mod subtitles;
 mod taken_back;
 mod targets;

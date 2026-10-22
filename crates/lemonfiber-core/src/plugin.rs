@@ -84,7 +84,7 @@ pub use conforming::{conformed, Conformed, Judged};
 pub(crate) use container::{holding, is_a_plugins, secrets_file, unit, user_of, variables};
 pub use container::{profile, Holding, Reading, Variable};
 pub use declared::{Declaration, Secret};
-pub use fronting::{proxied as fronting_proxied, taken as label_taken, DASHBOARD, PROXY};
+pub use fronting::{proxied as fronting_proxied, taken as label_taken, PROXY};
 pub use installed::{answering, spelled_alike, Asking, Installed, Placed, Reached, RunProof};
 pub use lemonfiber_manifest::container::Fields;
 pub use owning::{owned_by, owner, owns};

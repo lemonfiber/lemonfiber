@@ -38,6 +38,7 @@ mod minted;
 mod published;
 pub(crate) use published::published_as;
 mod quality;
+mod showing;
 mod subtitles;
 mod taken_back;
 // The request service's connection to the media server, held at the request gate's route
@@ -261,6 +262,12 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // like releases that happen to have none.
     wirings.extend(subtitles::seed_subtitles(ctx, &fillers).await);
     wirings.extend(quality::seed_quality(ctx, &fillers).await);
+
+    // The dashboard, applied the panel list for every service here, after everything a
+    // service is wired with, because its entries are what the household is sent to.
+    wirings.extend(
+        showing::seed_dashboard(ctx, &manifest.services, &fillers, project.as_deref()).await,
+    );
 
     // Persist what this pass recorded as the baseline a later run compares against —
     // unless the record was lost and this is not an adopt pass, in which case the

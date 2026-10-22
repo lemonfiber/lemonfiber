@@ -590,6 +590,7 @@ fn plugin_filling(plugin: &str, service: &str, capability: &str) -> crate::plugi
             description: "Reads comics".to_owned(),
             icon: None,
             hidden: false,
+            health: None,
             api: None,
             listens: None,
             media_types: Vec::new(),

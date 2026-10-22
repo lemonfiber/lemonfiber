@@ -34,6 +34,7 @@ fn recorded(plugin: &str, reached: Option<Reached>) -> Installed {
             description: "Reads comics".to_owned(),
             icon: None,
             hidden: false,
+            health: None,
             api: None,
             listens: None,
             media_types: Vec::new(),
