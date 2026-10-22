@@ -131,6 +131,33 @@
     },
     {
       "asked": {},
+      "case": "filed-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "filed"
+    },
+    {
+      "asked": {
+        "folders": [
+          {
+            "category": "conformance",
+            "folder": "/data/conformance/complete/conformance"
+          }
+        ]
+      },
+      "case": "file_under-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "file_under"
+    },
+    {
+      "asked": {},
       "case": "peer_port-answers",
       "expect": {
         "conforms": true

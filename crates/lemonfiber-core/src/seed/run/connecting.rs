@@ -14,6 +14,7 @@
 //! here fills what was asked for, and an operator reading a report that left it out
 //! could not tell a filler nothing reaches from one lemonfiber forgot.
 
+use lemonfiber_contract::capabilities::archive::extract;
 use lemonfiber_contract::capabilities::indexer::search;
 use lemonfiber_contract::capabilities::quality::sync;
 use lemonfiber_contract::capabilities::request::intake;
@@ -52,7 +53,8 @@ pub(super) const MUSIC: &str = ApplicationKind::Music.media_type();
 const ANSWERED: [&str; 4] = [USENET, TORRENT, CURATES, SEARCHES];
 
 /// Every contract an asker is paired by, as capability and major.
-const CONTRACTED: [(&str, u32); 4] = [
+const CONTRACTED: [(&str, u32); 5] = [
+    (extract::CAPABILITY, extract::MAJOR),
     (fetch::CAPABILITY, fetch::MAJOR),
     (search::CAPABILITY, search::MAJOR),
     (intake::CAPABILITY, intake::MAJOR),
@@ -99,6 +101,13 @@ pub(super) enum Connection {
     /// The filler, told to the asker as an aggregator it pulls indexers from, with the
     /// filler's own key to read it with.
     Aggregator,
+    /// The filler, whose completed downloads the extractor unpacks and hands back to it.
+    Extraction {
+        /// The media it files.
+        media: String,
+        /// The category its downloads are filed under.
+        category: String,
+    },
 }
 
 impl Connection {
@@ -205,6 +214,15 @@ fn connection(
         (Asking::Bundled(ApiKind::Bindery), SEARCHES, ApiKind::Servarr) => {
             Ok(Connection::Aggregator)
         }
+        (Asking::Over(extract::CAPABILITY), CURATES, ApiKind::Servarr) => media
+            .first()
+            .and_then(|kind| {
+                super::clients::category_for(kind).map(|category| Connection::Extraction {
+                    media: kind.clone(),
+                    category: category.value,
+                })
+            })
+            .ok_or(Unmade::Files),
         _ => Err(Unmade::Unpaired),
     }
 }

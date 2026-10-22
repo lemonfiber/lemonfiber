@@ -427,6 +427,7 @@ fn download_of(torrent: TorrentInfo) -> Download {
 }
 
 mod fetching;
+mod filing;
 mod peering;
 mod throttling;
 

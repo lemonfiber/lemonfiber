@@ -85,6 +85,12 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/lemonfiber/download.torrent/v1/file_under": {
+      "$ref": "operations/file_under.json"
+    },
+    "/lemonfiber/download.torrent/v1/filed": {
+      "$ref": "operations/filed.json"
+    },
     "/lemonfiber/download.torrent/v1/moved": {
       "$ref": "operations/moved.json"
     },

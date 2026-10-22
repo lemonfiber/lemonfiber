@@ -17,6 +17,8 @@ mod applications;
 mod baseline;
 mod clients;
 mod curating;
+mod extraction;
+mod filing;
 // What one service asking for what another fills comes to, by what each speaks.
 mod connecting;
 // The media server's cross-origin allow-list, held to the front door's origin on every
@@ -46,6 +48,7 @@ pub(crate) mod tokens;
 use fulfilment::{fulfilling, seed_fulfilment_targets};
 pub(crate) mod identity;
 mod reset;
+mod withholding;
 
 use applications::{seed_applications, skipped};
 use baseline::{escalate_broken_roots, wanted_roots, DATA_ROOT, SCHEMA_VERSION_FIELD};
@@ -63,6 +66,7 @@ use identity::seed_request_identity;
 pub(crate) use quality::reprofile;
 pub(crate) use reset::reset_connections;
 pub(crate) use subtitles::rewatch;
+use withholding::{withheld, withheld_brought};
 
 /// Wire the stack's services to each other, idempotently, and report what was
 /// wired and what a re-run still owes — or, on a run that only says what it would do,
@@ -199,6 +203,10 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
         baseline.merge(&records);
     }
 
+    let (filed, completed) = filing::seed_completed_folders(ctx, &fillers, &mut baseline).await;
+    wirings.extend(filed);
+    wirings.extend(extraction::seed_extraction(ctx, &fillers, &completed).await);
+
     // The indexer's app sync: register each curator it asks for back into it, so it
     // pushes them its indexers. A curator it has no application for is not left out:
     // it is among the pairs reported above as reached by nothing.
@@ -284,69 +292,6 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
         // what was attempted could only ever hold the attempts.
         unsupported: crate::app::targets::unsupported_here(&manifest.services, project.as_deref()),
     })
-}
-
-/// Take the services the operator declared unmanaged out of the manifest, and say what
-/// was taken, in the words they gave for taking it.
-///
-/// Removed at the top of a pass rather than gated at each of the dozen places that
-/// would otherwise write to one. A gate per write point is a gate somebody adds a thirteenth
-/// write beside, and the promise being kept — that lemonfiber observes and never
-/// writes — is one a thirteenth write breaks silently.
-///
-/// Reported rather than simply absent, and reported as settled information rather than
-/// as drift: a run that said nothing about a service the operator asked it to leave
-/// alone would be indistinguishable from one that forgot the service existed.
-fn withheld(
-    services: &mut Vec<lemonfiber_manifest::Service>,
-    declared: &[(String, String)],
-) -> Vec<crate::seed::Wiring> {
-    let mut observed = Vec::new();
-    services.retain(|service| {
-        let Some(because) = crate::unmanaged::covering(declared, &service.id) else {
-            return true;
-        };
-        observed.push(crate::seed::Wiring::settled(
-            service.name.clone(),
-            crate::seed::State::Observed {
-                reason: because.to_owned(),
-            },
-        ));
-        false
-    });
-    observed
-}
-
-/// The same, for the services installed plugins brought: each one the operator declared
-/// unmanaged is taken out of its plugin's record for the pass, and said.
-///
-/// A plugin's service is one this pass can write to — a torrent client's password is set
-/// on the client itself — so the promise is the same one, and kept the same way.
-fn withheld_brought(
-    installed: &[crate::plugin::Installed],
-    declared: &[(String, String)],
-) -> (Vec<crate::plugin::Installed>, Vec<crate::seed::Wiring>) {
-    let mut observed = Vec::new();
-    let kept = installed
-        .iter()
-        .map(|one| {
-            let mut one = one.clone();
-            one.services.retain(|placed| {
-                let Some(because) = crate::unmanaged::covering(declared, &placed.service) else {
-                    return true;
-                };
-                observed.push(crate::seed::Wiring::settled(
-                    placed.called().to_owned(),
-                    crate::seed::State::Observed {
-                        reason: because.to_owned(),
-                    },
-                ));
-                false
-            });
-            one
-        })
-        .collect();
-    (kept, observed)
 }
 
 /// The request service to ask about the household's telling, and what lemonfiber

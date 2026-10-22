@@ -6,8 +6,8 @@
 //! a torrent client's seeding and the port it takes peers on.
 
 use lemonfiber_ports::service::{
-    Download, Fetching, Metering, Moved, Peering, Pulling, Rates, Seeded, Seeding, Throttled,
-    Throttling, Transfers, UsenetAccount, UsenetAccounts, Wanted,
+    Download, Fetching, Filed, Filing, Metering, Moved, Peering, Pulling, Rates, Seeded, Seeding,
+    Throttled, Throttling, Transfers, UsenetAccount, UsenetAccounts, Wanted,
 };
 
 /// The rate, in bytes a second, the conformance cases hold a client to while active.
@@ -18,6 +18,14 @@ const MONTH: &str = "2026-01";
 
 /// The port the conformance cases have a torrent client take peers on.
 const PEER_PORT: u16 = 51_413;
+
+/// What the conformance cases ask a client to file its completed downloads under.
+fn filed() -> Vec<Filed> {
+    vec![Filed {
+        category: super::NAMED.to_owned(),
+        folder: format!("{}/complete/{}", super::FOLDER, super::NAMED),
+    }]
+}
 
 /// A torrent no client holds.
 const TORRENT: &str = "conformance-torrent";
@@ -64,6 +72,12 @@ crate::contract! {
             /// What it moved in one month, `YYYY-MM`.
             fn moved(str month: &str) -> Moved where asks = Asked { month: MONTH.to_owned() };
         }
+        impl Filing {
+            /// Every category it holds and the completed folder it files each under.
+            fn filed() -> Vec<Filed> where asks = Asked {};
+            /// File each category's completed downloads under the folder beside it.
+            fn file_under(slice folders: &[Filed] as Filed) -> () where asks = Asked { folders: filed() };
+        }
         impl UsenetAccounts {
             /// The provider accounts it downloads through.
             fn accounts() -> Vec<UsenetAccount> where asks = Asked {};
@@ -103,6 +117,12 @@ crate::contract! {
             fn seeding() -> Vec<Seeded> where asks = Asked {};
             /// Let one completed download go, with its files.
             fn stop_seeding(str name: &str) -> () where asks = Asked { name: TORRENT.to_owned() };
+        }
+        impl Filing {
+            /// Every category it holds and the completed folder it files each under.
+            fn filed() -> Vec<Filed> where asks = Asked {};
+            /// File each category's completed downloads under the folder beside it.
+            fn file_under(slice folders: &[Filed] as Filed) -> () where asks = Asked { folders: filed() };
         }
         impl Peering {
             /// The port it takes peers on, or none.
