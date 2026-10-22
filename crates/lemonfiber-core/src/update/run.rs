@@ -17,7 +17,9 @@
 //! the teardown that first had to ask about them, the disk with the reckoning, the
 //! capture with the archive. Nothing here is a second implementation of any of them.
 
+mod moving;
 mod staging;
+pub use moving::Moved;
 pub(crate) use staging::OPERATION;
 
 use lemonfiber_manifest::Manifest;
@@ -102,9 +104,12 @@ pub struct Report {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unvetted: Option<crate::model::Unvetted>,
     /// Each part this release installs as a plugin that the stack still runs as its own
-    /// service: a move in place on offer, which an update never takes.
+    /// service after this run: a move in place on offer, which a confirmed update takes.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub moves: Vec<crate::app::plugins::MoveOffered>,
+    /// Each move in place this run took, or tried to take and could not, with why.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub moved: Vec<Moved>,
 }
 
 /// What the release carrying this build changed, as every update report says it.
@@ -134,6 +139,7 @@ impl Report {
             offer: String::new(),
             unvetted: None,
             moves: Vec::new(),
+            moved: Vec::new(),
         }
     }
 }
@@ -162,28 +168,35 @@ pub(crate) async fn update(ctx: &Ctx, asked: Asked) -> Result<Report, Box<Proble
         .await
         .map_err(|_| Box::new(not_checked()))?;
     let changes = update::changes(&moving, &images, &ctx.settings.project);
-    let offer = offered(&changes);
+    let moving_in = moving::read(ctx, &manifest, asked.service.as_deref()).await;
+    let offer = offered(&changes, &moving::words(&moving_in));
     if let Some(answered) = asked.offer.as_deref().filter(|answered| *answered != offer) {
         return Err(Box::new(moved(answered, &offer)));
     }
 
     let report = if asked.confirm {
-        staging::apply(ctx, &manifest, changes, asked.wait).await
+        Box::pin(staging::apply(ctx, &manifest, changes, asked.wait)).await?
     } else {
         let active = waiting(ctx, &changes).await;
-        Ok(Report::proposed(changes, active, false))
+        Report::proposed(changes, active, false)
     };
-    report.map(|report| Report {
+    let moved = if asked.confirm && !ctx.dry_run && report.halted.is_none() {
+        Box::pin(moving::taken(ctx, moving_in)).await
+    } else {
+        Vec::new()
+    };
+    Ok(Report {
         offer,
         unvetted: crate::overlay::unvetted(ctx),
         moves: crate::app::plugins::moving_in::on_offer(ctx, &manifest),
+        moved,
         ..report
     })
 }
 
 /// The offer an update answers: each step, by the service it moves and the releases
-/// it moves between.
-fn offered(changes: &[Change]) -> String {
+/// it moves between, and each move in place, by its plugin and its install's offer.
+fn offered(changes: &[Change], moves: &[String]) -> String {
     let words: Vec<&str> = changes
         .iter()
         .flat_map(|change| {
@@ -193,6 +206,7 @@ fn offered(changes: &[Change]) -> String {
                 change.target.as_str(),
             ]
         })
+        .chain(moves.iter().map(String::as_str))
         .collect();
     over(&words)
 }
@@ -316,7 +330,7 @@ fn still_transferring(active: &[String]) -> Problem {
         "Updating stops the download clients, and what is part-way down does not always resume \
          where it left off. Nothing has been pulled, stopped or changed.",
         Remedy::new("Let them finish first, then update")
-            .with_detail("lemonfiber update --confirm --wait"),
+            .with_detail("lemonfiber update stack --confirm --wait"),
     )
     .in_state(State::Guided)
     .with_detail(active.join("\n"))

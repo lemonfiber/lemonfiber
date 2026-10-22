@@ -46,8 +46,15 @@
         "type": "string"
       }
     },
+    "moved": {
+      "description": "Each move in place this run took, or tried to take and could not, with why.",
+      "type": "array",
+      "items": {
+        "$ref": "StackMoveTaken.json"
+      }
+    },
     "moves": {
-      "description": "Each part this release installs as a plugin that the stack still runs as its own\nservice: a move in place on offer, which an update never takes.",
+      "description": "Each part this release installs as a plugin that the stack still runs as its own\nservice after this run: a move in place on offer, which a confirmed update takes.",
       "type": "array",
       "items": {
         "$ref": "MoveOffered.json"

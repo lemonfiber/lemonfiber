@@ -30,6 +30,7 @@ pub(crate) fn update(report: &Report) -> Lines {
     }
     lines.extend(transfers(&report.in_flight));
     lines.extend(super::overlay::unvetted(report.unvetted.as_ref()));
+    lines.extend(super::moving::moved(&report.moved));
     lines.extend(super::moving::offered(&report.moves));
     if report.confirmed {
         lines.extend(carried(report));
@@ -38,7 +39,7 @@ pub(crate) fn update(report: &Report) -> Lines {
         // somebody deciding is weighing; somebody reading a finished run wants to
         // know which services moved, and this would be between them and it.
         lines.extend(super::changelog::brought(&report.changelog));
-        lines.spaced("Take them with:  lemonfiber update --confirm");
+        lines.spaced("Take them with:  lemonfiber update stack --confirm");
     }
     lines
 }
@@ -103,7 +104,7 @@ fn transfers(active: &[String]) -> Lines {
     for one in active {
         lines.put(format!("  {one}"));
     }
-    lines.put("Let them finish first with:  lemonfiber update --confirm --wait");
+    lines.put("Let them finish first with:  lemonfiber update stack --confirm --wait");
     lines
 }
 

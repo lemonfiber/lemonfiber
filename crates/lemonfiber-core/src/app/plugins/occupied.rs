@@ -29,7 +29,9 @@ use crate::project::overlay::{self, Declared, Published};
 /// holds.
 ///
 /// `installed` is every other plugin on the machine, without this one's own record, so
-/// an update is not held to the version it replaces.
+/// an update is not held to the version it replaces. A stack service the plugin moves in
+/// place of holds nothing against it: only a first-party plugin names one, which the
+/// install refuses otherwise before this is asked.
 ///
 /// # Errors
 ///
@@ -48,8 +50,13 @@ pub(crate) fn unoccupied(
         .and_then(|file| crate::config::store::read(file).ok())
         .unwrap_or_default();
     let manifest = super::writing::stack_manifest(ctx)?;
+    let standing: Vec<Installed> = installed
+        .iter()
+        .chain(std::iter::once(would))
+        .cloned()
+        .collect();
     let (mut services, mut ports) =
-        run(&manifest, installed, &crate::app::beside::moved(&settings));
+        run(&manifest, &standing, &crate::app::beside::moved(&settings));
     let overlays: Vec<(PathBuf, String)> = ctx
         .settings
         .overlays

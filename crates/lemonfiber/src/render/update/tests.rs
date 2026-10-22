@@ -32,6 +32,7 @@ fn report(changes: Vec<Change>, applied: Vec<Applied>, confirmed: bool) -> Repor
         changelog: crate::render::fixtures::notes("0.4.0"),
         offer: String::new(),
         unvetted: None,
+        moved: Vec::new(),
         moves: Vec::new(),
     }
 }
@@ -51,7 +52,7 @@ fn a_stack_on_every_pin_is_told_once_and_asked_nothing() {
 fn an_available_update_names_both_versions_and_how_to_take_it() {
     let said = update(&report(vec![change(Jump::Minor, false)], Vec::new(), false)).text();
     assert!(said.contains("4.0.15 to 5.0.0"), "{said}");
-    assert!(said.contains("lemonfiber update --confirm"), "{said}");
+    assert!(said.contains("lemonfiber update stack --confirm"), "{said}");
 }
 
 #[test]

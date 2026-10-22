@@ -58,7 +58,7 @@ async fn a_move_on_offer_is_named_with_the_reading_that_takes_it() {
             .remedies
             .first()
             .and_then(|remedy| remedy.detail.as_deref()),
-        Some("lemonfiber plugin install jellyfin")
+        Some("lemonfiber update stack")
     );
 }
 

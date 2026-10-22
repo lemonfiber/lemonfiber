@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A move in place this run took, or tried to take and could not.",
+  "type": "object",
+  "properties": {
+    "plugin": {
+      "description": "The plugin the bundle installs.",
+      "type": "string"
+    },
+    "service": {
+      "description": "The stack's own service it took, or would have taken, the place of.",
+      "type": "string"
+    },
+    "taken": {
+      "description": "Whether the plugin now runs in the service's place.",
+      "type": "boolean"
+    },
+    "why": {
+      "description": "Why it was not taken, where it was not.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "plugin",
+    "service",
+    "taken"
+  ]
+}
