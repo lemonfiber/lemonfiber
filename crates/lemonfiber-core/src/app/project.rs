@@ -92,21 +92,15 @@ pub(crate) fn generated(
     resolved.project(|reading| crate::project::generated(manifest, installed, chosen, reading))
 }
 
-/// The project as this machine stands: its manifest, the plugins its register holds and
-/// the fillers chosen here.
-///
-/// # Errors
-///
-/// Where the register of installed plugins cannot be read.
-pub(crate) fn current(ctx: &Ctx, manifest: &Manifest) -> Result<Project, Box<Problem>> {
-    let register = super::plugins::read(ctx)?;
-    let installed = register.installed();
-    Ok(generated(
+/// The project as this machine stands: its manifest, the plugins installed here and the
+/// fillers chosen here.
+pub(crate) fn current(ctx: &Ctx, manifest: &Manifest, installed: &[Installed]) -> Project {
+    generated(
         manifest,
         installed,
         &super::targets::chosen_fillers(ctx),
         &Resolved::of(ctx, Some(manifest), installed),
-    ))
+    )
 }
 
 /// The project a lifecycle command runs, and what writing it came to.
@@ -138,12 +132,7 @@ pub(crate) fn prepared(
 ) -> Result<Prepared, Box<Problem>> {
     let register = super::plugins::read(ctx)?;
     let installed = register.installed();
-    let project = generated(
-        manifest,
-        installed,
-        &super::targets::chosen_fillers(ctx),
-        &Resolved::of(ctx, Some(manifest), installed),
-    );
+    let project = current(ctx, manifest, installed);
     let pass = if ctx.dry_run {
         Pass::Preview
     } else {
@@ -454,13 +443,7 @@ pub(crate) fn rewritten(
     operation: &str,
     stamp: &str,
 ) -> Result<(), Box<Problem>> {
-    let text = generated(
-        manifest,
-        installed,
-        &super::targets::chosen_fillers(ctx),
-        &Resolved::of(ctx, Some(manifest), installed),
-    )
-    .text;
+    let text = current(ctx, manifest, installed).text;
     let previous = held(ctx);
     if previous.as_deref() == Some(text.as_str()) {
         return Ok(());

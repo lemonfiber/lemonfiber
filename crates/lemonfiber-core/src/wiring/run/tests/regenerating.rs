@@ -34,8 +34,7 @@ fn a_plugin_media_server_as(
         .stack
         .checked_manifest(ctx.today())
         .ok()
-        .and_then(|manifest| crate::app::project::current(ctx, &manifest).ok())
-        .map(|project| project.text)
+        .map(|manifest| crate::app::project::current(ctx, &manifest, register.installed()).text)
         .unwrap_or_default();
     assert!(crate::app::project::kept(ctx, &generated).is_ok());
     crate::app::project::path(ctx).unwrap_or_default()

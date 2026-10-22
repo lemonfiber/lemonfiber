@@ -169,3 +169,20 @@ fn a_mount_source_that_cannot_be_made_stops_the_start_naming_it() {
         "named"
     );
 }
+
+#[cfg(unix)]
+#[test]
+fn a_start_whose_mount_source_cannot_be_made_is_refused() {
+    use std::os::unix::fs::PermissionsExt as _;
+
+    let (ctx, project) = machine("mount-start-unmade");
+    let _ = std::fs::remove_dir_all(project.join("config").join("jellyfin").join("cache"));
+    let tree = project.join("mounts");
+    let _ = std::fs::create_dir_all(&tree);
+    let _ = std::fs::set_permissions(&tree, std::fs::Permissions::from_mode(0o555));
+
+    let started = preparing(&ctx, true);
+    let _ = std::fs::set_permissions(&tree, std::fs::Permissions::from_mode(0o755));
+
+    assert!(!started);
+}

@@ -20,8 +20,8 @@ use super::Ctx;
 ///
 /// # Errors
 ///
-/// Returns the [`Problem`] a surface renders when the recorded choice cannot be read or a
-/// file cannot be written.
+/// Returns the [`Problem`] a surface renders when the recorded choice or the record of
+/// installed plugins cannot be read, or a file cannot be written.
 pub(crate) async fn reset(ctx: &Ctx, confirm: bool) -> Result<ResetReport, Box<Problem>> {
     let selection = super::quality::load_selection(ctx)?;
     let record = super::targets::beside_env(ctx, "materialised.json");
@@ -53,7 +53,8 @@ pub(crate) async fn reset(ctx: &Ctx, confirm: bool) -> Result<ResetReport, Box<P
         .checked_manifest(ctx.today())
         .map_err(|failure| Box::new(failure.problem()))?;
     super::project::rooted(ctx)?;
-    let project = super::project::current(ctx, &manifest)?;
+    let register = super::plugins::read(ctx)?;
+    let project = super::project::current(ctx, &manifest, register.installed());
     let pass = if confirm {
         super::project::Pass::Reset
     } else {
@@ -65,7 +66,6 @@ pub(crate) async fn reset(ctx: &Ctx, confirm: bool) -> Result<ResetReport, Box<P
     );
     if confirm {
         super::project::overlaid(ctx)?;
-        let register = super::plugins::read(ctx)?;
         super::project::secrets_written(ctx, &manifest, register.installed())
             .map_err(|failure| Box::new(failure.problem()))?;
     }

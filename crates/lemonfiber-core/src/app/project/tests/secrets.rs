@@ -76,8 +76,7 @@ fn the_operators_values_are_written_in_and_no_secret_reaches_the_project_or_its_
     let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK);
     let manifest = manifest.as_ref().ok();
     let text = manifest
-        .and_then(|manifest| super::super::current(&ctx, manifest).ok())
-        .map(|project| project.text)
+        .map(|manifest| super::super::current(&ctx, manifest, &[]).text)
         .unwrap_or_default();
 
     let written = super::super::materialised(&ctx, &text, super::super::Pass::Write);

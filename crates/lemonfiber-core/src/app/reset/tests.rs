@@ -198,3 +198,30 @@ async fn a_confirmed_reset_writes_each_secrets_file_and_a_preview_none() {
     assert!(!previewed);
     assert!(guard.is_file());
 }
+
+/// A reset whose record of installed plugins cannot be read is refused.
+#[tokio::test]
+async fn a_reset_whose_register_cannot_be_read_is_refused() {
+    let (into, env) = scratch("unregistered");
+    let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
+    let _ = std::fs::write(
+        env.with_file_name(crate::config::paths::PLUGINS),
+        "not a register",
+    );
+
+    assert!(reset(&carried(&into, &env), true).await.is_err());
+    assert!(!into.join(crate::project::FILE).exists());
+}
+
+/// A confirmed reset that cannot write a secrets file the project names is an error.
+#[tokio::test]
+async fn a_confirmed_reset_that_cannot_write_a_secrets_file_is_an_error() {
+    let (into, env) = scratch("unfilable");
+    let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
+    let _ = std::fs::write(
+        env.with_file_name(crate::config::paths::SECRETS_FILES),
+        "a file, not a directory",
+    );
+
+    assert!(reset(&bundled(&into, &env), true).await.is_err());
+}
