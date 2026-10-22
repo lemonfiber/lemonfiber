@@ -264,8 +264,6 @@ async fn applying(
 /// written.
 fn reread(ctx: &Ctx, key: &str) -> Result<(), Box<Problem>> {
     crate::settings::files::reread_now(ctx, &crate::settings::files::holding_of(key))
-        .map(drop)
-        .map_err(|err| Box::new(err.problem()))
 }
 
 /// Where the proposal stands once everything that could stop it has been asked.

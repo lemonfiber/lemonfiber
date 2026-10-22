@@ -248,8 +248,7 @@ pub(crate) fn reheld(ctx: &Ctx, carried: &Carried) -> Result<(), Box<Problem>> {
         Action::Restore { key, .. } => Some(crate::settings::files::holding_of(key)),
         _ => None,
     }) {
-        crate::settings::files::reread_now(ctx, &holding)
-            .map_err(|err| Box::new(crate::error::Diagnose::problem(&err)))?;
+        crate::settings::files::reread_now(ctx, &holding)?;
     }
     Ok(())
 }

@@ -6,6 +6,7 @@ use lemonfiber_manifest::{Manifest, Service};
 use crate::app::Ctx;
 use crate::config::env::quoted;
 use crate::config::store::{self, Failure};
+use crate::error::{Diagnose as _, Problem};
 use crate::plugin::{Holding, Installed, Variable};
 
 use super::{Resolved, Secrets};
@@ -135,18 +136,32 @@ pub(crate) fn reread(
     Ok(rewritten)
 }
 
-/// [`reread`] over the stack and everything installed as they stand.
+/// What is said where a value that changed could not be written into a file that reads it.
+pub(crate) const UNREACHED: &str = "The value itself changed. A service reading it from this \
+                                    file still holds the one it replaced until the file is \
+                                    written again.";
+
+/// [`reread`] over the stack and everything installed as they stand, once the value
+/// `holding` names has changed.
 ///
 /// # Errors
 ///
-/// Where a store cannot be read or a file cannot be written.
-pub(crate) fn reread_now(ctx: &Ctx, holding: &Holding) -> Result<Vec<String>, Failure> {
+/// Where a store cannot be read or a file cannot be written, saying that the value changed
+/// all the same.
+pub(crate) fn reread_now(ctx: &Ctx, holding: &Holding) -> Result<(), Box<Problem>> {
     let manifest = ctx.stack.checked_manifest(ctx.today()).ok();
     let installed: Vec<Installed> = crate::app::plugins::read(ctx)
         .map(|register| register.installed().to_vec())
         .unwrap_or_default();
     let resolved = Resolved::of(ctx, manifest.as_ref(), &installed);
     reread(ctx, manifest.as_ref(), &installed, &resolved, holding)
+        .map(drop)
+        .map_err(|failure| {
+            Box::new(Problem {
+                meaning: UNREACHED.to_owned(),
+                ..failure.problem()
+            })
+        })
 }
 
 /// Every variable of a stack service's secrets file, each with where its value is read

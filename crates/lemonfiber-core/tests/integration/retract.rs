@@ -287,6 +287,22 @@ async fn nothing_repaired_puts_nothing_back() {
     assert!(put_back.is_ok_and(|undos| undos.is_empty()));
 }
 
+/// An environment file that cannot be read stops the reversal of a setting in it, saying
+/// so, rather than reporting the setting put back.
+#[tokio::test]
+async fn an_environment_file_that_cannot_be_read_stops_the_reversal() {
+    let root = scratch("env-unwritable");
+    journalled(&root, &[a_credential_was_set()]);
+    let _ = std::fs::create_dir_all(paths(&root).env_file().join("held"));
+
+    let put_back = retract(&ctx(&root, Fake::silent()), &paths(&root)).await;
+
+    assert_eq!(
+        put_back.err().map(|problem| problem.code),
+        Some(lemonfiber_core::error::codes::config::CONFIG_UNREADABLE)
+    );
+}
+
 /// The reversal, asked for the way every surface asks for it.
 ///
 /// Through the dispatcher rather than through [`retract`] directly, and from here as

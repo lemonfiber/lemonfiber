@@ -168,7 +168,7 @@ async fn a_reader_the_engine_would_not_recreate_is_named_as_not_reached() {
 #[tokio::test]
 async fn a_secrets_file_that_cannot_be_written_is_named_and_nothing_restarts() {
     let (machine, installed) = crossed("crossed-unwritten", running(&["reader"]));
-    assert!(std::fs::write(machine.env.with_file_name("env"), "not a directory").is_ok());
+    unwritable_files(&machine);
 
     let reached_now = reached(&machine, &installed, CROSSING).await;
 
@@ -402,4 +402,60 @@ async fn a_crossing_key_put_back_by_an_undo_reaches_every_file_that_reads_it() {
     assert!(reheld.is_ok(), "{reheld:?}");
     assert!(std::fs::read_to_string(&file)
         .is_ok_and(|text| text.contains("SONARR_KEY=put-back") && !text.contains("undone")));
+}
+
+/// Where the files that read them live, under `machine`, made a file so none can be written.
+fn unwritable_files(machine: &Machine) {
+    assert!(std::fs::write(machine.env.with_file_name("env"), "not a directory").is_ok());
+}
+
+/// Whether `refused` says a file reading the changed value could not be written, and that
+/// the value changed all the same.
+fn refused_as_unreached(refused: Option<Box<crate::error::Problem>>) -> bool {
+    refused.is_some_and(|problem| {
+        problem.code == crate::error::codes::config::CONFIG_NOT_WRITTEN
+            && problem.meaning == crate::settings::files::UNREACHED
+    })
+}
+
+/// A crossing key set by hand that cannot reach a file that reads it is refused, saying
+/// why, rather than reported set while a reader keeps the value it replaced.
+#[tokio::test]
+async fn a_crossing_key_set_by_hand_that_cannot_reach_its_reader_is_refused() {
+    let machine = machine("set-unwritten", Reporting::absent());
+    registered(&machine, trusted_reader());
+    unwritable_files(&machine);
+
+    let set = crate::app::configuring::set(
+        &machine.ctx,
+        crate::app::Setting::to(CROSSING, "set-by-hand"),
+    )
+    .await;
+
+    assert!(refused_as_unreached(set.err()));
+}
+
+/// A crossing key an undo puts back that cannot reach a file that reads it is refused,
+/// saying why.
+#[tokio::test]
+async fn a_crossing_key_put_back_that_cannot_reach_its_reader_is_refused() {
+    let machine = machine("restored-unwritten", Reporting::absent());
+    registered(&machine, trusted_reader());
+    assert!(store::set(&machine.env, CROSSING, "put-back").is_ok());
+    unwritable_files(&machine);
+    let carried = crate::app::recover::Carried {
+        done: vec![crate::journal::Undo {
+            target: CROSSING.to_owned(),
+            action: crate::journal::Action::Restore {
+                key: CROSSING.to_owned(),
+                value: Some("put-back".to_owned()),
+                wrote: "undone".to_owned(),
+            },
+        }],
+        ..crate::app::recover::Carried::default()
+    };
+
+    let reheld = crate::app::recover::reheld(&machine.ctx, &carried);
+
+    assert!(refused_as_unreached(reheld.err()));
 }
