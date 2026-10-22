@@ -26,7 +26,7 @@ const FROM_MANIFEST: [&str; 2] = ["claim", "secret"];
 const REPLACES: &str = "replaces";
 
 /// The stack tables a bundle declares, carried as written.
-const STACK_TABLES: [&str; 3] = ["profile", "form", "removed"];
+pub(crate) const STACK_TABLES: [&str; 3] = ["profile", "form", "removed"];
 
 /// The stack manifest the bundle file `text` assembles from the copies in `held`, at
 /// `version`, or every reason it cannot.
