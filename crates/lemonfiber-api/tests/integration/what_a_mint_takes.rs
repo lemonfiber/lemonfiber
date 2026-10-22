@@ -180,7 +180,7 @@ async fn a_member_signed_in(
     allowed: bool,
     signing: Vec<Reply>,
 ) -> (axum::Router, String, PathBuf, Arc<Fake>) {
-    holding(named, allowed, signing, HOUSEHOLD).await
+    holding(named, allowed, signing, &household()).await
 }
 
 /// The same, over a media server whose list of its household is `household`.
@@ -188,12 +188,15 @@ async fn holding(
     named: &str,
     allowed: bool,
     signing: Vec<Reply>,
-    household: &'static str,
+    household: &[Member],
 ) -> (axum::Router, String, PathBuf, Arc<Fake>) {
     let transport = Fake::by_path_in_turn(vec![
-        ("/Users/AuthenticateByName", signing),
-        ("/Users/Me", vec![Reply::reply(200, STANDING)]),
-        ("/Users", vec![Reply::reply(200, household)]),
+        (media::identity("whoever"), signing),
+        (media::identity("standing"), vec![standing()]),
+        (
+            media::identity("household"),
+            vec![media::answered(&household)],
+        ),
     ]);
     let mut ctx = a_stack(&format!("member-mint-{named}"), transport.clone());
     seeded(&ctx);
@@ -235,7 +238,7 @@ fn sign_ins(transport: &Fake) -> usize {
     transport
         .requests()
         .iter()
-        .filter(|request| request.url.ends_with("/Users/AuthenticateByName"))
+        .filter(|request| request.url.ends_with(media::identity("whoever")))
         .count()
 }
 
@@ -253,7 +256,7 @@ fn member_mint(name: &str, scope: &str, password: &str) -> String {
 #[tokio::test]
 async fn a_member_mints_nothing_until_the_operator_allows_it() {
     let (router, member, env, transport) =
-        a_member_signed_in("unallowed", false, vec![Reply::reply(200, SIGNED_IN)]).await;
+        a_member_signed_in("unallowed", false, vec![recognised()]).await;
     let (refused, _) = sent(
         router,
         "POST",
@@ -274,11 +277,7 @@ async fn an_allowed_member_mints_a_key_for_themselves_with_their_password() {
     let (router, member, _, _) = a_member_signed_in(
         "allowed",
         true,
-        vec![
-            Reply::reply(200, SIGNED_IN),
-            Reply::reply(401, ""),
-            Reply::reply(200, SIGNED_IN),
-        ],
+        vec![recognised(), unrecognised(), recognised()],
     )
     .await;
     let (wrong, _) = sent(
@@ -353,7 +352,7 @@ async fn an_allowed_member_mints_a_key_for_themselves_with_their_password() {
 #[tokio::test]
 async fn a_member_mint_from_another_machine_in_the_clear_is_refused() {
     let (router, member, env, _) =
-        a_member_signed_in("in-the-clear", true, vec![Reply::reply(200, SIGNED_IN)]).await;
+        a_member_signed_in("in-the-clear", true, vec![recognised()]).await;
     let (refused, _) = sent(
         router,
         "POST",
@@ -369,16 +368,12 @@ async fn a_member_mint_from_another_machine_in_the_clear_is_refused() {
 
 #[tokio::test]
 async fn a_password_that_proves_another_account_mints_nothing() {
-    let somebody_else = r#"{"AccessToken":"a-session","User":{"Id":"b8c4"}}"#;
-    let (router, member, env, _) = a_member_signed_in(
-        "another-account",
-        true,
-        vec![
-            Reply::reply(200, SIGNED_IN),
-            Reply::reply(200, somebody_else),
-        ],
-    )
-    .await;
+    let somebody_else = media::answered(&Some(Signed {
+        id: "b8c4".to_owned(),
+        token: "a-session".to_owned(),
+    }));
+    let (router, member, env, _) =
+        a_member_signed_in("another-account", true, vec![recognised(), somebody_else]).await;
     let (refused, _) = sent(
         router,
         "POST",
@@ -447,8 +442,7 @@ async fn wrong_passwords_at_a_mint_earn_the_wait_a_sign_in_does() {
 
 #[tokio::test]
 async fn a_member_the_household_no_longer_lists_mints_nothing() {
-    let (router, member, env, _) =
-        holding("unlisted", true, vec![Reply::reply(200, SIGNED_IN)], "[]").await;
+    let (router, member, env, _) = holding("unlisted", true, vec![recognised()], &[]).await;
     let (refused, _) = sent(
         router,
         "POST",
@@ -464,8 +458,7 @@ async fn a_member_the_household_no_longer_lists_mints_nothing() {
 
 #[tokio::test]
 async fn a_member_proves_nothing_with_a_device_key_and_keeps_none() {
-    let (router, member, _, _) =
-        a_member_signed_in("device-keys", true, vec![Reply::reply(200, SIGNED_IN)]).await;
+    let (router, member, _, _) = a_member_signed_in("device-keys", true, vec![recognised()]).await;
     let proved = serde_json::json!({
         "name": "anas",
         "scope": "member:ana",

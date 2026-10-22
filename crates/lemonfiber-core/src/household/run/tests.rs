@@ -8,9 +8,9 @@ use super::{allowance, assemble, household, reaching, titled, Ctx, Naming, Selec
 use crate::household::State;
 use crate::model::{HouseholdReport, Restriction};
 use crate::ports::service::Certificate;
-use crate::ports::service::{Access, HouseholdRequest, Member};
+use crate::ports::service::{Access, HouseholdRequest, Member, NamedLibrary, Unrated};
 use crate::recyclarr::Kind;
-use crate::test_support::{a_context, a_password, SeedFs};
+use crate::test_support::{a_context, a_password, json, media, SeedFs};
 use std::collections::BTreeMap;
 use std::time::SystemTime;
 
@@ -85,9 +85,9 @@ fn titles() -> BTreeMap<(Kind, i64), Titled> {
 /// A transport answering the media server's accounts, the request service's check of
 /// its own key and its reads, and the curator libraries, by the shape of the URL.
 struct Fake {
-    accounts: &'static str,
-    folders: &'static str,
-    ratings: &'static str,
+    accounts: String,
+    folders: String,
+    ratings: String,
     answered: &'static str,
     requests: &'static str,
     library: &'static str,
@@ -109,14 +109,25 @@ struct Fake {
 impl Default for Fake {
     fn default() -> Self {
         Self {
-            accounts: r#"[{"Id":"a1","Name":"Alex","HasPassword":true,
-                "Policy":{"EnableAllFolders":true},
-                "LastActivityDate":"2026-08-30T10:00:00Z"}]"#,
-            folders: r#"{"Items":[{"Id":"lib-1","Name":"Films"}]}"#,
-            // As the pinned image answers, including the row that carries no age
-            // at all — its name for content it has no rating for.
-            ratings: r#"[{"Name":"Unrated"},{"Name":"U","Value":0},
-                {"Name":"12A","Value":12},{"Name":"15","Value":15}]"#,
+            accounts: json(&[alex(None, Unrated::LetThrough)]),
+            folders: json(&[NamedLibrary {
+                id: "lib-1".to_owned(),
+                name: "Films".to_owned(),
+            }]),
+            ratings: json(&[
+                Certificate {
+                    name: "U".to_owned(),
+                    age: 0,
+                },
+                Certificate {
+                    name: "12A".to_owned(),
+                    age: 12,
+                },
+                Certificate {
+                    name: "15".to_owned(),
+                    age: 15,
+                },
+            ]),
             answered: "",
             requests: "",
             library: "[]",
@@ -135,19 +146,19 @@ impl Fake {
     /// The scripted answers as a transport, routed by what each call asks for.
     fn transport(&self) -> Arc<Transport> {
         let mut routes = vec![
-            // Ahead of `/Users`, whose text it contains: the media server signs
-            // this program in before it will answer anything about accounts, and
-            // a route matched by prefix would answer the sign-in with the list.
             (
-                "/Users/AuthenticateByName",
-                Answer::reply(200, r#"{"AccessToken":"token"}"#),
+                media::identity("libraries"),
+                Answer::reply(200, self.folders.clone()),
             ),
-            ("/Library/MediaFolders", Answer::reply(200, self.folders)),
             (
-                "/Localization/ParentalRatings",
-                Answer::reply(200, self.ratings),
+                media::identity("ratings"),
+                Answer::reply(200, self.ratings.clone()),
             ),
-            ("/Users", Answer::reply(200, self.accounts)),
+            (media::identity("country"), Answer::reply(200, "null")),
+            (
+                media::identity("household"),
+                Answer::reply(200, self.accounts.clone()),
+            ),
             (
                 "/auth/me",
                 Answer::reply(if self.refuse { 403 } else { 200 }, self.answered),
@@ -193,9 +204,9 @@ fn unnamed() -> BTreeMap<String, String> {
     BTreeMap::new()
 }
 
-/// A context whose request service can be reached: the media-server password is
-/// recorded, so `household_requests` resolves a client. Tagged so each test keeps its own
-/// env file rather than racing on a shared one.
+/// A context whose media server has moved into its plugin and whose request service can
+/// be reached: the media-server password is recorded, so `household_requests` resolves a
+/// client. Tagged so each test keeps its own env file rather than racing on a shared one.
 fn ctx_with(fake: &Fake, tag: &str) -> Ctx {
     ctx_over(fake.transport(), tag, false)
 }
@@ -240,7 +251,17 @@ fn ctx_over(transport: Arc<Transport>, tag: &str, no_room: bool) -> Ctx {
         crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         &a_password(),
     );
-    context
+    media::reaching(context)
+}
+
+/// Alex, the one account the media server holds, held to `age_limit` where one is set and
+/// doing `unrated` with content it has no rating for.
+fn alex(age_limit: Option<u32>, unrated: Unrated) -> Member {
+    let mut alex = media::member("a1", "Alex", true);
+    alex.last_seen = Some("2026-08-30T10:00:00Z".to_owned());
+    alex.access.age_limit = age_limit;
+    alex.access.unrated = unrated;
+    alex
 }
 
 mod contracted;

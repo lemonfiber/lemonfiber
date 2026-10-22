@@ -14,16 +14,46 @@ use crate::common::household::{recorded_admin, stack_without};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::model::{HouseholdRemoval, Revoked};
+use lemonfiber_core::ports::http::{Method, Request};
+use lemonfiber_core::ports::service::Member;
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::http::{Answer, Fake};
-use lemonfiber_fixtures::support::Reporting;
-use lemonfiber_ports::docker::{Health, Lifecycle};
+use lemonfiber_testing::media;
 
 /// The household: the owner, who administers the server, and one ordinary member.
-const HOUSEHOLD: &str = r#"[
-    {"Id":"1","Name":"owner","HasPassword":true,"Policy":{"IsAdministrator":true,"EnableAllFolders":true}},
-    {"Id":"9","Name":"ana","HasPassword":true,"Policy":{"IsAdministrator":false,"EnableAllFolders":true}}
-]"#;
+fn household() -> Vec<Member> {
+    let mut owner = media::member("1", "owner", true);
+    owner.access.administrator = true;
+    vec![owner, media::member("9", "ana", true)]
+}
+
+/// The media server's half: holding [`household`], and answering a withdrawal with
+/// `withdrawing`.
+fn the_media_server(withdrawing: Answer) -> Vec<(&'static str, Vec<Answer>)> {
+    vec![
+        (
+            media::identity("household"),
+            vec![media::answered(&household())],
+        ),
+        (media::identity("withdraw"), vec![withdrawing]),
+    ]
+}
+
+/// Where each account was taken from, in the order it was: the media server's, and the
+/// request service's.
+fn taken_from(sent: &[Request]) -> Vec<&'static str> {
+    sent.iter()
+        .filter_map(|request| {
+            if request.url.ends_with(media::identity("withdraw")) {
+                Some("media server")
+            } else if request.method == Method::Delete && request.url.contains("/api/v1/user/") {
+                Some("request service")
+            } else {
+                None
+            }
+        })
+        .collect()
+}
 
 /// Two requests from Ana and one from somebody else, so the count is hers and not the
 /// household's: one filed under her name alone, one under her id whatever name it
@@ -37,20 +67,15 @@ const REQUESTS: &str = r#"{"pageInfo":{"results":3},"results":[
 /// Everything answering: the media server holds the household, and the request service
 /// knows Ana and gives her account up.
 fn answering_with(lookup: Answer, gone: Answer) -> Arc<Fake> {
-    let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
-    Fake::by_path_in_turn(vec![
-        (
-            "/Users/AuthenticateByName",
-            vec![signed_in.clone(), signed_in],
-        ),
+    let mut routes = the_media_server(media::taken());
+    routes.extend(vec![
         ("/auth/me", vec![Answer::reply(200, "{}")]),
         ("/api/v1/request", vec![Answer::reply(200, REQUESTS)]),
         ("/user/jellyfin/", vec![lookup]),
         ("/api/v1/user/", vec![gone]),
-        ("/Users/9", vec![Answer::reply(204, "")]),
-        ("/Users", vec![Answer::reply(200, HOUSEHOLD)]),
         ("", vec![Answer::reply(200, "[]")]),
-    ])
+    ]);
+    Fake::by_path_in_turn(routes)
 }
 
 /// The ordinary case: the request service knows them and gives the account up.
@@ -58,22 +83,14 @@ fn answering() -> Arc<Fake> {
     answering_with(Answer::reply(200, r#"{"id":7}"#), Answer::reply(200, "{}"))
 }
 
-/// A context over the shipped stack, with the media server up and a password recorded.
+/// A context over the shipped stack, with the media server moved into its plugin and up,
+/// and a password recorded.
 fn context(env: &std::path::Path, http: Arc<Fake>) -> Ctx {
-    lemonfiber_testing::a_context()
-        .over(crate::common::household::set_up_beside(env))
-        .engine(Arc::new(Reporting::holding(
-            &["jellyfin"],
-            Lifecycle::Running,
-            Health::Healthy,
-        )))
-        .clock(Arc::new(lemonfiber_adapters::System))
-        .settings(Settings {
-            env_file: Some(env.to_path_buf()),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(http)
+    media::keyed_in(context_on(
+        env,
+        http,
+        crate::common::household::set_up_beside(env),
+    ))
 }
 
 /// Ask to remove somebody, and hand back what was said and what was sent.
@@ -115,11 +132,8 @@ async fn what_it_costs_is_said_without_removing_anybody() {
     assert!(report.asks_through_the_request_service);
     assert_eq!(report.revoked, Revoked::Nothing);
 
-    let sent = http.requests();
     assert!(
-        !sent.iter().any(|request| {
-            matches!(request.method, lemonfiber_core::ports::http::Method::Delete)
-        }),
+        taken_from(&http.requests()).is_empty(),
         "an unconfirmed removal deleted something"
     );
 }
@@ -138,27 +152,16 @@ async fn confirmed_it_revokes_in_both_places_and_the_media_server_first() {
     assert!(report.confirmed);
     assert_eq!(report.revoked, Revoked::Everywhere);
 
-    let deletes: Vec<String> = http
-        .requests()
-        .into_iter()
-        .filter(|request| matches!(request.method, lemonfiber_core::ports::http::Method::Delete))
-        .map(|request| request.url)
-        .collect();
+    let sent = http.requests();
     assert_eq!(
-        deletes.len(),
-        2,
-        "both accounts were not taken: {deletes:?}"
+        taken_from(&sent),
+        ["media server", "request service"],
+        "both accounts were not taken, or the request service was asked first"
     );
-    assert!(
-        deletes.first().is_some_and(|url| url.contains("/Users/9")),
-        "the request service was asked first: {deletes:?}"
-    );
-    assert!(
-        deletes
-            .get(1)
-            .is_some_and(|url| url.contains("/api/v1/user/7")),
-        "{deletes:?}"
-    );
+    assert_eq!(media::asked_about(&sent, "withdraw"), ["9"]);
+    assert!(sent
+        .iter()
+        .any(|request| request.method == Method::Delete && request.url.contains("/api/v1/user/7")));
 }
 
 /// Somebody the request service never heard of costs nothing there, and is not a failure.
@@ -174,12 +177,9 @@ async fn somebody_who_never_asked_for_anything_has_nothing_to_revoke_there() {
         Revoked::Everywhere,
         "an account that was never there was reported as one left behind"
     );
-    assert!(
-        !http
-            .requests()
-            .iter()
-            .any(|request| request.url.contains("/api/v1/user/")
-                && matches!(request.method, lemonfiber_core::ports::http::Method::Delete)),
+    assert_eq!(
+        taken_from(&http.requests()),
+        ["media server"],
         "the request service was asked to remove an account it does not hold"
     );
 }
@@ -243,10 +243,7 @@ async fn the_account_that_runs_the_server_is_refused_here_rather_than_by_the_ser
         "the account running the server was removed"
     );
     assert!(
-        !http
-            .requests()
-            .iter()
-            .any(|request| matches!(request.method, lemonfiber_core::ports::http::Method::Delete)),
+        taken_from(&http.requests()).is_empty(),
         "it was refused only after asking the server to do it"
     );
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
@@ -324,11 +321,7 @@ async fn a_removal_serialises_under_its_own_name() {
 /// A context over a stack the caller chose.
 fn context_on(env: &std::path::Path, http: Arc<Fake>, stack: Source) -> Ctx {
     lemonfiber_testing::a_context()
-        .engine(Arc::new(Reporting::holding(
-            &["jellyfin"],
-            Lifecycle::Running,
-            Health::Healthy,
-        )))
+        .engine(Arc::new(media::running()))
         .clock(Arc::new(lemonfiber_adapters::System))
         .over(stack)
         .settings(Settings {
@@ -392,7 +385,11 @@ async fn a_stack_with_no_media_server_has_nobody_to_remove() {
 async fn a_stack_with_no_request_service_counts_nothing_and_asks_nothing() {
     let env = recorded_admin("no-asking");
     let http = answering();
-    let ctx = context_on(&env, http.clone(), stack_without("seerr", "asking"));
+    let ctx = media::keyed_in(context_on(
+        &env,
+        http.clone(),
+        stack_without("seerr", "asking"),
+    ));
 
     let said = dispatch(
         Command::Remove {
@@ -428,10 +425,9 @@ async fn a_media_server_that_will_not_say_who_is_here_removes_nobody() {
     let env = recorded_admin("unreadable");
     let http = Fake::by_path_in_turn(vec![
         (
-            "/Users/AuthenticateByName",
-            vec![Answer::reply(200, r#"{"AccessToken":"token"}"#)],
+            media::identity("household"),
+            vec![Answer::reply(200, "not json")],
         ),
-        ("/Users", vec![Answer::reply(200, "not json")]),
         ("", vec![Answer::reply(200, "[]")]),
     ]);
     let ctx = context(&env, http);
@@ -453,12 +449,8 @@ async fn a_media_server_that_will_not_say_who_is_here_removes_nobody() {
 #[tokio::test]
 async fn a_media_server_that_refuses_the_removal_leaves_the_other_account_alone() {
     let env = recorded_admin("refused");
-    let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
-    let http = Fake::by_path_in_turn(vec![
-        (
-            "/Users/AuthenticateByName",
-            vec![signed_in.clone(), signed_in],
-        ),
+    let mut routes = the_media_server(media::refusing());
+    routes.extend(vec![
         ("/auth/me", vec![Answer::reply(200, "{}")]),
         (
             "/api/v1/request",
@@ -468,10 +460,9 @@ async fn a_media_server_that_refuses_the_removal_leaves_the_other_account_alone(
             )],
         ),
         ("/user/jellyfin/", vec![Answer::reply(200, r#"{"id":7}"#)]),
-        ("/Users/9", vec![Answer::reply(500, "")]),
-        ("/Users", vec![Answer::reply(200, HOUSEHOLD)]),
         ("", vec![Answer::reply(200, "[]")]),
     ]);
+    let http = Fake::by_path_in_turn(routes);
     let ctx = context(&env, http.clone());
 
     let refused = dispatch(
@@ -484,12 +475,9 @@ async fn a_media_server_that_refuses_the_removal_leaves_the_other_account_alone(
     .await;
 
     assert!(refused.is_err(), "a refused removal was reported as done");
-    assert!(
-        !http
-            .requests()
-            .iter()
-            .any(|request| request.url.contains("/api/v1/user/7")
-                && matches!(request.method, lemonfiber_core::ports::http::Method::Delete)),
+    assert_eq!(
+        taken_from(&http.requests()),
+        ["media server"],
         "the request service's account was taken although the media server's was not"
     );
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
@@ -514,12 +502,8 @@ async fn a_request_service_that_will_not_say_what_it_holds_is_reported() {
         ),
     ] {
         let env = recorded_admin(tag);
-        let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
-        let http = Fake::by_path_in_turn(vec![
-            (
-                "/Users/AuthenticateByName",
-                vec![signed_in.clone(), signed_in],
-            ),
+        let mut routes = the_media_server(media::taken());
+        routes.extend(vec![
             ("/auth/me", vec![sign_in]),
             (
                 "/api/v1/request",
@@ -529,10 +513,9 @@ async fn a_request_service_that_will_not_say_what_it_holds_is_reported() {
                 )],
             ),
             ("/user/jellyfin/", vec![lookup]),
-            ("/Users/9", vec![Answer::reply(204, "")]),
-            ("/Users", vec![Answer::reply(200, HOUSEHOLD)]),
             ("", vec![Answer::reply(200, "[]")]),
         ]);
+        let http = Fake::by_path_in_turn(routes);
         let ctx = context(&env, http);
 
         let said = dispatch(

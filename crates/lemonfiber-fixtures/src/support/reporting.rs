@@ -46,6 +46,10 @@ pub struct Reporting {
     /// whether what it holds has settled — and a test about one must not spend the
     /// other's budget.
     refused: std::sync::atomic::AtomicUsize,
+    /// How many listings to answer before this engine is gone. Absent means it never goes.
+    answers: Option<usize>,
+    /// How many listings it has answered so far, counted only where it goes.
+    answered: std::sync::atomic::AtomicUsize,
     /// What `exec` answers a VPN probe with, where the test scripts one. Absent
     /// means `exec` has nothing to say and fails, as an engine asked for a
     /// container it does not know would.
@@ -99,6 +103,8 @@ impl Reporting {
             asked: std::sync::atomic::AtomicUsize::new(0),
             refusals: 0,
             refused: std::sync::atomic::AtomicUsize::new(0),
+            answers: None,
+            answered: std::sync::atomic::AtomicUsize::new(0),
             tunnel: None,
             ran: std::sync::Mutex::default(),
         }
@@ -194,6 +200,13 @@ impl Reporting {
         self
     }
 
+    /// The same engine, gone once it has answered `listings` listings.
+    #[must_use]
+    pub fn leaving_after(mut self, listings: usize) -> Self {
+        self.answers = Some(listings);
+        self
+    }
+
     /// The same engine, with something to say about a service.
     #[must_use]
     pub fn saying(mut self, service: &str, line: &str) -> Self {
@@ -250,6 +263,8 @@ impl Reporting {
             asked: std::sync::atomic::AtomicUsize::new(0),
             refusals: 0,
             refused: std::sync::atomic::AtomicUsize::new(0),
+            answers: None,
+            answered: std::sync::atomic::AtomicUsize::new(0),
             tunnel: None,
             ran: std::sync::Mutex::default(),
         }
@@ -310,6 +325,17 @@ fn listed(reporting: &Reporting, project: &str) -> Result<Vec<Container>, Engine
     if !reporting.reachable {
         return Err(EngineFailure::Unreachable {
             reason: "no daemon here".to_owned(),
+        });
+    }
+
+    if reporting.answers.is_some_and(|answers| {
+        reporting
+            .answered
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            >= answers
+    }) {
+        return Err(EngineFailure::Unreachable {
+            reason: "the daemon has gone".to_owned(),
         });
     }
 

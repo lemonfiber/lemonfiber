@@ -136,11 +136,6 @@ pub struct Ctx {
     /// A field rather than a constant read in place, so a test can sign an index with a
     /// key it made.
     pub catalogue_key: Option<Box<crate::plugin::Key>>,
-    /// The media server sessions this context has signed in to.
-    ///
-    /// Held for the life of the context rather than of a client, so a surface that
-    /// reads the household every minute signs in once rather than every minute.
-    pub sessions: Arc<crate::jellyfin::Sessions>,
 }
 
 /// A validator proving credentials against the real services, over `http` and over
@@ -213,7 +208,6 @@ impl Ctx {
             // half of this and not something a default could stand in for.
             archives: None,
             catalogue_key: crate::plugin::catalogue::carried().map(Box::new),
-            sessions: Arc::default(),
         }
     }
 

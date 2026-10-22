@@ -177,7 +177,9 @@ fn a_stack_service_moved_in_place_is_no_longer_written_a_secrets_file() {
     let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK);
     let mut moved = crate::test_support::a_placed("gluetun", &[], None, None);
     moved.replaces = Some("gluetun".to_owned());
-    let installed = [crate::test_support::an_installed("gluetun", vec![moved])];
+    let installed = [crate::test_support::pinned_as(
+        crate::test_support::an_installed("gluetun", vec![moved]),
+    )];
 
     let filed = |installed: &[crate::plugin::Installed]| -> Vec<String> {
         manifest

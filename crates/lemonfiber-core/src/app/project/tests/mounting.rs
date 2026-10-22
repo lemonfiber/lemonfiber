@@ -91,9 +91,7 @@ fn a_stack_directory_the_operator_named_gets_its_mount_sources_too() {
 fn a_stack_service_moved_in_place_gets_no_mount_source_of_the_stack() {
     let (ctx, project) = machine("mount-moved");
     let _ = std::fs::remove_dir_all(project.join("config").join("jellyfin").join("cache"));
-    let mut moved = crate::test_support::a_placed("jellyfin", &[], None, None);
-    moved.replaces = Some("jellyfin".to_owned());
-    let installed = [crate::test_support::an_installed("jellyfin", vec![moved])];
+    let installed: Vec<_> = crate::test_support::media::moved().into_iter().collect();
 
     assert!(making_beside(&ctx, &installed).is_ok());
 

@@ -1,9 +1,11 @@
 //! What the media server is playing now, read for everybody or for one member.
 //!
 //! **One member's is theirs alone.** A member asking reaches this command with their
-//! own id in it, put there by whoever admitted them, so there is no path on which
-//! another member's session is read and then left out. An operator may name a member
-//! to see what that person is watching, or name nobody to see the whole house.
+//! own id in it, put there by whoever admitted them. The server is asked for that
+//! account's sessions alone, and any it answers for another account are left out, so an
+//! adapter that answers with the whole house never shows a member anybody else's. An
+//! operator may name a member to see what that person is watching, or name nobody to see
+//! the whole house.
 
 use super::targets::media;
 use super::{Ctx, Outcome};
@@ -29,8 +31,8 @@ pub(crate) async fn playing(
     let Some(server) = media(ctx, &manifest).await else {
         return Ok(unread(
             member,
-            "there is no media server to ask what is playing, or no recorded password to \
-             sign in with",
+            "there is no media server to ask what is playing, or it cannot be asked over \
+             its contracts",
         ));
     };
 
@@ -54,10 +56,17 @@ pub(crate) async fn playing(
         ));
     };
 
-    Ok(answered(
-        server.serve.playing(Some(&account.id)).await,
-        account.name.clone(),
-    ))
+    let theirs = server
+        .serve
+        .playing(Some(&account.id))
+        .await
+        .map(|sessions| {
+            sessions
+                .into_iter()
+                .filter(|session| session.member_id == account.id)
+                .collect()
+        });
+    Ok(answered(theirs, account.name.clone()))
 }
 
 /// The reading, as the outcome the command answers with.

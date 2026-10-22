@@ -346,7 +346,11 @@ fn nothing_can_be_proven_without_a_project_directory() {
 
 #[tokio::test]
 async fn a_media_server_the_household_set_up_leaves_the_request_identity_to_them() {
-    let ctx = seed_ctx(None, true, Vec::new(), None, None).with_http(household(true, false));
+    let env = config_scratch("targets-household-set-up");
+    let _ = std::fs::create_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.to_path_buf()))
+        .with_http(household(true, false));
+    crate::test_support::media::moved_in(&ctx);
     let report = seeded(dispatch(Command::Seed, &ctx).await).unwrap_or_default();
     let identity = report
         .wirings

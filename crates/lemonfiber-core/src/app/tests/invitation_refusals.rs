@@ -17,39 +17,9 @@ use crate::app::Inviting;
 #[tokio::test]
 async fn the_record_is_read_from_further_back_than_the_window_it_judges() {
     let env = recorded_admin("window");
-    let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
-    let http = Fake::by_path_in_turn(vec![
-        (
-            "/Users/AuthenticateByName",
-            vec![
-                signed_in.clone(),
-                signed_in.clone(),
-                signed_in.clone(),
-                signed_in,
-            ],
-        ),
-        (
-            "/System/ActivityLog",
-            vec![Answer::reply(200, r#"{"Items":[]}"#)],
-        ),
-        (
-            "/Users/New",
-            vec![Answer::reply(
-                200,
-                r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
-            )],
-        ),
-        ("/Users", vec![Answer::reply(200, "[]")]),
-    ]);
+    let http = holding(&[], &[]);
     let recorded = std::sync::Arc::clone(&http);
-    let ctx = a_context()
-        .settings(Settings {
-            env_file: Some(env.clone()),
-            household_host: Some("192.168.1.20".to_owned()),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(http);
+    let ctx = offered_at(&env, http);
 
     let _ = dispatch(
         Command::Invite(Inviting {
@@ -65,15 +35,11 @@ async fn the_record_is_read_from_further_back_than_the_window_it_judges() {
     let read_from = recorded
         .requests()
         .into_iter()
-        .find(|request| request.url.contains("/System/ActivityLog"))
+        .find(|request| asked_to(request, "when_invited"))
         .and_then(|request| {
-            request
-                .url
-                .split("minDate=")
-                .nth(1)
-                .and_then(|rest| rest.split('&').next())
-                .map(str::to_owned)
+            serde_json::from_str::<serde_json::Value>(request.body.as_deref()?).ok()
         })
+        .and_then(|asked| asked.get("since")?.as_str().map(str::to_owned))
         .unwrap_or_default();
 
     assert!(
@@ -88,33 +54,7 @@ async fn the_record_is_read_from_further_back_than_the_window_it_judges() {
 #[tokio::test]
 async fn an_invitation_serialises_under_its_own_kind() {
     let env = recorded_admin("json");
-    let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
-    let http = Fake::by_path_in_turn(vec![
-        (
-            "/Users/AuthenticateByName",
-            vec![signed_in.clone(), signed_in.clone(), signed_in],
-        ),
-        (
-            "/System/ActivityLog",
-            vec![Answer::reply(200, r#"{"Items":[]}"#)],
-        ),
-        (
-            "/Users/New",
-            vec![Answer::reply(
-                200,
-                r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
-            )],
-        ),
-        ("/Users", vec![Answer::reply(200, "[]")]),
-    ]);
-    let ctx = a_context()
-        .settings(Settings {
-            env_file: Some(env.clone()),
-            household_host: Some("192.168.1.20".to_owned()),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(http);
+    let ctx = offered_at(&env, holding(&[], &[]));
 
     let json = dispatch(
         Command::Invite(Inviting {
@@ -166,48 +106,15 @@ async fn offering_an_account_over_an_unreadable_stack_says_so() {
 #[tokio::test]
 async fn an_invitation_the_server_will_not_withdraw_is_not_reported_as_withdrawn() {
     let env = recorded_admin("withdraw-refused");
-    let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
-    let http = Fake::by_path_in_turn(vec![
-        (
-            "/Users/AuthenticateByName",
-            vec![
-                signed_in.clone(),
-                signed_in.clone(),
-                signed_in.clone(),
-                signed_in,
-            ],
-        ),
-        (
-            "/System/ActivityLog",
-            vec![Answer::reply(
-                200,
-                r#"{"Items":[{"Type":"UserCreated","Date":"2000-01-01T00:00:00Z","UserId":"7"}]}"#,
-            )],
-        ),
-        (
-            "/Users/New",
-            vec![Answer::reply(
-                200,
-                r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
-            )],
-        ),
-        ("/Users/7", vec![Answer::reply(500, "no")]),
-        (
-            "/Users",
-            vec![Answer::reply(
-                200,
-                r#"[{"Id":"7","Name":"bo","HasPassword":false}]"#,
-            )],
-        ),
-    ]);
-    let ctx = a_context()
-        .settings(Settings {
-            env_file: Some(env.clone()),
-            household_host: Some("192.168.1.20".to_owned()),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(http);
+    let mut routes = vec![
+        (media::identity("withdraw"), vec![Answer::reply(500, "no")]),
+        (media::identity("suspend"), vec![Answer::reply(500, "no")]),
+    ];
+    routes.extend(answering(
+        &made_long_ago("7"),
+        &[media::member("7", "bo", false)],
+    ));
+    let ctx = offered_at(&env, Fake::by_path_in_turn(routes));
 
     let made = dispatch(
         Command::Invite(Inviting {
@@ -233,27 +140,12 @@ async fn an_invitation_the_server_will_not_withdraw_is_not_reported_as_withdrawn
 #[tokio::test]
 async fn a_media_server_that_refuses_the_account_is_reported() {
     let env = recorded_admin("refuses");
-    let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
-    let http = Fake::by_path_in_turn(vec![
-        (
-            "/Users/AuthenticateByName",
-            vec![signed_in.clone(), signed_in.clone(), signed_in],
-        ),
-        (
-            "/System/ActivityLog",
-            vec![Answer::reply(200, r#"{"Items":[]}"#)],
-        ),
-        ("/Users/New", vec![Answer::reply(400, "name already taken")]),
-        ("/Users", vec![Answer::reply(200, "[]")]),
-    ]);
-    let ctx = a_context()
-        .settings(Settings {
-            env_file: Some(env.clone()),
-            household_host: Some("192.168.1.20".to_owned()),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(http);
+    let mut routes = vec![(
+        media::identity("invite"),
+        vec![Answer::reply(400, "name already taken")],
+    )];
+    routes.extend(answering(&[], &[]));
+    let ctx = offered_at(&env, Fake::by_path_in_turn(routes));
 
     let refused = dispatch(
         Command::Invite(Inviting {
@@ -280,34 +172,12 @@ async fn a_media_server_that_refuses_the_account_is_reported() {
 #[tokio::test]
 async fn a_sweep_that_cannot_run_still_makes_the_invitation() {
     let env = recorded_admin("sweep-silent");
-    let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
-    let http = Fake::by_path_in_turn(vec![
-        (
-            "/Users/AuthenticateByName",
-            vec![signed_in.clone(), signed_in.clone(), signed_in],
-        ),
-        ("/System/ActivityLog", vec![Answer::Silent]),
-        (
-            "/Users/New",
-            vec![Answer::reply(
-                200,
-                r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
-            )],
-        ),
-        (
-            "/Users/9",
-            vec![Answer::reply(200, r#"{"Id":"9","Policy":{}}"#)],
-        ),
-        ("/Users", vec![Answer::Silent]),
-    ]);
-    let ctx = a_context()
-        .settings(Settings {
-            env_file: Some(env.clone()),
-            household_host: Some("192.168.1.20".to_owned()),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(http);
+    let mut routes = vec![
+        (media::identity("when_invited"), vec![Answer::Silent]),
+        (media::identity("household"), vec![Answer::Silent]),
+    ];
+    routes.extend(answering(&[], &[]));
+    let ctx = offered_at(&env, Fake::by_path_in_turn(routes));
 
     let made = dispatch(
         Command::Invite(Inviting {
@@ -360,10 +230,11 @@ async fn offering_an_account_without_a_media_server_says_there_is_nowhere_to_mak
     );
 }
 
-/// Without a recorded credential there is nothing to ask the server as.
+/// A media server that cannot be asked over its contracts has nothing to make an account
+/// with.
 ///
-/// Refused before anything is attempted rather than after a sign-in fails, so what
-/// comes back names the setup that has not run rather than a rejection.
+/// Refused before anything is attempted rather than after a call fails, so what comes
+/// back names what is missing rather than a rejection.
 #[tokio::test]
 async fn offering_an_account_before_setup_is_refused_rather_than_attempted() {
     let ctx = a_context().build().with_http(Fake::silent());
@@ -380,7 +251,7 @@ async fn offering_an_account_before_setup_is_refused_rather_than_attempted() {
 
     assert!(
         refused.is_err(),
-        "an invitation was made with no credential to make it with"
+        "an invitation was made on a media server nothing can ask"
     );
     assert!(invited(&refused).is_none(), "a refusal carried one anyway");
 }

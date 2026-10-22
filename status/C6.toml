@@ -22,7 +22,7 @@ requirement = [
   { id = "C6-R18", state = "done", evidence = ["crates/lemonfiber-plugin/src/schema.rs", "crates/lemonfiber-core/src/plugin/container.rs"] },
   { id = "C6-R19", state = "done", evidence = ["crates/lemonfiber-core/src/companion.rs", "crates/lemonfiber/src/ui/encrypted.rs", "crates/lemonfiber/src/exit/reporting.rs"] },
   { id = "C6-R20", state = "done", evidence = ["crates/lemonfiber-core/src/seed/run/decline.rs", "crates/lemonfiber-core/src/seed/run/taken_back.rs"] },
-  { id = "C6-R21", state = "done", evidence = ["crates/lemonfiber-core/src/seed/run/cors.rs", "crates/lemonfiber-core/src/jellyfin/cors.rs"] },
+  { id = "C6-R21", state = "done", evidence = ["crates/lemonfiber-core/src/seed/run/cors.rs", "crates/lemonfiber-contract/src/capabilities/media.rs"] },
   { id = "C6-R24", state = "done", evidence = ["crates/lemonfiber-core/src/seed/run/decline.rs", "crates/lemonfiber-core/src/seed/run/taken_back.rs", "crates/lemonfiber-core/src/seed/run/gate.rs", "crates/lemonfiber-core/src/seed/run/tokens.rs", "crates/lemonfiber-core/src/app/credentials/gating.rs", "crates/lemonfiber-core/src/app/credentials/tokening.rs"] },
   { id = "C6-R25", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/gating.rs"] },
 ]

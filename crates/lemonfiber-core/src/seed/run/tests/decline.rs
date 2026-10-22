@@ -2,6 +2,7 @@
 //! file.
 
 use super::*;
+use crate::test_support::media;
 
 /// The name the decline service's key is filed under.
 const APP: &str = crate::app_keys::DECLINE_APP;
@@ -19,52 +20,44 @@ fn stack(declining: bool) -> Vec<lemonfiber_manifest::Service> {
     services
 }
 
-/// The media server's key list, holding `keys` under the decline service's name and the
-/// request service's own key beside them.
-fn listed(keys: &[&str]) -> String {
-    let mut items: Vec<serde_json::Value> = keys
-        .iter()
-        .map(|key| serde_json::json!({ "AppName": APP, "AccessToken": key }))
-        .collect();
-    items.push(serde_json::json!({ "AppName": "Jellyseerr", "AccessToken": "seerrs" }));
-    serde_json::json!({ "Items": items }).to_string()
+/// A media server filing `filed` under the decline service's name, minting `minted`, and
+/// answering a mint and a revocation as taken where `written` and refused where not.
+fn serving(filed: &[&str], minted: &str, written: bool) -> Arc<Fake> {
+    serving_apart(filed, minted, written, written)
 }
 
-/// A media server answering its key list with each of `lists` in turn, a mint and a
-/// revocation with `written`.
-fn serving(lists: &[&[&str]], written: u16) -> Arc<Fake> {
-    serving_apart(lists, written, written)
-}
-
-/// A media server answering its key list with each of `lists` in turn, a mint with
-/// `minted` and a revocation with `revoked`.
-fn serving_apart(lists: &[&[&str]], minted: u16, revoked: u16) -> Arc<Fake> {
-    Fake::by_route_in_turn(vec![
+/// A media server filing `filed` under the decline service's name and minting `minted`,
+/// taking a mint where `mints` and a revocation where `revokes`.
+fn serving_apart(filed: &[&str], minted: &str, mints: bool, revokes: bool) -> Arc<Fake> {
+    Fake::by_path(vec![
+        (media::serve("filed_as"), media::answered(&filed)),
         (
-            Method::Post,
-            "/Users/AuthenticateByName",
-            vec![Answer::reply(200, r#"{"AccessToken":"token"}"#)],
+            media::serve("mint"),
+            if mints {
+                media::answered(&minted)
+            } else {
+                media::refusing()
+            },
         ),
         (
-            Method::Get,
-            "/Auth/Keys",
-            lists
-                .iter()
-                .map(|keys| Answer::reply(200, listed(keys)))
-                .collect(),
-        ),
-        (Method::Post, "/Auth/Keys", vec![Answer::reply(minted, "")]),
-        (
-            Method::Delete,
-            "/Auth/Keys/",
-            vec![Answer::reply(revoked, "")],
+            media::serve("revoke"),
+            if revokes {
+                media::taken()
+            } else {
+                media::refusing()
+            },
         ),
     ])
 }
 
+/// Whether `http` was asked to mint a key.
+fn minted_on(http: &Fake) -> bool {
+    http.asked_for(media::serve("mint"))
+}
+
 /// A stack directory holding `held` as the decline service's key, where it holds one,
-/// and a context with the media server's administrator recorded where `administered`
-/// says, answering over `http`.
+/// and a context asking the media server moved into its plugin as its administrator where
+/// `administered` says, answering over `http`.
 fn decline_ctx(
     name: &str,
     administered: bool,
@@ -76,13 +69,6 @@ fn decline_ctx(
     let _ = std::fs::create_dir_all(&at);
     let env = at.join(".env");
     let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
-    if administered {
-        let _ = store::set(
-            &env,
-            crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
-            &lemonfiber_fixtures::support::a_password(),
-        );
-    }
     if let Some(held) = held {
         let _ = store::write(&key_file(&at), &format!("{held}\n"));
     }
@@ -94,7 +80,14 @@ fn decline_ctx(
         })
         .build()
         .with_http(http);
-    (ctx, at)
+    (
+        if administered {
+            media::asking(ctx)
+        } else {
+            ctx
+        },
+        at,
+    )
 }
 
 /// Where the decline service reads its key, under `project`.
@@ -112,15 +105,16 @@ async fn seeded(
     let wiring = super::super::decline::seed_decline_key(
         ctx,
         &stack(declining),
-        &super::fillers_of(stack(declining)),
+        &super::moved_fillers(stack(declining)),
         Some(project),
     )
     .await;
     let revoked = http
         .requests()
         .into_iter()
-        .filter(|asked| asked.method == Method::Delete)
-        .filter_map(|asked| asked.url.rsplit('/').next().map(str::to_owned))
+        .filter(|asked| asked.url.ends_with(media::serve("revoke")))
+        .filter_map(|asked| serde_json::from_str::<serde_json::Value>(asked.body.as_deref()?).ok())
+        .filter_map(|asked| asked.get("key")?.as_str().map(str::to_owned))
         .collect();
     (wiring.map(|one| one.state), revoked)
 }
@@ -136,7 +130,7 @@ fn held(project: &std::path::Path) -> Option<String> {
 /// hands it over in the service's own key file.
 #[tokio::test]
 async fn a_key_is_minted_and_handed_over_in_the_service_file() {
-    let http = serving(&[&[], &[], &["fresh"]], 204);
+    let http = serving(&[], "fresh", true);
     let (ctx, at) = decline_ctx("decline-key-minted", true, None, http.clone());
 
     let (state, revoked) = seeded(&ctx, &http, true, &at).await;
@@ -144,13 +138,17 @@ async fn a_key_is_minted_and_handed_over_in_the_service_file() {
     assert_eq!(state, Some(State::Wired));
     assert_eq!(held(&at).as_deref(), Some("fresh"));
     assert!(revoked.is_empty(), "{revoked:?}");
-    assert!(http.asked_for(&format!("/Auth/Keys?App={APP}")));
+    assert!(http
+        .requests()
+        .iter()
+        .any(|asked| asked.url.ends_with(media::serve("filed_as"))
+            && asked.body.as_deref() == Some(format!(r#"{{"app":"{APP}"}}"#).as_str())));
 }
 
 /// A key the file holds and the media server lists is left as it is.
 #[tokio::test]
 async fn a_key_both_sides_hold_is_left_alone() {
-    let http = serving(&[&["kept"]], 204);
+    let http = serving(&["kept"], "fresh", true);
     let (ctx, at) = decline_ctx("decline-key-kept", true, Some("kept"), http.clone());
 
     let (state, revoked) = seeded(&ctx, &http, true, &at).await;
@@ -163,7 +161,7 @@ async fn a_key_both_sides_hold_is_left_alone() {
 /// nothing, and is revoked; the one the file holds stays.
 #[tokio::test]
 async fn a_key_nothing_holds_is_revoked() {
-    let http = serving(&[&["stray", "kept"]], 204);
+    let http = serving(&["stray", "kept"], "fresh", true);
     let (ctx, at) = decline_ctx("decline-key-stray", true, Some("kept"), http.clone());
 
     let (state, revoked) = seeded(&ctx, &http, true, &at).await;
@@ -177,7 +175,7 @@ async fn a_key_nothing_holds_is_revoked() {
 /// filed before the replacement is revoked once the new key is written.
 #[tokio::test]
 async fn a_key_the_media_server_dropped_is_replaced() {
-    let http = serving(&[&["stray"], &["stray"], &["stray", "fresh"]], 204);
+    let http = serving(&["stray"], "fresh", true);
     let (ctx, at) = decline_ctx("decline-key-dropped", true, Some("gone"), http.clone());
 
     let (state, revoked) = seeded(&ctx, &http, true, &at).await;
@@ -197,7 +195,7 @@ async fn a_key_is_told_from_one_sharing_its_short_fingerprint() {
         crate::ports::fingerprint(HELD),
         crate::ports::fingerprint(TWIN)
     );
-    let http = serving(&[&[TWIN, HELD]], 204);
+    let http = serving(&[TWIN, HELD], "fresh", true);
     let (ctx, at) = decline_ctx("decline-key-twins", true, Some(HELD), http.clone());
 
     let (state, revoked) = seeded(&ctx, &http, true, &at).await;
@@ -211,7 +209,7 @@ async fn a_key_is_told_from_one_sharing_its_short_fingerprint() {
 /// the key administers the whole server, so nothing is minted for it.
 #[tokio::test]
 async fn a_stranger_filling_decline_is_handed_no_key() {
-    let http = serving(&[&[]], 204);
+    let http = serving(&[], "fresh", true);
     let (ctx, at) = decline_ctx("decline-key-stranger", true, None, http.clone());
     let services = vec![
         media_server_svc(),
@@ -227,7 +225,8 @@ async fn a_stranger_filling_decline_is_handed_no_key() {
             Some(5057),
         )],
     );
-    let fillers = super::fillers_beside(services.clone(), &[stranger], &at);
+    let installed: Vec<_> = media::moved().into_iter().chain([stranger]).collect();
+    let fillers = super::fillers_beside(services.clone(), &installed, &at);
 
     let wiring =
         super::super::decline::seed_decline_key(&ctx, &services, &fillers, Some(&at)).await;
@@ -239,12 +238,7 @@ async fn a_stranger_filling_decline_is_handed_no_key() {
         ),
         "a stranger was not refused the key as a stranger"
     );
-    assert!(
-        http.requests()
-            .iter()
-            .all(|asked| !(asked.method == Method::Post && asked.url.ends_with("/Auth/Keys"))),
-        "a key was minted for a stranger"
-    );
+    assert!(!minted_on(&http), "a key was minted for a stranger");
     assert_eq!(held(&at), None);
 }
 
@@ -296,7 +290,7 @@ fn the_media_servers_key_crosses_only_where_any_of_its_credentials_may() {
 /// handed no key, and nothing is minted for it.
 #[tokio::test]
 async fn a_decline_service_that_cannot_be_asked_is_handed_no_key() {
-    let http = serving(&[&[]], 204);
+    let http = serving(&[], "fresh", true);
     let (ctx, at) = decline_ctx("decline-key-unasked", true, None, http.clone());
     let services = vec![
         media_server_svc(),
@@ -308,12 +302,12 @@ async fn a_decline_service_that_cannot_be_asked_is_handed_no_key() {
         "their-decline",
         lemonfiber_contract::capabilities::invite::decline::CAPABILITY,
     );
-    let fillers = super::fillers_trusting(
-        services.clone(),
-        &[theirs],
-        &at,
-        &crate::test_support::first_party("their-decline"),
-    );
+    let installed: Vec<_> = media::moved().into_iter().chain([theirs]).collect();
+    let trusted: Vec<_> = crate::test_support::first_party("their-decline")
+        .into_iter()
+        .chain(crate::plugin::first_party::EMBEDDED.iter().copied())
+        .collect();
+    let fillers = super::fillers_trusting(services.clone(), &installed, &at, &trusted);
 
     let wiring =
         super::super::decline::seed_decline_key(&ctx, &services, &fillers, Some(&at)).await;
@@ -326,9 +320,7 @@ async fn a_decline_service_that_cannot_be_asked_is_handed_no_key() {
         "a decline service that cannot be asked was not said to be"
     );
     assert!(
-        http.requests()
-            .iter()
-            .all(|asked| !(asked.method == Method::Post && asked.url.ends_with("/Auth/Keys"))),
+        !minted_on(&http),
         "a key was minted for a service that cannot be asked"
     );
 }
@@ -336,7 +328,7 @@ async fn a_decline_service_that_cannot_be_asked_is_handed_no_key() {
 /// A stack that no longer runs the service has every key filed under its name revoked.
 #[tokio::test]
 async fn removing_the_service_revokes_its_key() {
-    let http = serving(&[&["kept"]], 204);
+    let http = serving(&["kept"], "fresh", true);
     let (ctx, at) = decline_ctx("decline-key-retired", true, Some("kept"), http.clone());
 
     let (state, revoked) = seeded(&ctx, &http, false, &at).await;
@@ -348,7 +340,7 @@ async fn removing_the_service_revokes_its_key() {
 /// A stack that never ran the service, with nothing filed under its name, says nothing.
 #[tokio::test]
 async fn a_stack_without_the_service_and_no_key_says_nothing() {
-    let http = serving(&[&[]], 204);
+    let http = serving(&[], "fresh", true);
     let (ctx, at) = decline_ctx("decline-key-none", true, None, http.clone());
 
     let (state, _) = seeded(&ctx, &http, false, &at).await;
@@ -391,7 +383,7 @@ async fn a_rehearsal_mints_writes_and_revokes_nothing() {
             },
         ),
     ] {
-        let http = serving(&[keys], 204);
+        let http = serving(keys, "fresh", true);
         let (mut ctx, at) = decline_ctx(name, true, held_now, http.clone());
         ctx.dry_run = true;
 
@@ -399,13 +391,7 @@ async fn a_rehearsal_mints_writes_and_revokes_nothing() {
 
         assert_eq!(state, Some(expected), "{name}");
         assert!(revoked.is_empty(), "{name}: {revoked:?}");
-        assert!(
-            !http
-                .requests()
-                .iter()
-                .any(|asked| asked.method == Method::Post && asked.url.contains("/Auth/Keys")),
-            "{name}"
-        );
+        assert!(!minted_on(&http), "{name}");
         assert_eq!(held(&at).as_deref(), held_now, "{name}");
     }
 }
@@ -415,7 +401,7 @@ async fn a_rehearsal_mints_writes_and_revokes_nothing() {
 /// is left alone, and so is a stack without the service.
 #[tokio::test]
 async fn without_an_administrator_only_a_rehearsal_says_anything() {
-    let http = serving(&[&[]], 204);
+    let http = serving(&[], "fresh", true);
     let (mut ctx, at) = decline_ctx("decline-key-unadministered", false, None, http.clone());
 
     assert_eq!(seeded(&ctx, &http, true, &at).await.0, None);
@@ -434,7 +420,7 @@ async fn without_an_administrator_only_a_rehearsal_says_anything() {
 /// A stack with no media server has no key to hold.
 #[tokio::test]
 async fn a_stack_without_a_media_server_holds_no_key() {
-    let http = serving(&[&[]], 204);
+    let http = serving(&[], "fresh", true);
     let (ctx, _) = decline_ctx("decline-key-no-jellyfin", true, None, http.clone());
     let services = vec![manifest_service("decline", None, Some(5056))];
 
@@ -452,13 +438,13 @@ async fn a_stack_without_a_media_server_holds_no_key() {
 /// With no stack directory there is nowhere to hand the key over, and nothing is minted.
 #[tokio::test]
 async fn without_a_stack_directory_nothing_is_minted() {
-    let http = serving(&[&[]], 204);
+    let http = serving(&[], "fresh", true);
     let (ctx, _) = decline_ctx("decline-key-no-project", true, None, http.clone());
 
     let wiring = super::super::decline::seed_decline_key(
         &ctx,
         &stack(true),
-        &super::fillers_of(stack(true)),
+        &super::moved_fillers(stack(true)),
         None,
     )
     .await;
@@ -467,24 +453,14 @@ async fn without_a_stack_directory_nothing_is_minted() {
         wiring.map(|one| one.state),
         Some(State::Skipped { .. })
     ));
-    assert!(!http
-        .requests()
-        .iter()
-        .any(|asked| asked.method == Method::Post && asked.url.contains("/Auth/Keys")));
+    assert!(!minted_on(&http));
 }
 
 /// The media server refusing the key list, the mint or a revocation is reported, never
 /// called done.
 #[tokio::test]
 async fn a_refusal_is_reported() {
-    let unlisted = Fake::by_route(vec![
-        (
-            Method::Post,
-            "/Users/AuthenticateByName",
-            Answer::reply(200, r#"{"AccessToken":"token"}"#),
-        ),
-        (Method::Get, "/Auth/Keys", Answer::reply(500, "")),
-    ]);
+    let unlisted = Fake::by_path(vec![(media::serve("filed_as"), media::refusing())]);
     let (ctx, at) = decline_ctx("decline-key-unlisted", true, None, unlisted.clone());
     let (state, _) = seeded(&ctx, &unlisted, true, &at).await;
     assert!(matches!(state, Some(State::Failed { .. })), "{state:?}");
@@ -492,28 +468,18 @@ async fn a_refusal_is_reported() {
     let (state, _) = seeded(&ctx, &unlisted, false, &at).await;
     assert_eq!(state, None);
 
-    for (name, lists, held_now, declining) in [
-        ("decline-key-unminted", &[&[][..]][..], None, true),
+    for (name, filed, held_now, declining) in [
+        ("decline-key-unminted", &[][..], None, true),
         (
             "decline-key-unrevoked",
-            &[&["stray", "kept"][..]][..],
+            &["stray", "kept"][..],
             Some("kept"),
             true,
         ),
-        (
-            "decline-key-unretired",
-            &[&["kept"][..]][..],
-            Some("kept"),
-            false,
-        ),
-        (
-            "decline-key-unreplaced",
-            &[&["stray"][..], &["stray"][..], &["stray", "fresh"][..]][..],
-            None,
-            true,
-        ),
+        ("decline-key-unretired", &["kept"][..], Some("kept"), false),
+        ("decline-key-unreplaced", &["stray"][..], None, true),
     ] {
-        let http = serving(lists, 500);
+        let http = serving(filed, "fresh", false);
         let (ctx, at) = decline_ctx(name, true, held_now, http.clone());
 
         let (state, _) = seeded(&ctx, &http, declining, &at).await;
@@ -533,7 +499,7 @@ async fn a_key_that_cannot_be_handed_over_is_revoked_again() {
         ("decline-key-unwritable", "fresh", true),
         ("decline-key-two-words", "two words", false),
     ] {
-        let http = serving(&[&[], &[], &[minted]], 204);
+        let http = serving(&[], minted, true);
         let (ctx, at) = decline_ctx(name, true, None, http.clone());
         if blocked {
             // A file where the service's directory should be leaves nowhere to write.
@@ -551,31 +517,23 @@ async fn a_key_that_cannot_be_handed_over_is_revoked_again() {
     }
 }
 
-/// A mint the key list does not show as exactly one new key hands nothing over.
+/// A mint answered with no key hands nothing over.
 #[tokio::test]
-async fn a_mint_the_list_does_not_show_hands_nothing_over() {
-    for (name, after) in [
-        ("decline-key-unseen", &[][..]),
-        ("decline-key-two-new", &["one", "two"][..]),
-    ] {
-        let http = serving(&[&[], &[], after], 204);
-        let (ctx, at) = decline_ctx(name, true, None, http.clone());
+async fn a_mint_answered_with_no_key_hands_nothing_over() {
+    let http = serving(&[], "", true);
+    let (ctx, at) = decline_ctx("decline-key-unseen", true, None, http.clone());
 
-        let (state, _) = seeded(&ctx, &http, true, &at).await;
+    let (state, _) = seeded(&ctx, &http, true, &at).await;
 
-        assert!(
-            matches!(state, Some(State::Failed { .. })),
-            "{name}: {state:?}"
-        );
-        assert_eq!(held(&at), None, "{name}");
-    }
+    assert!(matches!(state, Some(State::Failed { .. })), "{state:?}");
+    assert_eq!(held(&at), None);
 }
 
 /// A key handed over whose predecessor the media server will not revoke is said, not called
 /// done; the new key stays where the service reads it.
 #[tokio::test]
 async fn a_replaced_key_the_server_will_not_revoke_is_said() {
-    let http = serving_apart(&[&["stray"], &["stray"], &["stray", "fresh"]], 204, 500);
+    let http = serving_apart(&["stray"], "fresh", true, false);
     let (ctx, at) = decline_ctx("decline-key-unrevoked-after", true, None, http.clone());
 
     let (state, _) = seeded(&ctx, &http, true, &at).await;

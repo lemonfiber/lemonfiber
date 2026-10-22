@@ -3,6 +3,7 @@
 use lemonfiber_sidecar::gate::{Credential, File, Kind, Upstream, Upstreams};
 
 use super::*;
+use crate::test_support::media;
 
 /// The name the gate's media server key is filed under.
 const APP: &str = crate::app_keys::GATE_APP;
@@ -24,46 +25,47 @@ fn stack(gating: bool) -> Vec<lemonfiber_manifest::Service> {
     services
 }
 
-/// The media server's key list, holding `keys` under the gate's name and the request
-/// service's own key beside them.
-fn listed(keys: &[&str]) -> String {
-    let mut items: Vec<serde_json::Value> = keys
-        .iter()
-        .map(|key| serde_json::json!({ "AppName": APP, "AccessToken": key }))
-        .collect();
-    items.push(serde_json::json!({ "AppName": "Jellyseerr", "AccessToken": "seerrs" }));
-    serde_json::json!({ "Items": items }).to_string()
-}
-
-/// A media server answering its key list with each of `lists` in turn, a mint with
-/// `minted` and a revocation with `revoked`.
-fn serving(lists: &[&[&str]], minted: u16, revoked: u16) -> Arc<Fake> {
-    Fake::by_route_in_turn(vec![
+/// A media server filing `filed` under the gate's name and minting `minted`, taking a mint
+/// where `mints` and a revocation where `revokes`.
+fn serving(filed: &[&str], minted: &str, mints: bool, revokes: bool) -> Arc<Fake> {
+    Fake::by_path(vec![
+        (media::serve("filed_as"), media::answered(&filed)),
         (
-            Method::Post,
-            "/Users/AuthenticateByName",
-            vec![Answer::reply(200, r#"{"AccessToken":"token"}"#)],
+            media::serve("mint"),
+            if mints {
+                media::answered(&minted)
+            } else {
+                media::refusing()
+            },
         ),
         (
-            Method::Get,
-            "/Auth/Keys",
-            lists
-                .iter()
-                .map(|keys| Answer::reply(200, listed(keys)))
-                .collect(),
-        ),
-        (Method::Post, "/Auth/Keys", vec![Answer::reply(minted, "")]),
-        (
-            Method::Delete,
-            "/Auth/Keys/",
-            vec![Answer::reply(revoked, "")],
+            media::serve("revoke"),
+            if revokes {
+                media::taken()
+            } else {
+                media::refusing()
+            },
         ),
     ])
 }
 
+/// Whether `http` was asked to mint a key.
+fn minted_on(http: &Fake) -> bool {
+    http.asked_for(media::serve("mint"))
+}
+
+/// The majors of the API the moved media server answers in, which the gate forwards to.
+fn moved_majors() -> Vec<u32> {
+    crate::app::targets::MediaServer::of(&moved_fillers(stack(true)))
+        .and_then(|server| server.pairing)
+        .map(|pairing| pairing.majors)
+        .unwrap_or_default()
+}
+
 /// A stack directory where each of `curators` has written its own key, holding `held` as
-/// the the gate's media server key where it holds one, and a context with the media
-/// server's administrator recorded where `administered` says, answering over `http`.
+/// the gate's media server key where it holds one, and a context asking the media server
+/// moved into its plugin as its administrator where `administered` says, answering over
+/// `http`.
 fn gate_ctx(
     name: &str,
     administered: bool,
@@ -76,13 +78,6 @@ fn gate_ctx(
     let _ = std::fs::create_dir_all(&at);
     let env = at.join(".env");
     let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
-    if administered {
-        let _ = store::set(
-            &env,
-            crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
-            &lemonfiber_fixtures::support::a_password(),
-        );
-    }
     for (curator, key) in curators {
         let config = at.join("config").join(curator).join("config.xml");
         let _ = store::write(&config, &format!("<Config><ApiKey>{key}</ApiKey></Config>"));
@@ -98,7 +93,14 @@ fn gate_ctx(
         })
         .build()
         .with_http(http);
-    (ctx, at)
+    (
+        if administered {
+            media::asking(ctx)
+        } else {
+            ctx
+        },
+        at,
+    )
 }
 
 /// The routes the gate should hold where `curators` have written their keys and `key` is
@@ -126,13 +128,13 @@ fn holding(curators: &[(&str, &str)], key: &str) -> Upstreams {
         kind: Kind::Jellyfin,
         address: media_server_svc_network_url(),
         credential: Credential::new(key),
-        majors: media_server_svc().majors(),
+        majors: moved_majors(),
     });
     Upstreams::of(upstreams)
 }
 
-/// Where the gate reaches the media server: at its id on the stack's network, on the port
-/// it says it listens on there.
+/// Where the gate reaches the media server: at the id its plugin's server keeps on the
+/// stack's network, on the port it listens on there.
 fn media_server_svc_network_url() -> String {
     "http://jellyfin:8096".to_owned()
 }
@@ -156,7 +158,7 @@ async fn seeded(
     gating: bool,
     project: &std::path::Path,
 ) -> (Option<State>, Vec<String>) {
-    let fillers = fillers_at(stack(gating), project);
+    let fillers = moved_at(stack(gating), project);
     let server = crate::app::targets::MediaServer::of(&fillers);
     let wiring = super::super::gate::seed_gate_routes(
         ctx,
@@ -176,8 +178,9 @@ async fn seeded(
 fn revoked(http: &Fake) -> Vec<String> {
     http.requests()
         .into_iter()
-        .filter(|asked| asked.method == Method::Delete)
-        .filter_map(|asked| asked.url.rsplit('/').next().map(str::to_owned))
+        .filter(|asked| asked.url.ends_with(media::serve("revoke")))
+        .filter_map(|asked| serde_json::from_str::<serde_json::Value>(asked.body.as_deref()?).ok())
+        .filter_map(|asked| asked.get("key")?.as_str().map(str::to_owned))
         .collect()
 }
 
@@ -191,28 +194,33 @@ const MOVIES_ONLY: &[(&str, &str)] = &[("radarr", "radarrs")];
 /// each curator, with the key it wrote, and one for the media server, with the new key.
 #[tokio::test]
 async fn the_routes_are_written_with_a_key_of_the_gates_own() {
-    let http = serving(&[&[], &[], &["fresh"]], 204, 204);
+    let http = serving(&[], "fresh", true, true);
     let (ctx, at) = gate_ctx("gate-routes-minted", true, CURATORS, None, http.clone());
 
     let (state, revoked) = seeded(&ctx, &http, true, &at).await;
 
     assert_eq!(state, Some(State::Wired));
     assert_eq!(routes(&at), Some(holding(CURATORS, "fresh")));
-    // The test stack pins the media server at tag `1`, so the gate forwards to major 1
-    // alone.
+    // The gate forwards to the majors of the API the plugin's server answers in, and to
+    // nothing else.
+    assert!(!moved_majors().is_empty());
     assert_eq!(
         routes(&at).and_then(|held| held.route("jellyfin").map(|one| one.majors.clone())),
-        Some(vec![1])
+        Some(moved_majors())
     );
     assert!(revoked.is_empty(), "{revoked:?}");
-    assert!(http.asked_for(&format!("/Auth/Keys?App={APP}")));
+    assert!(http
+        .requests()
+        .iter()
+        .any(|asked| asked.url.ends_with(media::serve("filed_as"))
+            && asked.body.as_deref() == Some(format!(r#"{{"app":"{APP}"}}"#).as_str())));
 }
 
 /// Routes that already say what they should, under a key the media server lists, are left
 /// alone.
 #[tokio::test]
 async fn routes_that_hold_are_left_alone() {
-    let http = serving(&[&["kept"]], 204, 204);
+    let http = serving(&["kept"], "fresh", true, true);
     let (ctx, at) = gate_ctx(
         "gate-routes-kept",
         true,
@@ -232,7 +240,7 @@ async fn routes_that_hold_are_left_alone() {
 /// revoked.
 #[tokio::test]
 async fn a_moved_curator_key_is_written_and_strays_revoked() {
-    let http = serving(&[&["stray", "kept"]], 204, 204);
+    let http = serving(&["stray", "kept"], "fresh", true, true);
     let (ctx, at) = gate_ctx(
         "gate-routes-moved",
         true,
@@ -256,7 +264,7 @@ async fn a_moved_curator_key_is_written_and_strays_revoked() {
 /// A curator that has written no key yet has no route until it has.
 #[tokio::test]
 async fn a_curator_without_a_key_has_no_route() {
-    let http = serving(&[&[], &[], &["fresh"]], 204, 204);
+    let http = serving(&[], "fresh", true, true);
     let (ctx, at) = gate_ctx("gate-routes-keyless", true, MOVIES_ONLY, None, http.clone());
 
     let (state, _) = seeded(&ctx, &http, true, &at).await;
@@ -269,7 +277,7 @@ async fn a_curator_without_a_key_has_no_route() {
 /// filed before the replacement is revoked once the routes are written.
 #[tokio::test]
 async fn a_key_the_media_server_dropped_is_replaced() {
-    let http = serving(&[&["stray"], &["stray"], &["stray", "fresh"]], 204, 204);
+    let http = serving(&["stray"], "fresh", true, true);
     let (ctx, at) = gate_ctx(
         "gate-routes-dropped",
         true,
@@ -289,7 +297,7 @@ async fn a_key_the_media_server_dropped_is_replaced() {
 /// that never ran it, with nothing filed, says nothing.
 #[tokio::test]
 async fn removing_the_gate_revokes_its_key() {
-    let http = serving(&[&["kept"]], 204, 204);
+    let http = serving(&["kept"], "fresh", true, true);
     let (ctx, at) = gate_ctx(
         "gate-routes-retired",
         true,
@@ -301,7 +309,7 @@ async fn removing_the_gate_revokes_its_key() {
     assert_eq!(state, Some(State::Wired));
     assert_eq!(revoked, vec!["kept".to_owned()]);
 
-    let http = serving(&[&[]], 204, 204);
+    let http = serving(&[], "fresh", true, true);
     let (ctx, at) = gate_ctx("gate-routes-none", true, CURATORS, None, http.clone());
     assert_eq!(seeded(&ctx, &http, false, &at).await.0, None);
 }
@@ -343,7 +351,7 @@ async fn a_rehearsal_mints_writes_and_revokes_nothing() {
             },
         ),
     ] {
-        let http = serving(&[keys], 204, 204);
+        let http = serving(keys, "fresh", true, true);
         let written = if moved { MOVIES_ONLY } else { CURATORS };
         let (mut ctx, at) = gate_ctx(name, true, written, held_now, http.clone());
         if moved {
@@ -359,13 +367,7 @@ async fn a_rehearsal_mints_writes_and_revokes_nothing() {
 
         assert_eq!(state, Some(expected), "{name}");
         assert!(revoked.is_empty(), "{name}: {revoked:?}");
-        assert!(
-            !http
-                .requests()
-                .iter()
-                .any(|asked| asked.method == Method::Post && asked.url.contains("/Auth/Keys")),
-            "{name}"
-        );
+        assert!(!minted_on(&http), "{name}");
         assert_eq!(routes(&at), before, "{name}");
     }
 }
@@ -374,7 +376,7 @@ async fn a_rehearsal_mints_writes_and_revokes_nothing() {
 /// not administer is left alone, and so is a stack without the gate.
 #[tokio::test]
 async fn without_an_administrator_only_a_rehearsal_says_anything() {
-    let http = serving(&[&[]], 204, 204);
+    let http = serving(&[], "fresh", true, true);
     let (mut ctx, at) = gate_ctx(
         "gate-routes-unadministered",
         false,
@@ -400,7 +402,7 @@ async fn without_an_administrator_only_a_rehearsal_says_anything() {
 /// the request service fulfils through, and nothing is asked of any server.
 #[tokio::test]
 async fn without_a_media_server_the_curators_are_still_routed() {
-    let http = serving(&[&[]], 204, 204);
+    let http = serving(&[], "fresh", true, true);
     let curators = [("sonarr", "sonarr-key")];
     let (ctx, project) = gate_ctx(
         "gate-routes-no-media-server",
@@ -454,7 +456,7 @@ async fn curators_seeded(
 /// missing stack directory is said, and routes that cannot be written are reported.
 #[tokio::test]
 async fn the_curators_routes_alone_are_rehearsed_held_and_reported() {
-    let http = serving(&[&[]], 204, 204);
+    let http = serving(&[], "fresh", true, true);
     let curators = [("sonarr", "sonarr-key")];
     let (mut ctx, project) = gate_ctx(
         "gate-routes-curators-alone",
@@ -519,14 +521,14 @@ async fn the_curators_routes_alone_are_rehearsed_held_and_reported() {
 /// minted.
 #[tokio::test]
 async fn without_a_stack_directory_nothing_is_minted() {
-    let http = serving(&[&[]], 204, 204);
+    let http = serving(&[], "fresh", true, true);
     let (ctx, _) = gate_ctx("gate-routes-no-project", true, CURATORS, None, http.clone());
 
     let wiring = super::super::gate::seed_gate_routes(
         &ctx,
         &stack(true),
-        &fillers_of(stack(true)),
-        served(&stack(true)).as_ref(),
+        &moved_fillers(stack(true)),
+        crate::app::targets::MediaServer::of(&moved_fillers(stack(true))).as_ref(),
         None,
     )
     .await;
@@ -537,24 +539,14 @@ async fn without_a_stack_directory_nothing_is_minted() {
             reason: "there is no stack directory to hand the request gate its routes in".to_owned(),
         })
     );
-    assert!(!http
-        .requests()
-        .iter()
-        .any(|asked| asked.method == Method::Post && asked.url.contains("/Auth/Keys")));
+    assert!(!minted_on(&http));
 }
 
 /// The media server refusing the key list, the mint or a revocation is reported, never
 /// called done.
 #[tokio::test]
 async fn a_refusal_is_reported() {
-    let unlisted = Fake::by_route(vec![
-        (
-            Method::Post,
-            "/Users/AuthenticateByName",
-            Answer::reply(200, r#"{"AccessToken":"token"}"#),
-        ),
-        (Method::Get, "/Auth/Keys", Answer::reply(500, "")),
-    ]);
+    let unlisted = Fake::by_path(vec![(media::serve("filed_as"), media::refusing())]);
     let (ctx, at) = gate_ctx(
         "gate-routes-unlisted",
         true,
@@ -567,24 +559,24 @@ async fn a_refusal_is_reported() {
     // Without the gate, an unreadable key list is nothing this stack asked about.
     assert_eq!(seeded(&ctx, &unlisted, false, &at).await.0, None);
 
-    for (name, lists, held_now, minted, revoked) in [
-        ("gate-routes-unminted", &[&[][..]][..], None, 500, 204),
+    for (name, filed, held_now, mints, revokes) in [
+        ("gate-routes-unminted", &[][..], None, false, true),
         (
             "gate-routes-unrevoked",
-            &[&["stray", "kept"][..]][..],
+            &["stray", "kept"][..],
             Some("kept"),
-            204,
-            500,
+            true,
+            false,
         ),
         (
             "gate-routes-unrevoked-after",
-            &[&["stray"][..], &["stray"][..], &["stray", "fresh"][..]][..],
+            &["stray"][..],
             None,
-            204,
-            500,
+            true,
+            false,
         ),
     ] {
-        let http = serving(lists, minted, revoked);
+        let http = serving(filed, "fresh", mints, revokes);
         let (ctx, at) = gate_ctx(name, true, CURATORS, held_now, http.clone());
 
         let (state, _) = seeded(&ctx, &http, true, &at).await;
@@ -600,7 +592,7 @@ async fn a_refusal_is_reported() {
 /// left on the server that nothing holds.
 #[tokio::test]
 async fn a_key_whose_routes_cannot_be_written_is_revoked_again() {
-    let http = serving(&[&[], &[], &["fresh"]], 204, 204);
+    let http = serving(&[], "fresh", true, true);
     let (ctx, at) = gate_ctx("gate-routes-unwritable", true, CURATORS, None, http.clone());
     blocked(&at);
 
@@ -623,7 +615,7 @@ async fn a_key_whose_routes_cannot_be_written_is_revoked_again() {
 /// the key stays: it is still the one the gate presents.
 #[tokio::test]
 async fn routes_that_cannot_be_updated_are_said() {
-    let http = serving(&[&["stray", "kept"]], 204, 204);
+    let http = serving(&["stray", "kept"], "fresh", true, true);
     let (ctx, at) = gate_ctx(
         "gate-routes-unwritable-kept",
         true,
@@ -716,19 +708,23 @@ fn the_key_the_gate_holds_is_told_from_one_sharing_its_short_fingerprint() {
 /// and every key filed under its name there is revoked, since nothing holds it.
 #[tokio::test]
 async fn a_gate_the_media_servers_key_may_not_reach_holds_none() {
-    let http = serving(&[&["stale"]], 204, 204);
+    let http = serving(&["stale"], "fresh", true, true);
     let (ctx, at) = gate_ctx("gate-withheld", true, CURATORS, None, http.clone());
     let mut services = stack(false);
     services.retain(|service| service.id != crate::app::gating::SERVICE);
-    let fillers = fillers_trusting(
-        services,
-        &[crate::test_support::contracted(
+    let installed: Vec<_> = media::moved()
+        .into_iter()
+        .chain([crate::test_support::contracted(
             "stranger",
             crate::app::gating::SERVICE,
             lemonfiber_contract::capabilities::request::gate::CAPABILITY,
-        )],
+        )])
+        .collect();
+    let fillers = fillers_trusting(
+        services,
+        &installed,
         &at,
-        &[],
+        crate::plugin::first_party::EMBEDDED,
     );
     let server = crate::app::targets::MediaServer::of(&fillers);
 
@@ -750,14 +746,17 @@ async fn a_gate_the_media_servers_key_may_not_reach_holds_none() {
 /// revoked.
 #[tokio::test]
 async fn a_stack_naming_no_gate_revokes_its_key_beside_a_plugins() {
-    let http = serving(&[&["stale"]], 204, 204);
+    let http = serving(&["stale"], "fresh", true, true);
     let (ctx, at) = gate_ctx("gate-unnamed", true, CURATORS, None, http.clone());
-    let fillers = fillers_trusting(
-        stack(false),
-        &[crate::test_support::a_contracted_gate()],
-        &at,
-        &crate::test_support::GATE_TRUSTED,
-    );
+    let installed: Vec<_> = media::moved()
+        .into_iter()
+        .chain([crate::test_support::a_contracted_gate()])
+        .collect();
+    let trusted: Vec<_> = crate::test_support::GATE_TRUSTED
+        .into_iter()
+        .chain(crate::plugin::first_party::EMBEDDED.iter().copied())
+        .collect();
+    let fillers = fillers_trusting(stack(false), &installed, &at, &trusted);
     let server = crate::app::targets::MediaServer::of(&fillers);
 
     let wirings = super::super::gate::seed_gate_routes(

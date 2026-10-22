@@ -16,10 +16,12 @@ use std::sync::Arc;
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::config::{Reaching, Settings};
 use lemonfiber_core::ports::http::Method;
+use lemonfiber_core::ports::service::{Certificate, NamedLibrary};
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::support::Reporting;
 use lemonfiber_ports::docker::{Health, Lifecycle};
+use lemonfiber_testing::media;
 
 /// Where the member who asked already hears from the request service.
 ///
@@ -119,31 +121,20 @@ pub fn with(name: &str, broken: Vec<(Option<Method>, &'static str, Answer)>) -> 
 pub fn table(broken: Vec<(Option<Method>, &'static str, Answer)>) -> Arc<Fake> {
     let mut routes = broken;
     routes.extend(vec![
-        // Ahead of `/Users`, whose text it contains: a route matched by prefix would
-        // answer the sign-in with the list of accounts.
         (
             None,
-            "/Users/AuthenticateByName",
-            Answer::reply(200, r#"{"AccessToken":"token"}"#),
+            media::identity("household"),
+            media::answered(&[media::member("a1", "Alex", true)]),
         ),
         (
             None,
-            "/Library/MediaFolders",
-            Answer::reply(200, r#"{"Items":[]}"#),
+            media::identity("libraries"),
+            media::answered(&Vec::<NamedLibrary>::new()),
         ),
         (
             None,
-            "/Localization/ParentalRatings",
-            Answer::reply(200, "[]"),
-        ),
-        (
-            None,
-            "/Users",
-            Answer::reply(
-                200,
-                r#"[{"Id":"a1","Name":"Alex","HasPassword":true,
-                    "Policy":{"EnableAllFolders":true}}]"#,
-            ),
+            media::identity("ratings"),
+            media::answered(&Vec::<Certificate>::new()),
         ),
         (None, "/auth/me", Answer::reply(200, "{}")),
         (
@@ -221,20 +212,21 @@ pub fn context(name: &str, transport: &Arc<Fake>) -> Ctx {
 /// off reaching the household — and that question cannot be asked of a context whose
 /// settings are always the permissive ones.
 pub fn reaching(name: &str, transport: &Arc<Fake>, allowed: Reaching) -> Ctx {
-    lemonfiber_testing::a_context()
+    let ctx = lemonfiber_testing::a_context()
         .over(set_up_request_service(name))
-        .engine(Arc::new(Reporting::holding(
-            &["jellyfin", "seerr"],
-            Lifecycle::Running,
-            Health::Healthy,
-        )))
+        .engine(Arc::new(
+            Reporting::holding(&["jellyfin", "seerr"], Lifecycle::Running, Health::Healthy)
+                .alongside(media::running()),
+        ))
         .settings(Settings {
             env_file: Some(recorded_admin(name)),
             reaching: allowed,
             ..Settings::default()
         })
         .build()
-        .with_http(transport.clone())
+        .with_http(transport.clone());
+    media::moved_in(&ctx);
+    ctx
 }
 
 /// The shipped stack with one service's block taken out.

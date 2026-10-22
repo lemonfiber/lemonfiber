@@ -76,8 +76,8 @@ async fn everybody(ctx: &Ctx, member: Option<&str>) -> Result<HouseholdReport, B
     // appear at all, and neither does an invitation nobody has taken up.
     let Some(server) = identity(ctx, &manifest).await else {
         return Ok(unavailable(
-            "there is no media server to ask who is in the household, or no recorded \
-             password to sign in with — so who is here cannot be read",
+            "there is no media server to ask who is in the household, or it cannot be \
+             asked over its contracts — so who is here cannot be read",
         ));
     };
 

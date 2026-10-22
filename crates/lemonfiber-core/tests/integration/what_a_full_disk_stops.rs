@@ -17,9 +17,11 @@ use lemonfiber_core::app::{dispatch, Command, Ctx};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::ports::filesystem::{FsKind, StorageFacts};
 use lemonfiber_core::ports::http::{Method, Request};
+use lemonfiber_core::ports::service::Invited;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::support::{Reporting, SeedFs};
 use lemonfiber_ports::docker::{Health, Lifecycle};
+use lemonfiber_testing::media;
 
 /// The account identifier the request service files this household's member under.
 const MEMBER: &str = "4";
@@ -64,31 +66,15 @@ fn roomy() -> StorageFacts {
 fn table(broken: Vec<(Option<Method>, &'static str, Answer)>) -> Arc<Fake> {
     let mut routes = broken;
     routes.extend(vec![
-        // Ahead of `/Users`, whose text it contains: a route matched by prefix would
-        // answer the sign-in with the list of accounts.
         (
             None,
-            "/Users/AuthenticateByName",
-            Answer::reply(200, r#"{"AccessToken":"token"}"#),
+            media::identity("household"),
+            media::answered(&[media::member("a1", "Alex", true)]),
         ),
         (
             None,
-            "/Library/MediaFolders",
-            Answer::reply(200, r#"{"Items":[]}"#),
-        ),
-        (
-            None,
-            "/Localization/ParentalRatings",
-            Answer::reply(200, "[]"),
-        ),
-        (
-            None,
-            "/Users",
-            Answer::reply(
-                200,
-                r#"[{"Id":"a1","Name":"Alex","HasPassword":true,
-                    "Policy":{"EnableAllFolders":true}}]"#,
-            ),
+            media::identity("when_invited"),
+            media::answered(&Vec::<Invited>::new()),
         ),
         (None, "/auth/me", Answer::reply(200, "{}")),
         (
@@ -136,24 +122,25 @@ fn context(name: &str, transport: &Arc<Fake>, facts: StorageFacts) -> Ctx {
         lemonfiber_core::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         "minted-earlier",
     );
-    lemonfiber_testing::a_context()
-        .engine(Arc::new(Reporting::holding(
-            &["jellyfin", "seerr"],
-            Lifecycle::Running,
-            Health::Healthy,
-        )))
-        .filesystem(Arc::new(
-            SeedFs::keyed(None, None)
-                .with_requests(lemonfiber_fixtures::support::SEERR_SETTINGS)
-                .with_facts(facts),
-        ))
-        .settings(Settings {
-            env_file: Some(env),
-            data_root: Some(dir),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(transport.clone())
+    media::keyed_in(
+        lemonfiber_testing::a_context()
+            .engine(Arc::new(
+                Reporting::holding(&["jellyfin", "seerr"], Lifecycle::Running, Health::Healthy)
+                    .alongside(media::running()),
+            ))
+            .filesystem(Arc::new(
+                SeedFs::keyed(None, None)
+                    .with_requests(lemonfiber_fixtures::support::SEERR_SETTINGS)
+                    .with_facts(facts),
+            ))
+            .settings(Settings {
+                env_file: Some(env),
+                data_root: Some(dir),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(transport.clone()),
+    )
 }
 
 /// Every body written to the narrow permissions endpoint, in order.

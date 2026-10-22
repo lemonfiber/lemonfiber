@@ -24,7 +24,8 @@ use crate::plugin::{Asking, Installed};
 use super::{Chosen, Contest, Reaches, Settled, Unfilled, Whose, Wired};
 
 /// Everything installed that claims a capability: the stack's services in declaration
-/// order, then each installed plugin's in the order the record holds them.
+/// order, but one an installed service has moved in place of, then each installed
+/// plugin's in the order the record holds them.
 ///
 /// `Claimed` for both. A declaration is what the manifest holds and running a probe is
 /// a separate act; a plugin's declaration has already been held to its demonstrations
@@ -38,6 +39,7 @@ pub(super) fn claimants(
         .services
         .iter()
         .filter(|service| service.provides.iter().any(|named| named == capability))
+        .filter(|service| !crate::project::moved_in_place(installed, &service.id))
         .map(|service| Claimant {
             service: service.id.clone(),
             plugin: None,

@@ -11,14 +11,8 @@ use crate::app::Inviting;
 #[tokio::test]
 async fn a_removal_dispatches_and_says_what_it_would_cost() {
     let env = recorded_admin("removing");
-    let household = r#"[{"Id":"9","Name":"ana","HasPassword":true,
-        "Policy":{"IsAdministrator":false,"EnableAllFolders":true}}]"#;
-    let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
-    let http = Fake::by_path_in_turn(vec![
-        (
-            "/Users/AuthenticateByName",
-            vec![signed_in.clone(), signed_in],
-        ),
+    let mut routes = answering(&[], &[media::member("9", "ana", true)]);
+    routes.extend(vec![
         ("/auth/jellyfin", vec![Answer::reply(200, "{}")]),
         (
             "/api/v1/request",
@@ -28,16 +22,18 @@ async fn a_removal_dispatches_and_says_what_it_would_cost() {
             )],
         ),
         ("/user/jellyfin/", vec![Answer::reply(404, "")]),
-        ("/Users", vec![Answer::reply(200, household)]),
         ("", vec![Answer::reply(200, "[]")]),
     ]);
-    let ctx = a_context()
-        .settings(Settings {
-            env_file: Some(env.clone()),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(http);
+    let http = Fake::by_path_in_turn(routes);
+    let ctx = media::reaching(
+        a_context()
+            .settings(Settings {
+                env_file: Some(env.clone()),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http),
+    );
 
     let said = dispatch(
         Command::Remove {
@@ -87,29 +83,8 @@ async fn a_removal_dispatches_and_says_what_it_would_cost() {
 #[tokio::test]
 async fn a_reset_hands_back_an_invitation_under_its_own_standing() {
     let env = recorded_admin("reissues");
-    let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
-    let http = Fake::by_path_in_turn(vec![
-        (
-            "/Users/AuthenticateByName",
-            vec![signed_in.clone(), signed_in],
-        ),
-        ("/Users/9/Password", vec![Answer::reply(204, "")]),
-        (
-            "/Users",
-            vec![Answer::reply(
-                200,
-                r#"[{"Id":"9","Name":"ana","HasPassword":true,"Policy":{"IsAdministrator":false}}]"#,
-            )],
-        ),
-    ]);
-    let ctx = a_context()
-        .settings(Settings {
-            env_file: Some(env.clone()),
-            household_host: Some("192.168.1.20".to_owned()),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(http);
+    let http = holding(&[], &[media::member("9", "ana", true)]);
+    let ctx = offered_at(&env, http);
 
     let said = dispatch(
         Command::Reissue {
@@ -137,41 +112,15 @@ async fn a_reset_hands_back_an_invitation_under_its_own_standing() {
 #[tokio::test]
 async fn offering_an_account_hands_back_one_address_and_a_name() {
     let env = recorded_admin("offers");
-    let http = Fake::by_path_in_turn(vec![
-        (
-            "/Users/AuthenticateByName",
-            vec![
-                Answer::reply(200, r#"{"AccessToken":"token"}"#),
-                Answer::reply(200, r#"{"AccessToken":"token"}"#),
-                Answer::reply(200, r#"{"AccessToken":"token"}"#),
-            ],
-        ),
-        (
-            "/System/ActivityLog",
-            vec![Answer::reply(200, r#"{"Items":[]}"#)],
-        ),
-        (
-            "/Users/New",
-            vec![Answer::reply(
-                200,
-                r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
-            )],
-        ),
-        // The request service answers too, so this copy of the app layer reaches
-        // the whole of the linking an invitation does. It is compiled twice, and a
-        // path driven from only one of them leaves the other counted as never run.
+    let mut routes = answering(&[], &[]);
+    // The request service answers too, so this copy of the app layer reaches the whole
+    // of the linking an invitation does. It is compiled twice, and a path driven from
+    // only one of them leaves the other counted as never run.
+    routes.extend(vec![
         ("/auth/jellyfin", vec![Answer::reply(200, "{}")]),
         ("/user/import-from-jellyfin", vec![Answer::reply(201, "{}")]),
-        ("/Users", vec![Answer::reply(200, "[]")]),
     ]);
-    let ctx = a_context()
-        .settings(Settings {
-            env_file: Some(env.clone()),
-            household_host: Some("192.168.1.20".to_owned()),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(http);
+    let ctx = offered_at(&env, Fake::by_path_in_turn(routes));
 
     let made = dispatch(
         Command::Invite(Inviting {
@@ -214,13 +163,15 @@ async fn a_machine_with_no_address_makes_no_account_and_says_so() {
     let env = recorded_admin("nowhere");
     let http = Fake::silent();
     let recorded = std::sync::Arc::clone(&http);
-    let ctx = a_context()
-        .settings(Settings {
-            env_file: Some(env.clone()),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(http);
+    let ctx = media::reaching(
+        a_context()
+            .settings(Settings {
+                env_file: Some(env.clone()),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http),
+    );
 
     let made = dispatch(
         Command::Invite(Inviting {
@@ -246,20 +197,56 @@ async fn a_machine_with_no_address_makes_no_account_and_says_so() {
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 }
 
+/// A media server whose adapter holds no key to be asked with makes no account, and says
+/// so as the administrator not being set up.
+#[tokio::test]
+async fn a_server_that_cannot_be_asked_makes_no_account_and_says_so() {
+    let env = recorded_admin("unkeyed");
+    let http = Fake::silent();
+    let recorded = std::sync::Arc::clone(&http);
+    let ctx = media::reaching(
+        a_context()
+            .settings(Settings {
+                env_file: Some(env.clone()),
+                household_host: Some("192.168.1.20".to_owned()),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http),
+    );
+    let _ = std::fs::remove_file(media::key_at(&ctx).unwrap_or_default());
+
+    let made = dispatch(
+        Command::Invite(Inviting {
+            name: "ana".to_owned(),
+            allowance: Allowance::default(),
+            confirm: true,
+        }),
+        &ctx,
+    )
+    .await;
+    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+
+    assert!(
+        made.as_ref()
+            .err()
+            .is_some_and(|problem| problem.code.as_str() == "INVITE-2"),
+        "{made:?}"
+    );
+    let asked = recorded.requests();
+    assert!(
+        asked.is_empty(),
+        "a server that cannot be asked was asked: {asked:?}"
+    );
+}
+
 /// Offer an account on a stack answering with `http`, and hand back both.
 async fn offering(
     env: &std::path::Path,
     http: std::sync::Arc<Fake>,
     name: &str,
 ) -> Result<Outcome, Box<super::super::Problem>> {
-    let ctx = a_context()
-        .settings(Settings {
-            env_file: Some(env.to_path_buf()),
-            household_host: Some("192.168.1.20".to_owned()),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(http);
+    let ctx = offered_at(env, http);
     dispatch(
         Command::Invite(Inviting {
             name: name.to_owned(),
@@ -281,10 +268,7 @@ async fn offering(
 #[tokio::test]
 async fn an_account_already_here_is_offered_again_rather_than_made_twice() {
     let env = recorded_admin("already");
-    let http = holding(
-        made_lately("7"),
-        r#"[{"Id":"7","Name":"Ana","HasPassword":false}]"#,
-    );
+    let http = holding(&made_lately("7"), &[media::member("7", "Ana", false)]);
     let recorded = std::sync::Arc::clone(&http);
 
     let made = offering(&env, http, "ana").await;
@@ -296,7 +280,10 @@ async fn an_account_already_here_is_offered_again_rather_than_made_twice() {
         "{made:?}"
     );
     assert!(
-        !recorded.asked_for("/Users/New"),
+        !recorded
+            .requests()
+            .iter()
+            .any(|one| asked_to(one, "invite")),
         "a second account was made for somebody already here"
     );
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
@@ -306,10 +293,7 @@ async fn an_account_already_here_is_offered_again_rather_than_made_twice() {
 #[tokio::test]
 async fn somebody_who_has_already_claimed_an_account_is_reported_as_in() {
     let env = recorded_admin("joined");
-    let http = holding(
-        r#"{"Items":[]}"#,
-        r#"[{"Id":"7","Name":"ana","HasPassword":true}]"#,
-    );
+    let http = holding(&[], &[media::member("7", "ana", true)]);
     let recorded = std::sync::Arc::clone(&http);
 
     let made = offering(&env, http, "ana").await;
@@ -319,7 +303,10 @@ async fn somebody_who_has_already_claimed_an_account_is_reported_as_in() {
         "{made:?}"
     );
     assert!(
-        !recorded.asked_for("/Users/New"),
+        !recorded
+            .requests()
+            .iter()
+            .any(|one| asked_to(one, "invite")),
         "a second account was made for somebody already in the house"
     );
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
@@ -335,10 +322,7 @@ async fn somebody_who_has_already_claimed_an_account_is_reported_as_in() {
 #[tokio::test]
 async fn an_invitation_that_ran_out_is_offered_again_on_the_account_it_was_for() {
     let env = recorded_admin("reissue");
-    let http = holding(
-        r#"{"Items":[{"Type":"UserCreated","Date":"2000-01-01T00:00:00Z","UserId":"7"}]}"#,
-        r#"[{"Id":"7","Name":"ana","HasPassword":false}]"#,
-    );
+    let http = holding(&made_long_ago("7"), &[media::member("7", "ana", false)]);
     let recorded = std::sync::Arc::clone(&http);
 
     let made = offering(&env, http, "ana").await;
@@ -350,7 +334,10 @@ async fn an_invitation_that_ran_out_is_offered_again_on_the_account_it_was_for()
         "{made:?}"
     );
     assert!(
-        !recorded.asked_for("/Users/New"),
+        !recorded
+            .requests()
+            .iter()
+            .any(|one| asked_to(one, "invite")),
         "a second account was made under a name the household already holds"
     );
     let kept = std::fs::read_to_string(env.with_file_name("invitations.json")).unwrap_or_default();
@@ -360,7 +347,14 @@ async fn an_invitation_that_ran_out_is_offered_again_on_the_account_it_was_for()
          it promises ran out before it was sent: {kept}"
     );
     assert!(
-        recorded.asked_for("/Users/7/Policy"),
+        recorded
+            .requests()
+            .iter()
+            .any(|one| asked_to(one, "claimable")
+                && one
+                    .body
+                    .as_deref()
+                    .is_some_and(|body| body.contains(r#""id":"7""#))),
         "the account was offered again without being made claimable"
     );
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
@@ -374,7 +368,7 @@ async fn an_invitation_that_ran_out_is_offered_again_on_the_account_it_was_for()
 #[tokio::test]
 async fn an_invitation_for_nobody_is_refused_before_the_server_is_asked() {
     let env = recorded_admin("blank");
-    let http = holding(r#"{"Items":[]}"#, "[]");
+    let http = holding(&[], &[]);
     let recorded = std::sync::Arc::clone(&http);
 
     let made = offering(&env, http, "   ").await;
@@ -401,10 +395,7 @@ async fn an_invitation_for_nobody_is_refused_before_the_server_is_asked() {
 #[tokio::test]
 async fn a_name_typed_with_spaces_around_it_is_the_person_of_that_name() {
     let env = recorded_admin("trimmed");
-    let http = holding(
-        made_lately("7"),
-        r#"[{"Id":"7","Name":"ana","HasPassword":false}]"#,
-    );
+    let http = holding(&made_lately("7"), &[media::member("7", "ana", false)]);
     let recorded = std::sync::Arc::clone(&http);
 
     let made = offering(&env, http, "  ana  ").await;
@@ -414,7 +405,10 @@ async fn a_name_typed_with_spaces_around_it_is_the_person_of_that_name() {
         "{made:?}"
     );
     assert!(
-        !recorded.asked_for("/Users/New"),
+        !recorded
+            .requests()
+            .iter()
+            .any(|one| asked_to(one, "invite")),
         "a second account was made for the same person with spaces round the name"
     );
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
@@ -429,48 +423,8 @@ async fn a_name_typed_with_spaces_around_it_is_the_person_of_that_name() {
 #[tokio::test]
 async fn an_invitation_nobody_claimed_is_taken_back_and_named() {
     let env = recorded_admin("sweeps");
-    let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
-    let http = Fake::by_path_in_turn(vec![
-        (
-            "/Users/AuthenticateByName",
-            vec![
-                signed_in.clone(),
-                signed_in.clone(),
-                signed_in.clone(),
-                signed_in,
-            ],
-        ),
-        (
-            "/System/ActivityLog",
-            vec![Answer::reply(
-                200,
-                r#"{"Items":[{"Type":"UserCreated","Date":"2000-01-01T00:00:00Z","UserId":"7"}]}"#,
-            )],
-        ),
-        (
-            "/Users/New",
-            vec![Answer::reply(
-                200,
-                r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
-            )],
-        ),
-        ("/Users/7", vec![Answer::reply(204, "")]),
-        (
-            "/Users",
-            vec![Answer::reply(
-                200,
-                r#"[{"Id":"7","Name":"bo","HasPassword":false}]"#,
-            )],
-        ),
-    ]);
-    let ctx = a_context()
-        .settings(Settings {
-            env_file: Some(env.clone()),
-            household_host: Some("192.168.1.20".to_owned()),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(http);
+    let http = holding(&made_long_ago("7"), &[media::member("7", "bo", false)]);
+    let ctx = offered_at(&env, http);
 
     let made = dispatch(
         Command::Invite(Inviting {
@@ -512,50 +466,10 @@ async fn an_unconfirmed_invitation_writes_nothing_to_the_media_server() {
 /// was, and still say what it would do.
 async fn offered_without_writing(named: &str, dry_run: bool, confirm: bool) {
     let env = recorded_admin(named);
-    let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
-    let http = Fake::by_path_in_turn(vec![
-        (
-            "/Users/AuthenticateByName",
-            vec![
-                signed_in.clone(),
-                signed_in.clone(),
-                signed_in.clone(),
-                signed_in,
-            ],
-        ),
-        (
-            "/System/ActivityLog",
-            vec![Answer::reply(
-                200,
-                r#"{"Items":[{"Type":"UserCreated","Date":"2000-01-01T00:00:00Z","UserId":"7"}]}"#,
-            )],
-        ),
-        (
-            "/Users/New",
-            vec![Answer::reply(
-                200,
-                r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
-            )],
-        ),
-        ("/Users/7", vec![Answer::reply(204, "")]),
-        (
-            "/Users",
-            vec![Answer::reply(
-                200,
-                r#"[{"Id":"7","Name":"bo","HasPassword":false}]"#,
-            )],
-        ),
-    ]);
+    let http = holding(&made_long_ago("7"), &[media::member("7", "bo", false)]);
     let recorded = std::sync::Arc::clone(&http);
-    let mut context = a_context()
-        .settings(Settings {
-            env_file: Some(env.clone()),
-            household_host: Some("192.168.1.20".to_owned()),
-            ..Settings::default()
-        })
-        .build();
-    context.dry_run = dry_run;
-    let ctx = context.with_http(http);
+    let mut ctx = offered_at(&env, http);
+    ctx.dry_run = dry_run;
 
     let made = dispatch(
         Command::Invite(Inviting {
@@ -570,9 +484,12 @@ async fn offered_without_writing(named: &str, dry_run: bool, confirm: bool) {
     let written: Vec<String> = recorded
         .requests()
         .into_iter()
-        .filter(|request| !matches!(request.method, crate::ports::http::Method::Get))
-        .map(|request| format!("{:?} {}", request.method, request.url))
-        .filter(|line| !line.contains("/Users/AuthenticateByName"))
+        .filter(|request| {
+            HOUSEHOLD_WRITES
+                .iter()
+                .any(|operation| asked_to(request, operation))
+        })
+        .map(|request| request.url)
         .collect();
 
     assert!(
@@ -598,33 +515,17 @@ async fn an_offer_on_a_stack_running_the_decline_service_carries_its_decline_add
     let stack = lemonfiber_fixtures::scratch::Scratch::named("offers-declinable-stack").kept();
     lemonfiber_fixtures::stack::manifest_into(&stack);
     let stack: &'static std::path::Path = Box::leak(stack.into_boxed_path());
-    let http = Fake::by_path_in_turn(vec![
-        (
-            "/Users/AuthenticateByName",
-            vec![Answer::reply(200, r#"{"AccessToken":"token"}"#); 3],
-        ),
-        (
-            "/System/ActivityLog",
-            vec![Answer::reply(200, r#"{"Items":[]}"#)],
-        ),
-        (
-            "/Users/New",
-            vec![Answer::reply(
-                200,
-                r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
-            )],
-        ),
-        ("/Users", vec![Answer::reply(200, "[]")]),
-    ]);
-    let ctx = a_context()
-        .over(crate::stack::Source::External(stack))
-        .settings(Settings {
-            env_file: Some(env.clone()),
-            household_host: Some("192.168.1.20".to_owned()),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(http);
+    let ctx = media::reaching(
+        a_context()
+            .over(crate::stack::Source::External(stack))
+            .settings(Settings {
+                env_file: Some(env.clone()),
+                household_host: Some("192.168.1.20".to_owned()),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(holding(&[], &[])),
+    );
 
     let made = dispatch(
         Command::Invite(Inviting {
@@ -663,33 +564,17 @@ async fn an_offer_on_a_machine_served_encrypted_carries_a_join_link() {
             network: true,
         },
     );
-    let http = Fake::by_path_in_turn(vec![
-        (
-            "/Users/AuthenticateByName",
-            vec![Answer::reply(200, r#"{"AccessToken":"token"}"#); 3],
-        ),
-        (
-            "/System/ActivityLog",
-            vec![Answer::reply(200, r#"{"Items":[]}"#)],
-        ),
-        (
-            "/Users/New",
-            vec![Answer::reply(
-                200,
-                r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
-            )],
-        ),
-        ("/Users", vec![Answer::reply(200, "[]")]),
-    ]);
-    let ctx = a_context()
-        .settings(Settings {
-            env_file: Some(env.clone()),
-            companion: Some(companion.clone()),
-            household_host: Some("192.168.1.20".to_owned()),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(http);
+    let ctx = media::reaching(
+        a_context()
+            .settings(Settings {
+                env_file: Some(env.clone()),
+                companion: Some(companion.clone()),
+                household_host: Some("192.168.1.20".to_owned()),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(holding(&[], &[])),
+    );
 
     let made = dispatch(
         Command::Invite(Inviting {

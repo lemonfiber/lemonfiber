@@ -341,14 +341,14 @@ fn no_media_server() -> Problem {
     )
 }
 
-/// Said where the media server's own account was never recorded.
+/// Said where the media server cannot be asked over its contracts.
 fn not_set_up() -> Problem {
     Problem::new(
         crate::error::codes::handoff::NOT_SET_UP,
-        "the media server's own account has not been set up yet",
-        "Finding somebody's account and the devices signed in to it is done as the \
-         administrator, and this machine has not recorded one",
-        Remedy::new("Run setup so the media server's account is made and recorded"),
+        "the media server cannot be asked over its contracts",
+        "Finding somebody's account and the devices signed in to it is asked of the media \
+         server's plugin, and this machine cannot reach it",
+        Remedy::new("Run setup so the media server's plugin is installed and running"),
     )
 }
 

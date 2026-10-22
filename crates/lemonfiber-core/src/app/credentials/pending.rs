@@ -130,7 +130,7 @@ async fn settle(ctx: &Ctx, minted: &Minted) {
         Some(false) if taken(ctx, minted, &replacement).await == Some(true) => {
             let _ =
                 promoted(ctx, &minted.setting, &replacement).and_then(|()| match &minted.opens {
-                    Opens::Media(server) => server.hand_upstream_if_contracted(&replacement),
+                    Opens::Media(server) => server.hand_upstream(&replacement),
                     Opens::Torrent(_) => Ok(()),
                 });
         }
@@ -168,7 +168,7 @@ async fn taken(ctx: &Ctx, minted: &Minted, password: &str) -> Option<bool> {
             }
         }
         Opens::Media(server) => {
-            let source = Box::pin(server.setting_up(ctx)).await?;
+            let source = Box::pin(server.identifying(ctx)).await?;
             source
                 .whoever(config::MEDIA_SERVER_ADMIN_USER, password, crate::PRODUCT)
                 .await

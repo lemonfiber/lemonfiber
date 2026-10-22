@@ -172,12 +172,18 @@ pub(crate) fn written<'a>(
     manifest: &'a Manifest,
     installed: &'a [Installed],
 ) -> impl Iterator<Item = &'a Service> {
-    declared(manifest).filter(move |service| {
-        !installed
-            .iter()
-            .flat_map(|one| &one.services)
-            .any(|placed| placed.replaces.as_deref() == Some(service.id.as_str()))
-    })
+    declared(manifest).filter(move |service| !moved_in_place(installed, &service.id))
+}
+
+/// Whether one of `installed` has moved in place of the stack's service `service`: a
+/// first-party plugin's service taking its id, the one kind of service that stands in
+/// for the stack's, so no other plugin can put the stack's service out by naming it.
+pub(crate) fn moved_in_place(installed: &[Installed], service: &str) -> bool {
+    installed
+        .iter()
+        .filter(|one| crate::plugin::first_party::holds(crate::plugin::first_party::EMBEDDED, one))
+        .flat_map(|one| &one.services)
+        .any(|placed| placed.service == service && placed.replaces.as_deref() == Some(service))
 }
 
 /// The one service that fills `capability`: the operator's choice where it names a

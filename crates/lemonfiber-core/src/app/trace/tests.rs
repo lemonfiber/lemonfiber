@@ -8,10 +8,9 @@ use super::{
 };
 use crate::doctor::{Category, Finding, Verdict};
 use crate::error::{Problem, Remedy};
-use crate::jellyfin::Jellyfin;
 use crate::ports::service::{ItemPart, QueueItem, TraceEvent};
 use crate::recyclarr::Kind;
-use crate::test_support::{a_context, a_password, nowhere, SeedFs};
+use crate::test_support::{a_context, nowhere, SeedFs};
 use crate::trace::{Coverage, Outcome, Presence, Stage};
 
 /// A curator config that opens a target, carrying a readable key.
@@ -35,8 +34,7 @@ struct Fake {
     history: &'static str,
     queue: &'static str,
     episodes: &'static str,
-    sign_in: &'static str,
-    media_server_library: &'static str,
+    holds: &'static str,
     wanted: &'static str,
     releases: &'static str,
 }
@@ -50,8 +48,7 @@ impl Fake {
             history,
             queue,
             episodes: NO_EPISODES,
-            sign_in: "",
-            media_server_library: "",
+            holds: "",
             wanted: "",
             releases: "",
         }
@@ -80,8 +77,10 @@ impl Fake {
     /// The scripted answers as a transport, routed by what each call asks for.
     fn transport(&self) -> Arc<Transport> {
         Transport::by_path(vec![
-            ("/AuthenticateByName", Answer::reply(200, self.sign_in)),
-            ("/Items", Answer::reply(200, self.media_server_library)),
+            (
+                crate::test_support::media::serve("has_item"),
+                Answer::reply(200, self.holds),
+            ),
             ("/history", Answer::reply(200, self.history)),
             ("/queue", Answer::reply(200, self.queue)),
             ("/episode", Answer::reply(200, self.episodes)),

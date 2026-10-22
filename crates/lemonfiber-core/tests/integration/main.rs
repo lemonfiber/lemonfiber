@@ -29,7 +29,6 @@ mod fulfilment_targets;
 mod golden;
 mod household_telling;
 mod http;
-mod jellyfin;
 mod lidarr;
 mod lock;
 mod logs;

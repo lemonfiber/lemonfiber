@@ -1,6 +1,7 @@
 //! Handing each service's key and the curators to the services that read them.
 
 use super::*;
+use crate::test_support::media;
 
 /// The request service is handed the curators, read from the curators themselves.
 ///
@@ -161,8 +162,8 @@ fn every_keyed_service() -> Vec<lemonfiber_manifest::Service> {
 async fn every_service_with_a_key_is_published_not_only_the_ones_that_file_media() {
     const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
     let env = recorded_admin("published-widely");
-    // The media server signs in and lists its keys, one of them lemonfiber's; the
-    // listening server says it already has an account. What an earlier run published
+    // The media server, moved into its plugin, files one key under lemonfiber's name;
+    // the listening server says it already has an account. What an earlier run published
     // for the dashboard is in the file, to be retired.
     let _ = store::set(
         &env,
@@ -177,17 +178,8 @@ async fn every_service_with_a_key_is_published_not_only_the_ones_that_file_media
     let _ = store::set(&env, "JELLYFIN_API_KEY", "jellyfin-key");
     let _ = store::set(&env, "AUDIOBOOKSHELF_API_KEY", "listening-token");
     let http = Fake::by_path(vec![
-        (
-            "/Users/AuthenticateByName",
-            Answer::reply(200, r#"{"AccessToken":"t"}"#),
-        ),
-        (
-            "/Auth/Keys",
-            Answer::reply(
-                200,
-                r#"{"Items":[{"AppName":"lemonfiber","AccessToken":"jellyfin-key"}]}"#,
-            ),
-        ),
+        (media::serve("filed_as"), media::answered(&["jellyfin-key"])),
+        (media::serve("revoke"), media::taken()),
         ("/status", Answer::reply(200, r#"{"isInit":true}"#)),
     ]);
     let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
@@ -202,7 +194,7 @@ async fn every_service_with_a_key_is_published_not_only_the_ones_that_file_media
     let wiring = super::super::published::publish_keys(
         &ctx,
         &services,
-        &super::fillers_of(services.clone()),
+        &super::moved_fillers(services.clone()),
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
         &Held::from(std::collections::BTreeMap::from([(
             "qbittorrent".to_owned(),
@@ -237,18 +229,16 @@ async fn every_service_with_a_key_is_published_not_only_the_ones_that_file_media
             "{retired} is still held for a dashboard that reads nothing: {written}"
         );
     }
-    let revoked: Vec<String> = http
+    let revoked: Vec<Option<String>> = http
         .requests()
         .into_iter()
-        .filter(|asked| asked.method == Method::Delete)
-        .map(|asked| asked.url)
+        .filter(|asked| asked.url.ends_with(media::serve("revoke")))
+        .map(|asked| asked.body)
         .collect();
-    assert_eq!(revoked.len(), 1, "{revoked:?}");
-    assert!(
-        revoked
-            .iter()
-            .all(|url| url.ends_with("/Auth/Keys/jellyfin-key")),
-        "the media server's key minted for the dashboard was not revoked: {revoked:?}"
+    assert_eq!(
+        revoked,
+        vec![Some(r#"{"key":"jellyfin-key"}"#.to_owned())],
+        "the media server's key minted for the dashboard was not revoked"
     );
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 }
@@ -264,13 +254,7 @@ async fn a_key_that_would_not_be_revoked_is_not_forgotten() {
         "minted-earlier",
     );
     let _ = store::set(&env, "JELLYFIN_API_KEY", "jellyfin-key");
-    let http = Fake::by_path(vec![
-        (
-            "/Users/AuthenticateByName",
-            Answer::reply(200, r#"{"AccessToken":"t"}"#),
-        ),
-        ("/Auth/Keys", Answer::reply(500, "")),
-    ]);
+    let http = Fake::by_path(vec![(media::serve("filed_as"), media::refusing())]);
     let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
         .with_http(http)
         .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
@@ -278,7 +262,7 @@ async fn a_key_that_would_not_be_revoked_is_not_forgotten() {
     let _ = super::super::published::publish_keys(
         &ctx,
         &[media_server_svc()],
-        &super::fillers_of(vec![media_server_svc()]),
+        &super::moved_fillers(vec![media_server_svc()]),
         Some(std::path::Path::new("/opt/lemonfiber/stack")),
         &Held::default(),
     )
@@ -290,6 +274,49 @@ async fn a_key_that_would_not_be_revoked_is_not_forgotten() {
         "a key still valid on the server was forgotten: {written}"
     );
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+}
+
+/// A media server filing no key under lemonfiber's name is asked to revoke nothing, and
+/// the key published for the dashboard is forgotten all the same.
+#[tokio::test]
+async fn a_server_filing_no_key_of_ours_revokes_nothing_and_forgets_the_published_one() {
+    let env = recorded_admin("unfiled");
+    let _ = store::set(
+        &env,
+        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
+        "minted-earlier",
+    );
+    let _ = store::set(&env, "JELLYFIN_API_KEY", "jellyfin-key");
+    let http = Fake::by_path(vec![
+        (
+            media::serve("filed_as"),
+            media::answered(&Vec::<String>::new()),
+        ),
+        (media::serve("revoke"), media::taken()),
+    ]);
+    let ctx = seed_ctx(None, true, Vec::new(), None, Some(env.clone()))
+        .with_http(http.clone())
+        .with_filesystem(Arc::new(SeedFs::keyed(None, None)));
+
+    let _ = super::super::published::publish_keys(
+        &ctx,
+        &[media_server_svc()],
+        &super::moved_fillers(vec![media_server_svc()]),
+        Some(std::path::Path::new("/opt/lemonfiber/stack")),
+        &Held::default(),
+    )
+    .await;
+
+    let written = std::fs::read_to_string(&env).unwrap_or_default();
+    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+    assert!(
+        media::served(&http.requests(), "revoke").is_empty(),
+        "a key was revoked on a server filing none of ours"
+    );
+    assert!(
+        !written.contains("JELLYFIN_API_KEY"),
+        "a key nothing reads is still held: {written}"
+    );
 }
 
 /// A rehearsal of a stack whose services have written no key names nothing, in the

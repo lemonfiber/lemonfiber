@@ -15,6 +15,10 @@ pub mod context;
 
 pub(crate) use context::{a_context, nowhere, repository_stack as stack};
 
+/// The media server moved into its plugin, the same file the testing crate is built from.
+#[path = "../../lemonfiber-testing/src/media.rs"]
+pub mod media;
+
 /// The day the fixture clock is stopped on, as the manifest's date rules read it.
 ///
 /// One day for every test that validates the real manifest, read from the same
@@ -165,8 +169,8 @@ pub(crate) const CONTRACTED_REQUESTS_AT: &str =
 
 /// A context over the shipped stack without its own request service, beside a plugin
 /// whose [`CONTRACTED_REQUESTS`] fills `request.intake` and speaks its first major on
-/// loopback 8080, holding its key where `keyed`, with the media server's administrator's
-/// password recorded and every call answered by `http`.
+/// loopback 8080, holding its key where `keyed`, with the media server moved into its
+/// plugin, its administrator's password recorded and every call answered by `http`.
 pub(crate) fn beside_contracted_requests(
     tag: &str,
     keyed: bool,
@@ -185,7 +189,8 @@ pub(crate) fn beside_contracted_requests(
         crate::ports::docker::Lifecycle::Running,
         crate::ports::docker::Health::Healthy,
     )
-    .publishing(&[(CONTRACTED_REQUESTS, "127.0.0.1", 8080)]);
+    .publishing(&[(CONTRACTED_REQUESTS, "127.0.0.1", 8080)])
+    .alongside(media::running());
     let mut ctx = a_context()
         .over(crate::stack::Source::External(Box::leak(
             dir.clone().into_boxed_path(),
@@ -206,6 +211,33 @@ pub(crate) fn beside_contracted_requests(
     if let Some(kept) = crate::app::plugins::kept_at(&ctx) {
         let _ = std::fs::write(kept, register.to_json().unwrap_or_default());
     }
+    media::moved_in(&ctx);
+    ctx
+}
+
+/// A curator configuration carrying a readable key, so the stack resolves its targets.
+pub(crate) const KEYED_CURATOR: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+
+/// A context over the repository's stack with its media server moved into its plugin,
+/// every curator keyed, an env file of its own under `name`, and every call answered by
+/// `http`.
+pub(crate) fn moved_household(
+    name: &str,
+    http: std::sync::Arc<lemonfiber_fixtures::http::Fake>,
+) -> crate::app::Ctx {
+    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("moved-{name}")).kept();
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::create_dir_all(&dir);
+    let mut ctx = a_context()
+        .engine(std::sync::Arc::new(media::running()))
+        .build()
+        .with_filesystem(std::sync::Arc::new(SeedFs::keyed(
+            Some(KEYED_CURATOR),
+            None,
+        )))
+        .with_http(http);
+    ctx.settings.env_file = Some(dir.join(".env"));
+    media::moved_in(&ctx);
     ctx
 }
 
@@ -233,6 +265,22 @@ pub(crate) fn an_installed(
         tree: String::new(),
         installed_at: String::new(),
     }
+}
+
+/// `installed` carrying the digests the bundle pins its plugin at, so this build holds it
+/// first-party.
+pub(crate) fn pinned_as(mut installed: crate::plugin::Installed) -> crate::plugin::Installed {
+    if let Some(pinned) = lemonfiber_bundled::PINNED
+        .iter()
+        .find(|one| one.first_party.plugin == installed.plugin)
+    {
+        pinned
+            .first_party
+            .manifest
+            .clone_into(&mut installed.manifest);
+        pinned.first_party.tree.clone_into(&mut installed.tree);
+    }
+    installed
 }
 
 /// The digest a contracted plugin was installed from.
@@ -332,7 +380,8 @@ pub(crate) const fn first_party(
 }
 
 /// A context reaching `service` on loopback [`CONTRACTED_PORT`], holding its key in
-/// `project` where `keyed`.
+/// `project` where `keyed`, beside the media server's adapter running where a moved server
+/// is reached.
 pub(crate) fn contracted_context(
     project: &std::path::Path,
     service: &str,
@@ -348,7 +397,8 @@ pub(crate) fn contracted_context(
         crate::ports::docker::Lifecycle::Running,
         crate::ports::docker::Health::Healthy,
     )
-    .publishing(&[(service, "127.0.0.1", CONTRACTED_PORT)]);
+    .publishing(&[(service, "127.0.0.1", CONTRACTED_PORT)])
+    .alongside(media::running());
     a_context().engine(std::sync::Arc::new(engine))
 }
 

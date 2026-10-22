@@ -21,69 +21,79 @@ use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::model::{HandedSession, Handoff, HandoffRemedy, HandoffState};
 use lemonfiber_core::platform::Environment;
-use lemonfiber_core::ports::http::{Method, Request};
+use lemonfiber_core::ports::http::Request;
+use lemonfiber_core::ports::service::{Member, Session};
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::http::{Answer, Fake};
-use lemonfiber_fixtures::support::Reporting;
-use lemonfiber_ports::docker::{Health, Lifecycle};
+use lemonfiber_testing::media;
 
 /// The owner, who administers the server, and Ana, who has claimed her account.
-const HOUSEHOLD: &str = r#"[
-    {"Id":"1","Name":"owner","HasPassword":true,"Policy":{"IsAdministrator":true}},
-    {"Id":"9","Name":"Ana","HasPassword":true,"Policy":{"IsAdministrator":false}}
-]"#;
+fn household() -> Vec<Member> {
+    let mut owner = media::member("1", "owner", true);
+    owner.access.administrator = true;
+    vec![owner, media::member("9", "Ana", true)]
+}
 
-/// Ana on her phone, and the owner in a browser — whose session is not Ana's.
-const ANA_SIGNED_IN: &str = r#"[
-    {"UserId":"9","DeviceId":"pixel-8","DeviceName":"Pixel 8","Client":"Jellyfin Android",
-     "LastActivityDate":"2026-09-29T10:05:00Z"},
-    {"UserId":"1","DeviceId":"firefox","DeviceName":"Firefox","Client":"Jellyfin Web"}
-]"#;
+/// A device signed in to Ana's account.
+fn session(device_id: &str, device: &str, client: &str, last_seen: Option<&str>) -> Session {
+    Session {
+        device_id: device_id.to_owned(),
+        device: device.to_owned(),
+        client: client.to_owned(),
+        last_seen: last_seen.map(str::to_owned),
+    }
+}
+
+/// Ana on her phone.
+fn ana_signed_in() -> Vec<Session> {
+    vec![session(
+        "pixel-8",
+        "Pixel 8",
+        "Jellyfin Android",
+        Some("2026-09-29T10:05:00Z"),
+    )]
+}
 
 /// Ana on the phone she already had, and on the television she was just handed over to.
-const ANA_ON_BOTH: &str = r#"[
-    {"UserId":"9","DeviceId":"pixel-8","DeviceName":"Pixel 8","Client":"Jellyfin Android"},
-    {"UserId":"9","DeviceId":"living-room","DeviceName":"Living room","Client":"Jellyfin Android TV"},
-    {"UserId":"1","DeviceId":"firefox","DeviceName":"Firefox","Client":"Jellyfin Web"}
-]"#;
-
-/// Only the owner, signed in in a browser.
-const NOBODY_ELSE: &str =
-    r#"[{"UserId":"1","DeviceId":"firefox","DeviceName":"Firefox","Client":"Jellyfin Web"}]"#;
+fn ana_on_both() -> Vec<Session> {
+    vec![
+        session("pixel-8", "Pixel 8", "Jellyfin Android", None),
+        session("living-room", "Living room", "Jellyfin Android TV", None),
+    ]
+}
 
 /// The address the household reaches the media server at, as recorded below.
 const ADDRESS: &str = "http://192.168.1.20:8096";
 
-/// A media server answering the household, the sessions and the Quick Connect question.
+/// A media server answering the household, the sessions and whether a device signs in by
+/// a code.
 fn a_server(household: Answer, sessions: Answer, quick_connect: Answer) -> Arc<Fake> {
     Fake::by_path_in_turn(vec![
-        (
-            "/Users/AuthenticateByName",
-            vec![Answer::reply(200, r#"{"AccessToken":"token"}"#)],
-        ),
-        ("/Sessions", vec![sessions]),
-        ("/QuickConnect/Enabled", vec![quick_connect]),
-        ("/Users", vec![household]),
+        (media::identity("sessions"), vec![sessions]),
+        (media::identity("signs_devices_in"), vec![quick_connect]),
+        (media::identity("household"), vec![household]),
     ])
 }
 
-/// Everything answering, with `sessions` for who is signed in.
-fn answering(sessions: &'static str) -> Arc<Fake> {
+/// Everything answering, with `sessions` for who of Ana's is signed in.
+fn answering(sessions: &[Session]) -> Arc<Fake> {
     a_server(
-        Answer::reply(200, HOUSEHOLD),
-        Answer::reply(200, sessions),
-        Answer::reply(200, "true"),
+        media::answered(&household()),
+        media::answered(&sessions),
+        media::answered(&true),
     )
 }
 
-/// A context over the shipped stack, with the media server up and a password recorded.
+/// A context over the shipped stack, with the media server moved into its plugin and up,
+/// and a password recorded.
 fn context(env: &Path, http: Arc<Fake>, host: Option<&str>) -> Ctx {
-    lemonfiber_testing::a_context()
-        .engine(Arc::new(Reporting::holding(
-            &["jellyfin"],
-            Lifecycle::Running,
-            Health::Healthy,
-        )))
+    media::keyed_in(unkeyed(env, http, host))
+}
+
+/// The same, with the media server's adapter holding no key to be asked with.
+fn unkeyed(env: &Path, http: Arc<Fake>, host: Option<&str>) -> Ctx {
+    let ctx = lemonfiber_testing::a_context()
+        .engine(Arc::new(media::running()))
         // A platform that publishes no name of its own, so the address is the one
         // recorded and nothing else.
         .environment(Environment::LinuxNative)
@@ -93,7 +103,12 @@ fn context(env: &Path, http: Arc<Fake>, host: Option<&str>) -> Ctx {
             ..Settings::default()
         })
         .build()
-        .with_http(http)
+        .with_http(http);
+    media::moved_in(&ctx);
+    if let Some(key) = media::key_at(&ctx) {
+        let _ = std::fs::remove_file(key);
+    }
+    ctx
 }
 
 /// What one run said, and everything it sent.
@@ -182,10 +197,12 @@ fn commands(said: &str) -> bool {
     said.contains('`') || said.contains("un this") || said.starts_with("lemonfiber ")
 }
 
-/// Whether anything but a sign-in or a read went to the media server.
+/// Whether anything but a read went to the media server.
 fn wrote(sent: &[Request]) -> bool {
     sent.iter().any(|request| {
-        request.method != Method::Get && !request.url.contains("/Users/AuthenticateByName")
+        !["household", "sessions", "signs_devices_in"]
+            .iter()
+            .any(|operation| request.url.ends_with(media::identity(operation)))
     })
 }
 
@@ -193,7 +210,7 @@ fn wrote(sent: &[Request]) -> bool {
 #[tokio::test]
 async fn the_first_run_issues_a_code_carrying_the_address() {
     let env = recorded_admin("handoff-issues");
-    let ran = handing(&env, "ana", answering(NOBODY_ELSE), false).await;
+    let ran = handing(&env, "ana", answering(&[]), false).await;
     let handoff = answered(&ran);
     let kept = std::fs::read_to_string(env.with_file_name("handoffs.json")).unwrap_or_default();
     gone(&env);
@@ -226,8 +243,8 @@ async fn the_first_run_issues_a_code_carrying_the_address() {
 #[tokio::test]
 async fn a_code_not_yet_used_is_pending() {
     let env = recorded_admin("handoff-pending");
-    let first = answered(&handing(&env, "Ana", answering(NOBODY_ELSE), false).await);
-    let second = answered(&handing(&env, "Ana", answering(NOBODY_ELSE), false).await);
+    let first = answered(&handing(&env, "Ana", answering(&[]), false).await);
+    let second = answered(&handing(&env, "Ana", answering(&[]), false).await);
     gone(&env);
 
     assert_eq!(second.state, HandoffState::Pending);
@@ -239,13 +256,13 @@ async fn a_code_not_yet_used_is_pending() {
         .is_some_and(|reason| reason.contains("home network")));
 }
 
-/// A device of theirs signed in is proved by the media server's own list, and the
-/// sessions of anybody else are not counted as theirs.
+/// A device of theirs signed in is proved by the media server's own list of the devices
+/// signed in to their account.
 #[tokio::test]
 async fn a_device_signed_in_is_read_from_the_media_server() {
     let env = recorded_admin("handoff-connected");
-    let _ = handing(&env, "Ana", answering(NOBODY_ELSE), false).await;
-    let ran = handing(&env, "Ana", answering(ANA_SIGNED_IN), false).await;
+    let _ = handing(&env, "Ana", answering(&[]), false).await;
+    let ran = handing(&env, "Ana", answering(&ana_signed_in()), false).await;
     let handoff = answered(&ran);
     gone(&env);
 
@@ -263,19 +280,19 @@ async fn a_device_signed_in_is_read_from_the_media_server() {
         }],
         "only Ana's own device is hers"
     );
-    assert!(ran
-        .sent
-        .iter()
-        .any(|request| request.url.contains("/Sessions")));
+    assert_eq!(
+        media::asked(&ran.sent, "sessions"),
+        [serde_json::json!({ "member": "9" })]
+    );
 }
 
 /// A device that signed in and then out is not still connected.
 #[tokio::test]
 async fn a_device_that_signed_out_is_no_longer_connected() {
     let env = recorded_admin("handoff-signed-out");
-    let _ = handing(&env, "Ana", answering(NOBODY_ELSE), false).await;
-    let before = answered(&handing(&env, "Ana", answering(ANA_SIGNED_IN), false).await);
-    let after = answered(&handing(&env, "Ana", answering(NOBODY_ELSE), false).await);
+    let _ = handing(&env, "Ana", answering(&[]), false).await;
+    let before = answered(&handing(&env, "Ana", answering(&ana_signed_in()), false).await);
+    let after = answered(&handing(&env, "Ana", answering(&[]), false).await);
     gone(&env);
 
     assert_eq!(before.state, HandoffState::Connected);
@@ -288,20 +305,16 @@ async fn a_device_that_signed_out_is_no_longer_connected() {
 #[tokio::test]
 async fn a_device_signed_in_before_the_code_is_not_the_one_handed_over() {
     let env = recorded_admin("handoff-already-signed-in");
-    let given = answered(&handing(&env, "Ana", answering(ANA_SIGNED_IN), false).await);
+    let given = answered(&handing(&env, "Ana", answering(&ana_signed_in()), false).await);
     let kept = std::fs::read_to_string(env.with_file_name("handoffs.json")).unwrap_or_default();
-    let again = answered(&handing(&env, "Ana", answering(ANA_SIGNED_IN), false).await);
-    let arrived = answered(&handing(&env, "Ana", answering(ANA_ON_BOTH), false).await);
+    let again = answered(&handing(&env, "Ana", answering(&ana_signed_in()), false).await);
+    let arrived = answered(&handing(&env, "Ana", answering(&ana_on_both()), false).await);
     gone(&env);
 
     assert_eq!(given.state, HandoffState::Ready);
     assert!(
         kept.contains("pixel-8"),
         "the devices signed in then were not kept: {kept}"
-    );
-    assert!(
-        !kept.contains("firefox"),
-        "somebody else's device was kept: {kept}"
     );
     assert_eq!(again.state, HandoffState::Pending);
     assert_eq!(again.sessions.len(), 1, "the phone she had is still listed");
@@ -318,12 +331,12 @@ async fn a_record_of_the_moment_alone_reads_as_nothing_signed_in_then() {
         env.with_file_name("handoffs.json"),
         r#"{"9":"2026-09-29T10:00:00Z"}"#,
     );
-    let signed_in = answered(&handing(&env, "Ana", answering(ANA_SIGNED_IN), false).await);
+    let signed_in = answered(&handing(&env, "Ana", answering(&ana_signed_in()), false).await);
     let _ = std::fs::write(
         env.with_file_name("handoffs.json"),
         r#"{"9":"2026-09-29T10:00:00Z"}"#,
     );
-    let waiting = answered(&handing(&env, "Ana", answering(NOBODY_ELSE), false).await);
+    let waiting = answered(&handing(&env, "Ana", answering(&[]), false).await);
     gone(&env);
 
     assert_eq!(signed_in.state, HandoffState::Connected);
@@ -336,7 +349,7 @@ async fn a_record_of_the_moment_alone_reads_as_nothing_signed_in_then() {
 #[tokio::test]
 async fn quick_connect_is_guided_and_never_approved() {
     let env = recorded_admin("handoff-quick-connect");
-    let ran = handing(&env, "Ana", answering(NOBODY_ELSE), false).await;
+    let ran = handing(&env, "Ana", answering(&[]), false).await;
     let handoff = answered(&ran);
     gone(&env);
 
@@ -349,12 +362,9 @@ async fn quick_connect_is_guided_and_never_approved() {
         "{:?}",
         handoff.steps
     );
-    assert!(!wrote(&ran.sent), "the hand-off wrote to the media server");
     assert!(
-        !ran.sent
-            .iter()
-            .any(|request| request.url.contains("/QuickConnect/Authorize")),
-        "a code was approved on somebody's behalf"
+        !wrote(&ran.sent),
+        "the hand-off wrote to the media server, or approved a code on somebody's behalf"
     );
 }
 
@@ -363,9 +373,9 @@ async fn quick_connect_is_guided_and_never_approved() {
 async fn quick_connect_is_not_described_where_it_is_off() {
     let env = recorded_admin("handoff-no-quick-connect");
     let http = a_server(
-        Answer::reply(200, HOUSEHOLD),
-        Answer::reply(200, NOBODY_ELSE),
-        Answer::reply(200, "false"),
+        media::answered(&household()),
+        media::answered(&Vec::<Session>::new()),
+        media::answered(&false),
     );
     let handoff = answered(&handing(&env, "Ana", http, false).await);
     gone(&env);
@@ -383,17 +393,14 @@ async fn quick_connect_is_not_described_where_it_is_off() {
 async fn an_unclaimed_account_is_told_it_has_no_password_yet() {
     let env = recorded_admin("handoff-unclaimed");
     let http = a_server(
-        Answer::reply(
-            200,
-            r#"[{"Id":"9","Name":"Ana","HasPassword":false,"Policy":{"IsAdministrator":false}}]"#,
-        ),
-        Answer::reply(200, "[]"),
-        Answer::reply(200, "true"),
+        media::answered(&[media::member("9", "Ana", false)]),
+        media::answered(&Vec::<Session>::new()),
+        media::answered(&true),
     );
     let unclaimed = answered(&handing(&env, "Ana", http, false).await);
     gone(&env);
     let env = recorded_admin("handoff-claimed");
-    let claimed = answered(&handing(&env, "Ana", answering(NOBODY_ELSE), false).await);
+    let claimed = answered(&handing(&env, "Ana", answering(&[]), false).await);
     gone(&env);
 
     assert!(unclaimed
@@ -410,7 +417,7 @@ async fn an_unclaimed_account_is_told_it_has_no_password_yet() {
 #[tokio::test]
 async fn nobody_with_an_account_is_unprovisioned_and_none_is_made() {
     let env = recorded_admin("handoff-unprovisioned");
-    let ran = handing(&env, "bob", answering(NOBODY_ELSE), false).await;
+    let ran = handing(&env, "bob", answering(&[]), false).await;
     let handoff = answered(&ran);
     gone(&env);
 
@@ -429,7 +436,7 @@ async fn nobody_with_an_account_is_unprovisioned_and_none_is_made() {
 #[tokio::test]
 async fn the_code_signs_nobody_in() {
     let env = recorded_admin("handoff-no-credential");
-    let handoff = answered(&handing(&env, "Ana", answering(NOBODY_ELSE), false).await);
+    let handoff = answered(&handing(&env, "Ana", answering(&[]), false).await);
     gone(&env);
 
     for client in &handoff.clients {
@@ -443,9 +450,9 @@ async fn the_code_signs_nobody_in() {
 #[tokio::test]
 async fn a_rehearsal_writes_nothing_down() {
     let env = recorded_admin("handoff-rehearsed");
-    let rehearsed = answered(&handing(&env, "Ana", answering(NOBODY_ELSE), true).await);
+    let rehearsed = answered(&handing(&env, "Ana", answering(&[]), true).await);
     let kept = env.with_file_name("handoffs.json").exists();
-    let real = answered(&handing(&env, "Ana", answering(NOBODY_ELSE), false).await);
+    let real = answered(&handing(&env, "Ana", answering(&[]), false).await);
     gone(&env);
 
     assert!(rehearsed.rehearsed);
@@ -464,9 +471,9 @@ async fn a_rehearsal_writes_nothing_down() {
 async fn a_silent_media_server_fails_as_the_server() {
     let env = recorded_admin("handoff-silent");
     let http = a_server(
-        Answer::reply(503, ""),
-        Answer::reply(503, ""),
-        Answer::reply(503, ""),
+        media::unavailable(),
+        media::unavailable(),
+        media::unavailable(),
     );
     let handoff = answered(&handing(&env, "Ana", http, false).await);
     gone(&env);
@@ -485,9 +492,9 @@ async fn a_silent_media_server_fails_as_the_server() {
 async fn sessions_that_cannot_be_read_fail_without_blaming_the_device() {
     let env = recorded_admin("handoff-sessions-unread");
     let http = a_server(
-        Answer::reply(200, HOUSEHOLD),
-        Answer::reply(500, ""),
-        Answer::reply(200, "true"),
+        media::answered(&household()),
+        media::refusing(),
+        media::answered(&true),
     );
     let handoff = answered(&handing(&env, "Ana", http, false).await);
     let kept = env.with_file_name("handoffs.json").exists();
@@ -510,7 +517,7 @@ async fn sessions_that_cannot_be_read_fail_without_blaming_the_device() {
 #[tokio::test]
 async fn no_address_is_a_reachability_problem() {
     let env = recorded_admin("handoff-nowhere");
-    let http = answering(NOBODY_ELSE);
+    let http = answering(&[]);
     let ctx = context(&env, http.clone(), None);
     let handoff = answered(&ran(&ctx, "Ana", &http).await);
     gone(&env);
@@ -530,7 +537,7 @@ async fn no_address_is_a_reachability_problem() {
 #[tokio::test]
 async fn the_administrator_is_not_handed_over() {
     let env = recorded_admin("handoff-owner");
-    let ran = handing(&env, "owner", answering(NOBODY_ELSE), false).await;
+    let ran = handing(&env, "owner", answering(&[]), false).await;
     gone(&env);
 
     assert_eq!(ran.refusal.as_deref(), Some("HANDOFF-4"));
@@ -541,7 +548,7 @@ async fn the_administrator_is_not_handed_over() {
 #[tokio::test]
 async fn a_hand_off_for_nobody_is_refused() {
     let env = recorded_admin("handoff-blank");
-    let ran = handing(&env, "  ", answering(NOBODY_ELSE), false).await;
+    let ran = handing(&env, "  ", answering(&[]), false).await;
     gone(&env);
 
     assert_eq!(ran.refusal.as_deref(), Some("HANDOFF-1"));
@@ -549,13 +556,14 @@ async fn a_hand_off_for_nobody_is_refused() {
     assert!(ran.sent.is_empty());
 }
 
-/// Without the media server's own account there is nothing to ask it as.
+/// A media server whose adapter cannot be asked over its contracts is refused as not set
+/// up.
 #[tokio::test]
-async fn nothing_recorded_is_refused_as_not_set_up() {
-    let scratch = lemonfiber_fixtures::scratch::Scratch::named("handoff-not-set-up").kept();
-    let _ = std::fs::create_dir_all(&scratch);
-    let env = scratch.join(".env");
-    let ran = handing(&env, "Ana", answering(NOBODY_ELSE), false).await;
+async fn a_server_that_cannot_be_asked_is_refused_as_not_set_up() {
+    let env = recorded_admin("handoff-not-set-up");
+    let http = answering(&[]);
+    let ctx = unkeyed(&env, http.clone(), Some("192.168.1.20"));
+    let ran = ran(&ctx, "Ana", &http).await;
     gone(&env);
 
     assert_eq!(ran.refusal.as_deref(), Some("HANDOFF-3"));
@@ -564,7 +572,7 @@ async fn nothing_recorded_is_refused_as_not_set_up() {
 
 /// A hand-off over `stack`, with everything else answering.
 async fn over(env: &Path, stack: Source) -> Ran {
-    let http = answering(NOBODY_ELSE);
+    let http = answering(&[]);
     let ctx = lemonfiber_testing::a_context()
         .over(stack)
         .settings(Settings {

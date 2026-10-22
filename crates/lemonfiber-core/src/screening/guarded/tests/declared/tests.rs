@@ -177,12 +177,3 @@ fn each_location_built_from_its_template_is_where_the_door_locates_the_item() {
     assert_eq!(at.poster, built(&locations.poster));
     assert_eq!(at.backdrop, built(&locations.backdrop));
 }
-
-#[tokio::test]
-async fn jellyfins_filler_answers_its_declaration_without_asking_jellyfin_anything() {
-    use crate::ports::service::Declaring;
-    let fake = lemonfiber_fixtures::http::Fake::scripted(Vec::new());
-    let jellyfin = super::Jellyfin::new(fake.clone(), "http://127.0.0.1:8096", "jellyfin");
-    assert_eq!(jellyfin.declared().await.ok(), Some(declared()));
-    assert!(fake.requests().is_empty());
-}

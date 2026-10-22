@@ -16,8 +16,8 @@ use crate::ports::service::Household;
 /// The media server's household, opened from what the stack holds now.
 ///
 /// Nothing where the stack's manifest cannot be read, where it runs no media server,
-/// or where no admin password is recorded for it yet. Each of those is a stack with
-/// no household to ask, and a member is refused rather than admitted on it.
+/// or where that server cannot be asked over its contracts. Each of those is a stack
+/// with no household to ask, and a member is refused rather than admitted on it.
 pub async fn household(ctx: &Ctx) -> Option<Arc<dyn Household>> {
     let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
     let identity: Arc<dyn Household> = super::targets::identity(ctx, &manifest).await?;

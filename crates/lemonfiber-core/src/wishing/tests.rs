@@ -10,29 +10,47 @@ use crate::app::{Ctx, Outcome, Wishing};
 use crate::ports::docker::{Health, Lifecycle};
 use crate::ports::http::Method;
 use crate::ports::media::Kind;
-use crate::ports::service::Wish;
-use crate::test_support::{a_context, a_password, Reporting, SeedFs};
+use crate::ports::service::{Certificate, Unrated, Wish};
+use crate::test_support::{a_context, json, media, Reporting, SeedFs};
 
 /// A Servarr config carrying a readable key, so the curators resolve their targets.
 const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
 
 /// The household: Ada, whom nothing holds back; Bea, held to twelve with unrated titles
 /// held back; and Cy, held to twelve with unrated titles let through.
-pub(super) const ACCOUNTS: &str = r#"[
-    {"Id":"a7f3","Name":"Ada","HasPassword":true,"Policy":{"EnableAllFolders":true}},
-    {"Id":"b8e4","Name":"Bea","HasPassword":true,
-        "Policy":{"EnableAllFolders":true,"MaxParentalRating":12,"BlockUnratedItems":["Movie","Series"]}},
-    {"Id":"c9d5","Name":"Cy","HasPassword":true,
-        "Policy":{"EnableAllFolders":true,"MaxParentalRating":12}}
-]"#;
+pub(super) fn accounts() -> String {
+    let held = |id: &str, name: &str, unrated: Unrated| {
+        let mut member = media::member(id, name, true);
+        member.access.age_limit = Some(12);
+        member.access.unrated = unrated;
+        member
+    };
+    json(&[
+        media::member("a7f3", "Ada", true),
+        held("b8e4", "Bea", Unrated::HeldBack),
+        held("c9d5", "Cy", Unrated::LetThrough),
+    ])
+}
 
 /// The media server's own table, as a British house's server answers it.
-pub(super) const RATINGS: &str = r#"[{"Name":"Unrated"},{"Name":"U","Value":0},
-    {"Name":"PG","Value":8},{"Name":"12A","Value":12},{"Name":"15","Value":15},
-    {"Name":"18","Value":18}]"#;
+pub(super) fn ratings() -> String {
+    let certificate = |name: &str, age: u32| Certificate {
+        name: name.to_owned(),
+        age,
+    };
+    json(&[
+        certificate("U", 0),
+        certificate("PG", 8),
+        certificate("12A", 12),
+        certificate("15", 15),
+        certificate("18", 18),
+    ])
+}
 
-/// The media server's configuration, naming the country its table is for.
-pub(super) const CONFIGURATION: &str = r#"{"MetadataCountryCode":"GB","CorsHosts":[]}"#;
+/// The country the media server's table is for.
+pub(super) fn country() -> String {
+    json(&Some("GB"))
+}
 
 /// The member's account on the request service: asks that wait for approval.
 pub(super) const WAITS: &str = r#"{"id":4,"permissions":32}"#;
@@ -64,15 +82,9 @@ pub(super) fn route(method: Method, fragment: &'static str, status: u16, body: &
 pub(super) fn house(first: Vec<Route>) -> Arc<Transport> {
     let mut routes = first;
     routes.extend([
-        route(
-            Method::Post,
-            "/Users/AuthenticateByName",
-            200,
-            r#"{"AccessToken":"token"}"#,
-        ),
-        route(Method::Get, "/System/Configuration", 200, CONFIGURATION),
-        route(Method::Get, "/Localization/ParentalRatings", 200, RATINGS),
-        route(Method::Get, "/Users", 200, ACCOUNTS),
+        route(Method::Post, media::identity("country"), 200, &country()),
+        route(Method::Post, media::identity("ratings"), 200, &ratings()),
+        route(Method::Post, media::identity("household"), 200, &accounts()),
         route(Method::Get, "/api/v1/user/jellyfin/", 200, WAITS),
         route(Method::Get, "/quota", 200, COUNTED),
         route(Method::Get, "/api/v1/request?", 200, NO_REQUESTS),
@@ -102,7 +114,8 @@ pub(super) fn ctx_running(transport: Arc<Transport>, tag: &str, running: &[&str]
     )
 }
 
-/// A house over `transport` whose engine is `engine`.
+/// A house over `transport` whose engine is `engine`, its media server moved into its
+/// plugin.
 pub(super) fn ctx_engine(transport: Arc<Transport>, tag: &str, engine: Reporting) -> Ctx {
     let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("wishing-{tag}")).kept();
     let _ = std::fs::remove_dir_all(&dir);
@@ -110,16 +123,12 @@ pub(super) fn ctx_engine(transport: Arc<Transport>, tag: &str, engine: Reporting
     let disk = SeedFs::keyed(Some(KEYED), None)
         .with_requests(lemonfiber_fixtures::support::SEERR_SETTINGS);
     let mut context = a_context()
-        .engine(Arc::new(engine))
+        .engine(Arc::new(engine.alongside(media::running())))
         .build()
         .with_filesystem(Arc::new(disk))
         .with_http(transport);
     context.settings.env_file = Some(dir.join(".env"));
-    let _ = crate::app::targets::record_secret(
-        &context,
-        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
-        &a_password(),
-    );
+    media::moved_in(&context);
     context
 }
 
@@ -238,7 +247,12 @@ async fn a_house_whose_stack_cannot_be_read_is_asking_not_working() {
 
 #[tokio::test]
 async fn a_media_server_that_will_not_say_who_is_in_the_house_is_asking_not_working() {
-    let transport = house(vec![route(Method::Get, "/Users", 500, "")]);
+    let transport = house(vec![route(
+        Method::Post,
+        media::identity("household"),
+        500,
+        "",
+    )]);
     let ctx = ctx_over(Arc::clone(&transport), "accounts-unread");
 
     let refused = asked(&ctx, "Ada", Kind::Movies, "603", &[]).await;
@@ -250,10 +264,10 @@ async fn a_media_server_that_will_not_say_who_is_in_the_house_is_asking_not_work
 #[tokio::test]
 async fn a_held_member_whose_rating_table_or_country_is_unread_is_offered_nothing() {
     for (failing, tag) in [
-        ("/System/Configuration", "country-unread"),
-        ("/Localization/ParentalRatings", "table-unread"),
+        (media::identity("country"), "country-unread"),
+        (media::identity("ratings"), "table-unread"),
     ] {
-        let transport = house(vec![route(Method::Get, failing, 500, "")]);
+        let transport = house(vec![route(Method::Post, failing, 500, "")]);
         let ctx = ctx_over(Arc::clone(&transport), tag);
 
         let search = found(&ctx, "Bea", "harbour", None).await;
@@ -266,10 +280,38 @@ async fn a_held_member_whose_rating_table_or_country_is_unread_is_offered_nothin
     }
 }
 
+/// An engine that cannot say what runs cannot say where the media server is published
+/// either, so asking is not working, and nothing is searched on a guess.
 #[tokio::test]
-async fn an_engine_that_cannot_say_what_runs_offers_no_kind_to_search() {
+async fn an_engine_that_cannot_say_what_runs_leaves_asking_not_working() {
     let transport = house(Vec::new());
-    let ctx = ctx_engine(Arc::clone(&transport), "engine-absent", Reporting::absent());
+    let dir = lemonfiber_fixtures::scratch::Scratch::named("wishing-engine-absent").kept();
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::create_dir_all(&dir);
+    let mut ctx = a_context()
+        .engine(Arc::new(Reporting::absent()))
+        .build()
+        .with_http(transport.clone());
+    ctx.settings.env_file = Some(dir.join(".env"));
+    media::moved_in(&ctx);
+
+    let refused = found(&ctx, "Ada", "harbour", None).await;
+
+    assert_eq!(code(&refused).as_deref(), Some("WISH-8"));
+    assert!(!asked_for(&transport, "/api/v1/search"));
+}
+
+/// An engine gone once the media server is reached cannot say which curators run, so no
+/// kind is offered to search and nothing is searched.
+#[tokio::test]
+async fn an_engine_gone_once_the_server_is_reached_offers_no_kind_to_search() {
+    let transport = house(Vec::new());
+    let ctx = ctx_engine(
+        Arc::clone(&transport),
+        "engine-gone",
+        Reporting::holding(&["sonarr", "radarr"], Lifecycle::Running, Health::Healthy)
+            .leaving_after(1),
+    );
 
     let refused = found(&ctx, "Ada", "harbour", None).await;
 

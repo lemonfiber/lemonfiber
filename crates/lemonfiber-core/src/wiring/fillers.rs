@@ -299,6 +299,15 @@ impl Fillers {
             .find(|one| one.id == upstream && one.brought_by() == Some(plugin))
     }
 
+    /// The adapter of `upstream`'s own plugin that stands in front of it, where one does.
+    #[must_use]
+    pub fn fronting(&self, upstream: &Filler) -> Option<&Filler> {
+        let plugin = upstream.brought_by()?;
+        self.services.iter().find(|one| {
+            one.fronts.as_deref() == Some(upstream.id.as_str()) && one.brought_by() == Some(plugin)
+        })
+    }
+
     /// Every service on this machine, the stack's first, each in the order it is declared.
     pub fn services(&self) -> impl Iterator<Item = &Filler> {
         self.services.iter()

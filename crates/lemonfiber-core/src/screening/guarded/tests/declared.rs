@@ -1,4 +1,5 @@
-//! What a guard in front of Jellyfin enforces, as Jellyfin's filler declares it.
+//! What a guard in front of Jellyfin enforces, as plugin-jellyfin's adapter declares it
+//! over `media.serve`: the declaration a guard is held to in these tests.
 //!
 //! Jellyfin answers its byte routes without asking who is there, so the guard asks it
 //! about the item first, as the member's own token sees it. It refuses outright what no
@@ -8,16 +9,41 @@
 //! the item `MediaSourceId` names as well. Jellyfin serves every route at its root and under
 //! `/emby` and `/mediabrowser` alike.
 
-use async_trait::async_trait;
-
-use super::screening::ABSENT;
-use super::{carrying, pictured_at, streamed_at, Jellyfin, AUTHORIZATION_HEADER};
 use crate::ports::http::Method;
 use crate::ports::service::{
-    Addressee, Answers, BytePath, Declared, Declaring, Failure, Held, Locations, Naming, Picture,
-    Ports, Presentation, Question, Statuses, Token, BASE, ITEM, TOKEN,
+    Addressee, Answers, BytePath, Declared, Held, Locations, Naming, Picture, Ports, Presentation,
+    Question, Statuses, Token, BASE, ITEM, TOKEN,
 };
 use crate::screening::door::GUARDED;
+
+/// The header Jellyfin reads a token from.
+const AUTHORIZATION_HEADER: &str = crate::endpoint::AUTHORIZATION;
+
+/// The status Jellyfin answers an item it holds none of with.
+const ABSENT: u16 = 404;
+
+/// The query a stream is asked for with: the item's own source, and the codecs every
+/// supported player decodes, in segments both platforms play.
+const STREAMED: &str = "VideoCodec=h264,hevc&AudioCodec=aac,mp3,ac3,eac3&SegmentContainer=mp4";
+
+/// A token in the scheme [`AUTHORIZATION_HEADER`] is parsed by.
+fn carrying(token: &str) -> String {
+    format!(r#"MediaBrowser Token="{token}""#)
+}
+
+/// Where Jellyfin streams an item from, beneath its address.
+fn streamed_at(id: &str) -> String {
+    format!("/Videos/{id}/master.m3u8?MediaSourceId={id}&{STREAMED}")
+}
+
+/// Where Jellyfin serves one of a title's pictures, beneath its address.
+fn pictured_at(id: &str, which: Picture) -> String {
+    let named = match which {
+        Picture::Poster => "Primary",
+        Picture::Backdrop => "Backdrop",
+    };
+    format!("/Items/{id}/Images/{named}")
+}
 
 /// The port Jellyfin listens on.
 const PORT: u16 = 8096;
@@ -153,12 +179,4 @@ pub(crate) fn declared() -> Declared {
     }
 }
 
-#[async_trait]
-impl Declaring for Jellyfin {
-    async fn declared(&self) -> Result<Declared, Failure> {
-        Ok(declared())
-    }
-}
-
-#[cfg(test)]
 mod tests;

@@ -1,7 +1,7 @@
 use super::fixtures::{
     ctx_library_only, ctx_through_a_tunnel, ctx_watching, ctx_with, ctx_with_torrents, Fake,
     Listening, ADDED, A_RELEASE, HAS_ITEM, HELD, IMPORTED, NOT_HELD, NO_ITEMS, ONE_INDEXER,
-    ONE_WANTED, SIGNED_IN,
+    ONE_WANTED,
 };
 use super::{walkthrough, worth_offering};
 use crate::walkthrough::{Reason, Shape, State, Step};
@@ -356,7 +356,7 @@ async fn imported_with_no_media_server_to_play_it_from_is_said_plainly() {
 #[tokio::test]
 async fn imported_and_still_not_in_the_library_is_its_own_answer() {
     let ctx = ctx_watching(&Fake {
-        library: NO_ITEMS,
+        holds: NO_ITEMS,
         ..Fake::default()
     });
     let (report, _) = walked(&ctx, Some("Sintel")).await;
@@ -383,7 +383,7 @@ async fn a_library_only_household_is_asked_whether_its_own_media_is_visible() {
 #[tokio::test]
 async fn a_library_only_household_whose_media_is_not_there_is_told() {
     let ctx = ctx_library_only(&Fake {
-        library: NO_ITEMS,
+        holds: NO_ITEMS,
         ..Fake::default()
     });
     let (report, _) = walked(&ctx, Some("Sintel")).await;
@@ -520,7 +520,6 @@ fn the_fixtures_are_the_shapes_the_services_actually_send() {
         A_RELEASE,
         ONE_INDEXER,
         IMPORTED,
-        SIGNED_IN,
         HAS_ITEM,
         NO_ITEMS,
     ] {

@@ -1,12 +1,13 @@
 //! What an invited member may ask for, and what travels back.
 
 use super::{
-    a_stack_where_requests_arrive_unseen, driving, offering, requesting, APPROVES_OWN, AS_IT_OPENS,
-    CERTIFICATES, LIBRARIES, NEW_ACCOUNT, ONE_ACCOUNT, PERMISSIONS, POLICY, RATINGS,
+    a_stack_where_requests_arrive_unseen, driving, libraries, offering, requesting,
+    the_media_server, APPROVES_OWN, PERMISSIONS,
 };
 use lemonfiber_core::app::{Allowance, Outcome};
 use lemonfiber_core::ports::service::Unrated;
 use lemonfiber_fixtures::http::{Answer, Fake};
+use lemonfiber_testing::media;
 use std::sync::Arc;
 
 /// The gap the setting exists to close: what a narrowed member may ask for is held to
@@ -46,7 +47,7 @@ async fn what_a_narrowed_member_may_ask_for_is_held_to_the_same_decision() {
 
 /// An offer that narrows nobody leaves what they may ask for alone.
 ///
-/// The same rule the policy is held to, one service along: an offer that says nothing
+/// The same rule the allowance is held to, one service along: an offer that says nothing
 /// about access must not quietly take a permission off somebody's account.
 #[tokio::test]
 async fn an_offer_that_narrows_nobody_leaves_what_they_may_ask_for_alone() {
@@ -73,7 +74,6 @@ async fn an_offer_that_narrows_nobody_leaves_what_they_may_ask_for_alone() {
 async fn what_was_applied_travels_back_with_the_invitation() {
     let (_, made) = offering(
         "applied",
-        AS_IT_OPENS,
         Allowance {
             libraries: Vec::new(),
             age_limit: Some(12),
@@ -136,30 +136,17 @@ fn a_stack_that_will_not_hold() -> Arc<Fake> {
 /// The same stack, with what the request service says about a member and what it does
 /// with the write chosen.
 fn a_stack_asking(member: Answer, written: Answer) -> Arc<Fake> {
-    let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
-    Fake::by_path_in_turn(vec![
-        ("/Users/AuthenticateByName", vec![signed_in]),
+    let mut routes = vec![
         ("/auth/me", vec![Answer::reply(200, "{}")]),
         ("/user/import-from-jellyfin", vec![Answer::reply(201, "{}")]),
         (PERMISSIONS, vec![Answer::reply(200, APPROVES_OWN), written]),
         ("/user/jellyfin/", vec![member]),
-        (RATINGS, vec![Answer::reply(200, CERTIFICATES)]),
-        (
-            "/System/ActivityLog",
-            vec![Answer::reply(200, r#"{"Items":[]}"#)],
-        ),
-        ("/Library/MediaFolders", vec![Answer::reply(200, LIBRARIES)]),
-        (POLICY, vec![Answer::reply(204, "")]),
-        (
-            NEW_ACCOUNT,
-            vec![Answer::reply(
-                200,
-                r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
-            )],
-        ),
-        (ONE_ACCOUNT, vec![Answer::reply(200, AS_IT_OPENS)]),
-        ("/Users", vec![Answer::reply(200, "[]")]),
-    ])
+    ];
+    routes.extend(the_media_server(
+        media::answered(&libraries()),
+        media::taken(),
+    ));
+    Fake::by_path_in_turn(routes)
 }
 
 /// A limit set on somebody whose requests already wait writes nothing there.

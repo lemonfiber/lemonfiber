@@ -26,66 +26,85 @@ use crate::common::household::recorded_admin;
 use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Inviting, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::model::{Invitation, InvitationStanding, Linked};
-use lemonfiber_core::ports::http::{Method, Request};
+use lemonfiber_core::ports::http::Request;
+use lemonfiber_core::ports::service::{Invited, Member};
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::ports::{stamp, HOUR};
-use lemonfiber_fixtures::support::Reporting;
-use lemonfiber_ports::docker::{Health, Lifecycle};
+use lemonfiber_testing::media;
 
-/// The household: the owner, who administers the server, and one ordinary member who
-/// has claimed her account. Ana having a password is what makes a reset mean anything.
-const HOUSEHOLD: &str = r#"[
-    {"Id":"1","Name":"owner","HasPassword":true,"Policy":{"IsAdministrator":true}},
-    {"Id":"9","Name":"Ana","HasPassword":true,"Policy":{"IsAdministrator":false}}
-]"#;
+/// The owner, who administers the server.
+fn owner() -> Member {
+    let mut owner = media::member("1", "owner", true);
+    owner.access.administrator = true;
+    owner
+}
 
-/// Where Ana's account is put back to having no password on it.
-const RESET: &str = "/Users/9/Password";
+/// The household: the owner, and one ordinary member who has claimed her account. Ana
+/// having a password is what makes a reset mean anything.
+fn household() -> Vec<Member> {
+    vec![owner(), media::member("9", "Ana", true)]
+}
+
+/// Ana, reset an hour ago: unclaimed, and seen before.
+fn ana_reset() -> Member {
+    let mut ana = media::member("9", "Ana", false);
+    ana.last_seen = Some(format!("{}Z", stamp(-HOUR)));
+    ana
+}
+
+/// An invitation the media server records `member` as having been sent at `at`.
+fn invited(member: &str, at: &str) -> Invited {
+    Invited {
+        member: member.to_owned(),
+        at: at.to_owned(),
+    }
+}
+
+/// When the media server says Ana was invited: when her account was made in January, and
+/// when her password was taken off two hours ago.
+fn ana_invited() -> Vec<Invited> {
+    vec![
+        invited("9", "2026-01-04T09:00:00Z"),
+        invited("9", &format!("{}Z", stamp(-2 * HOUR))),
+    ]
+}
+
+/// A media server holding `members`, recording `since` as when each was invited, making
+/// `made` when asked to invite somebody, and answering a password taken off with `reset`.
+fn a_server_holding(members: Answer, since: &[Invited], made: &Member, reset: Answer) -> Arc<Fake> {
+    let mut routes = vec![
+        ("/auth/jellyfin", vec![Answer::reply(200, "{}")]),
+        (media::identity("household"), vec![members]),
+        (media::identity("unclaim"), vec![reset]),
+    ];
+    routes.extend(media::household(&[], made, since));
+    Fake::by_path_in_turn(routes)
+}
 
 /// A media server answering the household with `who`, and the reset with `reset`.
 fn a_server(who: Answer, reset: Answer) -> Arc<Fake> {
-    let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
-    Fake::by_path_in_turn(vec![
-        (
-            "/Users/AuthenticateByName",
-            vec![signed_in.clone(), signed_in],
-        ),
-        (RESET, vec![reset]),
-        // Her own account, read and written back to switch it on after the reset.
-        (
-            "/Users/9",
-            vec![Answer::reply(
-                200,
-                r#"{"Id":"9","Name":"Ana","Policy":{"IsAdministrator":false}}"#,
-            )],
-        ),
-        ("/Users", vec![who]),
-    ])
+    a_server_holding(who, &[], &owner(), reset)
 }
 
 /// Everything answering: the household is readable and the reset is accepted.
 fn answering() -> Arc<Fake> {
-    a_server(Answer::reply(200, HOUSEHOLD), Answer::reply(204, ""))
+    a_server(media::answered(&household()), media::taken())
 }
 
-/// A context over the shipped stack, with the media server up and a password recorded.
+/// A context over the shipped stack, with the media server moved into its plugin and up,
+/// and a password recorded.
 fn context(env: &std::path::Path, http: Arc<Fake>, rehearsing: bool) -> Ctx {
-    // Stopped, because half of what this file asserts is about a window. Against
-    // the real clock every date written below would drift out of the window it was
-    // chosen to sit inside, and the test would go red on a day nothing changed.
-    let ctx = lemonfiber_testing::a_context()
-        .engine(Arc::new(Reporting::holding(
-            &["jellyfin"],
-            Lifecycle::Running,
-            Health::Healthy,
-        )))
-        .settings(Settings {
-            env_file: Some(env.to_path_buf()),
-            household_host: Some("192.168.1.20".to_owned()),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(http);
+    let ctx = media::keyed_in(
+        lemonfiber_testing::a_context()
+            .engine(Arc::new(media::running()))
+            .settings(Settings {
+                env_file: Some(env.to_path_buf()),
+                household_host: Some("192.168.1.20".to_owned()),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http),
+    );
     if rehearsing {
         ctx.rehearsing()
     } else {
@@ -106,9 +125,7 @@ struct Ran {
 impl Ran {
     /// Whether a reset was actually asked for.
     fn reset_somebody(&self) -> bool {
-        self.sent
-            .iter()
-            .any(|request| request.method == Method::Post && request.url.contains("/Password"))
+        !media::asked(&self.sent, "unclaim").is_empty()
     }
 }
 
@@ -235,7 +252,7 @@ async fn nobody_by_that_name_is_said_rather_than_guessed_at() {
 /// A household that will not be read stops the command before it picks anybody.
 #[tokio::test]
 async fn a_household_that_will_not_be_read_resets_nobody() {
-    let http = a_server(Answer::reply(500, ""), Answer::reply(204, ""));
+    let http = a_server(media::refusing(), media::taken());
     let ran = reissuing("unreadable", "Ana", http, false).await;
 
     assert_eq!(ran.refusal, Some("REISSUE-1".to_owned()));
@@ -249,7 +266,7 @@ async fn a_household_that_will_not_be_read_resets_nobody() {
 /// until it does.
 #[tokio::test]
 async fn a_refused_reset_is_reported_as_having_changed_nothing() {
-    let http = a_server(Answer::reply(200, HOUSEHOLD), Answer::reply(403, ""));
+    let http = a_server(media::answered(&household()), media::refusing());
     let ran = reissuing("refused", "Ana", http, false).await;
 
     assert_eq!(ran.refusal, Some("REISSUE-4".to_owned()));
@@ -282,49 +299,21 @@ async fn a_reset_needs_somebody_to_be_for() {
 ///
 /// Driven as the two commands actually run, one after the other against one server,
 /// because each is correct alone: the reset resets, the sweep sweeps, and the account is
-/// gone. Both records the media server writes are here, which is what makes the
-/// difference readable — `UserCreated` in January, `UserPasswordChanged` at the reset.
+/// gone. Both invitations the media server records for her are here, which is what makes
+/// the difference readable — her account made in January, her password taken off at the
+/// reset.
 #[tokio::test]
 async fn a_reset_stands_for_its_own_window_and_not_the_account_s_age() {
     // Ana joined in January and was reset today, so she is unclaimed and her account is
     // years old. Bo is a real expired invitation: made long ago and never claimed.
-    let household = format!(
-        r#"[
-        {{"Id":"1","Name":"owner","HasPassword":true,"Policy":{{"IsAdministrator":true}}}},
-        {{"Id":"9","Name":"Ana","HasPassword":false,"LastActivityDate":"{}.0000000Z"}},
-        {{"Id":"7","Name":"bo","HasPassword":false}}
-    ]"#,
-        stamp(-HOUR)
+    let mut since = ana_invited();
+    since.push(invited("7", "2026-01-04T09:00:00Z"));
+    let http = a_server_holding(
+        media::answered(&[owner(), ana_reset(), media::member("7", "bo", false)]),
+        &since,
+        &media::member("4", "cy", false),
+        media::taken(),
     );
-    let recorded = format!(
-        r#"{{"Items":[
-        {{"Type":"UserCreated","Date":"2026-01-04T09:00:00.0000000Z","UserId":"9"}},
-        {{"Type":"UserPasswordChanged","Date":"{}.0000000Z","UserId":"9"}},
-        {{"Type":"UserCreated","Date":"2026-01-04T09:00:00.0000000Z","UserId":"7"}}
-    ]}}"#,
-        stamp(-2 * HOUR)
-    );
-    let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
-    let http = Fake::by_path_in_turn(vec![
-        (
-            "/Users/AuthenticateByName",
-            vec![signed_in.clone(), signed_in],
-        ),
-        ("/auth/jellyfin", vec![Answer::reply(200, "{}")]),
-        ("/System/ActivityLog", vec![Answer::reply(200, recorded)]),
-        (
-            "/Users/New",
-            vec![Answer::reply(
-                200,
-                r#"{"Id":"4","Name":"cy","HasPassword":false}"#,
-            )],
-        ),
-        (
-            "/Users/4",
-            vec![Answer::reply(200, r#"{"Id":"4","Policy":{}}"#)],
-        ),
-        ("/Users", vec![Answer::reply(200, household)]),
-    ]);
 
     let env = recorded_admin("swept");
     let ctx = context(&env, http.clone(), false);
@@ -343,11 +332,11 @@ async fn a_reset_stands_for_its_own_window_and_not_the_account_s_age() {
         Some(Outcome::Invitation(invitation)) => invitation.withdrawn,
         _ => Vec::new(),
     };
-    let touched: Vec<String> = http
-        .requests()
-        .into_iter()
-        .map(|request| request.url)
-        .filter(|url| url.contains("/Users/9"))
+    let sent = http.requests();
+    let touched: Vec<String> = ["withdraw", "suspend", "unclaim", "claimable", "allow"]
+        .iter()
+        .flat_map(|operation| media::asked_about(&sent, operation))
+        .filter(|id| id == "9")
         .collect();
     assert!(
         touched.is_empty(),
@@ -362,18 +351,13 @@ async fn a_reset_stands_for_its_own_window_and_not_the_account_s_age() {
          she was told about had already run out before she was told about it"
     );
 
-    let taken: Vec<String> = http
-        .requests()
-        .into_iter()
-        .filter(|request| request.method == Method::Delete)
-        .map(|request| request.url)
-        .collect();
+    let taken = media::asked_about(&sent, "withdraw");
     // Counted before it is judged. The withdrawal asserted above can only have
     // happened through one of these, so an empty list here would mean the two
     // readings disagree — and `all` over an empty list would call that fine.
     assert_eq!(taken.len(), 1, "{taken:?}");
     assert!(
-        taken.iter().all(|url| url.ends_with("/Users/7")),
+        taken.iter().all(|id| id == "7"),
         "an account other than the expired invitation was deleted: {taken:?}"
     );
 }
@@ -387,33 +371,12 @@ async fn a_reset_stands_for_its_own_window_and_not_the_account_s_age() {
 /// is what it found.
 #[tokio::test]
 async fn offering_an_account_to_somebody_reset_says_their_password_went() {
-    let household = format!(
-        r#"[
-        {{"Id":"9","Name":"Ana","HasPassword":false,"LastActivityDate":"{}.0000000Z"}}
-    ]"#,
-        stamp(-HOUR)
+    let http = a_server_holding(
+        media::answered(&[ana_reset()]),
+        &ana_invited(),
+        &owner(),
+        media::taken(),
     );
-    let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
-    let http = Fake::by_path_in_turn(vec![
-        (
-            "/Users/AuthenticateByName",
-            vec![signed_in.clone(), signed_in],
-        ),
-        (
-            "/System/ActivityLog",
-            vec![Answer::reply(
-                200,
-                format!(
-                    r#"{{"Items":[
-                    {{"Type":"UserCreated","Date":"2026-01-04T09:00:00.0000000Z","UserId":"9"}},
-                    {{"Type":"UserPasswordChanged","Date":"{}.0000000Z","UserId":"9"}}
-                ]}}"#,
-                    stamp(-2 * HOUR)
-                ),
-            )],
-        ),
-        ("/Users", vec![Answer::reply(200, household)]),
-    ]);
 
     let env = recorded_admin("offer-after-reset");
     let ctx = context(&env, http.clone(), false);
@@ -438,10 +401,7 @@ async fn offering_an_account_to_somebody_reset_says_their_password_went() {
         "somebody already in the household was described as an account nobody has taken up"
     );
     assert!(
-        !http
-            .requests()
-            .iter()
-            .any(|request| request.method == Method::Delete),
+        media::asked(&http.requests(), "withdraw").is_empty(),
         "the offer withdrew the account it was describing"
     );
 }

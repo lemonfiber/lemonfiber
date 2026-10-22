@@ -56,7 +56,7 @@ const ADAPTER: &str = "http://jellyfin-adapter:8080";
 /// The envelope around Jellyfin's declaration, its question sent to the media server.
 fn envelope() -> Guarded {
     Guarded {
-        declared: crate::jellyfin::declared::declared(),
+        declared: declared::declared(),
         upstream: UPSTREAM.to_owned(),
         adapter: None,
         proxy: PROXY.to_owned(),
@@ -137,3 +137,5 @@ async fn a_guard_that_refuses_the_envelope_is_said_to_have_refused_it() {
         Err(Unguarded::Untaken(_))
     ));
 }
+
+mod declared;

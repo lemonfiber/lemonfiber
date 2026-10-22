@@ -275,11 +275,10 @@ async fn a_choice_about_one_person_refuses_on_any_of_its_three_calls() {
 /// refusal, from somewhere else, which is a case that proves nothing about here.
 #[tokio::test]
 async fn a_name_with_no_media_server_behind_it_is_refused() {
-    let household = a_household("noserver");
-    let Ok(mut manifest) = household.stack.manifest() else {
+    let household = crate::test_support::a_context().build();
+    let Ok(manifest) = household.stack.manifest() else {
         unreachable!("the shipped stack does not read");
     };
-    manifest.services.clear();
     let refused = found(&household, &manifest, "alex").await;
 
     assert_eq!(
@@ -323,7 +322,10 @@ async fn somebody_the_request_service_never_heard_of_has_no_limit_to_set() {
 async fn a_media_server_that_will_not_say_who_is_here_changes_nothing() {
     let ctx = refusing(
         "nohousehold",
-        vec![(Method::Post, "/Users/AuthenticateByName")],
+        vec![(
+            Method::Post,
+            crate::test_support::media::identity("household"),
+        )],
     );
 
     let refused = allowing(

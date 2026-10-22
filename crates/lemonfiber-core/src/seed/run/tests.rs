@@ -102,8 +102,9 @@ fn is_skipped(wiring: &crate::seed::Wiring) -> bool {
     matches!(wiring.state, crate::seed::State::Skipped { .. })
 }
 
-/// A context whose engine says the given torrent client log line, answering
-/// seeding's HTTP from `replies` and its randomness from `bytes`.
+/// A context whose engine says the given torrent client log line, and runs the media
+/// server's adapter where it is `reachable`, answering seeding's HTTP from `replies` and
+/// its randomness from `bytes`.
 fn seed_ctx(
     log: Option<&str>,
     reachable: bool,
@@ -113,6 +114,7 @@ fn seed_ctx(
 ) -> Ctx {
     let mut engine = if reachable {
         Reporting::holding(&["qbittorrent"], Lifecycle::Running, Health::Healthy)
+            .alongside(crate::test_support::media::running())
     } else {
         Reporting::absent()
     };
@@ -123,12 +125,14 @@ fn seed_ctx(
         env_file: env,
         ..Settings::default()
     };
-    a_context()
+    let mut ctx = a_context()
         .engine(Arc::new(engine))
         .settings(settings)
         .build()
         .with_http(Fake::scripted(replies))
-        .with_random(Arc::new(FixedRandom(bytes)))
+        .with_random(Arc::new(FixedRandom(bytes)));
+    ctx.seams.confined = crate::test_support::media::Keyed::over(Arc::clone(&ctx.seams.confined));
+    ctx
 }
 
 /// The line the torrent client logs its temporary password on.
@@ -227,6 +231,26 @@ fn curator(id: &str, port: u16, media: &str) -> lemonfiber_manifest::Service {
 /// the services a test declares, asked for as the stack asks.
 fn fillers_of(services: Vec<lemonfiber_manifest::Service>) -> crate::wiring::Fillers {
     fillers_at(services, stack_root())
+}
+
+/// The same, with the stack's media server moved into its plugin.
+fn moved_fillers(services: Vec<lemonfiber_manifest::Service>) -> crate::wiring::Fillers {
+    moved_at(services, stack_root())
+}
+
+/// The stack's `services`, written at `project`, with its media server moved into its
+/// plugin.
+fn moved_at(
+    services: Vec<lemonfiber_manifest::Service>,
+    project: &std::path::Path,
+) -> crate::wiring::Fillers {
+    fillers_beside(
+        services,
+        &crate::test_support::media::moved()
+            .into_iter()
+            .collect::<Vec<_>>(),
+        project,
+    )
 }
 
 /// The same, with the stack written to disk at `project`.
@@ -364,28 +388,33 @@ fn media_server_svc() -> lemonfiber_manifest::Service {
     media_server
 }
 
-/// The media server the shipped stack's identity ask settles on among `services`.
+/// The media server the shipped stack's identity ask settles on among `services`, the
+/// stack's own moved into its plugin where it is among them.
 fn served(services: &[lemonfiber_manifest::Service]) -> Option<crate::app::targets::MediaServer> {
-    crate::app::targets::MediaServer::of(&fillers_of(services.to_vec()))
+    let own = media_server_svc().id;
+    let fillers = if services.iter().any(|service| service.id == own) {
+        moved_fillers(services.to_vec())
+    } else {
+        fillers_of(services.to_vec())
+    };
+    crate::app::targets::MediaServer::of(&fillers)
 }
 
-/// A transport standing in for the household pair, routed by path: the media server's
-/// public info reports whether its wizard has run, its `/Startup/*` calls
-/// succeed, the request service's sign-in flips it to initialised, and its public settings
-/// report that state.
 /// A household that answers the media server's and the request service's setup reads.
 ///
-/// `completed` is what the media server says about its own wizard. `signed_in` is whether
-/// the request service is already initialised: where it is not, the catch-all answers "no"
-/// and then "yes", which is the read-write-read the identity wiring performs. Scripting the
-/// change in order rather than flipping a flag says which write is meant to cause it.
+/// `completed` is what the media server says about its own first run. `signed_in` is
+/// whether the request service is already initialised: where it is not, the catch-all
+/// answers "no" and then "yes", which is the read-write-read the identity wiring performs.
+/// Scripting the change in order rather than flipping a flag says which write is meant to
+/// cause it.
 fn household(completed: bool, signed_in: bool) -> Arc<Fake> {
-    household_changing(completed, signed_in, 200, 204)
+    household_changing(completed, signed_in, crate::test_support::media::taken())
 }
 
-/// [`household`], with the media server answering the administrator's sign-in with
-/// `admitted` and the password change with `changed`.
-fn household_changing(completed: bool, signed_in: bool, admitted: u16, changed: u16) -> Arc<Fake> {
+/// [`household`], with the media server answering the change of its administrator's
+/// password with `changed`.
+fn household_changing(completed: bool, signed_in: bool, changed: Answer) -> Arc<Fake> {
+    use crate::test_support::media;
     let initialised = if signed_in {
         vec![Answer::reply(200, r#"{"initialized":true}"#)]
     } else {
@@ -396,25 +425,11 @@ fn household_changing(completed: bool, signed_in: bool, admitted: u16, changed: 
     };
     Fake::by_path_in_turn(vec![
         (
-            "/System/Info/Public",
-            vec![Answer::reply(
-                200,
-                format!(r#"{{"StartupWizardCompleted":{completed}}}"#),
-            )],
+            media::identity("startup_completed"),
+            vec![media::answered(&completed)],
         ),
-        // The media server's setup calls and the request service's sign-in succeed, but
-        // neither by itself finishes the request service's setup.
-        ("/Startup/", vec![Answer::reply(200, "")]),
-        // The administrator's sign-in, and the password change made once the request
-        // service has been set up.
-        (
-            "/Users/AuthenticateByName",
-            vec![Answer::reply(
-                admitted,
-                r#"{"AccessToken":"token","User":{"Id":"admin-id"}}"#,
-            )],
-        ),
-        ("/Users/admin-id/Password", vec![Answer::reply(changed, "")]),
+        (media::identity("create_admin"), vec![media::taken()]),
+        (media::identity("replace_admin_password"), vec![changed]),
         ("/auth/jellyfin", vec![Answer::reply(200, "")]),
         ("/settings/initialize", vec![Answer::reply(200, "")]),
         // Untouched by anybody: what a service that has never had the agent
@@ -527,6 +542,7 @@ mod decline;
 mod gate;
 mod guarding;
 mod identity;
+mod intake;
 mod linking;
 mod passwords;
 mod proxies;

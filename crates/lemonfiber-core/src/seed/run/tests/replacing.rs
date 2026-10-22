@@ -179,61 +179,76 @@ fn replacing_a_bundled_service_changes_nothing_that_asks() {
     );
 }
 
-/// The household's media server, replaced the same way: the request service signs in
-/// against the stand-in, at the stand-in's address, with a password kept under a setting
-/// naming the plugin, and the request service that asks is the one it was.
+/// The stack with its media server moved into its plugin, and `others` beside it.
+fn moved_beside(others: Vec<crate::plugin::Installed>) -> Vec<crate::plugin::Installed> {
+    crate::test_support::media::moved()
+        .into_iter()
+        .chain(others)
+        .collect()
+}
+
+/// The household's media server, replaced by another plugin's chosen in its place: the
+/// request service that asks is the one it was, and signs in against the replacement's
+/// upstream, with a password kept under a setting naming that plugin.
 #[test]
 fn replacing_the_media_server_changes_nothing_that_signs_in_to_it() {
-    let shipped_stack = shipped(&[], &Chosen::default(), |_| ());
-    let was = shipped_stack
-        .as_ref()
-        .and_then(|(_, before)| MediaServer::of(before));
-    let after = shipped_stack.as_ref().and_then(|(manifest, before)| {
-        let identity = crate::app::targets::IDENTITY;
-        let asking = before
-            .asks()
-            .iter()
-            .find(|ask| ask.capability == identity)?;
-        let replaced = before.service(was.as_ref()?.id())?;
-        swapped(manifest, &asking.by, identity, replaced)
-    });
-    let now = after.as_ref().and_then(MediaServer::of);
+    let chosen = Chosen::read(Some("identity.source=media-adapter"));
+    let was = shipped(&moved_beside(Vec::new()), &Chosen::default(), |_| ())
+        .and_then(|(_, fillers)| MediaServer::of(&fillers));
+    let now = shipped(
+        &moved_beside(vec![crate::test_support::a_contracted_media_server(Some(
+            "jellyfin",
+        ))]),
+        &chosen,
+        |_| (),
+    )
+    .and_then(|(_, fillers)| MediaServer::of(&fillers));
 
     assert!(
         was.as_ref().and_then(crate::test_support::asker).is_some(),
         "the shipped stack's request service asks its media server"
     );
-    assert_eq!(now.as_ref().map(MediaServer::id), Some(STAND_IN));
     assert_eq!(
-        now.as_ref().map(|one| one.network.url()),
-        Some(format!("http://{STAND_IN}:{ITS_PORT}"))
+        now.as_ref().map(MediaServer::id),
+        Some(crate::test_support::MEDIA_UPSTREAM)
+    );
+    assert_eq!(
+        now.as_ref()
+            .and_then(|one| one.pairing.as_ref())
+            .map(|pairing| pairing.at.url()),
+        Some(format!(
+            "http://{}:9000",
+            crate::test_support::MEDIA_UPSTREAM
+        ))
     );
     assert_eq!(
         now.as_ref().and_then(crate::test_support::asker),
         was.as_ref().and_then(crate::test_support::asker)
     );
-    assert_eq!(now.as_ref().and_then(MediaServer::brought_by), Some(PLUGIN));
+    assert_eq!(
+        now.as_ref().and_then(MediaServer::brought_by),
+        Some("contracted")
+    );
     assert_eq!(
         now.as_ref().map(|one| one.setting.as_str()),
-        Some("PLUGIN_REPLACEMENT_STAND__IN_ADMIN_PASSWORD")
+        Some("PLUGIN_CONTRACTED_MEDIA__UPSTREAM_ADMIN_PASSWORD")
     );
 }
 
-/// The decline service acts on the server its link by name reaches, so a plugin standing
-/// in as the household's media server leaves its key in the stack's own server: never
-/// minted on, or handed for, a server the decline service does not reach.
+/// The decline service acts on the server its link by name reaches, so another plugin's
+/// server chosen as the household's leaves its key in the moved server, asked through its
+/// adapter: never minted on, or handed for, a server the decline service does not reach.
 #[test]
 fn replacing_the_media_server_leaves_the_decline_service_on_its_own_server() {
-    let shipped_stack = shipped(&[], &Chosen::default(), |_| ());
-    let after = shipped_stack.as_ref().and_then(|(manifest, before)| {
-        let identity = crate::app::targets::IDENTITY;
-        let asking = before
-            .asks()
-            .iter()
-            .find(|ask| ask.capability == identity)?;
-        let replaced = before.service(MediaServer::of(before)?.id())?;
-        swapped(manifest, &asking.by, identity, replaced)
-    });
+    let chosen = Chosen::read(Some("identity.source=media-adapter"));
+    let after = shipped(
+        &moved_beside(vec![crate::test_support::a_contracted_media_server(Some(
+            "jellyfin",
+        ))]),
+        &chosen,
+        |_| (),
+    )
+    .map(|(_, fillers)| fillers);
     let declined = after
         .as_ref()
         .and_then(crate::app::targets::declined_server);
@@ -243,9 +258,13 @@ fn replacing_the_media_server_leaves_the_decline_service_on_its_own_server() {
             .as_ref()
             .and_then(MediaServer::of)
             .map(|one| one.id().to_owned()),
-        Some(STAND_IN.to_owned())
+        Some(crate::test_support::MEDIA_UPSTREAM.to_owned())
     );
     assert_eq!(declined.as_ref().map(MediaServer::id), Some("jellyfin"));
+    assert_eq!(
+        declined.as_ref().map(|one| one.filler.id.as_str()),
+        Some(crate::test_support::media::ADAPTER)
+    );
     assert_eq!(
         declined.as_ref().map(|one| one.setting.as_str()),
         Some(crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY)

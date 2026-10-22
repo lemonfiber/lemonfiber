@@ -1,6 +1,7 @@
 //! The media server's cross-origin allow-list, held to the household front door's origin.
 
 use super::*;
+use crate::test_support::media;
 
 /// The origin the front door below is reached at.
 const DOOR: &str = "http://192.168.1.20:5055";
@@ -16,8 +17,9 @@ fn stack() -> Vec<lemonfiber_manifest::Service> {
     vec![published(media_server_svc()), published(requests_svc())]
 }
 
-/// A context whose household is reached at a recorded address, with the media server's
-/// administrator recorded where `administered` says, answering over `http`.
+/// A context whose household is reached at a recorded address, asking the media server
+/// moved into its plugin as its administrator where `administered` says, answering over
+/// `http`.
 fn cors_ctx(name: &str, administered: bool, http: Arc<Fake>) -> Ctx {
     // Kept rather than scoped to this helper, because the context reads the file long
     // after the helper returns and a scratch directory goes when its handle does.
@@ -26,14 +28,7 @@ fn cors_ctx(name: &str, administered: bool, http: Arc<Fake>) -> Ctx {
     let _ = std::fs::create_dir_all(&at);
     let env = at.join(".env");
     let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
-    if administered {
-        let _ = store::set(
-            &env,
-            crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
-            &lemonfiber_fixtures::support::a_password(),
-        );
-    }
-    a_context()
+    let ctx = a_context()
         .environment(crate::platform::Environment::LinuxNative)
         .settings(Settings {
             env_file: Some(env),
@@ -41,62 +36,65 @@ fn cors_ctx(name: &str, administered: bool, http: Arc<Fake>) -> Ctx {
             ..Settings::default()
         })
         .build()
-        .with_http(http)
+        .with_http(http);
+    if administered {
+        media::asking(ctx)
+    } else {
+        ctx
+    }
 }
 
-/// A media server whose allow-list reads as `first`, then as `after` once written.
-fn serving(first: &'static str, after: &'static str) -> Arc<Fake> {
-    Fake::by_path_in_turn(vec![
+/// A media server whose allow-list reads as `held`, taking a write where `takes`.
+fn serving(held: &[&str], takes: bool) -> Arc<Fake> {
+    Fake::by_path(vec![
+        (media::serve("allowed_origins"), media::answered(&held)),
         (
-            "/Users/AuthenticateByName",
-            vec![Answer::reply(200, r#"{"AccessToken":"token"}"#); 4],
-        ),
-        (
-            "/System/Configuration",
-            vec![
-                Answer::reply(200, first),
-                Answer::reply(200, first),
-                Answer::reply(204, ""),
-                Answer::reply(200, after),
-            ],
+            media::serve("allow_only"),
+            if takes {
+                media::taken()
+            } else {
+                media::refusing()
+            },
         ),
     ])
 }
 
 /// The allow-list at the media server's default, and once it names the front door alone.
-const OPEN: &str = r#"{"CorsHosts":["*"]}"#;
-const CLOSED: &str = r#"{"CorsHosts":["http://192.168.1.20:5055"]}"#;
+const OPEN: &[&str] = &["*"];
+const CLOSED: &[&str] = &[DOOR];
+
+/// The origins each write to the allow-list over `http` named, in order.
+fn written(http: &Fake) -> Vec<String> {
+    http.requests()
+        .into_iter()
+        .filter(|asked| asked.url.ends_with(media::serve("allow_only")))
+        .filter_map(|asked| serde_json::from_str::<serde_json::Value>(asked.body.as_deref()?).ok())
+        .filter_map(|asked| asked.get("origin")?.as_str().map(str::to_owned))
+        .collect()
+}
 
 /// The one wiring this pass reports, and the configurations it wrote.
 async fn seeded_cors(ctx: &Ctx, http: &Fake) -> (Option<State>, Vec<String>) {
     let wiring = super::super::cors::seed_cors(ctx, &stack(), served(&stack()).as_ref()).await;
-    let written = http
-        .requests()
-        .into_iter()
-        .filter(|asked| {
-            asked.method == Method::Post && asked.url.ends_with("/System/Configuration")
-        })
-        .filter_map(|asked| asked.body)
-        .collect();
-    (wiring.map(|one| one.state), written)
+    (wiring.map(|one| one.state), written(http))
 }
 
 /// An open list is closed to the front door's origin, and the pass says it wired it.
 #[tokio::test]
 async fn an_open_list_is_closed_to_the_front_door() {
-    let http = serving(OPEN, CLOSED);
+    let http = serving(OPEN, true);
     let ctx = cors_ctx("cors-open", true, http.clone());
 
     let (state, written) = seeded_cors(&ctx, &http).await;
 
     assert_eq!(state, Some(State::Wired));
-    assert_eq!(written, vec![format!(r#"{{"CorsHosts":["{DOOR}"]}}"#)]);
+    assert_eq!(written, vec![DOOR.to_owned()]);
 }
 
 /// A list already naming the front door alone is left as it is.
 #[tokio::test]
 async fn a_list_naming_the_door_alone_is_left_alone() {
-    let http = serving(CLOSED, CLOSED);
+    let http = serving(CLOSED, true);
     let ctx = cors_ctx("cors-closed", true, http.clone());
 
     let (state, written) = seeded_cors(&ctx, &http).await;
@@ -108,7 +106,7 @@ async fn a_list_naming_the_door_alone_is_left_alone() {
 /// A list naming an address the front door has moved from follows it.
 #[tokio::test]
 async fn a_list_follows_the_front_door_when_it_moves() {
-    let http = serving(r#"{"CorsHosts":["http://192.168.1.9:5055"]}"#, CLOSED);
+    let http = serving(&["http://192.168.1.9:5055"], true);
     let ctx = cors_ctx("cors-moved", true, http.clone());
 
     let (state, written) = seeded_cors(&ctx, &http).await;
@@ -120,7 +118,7 @@ async fn a_list_follows_the_front_door_when_it_moves() {
 /// A rehearsal says what it would write over what is there, and writes nothing.
 #[tokio::test]
 async fn a_rehearsal_says_what_it_would_write_and_writes_nothing() {
-    let http = serving(r#"{"CorsHosts":[]}"#, CLOSED);
+    let http = serving(&[], true);
     let mut ctx = cors_ctx("cors-rehearsed", true, http.clone());
     ctx.dry_run = true;
 
@@ -140,7 +138,7 @@ async fn a_rehearsal_says_what_it_would_write_and_writes_nothing() {
 /// because the empty list is the one that opens it.
 #[tokio::test]
 async fn with_no_front_door_address_nothing_is_written_and_the_pass_warns() {
-    let http = serving(OPEN, CLOSED);
+    let http = serving(OPEN, true);
     let mut ctx = cors_ctx("cors-nowhere", true, http.clone());
     ctx.settings.household_host = None;
 
@@ -160,7 +158,7 @@ async fn with_no_front_door_address_nothing_is_written_and_the_pass_warns() {
 /// media server has nothing to hold.
 #[tokio::test]
 async fn without_a_credential_or_a_media_server_nothing_is_asked() {
-    let http = serving(OPEN, CLOSED);
+    let http = serving(OPEN, true);
     let ctx = cors_ctx("cors-uncredentialled", false, http.clone());
     assert!(
         super::super::cors::seed_cors(&ctx, &stack(), served(&stack()).as_ref())
@@ -215,7 +213,7 @@ async fn a_media_server_that_cannot_be_read_is_reported() {
 /// A rehearsal over a list that names origins says which it would replace.
 #[tokio::test]
 async fn a_rehearsal_names_the_origins_it_would_replace() {
-    let http = serving(r#"{"CorsHosts":["*","http://elsewhere:80"]}"#, CLOSED);
+    let http = serving(&["*", "http://elsewhere:80"], true);
     let mut ctx = cors_ctx("cors-rehearsed-named", true, http.clone());
     ctx.dry_run = true;
 
@@ -233,20 +231,7 @@ async fn a_rehearsal_names_the_origins_it_would_replace() {
 /// A write the media server refuses is reported rather than called done.
 #[tokio::test]
 async fn a_write_the_media_server_refuses_is_reported() {
-    let http = Fake::by_path_in_turn(vec![
-        (
-            "/Users/AuthenticateByName",
-            vec![Answer::reply(200, r#"{"AccessToken":"token"}"#); 3],
-        ),
-        (
-            "/System/Configuration",
-            vec![
-                Answer::reply(200, OPEN),
-                Answer::reply(200, OPEN),
-                Answer::reply(400, "refused"),
-            ],
-        ),
-    ]);
+    let http = serving(OPEN, false);
     let ctx = cors_ctx("cors-refused", true, http.clone());
 
     let (state, written) = seeded_cors(&ctx, &http).await;
@@ -268,7 +253,7 @@ async fn a_stack_with_no_door_or_a_door_with_no_port_names_no_origin() {
         ("cors-no-door", vec![media_server_svc(), requests_svc()]),
         ("cors-no-port", vec![media_server_svc(), portless]),
     ] {
-        let http = serving(OPEN, CLOSED);
+        let http = serving(OPEN, true);
         let ctx = cors_ctx(name, true, http.clone());
 
         let wiring =
@@ -290,7 +275,7 @@ async fn a_stack_with_no_door_or_a_door_with_no_port_names_no_origin() {
 /// on the media server's allow-list: the list stays on the stack's own front door.
 #[tokio::test]
 async fn a_plugins_door_never_puts_its_origin_on_the_allow_list() {
-    let http = serving(OPEN, OPEN);
+    let http = serving(OPEN, true);
     let base = cors_ctx("cors-plugin-door", true, http.clone());
     let ctx = Ctx {
         settings: Settings {
@@ -318,14 +303,7 @@ async fn a_plugins_door_never_puts_its_origin_on_the_allow_list() {
 
     let services = [published(media_server_svc())];
     let wiring = super::super::cors::seed_cors(&ctx, &services, served(&services).as_ref()).await;
-    let written: Vec<String> = http
-        .requests()
-        .into_iter()
-        .filter(|asked| {
-            asked.method == Method::Post && asked.url.ends_with("/System/Configuration")
-        })
-        .filter_map(|asked| asked.body)
-        .collect();
+    let written = written(&http);
 
     assert!(
         written.iter().all(|body| !body.contains("home.lan")),

@@ -15,13 +15,10 @@ use crate::common::household::recorded_admin;
 use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Inviting, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::model::Linked;
+use lemonfiber_core::ports::http::Request;
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::http::{Answer, Fake};
-use lemonfiber_fixtures::support::Reporting;
-use lemonfiber_ports::docker::{Health, Lifecycle};
-
-/// The accounts the media server already holds, before this invitation.
-const HELD: &str = r#"[{"Id":"1","Name":"owner","HasPassword":true}]"#;
+use lemonfiber_testing::media;
 
 /// A media server that signs in and takes the account it is given, beside a request
 /// service that answers.
@@ -38,27 +35,23 @@ fn answering_with(linking: Answer) -> Arc<Fake> {
 /// different calls and the first would leave the second untried, so neither stands in
 /// for the other.
 fn answering_all(session: Answer, linking: Answer) -> Arc<Fake> {
-    let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
-    Fake::by_path_in_turn(vec![
-        (
-            "/Users/AuthenticateByName",
-            vec![signed_in.clone(), signed_in.clone(), signed_in],
-        ),
-        (
-            "/System/ActivityLog",
-            vec![Answer::reply(200, r#"{"Items":[]}"#)],
-        ),
-        (
-            "/Users/New",
-            vec![Answer::reply(
-                200,
-                r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
-            )],
-        ),
+    let mut routes = vec![
         ("/user/import-from-jellyfin", vec![linking]),
         ("/auth/me", vec![session]),
-        ("/Users", vec![Answer::reply(200, HELD)]),
-    ])
+    ];
+    // The owner is the one account the media server already holds, before this
+    // invitation.
+    routes.extend(media::household(
+        &[media::member("1", "owner", true)],
+        &media::member("9", "ana", false),
+        &[],
+    ));
+    Fake::by_path_in_turn(routes)
+}
+
+/// Whether an account was asked for.
+fn made_an_account(sent: &[Request]) -> bool {
+    !media::asked(sent, "invite").is_empty()
 }
 
 /// A media server and a request service that both answer.
@@ -66,7 +59,8 @@ fn answering() -> Arc<Fake> {
     answering_with(Answer::reply(201, "{}"))
 }
 
-/// A context over the shipped stack, with the media server up and a password recorded.
+/// A context over the shipped stack, with the media server moved into its plugin and up,
+/// and a password recorded.
 fn context(env: &std::path::Path) -> Ctx {
     context_over(env, answering())
 }
@@ -79,12 +73,13 @@ fn context_over(env: &std::path::Path, http: Arc<Fake>) -> Ctx {
 /// The same again, over a stack the caller chose — for the one case that is about a
 /// stack which does not carry a request service at all.
 fn context_on(env: &std::path::Path, http: Arc<Fake>, stack: Source) -> Ctx {
+    media::keyed_in(context_unmoved(env, http, stack))
+}
+
+/// The same, with the media server still the stack's own.
+fn context_unmoved(env: &std::path::Path, http: Arc<Fake>, stack: Source) -> Ctx {
     lemonfiber_testing::a_context()
-        .engine(Arc::new(Reporting::holding(
-            &["jellyfin"],
-            Lifecycle::Running,
-            Health::Healthy,
-        )))
+        .engine(Arc::new(media::running()))
         .clock(Arc::new(lemonfiber_adapters::System))
         .over(stack)
         .settings(Settings {
@@ -198,9 +193,7 @@ async fn an_invitation_stands_when_the_request_service_will_not_answer() {
         "a link that was not made was reported as though it had been"
     );
     assert!(
-        http.requests()
-            .iter()
-            .any(|request| request.url.contains("/Users/New")),
+        made_an_account(&http.requests()),
         "the media-server account was never even attempted"
     );
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
@@ -238,10 +231,7 @@ async fn somebody_already_here_is_named_once() {
         "the household already here was named more than once, or not at all"
     );
     assert!(
-        !http
-            .requests()
-            .iter()
-            .any(|request| request.url.contains("/Users/New")),
+        !made_an_account(&http.requests()),
         "a second account was made for somebody who already has one"
     );
     assert!(made.is_ok(), "{made:?}");

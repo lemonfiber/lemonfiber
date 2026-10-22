@@ -13,36 +13,20 @@ use crate::error::codes::key::{
 };
 use crate::journal::Kind;
 use crate::keys::{Kept, Minter, Purpose, State, Used};
-use crate::test_support::a_context;
+use crate::test_support::{a_context, media};
 
 /// The household the media server holds: one member, Ana.
-const ANA: &str = r#"[{"Id":"9","Name":"ana","HasPassword":true,
-    "Policy":{"IsAdministrator":false,"EnableAllFolders":true}}]"#;
+fn ana() -> String {
+    crate::test_support::json(&[media::member("9", "ana", true)])
+}
 
-/// A machine keeping its configuration in a directory of this case's own, its media
-/// server answering with `household` where there is one.
-fn a_machine(named: &str, household: Option<&'static str>) -> (Ctx, Arc<Heard>) {
+/// A machine keeping its configuration in a directory of this case's own, its media server
+/// moved into its plugin and answering with `household` where there is one.
+fn a_machine(named: &str, household: Option<String>) -> (Ctx, Arc<Heard>) {
     let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("keys-{named}")).kept();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
     let env = dir.join(".env");
-    let http = match household {
-        Some(users) => {
-            let _ = crate::config::store::set(
-                &env,
-                crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
-                "minted-earlier",
-            );
-            Fake::by_path(vec![
-                (
-                    "/Users/AuthenticateByName",
-                    Answer::reply(200, r#"{"AccessToken":"token"}"#),
-                ),
-                ("/Users", Answer::reply(200, users)),
-            ])
-        }
-        None => Fake::silent(),
-    };
     let heard = Arc::new(Heard::default());
     let ctx = a_context()
         .settings(Settings {
@@ -52,9 +36,15 @@ fn a_machine(named: &str, household: Option<&'static str>) -> (Ctx, Arc<Heard>) 
             ..Settings::default()
         })
         .build()
-        .with_http(http)
         .with_random(Arc::new(Chance::cycling()))
         .with_narrator(heard.clone());
+    let ctx = match household {
+        Some(members) => media::reaching(ctx.with_http(Fake::by_path(vec![(
+            media::identity("household"),
+            Answer::reply(200, members),
+        )]))),
+        None => ctx.with_http(Fake::silent()),
+    };
     (ctx, heard)
 }
 
@@ -218,7 +208,7 @@ async fn a_damaged_record_of_keys_is_refused_and_never_written_over() {
 
 #[tokio::test]
 async fn a_member_key_is_minted_for_the_account_the_household_holds() {
-    let (ctx, _) = a_machine("member", Some(ANA));
+    let (ctx, _) = a_machine("member", Some(ana()));
     let minted = mint(
         &ctx,
         "anas-assistant",
@@ -246,7 +236,7 @@ async fn a_member_key_cannot_be_minted_while_the_household_cannot_be_asked() {
 
 #[tokio::test]
 async fn a_member_mints_only_a_key_scoped_to_themselves() {
-    let (ctx, _) = a_machine("member-self", Some(ANA));
+    let (ctx, _) = a_machine("member-self", Some(ana()));
     allowing_members(&ctx);
     let ana = Minter::Member { id: "9".to_owned() };
     let someone = Minter::Member {
@@ -271,7 +261,7 @@ async fn a_member_mints_only_a_key_scoped_to_themselves() {
 
 #[tokio::test]
 async fn a_member_revokes_only_a_key_scoped_to_themselves() {
-    let (ctx, _) = a_machine("member-revoke", Some(ANA));
+    let (ctx, _) = a_machine("member-revoke", Some(ana()));
     assert!(
         mint(&ctx, "ha", "act", "home-assistant", &Minter::Operator, None)
             .await
@@ -379,13 +369,13 @@ async fn the_listing_says_when_each_key_was_last_used() {
 
 #[tokio::test]
 async fn a_member_key_whose_account_left_is_listed_as_orphaned() {
-    let (ctx, _) = a_machine("orphaned", Some(ANA));
+    let (ctx, _) = a_machine("orphaned", Some(ana()));
     assert!(
         mint(&ctx, "anas", "member:ana", "mcp", &Minter::Operator, None)
             .await
             .is_ok()
     );
-    let (gone, _) = a_machine("orphaned-later", Some("[]"));
+    let (gone, _) = a_machine("orphaned-later", Some("[]".to_owned()));
     let moved = Kept::at(&at(&ctx).unwrap_or_default()).unwrap_or_default();
     assert!(moved.keep(&at(&gone).unwrap_or_default()).is_ok());
     let listing = list(&gone, &Minter::Operator).await;
@@ -457,7 +447,7 @@ fn journal_of(ctx: &Ctx) -> std::path::PathBuf {
 
 #[tokio::test]
 async fn a_member_revokes_a_key_of_their_own() {
-    let (ctx, heard) = a_machine("member-revokes-own", Some(ANA));
+    let (ctx, heard) = a_machine("member-revokes-own", Some(ana()));
     allowing_members(&ctx);
     let ana = Minter::Member { id: "9".to_owned() };
     assert!(mint(&ctx, "anas", "member:ana", "mcp", &ana, None)
@@ -603,7 +593,7 @@ async fn a_record_of_keys_that_does_not_read_lists_and_puts_back_nothing() {
 
 #[tokio::test]
 async fn a_household_that_answers_nonsense_mints_no_member_key() {
-    let (ctx, _) = a_machine("household-nonsense", Some("not a household"));
+    let (ctx, _) = a_machine("household-nonsense", Some("not a household".to_owned()));
     let refused = mint(&ctx, "anas", "member:ana", "mcp", &Minter::Operator, None).await;
     assert!(refused.is_err_and(|problem| problem.code == UNASKED));
     assert!(kept(&ctx).keys.is_empty());
@@ -635,7 +625,7 @@ async fn revoking_a_name_no_key_ever_held_says_so() {
 
 #[tokio::test]
 async fn a_member_mints_nothing_until_the_operator_allows_it() {
-    let (ctx, heard) = a_machine("member-unallowed", Some(ANA));
+    let (ctx, heard) = a_machine("member-unallowed", Some(ana()));
     let ana = Minter::Member { id: "9".to_owned() };
     let refused = mint(&ctx, "anas", "member:ana", "mcp", &ana, None).await;
     assert!(refused.is_err_and(|problem| problem.code == MEMBERS_MAY_NOT_MINT));
@@ -656,7 +646,7 @@ async fn a_member_mints_nothing_until_the_operator_allows_it() {
 
 #[tokio::test]
 async fn a_member_keeps_and_revokes_their_keys_after_the_setting_is_turned_off() {
-    let (ctx, heard) = a_machine("member-turned-off", Some(ANA));
+    let (ctx, heard) = a_machine("member-turned-off", Some(ana()));
     allowing_members(&ctx);
     let ana = Minter::Member { id: "9".to_owned() };
     assert!(mint(&ctx, "anas", "member:ana", "mcp", &ana, None)
@@ -682,7 +672,7 @@ async fn a_member_keeps_and_revokes_their_keys_after_the_setting_is_turned_off()
 
 #[tokio::test]
 async fn a_member_sees_only_their_own_keys_and_never_another_keys_name() {
-    let (ctx, _) = a_machine("member-sees", Some(ANA));
+    let (ctx, _) = a_machine("member-sees", Some(ana()));
     allowing_members(&ctx);
     assert!(
         mint(&ctx, "ha", "act", "home-assistant", &Minter::Operator, None)

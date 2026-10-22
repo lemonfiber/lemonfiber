@@ -17,28 +17,17 @@ use lemonfiber_manifest::{ApiKind, Manifest};
 use lemonfiber_sidecar::gate::Kind;
 
 use crate::app::Ctx;
-use crate::jellyfin::Jellyfin;
 use crate::ports::service::Protocol;
 use crate::wiring::{Address, Filler, Fillers};
 
 use super::downloads::host_fillers;
 use super::filled::{spoken, Spoken};
 use super::layout::project_directory;
-use super::opening::loopback;
 use super::secrets::{record_secret, recorded_secret};
 
 /// What the request service asks the stack for: a service that answers, for the services
 /// that ask, whether a person is who they say they are.
 pub(crate) const IDENTITY: &str = source::CAPABILITY;
-
-/// How lemonfiber speaks to the media server, settled once when it is found.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Reach {
-    /// Through this build's adapter for the bundled server.
-    Bundled(ApiKind),
-    /// Over the contracts it speaks, and no other way.
-    Over,
-}
 
 /// Where, and in which API, another service signs the household in through the media
 /// server.
@@ -55,40 +44,40 @@ pub(crate) struct Pairing {
 /// The service filling the identity source, as everything that reaches it needs it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct MediaServer {
-    /// The service, as the lookup resolved it.
+    /// The service asked over the identity source's contract, as the lookup resolved it.
     pub filler: Filler,
-    /// How it is spoken to.
-    pub reach: Reach,
+    /// The server a household watches on: the upstream [`Self::filler`] fronts, or that
+    /// service itself where it fronts none. Its administrator is the one lemonfiber holds
+    /// a password for, so a server moved in place keeps the password, the address and
+    /// the routes it was set up with.
+    pub served: Filler,
     /// Where and in which API another service signs the household in through it:
     /// nothing where it is an adapter whose upstream names no API it answers in.
     pub pairing: Option<Pairing>,
     /// The service that asks for it, which is the request service — nothing where that
     /// is a service its administrator's password may not be handed to.
     pub asked_by: Option<Filler>,
-    /// Where the host reaches it.
-    pub loopback: String,
-    /// The port it publishes on the host, which an address handed to a person is built on.
+    /// The port the server publishes on the host, which an address handed to a person is
+    /// built on.
     pub port: u16,
-    /// Where the services beside it reach it.
-    pub network: Address,
-    /// The setting the administrator's password lemonfiber minted for it is kept under.
+    /// The setting the administrator's password lemonfiber minted for the server is kept
+    /// under.
     pub setting: String,
 }
 
 impl MediaServer {
     /// Whatever fills the identity source, where one service alone does, it speaks the
-    /// identity source's contract or this build's adapter for the bundled server, the
-    /// host and the stack's network can each reach it, and a setting can be kept for its
-    /// administrator.
+    /// identity source's contract, the server it serves publishes a port on the host,
+    /// and a setting can be kept for that server's administrator.
     ///
     /// Where the stack asks for an identity, the server is what that ask settles on. A
     /// stack where nothing asks — one whose household watches and does not ask — still
     /// has a media server: the one service here serving identity, with nobody asking for
     /// it and so nobody it is handed to.
     ///
-    /// Nothing otherwise: a contest the stack has not settled, a filler spoken to neither
-    /// way and one whose administrator's setting would land on another's are each nothing
-    /// to sign in to rather than something to guess at.
+    /// Nothing otherwise: a contest the stack has not settled, a filler speaking no
+    /// contract and one whose administrator's setting would land on another's are each
+    /// nothing to sign in to rather than something to guess at.
     #[must_use]
     pub(crate) fn of(fillers: &Fillers) -> Option<Self> {
         let (filler, asker) = fillers.filling(IDENTITY)?;
@@ -102,47 +91,35 @@ impl MediaServer {
     }
 
     /// `filler` as a media server nothing asks for, where it speaks the identity source's
-    /// contract or this build's adapter for the bundled server, the host and the stack's
-    /// network can each reach it, and a setting can be kept for its administrator: what a
-    /// service linked to one server by name acts on.
+    /// contract, the server it serves publishes a port on the host, and a setting can be
+    /// kept for that server's administrator: what a service linked to one server by name
+    /// acts on.
     #[must_use]
     pub(crate) fn at(fillers: &Fillers, filler: &Filler) -> Option<Self> {
-        let network = filler.address.clone()?;
-        let (reach, pairing) = if filler.contracted(source::CAPABILITY, source::MAJOR) {
-            (Reach::Over, upstream_pairing(fillers, filler))
-        } else if filler.speaks(ApiKind::Jellyfin) {
-            let pairing = Pairing {
-                protocol: Protocol(ApiKind::Jellyfin.name().to_owned()),
-                at: network.clone(),
-                majors: filler.majors.clone(),
-            };
-            (Reach::Bundled(ApiKind::Jellyfin), Some(pairing))
-        } else {
+        if !filler.contracted(source::CAPABILITY, source::MAJOR) {
             return None;
-        };
-        let port = filler.published?;
+        }
+        let served = fillers.fronted_by(filler).unwrap_or(filler);
         Some(Self {
             asked_by: None,
-            loopback: loopback(port),
-            port,
-            network,
-            setting: fillers.setting(filler, crate::config::ADMIN_PASSWORD_SUFFIX)?,
+            port: served.published?,
+            setting: fillers.setting(served, crate::config::ADMIN_PASSWORD_SUFFIX)?,
+            pairing: upstream_pairing(fillers, filler),
+            served: served.clone(),
             filler: filler.clone(),
-            reach,
-            pairing,
         })
     }
 
-    /// The service's id, which names its container and the request gate's route to it.
+    /// The server's id, which names its container and the request gate's route to it.
     #[must_use]
     pub(crate) fn id(&self) -> &str {
-        &self.filler.id
+        &self.served.id
     }
 
     /// What the server is called in front of an operator.
     #[must_use]
     pub(crate) fn name(&self) -> &str {
-        &self.filler.name
+        &self.served.name
     }
 
     /// The plugin that brought this server, or nothing where the stack ships it.
@@ -189,25 +166,16 @@ impl MediaServer {
     /// Why the record would not take it, in words.
     pub(crate) fn record_password(&self, ctx: &Ctx, password: &str) -> Result<(), String> {
         record_secret(ctx, &self.setting, password).map_err(|failure| failure.to_string())?;
-        self.hand_upstream_if_contracted(password)
-    }
-
-    /// The administrator's credential handed to the server's adapter where it is reached
-    /// over its contracts; nothing where it is the stack's own.
-    ///
-    /// # Errors
-    ///
-    /// Why the adapter's configuration would not take it, in words.
-    pub(crate) fn hand_upstream_if_contracted(&self, password: &str) -> Result<(), String> {
-        match self.reach {
-            Reach::Over => self.hand_upstream(password),
-            Reach::Bundled(_) => Ok(()),
-        }
+        self.hand_upstream(password)
     }
 
     /// The administrator's credential written where the server's adapter reads its
     /// upstream's, beside its key and readable by the operator alone.
-    fn hand_upstream(&self, password: &str) -> Result<(), String> {
+    ///
+    /// # Errors
+    ///
+    /// Why the adapter's configuration would not take it, in words.
+    pub(crate) fn hand_upstream(&self, password: &str) -> Result<(), String> {
         let configuration = self.filler.confined_to.as_deref().ok_or_else(|| {
             format!(
                 "{} has no configuration on this machine to hold its upstream's credential",
@@ -222,77 +190,20 @@ impl MediaServer {
             .map_err(|failure| failure.to_string())
     }
 
-    /// The server as its first run is driven: over `identity.source` where it speaks it,
-    /// otherwise through this build's adapter presenting nothing. Nothing where it speaks
-    /// the contract and cannot be asked over it.
-    pub(crate) async fn setting_up(&self, ctx: &Ctx) -> Option<Arc<dyn source::Fills>> {
-        match self.reach {
-            Reach::Over => self.over_identity(ctx).await,
-            Reach::Bundled(_) => Some(Arc::new(Jellyfin::new(
-                ctx.seams.http.clone(),
-                &self.loopback,
-                self.id(),
-            ))),
-        }
-    }
-
-    /// Who the household is, as the server's administrator answers: over
-    /// `identity.source` where it speaks it, otherwise through this build's adapter with
-    /// the password lemonfiber recorded. Nothing where it cannot be asked either way.
+    /// The server over `identity.source`, as its first run is driven and its household is
+    /// read: nothing where it cannot be asked over it.
     pub(crate) async fn identifying(&self, ctx: &Ctx) -> Option<Arc<dyn source::Fills>> {
-        match self.reach {
-            Reach::Over => self.over_identity(ctx).await,
-            Reach::Bundled(_) => self
-                .administered(ctx)
-                .map(|server| Arc::new(server.remembering(Arc::clone(&ctx.sessions))) as _),
-        }
-    }
-
-    /// The server as its administrator: over `media.serve` where it speaks it, otherwise
-    /// through this build's adapter with the password lemonfiber recorded. Nothing where
-    /// it cannot be asked either way.
-    pub(crate) async fn administering(&self, ctx: &Ctx) -> Option<Arc<dyn serve::Fills>> {
-        match self.reach {
-            Reach::Over => {
-                match Box::pin(spoken(ctx, &self.filler, serve::CAPABILITY, serve::MAJOR)).await {
-                    Spoken::Over(adapter) => Some(Arc::new(serve::Adapter(adapter))),
-                    Spoken::Unanswered | Spoken::Not => None,
-                }
-            }
-            Reach::Bundled(_) => self
-                .administered(ctx)
-                .map(|server| Arc::new(server.remembering(Arc::clone(&ctx.sessions))) as _),
-        }
-    }
-
-    /// The server through this build's adapter as its administrator, signing in with
-    /// `password`: nothing where it is spoken to over its contracts.
-    fn signed_in(&self, ctx: &Ctx, password: impl Into<String>) -> Option<Jellyfin> {
-        let Reach::Bundled(_) = self.reach else {
-            return None;
-        };
-        Some(Jellyfin::authenticated(
-            ctx.seams.http.clone(),
-            &self.loopback,
-            self.id(),
-            crate::config::MEDIA_SERVER_ADMIN_USER,
-            password,
-        ))
-    }
-
-    /// The server through this build's adapter as its administrator, where lemonfiber
-    /// holds the password: nothing for a server spoken to over its contracts, or one
-    /// somebody else set up, which is one this cannot sign in to.
-    #[must_use]
-    pub(crate) fn administered(&self, ctx: &Ctx) -> Option<Jellyfin> {
-        self.recorded_password(ctx)
-            .and_then(|password| self.signed_in(ctx, password))
-    }
-
-    /// The server over `identity.source`, where it can be asked over it.
-    async fn over_identity(&self, ctx: &Ctx) -> Option<Arc<dyn source::Fills>> {
         match Box::pin(spoken(ctx, &self.filler, source::CAPABILITY, source::MAJOR)).await {
             Spoken::Over(adapter) => Some(Arc::new(source::Adapter(adapter))),
+            Spoken::Unanswered | Spoken::Not => None,
+        }
+    }
+
+    /// The server as its administrator, over `media.serve`: nothing where it cannot be
+    /// asked over it.
+    pub(crate) async fn administering(&self, ctx: &Ctx) -> Option<Arc<dyn serve::Fills>> {
+        match Box::pin(spoken(ctx, &self.filler, serve::CAPABILITY, serve::MAJOR)).await {
+            Spoken::Over(adapter) => Some(Arc::new(serve::Adapter(adapter))),
             Spoken::Unanswered | Spoken::Not => None,
         }
     }

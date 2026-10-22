@@ -9,7 +9,7 @@
 use std::fmt::Write as _;
 use std::sync::Arc;
 
-use crate::ports::http::{Fetched, Http, Method, Request, Response};
+use crate::ports::http::{Http, Method, Request, Response};
 use crate::ports::service::Failure;
 use crate::text::fitted;
 
@@ -145,14 +145,6 @@ impl Endpoint {
     pub(crate) async fn send(&self, request: &Request) -> Result<Response, Failure> {
         self.http
             .send(request)
-            .await
-            .map_err(|_| self.unavailable())
-    }
-
-    /// Send a request and read its body as bytes, holding no more than `most`.
-    pub(crate) async fn fetch(&self, request: &Request, most: usize) -> Result<Fetched, Failure> {
-        self.http
-            .fetch(request, most)
             .await
             .map_err(|_| self.unavailable())
     }

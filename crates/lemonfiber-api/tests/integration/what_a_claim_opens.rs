@@ -14,25 +14,18 @@ const CLAIM: &str = "the-claim-on-ana";
 const CLAIM_HASHED: &str = "4937ceb5cd32fb8486f0e47e678405b43c5893c216c71e1aa81ac11be22a0ddf";
 
 /// Ana's account, nobody having set its password yet.
-const UNCLAIMED: &str = r#"[{"Id":"a7f3","Name":"ana","HasPassword":false,
-    "Policy":{"IsAdministrator":false,"EnableAllFolders":true}}]"#;
+fn unclaimed() -> Vec<Member> {
+    vec![media::member("a7f3", "ana", false)]
+}
 
-/// A media server holding `household`, whose empty-password sign-in answers
-/// `empty_sign_in`.
-fn holding(household: &'static str, empty_sign_in: Reply) -> Arc<Fake> {
-    Fake::by_path_in_turn(vec![
-        (
-            "/Users/AuthenticateByName",
-            vec![
-                Reply::reply(200, SIGNED_IN),
-                empty_sign_in,
-                Reply::reply(200, SIGNED_IN),
-            ],
-        ),
-        ("/Users/a7f3/Password", vec![Reply::reply(204, "")]),
-        ("/Sessions/Logout", vec![Reply::reply(204, "")]),
-        ("/Users/Me", vec![Reply::reply(200, STANDING)]),
-        ("/Users", vec![Reply::reply(200, household)]),
+/// A media server holding `household`, answering the first password set on an account
+/// with `claim`.
+fn holding(household: &[Member], claim: Reply) -> Arc<Fake> {
+    Fake::by_path(vec![
+        (media::identity("household"), media::answered(&household)),
+        (media::identity("claim"), claim),
+        (media::identity("whoever"), recognised()),
+        (media::identity("standing"), standing()),
     ])
 }
 
@@ -81,10 +74,7 @@ fn too_short() -> String {
 
 /// Whether the media server was asked to set a password.
 fn set_a_password(transport: &Fake) -> bool {
-    transport
-        .requests()
-        .iter()
-        .any(|request| request.url.ends_with("/Password"))
+    !media::asked(&transport.requests(), "claim").is_empty()
 }
 
 fn the_code(body: &str) -> String {
@@ -96,7 +86,7 @@ fn the_code(body: &str) -> String {
 
 #[tokio::test]
 async fn a_claim_on_an_open_invitation_sets_the_password_and_opens_a_session() {
-    let transport = holding(UNCLAIMED, Reply::reply(200, SIGNED_IN));
+    let transport = holding(&unclaimed(), media::answered(&true));
     let ctx = offered("claim-opens", transport.clone());
     let (router, admitting) = door_over(&ctx);
 
@@ -131,7 +121,7 @@ async fn a_claim_on_an_open_invitation_sets_the_password_and_opens_a_session() {
 
 #[tokio::test]
 async fn a_token_the_invitation_does_not_carry_is_refused_and_sets_nothing() {
-    let transport = holding(UNCLAIMED, Reply::reply(200, SIGNED_IN));
+    let transport = holding(&unclaimed(), media::answered(&true));
     let ctx = offered("claim-guessed", transport.clone());
     let (router, _) = door_over(&ctx);
 
@@ -148,7 +138,7 @@ async fn a_token_the_invitation_does_not_carry_is_refused_and_sets_nothing() {
 /// asked of the media server, naming that least.
 #[tokio::test]
 async fn a_short_password_is_refused_before_the_media_server_is_asked() {
-    let transport = holding(UNCLAIMED, Reply::reply(200, SIGNED_IN));
+    let transport = holding(&unclaimed(), media::answered(&true));
     let ctx = offered("claim-short", transport.clone());
     let (router, _) = door_over(&ctx);
 
@@ -169,7 +159,7 @@ async fn a_short_password_is_refused_before_the_media_server_is_asked() {
 
 #[tokio::test]
 async fn an_account_somebody_already_claimed_is_not_claimed_again() {
-    let transport = holding(HOUSEHOLD, Reply::reply(200, SIGNED_IN));
+    let transport = holding(&household(), media::answered(&true));
     let ctx = offered("claim-taken", transport.clone());
     let (router, _) = door_over(&ctx);
 
@@ -181,18 +171,18 @@ async fn an_account_somebody_already_claimed_is_not_claimed_again() {
     let _ = fs::remove_dir_all(a_directory("claim-taken"));
 }
 
-/// The media server refusing the empty password is an account that is claimed or
-/// switched off by the time the claim reaches it: refused, and the claim kept.
+/// The media server setting no password is an account that is claimed or switched off by
+/// the time the claim reaches it: refused, and the claim kept.
 #[tokio::test]
 async fn an_account_the_media_server_will_not_sign_in_empty_is_refused() {
-    let transport = holding(UNCLAIMED, Reply::reply(401, ""));
+    let transport = holding(&unclaimed(), media::answered(&false));
     let ctx = offered("claim-closed", transport.clone());
     let (router, _) = door_over(&ctx);
 
     let answer = claimed(router, &hers(), CLAIM).await;
 
     assert_eq!(answer.status, StatusCode::UNAUTHORIZED, "{}", answer.body);
-    assert!(!set_a_password(&transport));
+    assert!(session(&answer.body).is_empty());
     let Some(env) = ctx.settings.env_file.as_deref() else {
         unreachable!("a stack built here has an env file")
     };
@@ -205,10 +195,7 @@ async fn an_account_the_media_server_will_not_sign_in_empty_is_refused() {
 /// closed, so nobody is sent to ask for a new one.
 #[tokio::test]
 async fn a_household_that_cannot_be_read_claims_nothing() {
-    let transport = Fake::by_path(vec![
-        ("/Users/AuthenticateByName", Reply::reply(200, SIGNED_IN)),
-        ("/Users", Reply::reply(500, "")),
-    ]);
+    let transport = Fake::by_path(vec![(media::identity("household"), media::refusing())]);
     let ctx = offered("claim-unread", transport.clone());
     let (router, _) = door_over(&ctx);
 
@@ -224,14 +211,7 @@ async fn a_household_that_cannot_be_read_claims_nothing() {
 /// answering, and the claim is kept for another try.
 #[tokio::test]
 async fn a_password_the_media_server_will_not_take_keeps_the_claim() {
-    let transport = Fake::by_path_in_turn(vec![
-        (
-            "/Users/AuthenticateByName",
-            vec![Reply::reply(200, SIGNED_IN)],
-        ),
-        ("/Users/a7f3/Password", vec![Reply::reply(400, "")]),
-        ("/Users", vec![Reply::reply(200, UNCLAIMED)]),
-    ]);
+    let transport = holding(&unclaimed(), media::refusing());
     let ctx = offered("claim-refused", transport.clone());
     let (router, _) = door_over(&ctx);
 
@@ -262,7 +242,7 @@ async fn a_household_keeping_no_record_offers_no_claim() {
 async fn a_household_kept_for_a_while_asks_the_record_about_a_claim() {
     let ctx = offered(
         "claim-remembered",
-        holding(UNCLAIMED, Reply::reply(200, SIGNED_IN)),
+        holding(&unclaimed(), media::answered(&true)),
     );
     let kept = Remembered::over(Arc::new(ctx.clone()));
 

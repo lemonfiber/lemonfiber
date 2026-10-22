@@ -61,8 +61,8 @@ fn asking_curators(mut installed: crate::plugin::Installed) -> crate::plugin::In
 
 /// A stack directory whose gate accepts `held` on the curator's route, and a context over
 /// `http` reaching a first-party plugin's request service speaking `request.intake` in
-/// place of the stack's own, holding its key where `keyed`; with the stack's services and
-/// what its asks come to.
+/// place of the stack's own, holding its key where `keyed`, with the media server moved
+/// into its plugin; with the stack's services and what its asks come to.
 fn beside_contracted_requests(
     name: &str,
     keyed: bool,
@@ -96,16 +96,24 @@ fn beside_contracted_requests(
         .manifest()
         .map(|mut manifest| {
             manifest.services = services.clone();
-            crate::wiring::Fillers::trusting(
-                &manifest,
-                &[asking_curators(crate::test_support::contracted(
+            let installed: Vec<_> = crate::test_support::media::moved()
+                .into_iter()
+                .chain([asking_curators(crate::test_support::contracted(
                     "intake",
                     crate::test_support::CONTRACTED_REQUESTS,
                     "request.intake",
-                ))],
+                ))])
+                .collect();
+            let trusted: Vec<_> = crate::test_support::first_party("intake")
+                .into_iter()
+                .chain(crate::plugin::first_party::EMBEDDED.iter().copied())
+                .collect();
+            crate::wiring::Fillers::trusting(
+                &manifest,
+                &installed,
                 &crate::wiring::Chosen::default(),
                 Some(&at),
-                &crate::test_support::first_party("intake"),
+                &trusted,
             )
         })
         .unwrap_or_default();
@@ -157,10 +165,9 @@ async fn a_first_party_request_service_is_handed_a_token_over_the_contract() {
         ("/v1/move_fulfilment_target", vec![Answer::reply(204, "")]),
         ("/v1/test_fulfilment_target", vec![Answer::reply(204, "")]),
         (
-            "/Users/AuthenticateByName",
-            vec![Answer::reply(200, r#"{"AccessToken":"session"}"#)],
+            crate::test_support::media::serve("filed_as"),
+            vec![Answer::reply(200, crate::test_support::json(&["gates"]))],
         ),
-        ("/Auth/Keys", vec![Answer::reply(200, gate_keys())]),
     ]);
     let (ctx, at, services, fillers) =
         beside_contracted_requests("tokens-first-party", true, &http);

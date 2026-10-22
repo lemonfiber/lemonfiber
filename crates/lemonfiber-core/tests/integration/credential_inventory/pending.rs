@@ -4,8 +4,10 @@
 use super::{ctx, env_at, recorded, the_torrent_password};
 use lemonfiber_core::app::{dispatch, Command};
 use lemonfiber_core::config::{MEDIA_SERVER_ADMIN_PASSWORD_KEY, TORRENT_PASSWORD_KEY};
+use lemonfiber_core::ports::service::Signed;
 use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::http::{Answer, Fake};
+use lemonfiber_testing::media;
 use std::sync::Arc;
 
 /// The name a torrent client's replacement is kept under.
@@ -97,7 +99,7 @@ async fn an_unsettled_question_leaves_both_where_they_are() {
 }
 
 /// The media server's administrator password is settled the same way, through a
-/// sign-in as the administrator.
+/// sign-in as the administrator, asked of the server moved into its plugin.
 #[tokio::test]
 async fn the_administrators_replacement_is_settled_through_a_sign_in() {
     let env = env_at(
@@ -107,12 +109,21 @@ async fn the_administrators_replacement_is_settled_through_a_sign_in() {
             ("JELLYFIN_ADMIN_PASSWORD_PENDING", &the_replacement()),
         ],
     );
-    let session = r#"{"AccessToken":"token","User":{"Id":"admin-id"}}"#;
     let http = Fake::by_path_in_turn(vec![(
-        "/Users/AuthenticateByName",
-        vec![Answer::reply(401, ""), Answer::reply(200, session)],
+        media::identity("whoever"),
+        vec![
+            media::answered(&None::<Signed>),
+            media::answered(&Some(Signed {
+                id: "admin-id".to_owned(),
+                token: "token".to_owned(),
+            })),
+        ],
     )]);
-    any_command(&env, http, false).await;
+    let _ = dispatch(
+        Command::Forms,
+        &media::reaching(ctx(env.clone(), Files::empty(), http)),
+    )
+    .await;
     assert_eq!(
         recorded(&env, MEDIA_SERVER_ADMIN_PASSWORD_KEY),
         Some(the_replacement())

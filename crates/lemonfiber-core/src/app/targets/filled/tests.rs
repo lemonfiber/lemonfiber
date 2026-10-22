@@ -8,7 +8,8 @@ use super::{identified, identity, media, served, serving};
 use crate::app::Ctx;
 use crate::plugin::Installed;
 use crate::ports::docker::{Health, Lifecycle};
-use crate::test_support::{a_context, a_password, a_placed, an_installed, Reporting};
+use crate::test_support::media as moved_in;
+use crate::test_support::{a_context, a_placed, an_installed, Reporting};
 use crate::wiring::{Chosen, Fillers};
 
 const ADAPTER: &str = "plex-adapter";
@@ -120,27 +121,29 @@ async fn a_filler_speaking_a_major_this_build_does_not_is_never_asked_as_the_bun
     assert!(fake.request().is_none());
 }
 
-/// A context over the repository's stack, with an env file of its own holding the
-/// media server's administrator's password where one is given.
-fn bundled(tag: &str, password: Option<&str>) -> Ctx {
+/// A context over the repository's stack with its media server moved into its plugin,
+/// whose adapter's key is written where `keyed`.
+fn moved(tag: &str, keyed: bool) -> Ctx {
     let dir = Scratch::named(&format!("filled-{tag}")).kept();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
-    let mut ctx = a_context().build();
+    let mut ctx = a_context()
+        .engine(Arc::new(moved_in::running()))
+        .build()
+        .with_http(Fake::always(Answer::reply(200, "[]")));
     ctx.settings.env_file = Some(dir.join(".env"));
-    if let Some(password) = password {
-        let _ = crate::app::targets::record_secret(
-            &ctx,
-            crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
-            password,
-        );
+    moved_in::moved_in(&ctx);
+    if !keyed {
+        if let Some(key) = moved_in::key_at(&ctx) {
+            let _ = std::fs::remove_file(key);
+        }
     }
     ctx
 }
 
 #[tokio::test]
-async fn the_bundled_server_is_asked_as_its_administrator_where_its_password_is_recorded() {
-    let ctx = bundled("bundled", Some(&a_password()));
+async fn a_moved_server_is_asked_over_its_contracts_where_its_adapter_holds_its_key() {
+    let ctx = moved("moved", true);
     let Ok(manifest) = ctx.stack.checked_manifest(ctx.today()) else {
         unreachable!("the repository's stack reads")
     };
@@ -149,10 +152,10 @@ async fn the_bundled_server_is_asked_as_its_administrator_where_its_password_is_
     assert!(identity(&ctx, &manifest).await.is_some());
     assert!(serving(&ctx, &manifest).await.is_some());
 
-    let unseeded = bundled("unseeded", None);
-    assert!(media(&unseeded, &manifest).await.is_none());
-    assert!(identity(&unseeded, &manifest).await.is_none());
-    assert!(serving(&unseeded, &manifest).await.is_none());
+    let unkeyed = moved("unkeyed", false);
+    assert!(media(&unkeyed, &manifest).await.is_none());
+    assert!(identity(&unkeyed, &manifest).await.is_none());
+    assert!(serving(&unkeyed, &manifest).await.is_none());
 }
 
 #[tokio::test]

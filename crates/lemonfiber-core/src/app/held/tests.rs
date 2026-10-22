@@ -3,76 +3,66 @@ use std::sync::Arc;
 use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
 use super::{account as whose, held, unread, Ctx, Whom};
-use crate::ports::service::{Access, Medium, Member};
-use crate::test_support::{a_context, a_password, SeedFs};
+use crate::ports::service::{Access, Holds, Item, Medium, Member};
+use crate::test_support::{json, media, moved_household};
 
-/// A curator config carrying a readable key, so the stack resolves its targets.
-const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
+/// What the media server holds: a film and a series.
+fn shelf() -> Vec<Item> {
+    let item = |id: &str, title: &str, year: Option<u16>, medium: Medium| Item {
+        id: id.to_owned(),
+        title: title.to_owned(),
+        year,
+        medium,
+        holds: Holds::default(),
+    };
+    vec![
+        item("i1", "Arrival", Some(2016), Medium::Film),
+        item("i2", "The Expanse", None, Medium::Series),
+    ]
+}
 
 /// The media server's scripted answers to the two questions this read asks it.
 struct Server {
     /// Who it says holds an account.
-    accounts: &'static str,
+    accounts: String,
     /// What it answers about one account's shelf, and with what status.
-    shelf: (u16, &'static str),
+    shelf: (u16, String),
 }
 
 impl Default for Server {
     fn default() -> Self {
         Self {
-            accounts: r#"[{"Id":"a7f3","Name":"Ada","HasPassword":true,
-                "Policy":{"EnableAllFolders":true}}]"#,
-            shelf: (
-                200,
-                r#"{"Items":[
-                    {"Id":"i1","Name":"Arrival","ProductionYear":2016,"Type":"Movie"},
-                    {"Id":"i2","Name":"The Expanse","Type":"Series"}]}"#,
-            ),
+            accounts: json(&vec![account("a7f3", "Ada")]),
+            shelf: (200, json(&shelf())),
         }
     }
 }
 
 impl Server {
     /// The scripted answers as a transport, routed by what each call asks for.
-    ///
-    /// The shelf sits ahead of the account list because `/Users/{id}/Items`
-    /// contains both fragments, and behind the sign-in for the same reason.
     fn transport(&self) -> Arc<Transport> {
         Transport::by_path(vec![
             (
-                "/Users/AuthenticateByName",
-                Answer::reply(200, r#"{"AccessToken":"token"}"#),
+                media::serve("holdings"),
+                Answer::reply(self.shelf.0, self.shelf.1.clone()),
             ),
-            ("/Items", Answer::reply(self.shelf.0, self.shelf.1)),
-            ("/Users", Answer::reply(200, self.accounts)),
-            ("", Answer::reply(200, "[]")),
+            (
+                media::identity("household"),
+                Answer::reply(200, self.accounts.clone()),
+            ),
         ])
     }
 }
 
-/// A context whose media server can be reached: the admin password is recorded, so
-/// the media server is asked as its administrator. Tagged so each case keeps its own env file
-/// rather than racing on a shared one.
+/// A context whose media server has moved into its plugin and can be asked. Tagged so
+/// each case keeps its own env file rather than racing on a shared one.
 fn ctx_with(server: &Server, tag: &str) -> Ctx {
     ctx_over(server.transport(), tag)
 }
 
 /// The same context over a transport the caller keeps, to read back what was asked.
 fn ctx_over(transport: Arc<Transport>, tag: &str) -> Ctx {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("held-{tag}")).kept();
-    let _ = std::fs::remove_dir_all(&dir);
-    let _ = std::fs::create_dir_all(&dir);
-    let mut context = a_context()
-        .build()
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
-        .with_http(transport);
-    context.settings.env_file = Some(dir.join(".env"));
-    let _ = crate::app::targets::record_secret(
-        &context,
-        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
-        &a_password(),
-    );
-    context
+    moved_household(&format!("held-{tag}"), transport)
 }
 
 fn account(id: &str, name: &str) -> Member {
@@ -178,7 +168,7 @@ async fn the_same_shelf_answers_an_id_as_answers_a_name() {
 async fn a_household_the_server_will_not_name_leaves_the_shelf_unread() {
     let context = ctx_with(
         &Server {
-            accounts: "not json",
+            accounts: "not json".to_owned(),
             ..Server::default()
         },
         "nameless",
@@ -231,7 +221,7 @@ async fn nobody_of_that_name_has_no_shelf_rather_than_an_empty_one() {
 async fn a_shelf_the_server_will_not_answer_is_unread_and_still_says_whose() {
     let context = ctx_with(
         &Server {
-            shelf: (500, ""),
+            shelf: (500, String::new()),
             ..Server::default()
         },
         "refused",
@@ -295,13 +285,15 @@ async fn the_defaults_shelf_asks_nothing_about_who_holds_an_account() {
         .map(|one| one.url)
         .collect();
     assert!(
-        asked.iter().any(|url| url.contains("/Items?")),
+        asked
+            .iter()
+            .any(|url| url.ends_with(media::serve("holdings"))),
         "the shelf was never asked for: {asked:?}"
     );
     assert!(
         !asked
             .iter()
-            .any(|url| url.contains("/Users") && !url.contains("/Users/AuthenticateByName")),
+            .any(|url| url.ends_with(media::identity("household"))),
         "an account was read for the defaults: {asked:?}"
     );
 }
@@ -311,7 +303,7 @@ async fn the_defaults_shelf_asks_nothing_about_who_holds_an_account() {
 async fn a_defaults_shelf_the_server_will_not_answer_is_unread() {
     let context = ctx_with(
         &Server {
-            shelf: (500, ""),
+            shelf: (500, String::new()),
             ..Server::default()
         },
         "defaults-refused",

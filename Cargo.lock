@@ -1594,9 +1594,15 @@ dependencies = [
 name = "lemonfiber-testing"
 version = "0.17.0"
 dependencies = [
+ "include_dir",
  "lemonfiber-adapters",
+ "lemonfiber-bundled",
+ "lemonfiber-contract",
  "lemonfiber-core",
  "lemonfiber-fixtures",
+ "lemonfiber-plugin",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

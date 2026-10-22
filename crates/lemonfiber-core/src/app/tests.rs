@@ -15,9 +15,12 @@ use crate::model::InvitationStanding;
 use crate::model::VersionReport;
 use crate::ports::docker::{Engine, Failure as EngineFailure, Health, Lifecycle, LogQuery};
 use crate::ports::process::{Failure, Output, Progress};
+use crate::ports::service::Invited as Recorded;
 use crate::quality::Preset;
 use crate::stack::Source;
-use crate::test_support::{a_context, nowhere, refused, spoke, Recording, Reporting, Scripted};
+use crate::test_support::{
+    a_context, media, nowhere, refused, spoke, Recording, Reporting, Scripted,
+};
 use lemonfiber_fixtures::http::{Answer, Fake};
 use std::time::Duration;
 
@@ -64,49 +67,67 @@ fn recorded_admin(name: &str) -> std::path::PathBuf {
     env
 }
 
-/// A media server holding one account, and answering every call this makes.
-///
-/// `Users` is what the household read returns, and `log` what the record of
-/// account-making returns — the two halves that decide what is already here.
-fn holding(log: &'static str, users: &'static str) -> std::sync::Arc<Fake> {
-    let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
-    Fake::by_path_in_turn(vec![
-        (
-            "/Users/AuthenticateByName",
-            vec![
-                signed_in.clone(),
-                signed_in.clone(),
-                signed_in.clone(),
-                signed_in,
-            ],
-        ),
-        ("/System/ActivityLog", vec![Answer::reply(200, log)]),
-        (
-            "/Users/New",
-            vec![Answer::reply(
-                200,
-                r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
-            )],
-        ),
-        (
-            "/Users/7",
-            vec![Answer::reply(
-                200,
-                r#"{"Id":"7","Policy":{"IsAdministrator":false}}"#,
-            )],
-        ),
-        ("/Users", vec![Answer::reply(200, users)]),
-    ])
+/// A media server holding `members`, recording `since` as when each invitation was made,
+/// making account `9` for ana when asked to invite somebody, and taking every write.
+fn holding(since: &[Recorded], members: &[crate::ports::service::Member]) -> Arc<Fake> {
+    Fake::by_path_in_turn(answering(since, members))
+}
+
+/// The routes [`holding`] answers, for a test that adds the request service's.
+fn answering(
+    since: &[Recorded],
+    members: &[crate::ports::service::Member],
+) -> Vec<(&'static str, Vec<Answer>)> {
+    media::household(members, &media::member("9", "ana", false), since)
+}
+
+/// The media server's record of account `id` being made at `at`.
+fn made(id: &str, at: String) -> Vec<Recorded> {
+    vec![Recorded {
+        member: id.to_owned(),
+        at,
+    }]
 }
 
 /// What the media server records of account `id` being made an hour ago, by the test clock.
-fn made_lately(id: &str) -> &'static str {
-    let at = a_context().build().hours_ago(1);
-    Box::leak(
-        format!(r#"{{"Items":[{{"Type":"UserCreated","Date":"{at}","UserId":"{id}"}}]}}"#)
-            .into_boxed_str(),
+fn made_lately(id: &str) -> Vec<Recorded> {
+    made(id, a_context().build().hours_ago(1))
+}
+
+/// What the media server records of account `id` being made long before any window.
+fn made_long_ago(id: &str) -> Vec<Recorded> {
+    made(id, "2000-01-01T00:00:00Z".to_owned())
+}
+
+/// A context over the shipped stack with its media server moved into its plugin, the env
+/// file `env` and a household host, answering over `http`.
+fn offered_at(env: &std::path::Path, http: Arc<Fake>) -> Ctx {
+    media::reaching(
+        a_context()
+            .settings(Settings {
+                env_file: Some(env.to_path_buf()),
+                household_host: Some("192.168.1.20".to_owned()),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http),
     )
 }
+
+/// Whether `asked` went to the media server's `operation` of `identity.source`.
+fn asked_to(asked: &crate::ports::http::Request, operation: &str) -> bool {
+    asked.url.ends_with(media::identity(operation))
+}
+
+/// The identity operations that change the household.
+const HOUSEHOLD_WRITES: [&str; 6] = [
+    "invite",
+    "claimable",
+    "allow",
+    "unclaim",
+    "withdraw",
+    "suspend",
+];
 
 /// What a version report looks like when the engine said `compose`.
 ///

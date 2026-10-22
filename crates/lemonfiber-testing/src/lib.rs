@@ -7,6 +7,7 @@
 //! so the core includes [`context`] as a module of its own rather than as this crate.
 
 pub mod context;
+pub mod media;
 pub mod placeholder;
 
 pub use context::{a_context, a_live_context, nowhere, repository_stack, Context};

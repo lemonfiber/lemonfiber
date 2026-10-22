@@ -374,7 +374,7 @@ async fn a_shelf_with_no_media_server_behind_it_is_unread_not_empty() {
         "an unread shelf reported itself as read: {json}"
     );
     assert!(
-        json.contains("no recorded"),
+        json.contains("cannot be asked over its contracts"),
         "an unread shelf did not say why: {json}"
     );
 }

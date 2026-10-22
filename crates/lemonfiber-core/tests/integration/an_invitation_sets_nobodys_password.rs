@@ -11,11 +11,12 @@
 //! and nothing else, and what comes back to be passed on has no field it could be
 //! carried in.
 //!
-//! **One password does travel, and pretending otherwise would make this a filter
-//! nobody could check.** lemonfiber signs in to the media server as itself, with the
-//! credential it minted and recorded for that account. So the claim is not "no
-//! password appears" — it is that the only one that ever leaves is this program's
-//! own, and it goes only to the route where this program identifies itself.
+//! **Not even this program's own password travels.** The media server's plugin holds
+//! the administrator's credential and is asked with a key of its own, and the request
+//! service is asked with its own key, so the credential lemonfiber minted and recorded
+//! for the media server's administrator is in nothing either command sends. The claim
+//! is checked against that recorded credential, over traffic that is shown to have
+//! made the account calls, so it cannot pass on an exchange that never ran.
 //!
 //! **A reset is held to the same claim, because it is the same claim.** Putting an
 //! account back to having no password is the one way somebody who lost theirs gets in
@@ -34,39 +35,9 @@ use crate::common::household::recorded_admin;
 use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Inviting, Outcome};
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::ports::http::Request;
+use lemonfiber_core::ports::service::{Certificate, Member};
 use lemonfiber_fixtures::http::{Answer, Fake};
-use lemonfiber_fixtures::support::Reporting;
-use lemonfiber_ports::docker::{Health, Lifecycle};
-
-/// Where this program signs in as itself. **Two services, one credential**: it
-/// authenticates to the media server directly, and to the request service *through* the
-/// media server, which is the whole of why a household member needs no second account.
-///
-/// Both are this program identifying itself. Neither is somebody else's password, which
-/// is what the requirement is about — so the claim below is that the credential goes to
-/// these and nowhere else, not that it goes to one place.
-const SIGN_INS: [&str; 2] = ["/Users/AuthenticateByName", "/auth/jellyfin"];
-
-/// Stood in for any door [`SIGN_INS`] does not name, so that a failure says a password
-/// went somewhere it should not have without repeating where.
-const SOMEWHERE_ELSE: &str = "a door this file does not name";
-
-/// Where an account is asked for.
-const NEW_ACCOUNT: &str = "/Users/New";
-
-/// Where an account is put back to having no password on it.
-///
-/// The same endpoint somebody changes their own password at, which is why what is sent
-/// to it is asserted whole below rather than searched: `CurrentPw` and `NewPw` are
-/// fields it accepts, and sending neither is the whole of what makes this a reset the
-/// operator cannot read the result of.
-const RESET: &str = "/Users/9/Password";
-
-/// The household after Ana has claimed her account, which is what a reset is for.
-const CLAIMED: &str = r#"[
-    {"Id":"1","Name":"owner","HasPassword":true,"Policy":{"IsAdministrator":true}},
-    {"Id":"9","Name":"ana","HasPassword":true,"Policy":{"IsAdministrator":false}}
-]"#;
+use lemonfiber_testing::media;
 
 /// The operator's own recorded credential, assembled rather than written down: a
 /// literal reads to a source scanner as a credential committed to the repository.
@@ -74,77 +45,56 @@ fn admin_password() -> String {
     ["minted", "-earlier"].concat()
 }
 
-/// A media server that signs in, holds Ana with a password, and accepts the reset.
-fn a_server_holding_a_claimed_account() -> Arc<Fake> {
-    let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
-    Fake::by_path_in_turn(vec![
-        (
-            "/Users/AuthenticateByName",
-            vec![signed_in.clone(), signed_in.clone(), signed_in],
-        ),
-        ("/auth/jellyfin", vec![Answer::reply(200, "{}")]),
-        (RESET, vec![Answer::reply(204, "")]),
-        (
-            "/Users/9",
-            vec![Answer::reply(200, r#"{"Id":"9","Name":"ana","Policy":{}}"#)],
-        ),
-        ("/Users", vec![Answer::reply(200, CLAIMED)]),
-    ])
-}
-
-/// A media server that signs in, holds nobody, and takes the account it is given.
-fn a_server_holding_nobody() -> Arc<Fake> {
-    let signed_in = Answer::reply(200, r#"{"AccessToken":"token"}"#);
-    Fake::by_path_in_turn(vec![
-        (
-            "/Users/AuthenticateByName",
-            vec![signed_in.clone(), signed_in.clone(), signed_in],
-        ),
+/// A media server holding `members`, making Ana's account when asked to invite her,
+/// beside a request service that takes whoever it is told about.
+fn a_server_holding(members: &[Member]) -> Arc<Fake> {
+    let mut routes = vec![
         ("/auth/jellyfin", vec![Answer::reply(200, "{}")]),
         ("/user/import-from-jellyfin", vec![Answer::reply(201, "{}")]),
         (
-            "/System/ActivityLog",
-            vec![Answer::reply(200, r#"{"Items":[]}"#)],
+            media::identity("ratings"),
+            vec![media::answered(&[Certificate {
+                name: "12A".to_owned(),
+                age: 12,
+            }])],
         ),
-        (
-            "/Localization/ParentalRatings",
-            vec![Answer::reply(200, r#"[{"Name":"12A","Value":12}]"#)],
-        ),
-        ("/Users/9/Policy", vec![Answer::reply(204, "")]),
-        (
-            NEW_ACCOUNT,
-            vec![Answer::reply(
-                200,
-                r#"{"Id":"9","Name":"ana","HasPassword":false}"#,
-            )],
-        ),
-        (
-            "/Users/9",
-            vec![Answer::reply(
-                200,
-                r#"{"Id":"9","Name":"ana","HasPassword":false,"Policy":{}}"#,
-            )],
-        ),
-        ("/Users", vec![Answer::reply(200, "[]")]),
-    ])
+    ];
+    routes.extend(media::household(
+        members,
+        &media::member("9", "ana", false),
+        &[],
+    ));
+    Fake::by_path_in_turn(routes)
 }
 
-/// A context over the shipped stack, with the media server up and a password recorded.
+/// A media server holding Ana with a password, after she claimed her account, which is
+/// what a reset is for.
+fn a_server_holding_a_claimed_account() -> Arc<Fake> {
+    let mut owner = media::member("1", "owner", true);
+    owner.access.administrator = true;
+    a_server_holding(&[owner, media::member("9", "ana", true)])
+}
+
+/// A media server holding nobody, which takes the account it is given.
+fn a_server_holding_nobody() -> Arc<Fake> {
+    a_server_holding(&[])
+}
+
+/// A context over the shipped stack, with the media server moved into its plugin and up,
+/// and a password recorded.
 fn context(env: &std::path::Path, http: Arc<Fake>) -> Ctx {
-    lemonfiber_testing::a_context()
-        .engine(Arc::new(Reporting::holding(
-            &["jellyfin"],
-            Lifecycle::Running,
-            Health::Healthy,
-        )))
-        .clock(Arc::new(lemonfiber_adapters::System))
-        .settings(Settings {
-            env_file: Some(env.to_path_buf()),
-            household_host: Some("192.168.1.20".to_owned()),
-            ..Settings::default()
-        })
-        .build()
-        .with_http(http)
+    media::keyed_in(
+        lemonfiber_testing::a_context()
+            .engine(Arc::new(media::running()))
+            .clock(Arc::new(lemonfiber_adapters::System))
+            .settings(Settings {
+                env_file: Some(env.to_path_buf()),
+                household_host: Some("192.168.1.20".to_owned()),
+                ..Settings::default()
+            })
+            .build()
+            .with_http(http),
+    )
 }
 
 /// Every command that hands an operator an invitation to pass on, with the server each
@@ -241,29 +191,19 @@ async fn allowing(scratch: &str) -> (Vec<Request>, Option<Outcome>) {
 async fn the_account_is_asked_for_by_name_and_nothing_else() {
     let (sent, _) = offering("by-name").await;
 
-    let made: Vec<String> = sent
-        .iter()
-        .filter(|request| request.url.contains(NEW_ACCOUNT))
-        .filter_map(|request| request.body.clone())
-        .collect();
-
     assert_eq!(
-        made,
-        [r#"{"Name":"ana"}"#],
+        media::asked(&sent, "invite"),
+        [serde_json::json!({ "name": "ana" })],
         "an empty list means no account was asked for and nothing here was read; \
          anything beside the name means the operator sent something about how \
          somebody else signs in"
     );
 }
 
-/// The only password that leaves is this program's own, to its own sign-in — whichever
-/// command was asked for.
-///
-/// Stated as where it *does* go rather than as a filter over where it does not: an
-/// exclusion list is a place to add a second entry, and the point of the claim is
-/// that there is exactly one.
+/// No password leaves at all, not even this program's own — whichever command was asked
+/// for.
 #[tokio::test]
-async fn the_only_password_that_travels_is_this_program_signing_in_as_itself() {
+async fn no_password_travels_not_even_this_program_s_own() {
     let both = both_ways_an_account_becomes_claimable();
     assert_eq!(
         both.len(),
@@ -275,51 +215,31 @@ async fn the_only_password_that_travels_is_this_program_signing_in_as_itself() {
     // never derived from the pair it is describing.
     for (which, (command, http)) in BOTH_WAYS.into_iter().zip(both) {
         let (sent, _) = driving(which, command, http).await;
-        no_password_left_except_this_program_s_own(which, &sent);
+        no_password_left(which, &sent);
     }
 }
 
 /// Held apart from the loop above so the two assertions read as one claim about one
 /// command's traffic rather than as a pass over everything both of them sent.
 ///
-/// **What a failure prints is named from this file's own constants, never from the
+/// **What a failure prints is named from this file's own words, never from the
 /// traffic.** The subject here is a credential that must not travel, so a message built
 /// out of the requests would put the very thing under test into a terminal and a CI log —
-/// which is the failure this exists to catch, arriving by the back door. Each request
-/// that carried the credential is therefore reported as *which door it went to*, drawn
-/// from [`SIGN_INS`], or as [`SOMEWHERE_ELSE`] where it went anywhere this file does not
-/// name. A wrong door is the whole finding; its spelling adds nothing.
-///
-/// So nothing derived from the traffic reaches the message at all — not even the list of
-/// doors, which would only repeat one of two constants back. What a failure prints is the
-/// phrase for "somewhere else" and the set of doors that are allowed, both written here.
-fn no_password_left_except_this_program_s_own(which: &str, sent: &[Request]) {
-    let doors: Vec<&str> = sent
-        .iter()
-        .filter(|request| {
-            request
-                .body
-                .as_ref()
-                .is_some_and(|body| body.contains(&admin_password()))
-        })
-        .map(|request| {
-            SIGN_INS
-                .iter()
-                .find(|door| request.url.contains(*door))
-                .copied()
-                .unwrap_or(SOMEWHERE_ELSE)
-        })
-        .collect();
-
+/// which is the failure this exists to catch, arriving by the back door.
+fn no_password_left(which: &str, sent: &[Request]) {
     assert!(
-        !doors.is_empty(),
-        "{which} carried the recorded credential nowhere, so this proves nothing about \
-         where one travels — the exchange under it did not run"
+        ["invite", "unclaim"]
+            .iter()
+            .any(|operation| !media::asked(sent, operation).is_empty()),
+        "{which} asked the media server for no account, so this proves nothing about \
+         where a password travels — the exchange under it did not run"
     );
     assert!(
-        !doors.contains(&SOMEWHERE_ELSE),
-        "{which} sent the recorded credential to {SOMEWHERE_ELSE}; the only ones it may \
-         reach are this program's own sign-ins, {SIGN_INS:?}"
+        !sent.iter().any(|request| request
+            .body
+            .as_ref()
+            .is_some_and(|body| body.contains(&admin_password()))),
+        "{which} sent the recorded credential somewhere"
     );
 }
 
@@ -380,10 +300,10 @@ async fn what_is_passed_on_carries_no_password() {
 /// A reset asks for one, and there is nothing else in the request.
 ///
 /// The mirror of the account-creation body above, and the reason the promise holds for
-/// somebody who lost their password rather than only for somebody new. `CurrentPw` and
-/// `NewPw` are fields this endpoint accepts, so the body is asserted **whole**: a
-/// password added here would be the operator choosing the next one, and a search for
-/// what should not be present would pass anything spelled differently.
+/// somebody who lost their password rather than only for somebody new. The body is
+/// asserted **whole**: a password added here would be the operator choosing the next
+/// one, and a search for what should not be present would pass anything spelled
+/// differently.
 #[tokio::test]
 async fn a_reset_asks_for_one_and_sends_nothing_else() {
     let (sent, _) = driving(
@@ -395,17 +315,11 @@ async fn a_reset_asks_for_one_and_sends_nothing_else() {
     )
     .await;
 
-    let reset: Vec<String> = sent
-        .iter()
-        .filter(|request| request.url.contains(RESET))
-        .filter_map(|request| request.body.clone())
-        .collect();
-
     assert_eq!(
-        reset,
-        [r#"{"ResetPassword":true}"#],
+        media::asked(&sent, "unclaim"),
+        [serde_json::json!({ "id": "9" })],
         "an empty list means no reset was asked for and nothing here was read; anything \
-         beside the flag means the operator sent something about how somebody else \
+         beside the account means the operator sent something about how somebody else \
          signs in"
     );
 }
