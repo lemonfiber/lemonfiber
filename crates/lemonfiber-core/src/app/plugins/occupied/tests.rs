@@ -213,7 +213,9 @@ fn a_stack_service_moved_in_place_holds_nothing_of_its_own() {
     let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK);
     let mut moved = crate::test_support::a_placed("jellyfin", &["media.serve"], None, Some(8096));
     moved.replaces = Some("jellyfin".to_owned());
-    let installed = [crate::test_support::an_installed("jellyfin", vec![moved])];
+    let installed = [crate::test_support::pinned_as(
+        crate::test_support::an_installed("jellyfin", vec![moved]),
+    )];
 
     let (services, ports) = manifest
         .map(|manifest| run(&manifest, &installed, &[]))

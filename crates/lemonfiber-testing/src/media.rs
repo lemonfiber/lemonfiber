@@ -70,18 +70,24 @@ pub fn running() -> Reporting {
     )])
 }
 
+/// Where [`ADAPTER`]'s key is written in `ctx`'s stack: nothing where `ctx` names no
+/// stack directory.
+#[must_use]
+pub fn key_at(ctx: &Ctx) -> Option<std::path::PathBuf> {
+    let project = match ctx.stack {
+        Source::External(path) => Some(path.to_path_buf()),
+        Source::Embedded(_) => ctx.settings.stack_dir.clone(),
+    }?;
+    Some(lemonfiber_core::plugin::key_file(&project, ADAPTER))
+}
+
 /// `ctx`'s stack with the media server moved in: [`moved`] recorded beside the env file
 /// its settings name, with every plugin recorded there before, and [`ADAPTER`] keyed
 /// where its configuration is written. The register is left alone where `ctx` names no
 /// env file, and the key where it names no stack directory.
 pub fn moved_in(ctx: &Ctx) {
-    let project = match ctx.stack {
-        Source::External(path) => Some(path.to_path_buf()),
-        Source::Embedded(_) => ctx.settings.stack_dir.clone(),
-    };
-    if let Some(project) = project {
-        let key = lemonfiber_core::plugin::key_file(&project, ADAPTER);
-        let _ = std::fs::create_dir_all(key.parent().unwrap_or(&project));
+    if let Some(key) = key_at(ctx) {
+        let _ = std::fs::create_dir_all(key.parent().unwrap_or(&key));
         let _ = std::fs::write(&key, KEY);
     }
     let Some(kept) = ctx

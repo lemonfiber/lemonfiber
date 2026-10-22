@@ -4,41 +4,43 @@ use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
 use super::{claim_spent, household, offers_claim, vouched_for};
 use crate::app::Ctx;
-use crate::test_support::{a_context, a_password, nowhere};
+use crate::ports::service::Signed;
+use crate::test_support::{a_context, a_password, json, media, nowhere};
 
-/// What the media server answers a member's name and password with.
-const SIGNED_IN: &str = r#"{"AccessToken":"a-session","User":{"Id":"a7f3"}}"#;
-
-/// A context over the repository's stack, with an env file of the test's own and the
-/// media server answering every sign-in as the member it knows.
-fn ctx_with(tag: &str, admin_password: Option<&str>) -> (Ctx, Arc<Transport>) {
+/// A context over the repository's stack, with an env file of the test's own, its media
+/// server moved into its plugin where `moved`, and the server answering every sign-in as
+/// the member it knows.
+fn ctx_with(tag: &str, moved: bool) -> (Ctx, Arc<Transport>) {
     let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("members-{tag}")).kept();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
+    let signed = Some(Signed {
+        id: "a7f3".to_owned(),
+        token: "a-session".to_owned(),
+    });
     let transport = Transport::by_path(vec![(
-        "/Users/AuthenticateByName",
-        Answer::reply(200, SIGNED_IN),
+        media::identity("whoever"),
+        Answer::reply(200, json(&signed)),
     )]);
-    let mut context = a_context().build().with_http(transport.clone());
+    let mut context = a_context()
+        .engine(Arc::new(media::running()))
+        .build()
+        .with_http(transport.clone());
     context.settings.env_file = Some(dir.join(".env"));
-    if let Some(password) = admin_password {
-        let _ = crate::app::targets::record_secret(
-            &context,
-            crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
-            password,
-        );
+    if moved {
+        media::moved_in(&context);
     }
     (context, transport)
 }
 
-/// The household that comes back is the stack's own media server, at the address the
-/// manifest gives it.
+/// The household that comes back is the moved server's, asked over its contracts at the
+/// adapter the host reaches on its loopback.
 #[tokio::test]
-async fn a_stack_with_a_media_server_and_its_password_recorded_has_a_household_to_ask() {
-    let (context, transport) = ctx_with("held", Some(&a_password()));
+async fn a_stack_whose_media_server_moved_in_has_a_household_to_ask() {
+    let (context, transport) = ctx_with("held", true);
 
     let Some(held) = household(&context).await else {
-        unreachable!("a stack with a media server and its password recorded has a household")
+        unreachable!("a stack whose media server moved in has a household")
     };
     let signed = held.whoever("ana", &a_password(), "a-device").await;
 
@@ -46,23 +48,23 @@ async fn a_stack_with_a_media_server_and_its_password_recorded_has_a_household_t
         signed.ok().flatten().map(|signed| signed.id).as_deref(),
         Some("a7f3")
     );
-    assert!(transport
-        .request()
-        .is_some_and(|asked| asked.url.starts_with("http://127.0.0.1:")
-            && asked.url.ends_with("/Users/AuthenticateByName")));
+    assert!(transport.request().is_some_and(|asked| asked
+        .url
+        .starts_with(&format!("http://127.0.0.1:{}", media::PORT))
+        && asked.url.ends_with(media::identity("whoever"))));
 }
 
-/// Before the stack is seeded there is no admin password, and so no household.
+/// A stack whose media server speaks no contract has no household to ask.
 #[tokio::test]
-async fn a_stack_with_no_admin_password_recorded_has_no_household() {
-    let (context, _) = ctx_with("unseeded", None);
+async fn a_stack_whose_media_server_has_not_moved_has_no_household() {
+    let (context, _) = ctx_with("unmoved", false);
 
     assert!(household(&context).await.is_none());
 }
 
 #[tokio::test]
 async fn a_stack_whose_manifest_cannot_be_read_has_no_household() {
-    let (context, _) = ctx_with("unread", Some(&a_password()));
+    let (context, _) = ctx_with("unread", true);
     let context = Ctx {
         stack: nowhere(),
         ..context
@@ -74,7 +76,7 @@ async fn a_stack_whose_manifest_cannot_be_read_has_no_household() {
 /// A context whose record holds one offer for account `a7f3`, running out `lapses_in`
 /// hours from now — in the past where negative.
 fn offered(tag: &str, lapses_in: i64) -> Ctx {
-    let (context, _) = ctx_with(tag, None);
+    let (context, _) = ctx_with(tag, false);
     let offers: crate::invitation::Offers = [(
         "a7f3".to_owned(),
         crate::invitation::Offer {

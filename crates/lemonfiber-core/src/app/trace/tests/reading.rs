@@ -2,33 +2,27 @@
 
 use super::*;
 
-/// A media server sign-in that hands back an access token, and a library that has the
-/// traced item — the pair a media server answers when the item is finally available.
-const SIGNED_IN: &str = r#"{"AccessToken":"token"}"#;
+/// What the media server answers asked whether its library holds the traced item.
+const HOLDS: &str = "true";
 
-const HAS_ITEM: &str = r#"{"Items":[{"Name":"The Expanse"}]}"#;
-
-const NO_ITEM: &str = r#"{"Items":[]}"#;
-
-/// A context whose media server the trace cannot ask — no admin password is recorded,
+/// A context whose media server the trace cannot ask — it has not moved into its plugin,
 /// so the library stage is simply left unanswered, as on the curator-only slices.
 fn ctx(library: &'static str, history: &'static str, queue: &'static str) -> Ctx {
     ctx_with(&Fake::curator(library, history, queue))
 }
 
-/// A context that can reach its media server: the admin password is recorded under the
-/// env file, so the trace asks the media server as its administrator. Tagged so
-/// each test keeps its own env file rather than racing on a shared one.
+/// A context that can reach its media server: moved into its plugin, its adapter keyed
+/// and published, with an env file of the test's own under `tag`.
 fn ctx_with_media_server(fake: &Fake, tag: &str) -> Ctx {
     let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("trace-{tag}")).kept();
     let _ = std::fs::create_dir_all(&dir);
-    let mut context = ctx_with(fake);
+    let mut context = a_context()
+        .engine(Arc::new(crate::test_support::media::running()))
+        .build()
+        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
+        .with_http(fake.transport());
     context.settings.env_file = Some(dir.join(".env"));
-    let _ = crate::app::targets::record_secret(
-        &context,
-        crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
-        &a_password(),
-    );
+    crate::test_support::media::moved_in(&context);
     context
 }
 
@@ -123,8 +117,7 @@ async fn tracing_a_matched_item_present_in_the_library_reports_available() {
             history: r#"{"records":[{"eventType":"downloadFolderImported","date":"2026-01-01T00:00:00Z"}]}"#,
             queue: EMPTY_QUEUE,
             episodes: NO_EPISODES,
-            sign_in: SIGNED_IN,
-            media_server_library: HAS_ITEM,
+            holds: HOLDS,
             wanted: "",
             releases: "",
         },
@@ -143,16 +136,14 @@ async fn tracing_a_matched_item_present_in_the_library_reports_available() {
 
 #[tokio::test]
 async fn a_media_server_with_nothing_reads_as_absent() {
-    // The sign-in is accepted and the library answers, holding nothing: a confirmed
-    // absence, not an unknown.
+    // The library answers, holding nothing: a confirmed absence, not an unknown.
     let presence = library_presence(Some(&Holding(Some(false))), Kind::Tv, "The Expanse").await;
     assert_eq!(presence, Some(Presence::Absent));
 }
 
 #[tokio::test]
 async fn a_media_server_that_will_not_answer_leaves_presence_unknown() {
-    // The sign-in comes back as something that is not a session: the read failed, so
-    // presence is unknown — never inferred as absent.
+    // The library cannot be read: presence is unknown — never inferred as absent.
     let presence = library_presence(Some(&Holding(None)), Kind::Movies, "The Expanse").await;
     assert_eq!(presence, None);
 }

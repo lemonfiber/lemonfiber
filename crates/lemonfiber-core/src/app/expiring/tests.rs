@@ -338,11 +338,6 @@ const REACHED_AT: &str = r#"{"pushoverUserKey":"the-user-key",
 /// a queue would prove only that the right number of calls went out.
 fn service(closes: u16, lists: u16) -> Arc<Transport> {
     Transport::by_rules(vec![
-        (
-            None,
-            "/Users/AuthenticateByName",
-            Answer::reply(200, r#"{"AccessToken":"token"}"#),
-        ),
         (None, "/auth/me", Answer::reply(200, "{}")),
         (
             Some(crate::ports::http::Method::Get),
@@ -363,8 +358,8 @@ fn service(closes: u16, lists: u16) -> Arc<Transport> {
     ])
 }
 
-/// An install that reaches that service, keeping the transport so what it was sent
-/// can be read back.
+/// An install that reaches that service, its media server moved into its plugin, keeping
+/// the transport so what it was sent can be read back.
 fn install(name: &str, closes: u16) -> (Ctx, Arc<Transport>) {
     listing(name, closes, 200)
 }
@@ -374,6 +369,7 @@ fn listing(name: &str, closes: u16, lists: u16) -> (Ctx, Arc<Transport>) {
     let transport = service(closes, lists);
     let held: Arc<Transport> = Arc::clone(&transport);
     let mut ctx = a_context()
+        .engine(Arc::new(crate::test_support::media::running()))
         .build()
         .with_filesystem(Arc::new(
             SeedFs::keyed(Some(KEYED), None)
@@ -386,6 +382,7 @@ fn listing(name: &str, closes: u16, lists: u16) -> (Ctx, Arc<Transport>) {
         crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
         &a_password(),
     );
+    crate::test_support::media::moved_in(&ctx);
     (ctx, transport)
 }
 

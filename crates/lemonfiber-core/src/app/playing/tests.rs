@@ -4,35 +4,51 @@ use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
 use super::{account as whose, asked, playing, unread, Ctx};
 use crate::app::Outcome;
-use crate::ports::service::{Access, Medium, Member};
-use crate::test_support::{a_context, a_password, SeedFs};
+use crate::ports::service::{Access, Medium, Member, Playback};
+use crate::test_support::{a_context, a_password, json, media, moved_household};
 
-/// A curator config carrying a readable key, so the stack resolves its targets.
-const KEYED: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
-
-/// Ada watching an episode and Bram paused on a film, in the server's own words.
-const BOTH_WATCHING: &str = r#"[
-    {"UserId":"a7f3","UserName":"Ada","DeviceName":"TV",
-     "NowPlayingItem":{"Name":"Pilot","SeriesName":"The Expanse","ParentIndexNumber":1,
-                       "IndexNumber":1,"Type":"Episode"}},
-    {"UserId":"b2e9","UserName":"Bram","DeviceName":"Phone",
-     "NowPlayingItem":{"Name":"Arrival","Type":"Movie"},"PlayState":{"IsPaused":true}}
-]"#;
+/// Ada watching an episode and Bram paused on a film.
+fn both_watching() -> Vec<Playback> {
+    vec![
+        Playback {
+            member_id: "a7f3".to_owned(),
+            member: "Ada".to_owned(),
+            title: "Pilot".to_owned(),
+            series: Some("The Expanse".to_owned()),
+            season: Some(1),
+            episode: Some(1),
+            medium: Medium::Series,
+            paused: false,
+            device: "TV".to_owned(),
+        },
+        Playback {
+            member_id: "b2e9".to_owned(),
+            member: "Bram".to_owned(),
+            title: "Arrival".to_owned(),
+            series: None,
+            season: None,
+            episode: None,
+            medium: Medium::Film,
+            paused: true,
+            device: "Phone".to_owned(),
+        },
+    ]
+}
 
 /// The media server's scripted answers to the two questions this read asks it.
 struct Server {
     /// Who it says holds an account.
-    accounts: &'static str,
-    /// What it answers about its sessions, and with what status.
-    sessions: (u16, &'static str),
+    accounts: String,
+    /// What it answers about its sessions, and with what status: every session in the
+    /// house, whoever it is asked about.
+    sessions: (u16, String),
 }
 
 impl Default for Server {
     fn default() -> Self {
         Self {
-            accounts: r#"[{"Id":"a7f3","Name":"Ada","HasPassword":true},
-                          {"Id":"b2e9","Name":"Bram","HasPassword":true}]"#,
-            sessions: (200, BOTH_WATCHING),
+            accounts: json(&household()),
+            sessions: (200, json(&both_watching())),
         }
     }
 }
@@ -42,33 +58,28 @@ impl Server {
     fn transport(&self) -> Arc<Transport> {
         Transport::by_path(vec![
             (
-                "/Users/AuthenticateByName",
-                Answer::reply(200, r#"{"AccessToken":"token"}"#),
+                media::serve("playing"),
+                Answer::reply(self.sessions.0, self.sessions.1.clone()),
             ),
-            ("/Sessions", Answer::reply(self.sessions.0, self.sessions.1)),
-            ("/Users", Answer::reply(200, self.accounts)),
-            ("", Answer::reply(200, "[]")),
+            (
+                media::identity("household"),
+                Answer::reply(200, self.accounts.clone()),
+            ),
         ])
     }
 }
 
-/// A context whose media server can be signed in to, or not where `signs_in` is false.
-fn ctx_over(transport: Arc<Transport>, tag: &str, signs_in: bool) -> Ctx {
+/// A context whose media server has moved into its plugin, or has not where `moved` is
+/// false.
+fn ctx_over(transport: Arc<Transport>, tag: &str, moved: bool) -> Ctx {
+    if moved {
+        return moved_household(&format!("playing-{tag}"), transport);
+    }
     let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("playing-{tag}")).kept();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
-    let mut context = a_context()
-        .build()
-        .with_filesystem(Arc::new(SeedFs::keyed(Some(KEYED), None)))
-        .with_http(transport);
+    let mut context = a_context().build().with_http(transport);
     context.settings.env_file = Some(dir.join(".env"));
-    if signs_in {
-        let _ = crate::app::targets::record_secret(
-            &context,
-            crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
-            &a_password(),
-        );
-    }
     context
 }
 
@@ -151,12 +162,21 @@ async fn naming_nobody_is_every_session_in_the_house() {
 }
 
 /// **The narrowing, asserted.** A member's reading carries their sessions and no one
-/// else's, asked for by the id their own session carries.
+/// else's, asked for by the id their own session carries, even from a server that
+/// answers with the whole house.
 #[tokio::test]
 async fn a_member_is_answered_with_their_own_sessions_and_nobody_elses() {
-    let context = ctx_with(&Server::default(), "theirs");
+    let server = Server::default();
+    let transport = server.transport();
+    let context = ctx_over(transport.clone(), "theirs", true);
 
     let report = playing(&context, Some("a7f3")).await.unwrap_or_default();
+
+    assert!(transport
+        .requests()
+        .iter()
+        .any(|asked| asked.url.ends_with(media::serve("playing"))
+            && asked.body.as_deref() == Some(r#"{"member":"a7f3"}"#)));
 
     assert!(report.available, "{report:?}");
     assert_eq!(report.member, "Ada");
@@ -204,7 +224,7 @@ async fn nobody_of_that_name_is_unread_rather_than_everybody() {
 async fn a_household_the_server_will_not_name_leaves_it_unread() {
     let context = ctx_with(
         &Server {
-            accounts: "not json",
+            accounts: "not json".to_owned(),
             ..Server::default()
         },
         "nameless",
@@ -228,7 +248,7 @@ async fn a_household_the_server_will_not_name_leaves_it_unread() {
 async fn sessions_the_server_will_not_list_are_unread_and_still_say_whose() {
     let context = ctx_with(
         &Server {
-            sessions: (500, ""),
+            sessions: (500, String::new()),
             ..Server::default()
         },
         "refused",
@@ -247,10 +267,10 @@ async fn sessions_the_server_will_not_list_are_unread_and_still_say_whose() {
     );
 }
 
-/// No password to sign in with is said, rather than read as a quiet house.
+/// A media server that cannot be asked is said, rather than read as a quiet house.
 #[tokio::test]
 async fn no_media_server_to_ask_is_unread() {
-    let context = ctx_over(Server::default().transport(), "no-password", false);
+    let context = ctx_over(Server::default().transport(), "unmoved", false);
 
     let report = playing(&context, None).await.unwrap_or_default();
 

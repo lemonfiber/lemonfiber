@@ -107,8 +107,8 @@ async fn ran(files: &dyn FileSystem, decline: Option<&Decline>) -> Verdict {
     };
     let Some(keys) = &decline.keys else {
         return Verdict::Unverified {
-            reason: "there is no media server to ask, or no recorded password to sign in with, \
-                     so when the decline service's key was last used cannot be read"
+            reason: "there is no media server to ask, or it cannot be asked over its \
+                     contracts, so when the decline service's key was last used cannot be read"
                 .to_owned(),
             remedy: Remedy::new("Check the media server is running")
                 .with_detail("lemonfiber status"),

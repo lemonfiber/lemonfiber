@@ -580,7 +580,13 @@ fn a_stack_service_moved_in_place_is_left_out_and_its_stand_in_written() {
     let mut moved = a_placed("jellyfin", &["media.serve"], None, Some(8096));
     moved.replaces = Some("jellyfin".to_owned());
     moved.image = "ghcr.io/lemonfiber/plugin-jellyfin".to_owned();
-    let project = project(&carried(), &[an_installed("jellyfin", vec![moved])]);
+    let project = project(
+        &carried(),
+        &[crate::test_support::pinned_as(an_installed(
+            "jellyfin",
+            vec![moved],
+        ))],
+    );
     assert!(
         text(&entry(&project, "jellyfin"), "image")
             .starts_with("ghcr.io/lemonfiber/plugin-jellyfin"),
@@ -588,6 +594,32 @@ fn a_stack_service_moved_in_place_is_left_out_and_its_stand_in_written() {
         project.text
     );
     assert_eq!(project.text.matches("\n  jellyfin:\n").count(), 1);
+}
+
+/// Only a first-party plugin's service taking the stack's service's own id moves in place
+/// of it: one a third party brings, or a first-party service under another id, naming the
+/// stack's service as the one it replaces puts nothing out.
+#[test]
+fn only_a_first_party_service_taking_its_id_moves_in_place_of_a_stack_service() {
+    let replacing = |service: &str| {
+        let mut placed = a_placed(service, &["media.serve"], None, Some(8096));
+        placed.replaces = Some("jellyfin".to_owned());
+        an_installed("jellyfin", vec![placed])
+    };
+    let pinned = crate::test_support::pinned_as;
+
+    assert!(crate::project::moved_in_place(
+        &[pinned(replacing("jellyfin"))],
+        "jellyfin"
+    ));
+    assert!(!crate::project::moved_in_place(
+        &[replacing("jellyfin")],
+        "jellyfin"
+    ));
+    assert!(!crate::project::moved_in_place(
+        &[pinned(replacing("elsewhere"))],
+        "jellyfin"
+    ));
 }
 
 /// A plugin service the household reaches at a hostname shares a network with the proxy

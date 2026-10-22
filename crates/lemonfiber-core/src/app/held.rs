@@ -40,8 +40,8 @@ pub(crate) async fn held(ctx: &Ctx, whose: &Whom, most: u32) -> Result<HeldRepor
     let Some(server) = media(ctx, &manifest).await else {
         return Ok(unread(
             whose,
-            "there is no media server to ask what the household holds, or no recorded \
-             password to sign in with",
+            "there is no media server to ask what the household holds, or it cannot be \
+             asked over its contracts",
         ));
     };
 
