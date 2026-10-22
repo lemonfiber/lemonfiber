@@ -2,13 +2,14 @@ use std::path::Path;
 use std::sync::Arc;
 
 use lemonfiber_core::config::Settings;
+use lemonfiber_core::plugin::Register;
 use lemonfiber_core::ports::filesystem::{Beneath, Confined, Lying};
 use lemonfiber_core::ports::http::{Method, Request};
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::scratch::Scratch;
 
 use super::super::context::a_context;
-use super::{asked, asked_about, key_at, keyed_in, moved_in, served, Keyed, ADAPTER, KEY};
+use super::{asked, asked_about, key_at, keyed_in, moved_in, served, Keyed, ADAPTER, KEY, PLUGIN};
 
 static NO_STACK: include_dir::Dir<'static> = include_dir::Dir::new("", &[]);
 
@@ -45,6 +46,43 @@ fn an_embedded_stack_keys_the_adapter_in_the_stack_directory_its_settings_name()
         Some(lemonfiber_core::plugin::key_file(&directory, ADAPTER))
     );
     assert_eq!(key_at(&embedded(None)), None);
+}
+
+#[test]
+fn an_external_stack_keys_the_adapter_in_its_own_directory() {
+    let directory = Scratch::new("media-external-keyed");
+    let ctx = a_context()
+        .over(Source::External(Box::leak(
+            directory.to_path_buf().into_boxed_path(),
+        )))
+        .build();
+
+    assert_eq!(
+        key_at(&ctx),
+        Some(lemonfiber_core::plugin::key_file(&directory, ADAPTER))
+    );
+}
+
+#[test]
+fn a_context_naming_an_env_file_records_the_moved_plugin_once_beside_it() {
+    let directory = Scratch::new("media-env-file");
+    let mut ctx = embedded(Some(&directory));
+    ctx.settings.env_file = Some(directory.join(".env"));
+
+    moved_in(&ctx);
+    moved_in(&ctx);
+
+    let kept = std::fs::read_to_string(directory.join(lemonfiber_core::config::paths::PLUGINS))
+        .unwrap_or_default();
+    let register = Register::parse(&kept).unwrap_or_else(|_| Register::empty());
+    assert_eq!(
+        register
+            .installed()
+            .iter()
+            .map(|one| one.plugin.as_str())
+            .collect::<Vec<_>>(),
+        vec![PLUGIN]
+    );
 }
 
 #[test]
