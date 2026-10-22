@@ -10,6 +10,7 @@ use lemonfiber_core::config::{store, Protocols, Settings, TORRENT_PASSWORD_KEY};
 use lemonfiber_core::ports::docker::Engine;
 use lemonfiber_core::ports::http::Http;
 use lemonfiber_core::ports::process::Runner;
+use lemonfiber_core::stack::Source;
 use lemonfiber_core::update::State;
 use lemonfiber_fixtures::downloads::{QBIT_FINISHED, QBIT_TORRENTS, SAB_EMPTY};
 use lemonfiber_fixtures::files::Files;
@@ -147,6 +148,25 @@ async fn a_run_asked_to_wait_lets_what_is_coming_down_finish_first() {
     assert_eq!(machine.started(), vec!["sonarr".to_owned()]);
 }
 
+/// Every further mount source of the stack's services beneath its project, as a machine
+/// that has started its stack before holds them.
+fn mounted(context: &Ctx) {
+    let Source::External(project) = context.stack else {
+        return;
+    };
+    for service in context
+        .stack
+        .manifest()
+        .map(|manifest| manifest.services)
+        .unwrap_or_default()
+    {
+        for mount in &service.mount {
+            let at = project.join("mounts").join(&service.id).join(&mount.from);
+            assert!(std::fs::create_dir_all(at).is_ok());
+        }
+    }
+}
+
 /// An update that moved a service and could not record it is said as that: it stands,
 /// and it cannot be put back, which is what a run the record does not have is.
 #[tokio::test]
@@ -154,6 +174,7 @@ async fn a_run_that_cannot_be_recorded_says_it_stands_unrecorded() {
     let machine = Machine::coming(Coming::Answering);
     let archive = Kept::writing(true);
     let (context, journal) = recording(&machine, &archive, "unrecorded");
+    mounted(&context);
     let mut staging = journal.file_name().unwrap_or_default().to_os_string();
     staging.push(".writing");
     assert!(std::fs::create_dir_all(journal.with_file_name(staging).join("held")).is_ok());
