@@ -3,15 +3,8 @@
 
 use std::path::Path;
 
-use lemonfiber_manifest::Manifest;
-
-use super::machine;
+use super::{machine, manifest, plan};
 use crate::app::Ctx;
-
-/// The manifest of the stack this build carries.
-fn manifest() -> Option<Manifest> {
-    Manifest::from_toml(lemonfiber_bundled::STACK).ok()
-}
 
 /// A directory standing where the file `at` goes.
 fn blocked(at: &Path) {
@@ -33,16 +26,8 @@ fn secrets_blocked(ctx: &Ctx) {
 
 /// Prepare the project for a run that starts nothing, as a teardown does.
 fn preparing(ctx: &Ctx) -> bool {
-    let plan = crate::stack::closure::Plan {
-        forms: Vec::new(),
-        profiles: std::collections::BTreeSet::new(),
-        services: Vec::new(),
-        dropped: Vec::new(),
-        filtered: Vec::new(),
-        footprint: crate::stack::closure::Footprint::default(),
-        running: crate::stack::closure::Running::Unasked,
-    };
-    manifest().is_some_and(|manifest| super::super::prepared(ctx, &manifest, &plan, false).is_ok())
+    manifest()
+        .is_some_and(|manifest| super::super::prepared(ctx, &manifest, &plan(), false).is_ok())
 }
 
 /// Write the project as a change to what is installed does.

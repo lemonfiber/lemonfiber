@@ -4,6 +4,7 @@
 //! merged over it and nothing else.
 
 mod copying;
+mod mounting;
 mod moving;
 mod profiled;
 mod retiring;
@@ -91,21 +92,15 @@ pub(crate) fn generated(
     resolved.project(|reading| crate::project::generated(manifest, installed, chosen, reading))
 }
 
-/// The project as this machine stands: its manifest, the plugins its register holds and
-/// the fillers chosen here.
-///
-/// # Errors
-///
-/// Where the register of installed plugins cannot be read.
-pub(crate) fn current(ctx: &Ctx, manifest: &Manifest) -> Result<Project, Box<Problem>> {
-    let register = super::plugins::read(ctx)?;
-    let installed = register.installed();
-    Ok(generated(
+/// The project as this machine stands: its manifest, the plugins installed here and the
+/// fillers chosen here.
+pub(crate) fn current(ctx: &Ctx, manifest: &Manifest, installed: &[Installed]) -> Project {
+    generated(
         manifest,
         installed,
         &super::targets::chosen_fillers(ctx),
         &Resolved::of(ctx, Some(manifest), installed),
-    ))
+    )
 }
 
 /// The project a lifecycle command runs, and what writing it came to.
@@ -121,9 +116,9 @@ pub(crate) struct Prepared {
 /// Generate the project for `manifest` and what is installed here, and write it as a
 /// lifecycle command running `plan` does: previewed by a rehearsal, and otherwise written
 /// with each service's secrets file and the stack's own Compose files retired and, where
-/// `starting`, with the profiles of the start beside it and each service's state moved
-/// into its mount tree. Where `DATA_ROOT` is refused, a start is refused and anything
-/// else leaves the project on disk as it stands.
+/// `starting`, with the profiles of the start beside it, each service's state moved
+/// into its mount tree and each mount source not there yet made. Where `DATA_ROOT` is
+/// refused, a start is refused and anything else leaves the project on disk as it stands.
 ///
 /// # Errors
 ///
@@ -137,12 +132,7 @@ pub(crate) fn prepared(
 ) -> Result<Prepared, Box<Problem>> {
     let register = super::plugins::read(ctx)?;
     let installed = register.installed();
-    let project = generated(
-        manifest,
-        installed,
-        &super::targets::chosen_fillers(ctx),
-        &Resolved::of(ctx, Some(manifest), installed),
-    );
+    let project = current(ctx, manifest, installed);
     let pass = if ctx.dry_run {
         Pass::Preview
     } else {
@@ -171,6 +161,7 @@ pub(crate) fn prepared(
         secrets_written(ctx, manifest, installed).map_err(|failure| Box::new(failure.problem()))?;
         if starting {
             moved(ctx, manifest)?;
+            mounting::made(ctx, manifest, installed)?;
         }
     }
     Ok(Prepared {
@@ -452,13 +443,7 @@ pub(crate) fn rewritten(
     operation: &str,
     stamp: &str,
 ) -> Result<(), Box<Problem>> {
-    let text = generated(
-        manifest,
-        installed,
-        &super::targets::chosen_fillers(ctx),
-        &Resolved::of(ctx, Some(manifest), installed),
-    )
-    .text;
+    let text = current(ctx, manifest, installed).text;
     let previous = held(ctx);
     if previous.as_deref() == Some(text.as_str()) {
         return Ok(());

@@ -102,7 +102,7 @@ pub(crate) use subtitles::rewatch;
 /// One connection is unlike the rest: the torrent client's web UI password, the
 /// credential lemonfiber mints rather than reads — its temporary password is
 /// read from the container's log, replaced with a generated one, and the
-/// generated one recorded where the forwarded-port push reads it. The rest of
+/// generated one recorded where lemonfiber reads it back. The rest of
 /// the graph reads a credential and writes a connection: each curator's root
 /// folders and its download clients, each curator registered into the indexer so
 /// it pushes them indexers, the aggregator a book curator pulls from, the media

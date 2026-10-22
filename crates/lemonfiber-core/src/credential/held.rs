@@ -7,12 +7,11 @@
 //!
 //! **The consumer list is the load-bearing column.** Rotation walks it, and anything
 //! left off it is something a rotation strands without saying so. The torrent client's
-//! password is the case that proves it: the obvious consumer is the torrent client, but the
-//! tunnel's forwarded-port push authenticates to the same web UI on every connect and
-//! release, and it reads the password out of the environment at the moment its
-//! container was created. A list naming services rather than consumers would have one
-//! entry there and would be wrong in the way that is hardest to notice — the port
-//! simply stops being applied, and everything reports healthy.
+//! password is the case that proves it: the obvious consumer is the torrent client, but
+//! every library service it is registered in signs in to the same web UI with a copy of
+//! its own, which only a seed replaces. A list naming services rather than consumers
+//! would have one entry there and would leave each of those copies signing in with a
+//! password the client no longer takes.
 
 use serde::Serialize;
 
@@ -253,9 +252,9 @@ const TORRENT_CLIENT: Entry = Entry {
     setting: config::TORRENT_PASSWORD_KEY,
     consumers: &[
         Consumer::at_the_service("the torrent client's own web UI"),
-        Consumer::from_its_environment(
-            "the tunnel's forwarded-port push, which signs in on every connect and release",
-            "lemonfiber restart torrent",
+        Consumer::read_by_lemonfiber(
+            "lemonfiber's own port forwarding, which signs in to hand the client the \
+             tunnel's forwarded port",
         ),
         Consumer::by_seeding("each library service's download-client registration"),
     ],

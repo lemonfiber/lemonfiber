@@ -31,6 +31,30 @@ fn machine(name: &str) -> (Ctx, PathBuf) {
     (ctx, project)
 }
 
+/// The manifest of the stack this build carries.
+fn manifest() -> Option<lemonfiber_manifest::Manifest> {
+    lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK).ok()
+}
+
+/// A plan starting nothing in particular.
+fn plan() -> crate::stack::closure::Plan {
+    crate::stack::closure::Plan {
+        forms: Vec::new(),
+        profiles: std::collections::BTreeSet::new(),
+        services: Vec::new(),
+        dropped: Vec::new(),
+        filtered: Vec::new(),
+        footprint: crate::stack::closure::Footprint::default(),
+        running: crate::stack::closure::Running::Unasked,
+    }
+}
+
+/// Prepare the project of the stack this build carries for a run, starting where
+/// `starting`.
+fn preparing(ctx: &Ctx, starting: bool) -> bool {
+    manifest().is_some_and(|manifest| super::prepared(ctx, &manifest, &plan(), starting).is_ok())
+}
+
 /// Move what the machine's stack keeps in its configuration tree into its mount tree.
 fn moving(ctx: &Ctx) -> Result<(), Box<crate::error::Problem>> {
     let manifest = ctx
@@ -132,6 +156,35 @@ fn nothing_is_moved_where_the_move_cannot_be_journalled() {
     assert!(!to.exists());
 }
 
+#[test]
+fn an_overlay_that_cannot_be_journalled_is_refused() {
+    let (ctx, _) = machine("overlay-unjournalled");
+    let overlay = crate::overlay::at(ctx.settings.env_file.as_deref().unwrap_or(Path::new("")));
+    let _ = std::fs::create_dir_all(overlay.parent().unwrap_or(Path::new("")));
+    let _ = std::fs::write(&overlay, "services: {}\n");
+    let journal = crate::app::targets::layout(&ctx)
+        .map(|paths| paths.journal())
+        .unwrap_or_default();
+    let _ = std::fs::create_dir_all(&journal);
+
+    assert!(super::overlaid(&ctx).is_err());
+}
+
+#[test]
+fn a_start_whose_move_cannot_be_journalled_is_refused() {
+    let (ctx, project) = machine("unjournalled-start");
+    let journal = crate::app::targets::layout(&ctx)
+        .map(|paths| paths.journal())
+        .unwrap_or_default();
+    let _ = std::fs::create_dir_all(&journal);
+    let (from, to) = cache(&project);
+
+    assert!(!preparing(&ctx, true));
+
+    assert!(from.is_dir());
+    assert!(!to.exists());
+}
+
 #[cfg(unix)]
 mod links {
     use std::os::unix::fs::symlink;
@@ -176,6 +229,7 @@ mod links {
 }
 
 mod copying;
+mod mounting;
 mod profiled;
 mod refused;
 mod retiring;

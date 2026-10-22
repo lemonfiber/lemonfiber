@@ -248,8 +248,8 @@ pub(crate) const PROVIDER_VALIDATED_KEY: &str = "USENET_VALIDATED";
 
 /// The environment key holding the torrent client's web UI password.
 ///
-/// Seeding generates this password and records it here, because the
-/// forwarded-port push authenticates to the torrent client with it — the one credential
+/// Seeding generates this password and records it here, because lemonfiber's own port
+/// forwarding authenticates to the torrent client with it — the one credential
 /// lemonfiber mints and writes rather than reads from a service.
 pub const TORRENT_PASSWORD_KEY: &str = "QBITTORRENT_PASSWORD";
 
@@ -298,10 +298,10 @@ pub(crate) const MEDIA_SERVER_ADMIN_USER: &str = "admin";
 
 /// The account name the torrent client's web UI is reached under.
 ///
-/// One source of truth for the name, so the client that logs in, the download-client
-/// registration that hands it to a curator, and the tunnel's forwarded-port push all
-/// present the same one. Separate from the media server's although both spell it `admin`:
-/// they are two services, and either may change without the other.
+/// One source of truth for the name, so the client that logs in and the download-client
+/// registration that hands it to a curator present the same one. Separate from the media
+/// server's although both spell it `admin`: they are two services, and either may change
+/// without the other.
 pub(crate) const TORRENT_USER: &str = "admin";
 
 /// What a torrent client's web UI password setting ends in, after the service it is
@@ -309,16 +309,13 @@ pub(crate) const TORRENT_USER: &str = "admin";
 ///
 /// Per service, because the password is the one a particular client was set to, and a
 /// second client standing in for the first is a second password. The bundled client's
-/// comes out as [`TORRENT_PASSWORD_KEY`], which is where the tunnel's forwarded-port
-/// push reads it.
+/// comes out as [`TORRENT_PASSWORD_KEY`].
 pub(crate) const PASSWORD_SUFFIX: &str = "_PASSWORD";
 
-/// What the setting holding the account a torrent client is reached under ends in.
+/// What a setting holding the account a service is reached under ends in, after the
+/// service it is for; the bundled torrent client's is `QBITTORRENT_USERNAME`.
 ///
-/// The tunnel's forwarded-port push reads both halves of the credential from the
-/// environment, so the name is written beside the password rather than left to the
-/// default it falls back on; the bundled client's comes out as `QBITTORRENT_USERNAME`,
-/// which is where the push reads it.
+/// One of the [`CREDENTIAL_SUFFIXES`], so no plugin's setting is spelled onto one.
 pub(crate) const USERNAME_SUFFIX: &str = "_USERNAME";
 
 /// What the setting a service's own key is published under ends in.

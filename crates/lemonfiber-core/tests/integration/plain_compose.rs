@@ -225,3 +225,19 @@ async fn an_overlay_overrides_the_project_under_plain_compose_as_it_does_under_l
         "and only where it says: {ours}"
     );
 }
+
+/// Every service of every profile, each secrets file it names among them, resolves from
+/// what a reset alone leaves.
+#[tokio::test(start_paused = true)]
+async fn the_project_a_reset_writes_resolves_under_plain_compose() {
+    let (ctx, project) = machine("plain-reset", None);
+
+    let outcome = dispatch(Command::Reset { confirm: true }, &ctx).await;
+
+    assert!(outcome.is_ok(), "{outcome:?}");
+    let plain = resolved(
+        &["compose", "--profile", "*", "config"].map(str::to_owned),
+        &project,
+    );
+    assert!(plain.contains("name: lemonfiber"), "{plain}");
+}

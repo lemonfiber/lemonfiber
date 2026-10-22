@@ -7,10 +7,11 @@
 //! where they look.
 //!
 //! **The names here are this product's own, not theirs.** A key is published as
-//! `{SERVICE}_API_KEY`, and the stack maps that to whatever each consumer calls it —
-//! the extractor wants `UN_SONARR_0_API_KEY`. Which means a service added later needs a
-//! line of Compose rather than a line of Rust, and this file never learns any
-//! consumer's vocabulary.
+//! `{SERVICE}_API_KEY`, and a consumer's declaration names a secret of that service
+//! under whatever variable it reads — the extractor wants `UN_SONARR_0_API_KEY` — which
+//! lemonfiber writes into the consumer's secrets file. Which means a service added later
+//! needs a line of its declaration rather than a line of Rust, and this file never
+//! learns any consumer's vocabulary.
 //!
 //! **Only keys a service already wrote down are published.** Nothing here is minted for
 //! the purpose. The dashboard is published to the household network and holds no
@@ -149,8 +150,8 @@ fn under_its_service(
 /// Every curator-shaped service, not only the ones that file media: the indexer aggregator
 /// manages none and so declares no media types, which is what keeps it out of the curator
 /// list used for root folders and download clients — but it has a key like the rest, and a
-/// service added to the stack is given it with a line of Compose. The other two are not
-/// curator-shaped and each keeps its key in a file of its own shape.
+/// service added to the stack is given it by a secret its declaration names. The other
+/// two are not curator-shaped and each keeps its key in a file of its own shape.
 async fn written_down(
     ctx: &Ctx,
     services: &[Service],
@@ -216,30 +217,19 @@ async fn retired(ctx: &Ctx, services: &[Service], fillers: &crate::wiring::Fille
     }
 }
 
-/// What the stack's own download clients' credentials publish: each client's key under
-/// its own name, and the account name each torrent client is reached under.
+/// What the stack's own download clients' credentials publish: each Usenet client's key
+/// under its own name.
 ///
-/// The stack's alone. What reads these is the stack's own Compose — the tunnel's
-/// forwarded-port push reads the torrent client's account — and a plugin's client has
-/// nothing reading its credential out of the environment, so writing it there would be
-/// a second copy of a secret nobody asked for.
-///
-/// The name is published only once a password exists for it to pair with — one half of
-/// a credential authenticates with neither, and a name published on its own would let
-/// this connection report success on a stack where nothing was read at all. The
-/// password itself is already recorded under its own setting by the run that minted it.
+/// A torrent client publishes nothing here: its password is already recorded under its
+/// own setting by the run that minted it, and lemonfiber signs in with it under
+/// [`crate::config::TORRENT_USER`].
 fn from_the_clients(held: &Held) -> Vec<(String, String)> {
-    let mut found = Vec::new();
-    for (service, credential) in held.stacks() {
-        found.push(match credential {
-            Credential::ApiKey(key) => (published_as(service), key.clone()),
-            Credential::UserPass { username, .. } => (
-                crate::config::for_service(service, crate::config::USERNAME_SUFFIX),
-                username.clone(),
-            ),
-        });
-    }
-    found
+    held.stacks()
+        .filter_map(|(service, credential)| match credential {
+            Credential::ApiKey(key) => Some((published_as(service), key.clone())),
+            Credential::UserPass { .. } => None,
+        })
+        .collect()
 }
 
 #[cfg(test)]
