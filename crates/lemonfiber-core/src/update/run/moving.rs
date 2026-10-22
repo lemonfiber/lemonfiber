@@ -49,11 +49,7 @@ pub(super) async fn read(ctx: &Ctx, manifest: &Manifest, service: Option<&str>) 
     {
         let agreement = Box::pin(installing(ctx, &offered.plugin, Consent::default()))
             .await
-            .and_then(|installs| {
-                installs
-                    .agreement
-                    .ok_or_else(|| format!("installing {} offers nothing", offered.plugin))
-            });
+            .map(|installs| installs.agreement.unwrap_or_default());
         read.push(Read { offered, agreement });
     }
     read

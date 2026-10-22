@@ -101,20 +101,26 @@ async fn a_plugin_the_bundle_installs_moves_in_place_of_the_stack_service_it_rep
     assert_eq!(counted(reading(&ctx).await), Some(1));
 }
 
+/// An update of `service`, or of every service where absent, confirmed or only shown.
+fn updating(service: Option<&str>, confirm: bool) -> crate::update::run::Asked {
+    crate::update::run::Asked {
+        service: service.map(str::to_owned),
+        confirm,
+        wait: crate::app::Waiting::Never,
+        offer: None,
+    }
+}
+
 /// A confirmed update takes the move on offer, answering the move's own install offer,
 /// and leaves nothing on offer; a rehearsal of it names the move and takes nothing.
 #[tokio::test]
 async fn a_confirmed_update_takes_the_move_and_a_rehearsal_only_names_it() {
     let serving = Arc::new(Serving::listing(""));
     let ctx = unmoved("embedded-update", &serving);
-    let asked = |confirm| crate::update::run::Asked {
-        service: None,
-        confirm,
-        wait: crate::app::Waiting::Never,
-        offer: None,
-    };
 
-    let read = crate::update::run::update(&ctx, asked(false)).await.ok();
+    let read = crate::update::run::update(&ctx, updating(None, false))
+        .await
+        .ok();
     assert_eq!(
         read.as_ref()
             .map(|report| (report.moves.len(), report.moved.len())),
@@ -122,7 +128,7 @@ async fn a_confirmed_update_takes_the_move_and_a_rehearsal_only_names_it() {
     );
     assert_eq!(counted(reading(&ctx).await), Some(0));
 
-    let confirmed = crate::update::run::update(&ctx, asked(true)).await;
+    let confirmed = crate::update::run::update(&ctx, updating(None, true)).await;
 
     let report = confirmed.as_ref().ok();
     assert_eq!(
@@ -137,6 +143,26 @@ async fn a_confirmed_update_takes_the_move_and_a_rehearsal_only_names_it() {
     );
     assert!(report.is_some_and(|report| report.moves.is_empty()));
     assert_eq!(counted(reading(&ctx).await), Some(1));
+}
+
+/// A confirmed update narrowed to another service takes no move: the move stays on offer
+/// and nothing is installed.
+#[tokio::test]
+async fn an_update_narrowed_to_another_service_leaves_the_move_on_offer() {
+    let serving = Arc::new(Serving::listing(""));
+    let ctx = unmoved("embedded-narrowed", &serving);
+
+    let confirmed = crate::update::run::update(&ctx, updating(Some("sonarr"), true)).await;
+
+    assert_eq!(
+        confirmed
+            .as_ref()
+            .ok()
+            .map(|report| (report.moves.len(), report.moved.len())),
+        Some((1, 0)),
+        "{confirmed:?}"
+    );
+    assert_eq!(counted(reading(&ctx).await), Some(0));
 }
 
 #[tokio::test]
