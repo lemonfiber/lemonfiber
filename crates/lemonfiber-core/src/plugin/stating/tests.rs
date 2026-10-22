@@ -107,10 +107,6 @@ fn every_write_is_stated_as_a_path_and_what_goes_at_it() {
                 path: "/opt/lemonfiber/stack/config/caddy/Caddyfile".to_owned(),
                 puts: Puts::Region,
             },
-            Changing {
-                path: "/opt/lemonfiber/stack/config/homepage/services.yaml".to_owned(),
-                puts: Puts::Region,
-            },
         ]
     );
 }

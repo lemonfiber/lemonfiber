@@ -26,7 +26,7 @@ use crate::platform::Environment;
 const LOCAL: &str = ".local";
 
 /// The recorded address that means this machine and nowhere else.
-const ONLY_HERE: &str = "localhost";
+pub const ONLY_HERE: &str = "localhost";
 
 /// What is said about an address that was written down as a number.
 const MAY_CHANGE: &str = "That address is a number, and routers hand out different ones — so it \

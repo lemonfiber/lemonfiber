@@ -66,6 +66,7 @@ pub(crate) use guarding::exposure;
 use identity::seed_request_identity;
 pub(crate) use quality::reprofile;
 pub(crate) use reset::reset_connections;
+pub(crate) use showing::reshow;
 pub(crate) use subtitles::rewatch;
 use withholding::{withheld, withheld_brought};
 

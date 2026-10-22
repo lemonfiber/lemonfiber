@@ -16,10 +16,6 @@ const HOUSEHOLD_GROUP: &str = "Library";
 /// The group an operator surface is listed under where its wiring named none.
 const OPERATOR_GROUP: &str = "Automation";
 
-/// The host an operator surface, and a household service with no address to hand the
-/// household, is linked at.
-const THIS_MACHINE: &str = "localhost";
-
 /// One service as its entry is made, whichever declares it.
 struct Listing<'a> {
     /// The id it runs under.
@@ -171,7 +167,7 @@ fn link(place: &Place<'_>, port: u16, household: bool) -> String {
         .then(|| crate::door::address(place.named, place.recorded, place.environment, port))
         .flatten()
         .map_or_else(
-            || format!("http://{THIS_MACHINE}:{port}"),
+            || format!("http://{}:{port}", crate::door::ONLY_HERE),
             |address| address.url,
         )
 }

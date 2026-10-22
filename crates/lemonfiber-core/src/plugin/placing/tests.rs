@@ -170,7 +170,6 @@ fn installing_writes_a_directory_for_each_service_and_the_project() {
             PathBuf::from("/opt/lemonfiber/stack/config/komga-worker"),
             PathBuf::from("/opt/lemonfiber/stack/compose.generated.yml"),
             PathBuf::from("/opt/lemonfiber/stack/config/caddy/Caddyfile"),
-            PathBuf::from("/opt/lemonfiber/stack/config/homepage/services.yaml"),
         ]
     );
 }
@@ -202,9 +201,8 @@ fn a_directory_carries_no_content_and_the_project_carries_what_was_generated() {
     let planned = writes(&installed("komga", &["komga"]), stack(), &Reading::bare());
     assert_eq!(
         planned.len(),
-        4,
-        "one household service is one directory, the project, and a region in each of the \
-         proxy and the dashboard"
+        3,
+        "one household service is one directory, the project, and a region in the proxy"
     );
     assert_eq!(planned.first().map(super::Write::is_directory), Some(true));
     assert_eq!(document(&planned).as_deref(), Some(GENERATED));

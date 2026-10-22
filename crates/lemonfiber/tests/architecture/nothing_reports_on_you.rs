@@ -80,6 +80,13 @@ const NAMED: &[(&str, Reach, &str)] = &[
          reading a failure can go and look it up themselves",
     ),
     (
+        "duckduckgo.com",
+        Reach::Printed,
+        "where the dashboard's search box sends what somebody types into it, unless the \
+         operator records another address; the browser goes there when somebody searches, and \
+         nothing here fetches it",
+    ),
+    (
         "github.com",
         Reach::Asked,
         "the community quality guides the quality sync tool syncs profiles from, asked for once \

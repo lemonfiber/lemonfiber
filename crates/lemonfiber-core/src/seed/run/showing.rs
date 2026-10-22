@@ -10,8 +10,9 @@ use crate::app::showing;
 use crate::seed::{State, Wiring};
 use crate::wiring::Fillers;
 
-/// What the report calls this connection.
-const CONNECTION: &str = "The dashboard's panels";
+/// What the report calls this connection, which writes the dashboard's files and reaches
+/// no service to do it.
+pub(super) const CONNECTION: &str = "The dashboard's panels";
 
 /// Hold the dashboard to the panel list for the stack's `services` and every installed
 /// plugin's.
@@ -66,6 +67,18 @@ pub(super) async fn seed_dashboard(
         }
     };
     Some(settled(state))
+}
+
+/// Apply the dashboard the panel list again, as a change to what it is made from owes it,
+/// and say how that came out: nothing where the stack cannot be read or runs no dashboard.
+pub(crate) async fn reshow(ctx: &Ctx) -> Option<State> {
+    let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
+    let fillers = crate::app::targets::fillers_here(ctx, &manifest);
+    let project =
+        crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+    seed_dashboard(ctx, &manifest.services, &fillers, project.as_deref())
+        .await
+        .map(|wiring| wiring.state)
 }
 
 /// A panel list by how much it shows.

@@ -34,7 +34,7 @@
       "type": "string"
     },
     "description": {
-      "description": "What the plugin says it does for the operator, which is what its dashboard entry\nsays beside it.",
+      "description": "The line its dashboard entry shows beside it: the one its wiring names, or what\nthe plugin says it does for the operator.",
       "type": "string",
       "default": ""
     },
@@ -53,6 +53,24 @@
         "null"
       ],
       "default": null
+    },
+    "health": {
+      "description": "The path it answers over HTTP to say it is up, where its health is asked that way.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "hidden": {
+      "description": "Whether its wiring hid it from the dashboard.",
+      "type": "boolean"
+    },
+    "icon": {
+      "description": "The icon its dashboard entry shows, where its wiring names one.",
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "image": {
       "description": "The registry path, carrying no pin of its own.",

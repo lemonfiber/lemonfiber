@@ -142,7 +142,7 @@ struct Service {
 
 /// A widget on one entry, as Homepage names it.
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "lowercase", deny_unknown_fields)]
+#[serde(tag = "type", rename_all = "kebab-case", deny_unknown_fields)]
 enum ServiceWidget {
     /// A monitor's status page.
     Uptimekuma {
@@ -155,7 +155,7 @@ enum ServiceWidget {
 
 /// A widget along the page, as Homepage names it.
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase", deny_unknown_fields)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
 enum Widget {
     /// The machine's processor and memory use.
     Resources(Resources),
