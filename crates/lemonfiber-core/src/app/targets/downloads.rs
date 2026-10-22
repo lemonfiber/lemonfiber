@@ -63,6 +63,16 @@ pub(crate) enum Downloading {
     Usenet(Box<dyn usenet::Fills>),
 }
 
+impl Downloading {
+    /// The client, as it is asked where each category's completed downloads land.
+    pub(crate) fn filing(&self) -> &dyn crate::ports::service::Filing {
+        match self {
+            Self::Torrent(client) => client.as_ref(),
+            Self::Usenet(client) => client.as_ref(),
+        }
+    }
+}
+
 impl DownloadTarget {
     /// The client, as the protocol it moves.
     pub(crate) fn client(&self, ctx: &Ctx) -> Downloading {

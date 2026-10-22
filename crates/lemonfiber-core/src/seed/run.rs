@@ -17,6 +17,7 @@ mod applications;
 mod baseline;
 mod clients;
 mod curating;
+mod filing;
 // What one service asking for what another fills comes to, by what each speaks.
 mod connecting;
 // The media server's cross-origin allow-list, held to the front door's origin on every
@@ -198,6 +199,10 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
         wirings.extend(curator_wirings);
         baseline.merge(&records);
     }
+
+    // Where each download client files each category's completed downloads: the one
+    // folder per category both clients share, so the extractor watches one per curator.
+    wirings.extend(filing::seed_completed_folders(ctx, &fillers, &mut baseline).await);
 
     // The indexer's app sync: register each curator it asks for back into it, so it
     // pushes them its indexers. A curator it has no application for is not left out:
