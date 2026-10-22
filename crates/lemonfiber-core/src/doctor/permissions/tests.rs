@@ -128,3 +128,19 @@ fn the_guarded_files_are_the_declared_secret_ones_the_services_do_not_write() {
         "{what:?} still holds {excluded:?}"
     );
 }
+
+/// A file within a directory declared to hold credentials is guarded on its own, so one
+/// service's secrets file left readable is named although its directory is closed.
+#[test]
+fn each_file_within_a_guarded_directory_is_guarded_too() {
+    let scratch = lemonfiber_fixtures::scratch::Scratch::new("permissions-within");
+    let paths = Paths::rooted(&scratch.path().join("config"), &scratch.path().join("data"));
+    let files = paths.secrets_files();
+    assert!(std::fs::create_dir_all(&files).is_ok());
+    assert!(std::fs::write(files.join("gluetun.env"), "WIREGUARD_PRIVATE_KEY=x\n").is_ok());
+
+    let at: Vec<PathBuf> = guarded(&paths).into_iter().map(|one| one.at).collect();
+
+    assert!(at.contains(&files), "{at:?}");
+    assert!(at.contains(&files.join("gluetun.env")), "{at:?}");
+}

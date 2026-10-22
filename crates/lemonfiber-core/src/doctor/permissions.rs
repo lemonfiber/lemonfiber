@@ -72,15 +72,26 @@ impl Open {
     }
 }
 
-/// The files lemonfiber writes that hold a credential, against a resolved layout.
+/// The files lemonfiber writes that hold a credential, against a resolved layout: each
+/// one declared, and each file within one that is a directory.
 #[must_use]
 pub fn guarded(paths: &Paths) -> Vec<Guarded> {
     crate::stored::EVERY
         .iter()
         .filter(|entry| entry.secret && entry.accessor != THE_SERVICES_OWN)
-        .map(|entry| Guarded {
-            what: entry.what.to_owned(),
-            at: (entry.at)(paths),
+        .flat_map(|entry| {
+            let at = (entry.at)(paths);
+            let within: Vec<PathBuf> = std::fs::read_dir(&at)
+                .into_iter()
+                .flatten()
+                .flatten()
+                .map(|file| file.path())
+                .filter(|file| file.is_file())
+                .collect();
+            std::iter::once(at).chain(within).map(|at| Guarded {
+                what: entry.what.to_owned(),
+                at,
+            })
         })
         .collect()
 }
