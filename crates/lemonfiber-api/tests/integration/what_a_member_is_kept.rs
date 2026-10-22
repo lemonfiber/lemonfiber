@@ -5,24 +5,23 @@ use crate::door;
 use door::*;
 use lemonfiber_api::read::kept::{Kept, KEPT_FOR};
 use lemonfiber_core::app::Command;
-use lemonfiber_fixtures::http::Answer as Reply;
 use lemonfiber_fixtures::ports::Following;
 
-/// A stack whose media server signs this program in and holds nobody, on a clock that
-/// moves with the runtime.
+/// A stack whose media server, moved into its plugin, holds nobody, on a clock that moves
+/// with the runtime.
 fn a_household(named: &str) -> (Ctx, Arc<Fake>) {
-    let transport = Fake::by_path(vec![
-        (
-            "/Users/AuthenticateByName",
-            Reply::reply(200, r#"{"AccessToken":"token"}"#),
-        ),
-        ("/Users", Reply::reply(200, "[]")),
-    ]);
-    let mut ctx = lemonfiber_testing::a_context()
-        .runner(Arc::new(Idle))
-        .clock(Following::started())
-        .build()
-        .with_http(transport.clone());
+    let transport = Fake::by_path_in_turn(media::household(
+        &[],
+        &media::member("a7f3", "ana", false),
+        &[],
+    ));
+    let mut ctx = media::asking(
+        lemonfiber_testing::a_context()
+            .runner(Arc::new(Idle))
+            .clock(Following::started())
+            .build()
+            .with_http(transport.clone()),
+    );
     ctx.settings.env_file = Some(a_directory(named).join(".env"));
     seeded(&ctx);
     (ctx, transport)

@@ -9,13 +9,36 @@ use crate::door;
 use crate::what_a_key_admits::sent;
 use crate::what_a_member_may_ask_for::{as_a_member, signed_in, MEMBER, WHO};
 use door::*;
-use lemonfiber_fixtures::http::Answer as Reply;
+use lemonfiber_core::ports::service::{Holds, Image, Item, ItemDetail, Medium};
 
 /// A film on the member's shelf, by an id shaped like the media server's.
 const FILM: &str = "0123456789abcdef0123456789abcdef";
 
 /// What the media server holds as the film's every picture.
 const A_PICTURE: &str = "a-picture";
+
+/// The film, as the media server details it, holding both its pictures.
+fn the_film() -> ItemDetail {
+    ItemDetail {
+        item: Item {
+            id: FILM.to_owned(),
+            title: "Heat".to_owned(),
+            year: None,
+            medium: Medium::Film,
+            holds: Holds {
+                poster: true,
+                backdrop: true,
+                ..Holds::default()
+            },
+        },
+        overview: None,
+        minutes: None,
+        genres: Vec::new(),
+        certificate: None,
+        released: None,
+        seasons: Vec::new(),
+    }
+}
 
 /// A title's pictures are theirs as the title is, and are refused nothing a title read
 /// would not be: a parameter no read takes, and a title named by anything but an id.
@@ -55,17 +78,17 @@ async fn a_member_reaches_a_titles_pictures_as_they_reach_the_title() {
 /// it.
 fn over_a_picture(named: &str) -> (axum::Router, Arc<Token>, Arc<Fake>) {
     let transport = Fake::by_path(vec![
-        ("/Users/AuthenticateByName", Reply::reply(200, SIGNED_IN)),
-        ("/Users/Me", Reply::reply(200, STANDING)),
-        ("/Images/", Reply::served(200, "image/png", A_PICTURE)),
+        (media::identity("whoever"), recognised()),
+        (media::identity("standing"), standing()),
         (
-            "/Items/",
-            Reply::reply(
-                200,
-                format!(r#"{{"Id":"{FILM}","Name":"Heat","Type":"Movie","IsFolder":false}}"#),
-            ),
+            media::serve("picture"),
+            media::answered(&Some(Image {
+                media_type: "image/png".to_owned(),
+                bytes: A_PICTURE.as_bytes().to_vec(),
+            })),
         ),
-        ("/Users", Reply::reply(200, HOUSEHOLD)),
+        (media::serve("title"), media::answered(&Some(the_film()))),
+        (media::identity("household"), media::answered(&household())),
     ]);
     let ctx = a_stack(named, Arc::clone(&transport));
     let kept = keeping(&format!("{named}-kept"));
@@ -79,14 +102,14 @@ fn over_a_picture(named: &str) -> (axum::Router, Arc<Token>, Arc<Fake>) {
     (router, token, transport)
 }
 
-/// The picture `path` names, shown to whoever carries `secret`, and what the media
-/// server was asked for it.
+/// The picture `path` names, shown to whoever carries `secret`, and whose shelf the media
+/// server was asked for it from.
 async fn shown_to(
     router: &axum::Router,
     transport: &Fake,
     secret: &str,
     path: &str,
-) -> Vec<String> {
+) -> Vec<serde_json::Value> {
     let before = transport.requests().len();
     let (answer, headers) = sent(router.clone(), "GET", path, secret, None, "").await;
     assert_eq!(
@@ -101,11 +124,10 @@ async fn shown_to(
         Some("private"),
         "{path}"
     );
-    transport
-        .requests()
+    let sent: Vec<_> = transport.requests().into_iter().skip(before).collect();
+    media::served(&sent, "picture")
         .into_iter()
-        .skip(before)
-        .map(|request| request.url)
+        .filter_map(|asked| asked.get("member").cloned())
         .collect()
 }
 
@@ -115,7 +137,7 @@ async fn shown_to(
 #[tokio::test]
 async fn a_picture_comes_from_the_shelf_the_title_read_is_ruled_to_read() {
     let (router, token, transport) = over_a_picture("pictured");
-    let theirs = format!("/Items/{FILM}?userId={MEMBER}");
+    let theirs = serde_json::json!(MEMBER);
 
     let member = signed_in(router.clone()).await;
     let asked_for = shown_to(
@@ -125,14 +147,7 @@ async fn a_picture_comes_from_the_shelf_the_title_read_is_ruled_to_read() {
         &format!("/api/held/{FILM}/poster?member=bo"),
     )
     .await;
-    assert!(
-        asked_for.iter().any(|url| url.ends_with(&theirs)),
-        "{asked_for:?}"
-    );
-    assert!(
-        !asked_for.iter().any(|url| url.contains("userId=bo")),
-        "{asked_for:?}"
-    );
+    assert_eq!(asked_for, std::slice::from_ref(&theirs));
 
     let operator = asked(
         router.clone(),
@@ -149,10 +164,7 @@ async fn a_picture_comes_from_the_shelf_the_title_read_is_ruled_to_read() {
         &format!("/api/held/{FILM}/backdrop?member={WHO}"),
     )
     .await;
-    assert!(
-        asked_for.iter().any(|url| url.ends_with(&theirs)),
-        "{asked_for:?}"
-    );
+    assert_eq!(asked_for, [theirs]);
 
     let asked_for = shown_to(
         &router,
@@ -161,16 +173,7 @@ async fn a_picture_comes_from_the_shelf_the_title_read_is_ruled_to_read() {
         &format!("/api/held/{FILM}/poster?defaults=true"),
     )
     .await;
-    assert!(
-        asked_for
-            .iter()
-            .any(|url| url.ends_with(&format!("/Items/{FILM}"))),
-        "{asked_for:?}"
-    );
-    assert!(
-        !asked_for.iter().any(|url| url.contains("userId")),
-        "{asked_for:?}"
-    );
+    assert_eq!(asked_for, [serde_json::Value::Null]);
 
     let _ = fs::remove_dir_all(a_directory("pictured"));
     let _ = fs::remove_dir_all(a_directory("pictured-kept"));

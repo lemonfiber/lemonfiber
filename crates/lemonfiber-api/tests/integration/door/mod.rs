@@ -31,6 +31,7 @@ pub(crate) use lemonfiber_core::ports::service::{
 pub(crate) use lemonfiber_fixtures::http::Fake;
 pub(crate) use lemonfiber_fixtures::ports::{Chance, Idle, Stopped};
 pub(crate) use lemonfiber_fixtures::support::a_password;
+pub(crate) use lemonfiber_testing::media;
 use tower::ServiceExt as _;
 
 /// The second the stopped clock reads.
@@ -541,29 +542,45 @@ pub(crate) fn door_with(
 }
 
 /// What the stack's media server answers a name and password it recognises with.
-pub(crate) const SIGNED_IN: &str = r#"{"AccessToken":"a-session","User":{"Id":"a7f3"}}"#;
+pub(crate) fn recognised() -> lemonfiber_fixtures::http::Answer {
+    media::answered(&Some(Signed {
+        id: "a7f3".to_owned(),
+        token: "a-session".to_owned(),
+    }))
+}
+
+/// What it answers a name and password it does not recognise with.
+pub(crate) fn unrecognised() -> lemonfiber_fixtures::http::Answer {
+    media::answered(&None::<Signed>)
+}
 
 /// What it answers when asked whether that member's account still stands.
-pub(crate) const STANDING: &str = r#"{"Id":"a7f3","HasPassword":true}"#;
+pub(crate) fn standing() -> lemonfiber_fixtures::http::Answer {
+    media::answered(&true)
+}
 
 /// The household it holds: Ana, and nobody else.
-pub(crate) const HOUSEHOLD: &str = r#"[{"Id":"a7f3","Name":"ana","HasPassword":true,
-    "Policy":{"IsAdministrator":false,"EnableAllFolders":true}}]"#;
+pub(crate) fn household() -> Vec<Member> {
+    vec![media::member("a7f3", "ana", true)]
+}
 
 /// The world a stack runs in: the repository's stack, whose media server answers
-/// through `transport`, with an env file of the test's own.
+/// through `transport` once it is moved into its plugin, with an env file of the test's
+/// own.
 pub(crate) fn a_stack(named: &str, transport: Arc<Fake>) -> Ctx {
-    let mut ctx = lemonfiber_testing::a_context()
-        .runner(Arc::new(Idle))
-        .build()
-        .with_http(transport)
-        .with_random(Arc::new(not_the_token()));
+    let mut ctx = media::asking(
+        lemonfiber_testing::a_context()
+            .runner(Arc::new(Idle))
+            .build()
+            .with_http(transport)
+            .with_random(Arc::new(not_the_token())),
+    );
     ctx.settings.env_file = Some(a_directory(named).join(".env"));
     ctx
 }
 
-/// The stack seeded: the media server's admin password recorded where the stack
-/// keeps it.
+/// The stack seeded: its media server moved into its plugin, recorded where the stack
+/// keeps what is installed, with the administrator's password recorded beside it.
 pub(crate) fn seeded(ctx: &Ctx) {
     let Some(env) = ctx.settings.env_file.as_deref() else {
         unreachable!("a stack built here has an env file")
@@ -575,6 +592,7 @@ pub(crate) fn seeded(ctx: &Ctx) {
     ) else {
         unreachable!("a scratch directory can be written")
     };
+    media::moved_in(ctx);
 }
 
 /// The surface over that stack, admitting from the household the stack holds.

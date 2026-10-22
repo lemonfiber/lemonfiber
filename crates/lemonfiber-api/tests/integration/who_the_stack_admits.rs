@@ -9,19 +9,18 @@ use std::fs;
 
 use crate::door;
 use door::*;
-use lemonfiber_fixtures::http::Answer as Reply;
 
 /// A media server that recognises the member, and says their account stands.
 fn recognising() -> Arc<Fake> {
     Fake::by_path(vec![
-        ("/Users/AuthenticateByName", Reply::reply(200, SIGNED_IN)),
-        ("/Users/Me", Reply::reply(200, STANDING)),
+        (media::identity("whoever"), recognised()),
+        (media::identity("standing"), standing()),
     ])
 }
 
 /// A media server that recognises nobody.
 fn refusing() -> Arc<Fake> {
-    Fake::by_path(vec![("/Users/AuthenticateByName", Reply::reply(401, ""))])
+    Fake::by_path(vec![(media::identity("whoever"), unrecognised())])
 }
 
 /// A member's name and password, sent to the door.
@@ -51,7 +50,7 @@ async fn a_member_the_media_server_recognises_is_admitted_as_that_member() {
             .requests()
             .iter()
             .any(|request| request.url.starts_with("http://127.0.0.1:")
-                && request.url.ends_with("/Users/AuthenticateByName")
+                && request.url.ends_with(media::identity("whoever"))
                 && request
                     .body
                     .as_deref()
@@ -132,10 +131,11 @@ async fn an_invitation_claimed_after_it_ran_out_is_refused_with_no_sweep() {
 
     assert_eq!(answer.status, StatusCode::UNAUTHORIZED, "{}", answer.body);
     assert!(session(&answer.body).is_empty());
+    let sent = transport.requests();
     assert!(
-        transport.requests().iter().all(|request| request.method
-            != lemonfiber_core::ports::http::Method::Delete
-            && !request.url.ends_with("/Policy")),
+        ["withdraw", "suspend"]
+            .iter()
+            .all(|operation| media::asked(&sent, operation).is_empty()),
         "the refusal rested on something being taken back"
     );
     let _ = fs::remove_dir_all(a_directory("stack-lapsed"));

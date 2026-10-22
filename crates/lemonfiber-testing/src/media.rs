@@ -36,17 +36,17 @@ pub const KEY: &str = "the-adapter-key";
 /// Where `operation` of `identity.source` is asked.
 #[must_use]
 pub fn identity(operation: &str) -> &'static str {
-    asked_at(source::CAPABILITY, source::MAJOR, operation)
+    path_of(source::CAPABILITY, source::MAJOR, operation)
 }
 
 /// Where `operation` of `media.serve` is asked.
 #[must_use]
 pub fn serve(operation: &str) -> &'static str {
-    asked_at(serve::CAPABILITY, serve::MAJOR, operation)
+    path_of(serve::CAPABILITY, serve::MAJOR, operation)
 }
 
 /// Where `operation` of `capability` is asked in `major`, held for as long as a test runs.
-fn asked_at(capability: &str, major: u32, operation: &str) -> &'static str {
+fn path_of(capability: &str, major: u32, operation: &str) -> &'static str {
     Box::leak(lemonfiber_contract::path(capability, major, operation).into_boxed_str())
 }
 
@@ -298,7 +298,17 @@ pub fn keyed_in(mut ctx: Ctx) -> Ctx {
 /// What `operation` of `identity.source` was asked in `sent`, in order.
 #[must_use]
 pub fn asked(sent: &[Request], operation: &str) -> Vec<serde_json::Value> {
-    let at = identity(operation);
+    asked_at(sent, identity(operation))
+}
+
+/// What `operation` of `media.serve` was asked in `sent`, in order.
+#[must_use]
+pub fn served(sent: &[Request], operation: &str) -> Vec<serde_json::Value> {
+    asked_at(sent, serve(operation))
+}
+
+/// What was asked at `at` in `sent`, in order.
+fn asked_at(sent: &[Request], at: &str) -> Vec<serde_json::Value> {
     sent.iter()
         .filter(|request| request.url.ends_with(at))
         .filter_map(|request| serde_json::from_str(request.body.as_deref()?).ok())
