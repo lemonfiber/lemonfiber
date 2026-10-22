@@ -16,6 +16,9 @@ const CHECK: &str = "services.move-offered";
 /// The heading an operator reads this under.
 const TITLE: &str = "Parts this release runs as plugins";
 
+/// The reading of the update that shows each move and, confirmed, takes it.
+const UPDATE: &str = "lemonfiber update stack";
+
 /// Where the moves on offer are read when the check runs.
 #[async_trait]
 pub trait Offers: Send + Sync {
@@ -69,9 +72,9 @@ fn verdict(moves: Result<Vec<MoveOffered>, ()>) -> Verdict {
                 .with_detail("lemonfiber plugin installed"),
         };
     };
-    let Some(first) = moves.first() else {
+    if moves.is_empty() {
         return Verdict::Pass { note: None };
-    };
+    }
     let named: Vec<&str> = moves.iter().map(|one| one.plugin.as_str()).collect();
     Verdict::Warn(
         Problem::new(
@@ -80,8 +83,8 @@ fn verdict(moves: Result<Vec<MoveOffered>, ()>) -> Verdict {
             "This release runs each of these as a plugin, and this machine still runs it as the \
              stack's own service. It keeps running as it is until it is moved, and the move keeps \
              its container name, configuration, data and credentials.",
-            Remedy::new("Read the move, and answer the name it prints")
-                .with_detail(format!("lemonfiber plugin install {}", first.plugin)),
+            Remedy::new("Rehearse the update, which shows the move, then confirm it")
+                .with_detail(UPDATE.to_owned()),
         )
         .in_state(State::Guided),
     )

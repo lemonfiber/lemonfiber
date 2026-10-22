@@ -42,6 +42,12 @@
       ],
       "required": true
     },
+    "moved": {
+      "type": [
+        "array[ref:StackMoveTaken]"
+      ],
+      "required": false
+    },
     "moves": {
       "type": [
         "array[ref:MoveOffered]"

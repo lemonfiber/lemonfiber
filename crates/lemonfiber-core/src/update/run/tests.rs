@@ -117,7 +117,7 @@ fn a_run_that_would_interrupt_a_transfer_says_how_to_let_it_finish() {
     assert_eq!(problem.code.to_string(), "UPDATE-3");
     assert_eq!(
         remedy.as_deref(),
-        Some("lemonfiber update --confirm --wait")
+        Some("lemonfiber update stack --confirm --wait")
     );
 }
 
@@ -180,10 +180,19 @@ fn an_offer_names_every_step_it_was_made_over() {
         refused: false,
         because: String::new(),
     };
-    let offer = super::offered(&[step("4.0.2")]);
-    assert_eq!(offer, super::offered(&[step("4.0.2")]));
-    assert_ne!(offer, super::offered(&[step("4.0.3")]));
-    assert_ne!(offer, super::offered(&[]));
+    let offer = super::offered(&[step("4.0.2")], &[]);
+    assert_eq!(offer, super::offered(&[step("4.0.2")], &[]));
+    assert_ne!(offer, super::offered(&[step("4.0.3")], &[]));
+    assert_ne!(offer, super::offered(&[], &[]));
+    let moving = ["jellyfin".to_owned(), "1a2b".to_owned()];
+    assert_ne!(offer, super::offered(&[step("4.0.2")], &moving));
+    assert_ne!(
+        super::offered(&[step("4.0.2")], &moving),
+        super::offered(
+            &[step("4.0.2")],
+            &["jellyfin".to_owned(), "3c4d".to_owned()]
+        )
+    );
 }
 
 /// A confirmed update with nothing to move is answered as confirmed, and moves nothing.

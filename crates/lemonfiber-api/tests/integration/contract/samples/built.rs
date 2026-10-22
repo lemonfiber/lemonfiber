@@ -45,6 +45,7 @@ pub(super) fn an_update() -> lemonfiber_core::update::run::Report {
         halted: Some("sonarr did not come back".to_owned()),
         offer: String::new(),
         unvetted: None,
+        moved: Vec::new(),
         moves: vec![lemonfiber_core::app::plugins::MoveOffered {
             plugin: "jellyfin".to_owned(),
             service: "jellyfin".to_owned(),

@@ -3,6 +3,8 @@
 
 use super::fetching::{from_git, served, Serving};
 use super::*;
+use crate::ports::docker::{Health, Lifecycle};
+use crate::test_support::Reporting;
 
 /// The plugin the bundle installs.
 const BUNDLED: &str = "jellyfin";
@@ -51,13 +53,90 @@ async fn a_plugin_the_bundle_installs_is_read_from_this_build_at_its_pin() {
     assert_eq!(checkouts, Some(0), "the tree written out is removed again");
 }
 
-#[tokio::test]
-async fn a_plugin_the_bundle_installs_is_held_by_the_stack_service_it_replaces() {
-    let serving = Arc::new(Serving::listing(""));
-    let ctx = served("embedded-held", &serving);
+/// What the bundled plugin's adapter says of itself: the contracts it speaks and the
+/// upstream release it fronts, as its manifest pins them.
+const ABOUT: &str = r#"{"speaks":["media.serve@1","identity.source@1"],"upstream":"Jellyfin","releases":[{"version":"10.11.11","digest":"sha256:aefb67e6a7ff1debdd154a78a7bbb780fd0c873d8639210a7f6a2016ad2b35db"}]}"#;
 
-    assert_eq!(refusal(from_git(&ctx, BUNDLED).await), "PLUGIN-28");
+/// A context over the shipped stack, which still runs the bundled plugin's own service,
+/// with its server and adapter answering every proof it declares and published where
+/// the engine says.
+fn unmoved(name: &str, serving: &Arc<Serving>) -> Ctx {
+    use lemonfiber_fixtures::http::Answer;
+    let http = lemonfiber_fixtures::http::Fake::by_path(vec![
+        (
+            "/System/Info/Public",
+            Answer::reply(
+                200,
+                r#"{"ProductName":"Jellyfin Server","Version":"10.11.11","StartupWizardCompleted":true}"#,
+            ),
+        ),
+        ("/lemonfiber/adapter/v1/about", Answer::reply(200, ABOUT)),
+        ("", Answer::reply(401, "")),
+    ]);
+    let mut ctx = served(name, serving)
+        .with_http(http)
+        .with_patience(std::time::Duration::ZERO);
+    ctx.seams.engine = Arc::new(
+        Reporting::holding(&[BUNDLED, ADAPTER], Lifecycle::Running, Health::Healthy)
+            .publishing(&[(BUNDLED, "127.0.0.1", 8095), (ADAPTER, "127.0.0.1", 8080)]),
+    );
+    ctx.with_images(lemonfiber_fixtures::pulled::Pulled::holding(Vec::new()))
+}
+
+/// The bundled plugin's adapter.
+const ADAPTER: &str = "jellyfin-adapter";
+
+/// The plugin the bundle installs moves in place of the stack's own service of its id:
+/// that service's name and ports hold nothing against it, and the plugin is recorded.
+#[tokio::test]
+async fn a_plugin_the_bundle_installs_moves_in_place_of_the_stack_service_it_replaces() {
+    let serving = Arc::new(Serving::listing(""));
+    let ctx = unmoved("embedded-held", &serving);
+
+    let recorded = report(from_git(&ctx, BUNDLED).await)
+        .and_then(|one| one.install)
+        .map(|install| (install.would.plugin, install.recorded));
+
+    assert_eq!(recorded, Some((BUNDLED.to_owned(), true)));
+    assert_eq!(counted(reading(&ctx).await), Some(1));
+}
+
+/// A confirmed update takes the move on offer, answering the move's own install offer,
+/// and leaves nothing on offer; a rehearsal of it names the move and takes nothing.
+#[tokio::test]
+async fn a_confirmed_update_takes_the_move_and_a_rehearsal_only_names_it() {
+    let serving = Arc::new(Serving::listing(""));
+    let ctx = unmoved("embedded-update", &serving);
+    let asked = |confirm| crate::update::run::Asked {
+        service: None,
+        confirm,
+        wait: crate::app::Waiting::Never,
+        offer: None,
+    };
+
+    let read = crate::update::run::update(&ctx, asked(false)).await.ok();
+    assert_eq!(
+        read.as_ref()
+            .map(|report| (report.moves.len(), report.moved.len())),
+        Some((1, 0))
+    );
     assert_eq!(counted(reading(&ctx).await), Some(0));
+
+    let confirmed = crate::update::run::update(&ctx, asked(true)).await;
+
+    let report = confirmed.as_ref().ok();
+    assert_eq!(
+        report.map(|report| report.moved.clone()),
+        Some(vec![crate::update::run::Moved {
+            plugin: BUNDLED.to_owned(),
+            service: BUNDLED.to_owned(),
+            taken: true,
+            why: None,
+        }]),
+        "{confirmed:?}"
+    );
+    assert!(report.is_some_and(|report| report.moves.is_empty()));
+    assert_eq!(counted(reading(&ctx).await), Some(1));
 }
 
 #[tokio::test]
