@@ -30,6 +30,26 @@ pub(crate) fn frozen_day() -> lemonfiber_manifest::Date {
     })
 }
 
+/// The overlay's changes the journal holds, oldest first, each as the fingerprints it
+/// went from and to.
+pub(crate) fn overlaid(ctx: &crate::app::Ctx) -> Vec<(Option<String>, Option<String>)> {
+    crate::app::targets::layout(ctx)
+        .and_then(|paths| crate::app::recover::journal_at(&paths.journal()).ok())
+        .map(|journal| {
+            journal
+                .changes()
+                .iter()
+                .filter_map(|change| match &change.kind {
+                    crate::journal::Kind::Overlaid {
+                        previous, current, ..
+                    } => Some((previous.clone(), current.clone())),
+                    _ => None,
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 /// A journal line for a setting written over nothing — a fresh file, so the prior value
 /// is absent.
 ///

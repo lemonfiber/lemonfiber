@@ -262,3 +262,51 @@ fn no_value_field_exists_anywhere_in_a_secrets_schema() {
         assert!(!found.contains(&"value".to_owned()), "{found:?}");
     }
 }
+
+/// Each write refuses a name the other takes, saying which command takes it, and changes
+/// nothing: the settings write a `LEMONFIBER_*` key the configuration owns, and the
+/// configuration write the one core setting.
+#[tokio::test]
+async fn each_write_refuses_a_name_the_other_takes_naming_the_command_that_does() {
+    let device_key_apps = lemonfiber_core::device_keys::identity::SETTING;
+    for (action, given, name, other) in [
+        (
+            "settings-set",
+            Arguments {
+                setting: Some("LEMONFIBER_QUIET_HOURS".to_owned()),
+                value: Some("22-07".to_owned()),
+                ..Arguments::default()
+            },
+            "LEMONFIBER_QUIET_HOURS",
+            "lemonfiber config set",
+        ),
+        (
+            "config-set",
+            Arguments {
+                key: Some(device_key_apps.to_owned()),
+                value: Some("ios:TEAM.app".to_owned()),
+                ..Arguments::default()
+            },
+            device_key_apps,
+            "lemonfiber settings set",
+        ),
+    ] {
+        let ctx = world(action);
+        let Ok(command) = named(action, given) else {
+            unreachable!("{action} names its setting and value");
+        };
+        let refused = dispatch(command, &ctx).await.err();
+
+        assert!(
+            refused.as_ref().is_some_and(|problem| problem.code
+                == lemonfiber_core::error::codes::setting::TAKEN_ELSEWHERE
+                && problem.summary == format!("{name} is written with {other}")),
+            "{action}: {refused:?}"
+        );
+        let env = ctx.settings.env_file.clone().unwrap_or_default();
+        assert!(
+            std::fs::read_to_string(&env).map_or(true, |text| !text.contains(name)),
+            "{action}"
+        );
+    }
+}

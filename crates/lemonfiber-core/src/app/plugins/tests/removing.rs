@@ -691,3 +691,38 @@ fn a_removal_with_nowhere_to_look_is_not_admitted() {
         Some("UNDO-4".to_owned())
     );
 }
+
+/// An install and a removal each write the project, and each journals the overlay the
+/// operator wrote or changed before it, by content.
+#[tokio::test]
+async fn an_install_and_a_removal_each_journal_the_overlay_as_it_stands() {
+    let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+    let ctx = proving("overlaid", runner, answering(200));
+    let overlay = crate::overlay::at(
+        ctx.settings
+            .env_file
+            .as_deref()
+            .unwrap_or_else(|| std::path::Path::new("")),
+    );
+    let (written, changed) = ("services: {}\n", "services:\n  komga: {}\n");
+    let (was, now) = (
+        crate::credential::fingerprint(written),
+        crate::credential::fingerprint(changed),
+    );
+    let _ = std::fs::write(&overlay, written);
+
+    assert_eq!(
+        counted(installing(&ctx, &source("overlaid", PROVING)).await),
+        Some(1)
+    );
+    let installed = crate::test_support::overlaid(&ctx);
+    let _ = std::fs::write(&overlay, changed);
+    let gone = removal(removing(&ctx, "komga").await);
+
+    assert!(gone.as_ref().is_some_and(|one| one.removed));
+    assert_eq!(installed, [(None, Some(was.clone()))]);
+    assert_eq!(
+        crate::test_support::overlaid(&ctx),
+        [(None, Some(was.clone())), (Some(was), Some(now))]
+    );
+}

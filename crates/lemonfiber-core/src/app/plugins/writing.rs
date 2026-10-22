@@ -89,6 +89,7 @@ pub(crate) fn carry_out(
                 .map_err(|failure| Box::new(failure.problem()))?;
                 super::super::project::kept(ctx, text)
                     .map_err(|failure| Box::new(unwritable(&write.path, &failure.to_string())))?;
+                super::super::project::overlaid(ctx)?;
                 continue;
             }
             crate::plugin::Lands::Key => {
@@ -335,6 +336,7 @@ pub(crate) fn overwritten(
                 &failure.to_string(),
             ))
         })?;
+        super::super::project::overlaid(ctx)?;
     }
     Ok(())
 }
