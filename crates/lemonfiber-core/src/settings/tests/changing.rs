@@ -13,7 +13,7 @@ use crate::model::{SettingChange, SettingsReport};
 use crate::plugin::{Installed, Register};
 use crate::ports::docker::{Health, Lifecycle};
 use crate::ports::process::Output;
-use crate::test_support::{a_context, env_without_password};
+use crate::test_support::{a_context, env_without_password, overlaid};
 
 const MODE: &str = "comics:mode";
 
@@ -681,4 +681,22 @@ async fn a_store_that_will_not_take_the_value_leaves_the_documents_as_they_were(
     assert!(refused.is_err());
     assert_eq!(std::fs::read_to_string(&machine.document).ok(), before);
     assert!(upped(&machine.runner).is_empty());
+}
+
+/// A change that writes the project without starting it journals the overlay the operator
+/// wrote since, by content, as a start does.
+#[tokio::test]
+async fn a_change_that_writes_the_project_journals_the_overlay() {
+    let machine = machine("overlaid", running(&[]));
+    let overlay = crate::overlay::at(&machine.env);
+    let written = "services:\n  komga:\n    mem_limit: 1g\n";
+    assert!(std::fs::write(&overlay, written).is_ok());
+
+    let made = agreed(&machine.ctx, MODE, Some("fast")).await;
+
+    assert!(change(made).is_some_and(|change| change.applied));
+    assert_eq!(
+        overlaid(&machine.ctx),
+        [(None, Some(crate::credential::fingerprint(written)))]
+    );
 }

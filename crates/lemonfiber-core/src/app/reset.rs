@@ -62,6 +62,9 @@ pub(crate) async fn reset(ctx: &Ctx, confirm: bool) -> Result<ResetReport, Box<P
         super::project::materialised(ctx, &project.text, pass)
             .map_err(|failure| Box::new(failure.problem()))?,
     );
+    if confirm {
+        super::project::overlaid(ctx)?;
+    }
 
     // The connections a drifted service value reverts — the download-client categories the
     // operator changed. Read-only unless confirmed, so a preview lists them without writing.

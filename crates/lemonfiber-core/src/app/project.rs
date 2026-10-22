@@ -272,6 +272,16 @@ fn edited(at: &str) -> Problem {
     .in_state(State::Guided)
 }
 
+/// Journal the overlay where it changed since the journal last recorded it, by content:
+/// what writing the project owes it.
+///
+/// # Errors
+///
+/// Returns the [`Problem`] for a journal that cannot be read or written.
+pub(crate) fn overlaid(ctx: &Ctx) -> Result<(), Box<Problem>> {
+    crate::overlay::journalled(ctx).map_err(|failure| Box::new(failure.problem()))
+}
+
 /// Write `text` as the project and record it as lemonfiber's own, with the profiles
 /// beside it.
 ///
@@ -434,6 +444,7 @@ pub(crate) fn rewritten(
     )
     .map_err(|failure| Box::new(failure.problem()))?;
     kept(ctx, &text).map_err(|failure| Box::new(failure.problem()))?;
+    overlaid(ctx)?;
     secrets_written(ctx, manifest, installed).map_err(|failure| Box::new(failure.problem()))
 }
 

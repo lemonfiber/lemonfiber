@@ -7,7 +7,7 @@ use crate::app::Ctx;
 use crate::config::Settings;
 use crate::platform::Environment;
 use crate::stack::Source;
-use crate::test_support::a_context;
+use crate::test_support::{a_context, overlaid};
 
 static STACKLET: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/stacklet");
 
@@ -128,4 +128,24 @@ async fn a_reset_whose_project_cannot_be_written_is_an_error() {
     let _ = std::fs::create_dir_all(into.join(crate::project::FILE));
 
     assert!(reset(&carried(&into, &env), true).await.is_err());
+}
+
+/// The overlay the operator wrote is journalled, by content, by a confirmed reset, which
+/// writes the project, and by no preview.
+#[tokio::test]
+async fn a_confirmed_reset_journals_the_overlay_and_a_preview_does_not() {
+    let (into, env) = scratch("overlaid");
+    let overlay = crate::overlay::at(&env);
+    let _ = std::fs::create_dir_all(overlay.parent().unwrap_or(&into));
+    let _ = std::fs::write(&overlay, EDITED);
+
+    let _ = reset(&carried(&into, &env), false).await;
+    let previewed = overlaid(&carried(&into, &env));
+    let _ = reset(&carried(&into, &env), true).await;
+
+    assert_eq!(previewed, []);
+    assert_eq!(
+        overlaid(&carried(&into, &env)),
+        [(None, Some(crate::credential::fingerprint(EDITED)))]
+    );
 }

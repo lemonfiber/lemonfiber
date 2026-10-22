@@ -152,7 +152,7 @@ fn compose(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Composed, Box
     edits.extend(prepared.edits);
     plan.profiles.extend(prepared.hosting);
     let project = prepared.project;
-    crate::overlay::journalled(ctx).map_err(|failure| Box::new(failure.problem()))?;
+    super::project::overlaid(ctx)?;
     let command = build(&plan, &ctx.settings, &stack, action, ctx.environment);
     Ok(Composed {
         manifest,

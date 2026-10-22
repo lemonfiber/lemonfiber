@@ -4,8 +4,7 @@ use lemonfiber_fixtures::scratch::Scratch;
 
 use super::{journalled, layered, unvetted, FILE};
 use crate::app::Ctx;
-use crate::journal::Kind;
-use crate::test_support::a_context;
+use crate::test_support::{a_context, overlaid};
 
 fn machine(name: &str) -> (Scratch, Ctx, PathBuf) {
     let dir = Scratch::new(&format!("overlay-{name}"));
@@ -20,24 +19,6 @@ fn machine(name: &str) -> (Scratch, Ctx, PathBuf) {
         })
         .build();
     (dir, ctx, config.join(FILE))
-}
-
-fn overlaid(ctx: &Ctx) -> Vec<(Option<String>, Option<String>)> {
-    crate::app::targets::layout(ctx)
-        .and_then(|paths| crate::app::recover::journal_at(&paths.journal()).ok())
-        .map(|journal| {
-            journal
-                .changes()
-                .iter()
-                .filter_map(|change| match &change.kind {
-                    Kind::Overlaid {
-                        previous, current, ..
-                    } => Some((previous.clone(), current.clone())),
-                    _ => None,
-                })
-                .collect()
-        })
-        .unwrap_or_default()
 }
 
 #[test]
