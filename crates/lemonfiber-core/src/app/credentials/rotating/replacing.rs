@@ -54,7 +54,7 @@ pub(crate) async fn replace_admin_password(
 /// The media server as its administrator's password is changed on it, over
 /// `identity.source`.
 async fn asked(ctx: &Ctx, server: &MediaServer) -> Result<Arc<dyn source::Fills>, Replacing> {
-    Box::pin(server.setting_up(ctx))
+    Box::pin(server.identifying(ctx))
         .await
         .ok_or_else(|| Replacing::Unproven(UNASKED_OVER_ITS_CONTRACTS.to_owned()))
 }

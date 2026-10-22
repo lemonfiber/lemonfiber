@@ -304,7 +304,7 @@ async fn a_contracted_server_unanswered_over_its_contracts_is_asked_nothing() {
     let server = MediaServer::of(&fillers);
 
     if let Some(server) = server.as_ref() {
-        assert!(server.setting_up(&ctx).await.is_none());
+        assert!(server.identifying(&ctx).await.is_none());
         assert!(server.identifying(&ctx).await.is_none());
         assert!(server.administering(&ctx).await.is_none());
     }

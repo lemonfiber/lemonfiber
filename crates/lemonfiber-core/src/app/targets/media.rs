@@ -190,16 +190,13 @@ impl MediaServer {
             .map_err(|failure| failure.to_string())
     }
 
-    /// The server as its first run is driven, over `identity.source`: nothing where it
-    /// cannot be asked over it.
-    pub(crate) async fn setting_up(&self, ctx: &Ctx) -> Option<Arc<dyn source::Fills>> {
-        self.over_identity(ctx).await
-    }
-
-    /// Who the household is, as the server answers over `identity.source`: nothing where
-    /// it cannot be asked over it.
+    /// The server over `identity.source`, as its first run is driven and its household is
+    /// read: nothing where it cannot be asked over it.
     pub(crate) async fn identifying(&self, ctx: &Ctx) -> Option<Arc<dyn source::Fills>> {
-        self.over_identity(ctx).await
+        match Box::pin(spoken(ctx, &self.filler, source::CAPABILITY, source::MAJOR)).await {
+            Spoken::Over(adapter) => Some(Arc::new(source::Adapter(adapter))),
+            Spoken::Unanswered | Spoken::Not => None,
+        }
     }
 
     /// The server as its administrator, over `media.serve`: nothing where it cannot be
@@ -207,14 +204,6 @@ impl MediaServer {
     pub(crate) async fn administering(&self, ctx: &Ctx) -> Option<Arc<dyn serve::Fills>> {
         match Box::pin(spoken(ctx, &self.filler, serve::CAPABILITY, serve::MAJOR)).await {
             Spoken::Over(adapter) => Some(Arc::new(serve::Adapter(adapter))),
-            Spoken::Unanswered | Spoken::Not => None,
-        }
-    }
-
-    /// The server over `identity.source`, where it can be asked over it.
-    async fn over_identity(&self, ctx: &Ctx) -> Option<Arc<dyn source::Fills>> {
-        match Box::pin(spoken(ctx, &self.filler, source::CAPABILITY, source::MAJOR)).await {
-            Spoken::Over(adapter) => Some(Arc::new(source::Adapter(adapter))),
             Spoken::Unanswered | Spoken::Not => None,
         }
     }

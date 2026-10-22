@@ -168,7 +168,7 @@ async fn taken(ctx: &Ctx, minted: &Minted, password: &str) -> Option<bool> {
             }
         }
         Opens::Media(server) => {
-            let source = Box::pin(server.setting_up(ctx)).await?;
+            let source = Box::pin(server.identifying(ctx)).await?;
             source
                 .whoever(config::MEDIA_SERVER_ADMIN_USER, password, crate::PRODUCT)
                 .await

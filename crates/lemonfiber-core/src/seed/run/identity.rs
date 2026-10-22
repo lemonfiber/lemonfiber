@@ -38,7 +38,7 @@ pub(super) async fn seed_media_server_admin(
 ) -> Option<Admin> {
     let server = server?;
     let requests = server.asked_by.clone()?;
-    let Some(client) = server.setting_up(ctx).await else {
+    let Some(client) = server.identifying(ctx).await else {
         return Some(Admin {
             administered: Err(crate::seed::State::Skipped {
                 reason: format!(
