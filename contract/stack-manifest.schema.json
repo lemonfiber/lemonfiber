@@ -131,6 +131,26 @@
         {"description": "Nice to have.", "type": "string", "const": "optional"}
       ]
     },
+    "Dashboard": {
+      "description": "A service's entry on the household's dashboard, where its wiring names any of it.",
+      "type": "object",
+      "properties": {
+        "description": {
+          "description": "The line beside it.",
+          "type": ["string", "null"]
+        },
+        "group": {
+          "description": "The group it appears under.",
+          "type": ["string", "null"]
+        },
+        "hidden": {"description": "Whether it has no entry.", "type": "boolean"},
+        "icon": {
+          "description": "The icon it shows, from the dashboard's own icon set.",
+          "type": ["string", "null"]
+        }
+      },
+      "additionalProperties": false
+    },
     "Expect": {
       "description": "What the answer has to be.\n\nA status is a claim about the network path rather than about the service: Docker\npublishes a port by putting a proxy in front of it, and that proxy accepts a\nconnection before knowing whether anything inside is listening. So a status alone\nis not evidence — except for a refusal or a redirect to HTTPS, answers no port proxy\nproduces.\n\n**A key of the four key-wise constraints is a place rather than a name.** A plain\nname is a top-level member, and one beginning with `/` is a JSON Pointer, extended\nwith a step that picks an entry of a list by a field it holds. A flat name was enough while every service answered a flat object, and the\nonly thing it could say about a service that nests its payload was that the envelope\nwas there — which is a probe that passes by observing that something replied.",
       "type": "object",
@@ -403,6 +423,11 @@
         },
         "config_ro": {"description": "Whether its configuration directory is mounted read-only.", "type": "boolean", "default": false},
         "criticality": {"description": "How much its absence costs.", "$ref": "#/$defs/Criticality"},
+        "dashboard": {
+          "description": "Its entry on the household's dashboard, as the plugin the bundle assembles it\nfrom wires it. A stack directory's service declares none.",
+          "$ref": "#/$defs/Dashboard",
+          "default": {}
+        },
         "depends_on": {
           "description": "Same-profile dependencies only.",
           "type": "array",

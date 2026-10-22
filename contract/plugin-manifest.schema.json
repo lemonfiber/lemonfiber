@@ -1036,6 +1036,7 @@
           "type": ["string", "null"],
           "default": null
         },
+        "dashboard_hidden": {"description": "Whether it has no entry on the bundled dashboard.", "type": "boolean", "default": false},
         "dashboard_icon": {
           "description": "The icon its entry on the bundled dashboard shows, named from the dashboard's own\nicon set. Defaults to the service's id with `.png` after it.",
           "type": ["string", "null"],

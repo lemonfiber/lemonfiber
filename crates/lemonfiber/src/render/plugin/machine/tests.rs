@@ -33,6 +33,7 @@ fn recorded(plugin: &str, reached: Option<Reached>) -> Installed {
             name: "Komga".to_owned(),
             description: "Reads comics".to_owned(),
             icon: None,
+            hidden: false,
             api: None,
             listens: None,
             media_types: Vec::new(),

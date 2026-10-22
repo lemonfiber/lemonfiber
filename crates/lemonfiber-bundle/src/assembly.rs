@@ -17,6 +17,15 @@ const FROM_PLUGIN: [(&str, &str); 4] = [
     ("license", "license"),
 ];
 
+/// The fields of a part's `[[wiring]]` about its service that its stack service carries
+/// in its `dashboard` table, by the name the table gives each.
+const DASHBOARD: [(&str, &str); 4] = [
+    ("dashboard_group", "group"),
+    ("dashboard_description", "description"),
+    ("dashboard_icon", "icon"),
+    ("dashboard_hidden", "hidden"),
+];
+
 /// The tables of a part's manifest its stack service carries as written: its claims, and
 /// the secrets it holds in its own id's namespace.
 const FROM_MANIFEST: [&str; 2] = ["claim", "secret"];
@@ -116,6 +125,9 @@ fn service(one: &Held) -> Result<(Table, Vec<Value>), String> {
             written.insert(to.into(), value.clone());
         }
     }
+    if let Some(dashboard) = dashboard(&manifest, &id) {
+        written.insert("dashboard".into(), Value::Table(dashboard));
+    }
     for table in FROM_MANIFEST {
         if let Some(rows) = manifest.get(table) {
             written.insert(table.into(), rows.clone());
@@ -127,6 +139,25 @@ fn service(one: &Held) -> Result<(Table, Vec<Value>), String> {
         .map(|asks| asks.iter().filter_map(|ask| asked(&id, ask)).collect())
         .unwrap_or_default();
     Ok((written, asks))
+}
+
+/// The `dashboard` table of the service `id`, from the part's `[[wiring]]` about it, where
+/// that names any of it.
+fn dashboard(manifest: &Table, id: &str) -> Option<Table> {
+    let wiring = manifest
+        .get("wiring")
+        .and_then(Value::as_array)?
+        .iter()
+        .find(|row| {
+            row.get("service")
+                .and_then(Value::as_str)
+                .is_none_or(|named| named == id)
+        })?;
+    let table: Table = DASHBOARD
+        .iter()
+        .filter_map(|(from, to)| Some(((*to).to_owned(), wiring.get(*from)?.clone())))
+        .collect();
+    (!table.is_empty()).then_some(table)
 }
 
 /// One `[[ask]]` of the service `by`, as the stack's wiring row.

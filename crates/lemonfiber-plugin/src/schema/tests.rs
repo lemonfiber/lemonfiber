@@ -764,6 +764,20 @@ fn a_wiring_naming_no_dashboard_line_or_icon_leaves_the_plugins_description_and_
         Some("Reads your comics on any browser")
     );
     assert_eq!(entry.map(|entry| entry.icon), Some(None));
+    assert_eq!(entry.map(|entry| entry.hidden), Some(false));
+}
+
+#[test]
+fn a_wiring_hiding_its_entry_is_read_as_hidden() {
+    let hidden = WHOLE.replace(
+        "dashboard_group = \"Library\"\n",
+        "dashboard_group = \"Library\"\ndashboard_hidden = true\n",
+    );
+    let manifest = parse(&hidden);
+    let entry = manifest
+        .as_ref()
+        .and_then(|one| one.services.first().map(|service| one.entry(service)));
+    assert_eq!(entry.map(|entry| entry.hidden), Some(true));
 }
 
 #[test]

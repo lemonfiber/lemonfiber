@@ -76,6 +76,9 @@ pub struct Placed {
     /// The icon its dashboard entry shows, where its wiring names one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
+    /// Whether its wiring hid it from the dashboard.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub hidden: bool,
     /// The adapter of lemonfiber's its manifest names, which only a part the bundle
     /// assembles is reached through. A record read from the register holds none, whatever
     /// an older one carried: an installed plugin is reached over the contracts it speaks.
@@ -199,6 +202,7 @@ impl Placed {
             name: service.name.clone(),
             description: entry.description.to_owned(),
             icon: entry.icon.map(str::to_owned),
+            hidden: entry.hidden,
             api: service.api.clone(),
             listens: service.listens,
             media_types: service.media_types.clone(),

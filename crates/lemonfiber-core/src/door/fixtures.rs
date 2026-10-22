@@ -25,6 +25,7 @@ pub(crate) fn service(id: &str, bind: Option<Bind>, api: Option<ApiKind>) -> Ser
         last_release: "2026-01-01".to_owned(),
         describes: "a service".to_owned(),
         without_it: "nothing".to_owned(),
+        dashboard: lemonfiber_manifest::Dashboard::default(),
         media_types: Vec::new(),
         provides: Vec::new(),
         claim: Vec::new(),

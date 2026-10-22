@@ -165,6 +165,24 @@ pub struct Form {
     pub composable: bool,
 }
 
+/// A service's entry on the household's dashboard, where its wiring names any of it.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Dashboard {
+    /// The group it appears under.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+    /// The line beside it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// The icon it shows, from the dashboard's own icon set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
+    /// Whether it has no entry.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub hidden: bool,
+}
+
 crate::container_fields! {
 /// One container in the stack.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
@@ -224,6 +242,10 @@ pub struct Service {
     pub describes: String,
     /// The consequence of not running it.
     pub without_it: String,
+    /// Its entry on the household's dashboard, as the plugin the bundle assembles it
+    /// from wires it. A stack directory's service declares none.
+    #[serde(default)]
+    pub dashboard: Dashboard,
     /// Where this service's own requests go, in the terms an operator would
     /// recognise — not in protocol names.
     ///

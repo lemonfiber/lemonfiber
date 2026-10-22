@@ -157,6 +157,45 @@ fn a_part_of_two_services_is_refused_by_name() {
 }
 
 #[test]
+fn an_assembled_part_carries_its_wirings_dashboard_entry_and_nothing_else_of_it() {
+    let wired = format!(
+        "{CURATOR}\n[[wiring]]\nhostname = \"curator\"\ndashboard_group = \"Automation\"\n\
+         dashboard_description = \"Television\"\ndashboard_icon = \"sonarr.png\"\n\
+         dashboard_hidden = true\n"
+    );
+    let Ok(text) = assembled(
+        BUNDLE,
+        &[held("curator", &wired, Stage::Assembled)],
+        "0.18.0",
+    ) else {
+        unreachable!("the fixture assembles");
+    };
+    let read = Manifest::from_toml(&text).ok().and_then(|manifest| {
+        manifest
+            .services
+            .first()
+            .map(|service| service.dashboard.clone())
+    });
+    assert_eq!(
+        read,
+        Some(lemonfiber_manifest::Dashboard {
+            group: Some("Automation".into()),
+            description: Some("Television".into()),
+            icon: Some("sonarr.png".into()),
+            hidden: true,
+        })
+    );
+    assert!(!text.contains("hostname"), "{text}");
+}
+
+#[test]
+fn an_assembled_part_whose_wiring_names_no_entry_carries_no_dashboard_table() {
+    let wired = format!("{CURATOR}\n[[wiring]]\nhostname = \"curator\"\n");
+    let service = only_service(&stack(&[held("curator", &wired, Stage::Assembled)]));
+    assert!(service.get("dashboard").is_none());
+}
+
+#[test]
 fn the_assembly_reads_back_as_a_stack_manifest() {
     let Ok(text) = assembled(
         BUNDLE,

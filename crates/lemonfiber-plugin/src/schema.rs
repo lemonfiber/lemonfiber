@@ -326,6 +326,9 @@ pub struct Wiring {
     /// icon set. Defaults to the service's id with `.png` after it.
     #[serde(default)]
     pub dashboard_icon: Option<String>,
+    /// Whether it has no entry on the bundled dashboard.
+    #[serde(default)]
+    pub dashboard_hidden: bool,
 }
 
 /// One capability a plugin's service asks for.
@@ -359,6 +362,8 @@ pub struct Entry<'a> {
     pub description: &'a str,
     /// The icon its entry on the bundled dashboard shows, where one was named.
     pub icon: Option<&'a str>,
+    /// Whether it has no entry on the bundled dashboard.
+    pub hidden: bool,
 }
 
 impl Manifest {
@@ -390,6 +395,7 @@ impl Manifest {
                 .and_then(|wiring| wiring.dashboard_description.as_deref())
                 .unwrap_or(&self.plugin.description),
             icon: declared.and_then(|wiring| wiring.dashboard_icon.as_deref()),
+            hidden: declared.is_some_and(|wiring| wiring.dashboard_hidden),
         }
     }
 
