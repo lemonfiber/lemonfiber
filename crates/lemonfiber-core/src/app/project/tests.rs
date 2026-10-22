@@ -179,4 +179,5 @@ mod copying;
 mod profiled;
 mod refused;
 mod retiring;
+mod rooted;
 mod secrets;

@@ -624,3 +624,21 @@ async fn a_service_the_overlay_declares_is_refused() {
         .and_then(|one| one.detail.as_deref())
         .is_some_and(|detail| detail.contains("compose.override.yml")));
 }
+
+/// An install over a data root the setting names that is refused writes no project from
+/// it and records nothing, refused naming it.
+#[tokio::test]
+async fn an_install_over_a_refused_data_root_is_refused_and_records_nothing() {
+    let ctx = ctx("rooted-install");
+    let env = ctx.settings.env_file.clone().unwrap_or_default();
+    assert!(
+        crate::config::store::set(&env, crate::config::DATA_ROOT_KEY, "nfs://nas local/x").is_ok()
+    );
+    let at = source("rooted-install", MANIFEST);
+
+    assert_eq!(
+        refusal(installing(&ctx, &at).await),
+        crate::error::codes::storage::ROOT_REFUSED.to_string()
+    );
+    assert!(!record_of(&ctx).exists(), "the record was written");
+}

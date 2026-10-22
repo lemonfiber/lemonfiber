@@ -290,6 +290,7 @@ pub(crate) fn regenerated(
     if previous == text {
         return Ok(Vec::new());
     }
+    super::super::project::rooted(ctx)?;
     super::super::project::unedited(ctx)?;
     for held in register.installed() {
         unlinked(ctx, held, &directory)?;

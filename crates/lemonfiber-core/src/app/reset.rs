@@ -52,6 +52,7 @@ pub(crate) async fn reset(ctx: &Ctx, confirm: bool) -> Result<ResetReport, Box<P
         .stack
         .checked_manifest(ctx.today())
         .map_err(|failure| Box::new(failure.problem()))?;
+    super::project::rooted(ctx)?;
     let project = super::project::current(ctx, &manifest)?;
     let pass = if confirm {
         super::project::Pass::Reset

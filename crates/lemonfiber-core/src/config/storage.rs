@@ -8,6 +8,9 @@
 use std::net::{IpAddr, Ipv6Addr};
 use std::path::PathBuf;
 
+use crate::error::codes::storage::ROOT_REFUSED;
+use crate::error::{Problem, Remedy, State};
+
 /// How an NFS export is written as the data root.
 pub const NFS: &str = "nfs://";
 
@@ -40,6 +43,23 @@ pub enum Refused {
 }
 
 impl Refused {
+    /// What a data root written `written` is refused with wherever it is read: no project
+    /// is written from it, and the doctor names it.
+    #[must_use]
+    pub fn problem(&self, written: &str) -> Problem {
+        Problem::new(
+            ROOT_REFUSED,
+            format!("DATA_ROOT {written} cannot be the data root"),
+            "Written as it stands, it would mount something other than what it says, so no \
+             project is written from it.",
+            Remedy::new(
+                "Set it again with lemonfiber config set DATA_ROOT <path or nfs://server/export>",
+            ),
+        )
+        .in_state(State::Guided)
+        .with_detail(self.said())
+    }
+
     /// The sentence naming what is refused.
     #[must_use]
     pub fn said(&self) -> String {
