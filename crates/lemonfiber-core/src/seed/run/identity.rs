@@ -250,11 +250,15 @@ async fn changed_after_setup(ctx: &Ctx, server: &MediaServer) -> crate::seed::Wi
 }
 
 /// What replaces the administrator's password by hand: the rotation for the stack's own
-/// server, and the server itself for a plugin's, whose credentials lemonfiber does not
+/// server and for a first-party one standing in for it, which keeps the stack's names,
+/// and the server itself for any other plugin's, whose credentials lemonfiber does not
 /// rotate.
 fn rotated_by(server: &MediaServer) -> String {
     match server.brought_by() {
         None => format!("Run lemonfiber credentials rotate {}.", server.id()),
+        Some(_) if server.served.stands_in() => {
+            format!("Run lemonfiber credentials rotate {}.", server.id())
+        }
         Some(_) => format!(
             "Change the administrator's password in {} itself, then record it with \
              lemonfiber config set {} <password>.",

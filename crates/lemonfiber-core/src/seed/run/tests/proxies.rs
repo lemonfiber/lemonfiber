@@ -2,55 +2,47 @@
 //! door's.
 
 use super::*;
+use crate::test_support::media;
 
 /// The door's address on the network it reaches the media server on.
 const DOOR: &str = "10.80.96.18";
 
-/// A context with the media server's administrator recorded where `administered` says.
+/// A context asking the media server moved into its plugin as its administrator where
+/// `administered` says.
 fn proxies_ctx(name: &str, administered: bool, http: Arc<Fake>) -> Ctx {
     let at = lemonfiber_fixtures::scratch::Scratch::named(&format!("{name}-env")).kept();
     let _ = std::fs::remove_dir_all(&at);
     let _ = std::fs::create_dir_all(&at);
     let env = at.join(".env");
     let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
-    if administered {
-        let _ = store::set(
-            &env,
-            crate::config::MEDIA_SERVER_ADMIN_PASSWORD_KEY,
-            &lemonfiber_fixtures::support::a_password(),
-        );
-    }
-    a_context()
+    let ctx = a_context()
         .settings(Settings {
             env_file: Some(env),
             ..Settings::default()
         })
         .build()
-        .with_http(http)
+        .with_http(http);
+    if administered {
+        media::asking(ctx)
+    } else {
+        ctx
+    }
 }
 
 /// A media server whose trusted list reads as `first`, then as `after` once written.
-fn serving(first: &'static str, after: &'static str) -> Arc<Fake> {
+fn serving(first: &[&str], after: &[&str]) -> Arc<Fake> {
     Fake::by_path_in_turn(vec![
         (
-            "/Users/AuthenticateByName",
-            vec![Answer::reply(200, r#"{"AccessToken":"token"}"#); 4],
+            media::serve("known_proxies"),
+            vec![media::answered(&first), media::answered(&after)],
         ),
-        (
-            "/System/Configuration/network",
-            vec![
-                Answer::reply(200, first),
-                Answer::reply(200, first),
-                Answer::reply(204, ""),
-                Answer::reply(200, after),
-            ],
-        ),
-        ("/System/Restart", vec![Answer::reply(204, "")]),
+        (media::serve("trust_only"), vec![media::taken()]),
+        (media::serve("restart"), vec![media::taken()]),
     ])
 }
 
-const NOBODY: &str = r#"{"KnownProxies":[]}"#;
-const THE_DOOR: &str = r#"{"KnownProxies":["10.80.96.18"]}"#;
+const NOBODY: &[&str] = &[];
+const THE_DOOR: &[&str] = &[DOOR];
 
 /// The one wiring this pass reports, and whether it asked for a restart.
 async fn seeded(ctx: &Ctx, http: &Fake, door: Option<String>) -> (Option<State>, bool) {
@@ -59,7 +51,7 @@ async fn seeded(ctx: &Ctx, http: &Fake, door: Option<String>) -> (Option<State>,
     let restarted = http
         .requests()
         .iter()
-        .any(|asked| asked.url.ends_with("/System/Restart"));
+        .any(|asked| asked.url.ends_with(media::serve("restart")));
     (wiring.map(|one| one.state), restarted)
 }
 
@@ -115,16 +107,7 @@ async fn no_door_and_no_administrator_hold_nothing() {
 /// A server that will not take the list is said as unreached.
 #[tokio::test(start_paused = true)]
 async fn a_server_that_will_not_answer_is_unreached() {
-    let http = Fake::by_path_in_turn(vec![
-        (
-            "/Users/AuthenticateByName",
-            vec![Answer::reply(200, r#"{"AccessToken":"token"}"#); 4],
-        ),
-        (
-            "/System/Configuration/network",
-            vec![Answer::reply(500, ""); 4],
-        ),
-    ]);
+    let http = Fake::by_path(vec![(media::serve("known_proxies"), media::refusing())]);
     let ctx = proxies_ctx("proxies-unreached", true, http.clone());
     let (state, _) = seeded(&ctx, &http, Some(DOOR.to_owned())).await;
     assert!(state.is_some_and(|state| !matches!(state, State::Wired | State::AlreadyWired)));
@@ -136,27 +119,15 @@ async fn a_server_that_will_not_answer_is_unreached() {
 async fn a_server_that_does_not_come_back_is_unreached() {
     let http = Fake::by_path_in_turn(vec![
         (
-            "/Users/AuthenticateByName",
+            media::serve("known_proxies"),
             [
-                vec![Answer::reply(200, r#"{"AccessToken":"token"}"#)],
-                vec![Answer::reply(503, ""); 60],
+                vec![media::answered(&NOBODY)],
+                vec![media::unavailable(); 60],
             ]
             .concat(),
         ),
-        (
-            "/System/Configuration/network",
-            [
-                vec![
-                    Answer::reply(200, NOBODY),
-                    Answer::reply(200, NOBODY),
-                    Answer::reply(204, ""),
-                    Answer::reply(200, THE_DOOR),
-                ],
-                vec![Answer::reply(503, ""); 60],
-            ]
-            .concat(),
-        ),
-        ("/System/Restart", vec![Answer::reply(204, "")]),
+        (media::serve("trust_only"), vec![media::taken()]),
+        (media::serve("restart"), vec![media::taken()]),
     ]);
     let ctx = proxies_ctx("proxies-gone", true, http.clone());
     let (state, restarted) = seeded(&ctx, &http, Some(DOOR.to_owned())).await;

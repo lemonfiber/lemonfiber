@@ -12,14 +12,29 @@ async fn identity(
     identity_beside(ctx, services, &[], expected).await
 }
 
-/// The same, with `installed` beside the stack.
+/// The same, with `installed` beside the stack, written to a directory of its own, and the
+/// stack's own media server moved into its plugin where it is among `services`.
 async fn identity_beside(
     ctx: &Ctx,
     services: &[lemonfiber_manifest::Service],
     installed: &[crate::plugin::Installed],
     expected: &crate::baseline::Baseline,
 ) -> (Vec<Wiring>, crate::baseline::Baseline) {
-    let fillers = fillers_beside(services.to_vec(), installed, stack_root());
+    let own = media_server_svc().id;
+    let installed: Vec<crate::plugin::Installed> = services
+        .iter()
+        .any(|service| service.id == own)
+        .then(crate::test_support::media::moved)
+        .flatten()
+        .into_iter()
+        .chain(installed.iter().cloned())
+        .collect();
+    static BUILT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let nth = BUILT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let project = lemonfiber_fixtures::scratch::Scratch::new(&format!("identity-stack-{nth}"));
+    let key = crate::plugin::key_file(&project, crate::test_support::media::ADAPTER);
+    let _ = std::fs::create_dir_all(key.parent().unwrap_or(&project));
+    let fillers = fillers_beside(services.to_vec(), &installed, &project);
     let server = crate::app::targets::MediaServer::of(&fillers);
     let admin = super::super::identity::seed_media_server_admin(ctx, server.as_ref()).await;
     super::super::seed_request_identity(
@@ -214,7 +229,7 @@ async fn a_fresh_household_with_nowhere_to_record_its_password_is_given_none() {
         "the administrator connection did not fail over the record"
     );
     assert!(
-        !http.asked_for("/Startup/User"),
+        !http.asked_for(crate::test_support::media::identity("create_admin")),
         "the wizard was given a password nothing recorded"
     );
 }
@@ -223,12 +238,18 @@ async fn a_fresh_household_with_nowhere_to_record_its_password_is_given_none() {
 /// with what it leaves open and how to close it, and the minted password stays recorded.
 #[tokio::test]
 async fn a_password_change_the_media_server_refuses_after_setup_is_said() {
-    for (tag, admitted, changed) in [("unchanged", 200, 500), ("unadmitted", 401, 204)] {
-        a_password_change_refused_after_setup_is_said(tag, admitted, changed).await;
+    for (tag, changed) in [
+        ("unchanged", crate::test_support::media::refusing()),
+        (
+            "unadmitted",
+            crate::test_support::media::refused(lemonfiber_contract::wire::Kind::Unauthorised),
+        ),
+    ] {
+        a_password_change_refused_after_setup_is_said(tag, changed).await;
     }
 }
 
-async fn a_password_change_refused_after_setup_is_said(tag: &str, admitted: u16, changed: u16) {
+async fn a_password_change_refused_after_setup_is_said(tag: &str, changed: Answer) {
     let env = config_scratch(&format!("jellyfin-{tag}"));
     if let Some(parent) = env.parent() {
         let _ = std::fs::create_dir_all(parent);
@@ -241,7 +262,7 @@ async fn a_password_change_refused_after_setup_is_said(tag: &str, admitted: u16,
         Some(vec![0x11; 24]),
         Some(env.to_path_buf()),
     )
-    .with_http(super::household_changing(false, false, admitted, changed));
+    .with_http(super::household_changing(false, false, changed));
 
     let (wirings, _) = identity(
         &ctx,
@@ -267,38 +288,37 @@ async fn a_password_change_refused_after_setup_is_said(tag: &str, admitted: u16,
     assert!(written.contains("JELLYFIN_ADMIN_PASSWORD="), "{written}");
 }
 
-/// A plugin's media server that will not take its changed password is said the same way,
-/// and what closes it is the server itself: lemonfiber does not rotate a plugin's
-/// credentials, so the operator is pointed at the server and at the setting its own
-/// administrator's password is kept under.
+/// A third party's media server that will not take its changed password is said the same
+/// way, and what closes it is the server itself: lemonfiber does not rotate another
+/// plugin's credentials, so the operator is pointed at the server and at the setting its
+/// own administrator's password is kept under.
 #[tokio::test]
 async fn a_plugins_server_refusing_its_changed_password_points_at_the_server() {
+    use crate::test_support::{a_contracted_media_server, media, CONTRACTED_PORT, MEDIA_ADAPTER};
     let env = config_scratch("jellyfin-plugin-unchanged");
     if let Some(parent) = env.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
     let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
-    let ctx = seed_ctx(
+    let mut ctx = seed_ctx(
         None,
         true,
         Vec::new(),
         Some(vec![0x11; 24]),
         Some(env.to_path_buf()),
     )
-    .with_http(super::household_changing(false, false, 200, 500));
-    let mut placed = crate::test_support::a_placed(
-        "emby",
-        &["identity.source"],
-        Some(media_server_api()),
-        Some(8920),
-    );
-    placed.tag = "10.10.7".to_owned();
-    let server = crate::test_support::an_installed("emby-server", vec![placed]);
+    .with_http(super::household_changing(false, false, media::refusing()));
+    ctx.seams.engine =
+        Arc::new(
+            Reporting::holding(&[MEDIA_ADAPTER], Lifecycle::Running, Health::Healthy)
+                .publishing(&[(MEDIA_ADAPTER, "127.0.0.1", CONTRACTED_PORT)]),
+        );
+    ctx.seams.confined = media::Keyed::holding(Arc::clone(&ctx.seams.confined), &[MEDIA_ADAPTER]);
 
     let (wirings, _) = identity_beside(
         &ctx,
         &[requests_svc()],
-        &[server],
+        &[a_contracted_media_server(Some("jellyfin"))],
         &crate::baseline::Baseline::new(),
     )
     .await;
@@ -307,12 +327,13 @@ async fn a_plugins_server_refusing_its_changed_password_points_at_the_server() {
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 
     assert!(
-        changed.as_deref().is_some_and(|said| said
-            .contains("lemonfiber config set PLUGIN_EMBY__SERVER_EMBY_ADMIN_PASSWORD <password>")),
+        changed.as_deref().is_some_and(|said| said.contains(
+            "lemonfiber config set PLUGIN_CONTRACTED_MEDIA__UPSTREAM_ADMIN_PASSWORD <password>"
+        )),
         "{changed:?}"
     );
     assert!(
-        written.contains("PLUGIN_EMBY__SERVER_EMBY_ADMIN_PASSWORD="),
+        written.contains("PLUGIN_CONTRACTED_MEDIA__UPSTREAM_ADMIN_PASSWORD="),
         "{written}"
     );
     assert!(!written.contains("JELLYFIN_ADMIN_PASSWORD="), "{written}");
@@ -327,8 +348,8 @@ async fn a_plugins_server_refusing_its_changed_password_points_at_the_server() {
 async fn a_telling_set_before_lemonfiber_ran_is_adopted_as_the_baseline() {
     let http = Fake::by_path_in_turn(vec![
         (
-            "/System/Info/Public",
-            vec![Answer::reply(200, r#"{"StartupWizardCompleted":true}"#)],
+            crate::test_support::media::identity("startup_completed"),
+            vec![crate::test_support::media::answered(&true)],
         ),
         (
             "/settings/notifications/webpush",
@@ -381,8 +402,8 @@ async fn a_telling_set_before_lemonfiber_ran_is_adopted_as_the_baseline() {
 async fn a_telling_the_operator_switched_off_is_reported_rather_than_overruled() {
     let http = Fake::by_path_in_turn(vec![
         (
-            "/System/Info/Public",
-            vec![Answer::reply(200, r#"{"StartupWizardCompleted":true}"#)],
+            crate::test_support::media::identity("startup_completed"),
+            vec![crate::test_support::media::answered(&true)],
         ),
         (
             "/settings/notifications/webpush",
@@ -436,7 +457,8 @@ async fn a_telling_the_operator_switched_off_is_reported_rather_than_overruled()
 
 /// A plugin `intake` whose service, under [`CONTRACTED_REQUESTS`], fills
 /// `request.intake` over the contract and is what asks for the identity source, beside
-/// the stack's media server, with `trusted` as the first-party plugins.
+/// the stack's media server moved into its plugin, with `trusted` and every plugin this
+/// build embeds as the first-party plugins.
 fn beside_contracted_requests(
     project: &std::path::Path,
     trusted: &[crate::plugin::first_party::FirstParty],
@@ -455,12 +477,21 @@ fn beside_contracted_requests(
             manifest
                 .wirings
                 .retain(|wiring| wiring.asks.as_deref() != Some(crate::app::targets::IDENTITY));
+            let installed: Vec<_> = crate::test_support::media::moved()
+                .into_iter()
+                .chain([intake])
+                .collect();
+            let trusted: Vec<_> = trusted
+                .iter()
+                .copied()
+                .chain(crate::plugin::first_party::EMBEDDED.iter().copied())
+                .collect();
             crate::wiring::Fillers::trusting(
                 &manifest,
-                &[intake],
+                &installed,
                 &crate::wiring::Chosen::default(),
                 Some(project),
-                trusted,
+                &trusted,
             )
         })
         .unwrap_or_default()
@@ -486,6 +517,7 @@ fn contracted_identity_ctx(
     let mut ctx = contracted_ctx(project, CONTRACTED_REQUESTS, keyed, http)
         .with_random(Arc::new(FixedRandom(Some(vec![0x11; 24]))));
     ctx.settings.env_file = Some(env.to_path_buf());
+    ctx.seams.confined = crate::test_support::media::Keyed::over(Arc::clone(&ctx.seams.confined));
     ctx
 }
 
@@ -521,17 +553,13 @@ async fn a_first_party_request_service_is_set_up_and_told_over_the_contract() {
     let env = config_scratch("identity-contracted");
     let http = Fake::by_path_in_turn(vec![
         (
-            "/System/Info/Public",
-            vec![Answer::reply(200, r#"{"StartupWizardCompleted":true}"#)],
+            crate::test_support::media::identity("startup_completed"),
+            vec![crate::test_support::media::answered(&true)],
         ),
         (
-            "/Users/AuthenticateByName",
-            vec![Answer::reply(
-                200,
-                r#"{"AccessToken":"token","User":{"Id":"admin-id"}}"#,
-            )],
+            crate::test_support::media::identity("replace_admin_password"),
+            vec![crate::test_support::media::taken()],
         ),
-        ("/Users/admin-id/Password", vec![Answer::reply(204, "")]),
         (
             "/v1/initialized",
             vec![Answer::reply(200, "false"), Answer::reply(200, "true")],
@@ -617,7 +645,7 @@ async fn a_contracted_request_service_unreachable_or_untrusted_is_asked_nothing(
             "{tag}"
         );
         assert!(
-            !asked.iter().any(|one| one.url.contains(":8080")
+            !asked.iter().any(|one| one.url.contains("/request.intake/")
                 || one.url.contains("/api/v1/")
                 || (!one.url.contains(":8096")
                     && one

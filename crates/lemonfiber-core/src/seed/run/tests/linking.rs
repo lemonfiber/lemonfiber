@@ -5,6 +5,7 @@ use lemonfiber_sidecar::gate::{Accepted, File, Kind, Tokens, PORT};
 use lemonfiber_sidecar::TokenHash;
 
 use super::*;
+use crate::test_support::media;
 
 /// What the fixed randomness renders to, which is every token minted here.
 fn minted() -> String {
@@ -75,28 +76,28 @@ fn at_the_gate(key: &str) -> String {
     link("request-gate", PORT, "/jellyfin", key)
 }
 
-/// A household whose media server has been set up, whose request service answers each of
+/// A household whose media server, moved into its plugin, has been set up, whose request
+/// service answers each of
 /// `initialised` in turn when asked whether it is set up, lists `linked` as its
 /// media-server settings, and answers a new link with `relinked`.
 fn serving(initialised: &[bool], linked: &str, relinked: u16) -> Arc<Fake> {
     Fake::by_route_in_turn(vec![
         (
-            Method::Get,
-            "/System/Info/Public",
-            vec![Answer::reply(200, r#"{"StartupWizardCompleted":true}"#)],
+            Method::Post,
+            media::identity("startup_completed"),
+            vec![media::answered(&true)],
+        ),
+        (
+            Method::Post,
+            media::identity("replace_admin_password"),
+            vec![media::taken()],
+        ),
+        (
+            Method::Post,
+            media::serve("filed_as"),
+            vec![media::answered(&[GATES_KEY])],
         ),
         (Method::Post, "/auth/jellyfin", vec![Answer::reply(200, "")]),
-        (
-            Method::Get,
-            "/Auth/Keys",
-            vec![Answer::reply(
-                200,
-                serde_json::json!({ "Items": [
-                    { "AppName": crate::app_keys::GATE_APP, "AccessToken": GATES_KEY }
-                ] })
-                .to_string(),
-            )],
-        ),
         (
             Method::Post,
             "/settings/initialize",
@@ -121,19 +122,6 @@ fn serving(initialised: &[bool], linked: &str, relinked: u16) -> Arc<Fake> {
             vec![Answer::reply(relinked, "")],
         ),
         (
-            Method::Post,
-            "/Users/AuthenticateByName",
-            vec![Answer::reply(
-                200,
-                r#"{"AccessToken":"token","User":{"Id":"admin-id"}}"#,
-            )],
-        ),
-        (
-            Method::Post,
-            "/Users/admin-id/Password",
-            vec![Answer::reply(204, "")],
-        ),
-        (
             Method::Get,
             "/settings/notifications/webpush",
             vec![Answer::reply(200, r#"{"enabled":true,"types":222}"#)],
@@ -156,8 +144,9 @@ async fn seeded(
     rehearsing: bool,
 ) -> Vec<Wiring> {
     let bytes = random.then(|| vec![0xab; crate::secret::SECRET_BYTES]);
-    let mut ctx =
-        seed_ctx(None, true, Vec::new(), bytes, Some(recorded_admin(name))).with_http(http.clone());
+    let mut ctx = media::asking(
+        seed_ctx(None, true, Vec::new(), bytes, Some(recorded_admin(name))).with_http(http.clone()),
+    );
     ctx.dry_run = rehearsing;
     seeded_with(&ctx, services, project).await
 }
@@ -168,7 +157,7 @@ async fn seeded_with(
     services: &[lemonfiber_manifest::Service],
     project: &std::path::Path,
 ) -> Vec<Wiring> {
-    let fillers = fillers_at(services.to_vec(), project);
+    let fillers = moved_at(services.to_vec(), project);
     let server = crate::app::targets::MediaServer::of(&fillers);
     let admin = super::super::identity::seed_media_server_admin(ctx, server.as_ref()).await;
     super::super::seed_request_identity(
@@ -400,21 +389,23 @@ async fn an_old_token_that_cannot_be_retired_is_said() {
     let _ = std::fs::create_dir_all(tokens_file(&at).join("blocked"));
     let both = accepting(&["older", &minted()]).written();
     let http = serving(&[true], &at_the_gate("stale"), 200);
-    let ctx = seed_ctx(
-        None,
-        true,
-        Vec::new(),
-        Some(vec![0xab; crate::secret::SECRET_BYTES]),
-        Some(recorded_admin("linking-unretired")),
-    )
-    .with_http(http.clone())
-    .with_filesystem(lemonfiber_fixtures::files::Files::at(vec![
-        (tokens_file(&at), &both),
-        (
-            crate::app::gating::path(&at, File::Upstreams),
-            &admitting(&[("jellyfin", Kind::Jellyfin, GATES_KEY)]),
-        ),
-    ]));
+    let ctx = media::asking(
+        seed_ctx(
+            None,
+            true,
+            Vec::new(),
+            Some(vec![0xab; crate::secret::SECRET_BYTES]),
+            Some(recorded_admin("linking-unretired")),
+        )
+        .with_http(http.clone())
+        .with_filesystem(lemonfiber_fixtures::files::Files::at(vec![
+            (tokens_file(&at), &both),
+            (
+                crate::app::gating::path(&at, File::Upstreams),
+                &admitting(&[("jellyfin", Kind::Jellyfin, GATES_KEY)]),
+            ),
+        ])),
+    );
 
     let wirings = seeded_with(&ctx, &stack(true), &at).await;
 

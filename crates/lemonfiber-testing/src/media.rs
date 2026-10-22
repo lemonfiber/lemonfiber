@@ -14,6 +14,7 @@ use lemonfiber_contract::capabilities::{identity::source, media::serve};
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::plugin::{Installed, Register};
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
+use lemonfiber_core::ports::filesystem::{Beneath, Confined, Fault, Lying};
 use lemonfiber_core::ports::service::{Access, Certificate, Invited, Member, NamedLibrary};
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::http::Answer;
@@ -164,6 +165,12 @@ pub fn unavailable() -> Answer {
     refused(lemonfiber_contract::wire::Kind::Unavailable)
 }
 
+/// What the media server answers a call its upstream answered by refusing.
+#[must_use]
+pub fn refusing() -> Answer {
+    refused(lemonfiber_contract::wire::Kind::Refused)
+}
+
 /// What the media server answers a write it took.
 #[must_use]
 pub fn taken() -> Answer {
@@ -199,4 +206,80 @@ pub fn household(
         (identity("withdraw"), vec![taken()]),
         (identity("suspend"), vec![taken()]),
     ]
+}
+
+/// A disk holding a key for each of its services wherever that service's configuration
+/// directory is, and reading every other file as `inner` does: for a stack whose directory
+/// a test cannot write.
+pub struct Keyed {
+    inner: Arc<dyn Confined>,
+    services: Vec<String>,
+}
+
+impl Keyed {
+    /// `inner`, with [`ADAPTER`]'s key held wherever its configuration directory is.
+    #[must_use]
+    pub fn over(inner: Arc<dyn Confined>) -> Arc<Self> {
+        Self::holding(inner, &[ADAPTER])
+    }
+
+    /// `inner`, with a key held for each of `services` wherever its configuration
+    /// directory is.
+    #[must_use]
+    pub fn holding(inner: Arc<dyn Confined>, services: &[&str]) -> Arc<Self> {
+        Arc::new(Self {
+            inner,
+            services: services.iter().map(|one| (*one).to_owned()).collect(),
+        })
+    }
+
+    /// Whether `path` is where one of its services' keys is written in some stack.
+    fn holds(&self, path: &std::path::Path) -> bool {
+        self.services.iter().any(|service| {
+            path.ends_with(
+                std::path::Path::new(service).join(lemonfiber_contract::adapter::KEY_FILE),
+            )
+        })
+    }
+}
+
+impl Confined for Keyed {
+    fn read(&self, path: &std::path::Path, within: &std::path::Path) -> Beneath {
+        if self.holds(path) {
+            return Beneath::Read(KEY.to_owned());
+        }
+        self.inner.read(path, within)
+    }
+
+    fn overwrite(
+        &self,
+        path: &std::path::Path,
+        within: &std::path::Path,
+        contents: &[u8],
+    ) -> Result<(), Fault> {
+        self.inner.overwrite(path, within, contents)
+    }
+
+    fn lies(&self, path: &std::path::Path, within: &std::path::Path) -> Lying {
+        self.inner.lies(path, within)
+    }
+
+    fn moved(
+        &self,
+        from: &std::path::Path,
+        to: &std::path::Path,
+        within: &std::path::Path,
+    ) -> Result<(), Fault> {
+        self.inner.moved(from, to, within)
+    }
+}
+
+/// `ctx` asking its media server moved into its plugin through `fillers` it was handed,
+/// wherever their stack is written: the engine saying [`ADAPTER`] runs as [`running`]
+/// does, and [`ADAPTER`]'s key held wherever its configuration directory is.
+#[must_use]
+pub fn asking(mut ctx: Ctx) -> Ctx {
+    ctx.seams.engine = Arc::new(running());
+    ctx.seams.confined = Keyed::over(Arc::clone(&ctx.seams.confined));
+    ctx
 }
