@@ -159,7 +159,7 @@ impl<'a> Kept<'a> {
     ) -> Result<(), String> {
         let mut only = beside.to_vec();
         for (one, _) in presented.iter().zip(held).filter(|(_, held)| **held) {
-            if let Some(kept) = only.iter_mut().find(|kept| kept.path == one.route) {
+            for kept in only.iter_mut().filter(|kept| kept.path == one.route) {
                 kept.tokens = vec![sha256(&one.token)];
             }
         }

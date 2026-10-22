@@ -166,13 +166,19 @@ async fn seeded(
         Some(project),
     )
     .await;
-    let revoked = http
-        .requests()
+    (
+        wiring.into_iter().next().map(|one| one.state),
+        revoked(http),
+    )
+}
+
+/// Every key revoked over `http`.
+fn revoked(http: &Fake) -> Vec<String> {
+    http.requests()
         .into_iter()
         .filter(|asked| asked.method == Method::Delete)
         .filter_map(|asked| asked.url.rsplit('/').next().map(str::to_owned))
-        .collect();
-    (wiring.into_iter().next().map(|one| one.state), revoked)
+        .collect()
 }
 
 /// Both curators, with the keys they wrote.
@@ -735,12 +741,38 @@ async fn a_gate_the_media_servers_key_may_not_reach_holds_none() {
     )
     .await;
 
-    let revoked: Vec<String> = http
-        .requests()
-        .into_iter()
-        .filter(|asked| asked.method == Method::Delete)
-        .filter_map(|asked| asked.url.rsplit('/').next().map(str::to_owned))
-        .collect();
-    assert_eq!(revoked, vec!["stale".to_owned()], "{wirings:?}");
+    assert_eq!(revoked(&http), vec!["stale".to_owned()], "{wirings:?}");
+    assert_eq!(routes(&at), None);
+}
+
+/// A stack that names no gate of its own asked for no route to the media server, even
+/// beside a plugin's gate that may hold its key: every key filed under the gate's name is
+/// revoked.
+#[tokio::test]
+async fn a_stack_naming_no_gate_revokes_its_key_beside_a_plugins() {
+    let http = serving(&[&["stale"]], 204, 204);
+    let (ctx, at) = gate_ctx("gate-unnamed", true, CURATORS, None, http.clone());
+    let fillers = fillers_trusting(
+        stack(false),
+        &[crate::test_support::a_contracted_gate()],
+        &at,
+        &crate::test_support::GATE_TRUSTED,
+    );
+    let server = crate::app::targets::MediaServer::of(&fillers);
+
+    let wirings = super::super::gate::seed_gate_routes(
+        &ctx,
+        &stack(false),
+        &fillers,
+        server.as_ref(),
+        Some(&at),
+    )
+    .await;
+
+    assert_eq!(
+        wirings.into_iter().map(|one| one.state).collect::<Vec<_>>(),
+        vec![State::Wired]
+    );
+    assert_eq!(revoked(&http), vec!["stale".to_owned()]);
     assert_eq!(routes(&at), None);
 }

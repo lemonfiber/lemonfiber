@@ -306,6 +306,31 @@ async fn a_token_the_request_service_refuses_leaves_both_accepted() {
     assert_eq!(accepted(&at), Some(accepting(&["older", &minted()])));
 }
 
+/// A curator the gate has no route to is not given to the request service at the gate,
+/// and the gate is handed no token for it.
+#[tokio::test]
+async fn a_curator_the_gate_has_no_route_to_is_given_to_nobody() {
+    let at = project("tokens-unrouted", &[]);
+    let _ = std::fs::remove_file(crate::app::gating::path(&at, File::Upstreams));
+    let http = serving(&["[]"], 201, 200);
+
+    let wirings = seeded(&stack(true), &at, &http, true, false).await;
+
+    assert_eq!(
+        states(&wirings),
+        vec![State::Failed {
+            detail: "the tokens could not be handed to the request gate: it admits no route \
+                     sonarr"
+                .to_owned(),
+        }]
+    );
+    assert!(!http
+        .requests()
+        .iter()
+        .any(|asked| asked.method != Method::Get));
+    assert_eq!(accepted(&at), None);
+}
+
 /// Tokens the gate cannot be handed are not given to the request service either.
 #[tokio::test]
 async fn tokens_that_cannot_be_written_are_given_to_nobody() {
