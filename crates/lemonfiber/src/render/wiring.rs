@@ -187,6 +187,7 @@ pub(crate) fn substituted(report: &SubstitutionReport) -> Lines {
         lines.put(format!("  because  {why}"));
     }
     lines.extend(cost(&made.leaves_unfilled, report.applied));
+    lines.extend(super::overlay::unvetted(report.unvetted.as_ref()));
     if !report.applied {
         lines.extend(answering(report));
     }

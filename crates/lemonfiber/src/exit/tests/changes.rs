@@ -615,6 +615,7 @@ fn a_substitution_exits_successfully_whether_it_was_applied_or_only_worked_out()
     let made = |applied| {
         Outcome::Substitution(lemonfiber_core::model::SubstitutionReport {
             rehearsed: false,
+            unvetted: None,
             substitution: lemonfiber_core::wiring::Substitution {
                 capability: "indexer.search".to_owned(),
                 was: Some("prowlarr".to_owned()),

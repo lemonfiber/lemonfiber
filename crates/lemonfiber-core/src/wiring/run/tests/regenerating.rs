@@ -302,3 +302,33 @@ fn a_choice_over_a_refused_data_root_is_refused_naming_it() {
     assert_eq!(refused, Some(crate::error::codes::storage::ROOT_REFUSED));
     assert_eq!(read(&project), before);
 }
+
+/// A choice, offered, rehearsed or made, names the operator's overlay it would be merged
+/// under and every service it changes, as unvetted; with no overlay it names none.
+#[test]
+fn a_choice_names_the_unvetted_overlay_it_would_be_merged_under() {
+    let (ctx, _) = ctx("unvetted");
+    a_plugin_media_server(&ctx);
+    let offered = super::substituting(&ctx, &fill("identity.source", "server")).ok();
+    assert_eq!(offered.and_then(|report| report.unvetted), None);
+    let env = ctx.settings.env_file.clone().unwrap_or_default();
+    let overlay = crate::overlay::at(&env);
+    assert!(std::fs::write(
+        &overlay,
+        "services:\n  jellyfin:\n    environment:\n      X: y\n"
+    )
+    .is_ok());
+
+    let offered = super::substituting(&ctx, &fill("identity.source", "server")).ok();
+    let made = agreed(&ctx, fill("identity.source", "server")).ok();
+
+    for report in [offered, made] {
+        assert_eq!(
+            report.and_then(|report| report.unvetted),
+            Some(crate::model::Unvetted {
+                overlay: overlay.display().to_string(),
+                services: vec!["jellyfin".to_owned()],
+            })
+        );
+    }
+}
