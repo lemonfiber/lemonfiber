@@ -255,14 +255,17 @@ async fn paths(ctx: &Ctx, manifest: &Manifest, went: &mut Went) {
 fn by_hand(environment: Environment, at: &Path) -> String {
     match environment {
         Environment::Windows => format!(
-            "Remove-Item -Recurse -Force '{}' — as the account that owns it",
-            at.display()
+            "Remove-Item -Recurse -Force {} — as the account that owns it",
+            crate::shell::powershell(&at.display().to_string())
         ),
         Environment::MacOs
         | Environment::LinuxNative
         | Environment::LinuxDesktop
         | Environment::Unsupported => {
-            format!("rm -rf '{}' — as the account that owns it", at.display())
+            format!(
+                "rm -rf {} — as the account that owns it",
+                crate::shell::posix(&at.display().to_string())
+            )
         }
     }
 }

@@ -68,7 +68,10 @@ impl Open {
 
     /// The command that closes it.
     fn tighten(&self) -> String {
-        format!("chmod go-rwx {}", self.at.display())
+        format!(
+            "chmod go-rwx {}",
+            crate::shell::posix(&self.at.display().to_string())
+        )
     }
 }
 

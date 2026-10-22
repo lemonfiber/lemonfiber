@@ -62,11 +62,11 @@ async fn the_remedy_is_the_command_that_closes_each_of_the_open_ones() {
     let settled = said(vec![(".env", 0o644), ("admission.json", 0o640)]).await;
 
     assert!(
-        settled.contains("chmod go-rwx /somewhere/lemonfiber/.env"),
+        settled.contains("chmod go-rwx '/somewhere/lemonfiber/.env'"),
         "{settled}"
     );
     assert!(
-        settled.contains("chmod go-rwx /somewhere/lemonfiber/admission.json"),
+        settled.contains("chmod go-rwx '/somewhere/lemonfiber/admission.json'"),
         "{settled}"
     );
     assert!(settled.contains("2 files"), "{settled}");

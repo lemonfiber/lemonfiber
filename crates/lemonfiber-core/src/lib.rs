@@ -130,6 +130,7 @@ pub mod seerr;
 pub mod self_update;
 pub mod servarr;
 pub(crate) mod settings;
+pub mod shell;
 /// Moves every value the stack's environment file holds for a part or a published setting
 /// into the stores, once.
 pub use settings::filing::stack as filed_stack;
