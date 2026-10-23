@@ -112,6 +112,7 @@ async fn a_first_party_request_service_is_set_up_and_told_over_the_contract() {
             "/v1/initialized",
             vec![Answer::reply(200, "false"), Answer::reply(200, "true")],
         ),
+        ("/v1/establish", vec![Answer::reply(204, "")]),
         ("/v1/configure_identity", vec![Answer::reply(204, "")]),
         (
             "/v1/telling",
@@ -145,6 +146,17 @@ async fn a_first_party_request_service_is_set_up_and_told_over_the_contract() {
                 .as_deref()
                 .is_some_and(|body| body.contains(ADMINISTRATOR))),
         "{asked:?}"
+    );
+    let first = asked
+        .iter()
+        .find(|one| one.url.starts_with(CONTRACTED_REQUESTS_AT));
+    assert!(
+        first.is_some_and(|one| one.url == at("establish")
+            && one
+                .body
+                .as_deref()
+                .is_some_and(|body| body.contains(ADMINISTRATOR))),
+        "establish is asked before anything else, with the administrator: {asked:?}"
     );
     assert!(asked.iter().any(|one| one.url == at("tell")), "{asked:?}");
     assert!(

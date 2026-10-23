@@ -113,6 +113,13 @@ impl FakeReq {
 
 #[async_trait]
 impl Requests for FakeReq {
+    async fn establish(
+        &self,
+        _source: &lemonfiber_core::ports::service::IdentitySource,
+    ) -> Result<(), Failure> {
+        Ok(())
+    }
+
     async fn initialized(&self) -> Result<bool, Failure> {
         let count = match self.calls.lock() {
             Ok(mut calls) => {

@@ -372,7 +372,11 @@
       "files": [
         {
           "path": "request.intake/v1/openapi.json",
-          "sha256": "f53ecc5329bd4c325e151c3820510f104f1d5a05f240adea073ee4b6fcdcb7bb"
+          "sha256": "c75836af2e1dbea086d72ccf30c86e88004ad4a581bb3987edddf77cdb9f258b"
+        },
+        {
+          "path": "request.intake/v1/operations/establish.json",
+          "sha256": "584fe20daa6b87ec35cafc06e36f48a9b41f3e57dca6bb75cfe7d052bb581244"
         },
         {
           "path": "request.intake/v1/operations/initialized.json",
@@ -496,14 +500,14 @@
         },
         {
           "path": "request.intake/v1/conformance.json",
-          "sha256": "d60c8fc0a220f0c0e9e0b2efb7772835cdd17de9a237fe8c9c593b3d356e096e"
+          "sha256": "e984a53a2fd12f392e1223faa8fc141d94132165ebfa78733a09ecde7ea1d1ba"
         }
       ],
       "majors": [
         1
       ],
       "openapi": "request.intake/v1/openapi.json",
-      "operations": 30
+      "operations": 31
     },
     {
       "capability": "identity.source",

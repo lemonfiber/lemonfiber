@@ -426,6 +426,11 @@ async fn configure_requests(
     source: &IdentitySource,
     rehearsing: bool,
 ) -> State {
+    if !rehearsing {
+        if let Err(failure) = requests.establish(source).await {
+            return unreached(&failure);
+        }
+    }
     let initialized = match requests.initialized().await {
         Ok(done) => done,
         Err(failure) => return unreached(&failure),
