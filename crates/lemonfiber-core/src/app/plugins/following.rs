@@ -356,18 +356,23 @@ fn failed(plugin: &str, ran: &[Ran], meaning: String) -> Problem {
     )
 }
 
-/// Every captured value a `[[secret]]` declares, by the name it is kept under.
+/// Every captured value a `[[secret]]` of the plugin's own declares, by the name it is
+/// kept under.
 ///
 /// Reading the manifest refused a capture no secret declares; one met here anyway is
-/// not kept, because what is kept is what the operator read they would be holding.
+/// not kept, because what is kept is what the operator read they would be holding. Nor is
+/// one a secret of another service's declares: that credential crosses, and is read from
+/// where its holder keeps it.
 pub(super) fn keeping<'a>(
     plugin: &str,
     manifest: &Manifest,
     captured: &'a BTreeMap<String, String>,
 ) -> Vec<(String, &'a String)> {
+    let services = || manifest.services.iter().map(|service| service.id.as_str());
     let declared: Vec<&str> = manifest
         .secrets
         .iter()
+        .filter(|secret| crate::plugin::own_secret(plugin, services(), &secret.of))
         .map(|secret| secret.id.as_str())
         .collect();
     captured

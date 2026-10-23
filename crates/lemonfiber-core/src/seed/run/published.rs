@@ -76,28 +76,42 @@ pub(super) async fn publish_keys(
     crate::seed::Wiring::settled(CONNECTION.to_owned(), state)
 }
 
-/// Record every key, and say which could not be recorded where any could not.
+/// Record every key, write it again into every secrets file that reads it where it
+/// changed, and say which could not be recorded or written where any could not.
 ///
 /// A key left out is a consumer left reading a stale one, so the connection is not
 /// called wired over it; the rest are still recorded, since each one that lands is a
 /// consumer that works.
 fn recorded(ctx: &Ctx, published: Vec<(String, String)>) -> crate::seed::State {
-    let unrecorded: Vec<String> = published
-        .into_iter()
-        .filter_map(|(name, key)| {
-            crate::app::targets::record_secret(ctx, &name, &key)
-                .err()
-                .map(|failure| format!("{name} ({failure})"))
-        })
-        .collect();
-    if unrecorded.is_empty() {
+    let mut unrecorded = Vec::new();
+    let mut unwritten = Vec::new();
+    for (name, key) in published {
+        let moved = crate::app::targets::recorded_secret(ctx, &name).as_deref() != Some(&key);
+        if let Err(failure) = crate::app::targets::record_secret(ctx, &name, &key) {
+            unrecorded.push(format!("{name} ({failure})"));
+        } else if moved {
+            let holding = crate::plugin::Holding::Crossing(name.clone());
+            if let Err(problem) = crate::settings::files::reread_now(ctx, &holding) {
+                unwritten.push(format!("{name} ({})", problem.summary));
+            }
+        }
+    }
+    let said: Vec<String> = [
+        ("these keys could not be recorded", unrecorded),
+        (
+            "these keys were recorded and could not be written into every file that reads them",
+            unwritten,
+        ),
+    ]
+    .into_iter()
+    .filter(|(_, names)| !names.is_empty())
+    .map(|(what, names)| format!("{what}: {}", names.join(", ")))
+    .collect();
+    if said.is_empty() {
         return crate::seed::State::Wired;
     }
     crate::seed::State::Failed {
-        detail: format!(
-            "these keys could not be recorded: {}",
-            unrecorded.join(", ")
-        ),
+        detail: said.join("; "),
     }
 }
 

@@ -199,3 +199,71 @@ fn a_stack_service_moved_in_place_is_no_longer_written_a_secrets_file() {
     assert!(filed(&[]).contains(&"gluetun".to_owned()));
     assert!(!filed(&installed).contains(&"gluetun".to_owned()));
 }
+
+/// What `service`'s secrets file holds, for the stack this build carries.
+fn file_of(ctx: &crate::app::Ctx, service: &str) -> String {
+    let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK).ok();
+    crate::settings::Resolved::of(ctx, manifest.as_ref(), &[])
+        .secrets_file(service)
+        .and_then(|file| std::fs::read_to_string(file).ok())
+        .unwrap_or_default()
+}
+
+/// An assembled part's key of a curator is that curator's own, read where lemonfiber keeps
+/// it each time the part's file is written, never copied into the secret store, and
+/// written again into every file that reads it once it is replaced.
+#[test]
+fn an_assembled_parts_crossing_key_is_read_from_its_holder_and_never_filed() {
+    let (ctx, _) = machine("secrets-crossing");
+    let recorded =
+        |key: &str| crate::app::targets::record_secret(&ctx, "SONARR_API_KEY", key).is_ok();
+    assert!(recorded("sonarrs-key"));
+    let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK).ok();
+    let resolved = crate::settings::Resolved::of(&ctx, manifest.as_ref(), &[]);
+    assert!(manifest
+        .as_ref()
+        .is_some_and(|manifest| super::super::secrets_written(&ctx, manifest, &[]).is_ok()));
+
+    assert!(file_of(&ctx, "unpackerr").contains("UN_SONARR_0_API_KEY=sonarrs-key"));
+    assert!(file_of(&ctx, "recyclarr").contains("SONARR_API_KEY=sonarrs-key"));
+    let filed = crate::settings::secrets_at(&ctx)
+        .and_then(|at| std::fs::read_to_string(at).ok())
+        .unwrap_or_default();
+    assert!(!filed.contains("unpackerr:"), "{filed}");
+    assert!(!filed.contains("recyclarr:"), "{filed}");
+
+    assert!(recorded("sonarrs-new-key"));
+    let reread = crate::settings::files::reread(
+        &ctx,
+        manifest.as_ref(),
+        &[],
+        &resolved,
+        &crate::plugin::Holding::Crossing("SONARR_API_KEY".to_owned()),
+    );
+
+    let rewritten = reread.unwrap_or_default();
+    assert!(rewritten.contains(&"unpackerr".to_owned()), "{rewritten:?}");
+    assert!(rewritten.contains(&"recyclarr".to_owned()), "{rewritten:?}");
+    assert!(file_of(&ctx, "unpackerr").contains("UN_SONARR_0_API_KEY=sonarrs-new-key"));
+}
+
+/// A curator the stack does not run holds no key to hand over, so the part's variable for
+/// it is withheld rather than read under a name nothing keeps.
+#[test]
+fn an_assembled_parts_key_of_a_service_nothing_here_runs_is_withheld() {
+    let (ctx, _) = machine("secrets-withheld");
+    let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK)
+        .ok()
+        .map(|mut manifest| {
+            manifest.services.retain(|service| service.id != "lidarr");
+            manifest
+        });
+    let resolved = crate::settings::Resolved::of(&ctx, manifest.as_ref(), &[]);
+
+    let held = manifest
+        .as_ref()
+        .and_then(|manifest| manifest.services.iter().find(|one| one.id == "unpackerr"))
+        .map(|unpackerr| crate::settings::files::stack_holding(unpackerr, "music-key", &resolved));
+
+    assert_eq!(held, Some(crate::plugin::Holding::Withheld));
+}

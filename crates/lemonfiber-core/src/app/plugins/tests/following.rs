@@ -518,6 +518,20 @@ fn only_a_declared_capture_is_kept() {
     assert_eq!(kept, ["komga:token=t"]);
 }
 
+/// A capture a secret of another service's declares is that service's credential, which
+/// crosses and is read where its holder keeps it, so it is never kept.
+#[test]
+fn a_recipes_capture_of_a_crossing_key_is_not_kept() {
+    let captured = std::collections::BTreeMap::from([("token".to_owned(), "t".to_owned())]);
+    let kept = lemonfiber_plugin::Manifest::from_toml(&reciped()).map(|mut manifest| {
+        for secret in &mut manifest.secrets {
+            secret.of = "sonarr".to_owned();
+        }
+        super::super::following::keeping("komga", &manifest, &captured).len()
+    });
+    assert_eq!(kept.ok(), Some(0));
+}
+
 /// An install asks only for what its install recipes need; a recipe run on demand is
 /// asked for when it runs.
 #[tokio::test]

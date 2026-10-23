@@ -89,18 +89,25 @@ fn candidates(ctx: &Ctx, installed: &[Installed]) -> Vec<Filing> {
     installed
         .iter()
         .flat_map(|one| {
-            one.declared.secrets.iter().filter_map(|secret| {
-                let key = crate::config::for_plugin(
-                    &one.plugin,
-                    &secret.id,
-                    crate::config::CAPTURED_SUFFIX,
-                );
-                crate::app::targets::recorded_secret(ctx, &key).map(|value| Filing {
-                    name: super::named(&one.plugin, &secret.id),
-                    key,
-                    value,
+            let services = || crate::plugin::services_of(one);
+            one.declared
+                .secrets
+                .iter()
+                .filter(move |secret| {
+                    crate::plugin::own_secret(&one.plugin, services(), &secret.of)
                 })
-            })
+                .filter_map(|secret| {
+                    let key = crate::config::for_plugin(
+                        &one.plugin,
+                        &secret.id,
+                        crate::config::CAPTURED_SUFFIX,
+                    );
+                    crate::app::targets::recorded_secret(ctx, &key).map(|value| Filing {
+                        name: super::named(&one.plugin, &secret.id),
+                        key,
+                        value,
+                    })
+                })
         })
         .collect()
 }

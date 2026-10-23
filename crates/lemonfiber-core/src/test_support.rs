@@ -19,6 +19,9 @@ pub(crate) use context::{a_context, nowhere, repository_stack as stack};
 #[path = "../../lemonfiber-testing/src/media.rs"]
 pub mod media;
 
+mod crossing;
+pub(crate) use crossing::{a_crossing_reader, a_trusted_crossing_reader};
+
 /// The day the fixture clock is stopped on, as the manifest's date rules read it.
 ///
 /// One day for every test that validates the real manifest, read from the same

@@ -13,42 +13,6 @@ use crate::settings::Resolved;
 
 const CROSSING: &str = "SONARR_API_KEY";
 
-fn reader() -> Installed {
-    let placed = |service: &str| {
-        let mut placed = crate::test_support::a_placed(service, &[], None, None);
-        placed.fields.env.insert(
-            "SONARR_KEY".to_owned(),
-            Value::Secret(SecretOf {
-                secret: "sonarr-key".to_owned(),
-            }),
-        );
-        placed
-    };
-    let mut reader = crate::test_support::an_installed(
-        "reader",
-        vec![placed("reader"), placed("reader-worker")],
-    );
-    reader.manifest = crate::test_support::CONTRACTED_MANIFEST.to_owned();
-    reader.tree = crate::test_support::A_TREE.to_owned();
-    reader.declared.secrets = vec![crate::plugin::Secret {
-        id: "sonarr-key".to_owned(),
-        of: "sonarr".to_owned(),
-        why: "Asks the series service".to_owned(),
-    }];
-    reader
-}
-
-/// The reader, under the name of a plugin the machine trusts, so its files are written.
-fn trusted_reader() -> Installed {
-    let mut embedded = reader();
-    if let Some(trusted) = crate::plugin::first_party::EMBEDDED.first() {
-        trusted.plugin.clone_into(&mut embedded.plugin);
-        trusted.manifest.clone_into(&mut embedded.manifest);
-        trusted.tree.clone_into(&mut embedded.tree);
-    }
-    embedded
-}
-
 /// `installed` recorded as the one plugin installed on `machine`.
 fn registered(machine: &Machine, installed: Installed) {
     let mut register = crate::plugin::Register::empty();
@@ -63,7 +27,7 @@ fn registered(machine: &Machine, installed: Installed) {
 fn crossed(name: &str, engine: Reporting) -> (Machine, [Installed; 1]) {
     let machine = machine(name, engine);
     assert!(store::set(&machine.env, CROSSING, "replacement-key").is_ok());
-    (machine, [reader()])
+    (machine, [crate::test_support::a_crossing_reader()])
 }
 
 fn trusted(machine: &Machine, installed: &[Installed]) -> Resolved {
@@ -201,7 +165,7 @@ async fn a_granted_secret_is_listed_as_granted_held_where_it_may_cross_and_withh
         .map(|manifest| crate::settings::readers::readers(manifest, &installed))
         .unwrap_or_default();
     let listed = |resolved: &Resolved| {
-        super::super::listing::secrets(&machine.ctx, &readers, &installed, resolved)
+        super::super::listing::secrets(&machine.ctx, &readers, None, &installed, resolved)
             .into_iter()
             .find(|one| one.name == "reader:sonarr-key")
             .map(|one| (one.from, one.held))
@@ -252,7 +216,7 @@ async fn a_secret_no_installed_plugin_declares_is_read_from_the_store() {
     );
     let resolved = Resolved::of(&machine.ctx, None, &[]);
 
-    let listed = super::super::listing::secrets(&machine.ctx, &readers, &[], &resolved);
+    let listed = super::super::listing::secrets(&machine.ctx, &readers, None, &[], &resolved);
 
     assert!(listed
         .iter()
@@ -260,12 +224,35 @@ async fn a_secret_no_installed_plugin_declares_is_read_from_the_store() {
     assert_eq!(listed.len(), 1);
 }
 
+/// An assembled part's key of a curator is listed as the curator's, granted to it, rather
+/// than as a value of the part's own held in the secret store.
+#[tokio::test]
+async fn an_assembled_parts_crossing_key_is_listed_as_granted() {
+    let (machine, _) = crossed("assembled-granted", running(&[]));
+    let manifest = lemonfiber_manifest::Manifest::from_toml(lemonfiber_bundled::STACK).ok();
+    let readers = manifest
+        .as_ref()
+        .map(|manifest| crate::settings::readers::readers(manifest, &[]))
+        .unwrap_or_default();
+    let resolved = Resolved::of(&machine.ctx, manifest.as_ref(), &[]);
+
+    let listed =
+        super::super::listing::secrets(&machine.ctx, &readers, manifest.as_ref(), &[], &resolved);
+
+    let granted = listed.iter().find(|one| one.name == "unpackerr:tv-key");
+    assert_eq!(
+        granted.map(|one| one.from),
+        Some(Some(SecretFrom::Granted)),
+        "{listed:?}"
+    );
+}
+
 /// A crossing key the operator sets by hand is written into every file that reads it at
 /// once, as a rotation's is, so no reader keeps the value it replaced.
 #[tokio::test]
 async fn a_crossing_key_set_by_hand_rewrites_every_file_that_reads_it() {
     let machine = machine("set-by-hand", Reporting::absent());
-    registered(&machine, trusted_reader());
+    registered(&machine, crate::test_support::a_trusted_crossing_reader());
     let file = machine.env.with_file_name("env").join("reader.env");
     assert!(store::write(&file, "SONARR_KEY=the-replaced-key\n").is_ok());
 
@@ -381,7 +368,7 @@ async fn an_entered_secret_and_its_undo_each_reach_the_file_that_reads_it() {
 #[tokio::test]
 async fn a_crossing_key_put_back_by_an_undo_reaches_every_file_that_reads_it() {
     let machine = machine("restored", Reporting::absent());
-    registered(&machine, trusted_reader());
+    registered(&machine, crate::test_support::a_trusted_crossing_reader());
     assert!(store::set(&machine.env, CROSSING, "put-back").is_ok());
     let file = machine.env.with_file_name("env").join("reader.env");
     assert!(store::write(&file, "SONARR_KEY=undone\n").is_ok());
@@ -423,7 +410,7 @@ fn refused_as_unreached(refused: Option<Box<crate::error::Problem>>) -> bool {
 #[tokio::test]
 async fn a_crossing_key_set_by_hand_that_cannot_reach_its_reader_is_refused() {
     let machine = machine("set-unwritten", Reporting::absent());
-    registered(&machine, trusted_reader());
+    registered(&machine, crate::test_support::a_trusted_crossing_reader());
     unwritable_files(&machine);
 
     let set = crate::app::configuring::set(
@@ -440,7 +427,7 @@ async fn a_crossing_key_set_by_hand_that_cannot_reach_its_reader_is_refused() {
 #[tokio::test]
 async fn a_crossing_key_put_back_that_cannot_reach_its_reader_is_refused() {
     let machine = machine("restored-unwritten", Reporting::absent());
-    registered(&machine, trusted_reader());
+    registered(&machine, crate::test_support::a_trusted_crossing_reader());
     assert!(store::set(&machine.env, CROSSING, "put-back").is_ok());
     unwritable_files(&machine);
     let carried = crate::app::recover::Carried {
