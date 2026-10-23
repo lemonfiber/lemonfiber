@@ -156,7 +156,22 @@ pub async fn collect(ctx: &Ctx, lemonfiber: &str, wanted: &Wanted) -> Option<Con
         None => missing.push("no configuration has been written yet".to_owned()),
         Some(body) => pieces.push(Piece {
             name: "configuration.env".to_owned(),
-            body: bundle::settings(&body, marks, &terms),
+            body: bundle::settings(&bundle::plugins::withheld(&body), marks, &terms),
+        }),
+    }
+
+    match crate::app::plugins::read(ctx) {
+        Err(problem) => missing.push(format!(
+            "the record of installed plugins could not be read — {}",
+            problem.summary
+        )),
+        Ok(register) => pieces.push(Piece {
+            name: "plugins.txt".to_owned(),
+            body: bundle::prose(
+                &bundle::plugins::listed(register.installed()),
+                marks,
+                &terms,
+            ),
         }),
     }
 

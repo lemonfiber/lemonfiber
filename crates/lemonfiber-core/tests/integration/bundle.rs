@@ -42,6 +42,17 @@ const LEMONFIBER: &str = "0.7.0-test";
 /// A context over a stack that is there, an engine that is or is not, and a configuration
 /// file that is or is not.
 fn ctx(stack: Source, running: bool, configuration: Option<&'static str>) -> Ctx {
+    ctx_at(
+        stack,
+        running,
+        configuration,
+        PathBuf::from("/tmp/lemonfiber-bundle-test/.env"),
+    )
+}
+
+/// The same, keeping its settings file at `env`.
+fn ctx_at(stack: Source, running: bool, configuration: Option<&'static str>, env: PathBuf) -> Ctx {
+    let dir = env.parent().map(Path::to_path_buf).unwrap_or_default();
     lemonfiber_testing::a_context()
         .runner(Arc::new(lemonfiber_fixtures::ports::Idle))
         .engine(Arc::new(if running {
@@ -62,8 +73,8 @@ fn ctx(stack: Source, running: bool, configuration: Option<&'static str>) -> Ctx
         .filesystem(configuration.map_or_else(Files::empty, Files::anywhere))
         .over(stack)
         .settings(Settings {
-            env_file: Some(PathBuf::from("/tmp/lemonfiber-bundle-test/.env")),
-            stack_dir: Some(PathBuf::from("/tmp/lemonfiber-bundle-test")),
+            env_file: Some(env),
+            stack_dir: Some(dir),
             ..Settings::default()
         })
         .build()
@@ -123,6 +134,91 @@ async fn a_bundle_holds_what_could_be_read_and_says_where_it_came_from() {
     assert!(files
         .first()
         .is_some_and(|(_, body)| body.contains("configuration.env") && body.contains(LEMONFIBER)));
+}
+
+/// A settings file for the named case, with `register` kept beside it as the record of
+/// what is installed.
+fn beside(name: &str, register: &str) -> PathBuf {
+    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("bundle-{name}")).kept();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(std::fs::create_dir_all(&dir).is_ok());
+    assert!(std::fs::write(dir.join("plugins.json"), register).is_ok());
+    dir.join(".env")
+}
+
+#[tokio::test]
+async fn a_bundle_names_each_installed_plugin_and_withholds_its_own_configuration() {
+    let register = r#"{"installed": [{
+        "plugin": "komga",
+        "version": "1.2.0",
+        "from": "https://github.com/example/plugin-komga",
+        "services": [{
+            "service": "komga",
+            "image": "docker.io/gotson/komga",
+            "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "tag": "1.11.0",
+            "config_path": "/config",
+            "takes_data": true
+        }]
+    }]}"#;
+    let context = ctx_at(
+        Source::External(project()),
+        true,
+        Some("PUID=1000\nPLUGIN_KOMGA_KOMGA_API_KEY=held-by-the-plugin"),
+        beside("plugins", register),
+    );
+
+    let files = collect(&context, LEMONFIBER, &Wanted::default())
+        .await
+        .unwrap_or_default()
+        .files();
+    let body = |named: &str| {
+        files
+            .iter()
+            .find(|(name, _)| name == named)
+            .map(|(_, body)| body.clone())
+            .unwrap_or_default()
+    };
+
+    let plugins = body("plugins.txt");
+    assert!(
+        plugins.contains("komga 1.2.0, from https://github.com/example/plugin-komga, not reviewed"),
+        "{plugins}"
+    );
+    assert!(
+        plugins.contains("its own configuration was not collected"),
+        "{plugins}"
+    );
+    let configuration = body("configuration.env");
+    assert!(configuration.contains("PUID=1000"), "{configuration}");
+    assert!(!configuration.contains("PLUGIN_KOMGA"), "{configuration}");
+}
+
+#[tokio::test]
+async fn a_bundle_whose_plugin_record_will_not_read_says_so() {
+    let context = ctx_at(
+        Source::External(project()),
+        true,
+        None,
+        beside("plugins-unread", "{ not json"),
+    );
+
+    let contents = collect(&context, LEMONFIBER, &Wanted::default())
+        .await
+        .unwrap_or_default();
+
+    assert!(contents
+        .pieces
+        .iter()
+        .all(|piece| piece.name != "plugins.txt"));
+    assert!(
+        contents
+            .missing
+            .iter()
+            .any(|gap| gap.contains("the record of installed plugins could not be read")),
+        "{:?}",
+        contents.missing
+    );
 }
 
 /// The logs go in bounded and stated, and a key riding in one of them does not.

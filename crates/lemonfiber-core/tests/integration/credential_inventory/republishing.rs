@@ -191,3 +191,75 @@ async fn a_key_that_cannot_be_published_is_not_called_handed_out() {
     assert!(said.contains("could not be published"), "{said}");
     assert_eq!(recorded(&env, "PROWLARR_API_KEY"), Some(stale));
 }
+
+/// A plugin the build trusts, reading the aggregator's key as a secret that crosses to it.
+fn a_trusted_reader() -> String {
+    let trusted = lemonfiber_core::plugin::first_party::EMBEDDED
+        .first()
+        .copied()
+        .unwrap_or_else(|| unreachable!("the build embeds a first-party plugin"));
+    serde_json::json!({
+        "installed": [{
+            "plugin": trusted.plugin,
+            "version": "1.0.0",
+            "manifest": trusted.manifest,
+            "tree": trusted.tree,
+            "services": [{
+                "service": "reader",
+                "image": "docker.io/example/reader",
+                "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+                "tag": "1.0.0",
+                "config_path": "/config",
+                "takes_data": false,
+                "fields": { "env": { "AGGREGATOR_KEY": { "secret": "aggregator-key" } } }
+            }],
+            "declared": {
+                "secrets": [{ "id": "aggregator-key", "of": "prowlarr", "why": "it asks the aggregator." }]
+            }
+        }]
+    })
+    .to_string()
+}
+
+#[tokio::test]
+async fn a_key_handed_out_again_reaches_the_plugin_that_reads_it() {
+    let stale = format!("{}{}", "0000stale", "keykeykeykey");
+    let env = env_at("republish-to-plugin", &[("PROWLARR_API_KEY", &stale)]);
+    assert!(std::fs::write(
+        env.with_file_name(lemonfiber_core::config::paths::PLUGINS),
+        a_trusted_reader()
+    )
+    .is_ok());
+    let http = Fake::by_path(vec![(
+        "/system/status",
+        Answer::reply(200, AGGREGATOR_STATUS),
+    )]);
+    let ctx = ctx(env.clone(), Files::anywhere(SERVICE_CONFIG), http);
+
+    let inventory = asked(
+        &ctx,
+        Asking::Rotate {
+            credential: "Prowlarr API key".to_owned(),
+        },
+    )
+    .await;
+
+    let reader = inventory
+        .rotated
+        .iter()
+        .flat_map(|one| one.consumers.iter())
+        .find(|one| one.consumer == "reader")
+        .map(|one| one.reach.clone());
+    assert!(
+        reader
+            .as_ref()
+            .is_some_and(lemonfiber_core::credential::Reach::carried),
+        "{reader:?}"
+    );
+    let file = std::fs::read_to_string(env.with_file_name("env").join("reader.env"));
+    assert!(
+        file.as_deref()
+            .is_ok_and(|text| text.contains(&the_service_key()) && !text.contains(&stale)),
+        "{file:?}"
+    );
+}
