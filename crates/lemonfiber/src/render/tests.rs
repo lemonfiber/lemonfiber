@@ -336,6 +336,7 @@ fn the_rest_of_them() -> Vec<Outcome> {
             rehearsed: false,
             reverted: Vec::new(),
             reverted_connections: Vec::new(),
+            offer: "00000000-00000000".to_owned(),
             confirmed: false,
         }),
         Outcome::Word(a_term()),

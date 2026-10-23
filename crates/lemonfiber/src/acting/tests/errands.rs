@@ -13,6 +13,7 @@ fn a_reset(confirmed: bool) -> ResetReport {
         }],
         reverted_connections: vec!["sonarr → sabnzbd".to_owned()],
         confirmed,
+        offer: "00000000-00000000".to_owned(),
     }
 }
 
@@ -50,7 +51,7 @@ fn an_errand_takes_a_key_a_choice_and_an_answer_before_it_reaches_a_command() {
 #[test]
 fn a_reset_says_what_it_would_throw_away_before_it_asks() {
     let (mut acting, weighing) = sending("reset");
-    assert_eq!(weighing, Wanted::Carry(Command::Reset { confirm: false }));
+    assert_eq!(weighing, Wanted::Carry(Command::Reset { agreement: None }));
 
     acting.came_to(Ok(Outcome::Reset(a_reset(false))));
 
@@ -63,7 +64,9 @@ fn a_reset_says_what_it_would_throw_away_before_it_asks() {
     assert!(before.contains("compose.yaml"), "{said}");
     assert_eq!(
         acting.pressed(&Press::Typed('y')),
-        Wanted::Carry(Command::Reset { confirm: true })
+        Wanted::Carry(Command::Reset {
+            agreement: Some("00000000-00000000".to_owned()),
+        })
     );
 }
 

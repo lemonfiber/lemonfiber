@@ -77,11 +77,27 @@ fn a_reset_an_upgrade_and_a_restore_carry_the_agreement_into_the_command() {
         command(
             "reset",
             Arguments {
+                offer: Some("00000000-00000000".to_owned()),
+                ..Arguments::default()
+            }
+        ),
+        Some(Command::Reset {
+            agreement: Some("00000000-00000000".to_owned()),
+        })
+    );
+    assert_eq!(
+        refusal(
+            "reset",
+            Arguments {
                 confirm: true,
                 ..Arguments::default()
             }
         ),
-        Some(Command::Reset { confirm: true })
+        Some(Refused::Unwanted {
+            action: "reset".to_owned(),
+            argument: "confirm".to_owned()
+        }),
+        "a bare yes to a reset is refused rather than read as one"
     );
     assert_eq!(
         command(

@@ -9,6 +9,12 @@ use crate::platform::Environment;
 use crate::stack::Source;
 use crate::test_support::{a_context, overlaid};
 
+/// A reset answered the way a surface answers one: read, then the offer it printed.
+async fn confirmed(ctx: &Ctx) -> Result<crate::model::ResetReport, Box<crate::error::Problem>> {
+    let offer = reset(ctx, None).await?.offer;
+    reset(ctx, Some(offer)).await
+}
+
 static STACKLET: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/stacklet");
 
 /// A directory of this test's own, and the env-file path within it.
@@ -64,11 +70,11 @@ const EDITED: &str = "services:\n  sonarr:\n    image: my-own\n";
 #[tokio::test]
 async fn a_confirmed_reset_reverts_an_edited_file_to_lemonfibers() {
     let (into, env) = scratch("confirm");
-    let _ = reset(&carried(&into, &env), true).await;
+    let _ = confirmed(&carried(&into, &env)).await;
     let project = into.join(crate::project::FILE);
     let _ = std::fs::write(&project, EDITED);
 
-    let report = reset(&carried(&into, &env), true).await.unwrap_or_default();
+    let report = confirmed(&carried(&into, &env)).await.unwrap_or_default();
 
     assert!(report.confirmed);
     assert!(
@@ -86,13 +92,11 @@ async fn a_confirmed_reset_reverts_an_edited_file_to_lemonfibers() {
 #[tokio::test]
 async fn an_unconfirmed_reset_previews_and_writes_nothing() {
     let (into, env) = scratch("preview");
-    let _ = reset(&carried(&into, &env), true).await;
+    let _ = confirmed(&carried(&into, &env)).await;
     let project = into.join(crate::project::FILE);
     let _ = std::fs::write(&project, EDITED);
 
-    let report = reset(&carried(&into, &env), false)
-        .await
-        .unwrap_or_default();
+    let report = reset(&carried(&into, &env), None).await.unwrap_or_default();
 
     assert!(!report.confirmed);
     assert!(report
@@ -106,9 +110,32 @@ async fn an_unconfirmed_reset_previews_and_writes_nothing() {
 }
 
 #[tokio::test]
+async fn an_answer_to_a_reading_that_has_moved_is_refused_and_reverts_nothing() {
+    let (into, env) = scratch("moved");
+    let _ = confirmed(&carried(&into, &env)).await;
+    let project = into.join(crate::project::FILE);
+    let _ = std::fs::write(&project, EDITED);
+    let read = reset(&carried(&into, &env), None)
+        .await
+        .unwrap_or_default()
+        .offer;
+    let later = format!("{EDITED}  radarr:\n    image: mine-too\n");
+    let _ = std::fs::write(&project, &later);
+
+    let refused = reset(&carried(&into, &env), Some(read)).await.err();
+
+    assert_eq!(
+        refused.as_ref().map(|problem| problem.code),
+        Some(crate::error::codes::stack::RESET_MOVED)
+    );
+    assert_eq!(refused.map(|problem| problem.status()), Some(400));
+    assert_eq!(std::fs::read_to_string(&project).unwrap_or_default(), later);
+}
+
+#[tokio::test]
 async fn a_reset_with_nowhere_to_write_is_an_error() {
     // An embedded stack with no directory to materialise into cannot be reset.
-    assert!(reset(&ctx(None, None), true).await.is_err());
+    assert!(confirmed(&ctx(None, None)).await.is_err());
 }
 
 #[tokio::test]
@@ -117,7 +144,7 @@ async fn a_reset_over_an_unreadable_choice_is_an_error() {
     // A present-but-corrupt recorded choice cannot be read, so the reset stops rather
     // than guessing the state it would restore.
     let _ = std::fs::write(Path::new(&env).with_file_name("quality.json"), "not json");
-    assert!(reset(&ctx(Some(into.to_path_buf()), Some(env)), true)
+    assert!(confirmed(&ctx(Some(into.to_path_buf()), Some(env)))
         .await
         .is_err());
 }
@@ -126,7 +153,7 @@ async fn a_reset_over_an_unreadable_choice_is_an_error() {
 async fn a_reset_over_a_stack_that_does_not_pass_its_checks_is_an_error() {
     let (into, env) = scratch("unchecked");
 
-    let refused = reset(&ctx(Some(into.to_path_buf()), Some(env)), true)
+    let refused = confirmed(&ctx(Some(into.to_path_buf()), Some(env)))
         .await
         .err();
 
@@ -141,7 +168,7 @@ async fn a_reset_whose_project_cannot_be_written_is_an_error() {
     let (into, env) = scratch("unwritable-project");
     let _ = std::fs::create_dir_all(into.join(crate::project::FILE));
 
-    assert!(reset(&carried(&into, &env), true).await.is_err());
+    assert!(confirmed(&carried(&into, &env)).await.is_err());
 }
 
 /// The overlay the operator wrote is journalled, by content, by a confirmed reset, which
@@ -153,9 +180,9 @@ async fn a_confirmed_reset_journals_the_overlay_and_a_preview_does_not() {
     let _ = std::fs::create_dir_all(overlay.parent().unwrap_or(&into));
     let _ = std::fs::write(&overlay, EDITED);
 
-    let _ = reset(&carried(&into, &env), false).await;
+    let _ = reset(&carried(&into, &env), None).await;
     let previewed = overlaid(&carried(&into, &env));
-    let _ = reset(&carried(&into, &env), true).await;
+    let _ = confirmed(&carried(&into, &env)).await;
 
     assert_eq!(previewed, []);
     assert_eq!(
@@ -173,7 +200,7 @@ async fn a_reset_over_a_refused_data_root_is_refused_and_writes_nothing() {
         crate::config::store::set(&env, crate::config::DATA_ROOT_KEY, "nfs://nas local/x").is_ok()
     );
 
-    let refused = reset(&carried(&into, &env), true)
+    let refused = confirmed(&carried(&into, &env))
         .await
         .err()
         .map(|problem| problem.code);
@@ -191,9 +218,9 @@ async fn a_confirmed_reset_writes_each_secrets_file_and_a_preview_none() {
         .with_file_name(crate::config::paths::SECRETS_FILES)
         .join("gluetun.env");
 
-    assert!(reset(&bundled(&into, &env), false).await.is_ok());
+    assert!(reset(&bundled(&into, &env), None).await.is_ok());
     let previewed = guard.exists();
-    assert!(reset(&bundled(&into, &env), true).await.is_ok());
+    assert!(confirmed(&bundled(&into, &env)).await.is_ok());
 
     assert!(!previewed);
     assert!(guard.is_file());
@@ -209,7 +236,7 @@ async fn a_reset_whose_register_cannot_be_read_is_refused() {
         "not a register",
     );
 
-    assert!(reset(&carried(&into, &env), true).await.is_err());
+    assert!(confirmed(&carried(&into, &env)).await.is_err());
     assert!(!into.join(crate::project::FILE).exists());
 }
 
@@ -223,5 +250,5 @@ async fn a_confirmed_reset_that_cannot_write_a_secrets_file_is_an_error() {
         "a file, not a directory",
     );
 
-    assert!(reset(&bundled(&into, &env), true).await.is_err());
+    assert!(confirmed(&bundled(&into, &env)).await.is_err());
 }

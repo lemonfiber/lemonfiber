@@ -456,9 +456,9 @@ pub enum Request {
     /// will be lost and does nothing until `--confirm` — run it once to see the diffs,
     /// again with `--confirm` to reset.
     Reset {
-        /// Go ahead and revert, having seen what will be lost.
-        #[arg(long)]
-        confirm: bool,
+        /// The offer being answered, as the reading that made it printed it.
+        #[arg(long, value_name = "NAME")]
+        offer: Option<String>,
     },
     /// Move something onto a newer version, naming which.
     ///

@@ -18,6 +18,7 @@ use lemonfiber_core::app::{Allowance, Answer, Chosen, Command, Decision, Invitin
 use lemonfiber_core::asking::Policy;
 use lemonfiber_core::ports::service::{Quota, Unrated};
 
+use super::filled;
 use crate::actions::{Arguments, Refused};
 
 /// The requests this file answers, which is every one addressed to somebody here.
@@ -127,7 +128,7 @@ fn about_a_person(
         "household-handoff" => Ok(Command::Handoff { name }),
         _ => Ok(Command::Remove {
             name,
-            agreement: consent.offer.filter(|named| !named.trim().is_empty()),
+            agreement: filled(consent.offer),
         }),
     }
 }

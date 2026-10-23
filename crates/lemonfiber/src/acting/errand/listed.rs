@@ -155,7 +155,7 @@ static AFTER: &[Errand] = &[
         asks: "Throw away every edit above",
         needs: Needs::Nothing,
         accepts: None,
-        going: Going::Agreed,
+        going: Going::Answered,
     },
     Errand {
         name: "everything lemonfiber keeps removed",

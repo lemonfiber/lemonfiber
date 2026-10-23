@@ -15,6 +15,7 @@ fn a_reset_names_every_change_it_would_revert() {
             diff: "-yours\n+ours\n".to_owned(),
         }],
         reverted_connections: vec!["sonarr → sabnzbd".to_owned()],
+        offer: "00000000-00000000".to_owned(),
         confirmed: false,
     };
     let text = reset(&report).text();
@@ -33,6 +34,7 @@ fn a_reset_names_every_change_it_would_revert() {
         rehearsed: false,
         reverted: Vec::new(),
         reverted_connections: Vec::new(),
+        offer: "00000000-00000000".to_owned(),
         confirmed: false,
     };
     assert!(reset(&clean).text().contains("already lemonfiber's own"));

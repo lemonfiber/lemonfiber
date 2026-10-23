@@ -335,7 +335,9 @@ async fn main() -> ExitCode {
         Request::Key(asked) => translate::keyed(asked),
         Request::Seed => Command::Seed,
         Request::Adopt => Command::Adopt,
-        Request::Reset { confirm } => Command::Reset { confirm },
+        Request::Reset { offer } => Command::Reset {
+            agreement: offer.filter(|named| !named.trim().is_empty()),
+        },
         // Which of the two was named is the whole of what tells them apart, and clap
         // has already refused a run that named neither — which is the only place
         // somebody can be told what the two objects are while they are still typing.

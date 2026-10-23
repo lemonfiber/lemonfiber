@@ -530,7 +530,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Seed => seed::seed(ctx, false).await.map(Outcome::Seed),
         Command::Adopt => seed::seed(ctx, true).await.map(Outcome::Seed),
         Command::Uninstall(how) => uninstall::uninstall(ctx, how).await.map(Outcome::Uninstall),
-        Command::Reset { confirm } => reset::reset(ctx, confirm).await.map(Outcome::Reset),
+        Command::Reset { agreement } => reset::reset(ctx, agreement).await.map(Outcome::Reset),
         Command::Setup(action) => setup::setup(ctx, action).await.map(Outcome::Wizard),
         // Unconfirmed it says what moving onto this build's pins would change, and
         // touches nothing; confirmed it takes those steps behind a backup.

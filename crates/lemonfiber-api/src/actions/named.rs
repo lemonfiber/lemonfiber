@@ -325,7 +325,9 @@ pub(crate) fn carried(action: &str, given: Arguments) -> Result<Command, Refused
         "pull" => Ok(Command::Pull { forms }),
         "seed" => Ok(Command::Seed),
         "adopt" => Ok(Command::Adopt),
-        "reset" => Ok(Command::Reset { confirm }),
+        "reset" => Ok(Command::Reset {
+            agreement: filled(offer),
+        }),
         // Unconfirmed it lists what would go, which is the same listing `/api/stored`
         // answers with — so what a browser agrees to is what it was shown.
         "forget" => Ok(Command::Forget { confirm }),
@@ -393,11 +395,15 @@ pub(crate) fn carried(action: &str, given: Arguments) -> Result<Command, Refused
         // operator with an empty library needs. Blank is nothing named, not an
         // empty title, so a browser that sent the field and left it alone asks the
         // same thing as one that left it out.
-        "walkthrough" => Ok(Command::Walkthrough {
-            item: item.filter(|named| !named.trim().is_empty()),
-        }),
+        "walkthrough" => Ok(Command::Walkthrough { item: filled(item) }),
         _ => Err(unknown(action)),
     }
+}
+
+/// What was written, where anything was: a field sent and left blank names nothing,
+/// so it reads as one left out.
+fn filled(written: Option<String>) -> Option<String> {
+    written.filter(|given| !given.trim().is_empty())
 }
 
 /// A name this surface does not offer, refused as itself rather than invented.
@@ -439,7 +445,7 @@ fn removing(
     Ok(Command::Uninstall(
         Removing::surveying(chosen)
             .confirmed(confirm)
-            .agreeing(offer.filter(|given| !given.trim().is_empty()))
+            .agreeing(filled(offer))
             .waiting(wait),
     ))
 }

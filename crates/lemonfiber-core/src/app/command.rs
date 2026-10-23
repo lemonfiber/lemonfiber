@@ -488,11 +488,10 @@ pub enum Command {
     Adopt,
     /// Put the stack back to lemonfiber's own state, reverting every operator edit — the
     /// opposite of adopt. Because it discards their work, it names what will be lost and
-    /// does nothing until confirmed: unconfirmed it only previews the reverts.
+    /// does nothing until its offer is answered: until then it only previews the reverts.
     Reset {
-        /// Whether the operator confirmed the loss; without it, only the reverts are
-        /// shown and nothing is written.
-        confirm: bool,
+        /// The offer being answered, as the reading that made it printed it.
+        agreement: Option<String>,
     },
     /// Move the stack onto the image versions this build pins.
     ///

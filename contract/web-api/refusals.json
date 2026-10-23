@@ -779,6 +779,11 @@
     "status": 409,
     "description": "Raised when a change would write over a generated project the operator has edited."
   },
+  "STACK-13": {
+    "name": "RESET_MOVED",
+    "status": 400,
+    "description": "Raised where the offer a reset answers is not the one a reading of it makes now."
+  },
   "STACK-2": {
     "name": "STACK_UNUSABLE",
     "status": 500,

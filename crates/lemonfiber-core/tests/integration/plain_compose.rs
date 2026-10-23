@@ -232,7 +232,13 @@ async fn an_overlay_overrides_the_project_under_plain_compose_as_it_does_under_l
 async fn the_project_a_reset_writes_resolves_under_plain_compose() {
     let (ctx, project) = machine("plain-reset", None);
 
-    let outcome = dispatch(Command::Reset { confirm: true }, &ctx).await;
+    let outcome = dispatch(
+        Command::Reset {
+            agreement: Some("00000000-00000000".to_owned()),
+        },
+        &ctx,
+    )
+    .await;
 
     assert!(outcome.is_ok(), "{outcome:?}");
     let plain = resolved(

@@ -37,7 +37,7 @@ pub fn carried(command: Command, ctx: &Ctx) -> Command {
 #[must_use]
 fn unconfirmed(command: Command) -> Command {
     match command {
-        Command::Reset { .. } => Command::Reset { confirm: false },
+        Command::Reset { .. } => Command::Reset { agreement: None },
         Command::Remove { name, .. } => Command::Remove {
             name,
             agreement: None,

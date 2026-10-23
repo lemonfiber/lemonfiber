@@ -120,7 +120,6 @@ fn carries_agreement(command: &Command) -> bool {
             ..
         }) | Command::Quality(QualityAction::Set { confirm: true, .. })
             | Command::QualityUpgrade { confirm: true }
-            | Command::Reset { confirm: true }
             | Command::Forget { confirm: true }
             | Command::Invite(Inviting { confirm: true, .. })
             | Command::Migrate(MigrateAction::Act {
@@ -210,20 +209,18 @@ fn carries_offer(command: &Command) -> bool {
         // only yes it takes: dropped, it is a removal nobody could ask for; kept
         // silently, one nobody read the cost of.
         Command::Uninstall(asked) => asked.agreement.as_deref() == Some(OFFER),
-        // And taking somebody out of the household, where the offer is the only yes:
-        // dropped, nobody could be removed; kept silently, a removal nobody read the
-        // cost of.
-        Command::Remove { agreement, .. } => agreement.as_deref() == Some(OFFER),
+        // And taking somebody out of the household, reverting the operator's edits, or
+        // choosing what fills a capability, where the offer's own name is the only yes:
+        // dropped, nothing could be done; kept silently, one nobody read the cost of.
+        Command::Remove { agreement, .. }
+        | Command::Reset { agreement }
+        | Command::Wiring(Linking::Fill(Filling { agreement, .. })) => {
+            agreement.as_deref() == Some(OFFER)
+        }
         // And standing in place of a setup, where the offer's own name is the only yes:
         // dropped, nothing could be stopped; kept silently, what stopped is something
         // nobody read the list of.
         Command::Migrate(MigrateAction::Replace { offer }) => offer.as_deref() == Some(OFFER),
-        // And choosing what fills a capability, where the offer's own name is the only
-        // yes: dropped, no choice could be made; kept silently, one nobody read the cost
-        // of.
-        Command::Wiring(Linking::Fill(Filling { agreement, .. })) => {
-            agreement.as_deref() == Some(OFFER)
-        }
         Command::Settings(settling) => settling::agreed(settling),
         // And a plugin's install, update, removal and proof, the same way: the offer is the
         // only yes, so dropped none could act, and kept silently one would act on terms

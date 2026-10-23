@@ -127,4 +127,15 @@ codes! {
         remedy: "Check the container engine is running and the project directory can be \
             written, then start again. The message names the volume and the directory.",
     }
+    /// Raised where the offer a reset answers is not the one a reading of it makes now.
+    RESET_MOVED = "STACK-13" {
+        severity: Error,
+        status: 400,
+        since: "0.18.0",
+        meaning: "That agreement was given for a different reading of what a reset would \
+            revert: since it was read, an edit or a connection changed. Agreeing to it now \
+            would be agreeing to lose something nobody read, so nothing was reverted; the \
+            message names what moved.",
+        remedy: "Read what a reset would revert again, and answer the name it prints.",
+    }
 }

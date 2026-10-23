@@ -559,19 +559,42 @@ fn a_restore_with_no_name_is_refused_in_the_words_the_other_surface_gives() {
     assert!(said.contains("archive"), "{said}");
 }
 
-/// A reset is the agreement and nothing else: the run before it reverts nothing
-/// and only names what would be lost.
+/// A reset reverts nothing until its reading is answered: the run before it only
+/// names what would be lost, and the yes is the name that reading gave itself.
 #[test]
-fn a_reset_reverts_nothing_until_it_is_agreed_to() {
-    let errand = sending("reset");
+fn a_reset_reverts_nothing_until_its_reading_is_answered() {
+    let errand = every()
+        .find(|errand| errand.action == "reset")
+        .unwrap_or(all().0);
+    let reading = lemonfiber_core::model::ResetReport {
+        rehearsed: false,
+        reverted: Vec::new(),
+        reverted_connections: vec!["sonarr → sabnzbd".to_owned()],
+        confirmed: false,
+        offer: "00000000-00000000".to_owned(),
+    };
+
+    let stage = super::weighed(
+        errand,
+        Given::nothing(),
+        &Outcome::Reset(reading.clone()),
+        vec!["what would go".to_owned()],
+    );
+    let mut answered = None;
+    if let Stage::Agreeing { errand, given, .. } = &stage {
+        answered = Some(errand.sent(given));
+    }
 
     assert_eq!(
-        errand.and_then(|errand| errand.would(&Given::nothing())),
-        Some(Ok(Command::Reset { confirm: false }))
+        errand.would(&Given::nothing()),
+        Some(Ok(Command::Reset { agreement: None }))
     );
     assert_eq!(
-        errand.map(|errand| errand.sent(&Given::nothing())),
-        Some(Ok(Command::Reset { confirm: true }))
+        answered,
+        Some(Ok(Command::Reset {
+            agreement: Some(reading.offer),
+        })),
+        "the reading that was shown is what the yes names"
     );
 }
 

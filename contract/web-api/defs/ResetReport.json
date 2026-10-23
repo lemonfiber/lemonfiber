@@ -7,6 +7,10 @@
       "description": "Whether the reset was carried out, or only previewed pending confirmation.",
       "type": "boolean"
     },
+    "offer": {
+      "description": "The name of this reading, which the reset takes as its yes.",
+      "type": "string"
+    },
     "rehearsed": {
       "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
       "type": "boolean"
@@ -30,6 +34,7 @@
     "reverted",
     "reverted_connections",
     "confirmed",
+    "offer",
     "rehearsed"
   ]
 }

@@ -682,7 +682,7 @@ async fn a_dispatched_setup_serialises_under_its_own_kind() {
 async fn a_dispatched_reset_serialises_under_its_own_kind() {
     // The test stack is external, so a reset reverts nothing — but the command still
     // runs through dispatch, envelope and serialise for its outcome.
-    let json = dispatch(Command::Reset { confirm: false }, &ctx(Ok(spoke(""))))
+    let json = dispatch(Command::Reset { agreement: None }, &ctx(Ok(spoke(""))))
         .await
         .ok()
         .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
