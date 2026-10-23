@@ -22,8 +22,8 @@ use lemonfiber_core::uninstall::Tier;
 
 mod plugins;
 use plugins::{
-    carries_approved, carries_inputs, carries_plugin, carries_source, give_approved, give_inputs,
-    give_plugin, give_source,
+    carries_approved, carries_inputs, carries_plugin, carries_recipe, carries_source,
+    give_approved, give_inputs, give_plugin, give_recipe, give_source,
 };
 
 mod settling;
@@ -222,14 +222,15 @@ fn carries_offer(command: &Command) -> bool {
         // nobody read the list of.
         Command::Migrate(MigrateAction::Replace { offer }) => offer.as_deref() == Some(OFFER),
         Command::Settings(settling) => settling::agreed(settling),
-        // And a plugin's install, update, removal and proof, the same way: the offer is the
+        // And a plugin's install, update, removal, proof and run, the same way: the offer is the
         // only yes, so dropped none could act, and kept silently one would act on terms
         // nobody read.
         Command::Plugins(
             Installing::Install { consent, .. }
             | Installing::Update { consent, .. }
             | Installing::Remove { consent, .. }
-            | Installing::Prove { consent, .. },
+            | Installing::Prove { consent, .. }
+            | Installing::Run { consent, .. },
         ) => consent.agreement.as_deref() == Some(OFFER),
         // And the actions a key may call, where the offer is what the call is checked
         // against: dropped, a moved restart, pause or update would go ahead unseen.
@@ -656,7 +657,7 @@ type Sweep = (&'static str, fn(&mut Arguments), fn(&Command) -> bool);
 /// One row per argument rather than one test per argument, because the rule is one
 /// thing: an action may accept an argument only if the command it reaches has
 /// somewhere to put it, and must refuse it by that name otherwise.
-pub(super) const SWEEPS: [Sweep; 54] = [
+pub(super) const SWEEPS: [Sweep; 55] = [
     ("forms", give_forms, carries_forms),
     ("services", give_services, carries_services),
     ("wait", give_wait, carries_wait),
@@ -693,6 +694,7 @@ pub(super) const SWEEPS: [Sweep; 54] = [
     ("reason", give_reason, carries_reason),
     ("capability", give_capability, carries_capability),
     ("plugin", give_plugin, carries_plugin),
+    ("recipe", give_recipe, carries_recipe),
     ("source", give_source, carries_source),
     ("approved", give_approved, carries_approved),
     ("inputs", give_inputs, carries_inputs),

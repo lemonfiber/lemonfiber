@@ -105,6 +105,7 @@ pub const OFFERED: &[&str] = &[
     "plugin-update",
     "plugin-remove",
     "plugin-prove",
+    "plugin-run",
     "settings-set",
     "settings-clear",
 ];

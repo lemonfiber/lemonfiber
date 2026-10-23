@@ -423,6 +423,9 @@ const fn plugin(asked: &plugins::Asked) -> Asked {
             reports("plugin update", PLUGINS).disturbing(Situation::Switching)
         }
         plugins::Asked::Prove { .. } => reports("plugin prove", PLUGINS),
+        // The recipe's calls are made only on the real run; a rehearsal reads the recipe,
+        // checks the offer and every approval, and says what the run would make.
+        plugins::Asked::Run { .. } => reports("plugin run", PLUGINS),
     }
 }
 

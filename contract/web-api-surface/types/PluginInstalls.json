@@ -6,6 +6,12 @@
       ],
       "required": false
     },
+    "demand": {
+      "type": [
+        "anyOf(null,ref:PluginDemand)"
+      ],
+      "required": false
+    },
     "install": {
       "type": [
         "anyOf(null,ref:PluginInstall)"

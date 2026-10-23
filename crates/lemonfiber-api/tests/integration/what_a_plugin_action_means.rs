@@ -192,10 +192,23 @@ fn each_act_carries_what_its_command_takes() {
         }))
     );
     assert_eq!(
-        named("plugin-prove", remove),
+        named("plugin-prove", remove.clone()),
         Ok(Command::Plugins(Asked::Prove {
             plugin: "kavita".to_owned(),
             consent: consent(offer, &[]),
+        }))
+    );
+    let run = Arguments {
+        recipe: Some("rescan".to_owned()),
+        approved: vec![approval.to_owned()],
+        ..remove
+    };
+    assert_eq!(
+        named("plugin-run", run),
+        Ok(Command::Plugins(Asked::Run {
+            plugin: "kavita".to_owned(),
+            recipe: "rescan".to_owned(),
+            consent: consent(offer, &[approval]),
         }))
     );
 }
@@ -255,6 +268,22 @@ fn an_act_missing_its_subject_is_refused_by_name() {
     );
     missing("plugin-remove", Arguments::default(), "plugin");
     missing("plugin-prove", Arguments::default(), "plugin");
+    missing(
+        "plugin-run",
+        Arguments {
+            recipe: Some("rescan".to_owned()),
+            ..Arguments::default()
+        },
+        "plugin",
+    );
+    missing(
+        "plugin-run",
+        Arguments {
+            plugin: Some("kavita".to_owned()),
+            ..Arguments::default()
+        },
+        "recipe",
+    );
 }
 
 /// A bare `confirm` is no yes to any of the three, an approval is no part of a removal,

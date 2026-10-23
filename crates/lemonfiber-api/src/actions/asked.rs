@@ -18,9 +18,9 @@ pub use takers::{
     TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_APPROVED, TAKES_ARCHIVE, TAKES_BUNDLING,
     TAKES_CAPABILITY, TAKES_CHECK, TAKES_CONSENT, TAKES_DEVICE, TAKES_DISRUPTION, TAKES_DOWNLOAD,
     TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_KEY, TAKES_NAME, TAKES_NARROWING, TAKES_PLUGIN,
-    TAKES_POLICY, TAKES_PRESET, TAKES_PROGRESS, TAKES_REASON, TAKES_REQUEST, TAKES_RUN,
-    TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING, TAKES_SOURCE, TAKES_TERM,
-    TAKES_TIER, TAKES_TITLE, TAKES_VALUE, TAKES_WAITING, TAKES_WISH,
+    TAKES_POLICY, TAKES_PRESET, TAKES_PROGRESS, TAKES_REASON, TAKES_RECIPE, TAKES_REQUEST,
+    TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING, TAKES_SOURCE,
+    TAKES_TERM, TAKES_TIER, TAKES_TITLE, TAKES_VALUE, TAKES_WAITING, TAKES_WISH,
 };
 pub(crate) use unwanted::{unwanted, TAKEN};
 
@@ -132,6 +132,8 @@ pub struct Arguments {
     /// The plugin an update or a removal acts on, by the id the record of what is
     /// installed lists it under.
     pub plugin: Option<String>,
+    /// The demand recipe a run asks for, by the id the plugin's reading lists it under.
+    pub recipe: Option<String>,
     /// Where a plugin comes from: its name in the catalogue, its directory on this
     /// machine or the `plugin.toml` inside it, or a git repository, at a branch, tag or
     /// commit named after its last `@`.
@@ -256,6 +258,7 @@ impl Arguments {
             exceeded: Some("pause".to_owned()),
             unrestricted_for: Some(1),
             plugin: Some("komga".to_owned()),
+            recipe: Some("rescan".to_owned()),
             source: Some("komga".to_owned()),
             approved: vec!["api_key@komga".to_owned()],
             inputs: vec!["claim=1234".to_owned()],

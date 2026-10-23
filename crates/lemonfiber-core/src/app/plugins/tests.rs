@@ -275,6 +275,12 @@ pub(super) async fn answered(
                 .as_ref()
                 .map(|update| update.install.would.recipes.as_slice())
         })
+        .or_else(|| {
+            reading
+                .demand
+                .as_ref()
+                .map(|demand| std::slice::from_ref(&demand.recipe))
+        })
         .map(|recipes| {
             crate::plugin::approvals(recipes)
                 .into_iter()
@@ -296,6 +302,11 @@ pub(super) async fn answered(
             consent,
         },
         Asked::Prove { plugin, .. } => Asked::Prove { plugin, consent },
+        Asked::Run { plugin, recipe, .. } => Asked::Run {
+            plugin,
+            recipe,
+            consent,
+        },
         Asked::Installed => Asked::Installed,
     };
     plugins(ctx, &yes).await
@@ -536,6 +547,7 @@ fn entry_in(text: &str) -> String {
 }
 
 mod cataloguing;
+mod demanding;
 mod embedding;
 mod fetching;
 mod following;

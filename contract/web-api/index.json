@@ -28,6 +28,7 @@
     "plugin-install": "actions/plugin-install.json",
     "plugin-prove": "actions/plugin-prove.json",
     "plugin-remove": "actions/plugin-remove.json",
+    "plugin-run": "actions/plugin-run.json",
     "plugin-update": "actions/plugin-update.json",
     "pull": "actions/pull.json",
     "quality-reapply": "actions/quality-reapply.json",

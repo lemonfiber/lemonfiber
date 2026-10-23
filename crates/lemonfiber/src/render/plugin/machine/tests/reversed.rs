@@ -106,6 +106,7 @@ fn taking(
     left: Vec<lemonfiber_core::app::putting_back::Left>,
 ) -> Installs {
     Installs {
+        demand: None,
         nonconforming: Vec::new(),
         proof: None,
         rehearsed: false,
@@ -275,6 +276,7 @@ fn what_going_back_also_means_is_said_beside_what_went_back() {
 fn an_install_that_went_back_names_what_went_and_what_stayed() {
     let one = recorded("komga", Some(household()));
     let said = installs(&Installs {
+        demand: None,
         nonconforming: Vec::new(),
         proof: None,
         rehearsed: false,
@@ -331,6 +333,7 @@ fn an_install_that_went_back_names_what_went_and_what_stayed() {
 fn a_reversal_that_could_not_finish_names_what_is_still_standing() {
     let one = recorded("komga", Some(household()));
     let said = installs(&Installs {
+        demand: None,
         nonconforming: Vec::new(),
         proof: None,
         rehearsed: false,

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What asking for one of an installed plugin's demand recipes came to.",
+  "type": "object",
+  "properties": {
+    "plugin": {
+      "description": "The plugin whose recipe it is.",
+      "type": "string"
+    },
+    "ran": {
+      "description": "What running it came to, or nothing where it was only read.",
+      "anyOf": [
+        {
+          "$ref": "PluginRecipeRan.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "recipe": {
+      "description": "The recipe as the operator agrees to it: its calls, what it asks for, and every\nvalue it would carry where.",
+      "$ref": "PluginRecipe.json"
+    }
+  },
+  "required": [
+    "plugin",
+    "recipe"
+  ]
+}

@@ -415,6 +415,7 @@ async fn restored(ctx: &Ctx, was: &Installed, stack: &Path, stamp: &str) -> Rest
 /// The report: the listing as the record stands, and this run's one account.
 fn answering(installed: Vec<Installed>, update: Update, offer: String) -> Installs {
     Installs {
+        demand: None,
         nonconforming: Vec::new(),
         proof: None,
         agreement: Some(offer),

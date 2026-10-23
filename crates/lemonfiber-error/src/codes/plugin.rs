@@ -484,4 +484,27 @@ codes! {
         remedy: "Read the move with lemonfiber plugin install and the part's name, and answer \
             the name it prints.",
     }
+    /// Raised when a run names a plugin that is not installed, or a demand recipe the
+    /// plugin does not declare.
+    NOTHING_TO_RUN = "PLUGIN-44" {
+        severity: Error,
+        status: 404,
+        since: "0.18.0",
+        meaning: "There is no installed plugin by that name, or it declares no recipe by that \
+            name that runs on demand, so nothing was run. The message lists what there is.",
+        remedy: "See what is installed with lemonfiber plugin installed, and each plugin's \
+            demand recipes on its reading, and run one by those names.",
+    }
+    /// Raised when the manifest kept for an installed plugin is missing or is not the one
+    /// that was installed, so its demand recipes cannot be read.
+    MANIFEST_UNKEPT = "PLUGIN-45" {
+        severity: Error,
+        status: 409,
+        since: "0.18.0",
+        meaning: "A demand recipe is run from the manifest kept beside the install record when \
+            the plugin was installed, and that manifest is missing or is not the one the record \
+            names, so nothing was run.",
+        remedy: "Update the plugin from its source with lemonfiber plugin update, which keeps \
+            its manifest again, then run the recipe.",
+    }
 }

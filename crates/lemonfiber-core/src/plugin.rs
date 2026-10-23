@@ -99,8 +99,8 @@ pub use recorded::{Answer, Asked, Recording};
 pub use recording::{record, Failed, Recorded, Recorder, Taken, Took};
 pub use register::{Already, Register, Unreadable as Unrecorded};
 pub use reports::{
-    Fetchable, Install, Installs, Nonconforming, Removal, Reproof, Restored, Sourced, Substituted,
-    Unfilled, Update,
+    Demand, Fetchable, Install, Installs, Nonconforming, Removal, Reproof, Restored, Sourced,
+    Substituted, Unfilled, Update,
 };
 pub use source::{unspoken, Source, SPOKEN};
 pub use stating::{

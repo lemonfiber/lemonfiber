@@ -38,7 +38,8 @@ pub const PLUGINS: &str = "plugins.json";
 /// outside its contract, named once for the reason the install record's is.
 pub(crate) const NONCONFORMING: &str = "nonconforming.json";
 
-/// The directory the starting files of installed plugins' run proofs are kept in.
+/// The directory kept for each installed plugin: its manifest and the starting files of
+/// its run proofs.
 pub(crate) const STARTING_KEPT: &str = "plugin-starting";
 
 /// The file name of the verdicts the doctor keeps for installed plugins' run proofs.

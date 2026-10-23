@@ -23,6 +23,7 @@ use lemonfiber_core::plugin::{
 use super::super::Lines;
 
 mod answering;
+mod demanded;
 mod listed;
 mod reproved;
 mod updated;
@@ -97,6 +98,17 @@ pub(crate) fn installs(report: &Installs) -> Lines {
                 "prove",
                 report.agreement.as_deref(),
                 &[],
+                report.rehearsed,
+            ));
+        }
+        lines.spaced(shelf(report.installed.len()));
+    } else if let Some(one) = &report.demand {
+        lines.extend(demanded::demanded(one));
+        if one.ran.is_none() {
+            lines.extend(answering::unanswered(
+                "run",
+                report.agreement.as_deref(),
+                &lemonfiber_core::plugin::approvals(std::slice::from_ref(&one.recipe)),
                 report.rehearsed,
             ));
         }

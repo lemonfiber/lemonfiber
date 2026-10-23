@@ -1,6 +1,6 @@
 //! Where each argument a plugin action takes is carried in the command it reaches.
 
-use super::super::acting::{APPROVAL, INPUT, PLUGIN, SOURCE};
+use super::super::acting::{APPROVAL, INPUT, PLUGIN, RECIPE, SOURCE};
 use lemonfiber_api::actions::Arguments;
 use lemonfiber_core::app::plugins::{Asked as Installing, Inputs};
 use lemonfiber_core::app::Command;
@@ -13,12 +13,25 @@ pub(super) fn carries_plugin(command: &Command) -> bool {
             Installing::Update { plugin, .. }
                 | Installing::Remove { plugin, .. }
                 | Installing::Prove { plugin, .. }
+                | Installing::Run { plugin, .. }
         ) if plugin == PLUGIN
     )
 }
 
 pub(super) fn give_plugin(given: &mut Arguments) {
     given.plugin = Some(PLUGIN.to_owned());
+}
+
+/// Whether the command has the demand recipe it was told to run.
+pub(super) fn carries_recipe(command: &Command) -> bool {
+    matches!(
+        command,
+        Command::Plugins(Installing::Run { recipe, .. }) if recipe == RECIPE
+    )
+}
+
+pub(super) fn give_recipe(given: &mut Arguments) {
+    given.recipe = Some(RECIPE.to_owned());
 }
 
 /// Whether the command has the source a plugin comes from, read the way the command
@@ -42,7 +55,9 @@ pub(super) fn carries_approved(command: &Command) -> bool {
     matches!(
         command,
         Command::Plugins(
-            Installing::Install { consent, .. } | Installing::Update { consent, .. }
+            Installing::Install { consent, .. }
+                | Installing::Update { consent, .. }
+                | Installing::Run { consent, .. }
         ) if consent.approved == [APPROVAL]
     )
 }
@@ -56,7 +71,9 @@ pub(super) fn carries_inputs(command: &Command) -> bool {
     matches!(
         command,
         Command::Plugins(
-            Installing::Install { consent, .. } | Installing::Update { consent, .. }
+            Installing::Install { consent, .. }
+                | Installing::Update { consent, .. }
+                | Installing::Run { consent, .. }
         ) if Some(&consent.inputs) == Inputs::written(&[INPUT.to_owned()]).as_ref()
     )
 }

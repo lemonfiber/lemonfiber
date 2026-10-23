@@ -187,6 +187,7 @@ pub const TAKES_CONSENT: &[&str] = &[
     "plugin-update",
     "plugin-remove",
     "plugin-prove",
+    "plugin-run",
     "settings-set",
     "settings-clear",
 ];
@@ -494,9 +495,17 @@ pub const TAKES_KEPT: &[&str] = &["hosting-install", "hosting-remove"];
 /// The actions whose command carries the plugin it acts on, by the id the record of
 /// what is installed lists it under.
 ///
-/// An update and a removal, and not an install: what an install puts on is named by its
-/// source, and the plugin it holds is the source's to say.
-pub const TAKES_PLUGIN: &[&str] = &["plugin-update", "plugin-remove", "plugin-prove"];
+/// Every act on an installed plugin, and not an install: what an install puts on is
+/// named by its source, and the plugin it holds is the source's to say.
+pub const TAKES_PLUGIN: &[&str] = &[
+    "plugin-update",
+    "plugin-remove",
+    "plugin-prove",
+    "plugin-run",
+];
+
+/// The action whose command carries which demand recipe of the plugin is run.
+pub const TAKES_RECIPE: &[&str] = &["plugin-run"];
 
 /// The actions whose command carries where a plugin comes from: a name in the
 /// catalogue, a directory on the machine, or a git repository at a revision.
@@ -507,7 +516,7 @@ pub const TAKES_SOURCE: &[&str] = &["plugin-install", "plugin-update"];
 ///
 /// Apart from the offer, so agreeing to what a plugin does is never agreeing to what it
 /// sends. A removal sends nothing anywhere, so it approves nothing.
-pub const TAKES_APPROVED: &[&str] = &["plugin-install", "plugin-update"];
+pub const TAKES_APPROVED: &[&str] = &["plugin-install", "plugin-update", "plugin-run"];
 
 /// The action whose command carries the id a player keeps for the device it plays on.
 ///

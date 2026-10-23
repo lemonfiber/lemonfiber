@@ -342,6 +342,8 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `PLUGIN-41` | `PROOF_RUN_FAILED` | error | 1 | 409 | 0.18.0 | Raised when a proof an installed plugin declares, run as the image's own program, does not hold in the doctor. |
 | `PLUGIN-42` | `MOVE_OFFERED` | warning | 1 | 409 | 0.18.0 | Raised when a part this build installs as a plugin still runs as the stack's own service, so moving it in place is on offer. |
 | `PLUGIN-43` | `PROOF_ASKED_FAILED` | error | 1 | 409 | 0.18.0 | Raised when a proof an installed plugin declares, asked of its service, does not hold in the doctor. |
+| `PLUGIN-44` | `NOTHING_TO_RUN` | error | 1 | 404 | 0.18.0 | Raised when a run names a plugin that is not installed, or a demand recipe the plugin does not declare. |
+| `PLUGIN-45` | `MANIFEST_UNKEPT` | error | 1 | 409 | 0.18.0 | Raised when the manifest kept for an installed plugin is missing or is not the one that was installed, so its demand recipes cannot be read. |
 
 ## `PROC` — the program underneath
 

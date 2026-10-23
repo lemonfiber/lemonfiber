@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "plugin": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "ran": {
+      "type": [
+        "anyOf(null,ref:PluginRecipeRan)"
+      ],
+      "required": false
+    },
+    "recipe": {
+      "type": [
+        "ref:PluginRecipe"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}
