@@ -4,9 +4,9 @@
 # pull request out and reads its trees through the API. A change under
 # `.github/workflows/` or `.github/actions/` other than spec's pins moving
 # forward fails it, unless a maintainer approved the change it makes with the
-# `workflows-approved` label; `labeled` and `unlabeled` of that label run it
-# again when the approval is given or taken away, and any other label skips it
-# in a group of its own run.
+# `workflows-approved` label. Every `labeled` and `unlabeled` runs it again,
+# whatever the label: a skipped run would be its newest on the head, and branch
+# protection reads the check from that run alone.
 #
 # The verdict is a check on the head commit the event names, so every new head
 # gets its own run. Under `pull_request_target` `github.ref` is the base branch
@@ -19,12 +19,11 @@ on:
     types: [opened, synchronize, reopened, labeled, unlabeled]
 permissions: {}
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}${{ (github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'workflows-approved' && format('-{0}', github.run_id) || '' }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
   cancel-in-progress: ${{ github.event.action == 'synchronize' && github.run_attempt == 1 }}
 jobs:
   pin-only:
-    if: ${{ !((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'workflows-approved') }}
     permissions:
       contents: read
       pull-requests: read
-    uses: lemonfiber/spec/.github/workflows/pin-only.yml@e745e0f7f79f5f2e76b68e560b1c28e1df956493 # v1.0.103
+    uses: lemonfiber/spec/.github/workflows/pin-only.yml@7e55a9fec4d241c758e560f98006a8abce38fb9b # v1.0.108
