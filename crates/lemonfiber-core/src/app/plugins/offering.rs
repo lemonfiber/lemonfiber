@@ -65,8 +65,8 @@ pub(super) const DEMANDING: [&str; 3] = [
 pub struct Consent {
     /// The offer being answered, as its reading named it. Nothing is the reading itself.
     pub agreement: Option<String>,
-    /// Every value a recipe would carry elsewhere that was approved, as `value@to`, and
-    /// every privileged shape, as `shape@service`.
+    /// Every value a recipe would carry elsewhere that was approved, as `value@to`, every
+    /// privileged shape, as `shape@service`, and every grant, as `setting@plugin`.
     pub approved: Vec<String>,
     /// Every value the operator supplied for a recipe to bring in, by the input's name.
     pub inputs: Inputs,
@@ -239,7 +239,8 @@ pub(super) fn acting(
 }
 
 /// Whether this run acts on an install's or an update's reading, refused as [`acting`]
-/// refuses, and every service that reading has taking a privileged shape.
+/// refuses, and every service that reading has taking a privileged shape. Each grant the
+/// reading names is asked for as `<setting>@<plugin>` beside the rest (`ARCH-R323`).
 ///
 /// # Errors
 ///
@@ -253,6 +254,7 @@ pub(super) fn answered(
 ) -> Result<(bool, Vec<Taking>), Box<Problem>> {
     let taking = crate::plugin::taking(would);
     let asked = crate::plugin::asked(would, &taking);
+    let asked: Vec<&str> = asked.iter().map(String::as_str).collect();
     let acts = acting(ctx, consent, &would.plugin, standing, parts, &asked)?;
     Ok((acts, taking))
 }
@@ -269,6 +271,7 @@ pub(super) fn answered(
 fn the_plugin(read: &str, would: &Installed) -> String {
     let source = Installed {
         installed_at: String::new(),
+        granted: super::granting::approved(&would.granted, ""),
         ..would.clone()
     };
     crate::agreement::sealed(&[read, &json(&source)])
@@ -300,9 +303,9 @@ fn unapproved(plugin: &str, missing: &[&str]) -> Problem {
     Problem::new(
         UNAPPROVED,
         format!("{plugin} asks for approvals it was not given"),
-        "Nothing was changed. A value a recipe would carry to another host, and a privileged \
-         shape a service would take, are each agreed to as themselves, apart from the plugin, \
-         and these were not.",
+        "Nothing was changed. A value a recipe would carry to another host, a privileged shape \
+         a service would take, and another service's credential granted to the plugin, are \
+         each agreed to as themselves, apart from the plugin, and these were not.",
         Remedy::new("Approve each one the reading lists, by name, with the offer")
             .with_detail(missing.join(", ")),
     )
@@ -318,9 +321,9 @@ fn approves_nothing(plugin: &str, stray: &str) -> Problem {
             "{} is not something {plugin} asks to be approved",
             crate::text::plain(stray)
         ),
-        "Nothing was changed. An approval names one value and one destination, or one shape \
-         and the service taking it, as the reading lists them, and one naming anything else \
-         was given for a different reading.",
+        "Nothing was changed. An approval names one value and one destination, one shape and \
+         the service taking it, or one credential and the plugin granted it, as the reading \
+         lists them, and one naming anything else was given for a different reading.",
         Remedy::new("Read it again, and approve only what it lists"),
     )
     .in_state(State::Guided)

@@ -56,7 +56,7 @@ pub(crate) async fn update(
     // so the record of the new version says it was installed at that moment.
     let stamp = ctx.stamp();
     let stack_manifest = super::writing::stack_manifest(ctx)?;
-    let (would, _) = super::installing::settled(&stack_manifest, &read, path, from, &stamp);
+    let (mut would, _) = super::installing::settled(&stack_manifest, &read, path, from, &stamp);
     let was = installed_as(&held, &would.plugin)?;
     let stack = &super::super::project::directory(ctx)
         .ok_or_else(|| Box::new(nowhere_to_write(&would.plugin)))?;
@@ -64,6 +64,11 @@ pub(crate) async fn update(
     without.forget(&was.plugin);
     let wiring = super::standing::standing(ctx, &stack_manifest, &without, &would);
     unheld(ctx, &would, without.installed(), stack)?;
+    let trusted = crate::plugin::first_party::EMBEDDED;
+    super::granting::aimed(&would, trusted)?;
+    let granting =
+        super::granting::asked(ctx, &stack_manifest, without.installed(), &would, trusted);
+    would.granted = super::granting::approved(&granting, &stamp);
     let changes = crate::plugin::changes(&super::writing::landing(
         ctx,
         super::planned::writes(ctx, &would, stack, Some(&crate::plugin::root(path)))?,
@@ -185,6 +190,14 @@ async fn recorded(
     let mut after = held.clone();
     after.forget(&was.plugin);
     let _ = after.record(would.clone());
+    super::granting::journalled(
+        ctx,
+        &would.plugin,
+        &was.granted,
+        &would.granted,
+        coming.stamp,
+    )
+    .map_err(|why| why.detail.unwrap_or(why.summary))?;
     super::super::record::keep(super::kept_at(ctx).as_deref(), &after).map_err(|why| {
         format!(
             "the record of what is installed could not be written: {}",

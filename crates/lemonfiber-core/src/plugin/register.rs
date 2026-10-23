@@ -226,24 +226,33 @@ impl Register {
         self.installed.retain(|one| one.plugin != plugin);
     }
 
-    /// Give `plugin` the grant `grant`, or end the grant of its credential where `give`
-    /// is false, answering whether the record changed.
+    /// Give `plugin` the grant `grant` where it holds none of that credential, or end the
+    /// grant it holds where `give` is false and it is the one approved when `grant` was,
+    /// answering whether the record changed.
     ///
-    /// A plugin the record does not hold changes nothing: the grant goes with its
-    /// install, and an install taken away took its grants with it.
+    /// A plugin the record does not hold changes nothing: the grant goes with its install,
+    /// and an install taken away took its grants with it. Ending only the grant approved at
+    /// `grant.at` keeps a reversal of one approval from taking away a later one.
     pub fn regrant(&mut self, plugin: &str, grant: &super::Grant, give: bool) -> bool {
         let Some(one) = self.installed.iter_mut().find(|one| one.plugin == plugin) else {
             return false;
         };
         let before = one.granted.len();
-        one.granted
-            .retain(|held| held.credential != grant.credential);
-        let ended = one.granted.len() != before;
         if give {
+            if one
+                .granted
+                .iter()
+                .any(|held| held.credential == grant.credential)
+            {
+                return false;
+            }
             one.granted.push(grant.clone());
             one.granted
                 .sort_by(|one, other| one.credential.cmp(&other.credential));
+        } else {
+            one.granted
+                .retain(|held| held.credential != grant.credential || held.at != grant.at);
         }
-        give || ended
+        one.granted.len() != before
     }
 }

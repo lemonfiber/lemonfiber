@@ -71,14 +71,18 @@ pub(super) async fn install(
     // was fetched, rather than from the checkout it was read out of.
     let stamp = ctx.stamp();
     let stack_manifest = writing::stack_manifest(ctx)?;
-    let (would, named) = settled(&stack_manifest, &read, path, from, &stamp);
+    let (mut would, named) = settled(&stack_manifest, &read, path, from, &stamp);
+    let trusted = crate::plugin::first_party::EMBEDDED;
+    let granting = super::granting::asked(ctx, &stack_manifest, held.installed(), &would, trusted);
+    would.granted = super::granting::approved(&granting, &stamp);
     let mut after = held.clone();
     after
         .record(would.clone())
         .map_err(|there| Box::new(already(&there, &named)))?;
     super::colliding::unanswered(&would, held.installed())?;
     super::colliding::unshared(&would, held.installed())?;
-    super::replacing::unreplaced(&would, crate::plugin::first_party::EMBEDDED)?;
+    super::replacing::unreplaced(&would, trusted)?;
+    super::granting::aimed(&would, trusted)?;
 
     // Where the writes land, asked for before the branch rather than inside it. What
     // a rehearsal has to state is where every change goes, and a path is a fact about
@@ -128,6 +132,7 @@ pub(super) async fn install(
             crate::plugin::first_party::EMBEDDED,
         )?;
         carry_out(ctx, &would.plugin, &stamp, &planned)?;
+        super::granting::journalled(ctx, &would.plugin, &[], &would.granted, &stamp)?;
 
         // Started before it is registered, which is why the invocation carries this
         // plugin rather than reading it back: the register is what layers a plugin's

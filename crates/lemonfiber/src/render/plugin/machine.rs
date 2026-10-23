@@ -68,6 +68,11 @@ pub(crate) fn installs(report: &Installs) -> Lines {
         lines.extend(overriding(&install.overrides, install.recorded));
         lines.extend(answering::recipes(&install.would.recipes));
         lines.extend(answering::taking(&install.taking, acted));
+        lines.extend(answering::granting(
+            &install.would.plugin,
+            &install.would.granted,
+            acted,
+        ));
         lines.extend(container(&install.would));
         if let Some(put_back) = &install.reversed {
             lines.extend(reversal(put_back));
@@ -76,7 +81,10 @@ pub(crate) fn installs(report: &Installs) -> Lines {
             lines.extend(answering::unanswered(
                 "install",
                 report.agreement.as_deref(),
-                &asked(&install.would, &install.taking),
+                &asked(&install.would, &install.taking)
+                    .iter()
+                    .map(String::as_str)
+                    .collect::<Vec<_>>(),
                 report.rehearsed,
             ));
         }
@@ -121,7 +129,10 @@ pub(crate) fn installs(report: &Installs) -> Lines {
             lines.extend(answering::unanswered(
                 "update",
                 report.agreement.as_deref(),
-                &asked(&one.install.would, &one.install.taking),
+                &asked(&one.install.would, &one.install.taking)
+                    .iter()
+                    .map(String::as_str)
+                    .collect::<Vec<_>>(),
                 report.rehearsed,
             ));
         }

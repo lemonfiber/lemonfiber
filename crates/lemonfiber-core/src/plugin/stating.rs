@@ -155,11 +155,21 @@ pub fn taking(installed: &Installed) -> Vec<Taking> {
 }
 
 /// What the reading lists as approved one by one: each value the recipes would carry
-/// elsewhere, and each service taking a privileged shape.
+/// elsewhere, each service taking a privileged shape, and each credential granted to the
+/// plugin (`ARCH-R323`).
 #[must_use]
-pub fn asked<'a>(would: &'a Installed, taking: &'a [Taking]) -> Vec<&'a str> {
-    let mut asked = super::approvals(&would.recipes);
-    asked.extend(taking.iter().map(|one| one.approval.as_str()));
+pub fn asked(would: &Installed, taking: &[Taking]) -> Vec<String> {
+    let mut asked: Vec<String> = super::approvals(&would.recipes)
+        .into_iter()
+        .map(str::to_owned)
+        .collect();
+    asked.extend(taking.iter().map(|one| one.approval.clone()));
+    asked.extend(
+        would
+            .granted
+            .iter()
+            .map(|grant| grant.approval(&would.plugin)),
+    );
     asked
 }
 
