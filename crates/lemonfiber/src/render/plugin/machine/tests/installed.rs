@@ -712,3 +712,34 @@ fn a_source_that_cannot_be_fetched_is_said_to_leave_the_plugin_unupdatable() {
     );
     assert_eq!(said.matches("    source     ").count(), 2, "{said}");
 }
+
+#[test]
+fn an_answer_kept_against_a_plugin_is_named_with_when_why_and_what_it_stops() {
+    let said = installs(&Installs {
+        nonconforming: vec![lemonfiber_core::plugin::Nonconforming {
+            plugin: "komga".to_owned(),
+            capability: "media.serve".to_owned(),
+            operation: "holdings".to_owned(),
+            why: "the answer did not read".to_owned(),
+            at: "2026-10-23T08:00:00Z".to_owned(),
+        }],
+        proof: None,
+        rehearsed: false,
+        agreement: None,
+        removal: None,
+        installed: vec![recorded("komga", Some(household()))],
+        install: None,
+        update: None,
+        substituted: Vec::new(),
+        sources: Vec::new(),
+        unvetted: None,
+    })
+    .text();
+    assert!(
+        said.contains(
+            "outside    media.serve holdings at 2026-10-23T08:00:00Z: the answer did not read"
+        ),
+        "{said}"
+    );
+    assert!(said.contains("it fills none of media.serve"), "{said}");
+}

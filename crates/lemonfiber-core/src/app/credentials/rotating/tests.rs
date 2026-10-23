@@ -255,6 +255,7 @@ async fn a_contracted_server_unanswered_over_its_contracts_is_not_rotated() {
 struct OverItsContract {
     rotated: Result<super::Replaced, super::Replacing>,
     recorded: String,
+    pending: String,
     handed: std::collections::BTreeMap<String, String>,
     sent: Vec<Option<String>>,
 }
@@ -266,18 +267,31 @@ async fn rotated_over_its_contract(
     rehearsing: bool,
     writable: bool,
 ) -> OverItsContract {
+    rotated_answering(
+        name,
+        rehearsing,
+        writable,
+        lemonfiber_fixtures::http::Answer::reply(200, "null"),
+    )
+    .await
+}
+
+/// The same, with the adapter answering the replacement with `answer`.
+async fn rotated_answering(
+    name: &str,
+    rehearsing: bool,
+    writable: bool,
+    answer: lemonfiber_fixtures::http::Answer,
+) -> OverItsContract {
     use crate::test_support::{a_contracted_media_server, contracted_context, MEDIA_ADAPTER};
-    use lemonfiber_fixtures::http::{Answer, Fake};
+    use lemonfiber_fixtures::http::Fake;
 
     let env = crate::test_support::env_without_password(name);
     let project = env
         .parent()
         .unwrap_or(std::path::Path::new("."))
         .join("stack");
-    let asking = Fake::by_path(vec![(
-        "identity.source/v1/replace_admin_password",
-        Answer::reply(200, "null"),
-    )]);
+    let asking = Fake::by_path(vec![("identity.source/v1/replace_admin_password", answer)]);
     let ctx = contracted_context(&project, MEDIA_ADAPTER, true)
         .settings(config::Settings {
             env_file: Some(env.clone()),
@@ -312,6 +326,15 @@ async fn rotated_over_its_contract(
         .as_ref()
         .and_then(|server| crate::app::targets::recorded_secret(&ctx, &server.setting))
         .unwrap_or_default();
+    let pending = server
+        .as_ref()
+        .and_then(|server| {
+            crate::app::targets::recorded_secret(
+                &ctx,
+                &crate::app::credentials::pending::pending(&server.setting),
+            )
+        })
+        .unwrap_or_default();
     let handed = std::fs::read(&upstream)
         .ok()
         .and_then(|bytes| serde_json::from_slice(&bytes).ok())
@@ -326,6 +349,7 @@ async fn rotated_over_its_contract(
     OverItsContract {
         rotated,
         recorded,
+        pending,
         handed,
         sent,
     }
@@ -377,4 +401,48 @@ async fn a_replacement_the_adapter_cannot_be_handed_is_kept_and_said() {
     assert!(!over.recorded.is_empty());
     assert!(over.handed.is_empty());
     assert_eq!(over.sent.len(), 1);
+}
+
+/// A server that will not take the replacement for want of authority leaves the password
+/// in force as it was, forgets the replacement and hands its adapter nothing.
+#[tokio::test]
+async fn a_replacement_the_adapter_refuses_leaves_the_password_in_force() {
+    let over = rotated_answering(
+        "refused-over-contract",
+        false,
+        true,
+        crate::test_support::media::refused(lemonfiber_contract::wire::Kind::Unauthorised),
+    )
+    .await;
+
+    assert!(matches!(over.rotated, Err(super::Replacing::Refused)));
+    assert!(over.recorded.is_empty(), "the password in force moved");
+    assert!(over.pending.is_empty(), "a refused replacement was kept");
+    assert!(over.handed.is_empty());
+    assert_eq!(over.sent.len(), 1);
+}
+
+/// A server that could not say whether it took the replacement leaves the password in
+/// force as it was and keeps the replacement it was sent under the pending setting,
+/// which is written before the adapter is asked.
+#[tokio::test]
+async fn a_replacement_the_adapter_cannot_settle_is_kept_pending_as_it_was_sent() {
+    let over = rotated_answering(
+        "unsettled-over-contract",
+        false,
+        true,
+        crate::test_support::media::unavailable(),
+    )
+    .await;
+
+    assert!(matches!(over.rotated, Err(super::Replacing::Unproven(_))));
+    assert!(over.recorded.is_empty(), "the password in force moved");
+    assert!(!over.pending.is_empty());
+    assert_eq!(
+        over.sent,
+        vec![Some(crate::test_support::json(
+            &serde_json::json!({ "replacement": over.pending })
+        ))]
+    );
+    assert!(over.handed.is_empty());
 }

@@ -5,7 +5,7 @@ use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_ports::http::{Fetched, Http, Method, Request, Response, Unreachable};
 use lemonfiber_ports::service::Failure;
 
-use super::{Contracted, Witness, LARGEST};
+use super::{Contracted, Witness, DEADLINE, LARGEST};
 
 /// Records what it was told.
 #[derive(Default)]
@@ -264,4 +264,35 @@ async fn a_call_without_the_key_carries_none_and_answers_its_status() {
         )),
         None => unreachable!("media.serve carries operations"),
     }
+}
+
+/// An adapter that takes every request and never answers it.
+struct Silent;
+
+#[async_trait]
+impl Http for Silent {
+    async fn send(&self, _request: &Request) -> Result<Response, Unreachable> {
+        std::future::pending().await
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn an_answer_that_does_not_come_by_the_deadline_is_refused_as_absent() {
+    let told = Arc::new(Told::default());
+    let client = Contracted::new(
+        Arc::new(Silent),
+        "http://adapter:8080/",
+        "plex-adapter",
+        "k3y",
+    )
+    .witnessed_by(told.clone());
+    let started = tokio::time::Instant::now();
+
+    let answered: Result<serde_json::Value, Failure> = asked(&client).await;
+
+    assert!(
+        matches!(answered, Err(Failure::Unavailable { .. })),
+        "{answered:?}"
+    );
+    assert_eq!(started.elapsed(), DEADLINE);
 }
