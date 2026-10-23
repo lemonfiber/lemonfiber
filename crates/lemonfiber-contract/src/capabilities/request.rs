@@ -23,6 +23,10 @@ use lemonfiber_ports::service::{
 use super::{curator_address, CURATOR, CURATOR_PORT, FOLDER, NAMED, TOKEN_HASH};
 use crate::conformance::Placeholder;
 
+/// The media server account the conformance cases link, find and ask for, in the shape a
+/// media server's account id takes.
+const MEMBER: &str = "c0f04a7e5e1d4b2a9c3f0e8d7b6a5c4d";
+
 /// Where the conformance cases say the identity source is reached.
 const IDENTITY_AT: &str = "http://conformance-identity";
 
@@ -61,6 +65,18 @@ fn earlier(operation: &str, pointer: &str) -> String {
     Placeholder::answer(intake::CAPABILITY, intake::MAJOR, operation, pointer).written()
 }
 
+/// The identity source the conformance cases sign the request service in through.
+fn identity() -> IdentitySource {
+    IdentitySource {
+        at: IDENTITY_AT.to_owned(),
+        protocol: Protocol(NAMED.to_owned()),
+        credential: Credential::UserPass {
+            username: NAMED.to_owned(),
+            password: Placeholder::Minted.written(),
+        },
+    }
+}
+
 /// The account the request service holds for the member the conformance cases link.
 fn member() -> String {
     earlier("member_for", "")
@@ -70,29 +86,22 @@ crate::contract! {
     /// `request.intake`: a request service.
     pub mod intake = "request.intake" @ 1 {
         impl Requests {
+            /// Hold an owner through an identity source, so it answers its key.
+            fn establish(refer source: &IdentitySource as IdentitySource) -> () where asks = Asked { source: identity() };
             /// Whether it has been set up already.
             fn initialized() -> bool where asks = Asked {};
             /// Sign the household in through an identity source, and finish setting up.
-            fn configure_identity(refer source: &IdentitySource as IdentitySource) -> () where asks = Asked {
-                source: IdentitySource {
-                    at: IDENTITY_AT.to_owned(),
-                    protocol: Protocol(NAMED.to_owned()),
-                    credential: Credential::UserPass {
-                        username: NAMED.to_owned(),
-                        password: Placeholder::Minted.written(),
-                    },
-                },
-            };
+            fn configure_identity(refer source: &IdentitySource as IdentitySource) -> () where asks = Asked { source: identity() };
             /// Whether it answers to the key it is asked with, as its owner.
             fn answers() -> () where asks = Asked {};
             /// Every request the household has made.
             fn requests() -> Vec<HouseholdRequest> where asks = Asked {};
             /// Give each of these identity-source members an account.
-            fn link_members(slice members: &[String] as String) -> () where asks = Asked { members: vec![NAMED.to_owned()] };
+            fn link_members(slice members: &[String] as String) -> () where asks = Asked { members: vec![MEMBER.to_owned()] };
             /// The account it holds for one identity-source member, if any.
-            fn member_for(str media_server_id: &str) -> Option<String> where asks = Asked { media_server_id: NAMED.to_owned() };
+            fn member_for(str media_server_id: &str) -> Option<String> where asks = Asked { media_server_id: MEMBER.to_owned() };
             /// What one identity-source member may ask for, if it holds them.
-            fn requesting(str media_server_id: &str) -> Option<Requesting> where asks = Asked { media_server_id: NAMED.to_owned() };
+            fn requesting(str media_server_id: &str) -> Option<Requesting> where asks = Asked { media_server_id: MEMBER.to_owned() };
             /// Make what one member asks for wait for approval.
             fn approval_first(str id: &str) -> () where asks = Asked { id: member() };
             /// Take one member's account away, with everything it asked for.

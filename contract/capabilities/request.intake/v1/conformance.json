@@ -11,7 +11,28 @@
       },
       "keyed": false,
       "live": true,
-      "operation": "initialized"
+      "operation": "establish"
+    },
+    {
+      "asked": {
+        "source": {
+          "at": "http://conformance-identity",
+          "credential": {
+            "user-pass": {
+              "password": "{minted}",
+              "username": "conformance"
+            }
+          },
+          "protocol": "conformance"
+        }
+      },
+      "case": "establish-answers",
+      "expect": {
+        "conforms": true
+      },
+      "keyed": true,
+      "live": false,
+      "operation": "establish"
     },
     {
       "asked": {},
@@ -67,7 +88,7 @@
     {
       "asked": {
         "members": [
-          "conformance"
+          "c0f04a7e5e1d4b2a9c3f0e8d7b6a5c4d"
         ]
       },
       "case": "link_members-answers",
@@ -80,7 +101,7 @@
     },
     {
       "asked": {
-        "media_server_id": "conformance"
+        "media_server_id": "c0f04a7e5e1d4b2a9c3f0e8d7b6a5c4d"
       },
       "case": "member_for-answers",
       "expect": {
@@ -92,7 +113,7 @@
     },
     {
       "asked": {
-        "media_server_id": "conformance"
+        "media_server_id": "c0f04a7e5e1d4b2a9c3f0e8d7b6a5c4d"
       },
       "case": "requesting-answers",
       "expect": {

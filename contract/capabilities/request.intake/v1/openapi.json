@@ -112,6 +112,9 @@
     "/lemonfiber/request.intake/v1/detail": {
       "$ref": "operations/detail.json"
     },
+    "/lemonfiber/request.intake/v1/establish": {
+      "$ref": "operations/establish.json"
+    },
     "/lemonfiber/request.intake/v1/fulfilment_targets": {
       "$ref": "operations/fulfilment_targets.json"
     },

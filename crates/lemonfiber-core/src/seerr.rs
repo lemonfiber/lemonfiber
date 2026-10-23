@@ -277,6 +277,11 @@ struct WebPush {
 
 #[async_trait]
 impl Requests for Seerr {
+    /// Nothing to ask: `configure_identity`'s first sign-in is what makes Seerr's owner.
+    async fn establish(&self, _source: &IdentitySource) -> Result<(), Failure> {
+        Ok(())
+    }
+
     async fn initialized(&self) -> Result<bool, Failure> {
         let response = self
             .endpoint

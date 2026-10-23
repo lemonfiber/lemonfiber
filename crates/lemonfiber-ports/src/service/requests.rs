@@ -147,6 +147,16 @@ pub struct Requesting {
 /// accounts of its own.
 #[async_trait]
 pub trait Requests: Send + Sync {
+    /// Make the service hold an owner through `source`, so it answers the key this client
+    /// carries; a service that already holds one, or answers its key from its first
+    /// start, is left as it was.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure`] when it is unreachable or refuses, and
+    /// [`Failure::Unsupported`] for a protocol it does not sign in through.
+    async fn establish(&self, source: &IdentitySource) -> Result<(), Failure>;
+
     /// Whether it has already been initialised — the gate that never re-points a
     /// running instance's identity source and so keeps its existing sign-ins.
     ///

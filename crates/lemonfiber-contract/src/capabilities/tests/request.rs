@@ -23,6 +23,10 @@ fn endpoint(host: &str) -> Endpoint {
 
 #[async_trait]
 impl Requests for Upstream {
+    async fn establish(&self, source: &IdentitySource) -> Result<(), Failure> {
+        self.tell(format!("establish {}", json(source)));
+        Ok(())
+    }
     async fn initialized(&self) -> Result<bool, Failure> {
         Ok(false)
     }

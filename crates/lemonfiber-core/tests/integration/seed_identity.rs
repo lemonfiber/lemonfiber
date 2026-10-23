@@ -85,6 +85,7 @@ struct FakeReq {
     gate: Init,
     readback: Init,
     configure: Configure,
+    establish: Configure,
     calls: Mutex<u32>,
     /// What the service is holding for what the household gets told, which `tell`
     /// overwrites so a test can read back what would have reached it.
@@ -97,8 +98,16 @@ impl FakeReq {
             gate,
             readback,
             configure,
+            establish: Configure::Ok,
             calls: Mutex::new(0),
             told: Mutex::new(Telling::default()),
+        }
+    }
+
+    fn refusing_an_owner(self) -> Self {
+        Self {
+            establish: Configure::Rejects,
+            ..self
         }
     }
 
@@ -113,6 +122,19 @@ impl FakeReq {
 
 #[async_trait]
 impl Requests for FakeReq {
+    async fn establish(
+        &self,
+        _source: &lemonfiber_core::ports::service::IdentitySource,
+    ) -> Result<(), Failure> {
+        match self.establish {
+            Configure::Ok => Ok(()),
+            Configure::Rejects => Err(Failure::Refused {
+                service: "seerr".to_owned(),
+                detail: NO_OWNER.to_owned(),
+            }),
+        }
+    }
+
     async fn initialized(&self) -> Result<bool, Failure> {
         let count = match self.calls.lock() {
             Ok(mut calls) => {
@@ -342,6 +364,7 @@ fn media(startup: Startup, create: Create) -> FakeMedia {
 }
 
 const RANDOM: [u8; 24] = [0x11; 24];
+const NO_OWNER: &str = "HTTP 409: no owner can be made";
 
 /// A rehearsal against a fresh media server mints no admin password and creates no
 /// account, and says what a real pass would do without a value in it.
@@ -516,6 +539,23 @@ async fn a_rejected_sign_in_fails() {
     )
     .await;
     assert!(matches!(state, State::Failed { .. }), "{state:?}");
+}
+
+#[tokio::test]
+async fn a_refused_owner_fails_before_the_request_service_is_read() {
+    let (state, _) = identity(
+        media(Startup::Fresh, Create::Ok),
+        FakeReq::new(Init::Done, Init::Done, Configure::Ok).refusing_an_owner(),
+        Some(RANDOM.to_vec()),
+        None,
+    )
+    .await;
+    assert_eq!(
+        state,
+        State::Failed {
+            detail: NO_OWNER.to_owned(),
+        }
+    );
 }
 
 #[tokio::test]
