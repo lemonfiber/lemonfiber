@@ -46,7 +46,6 @@ pub(crate) async fn as_the_defaults(ctx: &Ctx) -> Result<HouseholdReport, Box<Pr
         );
     }
 
-    let quality = crate::quality::run::recorded_selection(ctx);
     let no_room = crate::space::run::admits(ctx).await.is_err();
     let mut member = HouseholdMember {
         access: MemberAccess {
@@ -57,7 +56,7 @@ pub(crate) async fn as_the_defaults(ctx: &Ctx) -> Result<HouseholdReport, Box<Pr
         claimed: true,
         ..HouseholdMember::default()
     };
-    member.to_hand_over = handing_over::to_hand_over(&member, &quality, None, no_room);
+    member.to_hand_over = handing_over::to_hand_over(&member, None, no_room);
 
     Ok(HouseholdReport {
         rehearsed: false,

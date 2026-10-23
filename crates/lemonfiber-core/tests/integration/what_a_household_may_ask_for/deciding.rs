@@ -127,13 +127,14 @@ async fn a_reading_hangs_what_the_house_is_owed_where_they_ask() {
         .filter(|request: &&Request| request.url.contains("/settings/discover/add"))
         .filter_map(|request| request.body.clone())
         .collect();
-    // What is hung rather than how many: whether the disk of the machine running this
-    // has room is not this test's business, and asserting a count would make it so.
+    // What is hung rather than which: whether the disk of the machine running this has
+    // room is not this test's business, and asserting one notice would make it so.
+    assert!(!filed.is_empty(), "the reading hung nothing: {filed:?}");
     assert!(
         filed
             .iter()
-            .any(|notice| notice.contains("A film about") && notice.contains("a season about")),
-        "the reading hung nothing saying what a thing costs: {filed:?}"
+            .all(|notice| !notice.contains("GB") && !notice.contains("disk")),
+        "the reading hung a size or the disk where the household asks: {filed:?}"
     );
 }
 
@@ -268,16 +269,16 @@ async fn a_reason_survives_the_refusal_and_reaches_whoever_asked() {
         "the words were kept and not written to the person they are for: {said}"
     );
     assert!(
-        said.contains("lemonfiber's own record"),
+        said.contains("the house's own record"),
         "a reason this program holds was reported as the service's: {said}"
     );
 }
 
 /// Everything a household member is owed at the moment of asking is written to them.
 ///
-/// The four the requirements ask for and the request service cannot show: what happens
-/// to what they ask for, what their period has left and when it makes room, roughly what
-/// a thing costs before they choose one, and what is still waiting on an answer.
+/// The three the requirements ask for and the request service cannot show: what happens
+/// to what they ask for, what their period has left and when it makes room, and what is
+/// still waiting on an answer. No size: what they may ask for is said in titles.
 #[tokio::test]
 async fn what_a_member_is_owed_when_they_ask_is_written_to_them() {
     let said = dispatch(Command::Household { member: None }, &answering("owed"))
@@ -290,7 +291,10 @@ async fn what_a_member_is_owed_when_they_ask_is_written_to_them() {
     assert!(said.contains("to_hand_over"), "{said}");
     assert!(said.contains("What you may ask for:"), "{said}");
     assert!(said.contains("5 of 5 a week used"), "{said}");
-    assert!(said.contains("Before you ask"), "{said}");
+    assert!(
+        !said.contains("Before you ask"),
+        "a member was told a size: {said}"
+    );
     assert!(said.contains("Waiting on an answer:"), "{said}");
     assert!(said.contains("Nothing expires it"), "{said}");
 }

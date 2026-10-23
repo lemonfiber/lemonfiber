@@ -216,9 +216,9 @@ pub struct HouseholdMember {
     ///
     /// Everything a household member is owed at the moment of asking and cannot be
     /// shown where they ask: what happens to what they ask for, what their period has
-    /// left and when it makes room, roughly what a thing costs before they choose one,
-    /// what is still waiting on an answer, and what was refused and why. Written to
-    /// them rather than about them, so it can be handed over as it stands.
+    /// left and when it makes room, what is still waiting on an answer, and what was
+    /// refused and why. Written to them rather than about them, in the household's own
+    /// words, so it can be handed over as it stands.
     ///
     /// Empty where there is nothing to tell them — a member the request service holds
     /// no account for has no standing to report and nothing waiting.

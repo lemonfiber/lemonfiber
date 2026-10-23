@@ -4,11 +4,12 @@ use std::sync::Arc;
 use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
 use super::naming::Titled;
-use super::{allowance, assemble, household, reaching, titled, Ctx, Naming, Selection};
+use super::{allowance, assemble, household, reaching, titled, Ctx, Naming};
 use crate::household::State;
 use crate::model::{HouseholdReport, Restriction};
 use crate::ports::service::Certificate;
 use crate::ports::service::{Access, HouseholdRequest, Member, NamedLibrary, Unrated};
+use crate::quality::Selection;
 use crate::recyclarr::Kind;
 use crate::test_support::{a_context, a_password, json, media, SeedFs};
 use std::collections::BTreeMap;

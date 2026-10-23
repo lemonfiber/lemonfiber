@@ -30,7 +30,6 @@ use crate::error::{Diagnose, Problem};
 use crate::household::State;
 use crate::model::{HouseholdMember, HouseholdReport, MemberRequest, Restriction};
 use crate::ports::service::{HouseholdRequest, Member};
-use crate::quality::Selection;
 use crate::recyclarr::Kind;
 
 /// Read the household's requests, grouped by the member who made each one.
@@ -150,7 +149,7 @@ async fn everybody(ctx: &Ctx, member: Option<&str>) -> Result<HouseholdReport, B
     let quality = crate::quality::run::recorded_selection(ctx);
 
     if let Some(access) = &reached {
-        findings.extend(shown_to_the_household(ctx, access, &asked, &quality, no_room).await);
+        findings.extend(shown_to_the_household(ctx, access, &asked, no_room).await);
     }
 
     // Listed in their place rather than dropped, so an invitation taken back at its lapse
@@ -217,9 +216,9 @@ async fn asked_of(
 ///
 /// Everything else here is written for the operator. This is the only part anybody in the
 /// house ever meets, and it reaches them on the request service's own page because they
-/// have no account here on purpose — what a thing costs, whether the disk has room, and
-/// whether anything is counted over a period at all, which is the one moment all three are
-/// in hand at once.
+/// have no account here on purpose — whether the house has room for new things and whether
+/// anything is counted over a period at all, which is the one moment both are in hand at
+/// once.
 ///
 /// **The notices and the block are one pass deliberately.** The sentence saying why nothing
 /// can be fetched and the permission that stops anything being asked for go up and come
@@ -230,13 +229,11 @@ async fn shown_to_the_household(
     ctx: &Ctx,
     access: &crate::app::targets::HouseholdAccess,
     asked: &allowance::Asked,
-    quality: &Selection,
     no_room: bool,
 ) -> Vec<String> {
     let mut findings = Vec::new();
     if let Some(finding) = notices::put_where_they_ask(
         access.requests.as_ref(),
-        quality,
         no_room,
         asked.under_a_limit(),
         ctx.dry_run,
@@ -430,8 +427,7 @@ fn assemble(
         };
         // Composed from the finished member rather than from the parts, so the message
         // and the line above it cannot report different figures for one person.
-        member.to_hand_over =
-            handing_over::to_hand_over(&member, naming.quality, naming.expiring, naming.no_room);
+        member.to_hand_over = handing_over::to_hand_over(&member, naming.expiring, naming.no_room);
         members.push(member);
     }
     members.sort_by(|one, two| one.name.cmp(&two.name));
