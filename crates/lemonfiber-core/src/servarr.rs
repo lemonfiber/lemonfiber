@@ -304,14 +304,15 @@ fn set_field(fields: &mut Vec<serde_json::Value>, field: &str, value: Option<&st
     fields.push(serde_json::json!({ "name": field, "value": value }));
 }
 
-/// Register a download client, in the protocol it is reached in.
+/// Register a download client, in the protocol it is reached in, saved without the app
+/// reaching it first: whether it answers is what testing the clients says.
 async fn register_download_client(
     servarr: &Servarr,
     client: &DownloadClient,
 ) -> Result<(), Failure> {
     let body = download_client_body(servarr, client, None)?;
     let response = servarr
-        .probe(&servarr.request(Method::Post, "/downloadclient", Some(body)))
+        .probe(&servarr.request(Method::Post, "/downloadclient?forceSave=true", Some(body)))
         .await?;
     servarr.endpoint.expect_success(&response)
 }

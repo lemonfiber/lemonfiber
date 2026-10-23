@@ -6,7 +6,7 @@
 //! and how a household's request reaches it. Every kind of media is named by what it is,
 //! never by the service that files it.
 
-use lemonfiber_ports::media::{Format, Kind};
+use lemonfiber_ports::media::{Format, Kind, MUSIC};
 use lemonfiber_ports::service::{
     AddPlan, Added, Carried, Carrying, Catalogue, CatalogueEntry, Category, ClientProbe,
     Credential, DownloadClient, FoundItem, Identity, Importing, ItemPart, Maintenance,
@@ -14,6 +14,7 @@ use lemonfiber_ports::service::{
     Record, RegisteredClient, RegisteredFolder, ReleaseProbe, RootFolder, StuckItem, TraceEvent,
 };
 use lemonfiber_ports::Client;
+use serde_json::Value;
 
 use super::{FOLDER, NAMED};
 use crate::conformance::Placeholder;
@@ -23,6 +24,31 @@ const CLIENT_HOST: &str = "conformance-download";
 
 /// The port the conformance cases name a download client on.
 const CLIENT_PORT: u16 = 80;
+
+/// The protocol the conformance cases register their download client in: the native API
+/// of the download filler the bundle ships, as the core names the clients it registers.
+const CLIENT_PROTOCOL: &str = "sabnzbd";
+
+/// Every operation that takes a `Kind`, each asked once for each kind.
+const BY_KIND: [&str; 11] = [
+    "search_upgrades",
+    "lookup",
+    "add_plan",
+    "add",
+    "probe_releases",
+    "library",
+    "find_items",
+    "item_history",
+    "item_queue",
+    "item_parts",
+    "stuck_items",
+];
+
+/// Every operation that takes a `Record` sort, each asked once for each media type's.
+const BY_RECORD: [&str; 2] = ["records", "carry"];
+
+/// The one operation that names a root folder's media type.
+const BY_FOLDER: &str = "register_root_folder";
 
 /// The field the conformance cases set on a download client.
 const FIELD: &str = "category";
@@ -39,7 +65,7 @@ fn client() -> DownloadClient {
         name: NAMED.to_owned(),
         host: CLIENT_HOST.to_owned(),
         port: CLIENT_PORT,
-        protocol: Protocol(NAMED.to_owned()),
+        protocol: Protocol(CLIENT_PROTOCOL.to_owned()),
         credential: Credential::ApiKey(Placeholder::Minted.written()),
         category: Category {
             field: FIELD.to_owned(),
@@ -167,4 +193,68 @@ crate::contract! {
             fn stuck_items(value kind: Kind) -> Vec<StuckItem> where asks = Asked { kind: Kind::Tv };
         }
     }
+}
+
+/// `library.curate`, every operation bound to a kind of media asked once for each media
+/// type it takes.
+#[must_use]
+pub fn capability() -> crate::Capability {
+    let mut curated = curate::capability();
+    for operation in &mut curated.operations {
+        operation.filed = filed(operation.name, &operation.asks);
+    }
+    curated
+}
+
+/// What the case of `operation`, which otherwise posts `asks`, posts for each media type
+/// it is bound to; nothing where it is bound to none.
+fn filed(operation: &str, asks: &Value) -> Vec<(&'static str, Value)> {
+    let each = |pointer: &str, by: Vec<(&'static str, Value)>| {
+        by.into_iter()
+            .map(|(media_type, value)| {
+                let mut asked = asks.clone();
+                if let Some(at) = asked.pointer_mut(pointer) {
+                    *at = value;
+                }
+                (media_type, asked)
+            })
+            .collect()
+    };
+    if BY_KIND.contains(&operation) {
+        return each(
+            "/kind",
+            Kind::ALL
+                .iter()
+                .map(|kind| (kind.media_type(), wire(kind)))
+                .collect(),
+        );
+    }
+    if BY_RECORD.contains(&operation) {
+        return each(
+            "/sort",
+            [
+                (Kind::Tv.media_type(), Record::Series),
+                (Kind::Movies.media_type(), Record::Film),
+                (MUSIC, Record::Artist),
+            ]
+            .iter()
+            .map(|(media_type, sort)| (*media_type, wire(sort)))
+            .collect(),
+        );
+    }
+    if operation == BY_FOLDER {
+        return each(
+            "/folder/media_type",
+            [Kind::Tv.media_type(), Kind::Movies.media_type(), MUSIC]
+                .into_iter()
+                .map(|media_type| (media_type, Value::String(media_type.to_owned())))
+                .collect(),
+        );
+    }
+    Vec::new()
+}
+
+/// `value` as the wire writes it.
+fn wire<T: serde::Serialize>(value: &T) -> Value {
+    serde_json::to_value(value).unwrap_or(Value::Null)
 }

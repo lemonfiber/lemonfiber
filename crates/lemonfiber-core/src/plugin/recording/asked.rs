@@ -149,7 +149,7 @@ pub(super) async fn taken(
                     ),
                 };
                 conformance.extend(fronting.iter().flat_map(|fronting| {
-                    fronted::fixtures(fronting.service)
+                    fronted::fixtures(fronting.service, &placed.media_types)
                         .into_iter()
                         .map(|(named, fixture)| Taken {
                             named,
@@ -218,7 +218,7 @@ async fn recorded(
         .iter()
         .filter_map(|item| item.fixture.map(str::to_owned))
         .chain(service.fronting.iter().flat_map(|fronting| {
-            fronted::fixtures(fronting.service)
+            fronted::fixtures(fronting.service, &placed.media_types)
                 .into_iter()
                 .map(|(_, fixture)| fixture)
         }))

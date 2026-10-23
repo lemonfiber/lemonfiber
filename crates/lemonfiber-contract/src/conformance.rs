@@ -144,6 +144,8 @@ pub struct Case<'c> {
     pub live: bool,
     /// What it posts, its placeholders still to be filled.
     pub asks: Value,
+    /// The media type it is asked for, where its operation is bound to one.
+    pub media_type: Option<&'static str>,
 }
 
 /// Every case of `capability`, in the order they are published.
@@ -156,17 +158,51 @@ pub fn cases(capability: &Capability) -> Vec<Case<'_>> {
         expect: Expect::Status(UNKEYED),
         live: true,
         asks: Value::Object(serde_json::Map::new()),
+        media_type: None,
     });
     unkeyed
         .into_iter()
-        .chain(capability.operations.iter().map(|operation| Case {
-            case: answers(operation.name),
-            operation,
-            keyed: true,
-            expect: Expect::Conforms,
-            live: false,
-            asks: operation.asks.clone(),
-        }))
+        .chain(capability.operations.iter().flat_map(keyed))
+        .collect()
+}
+
+/// Every case of `capability` an adapter whose upstream files `files` is asked: every
+/// case of an operation bound to no kind of media, and those of the media types it files.
+#[must_use]
+pub fn filed<'c>(capability: &'c Capability, files: &[String]) -> Vec<Case<'c>> {
+    cases(capability)
+        .into_iter()
+        .filter(|case| {
+            case.media_type
+                .is_none_or(|media_type| files.iter().any(|filed| filed == media_type))
+        })
+        .collect()
+}
+
+/// The cases asking `operation` under the key: one, or one per media type it is bound to.
+fn keyed(operation: &Operation) -> Vec<Case<'_>> {
+    let asked = |case: String, asks: &Value, media_type| Case {
+        case,
+        operation,
+        keyed: true,
+        expect: Expect::Conforms,
+        live: false,
+        asks: asks.clone(),
+        media_type,
+    };
+    if operation.filed.is_empty() {
+        return vec![asked(answers(operation.name), &operation.asks, None)];
+    }
+    operation
+        .filed
+        .iter()
+        .map(|(media_type, asks)| {
+            asked(
+                format!("{}-{media_type}", answers(operation.name)),
+                asks,
+                Some(*media_type),
+            )
+        })
         .collect()
 }
 

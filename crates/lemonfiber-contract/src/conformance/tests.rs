@@ -145,3 +145,68 @@ fn every_case_asks_a_body_and_names_only_cases_asked_before_it() {
     }
     assert!(asked_before.contains(&format!("media.serve@1/{}", answers("mint"))));
 }
+
+#[test]
+fn a_curator_is_asked_the_cases_of_each_kind_it_files_and_no_other() {
+    let curate = crate::capabilities::library::capability();
+    let named = |files: &[&str]| -> Vec<String> {
+        let files: Vec<String> = files.iter().map(|one| (*one).to_owned()).collect();
+        super::filed(&curate, &files)
+            .into_iter()
+            .map(|case| case.case)
+            .collect()
+    };
+    let films = named(&["movies"]);
+    assert!(
+        films.contains(&"lookup-answers-movies".to_owned()),
+        "{films:?}"
+    );
+    assert!(films.contains(&"records-answers-movies".to_owned()));
+    assert!(films.contains(&"register_root_folder-answers-movies".to_owned()));
+    assert!(films.contains(&"download_clients-answers".to_owned()));
+    assert!(!films
+        .iter()
+        .any(|case| case.ends_with("-tv") || case.ends_with("-music")));
+
+    let music = named(&["music"]);
+    assert!(
+        music.contains(&"records-answers-music".to_owned()),
+        "{music:?}"
+    );
+    assert!(!music.iter().any(|case| case.starts_with("lookup-answers")));
+
+    let every = cases(&curate).len();
+    assert_eq!(named(&["tv", "movies", "music"]).len(), every);
+}
+
+#[test]
+fn a_kind_bound_case_posts_its_own_kind() {
+    let curate = crate::capabilities::library::capability();
+    let asks = |case: &str| {
+        cases(&curate)
+            .into_iter()
+            .find(|one| one.case == case)
+            .map(|one| one.asks)
+            .unwrap_or_default()
+    };
+    assert_eq!(
+        asks("lookup-answers-movies").pointer("/kind"),
+        Some(&Value::from("movies"))
+    );
+    assert_eq!(
+        asks("lookup-answers-tv").pointer("/kind"),
+        Some(&Value::from("tv"))
+    );
+    assert_eq!(
+        asks("carry-answers-music").pointer("/sort"),
+        Some(&Value::from("artist"))
+    );
+    assert_eq!(
+        asks("register_root_folder-answers-music").pointer("/folder/media_type"),
+        Some(&Value::from("music"))
+    );
+    assert_eq!(
+        asks("register_download_client-answers").pointer("/client/protocol"),
+        Some(&Value::from("sabnzbd"))
+    );
+}

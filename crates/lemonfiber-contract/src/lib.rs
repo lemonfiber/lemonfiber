@@ -76,6 +76,9 @@ pub struct Operation {
     pub largest: usize,
     /// What its conformance case posts, its placeholders still to be filled.
     pub asks: serde_json::Value,
+    /// For an operation bound to a kind of media, what its case for each media type posts
+    /// instead, by media type; none for every other operation.
+    pub filed: Vec<(&'static str, serde_json::Value)>,
     /// How its answer is read.
     reads: Reading,
 }
@@ -96,6 +99,7 @@ impl Operation {
             answered: schemars::schema_for!(R),
             largest: client::LARGEST,
             asks: serde_json::Value::Null,
+            filed: Vec::new(),
             reads: read_as::<R>,
         }
     }
@@ -104,6 +108,13 @@ impl Operation {
     #[must_use]
     pub fn asking<A: serde::Serialize>(mut self, asks: &A) -> Self {
         self.asks = serde_json::to_value(asks).unwrap_or_default();
+        self
+    }
+
+    /// The same operation, its case for `media_type` posting `asks`.
+    #[must_use]
+    pub fn filing(mut self, media_type: &'static str, asks: serde_json::Value) -> Self {
+        self.filed.push((media_type, asks));
         self
     }
 

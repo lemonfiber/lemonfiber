@@ -52,7 +52,7 @@ pub fn all() -> Vec<crate::Capability> {
         download::usenet::capability(),
         download::torrent::capability(),
         network::egress::capability(),
-        library::curate::capability(),
+        library::capability(),
         indexer::search::capability(),
         subtitles::fetch::capability(),
         request::intake::capability(),

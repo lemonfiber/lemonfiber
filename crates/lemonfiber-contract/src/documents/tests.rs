@@ -76,7 +76,19 @@ fn every_operation_has_a_case_and_every_adapter_refuses_a_call_without_its_key()
             .and_then(serde_json::Value::as_array)
             .cloned()
             .unwrap_or_default();
-        assert_eq!(cases.len(), capability.operations.len() + 1);
+        let asked: usize = capability
+            .operations
+            .iter()
+            .map(|operation| operation.filed.len().max(1))
+            .sum();
+        assert_eq!(cases.len(), asked + 1);
+        assert!(cases
+            .iter()
+            .filter(|case| case.get("media_type").is_some())
+            .all(|case| case
+                .pointer("/case")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|named| named.contains("-answers-"))));
         assert!(cases.iter().any(|case| {
             case.pointer("/keyed") == Some(&serde_json::Value::Bool(false))
                 && case.pointer("/expect/status/0") == Some(&serde_json::json!(401))
