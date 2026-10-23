@@ -163,8 +163,8 @@ async fn down(ctx: &Ctx, forms: &[String], wait: Waiting) -> Result<Outcome, Box
 /// Remove somebody from the household, or say what that would cost.
 ///
 /// Beside the table for the reason [`down`] is.
-async fn removed(ctx: &Ctx, name: String, confirm: bool) -> Result<Outcome, Box<Problem>> {
-    remove::remove(ctx, name, confirm)
+async fn removed(ctx: &Ctx, name: String, offer: Option<String>) -> Result<Outcome, Box<Problem>> {
+    remove::remove(ctx, name, offer.as_deref())
         .await
         .map(Outcome::Removal)
 }
@@ -477,7 +477,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         }) => invited(ctx, name, to, confirm).await,
         Command::Reissue { name } => invite::reissue(ctx, name).await.map(Outcome::Invitation),
         Command::Handoff { name } => handoff::handoff(ctx, name).await.map(Outcome::Handoff),
-        Command::Remove { name, confirm } => removed(ctx, name, confirm).await,
+        Command::Remove { name, agreement } => removed(ctx, name, agreement).await,
         Command::Catalogue => engine::catalogue(ctx).map(Outcome::Catalogue),
         Command::Wiring(asked) => wiring::wiring(ctx, &asked),
         Command::Settings(asked) => crate::settings::run::settings(ctx, &asked).await,

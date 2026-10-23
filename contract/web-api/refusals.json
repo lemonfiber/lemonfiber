@@ -664,6 +664,11 @@
     "status": 400,
     "description": "The flag is not honoured by this command yet."
   },
+  "REMOVE-7": {
+    "name": "REMOVAL_MOVED",
+    "status": 400,
+    "description": "Said where the offer answered is not the one a reading of the removal makes now."
+  },
   "REPAIR-1": {
     "name": "STALE",
     "status": 400,

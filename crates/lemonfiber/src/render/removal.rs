@@ -46,8 +46,8 @@ pub(super) fn removal(report: &HouseholdRemoval) -> Lines {
                 .to_owned()
         }
         Revoked::Nothing => format!(
-            "Nothing has been removed. Run `lemonfiber remove {} --confirm` to go ahead.",
-            report.name
+            "Nothing has been removed. Run `lemonfiber remove {} --offer {}` to go ahead.",
+            report.name, report.offer
         ),
     });
 

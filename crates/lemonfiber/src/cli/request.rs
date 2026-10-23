@@ -367,9 +367,9 @@ pub enum Request {
     Remove {
         /// Whose account to take away, as `lemonfiber household` shows them.
         name: String,
-        /// Go ahead and remove them, having seen what goes.
-        #[arg(long)]
-        confirm: bool,
+        /// The offer being answered, as the reading that made it printed it.
+        #[arg(long, value_name = "NAME")]
+        offer: Option<String>,
     },
     /// Remove everything lemonfiber keeps on this machine.
     ///

@@ -128,7 +128,6 @@ pub const TAKES_AGREEMENT: &[&str] = &[
     "migrate-beside",
     "migrate-import",
     "uninstall",
-    "remove",
     "quality-set",
     "quality-upgrade",
     "repair",
@@ -172,6 +171,7 @@ pub const TAKES_AGREEMENT: &[&str] = &[
 ///
 /// Everywhere else the reply is the answer.
 pub const TAKES_CONSENT: &[&str] = &[
+    "remove",
     "restart",
     "update",
     "downloads-pause",

@@ -464,7 +464,7 @@ fn answering_twice() -> Vec<Command> {
         }),
         Command::Remove {
             name: "ana".to_owned(),
-            confirm: true,
+            agreement: Some("00000000-00000000-00000000".to_owned()),
         },
         Command::QualityUpgrade { confirm: true },
         Command::Repair {
@@ -541,7 +541,7 @@ fn a_rehearsal_carries_the_confirmable_commands_without_their_yes() {
         Command::Reset { confirm: true },
         Command::Remove {
             name: "ana".to_owned(),
-            confirm: true,
+            agreement: Some("00000000-00000000-00000000".to_owned()),
         },
         Command::QualityUpgrade { confirm: true },
         Command::Migrate(MigrateAction::Act {

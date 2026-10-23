@@ -57,4 +57,15 @@ codes! {
             account is gone.",
         remedy: "Check the media server is running, then run this again.",
     }
+    /// Said where the offer answered is not the one a reading of the removal makes now.
+    REMOVAL_MOVED = "REMOVE-7" {
+        severity: Error,
+        status: 400,
+        since: "0.18.0",
+        meaning: "That agreement was given for a different reading of what removing them \
+            costs: since it was read, their account, their requests or the request service's \
+            account changed. Agreeing to it now would be agreeing to a cost nobody read, so \
+            nobody was removed; the message names what moved.",
+        remedy: "Read what removing them costs again, and answer the name it prints.",
+    }
 }

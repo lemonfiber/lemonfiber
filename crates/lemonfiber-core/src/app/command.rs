@@ -313,12 +313,12 @@ pub enum Command {
     ///
     /// Because it throws away what cannot be got back — their watch history goes with
     /// the account, and the request service destroys what they asked for — it says
-    /// what would go and does nothing until `confirm`.
+    /// what would go, and does nothing until its offer is answered.
     Remove {
         /// Whose account to take away.
         name: String,
-        /// Go ahead and remove them, having seen what goes.
-        confirm: bool,
+        /// The offer being answered, as the reading that made it printed it.
+        agreement: Option<String>,
     },
     /// Say what each service in this stack is for, what going without it costs, how
     /// much that matters, and what became of anything the stack has dropped.

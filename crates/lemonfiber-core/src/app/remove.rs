@@ -9,26 +9,36 @@
 //! failure after that leaves something tidy-up-able rather than somebody who can still
 //! watch. The other order has the opposite failure, and it is the one that matters.
 //!
-//! **Nothing happens until it is confirmed**, because none of it can be undone. What an
-//! unconfirmed run says is the whole answer: every figure in it is knowable without
-//! removing anybody, which is what makes the confirmation meaningful rather than
-//! ceremonial.
+//! **Nothing happens until its offer is answered**, because none of it can be undone.
+//! What a reading says is the whole answer: every figure in it is knowable without
+//! removing anybody, and the removal reads it again when it runs and refuses where
+//! anything moved, so a yes agrees to the cost that was read.
 
 use crate::app::Ctx;
+use crate::error::codes::remove::REMOVAL_MOVED;
 use crate::model::{HouseholdRemoval, Revoked};
 use crate::ports::service::Member;
 
-/// Remove somebody from the household, or — until `confirm` — say what that would cost.
+/// The parts a removal's offer is named over, in the order it is built.
+const OFFERED: [&str; 3] = [
+    "their account",
+    "their requests",
+    "the request service's account",
+];
+
+/// Remove somebody from the household, or — until its offer is answered — say what that
+/// would cost.
 ///
 /// # Errors
 ///
 /// Returns a [`Problem`](crate::error::Problem) where the stack has no media server,
 /// where it will not answer, where nobody is named, where nobody by that name is here,
-/// or where the account named administers the server.
+/// where the account named administers the server, or where the offer answered is not
+/// the one a reading makes now.
 pub(crate) async fn remove(
     ctx: &Ctx,
     name: String,
-    confirm: bool,
+    agreement: Option<&str>,
 ) -> Result<HouseholdRemoval, Box<crate::error::Problem>> {
     // Trimmed for the same reason an invitation is: the media server keeps the spaces
     // and treats the result as a different person, so `ana ` would find nobody while an
@@ -62,9 +72,14 @@ pub(crate) async fn remove(
 
     let asking = super::targets::household_requests(ctx, &manifest).await;
     let mut cost = what_it_costs(asking.as_ref(), &member).await;
+    let standing = offer(&member, &cost);
 
-    if !confirm {
-        return Ok(cost.into_report(member.name, false, Revoked::Nothing));
+    let Some(answered) = agreement else {
+        return Ok(cost.into_report(member.name, false, Revoked::Nothing, standing));
+    };
+    let moved = crate::agreement::differs(answered, &standing, &OFFERED);
+    if !moved.is_empty() {
+        return Err(Box::new(offer_moved(&member.name, &moved, &standing)));
     }
 
     if server.withdraw(&member.id).await.is_err() {
@@ -74,7 +89,40 @@ pub(crate) async fn remove(
     let revoked =
         also_from_the_request_service(asking.as_ref(), &cost.held, &mut cost.findings).await;
 
-    Ok(cost.into_report(member.name, true, revoked))
+    Ok(cost.into_report(member.name, true, revoked, standing))
+}
+
+/// The offer a reading of this removal makes: their account, their requests and the
+/// request service's account, each named apart so a refusal can say which moved.
+fn offer(member: &Member, cost: &Cost) -> String {
+    let requests = cost.requests.to_string();
+    let held = match &cost.held {
+        Held::Account(id) => id.as_str(),
+        Held::None => "none",
+        Held::NoService => "no request service",
+        Held::Unreadable => "unread",
+    };
+    crate::agreement::parted(&[&[&member.id, &member.name], &[&requests], &[held]])
+}
+
+/// A removal answering a reading of its cost that has since moved.
+fn offer_moved(name: &str, moved: &[&str], standing: &str) -> crate::error::Problem {
+    crate::error::Problem::new(
+        REMOVAL_MOVED,
+        format!(
+            "That removal was agreed to against a different reading of what removing {name} costs"
+        ),
+        format!(
+            "Since it was read, {} changed, so nobody was removed. Agreeing to it now would \
+             be agreeing to a cost nobody read.",
+            moved.join(" and ")
+        ),
+        crate::error::Remedy::new(
+            "Read what removing them costs again, and answer the name it prints",
+        )
+        .with_detail(format!("the offer standing now is {standing}")),
+    )
+    .in_state(crate::error::State::Guided)
 }
 
 /// What removing this member takes, read before anything is written.
@@ -92,11 +140,18 @@ struct Cost {
 
 impl Cost {
     /// The same cost as the answer a surface renders, once its fate is known.
-    fn into_report(self, name: String, confirmed: bool, revoked: Revoked) -> HouseholdRemoval {
+    fn into_report(
+        self,
+        name: String,
+        confirmed: bool,
+        revoked: Revoked,
+        offer: String,
+    ) -> HouseholdRemoval {
         HouseholdRemoval {
             rehearsed: false,
             name,
             confirmed,
+            offer,
             requests: self.requests,
             asks_through_the_request_service: matches!(self.held, Held::Account(_)),
             watch_history: watch_history(revoked).to_owned(),

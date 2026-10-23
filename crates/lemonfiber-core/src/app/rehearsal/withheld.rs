@@ -40,7 +40,7 @@ fn unconfirmed(command: Command) -> Command {
         Command::Reset { .. } => Command::Reset { confirm: false },
         Command::Remove { name, .. } => Command::Remove {
             name,
-            confirm: false,
+            agreement: None,
         },
         Command::QualityUpgrade { .. } => Command::QualityUpgrade { confirm: false },
         Command::Migrate(MigrateAction::Act { mode, .. }) => Command::Migrate(MigrateAction::Act {

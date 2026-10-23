@@ -442,6 +442,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `REMOVE-4` | `NOBODY_HERE` | error | 1 | 500 | 0.11.0 | Said where nobody by that name is in the household. |
 | `REMOVE-5` | `RUNS_THE_SERVER` | error | 1 | 500 | 0.11.0 | Said where the account named administers the server. |
 | `REMOVE-6` | `WOULD_NOT_REMOVE` | error | 1 | 500 | 0.11.0 | Said where the media server refused to remove the account. |
+| `REMOVE-7` | `REMOVAL_MOVED` | error | 1 | 400 | 0.18.0 | Said where the offer answered is not the one a reading of the removal makes now. |
 
 ## `REPAIR` — putting right what the doctor found
 

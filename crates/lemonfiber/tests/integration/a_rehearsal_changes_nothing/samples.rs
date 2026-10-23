@@ -209,7 +209,7 @@ fn over_the_household() -> Vec<(&'static str, Command)> {
             "remove",
             Command::Remove {
                 name: "ana".to_owned(),
-                confirm: true,
+                agreement: Some("00000000-00000000-00000000".to_owned()),
             },
         ),
     ]

@@ -60,6 +60,7 @@ pub(super) fn asked_for(action: &str, given: Arguments) -> Result<Command, Refus
     let Arguments {
         name,
         confirm,
+        offer,
         libraries,
         age_limit,
         unrated,
@@ -74,7 +75,7 @@ pub(super) fn asked_for(action: &str, given: Arguments) -> Result<Command, Refus
         "invite" | "reissue" | "remove" | "household-handoff" => about_a_person(
             action,
             name,
-            confirm,
+            Consent { confirm, offer },
             RawAllowance {
                 libraries,
                 age_limit,
@@ -104,7 +105,7 @@ pub(super) fn asked_for(action: &str, given: Arguments) -> Result<Command, Refus
 fn about_a_person(
     action: &str,
     name: Option<String>,
-    confirm: bool,
+    consent: Consent,
     allowance: RawAllowance,
 ) -> Result<Command, Refused> {
     let name = name.ok_or_else(|| Refused::Missing {
@@ -120,12 +121,24 @@ fn about_a_person(
         "invite" => Ok(Command::Invite(Inviting {
             name,
             allowance,
-            confirm,
+            confirm: consent.confirm,
         })),
         "reissue" => Ok(Command::Reissue { name }),
         "household-handoff" => Ok(Command::Handoff { name }),
-        _ => Ok(Command::Remove { name, confirm }),
+        _ => Ok(Command::Remove {
+            name,
+            agreement: consent.offer.filter(|named| !named.trim().is_empty()),
+        }),
     }
+}
+
+/// What was said to go ahead with: a bare yes, which an invitation takes, and the offer
+/// a reading printed, which is the only yes a removal takes.
+struct Consent {
+    /// The bare yes.
+    confirm: bool,
+    /// The offer answered.
+    offer: Option<String>,
 }
 
 /// What an invitation was told to allow, as the three arguments carrying it.

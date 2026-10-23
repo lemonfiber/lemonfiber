@@ -322,7 +322,10 @@ async fn main() -> ExitCode {
         Request::Clients => Command::Clients,
         Request::Invite { name, allowance } => invitation(name, allowance),
         Request::Reissue { name } => Command::Reissue { name },
-        Request::Remove { name, confirm } => Command::Remove { name, confirm },
+        Request::Remove { name, offer } => Command::Remove {
+            name,
+            agreement: offer.filter(|named| !named.trim().is_empty()),
+        },
         Request::Forget { confirm } => Command::Forget { confirm },
         Request::Uninstall(asked) => removing(asked),
         Request::Space { offer } => Command::Space { agreement: offer },

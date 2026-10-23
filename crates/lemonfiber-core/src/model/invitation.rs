@@ -215,6 +215,8 @@ pub struct HouseholdRemoval {
     pub name: String,
     /// Whether it was carried out, or only described pending confirmation.
     pub confirmed: bool,
+    /// The name of this reading, which the removal takes as its yes.
+    pub offer: String,
     /// How many of their requests go with them.
     ///
     /// **They are destroyed, not reassigned.** The request service removes them by hand
