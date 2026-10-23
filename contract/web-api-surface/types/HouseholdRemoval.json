@@ -41,6 +41,12 @@
         "ref:Revoked"
       ],
       "required": true
+    },
+    "watch-history": {
+      "type": [
+        "string"
+      ],
+      "required": true
     }
   },
   "variants": []

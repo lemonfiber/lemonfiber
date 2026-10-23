@@ -282,6 +282,8 @@ fn serving() -> Vec<Outcome> {
             requests: 1,
             asks_through_the_request_service: true,
             revoked: lemonfiber_core::model::Revoked::Nothing,
+            watch_history: "Their watch history goes with the account, and cannot be got back."
+                .to_owned(),
             findings: Vec::new(),
         }),
         Outcome::FrontDoor(a_front_door()),

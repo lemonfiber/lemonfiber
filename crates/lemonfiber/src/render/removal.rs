@@ -21,14 +21,7 @@ pub(super) fn removal(report: &HouseholdRemoval) -> Lines {
         format!("Removing {} would take all of this:", report.name)
     });
 
-    // Watch history is not a choice this program makes. The media server's own removal
-    // takes only an account identifier — there is no option to keep anything — so this
-    // is stated as the fact it is rather than as something that could be arranged.
-    lines.spaced(if report.confirmed {
-        "  Their watch history went with the account. It cannot be got back."
-    } else {
-        "  Their watch history, which goes with the account. It cannot be got back."
-    });
+    lines.spaced(format!("  {}", report.watch_history));
 
     lines.put(asked_for(report));
 

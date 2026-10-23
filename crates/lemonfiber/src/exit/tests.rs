@@ -254,6 +254,8 @@ fn removal(revoked: lemonfiber_core::model::Revoked) -> lemonfiber_core::model::
         requests: 1,
         asks_through_the_request_service: true,
         revoked,
+        watch_history: "Their watch history goes with the account, and cannot be got back."
+            .to_owned(),
         findings: Vec::new(),
     }
 }

@@ -131,6 +131,10 @@ async fn what_it_costs_is_said_without_removing_anybody() {
     assert_eq!(report.requests, 2, "the count was not hers alone");
     assert!(report.asks_through_the_request_service);
     assert_eq!(report.revoked, Revoked::Nothing);
+    assert_eq!(
+        report.watch_history,
+        "Their watch history goes with the account, and cannot be got back."
+    );
 
     assert!(
         taken_from(&http.requests()).is_empty(),
@@ -151,6 +155,10 @@ async fn confirmed_it_revokes_in_both_places_and_the_media_server_first() {
     let report = said.unwrap_or_else(|| unreachable!("a confirmed removal answers"));
     assert!(report.confirmed);
     assert_eq!(report.revoked, Revoked::Everywhere);
+    assert_eq!(
+        report.watch_history,
+        "Their watch history went with the account, and cannot be got back."
+    );
 
     let sent = http.requests();
     assert_eq!(
@@ -209,6 +217,7 @@ async fn an_account_the_request_service_keeps_is_reported_rather_than_claimed_go
 
     let report = said.unwrap_or_else(|| unreachable!("a confirmed removal answers"));
     assert_eq!(report.revoked, Revoked::MediaServerOnly);
+    assert!(report.watch_history.contains("went with the account"));
     assert!(
         report
             .findings

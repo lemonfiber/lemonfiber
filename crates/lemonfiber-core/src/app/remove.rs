@@ -99,9 +99,26 @@ impl Cost {
             confirmed,
             requests: self.requests,
             asks_through_the_request_service: matches!(self.held, Held::Account(_)),
+            watch_history: watch_history(revoked).to_owned(),
             revoked,
             findings: self.findings,
         }
+    }
+}
+
+/// What removing somebody does to their watch history, before it is done.
+pub(crate) const HISTORY_GOES: &str =
+    "Their watch history goes with the account, and cannot be got back.";
+
+/// What removing somebody did to their watch history, once the account is gone.
+pub(crate) const HISTORY_WENT: &str =
+    "Their watch history went with the account, and cannot be got back.";
+
+/// What became of their watch history, read off how far the removal got.
+const fn watch_history(revoked: Revoked) -> &'static str {
+    match revoked {
+        Revoked::Everywhere | Revoked::MediaServerOnly => HISTORY_WENT,
+        Revoked::Nothing => HISTORY_GOES,
     }
 }
 

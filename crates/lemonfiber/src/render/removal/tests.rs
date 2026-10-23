@@ -10,6 +10,8 @@ fn asked(requests: usize) -> HouseholdRemoval {
         requests,
         asks_through_the_request_service: true,
         revoked: Revoked::Nothing,
+        watch_history: "Their watch history goes with the account, and cannot be got back."
+            .to_owned(),
         findings: Vec::new(),
     }
 }
@@ -35,15 +37,11 @@ fn what_goes_is_said_before_how_to_go_ahead() {
     );
 }
 
-/// Watch history is stated as a fact, because there is no option to keep it.
 #[test]
-fn the_watch_history_is_not_offered_as_a_choice() {
-    let text = removal(&asked(0)).text();
-    assert!(text.contains("It cannot be got back."), "{text}");
-    assert!(
-        !text.contains("kept") && !text.contains("keep"),
-        "the history was described as something that could be kept: {text}"
-    );
+fn the_watch_history_is_said_in_the_stacks_words() {
+    let asked = asked(0);
+    let text = removal(&asked).text();
+    assert!(text.contains(&asked.watch_history), "{text}");
 }
 
 /// Requests stop existing rather than moving somewhere, and the number is exact.
@@ -79,6 +77,8 @@ fn a_confirmed_removal_says_what_it_did_and_how_far_it_reached() {
     let done = HouseholdRemoval {
         confirmed: true,
         revoked: Revoked::Everywhere,
+        watch_history: "Their watch history goes with the account, and cannot be got back."
+            .to_owned(),
         ..asked(1)
     };
     let text = removal(&done).text();
@@ -114,6 +114,8 @@ fn more_than_one_request_reads_as_more_than_one() {
     let done = HouseholdRemoval {
         confirmed: true,
         revoked: Revoked::Everywhere,
+        watch_history: "Their watch history goes with the account, and cannot be got back."
+            .to_owned(),
         ..asked(3)
     };
     let text = removal(&done).text();
@@ -129,6 +131,8 @@ fn a_partial_removal_names_the_half_that_is_left() {
     let half = HouseholdRemoval {
         confirmed: true,
         revoked: Revoked::MediaServerOnly,
+        watch_history: "Their watch history goes with the account, and cannot be got back."
+            .to_owned(),
         findings: vec!["the request service still holds an account".to_owned()],
         ..asked(1)
     };
