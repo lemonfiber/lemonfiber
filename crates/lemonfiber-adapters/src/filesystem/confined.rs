@@ -102,22 +102,15 @@ pub(super) fn overwrite(path: &Path, within: &Path, contents: &[u8]) -> Result<(
 }
 
 /// Write `contents` whole into `path`, made with every directory missing above it, as
-/// `readable` says, opened once refusing a link at its own name and then held to lying
-/// beneath `within` by what was opened.
+/// `readable` says, opened through the handle of the directory it is in and refusing a
+/// link at its own name, then held to lying beneath `within` by what was opened.
 pub(super) fn written(
     path: &Path,
     within: &Path,
     contents: &[u8],
     readable: Readable,
 ) -> Result<(), Fault> {
-    if let Some(parent) = path.parent() {
-        make(parent, within)?;
-    }
-    let file = match created(readable).open(path) {
-        Ok(file) => file,
-        Err(_) if unopened(path) == Beneath::Escaped => return Err(Fault::escaped(path, within)),
-        Err(error) => return Err(Fault::new(error.to_string())),
-    };
+    let file = created(path, within, readable)?;
     if standing(&file, path, within) != Standing::Plain {
         return Err(Fault::escaped(path, within));
     }
@@ -128,19 +121,41 @@ pub(super) fn written(
     )
 }
 
-/// Opening to write, a file made new readable as `readable` says.
+/// `path` opened to write, made new readable as `readable` says where it is not there,
+/// through the handle of the directory it is in, every step to which was reached through
+/// no link, and refusing a link at its own name.
 #[cfg(unix)]
-fn created(readable: Readable) -> std::fs::OpenOptions {
-    use std::os::unix::fs::OpenOptionsExt as _;
-    let mut options = options(Use::Write);
-    options.mode(mode(readable));
-    options
+fn created(path: &Path, within: &Path, readable: Readable) -> Result<std::fs::File, Fault> {
+    use rustix::fs::{openat, Mode, OFlags};
+    let (Some(parent), Some(name)) = (path.parent(), path.file_name()) else {
+        return Err(Fault::escaped(path, within));
+    };
+    let here = made(parent, within)?;
+    let flags =
+        OFlags::WRONLY | OFlags::CREATE | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC;
+    let made_as = match readable {
+        Readable::Owner => Mode::RUSR | Mode::WUSR,
+        Readable::Shared => Mode::RUSR | Mode::WUSR | Mode::RGRP | Mode::ROTH,
+    };
+    openat(&here, name, flags, made_as)
+        .map(std::fs::File::from)
+        .map_err(|error| match error {
+            rustix::io::Errno::LOOP => Fault::escaped(path, within),
+            error => Fault::new(error.to_string()),
+        })
 }
 
-/// Opening to write, where the platform keeps no mode.
+/// `path` opened to write, made where it is not there with every directory above it.
+/// Windows has no flag that refuses a link on the way, so what was opened is held to
+/// `within` afterwards.
 #[cfg(windows)]
-fn created(_readable: Readable) -> std::fs::OpenOptions {
+fn created(path: &Path, within: &Path, _readable: Readable) -> Result<std::fs::File, Fault> {
+    if let Some(parent) = path.parent() {
+        make(parent, within)?;
+    }
     options(Use::Write)
+        .open(path)
+        .map_err(|error| Fault::new(error.to_string()))
 }
 
 /// The mode a file readable as `readable` says is held to.
@@ -171,6 +186,13 @@ fn kept_to(_file: &std::fs::File, _readable: Readable) -> std::io::Result<()> {
 /// a link, so a link put on the way between two steps is refused rather than followed.
 #[cfg(unix)]
 pub(super) fn make(path: &Path, within: &Path) -> Result<(), Fault> {
+    made(path, within).map(drop)
+}
+
+/// The directory `path`, made with every directory missing above it as [`make`] makes
+/// them, held open by the handle the walk ended on.
+#[cfg(unix)]
+fn made(path: &Path, within: &Path) -> Result<rustix::fd::OwnedFd, Fault> {
     use rustix::fs::{mkdirat, openat, Mode, OFlags, CWD};
     let opening = OFlags::DIRECTORY | OFlags::RDONLY | OFlags::CLOEXEC;
     let unmade = |error: rustix::io::Errno| {
@@ -188,7 +210,7 @@ pub(super) fn make(path: &Path, within: &Path) -> Result<(), Fault> {
         }
         here = openat(&here, name, opening | OFlags::NOFOLLOW, Mode::empty()).map_err(unmade)?;
     }
-    Ok(())
+    Ok(here)
 }
 
 /// Make `path` and every directory missing above it, one at a time from `within` down.
