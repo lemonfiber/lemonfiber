@@ -112,26 +112,39 @@ async fn apply_music_format(
     Ok(())
 }
 
-async fn probe_releases(servarr: &Servarr, id_param: &str) -> Result<ReleaseProbe, Failure> {
-    // One wanted item is enough to judge the preset against — search for what the
-    // operator is actually missing rather than a made-up query.
+impl Servarr {
+    /// Whether anything is on the wanted list, which a release search is spent on: read
+    /// from the list alone, so it searches nothing.
+    ///
+    /// # Errors
+    ///
+    /// [`Failure`] where the wanted list cannot be read.
+    pub(crate) async fn wants_any(&self) -> Result<bool, Failure> {
+        first_wanted(self).await.map(|first| first.is_some())
+    }
+}
+
+/// The first item on the wanted list, where there is one.
+async fn first_wanted(servarr: &Servarr) -> Result<Option<i64>, Failure> {
     let response = servarr
         .probe(&servarr.request(Method::Get, "/wanted/missing?page=1&pageSize=1", None))
         .await?;
     let wanted: Wanted = servarr
         .endpoint
         .decode(&response, "the wanted list could not be read")?;
-    let Some(record) = wanted.records.first() else {
+    Ok(wanted.records.first().map(|record| record.id))
+}
+
+async fn probe_releases(servarr: &Servarr, id_param: &str) -> Result<ReleaseProbe, Failure> {
+    // One wanted item is enough to judge the preset against — search for what the
+    // operator is actually missing rather than a made-up query.
+    let Some(wanted) = first_wanted(servarr).await? else {
         return Ok(ReleaseProbe::NothingWanted);
     };
 
     // A manual search hits the indexers live — the disruptive part the caller gates.
     let response = servarr
-        .probe(&servarr.request(
-            Method::Get,
-            &format!("/release?{id_param}={}", record.id),
-            None,
-        ))
+        .probe(&servarr.request(Method::Get, &format!("/release?{id_param}={wanted}"), None))
         .await?;
     let releases: Vec<ReleaseResource> = servarr
         .endpoint

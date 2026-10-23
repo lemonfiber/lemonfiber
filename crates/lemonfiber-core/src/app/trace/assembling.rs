@@ -127,6 +127,7 @@ pub(crate) fn assemble(
         } else {
             Confidence::Certain
         },
+        searchable: None,
     }
 }
 

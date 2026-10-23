@@ -31,6 +31,15 @@ pub struct TraceMoment {
     pub at: String,
 }
 
+/// What a search that could tell this trace's stall apart would spend, and what it covers.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct Searchable {
+    /// What the search spends, in the stack's words.
+    pub spends: String,
+    /// What the search covers: the curator's wanted list at the quality in force.
+    pub covers: String,
+}
+
 /// Where one item is in the pipeline: how far it got, why it stopped if it did, and the
 /// stages it passed through — the answer to "where is my show?".
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
@@ -63,4 +72,9 @@ pub struct TraceReport {
     /// the linear pipeline: not where the item got to, but where two services' views of
     /// it contradict, surfaced rather than silently reconciled.
     pub findings: Vec<String>,
+    /// What a search would spend to tell nothing at the quality from nothing at all,
+    /// where the trace stopped at `monitored` with that open and a search would spend
+    /// something.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub searchable: Option<Searchable>,
 }

@@ -112,15 +112,36 @@ fn the_season_the_reading_was_narrowed_to_narrows_the_search_too() {
 // ── It cannot be asked for as the read it is not ──────────────────────────────
 
 #[test]
-fn a_trace_that_asks_the_indexers_nothing_is_refused_rather_than_read_as_a_trace() {
-    // Without the widening this would be `/api/trace?term=…`, which is served. So a
-    // request that named a show and left the widening out is refused for the widening
-    // rather than carried out as the read it happens to match.
+fn a_search_that_does_not_say_disruptive_is_the_search_it_names() {
+    // A search is nothing but the widening, so leaving the word out asks for it: the
+    // read is `/api/trace?term=…`, and this action is never mistaken for it.
+    assert_eq!(
+        command(
+            SEARCH,
+            Arguments {
+                term: Some(FOLLOWED.to_owned()),
+                ..Arguments::default()
+            }
+        ),
+        Some(Command::Trace(Tracing {
+            term: FOLLOWED.to_owned(),
+            season: None,
+            searching: true,
+        }))
+    );
+}
+
+#[test]
+fn a_search_saying_it_disturbs_nothing_is_refused_rather_than_read_as_a_trace() {
+    // A request that says the indexers are not to be asked is asking for the read,
+    // which this action is not; it is refused for the widening rather than carried
+    // out as the read it happens to match.
     assert_eq!(
         refusal(
             SEARCH,
             Arguments {
                 term: Some(FOLLOWED.to_owned()),
+                disruptive: false.into(),
                 ..Arguments::default()
             }
         ),
@@ -282,8 +303,15 @@ async fn a_run_narrowed_to_one_season_is_answered_the_same_way() {
 }
 
 #[tokio::test]
-async fn asking_for_it_without_the_widening_is_refused_over_the_wire_too() {
+async fn a_search_that_leaves_the_word_out_is_answered_the_same_way() {
     let (status, answered) = said(r#"{"term":"The Expanse"}"#).await;
+    assert_eq!(status, StatusCode::ACCEPTED.as_u16(), "{answered}");
+    assert!(answered.contains(r#""kind":"job""#), "{answered}");
+}
+
+#[tokio::test]
+async fn a_search_saying_it_disturbs_nothing_is_refused_over_the_wire_too() {
+    let (status, answered) = said(r#"{"disruptive":false,"term":"The Expanse"}"#).await;
     assert_eq!(status, StatusCode::BAD_REQUEST.as_u16());
     assert!(answered.contains("needs disruptive"), "{answered}");
 }

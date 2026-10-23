@@ -5,7 +5,7 @@
 //! anything, whether the client took it — is left to the services that can.
 
 use super::reading::{Reads, Searched};
-use crate::model::{TraceReport, TraceStage};
+use crate::model::{Searchable, TraceReport, TraceStage};
 use crate::trace::{Confidence, Presence, Stage};
 
 /// Why a wanted item that nothing has been grabbed for has stopped, where nobody asked
@@ -161,5 +161,16 @@ pub(crate) fn not_matched(term: &str) -> TraceReport {
         coverage: None,
         confidence: Confidence::Certain,
         findings: Vec::new(),
+        searchable: None,
+    }
+}
+
+/// What a search spent on `curator`'s wanted list would cost and cover.
+pub(crate) fn searchable(curator: &str) -> Searchable {
+    Searchable {
+        spends: "one live release search against the indexers, counted towards the daily cap \
+                 they hold the operator to"
+            .to_owned(),
+        covers: format!("{curator}'s wanted list, read against the quality in force"),
     }
 }

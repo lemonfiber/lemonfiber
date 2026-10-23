@@ -20,7 +20,6 @@ use lemonfiber_core::quality::Preset;
 use lemonfiber_core::recyclarr::Kind;
 use lemonfiber_core::repair::run::Consent;
 
-use super::asked::Disturbing;
 use super::Refused;
 
 /// What a diagnosis was narrowed to, or why the name it was given narrows to
@@ -108,14 +107,13 @@ pub(super) fn listing(confirm: bool, offer: Option<String>) -> Result<restore::C
 
 /// The widening a read's second door requires, or the refusal for want of it.
 ///
-/// Two actions here are the widened form of a read this surface also serves, and both
-/// require the word rather than defaulting it: without it each is that read, and two
-/// ways to ask one thing is the arrangement every read on this surface is kept out of.
-/// Which read each widens is what the names say — `diagnose` over `/api/checks`, and
-/// `search` over `/api/trace` — because one word answering at two doors is that same
-/// arrangement wearing a disguise.
-pub(super) fn widening(action: &str, disruptive: Disturbing) -> Result<(), Refused> {
-    if disruptive.included() {
+/// Two actions here are the widened form of a read this surface also serves: `diagnose`
+/// over `/api/checks`, and `search` over `/api/trace`. A diagnosis requires the word,
+/// since without it the action would be that read. A search is nothing but the widening,
+/// so the word unsaid asks for it, and only a request saying it is left out is refused.
+/// Each caller says which by whether the request is `widened`.
+pub(super) fn widening(action: &str, widened: bool) -> Result<(), Refused> {
+    if widened {
         return Ok(());
     }
     Err(Refused::Missing {

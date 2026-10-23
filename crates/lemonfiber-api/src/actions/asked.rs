@@ -94,7 +94,7 @@ pub struct Arguments {
     pub check: Option<String>,
     /// Whether the checks that disturb the running system are included.
     // Read from a bare word, so published as one.
-    #[schemars(with = "bool", extend("default" = false))]
+    #[schemars(with = "bool")]
     pub disruptive: Disturbing,
     /// What was read before answering — the offer a repair's yes was read in, the
     /// listing a restore's was, what a replacement would stop — as it named itself.
@@ -304,16 +304,18 @@ impl Running {
 
 /// Whether a run includes the checks that disturb a running system.
 ///
-/// A two-variant reading of the bare word a surface carries rather than a fourth
-/// flag among three: `--fix-disruptive` on a command line and a `disruptive` in a
-/// request body are one word that is there or is not, and which way round it reads
-/// is decided here, once. A surface that read it the other way round would drop the
-/// default route out from under a stack nobody asked it to disturb.
+/// A reading of the bare word a surface carries rather than a fourth flag among three:
+/// `--fix-disruptive` on a command line and a `disruptive` in a request body are one
+/// word, and which way round it reads is decided here, once. A surface that read it the
+/// other way round would drop the default route out from under a stack nobody asked it
+/// to disturb.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
 #[serde(from = "bool")]
 pub enum Disturbing {
-    /// Left out, which is what an ordinary run does.
+    /// Not said at all, which every action but one that only disturbs reads as left out.
     #[default]
+    Unsaid,
+    /// Left out, because the request said so.
     Left,
     /// Included, because the operator asked for them.
     Included,
@@ -334,5 +336,11 @@ impl Disturbing {
     #[must_use]
     pub const fn included(self) -> bool {
         matches!(self, Self::Included)
+    }
+
+    /// Whether an action that does nothing but disturb may run: asked for, or not said.
+    #[must_use]
+    pub const fn allowed(self) -> bool {
+        matches!(self, Self::Included | Self::Unsaid)
     }
 }

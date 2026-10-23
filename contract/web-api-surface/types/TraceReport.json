@@ -42,6 +42,12 @@
       ],
       "required": true
     },
+    "searchable": {
+      "type": [
+        "anyOf(null,ref:Searchable)"
+      ],
+      "required": false
+    },
     "stages": {
       "type": [
         "array[ref:TraceStage]"

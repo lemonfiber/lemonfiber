@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a search that could tell this trace's stall apart would spend, and what it covers.",
+  "type": "object",
+  "properties": {
+    "covers": {
+      "description": "What the search covers: the curator's wanted list at the quality in force.",
+      "type": "string"
+    },
+    "spends": {
+      "description": "What the search spends, in the stack's words.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "spends",
+    "covers"
+  ]
+}
