@@ -437,7 +437,8 @@ async fn worked(
     Ok(report)
 }
 
-/// Run a pull, handing each line the engine writes to the narrator as it arrives.
+/// Run a pull, handing each line the engine writes to the narrator as it arrives and
+/// keeping none of them.
 async fn pulled(
     ctx: &Ctx,
     command: &[String],
@@ -450,11 +451,7 @@ async fn pulled(
     };
     while let Some(event) = progress.recv().await {
         match event {
-            crate::ports::process::Progress::Line(line) => {
-                ctx.narrator.pulled(&line).await;
-                output.stdout.push_str(&line);
-                output.stdout.push('\n');
-            }
+            crate::ports::process::Progress::Line(line) => ctx.narrator.pulled(&line).await,
             crate::ports::process::Progress::Ended(status) => output.status = status,
         }
     }

@@ -160,7 +160,8 @@ fn stream(argv: &[String]) -> Result<tokio::sync::mpsc::Receiver<Progress>, Fail
     //
     // A receiver that goes away first is work that was ended part-way, and the
     // child goes with it: dropped here, it is killed rather than left to finish a
-    // start or a pull nobody is waiting on any more.
+    // start or a pull nobody is waiting on any more. One that outlasts
+    // [`RUN_WITHIN`] is killed too, and ends with no exit status, as a run does.
     tokio::spawn(async move {
         let mut readers = Vec::new();
         if let Some(out) = stdout {
@@ -169,18 +170,26 @@ fn stream(argv: &[String]) -> Result<tokio::sync::mpsc::Receiver<Progress>, Fail
         if let Some(err) = stderr {
             readers.push(tokio::spawn(forward(err, sender.clone())));
         }
-        let ending = async {
-            for reader in readers {
-                let _ = reader.await;
+        let ended = {
+            let ending = async {
+                for reader in readers {
+                    let _ = reader.await;
+                }
+                child.wait().await.ok().and_then(|exit| exit.code())
+            };
+            tokio::select! {
+                status = ending => Some(status),
+                () = sender.closed() => return,
+                () = tokio::time::sleep(RUN_WITHIN) => None,
             }
-            child.wait().await.ok().and_then(|exit| exit.code())
         };
-        tokio::select! {
-            status = ending => {
-                let _ = sender.send(Progress::Ended(status)).await;
-            }
-            () = sender.closed() => {}
-        }
+        let status = if let Some(status) = ended {
+            status
+        } else {
+            let _killed = child.kill().await;
+            None
+        };
+        let _ = sender.send(Progress::Ended(status)).await;
     });
     Ok(receiver)
 }
