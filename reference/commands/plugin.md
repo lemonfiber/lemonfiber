@@ -24,6 +24,7 @@ Commands:
   installed         Say what is installed, and what each plugin is doing
   remove            Take a plugin off this machine, putting back everything installing it wrote
   prove             Ask an installed plugin's adapters again whether they speak what they declare, and run each proof it declares that runs its image's own program again
+  run               Run one of an installed plugin's recipes that runs only when asked for by name
   update            Replace an installed plugin with another version of it, as one operation
   help              Print this message or the help of the given subcommand(s)
 
@@ -466,6 +467,54 @@ Options:
 
       --force
           Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber plugin run`
+
+```text
+Run one of an installed plugin's recipes that runs only when asked for by name.
+
+Named on its own it says what the recipe would call, what it asks you for and every value it would send where, touches nothing, and prints a name for that offer; answering with that name, and approving each value with `--approve`, is the yes. What you approve is for this run alone: an approval given at install or to an earlier run is not one here. A recipe that does not hold changes nothing about what is installed and names every call that had already landed somewhere. `--dry-run` answers an offer the same way and calls nothing.
+
+Usage: lemonfiber plugin run [OPTIONS] <PLUGIN> <RECIPE>
+
+Arguments:
+  <PLUGIN>
+          The plugin's id, as `lemonfiber plugin installed` lists it
+
+  <RECIPE>
+          The recipe's id, as the plugin's reading lists it
+
+Options:
+      --json
+          Print machine-readable output
+
+      --offer <NAME>
+          The offer being answered, as the run that made it printed it
+
+      --approve <VALUE@DESTINATION>
+          A value the recipe would send elsewhere, approved as itself, as the reading lists it. Once for each
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --input <NAME=VALUE>
+          A value the recipe asks for, written as its name, `=`, and the value. Once for each. At a terminal, one it asks for and was not given here is asked for, a secret without it showing as it is typed
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
