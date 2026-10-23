@@ -1,13 +1,9 @@
+use super::super::notices::tests::NOT_FOR_THE_HOUSEHOLD;
 use super::to_hand_over;
 use crate::asking::{Estimate, Policy, Refused, Standing};
 use crate::household::State;
 use crate::model::{Counted, HouseholdMember, MemberAsking, MemberRequest};
-use crate::quality::{Preset, Selection};
-
-/// The quality these fixtures are read at.
-fn quality() -> Selection {
-    Selection::everywhere(Preset::Balanced)
-}
+use crate::quality::Preset;
 
 /// One member holding a limit they have nearly used, or holding none at all.
 fn asking(limit: Option<u32>) -> MemberAsking {
@@ -74,12 +70,7 @@ fn member(asking: Option<MemberAsking>, requests: Vec<MemberRequest>) -> Househo
 /// in front of the person who set it.
 #[test]
 fn somebody_close_to_their_limit_is_told_all_three() {
-    let said = to_hand_over(
-        &member(Some(asking(Some(5))), Vec::new()),
-        &quality(),
-        None,
-        false,
-    );
+    let said = to_hand_over(&member(Some(asking(Some(5))), Vec::new()), None, false);
     let whole = said.join("\n");
 
     assert!(whole.contains("4 of 5"), "{whole}");
@@ -93,12 +84,7 @@ fn somebody_close_to_their_limit_is_told_all_three() {
 /// and only one of them means they may ask for whatever they like.
 #[test]
 fn somebody_nothing_limits_is_told_so() {
-    let said = to_hand_over(
-        &member(Some(asking(None)), Vec::new()),
-        &quality(),
-        None,
-        false,
-    );
+    let said = to_hand_over(&member(Some(asking(None)), Vec::new()), None, false);
 
     assert!(
         said.iter().any(|line| line.contains("Nothing limits")),
@@ -106,24 +92,32 @@ fn somebody_nothing_limits_is_told_so() {
     );
 }
 
-/// Roughly what a thing costs is said before anybody has asked for one.
+/// Nothing handed over names a size, a service or how the house is run.
 ///
-/// The whole of what the requirement wants: the figure that changes a mind arrives
-/// before the choice rather than beside the approval.
+/// What somebody may ask for is said in titles, and the house is the house: the message
+/// is the household's, whichever of its lines a member is sent.
 #[test]
-fn what_a_thing_costs_is_said_before_anybody_asks() {
+fn nothing_handed_over_is_in_anything_but_the_households_own_words() {
     let said = to_hand_over(
-        &member(Some(asking(None)), Vec::new()),
-        &quality(),
-        None,
-        false,
+        &member(
+            Some(asking(Some(5))),
+            vec![
+                request(1, State::WaitingForApproval, None),
+                request(2, State::Declined, Some("we already have it dubbed")),
+            ],
+        ),
+        Some(30),
+        true,
     );
-    let whole = said.join("\n");
-
-    assert!(whole.contains("Before you ask"), "{whole}");
-    assert!(whole.contains("a film about "), "{whole}");
-    assert!(whole.contains("a season of television about "), "{whole}");
-    assert!(whole.contains("not a measurement"), "{whole}");
+    assert!(
+        said.len() > 4,
+        "there was too little said to hold to anything: {said:?}"
+    );
+    for line in &said {
+        for word in NOT_FOR_THE_HOUSEHOLD {
+            assert!(!line.contains(word), "a member was handed {word:?}: {line}");
+        }
+    }
 }
 
 /// Waiting and refused are two answers, and neither borrows the other's words.
@@ -137,7 +131,6 @@ fn waiting_and_refused_are_never_the_same_answer() {
                 request(2, State::Declined, Some("we already have it dubbed")),
             ],
         ),
-        &quality(),
         None,
         false,
     );
@@ -162,13 +155,13 @@ fn waiting_and_refused_are_never_the_same_answer() {
     );
 }
 
-/// A reason is said to be this program's record and never the service's.
+/// A reason is said to be the house's own record.
 ///
 /// Said once rather than under every refusal, and not at all where nothing was
 /// refused — a caveat repeated is one nobody reads, and one offered for something
 /// that did not happen is an apology for nothing.
 #[test]
-fn a_reason_is_said_to_be_this_programs_own_record() {
+fn a_reason_is_said_to_be_the_houses_own_record() {
     let refused = to_hand_over(
         &member(
             None,
@@ -177,21 +170,15 @@ fn a_reason_is_said_to_be_this_programs_own_record() {
                 request(2, State::Declined, Some("no room")),
             ],
         ),
-        &quality(),
         None,
         false,
     );
-    let nothing_refused = to_hand_over(
-        &member(Some(asking(Some(5))), Vec::new()),
-        &quality(),
-        None,
-        false,
-    );
+    let nothing_refused = to_hand_over(&member(Some(asking(Some(5))), Vec::new()), None, false);
 
     assert_eq!(
         refused
             .iter()
-            .filter(|line| line.contains("lemonfiber's own record"))
+            .filter(|line| line.contains("the house's own record"))
             .count(),
         1,
         "{refused:?}"
@@ -211,7 +198,7 @@ fn a_reason_is_said_to_be_this_programs_own_record() {
     assert!(
         !nothing_refused
             .iter()
-            .any(|line| line.contains("lemonfiber's own record")),
+            .any(|line| line.contains("the house's own record")),
         "{nothing_refused:?}"
     );
 }
@@ -227,7 +214,6 @@ fn a_refusal_made_elsewhere_carries_no_words() {
             Some(asking(Some(5))),
             vec![request(1, State::Declined, None)],
         ),
-        &quality(),
         None,
         false,
     );
@@ -239,23 +225,18 @@ fn a_refusal_made_elsewhere_carries_no_words() {
     );
 }
 
-/// A full disk is said as the disk, and never as somebody's limit.
+/// A full house is said as the house, and never as somebody's limit.
 #[test]
-fn a_full_disk_is_said_as_the_disk() {
-    let said = to_hand_over(
-        &member(Some(asking(Some(5))), Vec::new()),
-        &quality(),
-        None,
-        true,
-    );
+fn a_full_house_is_said_as_the_house() {
+    let said = to_hand_over(&member(Some(asking(Some(5))), Vec::new()), None, true);
     let line = said
         .iter()
-        .find(|line| line.contains("no room left on the disk"))
+        .find(|line| line.contains("no room for new things right now"))
         .cloned()
         .unwrap_or_default();
 
     assert!(
-        line.contains("that is the disk rather than anything of yours"),
+        line.contains("That is the house rather than anything of yours"),
         "{line}"
     );
     assert!(!line.contains("limit is"), "{line}");
@@ -263,12 +244,13 @@ fn a_full_disk_is_said_as_the_disk() {
 
 /// A member with nothing to say is handed nothing rather than a bare notice.
 ///
-/// The cost line alone is the same sentence for everybody in the house, which is a
+/// Whether the house has room is the same sentence for everybody in it, which is a
 /// notice rather than an answer, and handing one over as though it were addressed to
 /// somebody would teach a household to ignore the next one.
 #[test]
 fn a_member_with_nothing_to_say_is_handed_nothing() {
-    assert!(to_hand_over(&member(None, Vec::new()), &quality(), None, false).is_empty());
+    assert!(to_hand_over(&member(None, Vec::new()), None, false).is_empty());
+    assert!(to_hand_over(&member(None, Vec::new()), None, true).is_empty());
 }
 
 /// A request nothing holds a title for is still named as something.
@@ -279,8 +261,8 @@ fn a_request_with_no_title_is_still_named() {
     let mut nameless = untitled.clone();
     nameless.media = None;
 
-    let by_kind = to_hand_over(&member(None, vec![untitled]), &quality(), None, false);
-    let by_number = to_hand_over(&member(None, vec![nameless]), &quality(), None, false);
+    let by_kind = to_hand_over(&member(None, vec![untitled]), None, false);
+    let by_number = to_hand_over(&member(None, vec![nameless]), None, false);
     assert!(
         !by_kind.is_empty() && !by_number.is_empty(),
         "no message at all"
@@ -304,7 +286,7 @@ fn a_request_made_today_reads_as_asked_today() {
     let mut fresh = request(1, State::WaitingForApproval, None);
     fresh.waiting_days = Some(0);
 
-    let said = to_hand_over(&member(None, vec![fresh]), &quality(), None, false);
+    let said = to_hand_over(&member(None, vec![fresh]), None, false);
 
     assert!(
         said.iter().any(|line| line.contains(", asked today")),
@@ -322,12 +304,7 @@ fn one_day_waiting_reads_as_one_day() {
     unread.waiting_days = None;
     unread.estimate = None;
 
-    let said = to_hand_over(
-        &member(None, vec![overnight, unread]),
-        &quality(),
-        None,
-        false,
-    );
+    let said = to_hand_over(&member(None, vec![overnight, unread]), None, false);
 
     assert!(
         said.iter().any(|line| line.contains("1 day ago")),
@@ -349,7 +326,6 @@ fn one_day_waiting_reads_as_one_day() {
 fn a_member_under_a_period_is_told_the_wait_can_end_unanswered() {
     let said = to_hand_over(
         &member(None, vec![request(1, State::WaitingForApproval, None)]),
-        &quality(),
         Some(30),
         false,
     );
@@ -380,7 +356,7 @@ fn a_request_that_ran_out_is_not_said_to_have_been_turned_down() {
         refused.expired = true;
     }
 
-    let said = to_hand_over(&member(None, vec![ran_out]), &quality(), Some(30), false);
+    let said = to_hand_over(&member(None, vec![ran_out]), Some(30), false);
 
     assert!(
         said.iter()
@@ -399,7 +375,7 @@ fn every_policy_has_words_to_be_told_in() {
     for policy in Policy::ALL {
         let mut held = asking(None);
         held.policy = policy;
-        let said = to_hand_over(&member(Some(held), Vec::new()), &quality(), None, false);
+        let said = to_hand_over(&member(Some(held), Vec::new()), None, false);
         assert!(
             said.first()
                 .is_some_and(|line| line.starts_with("What you may ask for: ")),

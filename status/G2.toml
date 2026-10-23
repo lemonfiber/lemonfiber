@@ -15,4 +15,5 @@ requirement = [
   { id = "G2-R11", state = "done", evidence = ["crates/lemonfiber/src/render.rs", "crates/lemonfiber-core/src/app.rs"] },
   { id = "G2-R12", state = "done", evidence = ["crates/lemonfiber-core/src/glossary.rs", "crates/lemonfiber/src/render/glossary.rs"] },
   { id = "G2-R13", state = "done", evidence = ["crates/lemonfiber-core/src/glossary.rs"] },
+  { id = "G2-R16", state = "partial", evidence = ["crates/lemonfiber-core/src/household/run/notices.rs", "crates/lemonfiber-core/src/household/run/handing_over.rs", "crates/lemonfiber-core/src/wishing/ask.rs", "crates/lemonfiber-core/src/household/run/notices/tests.rs::nothing_the_house_is_shown_is_in_anything_but_its_own_words", "crates/lemonfiber-core/src/household/run/handing_over/tests.rs::nothing_handed_over_is_in_anything_but_the_households_own_words"] },
 ]

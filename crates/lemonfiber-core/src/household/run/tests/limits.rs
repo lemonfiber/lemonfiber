@@ -229,13 +229,13 @@ fn a_reason_this_machine_holds_reaches_the_request_it_belongs_to() {
     );
 }
 
-/// A full disk reaches the same answer, as the disk rather than as a limit.
+/// A full house reaches the same answer, as the house rather than as a limit.
 ///
 /// Somebody deciding what to ask for is owed the refusal an approval would meet, and
 /// owed it in the words that say which of the two it is: a member who read a full
-/// disk as their own limit would wait for a period to roll over and change nothing.
+/// house as their own limit would wait for a period to roll over and change nothing.
 #[test]
-fn a_full_disk_reaches_whoever_is_about_to_ask() {
+fn a_full_house_reaches_whoever_is_about_to_ask() {
     let report = assemble(
         vec![account("Ana", true)],
         vec![request(
@@ -267,9 +267,9 @@ fn a_full_disk_reaches_whoever_is_about_to_ask() {
         .first()
         .map(|member| member.to_hand_over.join("\n"))
         .unwrap_or_default();
-    assert!(said.contains("no room left on the disk"), "{said}");
+    assert!(said.contains("no room for new things right now"), "{said}");
     assert!(
-        said.contains("that is the disk rather than anything of yours"),
+        said.contains("That is the house rather than anything of yours"),
         "{said}"
     );
 }

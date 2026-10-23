@@ -2,38 +2,36 @@
 //!
 //! **Every figure this composes already existed and none of it was in front of the
 //! person it is about.** What a period allows and what it has left, when it next makes
-//! room, roughly what a thing will take before anybody asks for it, and why a request was
-//! refused — all of it is gathered beside the household list, which is a list the
-//! household never sees. So the requirements it serves read as unmet by anybody standing
-//! where they are written from.
+//! room, and why a request was refused — all of it is gathered beside the household list,
+//! which is a list the household never sees. So the requirements it serves read as unmet
+//! by anybody standing where they are written from.
 //!
-//! **This program cannot put it where they ask.** The request service has no notion of
-//! size, its over-quota refusal names neither the limit nor the reset, and its decline
-//! carries no reason at all — and nobody in the house has an account here or a way in, on
-//! purpose. What is left is to write the answer in the second person and hand it to the
-//! one person who can pass it on, which is what this does: a message ready to send as it
-//! stands, rather than four figures an operator has to compose into one.
+//! **This program cannot put it where they ask.** The request service's over-quota
+//! refusal names neither the limit nor the reset, and its decline carries no reason at
+//! all — and nobody in the house has an account here or a way in, on purpose. What is left
+//! is to write the answer in the second person and hand it to the one person who can pass
+//! it on, which is what this does: a message ready to send as it stands.
 //!
-//! **The three answers are kept apart.** Waiting on a decision, refused, and refused by
-//! the disk are different things to be told, and a surface that merged any two of them
-//! would hand somebody the wrong next move — wait, ask for something else, or free some
-//! room. So each is its own line and none of them borrows another's words.
+//! **It is said in the household's words.** No size, no service and nothing about how the
+//! house is run: what somebody may ask for is said in titles, and the house is the house.
+//!
+//! **The three answers are kept apart.** Waiting on a decision, refused, and refused for
+//! want of room are different things to be told, and a surface that merged any two of
+//! them would hand somebody the wrong next move — wait, ask for something else, or wait
+//! for room. So each is its own line and none of them borrows another's words.
 
 use crate::household::State;
 use crate::model::{HouseholdMember, MemberRequest};
-use crate::quality::Selection;
-use crate::recyclarr::Kind;
 
 /// What to tell one member, in the order they would want it.
 ///
-/// Nothing at all for somebody with no standing to report and nothing waiting. What a
-/// thing costs and what the disk is doing are true of everybody in the house alike, so a
-/// message carrying only those is a notice rather than an answer — and one handed over as
-/// though it were addressed to somebody teaches a household to ignore the next.
+/// Nothing at all for somebody with no standing to report and nothing waiting. Whether
+/// the house has room is true of everybody in it alike, so a message carrying only that
+/// is a notice rather than an answer — and one handed over as though it were addressed to
+/// somebody teaches a household to ignore the next.
 #[must_use]
 pub(super) fn to_hand_over(
     member: &HouseholdMember,
-    quality: &Selection,
     expiring: Option<u32>,
     no_room: bool,
 ) -> Vec<String> {
@@ -53,7 +51,6 @@ pub(super) fn to_hand_over(
             |sentence| format!("Your limit: {sentence}."),
         ));
     }
-    said.push(before_you_ask(quality));
     said.extend(unanswered);
     said.extend(refused);
     if no_room {
@@ -62,31 +59,14 @@ pub(super) fn to_hand_over(
     said
 }
 
-/// What is said where the disk has no room left.
+/// What is said while the house has no room.
 ///
-/// The disk's own answer, said as the disk and never as a limit. Somebody who read a
-/// full disk as their own quota would wait for a period to roll over and watch the same
-/// refusal happen again, having done the one thing that could not help.
-const NO_ROOM: &str = "There is no room left on the disk, so nothing new is being fetched \
-                       at the moment — that is the disk rather than anything of yours, and \
-                       waiting for your limit to roll over will not change it.";
-
-/// Roughly what the two kinds of thing cost, before anybody has chosen one.
-///
-/// The line the requirement is actually about. A household member is shown no cost where
-/// they ask, and most excessive requests are innocent — nobody means to ask for four
-/// hundred gigabytes, they did not know a whole series at that quality was that much. The
-/// figure is a guess and says so, because a number without the word in front of it is one
-/// somebody will hold this house to.
-fn before_you_ask(quality: &Selection) -> String {
-    format!(
-        "Before you ask, roughly what things take at the quality this house is set to: a \
-         film {}, a season of television {} — a guess from the quality and how long a \
-         thing of that kind usually runs, not a measurement.",
-        super::allowance::for_kind(Kind::Movies, quality).reading(),
-        super::allowance::for_kind(Kind::Tv, quality).reading(),
-    )
-}
+/// The house's own answer, and never a limit. Somebody who read a full house as their own
+/// allowance would wait for a period to roll over and watch the same refusal happen again,
+/// having done the one thing that could not help.
+const NO_ROOM: &str = "The house has no room for new things right now. That is the house \
+                       rather than anything of yours, and waiting for your limit to roll \
+                       over will not change it.";
 
 /// What is still waiting on somebody, where anything is.
 ///
@@ -113,11 +93,8 @@ fn waiting(requests: &[MemberRequest], expiring: Option<u32>) -> Vec<String> {
         .filter(|request| request.state == Some(State::WaitingForApproval))
     {
         said.push(format!(
-            "Waiting on an answer: {}{}{}. {ends}.",
+            "Waiting on an answer: {}{}. {ends}.",
             named(request),
-            request
-                .estimate
-                .map_or_else(String::new, |estimate| format!(", {}", estimate.reading())),
             request.waiting_days.map_or_else(String::new, asked_ago),
         ));
     }
@@ -170,8 +147,8 @@ fn turned_down(requests: &[MemberRequest]) -> Vec<String> {
         .collect();
     if !said.is_empty() {
         said.push(
-            "The request service tells you a request was declined and carries no reason \
-             with it, so those words are lemonfiber's own record of what was said here."
+            "Where you ask, a request that was turned down shows no reason, so those words \
+             are the house's own record of what was said."
                 .to_owned(),
         );
     }
