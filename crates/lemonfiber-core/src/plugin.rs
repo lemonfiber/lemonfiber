@@ -30,6 +30,7 @@ mod container;
 mod declared;
 pub mod first_party;
 mod fronting;
+mod granted;
 mod installed;
 // Whose a journalled change is. Apart from the fronting whose region markers carry the
 // same name: those say where a plugin's wiring sits, and this says what leaves the
@@ -88,6 +89,7 @@ pub(crate) use container::{
 pub use container::{profile, Holding, Reading, Variable};
 pub use declared::{Declaration, Secret};
 pub use fronting::{proxied as fronting_proxied, taken as label_taken, PROXY};
+pub use granted::{approval as grant_approval, Grant};
 pub use installed::{
     answering, spelled_alike, Asking, Installed, Placed, Reached, RequestProof, RunProof,
 };

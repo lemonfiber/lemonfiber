@@ -254,6 +254,7 @@ pub(crate) fn an_installed(
     services: Vec<crate::plugin::Placed>,
 ) -> crate::plugin::Installed {
     crate::plugin::Installed {
+        granted: Vec::new(),
         plugin: plugin.to_owned(),
         version: "1.0.0".to_owned(),
         name: None,

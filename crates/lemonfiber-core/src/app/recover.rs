@@ -15,6 +15,7 @@ use std::path::{Path, PathBuf};
 use crate::config::store;
 use crate::error::Problem;
 use crate::journal::{is_sealed, Action, Undo};
+use crate::plugin::Grant;
 use crate::ports::filesystem::{Confined, Lying};
 use crate::ports::service::Client as _;
 use crate::repair;
@@ -245,6 +246,9 @@ pub(crate) fn carrying_out(
 pub(crate) fn reheld(ctx: &Ctx, carried: &Carried) -> Result<(), Box<Problem>> {
     for holding in carried.done.iter().filter_map(|undo| match &undo.action {
         Action::Rehold { name, .. } => Some(crate::plugin::Holding::Store(name.clone())),
+        Action::Regrant { credential, .. } => {
+            Some(crate::plugin::Holding::Crossing(credential.clone()))
+        }
         Action::Restore { key, .. } => Some(crate::settings::files::holding_of(key)),
         _ => None,
     }) {
@@ -346,6 +350,24 @@ fn carry_out(confined: &dyn Confined, action: &Action, env_file: &Path) -> Resul
                 filed.as_deref(),
             ),
         ),
+        Action::Regrant {
+            plugin,
+            credential,
+            of,
+            serves,
+            at,
+            give,
+        } => regranted(
+            env_file,
+            plugin,
+            &Grant {
+                credential: credential.clone(),
+                of: of.clone(),
+                serves: serves.clone(),
+                at: at.clone(),
+            },
+            *give,
+        ),
         Action::Rehold {
             name,
             earlier,
@@ -362,6 +384,17 @@ fn carry_out(confined: &dyn Confined, action: &Action, env_file: &Path) -> Resul
             ),
         ),
     }
+}
+
+/// Give `plugin` the grant back, or end it, in the register beside `env_file`.
+fn regranted(env_file: &Path, plugin: &str, grant: &Grant, give: bool) -> Result<Step, Fault> {
+    let at = env_file.with_file_name(crate::config::paths::PLUGINS);
+    let mut register: crate::plugin::Register = super::record::kept(Some(&at));
+    if !register.regrant(plugin, grant, give) {
+        return Ok(Step::Done);
+    }
+    store::write(&at, &register.to_json().unwrap_or_default()).map_err(Fault::Store)?;
+    Ok(Step::Done)
 }
 
 fn settled(name: &str, undone: Result<undoing::Undone, store::Failure>) -> Result<Step, Fault> {

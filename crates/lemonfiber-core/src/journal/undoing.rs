@@ -96,6 +96,21 @@ impl Change {
                 kept: current.clone(),
                 filed: filed.clone(),
             },
+            Kind::Granted {
+                plugin,
+                credential,
+                of,
+                serves,
+                at,
+                given,
+            } => Action::Regrant {
+                plugin: plugin.clone(),
+                credential: credential.clone(),
+                of: of.clone(),
+                serves: serves.clone(),
+                at: at.clone(),
+                give: !given,
+            },
             Kind::Overlaid { path, .. } => Action::Leave { path: path.clone() },
         };
         Undo {

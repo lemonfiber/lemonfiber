@@ -15,6 +15,7 @@ use lemonfiber_core::doctor::{Category, Finding, Verdict as Checked};
 /// differently, arranged so one listing exercises both.
 fn recorded(plugin: &str, reached: Option<Reached>) -> Installed {
     Installed {
+        granted: Vec::new(),
         plugin: plugin.to_owned(),
         version: "1.2.0".to_owned(),
         name: None,

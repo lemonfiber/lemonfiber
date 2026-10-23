@@ -360,6 +360,15 @@ fn undone(undo: &Undo) -> String {
         Action::ReinstateDevice { name } => format!("made the device key {name} good again"),
         Action::Resettle { name, .. } => format!("put the setting {name} back"),
         Action::Rehold { name, .. } => format!("put the secret {name} back"),
+        Action::Regrant {
+            plugin,
+            credential,
+            give: true,
+            ..
+        } => format!("granted {credential} to {plugin} again"),
+        Action::Regrant {
+            plugin, credential, ..
+        } => format!("ended {plugin}'s grant of {credential}"),
         Action::Leave { path } => format!("left the overlay {path} as it is"),
     }
 }

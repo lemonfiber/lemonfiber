@@ -156,6 +156,15 @@ fn did(kind: &Kind) -> String {
             ..
         } => format!("kept the secret {name}"),
         Kind::Secret { name, .. } => format!("replaced the secret {name}"),
+        Kind::Granted {
+            plugin,
+            credential,
+            given: true,
+            ..
+        } => format!("granted {credential} to {plugin}"),
+        Kind::Granted {
+            plugin, credential, ..
+        } => format!("ended {plugin}'s grant of {credential}"),
         Kind::Overlaid {
             path,
             current: None,

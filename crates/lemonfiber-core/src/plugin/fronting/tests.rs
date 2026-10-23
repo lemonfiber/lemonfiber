@@ -37,6 +37,7 @@ fn placed(service: &str, reached: Option<Reached>) -> Placed {
 
 fn installed(services: Vec<Placed>) -> Installed {
     Installed {
+        granted: Vec::new(),
         plugin: "comics".to_owned(),
         version: "1.0.0".to_owned(),
         name: None,

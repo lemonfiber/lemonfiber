@@ -571,6 +571,7 @@ fn a_choice_where_only_one_claims_it_is_reported_as_no_choice_at_all() {
 /// An installed plugin whose one service claims `capability`, as its record holds it.
 fn plugin_filling(plugin: &str, service: &str, capability: &str) -> crate::plugin::Installed {
     crate::plugin::Installed {
+        granted: Vec::new(),
         plugin: plugin.to_owned(),
         version: "1.0.0".to_owned(),
         name: None,

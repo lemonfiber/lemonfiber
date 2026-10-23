@@ -287,7 +287,8 @@ pub fn standing(
         | Kind::KeyCollected { .. }
         | Kind::DeviceKeyRegistered { .. }
         | Kind::Setting { .. }
-        | Kind::Secret { .. } => Standing::whole(),
+        | Kind::Secret { .. }
+        | Kind::Granted { .. } => Standing::whole(),
     }
 }
 

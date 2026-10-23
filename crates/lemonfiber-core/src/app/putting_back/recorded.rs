@@ -94,6 +94,21 @@ fn inverted(kind: &crate::journal::Kind) -> Option<crate::journal::Kind> {
             from: to.clone(),
             to: from.clone(),
         }),
+        Kind::Granted {
+            plugin,
+            credential,
+            of,
+            serves,
+            at,
+            given,
+        } => Some(Kind::Granted {
+            plugin: plugin.clone(),
+            credential: credential.clone(),
+            of: of.clone(),
+            serves: serves.clone(),
+            at: at.clone(),
+            given: !given,
+        }),
         Kind::Created { .. }
         | Kind::Made { .. }
         | Kind::Copied { .. }

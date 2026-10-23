@@ -142,6 +142,15 @@ fn restoring(action: &Action) -> String {
             ..
         } => format!("the secret {name} back to what it held"),
         Action::Rehold { name, .. } => format!("the secret {name} forgotten, as it was"),
+        Action::Regrant {
+            plugin,
+            credential,
+            give: true,
+            ..
+        } => format!("{credential} granted to {plugin} again"),
+        Action::Regrant {
+            plugin, credential, ..
+        } => format!("{plugin}'s grant of {credential} ended, as it was"),
         Action::Leave { path } => format!("the overlay {path} left as it is"),
     }
 }

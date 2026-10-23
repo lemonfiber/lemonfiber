@@ -330,6 +330,7 @@ fn a_refused_adoption_exits_on_what_the_operator_must_resolve() {
 /// One plugin's record, as an install settles it.
 fn komga() -> lemonfiber_core::plugin::Installed {
     lemonfiber_core::plugin::Installed {
+        granted: Vec::new(),
         plugin: "komga".to_owned(),
         version: "1.2.0".to_owned(),
         name: None,

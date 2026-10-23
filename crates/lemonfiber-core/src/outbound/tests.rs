@@ -114,6 +114,7 @@ fn a_name_is_given_for_every_request() {
 #[test]
 fn the_git_sources_of_installed_plugins_are_where_fetching_one_goes() {
     let from = |source: &str| crate::plugin::Installed {
+        granted: Vec::new(),
         plugin: "komga".to_owned(),
         version: "1.0.0".to_owned(),
         name: None,

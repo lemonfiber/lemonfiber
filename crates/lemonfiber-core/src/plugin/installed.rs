@@ -393,6 +393,10 @@ pub struct Installed {
     /// the install would have run under.
     #[serde(default)]
     pub installed_at: String,
+    /// Each credential of another service the operator granted it, where it is
+    /// third-party (`F14-R20`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub granted: Vec<super::granted::Grant>,
 }
 
 impl Installed {
@@ -410,6 +414,7 @@ impl Installed {
     #[must_use]
     pub fn of(manifest: &Manifest) -> Self {
         Self {
+            granted: Vec::new(),
             plugin: manifest.plugin.id.clone(),
             version: manifest.plugin.version.clone(),
             name: Some(manifest.plugin.name.clone()),

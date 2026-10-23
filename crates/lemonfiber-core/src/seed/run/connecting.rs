@@ -246,7 +246,7 @@ pub(super) fn pairings(fillers: &Fillers) -> Vec<Pairing<'_>> {
                 asker,
                 ask,
                 filler,
-                made: made(asker, ask, filler),
+                made: made(fillers, asker, ask, filler),
             });
         }
     }
@@ -255,13 +255,12 @@ pub(super) fn pairings(fillers: &Fillers) -> Vec<Pairing<'_>> {
 
 /// What one asker and one filler come to.
 fn made<'a>(
+    fillers: &Fillers,
     asker: &'a Filler,
     ask: &Ask,
     filler: &'a Filler,
 ) -> Result<(Connection, &'a Address, Cleared<'a>), Unmade> {
-    // Every connection here hands the asker the filler's credential, so an asker that
-    // credential may not reach is connected to nothing, whatever fills what it asked for.
-    if !crate::wiring::crosses(filler.holder(), asker.holder()) {
+    if !fillers.hands(filler, asker) {
         return Err(Unmade::Asked);
     }
     let speaks = filler.adapter.as_ref().ok_or(Unmade::NoAdapter)?.kind;
@@ -334,8 +333,8 @@ fn reason(pairing: &Pairing<'_>, why: Unmade) -> String {
              not register a third-party plugin's service in it"
         ),
         Unmade::Asked => format!(
-            "{fills} and {asker} is a third-party plugin's service, which lemonfiber never \
-             hands another service's credential"
+            "{fills} and {asker} is a third-party plugin's service, which is handed another \
+             service's credential only where the operator granted it in an install or update"
         ),
     }
 }
