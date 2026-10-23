@@ -381,6 +381,10 @@ async fn a_curator_held_where_it_was_reached_before_is_moved_in_place() {
     ] {
         assert!(sent.contains(field), "{field} missing from {sent}");
     }
+    assert!(
+        !sent.contains("\"id\""),
+        "the service holds its id as read-only and refuses a body naming it: {sent}"
+    );
 }
 
 /// A curator held at the right endpoint under another key has its key rewritten.
