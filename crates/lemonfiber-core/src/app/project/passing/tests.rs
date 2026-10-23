@@ -216,3 +216,16 @@ async fn a_service_holding_the_pass_services_id_leaves_it_out_and_makes_nothing(
     assert!(!project.join(PINNED).exists());
     assert_eq!(held(&project, File::Key), None);
 }
+
+#[tokio::test]
+async fn a_registry_answering_no_digest_leaves_the_pass_service_out_and_says_so() {
+    let registry = Registered::publishing("latest");
+    let (ctx, project) = machine("pass-undigested", &registry, true);
+
+    let said = readied(&ctx).await.unwrap_or_default();
+
+    assert!(said.contains("named latest"), "{said}");
+    assert!(said.contains("which is no digest"), "{said}");
+    assert!(!project.join(PINNED).exists());
+    assert_eq!(held(&project, File::Key), None);
+}

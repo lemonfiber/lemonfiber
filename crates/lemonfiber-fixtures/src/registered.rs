@@ -71,3 +71,6 @@ impl Registered {
             .map_err(|reason| Unanswerable::about_tag(tagged, &reason))
     }
 }
+
+#[cfg(test)]
+mod tests;
