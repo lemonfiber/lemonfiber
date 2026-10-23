@@ -348,6 +348,10 @@ pub struct Ask {
     /// Whether every service that fills it is reached rather than one.
     #[serde(default)]
     pub each: bool,
+    /// The upstream's own API the service talks in, which the ask then reaches in place
+    /// of the adapter fronting it.
+    #[serde(default)]
+    pub native: Option<String>,
 }
 
 /// Where one service's own entry goes, once the manifest's defaults are taken.

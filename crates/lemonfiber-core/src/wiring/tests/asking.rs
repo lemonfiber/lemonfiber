@@ -12,6 +12,7 @@ use crate::wiring::{
 fn plugin_asking(plugin: &str, service: &str, capability: &str, each: bool) -> Installed {
     let mut placed = crate::test_support::a_placed(service, &[], None, None);
     placed.asks = vec![Asking {
+        native: None,
         capability: capability.to_owned(),
         each,
     }];

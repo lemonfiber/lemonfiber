@@ -20,6 +20,7 @@ fn the_sync(speaking: bool) -> crate::plugin::Installed {
     let mut installed = crate::test_support::contracted("syncer", "sync", "quality.sync");
     for placed in &mut installed.services {
         placed.asks = vec![crate::plugin::Asking {
+            native: None,
             capability: "library.curate".to_owned(),
             each: true,
         }];

@@ -124,11 +124,13 @@ fn each_ask_is_kept_on_the_service_that_makes_it() {
     let record = installed(|manifest| {
         manifest.asking = vec![
             lemonfiber_plugin::Ask {
+                native: None,
                 service: Some("komga-sidecar".to_owned()),
                 capability: "library.curate".to_owned(),
                 each: true,
             },
             lemonfiber_plugin::Ask {
+                native: None,
                 service: Some("komga".to_owned()),
                 capability: "download.usenet".to_owned(),
                 each: false,
@@ -139,6 +141,7 @@ fn each_ask_is_kept_on_the_service_that_makes_it() {
     assert_eq!(
         asks("komga-sidecar"),
         Some(vec![super::Asking {
+            native: None,
             capability: "library.curate".to_owned(),
             each: true,
         }])
@@ -146,6 +149,7 @@ fn each_ask_is_kept_on_the_service_that_makes_it() {
     assert_eq!(
         asks("komga"),
         Some(vec![super::Asking {
+            native: None,
             capability: "download.usenet".to_owned(),
             each: false,
         }])
@@ -171,6 +175,7 @@ fn a_variable_asking_an_address_is_an_ask_once_unless_narrowed_or_already_asked(
     };
     let record = installed(|manifest| {
         manifest.asking = vec![lemonfiber_plugin::Ask {
+            native: None,
             service: Some("komga".to_owned()),
             capability: "download.usenet".to_owned(),
             each: false,
@@ -192,6 +197,7 @@ fn a_variable_asking_an_address_is_an_ask_once_unless_narrowed_or_already_asked(
         });
     });
     let asked = |capability: &str| super::Asking {
+        native: None,
         capability: capability.to_owned(),
         each: false,
     };
