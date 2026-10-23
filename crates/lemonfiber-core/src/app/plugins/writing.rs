@@ -19,7 +19,7 @@ use crate::error::{Problem, Remedy, State};
 use crate::error::Diagnose as _;
 use crate::journal::{Change, Kind};
 use crate::plugin::Installed;
-use crate::ports::filesystem::{Lying, Readable};
+use crate::ports::filesystem::Lying;
 
 use super::super::Ctx;
 use super::{NOWHERE, UNWRITABLE};
@@ -110,7 +110,7 @@ pub(crate) fn carry_out(
                 continue;
             }
             crate::plugin::Lands::Starting { .. } | crate::plugin::Lands::Upstream(_) => {
-                seeded(ctx, (plugin, stamp, &journal), write)?;
+                seeding::seeded(ctx, (plugin, stamp, &journal), write)?;
                 continue;
             }
         };
@@ -142,7 +142,7 @@ pub(crate) fn carry_out(
 }
 
 /// Why a path beneath the stack directory is not written to.
-const LINKED: &str = "it is reached through a link or lies outside the stack directory";
+pub(super) const LINKED: &str = "it is reached through a link or lies outside the stack directory";
 
 /// Refuse where a mount source of `installed`'s services is reached through a link from
 /// the stack directory, before its document is written from the record.
@@ -182,58 +182,12 @@ fn made_whole(
     }
 }
 
-/// Write a starting file or an adapter's `upstream.json`, each secret it names written
-/// as the secret store holds it for `plugin`.
-fn seeded(
-    ctx: &Ctx,
-    recording: (&str, &str, &Path),
-    write: &crate::plugin::Write,
-) -> Result<(), Box<Problem>> {
-    let plugin = recording.0;
-    let secrets = crate::settings::secrets_at(ctx)
-        .and_then(|at| crate::settings::Secrets::at(&at).ok())
-        .unwrap_or_default();
-    let held = |secret: &str| {
-        secrets
-            .value(&crate::settings::named(plugin, secret))
-            .map(str::to_owned)
-    };
-    let unwritten = |why: String| Box::new(unwritable(&write.path, &why));
-    match &write.lands {
-        crate::plugin::Lands::Starting { bytes, seeded } => {
-            let bytes = crate::plugin::seeding::written(bytes, &held, ctx.seams.random.as_ref())
-                .map_err(unwritten)?;
-            let readable = if *seeded {
-                Readable::Owner
-            } else {
-                Readable::Shared
-            };
-            made_confined(ctx, recording, &write.path, &bytes, readable)
-        }
-        crate::plugin::Lands::Upstream(fields) => {
-            let text = crate::plugin::seeding::upstream(fields, &held).map_err(unwritten)?;
-            made_confined(
-                ctx,
-                recording,
-                &write.path,
-                text.as_bytes(),
-                Readable::Owner,
-            )
-        }
-        crate::plugin::Lands::Directory { .. }
-        | crate::plugin::Lands::Document { .. }
-        | crate::plugin::Lands::Key
-        | crate::plugin::Lands::Secrets(_)
-        | crate::plugin::Lands::Region { .. } => Ok(()),
-    }
-}
-
 /// Journal every path writing `path` brings into being, parent first.
 ///
 /// Every writer here brings the whole missing chain into being, so all of it is what a
 /// reversal has to remove. Recorded parent-first and so unwound child-first, exactly as an
 /// apply records the data root it makes.
-fn recorded_making(
+pub(super) fn recorded_making(
     ctx: &Ctx,
     (plugin, stamp, journal): (&str, &str, &Path),
     path: &Path,
@@ -245,25 +199,6 @@ fn recorded_making(
         .collect();
     crate::app::recover::journalled(journal, &changes, ctx.seams.random.as_ref())
         .map_err(|failure| Box::new(failure.problem()))
-}
-
-/// Write one file beneath the stack directory that a plugin's service reads, readable as
-/// `readable` says, through no link on the way to it, since the directory is one its
-/// container writes.
-fn made_confined(
-    ctx: &Ctx,
-    recording: (&str, &str, &Path),
-    path: &Path,
-    content: &[u8],
-    readable: Readable,
-) -> Result<(), Box<Problem>> {
-    let stack =
-        super::super::project::directory(ctx).ok_or_else(|| Box::new(unwritable(path, LINKED)))?;
-    recorded_making(ctx, recording, path, false)?;
-    ctx.seams
-        .confined
-        .written(path, &stack, content, readable)
-        .map_err(|fault| Box::new(unwritable(path, &fault.message)))
 }
 
 /// Mint the key an adapter service is asked with and write it where its container reads
@@ -550,7 +485,7 @@ pub(crate) fn nowhere_to_write(plugin: &str) -> Problem {
 }
 
 /// A directory or a document the install could not put where it decided it goes.
-fn unwritable(at: &Path, why: &str) -> Problem {
+pub(super) fn unwritable(at: &Path, why: &str) -> Problem {
     Problem::new(
         UNWRITABLE,
         format!("{} could not be written", at.display()),
@@ -561,6 +496,8 @@ fn unwritable(at: &Path, why: &str) -> Problem {
     .in_state(State::Guided)
     .with_detail(why.to_owned())
 }
+
+mod seeding;
 
 #[cfg(test)]
 mod tests;

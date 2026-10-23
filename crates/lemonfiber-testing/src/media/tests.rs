@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::plugin::Register;
-use lemonfiber_core::ports::filesystem::{Beneath, Confined, Lying};
+use lemonfiber_core::ports::filesystem::{Beneath, Confined, Lying, Readable};
 use lemonfiber_core::ports::http::{Method, Request};
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::scratch::Scratch;
@@ -123,6 +123,16 @@ fn a_keyed_disk_holds_the_adapters_key_and_reads_every_other_file_as_the_disk_do
     assert_eq!(
         keyed.read(&moved, &directory),
         Beneath::Read("written".to_owned())
+    );
+
+    let seeded = directory.join("seeded").join("other.txt");
+    assert_eq!(
+        keyed.written(&seeded, &directory, b"seeded", Readable::Owner),
+        Ok(())
+    );
+    assert_eq!(
+        keyed.read(&seeded, &directory),
+        Beneath::Read("seeded".to_owned())
     );
 }
 

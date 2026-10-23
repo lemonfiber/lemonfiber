@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use lemonfiber_fixtures::scratch::Scratch;
-use lemonfiber_ports::filesystem::{Beneath, Confined, Lying, READ_LIMIT};
+use lemonfiber_ports::filesystem::{Beneath, Confined, Lying, Readable, READ_LIMIT};
 
 use super::super::Disk;
 use super::landed;
@@ -195,4 +195,92 @@ fn a_mount_source_lies_beneath_only_through_no_link() {
         );
     }
     assert_eq!(Disk.lies(&owned, &owned), Lying::Plain);
+}
+
+/// A file written is made with every directory missing above it, and held to the mode
+/// its readers name whether it was there already or not.
+#[cfg(unix)]
+#[test]
+fn a_file_written_is_made_with_its_directories_and_held_to_its_mode() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let (_dir, owned, _) = owned();
+    let seeded = owned.join("made").join("deep").join("seed.ini");
+    let mode = |path: &std::path::Path| {
+        std::fs::metadata(path).map(|meta| meta.permissions().mode() & 0o777)
+    };
+
+    assert!(Disk
+        .written(&seeded, &owned, b"secret", Readable::Owner)
+        .is_ok());
+    assert!(Disk
+        .written(&owned.join("kept.yml"), &owned, b"ours", Readable::Owner)
+        .is_ok());
+    assert!(Disk
+        .written(&owned.join("shared.yml"), &owned, b"open", Readable::Shared)
+        .is_ok());
+
+    assert_eq!(
+        std::fs::read_to_string(&seeded).ok().as_deref(),
+        Some("secret")
+    );
+    assert_eq!(
+        std::fs::read_to_string(owned.join("kept.yml"))
+            .ok()
+            .as_deref(),
+        Some("ours")
+    );
+    assert_eq!(mode(&seeded).ok(), Some(0o600));
+    assert_eq!(mode(&owned.join("kept.yml")).ok(), Some(0o600));
+    assert_eq!(mode(&owned.join("shared.yml")).ok(), Some(0o644));
+}
+
+/// A link at the name, or a linked directory on the way, is refused, and what it points
+/// at is untouched.
+#[cfg(unix)]
+#[test]
+fn a_file_written_through_a_link_is_refused() {
+    let (dir, owned, operator) = owned();
+    let _ = std::os::unix::fs::symlink(&operator, owned.join("planted.yml"));
+    let _ = std::os::unix::fs::symlink(&*dir, owned.join("up"));
+
+    let planted = Disk.written(&owned.join("planted.yml"), &owned, b"ours", Readable::Owner);
+    let up = Disk.written(
+        &owned.join("up").join("operator.env"),
+        &owned,
+        b"ours",
+        Readable::Owner,
+    );
+
+    assert!(planted.is_err_and(|fault| fault.message.contains("is a link")));
+    assert!(up.is_err());
+    assert_eq!(
+        std::fs::read_to_string(&operator).ok().as_deref(),
+        Some("SECRET=kept")
+    );
+}
+
+/// A directory, a pipe something reads, or a path naming no file is not written.
+#[cfg(unix)]
+#[test]
+fn a_file_written_where_no_plain_file_can_be_is_refused() {
+    use std::os::unix::fs::OpenOptionsExt as _;
+    let (_dir, owned, _) = owned();
+    let _ = std::fs::create_dir_all(owned.join("folder.yml"));
+    let pipe = owned.join("pipe.yml");
+    let made = std::process::Command::new("mkfifo").arg(&pipe).status();
+    assert!(made.is_ok_and(|status| status.success()), "a pipe was made");
+    let reader = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NONBLOCK)
+        .open(&pipe);
+    assert!(reader.is_ok(), "the pipe has a reader");
+
+    let folder = Disk.written(&owned.join("folder.yml"), &owned, b"ours", Readable::Shared);
+    let piped = Disk.written(&pipe, &owned, b"ours", Readable::Shared);
+
+    let nameless = Disk.written(&owned.join(".."), &owned, b"ours", Readable::Shared);
+
+    assert!(folder.is_err());
+    assert!(piped.is_err_and(|fault| fault.message.contains("not a plain file")));
+    assert!(nameless.is_err_and(|fault| fault.message.contains("not a plain file")));
 }
