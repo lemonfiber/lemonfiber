@@ -3,7 +3,7 @@
 use super::{asked, beside, ctx, recorded, silent, WITH_A_SECRET};
 use lemonfiber_core::app::{dispatch, Asking, Command};
 use lemonfiber_core::config::store;
-use lemonfiber_core::credential::{Rotation, State};
+use lemonfiber_core::credential::{Origin, Rotation, Settled, State};
 use lemonfiber_fixtures::files::Files;
 
 /// A plugin's declared secret is on the same list as every other, saying whose it is,
@@ -168,6 +168,56 @@ async fn a_crossing_secret_is_read_from_its_holder_and_never_kept() {
     let said = "not kept — it is sonarr's, and read from there".to_owned();
     assert_eq!(line(&absent), Some((State::Absent, said.clone(), true)));
     assert_eq!(line(&inventory), Some((State::Active, said, true)));
+}
+
+/// A secret lemonfiber mints for a plugin is lemonfiber's on the list, said to be minted
+/// at install while nothing holds it, and rotating it mints one and holds it.
+#[tokio::test]
+async fn a_minted_plugin_secret_is_lemonfibers_and_rotating_it_holds_a_new_one() {
+    let env = beside(
+        "pluginminted",
+        &WITH_A_SECRET.replace(r#""of": "komga","#, r#""of": "komga", "minted": true,"#),
+    );
+    let ctx = ctx(env.clone(), Files::empty(), silent());
+
+    let listed = asked(&ctx, Asking::Read).await;
+    let line = listed
+        .held
+        .iter()
+        .find(|one| one.plugins() == Some("comics"));
+    assert!(
+        line.is_some_and(|one| one.origin == Origin::Lemonfiber
+            && one
+                .location
+                .contains("mints it when the plugin is installed")),
+        "{:?}",
+        listed.held
+    );
+
+    let rotated = asked(
+        &ctx,
+        Asking::Rotate {
+            credential: "comics api_key".to_owned(),
+        },
+    )
+    .await
+    .rotated;
+    assert!(
+        rotated
+            .as_ref()
+            .is_some_and(|rotation| matches!(rotation.settled, Settled::Replaced { .. })),
+        "{rotated:?}"
+    );
+    let held = std::fs::read_to_string(env.with_file_name("secrets.json"))
+        .ok()
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+        .and_then(|store| {
+            store
+                .pointer("/held/comics:api_key/value")
+                .and_then(serde_json::Value::as_str)
+                .map(str::len)
+        });
+    assert_eq!(held, Some(32));
 }
 
 /// A register that is there and will not read refuses the inventory rather than

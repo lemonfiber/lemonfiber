@@ -286,7 +286,13 @@ async fn on(ctx: &Ctx, coming: &Coming<'_>, install: &mut Install) -> Came {
             let planned = super::writing::landing(ctx, planned);
             super::writing::unlinked(ctx, coming.would, coming.stack)
                 .and_then(|()| {
-                    super::minting::minted(ctx, &coming.would.plugin, coming.manifest, coming.stamp)
+                    super::minting::minted(
+                        ctx,
+                        coming.would,
+                        coming.manifest,
+                        coming.stamp,
+                        crate::plugin::first_party::EMBEDDED,
+                    )
                 })
                 .and_then(|()| carry_out(ctx, &coming.would.plugin, coming.stamp, &planned))
         });

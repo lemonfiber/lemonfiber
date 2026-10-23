@@ -2,7 +2,8 @@
 //!
 //! Made before anything is written, because the plugin's secrets files, starting files
 //! and adapters' `upstream.json` are written from the store. One already held is kept,
-//! so a reinstall or an update hands the upstream the credential it already answers to.
+//! so a reinstall or an update hands the upstream the credential it already answers to,
+//! and a part moved in place is filed the key the stack already published for it.
 
 use lemonfiber_plugin::Manifest;
 
@@ -10,9 +11,12 @@ use super::super::Ctx;
 use super::following::diagnosed;
 use crate::error::Problem;
 use crate::journal::{Change, Kind};
+use crate::plugin::first_party::FirstParty;
+use crate::plugin::Installed;
 
-/// Hold a freshly minted value for each secret `manifest` mints that `plugin` holds none
-/// of yet, journalling each by its fingerprint.
+/// Hold a freshly minted value for each secret `manifest` mints that `would` holds none
+/// of yet, journalling each by its fingerprint; for a plugin `trusted` names, the key the
+/// stack already published for a part it moves in place of instead.
 ///
 /// # Errors
 ///
@@ -20,13 +24,16 @@ use crate::journal::{Change, Kind};
 /// store or the journal would not take them.
 pub(super) fn minted(
     ctx: &Ctx,
-    plugin: &str,
+    would: &Installed,
     manifest: &Manifest,
     stamp: &str,
+    trusted: &[FirstParty],
 ) -> Result<(), Box<Problem>> {
     if !manifest.secrets.iter().any(|secret| secret.minted) {
         return Ok(());
     }
+    let plugin = would.plugin.as_str();
+    let first_party = crate::plugin::first_party::holds(trusted, would);
     let held = crate::settings::secrets_at(ctx)
         .zip(crate::app::targets::layout(ctx))
         .ok_or(crate::config::store::Failure::Nowhere);
@@ -36,7 +43,10 @@ pub(super) fn minted(
         .iter()
         .filter(|secret| secret.minted)
         .map(|secret| {
-            crate::plugin::seeding::mint(ctx.seams.random.as_ref())
+            first_party
+                .then(|| moved(ctx, manifest, &secret.of))
+                .flatten()
+                .or_else(|| crate::plugin::seeding::mint(ctx.seams.random.as_ref()))
                 .map(|value| (crate::settings::named(plugin, &secret.id), value))
         })
         .collect::<Option<_>>()
@@ -75,4 +85,21 @@ pub(super) fn minted(
         crate::app::recover::journalled(&paths.journal(), &changes, ctx.seams.random.as_ref())
     })
     .map_err(|failure| diagnosed(&failure))
+}
+
+/// The credential the stack's own service `of` moves in place of already answers to, as
+/// lemonfiber published it for what reads it, where `of` moves in place of one.
+///
+/// A part moved in place keeps its configuration, so its upstream answers to the key it
+/// had; one minted afresh would be a key nothing seeded into it. Asked only of a
+/// first-party plugin: the stack's own key goes to nothing else.
+fn moved(ctx: &Ctx, manifest: &Manifest, of: &str) -> Option<String> {
+    manifest
+        .services
+        .iter()
+        .filter(|service| service.id == of)
+        .find_map(|service| service.replaces.as_deref())
+        .and_then(|reserved| {
+            crate::app::targets::recorded_secret(ctx, &crate::seed::run::published_as(reserved))
+        })
 }

@@ -18,8 +18,8 @@ pub(crate) fn root(ctx: &Ctx, plugin: &str) -> Option<PathBuf> {
 }
 
 /// Keep a copy of the plugin's manifest and of the starting files of every service
-/// `installed` runs a proof of, from the plugin's source at `source`, in place of any
-/// kept before.
+/// `installed` runs a proof of or whose files name a secret, from the plugin's source at
+/// `source`, in place of any kept before.
 pub(crate) fn kept(ctx: &Ctx, installed: &Installed, source: &Path) {
     let Some(into) = root(ctx, &installed.plugin) else {
         return;
@@ -28,7 +28,7 @@ pub(crate) fn kept(ctx: &Ctx, installed: &Installed, source: &Path) {
     if std::fs::create_dir_all(&into).is_ok() {
         let _ = std::fs::copy(source.join(MANIFEST), into.join(MANIFEST));
     }
-    for service in proved(installed) {
+    for service in proved(installed, source) {
         let _ = keep(
             Starting {
                 root: source,
@@ -68,12 +68,19 @@ pub(crate) fn forgotten(ctx: &Ctx, plugin: &str) {
     }
 }
 
-/// Every service `installed` runs a proof of, once each.
-fn proved(installed: &Installed) -> Vec<String> {
+/// Every service `installed` runs a proof of or whose starting files at `source` name a
+/// secret, once each.
+fn proved(installed: &Installed, source: &Path) -> Vec<String> {
+    let seeded = crate::plugin::seeding::shipped_by(installed, source)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|file| crate::plugin::seeding::seeded(&file.bytes))
+        .map(|file| file.service);
     let mut services: Vec<String> = installed
         .run_proofs
         .iter()
         .map(|one| one.service.clone())
+        .chain(seeded)
         .collect();
     services.sort();
     services.dedup();

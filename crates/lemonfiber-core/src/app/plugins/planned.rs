@@ -23,14 +23,8 @@ pub(crate) fn writes(
     source: Option<&Path>,
 ) -> Result<Vec<Write>, Box<Problem>> {
     let starting = match source {
-        Some(source) => crate::plugin::seeding::shipped(
-            installed
-                .services
-                .iter()
-                .map(|placed| placed.service.as_str()),
-            source,
-        )
-        .map_err(|why| Box::new(unshipped(&installed.plugin, &why)))?,
+        Some(source) => crate::plugin::seeding::shipped_by(installed, source)
+            .map_err(|why| Box::new(unshipped(&installed.plugin, &why)))?,
         None => Vec::new(),
     };
     let starting = crate::plugin::seeding::starting(starting, stack, &|at| at.exists());
