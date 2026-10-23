@@ -217,29 +217,22 @@ async fn starting_files_that_cannot_be_read_again_once_accepted_plan_nothing() {
         .is_some_and(|said| said.contains("no starting file may be either")));
 }
 
-#[test]
-fn nothing_is_minted_where_the_machine_supplies_no_random_bytes() {
+#[tokio::test]
+async fn an_install_the_machine_supplies_no_random_bytes_for_mints_and_writes_nothing() {
     let mut ctx = seeding("seeded-unminted");
     ctx.seams.random = std::sync::Arc::new(lemonfiber_fixtures::ports::Chance::exactly(None));
-    let manifest = lemonfiber_plugin::Manifest::from_toml(&seeded());
-    assert!(manifest.is_ok(), "{manifest:?}");
-    let Ok(manifest) = manifest else {
-        return;
-    };
 
-    let refused = super::super::minting::minted(
-        &ctx,
-        &crate::plugin::Installed::of(&manifest),
-        &manifest,
-        "1",
-        &[],
+    let problem = installing(&ctx, &shipped("seeded-unminted")).await.err();
+
+    assert!(
+        problem
+            .as_ref()
+            .and_then(|problem| problem.detail.as_deref())
+            .is_some_and(|said| said.contains(crate::plugin::seeding::UNMINTED)),
+        "{problem:?}"
     );
-
-    assert!(refused
-        .err()
-        .and_then(|problem| problem.detail)
-        .is_some_and(|said| said.contains(crate::plugin::seeding::UNMINTED)));
     assert_eq!(minted(&ctx), None);
+    assert!(!stack_of(&ctx).join("config/komga/application.yml").exists());
 }
 
 /// What carrying out `lands` at `komga`'s `application.yml` says went wrong, where it did.
