@@ -111,13 +111,6 @@ impl Operation {
         self
     }
 
-    /// The same operation, its case for `media_type` posting `asks`.
-    #[must_use]
-    pub fn filing(mut self, media_type: &'static str, asks: serde_json::Value) -> Self {
-        self.filed.push((media_type, asks));
-        self
-    }
-
     /// What `client` answers this operation comes to, read as the core reads it: the
     /// answer's status, size and shape held to the contract.
     ///
