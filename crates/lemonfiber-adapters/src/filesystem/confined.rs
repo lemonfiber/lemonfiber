@@ -132,7 +132,7 @@ fn created(path: &Path, within: &Path, readable: Readable) -> Result<std::fs::Fi
     };
     let here = made(parent, within)?;
     let flags =
-        OFlags::WRONLY | OFlags::CREATE | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC;
+        OFlags::RDWR | OFlags::CREATE | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC;
     let made_as = match readable {
         Readable::Owner => Mode::RUSR | Mode::WUSR,
         Readable::Shared => Mode::RUSR | Mode::WUSR | Mode::RGRP | Mode::ROTH,
