@@ -107,12 +107,10 @@ impl Cost {
 }
 
 /// What removing somebody does to their watch history, before it is done.
-pub(crate) const HISTORY_GOES: &str =
-    "Their watch history goes with the account, and cannot be got back.";
+const HISTORY_GOES: &str = "Their watch history goes with the account, and cannot be got back.";
 
 /// What removing somebody did to their watch history, once the account is gone.
-pub(crate) const HISTORY_WENT: &str =
-    "Their watch history went with the account, and cannot be got back.";
+const HISTORY_WENT: &str = "Their watch history went with the account, and cannot be got back.";
 
 /// What became of their watch history, read off how far the removal got.
 const fn watch_history(revoked: Revoked) -> &'static str {

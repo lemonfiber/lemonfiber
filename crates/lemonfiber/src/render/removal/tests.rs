@@ -1,6 +1,9 @@
 use super::removal;
 use lemonfiber_core::model::{HouseholdRemoval, Revoked};
 
+/// What a removal that reached the media server says of the watch history.
+const WENT: &str = "Their watch history went with the account, and cannot be got back.";
+
 /// A removal as it stands before anything is done to it.
 fn asked(requests: usize) -> HouseholdRemoval {
     HouseholdRemoval {
@@ -77,8 +80,7 @@ fn a_confirmed_removal_says_what_it_did_and_how_far_it_reached() {
     let done = HouseholdRemoval {
         confirmed: true,
         revoked: Revoked::Everywhere,
-        watch_history: "Their watch history goes with the account, and cannot be got back."
-            .to_owned(),
+        watch_history: WENT.to_owned(),
         ..asked(1)
     };
     let text = removal(&done).text();
@@ -114,8 +116,7 @@ fn more_than_one_request_reads_as_more_than_one() {
     let done = HouseholdRemoval {
         confirmed: true,
         revoked: Revoked::Everywhere,
-        watch_history: "Their watch history goes with the account, and cannot be got back."
-            .to_owned(),
+        watch_history: WENT.to_owned(),
         ..asked(3)
     };
     let text = removal(&done).text();
@@ -131,8 +132,7 @@ fn a_partial_removal_names_the_half_that_is_left() {
     let half = HouseholdRemoval {
         confirmed: true,
         revoked: Revoked::MediaServerOnly,
-        watch_history: "Their watch history goes with the account, and cannot be got back."
-            .to_owned(),
+        watch_history: WENT.to_owned(),
         findings: vec!["the request service still holds an account".to_owned()],
         ..asked(1)
     };

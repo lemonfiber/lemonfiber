@@ -6,6 +6,7 @@
 use super::Ctx;
 use crate::error::{Diagnose, Problem};
 use crate::model::{LifecycleReport, StackEdit};
+use crate::ports::process::{Failure, Output, Progress};
 use crate::stack::closure::{everything, resolve, Plan};
 use crate::stack::compose::{build, Action};
 
@@ -439,20 +440,17 @@ async fn worked(
 
 /// Run a pull, handing each line the engine writes to the narrator as it arrives and
 /// keeping none of them.
-async fn pulled(
-    ctx: &Ctx,
-    command: &[String],
-) -> Result<crate::ports::process::Output, crate::ports::process::Failure> {
+async fn pulled(ctx: &Ctx, command: &[String]) -> Result<Output, Failure> {
     let mut progress = ctx.seams.runner.stream(command).await?;
-    let mut output = crate::ports::process::Output {
+    let mut output = Output {
         status: None,
         stdout: String::new(),
         stderr: String::new(),
     };
     while let Some(event) = progress.recv().await {
         match event {
-            crate::ports::process::Progress::Line(line) => ctx.narrator.pulled(&line).await,
-            crate::ports::process::Progress::Ended(status) => output.status = status,
+            Progress::Line(line) => ctx.narrator.pulled(&line).await,
+            Progress::Ended(status) => output.status = status,
         }
     }
     Ok(output)
