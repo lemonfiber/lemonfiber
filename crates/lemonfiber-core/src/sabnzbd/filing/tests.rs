@@ -20,9 +20,8 @@ const CATEGORIES: &str = r#"{"config":{"categories":[
     {"name":"movies","dir":"films"},
     {"name":"music","dir":""}]}}"#;
 
-/// The client's completed folder.
-const COMPLETED: &str =
-    r#"{"config":{"misc":{"complete_dir":"/data/downloads/usenet/complete/"}}}"#;
+/// The client's completed folder, as it resolves it.
+const COMPLETED: &str = r#"{"status":{"completedir":"/data/downloads/usenet/complete/"}}"#;
 
 fn filed(category: &str, folder: &str) -> Filed {
     Filed {
@@ -42,6 +41,21 @@ async fn each_category_is_read_as_the_folder_its_downloads_complete_into() {
             filed("movies", "/data/downloads/usenet/complete/films"),
             filed("music", "/data/downloads/usenet/complete/music"),
         ])
+    );
+}
+
+#[tokio::test]
+async fn the_completed_folder_is_the_one_the_client_resolves_rather_than_its_setting() {
+    let (sab, http) = client(vec![(200, CATEGORIES), (200, COMPLETED)]);
+
+    let _ = sab.filed().await;
+
+    let asked: Vec<String> = http.requests().into_iter().map(|one| one.url).collect();
+    assert!(
+        asked
+            .get(1)
+            .is_some_and(|url| url.contains("mode=fullstatus&skip_dashboard=1")),
+        "{asked:?}"
     );
 }
 
