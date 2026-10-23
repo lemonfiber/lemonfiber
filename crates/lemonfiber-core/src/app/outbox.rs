@@ -33,8 +33,7 @@ pub(crate) fn save(ctx: &Ctx, outbox: &Outbox) {
     let _ = super::record::keep(path(ctx).as_deref(), outbox);
 }
 
-/// The file it is kept in, beside the environment file.
-pub(crate) const FILE: &str = "outbox.json";
+pub(crate) use crate::config::paths::OUTBOX as FILE;
 
 /// Where it is kept: beside the environment file, or nowhere on a machine with
 /// nothing configured — which has nobody to owe anything to either.

@@ -11,7 +11,7 @@
 
 use std::collections::BTreeMap;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::Expect;
 
@@ -72,7 +72,9 @@ pub struct Recipe {
 }
 
 /// When a recipe runs.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 #[schemars(rename = "PluginRecipeOn")]
 pub enum On {
@@ -135,6 +137,15 @@ pub struct Input {
     /// showing it.
     #[serde(default)]
     pub secret: bool,
+}
+
+impl Input {
+    /// What the operator is asked for it: the sentence `ask` writes, or its name where
+    /// it writes none.
+    #[must_use]
+    pub fn question(&self) -> &str {
+        self.ask.as_deref().unwrap_or(&self.name)
+    }
 }
 
 /// One call in a flow.

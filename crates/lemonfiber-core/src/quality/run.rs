@@ -127,7 +127,7 @@ pub(crate) fn quality(ctx: &Ctx, action: QualityAction) -> Result<QualityReport,
 /// Where the record of what lemonfiber last wrote to the stack is kept — beside the
 /// environment file, the same derivation the lifecycle path uses.
 fn materialised_record(ctx: &Ctx) -> Option<PathBuf> {
-    crate::app::targets::beside_env(ctx, "materialised.json")
+    crate::app::targets::beside_env(ctx, crate::config::paths::MATERIALISED)
 }
 
 /// The choice on record, or the default where none has been made.
@@ -204,7 +204,7 @@ pub(crate) fn save_selection(ctx: &Ctx, selection: &Selection) -> Result<(), Box
 /// the one path the context carries, and equal to
 /// [`crate::config::paths::Paths::quality`].
 fn quality_path(ctx: &Ctx) -> Option<PathBuf> {
-    crate::app::targets::beside_env(ctx, "quality.json")
+    crate::app::targets::beside_env(ctx, crate::config::paths::QUALITY)
 }
 
 /// What the media server this stack runs can do with content a client must

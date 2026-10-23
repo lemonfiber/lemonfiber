@@ -8,8 +8,9 @@ pub(crate) use lemonfiber_api::actions::{
     TAKES_ARCHIVE, TAKES_BUNDLING, TAKES_CAPABILITY, TAKES_CHECK, TAKES_CONSENT, TAKES_DEVICE,
     TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_KEY, TAKES_NAME,
     TAKES_NARROWING, TAKES_PLUGIN, TAKES_POLICY, TAKES_PRESET, TAKES_PROGRESS, TAKES_REASON,
-    TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING, TAKES_SHARING,
-    TAKES_SOURCE, TAKES_TERM, TAKES_TIER, TAKES_TITLE, TAKES_VALUE, TAKES_WAITING, TAKES_WISH,
+    TAKES_RECIPE, TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES, TAKES_SETTING,
+    TAKES_SHARING, TAKES_SOURCE, TAKES_TERM, TAKES_TIER, TAKES_TITLE, TAKES_VALUE, TAKES_WAITING,
+    TAKES_WISH,
 };
 pub(crate) use lemonfiber_core::app::Command;
 pub(crate) use std::collections::BTreeSet;
@@ -115,6 +116,7 @@ pub(crate) fn exactly_what(action: &str) -> Arguments {
         reason: takes(TAKES_REASON).then(|| REASON.to_owned()),
         capability: takes(TAKES_CAPABILITY).then(|| CAPABILITY.to_owned()),
         plugin: takes(TAKES_PLUGIN).then(|| PLUGIN.to_owned()),
+        recipe: takes(TAKES_RECIPE).then(|| RECIPE.to_owned()),
         source: takes(TAKES_SOURCE).then(|| SOURCE.to_owned()),
         approved: if takes(TAKES_APPROVED) {
             vec![APPROVAL.to_owned()]
@@ -169,6 +171,9 @@ pub(crate) const CAPABILITY: &str = "indexer.search";
 
 /// A plugin an update or a removal acts on.
 pub(crate) const PLUGIN: &str = "komga";
+
+/// A demand recipe the plugin is asked to run.
+pub(crate) const RECIPE: &str = "rescan";
 
 /// Where a plugin comes from: a directory on the machine.
 pub(crate) const SOURCE: &str = "./plugins/komga";

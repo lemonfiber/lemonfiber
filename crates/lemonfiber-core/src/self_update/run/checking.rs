@@ -18,8 +18,7 @@ use crate::config::REACH_UPDATES_KEY;
 use crate::outbound::RELEASE_LIST;
 use crate::self_update::{asking, changed, newest, schema, Noticed, Silence};
 
-/// What the record of past checks is kept in, beside the settings it belongs with.
-const RECORD: &str = "updates.json";
+use crate::config::paths::UPDATES as RECORD;
 
 /// What the check came to.
 pub(super) struct Read {

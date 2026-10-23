@@ -38,8 +38,7 @@ pub const FIELD: &str = "peer_port";
 /// The check a port that was not passed is raised under.
 pub const CHECK: &str = "vpn.port-passed";
 
-/// The record of the guard's last answer every client took.
-const RECORD: &str = "forwarded.json";
+use crate::config::paths::FORWARDED as RECORD;
 
 /// Ask the guard for its forwarded port and pass it to every torrent client inside it
 /// where `asking` says to, journalling each port set as it is set.

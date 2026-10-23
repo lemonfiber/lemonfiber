@@ -17,11 +17,7 @@ use crate::error::Problem;
 
 use super::Ctx;
 
-/// What the record is called, beside the environment file.
-///
-/// Named once and used from both sides: a reader and a writer disagreeing about the file
-/// name would look exactly like a household nobody had ever refused anything.
-const NAME: &str = "refusals.json";
+use crate::config::paths::REFUSALS as NAME;
 
 /// Every reason this machine holds, or none where nothing has been turned down here.
 #[must_use]

@@ -144,6 +144,33 @@ pub enum PluginCommand {
         #[arg(long, value_name = "NAME")]
         offer: Option<String>,
     },
+    /// Run one of an installed plugin's recipes that runs only when asked for by name.
+    ///
+    /// Named on its own it says what the recipe would call, what it asks you for and
+    /// every value it would send where, touches nothing, and prints a name for that
+    /// offer; answering with that name, and approving each value with `--approve`, is the
+    /// yes. What you approve is for this run alone: an approval given at install or to an
+    /// earlier run is not one here. A recipe that does not hold changes nothing about what
+    /// is installed and names every call that had already landed somewhere.
+    /// `--dry-run` answers an offer the same way and calls nothing.
+    Run {
+        /// The plugin's id, as `lemonfiber plugin installed` lists it.
+        plugin: String,
+        /// The recipe's id, as the plugin's reading lists it.
+        recipe: String,
+        /// The offer being answered, as the run that made it printed it.
+        #[arg(long, value_name = "NAME")]
+        offer: Option<String>,
+        /// A value the recipe would send elsewhere, approved as itself, as the reading
+        /// lists it. Once for each.
+        #[arg(long = "approve", value_name = "VALUE@DESTINATION")]
+        approved: Vec<String>,
+        /// A value the recipe asks for, written as its name, `=`, and the value. Once for
+        /// each. At a terminal, one it asks for and was not given here is asked for, a
+        /// secret without it showing as it is typed.
+        #[arg(long = "input", value_name = "NAME=VALUE")]
+        inputs: Vec<String>,
+    },
     /// Replace an installed plugin with another version of it, as one operation.
     ///
     /// The source of the new version is any an install takes, and has to hold the

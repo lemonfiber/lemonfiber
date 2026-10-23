@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One value a recipe asks the operator for when it runs.\n\nNever the value: a reading says what will be asked, and what is given for it is\nhanded to the recipe and said back by nothing.",
+  "type": "object",
+  "properties": {
+    "ask": {
+      "description": "What the operator is asked for it.",
+      "type": "string"
+    },
+    "name": {
+      "description": "What the input is called, which is what a value is given for it under.",
+      "type": "string"
+    },
+    "secret": {
+      "description": "Whether the value may be a secret, so a surface takes it without showing it.",
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "name",
+    "ask",
+    "secret"
+  ]
+}

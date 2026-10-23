@@ -30,11 +30,7 @@ use crate::error::{Problem, Remedy};
 use crate::model::{HandedClient, HandedSession, Handoff, HandoffRemedy, HandoffState};
 use crate::ports::service::Member;
 
-/// What the record is called, beside the environment file.
-///
-/// Named once and used from both sides: a reader and a writer disagreeing about the file
-/// name would read as nobody ever having been handed a code.
-const NAME: &str = "handoffs.json";
+use crate::config::paths::HANDOFFS as NAME;
 
 /// Each account's first code, by the identifier the media server gave the account.
 type Issued = BTreeMap<String, Kept>;

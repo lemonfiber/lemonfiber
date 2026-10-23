@@ -265,6 +265,12 @@ pub struct Installs {
     /// Filled on the reading of what is installed, as `substituted` is.
     #[serde(default)]
     pub nonconforming: Vec<Nonconforming>,
+    /// What asking for one of a plugin's demand recipes came to, or nothing where none
+    /// was asked for.
+    ///
+    /// Boxed for the reason the install is: it carries a whole recipe, and every other
+    /// run's report would otherwise be as large as the one run that asks for one.
+    pub demand: Option<Box<Demand>>,
     /// What proving a plugin again came to, or nothing where nothing was proved.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proof: Option<Reproof>,
@@ -283,6 +289,19 @@ pub struct Installs {
     /// over the project this run would start, and held to nothing lemonfiber vets.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unvetted: Option<crate::model::Unvetted>,
+}
+
+/// What asking for one of an installed plugin's demand recipes came to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "PluginDemand")]
+pub struct Demand {
+    /// The plugin whose recipe it is.
+    pub plugin: String,
+    /// The recipe as the operator agrees to it: its calls, what it asks for, and every
+    /// value it would carry where.
+    pub recipe: super::Recipe,
+    /// What running it came to, or nothing where it was only read.
+    pub ran: Option<super::running::Ran>,
 }
 
 /// What asking an installed plugin's adapters again came to.

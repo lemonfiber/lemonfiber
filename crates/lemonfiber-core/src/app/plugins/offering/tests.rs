@@ -116,6 +116,8 @@ fn an_approval_of_a_pair_inside_the_stack_is_refused_as_one_nothing_asks_for() {
         id: "adopt".to_owned(),
         title: "Adopt".to_owned(),
         why: "Held".to_owned(),
+        on: lemonfiber_plugin::On::Install,
+        inputs: Vec::new(),
         steps: Vec::new(),
         pairs: vec![pair("komga", false), pair("meta.example.org", true)],
     }];

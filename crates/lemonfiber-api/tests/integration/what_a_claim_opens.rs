@@ -122,7 +122,7 @@ async fn a_claim_on_an_open_invitation_sets_the_password_and_opens_a_session() {
 #[tokio::test]
 async fn a_token_the_invitation_does_not_carry_is_refused_and_sets_nothing() {
     let transport = holding(&unclaimed(), media::answered(&true));
-    let ctx = offered("claim-guessed", transport.clone());
+    let ctx = offered("claim-opening-guessed", transport.clone());
     let (router, _) = door_over(&ctx);
 
     let answer = claimed(router, &hers(), "a-guess").await;
@@ -131,7 +131,7 @@ async fn a_token_the_invitation_does_not_carry_is_refused_and_sets_nothing() {
     assert_eq!(the_code(&answer.body), "ADMIT-13");
     assert!(session(&answer.body).is_empty());
     assert!(!set_a_password(&transport));
-    let _ = fs::remove_dir_all(a_directory("claim-guessed"));
+    let _ = fs::remove_dir_all(a_directory("claim-opening-guessed"));
 }
 
 /// A password shorter than the least the core takes is refused before anything is

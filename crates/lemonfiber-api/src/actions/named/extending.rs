@@ -1,7 +1,7 @@
 //! The acts on what extends the stack: installing, updating, removing and proving a plugin,
-//! and choosing which service fills a capability.
+//! running one of its demand recipes, and choosing which service fills a capability.
 //!
-//! Apart from the table that names them for the reason the quality choice is: five rows
+//! Apart from the table that names them for the reason the quality choice is: six rows
 //! reading fields no other row reads, where a missing subject is the only thing any of
 //! them can refuse. Whether a source holds a plugin, whether the plugin named is
 //! installed, whether a service can fill a capability and whether the offer still
@@ -19,11 +19,12 @@ use lemonfiber_core::plugin::Source;
 use super::{filled, Arguments, Refused};
 
 /// Every act on what extends the stack.
-const ABOUT: [&str; 5] = [
+const ABOUT: [&str; 6] = [
     "plugin-install",
     "plugin-update",
     "plugin-remove",
     "plugin-prove",
+    "plugin-run",
     "wiring-fill",
 ];
 
@@ -41,6 +42,7 @@ pub(super) fn about_extending(action: &str) -> bool {
 pub(super) fn asked_for(action: &str, given: Arguments) -> Result<Command, Refused> {
     let Arguments {
         plugin,
+        recipe,
         source,
         capability,
         service,
@@ -84,6 +86,11 @@ pub(super) fn asked_for(action: &str, given: Arguments) -> Result<Command, Refus
         },
         "plugin-prove" => Asked::Prove {
             plugin: plugin.ok_or_else(|| needs("plugin"))?,
+            consent,
+        },
+        "plugin-run" => Asked::Run {
+            plugin: plugin.ok_or_else(|| needs("plugin"))?,
+            recipe: filled(recipe).ok_or_else(|| needs("recipe"))?,
             consent,
         },
         _ => Asked::Remove {

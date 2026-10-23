@@ -95,8 +95,7 @@ struct Acted {
     at: Option<u64>,
 }
 
-/// The record's file name, named once so the layout and the readers agree.
-const RECORD: &str = "boot.json";
+use crate::config::paths::BOOT as RECORD;
 
 /// Bring back what this machine was running, if anything should come back at all.
 ///

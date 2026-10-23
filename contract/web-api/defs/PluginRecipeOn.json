@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "When a recipe runs.",
+  "oneOf": [
+    {
+      "description": "During an install and an update, after the plugin's proofs and the stack's checks\nhold and before the install is recorded. What a recipe that says nothing does,\nbecause a first-run flow is what a recipe is for.",
+      "type": "string",
+      "const": "install"
+    },
+    {
+      "description": "Only when the operator asks for it by name, with approvals of its own.",
+      "type": "string",
+      "const": "demand"
+    }
+  ]
+}

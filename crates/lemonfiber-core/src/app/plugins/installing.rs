@@ -177,6 +177,7 @@ pub(super) async fn install(
     let standing = if recorded { after } else { held };
 
     Ok(Installs {
+        demand: None,
         nonconforming: Vec::new(),
         proof: None,
         rehearsed: false,

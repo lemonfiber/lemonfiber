@@ -5,7 +5,7 @@
 //! nothing; answered with the offer that reading named, it asks.
 
 use crate::error::codes::plugin::NOTHING_TO_PROVE;
-use crate::error::{Problem, Remedy, State};
+use crate::error::Problem;
 use crate::plugin::program::Starting;
 use crate::plugin::{Installed, Installs, Register, Reproof, Verdict};
 
@@ -25,14 +25,7 @@ pub(crate) async fn prove(
     plugin: &str,
     consent: &Consent,
 ) -> Result<Installs, Box<Problem>> {
-    let Some(proved) = held
-        .installed()
-        .iter()
-        .find(|one| one.plugin == plugin)
-        .cloned()
-    else {
-        return Err(Box::new(not_installed(plugin, held.installed())));
-    };
+    let proved = super::absent::named(&held, plugin, NOTHING_TO_PROVE, "Nothing was asked.")?;
     let kept: Vec<_> = conformance::held(ctx)?
         .into_iter()
         .filter(|one| one.plugin == plugin)
@@ -114,6 +107,7 @@ fn unproven(why: &str) -> Verdict {
 /// What proving came to, beside everything installed.
 fn answering(held: &Register, proof: Reproof, offer: String) -> Installs {
     Installs {
+        demand: None,
         nonconforming: Vec::new(),
         proof: Some(proof),
         agreement: Some(offer),
@@ -126,24 +120,4 @@ fn answering(held: &Register, proof: Reproof, offer: String) -> Installs {
         sources: Vec::new(),
         unvetted: None,
     }
-}
-
-/// Nothing by that name is installed.
-fn not_installed(plugin: &str, held: &[Installed]) -> Problem {
-    let names: Vec<&str> = held.iter().map(|one| one.plugin.as_str()).collect();
-    let meaning = if names.is_empty() {
-        "Nothing was asked. This machine has no plugins installed.".to_owned()
-    } else {
-        format!(
-            "Nothing was asked. What is installed: {}.",
-            names.join(", ")
-        )
-    };
-    Problem::new(
-        NOTHING_TO_PROVE,
-        format!("{plugin} is not installed"),
-        meaning,
-        Remedy::new("Run lemonfiber plugin installed to see what is on this machine"),
-    )
-    .in_state(State::Guided)
 }

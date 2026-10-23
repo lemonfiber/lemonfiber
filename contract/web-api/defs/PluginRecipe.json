@@ -7,6 +7,19 @@
       "description": "The recipe's id within the plugin.",
       "type": "string"
     },
+    "inputs": {
+      "description": "Every value it asks the operator for when it runs, in the order it declares them.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "PluginRecipeInput.json"
+      }
+    },
+    "on": {
+      "description": "When it runs: as part of an install and an update, or only when asked for by name.",
+      "$ref": "PluginRecipeOn.json",
+      "default": "install"
+    },
     "pairs": {
       "description": "Every value it could carry, and where to.",
       "type": "array",

@@ -6,6 +6,18 @@
       ],
       "required": true
     },
+    "inputs": {
+      "type": [
+        "array[ref:PluginRecipeInput]"
+      ],
+      "required": false
+    },
+    "on": {
+      "type": [
+        "ref:PluginRecipeOn"
+      ],
+      "required": false
+    },
     "pairs": {
       "type": [
         "array[ref:PluginPair]"

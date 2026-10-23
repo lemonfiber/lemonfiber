@@ -85,7 +85,7 @@ fn reset_moved(moved: &[&str], standing: &str) -> Problem {
 /// What a reset reverts, carried out where `confirm` and only read otherwise.
 async fn reading(ctx: &Ctx, confirm: bool) -> Result<(Vec<StackEdit>, Vec<String>), Box<Problem>> {
     let selection = super::quality::load_selection(ctx)?;
-    let record = super::targets::beside_env(ctx, "materialised.json");
+    let record = super::targets::beside_env(ctx, crate::config::paths::MATERIALISED);
     let into = ctx.settings.stack_dir.as_deref();
 
     let mut reverted = if confirm {

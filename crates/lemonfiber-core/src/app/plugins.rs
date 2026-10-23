@@ -38,6 +38,8 @@ use super::Ctx;
 // answer, and taking it back where it did not. Its own file because the one thing
 // here that reaches a service and a container engine should be the one thing a
 // reader has to hold a seam in mind for.
+mod absent;
+mod demanding;
 mod proving;
 // Asking the stack's own checks what they make of the machine, before the writes and
 // again after them. Apart from the proving because the two answer different
@@ -159,6 +161,17 @@ pub enum Asked {
         /// anywhere, so it approves no pair.
         consent: Consent,
     },
+    /// Run one of an installed plugin's demand recipes, which runs only when asked for
+    /// by name.
+    Run {
+        /// The plugin's id, as `lemonfiber plugin installed` lists it.
+        plugin: String,
+        /// The recipe's id, as the plugin's reading lists it.
+        recipe: String,
+        /// The offer this answers, the pairs approved beside it and the values given for
+        /// its inputs, or nothing for the reading. All of it is this run's alone.
+        consent: Consent,
+    },
 }
 
 /// What a source is read for, once it is a directory this run can read.
@@ -214,7 +227,10 @@ use crate::error::codes::plugin::{NOWHERE, UNPROVED, UNWRITABLE};
 /// cannot be written. Every one of those after the first write puts the install back
 /// before it answers.
 pub(crate) async fn plugins(ctx: &Ctx, action: &Asked) -> Result<Installs, Box<Problem>> {
-    let starts = !matches!(action, Asked::Installed | Asked::Prove { .. });
+    let starts = !matches!(
+        action,
+        Asked::Installed | Asked::Prove { .. } | Asked::Run { .. }
+    );
     Box::pin(asked(ctx, action)).await.map(|installs| Installs {
         unvetted: crate::overlay::unvetted(ctx).filter(|_| starts),
         ..installs
@@ -238,6 +254,11 @@ async fn asked(ctx: &Ctx, action: &Asked) -> Result<Installs, Box<Problem>> {
         Asked::Prove { plugin, consent } => {
             Box::pin(reproving::prove(ctx, held, plugin, consent)).await
         }
+        Asked::Run {
+            plugin,
+            recipe,
+            consent,
+        } => Box::pin(demanding::demand(ctx, held, plugin, recipe, consent)).await,
         Asked::Update {
             plugin,
             source,

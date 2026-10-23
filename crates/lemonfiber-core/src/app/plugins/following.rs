@@ -18,7 +18,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use lemonfiber_plugin::{Input, Manifest, On, Origin};
+use lemonfiber_plugin::{Input, Manifest, On, Origin, Recipe};
 
 use crate::error::codes::plugin::{
     CALL_REFUSED, INPUT_UNMATCHED, STEP_FAILED, UNRECORDABLE, VALUE_WITHHELD,
@@ -34,35 +34,63 @@ use crate::ports::asking::Asking;
 use super::super::Ctx;
 use super::{Consent, Inputs};
 
-/// Every operator input an install recipe of this manifest asks for, once each, in the
-/// order they are declared.
-fn asked(manifest: &Manifest) -> Vec<&Input> {
-    let mut seen = BTreeSet::new();
+/// Every install recipe of this manifest, in the order it declares them.
+fn installing(manifest: &Manifest) -> Vec<&Recipe> {
     manifest
         .recipes
         .iter()
         .filter(|recipe| recipe.on == On::Install)
+        .collect()
+}
+
+/// Every operator input these recipes ask for, once each, in the order they are declared.
+fn asked<'a>(recipes: &[&'a Recipe]) -> Vec<&'a Input> {
+    let mut seen = BTreeSet::new();
+    recipes
+        .iter()
         .flat_map(|recipe| &recipe.inputs)
         .filter(|input| input.origin == Origin::Operator)
         .filter(|input| seen.insert(input.name.as_str()))
         .collect()
 }
 
-/// Every value the install recipes ask the operator for: what was given, and at a
-/// keyboard what was not, asked for in the words the manifest writes, a secret without
-/// it showing as it is typed.
+/// Every value the install recipes ask the operator for, [`gathering`] them.
 ///
 /// # Errors
 ///
-/// Where a value was given that no install recipe asks for, or one asked for was not
-/// given and nobody is there to ask or nothing was typed; naming each, never a value.
+/// As [`gathering`].
 pub(super) fn gathered(
     plugin: &str,
     manifest: &Manifest,
     given: &Inputs,
     asking: &dyn Asking,
 ) -> Result<Inputs, Box<Problem>> {
-    let asked = asked(manifest);
+    gathering(
+        plugin,
+        &installing(manifest),
+        given,
+        asking,
+        "Nothing was installed and nothing was written",
+    )
+}
+
+/// Every value `recipes` ask the operator for: what was given, and at a keyboard what
+/// was not, asked for in the words the manifest writes, a secret without it showing as
+/// it is typed.
+///
+/// # Errors
+///
+/// Where a value was given that none of them asks for, or one asked for was not given
+/// and nobody is there to ask or nothing was typed; naming each, never a value, after
+/// `nothing` says what was not done.
+pub(super) fn gathering(
+    plugin: &str,
+    recipes: &[&Recipe],
+    given: &Inputs,
+    asking: &dyn Asking,
+    nothing: &str,
+) -> Result<Inputs, Box<Problem>> {
+    let asked = asked(recipes);
     let unasked: Vec<&str> = given
         .values()
         .keys()
@@ -77,7 +105,7 @@ pub(super) fn gathered(
             .filter(|input| !given.values().contains_key(&input.name))
             .collect();
         for input in unanswered {
-            let question = input.ask.as_deref().unwrap_or(&input.name);
+            let question = input.question();
             let typed = if input.secret {
                 asking.secret(question)
             } else {
@@ -96,7 +124,7 @@ pub(super) fn gathered(
     if missing.is_empty() && unasked.is_empty() {
         return Ok(Inputs::of(values));
     }
-    Err(Box::new(unmatched(plugin, &missing, &unasked)))
+    Err(Box::new(unmatched(plugin, &missing, &unasked, nothing)))
 }
 
 /// The consent an act runs its recipes under: as given, with every value the install
@@ -118,7 +146,7 @@ pub(super) fn consented(
 }
 
 /// Said where the inputs given are not the ones the recipes ask for.
-fn unmatched(plugin: &str, missing: &[&str], unasked: &[&str]) -> Problem {
+fn unmatched(plugin: &str, missing: &[&str], unasked: &[&str], nothing: &str) -> Problem {
     let mut said = Vec::new();
     if !missing.is_empty() {
         said.push(format!(
@@ -135,10 +163,7 @@ fn unmatched(plugin: &str, missing: &[&str], unasked: &[&str]) -> Problem {
     Problem::new(
         INPUT_UNMATCHED,
         format!("{plugin}'s recipes were not given what they ask for"),
-        format!(
-            "Nothing was installed and nothing was written: {}.",
-            said.join("; ")
-        ),
+        format!("{nothing}: {}.", said.join("; ")),
         Remedy::new("Give each input its recipe asks for, by name, and nothing else"),
     )
     .in_state(State::Guided)
@@ -185,8 +210,7 @@ impl Unfollowed {
 ///
 /// # Errors
 ///
-/// Where a recipe does not hold, with what every step of every recipe run came to, and
-/// where what they captured could not be kept.
+/// As [`following`].
 pub(super) async fn followed(
     ctx: &Ctx,
     manifest: &Manifest,
@@ -195,6 +219,50 @@ pub(super) async fn followed(
     consent: &Consent,
     stamp: &str,
 ) -> Result<Vec<Ran>, Unfollowed> {
+    following(
+        ctx,
+        Following {
+            manifest,
+            would,
+            services,
+            stamp,
+        },
+        &installing(manifest),
+        consent,
+    )
+    .await
+}
+
+/// What a run of a plugin's recipes is made against.
+pub(super) struct Following<'a> {
+    /// The plugin's manifest, whose secrets say what a capture is kept as.
+    pub(super) manifest: &'a Manifest,
+    /// The plugin as it is, or would be, recorded.
+    pub(super) would: &'a Installed,
+    /// Every service the stack declares.
+    pub(super) services: &'a [lemonfiber_manifest::Service],
+    /// The stamp what is kept is journalled under.
+    pub(super) stamp: &'a str,
+}
+
+/// Run `recipes` in order under `consent`, and keep what they capture.
+///
+/// # Errors
+///
+/// Where a recipe does not hold, with what every step of every recipe run came to, and
+/// where what they captured could not be kept.
+pub(super) async fn following(
+    ctx: &Ctx,
+    against: Following<'_>,
+    recipes: &[&Recipe],
+    consent: &Consent,
+) -> Result<Vec<Ran>, Unfollowed> {
+    let Following {
+        manifest,
+        would,
+        services,
+        stamp,
+    } = against;
     let reaching = reaching(services, would);
     let credentials = credentials(ctx, services);
     let running = Running {
@@ -206,11 +274,7 @@ pub(super) async fn followed(
     };
     let mut ran = Vec::new();
     let mut captured = BTreeMap::new();
-    for recipe in manifest
-        .recipes
-        .iter()
-        .filter(|recipe| recipe.on == On::Install)
-    {
+    for recipe in recipes {
         let values = inputs_of(ctx, recipe, &consent.inputs);
         let outcome = run(&running, recipe, &values).await;
         let held = outcome.ran.held;

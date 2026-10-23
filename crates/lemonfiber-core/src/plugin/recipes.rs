@@ -15,7 +15,7 @@
 //! field of its own rather than leaving a client to know it.
 
 use lemonfiber_manifest::ApiKind;
-use lemonfiber_plugin::Manifest;
+use lemonfiber_plugin::{Manifest, On, Origin};
 use serde::{Deserialize, Serialize};
 
 /// Whose an adapter is.
@@ -96,6 +96,22 @@ pub struct Pair {
     pub from: Option<String>,
 }
 
+/// One value a recipe asks the operator for when it runs.
+///
+/// Never the value: a reading says what will be asked, and what is given for it is
+/// handed to the recipe and said back by nothing.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(rename = "PluginRecipeInput")]
+pub struct RecipeInput {
+    /// What the input is called, which is what a value is given for it under.
+    pub name: String,
+    /// What the operator is asked for it.
+    pub ask: String,
+    /// Whether the value may be a secret, so a surface takes it without showing it.
+    pub secret: bool,
+}
+
 /// One recipe, as an operator agrees to what it does.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -107,6 +123,12 @@ pub struct Recipe {
     pub title: String,
     /// Why it is worth running.
     pub why: String,
+    /// When it runs: as part of an install and an update, or only when asked for by name.
+    #[serde(default)]
+    pub on: On,
+    /// Every value it asks the operator for when it runs, in the order it declares them.
+    #[serde(default)]
+    pub inputs: Vec<RecipeInput>,
     /// Every call, in the order the recipe makes them.
     pub steps: Vec<Step>,
     /// Every value it could carry, and where to.
@@ -176,6 +198,17 @@ pub fn declared(manifest: &Manifest) -> Vec<Recipe> {
             id: recipe.id.clone(),
             title: recipe.title.clone(),
             why: recipe.why.clone(),
+            on: recipe.on,
+            inputs: recipe
+                .inputs
+                .iter()
+                .filter(|input| input.origin == Origin::Operator)
+                .map(|input| RecipeInput {
+                    name: input.name.clone(),
+                    ask: input.question().to_owned(),
+                    secret: input.secret,
+                })
+                .collect(),
             steps: recipe
                 .steps
                 .iter()

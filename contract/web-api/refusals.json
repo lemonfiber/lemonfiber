@@ -494,6 +494,16 @@
     "status": 403,
     "description": "Raised when a plugin that is not first-party declares a service replacing one the stack ships."
   },
+  "PLUGIN-44": {
+    "name": "NOTHING_TO_RUN",
+    "status": 404,
+    "description": "Raised when a run names a plugin that is not installed, or a demand recipe the plugin does not declare."
+  },
+  "PLUGIN-45": {
+    "name": "MANIFEST_UNKEPT",
+    "status": 409,
+    "description": "Raised when the manifest kept for an installed plugin is missing or is not the one that was installed, so its demand recipes cannot be read."
+  },
   "PLUGIN-5": {
     "name": "ALREADY",
     "status": 400,

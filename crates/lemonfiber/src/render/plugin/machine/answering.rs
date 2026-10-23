@@ -28,6 +28,21 @@ pub(super) fn recipes(declared: &[Recipe]) -> Lines {
             plain(&recipe.title)
         ));
         lines.put(format!("      {}", plain(&recipe.why)));
+        if recipe.on == lemonfiber_core::plugin::On::Demand {
+            lines.put("      runs only when asked for by name");
+        }
+        for input in &recipe.inputs {
+            lines.put(format!(
+                "      asks {}: {}{}",
+                plain(&input.name),
+                plain(&input.ask),
+                if input.secret {
+                    " (a secret, taken without showing it)"
+                } else {
+                    ""
+                }
+            ));
+        }
         for (at, step) in recipe.steps.iter().enumerate() {
             lines.put(format!(
                 "      {}. {} {} {}{}",

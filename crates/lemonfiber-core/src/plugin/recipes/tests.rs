@@ -246,6 +246,47 @@ fn a_value_an_input_brings_in_carries_the_inputs_origin() {
     }
 }
 
+/// A reading lists every input a recipe asks the operator for, with its question and
+/// whether it is a secret, and none the credential store answers.
+#[test]
+fn a_recipe_lists_what_it_asks_the_operator_for_and_nothing_the_store_answers() {
+    let text = RECIPED
+        .replace(
+            "[[recipe.step]]\nid      = \"in\"",
+            "on = \"demand\"\n\n\
+             [[recipe.input]]\nname   = \"code\"\norigin = \"operator\"\nask    = \"The claim code\"\nsecret = true\n\n\
+             [[recipe.input]]\nname   = \"user\"\norigin = \"operator\"\n\n\
+             [[recipe.input]]\nname   = \"key\"\norigin = \"credential-store\"\nof     = \"sonarr\"\n\n\
+             [[recipe.step]]\nid      = \"in\"",
+        );
+    let read = Manifest::from_toml(&text);
+    assert!(read.is_ok(), "{read:?}");
+    let recipe = read
+        .ok()
+        .map(|manifest| declared(&manifest))
+        .and_then(|recipes| recipes.into_iter().next());
+
+    assert_eq!(
+        recipe.as_ref().map(|one| one.on),
+        Some(lemonfiber_plugin::On::Demand)
+    );
+    assert_eq!(
+        recipe.map(|one| one.inputs),
+        Some(vec![
+            super::RecipeInput {
+                name: "code".to_owned(),
+                ask: "The claim code".to_owned(),
+                secret: true,
+            },
+            super::RecipeInput {
+                name: "user".to_owned(),
+                ask: "user".to_owned(),
+                secret: false,
+            },
+        ])
+    );
+}
+
 #[test]
 fn every_adapter_the_plugins_services_name_is_said_to_be_lemonfibers() {
     assert_eq!(

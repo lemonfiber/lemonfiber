@@ -113,7 +113,7 @@ pub(crate) fn dated(ctx: &Ctx, found: Vec<Finding>) -> Vec<Finding> {
 /// Where the store is kept: beside the environment file, or nowhere on a machine
 /// with nothing configured — which has no faults to remember either.
 fn path(ctx: &Ctx) -> Option<std::path::PathBuf> {
-    super::targets::beside_env(ctx, "conditions.json")
+    super::targets::beside_env(ctx, crate::config::paths::CONDITIONS)
 }
 
 #[cfg(test)]

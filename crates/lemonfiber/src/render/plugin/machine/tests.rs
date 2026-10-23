@@ -131,6 +131,7 @@ fn moving(recorded: bool, restored: Option<Restored>, stopped: Option<&str>) -> 
     let mut next = self::recorded("komga", None);
     next.version = "1.3.0".to_owned();
     Installs {
+        demand: None,
         nonconforming: Vec::new(),
         proof: None,
         rehearsed: false,

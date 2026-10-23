@@ -393,6 +393,26 @@ fn the_words_about_this_machine_become_commands() {
         })),
         "a proof names the plugin and carries the offer it answers"
     );
+    let ran = door(lemonfiber::cli::PluginCommand::Run {
+        plugin: "komga".to_owned(),
+        recipe: "rescan".to_owned(),
+        offer: Some("1a2b3c4d".to_owned()),
+        approved: vec!["token@metadata.example.org".to_owned()],
+        inputs: vec!["code=1234".to_owned()],
+    });
+    let expected = plugins::Asked::Run {
+        plugin: "komga".to_owned(),
+        recipe: "rescan".to_owned(),
+        consent: plugins::Consent {
+            inputs: plugins::Inputs::of([("code".to_owned(), "1234".to_owned())].into()),
+            ..consent(Some("1a2b3c4d"), &["token@metadata.example.org"])
+        },
+    };
+    assert_eq!(
+        ran,
+        Some(Command::Plugins(expected)),
+        "a run names the plugin and the recipe and carries its whole yes"
+    );
     assert_eq!(
         door(lemonfiber::cli::PluginCommand::Update {
             plugin: "komga".to_owned(),

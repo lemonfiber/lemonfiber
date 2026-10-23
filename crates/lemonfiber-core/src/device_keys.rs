@@ -63,8 +63,7 @@ pub const REFUSALS: [Code; 13] = [
     ATTESTATION_REVOKED,
 ];
 
-/// The file the device keys are kept in, beside the configuration a backup carries.
-pub const FILE: &str = "device-keys.json";
+pub use crate::config::paths::DEVICE_KEYS as FILE;
 
 /// Where a device key lives, as its attestation says.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]

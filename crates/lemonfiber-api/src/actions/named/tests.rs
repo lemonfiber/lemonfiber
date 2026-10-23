@@ -52,6 +52,7 @@ fn everything(confirm: bool) -> Arguments {
         reason: Some("there is no room this month".to_owned()),
         capability: Some("indexer.search".to_owned()),
         plugin: Some("komga".to_owned()),
+        recipe: Some("rescan".to_owned()),
         source: Some("./plugins/komga".to_owned()),
         approved: vec!["token@metadata.example.org".to_owned()],
         tier: Some("services".to_owned()),

@@ -27,7 +27,7 @@ use crate::within::{directory_of, read_unlinked, write_unlinked};
 /// The same answer the lifecycle commands derive, so the record a region re-records
 /// is the one the next pass over the stack reads.
 pub(crate) fn record_beside(env_file: &Path) -> std::path::PathBuf {
-    env_file.with_file_name("materialised.json")
+    env_file.with_file_name(crate::config::paths::MATERIALISED)
 }
 
 /// Write `owner`'s region holding `body` into the file at `path`.

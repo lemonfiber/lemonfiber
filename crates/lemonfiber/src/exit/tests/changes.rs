@@ -357,6 +357,7 @@ fn installed(
     reversed: Option<lemonfiber_core::app::putting_back::Reversal>,
 ) -> Outcome {
     Outcome::Plugins(lemonfiber_core::plugin::Installs {
+        demand: None,
         nonconforming: Vec::new(),
         proof: None,
         rehearsed: false,
@@ -415,6 +416,7 @@ fn an_install_that_was_put_back_exits_as_a_refusal_rather_than_a_report() {
 fn only_a_proof_asked_again_that_did_not_hold_is_a_refusal() {
     let proved = |asked: bool, cleared: bool| {
         Outcome::Plugins(lemonfiber_core::plugin::Installs {
+            demand: None,
             nonconforming: Vec::new(),
             proof: Some(lemonfiber_core::plugin::Reproof {
                 plugin: "komga".to_owned(),
@@ -449,6 +451,7 @@ fn only_a_proof_asked_again_that_did_not_hold_is_a_refusal() {
 fn a_removal_that_left_something_standing_exits_as_a_refusal() {
     let taking = |removed: bool, left: Vec<lemonfiber_core::app::putting_back::Left>| {
         Outcome::Plugins(lemonfiber_core::plugin::Installs {
+            demand: None,
             nonconforming: Vec::new(),
             proof: None,
             rehearsed: false,
@@ -508,6 +511,7 @@ fn a_removal_that_left_something_standing_exits_as_a_refusal() {
 fn an_update_that_did_not_hold_exits_as_a_refusal() {
     let moving = |recorded: bool, restored: bool| {
         Outcome::Plugins(lemonfiber_core::plugin::Installs {
+            demand: None,
             nonconforming: Vec::new(),
             proof: None,
             rehearsed: false,
@@ -570,6 +574,7 @@ fn reading_what_is_installed_always_succeeds() {
     assert_eq!(
         shown(settled(&Outcome::Plugins(
             lemonfiber_core::plugin::Installs {
+                demand: None,
                 nonconforming: Vec::new(),
                 proof: None,
                 rehearsed: false,

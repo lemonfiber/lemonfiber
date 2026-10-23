@@ -19,11 +19,7 @@ use crate::error::Problem;
 
 use super::Ctx;
 
-/// What the arrangement is called, beside the environment file.
-///
-/// Named once and used from both sides: a reader and a writer disagreeing about the file
-/// name would look exactly like a household that had never arranged this.
-const NAME: &str = "expiring.json";
+use crate::config::paths::EXPIRING as NAME;
 
 /// What this household agreed to, or nothing where it has agreed to nothing.
 #[must_use]

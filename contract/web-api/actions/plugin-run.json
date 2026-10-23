@@ -1,0 +1,65 @@
+{
+  "action": "plugin-run",
+  "arguments": [
+    {
+      "name": "offer",
+      "type": {
+        "default": null,
+        "description": "What was read before answering — the offer a repair's yes was read in, the\nlisting a restore's was, what a replacement would stop — as it named itself.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "plugin",
+      "type": {
+        "default": null,
+        "description": "The plugin an update or a removal acts on, by the id the record of what is\ninstalled lists it under.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "recipe",
+      "type": {
+        "default": null,
+        "description": "The demand recipe a run asks for, by the id the plugin's reading lists it under.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "approved",
+      "type": {
+        "default": [],
+        "description": "Every value a recipe would carry elsewhere that is approved, as `value@destination`,\nand every privileged shape, as `shape@service`, exactly as the reading lists them.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    {
+      "name": "inputs",
+      "type": {
+        "default": [],
+        "description": "Every value the operator supplies for an input a recipe asks for, as `name=value`.\nWhat follows the `=` may be a secret, and is never repeated back.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    }
+  ],
+  "consent": [
+    "offer",
+    "approved"
+  ],
+  "rehearsal": true
+}

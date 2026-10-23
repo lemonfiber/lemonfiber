@@ -469,57 +469,63 @@ pub(crate) enum Under {
 /// Where a value for a recipe's input is written without its `=`, said without
 /// repeating what was written, since what follows a name may be a secret.
 pub(crate) fn plugin(read: PluginCommand) -> Result<Under, u8> {
-    Ok(match read {
+    let asked = match read {
         PluginCommand::Install {
             source,
             offer,
             approved,
             inputs,
-        } => Under::Dispatched(Command::Plugins(plugins::Asked::Install {
+        } => plugins::Asked::Install {
             source: lemonfiber_core::plugin::Source::named(&source),
-            consent: plugins::Consent {
-                agreement: offer,
-                approved,
-                inputs: given(&inputs)?,
-            },
-        })),
-        PluginCommand::Installed => Under::Dispatched(Command::Plugins(plugins::Asked::Installed)),
-        PluginCommand::Remove { plugin, offer } => {
-            Under::Dispatched(Command::Plugins(plugins::Asked::Remove {
-                plugin,
-                consent: plugins::Consent {
-                    agreement: offer,
-                    approved: Vec::new(),
-                    inputs: plugins::Inputs::default(),
-                },
-            }))
-        }
-        PluginCommand::Prove { plugin, offer } => {
-            Under::Dispatched(Command::Plugins(plugins::Asked::Prove {
-                plugin,
-                consent: plugins::Consent {
-                    agreement: offer,
-                    approved: Vec::new(),
-                    inputs: plugins::Inputs::default(),
-                },
-            }))
-        }
+            consent: consented(offer, approved, &inputs)?,
+        },
+        PluginCommand::Installed => plugins::Asked::Installed,
+        PluginCommand::Remove { plugin, offer } => plugins::Asked::Remove {
+            plugin,
+            consent: consented(offer, Vec::new(), &[])?,
+        },
+        PluginCommand::Prove { plugin, offer } => plugins::Asked::Prove {
+            plugin,
+            consent: consented(offer, Vec::new(), &[])?,
+        },
+        PluginCommand::Run {
+            plugin,
+            recipe,
+            offer,
+            approved,
+            inputs,
+        } => plugins::Asked::Run {
+            plugin,
+            recipe,
+            consent: consented(offer, approved, &inputs)?,
+        },
         PluginCommand::Update {
             plugin,
             source,
             offer,
             approved,
             inputs,
-        } => Under::Dispatched(Command::Plugins(plugins::Asked::Update {
+        } => plugins::Asked::Update {
             plugin,
             source: lemonfiber_core::plugin::Source::named(&source),
-            consent: plugins::Consent {
-                agreement: offer,
-                approved,
-                inputs: given(&inputs)?,
-            },
-        })),
-        PluginCommand::Authoring(read) => Under::Published(read),
+            consent: consented(offer, approved, &inputs)?,
+        },
+        PluginCommand::Authoring(read) => return Ok(Under::Published(read)),
+    };
+    Ok(Under::Dispatched(Command::Plugins(asked)))
+}
+
+/// The yes an act on a plugin was given: the offer it answers, what it approves, and
+/// the values given for its recipes' inputs, refused as [`given`] refuses.
+fn consented(
+    agreement: Option<String>,
+    approved: Vec<String>,
+    inputs: &[String],
+) -> Result<plugins::Consent, u8> {
+    Ok(plugins::Consent {
+        agreement,
+        approved,
+        inputs: given(inputs)?,
     })
 }
 

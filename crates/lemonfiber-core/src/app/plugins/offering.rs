@@ -53,6 +53,13 @@ pub(super) const REMOVING: [&str; 3] = [
 /// The parts proving a plugin again is offered over, as a refusal names them.
 pub(super) const PROVING: [&str; 2] = ["the plugin it proves", "what is kept against it"];
 
+/// The parts running a demand recipe is offered over, as a refusal names them.
+pub(super) const DEMANDING: [&str; 3] = [
+    "the plugin whose recipe it runs",
+    "the recipe it runs",
+    "what it would send where",
+];
+
 /// What the operator gave as their yes.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Consent {
@@ -167,6 +174,13 @@ pub(super) fn removing(going: &Installed, leaves: &[crate::plugin::Unfilled]) ->
 /// every answer kept against it that a pass would clear.
 pub(super) fn proving(plugin: &Installed, kept: &[crate::plugin::Nonconforming]) -> String {
     crate::agreement::parted(&[&[&json(plugin)], &[&json(kept)]])
+}
+
+/// What running a demand recipe is offered as: the plugin as the record holds it, the
+/// recipe as the operator agrees to it, and every value it would carry where.
+pub(super) fn demanding(plugin: &Installed, recipe: &crate::plugin::Recipe) -> String {
+    let sent = crate::plugin::approvals(std::slice::from_ref(recipe)).join("\n");
+    crate::agreement::parted(&[&[&json(plugin)], &[&json(recipe)], &[&sent]])
 }
 
 /// Every service a plugin's going stops.

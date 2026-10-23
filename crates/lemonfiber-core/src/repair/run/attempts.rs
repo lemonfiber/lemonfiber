@@ -59,8 +59,7 @@ impl Repairs {
     }
 }
 
-/// The name this record is kept under, beside the environment file.
-const NAME: &str = "repairs.json";
+use crate::config::paths::REPAIRS as NAME;
 
 /// Read what previous runs recorded, or an empty record where there is none.
 #[must_use]

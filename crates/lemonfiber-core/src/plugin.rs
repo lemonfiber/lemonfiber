@@ -94,13 +94,13 @@ pub use lemonfiber_manifest::container::Fields;
 pub use owning::{owned_by, owner, owns};
 pub use placing::{key_file, mount_sources, mount_tree, writes, Lands, Write};
 pub use provenance::{held, vouched, Key, Provenance, Unusable, Vouch, Vouched};
-pub use recipes::{approval, approvals, Adapter, Named, Owner, Pair, Recipe, Step};
+pub use recipes::{approval, approvals, Adapter, Named, Owner, Pair, Recipe, RecipeInput, Step};
 pub use recorded::{Answer, Asked, Recording};
 pub use recording::{record, Failed, Recorded, Recorder, Taken, Took};
 pub use register::{Already, Register, Unreadable as Unrecorded};
 pub use reports::{
-    Fetchable, Install, Installs, Nonconforming, Removal, Reproof, Restored, Sourced, Substituted,
-    Unfilled, Update,
+    Demand, Fetchable, Install, Installs, Nonconforming, Removal, Reproof, Restored, Sourced,
+    Substituted, Unfilled, Update,
 };
 pub use source::{unspoken, Source, SPOKEN};
 pub use stating::{
@@ -123,7 +123,7 @@ pub use lemonfiber_plugin::vocabulary::{
     Capability, Constraint, Credential, Declared, Probe, ProbeKind, Published as Capabilities,
     Removed, Requirement, Unpublishable,
 };
-pub use lemonfiber_plugin::{Shape, Violation};
+pub use lemonfiber_plugin::{On, Shape, Violation};
 
 /// The stack this build pins, which is what says who declares each capability.
 const STACK: &str = lemonfiber_bundled::STACK;

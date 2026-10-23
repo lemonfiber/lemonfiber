@@ -76,7 +76,7 @@ pub(crate) fn save_baseline(ctx: &Ctx, baseline: &crate::baseline::Baseline) {
 /// [`crate::config::paths::Paths::baseline`], which the layout keeps in the same
 /// directory; the two must stay in step if that layout ever moves.
 pub(super) fn baseline_path(ctx: &Ctx) -> Option<std::path::PathBuf> {
-    crate::app::targets::beside_env(ctx, "baseline.json")
+    crate::app::targets::beside_env(ctx, crate::config::paths::BASELINE)
 }
 
 /// The baseline field a service's own version is recorded under — a reserved key

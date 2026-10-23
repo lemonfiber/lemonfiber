@@ -43,8 +43,7 @@ pub(crate) const HOURS_TO_CLAIM: i64 = 48;
 /// still standing, and every older one would read as undated.
 pub(crate) const HOURS_OF_RECORD: i64 = 24 * 30;
 
-/// Where the record of what was offered is kept, beside the configuration.
-pub(crate) const RECORD: &str = "invitations.json";
+pub(crate) use crate::config::paths::INVITATIONS as RECORD;
 
 /// What this program offered, by the account it offered it on.
 pub(crate) type Offers = BTreeMap<String, Offer>;

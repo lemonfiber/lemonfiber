@@ -252,6 +252,147 @@ pub const EVERY: &[Entry] = &[
         at: Paths::plugins,
     },
     Entry {
+        accessor: "nonconforming",
+        what: "what a plugin answered outside its contract",
+        why: "Each answer an installed plugin's adapter gave that its contract does not \
+              allow. The plugin fills none of that capability until a proof it passes clears \
+              it, so losing this would let it fill one again unproven.",
+        secret: false,
+        at: Paths::nonconforming,
+    },
+    Entry {
+        accessor: "plugin_starting",
+        what: "what each installed plugin is run with again",
+        why: "Each installed plugin's manifest and the starting files its run proofs use, \
+              kept once the install holds so the doctor and its demand recipes work after \
+              its source is gone. Removing a plugin takes its directory away.",
+        secret: false,
+        at: Paths::plugin_starting,
+    },
+    Entry {
+        accessor: "run_verdicts",
+        what: "what each plugin's run proofs last came to",
+        why: "Each run proof's last verdict, against the image, the arguments and the \
+              starting files it ran with, so the doctor runs it again only when one of those \
+              moves rather than on every diagnosis.",
+        secret: false,
+        at: Paths::run_verdicts,
+    },
+    Entry {
+        accessor: "catalogue",
+        what: "the newest plugin catalogue this machine verified",
+        why: "Which release of the signed plugin catalogue was the newest one checked here. \
+              An older release is still validly signed, and this is what refuses one that \
+              was replaced.",
+        secret: false,
+        at: Paths::catalogue,
+    },
+    Entry {
+        accessor: "keys",
+        what: "the keys other programs reach the web interface with",
+        why: "Each key's name, scope and the SHA-256 digest of its secret, never the secret \
+              itself. Removing an entry revokes that key, and removing the file revokes \
+              every one.",
+        secret: true,
+        at: Paths::keys,
+    },
+    Entry {
+        accessor: "keys_used",
+        what: "when each key was last used",
+        why: "When each key last reached the web interface, kept apart from the keys so \
+              writing it never rewrites them. It holds no part of any secret.",
+        secret: false,
+        at: Paths::keys_used,
+    },
+    Entry {
+        accessor: "device_keys",
+        what: "the phones that may prove they are you",
+        why: "The public half of each key a phone registered to stand in for your password \
+              when a key is minted, with what attested where it lives. Nothing here could \
+              sign anything.",
+        secret: false,
+        at: Paths::device_keys,
+    },
+    Entry {
+        accessor: "invitations",
+        what: "when each invitation was offered",
+        why: "When each account nobody has claimed yet was offered. The media server's own \
+              record of when an account was made can lose it, and an invitation nobody can \
+              date is withdrawn.",
+        secret: false,
+        at: Paths::invitations,
+    },
+    Entry {
+        accessor: "expiring",
+        what: "how long a request may wait for a decision",
+        why: "What the household agreed about requests nobody rules on: how long one waits \
+              before it is closed. Without it nothing is closed, because nobody agreed to \
+              it.",
+        secret: false,
+        at: Paths::expiring,
+    },
+    Entry {
+        accessor: "held_back",
+        what: "whose asking was taken away while the disk was full",
+        why: "Each member whose permission to ask was taken away while the disk had no room, \
+              and what came off them, so exactly that is given back once there is room \
+              again.",
+        secret: false,
+        at: Paths::held_back,
+    },
+    Entry {
+        accessor: "forwarded",
+        what: "the port the egress guard last forwarded",
+        why: "The port the VPN's egress guard last forwarded, which every torrent client was \
+              set to take, so a client is set again only when the guard's answer changes.",
+        secret: false,
+        at: Paths::forwarded,
+    },
+    Entry {
+        accessor: "outbox",
+        what: "what you have been told, and what is still owed you",
+        why: "Every alert decided and not yet delivered, and what was already said, so an \
+              alert held while a channel was down is delivered once it is back rather than \
+              lost.",
+        secret: false,
+        at: Paths::outbox,
+    },
+    Entry {
+        accessor: "conditions",
+        what: "what is wrong, and since when",
+        why: "Each condition the doctor found, since when it has held and whether you were \
+              told, so how long something has been broken and whether it comes and goes are \
+              answered across runs.",
+        secret: false,
+        at: Paths::conditions,
+    },
+    Entry {
+        accessor: "halted",
+        what: "which containers lemonfiber stopped itself",
+        why: "Each container lemonfiber stopped, so one that exits with an error when told \
+              to stop reads as stopped rather than as a fault. Starting it again lets go of \
+              it.",
+        secret: false,
+        at: Paths::halted,
+    },
+    Entry {
+        accessor: "repairs",
+        what: "every repair lemonfiber carried out",
+        why: "Each repair and what it came to, the ones that changed nothing included, so a \
+              repair that keeps failing to hold a fault down can be seen for what it is.",
+        secret: false,
+        at: Paths::repairs,
+    },
+    Entry {
+        accessor: "grants",
+        what: "how long each member's devices may play",
+        why: "The last day each member's client spoke to the media server. A grant lasts a \
+              set number of days from then, and the devices on one that ran out are signed \
+              out.",
+        secret: false,
+        at: Paths::grants,
+    },
+    Entry {
         accessor: "acknowledged",
         what: "the words you have gone and looked up",
         why: "So a report names a word you already know instead of explaining it again. What \
