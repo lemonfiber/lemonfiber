@@ -15,6 +15,7 @@
 //! See `.docs/architecture/module-layout.md`.
 
 pub mod acknowledged;
+mod asking;
 pub mod autostart;
 pub mod bindings;
 mod bundled;
@@ -38,6 +39,7 @@ pub mod permissions;
 pub(crate) mod proved;
 pub mod providers;
 pub mod releases;
+pub(crate) mod requested;
 pub mod seasons;
 pub mod storage;
 pub mod telling;

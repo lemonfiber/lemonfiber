@@ -459,6 +459,18 @@ codes! {
         remedy: "Prove the plugin again with lemonfiber plugin prove, and take what it says up \
             with whoever published the plugin.",
     }
+    /// Raised when a proof an installed plugin declares, asked of its service, does not
+    /// hold in the doctor.
+    PROOF_ASKED_FAILED = "PLUGIN-43" {
+        severity: Error,
+        status: 409,
+        since: "0.18.0",
+        meaning: "A proof an installed plugin declares asked one of its services a question, and \
+            the answer is not what the proof declares. The message names the proof, the plugin \
+            and each fault.",
+        remedy: "Prove the plugin again with lemonfiber plugin prove, and take what it says up \
+            with whoever published the plugin.",
+    }
     /// Raised when a part this build installs as a plugin still runs as the stack's own
     /// service, so moving it in place is on offer.
     MOVE_OFFERED = "PLUGIN-42" {

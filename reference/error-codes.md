@@ -341,6 +341,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `PLUGIN-40` | `STRANGER_REPLACING` | error | 1 | 403 | 0.18.0 | Raised when a plugin that is not first-party declares a service replacing one the stack ships. |
 | `PLUGIN-41` | `PROOF_RUN_FAILED` | error | 1 | 409 | 0.18.0 | Raised when a proof an installed plugin declares, run as the image's own program, does not hold in the doctor. |
 | `PLUGIN-42` | `MOVE_OFFERED` | warning | 1 | 409 | 0.18.0 | Raised when a part this build installs as a plugin still runs as the stack's own service, so moving it in place is on offer. |
+| `PLUGIN-43` | `PROOF_ASKED_FAILED` | error | 1 | 409 | 0.18.0 | Raised when a proof an installed plugin declares, asked of its service, does not hold in the doctor. |
 
 ## `PROC` — the program underneath
 

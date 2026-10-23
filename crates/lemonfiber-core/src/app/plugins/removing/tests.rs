@@ -13,6 +13,7 @@ fn filling(plugin: &str, provides: &[&str]) -> Installed {
         provides: provides.iter().map(|one| (*one).to_owned()).collect(),
         contributions: Vec::new(),
         run_proofs: Vec::new(),
+        request_proofs: Vec::new(),
         declared: crate::plugin::Declaration::default(),
         recipes: Vec::new(),
         adapters: Vec::new(),

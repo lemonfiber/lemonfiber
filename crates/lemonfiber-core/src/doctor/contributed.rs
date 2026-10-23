@@ -26,15 +26,14 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use lemonfiber_plugin::extension;
-use lemonfiber_plugin::{Contribution, Expect};
+use lemonfiber_plugin::Contribution;
 
+use super::asking::{put, Asks};
 use super::{Category, Check, Finding, Reported, Verdict};
 use crate::error::codes::plugin::CONTRIBUTED_FAILED;
 use crate::error::{Problem, Remedy, State};
-use crate::plugin::judging::{judge, live, method};
-use crate::plugin::recorded::Answer;
 use crate::plugin::Installed;
-use crate::ports::http::{self, Http, Method};
+use crate::ports::http::Http;
 
 /// Every check an installed plugin adds to the register, ready to be run with the rest.
 ///
@@ -110,24 +109,6 @@ fn bounded(asked: Option<u32>) -> Duration {
     Duration::from_secs(u64::from(seconds))
 }
 
-/// What this check asks, or why nothing can be asked.
-#[derive(Debug)]
-enum Asks {
-    /// Everything the engine needs to put the question.
-    Service {
-        /// Where the plugin's service answers.
-        address: String,
-        /// The method, as the transport carries it.
-        method: Method,
-        /// The path on that service.
-        path: String,
-        /// What the answer has to be.
-        expect: Box<Expect>,
-    },
-    /// Why the question cannot be put, in the words the finding carries.
-    Nothing(String),
-}
-
 /// The question this row puts, where every part of it is there.
 fn asked(entry: &Contribution, answering: &BTreeMap<String, String>) -> Asks {
     if family(entry).is_none() {
@@ -136,42 +117,12 @@ fn asked(entry: &Contribution, answering: &BTreeMap<String, String>) -> Asks {
             entry.category.as_deref().unwrap_or("nothing")
         ));
     }
-    let Some(service) = entry.service.clone() else {
-        return Asks::Nothing(
-            "it does not settle which of this plugin's services it asks".to_owned(),
-        );
-    };
-    let Some(address) = answering.get(&service) else {
-        return Asks::Nothing(format!(
-            "{service} is not answering anywhere lemonfiber can reach"
-        ));
-    };
-    let (Some(request), Some(expect)) = (&entry.request, &entry.expect) else {
-        return Asks::Nothing(
-            "it asks nothing, or says nothing about the answer, so there is nothing to establish"
-                .to_owned(),
-        );
-    };
-    let Some(method) = method(&request.method) else {
-        return Asks::Nothing(format!(
-            "{} is not a method lemonfiber can send",
-            request.method
-        ));
-    };
-    // A route on the service's own address and nothing that could name another host
-    // once joined to it: asked here as well as by the reader, because this is the join.
-    if !lemonfiber_plugin::refusing::carried::is_route(&request.path) {
-        return Asks::Nothing(format!(
-            "{} is not a route on {service}, so it was never asked",
-            request.path
-        ));
-    }
-    Asks::Service {
-        address: address.clone(),
-        method,
-        path: request.path.clone(),
-        expect: Box::new(expect.clone()),
-    }
+    super::asking::asked(
+        entry.service.as_deref(),
+        entry.request.as_ref(),
+        entry.expect.as_ref(),
+        answering,
+    )
 }
 
 /// The remedies this same plugin declared for this check, in the order it declared them.
@@ -277,54 +228,14 @@ impl Contributed {
     }
 
     /// What asking the service came to.
-    ///
-    /// One match over both shapes, so that neither is reached by having fallen past
-    /// the other — a branch nothing can arrive at is a branch nobody can be sure of.
     async fn verdict(&self) -> Verdict {
-        match &self.asks {
-            Asks::Nothing(why) => self.unrun(why),
-            Asks::Service {
-                address,
-                method,
-                path,
-                expect,
-            } => self.asking(address, *method, path, expect).await,
-        }
-    }
-
-    /// The question put, and what came back made into a verdict.
-    async fn asking(&self, address: &str, method: Method, path: &str, expect: &Expect) -> Verdict {
-        // No headers. A contributed check cannot present a credential, because there is
-        // nowhere in the row to write one — which is what keeps "this asks as nobody"
-        // a property of the format rather than a convention somebody has to hold.
-        let answered = self
-            .http
-            .send(&http::Request {
-                method,
-                url: format!("{}{path}", address.trim_end_matches('/')),
-                headers: Vec::new(),
-                body: None,
-                pinned: None,
-            })
-            .await;
-        match answered {
-            Err(unreachable) => self.unrun(&format!(
-                "{} did not answer: {}",
-                unreachable.url, unreachable.reason
-            )),
-            Ok(response) => self.judged(expect, &live(&response)),
-        }
-    }
-
-    /// The verdict the shared evaluator reached about what came back.
-    fn judged(&self, expect: &Expect, answer: &Answer) -> Verdict {
-        let faults = judge(expect, answer);
-        if faults.is_empty() {
-            return Verdict::Pass {
+        match put(self.http.as_ref(), &self.asks).await {
+            Err(why) => self.unrun(&why),
+            Ok(faults) if faults.is_empty() => Verdict::Pass {
                 note: Some(format!("{} answered as it declares", self.of())),
-            };
+            },
+            Ok(faults) => Verdict::Fail(self.problem(&faults)),
         }
-        Verdict::Fail(self.problem(&faults))
     }
 
     /// The problem a failing contributed check amounts to.

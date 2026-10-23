@@ -29,7 +29,7 @@ use serde::{Deserialize, Serialize};
 mod proved;
 mod reached;
 
-pub use proved::RunProof;
+pub use proved::{RequestProof, RunProof};
 pub use reached::Reached;
 
 /// One service of an installed plugin, as it was placed.
@@ -330,6 +330,9 @@ pub struct Installed {
     /// Every proof it declares that runs the image's own program.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub run_proofs: Vec<RunProof>,
+    /// Every proof it declares that asks one of its services a question.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub request_proofs: Vec<RequestProof>,
     /// What the plugin declared about itself: where it is published, whether it was
     /// reviewed, what it claims, what it may change, where it may reach and what it
     /// will hold.
@@ -417,6 +420,7 @@ impl Installed {
                 })
                 .collect(),
             run_proofs: proved::run_proofs(manifest),
+            request_proofs: proved::request_proofs(manifest),
             declared: super::declared::Declaration::of(manifest),
             recipes: super::recipes::declared(manifest),
             adapters: super::recipes::named(manifest),
