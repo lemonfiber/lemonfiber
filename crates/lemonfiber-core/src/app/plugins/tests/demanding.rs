@@ -247,3 +247,66 @@ async fn a_manifest_kept_for_it_that_is_gone_refuses_the_run() {
     );
     assert!(!http.asked_for("/api/rescan"));
 }
+
+#[tokio::test]
+async fn a_manifest_kept_for_it_that_is_not_the_one_installed_refuses_the_run() {
+    let (ctx, http) = installed("demand-edited", 200).await;
+    if let Some(at) = super::super::kept::root(&ctx, "komga") {
+        let _ = std::fs::write(
+            at.join(lemonfiber_bundle::MANIFEST),
+            demanding().replace("Rescan the library", "Rescan it all"),
+        );
+    }
+
+    let consent = yes(&ctx, &[("code", "1234")]).await;
+    let (code, meaning) = refused(run(&ctx, "rescan", consent).await);
+    assert_eq!(code, MANIFEST_UNKEPT.to_string());
+    assert!(
+        meaning.contains("is not the one that was installed"),
+        "{meaning}"
+    );
+    assert!(!http.asked_for("/api/rescan"));
+}
+
+#[tokio::test]
+async fn a_recipe_the_record_names_that_the_kept_manifest_lacks_refuses_the_run() {
+    let (ctx, http) = installed("demand-renamed", 200).await;
+    let record = record_of(&ctx);
+    let _ = std::fs::write(
+        &record,
+        read(&record).replace(r#""rescan""#, r#""refresh""#),
+    );
+
+    let reading = run(&ctx, "refresh", super::super::Consent::default()).await;
+    let consent = super::super::Consent {
+        agreement: reading.ok().and_then(|one| one.agreement),
+        inputs: super::super::Inputs::of(std::collections::BTreeMap::from([(
+            "code".to_owned(),
+            "1234".to_owned(),
+        )])),
+        ..super::super::Consent::default()
+    };
+    let (code, meaning) = refused(run(&ctx, "refresh", consent).await);
+    assert_eq!(code, MANIFEST_UNKEPT.to_string());
+    assert!(
+        meaning.contains("declares no such demand recipe"),
+        "{meaning}"
+    );
+    assert!(!http.asked_for("/api/rescan"));
+}
+
+#[tokio::test]
+async fn a_plugin_with_no_recipe_on_demand_says_it_declares_none() {
+    let http = rescanning(200, "{}");
+    let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+    let ctx = proving("demand-none", runner, http as Arc<dyn Http>);
+    let installed = installing(&ctx, &source("demand-none", PROVING)).await;
+    assert!(installed.is_ok(), "the plugin installs: {installed:?}");
+
+    let (code, meaning) = refused(run(&ctx, "rescan", super::super::Consent::default()).await);
+    assert_eq!(code, NOTHING_TO_RUN.to_string());
+    assert!(
+        meaning.ends_with("komga declares no recipe that runs on demand."),
+        "{meaning}"
+    );
+}

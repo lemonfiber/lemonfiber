@@ -48,7 +48,7 @@ pub(super) async fn demand(
         ran: None,
     };
     if acting {
-        demand.ran = Some(run(ctx, &installed, recipe, consent).await?);
+        demand.ran = run(ctx, &installed, recipe, consent).await?;
     }
     Ok(Installs {
         installed: held.installed().to_vec(),
@@ -79,7 +79,7 @@ async fn run(
     installed: &Installed,
     recipe: &str,
     consent: &Consent,
-) -> Result<crate::plugin::running::Ran, Box<Problem>> {
+) -> Result<Option<crate::plugin::running::Ran>, Box<Problem>> {
     let manifest =
         kept::manifest(ctx, installed).map_err(|why| Box::new(unkept(&installed.plugin, &why)))?;
     let Some(whole) = manifest
@@ -119,15 +119,7 @@ async fn run(
                 "Nothing of what is installed changed.".to_owned(),
             ))
         })?;
-    Ok(ran
-        .into_iter()
-        .next()
-        .unwrap_or_else(|| crate::plugin::running::Ran {
-            recipe: recipe.to_owned(),
-            held: true,
-            why: None,
-            steps: Vec::new(),
-        }))
+    Ok(ran.into_iter().next())
 }
 
 /// The plugin declares no demand recipe by that name.
