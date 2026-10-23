@@ -22,6 +22,8 @@
 //! answers on. Which dashboard group a tier belongs to is the stack's answer rather
 //! than the format's, so nothing declared is kept as nothing declared.
 
+use std::collections::BTreeMap;
+
 use lemonfiber_manifest::container::{Fields, Value};
 use lemonfiber_plugin::{Manifest, Service};
 use serde::{Deserialize, Serialize};
@@ -104,6 +106,10 @@ pub struct Placed {
     /// The service of the same plugin it stands in front of, as an adapter.
     #[serde(default)]
     pub fronts: Option<String>,
+    /// Each field of the `upstream.json` lemonfiber writes for it as an adapter, to the
+    /// id of the plugin's secret that field holds.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub upstream: BTreeMap<String, String>,
     /// The API it answers the stack's other services in, where it names one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub native: Option<String>,
@@ -216,6 +222,11 @@ impl Placed {
             media_types: service.media_types.clone(),
             networks: Vec::new(),
             speaks: service.speaks.clone(),
+            upstream: service
+                .upstream
+                .iter()
+                .map(|(field, held)| (field.clone(), held.secret.clone()))
+                .collect(),
             fronts: service.fronts.clone(),
             native: service.native.clone(),
             replaces: service.replaces.clone(),

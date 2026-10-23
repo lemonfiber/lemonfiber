@@ -8,9 +8,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::Arc;
 
-use lemonfiber_contract::adapter::{
-    ready_path, KEY_FILE, UPSTREAM_FILE, UPSTREAM_PASSWORD, UPSTREAM_USERNAME,
-};
+use lemonfiber_contract::adapter::{ready_path, UPSTREAM_PASSWORD, UPSTREAM_USERNAME};
 use lemonfiber_contract::conformance::filed;
 use lemonfiber_contract::Contracted;
 use lemonfiber_plugin::{Health, HealthKind};
@@ -29,8 +27,10 @@ use crate::plugin::recorded::{Answer, Asked};
 use crate::ports::http::{Http, Method, Request, JSON};
 use crate::ports::serving::{Serve, Served};
 use filling::Filling;
+use preparing::Prepared;
 
 mod filling;
+mod preparing;
 
 /// The contract whose first run the adapter performs, as the seed performs it.
 fn identity() -> String {
@@ -166,6 +166,7 @@ pub(super) async fn answers(
                 adapter,
                 held: &prepared.held,
                 key: &prepared.key,
+                made: &prepared.made,
             }
             .asked(items)
             .await
@@ -173,7 +174,7 @@ pub(super) async fn answers(
         Err(unran) => Err(Faulted::new(
             "adapter's container",
             unran.to_string(),
-            vec![prepared.key.clone()],
+            prepared.made.clone(),
         )),
     };
     let finished = match outcome {
@@ -200,55 +201,6 @@ pub(super) async fn answers(
     }
     recorder.serving.removed(&served).await;
     finished
-}
-
-/// What both containers are given before either starts.
-struct Prepared {
-    /// The throwaway copy of the upstream's starting files.
-    copy: Throwaway,
-    /// Its throwaway library, where it takes one.
-    data: Option<std::path::PathBuf>,
-    /// The throwaway copy of the adapter's starting files, which holds its key.
-    held: Throwaway,
-    /// The key lemonfiber minted for the adapter.
-    key: String,
-}
-
-impl Prepared {
-    /// Both copies and the adapter's key, or why one could not be made.
-    fn of(
-        recorder: Recorder<'_>,
-        root: &Path,
-        upstream: &Placed,
-        adapter: Fronting<'_>,
-    ) -> Result<Self, Faulted> {
-        let copy = Throwaway::of(Some(Starting {
-            root,
-            service: &upstream.service,
-        }))
-        .map_err(refused("starting files"))?;
-        let data = if upstream.takes_data {
-            Some(copy.emptied("data").map_err(refused("data"))?)
-        } else {
-            None
-        };
-        let held = Throwaway::of(Some(Starting {
-            root,
-            service: &adapter.placed.service,
-        }))
-        .map_err(refused("adapter's starting files"))?;
-        let key = crate::secret::generate(recorder.random).ok_or_else(|| {
-            refused("adapter's key")(crate::secret::NO_RANDOMNESS_FOR_PASSWORD.to_owned())
-        })?;
-        held.hold(KEY_FILE, &key)
-            .map_err(refused("adapter's key"))?;
-        Ok(Self {
-            copy,
-            data,
-            held,
-            key,
-        })
-    }
 }
 
 /// A step that failed, why, and every credential the run had made by then.
@@ -293,12 +245,13 @@ struct Asking<'a> {
     adapter: Fronting<'a>,
     held: &'a Throwaway,
     key: &'a str,
+    made: &'a [String],
 }
 
 impl Asking<'_> {
     /// Every answer, once both are healthy and the first run is done, scrubbed.
     async fn asked(&self, items: &[&Item<'_>]) -> Result<(Vec<Answer>, Vec<Case>), Faulted> {
-        let mut made = vec![self.key.to_owned()];
+        let mut made = self.made.to_vec();
         let reached = self
             .ready()
             .await
@@ -485,11 +438,16 @@ impl Asking<'_> {
             self.key,
         ));
         let keep = |password: &str| {
-            let credential = serde_json::json!({
-                UPSTREAM_USERNAME: crate::config::MEDIA_SERVER_ADMIN_USER,
-                UPSTREAM_PASSWORD: password,
-            });
-            self.held.hold(UPSTREAM_FILE, &credential.to_string())
+            filling::handed_over(
+                self.held,
+                &[
+                    (
+                        UPSTREAM_USERNAME.to_owned(),
+                        crate::config::MEDIA_SERVER_ADMIN_USER.to_owned(),
+                    ),
+                    (UPSTREAM_PASSWORD.to_owned(), password.to_owned()),
+                ],
+            )
         };
         crate::seed::wire_media_server_admin(&source, self.recorder.random, None, false, &keep)
             .await

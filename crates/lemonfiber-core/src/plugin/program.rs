@@ -21,7 +21,7 @@ use crate::project::entry::{
     configuration, constant_text, DROPPED, KEPT, OPERATOR_FALLBACK, PROCESSES, SECURITY,
 };
 
-pub(crate) use throwaway::{digest as starting_digest, keep, Starting, Throwaway};
+pub(crate) use throwaway::{digest as starting_digest, held as shipped, keep, Starting, Throwaway};
 
 /// The most of a run's standard output that is read.
 pub(crate) const READ_AT_MOST: usize = 64 * 1024;
@@ -192,8 +192,9 @@ pub(crate) async fn performed(
     run: &lemonfiber_plugin::Run,
     operator: &Operator,
     starting: Option<Starting<'_>>,
+    random: &dyn crate::ports::random::Random,
 ) -> Came {
-    let copy = match throwaway::Throwaway::of(starting) {
+    let copy = match throwaway::Throwaway::of(starting, random) {
         Ok(copy) => copy,
         Err(why) => return Came::Unproven(why),
     };

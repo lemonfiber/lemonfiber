@@ -200,6 +200,7 @@ async fn a_run_that_said_what_it_declares_passes_and_its_copy_is_gone() {
             root: &source,
             service: "qualitysync",
         }),
+        &lemonfiber_fixtures::ports::Chance::cycling(),
     )
     .await;
     assert_eq!(verdict(&came, &expecting()), Verdict::Passed);
@@ -222,6 +223,7 @@ async fn a_run_that_overran_fails_naming_its_limit() {
         &run_of(&["sync"], Some(5)),
         &operator(),
         None,
+        &lemonfiber_fixtures::ports::Chance::cycling(),
     )
     .await;
     assert_eq!(came, Came::Overran(5));
@@ -266,6 +268,7 @@ async fn a_run_the_engine_could_not_make_is_unproven_naming_why() {
             &run_of(&["-v"], None),
             &operator(),
             None,
+            &lemonfiber_fixtures::ports::Chance::cycling(),
         )
         .await;
         let said = verdict(&came, &expecting());
@@ -295,6 +298,7 @@ async fn a_run_whose_starting_files_are_refused_is_unproven_and_never_made() {
             root: &source,
             service: "qualitysync",
         }),
+        &lemonfiber_fixtures::ports::Chance::cycling(),
     )
     .await;
     #[cfg(unix)]

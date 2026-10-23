@@ -472,6 +472,7 @@ fn a_plugins_service_declares_exactly_the_fields_the_contract_permits() {
         "tag",
         "takes_data",
         "tmpfs",
+        "upstream",
         "user_mode",
     ];
     let published = published();

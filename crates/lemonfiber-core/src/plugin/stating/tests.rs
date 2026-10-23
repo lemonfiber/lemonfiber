@@ -75,6 +75,7 @@ fn planned() -> Vec<crate::plugin::Write> {
                 &Installed::of(&read),
                 stack(),
                 &crate::plugin::Reading::bare(),
+                Vec::new(),
                 Some(crate::plugin::Write::project(
                     stack().join(crate::project::FILE),
                     None,
@@ -127,6 +128,7 @@ fn an_adapter_service_states_its_key_by_path() {
                 &Installed::of(&read),
                 stack(),
                 &crate::plugin::Reading::bare(),
+                Vec::new(),
                 Some(crate::plugin::Write::project(
                     stack().join(crate::project::FILE),
                     None,

@@ -733,6 +733,12 @@
           "default": [],
           "items": {"type": "string"}
         },
+        "upstream": {
+          "description": "Each field of the `upstream.json` lemonfiber writes for this adapter, to the secret\nit holds.",
+          "type": "object",
+          "additionalProperties": {"$ref": "#/$defs/ServiceSecretOf"},
+          "default": {}
+        },
         "user_mode": {
           "description": "Who the container runs as.",
           "anyOf": [
@@ -850,6 +856,7 @@
       "type": "object",
       "properties": {
         "id": {"description": "What the value is, within its namespace.", "type": "string"},
+        "minted": {"description": "Whether lemonfiber makes the value at install, rather than anything capturing or\nentering it.", "type": "boolean"},
         "of": {"description": "Whose credential it is.", "type": "string"},
         "why": {"description": "What holding it is for.", "type": "string"}
       },

@@ -733,3 +733,16 @@ fn a_port_two_services_publish_is_refused_naming_both() {
         "{said:#?}"
     );
 }
+
+#[test]
+fn a_part_the_bundle_assembles_mints_no_secret() {
+    let text = edited(
+        r#"path = "/config/config.xml", version = 3 }"#,
+        "path = \"/config/config.xml\", version = 3 }\nsecret = [{ id = \"upstream-key\", of = \
+         \"sonarr\", why = \"Sign in\", minted = true }]",
+    );
+    let caught = messages(&text)
+        .iter()
+        .any(|message| message.contains("secret upstream-key: is minted"));
+    assert!(caught, "{:?}", messages(&text));
+}

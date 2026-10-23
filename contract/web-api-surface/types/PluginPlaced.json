@@ -161,6 +161,12 @@
         "boolean"
       ],
       "required": true
+    },
+    "upstream": {
+      "type": [
+        "object{string}"
+      ],
+      "required": false
     }
   },
   "variants": []

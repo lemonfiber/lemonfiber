@@ -26,6 +26,16 @@
       "description": "A service's own secrets file, readable by its owner alone, its values never shown.",
       "type": "string",
       "const": "secrets"
+    },
+    {
+      "description": "A file the plugin ships for one of its services, written where none is yet; one\nnaming a secret is readable by its owner alone and shown with the secret's name.",
+      "type": "string",
+      "const": "starting"
+    },
+    {
+      "description": "The credentials an adapter reads its upstream's with, readable by its owner alone,\ntheir values never shown.",
+      "type": "string",
+      "const": "upstream"
     }
   ]
 }

@@ -433,6 +433,7 @@ pub(super) async fn running(
         run,
         &crate::plugin::program::Operator::of(ctx),
         Some(starting),
+        ctx.seams.random.as_ref(),
     )
     .await;
     crate::plugin::program::verdict(&came, expect)

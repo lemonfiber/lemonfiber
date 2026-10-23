@@ -36,6 +36,7 @@ mod failing;
 mod fronting;
 mod installing;
 mod leaving;
+mod minting;
 mod naming;
 pub(crate) mod program;
 mod reaching;
@@ -73,6 +74,7 @@ pub fn refusals(manifest: &Manifest, occupied: &[&str]) -> Vec<Violation> {
     running(manifest, &mut found);
     colliding::with_the_stack(manifest, &mut found);
     reaching::beyond(manifest, &mut found);
+    minting::minted(manifest, &mut found);
     naming::wired(manifest, &mut found);
     asking::asked(manifest, &mut found);
     naming::about(manifest, &mut found);
@@ -193,6 +195,7 @@ fn running(manifest: &Manifest, found: &mut Vec<Violation>) {
         leaving::stated(service, found);
         fronting::native(service, &manifest.services, found);
         replacing::replaced(service, found);
+        minting::handed(manifest, service, found);
     }
 }
 

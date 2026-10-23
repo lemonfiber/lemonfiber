@@ -87,7 +87,10 @@ pub(super) async fn install(
     let stack = &super::super::project::directory(ctx)
         .ok_or_else(|| Box::new(nowhere_to_write(&would.plugin)))?;
     super::occupied::unoccupied(ctx, &would, held.installed(), stack)?;
-    let planned = writing::landing(ctx, super::planned::writes(ctx, &would, stack)?);
+    let planned = writing::landing(
+        ctx,
+        super::planned::writes(ctx, &would, stack, Some(&crate::plugin::root(path)))?,
+    );
     let wiring = standing::standing(ctx, &stack_manifest, &held, &would);
     let changes = crate::plugin::changes(&planned);
     let offer = offering::installing(&read.digest, &would, &changes, &wiring);
@@ -117,6 +120,7 @@ pub(super) async fn install(
         let (standing, before) = verifying::looked(ctx).await?;
 
         writing::unlinked(ctx, &would, stack)?;
+        super::minting::minted(ctx, &would.plugin, &read.manifest, &stamp)?;
         carry_out(ctx, &would.plugin, &stamp, &planned)?;
 
         // Started before it is registered, which is why the invocation carries this
@@ -348,6 +352,16 @@ pub(super) fn accepted(path: &Path, from: Option<&Fetched<'_>>) -> Result<Accept
     }
     let mut refusals = lemonfiber_plugin::refusals(&manifest, BUNDLED_CHECKS);
     refusals.extend(lemonfiber_plugin::uninstallable(&manifest));
+    match crate::plugin::seeding::shipped(
+        manifest.services.iter().map(|service| service.id.as_str()),
+        &crate::plugin::root(path),
+    ) {
+        Ok(shipped) => refusals.extend(crate::plugin::seeding::refused(&manifest, &shipped)),
+        Err(message) => refusals.push(lemonfiber_plugin::Violation {
+            location: crate::project::entry::CONFIGURATION_TREE.to_owned(),
+            message,
+        }),
+    }
     if refusals.is_empty() {
         Ok(Accepted {
             manifest,

@@ -54,6 +54,10 @@ pub struct Secret {
     pub of: String,
     /// What holding it is for.
     pub why: String,
+    /// Whether lemonfiber makes the value at install, rather than anything capturing or
+    /// entering it.
+    #[serde(default, skip_serializing_if = "core::ops::Not::not")]
+    pub minted: bool,
 }
 
 /// A secret the manifest declares.

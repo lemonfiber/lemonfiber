@@ -319,7 +319,16 @@ async fn a_claim_probe_that_runs_is_recorded_by_running_it() {
     let program = Proving::exiting(0, "v8.7.3 (");
     let mut took = Vec::new();
     for running in runs {
-        took.push(super::ran::taken(&read, running, &at, program.as_ref()).await);
+        took.push(
+            super::ran::taken(
+                &read,
+                running,
+                &at,
+                program.as_ref(),
+                &lemonfiber_fixtures::ports::Chance::cycling(),
+            )
+            .await,
+        );
     }
     let kept: serde_json::Value = serde_json::from_str(
         &std::fs::read_to_string(at.join("recordings/recyclarr/runs.json")).unwrap_or_default(),
@@ -351,7 +360,10 @@ fn a_stream_guard_is_recorded_holding_a_certificate_the_core_would_write() {
                     .into_iter()
                     .next()
             });
-        let copy = crate::plugin::program::Throwaway::of(None);
+        let copy = crate::plugin::program::Throwaway::of(
+            None,
+            &lemonfiber_fixtures::ports::Chance::cycling(),
+        );
         let (Some(placed), Ok(copy)) = (placed, copy) else {
             unreachable!("the fixture places a service and a copy is made");
         };
@@ -378,7 +390,8 @@ fn a_certificate_that_cannot_be_written_stops_the_guard_before_it_starts() {
                 .into_iter()
                 .next()
         });
-    let copy = crate::plugin::program::Throwaway::of(None);
+    let copy =
+        crate::plugin::program::Throwaway::of(None, &lemonfiber_fixtures::ports::Chance::cycling());
     let (Some(placed), Ok(copy)) = (placed, copy) else {
         unreachable!("the fixture places a service and a copy is made");
     };

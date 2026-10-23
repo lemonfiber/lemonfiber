@@ -99,7 +99,18 @@ pub(crate) fn carry_out(
             crate::plugin::Lands::Secrets(variables) => {
                 let text = crate::settings::text(ctx, variables)
                     .map_err(|why| Box::new(unwritable(&write.path, &why.to_string())))?;
-                made_whole(ctx, plugin, stamp, &journal, &write.path, Some(&text))?;
+                made_whole(
+                    ctx,
+                    plugin,
+                    stamp,
+                    &journal,
+                    &write.path,
+                    Some(text.as_bytes()),
+                )?;
+                continue;
+            }
+            crate::plugin::Lands::Starting { .. } | crate::plugin::Lands::Upstream(_) => {
+                seeded(ctx, (plugin, stamp, &journal), write)?;
                 continue;
             }
         };
@@ -154,18 +165,9 @@ fn made_whole(
     stamp: &str,
     journal: &Path,
     path: &Path,
-    content: Option<&str>,
+    content: Option<&[u8]>,
 ) -> Result<(), Box<Problem>> {
-    // Both writers below bring the whole missing chain into being, so all of it is what
-    // a reversal has to remove. Recorded parent-first and so unwound child-first,
-    // exactly as an apply records the data root it makes.
-    let making = missing_from(path, content.is_none());
-    let changes: Vec<Change> = making
-        .iter()
-        .map(|made_here| made(plugin, made_here, stamp))
-        .collect();
-    crate::app::recover::journalled(journal, &changes, ctx.seams.random.as_ref())
-        .map_err(|failure| Box::new(failure.problem()))?;
+    recorded_making(ctx, (plugin, stamp, journal), path, content.is_none())?;
 
     match content {
         None => std::fs::create_dir_all(path)
@@ -175,9 +177,93 @@ fn made_whole(
         // failure is reported as this install's own: the writer is shared with the
         // settings file and says *your settings could not be saved*, which about a
         // plugin's file names the wrong file and offers the wrong remedy.
-        Some(content) => crate::config::store::write(path, content)
+        Some(content) => crate::config::store::write_bytes(path, content)
             .map_err(|failure| Box::new(unwritable(path, &failure.to_string()))),
     }
+}
+
+/// Write a starting file or an adapter's `upstream.json`, each secret it names written
+/// as the secret store holds it for `plugin`.
+fn seeded(
+    ctx: &Ctx,
+    recording: (&str, &str, &Path),
+    write: &crate::plugin::Write,
+) -> Result<(), Box<Problem>> {
+    let (plugin, stamp, journal) = recording;
+    let secrets = crate::settings::secrets_at(ctx)
+        .and_then(|at| crate::settings::Secrets::at(&at).ok())
+        .unwrap_or_default();
+    let held = |secret: &str| {
+        secrets
+            .value(&crate::settings::named(plugin, secret))
+            .map(str::to_owned)
+    };
+    let unwritten = |why: String| Box::new(unwritable(&write.path, &why));
+    match &write.lands {
+        crate::plugin::Lands::Starting { bytes, seeded } => {
+            let bytes = crate::plugin::seeding::written(bytes, &held, ctx.seams.random.as_ref())
+                .map_err(unwritten)?;
+            if *seeded {
+                made_whole(ctx, plugin, stamp, journal, &write.path, Some(&bytes))
+            } else {
+                made_shared(ctx, recording, &write.path, &bytes)
+            }
+        }
+        crate::plugin::Lands::Upstream(fields) => {
+            let text = crate::plugin::seeding::upstream(fields, &held).map_err(unwritten)?;
+            made_whole(
+                ctx,
+                plugin,
+                stamp,
+                journal,
+                &write.path,
+                Some(text.as_bytes()),
+            )
+        }
+        crate::plugin::Lands::Directory { .. }
+        | crate::plugin::Lands::Document { .. }
+        | crate::plugin::Lands::Key
+        | crate::plugin::Lands::Secrets(_)
+        | crate::plugin::Lands::Region { .. } => Ok(()),
+    }
+}
+
+/// Journal every path writing `path` brings into being, parent first.
+///
+/// Every writer here brings the whole missing chain into being, so all of it is what a
+/// reversal has to remove. Recorded parent-first and so unwound child-first, exactly as an
+/// apply records the data root it makes.
+fn recorded_making(
+    ctx: &Ctx,
+    (plugin, stamp, journal): (&str, &str, &Path),
+    path: &Path,
+    directory: bool,
+) -> Result<(), Box<Problem>> {
+    let changes: Vec<Change> = missing_from(path, directory)
+        .iter()
+        .map(|made_here| made(plugin, made_here, stamp))
+        .collect();
+    crate::app::recover::journalled(journal, &changes, ctx.seams.random.as_ref())
+        .map_err(|failure| Box::new(failure.problem()))
+}
+
+/// Write one starting file that names no secret as the stack's own files are written:
+/// beneath the stack directory, through no link, readable by whoever the service runs as.
+fn made_shared(
+    ctx: &Ctx,
+    recording: (&str, &str, &Path),
+    path: &Path,
+    content: &[u8],
+) -> Result<(), Box<Problem>> {
+    let stack =
+        super::super::project::directory(ctx).ok_or_else(|| Box::new(unwritable(path, LINKED)))?;
+    recorded_making(ctx, recording, path, false)?;
+    path.parent()
+        .map_or(Ok(()), std::fs::create_dir_all)
+        .and_then(|()| {
+            crate::within::write_unlinked(ctx.seams.confined.as_ref(), path, &stack, content)
+        })
+        .map_err(|why| Box::new(unwritable(path, &why.to_string())))
 }
 
 /// Mint the key an adapter service is asked with and write it where its container reads
@@ -194,7 +280,14 @@ fn keyed(
     }
     let key = crate::keys::Secret::mint(ctx.seams.random.as_ref())
         .ok_or_else(|| Box::new(unwritable(path, UNMINTED)))?;
-    made_whole(ctx, plugin, stamp, journal, path, Some(key.as_str()))
+    made_whole(
+        ctx,
+        plugin,
+        stamp,
+        journal,
+        path,
+        Some(key.as_str().as_bytes()),
+    )
 }
 
 /// Why an adapter's key could not be written.
@@ -386,7 +479,9 @@ pub(crate) fn landing(ctx: &Ctx, planned: Vec<crate::plugin::Write>) -> Vec<crat
             crate::plugin::Lands::Directory { .. }
             | crate::plugin::Lands::Document { .. }
             | crate::plugin::Lands::Key
-            | crate::plugin::Lands::Secrets(_) => true,
+            | crate::plugin::Lands::Secrets(_)
+            | crate::plugin::Lands::Starting { .. }
+            | crate::plugin::Lands::Upstream(_) => true,
         })
         .collect()
 }

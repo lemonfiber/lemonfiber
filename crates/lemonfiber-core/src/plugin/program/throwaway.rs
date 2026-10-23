@@ -1,8 +1,11 @@
 //! A throwaway copy of a service's starting files, taken off the disk when it is dropped.
 
+use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use crate::ports::random::Random;
 use crate::project::entry::CONFIGURATION_TREE;
 
 /// The most starting files one service may ship.
@@ -91,17 +94,39 @@ fn hex(bytes: &[u8]) -> String {
 pub(crate) struct Throwaway {
     root: PathBuf,
     copy: PathBuf,
+    minted: BTreeMap<String, String>,
 }
 
 impl Throwaway {
-    /// A fresh copy of the files at `starting`, or an empty directory where there are none.
-    pub(crate) fn of(starting: Option<Starting<'_>>) -> Result<Self, String> {
-        Self::beneath(&std::env::temp_dir(), starting)
+    /// A fresh copy of the files at `starting`, or an empty directory where there are none,
+    /// each secret they name written as a value minted from `random` for this copy alone.
+    pub(crate) fn of(starting: Option<Starting<'_>>, random: &dyn Random) -> Result<Self, String> {
+        Self::beneath(&std::env::temp_dir(), starting, random)
     }
 
     /// A fresh copy of the files at `starting` in a directory of its own beneath `temp`.
-    fn beneath(temp: &Path, starting: Option<Starting<'_>>) -> Result<Self, String> {
-        let files = held(starting)?;
+    fn beneath(
+        temp: &Path,
+        starting: Option<Starting<'_>>,
+        random: &dyn Random,
+    ) -> Result<Self, String> {
+        let minting = RefCell::new(BTreeMap::new());
+        let value = |secret: &str| {
+            let mut minted = minting.borrow_mut();
+            if let Some(held) = minted.get(secret) {
+                return Some(String::clone(held));
+            }
+            let fresh = crate::plugin::seeding::mint(random)?;
+            minted.insert(secret.to_owned(), fresh.clone());
+            Some(fresh)
+        };
+        let files = held(starting)?
+            .into_iter()
+            .map(|(path, bytes)| {
+                crate::plugin::seeding::written(&bytes, &value, random).map(|bytes| (path, bytes))
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+        let minted = minting.into_inner();
         swept(temp, std::time::SystemTime::now());
         let root = temp.join(format!(
             "{NAMED}{}-{}",
@@ -113,6 +138,7 @@ impl Throwaway {
                 let made = Self {
                     copy: root.join(CONFIGURATION_TREE),
                     root: root.clone(),
+                    minted,
                 };
                 let filled = opened(&made.root, 0o700).and_then(|()| made.filled(&files));
                 filled.map(|()| made)
@@ -123,6 +149,16 @@ impl Throwaway {
     /// The directory the copy is in.
     pub(crate) fn path(&self) -> &Path {
         &self.copy
+    }
+
+    /// The value minted for `secret` where the copy's files name it.
+    pub(crate) fn minted(&self, secret: &str) -> Option<&str> {
+        self.minted.get(secret).map(String::as_str)
+    }
+
+    /// Every value minted for the copy, which whatever ran with it is to be scrubbed of.
+    pub(crate) fn made(&self) -> impl Iterator<Item = &str> {
+        self.minted.values().map(String::as_str)
     }
 
     /// A further empty directory beside the copy, open to whoever the service is, and
@@ -290,7 +326,7 @@ fn opened(_at: &Path, _mode: u32) -> std::io::Result<()> {
 /// sorted; none where the directory is not there, and refused where a link stands
 /// anywhere from the source down, where anything is neither a file nor a directory, or
 /// where they pass the bounds.
-fn held(starting: Option<Starting<'_>>) -> Result<Vec<(String, Vec<u8>)>, String> {
+pub(crate) fn held(starting: Option<Starting<'_>>) -> Result<Vec<(String, Vec<u8>)>, String> {
     let mut found = Vec::new();
     let Some(starting) = starting else {
         return Ok(found);

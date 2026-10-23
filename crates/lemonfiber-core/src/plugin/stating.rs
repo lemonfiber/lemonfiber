@@ -44,6 +44,12 @@ pub enum Puts {
     Region,
     /// A service's own secrets file, readable by its owner alone, its values never shown.
     Secrets,
+    /// A file the plugin ships for one of its services, written where none is yet; one
+    /// naming a secret is readable by its owner alone and shown with the secret's name.
+    Starting,
+    /// The credentials an adapter reads its upstream's with, readable by its owner alone,
+    /// their values never shown.
+    Upstream,
 }
 
 /// One change installing a plugin makes to the machine.
@@ -174,6 +180,8 @@ pub fn changes(planned: &[Write]) -> Vec<Changing> {
                 Lands::Key => Puts::Key,
                 Lands::Region { .. } => Puts::Region,
                 Lands::Secrets(_) => Puts::Secrets,
+                Lands::Starting { .. } => Puts::Starting,
+                Lands::Upstream(_) => Puts::Upstream,
             },
         })
         .collect()

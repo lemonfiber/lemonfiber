@@ -185,6 +185,13 @@
     "takes_data": {
       "description": "Whether the library is mounted for it.",
       "type": "boolean"
+    },
+    "upstream": {
+      "description": "Each field of the `upstream.json` lemonfiber writes for it as an adapter, to the\nid of the plugin's secret that field holds.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
     }
   },
   "additionalProperties": false,

@@ -28,6 +28,7 @@ pub(crate) struct Kept {
 pub(crate) enum Source {
     Operator,
     Recipe,
+    Minted,
 }
 
 impl Source {
@@ -35,6 +36,7 @@ impl Source {
         match self {
             Self::Operator => "operator",
             Self::Recipe => "recipe",
+            Self::Minted => "minted",
         }
     }
 }

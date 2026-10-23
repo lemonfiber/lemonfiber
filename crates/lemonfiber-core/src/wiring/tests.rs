@@ -597,6 +597,7 @@ fn plugin_filling(plugin: &str, service: &str, capability: &str) -> crate::plugi
             networks: Vec::new(),
             speaks: Vec::new(),
             fronts: None,
+            upstream: std::collections::BTreeMap::new(),
             native: None,
             replaces: None,
             shape: None,

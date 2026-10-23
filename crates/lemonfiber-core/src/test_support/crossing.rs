@@ -22,6 +22,7 @@ pub(crate) fn a_crossing_reader() -> crate::plugin::Installed {
         id: "sonarr-key".to_owned(),
         of: "sonarr".to_owned(),
         why: "Asks the series service".to_owned(),
+        minted: false,
     }];
     reader
 }

@@ -66,6 +66,17 @@ pub enum Lands {
     Key,
     /// A service's own secrets file, each variable's value read as it is written.
     Secrets(Vec<super::container::Variable>),
+    /// A file the plugin's source ships for one of its services, as shipped, each secret
+    /// it names written in where it is `seeded`.
+    Starting {
+        /// What the source ships.
+        bytes: Vec<u8>,
+        /// Whether it names a secret, and so is written with its value.
+        seeded: bool,
+    },
+    /// The credentials an adapter reads its upstream's with: each field, to the id of the
+    /// plugin's secret it holds.
+    Upstream(std::collections::BTreeMap<String, String>),
     /// A region inside a file the stack already has, holding this.
     Region {
         /// The file beneath the stack directory, as the record of what lemonfiber
@@ -156,7 +167,7 @@ pub fn mount_sources(installed: &Installed, stack: &Path) -> Vec<PathBuf> {
 ///
 /// Not published, unlike the document's path: nothing outside this module has had to
 /// ask yet, and a name nothing reads is one that drifts from what it describes.
-fn configuration(stack: &Path, service: &str) -> PathBuf {
+pub(crate) fn configuration(stack: &Path, service: &str) -> PathBuf {
     stack.join(CONFIGURATION_TREE).join(service)
 }
 
@@ -179,6 +190,7 @@ pub fn writes(
     installed: &Installed,
     stack: &Path,
     reading: &Reading<'_>,
+    starting: Vec<Write>,
     project: Option<Write>,
 ) -> Vec<Write> {
     let mut planned: Vec<Write> = installed
@@ -205,6 +217,18 @@ pub fn writes(
             .iter()
             .filter(|placed| !placed.speaks.is_empty())
             .map(|placed| Write::key(key_file(stack, &placed.service))),
+    );
+    planned.extend(starting);
+    planned.extend(
+        installed
+            .services
+            .iter()
+            .filter(|placed| !placed.upstream.is_empty())
+            .map(|placed| Write {
+                path: configuration(stack, &placed.service)
+                    .join(lemonfiber_contract::adapter::UPSTREAM_FILE),
+                lands: Lands::Upstream(placed.upstream.clone()),
+            }),
     );
     planned.extend(installed.services.iter().filter_map(|placed| {
         super::container::secrets_file(placed, reading).map(|path| Write {

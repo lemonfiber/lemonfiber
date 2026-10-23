@@ -545,7 +545,7 @@ fn a_variable_asking_an_address_is_written_with_the_one_its_ask_settles_on() {
     )]
     .into();
     let plugin = crate::test_support::an_installed("subs", vec![placed]);
-    let document = super::super::planned::writes(&ctx, &plugin, &stack_of(&ctx))
+    let document = super::super::planned::writes(&ctx, &plugin, &stack_of(&ctx), None)
         .unwrap_or_default()
         .into_iter()
         .find_map(|write| match write.lands {
@@ -583,7 +583,7 @@ fn a_setting_is_written_as_the_operator_recorded_it_and_as_its_default_otherwise
         r#"{"schema":1,"written_by":"","values":{"subs:mode":"fast"}}"#
     )
     .is_ok());
-    let document = super::super::planned::writes(&ctx, &plugin, &stack_of(&ctx))
+    let document = super::super::planned::writes(&ctx, &plugin, &stack_of(&ctx), None)
         .unwrap_or_default()
         .into_iter()
         .find_map(|write| match write.lands {

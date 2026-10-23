@@ -1,33 +1,4 @@
-use crate::refusing::tests::{names, said, INSTALLABLE};
-
-/// The upstream the fixture's service stands in front of when it speaks.
-const UPSTREAM: &str = r#"[[service]]
-id          = "komga-server"
-name        = "Komga server"
-image       = "docker.io/gotson/komga"
-digest      = "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
-tag         = "1.11.0"
-criticality = "important"
-
-"#;
-
-/// The fixture's service, speaking `speaks` in front of an upstream of its own and
-/// saying `rest`.
-fn speaking(speaks: &str, rest: &str) -> String {
-    INSTALLABLE
-        .replace(
-            "config_path = \"/config\"\n",
-            &format!(
-                "config_path = \"/config\"\nspeaks      = {speaks}\nfronts      = \"komga-server\"\n{rest}"
-            ),
-        )
-        .replace("[[claim]]\n", &format!("{UPSTREAM}[[claim]]\n"))
-        .replace("[[wiring]]\n", "[[wiring]]\nservice         = \"komga\"\n")
-        .replace(
-            "id      = \"komga.serves\"\n",
-            "id      = \"komga.serves\"\nservice = \"komga\"\n",
-        )
-}
+use crate::refusing::tests::{names, said, speaking, INSTALLABLE};
 
 #[test]
 fn an_adapter_names_one_other_service_of_its_plugin_that_speaks_nothing_as_its_upstream() {

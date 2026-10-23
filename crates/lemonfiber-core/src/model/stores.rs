@@ -70,6 +70,8 @@ pub enum SecretFrom {
     Recipe,
     /// It is another service's credential, granted to cross.
     Granted,
+    /// lemonfiber made it at install.
+    Minted,
 }
 
 /// One service reading a setting or a secret.

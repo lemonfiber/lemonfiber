@@ -38,6 +38,8 @@ pub(crate) struct Running {
     pub(crate) kept: Option<PathBuf>,
     /// The moment this run is stamped with.
     pub(crate) now: String,
+    /// Where the values minted for a run's throwaway starting files come from.
+    pub(crate) random: Arc<dyn crate::ports::random::Random>,
 }
 
 /// A check for every run proof `installed` declares.
@@ -166,6 +168,7 @@ impl Proved {
             &self.proof.run,
             &self.running.operator,
             starting,
+            self.running.random.as_ref(),
         )
         .await;
         let reached = verdict(&came, &self.proof.expect);
