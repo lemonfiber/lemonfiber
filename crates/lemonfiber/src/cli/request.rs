@@ -363,13 +363,14 @@ pub enum Request {
     /// Revokes access to the media server and to the request service. Their watch
     /// history goes with the account — the media server offers no way to keep it —
     /// and the request service destroys what they asked for. Because none of that
-    /// can be got back, it says what would go and does nothing until `--confirm`.
+    /// can be got back, it says what would go, does nothing, and prints a name for
+    /// that offer; answering with `--offer` and that name is the yes.
     Remove {
         /// Whose account to take away, as `lemonfiber household` shows them.
         name: String,
-        /// Go ahead and remove them, having seen what goes.
-        #[arg(long)]
-        confirm: bool,
+        /// The offer being answered, as the reading that made it printed it.
+        #[arg(long, value_name = "NAME")]
+        offer: Option<String>,
     },
     /// Remove everything lemonfiber keeps on this machine.
     ///
@@ -453,12 +454,12 @@ pub enum Request {
     ///
     /// The opposite of adopt: it discards your hand-edits to the stack files and
     /// restores lemonfiber's own. Because it throws work away, it names exactly what
-    /// will be lost and does nothing until `--confirm` — run it once to see the diffs,
-    /// again with `--confirm` to reset.
+    /// will be lost, does nothing, and prints a name for that offer — run it once to
+    /// see the diffs, again with `--offer` and that name to reset.
     Reset {
-        /// Go ahead and revert, having seen what will be lost.
-        #[arg(long)]
-        confirm: bool,
+        /// The offer being answered, as the reading that made it printed it.
+        #[arg(long, value_name = "NAME")]
+        offer: Option<String>,
     },
     /// Move something onto a newer version, naming which.
     ///

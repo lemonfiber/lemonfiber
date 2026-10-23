@@ -1,0 +1,41 @@
+{
+  "fields": {
+    "expect": {
+      "type": [
+        "ref:Expect"
+      ],
+      "required": true
+    },
+    "proof": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "request": {
+      "type": [
+        "ref:PluginRequest"
+      ],
+      "required": true
+    },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "title": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "why": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

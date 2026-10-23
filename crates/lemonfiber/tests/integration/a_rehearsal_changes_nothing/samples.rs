@@ -209,7 +209,7 @@ fn over_the_household() -> Vec<(&'static str, Command)> {
             "remove",
             Command::Remove {
                 name: "ana".to_owned(),
-                confirm: true,
+                agreement: Some("00000000-00000000-00000000".to_owned()),
             },
         ),
     ]
@@ -260,7 +260,12 @@ fn over_what_this_machine_keeps() -> Vec<(&'static str, Command)> {
         ),
         ("seed", Command::Seed),
         ("adopt", Command::Adopt),
-        ("reset", Command::Reset { confirm: true }),
+        (
+            "reset",
+            Command::Reset {
+                agreement: Some("00000000-00000000".to_owned()),
+            },
+        ),
         (
             "update",
             Command::Update(lemonfiber_core::update::run::Asked {

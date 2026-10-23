@@ -464,14 +464,16 @@ fn answering_twice() -> Vec<Command> {
         }),
         Command::Remove {
             name: "ana".to_owned(),
-            confirm: true,
+            agreement: Some("00000000-00000000-00000000".to_owned()),
         },
         Command::QualityUpgrade { confirm: true },
         Command::Repair {
             consent: crate::repair::run::Consent::Standing,
             disruptive: false,
         },
-        Command::Reset { confirm: true },
+        Command::Reset {
+            agreement: Some("00000000-00000000".to_owned()),
+        },
         Command::Update(crate::update::run::Asked {
             service: None,
             confirm: true,
@@ -538,10 +540,12 @@ fn every_command_is_answered_the_way_the_table_says() {
 fn a_rehearsal_carries_the_confirmable_commands_without_their_yes() {
     let rehearsing = crate::test_support::a_context().build().rehearsing();
     for asked in [
-        Command::Reset { confirm: true },
+        Command::Reset {
+            agreement: Some("00000000-00000000".to_owned()),
+        },
         Command::Remove {
             name: "ana".to_owned(),
-            confirm: true,
+            agreement: Some("00000000-00000000-00000000".to_owned()),
         },
         Command::QualityUpgrade { confirm: true },
         Command::Migrate(MigrateAction::Act {
@@ -601,7 +605,9 @@ fn a_rehearsed_support_bundle_is_the_run_that_describes_one() {
 #[test]
 fn a_real_run_carries_the_command_it_was_given() {
     let real = crate::test_support::a_context().build();
-    let asked = Command::Reset { confirm: true };
+    let asked = Command::Reset {
+        agreement: Some("00000000-00000000".to_owned()),
+    };
     assert_eq!(carried(asked.clone(), &real), asked);
 }
 

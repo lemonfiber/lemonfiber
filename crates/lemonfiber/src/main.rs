@@ -322,7 +322,10 @@ async fn main() -> ExitCode {
         Request::Clients => Command::Clients,
         Request::Invite { name, allowance } => invitation(name, allowance),
         Request::Reissue { name } => Command::Reissue { name },
-        Request::Remove { name, confirm } => Command::Remove { name, confirm },
+        Request::Remove { name, offer } => Command::Remove {
+            name,
+            agreement: offer.filter(|named| !named.trim().is_empty()),
+        },
         Request::Forget { confirm } => Command::Forget { confirm },
         Request::Uninstall(asked) => removing(asked),
         Request::Space { offer } => Command::Space { agreement: offer },
@@ -332,7 +335,9 @@ async fn main() -> ExitCode {
         Request::Key(asked) => translate::keyed(asked),
         Request::Seed => Command::Seed,
         Request::Adopt => Command::Adopt,
-        Request::Reset { confirm } => Command::Reset { confirm },
+        Request::Reset { offer } => Command::Reset {
+            agreement: offer.filter(|named| !named.trim().is_empty()),
+        },
         // Which of the two was named is the whole of what tells them apart, and clap
         // has already refused a run that named neither — which is the only place
         // somebody can be told what the two objects are while they are still typing.

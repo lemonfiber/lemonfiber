@@ -15,4 +15,5 @@ requirement = [
   { id = "G7-R11", state = "done", evidence = ["crates/lemonfiber-core/src/health.rs"] },
   { id = "G7-R12", state = "done", evidence = ["crates/lemonfiber-core/src/health.rs"] },
   { id = "G7-R13", state = "done", evidence = ["crates/lemonfiber-core/src/health.rs"] },
+  { id = "G7-R14", state = "done", evidence = ["crates/lemonfiber-core/src/health/summary.rs", "crates/lemonfiber-core/src/condition.rs", "contract/web-api/defs/Affected.json", "crates/lemonfiber-core/src/health/summary/tests.rs::an_acknowledged_item_is_shown_as_acknowledged_and_still_counted"] },
 ]

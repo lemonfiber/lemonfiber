@@ -279,6 +279,7 @@ fn serving() -> Vec<Outcome> {
             rehearsed: false,
             name: "ana".to_owned(),
             confirmed: false,
+            offer: "00000000-00000000-00000000".to_owned(),
             requests: 1,
             asks_through_the_request_service: true,
             revoked: lemonfiber_core::model::Revoked::Nothing,

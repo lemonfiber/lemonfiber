@@ -163,8 +163,8 @@ async fn down(ctx: &Ctx, forms: &[String], wait: Waiting) -> Result<Outcome, Box
 /// Remove somebody from the household, or say what that would cost.
 ///
 /// Beside the table for the reason [`down`] is.
-async fn removed(ctx: &Ctx, name: String, confirm: bool) -> Result<Outcome, Box<Problem>> {
-    remove::remove(ctx, name, confirm)
+async fn removed(ctx: &Ctx, name: String, offer: Option<String>) -> Result<Outcome, Box<Problem>> {
+    remove::remove(ctx, name, offer.as_deref())
         .await
         .map(Outcome::Removal)
 }
@@ -477,7 +477,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         }) => invited(ctx, name, to, confirm).await,
         Command::Reissue { name } => invite::reissue(ctx, name).await.map(Outcome::Invitation),
         Command::Handoff { name } => handoff::handoff(ctx, name).await.map(Outcome::Handoff),
-        Command::Remove { name, confirm } => removed(ctx, name, confirm).await,
+        Command::Remove { name, agreement } => removed(ctx, name, agreement).await,
         Command::Catalogue => engine::catalogue(ctx).map(Outcome::Catalogue),
         Command::Wiring(asked) => wiring::wiring(ctx, &asked),
         Command::Settings(asked) => crate::settings::run::settings(ctx, &asked).await,
@@ -530,7 +530,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Seed => seed::seed(ctx, false).await.map(Outcome::Seed),
         Command::Adopt => seed::seed(ctx, true).await.map(Outcome::Seed),
         Command::Uninstall(how) => uninstall::uninstall(ctx, how).await.map(Outcome::Uninstall),
-        Command::Reset { confirm } => reset::reset(ctx, confirm).await.map(Outcome::Reset),
+        Command::Reset { agreement } => reset::reset(ctx, agreement).await.map(Outcome::Reset),
         Command::Setup(action) => setup::setup(ctx, action).await.map(Outcome::Wizard),
         // Unconfirmed it says what moving onto this build's pins would change, and
         // touches nothing; confirmed it takes those steps behind a backup.

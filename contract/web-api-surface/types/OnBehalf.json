@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "destination": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "plugin": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "purpose": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

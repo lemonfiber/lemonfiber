@@ -37,10 +37,10 @@ pub fn carried(command: Command, ctx: &Ctx) -> Command {
 #[must_use]
 fn unconfirmed(command: Command) -> Command {
     match command {
-        Command::Reset { .. } => Command::Reset { confirm: false },
+        Command::Reset { .. } => Command::Reset { agreement: None },
         Command::Remove { name, .. } => Command::Remove {
             name,
-            confirm: false,
+            agreement: None,
         },
         Command::QualityUpgrade { .. } => Command::QualityUpgrade { confirm: false },
         Command::Migrate(MigrateAction::Act { mode, .. }) => Command::Migrate(MigrateAction::Act {

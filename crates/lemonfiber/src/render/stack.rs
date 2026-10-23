@@ -27,8 +27,9 @@ pub(super) fn reset(report: &ResetReport) -> Lines {
         lines.put(format!("Reverted {count} change(s) to lemonfiber's state:"));
     } else {
         lines.put(format!(
-            "A reset would revert these {count} change(s) to lemonfiber's state — run again \
-             with --confirm to do it:"
+            "A reset would revert these {count} change(s) to lemonfiber's state — run \
+             `lemonfiber reset --offer {}` to do it:",
+            report.offer
         ));
     }
     // The service connections whose category drifted, named as they read in a seed report.

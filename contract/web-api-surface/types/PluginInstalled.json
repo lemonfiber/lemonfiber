@@ -66,6 +66,12 @@
       ],
       "required": false
     },
+    "request_proofs": {
+      "type": [
+        "array[ref:PluginRequestProof]"
+      ],
+      "required": false
+    },
     "revision": {
       "type": [
         "string"

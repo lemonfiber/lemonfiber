@@ -93,6 +93,31 @@ fn context(env: &std::path::Path, http: Arc<Fake>) -> Ctx {
     ))
 }
 
+/// Remove somebody the way a surface does: read what it costs, then answer the offer that
+/// reading printed. A reading that is refused is answered with an offer it never made.
+async fn confirmed(ctx: &Ctx, name: &str) -> Result<Outcome, Box<lemonfiber_core::error::Problem>> {
+    let offer = match dispatch(
+        Command::Remove {
+            name: name.to_owned(),
+            agreement: None,
+        },
+        ctx,
+    )
+    .await
+    {
+        Ok(Outcome::Removal(report)) => report.offer,
+        _ => "00000000-00000000-00000000".to_owned(),
+    };
+    dispatch(
+        Command::Remove {
+            name: name.to_owned(),
+            agreement: Some(offer),
+        },
+        ctx,
+    )
+    .await
+}
+
 /// Ask to remove somebody, and hand back what was said and what was sent.
 async fn removing(
     scratch: &str,
@@ -102,14 +127,18 @@ async fn removing(
 ) -> Option<HouseholdRemoval> {
     let env = recorded_admin(scratch);
     let ctx = context(&env, http);
-    let said = dispatch(
-        Command::Remove {
-            name: name.to_owned(),
-            confirm,
-        },
-        &ctx,
-    )
-    .await;
+    let said = if confirm {
+        confirmed(&ctx, name).await
+    } else {
+        dispatch(
+            Command::Remove {
+                name: name.to_owned(),
+                agreement: None,
+            },
+            &ctx,
+        )
+        .await
+    };
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     match said.ok() {
         Some(Outcome::Removal(report)) => Some(report),
@@ -139,6 +168,55 @@ async fn what_it_costs_is_said_without_removing_anybody() {
     assert!(
         taken_from(&http.requests()).is_empty(),
         "an unconfirmed removal deleted something"
+    );
+}
+
+#[tokio::test]
+async fn an_answer_to_a_reading_that_has_moved_is_refused_naming_what_moved() {
+    let http = answering();
+    let env = recorded_admin("moved");
+    let ctx = context(&env, http.clone());
+    let reading = dispatch(
+        Command::Remove {
+            name: "ana".to_owned(),
+            agreement: None,
+        },
+        &ctx,
+    )
+    .await;
+    let Ok(Outcome::Removal(read)) = reading else {
+        unreachable!("an unconfirmed removal answers")
+    };
+    let moved = read
+        .offer
+        .split('-')
+        .enumerate()
+        .map(|(at, part)| if at == 1 { "ffffffff" } else { part })
+        .collect::<Vec<_>>()
+        .join("-");
+
+    let refused = dispatch(
+        Command::Remove {
+            name: "ana".to_owned(),
+            agreement: Some(moved),
+        },
+        &ctx,
+    )
+    .await
+    .err();
+    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+
+    assert_eq!(
+        refused.as_ref().map(|problem| problem.code.as_str()),
+        Some("REMOVE-7")
+    );
+    assert!(refused
+        .as_ref()
+        .is_some_and(|problem| problem.meaning.contains("their requests")
+            && !problem.meaning.contains("their account")));
+    assert!(
+        taken_from(&http.requests()).is_empty(),
+        "a moved answer removed somebody"
     );
 }
 
@@ -238,14 +316,7 @@ async fn the_account_that_runs_the_server_is_refused_here_rather_than_by_the_ser
     let env = recorded_admin("owner");
     let ctx = context(&env, http.clone());
 
-    let refused = dispatch(
-        Command::Remove {
-            name: "owner".to_owned(),
-            confirm: true,
-        },
-        &ctx,
-    )
-    .await;
+    let refused = confirmed(&ctx, "owner").await;
 
     assert!(
         refused.is_err(),
@@ -265,24 +336,10 @@ async fn nobody_by_that_name_is_refused_rather_than_removed_silently() {
     let env = recorded_admin("nobody");
     let ctx = context(&env, http.clone());
 
-    let refused = dispatch(
-        Command::Remove {
-            name: "  ".to_owned(),
-            confirm: true,
-        },
-        &ctx,
-    )
-    .await;
+    let refused = confirmed(&ctx, "  ").await;
     assert!(refused.is_err(), "a blank name removed somebody");
 
-    let missing = dispatch(
-        Command::Remove {
-            name: "nobody-here".to_owned(),
-            confirm: true,
-        },
-        &ctx,
-    )
-    .await;
+    let missing = confirmed(&ctx, "nobody-here").await;
     assert!(missing.is_err(), "a name nobody holds removed somebody");
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 }
@@ -311,7 +368,7 @@ async fn a_removal_serialises_under_its_own_name() {
     let json = dispatch(
         Command::Remove {
             name: "ana".to_owned(),
-            confirm: false,
+            agreement: None,
         },
         &ctx,
     )
@@ -354,14 +411,7 @@ async fn a_stack_that_cannot_be_read_removes_nobody() {
         Source::External(std::path::Path::new("/lemonfiber/no/such/stack")),
     );
 
-    let refused = dispatch(
-        Command::Remove {
-            name: "ana".to_owned(),
-            confirm: true,
-        },
-        &ctx,
-    )
-    .await;
+    let refused = confirmed(&ctx, "ana").await;
 
     assert!(refused.is_err(), "an unreadable stack removed somebody");
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
@@ -373,14 +423,7 @@ async fn a_stack_with_no_media_server_has_nobody_to_remove() {
     let env = recorded_admin("no-server");
     let ctx = context_on(&env, answering(), stack_without("jellyfin", "server"));
 
-    let refused = dispatch(
-        Command::Remove {
-            name: "ana".to_owned(),
-            confirm: true,
-        },
-        &ctx,
-    )
-    .await;
+    let refused = confirmed(&ctx, "ana").await;
 
     assert!(
         refused.is_err(),
@@ -400,14 +443,7 @@ async fn a_stack_with_no_request_service_counts_nothing_and_asks_nothing() {
         stack_without("seerr", "asking"),
     ));
 
-    let said = dispatch(
-        Command::Remove {
-            name: "ana".to_owned(),
-            confirm: true,
-        },
-        &ctx,
-    )
-    .await;
+    let said = confirmed(&ctx, "ana").await;
 
     let Some(Outcome::Removal(report)) = said.ok() else {
         unreachable!("a stack with no request service still removes the account")
@@ -441,14 +477,7 @@ async fn a_media_server_that_will_not_say_who_is_here_removes_nobody() {
     ]);
     let ctx = context(&env, http);
 
-    let refused = dispatch(
-        Command::Remove {
-            name: "ana".to_owned(),
-            confirm: true,
-        },
-        &ctx,
-    )
-    .await;
+    let refused = confirmed(&ctx, "ana").await;
 
     assert!(refused.is_err(), "an unreadable household removed somebody");
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
@@ -474,14 +503,7 @@ async fn a_media_server_that_refuses_the_removal_leaves_the_other_account_alone(
     let http = Fake::by_path_in_turn(routes);
     let ctx = context(&env, http.clone());
 
-    let refused = dispatch(
-        Command::Remove {
-            name: "ana".to_owned(),
-            confirm: true,
-        },
-        &ctx,
-    )
-    .await;
+    let refused = confirmed(&ctx, "ana").await;
 
     assert!(refused.is_err(), "a refused removal was reported as done");
     assert_eq!(
@@ -530,7 +552,7 @@ async fn a_request_service_that_will_not_say_what_it_holds_is_reported() {
         let said = dispatch(
             Command::Remove {
                 name: "ana".to_owned(),
-                confirm: false,
+                agreement: None,
             },
             &ctx,
         )

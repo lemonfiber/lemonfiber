@@ -3,26 +3,87 @@
 //! Drift is preserved by default: an operator's edit is theirs to keep. A reset is the
 //! escape hatch from that — the explicit, confirmed decision to let lemonfiber's state
 //! win and discard the edits. Because it discards work, it names exactly what will be
-//! lost first, and does nothing until confirmed: unconfirmed it only previews, so the
-//! operator sees the diffs before deciding.
+//! lost first, and does nothing until the offer that reading made is answered; the reset
+//! reads it again when it runs and refuses where anything moved.
 //!
 //! A reset restores lemonfiber's state *including* the operator's recorded quality choice
 //! — that is a managed setting, not drift — so the stack is written carrying the recorded
 //! preset, with only the hand-edits on top of it reverted.
 
-use crate::error::{Diagnose, Problem};
-use crate::model::ResetReport;
+use crate::error::codes::stack::RESET_MOVED;
+use crate::error::{Diagnose, Problem, Remedy, State};
+use crate::model::{ResetReport, StackEdit};
 
 use super::Ctx;
 
-/// Revert the stack to lemonfiber's state, or — until `confirm` — preview what that would
-/// discard.
+/// The parts a reset's offer is named over, in the order it is built.
+const OFFERED: [&str; 2] = ["the edits it reverts", "the connections it reverts"];
+
+/// Revert the stack to lemonfiber's state, or — until its offer is answered — preview what
+/// that would discard.
 ///
 /// # Errors
 ///
 /// Returns the [`Problem`] a surface renders when the recorded choice or the record of
-/// installed plugins cannot be read, or a file cannot be written.
-pub(crate) async fn reset(ctx: &Ctx, confirm: bool) -> Result<ResetReport, Box<Problem>> {
+/// installed plugins cannot be read, a file cannot be written, or the offer answered is
+/// not the one a reading makes now.
+pub(crate) async fn reset(
+    ctx: &Ctx,
+    agreement: Option<String>,
+) -> Result<ResetReport, Box<Problem>> {
+    let (reverted, reverted_connections) = reading(ctx, false).await?;
+    let standing = offer(&reverted, &reverted_connections);
+    let Some(answered) = agreement else {
+        return Ok(ResetReport {
+            rehearsed: false,
+            reverted,
+            reverted_connections,
+            confirmed: false,
+            offer: standing,
+        });
+    };
+    let moved = crate::agreement::differs(&answered, &standing, &OFFERED);
+    if !moved.is_empty() {
+        return Err(Box::new(reset_moved(&moved, &standing)));
+    }
+    let (reverted, reverted_connections) = reading(ctx, true).await?;
+    Ok(ResetReport {
+        rehearsed: false,
+        reverted,
+        reverted_connections,
+        confirmed: true,
+        offer: standing,
+    })
+}
+
+/// The offer a reading of a reset makes: each edit it reverts, then each connection.
+fn offer(reverted: &[StackEdit], connections: &[String]) -> String {
+    let edits: Vec<&str> = reverted
+        .iter()
+        .flat_map(|edit| [edit.path.as_str(), edit.diff.as_str()])
+        .collect();
+    let connections: Vec<&str> = connections.iter().map(String::as_str).collect();
+    crate::agreement::parted(&[&edits, &connections])
+}
+
+/// A reset answering a reading of it that has since moved.
+fn reset_moved(moved: &[&str], standing: &str) -> Problem {
+    Problem::new(
+        RESET_MOVED,
+        "That reset was agreed to against a different reading of what it would revert",
+        format!(
+            "Since it was read, {} changed, so nothing was reverted. Agreeing to it now would \
+             be agreeing to lose something nobody read.",
+            moved.join(" and ")
+        ),
+        Remedy::new("Read what a reset would revert again, and answer the name it prints")
+            .with_detail(format!("the offer standing now is {standing}")),
+    )
+    .in_state(State::Guided)
+}
+
+/// What a reset reverts, carried out where `confirm` and only read otherwise.
+async fn reading(ctx: &Ctx, confirm: bool) -> Result<(Vec<StackEdit>, Vec<String>), Box<Problem>> {
     let selection = super::quality::load_selection(ctx)?;
     let record = super::targets::beside_env(ctx, "materialised.json");
     let into = ctx.settings.stack_dir.as_deref();
@@ -78,12 +139,7 @@ pub(crate) async fn reset(ctx: &Ctx, confirm: bool) -> Result<ResetReport, Box<P
         .map(|wiring| wiring.connection)
         .collect();
 
-    Ok(ResetReport {
-        rehearsed: false,
-        reverted,
-        reverted_connections,
-        confirmed: confirm,
-    })
+    Ok((reverted, reverted_connections))
 }
 
 #[cfg(test)]

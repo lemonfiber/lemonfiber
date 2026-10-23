@@ -1,6 +1,6 @@
 //! A proof that runs the image's own program, as an install keeps it.
 
-use lemonfiber_plugin::{Expect, Manifest, Run};
+use lemonfiber_plugin::{Expect, Manifest, Request, Run};
 use serde::{Deserialize, Serialize};
 
 use super::{Installed, Placed};
@@ -23,6 +23,44 @@ pub struct RunProof {
     pub run: Run,
     /// What the run must come to.
     pub expect: Expect,
+}
+
+/// One proof that asks one of the plugin's services a question, kept so the doctor can ask
+/// it again without the plugin's source.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(rename = "PluginRequestProof")]
+pub struct RequestProof {
+    /// The proof's id.
+    pub proof: String,
+    /// What it establishes, in one line.
+    pub title: String,
+    /// Why it is worth asserting.
+    pub why: String,
+    /// The service it asks.
+    pub service: String,
+    /// What it asks.
+    pub request: Request,
+    /// What the answer must be.
+    pub expect: Expect,
+}
+
+/// Every proof in `manifest` that asks one of its services and settles which.
+pub(super) fn request_proofs(manifest: &Manifest) -> Vec<RequestProof> {
+    manifest
+        .proofs
+        .iter()
+        .filter_map(|proof| {
+            Some(RequestProof {
+                proof: proof.id.clone(),
+                title: proof.title.clone(),
+                why: proof.why.clone(),
+                service: manifest.asks(proof.service.as_deref())?.id.clone(),
+                request: proof.request.clone()?,
+                expect: proof.expect.clone(),
+            })
+        })
+        .collect()
 }
 
 /// Every proof in `manifest` that runs the image's own program and settles its service.

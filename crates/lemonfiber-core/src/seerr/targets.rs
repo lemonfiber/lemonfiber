@@ -151,6 +151,7 @@ pub(super) async fn move_fulfilment_target(
             held.id
         )));
     };
+    moved.remove("id");
     for (at, value) in [
         ("hostname", serde_json::json!(at.host)),
         ("port", serde_json::json!(at.port)),

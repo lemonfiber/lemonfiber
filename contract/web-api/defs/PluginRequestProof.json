@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One proof that asks one of the plugin's services a question, kept so the doctor can ask\nit again without the plugin's source.",
+  "type": "object",
+  "properties": {
+    "expect": {
+      "description": "What the answer must be.",
+      "$ref": "Expect.json"
+    },
+    "proof": {
+      "description": "The proof's id.",
+      "type": "string"
+    },
+    "request": {
+      "description": "What it asks.",
+      "$ref": "PluginRequest.json"
+    },
+    "service": {
+      "description": "The service it asks.",
+      "type": "string"
+    },
+    "title": {
+      "description": "What it establishes, in one line.",
+      "type": "string"
+    },
+    "why": {
+      "description": "Why it is worth asserting.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "proof",
+    "title",
+    "why",
+    "service",
+    "request",
+    "expect"
+  ]
+}

@@ -432,23 +432,34 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
         Box::new(permissions),
         Box::new(overlay),
     ];
-    // Appended to the same list rather than kept in one of their own, which is the
-    // whole of what *run where the bundled ones are run* means: one register, one
-    // budget, one narrowing, one overall. A second list beside this one would be a
-    // second set of rules for a row an operator reads in the same report.
-    //
-    // Where each plugin's service answers is composed once, from the record of what was
-    // installed, so a row asks the port the install published rather than a port
-    // something guessed.
-    let answering = crate::plugin::answering(&stack.installed);
-    for installed in &stack.installed {
-        checks.extend(crate::doctor::contributed::declared(
-            installed,
-            &answering,
-            &ctx.seams.http,
-        ));
-    }
+    checks.extend(declared_by_plugins(ctx, stack));
     checks
+}
+
+/// Every check an installed plugin declares: the rows it contributes and the proofs that
+/// ask its services.
+///
+/// Appended to the same list as the bundled ones rather than kept in one of their own,
+/// which is the whole of what *run where the bundled ones are run* means: one register,
+/// one budget, one narrowing, one overall. Where each plugin's service answers is
+/// composed once, from the record of what was installed, so a row asks the port the
+/// install published rather than a port something guessed.
+fn declared_by_plugins(ctx: &Ctx, stack: &Stack) -> Vec<Box<dyn Check>> {
+    let answering = crate::plugin::answering(&stack.installed);
+    stack
+        .installed
+        .iter()
+        .flat_map(|installed| {
+            let mut declared =
+                crate::doctor::contributed::declared(installed, &answering, &ctx.seams.http);
+            declared.extend(crate::doctor::requested::declared(
+                installed,
+                &answering,
+                &ctx.seams.http,
+            ));
+            declared
+        })
+        .collect()
 }
 
 #[cfg(test)]

@@ -261,6 +261,7 @@ pub(crate) fn an_installed(
         provides: Vec::new(),
         contributions: Vec::new(),
         run_proofs: Vec::new(),
+        request_proofs: Vec::new(),
         declared: crate::plugin::Declaration::default(),
         recipes: Vec::new(),
         adapters: Vec::new(),

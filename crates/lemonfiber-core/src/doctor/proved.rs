@@ -60,6 +60,14 @@ pub(crate) fn declared(installed: &Installed, running: &Running) -> Vec<Box<dyn 
         .collect()
 }
 
+/// What to do about a proof of `plugin` that did not hold.
+pub(super) fn reproving(plugin: &str) -> Remedy {
+    Remedy::new(format!(
+        "Prove {plugin} again, and take what it says up with its author"
+    ))
+    .with_detail(format!("lemonfiber plugin prove {plugin}"))
+}
+
 /// One run proof of one installed plugin.
 struct Proved {
     plugin: String,
@@ -194,11 +202,7 @@ impl Proved {
                          declares.",
                         self.of()
                     ),
-                    Remedy::new(format!(
-                        "Prove {} again, and take what it says up with its author",
-                        self.plugin
-                    ))
-                    .with_detail(format!("lemonfiber plugin prove {}", self.plugin)),
+                    reproving(&self.plugin),
                 )
                 .in_state(State::Guided)
                 .with_detail(faults.join("; ")),

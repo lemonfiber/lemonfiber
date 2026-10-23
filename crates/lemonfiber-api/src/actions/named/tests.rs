@@ -102,7 +102,7 @@ fn every_action_that_reads_the_agreement_is_listed_as_taking_it() {
         "these read confirm, and the table refuses it before they can"
     );
     assert!(
-        reading.contains(&"migrate-adopt") && reading.contains(&"reset"),
+        reading.contains(&"migrate-adopt") && reading.contains(&"forget"),
         "and the sweep sees the reads it exists to find: {reading:?}"
     );
 }

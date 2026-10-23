@@ -10,6 +10,7 @@ fn asked(requests: usize) -> HouseholdRemoval {
         rehearsed: false,
         name: "ana".to_owned(),
         confirmed: false,
+        offer: "00000000-00000000-00000000".to_owned(),
         requests,
         asks_through_the_request_service: true,
         revoked: Revoked::Nothing,
@@ -27,7 +28,7 @@ fn asked(requests: usize) -> HouseholdRemoval {
 fn what_goes_is_said_before_how_to_go_ahead() {
     let text = removal(&asked(2)).text();
     let cost = text.find("watch history");
-    let confirm = text.find("--confirm");
+    let confirm = text.find("--offer 00000000-00000000-00000000");
 
     assert!(cost.is_some() && confirm.is_some(), "{text}");
     assert!(
@@ -79,6 +80,7 @@ fn never_having_asked_for_anything_is_said_rather_than_left_blank() {
 fn a_confirmed_removal_says_what_it_did_and_how_far_it_reached() {
     let done = HouseholdRemoval {
         confirmed: true,
+        offer: "00000000-00000000-00000000".to_owned(),
         revoked: Revoked::Everywhere,
         watch_history: WENT.to_owned(),
         ..asked(1)
@@ -91,7 +93,7 @@ fn a_confirmed_removal_says_what_it_did_and_how_far_it_reached() {
     assert!(text.contains("Both accounts are gone."), "{text}");
     assert!(text.contains("which no longer exist"), "{text}");
     assert!(
-        !text.contains("--confirm"),
+        !text.contains("--offer"),
         "a done removal still asked: {text}"
     );
 }
@@ -115,6 +117,7 @@ fn the_dispatch_draws_a_removal() {
 fn more_than_one_request_reads_as_more_than_one() {
     let done = HouseholdRemoval {
         confirmed: true,
+        offer: "00000000-00000000-00000000".to_owned(),
         revoked: Revoked::Everywhere,
         watch_history: WENT.to_owned(),
         ..asked(3)
@@ -131,6 +134,7 @@ fn more_than_one_request_reads_as_more_than_one() {
 fn a_partial_removal_names_the_half_that_is_left() {
     let half = HouseholdRemoval {
         confirmed: true,
+        offer: "00000000-00000000-00000000".to_owned(),
         revoked: Revoked::MediaServerOnly,
         watch_history: WENT.to_owned(),
         findings: vec!["the request service still holds an account".to_owned()],

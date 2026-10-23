@@ -241,7 +241,9 @@ fn an_act_key_calls_exactly_what_a_key_may_call() {
     for refused in [
         an_uninstall(),
         Command::Seed,
-        Command::Reset { confirm: true },
+        Command::Reset {
+            agreement: Some("00000000-00000000".to_owned()),
+        },
         Command::Forget { confirm: true },
         Command::Doctor(Diagnosing {
             narrowing: lemonfiber_core::doctor::Narrowing::Suite,
@@ -289,7 +291,9 @@ fn a_member_key_is_exactly_that_members_session_at_either_door() {
 fn nothing_that_cannot_be_undone_or_widens_trust_is_callable_by_a_key() {
     let never = [
         an_uninstall(),
-        Command::Reset { confirm: true },
+        Command::Reset {
+            agreement: Some("00000000-00000000".to_owned()),
+        },
         Command::Seed,
         Command::Credentials(lemonfiber_core::app::Asking::Read),
         Command::Plugins(lemonfiber_core::app::plugins::Asked::Installed),

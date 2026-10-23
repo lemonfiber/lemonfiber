@@ -608,6 +608,7 @@ fn plugin_filling(plugin: &str, service: &str, capability: &str) -> crate::plugi
         provides: vec![capability.to_owned()],
         contributions: Vec::new(),
         run_proofs: Vec::new(),
+        request_proofs: Vec::new(),
         declared: crate::plugin::Declaration::default(),
         recipes: Vec::new(),
         adapters: Vec::new(),

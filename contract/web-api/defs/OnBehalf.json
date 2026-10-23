@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A request lemonfiber makes on an installed plugin's behalf, attributed to it.",
+  "type": "object",
+  "properties": {
+    "destination": {
+      "description": "Where it goes, as the plugin declared it.",
+      "type": "string"
+    },
+    "plugin": {
+      "description": "The plugin that declared it, by its id.",
+      "type": "string"
+    },
+    "purpose": {
+      "description": "Why it may be made.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "plugin",
+    "destination",
+    "purpose"
+  ]
+}

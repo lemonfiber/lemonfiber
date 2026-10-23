@@ -263,6 +263,44 @@ pub(super) fn a_settings_report() -> SettingsReport {
 
 /// One request of this product's own and one of a service's, which is both
 /// halves of what leaves this machine.
+/// The one service the installed sample plugin places, on the wider tier.
+fn komga_placed() -> lemonfiber_core::plugin::Placed {
+    lemonfiber_core::plugin::Placed {
+        fields: lemonfiber_core::plugin::Fields::default(),
+        service: "komga".to_owned(),
+        image: "docker.io/gotson/komga".to_owned(),
+        digest: "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            .to_owned(),
+        tag: "1.11.0".to_owned(),
+        config_path: "/config".to_owned(),
+        takes_data: true,
+        reached: Some(lemonfiber_core::plugin::Reached::Household {
+            port: 25600,
+            hostname: "comics".to_owned(),
+            group: Some("Library".to_owned()),
+        }),
+        provides: Vec::new(),
+        name: "Komga".to_owned(),
+        description: "Reads comics".to_owned(),
+        icon: None,
+        hidden: false,
+        health: None,
+        api: None,
+        listens: None,
+        media_types: Vec::new(),
+        networks: Vec::new(),
+        speaks: Vec::new(),
+        fronts: None,
+        native: None,
+        replaces: None,
+        shape: None,
+        asks: Vec::new(),
+        reaches: None,
+        asks_for: None,
+        starting: None,
+    }
+}
+
 /// One plugin, installed, with its one service on the wider tier.
 ///
 /// Carrying the install beside the listing rather than only the listing: the
@@ -274,43 +312,11 @@ pub(super) fn what_is_installed() -> lemonfiber_core::plugin::Installs {
         version: "1.2.0".to_owned(),
         name: None,
         description: None,
-        services: vec![lemonfiber_core::plugin::Placed {
-            fields: lemonfiber_core::plugin::Fields::default(),
-            service: "komga".to_owned(),
-            image: "docker.io/gotson/komga".to_owned(),
-            digest: "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
-                .to_owned(),
-            tag: "1.11.0".to_owned(),
-            config_path: "/config".to_owned(),
-            takes_data: true,
-            reached: Some(lemonfiber_core::plugin::Reached::Household {
-                port: 25600,
-                hostname: "comics".to_owned(),
-                group: Some("Library".to_owned()),
-            }),
-            provides: Vec::new(),
-            name: "Komga".to_owned(),
-            description: "Reads comics".to_owned(),
-            icon: None,
-            hidden: false,
-            health: None,
-            api: None,
-            listens: None,
-            media_types: Vec::new(),
-            networks: Vec::new(),
-            speaks: Vec::new(),
-            fronts: None,
-            native: None,
-            replaces: None,
-            shape: None,
-            asks: Vec::new(),
-            reaches: None,
-            asks_for: None,
-            starting: None,
-        }],
+        services: vec![komga_placed()],
         provides: Vec::new(),
         contributions: Vec::new(),
         run_proofs: Vec::new(),
+        request_proofs: Vec::new(),
         declared: lemonfiber_core::plugin::Declaration::default(),
         recipes: Vec::new(),
         adapters: Vec::new(),
@@ -381,6 +387,11 @@ pub(super) fn what_leaves() -> lemonfiber_core::outbound::Leaving {
             allowed: true,
             switch: lemonfiber_core::config::REACH_INDEXER_KEY.to_owned(),
             cost: "a key is recorded without ever having been proven".to_owned(),
+        }],
+        on_behalf: vec![lemonfiber_core::outbound::OnBehalf {
+            plugin: "comics".to_owned(),
+            destination: "metadata.example".to_owned(),
+            purpose: "a destination this plugin's recipes declare".to_owned(),
         }],
         theirs: vec![lemonfiber_core::outbound::Elsewhere {
             service: "prowlarr".to_owned(),

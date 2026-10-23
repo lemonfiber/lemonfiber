@@ -25,7 +25,7 @@
 //! is declared with, so a code added here reaches a client as a regenerated diff.
 
 use crate::error::codes::{
-    gone, life, migrate, plugin, rate, repair, restore, setting, space, update, wire,
+    gone, life, migrate, plugin, rate, remove, repair, restore, setting, space, stack, update, wire,
 };
 use crate::error::Code;
 
@@ -36,7 +36,7 @@ use crate::error::Code;
 /// an operator searching for the code reads what else that command refuses. Letting a
 /// download go raises the disk account's, because its offer is one line of that
 /// account.
-pub const MOVED: [Code; 11] = [
+pub const MOVED: [Code; 13] = [
     repair::STALE,
     restore::MOVED_ON,
     migrate::OFFER_MOVED,
@@ -48,6 +48,8 @@ pub const MOVED: [Code; 11] = [
     update::UPDATE_MOVED,
     rate::PAUSING_MOVED,
     setting::SETTINGS_MOVED,
+    remove::REMOVAL_MOVED,
+    stack::RESET_MOVED,
 ];
 
 /// A checksum over every word an operator read before agreeing.

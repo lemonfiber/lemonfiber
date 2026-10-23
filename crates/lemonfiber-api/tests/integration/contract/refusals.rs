@@ -43,13 +43,14 @@ fn a_claim_that_collects_nothing_is_listed_as_unauthorised() {
 
 /// The codes at a status of the client's own making that no request on this surface is
 /// answered with: an arrangement for closing requests is made at a shell, and a check a
-/// plugin contributed, a proof that runs a plugin's image and a move in place on offer
-/// are each said inside a diagnosis rather than refusing one.
-const ANSWERED_ELSEWHERE: [Code; 5] = [
+/// plugin contributed, a proof that runs a plugin's image or asks its service, and a move
+/// in place on offer are each said inside a diagnosis rather than refusing one.
+const ANSWERED_ELSEWHERE: [Code; 6] = [
     quota::NOTHING_AGREED,
     quota::TOO_SOON,
     plugin::CONTRIBUTED_FAILED,
     plugin::PROOF_RUN_FAILED,
+    plugin::PROOF_ASKED_FAILED,
     plugin::MOVE_OFFERED,
 ];
 

@@ -42,11 +42,6 @@ use lemonfiber_manifest::Service;
 /// leaves this machine* in this report and the two are opposite claims.
 const UNKNOWN: &str = "not known to lemonfiber";
 
-/// What is said about a destination a plugin's recipes declare.
-const CARRIED: &str = "A destination this plugin's recipes declare they may call, or carry \
-                       a value it captured to. Declared in its manifest and held to it: a \
-                       recipe reaching anywhere else is refused before it is installed.";
-
 /// What is said about a service this build ships no record for.
 const NO_RECORD: &str = "This service is not one lemonfiber knows, so nothing here can say \
                          where it reaches or what it asks for. It is listed because leaving \
@@ -105,48 +100,27 @@ fn said(
     }
 }
 
-/// What installed plugins bring to this account: each of their services, and every
-/// destination outside the stack their recipes declare.
+/// What installed plugins bring to this account as services of the stack: each of their
+/// services, attributed to its plugin.
 ///
 /// A plugin's service is listed as it says where it reaches and what it asks for, and
-/// one that says nothing as one lemonfiber has no record of, attributed to its plugin,
-/// for the reason an undescribed bundled service is listed: leaving it out would make
-/// the account read as complete while it was short. A destination a recipe
-/// declares is recorded, because the plugin declared it and was held to it, and it is
-/// listed only where it is outside the stack: a recipe reaching one of the stack's own
-/// services is not something leaving the machine.
-pub(super) fn brought(stack: &[Service], installed: &[crate::plugin::Installed]) -> Vec<Elsewhere> {
-    let inside = |to: &str| stack.iter().any(|service| service.id == to);
+/// one that says nothing as one lemonfiber has no record of, for the reason an
+/// undescribed bundled service is listed: leaving it out would make the account read as
+/// complete while it was short.
+pub(super) fn brought(installed: &[crate::plugin::Installed]) -> Vec<Elsewhere> {
     installed
         .iter()
         .flat_map(|one| {
-            let origin = crate::origin::Origin::Plugin {
-                named: one.plugin.clone(),
-            };
-            let services = one.services.iter().map({
-                let origin = origin.clone();
-                move |placed| {
-                    said(
-                        &placed.service,
-                        placed.reaches.as_deref(),
-                        placed.asks_for.as_deref(),
-                        origin.clone(),
-                    )
-                }
-            });
-            let hosts = one
-                .declared
-                .reaches
-                .iter()
-                .filter(|to| !inside(to))
-                .map(move |to| Elsewhere {
-                    service: one.plugin.clone(),
-                    destination: to.clone(),
-                    purpose: CARRIED.to_owned(),
-                    recorded: true,
-                    origin: origin.clone(),
-                });
-            services.chain(hosts).collect::<Vec<Elsewhere>>()
+            one.services.iter().map(|placed| {
+                said(
+                    &placed.service,
+                    placed.reaches.as_deref(),
+                    placed.asks_for.as_deref(),
+                    crate::origin::Origin::Plugin {
+                        named: one.plugin.clone(),
+                    },
+                )
+            })
         })
         .collect()
 }

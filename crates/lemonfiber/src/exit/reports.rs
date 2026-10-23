@@ -331,7 +331,7 @@ pub(crate) fn seed_exit(report: &lemonfiber_core::seed::Report) -> ExitCode {
     }
 }
 
-/// The exit code a reset earns. A reset without --confirm that found edits to revert
+/// The exit code a reset earns. A reset without an offer that found edits to revert
 /// only previewed them — like a held quality choice, it needs the operator's say-so, so
 /// a script sees a non-zero result to act on. Both an edited stack file and a drifted
 /// connection are pending reverts, so either one left unconfirmed is a non-zero result.

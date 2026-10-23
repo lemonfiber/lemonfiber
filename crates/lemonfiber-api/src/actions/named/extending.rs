@@ -16,7 +16,7 @@ use lemonfiber_core::app::plugins::{Asked, Consent, Inputs};
 use lemonfiber_core::app::{Command, Filling, Linking};
 use lemonfiber_core::plugin::Source;
 
-use super::{Arguments, Refused};
+use super::{filled, Arguments, Refused};
 
 /// Every act on what extends the stack.
 const ABOUT: [&str; 5] = [
@@ -54,7 +54,7 @@ pub(super) fn asked_for(action: &str, given: Arguments) -> Result<Command, Refus
         action: action.to_owned(),
         argument: argument.to_owned(),
     };
-    let agreement = named(offer);
+    let agreement = filled(offer);
     if action == "wiring-fill" {
         // Both halves are required, and nothing here decides anything about either:
         // whether the service can fill the capability is the core's answer.
@@ -70,8 +70,8 @@ pub(super) fn asked_for(action: &str, given: Arguments) -> Result<Command, Refus
         approved,
         inputs: supplied(&inputs)?,
     };
-    let source = named(source).map(|written| Source::named(&written));
-    let plugin = named(plugin);
+    let source = filled(source).map(|written| Source::named(&written));
+    let plugin = filled(plugin);
     let asked = match action {
         "plugin-install" => Asked::Install {
             source: source.ok_or_else(|| needs("source"))?,
@@ -107,10 +107,4 @@ fn supplied(written: &[String]) -> Result<Inputs, Refused> {
                   without the \"=\""
             .to_owned(),
     })
-}
-
-/// What was written, where anything was: a field sent and left blank names nothing,
-/// so it reads as one left out.
-fn named(written: Option<String>) -> Option<String> {
-    written.filter(|given| !given.trim().is_empty())
 }

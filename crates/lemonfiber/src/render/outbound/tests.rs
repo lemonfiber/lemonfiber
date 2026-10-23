@@ -67,6 +67,7 @@ fn each_request_is_offered_the_command_that_switches_it_off() {
 fn the_stacks_own_requests_are_headed_as_the_stacks() {
     let said = leaving(&Leaving {
         ours: Vec::new(),
+        on_behalf: Vec::new(),
         theirs: vec![Elsewhere {
             service: "prowlarr".to_owned(),
             destination: "the indexers you configured".to_owned(),
@@ -87,6 +88,7 @@ fn the_stacks_own_requests_are_headed_as_the_stacks() {
 fn a_plugins_request_is_marked_with_the_plugin_that_brought_it() {
     let said = leaving(&Leaving {
         ours: Vec::new(),
+        on_behalf: Vec::new(),
         theirs: vec![Elsewhere {
             service: "komga".to_owned(),
             destination: "metadata.example".to_owned(),
@@ -102,9 +104,33 @@ fn a_plugins_request_is_marked_with_the_plugin_that_brought_it() {
 }
 
 #[test]
+fn what_lemonfiber_sends_for_a_plugin_names_the_plugin_apart_from_the_stacks_requests() {
+    let said = leaving(&Leaving {
+        ours: Vec::new(),
+        on_behalf: vec![lemonfiber_core::outbound::OnBehalf {
+            plugin: "comics".to_owned(),
+            destination: "metadata.example".to_owned(),
+            purpose: "A destination this plugin's recipes declare.".to_owned(),
+        }],
+        theirs: Vec::new(),
+    })
+    .text();
+    assert!(
+        said.contains("What lemonfiber sends on behalf of installed plugins:"),
+        "{said}"
+    );
+    assert!(
+        said.contains("metadata.example — for plugin comics"),
+        "{said}"
+    );
+    assert!(!said.contains("theirs"), "{said}");
+}
+
+#[test]
 fn a_service_that_reaches_nothing_says_nothing_leaves_rather_than_nowhere() {
     let said = leaving(&Leaving {
         ours: Vec::new(),
+        on_behalf: Vec::new(),
         theirs: vec![Elsewhere {
             service: "unpackerr".to_owned(),
             destination: String::new(),
@@ -137,6 +163,7 @@ fn the_printer_reaches_this_renderer_for_this_outcome() {
 fn a_service_lemonfiber_has_no_record_for_says_so_rather_than_promising_anything() {
     let said = leaving(&Leaving {
         ours: Vec::new(),
+        on_behalf: Vec::new(),
         theirs: vec![Elsewhere {
             service: "somebodys-own-service".to_owned(),
             destination: "not known to lemonfiber".to_owned(),
@@ -158,8 +185,10 @@ fn a_service_lemonfiber_has_no_record_for_says_so_rather_than_promising_anything
 fn a_stack_with_no_services_says_nothing_about_them_at_all() {
     let said = leaving(&Leaving {
         ours: Vec::new(),
+        on_behalf: Vec::new(),
         theirs: Vec::new(),
     })
     .text();
     assert!(!said.contains("theirs"), "{said}");
+    assert!(!said.contains("on behalf"), "{said}");
 }

@@ -1,8 +1,8 @@
 //! Where `SABnzbd` files each category's completed downloads.
 //!
 //! A category's folder is its own `dir`: an absolute one is where its completed downloads
-//! land, a relative one is read below the client's completed folder, and an empty one
-//! files them under the category's own name there. The category `*` is what a download
+//! land, a relative one is read below the client's completed folder as the client resolves
+//! it, and an empty one files them under the category's own name there. The category `*` is what a download
 //! with no category is filed under, which no curator hands it, so it is not one of them.
 
 use async_trait::async_trait;
@@ -25,8 +25,6 @@ struct Held {
 struct Config {
     #[serde(default)]
     categories: Vec<Category>,
-    #[serde(default)]
-    misc: Option<Misc>,
 }
 
 /// One category and the folder it names.
@@ -37,11 +35,16 @@ struct Category {
     dir: String,
 }
 
-/// The client's completed folder.
+/// One `fullstatus` answer, as far as it is read here.
 #[derive(serde::Deserialize)]
-struct Misc {
-    #[serde(default)]
-    complete_dir: String,
+struct Status {
+    status: Completing,
+}
+
+/// The client's completed folder, resolved against its own base folder.
+#[derive(serde::Deserialize)]
+struct Completing {
+    completedir: String,
 }
 
 /// The client's answer to a category written, which carries a `false` status where it
@@ -61,17 +64,13 @@ impl Filing for Sabnzbd {
                 "the categories could not be read",
             )
             .await?;
-        let completed: Held = self
+        let completed: Status = self
             .read(
-                "get_config&section=misc&keyword=complete_dir",
+                "fullstatus&skip_dashboard=1",
                 "the completed folder could not be read",
             )
             .await?;
-        let below = completed
-            .config
-            .misc
-            .map(|misc| misc.complete_dir)
-            .unwrap_or_default();
+        let below = completed.status.completedir;
         Ok(held
             .config
             .categories

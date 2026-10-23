@@ -38,7 +38,7 @@ async fn a_removal_dispatches_and_says_what_it_would_cost() {
     let said = dispatch(
         Command::Remove {
             name: "ana".to_owned(),
-            confirm: false,
+            agreement: None,
         },
         &ctx,
     )
@@ -54,7 +54,7 @@ async fn a_removal_dispatches_and_says_what_it_would_cost() {
     let refused = dispatch(
         Command::Remove {
             name: "  ".to_owned(),
-            confirm: false,
+            agreement: None,
         },
         &ctx,
     )

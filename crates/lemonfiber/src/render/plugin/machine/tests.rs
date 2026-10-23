@@ -52,6 +52,7 @@ fn recorded(plugin: &str, reached: Option<Reached>) -> Installed {
         provides: Vec::new(),
         contributions: Vec::new(),
         run_proofs: Vec::new(),
+        request_proofs: Vec::new(),
         declared: lemonfiber_core::plugin::Declaration::default(),
         recipes: Vec::new(),
         adapters: Vec::new(),

@@ -247,6 +247,7 @@ fn an_unconfirmed_reset_that_found_edits_asks_to_be_confirmed() {
             diff: String::new(),
         }],
         reverted_connections: Vec::new(),
+        offer: "00000000-00000000".to_owned(),
         confirmed: false,
     };
     assert_ne!(
@@ -257,6 +258,7 @@ fn an_unconfirmed_reset_that_found_edits_asks_to_be_confirmed() {
         rehearsed: false,
         reverted: Vec::new(),
         reverted_connections: Vec::new(),
+        offer: "00000000-00000000".to_owned(),
         confirmed: false,
     };
     assert_eq!(

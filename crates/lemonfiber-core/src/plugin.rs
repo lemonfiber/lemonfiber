@@ -87,7 +87,9 @@ pub(crate) use container::{
 pub use container::{profile, Holding, Reading, Variable};
 pub use declared::{Declaration, Secret};
 pub use fronting::{proxied as fronting_proxied, taken as label_taken, PROXY};
-pub use installed::{answering, spelled_alike, Asking, Installed, Placed, Reached, RunProof};
+pub use installed::{
+    answering, spelled_alike, Asking, Installed, Placed, Reached, RequestProof, RunProof,
+};
 pub use lemonfiber_manifest::container::Fields;
 pub use owning::{owned_by, owner, owns};
 pub use placing::{key_file, mount_sources, mount_tree, writes, Lands, Write};

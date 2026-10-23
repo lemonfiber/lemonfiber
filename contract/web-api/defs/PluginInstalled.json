@@ -83,6 +83,13 @@
         "$ref": "PluginRecipe.json"
       }
     },
+    "request_proofs": {
+      "description": "Every proof it declares that asks one of its services a question.",
+      "type": "array",
+      "items": {
+        "$ref": "PluginRequestProof.json"
+      }
+    },
     "revision": {
       "description": "The commit it was installed at, where it came from a git source.\n\nThe one commit the revision named at install resolved to, so what was installed\ncan be told from whatever that source serves now. Empty for a plugin installed\nfrom a directory, which has no revision to name, and for a record written before\nthis was kept.",
       "type": "string",

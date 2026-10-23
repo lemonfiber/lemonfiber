@@ -313,12 +313,12 @@ pub enum Command {
     ///
     /// Because it throws away what cannot be got back — their watch history goes with
     /// the account, and the request service destroys what they asked for — it says
-    /// what would go and does nothing until `confirm`.
+    /// what would go, and does nothing until its offer is answered.
     Remove {
         /// Whose account to take away.
         name: String,
-        /// Go ahead and remove them, having seen what goes.
-        confirm: bool,
+        /// The offer being answered, as the reading that made it printed it.
+        agreement: Option<String>,
     },
     /// Say what each service in this stack is for, what going without it costs, how
     /// much that matters, and what became of anything the stack has dropped.
@@ -488,11 +488,10 @@ pub enum Command {
     Adopt,
     /// Put the stack back to lemonfiber's own state, reverting every operator edit — the
     /// opposite of adopt. Because it discards their work, it names what will be lost and
-    /// does nothing until confirmed: unconfirmed it only previews the reverts.
+    /// does nothing until its offer is answered: until then it only previews the reverts.
     Reset {
-        /// Whether the operator confirmed the loss; without it, only the reverts are
-        /// shown and nothing is written.
-        confirm: bool,
+        /// The offer being answered, as the reading that made it printed it.
+        agreement: Option<String>,
     },
     /// Move the stack onto the image versions this build pins.
     ///

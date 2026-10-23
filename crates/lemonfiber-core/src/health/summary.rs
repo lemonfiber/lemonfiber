@@ -67,6 +67,10 @@ pub struct Affected {
     /// The technical half of what happened, kept out of the summary so the plain
     /// words lead, and here for whoever wants the code.
     pub exit: Option<i32>,
+    /// Whether the operator has acknowledged it by declining its fix. It still stands
+    /// and is still counted.
+    #[serde(default)]
+    pub acknowledged: bool,
 }
 
 impl Summary {
@@ -125,6 +129,7 @@ impl Summary {
                 remedies: condition.remedies.clone(),
                 downstream: Self::downstream_of(&condition.check, &steady),
                 exit: condition.exit,
+                acknowledged: condition.declined,
             })
             .collect();
         // Worst first, and stably, so two things equally wrong keep the order the

@@ -1,8 +1,15 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Everything that leaves this machine: lemonfiber's own requests, and the stack's.",
+  "description": "Everything that leaves this machine: lemonfiber's own requests, those it makes on an\ninstalled plugin's behalf, and the stack's.",
   "type": "object",
   "properties": {
+    "on_behalf": {
+      "description": "Every request lemonfiber makes on an installed plugin's behalf.",
+      "type": "array",
+      "items": {
+        "$ref": "OnBehalf.json"
+      }
+    },
     "ours": {
       "description": "Every request lemonfiber makes on its own account, in a fixed order.",
       "type": "array",
@@ -20,6 +27,7 @@
   },
   "required": [
     "ours",
+    "on_behalf",
     "theirs"
   ]
 }

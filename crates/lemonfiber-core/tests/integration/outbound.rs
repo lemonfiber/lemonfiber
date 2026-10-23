@@ -274,19 +274,34 @@ async fn a_fetch_is_refused_by_name_when_fetching_is_switched_off() {
     assert!(problem.meaning.contains(REACH_REGISTRY_KEY), "{problem:?}");
 }
 
-/// Nothing unexpected leaves this machine during a whole diagnosis.
+/// Where a request from this machine may go: every destination lemonfiber is documented
+/// to ask, and every one an installed plugin declares it may be sent to on its behalf.
+async fn expected(settings: Settings) -> Vec<String> {
+    let report = listed(settings).await;
+    report
+        .ours
+        .into_iter()
+        .flat_map(|entry| entry.destination)
+        .chain(report.on_behalf.into_iter().map(|one| one.destination))
+        .collect()
+}
+
+/// Whether a request to `url` goes somewhere `expected` names, as a whole address or
+/// as a host.
+fn expected_at(url: &str, expected: &[String]) -> bool {
+    expected
+        .iter()
+        .any(|known| url.starts_with(known.as_str()) || host(url) == known)
+}
+
+/// What a whole non-disruptive diagnosis under `settings` sent off this machine to
+/// somewhere it was not expected to go.
 ///
-/// The other guards read source text; this watches. A full non-disruptive run is the
-/// widest thing this product does on its own — nine checks, several of them reaching
-/// services — and every request it makes goes through the one transport, so the
-/// transport is where the claim can be observed rather than argued.
-///
-/// What counts as expected is not a second list written here. It is the enumeration
-/// itself: a request is fine if it stays on this machine, and otherwise its host must
-/// be one the operator would have been told about. An address written into the code
-/// and left off the list fails here even though every source sweep passed.
-#[tokio::test]
-async fn a_whole_diagnosis_reaches_nowhere_the_operator_was_not_told_about() {
+/// The other guards read source text; this watches. A full run is the widest thing this
+/// product does on its own, and every request it makes goes through the one transport,
+/// so the transport is where the claim can be observed rather than argued. What counts
+/// as expected is not a second list written here: it is the enumeration itself.
+async fn unexpected_after_a_diagnosis(settings: Settings) -> Vec<String> {
     let http = lemonfiber_fixtures::http::Fake::silent();
     let ctx = lemonfiber_testing::a_context()
         .runner(Arc::new(lemonfiber_fixtures::ports::Idle))
@@ -296,6 +311,7 @@ async fn a_whole_diagnosis_reaches_nowhere_the_operator_was_not_told_about() {
             lemonfiber_core::ports::docker::Health::Healthy,
         )))
         .filesystem(lemonfiber_fixtures::files::Files::ending(Vec::new()))
+        .settings(settings.clone())
         .build()
         .with_http(http.clone());
 
@@ -304,37 +320,71 @@ async fn a_whole_diagnosis_reaches_nowhere_the_operator_was_not_told_about() {
             .await;
     assert!(ran.is_ok(), "the diagnosis ran: {ran:?}");
 
-    let asked = http.requests();
+    let left: Vec<String> = http
+        .requests()
+        .into_iter()
+        .map(|request| request.url)
+        .filter(|url| !stays_here(url))
+        .collect();
     assert!(
-        !asked.is_empty(),
-        "the diagnosis asked nothing at all, so this is watching a run that did not happen"
+        !left.is_empty(),
+        "nothing in this run left the machine at all, so the claim is about nothing"
     );
-    let told_about: Vec<String> = listed(Settings::default())
+    let expected = expected(settings).await;
+    left.into_iter()
+        .filter(|url| !expected_at(url, &expected))
+        .collect()
+}
+
+/// Nothing unexpected leaves this machine during a whole diagnosis with no plugin
+/// installed, and with none installed what is expected is exactly what lemonfiber is
+/// documented to ask.
+#[tokio::test]
+async fn a_whole_diagnosis_reaches_nowhere_the_operator_was_not_told_about() {
+    let unexpected = unexpected_after_a_diagnosis(Settings::default()).await;
+    assert!(
+        unexpected.is_empty(),
+        "these left this machine and the operator is told about none of them: {unexpected:?}"
+    );
+
+    let documented: Vec<String> = listed(Settings::default())
         .await
         .ours
         .into_iter()
         .flat_map(|entry| entry.destination)
         .collect();
-    let left: Vec<&String> = asked
-        .iter()
-        .map(|request| &request.url)
-        .filter(|url| !stays_here(url))
-        .collect();
-    assert!(
-        !left.is_empty(),
-        "nothing in this run left the machine at all, so what is watched below is only \
-         loopback traffic and the claim is about nothing"
-    );
-    let unexpected: Vec<String> = asked
-        .iter()
-        .map(|request| request.url.clone())
-        .filter(|url| !stays_here(url))
-        .filter(|url| !told_about.iter().any(|known| url.starts_with(known)))
-        .collect();
+    assert!(!documented.is_empty(), "nothing is documented at all");
+    assert_eq!(expected(Settings::default()).await, documented);
+}
+
+/// With a plugin installed, a whole diagnosis is measured against the documented set
+/// together with what that plugin declares it reaches, and only then does its reach
+/// count as expected.
+#[tokio::test]
+async fn a_diagnosis_with_a_plugin_installed_is_measured_against_its_declared_reach_too() {
+    let with = beside("leak-plugin", INSTALLED);
+
+    let unexpected = unexpected_after_a_diagnosis(with.clone()).await;
     assert!(
         unexpected.is_empty(),
         "these left this machine and the operator is told about none of them: {unexpected:?}"
     );
+
+    let declared = "https://metadata.example/v1/series";
+    assert!(expected_at(declared, &expected(with).await));
+    assert!(!expected_at(declared, &expected(Settings::default()).await));
+}
+
+/// The host a URL names, without its port or path.
+fn host(url: &str) -> &str {
+    url.split_once("://")
+        .map_or(url, |(_, rest)| rest)
+        .split('/')
+        .next()
+        .unwrap_or_default()
+        .split(':')
+        .next()
+        .unwrap_or_default()
 }
 
 /// Whether a URL names somewhere only this machine can reach.
@@ -342,15 +392,7 @@ async fn a_whole_diagnosis_reaches_nowhere_the_operator_was_not_told_about() {
 /// The stack's own services are reached by container name on Compose's network or by
 /// a loopback port, and neither is a request that leaves.
 fn stays_here(url: &str) -> bool {
-    let host = url
-        .split_once("://")
-        .map_or(url, |(_, rest)| rest)
-        .split('/')
-        .next()
-        .unwrap_or_default()
-        .split(':')
-        .next()
-        .unwrap_or_default();
+    let host = host(url);
     host == "localhost" || !host.contains('.') || host.starts_with("127.")
 }
 
@@ -452,7 +494,7 @@ const INSTALLED: &str = r#"{
 async fn what_a_plugin_brings_is_in_the_account_and_says_it_is_the_plugins() {
     let report = listed(beside("plugin", INSTALLED)).await;
 
-    let theirs: Vec<(&str, &str)> = report
+    let services: Vec<&str> = report
         .theirs
         .iter()
         .filter(|one| {
@@ -461,11 +503,15 @@ async fn what_a_plugin_brings_is_in_the_account_and_says_it_is_the_plugins() {
                     named: "comics".to_owned(),
                 }
         })
-        .map(|one| (one.service.as_str(), one.destination.as_str()))
+        .map(|one| one.service.as_str())
         .collect();
-    assert_eq!(theirs.len(), 2, "{:?}", report.theirs);
-    assert!(theirs.iter().any(|(service, _)| *service == "komga"));
-    assert!(theirs.contains(&("comics", "metadata.example")));
+    assert_eq!(services, vec!["komga"], "{:?}", report.theirs);
+    let sent: Vec<(&str, &str)> = report
+        .on_behalf
+        .iter()
+        .map(|one| (one.plugin.as_str(), one.destination.as_str()))
+        .collect();
+    assert_eq!(sent, vec![("comics", "metadata.example")]);
 }
 
 /// A register that is there and will not read refuses the account rather than being

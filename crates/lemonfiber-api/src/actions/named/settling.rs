@@ -8,7 +8,7 @@
 
 use lemonfiber_core::app::{Command, Setting, Settling};
 
-use super::{Arguments, Refused};
+use super::{filled, Arguments, Refused};
 
 /// Every act on what the stack is set to.
 const ABOUT: [&str; 3] = ["config-set", "settings-set", "settings-clear"];
@@ -47,10 +47,8 @@ pub(super) fn asked_for(action: &str, given: Arguments) -> Result<Command, Refus
             Setting::to(&key, &value).agreed(confirm).waiting(wait),
         ));
     }
-    let setting = setting
-        .filter(|named| !named.trim().is_empty())
-        .ok_or_else(|| needs("setting"))?;
-    let agreement = offer.filter(|named| !named.trim().is_empty());
+    let setting = filled(setting).ok_or_else(|| needs("setting"))?;
+    let agreement = filled(offer);
     let settling = if action == "settings-set" {
         Settling::Set {
             setting,
