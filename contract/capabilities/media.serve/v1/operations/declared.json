@@ -145,6 +145,25 @@
                     }
                   ]
                 },
+                "LivePath": {
+                  "additionalProperties": false,
+                  "description": "A path the upstream serves a live stream's bytes under, its playlists and segments\nincluded.",
+                  "properties": {
+                    "pattern": {
+                      "description": "The paths it covers, holding one group named `stream` where the live stream's id\nsits, every match starting at the path's start.",
+                      "type": "string"
+                    },
+                    "stream": {
+                      "description": "The shape a live stream's id has, matched against what the group holds.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "pattern",
+                    "stream"
+                  ],
+                  "type": "object"
+                },
                 "Locations": {
                   "additionalProperties": false,
                   "description": "Where an item is found, each a template naming the household address as `{base}` and\nthe item as `{item}`.",
@@ -396,6 +415,14 @@
                   "description": "Where it serves an item's bytes, the first that covers a path deciding it.",
                   "items": {
                     "$ref": "#/$defs/BytePath"
+                  },
+                  "type": "array"
+                },
+                "live": {
+                  "default": [],
+                  "description": "Where it serves a live stream's bytes, which a pass is asked about rather than the\nmedia server; none where it serves no live stream.",
+                  "items": {
+                    "$ref": "#/$defs/LivePath"
                   },
                   "type": "array"
                 },

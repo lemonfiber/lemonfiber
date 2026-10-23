@@ -99,6 +99,7 @@ pub mod origin;
 pub mod outbound;
 pub mod outward;
 pub mod overlay;
+pub mod pass;
 pub(crate) mod patience;
 pub mod platform;
 pub use crate::error::plural;

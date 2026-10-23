@@ -11,8 +11,8 @@
 
 use crate::ports::http::Method;
 use crate::ports::service::{
-    Addressee, Answers, BytePath, Declared, Held, Locations, Naming, Picture, Ports, Presentation,
-    Question, Statuses, Token, BASE, ITEM, TOKEN,
+    Addressee, Answers, BytePath, Declared, Held, LivePath, Locations, Naming, Picture, Ports,
+    Presentation, Question, Statuses, Token, BASE, ITEM, TOKEN,
 };
 use crate::screening::door::GUARDED;
 
@@ -144,6 +144,10 @@ pub(crate) fn declared() -> Declared {
                 refusing(),
             ),
         ],
+        live: vec![LivePath {
+            pattern: "^/LiveTv/LiveStreamFiles/(?P<stream>[^/]+)/stream\\.".to_owned(),
+            stream: "^[0-9A-Za-z]{1,64}$".to_owned(),
+        }],
         refused: vec![
             format!("{PREFIXED}/{BY_NAME}/[^/]+/Images(?:/|$)"),
             format!("{PREFIXED}/Branding/Splashscreen/?$"),

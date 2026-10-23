@@ -11,8 +11,8 @@ use regex_syntax::hir::Look;
 
 use super::joined::joined;
 use super::{
-    Answers, BytePath, Declared, Held, Locations, Presentation, Question, Statuses, Token, BASE,
-    ITEM, TOKEN,
+    Answers, BytePath, Declared, Held, LivePath, Locations, Presentation, Question, Statuses,
+    Token, BASE, ITEM, TOKEN,
 };
 
 /// The longest pattern a declaration may hold, in bytes.
@@ -26,6 +26,9 @@ const NAME_MOST: usize = 64;
 
 /// The group a byte path names its item with.
 const ITEM_NAME: &str = "item";
+
+/// The group a live-stream path names its live stream with.
+pub const STREAM_NAME: &str = "stream";
 
 /// The statuses an answer can be.
 const STATUS: std::ops::RangeInclusive<u16> = 100..=599;
@@ -58,6 +61,12 @@ pub enum Undeclarable {
     #[error("its byte path {pattern} does not hold exactly one group named item")]
     Unplaced {
         /// The byte path's pattern.
+        pattern: String,
+    },
+    /// A live-stream path does not say where the live stream's id sits.
+    #[error("its live-stream path {pattern} does not hold exactly one group named stream")]
+    Unstreamed {
+        /// The live-stream path's pattern.
         pattern: String,
     },
     /// A pattern does not compile, is too large, or is not anchored where the guard
@@ -119,6 +128,9 @@ impl Declared {
         }
         for pattern in &self.refused {
             path_pattern(pattern)?;
+        }
+        for path in &self.live {
+            live_path(path)?;
         }
         match (&self.question, self.bytes.first()) {
             (None, Some(path)) => {
@@ -204,6 +216,22 @@ fn byte_path(path: &BytePath) -> Result<(), Undeclarable> {
         }
     }
     Ok(())
+}
+
+/// Whether a live-stream path says once where its live stream sits, and is anchored
+/// throughout.
+fn live_path(path: &LivePath) -> Result<(), Undeclarable> {
+    let engine = path_pattern(&path.pattern)?;
+    let streams = engine
+        .capture_names()
+        .filter(|name| *name == Some(STREAM_NAME))
+        .count();
+    if streams != 1 {
+        return Err(Undeclarable::Unstreamed {
+            pattern: path.pattern.clone(),
+        });
+    }
+    shape(&path.stream)
 }
 
 /// Whether `name` is a plain parameter name.

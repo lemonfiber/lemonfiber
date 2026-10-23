@@ -20,7 +20,7 @@ use crate::http::Method;
 mod checked;
 mod joined;
 
-pub use checked::Undeclarable;
+pub use checked::{Undeclarable, STREAM_NAME};
 pub use joined::joined;
 
 /// What a location template's host is.
@@ -50,6 +50,20 @@ pub struct BytePath {
     /// in the path, each matched without regard to case, and a parameter on the path
     /// whose name holds anything but ASCII letters, digits, `_`, `-` and `.` refused.
     pub naming: Vec<Naming>,
+}
+
+/// A path the upstream serves a live stream's bytes under, its playlists and segments
+/// included.
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub struct LivePath {
+    /// The paths it covers, holding one group named `stream` where the live stream's id
+    /// sits, every match starting at the path's start.
+    pub pattern: String,
+    /// The shape a live stream's id has, matched against what the group holds.
+    pub stream: String,
 }
 
 /// A query parameter naming another item than the one in the path.
@@ -221,6 +235,10 @@ pub struct Ports {
 pub struct Declared {
     /// Where it serves an item's bytes, the first that covers a path deciding it.
     pub bytes: Vec<BytePath>,
+    /// Where it serves a live stream's bytes, which a pass is asked about rather than the
+    /// media server; none where it serves no live stream.
+    #[serde(default)]
+    pub live: Vec<LivePath>,
     /// Paths refused without asking anything, because no question about an item covers
     /// them.
     pub refused: Vec<String>,

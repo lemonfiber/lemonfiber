@@ -108,6 +108,11 @@ const LISTENS: &[(&str, &str)] = &[
          ask for at all",
     ),
     (
+        "crates/lemonfiber/src/passing.rs",
+        "the pass service answering the stream guard, in its own container, at the one \
+         address the core gives it on the network it shares with the guard alone",
+    ),
+    (
         "crates/lemonfiber/src/ui/answering.rs",
         "holding open what that policy handed over, which is the other half of the one \
          thing this product serves — each connection bounded in how long its headers may \

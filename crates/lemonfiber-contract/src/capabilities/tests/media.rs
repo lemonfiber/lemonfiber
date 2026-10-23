@@ -6,9 +6,9 @@ use lemonfiber_ports::http::Method;
 use lemonfiber_ports::media::Kind;
 use lemonfiber_ports::service::{
     Addressee, Answers, AppKeys, BytePath, Dated, Declared, Declaring, EpisodeDetail, Failure,
-    Fronted, Held, Holds, HowFar, Image, Item, ItemDetail, ItemProgress, Library, Locations,
-    Medium, Naming, Picture, Playback, Ports, Presentation, Question, Screening, SeasonDetail,
-    SeriesHeld, Statuses, Token, Upkeep,
+    Fronted, Held, Holds, HowFar, Image, Item, ItemDetail, ItemProgress, Library, LivePath,
+    Locations, Medium, Naming, Picture, Playback, Ports, Presentation, Question, Screening,
+    SeasonDetail, SeriesHeld, Statuses, Token, Upkeep,
 };
 
 use super::{crosses_alike, serve, Upstream};
@@ -194,6 +194,10 @@ pub(super) fn declared() -> Declared {
                     },
                 },
             ],
+        }],
+        live: vec![LivePath {
+            pattern: "^/films/live/(?P<stream>[^/]+)/".to_owned(),
+            stream: "^[a-z]{6}$".to_owned(),
         }],
         refused: vec!["^/posters/by-name/.*$".to_owned()],
         question: Some(Question {

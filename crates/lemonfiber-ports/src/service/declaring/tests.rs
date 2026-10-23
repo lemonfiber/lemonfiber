@@ -1,6 +1,6 @@
 use super::{
-    Addressee, Answers, BytePath, Declared, Held, Locations, Naming, Ports, Presentation, Question,
-    Statuses, Token, Undeclarable,
+    Addressee, Answers, BytePath, Declared, Held, LivePath, Locations, Naming, Ports, Presentation,
+    Question, Statuses, Token, Undeclarable,
 };
 use crate::http::Method;
 
@@ -23,6 +23,10 @@ fn declared() -> Declared {
                     },
                 },
             ],
+        }],
+        live: vec![LivePath {
+            pattern: "^/media/live/(?P<stream>[^/]+)/".to_owned(),
+            stream: "^[0-9]+$".to_owned(),
         }],
         refused: vec!["^/everything$".to_owned()],
         question: Some(Question {
@@ -544,4 +548,53 @@ fn a_location_another_url_reader_would_take_elsewhere_or_rewrite_is_refused() {
             "{template:?}"
         );
     }
+}
+
+#[test]
+fn a_live_stream_path_that_does_not_say_where_the_stream_sits_once_is_refused() {
+    for pattern in ["^/media/live/([^/]+)/", "^/media/live/(?P<item>[^/]+)/"] {
+        let mut unplaced = declared();
+        for live in &mut unplaced.live {
+            pattern.clone_into(&mut live.pattern);
+        }
+        assert_eq!(
+            unplaced.checked(),
+            Err(Undeclarable::Unstreamed {
+                pattern: pattern.to_owned()
+            }),
+            "{pattern}"
+        );
+    }
+}
+
+#[test]
+fn a_live_stream_path_or_shape_not_anchored_where_it_is_relied_on_is_refused() {
+    let mut loose = declared();
+    for live in &mut loose.live {
+        "/media/live/(?P<stream>[^/]+)/".clone_into(&mut live.pattern);
+    }
+    let mut partial = declared();
+    for live in &mut partial.live {
+        "[0-9]+".clone_into(&mut live.stream);
+    }
+
+    assert!(matches!(
+        loose.checked(),
+        Err(Undeclarable::Unanchored { .. })
+    ));
+    assert!(matches!(
+        partial.checked(),
+        Err(Undeclarable::Unanchored { .. })
+    ));
+}
+
+#[test]
+fn a_declaration_naming_no_live_stream_reads_as_serving_none() {
+    let mut text = serde_json::to_value(declared()).unwrap_or_default();
+    if let Some(fields) = text.as_object_mut() {
+        fields.remove("live");
+    }
+    let read: Option<Declared> = serde_json::from_value(text).ok();
+
+    assert_eq!(read.map(|one| one.live), Some(Vec::new()));
 }

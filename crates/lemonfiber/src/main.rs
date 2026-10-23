@@ -21,6 +21,7 @@ mod exit;
 mod keyboard;
 mod logs;
 mod pane;
+mod passing;
 mod prompt;
 mod render;
 mod repair;
@@ -49,19 +50,18 @@ use translate::{
 ///
 /// Different answers to the same request, and only one of them can have the
 /// terminal — so which it is has to be settled before either starts.
-async fn read_logs(
-    ctx: &Ctx,
-    forms: &[String],
-    services: &[String],
-    follow: bool,
-    watch: bool,
-    tail: u32,
-    json: bool,
-) -> ExitCode {
+async fn read_logs(ctx: &Ctx, asked: RawLogs, json: bool) -> ExitCode {
+    let RawLogs {
+        services,
+        form,
+        follow,
+        watch,
+        tail,
+    } = asked;
     if watch {
-        terminal::watching(ctx, forms, services, tail).await
+        terminal::watching(ctx, &form, &services, tail).await
     } else {
-        stream(ctx, forms, services, follow, tail, json).await
+        stream(ctx, &form, &services, follow, tail, json).await
     }
 }
 
@@ -217,13 +217,7 @@ async fn main() -> ExitCode {
         // Streaming is not a value that arrives once, so it does not become a
         // command and does not go through dispatch. It still goes through the
         // core, which is the part that matters.
-        Request::Logs(RawLogs {
-            services,
-            form,
-            follow,
-            watch,
-            tail,
-        }) => return read_logs(&ctx, &form, &services, follow, watch, tail, cli.json).await,
+        Request::Logs(asked) => return read_logs(&ctx, asked, cli.json).await,
         // Long-running, and still a value that arrives once: what a guard produces
         // is one report, at the end. So it goes through dispatch like everything
         // that answers, and the waiting is the command's rather than this file's.
@@ -350,6 +344,7 @@ async fn main() -> ExitCode {
         // log viewer it runs its own way instead of through dispatch. It takes the
         // context by value because every request it answers reaches through it.
         Request::Ui(asked) => return serving(ctx, asked).await,
+        Request::Pass { config, listen } => return passing::answering(&config, listen).await,
         // A restore is the one request that is the same command twice: what it
         // would overwrite, and then the overwrite. Both are dispatched, so what
         // an operator is shown before it happens is the command's own answer
