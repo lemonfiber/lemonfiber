@@ -102,7 +102,7 @@ impl Key {
     fn tag(&self, stream: &str, member: &str, lapses: u64) -> hmac::Tag {
         hmac::sign(
             &hmac::Key::new(hmac::HMAC_SHA256, &self.0),
-            &signed(stream, member, lapses),
+            &signed(stream, member.as_bytes(), lapses),
         )
     }
 
@@ -140,9 +140,6 @@ impl Key {
         else {
             return false;
         };
-        let Ok(member) = String::from_utf8(member) else {
-            return false;
-        };
         now < lapses
             && hmac::verify(
                 &hmac::Key::new(hmac::HMAC_SHA256, &self.0),
@@ -154,9 +151,9 @@ impl Key {
 }
 
 /// What a pass's MAC is taken over: each field with its length in front.
-fn signed(stream: &str, member: &str, lapses: u64) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(stream.len() + member.len() + 24);
-    for field in [stream.as_bytes(), member.as_bytes()] {
+fn signed(stream: &str, member: &[u8], lapses: u64) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(stream.len() + member.len() + 3 * size_of::<u64>());
+    for field in [stream.as_bytes(), member] {
         bytes.extend_from_slice(&(field.len() as u64).to_be_bytes());
         bytes.extend_from_slice(field);
     }
