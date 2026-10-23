@@ -43,9 +43,7 @@ pub(crate) async fn readied(ctx: &Ctx, manifest: &Manifest) -> Option<String> {
     if let Err(why) = made(ctx, &directory) {
         return Some(why);
     }
-    store::write(&directory.join(PINNED), &format!("{}\n", pin?))
-        .err()
-        .map(|failure| failure.to_string())
+    kept(&directory.join(PINNED), &format!("{}\n", pin?)).err()
 }
 
 /// The pin of this release's own image, asked of the registry it is published to.
@@ -95,17 +93,20 @@ fn made(ctx: &Ctx, directory: &Path) -> Result<(), String> {
             .and_then(|bytes| <[u8; KEY_BYTES]>::try_from(bytes).ok())
             .map(Key::of)
             .ok_or("no randomness could be drawn for the pass service's key")?;
-        store::write(&configuration.join(File::Key.name()), &key.written())
-            .map_err(|failure| failure.to_string())?;
+        kept(&configuration.join(File::Key.name()), &key.written())?;
     }
     if reading(File::Live).is_none() {
-        store::write(
+        kept(
             &configuration.join(File::Live.name()),
             &Live::of(Vec::new()).written(),
-        )
-        .map_err(|failure| failure.to_string())?;
+        )?;
     }
     Ok(())
+}
+
+/// Write `text` to `path` owner-only, or say why it was not written.
+fn kept(path: &Path, text: &str) -> Result<(), String> {
+    store::write(path, text).map_err(|failure| failure.to_string())
 }
 
 #[cfg(test)]

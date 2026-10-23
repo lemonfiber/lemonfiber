@@ -229,3 +229,47 @@ async fn a_registry_answering_no_digest_leaves_the_pass_service_out_and_says_so(
     assert!(!project.join(PINNED).exists());
     assert_eq!(held(&project, File::Key), None);
 }
+
+/// Put a directory holding a file where `path` is written, so no write lands there.
+fn blocked(path: &Path) {
+    assert!(std::fs::create_dir_all(path.join("held")).is_ok());
+}
+
+#[tokio::test]
+async fn a_pin_that_cannot_be_written_says_why_and_is_asked_again() {
+    let registry = Registered::publishing(DIGEST);
+    let (ctx, project) = machine("pass-unpinnable", &registry, true);
+    blocked(&project.join(PINNED));
+
+    let said = readied(&ctx).await.unwrap_or_default();
+
+    assert!(said.contains(PINNED), "{said}");
+    assert_eq!(super::super::pinned(&ctx), None);
+    assert!(held(&project, File::Key).is_some_and(|text| Key::read(&text).is_ok()));
+}
+
+#[tokio::test]
+async fn a_key_that_cannot_be_written_says_why_and_pins_nothing() {
+    let registry = Registered::publishing(DIGEST);
+    let (ctx, project) = machine("pass-unwritable-key", &registry, true);
+    blocked(&project.join("config").join(SERVICE).join(File::Key.name()));
+
+    let said = readied(&ctx).await.unwrap_or_default();
+
+    assert!(said.contains(File::Key.name()), "{said}");
+    assert!(!project.join(PINNED).exists());
+    assert_eq!(held(&project, File::Live), None);
+}
+
+#[tokio::test]
+async fn live_paths_that_cannot_be_written_say_why_and_pin_nothing() {
+    let registry = Registered::publishing(DIGEST);
+    let (ctx, project) = machine("pass-unwritable-live", &registry, true);
+    blocked(&project.join("config").join(SERVICE).join(File::Live.name()));
+
+    let said = readied(&ctx).await.unwrap_or_default();
+
+    assert!(said.contains(File::Live.name()), "{said}");
+    assert!(!project.join(PINNED).exists());
+    assert!(held(&project, File::Key).is_some_and(|text| Key::read(&text).is_ok()));
+}
