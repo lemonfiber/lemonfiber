@@ -85,9 +85,13 @@ pub(crate) fn every_file(
         .flat_map(|manifest| crate::project::written(manifest, installed))
         .filter(|service| crate::project::names_a_secret(&service.env))
         .filter_map(|service| {
-            resolved
-                .secrets_file(&service.id)
-                .map(|path| (service.id.clone(), path, of_stack_service(service)))
+            resolved.secrets_file(&service.id).map(|path| {
+                (
+                    service.id.clone(),
+                    path,
+                    of_stack_service(service, resolved),
+                )
+            })
         })
         .collect();
     files.extend(resolved.reading(|reading| {
@@ -166,14 +170,14 @@ pub(crate) fn reread_now(ctx: &Ctx, holding: &Holding) -> Result<(), Box<Problem
 
 /// Every variable of a stack service's secrets file, each with where its value is read
 /// from.
-pub(crate) fn of_stack_service(service: &Service) -> Vec<Variable> {
+pub(crate) fn of_stack_service(service: &Service, resolved: &Resolved) -> Vec<Variable> {
     service
         .env
         .iter()
         .filter_map(|(name, value)| match value {
             Value::Secret(secret) => Some(Variable {
                 name: name.clone(),
-                holding: holding(service, &secret.secret),
+                holding: stack_holding(service, &secret.secret, resolved),
             }),
             _ => None,
         })
@@ -181,22 +185,21 @@ pub(crate) fn of_stack_service(service: &Service) -> Vec<Variable> {
 }
 
 /// Where a stack service's secret is read from: the secret store, where the operator
-/// enters it, and otherwise the credential lemonfiber keeps for the service it is of,
-/// under the stack's own name for it, read where it is held and never copied.
-fn holding(service: &Service, id: &str) -> Holding {
+/// enters it; the credential lemonfiber keeps for the service itself, under the stack's
+/// own name for it; and a credential that crosses from another service, where its holder
+/// keeps it, read there each time and never copied.
+pub(crate) fn stack_holding(service: &Service, id: &str, resolved: &Resolved) -> Holding {
     let named = crate::settings::named(&service.id, id);
     if crate::settings::legacy::named(&named).is_some_and(|row| row.secret) {
         return Holding::Store(named);
     }
-    let of = service
-        .secret
-        .iter()
-        .find(|secret| secret.id == id)
-        .map_or(service.id.as_str(), |secret| secret.of.as_str());
-    Holding::Crossing(crate::config::for_service(
-        of,
-        crate::config::API_KEY_SUFFIX,
-    ))
+    match service.secret.iter().find(|secret| secret.id == id) {
+        Some(secret) if secret.of != service.id => resolved.crossing_into(&service.id, &secret.of),
+        _ => Holding::Crossing(crate::config::for_service(
+            &service.id,
+            crate::config::API_KEY_SUFFIX,
+        )),
+    }
 }
 
 pub(crate) fn forgotten(ctx: &Ctx, plugin: &Installed) {

@@ -81,7 +81,9 @@ pub use claimed::{
     Digested, Evidence, FailingAsDeclared, Ran, Unreadable, Verdict,
 };
 pub use conforming::{conformed, Conformed, Judged};
-pub(crate) use container::{holding, is_a_plugins, secrets_file, unit, user_of, variables};
+pub(crate) use container::{
+    holding, is_a_plugins, own_secret, secrets_file, services_of, unit, user_of, variables,
+};
 pub use container::{profile, Holding, Reading, Variable};
 pub use declared::{Declaration, Secret};
 pub use fronting::{proxied as fronting_proxied, taken as label_taken, PROXY};

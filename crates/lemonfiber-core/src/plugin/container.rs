@@ -147,16 +147,39 @@ pub(crate) fn variables(
         .collect()
 }
 
-/// Where the plugin's secret `id` is read from: its holder where it is a credential that
-/// crosses, the secret store otherwise.
+/// Where the plugin's secret `id` is read from: the secret store where it is the plugin's
+/// own, and its holder where it is a credential that crosses, withheld where nothing may
+/// hand it over.
 pub(crate) fn holding(installed: &Installed, id: &str, reading: &Reading<'_>) -> Holding {
-    installed
+    match installed
         .declared
         .secrets
         .iter()
         .find(|secret| secret.id == id)
-        .and_then(|secret| (reading.crossing)(&installed.plugin, &secret.of))
-        .unwrap_or_else(|| Holding::Store(crate::settings::named(&installed.plugin, id)))
+    {
+        Some(secret) if !own_secret(&installed.plugin, services_of(installed), &secret.of) => {
+            (reading.crossing)(&installed.plugin, &secret.of).unwrap_or(Holding::Withheld)
+        }
+        _ => Holding::Store(crate::settings::named(&installed.plugin, id)),
+    }
+}
+
+/// Whether a secret whose `of` is `of` is the plugin `plugin`'s own: of the plugin or one
+/// of its `services`, rather than a credential that crosses to it.
+pub(crate) fn own_secret<'a>(
+    plugin: &str,
+    mut services: impl Iterator<Item = &'a str>,
+    of: &str,
+) -> bool {
+    plugin == of || services.any(|service| service == of)
+}
+
+/// The ids of an installed plugin's services.
+pub(crate) fn services_of(installed: &Installed) -> impl Iterator<Item = &str> {
+    installed
+        .services
+        .iter()
+        .map(|placed| placed.service.as_str())
 }
 
 /// Each further mount the model allows: a source inside its own mount tree and inside no

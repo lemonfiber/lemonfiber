@@ -47,17 +47,21 @@ of  = "komga"
 why = "Signs the library in"
 "#;
 
-fn installed() -> Vec<Installed> {
-    Manifest::from_toml(SECRET)
+fn installed(text: &str) -> Vec<Installed> {
+    Manifest::from_toml(text)
         .iter()
         .map(Installed::of)
         .collect()
 }
 
 fn machine(name: &str, value: Option<&str>) -> Ctx {
+    machine_declaring(name, value, SECRET)
+}
+
+fn machine_declaring(name: &str, value: Option<&str>, text: &str) -> Ctx {
     let env = env_without_password(&format!("filing-{name}"));
     let mut register = Register::empty();
-    let installing = installed();
+    let installing = installed(text);
     assert_eq!(installing.len(), 1);
     for one in installing {
         assert!(register.record(one).is_ok());
@@ -148,6 +152,15 @@ fn a_plugins_secret_in_the_environment_file_is_filed_once_and_journalled() {
     );
     super::super::filing::filed(&ctx);
     assert_eq!(journal(&ctx).len(), 1, "a second run files nothing");
+}
+
+#[test]
+fn a_captured_crossing_key_is_never_filed_into_the_secret_store() {
+    let crossing = SECRET.replace("of  = \"komga\"", "of  = \"sonarr\"");
+    let ctx = machine_declaring("crossing", Some("sonarrs-key"), &crossing);
+    super::super::filing::filed(&ctx);
+    assert_eq!(held(&ctx), None);
+    assert!(journal(&ctx).is_empty());
 }
 
 #[test]

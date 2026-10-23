@@ -21,7 +21,7 @@ pub(super) fn report(
     let resolved = Resolved::of(ctx, Some(manifest), installed);
     SettingsReport {
         settings: settings(&Recorded::of(ctx), &readers),
-        secrets: secrets(ctx, &readers, installed, &resolved),
+        secrets: secrets(ctx, &readers, Some(manifest), installed, &resolved),
         unvetted: change.as_ref().and(crate::overlay::unvetted(ctx)),
         change,
         rehearsed: ctx.dry_run,
@@ -46,6 +46,7 @@ fn settings(recorded: &Recorded, readers: &Readers) -> Vec<SettingRead> {
 pub(super) fn secrets(
     ctx: &Ctx,
     readers: &Readers,
+    manifest: Option<&Manifest>,
     installed: &[Installed],
     resolved: &Resolved,
 ) -> Vec<SecretRead> {
@@ -56,7 +57,7 @@ pub(super) fn secrets(
         .secrets
         .iter()
         .map(|(name, reading)| {
-            let (from, held) = match holding(name, installed, resolved) {
+            let (from, held) = match holding(name, manifest, installed, resolved) {
                 Holding::Store(name) => (
                     kept.source(&name).map(|source| match source {
                         Source::Operator => SecretFrom::Operator,
@@ -81,11 +82,22 @@ pub(super) fn secrets(
         .collect()
 }
 
-fn holding(name: &str, installed: &[Installed], resolved: &Resolved) -> Holding {
+fn holding(
+    name: &str,
+    manifest: Option<&Manifest>,
+    installed: &[Installed],
+    resolved: &Resolved,
+) -> Holding {
     name.split_once(NAMESPACED)
         .and_then(|(namespace, id)| {
-            let one = installed.iter().find(|one| one.plugin == namespace)?;
-            Some(resolved.reading(|reading| crate::plugin::holding(one, id, reading)))
+            if let Some(one) = installed.iter().find(|one| one.plugin == namespace) {
+                return Some(resolved.reading(|reading| crate::plugin::holding(one, id, reading)));
+            }
+            let service = manifest?
+                .services
+                .iter()
+                .find(|service| service.id == namespace)?;
+            Some(super::files::stack_holding(service, id, resolved))
         })
         .unwrap_or_else(|| Holding::Store(name.to_owned()))
 }

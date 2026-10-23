@@ -82,16 +82,23 @@ impl Resolved {
         let owner = fillers
             .service(of)
             .filter(|owner| owner.brought_by() != Some(plugin))?;
-        let crossed = fillers
+        let recipient = fillers
             .services()
-            .find(|one| one.brought_by() == Some(plugin))
-            .is_some_and(|recipient| crosses(owner.holder(), recipient.holder()));
-        Some(
-            fillers
-                .setting(owner, crate::config::API_KEY_SUFFIX)
-                .filter(|_| crossed)
-                .map_or(Holding::Withheld, Holding::Crossing),
-        )
+            .find(|one| one.brought_by() == Some(plugin));
+        Some(crossed(fillers, owner, recipient))
+    }
+
+    /// Where the stack's service `recipient` reads the credential of the service `of`:
+    /// where that is held, under its holder's name for it, or withheld where nothing may
+    /// hand it over or nothing here holds it.
+    pub(crate) fn crossing_into(&self, recipient: &str, of: &str) -> Holding {
+        self.fillers
+            .as_ref()
+            .and_then(|fillers| {
+                let owner = fillers.service(of)?;
+                Some(crossed(fillers, owner, fillers.service(recipient)))
+            })
+            .unwrap_or(Holding::Withheld)
     }
 
     pub(crate) fn reading<T>(&self, write: impl FnOnce(&Reading<'_>) -> T) -> T {
@@ -122,6 +129,19 @@ impl Resolved {
             operator: &operator,
         })
     }
+}
+
+/// Where `recipient` reads `owner`'s credential: under its holder's name for it where the
+/// credential may cross to `recipient`, and withheld otherwise.
+fn crossed(
+    fillers: &Fillers,
+    owner: &crate::wiring::Filler,
+    recipient: Option<&crate::wiring::Filler>,
+) -> Holding {
+    fillers
+        .setting(owner, crate::config::API_KEY_SUFFIX)
+        .filter(|_| recipient.is_some_and(|recipient| crosses(owner.holder(), recipient.holder())))
+        .map_or(Holding::Withheld, Holding::Crossing)
 }
 
 /// The variables of the operator's environment file the project is written with: none of

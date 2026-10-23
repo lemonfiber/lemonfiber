@@ -96,7 +96,13 @@ pub(crate) async fn reset_curator(
 ) -> Rotation {
     let name = format!("{} API key", target.name);
     let setting = published_as(&target.id);
-    reset(ctx, &name, &setting, services, fillers, project, target).await
+    let mut rotation = reset(ctx, &name, &setting, services, fillers, project, target).await;
+    if matches!(rotation.settled, Settled::Replaced { .. }) {
+        rotation
+            .consumers
+            .extend(crate::settings::run::crossed(ctx, &setting).await);
+    }
+    rotation
 }
 
 /// The reset itself, recorded as `setting` and reported as `name`.

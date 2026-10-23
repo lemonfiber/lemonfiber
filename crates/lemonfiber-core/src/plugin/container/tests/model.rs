@@ -420,3 +420,36 @@ fn a_secret_is_read_from_the_store_unless_its_holder_lets_it_cross() {
         }]
     );
 }
+
+#[test]
+fn a_crossing_secret_whose_holder_nothing_here_names_is_withheld_and_an_own_one_is_stored() {
+    let placed = naming_a_secret();
+    let declaring = |of: &str| {
+        let one = installed(vec![naming_a_secret()]);
+        Installed {
+            declared: crate::plugin::Declaration {
+                secrets: vec![crate::plugin::Secret {
+                    id: "key".to_owned(),
+                    of: of.to_owned(),
+                    why: "reads it".to_owned(),
+                }],
+                ..crate::plugin::Declaration::default()
+            },
+            ..one
+        }
+    };
+    let reading = Secrets::bare();
+    let held = |of: &str| {
+        variables(&declaring(of), &placed, &reading)
+            .into_iter()
+            .map(|variable| variable.holding)
+            .collect::<Vec<_>>()
+    };
+
+    assert_eq!(held("sonarr"), [Holding::Withheld]);
+    assert_eq!(
+        held(&placed.service),
+        [Holding::Store("komga:key".to_owned())]
+    );
+    assert_eq!(held("komga"), [Holding::Store("komga:key".to_owned())]);
+}

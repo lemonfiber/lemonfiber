@@ -536,6 +536,34 @@ async fn a_landed_reset_is_no_longer_owed() {
     }
 }
 
+/// The curator's replaced key reaches every secrets file that reads it, as a rotation's
+/// does, so no reader is left holding the key that was taken back.
+#[tokio::test]
+async fn a_curator_key_taken_back_reaches_every_file_that_reads_it() {
+    let http = household(&curator_gated(), 200, keys(false), media::taken(), 201);
+    let (ctx, project) = taking("propagated", &http, false);
+    let env = ctx.settings.env_file.clone().unwrap_or_default();
+    let mut register = crate::plugin::Register::empty();
+    assert!(register
+        .record(crate::test_support::a_trusted_crossing_reader())
+        .is_ok());
+    assert!(std::fs::write(
+        env.with_file_name(crate::config::paths::PLUGINS),
+        serde_json::to_string(&register).unwrap_or_default()
+    )
+    .is_ok());
+    let file = env.with_file_name("env").join("reader.env");
+    let _ = std::fs::create_dir_all(env.with_file_name("env"));
+    let _ = std::fs::write(&file, "SONARR_KEY=old-sonarr-key\n");
+
+    let _ = taken(&ctx, &gated(), &project, owing()).await;
+
+    assert_eq!(
+        std::fs::read_to_string(&file).ok().as_deref(),
+        Some("SONARR_KEY=new-sonarr-key\n")
+    );
+}
+
 #[tokio::test]
 async fn an_owed_key_of_a_curator_the_stack_no_longer_runs_is_forgotten() {
     let http = household(&curator_gated(), 200, keys(false), media::taken(), 201);
