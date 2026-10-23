@@ -31,6 +31,9 @@ pub struct Secret {
     /// Whether lemonfiber made the value at install.
     #[serde(default, skip_serializing_if = "core::ops::Not::not")]
     pub minted: bool,
+    /// The capability of the plugin's own that a credential crossing to it is needed to fill.
+    #[serde(default, rename = "for", skip_serializing_if = "Option::is_none")]
+    pub serves: Option<String>,
 }
 
 /// What a plugin declared about itself, as its install read it.
@@ -111,6 +114,7 @@ impl Declaration {
                     of: secret.of.clone(),
                     why: secret.why.clone(),
                     minted: secret.minted,
+                    serves: secret.serves.clone(),
                 })
                 .collect(),
         }

@@ -9,6 +9,7 @@ const NONE: BTreeMap<String, Value> = BTreeMap::new();
 
 static DECLARED: std::sync::LazyLock<[Secret; 1]> = std::sync::LazyLock::new(|| {
     [Secret {
+        serves: None,
         id: "admin-key".to_owned(),
         of: "jellyfin".to_owned(),
         why: "Mint keys for the stack's services".to_owned(),

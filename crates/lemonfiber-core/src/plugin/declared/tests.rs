@@ -87,6 +87,7 @@ fn what_a_plugin_declared_is_kept_as_it_declared_it() {
             }],
             reaches: vec!["metadata.example.org".to_owned()],
             secrets: vec![Secret {
+                serves: None,
                 id: "api-key".to_owned(),
                 of: "komga".to_owned(),
                 why: "Read the library counts".to_owned(),

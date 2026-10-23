@@ -19,6 +19,7 @@ pub(crate) fn a_crossing_reader() -> crate::plugin::Installed {
     reader.manifest = super::CONTRACTED_MANIFEST.to_owned();
     reader.tree = super::A_TREE.to_owned();
     reader.declared.secrets = vec![crate::plugin::Secret {
+        serves: None,
         id: "sonarr-key".to_owned(),
         of: "sonarr".to_owned(),
         why: "Asks the series service".to_owned(),
