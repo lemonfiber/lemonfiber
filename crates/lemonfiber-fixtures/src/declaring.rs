@@ -3,8 +3,8 @@
 use async_trait::async_trait;
 use lemonfiber_ports::http::Method;
 use lemonfiber_ports::service::{
-    Addressee, Answers, BytePath, Declared, Declaring, Failure, Held, Locations, Naming, Ports,
-    Presentation, Question, Statuses, Token,
+    Addressee, Answers, BytePath, Declared, Declaring, Failure, Held, LivePath, Locations, Naming,
+    Ports, Presentation, Question, Statuses, Token,
 };
 
 /// The name a server that will not answer is reported under.
@@ -49,6 +49,10 @@ pub fn enforceable() -> Declared {
                 parameter: "other".to_owned(),
                 held: Held::Refused,
             }],
+        }],
+        live: vec![LivePath {
+            pattern: "^/media/live/(?P<stream>[^/]+)/".to_owned(),
+            stream: "^[0-9a-f]{32}$".to_owned(),
         }],
         refused: Vec::new(),
         question: Some(Question {

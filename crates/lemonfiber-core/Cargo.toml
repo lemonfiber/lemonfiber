@@ -22,6 +22,7 @@ lemonfiber-plugin = { workspace = true }
 lemonfiber-ports = { workspace = true }
 lemonfiber-sidecar = { workspace = true }
 argon2 = { workspace = true }
+regex = { workspace = true }
 ring = { workspace = true }
 x509-parser = { workspace = true }
 ciborium-ll = { workspace = true }
@@ -66,7 +67,6 @@ tokio = { workspace = true, features = ["net", "rt-multi-thread", "test-util"] }
 # reader keeps each claim as the TOML table it found.
 toml = { workspace = true }
 # The door's cases, judged by a guard matching the media server's declared patterns.
-regex = { workspace = true }
 
 [lints]
 workspace = true

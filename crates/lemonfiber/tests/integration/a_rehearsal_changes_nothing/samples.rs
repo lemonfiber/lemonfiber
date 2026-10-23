@@ -12,10 +12,12 @@ use lemonfiber_core::doctor::Narrowing;
 
 /// The subcommands that never become a [`Command`], and why.
 ///
-/// Named rather than filtered by shape, so that adding a fourth means saying what it
-/// is. Following a log is a stream rather than an answer; and the terminal is a
-/// program that then issues commands of its own, each of which arrives here under
-/// its own name. `help` is clap's, not lemonfiber's, and answers nothing.
+/// Named rather than filtered by shape, so that adding a fifth means saying what it
+/// is. Following a log is a stream rather than an answer; the terminal is a program
+/// that then issues commands of its own, each of which arrives here under its own
+/// name; and the pass service answers the stream guard inside its own container for
+/// as long as it runs, reading only the files it is mounted. `help` is clap's, not
+/// lemonfiber's, and answers nothing.
 ///
 /// `plugin` was on this list while every word under it was a generated document
 /// answering the same on every machine. Two of them are not: one settles what
@@ -23,7 +25,7 @@ use lemonfiber_core::doctor::Narrowing;
 /// that back. So the word is dispatched now and is driven below, which is what makes
 /// the sentence this list is for — *reading one asks nothing of this machine* — stop
 /// covering a word that writes.
-pub(super) const NOT_DISPATCHED: [&str; 3] = ["logs", "ui", "help"];
+pub(super) const NOT_DISPATCHED: [&str; 4] = ["logs", "ui", "pass", "help"];
 
 /// What a rehearsal of each subcommand is driven with.
 ///

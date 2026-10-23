@@ -33,10 +33,10 @@
 //!
 //! **Completeness.** The list below is held against clap's own subcommands, so a new
 //! command that nobody decided a rehearsal for fails here as well as failing to
-//! compile in `app::rehearsal`. Two subcommands are named as not going through the
+//! compile in `app::rehearsal`. Three subcommands are named as not going through the
 //! dispatcher at all, which is a fact about them rather than an exemption: streaming
-//! logs and the terminal are not values that arrive once. `help` is clap's, not
-//! lemonfiber's, and answers nothing.
+//! logs, the terminal and the pass service are not values that arrive once. `help` is
+//! clap's, not lemonfiber's, and answers nothing.
 
 use samples::{beyond_the_command_line, samples, NOT_DISPATCHED};
 use std::collections::{BTreeMap, BTreeSet};

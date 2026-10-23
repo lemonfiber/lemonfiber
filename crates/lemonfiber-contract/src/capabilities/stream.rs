@@ -6,8 +6,8 @@
 
 use lemonfiber_ports::http::Method;
 use lemonfiber_ports::service::{
-    Addressee, Answers, BytePath, Declared, Guarded, Guarding, Held, Locations, Naming, Ports,
-    Presentation, Presented, Question, Statuses, Token,
+    Addressee, Answers, BytePath, Declared, Guarded, Guarding, Held, LivePath, Locations, Naming,
+    Ports, Presentation, Presented, Question, Statuses, Token,
 };
 
 use super::PROXY;
@@ -43,6 +43,10 @@ fn declared() -> Declared {
                     },
                 },
             ],
+        }],
+        live: vec![LivePath {
+            pattern: "^/live/(?P<stream>[^/]+)/".to_owned(),
+            stream: HEX.to_owned(),
         }],
         refused: vec!["^/everything/picture$".to_owned()],
         question: Some(Question {

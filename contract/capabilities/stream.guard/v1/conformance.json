@@ -41,6 +41,12 @@
                 "pattern": "^/items/(?P<item>[^/]+)/bytes$"
               }
             ],
+            "live": [
+              {
+                "pattern": "^/live/(?P<stream>[^/]+)/",
+                "stream": "^[0-9a-f]{32}$"
+              }
+            ],
             "locations": {
               "backdrop": "{base}/items/{item}/backdrop",
               "poster": "{base}/items/{item}/poster",

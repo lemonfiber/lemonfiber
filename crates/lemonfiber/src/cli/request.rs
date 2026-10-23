@@ -496,6 +496,20 @@ pub enum Request {
     /// machine only unless `--lan` says otherwise and serves plain text unless `--tls`
     /// does, which it says when it starts, with the address and this run's token.
     Ui(RawUi),
+    /// Confirm live-stream passes for the stream guard, for as long as it runs.
+    ///
+    /// Run by the stack as a service of its own, holding the pass key read-only, and
+    /// never by hand.
+    #[command(hide = true)]
+    Pass {
+        /// The directory holding the pass key and the media server's live-stream paths.
+        #[arg(long, value_name = "PATH", default_value = "/config")]
+        config: PathBuf,
+        /// The address to answer at: the service's own on the network it shares with the
+        /// guard.
+        #[arg(long, value_name = "ADDRESS")]
+        listen: std::net::SocketAddr,
+    },
     /// Pair a phone with this stack, or replace the certificate a paired phone pins.
     Companion(RawCompanion),
     /// Mint, list or revoke the keys another program reaches the web interface with.

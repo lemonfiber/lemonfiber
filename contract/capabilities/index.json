@@ -698,7 +698,7 @@
         },
         {
           "path": "media.serve/v1/operations/declared.json",
-          "sha256": "0f58e284e7c9967adf6be335004c1185590c9b0df369334188baf9daa7a2dd2b"
+          "sha256": "c17023736c15951d9a7e930cc13604873acc42ac502ccf04ba726d805edb7747"
         },
         {
           "path": "media.serve/v1/conformance.json",
@@ -833,11 +833,11 @@
         },
         {
           "path": "stream.guard/v1/operations/guard.json",
-          "sha256": "781632cc4cdaad6d0794b981ce4270a6d577ffd1758628a40a4f112d00aaff1d"
+          "sha256": "2572072d6abfbcbd120f1c0e4d573797004a4d23edf17cd5042214f28e48d955"
         },
         {
           "path": "stream.guard/v1/operations/guarding.json",
-          "sha256": "e0719171d34cacb6065afa2105fe3d1bf84577626563e0486df91d1bcb385e12"
+          "sha256": "812d5cd1c1366498b332bd79fc5dabaae991230982d2dbd8f3ed6d55b361b1ca"
         },
         {
           "path": "stream.guard/v1/operations/certificate.json",
@@ -845,7 +845,7 @@
         },
         {
           "path": "stream.guard/v1/conformance.json",
-          "sha256": "88ea6de580d65bc81e0c34eeea21075ddc52b09753bbb69e395c16161f76a7e8"
+          "sha256": "87f0958ad7d8333d994ec998bdbed7f4dba736c928a988ac828770688e285e75"
         }
       ],
       "majors": [

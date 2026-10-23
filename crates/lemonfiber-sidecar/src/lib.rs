@@ -12,6 +12,7 @@
 
 pub mod decline;
 pub mod gate;
+pub mod pass;
 
 mod shape;
 mod token;

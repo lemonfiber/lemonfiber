@@ -149,6 +149,7 @@ Options:
 - [`lemonfiber backup`](commands/backup.md)
 - [`lemonfiber support`](commands/support.md)
 - [`lemonfiber ui`](commands/ui.md)
+- [`lemonfiber pass`](commands/pass.md)
 - [`lemonfiber companion`](commands/companion.md)
 - [`lemonfiber key`](commands/key.md)
 - [`lemonfiber restore`](commands/restore.md)
